@@ -1074,6 +1074,14 @@ export class HttpWsTransport implements ErploraTransport {
         `request to ${path} failed: ${safeErr(e)}`,
       );
     }
+    // hub#1682: a `204 No Content` is a SUCCESS with nothing to say — no body, and no
+    // `content-type` either. It reaches here because the runtime hands the SaaS's answer back
+    // untouched (`cloud_body_passthrough`) and the SaaS answers a delete that way. Without this,
+    // the empty body fell through to `res.json()`, blew up, and was reported as
+    // `server_unavailable: invalid JSON body` — the caller was told the hub had not answered
+    // while the template had already been dropped from Meta. There is nothing to unwrap: 204
+    // means «done», by definition of the status and not by convention of any one route.
+    if (res.status === 204) return undefined;
     const ct = res.headers?.get?.('content-type');
     // hub#782: the runtime ALWAYS answers `application/json`, even on a 4xx domain refusal. The
     // proxy answers `text/html`. So a content-type that is PRESENT and is NOT JSON is the signature
@@ -2124,6 +2132,134 @@ export class EventsApi {
   }
 }
 
+/** Where the business's WhatsApp templates live. Every path {@link WhatsappTemplatesApi} can build
+ *  starts here — `crates/server/src/whatsapp_templates.rs` (hub#1610). */
+export const WHATSAPP_TEMPLATES_BASE_PATH = '/api/hub/whatsapp/templates';
+
+/**
+ * A Meta template name, exactly as the runtime defines it
+ * (`whatsapp_templates.rs::template_name_is_safe`, itself the SaaS's `NAME_RE`): lowercase letters,
+ * digits and underscores, up to 512. Checked here for ONE reason — the name is pasted into a path
+ * by {@link WhatsappTemplatesApi.remove}, and `fetch` normalises `..` out of a URL, so a name is
+ * the one value in this surface an attacker could steer a request with. The runtime refuses the
+ * same names and stays the door that counts; this is the half that never builds the URL at all.
+ */
+const TEMPLATE_NAME_PATTERN = /^[a-z0-9_]{1,512}$/;
+
+/**
+ * One template of the business, with the verdict Meta gave it.
+ *
+ * The field names are **the SaaS's**, not this SDK's: the runtime is a passthrough (status and body
+ * come back untouched) and re-shaping them here would be a second place to keep in step with Meta.
+ * `status` and `rejected_reason` travel as CODES for the same reason — the module turns them into a
+ * sentence with its own `en` + `es` strings (ADR-0055), so a `status` translated to prose here is a
+ * status the tab could no longer act on.
+ */
+export interface WhatsappTemplate {
+  name: string;
+  language: string;
+  category?: string;
+  /** Meta's verdict as Meta words it: `PENDING`, `APPROVED`, `REJECTED`, `PAUSED`… */
+  status: string;
+  /** Why Meta rejected it, as a code (`INVALID_FORMAT`). Absent unless `status` is a rejection. */
+  rejected_reason?: string;
+  meta_id?: string;
+  [field: string]: unknown;
+}
+
+/** What `GET /api/hub/whatsapp/templates` answers. */
+export interface WhatsappTemplateList {
+  templates: WhatsappTemplate[];
+  /**
+   * `true` when the SaaS could not reach Meta and is answering with what it had stored, so the tab
+   * can say the verdicts may have moved instead of presenting stale ones as current.
+   */
+  stale: boolean;
+}
+
+/**
+ * The template the business wrote, on its way to Meta.
+ *
+ * Deliberately open: every rule about what Meta accepts — the name, the category, the numbered
+ * placeholders, one example per placeholder — lives in the SaaS, which is the half that knows.
+ * The runtime does not copy them either (it checks only that the body is an object), and a type
+ * that copied them here would refuse templates Meta would have taken and would need updating every
+ * time Meta moves.
+ */
+export interface WhatsappTemplateInput {
+  name: string;
+  language: string;
+  category?: string;
+  [field: string]: unknown;
+}
+
+/**
+ * **The templates the business promises Meta** (hub#1682) — the only way a module reaches them.
+ *
+ * Three methods and no more. It is not a proxy and must not become one: the paths are built from
+ * one fixed prefix, the only value that ever reaches a path is a template name checked against
+ * {@link TEMPLATE_NAME_PATTERN} first, and the method list is pinned by `whatsapp-templates.test.ts`.
+ *
+ * The credential is never here. The shell puts `X-Hub-Session` on the transport and the runtime
+ * swaps it for the hub's machine credential on its way to the SaaS (ADR-0003), which is what keeps
+ * the Meta token out of the browser (ADR-0012).
+ */
+export class WhatsappTemplatesApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /**
+   * `GET /api/hub/whatsapp/templates` — every template of this business with the verdict Meta gave
+   * it, plus {@link WhatsappTemplateList.stale} when the SaaS answered from store because Meta was
+   * unreachable.
+   *
+   * Read when the tab OPENS, never on a timer: the SaaS refreshes against Meta on every call and
+   * that path carries no throttle of its own (hub#1610).
+   */
+  async list(): Promise<WhatsappTemplateList> {
+    return this.send({
+      method: 'GET',
+      path: WHATSAPP_TEMPLATES_BASE_PATH,
+    }) as Promise<WhatsappTemplateList>;
+  }
+
+  /**
+   * `POST /api/hub/whatsapp/templates` — register the template with Meta. `201` when it is new,
+   * `200` when it replaced one in place; **both come back `PENDING`**, because any edit sends a
+   * template back through Meta's review.
+   *
+   * The body travels **verbatim**. A refusal comes back with its status and a `code`
+   * (`invalid_name`, `missing_example`, `meta_rate_limited`…) inside an {@link ErploraError}, and
+   * the module is the one that turns that code into a sentence (ADR-0055).
+   *
+   * The name is NOT checked here, unlike in {@link remove}: it travels in the body, never in a
+   * path, so it cannot steer a request — and the SaaS is the half that knows which names Meta
+   * takes. Checking it here would refuse templates Meta would have accepted.
+   */
+  async register(template: WhatsappTemplateInput): Promise<WhatsappTemplate> {
+    return this.send({
+      method: 'POST',
+      path: WHATSAPP_TEMPLATES_BASE_PATH,
+      body: template,
+    }) as Promise<WhatsappTemplate>;
+  }
+
+  /**
+   * `DELETE /api/hub/whatsapp/templates/{name}` — drop it from Meta and from the SaaS, every
+   * language of it.
+   *
+   * Answers `204`, so this resolves with `undefined`: there is no template left to describe.
+   * **Not reversible in any useful sense** — a template deleted has to be written and approved
+   * again, and Meta's review takes days.
+   */
+  async remove(name: string): Promise<void> {
+    const template = checkedSegment('template name', name, TEMPLATE_NAME_PATTERN);
+    await this.send({
+      method: 'DELETE',
+      path: `${WHATSAPP_TEMPLATES_BASE_PATH}/${template}`,
+    });
+  }
+}
+
 /** Where the hub's print queue lives. Every path {@link PrintApi} can build starts here. */
 export const PRINT_JOBS_BASE_PATH = '/api/print/jobs';
 
@@ -2238,6 +2374,7 @@ export class ErploraClient {
   private flowsApi?: FlowsApi;
   private eventsApi?: EventsApi;
   private printApi?: PrintApi;
+  private whatsappTemplatesApi?: WhatsappTemplatesApi;
 
   constructor(
     private readonly transport: ErploraTransport,
@@ -2370,6 +2507,7 @@ export class ErploraClient {
     scoped.flowsApi = undefined;
     scoped.eventsApi = undefined;
     scoped.printApi = undefined;
+    scoped.whatsappTemplatesApi = undefined;
     return scoped;
   }
 
@@ -2453,6 +2591,43 @@ export class ErploraClient {
    * the runtime checks, plus `printer` declared in the module's `module.json` and granted by the
    * owner in Settings → Permissions.
    */
+  /**
+   * **The templates the business promises Meta** (hub#1682) — list them, register one, drop one.
+   *
+   * A template approved by Meta is the ONLY thing that lets the business write to a customer
+   * outside the 24 h since that customer last wrote: without one there is no appointment reminder,
+   * no «your order is ready» and no confirmation. Until this surface existed the WhatsApp module
+   * could save a template and nothing more — Meta never saw it — and the owner had to leave ERPlora
+   * and write it again in Meta's WhatsApp Manager.
+   *
+   * Module-scoped and gated twice, like every other surface here: an owner/admin session the
+   * runtime checks, plus **`notify`** — «Notificaciones · enviar notificaciones por email, SMS o
+   * WhatsApp» — declared in the module's `module.json` and granted by the owner in
+   * Settings → Permissions. `notify` and not a new capability (ADR-0470): a template approved by
+   * Meta is what makes a WhatsApp notification legal outside those 24 h, so it is the same risk the
+   * owner already weighed. A refusal arrives as `capability_denied`, so the tab can ask for the
+   * grant instead of showing «error».
+   */
+  get whatsappTemplates(): WhatsappTemplatesApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the WhatsApp templates are module-scoped: use `erplora.forModule("<your module id>").whatsappTemplates`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
   /**
    * ⚠️ **Not `print`.** `erplora.print(req)` is a PUBLISHED contract — the shell bolts the print
    * service onto this very instance in `apps/web/src/main.ts` and every module calls it to QUEUE a

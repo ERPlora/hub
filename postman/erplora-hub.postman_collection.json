@@ -2809,7 +2809,7 @@
         {
           "name": "WhatsApp templates — what Meta says about each one",
           "request": {
-            "description": "This hub's templates with the verdict Meta gave each one (`APPROVED`, `PENDING`, `REJECTED` + `rejected_reason`). `stale: true` means the SaaS could not reach Meta and is answering with what it had stored. Read it when the tab opens, never on a timer: every call refreshes against Meta and that path has no throttle.\n\n(auth: admin)",
+            "description": "This hub's templates with the verdict Meta gave each one (`APPROVED`, `PENDING`, `REJECTED` + `rejected_reason`). `stale: true` means the SaaS could not reach Meta and is answering with what it had stored. Read it when the tab opens, never on a timer: every call refreshes against Meta and that path has no throttle. A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).whatsappTemplates`) also needs the `notify` capability declared in its `module.json` and granted by the owner in Settings → Permissions; without it the answer is `403 capability_denied`. The shell names no module and is unaffected.\n\n(auth: admin+capability)",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -2846,7 +2846,7 @@
               },
               "raw": "{\n  \"body\": \"Hola {{1}}, tu mesa ya esta lista.\",\n  \"category\": \"UTILITY\",\n  \"footer\": \"\",\n  \"header\": \"\",\n  \"language\": \"es\",\n  \"name\": \"table_ready\",\n  \"variables\": [\n    \"Ana\"\n  ]\n}"
             },
-            "description": "Registers the template in the business's Meta account. `201` = new to Meta, `200` = edited in place; either way it goes back to `PENDING`, because Meta reviews an edit again. Refusals come back as a code, never as prose: `invalid_name`, `invalid_category`, `invalid_language`, `missing_body`, `invalid_placeholders`, `invalid_header_placeholders`, `missing_example`, `invalid_variables`, `no_whatsapp_number`, `meta_permission_denied`, `meta_rate_limited`, `meta_unreachable`, `meta_template_failed`. `body` numbers its placeholders `{{1}}…{{n}}` without gaps and `variables` carries one example per placeholder.\n\n(auth: admin)",
+            "description": "Registers the template in the business's Meta account. `201` = new to Meta, `200` = edited in place; either way it goes back to `PENDING`, because Meta reviews an edit again. Refusals come back as a code, never as prose: `invalid_name`, `invalid_category`, `invalid_language`, `missing_body`, `invalid_placeholders`, `invalid_header_placeholders`, `missing_example`, `invalid_variables`, `no_whatsapp_number`, `meta_permission_denied`, `meta_rate_limited`, `meta_unreachable`, `meta_template_failed`. `body` numbers its placeholders `{{1}}…{{n}}` without gaps and `variables` carries one example per placeholder. A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).whatsappTemplates`) also needs the `notify` capability declared in its `module.json` and granted by the owner in Settings → Permissions; without it the answer is `403 capability_denied`. The shell names no module and is unaffected.\n\n(auth: admin+capability)",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -2879,7 +2879,7 @@
         {
           "name": "Delete a template from Meta",
           "request": {
-            "description": "Drops the template from Meta and from the SaaS — every language of it, as Meta does. `204` on success; a name this hub does not have is a `404` whether it belongs to another business or to nobody. The name is lowercase letters, digits and underscores: anything else the hub refuses before calling.\n\n(auth: admin)",
+            "description": "Drops the template from Meta and from the SaaS — every language of it, as Meta does. `204` on success; a name this hub does not have is a `404` whether it belongs to another business or to nobody. The name is lowercase letters, digits and underscores: anything else the hub refuses before calling. A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).whatsappTemplates`) also needs the `notify` capability declared in its `module.json` and granted by the owner in Settings → Permissions; without it the answer is `403 capability_denied`. The shell names no module and is unaffected.\n\n(auth: admin+capability)",
             "header": [
               {
                 "key": "X-Hub-Session",
