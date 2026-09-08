@@ -390,7 +390,11 @@ passed=$((passed + 1))
 make_manifest "1.0.0"
 PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-326-g24ccbdc5"
 [ "$status" -ne 0 ] || fail "develop without any v* tag must be REFUSED, not numbered blindly"
-grep -qi "tag" "$tmp_dir/out" || fail "the refusal should point at the missing tags (fetch-depth/tags)"
+# 🔴 No `grep -qi "tag"`: the script's own name («image-tags») satisfies that on ANY error. Without
+# the guard the script still refused, but for the WRONG reason («'..1-dev…' no es semver») and
+# without telling anybody the tags are missing — a mutant that survived in the hub#1674 review.
+grep -q "fetch-depth" "$tmp_dir/out" \
+    || fail "the refusal must point at the missing tags (fetch-depth: 0) — got: $(cat "$tmp_dir/out")"
 passed=$((passed + 1))
 
 # ── Una rama de trabajo se numera igual que develop ───────────────────────────────────
