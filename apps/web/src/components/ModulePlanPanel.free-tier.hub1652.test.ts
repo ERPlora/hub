@@ -197,6 +197,39 @@ describe('ModulePlanPanel — expiring drops you to the free plan, not out (hub#
   });
 });
 
+describe('ModulePlanPanel — the Cloud is unreachable (hub#1652)', () => {
+  it('keeps the free tier as the floor: it is entitled locally, not granted by the answer', async () => {
+    // `loadStatus()` swallows the failure and leaves `sub` null. That is not «no plan»: ADR-0032
+    // entitles the 0 € tier with no purchase at all, so the manifest alone already says the module
+    // runs. What must not happen is the half-and-half the first cut of this shipped — the block in
+    // the grey «no plan» tone with «Active» written inside it.
+    cloudModuleSubscription.mockRejectedValue(new Error('cloud module-subscription → 503'));
+    const w = mount(ModulePlanPanel, {
+      props: { moduleId: 'whatsapp_inbox', billing: WITH_FREE },
+      global: { plugins: [emptyI18n() as Plugin] },
+    });
+    await flushPromises();
+
+    expect(pillTone(w)).toBe('success');
+    expect(pillLabel(w)).toBe('modulePlan.status.active');
+    expect(hint(w)).toBe('modulePlan.hint.free');
+    expect(featuredName(w)).toBe('WhatsApp Free');
+  });
+
+  it('still says «no plan» for a module with no free tier, where nothing is entitled', async () => {
+    cloudModuleSubscription.mockRejectedValue(new Error('cloud module-subscription → 503'));
+    const w = mount(ModulePlanPanel, {
+      props: { moduleId: 'some_module', billing: NO_FREE },
+      global: { plugins: [emptyI18n() as Plugin] },
+    });
+    await flushPromises();
+
+    expect(pillTone(w)).toBe('neutral');
+    expect(pillLabel(w)).toBe('modulePlan.status.none');
+    expect(featuredName(w)).toBeNull();
+  });
+});
+
 describe('ModulePlanPanel — the free-plan sentence is translated, and names the plan', () => {
   for (const [lang, catalogue, sentence] of [
     ['en', en, 'You are on WhatsApp Free'],

@@ -257,7 +257,11 @@ const STATUS_ICON: Record<Tone, string> = {
   danger: 'close-circle-outline',
   neutral: 'pricetag-outline',
 };
-const statusTone = computed<Tone>(() => (sub.value ? STATUS_TONE[displayStatus.value] : 'neutral'));
+// Por `displayStatus` también cuando NO hay respuesta del Cloud: el tono y la palabra tienen que
+// salir del mismo sitio o la pantalla se contradice —bloque gris de «Sin plan» con «Activo» dentro—.
+// Y sin respuesta el gratuito sigue siendo el suelo: ADR-0032 lo da por el manifest, no por lo que
+// conteste el Cloud. Un módulo SIN tier gratuito se queda en `none`, que es su tono neutro de siempre.
+const statusTone = computed<Tone>(() => STATUS_TONE[displayStatus.value]);
 const statusIcon = computed(() => STATUS_ICON[statusTone.value]);
 // El gratuito toma prestada la palabra de `active`: para quien lo lee es el mismo hecho —está
 // dentro y funcionando—, y dos sinónimos para un estado son peor que uno.
