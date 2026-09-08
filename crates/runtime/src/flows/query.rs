@@ -269,7 +269,7 @@ pub(crate) async fn execute_flow_query_page(
     params: &Params,
     limit: i64,
 ) -> Result<QueryPage> {
-    grants::check_query_grant(db, hub_id, flow_id, name).await?;
+    grants::check_query_grant(db, hub_id, flow_id, run_id, name, params).await?;
 
     // The context the read runs under: attributed to the flow, machine-principal (never offered a
     // manager's PIN, hub#361), carrying only the permissions of what this flow was granted.

@@ -24,6 +24,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
+use crate::flows::def;
 use crate::flows::net::{self, Url};
 use crate::host_notify::{Channel, FLOW_GRANT_PREFIX};
 use crate::registry::{new_id, now_rfc3339, Registry};
@@ -164,16 +165,48 @@ impl GrantSpec {
             payload,
         }
     }
+
+    /// A `query` grant that fixes part of its parameters (hub#1662) — «read the appointments **of
+    /// this customer**», not «read the appointments».
+    pub fn pinned_query(query: impl Into<String>, params: Params) -> Self {
+        Self {
+            kind: GrantKind::Query,
+            value: query.into(),
+            payload: params,
+        }
+    }
 }
+
+/// The kinds whose grant is ever handed values to judge, and therefore the only ones a pin can
+/// restrict: a `command`'s payload (hub#1623) and a `query`'s parameters (hub#1662). A pin on any
+/// other kind is refused rather than stored, the rule [`GrantKind::is_available`] applies to the
+/// kinds themselves — never put a restriction on the screen that nothing applies.
+impl GrantKind {
+    pub fn can_pin(self) -> bool {
+        matches!(self, GrantKind::Command | GrantKind::Query)
+    }
+}
+
+/// The roots a pin may reference (hub#1662). The run scope the executor builds is
+/// `{ input, steps }` and nothing else, so these two are all of it.
+///
+/// `secret.…` is absent on purpose and it is not an oversight: a gate that answered «granted» only
+/// when a value equalled a secret would be an **oracle** — a model that can retry has a way to read
+/// the secret one guess at a time. `event.…` is absent because the run scope does not carry it, so
+/// such a pin could only ever deny: a permission that authorises nothing, which is exactly what
+/// this file refuses to store.
+const PIN_ROOTS: [&str; 2] = ["input", "steps"];
 
 /// The live grants of one flow, read once. Everything the gate and the context need comes from
 /// this snapshot, so a step asks the database once and then answers consistently for that step.
 #[derive(Debug, Clone, Default)]
 pub struct Authority {
     granted: HashSet<(GrantKind, String)>,
-    /// hub#1623 — command name → the payload fields its grant fixes. A command absent from here is
-    /// a command whose grant pins nothing; it is NOT «denied», which is what `granted` answers.
-    pins: HashMap<String, Params>,
+    /// hub#1623, widened by hub#1662 — the grant → the values it FIXES. Keyed by the whole pair and
+    /// not by the name, because `command` and `query` are two vocabularies: a read and a write that
+    /// happened to share a name must not be able to inherit each other's restriction. A pair absent
+    /// from here pins nothing; it is NOT «denied», which is what `granted` answers.
+    pins: HashMap<(GrantKind, String), Params>,
 }
 
 impl Authority {
@@ -192,7 +225,23 @@ impl Authority {
     /// the pre-hub#1623 answer — and never a command that is denied. Which is why the enforcement
     /// does not live here but in [`check_command_grant`], the one door the dispatcher goes through.
     pub fn command_pin(&self, command: &str) -> Option<&Params> {
-        self.pins.get(command).filter(|p| !p.is_empty())
+        self.pin(GrantKind::Command, command)
+    }
+
+    /// The parameters this flow's grant for `query` FIXES (hub#1662), or `None` when it pins none.
+    ///
+    /// Same separation as [`Authority::command_pin`], and for the same reason: the pin narrows a
+    /// grant that EXISTS, so a caller that forgets to ask gets the pre-hub#1662 answer — granted and
+    /// unpinned — and never a read that is denied. The enforcement lives in [`check_query_grant`],
+    /// the one door `Runtime::execute_flow_query` and `execute_flow_query_page` both go through.
+    pub fn query_pin(&self, query: &str) -> Option<&Params> {
+        self.pin(GrantKind::Query, query)
+    }
+
+    fn pin(&self, kind: GrantKind, value: &str) -> Option<&Params> {
+        self.pins
+            .get(&(kind, value.to_string()))
+            .filter(|p| !p.is_empty())
     }
 
     /// May this flow run this query RIGHT NOW? Same default-deny, same freshness. A read is not
@@ -515,6 +564,53 @@ fn check_recipient_pattern(registry: &Registry, value: &str) -> Result<()> {
     Ok(())
 }
 
+/// Is this a value a pin may FIX? (hub#1662)
+///
+/// A pin holds a literal or a **reference to this run** — `input.…`, `steps.…`. Everything else is
+/// refused at save rather than stored, the rule this whole function follows: never keep a
+/// restriction nothing can enforce, because on the screen it reads as containment.
+///
+/// - `secret.…` would make the gate an **oracle**: «granted» exactly when a value equals the
+///   secret, and a caller that can retry reads it one guess at a time.
+/// - `event.…` names something the run scope does not carry ([`run_scope`] builds `{input, steps}`),
+///   so it could only ever deny — a permission that authorises nothing.
+/// - `{{…}}` prose is refused because a pin is a VALUE, not a sentence: rendering it would flatten
+///   a number to a string and, worse, an unresolved template renders EMPTY, so the pin would
+///   quietly stop matching anything and the containment would read as working while it denied
+///   everything.
+fn check_pin_value(kind: &GrantKind, name: &str, field: &str, written: &Json) -> Result<()> {
+    let refuse = |why: String| -> Result<()> {
+        Err(RuntimeError::Domain {
+            code: ERR_INVALID_GRANT_PAYLOAD.to_string(),
+            message: format!(
+                "the `{}` grant for `{name}` fixes `{field}` to something it cannot be: {why}",
+                kind.as_str()
+            ),
+        })
+    };
+    let Some(text) = written.as_str() else {
+        return Ok(()); // a number, a bool, a structure: a literal, compared as it stands
+    };
+    if text.contains("{{") {
+        return refuse(
+            "a pin is a value, not text with templates in it; name the path on its own \
+             (`steps.<step>.<field>`) so its type survives"
+                .to_string(),
+        );
+    }
+    if def::is_path(text) && !PIN_ROOTS.contains(&text.split('.').next().unwrap_or_default()) {
+        return refuse(format!(
+            "`{text}` is not something this run carries; a pin may name {} and nothing else",
+            PIN_ROOTS
+                .iter()
+                .map(|r| format!("`{r}.…`"))
+                .collect::<Vec<_>>()
+                .join(" or ")
+        ));
+    }
+    Ok(())
+}
+
 /// Reads the live grants of a flow. One query, and the caller decides what to ask of the result.
 pub async fn authority(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) -> Result<Authority> {
     let mut p = Params::new();
@@ -531,32 +627,34 @@ pub async fn authority(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) ->
         )
         .await?;
     let mut granted = HashSet::new();
-    let mut pins: HashMap<String, Params> = HashMap::new();
+    let mut pins: HashMap<(GrantKind, String), Params> = HashMap::new();
     for r in &res.rows {
         let Some(kind) = GrantKind::parse(r["kind"].as_str().unwrap_or_default()) else {
             continue;
         };
         let value = r["value"].as_str().unwrap_or_default().to_string();
-        // A pin only means something for a command, and only when it parses (hub#1623). What a row
-        // holding garbage in `payload` means is hub#1636: **nothing**. It used to pin nothing and
-        // still be granted, so an unreadable RESTRICTION became a wider AUTHORISATION — the one
-        // direction a permission may never move on its own, and the opposite of the rule the gate
-        // reads by ("the safe reading of a bug on an authorisation path is deny").
+        // A pin only means something for a kind that CARRIES one, and only when it parses
+        // (hub#1623 for a `command`, hub#1662 for a `query`). What a row holding garbage in
+        // `payload` means is hub#1636: **nothing**. It used to pin nothing and still be granted, so
+        // an unreadable RESTRICTION became a wider AUTHORISATION — the one direction a permission
+        // may never move on its own, and the opposite of the rule the gate reads by ("the safe
+        // reading of a bug on an authorisation path is deny").
         //
         // So the row is dropped: default-deny by absence, exactly as the header of this file
-        // states. Only for a `command`, because only a `command` carries a pin — `replace` refuses
-        // a payload on every other kind, so denying a read over a column nothing consults would
-        // stop a flow for no gain in containment.
+        // states. Only for a kind that can be pinned — `replace` refuses a payload on every other
+        // one, so denying a `notify` over a column nothing consults would stop a flow for no gain
+        // in containment. hub#1662 moved `query` from that second group into the first: a read now
+        // carries a pin, so an unreadable one closes the read exactly as it closes a write.
         //
         // Nothing reachable produces this state (the column is `NOT NULL DEFAULT '{}'`, `replace`
         // serialises an object and `parse_pairs` refuses anything else), which is precisely why it
         // is REPORTED and not only refused: an owner whose automation stopped at 3 AM has no other
         // thread back to a row their permissions screen still shows as granted.
-        if kind == GrantKind::Command {
+        if kind.can_pin() {
             match parse_pin(&r["payload"]) {
                 Some(pin) => {
                     if !pin.is_empty() {
-                        pins.insert(value.clone(), pin);
+                        pins.insert((kind, value.clone()), pin);
                     }
                 }
                 None => {
@@ -623,7 +721,94 @@ fn parse_pin(raw: &Json) -> Option<Params> {
     }
 }
 
-/// Does `payload` honour what the grant FIXED? (hub#1623)
+/// The reference this pin value names, if it names one (hub#1662).
+///
+/// A pin value is a **bare path** (`steps.resolve_customer.id`) or a **literal** — never prose with
+/// `{{…}}` in it. [`def::is_path`] is what tells them apart, and it is the very function the mapping
+/// language uses, so a grant reads like the flow document an owner already knows. A literal like
+/// `"customer"` is not rooted at `input`/`steps`/`event`/`secret`, so every pin written before this
+/// existed keeps comparing byte for byte.
+fn pin_reference(value: &Json) -> Option<&str> {
+    value.as_str().filter(|s| def::is_path(s))
+}
+
+/// The run's own facts, in the shape the mapping language addresses them: `{ input, steps }` — the
+/// same object [`crate::flows::executor`] builds for a step's `params`.
+///
+/// Read **fresh**, at the instant of the gate, like the grants themselves: the pin is judged against
+/// what this run has actually resolved, not against a snapshot somebody took earlier.
+async fn run_scope(db: &dyn DatabaseAdapter, hub_id: &str, run_id: &str) -> Result<Json> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("id".into(), json!(run_id));
+    let res = db
+        .query(
+            "SELECT input, vars FROM _flow_runs \
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
+            &p,
+        )
+        .await?;
+    // No run, no scope, no read. A gate that shrugged here would resolve every reference to
+    // nothing, and «nothing» must never read as «no restriction» (hub#1636).
+    let Some(row) = res.rows.first() else {
+        return Err(RuntimeError::Domain {
+            code: ERR_GRANT_PAYLOAD_DENIED.to_string(),
+            message: format!(
+                "the grant fixes values against run `{run_id}`, and that run cannot be read; \
+                 refused (ADR-0283 §2)."
+            ),
+        });
+    };
+    // SQLite and Postgres do not agree on whether a JSON column comes back decoded or as text, the
+    // same split `parse_pin` handles two functions up.
+    let parse = |v: &Json| -> Json {
+        match v {
+            Json::Object(_) => v.clone(),
+            Json::String(text) => serde_json::from_str(text).unwrap_or(Json::Null),
+            _ => Json::Null,
+        }
+    };
+    let vars = parse(&row["vars"]);
+    Ok(json!({
+        "input": parse(&row["input"]),
+        "steps": vars.get("steps").cloned().unwrap_or_else(|| json!({})),
+    }))
+}
+
+/// The pin with its references resolved against this run (hub#1662).
+///
+/// **A reference that resolves to nothing is a refusal, never a free pass.** Renaming the step that
+/// resolves the customer, or reaching the read before that step ran, would otherwise turn a pinned
+/// grant back into the wide one — «edit the flow» as the way round a permission the owner gave.
+/// Same direction hub#1636 chose for an unreadable pin, and for the same reason.
+fn resolve_pin(
+    flow_id: &str,
+    noun: &str,
+    name: &str,
+    pin: &Params,
+    scope: &Json,
+) -> Result<Params> {
+    let mut out = Params::new();
+    for (field, written) in pin {
+        let value = match pin_reference(written) {
+            None => written.clone(),
+            Some(path) => def::resolve_path(path, scope)
+                .filter(|v| !v.is_null())
+                .ok_or_else(|| RuntimeError::Domain {
+                    code: ERR_GRANT_PAYLOAD_DENIED.to_string(),
+                    message: format!(
+                        "flow `{flow_id}` may run {noun} `{name}` only with `{field}` = \
+                         `{path}`, and this run has no value there. A grant that cannot be \
+                         resolved authorises nothing (ADR-0283 §2)."
+                    ),
+                })?,
+        };
+        out.insert(field.clone(), value);
+    }
+    Ok(out)
+}
+
+/// Does this call honour what the grant FIXED? (hub#1623 for a write, hub#1662 for a read)
 ///
 /// Every pinned field must be **present and equal**. Absence is a refusal and not a pass, because
 /// the field the pin names is exactly the one whose default the caller must not get to choose: a
@@ -631,27 +816,65 @@ fn parse_pin(raw: &Json) -> Option<Params> {
 /// leaving it out, which is easier than contradicting it.
 ///
 /// Fields the pin does NOT name are free. The pin narrows a grant; it is not a schema, and the
-/// command's own schema is still the thing that decides whether the rest of the payload is valid.
-fn check_payload_pin(flow_id: &str, command: &str, pin: &Params, payload: &Params) -> Result<()> {
-    for (field, fixed) in pin {
+/// operation's own schema is still the thing that decides whether the rest is valid.
+///
+/// `written` is what the GRANT says and `resolved` is what it came to in this run; the refusal
+/// quotes the first. An owner reads «only with `customer_id` = `steps.resolve_customer.id`», which
+/// is the sentence they authorised — and neither the resolved value nor the one that was sent
+/// reaches the message, because both are somebody's data and an error string travels much further
+/// than this gate does.
+fn check_payload_pin(
+    flow_id: &str,
+    noun: &str,
+    name: &str,
+    written: &Params,
+    resolved: &Params,
+    payload: &Params,
+) -> Result<()> {
+    for (field, fixed) in resolved {
         let sent = payload.get(field);
         if sent == Some(fixed) {
             continue;
         }
+        let says = written.get(field).unwrap_or(fixed);
         return Err(RuntimeError::Domain {
             code: ERR_GRANT_PAYLOAD_DENIED.to_string(),
             message: format!(
-                "flow `{flow_id}` may run `{command}` only with `{field}` = {fixed}, and this call \
-                 {}. A grant fixes what it fixes; the payload does not get to argue with it \
+                "flow `{flow_id}` may run {noun} `{name}` only with `{field}` = {says}, and this \
+                 call {}. A grant fixes what it fixes; the call does not get to argue with it \
                  (ADR-0283 §2).",
                 match sent {
-                    Some(v) => format!("sent {v}"),
-                    None => "omitted it".to_string(),
+                    Some(_) => "sent another value",
+                    None => "omitted it",
                 }
             ),
         });
     }
     Ok(())
+}
+
+/// The pin of `name` and what it resolves to in this run — or `None` when the grant pins nothing.
+///
+/// The run is read **only when a pin really names one** ([`pin_reference`]), so the overwhelmingly
+/// common gate — a grant with no pin, or one that fixes a literal — still costs exactly the one
+/// query it always did.
+async fn resolved_pin(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    flow_id: &str,
+    run_id: &str,
+    noun: &str,
+    name: &str,
+    pin: Option<&Params>,
+) -> Result<Option<(Params, Params)>> {
+    let Some(pin) = pin else { return Ok(None) };
+    let scope = if pin.values().any(|v| pin_reference(v).is_some()) {
+        run_scope(db, hub_id, run_id).await?
+    } else {
+        Json::Null
+    };
+    let resolved = resolve_pin(flow_id, noun, name, pin, &scope)?;
+    Ok(Some((pin.clone(), resolved)))
 }
 
 /// **The gate**, as the dispatcher calls it (`commands::execute_at` under
@@ -661,6 +884,7 @@ pub async fn check_command_grant(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     flow_id: &str,
+    run_id: &str,
     command: &str,
     payload: &Params,
 ) -> Result<()> {
@@ -669,8 +893,18 @@ pub async fn check_command_grant(
         // hub#1623 — granted is only half the question when the grant FIXED part of the payload.
         // Asked HERE, in the same read, so a caller cannot get the name checked and skip the pin:
         // the dispatcher calls this one function and there is no second door.
-        if let Some(pin) = authority.command_pin(command) {
-            check_payload_pin(flow_id, command, pin, payload)?;
+        if let Some((written, resolved)) = resolved_pin(
+            db,
+            hub_id,
+            flow_id,
+            run_id,
+            "command",
+            command,
+            authority.command_pin(command),
+        )
+        .await?
+        {
+            check_payload_pin(flow_id, "command", command, &written, &resolved, payload)?;
         }
         return Ok(());
     }
@@ -690,9 +924,29 @@ pub async fn check_query_grant(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     flow_id: &str,
+    run_id: &str,
     query: &str,
+    params: &Params,
 ) -> Result<()> {
-    if authority(db, hub_id, flow_id).await?.allows_query(query) {
+    let authority = authority(db, hub_id, flow_id).await?;
+    if authority.allows_query(query) {
+        // hub#1662 — granted is «what», and on a read the other half is «WHOSE». The identity IS
+        // the filter here: `customer_id` is not a field of what comes back, it is what decides what
+        // comes back, so there is no row for a module to compare a caller against. Which is why the
+        // pin is resolved in this door, in the same read as the name.
+        if let Some((written, resolved)) = resolved_pin(
+            db,
+            hub_id,
+            flow_id,
+            run_id,
+            "query",
+            query,
+            authority.query_pin(query),
+        )
+        .await?
+        {
+            check_payload_pin(flow_id, "query", query, &written, &resolved, params)?;
+        }
         return Ok(());
     }
     Err(RuntimeError::Domain {
@@ -897,19 +1151,24 @@ pub async fn replace(
         if *kind == GrantKind::RecipientQuery {
             check_recipient_pattern(registry, value)?;
         }
-        // hub#1623 — a pin is only enforced for a `command`, because `check_command_grant` is the
-        // only gate that is handed a payload. Storing one anywhere else would put a restriction on
-        // the screen that nothing applies, which is the exact failure `is_available` exists to
-        // prevent one kind at a time.
-        if !payload.is_empty() && *kind != GrantKind::Command {
-            return Err(RuntimeError::Domain {
-                code: ERR_INVALID_GRANT_PAYLOAD.to_string(),
-                message: format!(
-                    "only a `command` grant can fix payload values; a `{}` grant carries no \
-                     payload, so the fixed fields would restrict nothing.",
-                    kind.as_str()
-                ),
-            });
+        // hub#1623, widened by hub#1662 — a pin is only enforced where a gate is handed values to
+        // judge: `check_command_grant` (a payload) and `check_query_grant` (the parameters).
+        // Storing one anywhere else would put a restriction on the screen that nothing applies,
+        // which is the exact failure `is_available` exists to prevent one kind at a time.
+        if !payload.is_empty() {
+            if !kind.can_pin() {
+                return Err(RuntimeError::Domain {
+                    code: ERR_INVALID_GRANT_PAYLOAD.to_string(),
+                    message: format!(
+                        "only a `command` or a `query` grant can fix values; a `{}` grant is \
+                         handed none, so the fixed fields would restrict nothing.",
+                        kind.as_str()
+                    ),
+                });
+            }
+            for (field, written) in payload {
+                check_pin_value(kind, value, field, written)?;
+            }
         }
     }
 
@@ -1119,6 +1378,9 @@ mod tests {
 
     const HUB: &str = "hub-grants";
     const FLOW: &str = "flow-1";
+    /// A run id for the gates that never look one up: the run is read only when a pin REFERENCES
+    /// it (hub#1662), so a grant with no pin — or one that fixes a literal — never touches it.
+    const RUN: &str = "run-unused";
 
     fn registry() -> Registry {
         let mut reg = Registry::new();
@@ -1204,7 +1466,14 @@ mod tests {
         .await
         .unwrap();
 
-        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+        let err = check_command_grant(
+            &db,
+            HUB,
+            FLOW,
+            RUN,
+            "sales.sale.void",
+            &sent("channel", "staff"),
+        )
             .await
             .expect_err("«de parte del salón» is not what was granted");
         assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
@@ -1216,6 +1485,7 @@ mod tests {
             &db,
             HUB,
             FLOW,
+            RUN,
             "sales.sale.void",
             &sent("channel", "customer"),
         )
@@ -1240,7 +1510,7 @@ mod tests {
         .await
         .unwrap();
 
-        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &Params::new())
+        let err = check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &Params::new())
             .await
             .expect_err("absence is not agreement");
         assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
@@ -1266,7 +1536,7 @@ mod tests {
         let mut payload = sent("channel", "customer");
         payload.insert("appointment_id".into(), json!("appt-7"));
         payload.insert("reason".into(), json!("me ha surgido algo"));
-        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &payload)
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &payload)
             .await
             .expect("what the grant did not fix, it did not forbid");
     }
@@ -1297,7 +1567,7 @@ mod tests {
 
         let honest: Params =
             serde_json::from_str(r#"{"channel":"customer","max_items":1,"notify":true}"#).unwrap();
-        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &honest)
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &honest)
             .await
             .expect("the exact values pass");
 
@@ -1321,7 +1591,7 @@ mod tests {
         for (how, raw) in evasions {
             let payload: Params =
                 serde_json::from_str(raw).unwrap_or_else(|e| panic!("{how}: {e}"));
-            let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &payload)
+            let err = check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &payload)
                 .await
                 .err()
                 .unwrap_or_else(|| panic!("{how}: got through the pin"));
@@ -1346,7 +1616,7 @@ mod tests {
         .await
         .unwrap();
 
-        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &sent("channel", "staff"))
             .await
             .expect("an unpinned grant is the pre-hub#1623 grant, and it judges the name");
     }
@@ -1389,7 +1659,14 @@ mod tests {
         // And the gate follows the new row, not the old one.
         assert_eq!(
             code_of(
-                &check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+                &check_command_grant(
+                    &db,
+                    HUB,
+                    FLOW,
+                    RUN,
+                    "sales.sale.void",
+                    &sent("channel", "staff"),
+                )
                     .await
                     .expect_err("the widened call is refused from now on")
             ),
@@ -1420,28 +1697,45 @@ mod tests {
         assert_eq!(second[0].granted_by, "hub_user:1");
     }
 
-    /// hub#1623 — a pin is only enforced where a payload is judged, which is a `command`. Storing
-    /// one on any other kind would put a restriction on the screen that nothing applies — the same
-    /// rule `is_available` enforces for the kinds themselves.
+    /// hub#1623, **narrowed by hub#1662** — a pin is only enforced where a gate is handed values to
+    /// judge: a `command`'s payload and a `query`'s parameters. On `notify`, `http` and
+    /// `recipient_query` nothing is ever compared against it, so storing one would put a
+    /// restriction on the screen that nothing applies — the same rule `is_available` enforces for
+    /// the kinds themselves. The list is spelled out here so adding a kind cannot quietly gain a
+    /// pin nobody enforces.
     #[tokio::test]
-    async fn a_pin_is_refused_on_a_kind_that_carries_no_payload() {
+    async fn a_pin_is_refused_on_a_kind_that_is_handed_no_values() {
         let db = db_with_schema().await;
-        let err = replace(
-            &db,
-            HUB,
-            FLOW,
-            &registry(),
-            &[GrantSpec {
-                kind: GrantKind::Query,
-                value: "sales.sale.list".into(),
-                payload: pin("channel", "customer"),
-            }],
-            "hub_user:1",
-        )
-        .await
-        .expect_err("a query takes no payload, so the pin would restrict nothing");
-        assert_eq!(code_of(&err), ERR_INVALID_GRANT_PAYLOAD);
-        assert!(list(&db, HUB, FLOW).await.unwrap().is_empty(), "and nothing was stored");
+        for (kind, value) in [
+            (GrantKind::Notify, "email"),
+            (GrantKind::Http, "https://example.com/*"),
+            (GrantKind::RecipientQuery, "sales.sale.list#email"),
+        ] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[GrantSpec {
+                    kind,
+                    value: value.into(),
+                    payload: pin("channel", "customer"),
+                }],
+                "hub_user:1",
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(code_of(&err), ERR_INVALID_GRANT_PAYLOAD, "{}", kind.as_str());
+            assert!(
+                list(&db, HUB, FLOW).await.unwrap().is_empty(),
+                "and nothing was stored"
+            );
+        }
+        assert!(
+            !GrantKind::ALL.iter().any(|k| k.can_pin()
+                && !matches!(k, GrantKind::Command | GrantKind::Query)),
+            "a new kind that can be pinned has to be added to this test with its gate"
+        );
     }
 
     /// hub#1623 — the pin survives the trip through the `PUT …/grants` body, and a `payload` that
@@ -1523,7 +1817,7 @@ mod tests {
                 sent("channel", "staff"),
                 Params::new(),
             ] {
-                let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &attempt)
+                let err = check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &attempt)
                     .await
                     .expect_err("an unreadable grant is not an unrestricted one");
                 assert_eq!(code_of(&err), ERR_GRANT_DENIED, "payload `{raw}`");
@@ -1532,7 +1826,7 @@ mod tests {
             // And ONE broken row is one denial, not an authority wiped clean: the other grants of
             // the same flow still answer, or a single mangled byte would silently stop every
             // automation the owner has.
-            check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
+            check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.create", &Params::new())
                 .await
                 .unwrap_or_else(|e| {
                     panic!("payload `{raw}`: the readable grant still answers: {e}")
@@ -1558,25 +1852,29 @@ mod tests {
         .unwrap();
         corrupt_the_stored_pin(&db, "sales.sale.void", "{}").await;
 
-        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &sent("channel", "staff"))
             .await
             .expect("`{}` fixes nothing, so nothing is contradicted");
     }
 
-    /// hub#1636 — the guard is scoped to `command`, and that scope is a decision, not an oversight.
-    /// Only a `command` grant carries a pin (`replace` refuses a payload on every other kind), so a
-    /// `query` row whose `payload` column is unreadable holds nothing the gate ever consults.
-    /// Denying the read would stop the flow over a column that decides nothing — containment
-    /// bought with availability and paid for with neither.
+    /// hub#1636, **re-decided by hub#1662**. That issue scoped the guard to `command` and wrote down
+    /// why: a `query` row carried no pin, so its `payload` column decided nothing and denying the
+    /// read would have bought containment with availability and got neither. hub#1662 gave a read a
+    /// pin, so the premise is gone and the rule that outlives it is hub#1636's own — an unreadable
+    /// RESTRICTION must never become a wider AUTHORISATION. The read closes exactly like the write.
     #[tokio::test]
-    async fn an_unreadable_payload_on_a_kind_that_has_no_pin_does_not_close_the_read() {
+    async fn an_unreadable_pin_on_a_query_grant_closes_the_read_too() {
         let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "resolve_customer": { "id": 4470 } })).await;
         replace(
             &db,
             HUB,
             FLOW,
             &registry(),
-            &[GrantSpec::pair(GrantKind::Query, "sales.sale.list")],
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("steps.resolve_customer.id")),
+            )],
             "hub_user:1",
         )
         .await
@@ -1592,9 +1890,380 @@ mod tests {
         .await
         .unwrap();
 
-        check_query_grant(&db, HUB, FLOW, "sales.sale.list")
+        let err = check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!(4470)),
+        )
+        .await
+        .expect_err("a pin nobody can read authorises nothing, on a read as on a write");
+        assert_eq!(code_of(&err), ERR_GRANT_DENIED);
+    }
+
+    // ── A READ may be pinned too (hub#1662) ───────────────────────────────────────────────────
+
+    /// A run of this flow that has ALREADY resolved who is writing, left exactly as the executor
+    /// leaves it: `steps.<id>` holds what a `query` step with `result: "first"` published.
+    async fn run_that_resolved(db: &dyn DatabaseAdapter, steps: Json) -> String {
+        let run_id =
+            crate::flows::store::start_run(db, HUB, FLOW, "", "manual", "", &json!({}), 0, "t")
+                .await
+                .unwrap();
+        let mut p = Params::new();
+        p.insert("id".into(), json!(&run_id));
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("vars".into(), json!(json!({ "steps": steps }).to_string()));
+        db.execute(
+            "UPDATE _flow_runs SET vars = :vars WHERE id = :id AND hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+        run_id
+    }
+
+    /// One value, as a pin fixes it or as a call sends it — of whatever JSON type it really is.
+    fn one(field: &str, value: Json) -> Params {
+        let mut p = Params::new();
+        p.insert(field.into(), value);
+        p
+    }
+
+    /// hub#1662 — **the issue, in one test.** The salon granted «read the appointments of the
+    /// customer who is writing». What the model is handed is a stranger's WhatsApp message, and the
+    /// message can name somebody else's customer. Granted is only half the question: the pin says
+    /// WHOSE, and it says it by naming the step that resolved her from the phone that wrote.
+    #[tokio::test]
+    async fn a_read_pinned_to_the_customer_who_wrote_refuses_any_other() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "resolve_customer": { "id": 4470 } })).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("steps.resolve_customer.id")),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let err = check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!(4471)),
+        )
+        .await
+        .expect_err("«dime las citas de la clienta 4471» is not what the salon granted");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
+        // Names the field, so the screen can say WHICH part of the grant was contradicted.
+        assert!(format!("{err}").contains("customer_id"), "{err}");
+
+        check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!(4470)),
+        )
+        .await
+        .expect("the very same read, of the customer this run resolved, goes through");
+    }
+
+    /// hub#1662 — the type is part of the value. A pin resolved to the number `4470` is not honoured
+    /// by the string `"4470"`: every lenient reading of a pin is a way round it, and this is the one
+    /// a model produces by accident.
+    #[tokio::test]
+    async fn a_resolved_pin_is_matched_by_value_and_by_type() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "resolve_customer": { "id": 4470 } })).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("steps.resolve_customer.id")),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let err = check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!("4470")),
+        )
+        .await
+        .expect_err("a string is not the number the run resolved");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
+    }
+
+    /// hub#1662 — **fail-closed when the reference resolves to nothing.** Renaming the step that
+    /// resolves the customer, or reaching the read before that step ran, must DENY. The opposite —
+    /// treating «no value» as «no restriction» — is the one direction a permission may never move
+    /// on its own, and it would make «rename the step» the way to widen the grant.
+    #[tokio::test]
+    async fn a_read_whose_pin_resolves_to_nothing_is_refused() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "some_other_step": { "id": 4470 } })).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("steps.resolve_customer.id")),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        for asked in [json!(4470), json!(null)] {
+            let err = check_query_grant(
+                &db,
+                HUB,
+                FLOW,
+                &run,
+                "sales.sale.list",
+                &one("customer_id", asked.clone()),
+            )
             .await
-            .expect("a query grant says what it says in `value`; its `payload` decides nothing");
+            .unwrap_err();
+            assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED, "asked {asked}");
+        }
+    }
+
+    /// hub#1662 — a `query` grant that pins NOTHING keeps reading exactly as it did before this
+    /// existed. Every flow installed in the fleet has one of these, and widening or closing them
+    /// silently is the regression this test is here to stop.
+    #[tokio::test]
+    async fn a_query_grant_without_a_pin_reads_as_it_always_did() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({})).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pair(GrantKind::Query, "sales.sale.list")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!(4471)),
+        )
+        .await
+        .expect("an unpinned grant says what it says in `value` and judges no parameter");
+    }
+
+    /// hub#1662 — a pin may name the RUN (`input.…`, `steps.…`) and nothing else. A `secret.…`
+    /// reference would turn the gate into an oracle — try values until the read passes and the
+    /// secret is yours — and an `event.…` one names something the run scope does not carry, so it
+    /// could only ever deny. Both are refused at save, the rule this file already applies to a pin
+    /// on a kind that carries none: never store a restriction nothing can enforce.
+    #[tokio::test]
+    async fn a_pin_may_name_the_run_and_never_a_secret() {
+        let db = db_with_schema().await;
+        for reference in ["secret.stripe_key", "event.customer_id"] {
+            let err = replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[GrantSpec::pinned_query(
+                    "sales.sale.list",
+                    one("customer_id", json!(reference)),
+                )],
+                "hub_user:1",
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(code_of(&err), ERR_INVALID_GRANT_PAYLOAD, "{reference}");
+        }
+
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("input.customer_id")),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .expect("the run's own trigger input is a legal reference");
+    }
+
+    /// hub#1662 — the same mechanism on the WRITE side, which hub#1623 left half open: pinning
+    /// `channel: "customer"` stopped the automation cancelling «on behalf of the salon», and left
+    /// the model free to name ANY appointment. A pin that resolves against the run closes that too.
+    #[tokio::test]
+    async fn a_command_pin_may_name_the_run_so_a_stranger_cannot_choose_the_row() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "resolve_customer": { "id": 4470 } })).await;
+        let mut pinned = pin("channel", "customer");
+        pinned.insert(
+            "customer_id".into(),
+            json!("steps.resolve_customer.id"),
+        );
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pinned)],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let mut theirs = sent("channel", "customer");
+        theirs.insert("customer_id".into(), json!(4471));
+        let err = check_command_grant(&db, HUB, FLOW, &run, "sales.sale.void", &theirs)
+            .await
+            .expect_err("cancelling somebody else's appointment is not what was granted");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
+
+        let mut hers = sent("channel", "customer");
+        hers.insert("customer_id".into(), json!(4470));
+        check_command_grant(&db, HUB, FLOW, &run, "sales.sale.void", &hers)
+            .await
+            .expect("her own appointment, as the customer, is exactly the grant");
+    }
+
+    /// hub#1662 — a literal pin is still literal. `"customer"` is not a path (it is not rooted at
+    /// `input`/`steps`), so every grant written before this existed keeps comparing byte for byte.
+    #[tokio::test]
+    async fn a_literal_pin_is_never_read_as_a_reference() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "customer": { "id": 1 } })).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        check_command_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.void",
+            &sent("channel", "customer"),
+        )
+        .await
+        .expect("the pre-hub#1662 grant compares against the word it stored");
+    }
+
+    /// hub#1662 — a pin is a VALUE, not a sentence. A `{{…}}` template would be rendered: a number
+    /// flattened to a string and, worse, an unresolved template renders EMPTY, so the pin would
+    /// quietly stop matching anything and the containment would read as working while it denied
+    /// everything. It is refused at save, on a read as on a write — the bare path is the way to
+    /// say «what this run resolved», and it keeps the type.
+    #[tokio::test]
+    async fn a_pin_is_a_value_and_never_a_template() {
+        let db = db_with_schema().await;
+        for (kind, name) in [
+            (GrantKind::Query, "sales.sale.list"),
+            (GrantKind::Command, "sales.sale.void"),
+        ] {
+            for written in [
+                "{{steps.resolve_customer.id}}",
+                "cust-{{steps.resolve_customer.id}}",
+            ] {
+                let err = replace(
+                    &db,
+                    HUB,
+                    FLOW,
+                    &registry(),
+                    &[GrantSpec {
+                        kind,
+                        value: name.into(),
+                        payload: one("customer_id", json!(written)),
+                    }],
+                    "hub_user:1",
+                )
+                .await
+                .unwrap_err();
+                assert_eq!(
+                    code_of(&err),
+                    ERR_INVALID_GRANT_PAYLOAD,
+                    "{} `{written}`",
+                    kind.as_str()
+                );
+                assert!(
+                    list(&db, HUB, FLOW).await.unwrap().is_empty(),
+                    "and nothing was stored"
+                );
+            }
+        }
+    }
+
+    /// hub#1662 — a step that RAN and resolved nobody publishes `id: null`, and `null` is not «no
+    /// restriction». Left alone, a caller sending `customer_id: null` would match it and read
+    /// whatever the query does with a null filter. A reference that resolves to `null` resolves to
+    /// nothing, and nothing refuses — the same answer as a step that never ran.
+    #[tokio::test]
+    async fn a_pin_that_resolves_to_null_refuses_even_the_null_that_was_sent() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "resolve_customer": { "id": null } })).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("steps.resolve_customer.id")),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let err = check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!(null)),
+        )
+        .await
+        .expect_err("nobody is not a customer, and null does not match null here");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
     }
 
     /// hub#1636 — a broken authorisation row that only failed at 3 AM would be a mystery: the flow
@@ -1634,6 +2303,7 @@ mod tests {
             &db,
             HUB,
             FLOW,
+            RUN,
             "sales.sale.void",
             &sent("channel", "customer"),
         )
@@ -1649,6 +2319,7 @@ mod tests {
                     &db,
                     HUB,
                     FLOW,
+                    RUN,
                     "sales.sale.void",
                     &sent("channel", "customer"),
                 )
@@ -1663,7 +2334,7 @@ mod tests {
     #[tokio::test]
     async fn a_flow_with_no_grants_may_run_nothing() {
         let db = db_with_schema().await;
-        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
+        let err = check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.create", &Params::new())
             .await
             .expect_err("default-deny: absence is the answer, not an empty allow-list");
         assert!(format!("{err}").contains("sales.sale.create"), "{err}");
@@ -1684,12 +2355,12 @@ mod tests {
         .await
         .unwrap();
 
-        check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.create", &Params::new())
             .await
             .expect("the granted command runs");
         // A sibling command of the same module is a different question with the same answer as
         // before: no.
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.void", &Params::new())
+        assert!(check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &Params::new())
             .await
             .is_err());
     }
@@ -1710,13 +2381,13 @@ mod tests {
         .unwrap();
 
         assert!(
-            check_command_grant(&db, HUB, "flow-2", "sales.sale.create", &Params::new())
+            check_command_grant(&db, HUB, "flow-2", RUN, "sales.sale.create", &Params::new())
                 .await
                 .is_err(),
             "another flow of the same hub is not covered"
         );
         assert!(
-            check_command_grant(&db, "hub-other", FLOW, "sales.sale.create", &Params::new())
+            check_command_grant(&db, "hub-other", FLOW, RUN, "sales.sale.create", &Params::new())
                 .await
                 .is_err(),
             "the same flow id in another tenant is not covered"
@@ -1731,7 +2402,7 @@ mod tests {
         replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
             .await
             .unwrap();
-        check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.create", &Params::new())
             .await
             .unwrap();
 
@@ -1740,7 +2411,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
+        assert!(check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.create", &Params::new())
             .await
             .is_err());
         assert!(list(&db, HUB, FLOW).await.unwrap().is_empty());
@@ -2384,19 +3055,22 @@ mod tests {
         .await
         .unwrap();
 
-        check_query_grant(&db, HUB, FLOW, "sales.sale.list")
+        let run = run_that_resolved(&db, json!({})).await;
+        check_query_grant(&db, HUB, FLOW, &run, "sales.sale.list", &Params::new())
             .await
             .expect("the granted query runs");
         assert!(
-            check_query_grant(&db, HUB, FLOW, "sales.sale.totals")
+            check_query_grant(&db, HUB, FLOW, &run, "sales.sale.totals", &Params::new())
                 .await
                 .is_err(),
             "a sibling query is a different question with the same default answer: no"
         );
         // And granting a READ never opens a WRITE, whatever they share.
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
-            .await
-            .is_err());
+        assert!(
+            check_command_grant(&db, HUB, FLOW, &run, "sales.sale.create", &Params::new())
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
