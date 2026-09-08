@@ -893,6 +893,19 @@ export interface CloudModuleSubscription {
   trialEnd: string | null;
   /** Fin del periodo de facturación actual (ISO) o null. */
   periodEnd: string | null;
+  /**
+   * Slug del `ModuleTier` en el que está ESTE hub ahora mismo, o `null` (ERPlora/saas#1921).
+   *
+   * No es la misma pregunta que `status`, que describe la SUSCRIPCIÓN: se está en un plan sin
+   * haber comprado nunca ninguno, porque todos nuestros módulos premium traen un tier a 0 € y por
+   * ahí entra la mayoría (ADR-0032). Por eso el gratuito llega como `status: 'none'` + `tier`
+   * con el slug del gratis, y son dos respuestas a propósito.
+   *
+   * El slug es el mismo de `billing.tiers[].slug` del manifest (el SaaS crea el `ModuleTier` por
+   * ese slug), así que casa directamente con el tier que pinta la pantalla. Es ADITIVO: un SaaS
+   * anterior a saas#1921 no manda la clave y aquí queda `null`.
+   */
+  tier: string | null;
 }
 
 const SUB_STATUS = ['active', 'trialing', 'expired', 'none', 'canceled', 'past_due'] as const;
@@ -902,13 +915,19 @@ function normSubStatus(s: unknown): ModuleSubscriptionStatus {
 
 /** Estado de plan del módulo para ESTE hub (auth usuario + X-Hub-Id). */
 export async function cloudModuleSubscription(moduleSlug: string): Promise<CloudModuleSubscription> {
-  const data = await get<{ status?: string; trial_end?: string | null; period_end?: string | null }>(
-    `/api/v1/hub/device/module-subscription/?module=${encodeURIComponent(moduleSlug)}`,
-  );
+  const data = await get<{
+    status?: string;
+    trial_end?: string | null;
+    period_end?: string | null;
+    tier?: string | null;
+  }>(`/api/v1/hub/device/module-subscription/?module=${encodeURIComponent(moduleSlug)}`);
   return {
     status: normSubStatus(data.status),
     trialEnd: data.trial_end ?? null,
     periodEnd: data.period_end ?? null,
+    // Cadena vacía = no dice nada, igual que ausente: se normaliza a `null` para que quien lo lea
+    // tenga UNA forma de "no lo sé" y no dos.
+    tier: typeof data.tier === 'string' && data.tier ? data.tier : null,
   };
 }
 

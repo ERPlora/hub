@@ -45,18 +45,20 @@
       </div>
       <template v-else>
         <ok-status-pill :tone="statusTone" :label="statusLabel" size="sm" />
-        <p v-if="sub && sub.status === 'trialing' && sub.trialEnd" class="status-line">
+        <!-- Por `displayStatus`, no por `sub.status`: un `trialing` sobre el tier gratuito no es
+             una prueba (ADR-0032), así que tampoco tiene fecha de fin de prueba que anunciar. -->
+        <p v-if="displayStatus === 'trialing' && sub?.trialEnd" class="status-line">
           {{ t('modulePlan.trialEnds', { date: fmtDate(sub.trialEnd) }) }}
         </p>
         <p
-          v-else-if="sub && sub.periodEnd && (sub.status === 'active' || sub.status === 'canceled')"
+          v-else-if="sub?.periodEnd && (displayStatus === 'active' || displayStatus === 'canceled')"
           class="status-line"
         >
-          {{ sub.status === 'canceled'
+          {{ displayStatus === 'canceled'
             ? t('modulePlan.cancelsOn', { date: fmtDate(sub.periodEnd) })
             : t('modulePlan.renewsOn', { date: fmtDate(sub.periodEnd) }) }}
         </p>
-        <p v-else class="status-line opacity-70">{{ statusHint }}</p>
+        <p v-else class="status-line opacity-70" data-testid="module-plan-hint">{{ statusHint }}</p>
 
         <!-- Dónde se gestiona. La frase se queda aunque ahora haya botón: en Google Play el botón
              no se ofrece (hub#756) y sin esta línea ahí no quedaría dicho dónde se hace. -->
@@ -101,11 +103,19 @@
     <ion-grid v-if="tiers.length" class="ion-no-padding">
       <ion-row>
         <ion-col v-for="tier in tiers" :key="tier.slug" size="12" size-md="6" size-lg="3">
+          <!-- `featured` + `badge` ya venían en la tarjeta y el panel no los usaba: con cuatro
+               precios delante, «Activo» a secas no dice cuál es el tuyo. Es lo que hacen Shopify,
+               Odoo y Square — el plan actual se señala EN su tarjeta.
+               `|| undefined` no es cosmética: `featured="false"` es un ATRIBUTO PRESENTE, y el
+               conversor Boolean de Lit lee presencia, así que marcaría de más justo en la ventana
+               en la que el elemento aún no se ha registrado. Ausente es la única forma de "no". -->
           <ok-pricing-card
             :name="tier.name"
             :price="priceLabel(tier)"
             :period="periodLabel(tier)"
             :features.prop="tierFeatures(tier)"
+            :featured="isCurrentTier(tier) || undefined"
+            :badge="isCurrentTier(tier) ? t('modulePlan.yourPlan') : undefined"
           />
         </ion-col>
       </ion-row>
@@ -163,6 +173,62 @@ const tiers = computed<BillingTierDef[]>(() => props.billing.tiers ?? []);
 /** Bloque `billing` de `locales/<lang>.json` del módulo. `undefined` = el módulo no traduce. */
 const billingLocale = ref<ModuleBillingLocale | undefined>(undefined);
 
+/**
+ * El tier gratuito del manifest, si el módulo trae uno.
+ *
+ * ADR-0032: un módulo premium que declara un tier a 0 € es instalable SIN compra y corre en modo
+ * gratuito con su cuota aplicada en el proxy (`_has_free_tier()` en
+ * `saas/apps/public/modules/entitlement.py`). Hoy TODOS nuestros módulos lo traen, así que por ahí
+ * entra la mayoría; la prueba sin tarjeta es la vía de los que NO lo traen — una de las dos, nunca
+ * las dos (regla de Ioan del 2026-09-07, guardia al publicar en ERPlora/module-toolkit#228).
+ */
+const freeTier = computed<BillingTierDef | null>(() => tiers.value.find((tier) => !tier.price) ?? null);
+
+/**
+ * En qué tier está este hub AHORA, nombrado sobre el manifest que tiene instalado.
+ *
+ * El slug lo manda el Cloud (`tier`, ERPlora/saas#1921) y es el mismo de `billing.tiers[].slug`.
+ * Dos casos que no son el mismo:
+ *   · el Cloud NO manda slug (SaaS anterior a saas#1921) → el suelo lo sabe el manifest: el
+ *     gratuito, si lo hay;
+ *   · el Cloud manda un slug que este manifest no conoce (el módulo se actualizó en el
+ *     marketplace y este hub sigue con el bundle anterior) → no se marca NADA, porque marcar por
+ *     posición pondría la insignia en el plan de otro.
+ */
+const currentTier = computed<BillingTierDef | null>(() => {
+  const slug = sub.value?.tier ?? null;
+  if (slug) return tiers.value.find((tier) => tier.slug === slug) ?? null;
+  return freeTier.value;
+});
+
+/** ¿El plan en el que estás es el que no cuesta nada? */
+const onFreeTier = computed(() => currentTier.value != null && !currentTier.value.price);
+
+/** ¿Es ESTA la tarjeta de tu plan? Lo que decide `featured` y la insignia «Tu plan». */
+function isCurrentTier(tier: BillingTierDef): boolean {
+  return currentTier.value != null && currentTier.value.slug === tier.slug;
+}
+
+/**
+ * Lo que se PINTA, que no siempre es lo que dice `status` (hub#1652).
+ *
+ * `status` describe la SUSCRIPCIÓN y sin compra no hay ninguna, así que el Cloud responde `none`
+ * a quien entró por el gratuito — es decir, a casi todo el mundo. Pintarlo tal cual dejaba «Sin
+ * plan» en la única pantalla que existe para explicar tu plan. Y `trialing` sobre el gratuito no
+ * es un estado de este producto: un módulo con tier a 0 € no lleva prueba (ADR-0032). Las dos
+ * respuestas se resuelven en la misma: estás en el gratuito.
+ *
+ * Lo que NO se toca es `expired`, `canceled` ni `past_due`: el plan de pago caducó de verdad y
+ * suavizarlo es cómo un cliente se pierde una renovación fallida. Lo que cambia ahí es DÓNDE te
+ * deja, no el hecho.
+ */
+type DisplayStatus = ModuleSubscriptionStatus | 'free';
+const displayStatus = computed<DisplayStatus>(() => {
+  const s = sub.value?.status ?? 'none';
+  if ((s === 'none' || s === 'trialing') && onFreeTier.value) return 'free';
+  return s;
+});
+
 // "Posee el módulo" según el estado de la suscripción: activa, en prueba o cancelada-pero-vigente.
 const isOwned = computed(() => {
   const s = sub.value?.status;
@@ -173,13 +239,16 @@ const isOwned = computed(() => {
 
 /** Tono compartido por el bloque y la píldora: el vocabulario de OutfitKit, no los colores de Ionic. */
 type Tone = 'success' | 'warning' | 'danger' | 'neutral';
-const STATUS_TONE: Record<ModuleSubscriptionStatus, Tone> = {
+const STATUS_TONE: Record<DisplayStatus, Tone> = {
   active: 'success',
   trialing: 'success',
   past_due: 'warning',
   canceled: 'warning',
   expired: 'danger',
-  // No tener plan no es un fallo, así que no toma un tono de alarma.
+  // Estar en el gratuito es estar dentro, con su cuota: mismo tono que cualquier plan al día.
+  free: 'success',
+  // No tener plan no es un fallo, así que no toma un tono de alarma. Solo lo alcanzan los módulos
+  // que NO declaran tier gratuito; para el resto, el suelo es el gratis.
   none: 'neutral',
 };
 const STATUS_ICON: Record<Tone, string> = {
@@ -188,15 +257,18 @@ const STATUS_ICON: Record<Tone, string> = {
   danger: 'close-circle-outline',
   neutral: 'pricetag-outline',
 };
-const statusTone = computed<Tone>(() => (sub.value ? STATUS_TONE[sub.value.status] : 'neutral'));
+const statusTone = computed<Tone>(() => (sub.value ? STATUS_TONE[displayStatus.value] : 'neutral'));
 const statusIcon = computed(() => STATUS_ICON[statusTone.value]);
-const statusLabel = computed(() => {
-  const s = sub.value?.status ?? 'none';
-  return t(`modulePlan.status.${s}`);
-});
+// El gratuito toma prestada la palabra de `active`: para quien lo lee es el mismo hecho —está
+// dentro y funcionando—, y dos sinónimos para un estado son peor que uno.
+const statusLabel = computed(() =>
+  t(`modulePlan.status.${displayStatus.value === 'free' ? 'active' : displayStatus.value}`),
+);
 const statusHint = computed(() => {
-  const s = sub.value?.status ?? 'none';
-  return t(`modulePlan.hint.${s}`);
+  // Caducar no te deja fuera si el módulo trae gratuito: te devuelve a él, y la frase lo dice.
+  const key =
+    displayStatus.value === 'expired' && freeTier.value ? 'expiredOnFree' : displayStatus.value;
+  return t(`modulePlan.hint.${key}`, { plan: currentTier.value?.name ?? freeTier.value?.name ?? '' });
 });
 
 function fmtDate(iso: string): string {
