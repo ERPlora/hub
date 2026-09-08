@@ -2187,6 +2187,85 @@ mod tests {
         .expect("the pre-hub#1662 grant compares against the word it stored");
     }
 
+    /// hub#1662 — a pin is a VALUE, not a sentence. A `{{…}}` template would be rendered: a number
+    /// flattened to a string and, worse, an unresolved template renders EMPTY, so the pin would
+    /// quietly stop matching anything and the containment would read as working while it denied
+    /// everything. It is refused at save, on a read as on a write — the bare path is the way to
+    /// say «what this run resolved», and it keeps the type.
+    #[tokio::test]
+    async fn a_pin_is_a_value_and_never_a_template() {
+        let db = db_with_schema().await;
+        for (kind, name) in [
+            (GrantKind::Query, "sales.sale.list"),
+            (GrantKind::Command, "sales.sale.void"),
+        ] {
+            for written in [
+                "{{steps.resolve_customer.id}}",
+                "cust-{{steps.resolve_customer.id}}",
+            ] {
+                let err = replace(
+                    &db,
+                    HUB,
+                    FLOW,
+                    &registry(),
+                    &[GrantSpec {
+                        kind,
+                        value: name.into(),
+                        payload: one("customer_id", json!(written)),
+                    }],
+                    "hub_user:1",
+                )
+                .await
+                .unwrap_err();
+                assert_eq!(
+                    code_of(&err),
+                    ERR_INVALID_GRANT_PAYLOAD,
+                    "{} `{written}`",
+                    kind.as_str()
+                );
+                assert!(
+                    list(&db, HUB, FLOW).await.unwrap().is_empty(),
+                    "and nothing was stored"
+                );
+            }
+        }
+    }
+
+    /// hub#1662 — a step that RAN and resolved nobody publishes `id: null`, and `null` is not «no
+    /// restriction». Left alone, a caller sending `customer_id: null` would match it and read
+    /// whatever the query does with a null filter. A reference that resolves to `null` resolves to
+    /// nothing, and nothing refuses — the same answer as a step that never ran.
+    #[tokio::test]
+    async fn a_pin_that_resolves_to_null_refuses_even_the_null_that_was_sent() {
+        let db = db_with_schema().await;
+        let run = run_that_resolved(&db, json!({ "resolve_customer": { "id": null } })).await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned_query(
+                "sales.sale.list",
+                one("customer_id", json!("steps.resolve_customer.id")),
+            )],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let err = check_query_grant(
+            &db,
+            HUB,
+            FLOW,
+            &run,
+            "sales.sale.list",
+            &one("customer_id", json!(null)),
+        )
+        .await
+        .expect_err("nobody is not a customer, and null does not match null here");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
+    }
+
     /// hub#1636 — a broken authorisation row that only failed at 3 AM would be a mystery: the flow
     /// stops, the permissions screen still shows the grant, and nothing connects the two. So the
     /// denial is also REPORTED, naming the row that has to be revoked and granted again.
