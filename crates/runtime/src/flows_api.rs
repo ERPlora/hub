@@ -1,5 +1,7 @@
 //! Scheduler, flows, runs and approvals — split out of `lib.rs` verbatim (hub#1403).
 
+use std::collections::HashMap;
+
 use crate::*;
 
 impl Runtime {
@@ -102,6 +104,97 @@ impl Runtime {
             granted_by,
         )
         .await
+    }
+
+    /// **Turns a module's own factory recipe on** (hub#1677, ADR-0470) — the whole of «activate»
+    /// behind one call, so the REST layer stays a door and the order that gives the guarantee
+    /// (paused → grants → running) lives in one place. `created` says whether it built the flow or
+    /// found the one that was already there, which is the `201`/`200` the door answers.
+    ///
+    /// The document is served in the hub's own language with a fallback to `en` (ADR-0055/0199):
+    /// `erplora validate` guarantees the languages of a family are the same automation in other
+    /// words, so this picks prose, never behaviour.
+    pub async fn activate_flow_template(
+        &self,
+        module: &str,
+        family: &str,
+        by: &str,
+    ) -> Result<flows::templates::Activation> {
+        let language = self.hub_language().await;
+        flows::templates::activate(
+            self.db.as_ref(),
+            &self.hub_id,
+            &self.registry,
+            module,
+            family,
+            &language,
+            by,
+        )
+        .await
+    }
+
+    /// Pauses it, keeping its permissions and its history (hub#1677, ADR-0470).
+    pub async fn deactivate_flow_template(
+        &self,
+        module: &str,
+        family: &str,
+        by: &str,
+    ) -> Result<flows::Flow> {
+        flows::templates::deactivate(
+            self.db.as_ref(),
+            &self.hub_id,
+            &self.registry,
+            module,
+            family,
+            by,
+        )
+        .await
+    }
+
+    /// `template_ref → (flow id, enabled)` for every flow this hub built from a factory recipe.
+    ///
+    /// One read for the whole listing rather than one per template: the gallery asks for all of
+    /// them at once, and a query per card is how a screen that opens in 40 ms starts taking a
+    /// second on a hub with thirty recipes installed.
+    pub async fn installed_flow_templates(&self) -> Result<HashMap<String, (String, bool)>> {
+        Ok(flows::store::list(self.db.as_ref(), &self.hub_id)
+            .await?
+            .into_iter()
+            .filter_map(|f| {
+                f.template_ref
+                    .clone()
+                    .map(|reference| (reference, (f.id.clone(), f.enabled)))
+            })
+            .collect())
+    }
+
+    /// The hub's own language, `en` when it says nothing (ADR-0055/0199: `en` is the source).
+    async fn hub_language(&self) -> String {
+        self.get_settings()
+            .await
+            .ok()
+            .and_then(|s| {
+                s.get("language")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            })
+            .filter(|l| !l.trim().is_empty())
+            .unwrap_or_else(|| "en".to_string())
+    }
+
+    /// **Does this module hold `kind` right now?** — a question, not a gate (hub#1677).
+    ///
+    /// Deliberately separate from [`Self::require_module_capability`]: that one is the door a route
+    /// stands behind, and `contracts/kernel/routes.snapshot` reads its NAME to classify the route.
+    /// This one is used where the capability changes the ANSWER instead of opening the door —
+    /// `GET /api/hub/flows/templates` serves a module without `manage_flows` only its own recipes —
+    /// and calling the gate there would have printed a gate that is not being applied.
+    pub async fn has_module_capability(
+        &self,
+        module_id: &str,
+        kind: manifest::CapabilityKind,
+    ) -> bool {
+        self.require_module_capability(module_id, kind).await.is_ok()
     }
 
     /// `manual` trigger: starts a run and returns its id. The run itself is advanced by the tick,

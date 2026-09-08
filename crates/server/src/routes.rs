@@ -398,6 +398,18 @@ pub fn app(state: AppState) -> Router {
         // `tests/flow_templates_route.rs` lo comprueba contra el router real — si algún día se
         // colara por `:id`, la respuesta sería «no existe ese flujo» en vez de la lista.
         .route("/api/hub/flows/templates", get(flows_api::list_templates))
+        // Y encenderlas en un toque (hub#1677, ADR-0470). Van aquí, con el resto de `templates`,
+        // por el mismo motivo: `templates` es estático y matchit lo resuelve antes que el `:id` de
+        // abajo. Puerta: sesión local de owner/admin, y NINGUNA capability nueva — si la petición
+        // nombra un módulo, tiene que ser el de la ruta (`403 flow.template_not_yours`).
+        .route(
+            "/api/hub/flows/templates/:module/:family/activate",
+            post(flows_api::activate_template),
+        )
+        .route(
+            "/api/hub/flows/templates/:module/:family/deactivate",
+            post(flows_api::deactivate_template),
+        )
         // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
         // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
         .route("/api/hub/flows/secrets", get(flows_api::list_secrets))

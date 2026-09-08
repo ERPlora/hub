@@ -1923,7 +1923,7 @@
         {
           "name": "GET /api/hub/flows/templates",
           "request": {
-            "description": "auth: admin+capability",
+            "description": "auth: admin",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -1944,6 +1944,68 @@
               ],
               "query": [],
               "raw": "{{hub_url}}/api/hub/flows/templates"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/flows/templates/:module/:family/activate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "templates",
+                "{{module}}",
+                "{{family}}",
+                "activate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/templates/{{module}}/{{family}}/activate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/flows/templates/:module/:family/deactivate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "templates",
+                "{{module}}",
+                "{{family}}",
+                "deactivate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/templates/{{module}}/{{family}}/deactivate"
             }
           },
           "response": []
