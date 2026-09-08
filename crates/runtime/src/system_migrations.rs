@@ -3828,7 +3828,17 @@ mod kind_contract_tests {
         // deliberately does NOT join `ux_flow_grant_live` (the why is in the migration's own block).
         // When it was written the maximum was v58 on `origin/develop`, on `main`, across the 87
         // remote branches that carry the file and in every local worktree of the fleet.
-        assert_eq!(MIGRATIONS.len(), 56, "el catálogo cambió de tamaño");
+        // + `flow_template_ref` (v60, hub#1677 / ADR-0470): the `template_ref` column of `_flow`,
+        // which records WHICH factory recipe (`<module>/<family>`) a flow was built from. It is
+        // what makes the one-tap door idempotent — a second tap has to land on the same automation
+        // — and what lets the listing answer `installed`; the event + command heuristic it replaces
+        // (wi#79) could not tell two families of the same module apart. `NULL` on every flow the
+        // editor creates, so `ALTER … ADD COLUMN IF NOT EXISTS` plus its index is re-runnable and
+        // rewrites nothing, and it is additive, so ADR-0269 retires it by leaving it unwritten.
+        // When it was written the maximum was v59 on `origin/develop`, on `main` and across the
+        // 183 remote branches that carry the file — none of them asked for a v60 — and no local
+        // worktree of the fleet but this one carried it.
+        assert_eq!(MIGRATIONS.len(), 57, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO
