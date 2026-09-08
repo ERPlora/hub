@@ -70,12 +70,15 @@ run() { # $1=git ref ; stdout+stderr -> $tmp_dir/out ; sets $status
 # (hub#1170 channels) and the `git tag --list 'v*'` output (hub#1625 — the `dev` base).
 # `$3` empty = the flag is NOT passed, which is also how a checkout without tags is exercised.
 run_channel() { # $1=git ref ; $2=git describe output ; $3=git tag --list output (optional)
+    # `${extra[@]+…}` y no `"${extra[@]}"` a secas: con `set -u`, el bash 3.2 que trae macOS
+    # mata el script en un array VACÍO («extra[@]: unbound variable»), y esta batería tiene que
+    # correr igual la lance el runner (bash 5) o el portátil.
     local extra=()
     [ -n "${3:-}" ] && extra=(--git-tags "$3")
     PUBLISHED="${PUBLISHED:-}" \
     IMAGE_TAGS_PUBLISHED_CMD="$published_stub" \
         "$script" --manifest "$tmp_dir/repo/Cargo.toml" --image ghcr.io/erplora/hub \
-                  --ref "$1" --sha abc1234def --describe "$2" "${extra[@]}" > "$tmp_dir/out" 2>&1
+                  --ref "$1" --sha abc1234def --describe "$2" ${extra[@]+"${extra[@]}"} > "$tmp_dir/out" 2>&1
     status=$?
 }
 
