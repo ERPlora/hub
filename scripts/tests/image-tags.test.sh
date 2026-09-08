@@ -66,12 +66,16 @@ run() { # $1=git ref ; stdout+stderr -> $tmp_dir/out ; sets $status
     status=$?
 }
 
-# Same, with the `git describe --tags --long` output the workflow passes (hub#1170 channels).
-run_channel() { # $1=git ref ; $2=git describe output ; extra env via caller
+# Same, with the two git seams the workflow passes: the `git describe --tags --long` output
+# (hub#1170 channels) and the `git tag --list 'v*'` output (hub#1625 — the `dev` base).
+# `$3` empty = the flag is NOT passed, which is also how a checkout without tags is exercised.
+run_channel() { # $1=git ref ; $2=git describe output ; $3=git tag --list output (optional)
+    local extra=()
+    [ -n "${3:-}" ] && extra=(--git-tags "$3")
     PUBLISHED="${PUBLISHED:-}" \
     IMAGE_TAGS_PUBLISHED_CMD="$published_stub" \
         "$script" --manifest "$tmp_dir/repo/Cargo.toml" --image ghcr.io/erplora/hub \
-                  --ref "$1" --sha abc1234def --describe "$2" > "$tmp_dir/out" 2>&1
+                  --ref "$1" --sha abc1234def --describe "$2" "${extra[@]}" > "$tmp_dir/out" 2>&1
     status=$?
 }
 
@@ -166,9 +170,9 @@ passed=$((passed + 1))
 # hub's service is registered with (Cloud/Dokploy provisioning). A manual build from
 # `develop` — or any work branch — must never move it. (Since hub#1170 `develop` also gets
 # the moving `:dev` and a prerelease version from `git describe` — see the channel cases
-# below — so this case passes a describe; the assertions about `:latest` are unchanged.)
+# below — so this case passes a describe and a tag list; the `:latest` assertions are unchanged.)
 make_manifest "2.5.0"
-PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487" "v1.1.7"
 [ "$status" -eq 0 ] || fail "a dispatch from develop should be accepted (got $status): $(cat "$tmp_dir/out")"
 grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" \
     && fail "a build from develop must NOT publish :latest — that moves the whole fleet (hub#872)"
@@ -179,7 +183,7 @@ passed=$((passed + 1))
 
 # ── …and neither does an arbitrary work branch ───────────────────────────────────────
 make_manifest "2.5.0"
-PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-61-g60307487"
+PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-61-g60307487" "v1.1.7"
 [ "$status" -eq 0 ] || fail "a dispatch from a work branch should be accepted (got $status): $(cat "$tmp_dir/out")"
 grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" \
     && fail "a build from a work branch must NOT publish :latest (hub#872)"
@@ -249,47 +253,50 @@ passed=$((passed + 1))
 # ═════════════════════════════════════════════════════════════════════════════════════
 
 # ── A push to `develop` publishes `:dev` + `:<sha>` with a PRERELEASE version ─────────
-# `X.Y.Z` is the last reachable `v*` tag; `<n>` commits since; `+g<sha>` build metadata.
-# The version is what `build-hub.yml` stamps into Cargo.toml, so `/readyz` and
-# `/api/hub/context` report it instead of the placeholder.
+# `X.Y.Z` is one patch above the newest `v*` tag the repo HOLDS (hub#1625); `<n>` commits
+# since the last reachable one; `+g<sha>` build metadata. The version is what `build-hub.yml`
+# stamps into Cargo.toml, so `/readyz` and `/api/hub/context` report it instead of the
+# placeholder.
 make_manifest "1.0.0"
-PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487" "v1.1.7"
 [ "$status" -eq 0 ] || fail "a push to develop should be accepted (got $status): $(cat "$tmp_dir/out")"
-grep -q "^version=1.1.7-dev.61+g60307487$" "$tmp_dir/out" \
-    || fail "develop must serve a prerelease derived from git describe — got: $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.8-dev.61+g60307487$" "$tmp_dir/out" \
+    || fail "develop must serve a prerelease ahead of the newest release — got: $(cat "$tmp_dir/out")"
 grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" || fail "develop must publish the moving :dev tag (pre deploys it)"
 grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "develop must publish the immutable sha tag"
 grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" && fail "develop must NOT move :latest (hub#872)"
 grep -qxF "ghcr.io/erplora/hub:canary" "$tmp_dir/out" && fail "develop must NOT move :canary"
 grep -qxF "ghcr.io/erplora/hub:stable" "$tmp_dir/out" && fail "develop must NOT move :stable"
-grep -q "^ghcr.io/erplora/hub:1\.1\.7" "$tmp_dir/out" && fail "develop must NOT mint a version tag"
+grep -q "^ghcr.io/erplora/hub:1\.1\.[78]" "$tmp_dir/out" && fail "develop must NOT mint a version tag"
 grep -q "^stamp=1$" "$tmp_dir/out" || fail "develop must ask the workflow to stamp Cargo.toml"
 passed=$((passed + 1))
 
 # ── …and a manual `workflow_dispatch` from develop is the SAME build ─────────────────
 # The ref decides, not the event: the dispatched build is what pre validates (hub#1170).
 make_manifest "1.0.0"
-GITHUB_EVENT_NAME=workflow_dispatch PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487"
+GITHUB_EVENT_NAME=workflow_dispatch PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487" "v1.1.7"
 [ "$status" -eq 0 ] || fail "a dispatch from develop should be accepted (got $status): $(cat "$tmp_dir/out")"
-grep -q "^version=1.1.7-dev.61+g60307487$" "$tmp_dir/out" || fail "a dispatch from develop must serve the same prerelease"
+grep -q "^version=1.1.8-dev.61+g60307487$" "$tmp_dir/out" || fail "a dispatch from develop must serve the same prerelease"
 grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" || fail "a dispatch from develop must publish :dev"
 grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" && fail "a dispatch from develop must NOT move :latest"
 passed=$((passed + 1))
 
 # ── A work branch gets the honest prerelease too, but never a moving tag ─────────────
 make_manifest "1.0.0"
-PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-3-gdeadbeef"
+PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-3-gdeadbeef" "v1.1.7"
 [ "$status" -eq 0 ] || fail "a work branch build should be accepted (got $status): $(cat "$tmp_dir/out")"
-grep -q "^version=1.1.7-dev.3+gdeadbeef$" "$tmp_dir/out" || fail "a work branch must serve the prerelease, not the placeholder"
+grep -q "^version=1.1.8-dev.3+gdeadbeef$" "$tmp_dir/out" || fail "a work branch must serve the prerelease, not the placeholder"
 grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" && fail "a work branch must NOT move :dev — only develop feeds pre"
 grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "a work branch must still publish the sha tag"
 passed=$((passed + 1))
 
-# ── `develop` sitting exactly on a tag is still a prerelease of it (n=0) ─────────────
+# ── `develop` sitting exactly on a tag is still a prerelease — de la SIGUIENTE (n=0) ─
+# `n=0` no significa «esto es el release»: la imagen sigue siendo `:dev`, mutable, y el
+# número tiene que quedar por delante del tag para no volver a rechazar módulos (hub#1625).
 make_manifest "1.0.0"
-PUBLISHED="" run_channel "refs/heads/develop" "v1.1.9-0-gf2354593"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.9-0-gf2354593" "v1.1.9"
 [ "$status" -eq 0 ] || fail "develop on a tag should be accepted (got $status)"
-grep -q "^version=1.1.9-dev.0+gf2354593$" "$tmp_dir/out" || fail "n=0 is still a dev prerelease — got: $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.10-dev.0+gf2354593$" "$tmp_dir/out" || fail "n=0 is still a dev prerelease — got: $(cat "$tmp_dir/out")"
 passed=$((passed + 1))
 
 # ── Without a usable `git describe`, develop is REFUSED — never the placeholder ──────
@@ -304,6 +311,101 @@ passed=$((passed + 1))
 make_manifest "1.0.0"
 PUBLISHED="" run_channel "refs/heads/develop" "60307487"
 [ "$status" -ne 0 ] || fail "a describe output with no v* tag must be REFUSED"
+passed=$((passed + 1))
+
+# ═════════════════════════════════════════════════════════════════════════════════════
+# hub#1625 — el canal `dev` se numera contra los tags que el repositorio TIENE.
+#
+# `main` es una rama HUÉRFANA (las releases se promueven con `commit-tree`), así que desde
+# `develop` ningún `v1.1.8`…`v1.1.17` es alcanzable y `git describe` se queda clavado en
+# `v1.1.7`: la imagen `:dev` se estampaba `1.1.7-dev.N` con DIEZ releases por debajo del
+# código que ejecuta. Consecuencia medida el 2026-09-08: `whatsapp_inbox` declara suelo
+# 1.1.17 y el hub de pre lo rechazaba con «requiere ERPlora 1.1.17 y este hub es 1.1.7»,
+# un módulo que ese hub sí puede ejecutar.
+#
+# La regla: la base sale del núcleo `X.Y.Z` MÁS ALTO entre los tags `v*` que el repositorio
+# tiene —alcanzables o no— y se sube UN patch. Por delante y no por debajo: `develop` ya
+# contiene lo que ese tag publicó (el tag se corta de su árbol), así que `1.1.17-dev.N`
+# —que en semver 2.0 va POR DEBAJO de `1.1.17`— seguiría mintiendo en el mismo sentido.
+# El `<n>` y el `+g<sha>` siguen saliendo de `git describe`: son el contador que crece
+# commit a commit dentro del canal.
+# ═════════════════════════════════════════════════════════════════════════════════════
+
+# ── La base va por DELANTE del último release, aunque no sea alcanzable ───────────────
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-326-g24ccbdc5" "v1.1.7
+v1.1.15
+v1.1.16
+v1.1.17"
+[ "$status" -eq 0 ] || fail "develop with tags should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.18-dev.326+g24ccbdc5$" "$tmp_dir/out" \
+    || fail "the dev base must be one patch above the newest tag the repo HOLDS — got: $(cat "$tmp_dir/out")"
+# 🔴 El positivo que este caso tiene que cazar: si alguien vuelve a derivar la base de
+# `git describe`, aquí reaparece `1.1.7-dev.326` y el módulo de WhatsApp vuelve a rechazarse.
+grep -q "^version=1\.1\.7-" "$tmp_dir/out" \
+    && fail "the dev base must NOT come from git describe again (hub#1625) — got: $(cat "$tmp_dir/out")"
+# …y sigue siendo el canal `dev`: nada de tags de versión, nada de mover `:latest`.
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" || fail "develop must still publish the moving :dev tag"
+grep -q "^ghcr.io/erplora/hub:1\.1\.18" "$tmp_dir/out" && fail "develop must NOT mint a version tag"
+passed=$((passed + 1))
+
+# ── El tag más nuevo se elige por NÚMERO, no por orden alfabético ─────────────────────
+# `sort` a secas pone `v1.1.9` por encima de `v1.1.10`, y la base saldría una release corta.
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.9-4-gfeedface" "v1.1.9
+v1.1.10"
+[ "$status" -eq 0 ] || fail "develop should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.11-dev.4+gfeedface$" "$tmp_dir/out" \
+    || fail "the newest tag is chosen by NUMBER, not alphabetically — got: $(cat "$tmp_dir/out")"
+passed=$((passed + 1))
+
+# ── Una candidata `-rc.N` también cuenta: develop ya lleva lo que publicó ─────────────
+# `1.2.0-dev.N` iría por DEBAJO de `1.2.0-rc.1` en semver, que es el mismo sentido del bug.
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-326-g24ccbdc5" "v1.1.17
+v1.2.0-rc.1"
+[ "$status" -eq 0 ] || fail "develop should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.2.1-dev.326+g24ccbdc5$" "$tmp_dir/out" \
+    || fail "an rc tag counts towards the dev base — got: $(cat "$tmp_dir/out")"
+passed=$((passed + 1))
+
+# ── Lo que no es `vX.Y.Z` en la lista se ignora; no envenena ni sube la base ──────────
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-326-g24ccbdc5" "nightly
+v1.1
+v1.1.18.1
+v2.x
+v1.1.17"
+[ "$status" -eq 0 ] || fail "junk tags should be ignored, not fatal (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.18-dev.326+g24ccbdc5$" "$tmp_dir/out" \
+    || fail "only vX.Y.Z tags count towards the dev base — got: $(cat "$tmp_dir/out")"
+passed=$((passed + 1))
+
+# ── Sin un solo tag `v*`, develop se NIEGA — nunca inventa el número ──────────────────
+# Un checkout sin tags no sabe contra qué release se numera, y publicar `:dev` a ciegas es
+# lo que dejó a pre diez releases por debajo. Refuse-by-default, como con `git describe`.
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-326-g24ccbdc5"
+[ "$status" -ne 0 ] || fail "develop without any v* tag must be REFUSED, not numbered blindly"
+grep -qi "tag" "$tmp_dir/out" || fail "the refusal should point at the missing tags (fetch-depth/tags)"
+passed=$((passed + 1))
+
+# ── Una rama de trabajo se numera igual que develop ───────────────────────────────────
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-3-gdeadbeef" "v1.1.7
+v1.1.17"
+[ "$status" -eq 0 ] || fail "a work branch should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.18-dev.3+gdeadbeef$" "$tmp_dir/out" \
+    || fail "a work branch gets the same base as develop — got: $(cat "$tmp_dir/out")"
+passed=$((passed + 1))
+
+# ── Un tag de release NO mira la lista: su versión es la del tag, y nada más ──────────
+make_manifest "1.0.0"
+PUBLISHED="1.1.9" run_channel "refs/tags/v1.2.0" "v1.2.0-0-gcafe1234" "v1.1.17
+v9.9.9"
+[ "$status" -eq 0 ] || fail "a final tag should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.2.0$" "$tmp_dir/out" \
+    || fail "a release takes its version from the TAG, never from the tag list — got: $(cat "$tmp_dir/out")"
 passed=$((passed + 1))
 
 # ── An rc tag publishes the CANARY: `:X.Y.Z-rc.N` + `:canary` + `:<sha>` ─────────────
