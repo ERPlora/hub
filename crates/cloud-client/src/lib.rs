@@ -53,7 +53,11 @@ impl Auth {
                 // by the SHAPE of what this hub holds — one header, never both — so a hub
                 // deployed before the switch (a legacy `cloud_api_token`) keeps sending the
                 // legacy header, and the SaaS accepts either (`IsHubMachine`).
-                let header = if is_api_key(token) { "X-Api-Key" } else { "X-Hub-Token" };
+                let header = if is_api_key(token) {
+                    "X-Api-Key"
+                } else {
+                    "X-Hub-Token"
+                };
                 vec![("X-Hub-Id", hub_id.clone()), (header, token.clone())]
             }
             Auth::UserJwt { hub_id, access } => {
@@ -1298,11 +1302,25 @@ mod tests {
             token: key.clone(),
         };
 
-        let r = c.signed("GET", "https://erplora.com/api/v1/hub/device/info/".into(), &auth);
+        let r = c.signed(
+            "GET",
+            "https://erplora.com/api/v1/hub/device/info/".into(),
+            &auth,
+        );
 
-        assert!(r.headers.iter().any(|(n, v)| *n == "X-Api-Key" && *v == key));
-        assert!(!r.headers.iter().any(|(n, _)| *n == "X-Hub-Token"), "{:?}", r.headers);
-        assert!(r.headers.iter().any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Api-Key" && *v == key));
+        assert!(
+            !r.headers.iter().any(|(n, _)| *n == "X-Hub-Token"),
+            "{:?}",
+            r.headers
+        );
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
     }
 
     /// The positive control of the shape check: what is NOT a key keeps the legacy header,
@@ -1325,11 +1343,26 @@ mod tests {
                 hub_id: "hub-1".into(),
                 token: token.to_string(),
             };
-            let r = c.signed("GET", "https://erplora.com/api/v1/hub/device/info/".into(), &auth);
-            assert!(r.headers.iter().any(|(n, _)| *n == "X-Hub-Token"), "{token:?}: {:?}", r.headers);
-            assert!(!r.headers.iter().any(|(n, _)| *n == "X-Api-Key"), "{token:?}: {:?}", r.headers);
+            let r = c.signed(
+                "GET",
+                "https://erplora.com/api/v1/hub/device/info/".into(),
+                &auth,
+            );
+            assert!(
+                r.headers.iter().any(|(n, _)| *n == "X-Hub-Token"),
+                "{token:?}: {:?}",
+                r.headers
+            );
+            assert!(
+                !r.headers.iter().any(|(n, _)| *n == "X-Api-Key"),
+                "{token:?}: {:?}",
+                r.headers
+            );
         }
-        assert!(is_api_key(&format!("erpk_pre_{}", "Z9".repeat(24))), "pre keys are keys too");
+        assert!(
+            is_api_key(&format!("erpk_pre_{}", "Z9".repeat(24))),
+            "pre keys are keys too"
+        );
     }
 
     /// 🔒 Y la puerta es UNA. Este test es de FUENTE a propósito: `Auth::headers` es `pub(crate)`,
