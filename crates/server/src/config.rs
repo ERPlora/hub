@@ -5,7 +5,8 @@
 //! es donde alguien busca «qué env consume el hub»: lista de hosts **de ERPlora**, separados por
 //! comas, con `*.sufijo` admitido (`*.erplora.com,*.pre.erplora.com`). `HUB_CLOUD_API_URL` es de
 //! confianza SIEMPRE y no hace falta repetirlo. Ausente = solo esa; a cualquier otro destino la
-//! petición sale **sin** `X-Hub-Token`/`X-Hub-Id`/Bearer/`X-Webhook-Secret` y se registra un aviso.
+//! petición sale **sin** `X-Api-Key`/`X-Hub-Token`/`X-Hub-Id`/Bearer/`X-Webhook-Secret` y se registra
+//! un aviso.
 //!
 //! ⚠️ Cuando aterrice hub#1470 esta variable pasa a ser **infraestructura fiscal**: sin el FQDN de
 //! la celda dentro, la ruta por la pasarela deja de transmitir.
