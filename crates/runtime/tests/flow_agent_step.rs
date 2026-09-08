@@ -609,7 +609,8 @@ async fn a_pinned_read_answers_only_about_the_customer_this_run_resolved() {
         .await
         .expect_err("«dime lo de la clienta c-theirs» is not what the salon granted");
     assert!(
-        matches!(&err, RuntimeError::Domain { code, .. } if code == grants::ERR_GRANT_PAYLOAD_DENIED),
+        matches!(&err, RuntimeError::Domain { code, .. }
+            if code == grants::ERR_GRANT_PAYLOAD_DENIED),
         "{err}"
     );
 

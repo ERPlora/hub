@@ -1466,7 +1466,14 @@ mod tests {
         .await
         .unwrap();
 
-        let err = check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &sent("channel", "staff"))
+        let err = check_command_grant(
+            &db,
+            HUB,
+            FLOW,
+            RUN,
+            "sales.sale.void",
+            &sent("channel", "staff"),
+        )
             .await
             .expect_err("«de parte del salón» is not what was granted");
         assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
@@ -1652,7 +1659,14 @@ mod tests {
         // And the gate follows the new row, not the old one.
         assert_eq!(
             code_of(
-                &check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &sent("channel", "staff"))
+                &check_command_grant(
+                    &db,
+                    HUB,
+                    FLOW,
+                    RUN,
+                    "sales.sale.void",
+                    &sent("channel", "staff"),
+                )
                     .await
                     .expect_err("the widened call is refused from now on")
             ),
