@@ -102,8 +102,14 @@ describe('ModulePlanPanel', () => {
 
     const pill = w.find('ok-status-pill');
     expect(pill.exists()).toBe(true);
-    // `none` is not a failure, so it must not borrow an alarming tone.
-    expect(pill.attributes('tone')).toBe('neutral');
+    // This used to assert `neutral`, the tone of «No plan» — the Cloud answers `status: 'none'`
+    // when nobody ever bought anything, and this fixture never did. It was the right tone for the
+    // wrong sentence: the fixture declares WhatsApp Free at 0 €, so this hub IS on a plan and the
+    // screen now says so (hub#1652). What the assertion was really guarding — that not having a
+    // PAID subscription is not painted as a failure — is stronger than before, and the module with
+    // no free tier to fall back on keeps the neutral tone in
+    // `ModulePlanPanel.free-tier.hub1652.test.ts`.
+    expect(pill.attributes('tone')).toBe('success');
   });
 
   it('hand-rolls no card of its own: the flattened Ionic padding never reaches it', async () => {
