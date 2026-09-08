@@ -14,6 +14,42 @@
 //! with its `en` + `es` strings (ADR-0055). A code translated to prose here is a code the tab can
 //! no longer act on.
 use crate::*;
+use erplora_runtime::manifest::CapabilityKind;
+
+/// The gate of the three doors: the human **and**, when the caller names a module, the `notify`
+/// capability declared in its manifest and granted by the owner (hub#1682).
+///
+/// The human half does not move — it is [`whatsapp_connect::require_owner`], the same one the four
+/// connect doors use, so an anonymous caller is still `401` and a cashier still `403`.
+///
+/// The module half is new because the CALLER is new. Until hub#1682 nothing in module code could
+/// reach these routes: `ErploraClient` never exposed the transport and `coreRequest` is sealed on
+/// purpose, so an admin session was the whole gate and that was the whole risk. The typed
+/// `whatsappTemplates` surface of `@erplora/module-sdk` changes that — reaching it becomes possible
+/// for EVERY installed module, whenever an admin happens to be logged in — and what is behind the
+/// door is not a read: it is registering, in the business's own Meta account, the templates it will
+/// be judged by, and DELETING the ones already approved. Losing them costs the business every
+/// appointment reminder and every «your order is ready» until Meta approves them again, which takes
+/// days.
+///
+/// **`notify`, and no new capability** (the criterion of ADR-0470). It is the one the owner already
+/// grants as «Notificaciones · permite enviar notificaciones por email, SMS o WhatsApp»
+/// ([`crate::settings::capability_meta`]): a template approved by Meta is the ONLY thing that makes
+/// a WhatsApp notification legal outside the 24 h since the customer last wrote, so this is the
+/// same risk they weighed when they granted it, not a second one to explain.
+///
+/// ⚠️ **The hub#1677 exception does not reach here.** `admin_session_no_capability!` drops this half
+/// for the flow-template switches because the call site replaces it with something NARROWER — a
+/// module may only touch the recipes its own publisher wrote and signed. A Meta template has no
+/// owning module: it belongs to the business, the SaaS stores it per hub, and there is no narrower
+/// rule to put in the gate's place. With nothing to replace it, the default-deny gate stays.
+async fn require_owner_and_notify(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
+    whatsapp_connect::require_owner(st, headers).await?;
+    let rt = st.runtime.read().await;
+    crate::flows_api::require_module_capability(headers, &rt, CapabilityKind::Notify)
+        .await
+        .map(|_| ())
+}
 
 /// A Meta template name, as the SaaS defines it (`NAME_RE = ^[a-z0-9_]{1,512}$` in
 /// `apps/whatsapp_inbox/services/templates.py`). Only the DELETE needs this: the name travels
@@ -42,7 +78,7 @@ fn refused(code: &str, message: &str) -> Response {
 /// Read when the tab OPENS, never on a timer: the SaaS refreshes against Meta on every call and
 /// that path carries no throttle of its own (reviewer of saas#1905).
 pub(crate) async fn whatsapp_templates(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    if let Err(r) = whatsapp_connect::require_owner(&st, &headers).await {
+    if let Err(r) = require_owner_and_notify(&st, &headers).await {
         return r;
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
@@ -66,7 +102,7 @@ pub(crate) async fn whatsapp_template_register(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
-    if let Err(r) = whatsapp_connect::require_owner(&st, &headers).await {
+    if let Err(r) = require_owner_and_notify(&st, &headers).await {
         return r;
     }
     if !body.is_object() {
@@ -90,7 +126,7 @@ pub(crate) async fn whatsapp_template_delete(
     Path(name): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(r) = whatsapp_connect::require_owner(&st, &headers).await {
+    if let Err(r) = require_owner_and_notify(&st, &headers).await {
         return r;
     }
     if !template_name_is_safe(&name) {
