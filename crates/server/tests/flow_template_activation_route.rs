@@ -106,6 +106,21 @@ fn appointments_dir(root: &Path, version: &str) -> PathBuf {
 
 /// El módulo que PUBLICA la receta de fábrica, con su familia completa en `flows/`.
 fn whatsapp_dir(root: &Path, floor: &str) -> PathBuf {
+    // Dos permisos a propósito: uno ancho y uno ACOTADO (hub#1623/#1654). El acotado es el caso
+    // real: anular una cita **como clienta**, nunca de parte del salón.
+    whatsapp_dir_with_grants(
+        root,
+        floor,
+        json!({ "grants": [
+            { "kind": "command", "value": CREATE },
+            { "kind": "command", "value": CANCEL, "payload": { "channel": "customer" } },
+        ]}),
+    )
+}
+
+/// El mismo módulo con el sidecar de permisos que se le pase, que es lo que permite construir el
+/// caso en el que `grants::replace` FALLA a mitad de la activación.
+fn whatsapp_dir_with_grants(root: &Path, floor: &str, grants: Value) -> PathBuf {
     let dir = root.join(WHATSAPP);
     std::fs::create_dir_all(dir.join("flows")).unwrap();
     std::fs::write(
@@ -132,15 +147,9 @@ fn whatsapp_dir(root: &Path, floor: &str) -> PathBuf {
         )
         .unwrap();
     }
-    // Dos permisos a propósito: uno ancho y uno ACOTADO (hub#1623/#1654). El acotado es el caso
-    // real: anular una cita **como clienta**, nunca de parte del salón.
     std::fs::write(
         dir.join(format!("flows/{FAMILY}.grants.json")),
-        json!({ "grants": [
-            { "kind": "command", "value": CREATE },
-            { "kind": "command", "value": CANCEL, "payload": { "channel": "customer" } },
-        ]})
-        .to_string(),
+        grants.to_string(),
     )
     .unwrap();
     std::fs::write(
@@ -207,6 +216,11 @@ async fn fixture() -> Fixture {
 /// encima es el caso «descartada por suelo» (hub#1649), donde la receta NO se ofrece y encenderla
 /// tiene que negarse con el motivo del descarte.
 async fn fixture_with(floor: &str) -> Fixture {
+    fixture_with_grants(floor, None).await
+}
+
+/// `grants` = el sidecar de permisos de la familia, cuando el caso lo necesita distinto del real.
+async fn fixture_with_grants(floor: &str, grants: Option<Value>) -> Fixture {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -246,9 +260,11 @@ async fn fixture_with(floor: &str) -> Fixture {
     rt.set_module_capability(EDITOR, "manage_flows", true, "hub_user:admin")
         .await
         .unwrap();
-    rt.install_from_dir(&whatsapp_dir(&modules, floor))
-        .await
-        .unwrap();
+    let whatsapp = match grants {
+        Some(sidecar) => whatsapp_dir_with_grants(&modules, floor, sidecar),
+        None => whatsapp_dir(&modules, floor),
+    };
+    rt.install_from_dir(&whatsapp).await.unwrap();
 
     let cfg = HubConfig {
         demo: false,
@@ -622,6 +638,78 @@ fn modules_of(list: &Value) -> Vec<String> {
         .iter()
         .map(|t| t["module"].as_str().unwrap_or_default().to_string())
         .collect()
+}
+
+#[tokio::test]
+async fn a_recipe_whose_permissions_are_refused_is_never_left_running() {
+    // 🔴 **El ORDEN es la garantía, y NO hay transacción.** `DatabaseAdapter` solo ofrece
+    // `execute_tx(&[(String, Params)])` —una lista de sentencias armada de antemano— y crear la
+    // receta, sembrar sus triggers y conceder sus permisos LEEN por el medio, así que activar no
+    // cabe en una. Lo que sustituye a la transacción es el orden: validar → crear/reutilizar EN
+    // PAUSA → `replace` de los grants (que ya es todo-o-nada) → encender.
+    //
+    // Lo que ese orden compra es exactamente este test: si los permisos se caen a mitad, lo que
+    // queda es una receta APAGADA y sin permisos —el estado que ADR-0463 §5 llama normal, y que el
+    // siguiente toque reutiliza—. Lo que no puede pasar nunca es lo contrario: una automatización
+    // CORRIENDO con la mitad de sus permisos, disparándose sola con un `flow.grant_denied` en cada
+    // paso. Crear ya encendida y apagar después no sería lo mismo: entre las dos escrituras la
+    // automatización está viva.
+    //
+    // El fallo se provoca por donde se provoca de verdad: un sidecar que pide un command que
+    // ningún módulo instalado publica. `wanted_grants` no puede verlo (solo mira el KIND) y
+    // `store::create` tampoco (los pasos sí son válidos), así que revienta dentro de
+    // `grants::replace`, ya con la fila escrita — que es el único sitio donde este orden importa.
+    let fx = fixture_with_grants(
+        "1.1.69",
+        Some(json!({ "grants": [
+            { "kind": "command", "value": CREATE },
+            { "kind": "command", "value": "nobody.ships.this" },
+        ]})),
+    )
+    .await;
+
+    let response = send(
+        &fx.router,
+        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+    )
+    .await;
+    assert!(
+        !response.status().is_success(),
+        "un permiso que no existe no se concede a medias: la activación se niega entera"
+    );
+
+    // Y lo que quedó en el hub no está corriendo. Se pregunta por la MISMA puerta que lee la
+    // pantalla del módulo, que es donde se notaría.
+    let listing = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
+    assert_eq!(listing.status(), StatusCode::OK);
+    let body = body_json(listing).await;
+    let card = body["data"]
+        .as_array()
+        .expect("una lista de plantillas")
+        .iter()
+        .find(|t| t["family"] == FAMILY)
+        .expect("su receta sigue ofreciéndose: lo que falló es encenderla, no publicarla")
+        .clone();
+    assert_ne!(
+        card["installed"]["enabled"],
+        json!(true),
+        "una automatización CORRIENDO con la mitad de sus permisos es lo único que el orden \
+         validar → crear en pausa → grants → encender existe para impedir"
+    );
+
+    // Y el control positivo de que este test puede fallar: la receta del vecino, con sus permisos
+    // en su sitio, SÍ se queda corriendo por esta misma puerta.
+    let ok = send(
+        &fx.router,
+        post(
+            &activate_uri(NEIGHBOUR, NEIGHBOUR_FAMILY),
+            Some(&fx.admin),
+            Some(NEIGHBOUR),
+        ),
+    )
+    .await;
+    assert!(ok.status().is_success(), "control: una receta sana sí se enciende");
+    assert_eq!(body_json(ok).await["data"]["enabled"], json!(true));
 }
 
 #[tokio::test]
