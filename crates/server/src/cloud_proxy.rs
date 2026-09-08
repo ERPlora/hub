@@ -91,6 +91,70 @@ pub(crate) async fn proxy_cloud_get(
     }
 }
 
+/// Hub-scoped call to the Cloud with a method OTHER than GET, JSON in (when there is a body) and
+/// the Cloud's status + bytes out. Same credential rule as [`cloud_get_raw`]: the machine secret
+/// is materialised for THIS destination only (hub#1464) and never copied around.
+///
+/// The method comes from the [`cloud_client::PreparedRequest`] itself, so a door that the client
+/// declares as `DELETE` cannot be sent as a `POST` by the handler that proxies it.
+pub(crate) async fn cloud_send_raw(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+    body: Option<&Value>,
+) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
+    let Some(auth) = auth::hub_scoped_auth(headers, st) else {
+        return Err(CloudGetError::NoCredential);
+    };
+    let method = reqwest::Method::from_bytes(req.method.as_bytes())
+        .map_err(|e| CloudGetError::Network(e.to_string()))?;
+    let mut r = st.http.request(method, &req.url);
+    for (k, v) in
+        cloud_client::CloudClient::new(&st.config.cloud_base_url).headers_for(&req.url, &auth)
+    {
+        r = r.header(k, v);
+    }
+    if let Some(language) = headers.get(axum::http::header::ACCEPT_LANGUAGE) {
+        r = r.header(axum::http::header::ACCEPT_LANGUAGE, language);
+    }
+    if let Some(body) = body {
+        r = r.json(body);
+    }
+    let resp = r
+        .send()
+        .await
+        .map_err(|e| CloudGetError::Network(e.to_string()))?;
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| CloudGetError::Network(e.to_string()))?;
+    Ok((status, bytes))
+}
+
+/// Hub-scoped non-GET call to the Cloud, returning its answer untouched (see [`cloud_send_raw`]).
+pub(crate) async fn proxy_cloud_send(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+    body: Option<&Value>,
+) -> Response {
+    match cloud_send_raw(st, headers, req, body).await {
+        Ok((status, bytes)) => cloud_body_passthrough(status, bytes),
+        Err(e) => cloud_get_error_response(e),
+    }
+}
+
+/// Like [`cloud_json_passthrough`], but an EMPTY answer stays empty: a `204 No Content` (what the
+/// SaaS returns when it drops a WhatsApp template) must not grow a `content-type: application/json`
+/// and a zero-byte body that `response.json()` in the browser then chokes on.
+pub(crate) fn cloud_body_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
+    if body.is_empty() {
+        return status.into_response();
+    }
+    cloud_json_passthrough(status, body)
+}
+
 /// Hands the front the Cloud's JSON as it came: same status, `no-store`, nothing reinterpreted.
 pub(crate) fn cloud_json_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
     (

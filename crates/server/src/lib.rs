@@ -97,6 +97,7 @@ pub mod usage_series;
 pub mod version;
 pub mod whatsapp_connect;
 pub mod whatsapp_quota;
+pub mod whatsapp_templates;
 
 pub use state::{
     AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, WsEvent, DEV_HUB_ID,

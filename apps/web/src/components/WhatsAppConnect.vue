@@ -4,6 +4,11 @@
 // foreign script may run from a module bundle — so the shell owns the popup, the CSP exception
 // and the runtime doors, and the module only embeds this element where its «Channel» block is.
 //
+// No `<style>` block here on purpose (hub#1614): this component is only ever mounted as the
+// custom element `<erp-whatsapp-connect>`, and Vite would send a scoped block to the shell's
+// global stylesheet — which never reaches inside the module's shadow root. Its rules live with
+// the element, in `elements/whatsapp-connect.ts`, and travel with it.
+//
 // Three states, one sentence each: no Meta app configured on the SaaS → nothing at all (a button
 // that opens nothing is worse than none); no number → the button; a number → the number, its
 // origin (the WhatsApp Business app, when it came from there) and «Disconnect». A refusal from
@@ -202,38 +207,3 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
   </section>
 </template>
 
-<style scoped>
-.whatsapp-connect {
-  display: grid;
-  gap: 0.5rem;
-}
-.whatsapp-connect__number {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-.whatsapp-connect__identity {
-  display: grid;
-  gap: 0.25rem;
-}
-.whatsapp-connect__phone {
-  font-variant-numeric: tabular-nums;
-}
-.whatsapp-connect__badges {
-  display: inline-flex;
-  gap: 0.375rem;
-}
-.whatsapp-connect__intro,
-.whatsapp-connect__help,
-.whatsapp-connect__admin-only,
-.whatsapp-connect__status {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--ion-color-medium, #6b7280);
-}
-.whatsapp-connect__status--error {
-  color: var(--ion-color-danger, #b91c1c);
-}
-</style>
