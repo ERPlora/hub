@@ -61,6 +61,8 @@ describe('the «Your plan» badge has room above its card (hub#1652)', () => {
     // current card reserved room, the rows would jump height as your plan changes.
     const col = /<ion-col[^>]*v-for="tier in tiers"[^>]*>/.exec(panel)?.[0] ?? '';
     expect(col, 'the tier `ion-col` is not where this test thinks it is').not.toBe('');
-    expect(col).toContain('tier-col');
+    // A STATIC `class`, not a `:class` bound to which tier you are on: a conditional reserve is
+    // exactly the bug this test exists to reject, and it would still contain the string.
+    expect(col).toMatch(/\sclass="[^"]*\btier-col\b/);
   });
 });
