@@ -277,6 +277,14 @@ async fn deleting_a_template_names_it_in_the_path_and_answers_with_no_content() 
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    // A `204` has to stay EMPTY on the way out, header included: the tab calls this door with
+    // `fetch` and a `content-type: application/json` over zero bytes is what makes the browser's
+    // `response.json()` throw on a delete that actually worked.
+    assert_eq!(
+        response.headers().get(axum::http::header::CONTENT_TYPE),
+        None,
+        "a 204 must not be announced as JSON"
+    );
     let s = seen.lock().unwrap();
     assert_eq!(s.path, "delete:table_ready");
     machine_credential_and_nothing_else(&s);
