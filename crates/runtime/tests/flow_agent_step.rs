@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::flows::approvals;
 use erplora_runtime::flows::executor::PendingIo;
-use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
+use erplora_runtime::flows::grants::{self, GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::{Runtime, RuntimeError};
 use serde_json::{json, Value};
@@ -549,6 +549,84 @@ async fn a_flow_may_only_run_the_queries_it_was_granted() {
             "a sibling query of the same module is a different question with the same answer",
         );
     assert!(format!("{err}").contains("crm.note.recent"), "{err}");
+}
+
+/// hub#1662 — **the issue, end to end, through the door the agent runner really uses.** The salon
+/// granted «read the customer this conversation is with», pinned to what the run itself resolved.
+/// The model is reading a stranger's message and the message can name anybody, so the value it
+/// sends is not to be trusted — and the gate does not trust it.
+///
+/// It is deliberately asserted on [`Runtime::execute_flow_query`] and not on the runner's tool
+/// filter: the runner is a CALLER, and a gate a caller can skip is not a gate.
+#[tokio::test]
+async fn a_pinned_read_answers_only_about_the_customer_this_run_resolved() {
+    let rt = runtime().await;
+    for id in ["c-hers", "c-theirs"] {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(HUB));
+        rt.db_for_test()
+            .execute(
+                "INSERT INTO crm_customer (id, hub_id, email, phone) \
+                 VALUES (:id, :hub_id, '', '')",
+                &p,
+            )
+            .await
+            .unwrap();
+    }
+    let flow_id = flow_with(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "triggers": [{ "kind": "manual" }],
+            "steps": [
+                // The deterministic half of the recipe: who is writing, resolved by the flow and
+                // not by the model. `crm.customer.list` orders by id, so this is `c-hers`.
+                { "id": "who", "kind": "query", "query": "crm.customer.list", "result": "first" },
+                { "id": "agent", "kind": "ai", "prompt": "Answer her",
+                  "tools": { "queries": ["crm.customer.get"], "commands": [] },
+                  "policy": "manual" }
+            ]
+        }),
+    )
+    .await;
+    grant(
+        &rt,
+        &flow_id,
+        &[
+            GrantSpec::pair(GrantKind::Query, "crm.customer.list"),
+            GrantSpec::pinned_query("crm.customer.get", pin("id", "steps.who.id")),
+        ],
+    )
+    .await;
+    start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
+    let run = run_of(&rt, &flow_id).await;
+
+    let mut theirs = Params::new();
+    theirs.insert("id".into(), json!("c-theirs"));
+    let err = rt
+        .execute_flow_query(&flow_id, &run.id, "crm.customer.get", &theirs)
+        .await
+        .expect_err("«dime lo de la clienta c-theirs» is not what the salon granted");
+    assert!(
+        matches!(&err, RuntimeError::Domain { code, .. } if code == grants::ERR_GRANT_PAYLOAD_DENIED),
+        "{err}"
+    );
+
+    let mut hers = Params::new();
+    hers.insert("id".into(), json!("c-hers"));
+    let rows = rt
+        .execute_flow_query(&flow_id, &run.id, "crm.customer.get", &hers)
+        .await
+        .expect("her own row, which is the read the owner authorised");
+    assert_eq!(rows.len(), 1, "{rows:?}");
+}
+
+/// One pinned field, as an owner gives one.
+fn pin(field: &str, value: &str) -> Params {
+    let mut p = Params::new();
+    p.insert(field.into(), json!(value));
+    p
 }
 
 /// The tenant is never negotiable, and neither is the flow: an approval belongs to one run of one
