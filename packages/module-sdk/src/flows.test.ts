@@ -17,6 +17,7 @@ import {
   EVENTS_BASE_PATH,
   FLOWS_BASE_PATH,
   HttpWsTransport,
+  INVALID_ARGUMENT,
   MODULE_HEADER,
   MODULE_SCOPE_REQUIRED,
   RELEASE_REVOKED,
@@ -100,9 +101,11 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     .filter((n) => n !== 'constructor')
     .sort();
   assert.deepEqual(methods, [
+    'activateTemplate',
     'approvals',
     'approve',
     'create',
+    'deactivateTemplate',
     'deleteSecret',
     'get',
     'getRun',
@@ -140,6 +143,8 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
   await flows.deleteSecret('API_KEY');
   await flows.schema();
   await flows.templates();
+  await flows.activateTemplate('appointment-from-whatsapp');
+  await flows.deactivateTemplate('appointment-from-whatsapp');
 
   assert.deepEqual(
     calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
@@ -164,6 +169,10 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
       // hub#1611 — the automations the installed modules ship. A static segment, so it never
       // collides with `/flows/:id`; the hub side pins that against the real router.
       'GET /api/hub/flows/templates',
+      // hub#1677 / ADR-0470 — turning MY OWN recipe on in one tap. The module id in the path is
+      // the client's own and is never an argument: see the test below.
+      'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/activate',
+      'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/deactivate',
     ],
   );
   for (const call of calls) {
@@ -647,4 +656,37 @@ test('hub#953: a hub older than these routes leaves the methods ABSENT, so the s
       `\`typeof client.events.${name} === 'function'\` is the probe a module writes`,
     );
   }
+});
+
+test('hub#1677: a module can only name ITS OWN id in the activation path', async () => {
+  // ADR-0470 §1: a module turns on its own recipes and nobody else's. The hub refuses a mismatch
+  // with `403 flow.template_not_yours`, and this surface makes the mismatch unrepresentable: the
+  // module segment comes from `forModule(<id>)`, never from an argument, so there is no call to
+  // write that would even ask.
+  const { client, calls } = scoped({ ok: true, data: null });
+
+  await client.flows.activateTemplate('appointment-from-whatsapp');
+
+  assert.equal(
+    calls[0].url.replace('http://hub', ''),
+    `${FLOWS_BASE_PATH}/templates/${EDITOR}/appointment-from-whatsapp/activate`,
+  );
+  assert.equal(calls[0].headers[MODULE_HEADER], EDITOR);
+});
+
+test('hub#1677: a family that would not survive a URL is refused before it is pasted into one', async () => {
+  const { client, calls } = scoped({ ok: true, data: null });
+
+  for (const bad of ['../../flows', 'family/with/slashes', '', 'has spaces']) {
+    await assert.rejects(
+      () => client.flows.activateTemplate(bad),
+      (e: unknown) => e instanceof ErploraError && e.code === INVALID_ARGUMENT,
+      `\`${bad}\` must not reach the hub as a path segment`,
+    );
+    await assert.rejects(
+      () => client.flows.deactivateTemplate(bad),
+      (e: unknown) => e instanceof ErploraError && e.code === INVALID_ARGUMENT,
+    );
+  }
+  assert.deepEqual(calls, [], 'and nothing was sent');
 });

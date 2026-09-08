@@ -48,7 +48,17 @@ impl Auth {
     pub(crate) fn headers(&self) -> Vec<(&'static str, String)> {
         match self {
             Auth::HubToken { hub_id, token } => {
-                vec![("X-Hub-Id", hub_id.clone()), ("X-Hub-Token", token.clone())]
+                // ADR-0467 (saas#1928): the machine credential is an API key since the SaaS
+                // mints one into `HUB_CLOUD_API_TOKEN` on every deploy. The header is decided
+                // by the SHAPE of what this hub holds — one header, never both — so a hub
+                // deployed before the switch (a legacy `cloud_api_token`) keeps sending the
+                // legacy header, and the SaaS accepts either (`IsHubMachine`).
+                let header = if is_api_key(token) {
+                    "X-Api-Key"
+                } else {
+                    "X-Hub-Token"
+                };
+                vec![("X-Hub-Id", hub_id.clone()), (header, token.clone())]
             }
             Auth::UserJwt { hub_id, access } => {
                 vec![
@@ -64,6 +74,18 @@ impl Auth {
             }
         }
     }
+}
+
+/// Whether a machine credential is an API key of the SaaS (`erpk_<live|pre>_<48 base62>`,
+/// ADR-0467) rather than a legacy `cloud_api_token`. The shape is the contract the SaaS itself
+/// parses (`apps/auth/apikeys/models.py::parse_key`); anything else is sent as before.
+pub fn is_api_key(token: &str) -> bool {
+    let mut parts = token.split('_');
+    matches!(
+        (parts.next(), parts.next(), parts.next(), parts.next()),
+        (Some("erpk"), Some("live" | "pre"), Some(secret), None)
+            if secret.len() == 48 && secret.bytes().all(|b| b.is_ascii_alphanumeric())
+    )
 }
 
 /// Una petición lista para ejecutar por el cliente HTTP del llamador.
@@ -1266,6 +1288,81 @@ mod tests {
             .headers
             .iter()
             .any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
+    }
+
+    /// ADR-0467 (saas#1928): the SaaS mints an API key into `HUB_CLOUD_API_TOKEN` on every
+    /// deploy. A hub holding a key sends it as `X-Api-Key`; one still holding its legacy
+    /// `cloud_api_token` keeps the legacy header — decided by shape, ONE header, never both.
+    #[test]
+    fn a_machine_credential_shaped_like_an_api_key_travels_as_x_api_key() {
+        let c = CloudClient::new("https://erplora.com");
+        let key = format!("erpk_live_{}", "a".repeat(48));
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: key.clone(),
+        };
+
+        let r = c.signed(
+            "GET",
+            "https://erplora.com/api/v1/hub/device/info/".into(),
+            &auth,
+        );
+
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Api-Key" && *v == key));
+        assert!(
+            !r.headers.iter().any(|(n, _)| *n == "X-Hub-Token"),
+            "{:?}",
+            r.headers
+        );
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
+    }
+
+    /// The positive control of the shape check: what is NOT a key keeps the legacy header,
+    /// including near misses the SaaS would refuse as a key (wrong prefix, wrong length,
+    /// a character outside base62, a fourth segment).
+    #[test]
+    fn anything_not_shaped_like_an_api_key_keeps_the_legacy_header() {
+        for token in [
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", // secrets.token_hex(32)
+            &format!("erpk_live_{}", "a".repeat(47)),
+            &format!("erpk_live_{}", "a".repeat(49)),
+            &format!("erpk_test_{}", "a".repeat(48)),
+            &format!("erpk_live_{}-", "a".repeat(47)),
+            &format!("erpk_live_{}_x", "a".repeat(48)),
+            "",
+        ] {
+            assert!(!is_api_key(token), "{token:?} is not a key");
+            let c = CloudClient::new("https://erplora.com");
+            let auth = Auth::HubToken {
+                hub_id: "hub-1".into(),
+                token: token.to_string(),
+            };
+            let r = c.signed(
+                "GET",
+                "https://erplora.com/api/v1/hub/device/info/".into(),
+                &auth,
+            );
+            assert!(
+                r.headers.iter().any(|(n, _)| *n == "X-Hub-Token"),
+                "{token:?}: {:?}",
+                r.headers
+            );
+            assert!(
+                !r.headers.iter().any(|(n, _)| *n == "X-Api-Key"),
+                "{token:?}: {:?}",
+                r.headers
+            );
+        }
+        assert!(
+            is_api_key(&format!("erpk_pre_{}", "Z9".repeat(24))),
+            "pre keys are keys too"
+        );
     }
 
     /// 🔒 Y la puerta es UNA. Este test es de FUENTE a propósito: `Auth::headers` es `pub(crate)`,

@@ -41,6 +41,14 @@ pub struct Flow {
     pub created_by: String,
     pub updated_at: String,
     pub updated_by: String,
+    /// The factory recipe this flow was built from (`<module>/<family>`), or `None` when a person
+    /// wrote it in the editor (hub#1677, ADR-0470).
+    ///
+    /// It is what makes «activate» idempotent: the second tap finds this row instead of creating a
+    /// second copy of the same automation. It travels in the API because the module's screen reads
+    /// it to say «active» — the heuristic it replaces (guessing by trigger event + command, wi#79)
+    /// could not tell two families of the same module apart.
+    pub template_ref: Option<String>,
 }
 
 /// What a `POST`/`PUT` carries. The definition is validated before anything touches the database.
@@ -164,6 +172,25 @@ pub async fn create(
     new: &NewFlow,
     by: &str,
 ) -> Result<Flow> {
+    create_from_template(db, hub_id, registry, new, by, None).await
+}
+
+/// The same creation, remembering **which factory recipe it came from** (hub#1677, ADR-0470).
+///
+/// [`create`] delegates here with `None`, which is every flow a person writes in the editor: one
+/// implementation, so the recipe path cannot drift away from the hand-written one on the checks
+/// that matter (the document parses, the commands and queries it names exist).
+///
+/// `template_ref` is `<module>/<family>` and is what [`find_by_template_ref`] looks a flow up by,
+/// which is what makes «activate» idempotent instead of a second copy per tap.
+pub async fn create_from_template(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    registry: &Registry,
+    new: &NewFlow,
+    by: &str,
+    template_ref: Option<&str>,
+) -> Result<Flow> {
     // Parse BEFORE writing: a stored document that does not parse is a flow that fails at 3 AM
     // instead of at the screen where it was written.
     let def = FlowDefinition::parse(&new.definition)?;
@@ -180,16 +207,43 @@ pub async fn create(
     p.insert("definition".into(), json!(new.definition.to_string()));
     p.insert("now".into(), json!(now));
     p.insert("by".into(), json!(by));
+    p.insert("template_ref".into(), json!(template_ref));
     db.execute(
         "INSERT INTO _flow (id, hub_id, name, enabled, schema_version, definition, \
-                            created_at, created_by, updated_at, updated_by) \
+                            created_at, created_by, updated_at, updated_by, template_ref) \
          VALUES (:id, :hub_id, :name, :enabled, :schema_version, :definition, \
-                 :now, :by, :now, :by)",
+                 :now, :by, :now, :by, :template_ref)",
         &p,
     )
     .await?;
     seed_triggers(db, hub_id, &id, &def, new.enabled).await?;
     get(db, hub_id, &id).await
+}
+
+/// The flow this hub already built from `template_ref`, if any (hub#1677).
+///
+/// Scoped to the hub like every other read here, and it skips the soft-deleted: a recipe whose
+/// flow the owner deleted is a recipe that is **not** installed, and activating it again has to
+/// build a new one rather than resurrect a row the owner binned.
+pub async fn find_by_template_ref(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    template_ref: &str,
+) -> Result<Option<Flow>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("template_ref".into(), json!(template_ref));
+    let res = db
+        .query(
+            "SELECT id, name, enabled, schema_version, definition, created_at, created_by, \
+                    updated_at, updated_by, template_ref \
+             FROM _flow \
+             WHERE hub_id = :hub_id AND template_ref = :template_ref AND deleted_at IS NULL \
+             ORDER BY created_at, id",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().map(flow_row))
 }
 
 pub async fn update(
@@ -231,7 +285,7 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<Flo
     let res = db
         .query(
             "SELECT id, name, enabled, schema_version, definition, created_at, created_by, \
-                    updated_at, updated_by \
+                    updated_at, updated_by, template_ref \
              FROM _flow WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
@@ -245,7 +299,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Flow>> {
     let res = db
         .query(
             "SELECT id, name, enabled, schema_version, definition, created_at, created_by, \
-                    updated_at, updated_by \
+                    updated_at, updated_by, template_ref \
              FROM _flow WHERE hub_id = :hub_id AND deleted_at IS NULL ORDER BY created_at, id",
             &p,
         )
@@ -340,6 +394,12 @@ fn flow_row(row: &Json) -> Flow {
         created_by: text("created_by"),
         updated_at: text("updated_at"),
         updated_by: text("updated_by"),
+        // `NULL` and `''` both mean «no recipe»: the column is nullable, and an adapter that hands
+        // back an empty string for a NULL must not invent a family whose name is the empty string.
+        template_ref: row["template_ref"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
     }
 }
 

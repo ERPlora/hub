@@ -682,13 +682,13 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 
 | Canal | Lo dispara | Versión horneada | Tags |
 |---|---|---|---|
-| **`dev`** | push/dispatch en `develop` — lo despliega **pre** | `X.Y.Z-dev.<n>+g<sha>` (`git describe --tags --long`: último tag `v*` alcanzable + commits desde) | `:dev` |
+| **`dev`** | push/dispatch en `develop` — lo despliega **pre** | `X.Y.Z-dev.<n>+g<sha>` — `X.Y.Z` es **un patch por encima** del tag `v*` más nuevo que el repo **tiene** (`git tag --list`; hub#1625: `main` es huérfano y `git describe` se quedaba diez releases atrás); `<n>`/`<sha>` de `git describe --tags --long` | `:dev` |
 | **`canary`** | tag `vX.Y.Z-rc.N` — candidata para un **subconjunto** de hubs de prod | `X.Y.Z-rc.N` | `:X.Y.Z-rc.N` `:canary` (NO mueve `:latest`, `:X.Y` ni `:X`) |
 | **`stable` = `latest`** | tag `vX.Y.Z` final — lo que estrena todo hub nuevo | `X.Y.Z` | `:X.Y.Z` `:X.Y` `:X` `:latest` `:stable` (alias, mismo digest) |
 
 `main` sigue como hasta ahora (`:latest` + `:<sha>`, versión del Cargo: main = prod). El guard
 rechaza un tag no semver, ya publicado, no monótono o una rc de una versión ya cerrada, y en
-`develop` se **niega** a publicar sin `git describe` antes que hornear el hueco `1.0.0`. Un tag
+`develop` se **niega** a publicar sin `git describe` o sin un solo tag `v*` antes que hornear el hueco `1.0.0`. Un tag
 `-rc.N` **no** dispara `tauri-release.yml` (las stores son irreversibles).
 
 ---

@@ -1881,6 +1881,34 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NUL
         postgres: "\
 ALTER TABLE _flow_grants ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT '{}';",
     },
+    // ── v60 — hub#1677 / ADR-0470: which factory recipe a flow came from ──────────────────────
+    // A module activates its OWN recipe in one tap, and doing it twice has to land on the SAME
+    // flow instead of a second copy. So the row has to remember which template it was built from,
+    // and `<module>/<family>` is that name: it is what the module already knows about itself, and
+    // it is stable across releases of the module because the family is the file prefix the
+    // publisher chose.
+    //
+    // It could not be read back out of the document: the root of `flow.schema.json` is
+    // `additionalProperties: false`, so the template's origin has nowhere to live inside the JSON,
+    // and the «guess it from the trigger event plus the command» heuristic does not separate two
+    // families of the same module — with two appointment recipes and one of them installed, both
+    // read as «you already have this one».
+    //
+    // `NULL` on purpose for everything the editor writes: a flow somebody built by hand came from
+    // no recipe, and `NULL` says that, while `''` would be a family whose name is empty.
+    //
+    // 🔴 The number is the NEXT ONE AFTER THE MAXIMUM, never a gap: when it was written the maximum
+    // was v59 on `origin/develop` and across every remote branch (checked one by one). `apply`
+    // compares against the highest applied version and SILENTLY skips anything below it, so a
+    // rebase that lands another v60 has to renumber this one.
+    SystemMigration {
+        version: 60,
+        name: "flow_template_ref",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_ref TEXT;\
+CREATE INDEX IF NOT EXISTS ix_flow_template_ref ON _flow (hub_id, template_ref);",
+    },
 
 ];
 
@@ -3800,7 +3828,17 @@ mod kind_contract_tests {
         // deliberately does NOT join `ux_flow_grant_live` (the why is in the migration's own block).
         // When it was written the maximum was v58 on `origin/develop`, on `main`, across the 87
         // remote branches that carry the file and in every local worktree of the fleet.
-        assert_eq!(MIGRATIONS.len(), 56, "el catálogo cambió de tamaño");
+        // + `flow_template_ref` (v60, hub#1677 / ADR-0470): the `template_ref` column of `_flow`,
+        // which records WHICH factory recipe (`<module>/<family>`) a flow was built from. It is
+        // what makes the one-tap door idempotent — a second tap has to land on the same automation
+        // — and what lets the listing answer `installed`; the event + command heuristic it replaces
+        // (wi#79) could not tell two families of the same module apart. `NULL` on every flow the
+        // editor creates, so `ALTER … ADD COLUMN IF NOT EXISTS` plus its index is re-runnable and
+        // rewrites nothing, and it is additive, so ADR-0269 retires it by leaving it unwritten.
+        // When it was written the maximum was v59 on `origin/develop`, on `main` and across the
+        // 183 remote branches that carry the file — none of them asked for a v60 — and no local
+        // worktree of the fleet but this one carried it.
+        assert_eq!(MIGRATIONS.len(), 57, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

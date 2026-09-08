@@ -17,8 +17,11 @@
 #                            el SaaS promueve a un SUBCONJUNTO de hubs de prod. NO mueve :latest.
 #   - `dev`                 push a `develop` (o `workflow_dispatch` desde develop) → :dev. Es lo que
 #                            despliega PRE. La versión horneada es la prerelease
-#                            `X.Y.Z-dev.<n>+g<sha>` (de `git describe --tags --long`), no el hueco
-#                            del Cargo: servir `1.0.0` desde develop era el bug de hub#1170.
+#                            `X.Y.Z-dev.<n>+g<sha>`, no el hueco del Cargo: servir `1.0.0` desde
+#                            develop era el bug de hub#1170. `X.Y.Z` es UN PATCH POR ENCIMA del
+#                            tag `v*` más nuevo que el repositorio TIENE (hub#1625: `main` es
+#                            huérfana, así que `git describe` se queda diez releases atrás y PRE
+#                            rechazaba módulos que sí podía ejecutar); `<n>`/`<sha>`, de describe.
 #   - `main`                push a `main` → :latest + :<sha>, como siempre (main = prod).
 #   - otra rama             `workflow_dispatch` → SOLO :<sha> (hub#872): sirve para probar esa
 #                            imagen en UN hub concreto sin cambiar el código de la flota.
@@ -83,9 +86,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Historial y tags completos: la versión de `dev` sale de `git describe --tags --long`
-          # (último tag `v*` alcanzable + nº de commits). Con el checkout superficial por defecto
-          # no hay tags, y el guard se NIEGA a publicar antes que hornear el hueco del Cargo.
+          # Historial y tags completos: la versión de `dev` sale de `git tag --list 'v*'` (el
+          # release más nuevo que el repo TIENE, +1 patch — hub#1625) y de `git describe
+          # --tags --long` (nº de commits + sha). Con el checkout superficial por defecto no hay
+          # tags, y el guard se NIEGA a publicar antes que hornear el hueco del Cargo.
           fetch-depth: 0
           fetch-tags: true
 
@@ -143,7 +147,8 @@ jobs:
         run: |
           ./scripts/image-tags.sh \
             --image "${IMAGE}" --ref "${GITHUB_REF}" --sha "${GITHUB_SHA}" \
-            --describe "$(git describe --tags --long --match 'v*' 2>/dev/null || true)"
+            --describe "$(git describe --tags --long --match 'v*' 2>/dev/null || true)" \
+            --git-tags "$(git tag --list 'v*' 2>/dev/null || true)"
 
       # Lo que el runtime reporta (`env!("CARGO_PKG_VERSION")` → `/readyz`, `/api/hub/context`,
       # el latido, `error_sink`) debe ser la versión con la que se llama la imagen: la del TAG

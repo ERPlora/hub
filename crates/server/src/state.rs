@@ -206,12 +206,15 @@ pub struct HubConfig {
     pub module_cache: PathBuf,
     pub auth_mode: AuthMode,
     pub jwt_public_key: Option<String>,
-    /// Credencial de **máquina** del hub (`cloud_api_token`), enviada como `X-Hub-Token` para
-    /// hablar con el Cloud en endpoints hub-scoped (marketplace, entitlement, asistente, install)
-    /// **sin** usuario logueado.
+    /// Credencial de **máquina** del hub para hablar con el Cloud en endpoints hub-scoped
+    /// (marketplace, entitlement, asistente, install) **sin** usuario logueado.
     ///
-    /// **La inyecta el aprovisionamiento** como env `HUB_CLOUD_API_TOKEN`: el SaaS acuña el token al
-    /// crear el hub (`Hub.cloud_api_token`) y el hub nace con él puesto. No lo pide nadie.
+    /// **La inyecta el aprovisionamiento** como env `HUB_CLOUD_API_TOKEN`. Desde ADR-0467
+    /// (saas#1928) es una **API key** (`erpk_<live|pre>_…`) que el SaaS acuña **en cada
+    /// despliegue** y guarda solo como hash; la anterior caduca a los 7 días. Viaja como
+    /// `X-Api-Key`; un hub desplegado antes del cambio aún lleva el `cloud_api_token` legado y lo
+    /// manda como `X-Hub-Token` — el header lo decide la forma (`cloud_client::is_api_key`) y el
+    /// SaaS acepta los dos. No lo pide nadie.
     ///
     /// Es un **secreto del runtime**: vive solo aquí, nunca en el navegador. Y como desde ADR-0154 el
     /// runtime corre en el contenedor del hub —no dentro de la app instalable—, **la app NUNCA lo

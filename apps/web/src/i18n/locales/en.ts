@@ -1762,6 +1762,9 @@ export default {
     // buttons that carried them (hub#479).
     managedInAccount: 'Plans for this module are managed from your ERPlora account at erplora.com.',
     checkPurchase: 'I already subscribed — check',
+    // Badge on the card of the plan you are on (hub#1652). Same words as `statusTitle` on purpose:
+    // it is the same fact, said on the block and again on the card it points at.
+    yourPlan: 'Your plan',
     managePlan: 'Manage plan',
     managePlanError: 'Could not open plan management. Try again.',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
@@ -1778,6 +1781,12 @@ export default {
       trialing: 'You are in your trial period.',
       expired: 'Your subscription has expired. Subscribe again to keep using it.',
       none: 'You don\'t have a plan for this module yet.',
+      // Coming in through the free tier IS being on a plan (ADR-0032): no purchase, no card, and
+      // the module runs with that tier's quota. It is how the majority of our customers come in.
+      free: 'You are on {plan}, the plan everyone comes in on.',
+      // Expiring does not leave you outside when the module ships a free tier: it drops you back
+      // onto it. Saying "subscribe again to keep using it" there is simply not true.
+      expiredOnFree: 'Your subscription has expired. You are still on {plan}.',
       canceled: 'Your subscription is canceled.',
       past_due: 'There is a pending payment on your subscription.',
     },
