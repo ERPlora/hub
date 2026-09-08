@@ -11,6 +11,9 @@
 //! Four doors, all passthrough: the SaaS's status and JSON come back untouched, so «no phone
 //! number» stays the 404 the page can name, and a SaaS that does not answer is a 502, never a
 //! silent ok.
+//!
+//! The templates the business promises Meta go through the same gate and the same credential, in
+//! [`crate::whatsapp_templates`] (hub#1610); `require_owner` and `placeholder` are shared with it.
 use crate::*;
 
 fn gate(e: auth::AuthError) -> Response {
@@ -21,7 +24,7 @@ fn gate(e: auth::AuthError) -> Response {
     (status, Json(json!({ "ok": false, "error": e.message() }))).into_response()
 }
 
-async fn require_owner(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) async fn require_owner(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
     let rt = st.runtime.read().await;
     auth::require_admin_session(headers, &st.config, &rt)
         .await
@@ -34,44 +37,7 @@ pub(crate) fn phone_number_id_is_safe(id: &str) -> bool {
     !id.is_empty() && id.len() <= 32 && id.chars().all(|c| c.is_ascii_digit())
 }
 
-/// Hub-scoped POST to the Cloud with the machine credential, JSON in, JSON out untouched.
-async fn cloud_post_json(
-    st: &AppState,
-    headers: &HeaderMap,
-    req: cloud_client::PreparedRequest,
-    body: &Value,
-) -> Response {
-    let Some(auth) = auth::hub_scoped_auth(headers, st) else {
-        return cloud_proxy::cloud_get_error_response(cloud_proxy::CloudGetError::NoCredential);
-    };
-    let mut r = st.http.post(&req.url).json(body);
-    // The credential is materialised for THIS destination only (hub#1464), never copied around.
-    for (k, v) in
-        cloud_client::CloudClient::new(&st.config.cloud_base_url).headers_for(&req.url, &auth)
-    {
-        r = r.header(k, v);
-    }
-    if let Some(language) = headers.get(axum::http::header::ACCEPT_LANGUAGE) {
-        r = r.header(axum::http::header::ACCEPT_LANGUAGE, language);
-    }
-    let resp = match r.send().await {
-        Ok(resp) => resp,
-        Err(e) => {
-            return cloud_proxy::cloud_get_error_response(cloud_proxy::CloudGetError::Network(
-                e.to_string(),
-            ))
-        }
-    };
-    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-    match resp.bytes().await {
-        Ok(bytes) => cloud_proxy::cloud_json_passthrough(status, bytes),
-        Err(e) => cloud_proxy::cloud_get_error_response(cloud_proxy::CloudGetError::Network(
-            e.to_string(),
-        )),
-    }
-}
-
-fn placeholder(st: &AppState) -> cloud_client::Auth {
+pub(crate) fn placeholder(st: &AppState) -> cloud_client::Auth {
     // The real credential is chosen by `hub_scoped_auth` at send time; this only builds the URL.
     cloud_client::Auth::HubToken {
         hub_id: st.hub_id(),
@@ -116,11 +82,11 @@ pub(crate) async fn whatsapp_connect(
             .into_response();
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    cloud_post_json(
+    cloud_proxy::proxy_cloud_send(
         &st,
         &headers,
         cloud.whatsapp_connect(&placeholder(&st)),
-        &body,
+        Some(&body),
     )
     .await
 }
@@ -142,11 +108,11 @@ pub(crate) async fn whatsapp_disconnect(
             .into_response();
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    cloud_post_json(
+    cloud_proxy::proxy_cloud_send(
         &st,
         &headers,
         cloud.whatsapp_disconnect(&placeholder(&st), &phone_number_id),
-        &json!({}),
+        Some(&json!({})),
     )
     .await
 }
