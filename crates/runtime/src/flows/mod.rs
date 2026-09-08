@@ -32,6 +32,7 @@
 //! - [`notify`] — the message to a CUSTOMER: the recipient read, its two grants, and the row that
 //!   carries it to the outbox (hub#821);
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
+//! - [`templates`] — turning a module's own factory recipe on in one tap (hub#1677, ADR-0470);
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
 //! - [`waits`] — the OTHER exits of a `delay` (hub#951): the events that cancel a sleeping run and
 //!   the events that move it. `triggers` can only insert a run; this is the only thing in the
@@ -53,6 +54,7 @@ pub mod query;
 pub mod schema;
 pub mod secrets;
 pub mod store;
+pub mod templates;
 pub mod triggers;
 pub mod waits;
 

@@ -1881,6 +1881,34 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NUL
         postgres: "\
 ALTER TABLE _flow_grants ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT '{}';",
     },
+    // ── v60 — hub#1677 / ADR-0470: which factory recipe a flow came from ──────────────────────
+    // A module activates its OWN recipe in one tap, and doing it twice has to land on the SAME
+    // flow instead of a second copy. So the row has to remember which template it was built from,
+    // and `<module>/<family>` is that name: it is what the module already knows about itself, and
+    // it is stable across releases of the module because the family is the file prefix the
+    // publisher chose.
+    //
+    // It could not be read back out of the document: the root of `flow.schema.json` is
+    // `additionalProperties: false`, so the template's origin has nowhere to live inside the JSON,
+    // and the «guess it from the trigger event plus the command» heuristic does not separate two
+    // families of the same module — with two appointment recipes and one of them installed, both
+    // read as «you already have this one».
+    //
+    // `NULL` on purpose for everything the editor writes: a flow somebody built by hand came from
+    // no recipe, and `NULL` says that, while `''` would be a family whose name is empty.
+    //
+    // 🔴 The number is the NEXT ONE AFTER THE MAXIMUM, never a gap: when it was written the maximum
+    // was v59 on `origin/develop` and across every remote branch (checked one by one). `apply`
+    // compares against the highest applied version and SILENTLY skips anything below it, so a
+    // rebase that lands another v60 has to renumber this one.
+    SystemMigration {
+        version: 60,
+        name: "flow_template_ref",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_ref TEXT;\
+CREATE INDEX IF NOT EXISTS ix_flow_template_ref ON _flow (hub_id, template_ref);",
+    },
 
 ];
 

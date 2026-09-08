@@ -37,8 +37,14 @@ const MODULE_HEADER: &str = "x-erplora-module";
 const WHATSAPP: &str = "whatsapp_inbox";
 /// El vecino cuyo command usa la receta, y al que apunta su suelo de versión.
 const APPOINTMENTS: &str = "appointments";
-/// Un tercer módulo instalado que NO es dueño de la receta.
+/// Un tercer módulo instalado que NO es dueño de la receta y no trae ninguna.
 const INTRUDER: &str = "inventory";
+/// Otro módulo que SÍ trae la suya: lo que un módulo sin `manage_flows` no puede llegar a ver.
+const NEIGHBOUR: &str = "reservations";
+const NEIGHBOUR_FAMILY: &str = "table-from-whatsapp";
+/// La galería de Automatizaciones: el módulo que SÍ declara `manage_flows` y al que el dueño se lo
+/// concedió. Es quien tiene que seguir viendo la lista entera.
+const EDITOR: &str = "flows";
 const FAMILY: &str = "appointment-from-whatsapp";
 const TEMPLATES: &str = "/api/hub/flows/templates";
 const CREATE: &str = "appointments.appointments.create";
@@ -145,6 +151,43 @@ fn whatsapp_dir(root: &Path, floor: &str) -> PathBuf {
     dir
 }
 
+/// Un vecino que publica **su** receta. Sirve para una sola cosa: que «solo lo suyo» pueda fallar.
+/// Sin él, servir la lista entera y servir la del que llama son indistinguibles.
+fn neighbour_dir(root: &Path) -> PathBuf {
+    let dir = root.join(NEIGHBOUR);
+    std::fs::create_dir_all(dir.join("flows")).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        serde_json::to_string_pretty(&json!({
+            "id": NEIGHBOUR, "name": "Reservations", "version": "1.0.0"
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join(format!("flows/{NEIGHBOUR_FAMILY}.en.flow.json")),
+        json!({
+            "schema_version": 1,
+            "name": "Book a table from WhatsApp",
+            "triggers": [{ "kind": "manual" }],
+            "steps": [{ "id": "s1", "kind": "command", "command": CREATE }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join(format!("flows/{NEIGHBOUR_FAMILY}.grants.json")),
+        json!({ "grants": [{ "kind": "command", "value": CREATE }] }).to_string(),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join(format!("flows/{NEIGHBOUR_FAMILY}.requires.json")),
+        json!({ "modules": { APPOINTMENTS: "1.0.0" } }).to_string(),
+    )
+    .unwrap();
+    dir
+}
+
 fn plain_dir(root: &Path, id: &str) -> PathBuf {
     let dir = root.join(id);
     std::fs::create_dir_all(&dir).unwrap();
@@ -185,6 +228,22 @@ async fn fixture_with(floor: &str) -> Fixture {
         .await
         .unwrap();
     rt.install_from_dir(&plain_dir(&modules, INTRUDER))
+        .await
+        .unwrap();
+    rt.install_from_dir(&neighbour_dir(&modules)).await.unwrap();
+    // La galería: declara `manage_flows` y el dueño se lo concedió en Ajustes → Permisos.
+    std::fs::create_dir_all(modules.join(EDITOR)).unwrap();
+    std::fs::write(
+        modules.join(EDITOR).join("module.json"),
+        serde_json::to_string_pretty(&json!({
+            "id": EDITOR, "name": "Automations", "version": "1.0.0",
+            "capabilities": { "manage_flows": {} }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    rt.install_from_dir(&modules.join(EDITOR)).await.unwrap();
+    rt.set_module_capability(EDITOR, "manage_flows", true, "hub_user:admin")
         .await
         .unwrap();
     rt.install_from_dir(&whatsapp_dir(&modules, floor))
@@ -553,5 +612,98 @@ async fn the_listing_says_which_templates_are_already_running() {
     assert_eq!(
         body["data"][0]["installed"]["enabled"], false,
         "una receta en pausa SIGUE montada: la tarjeta dice «pausada», no «actívala»"
+    );
+}
+
+/// Los módulos de los que la respuesta habla, en orden.
+fn modules_of(list: &Value) -> Vec<String> {
+    list.as_array()
+        .expect("una lista")
+        .iter()
+        .map(|t| t["module"].as_str().unwrap_or_default().to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_module_without_manage_flows_is_served_only_its_own_recipes() {
+    // La pantalla de tres pasos de whatsapp_inbox#123 tiene que saber si su receta ya está puesta,
+    // y `whatsapp_inbox` NO declara `manage_flows` a propósito («la capability con más alcance de
+    // todas», y su `whatsapp-uses.ts` lo explica). Sin esto, el `installed` que pide ADR-0470 §5 le
+    // sería inútil justo a quien lo necesita: la ruta le contestaba `capability_denied`.
+    //
+    // Lo que se le sirve es estrictamente LO SUYO: es el mismo principio que ya rige activar («solo
+    // SUS recetas») y es mucho más estrecho que `manage_flows`.
+    let fx = fixture().await;
+
+    let everything = send(&fx.router, get(TEMPLATES, &fx.admin, None)).await;
+    assert_eq!(everything.status(), StatusCode::OK);
+    let everything = body_json(everything).await;
+    assert_eq!(
+        modules_of(&everything["data"]),
+        vec![NEIGHBOUR, WHATSAPP],
+        "control: el shell no nombra módulo y sigue viendo la galería entera"
+    );
+
+    let mine = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
+    assert_eq!(
+        mine.status(),
+        StatusCode::OK,
+        "y ya no es un 403: leer las recetas propias no necesita administrar flujos"
+    );
+    assert_eq!(
+        modules_of(&body_json(mine).await["data"]),
+        vec![WHATSAPP],
+        "solo lo suyo: la receta del vecino no es asunto de este módulo"
+    );
+}
+
+#[tokio::test]
+async fn the_gallery_still_gets_the_whole_list_because_it_holds_manage_flows() {
+    // La otra mitad, y la que impide «arreglarlo» acotando siempre: Automatizaciones ES un módulo
+    // y nombra el suyo en la cabecera. Si el acotado se le aplicara también, la galería se quedaría
+    // vacía — que es exactamente la regresión que hub#1611 vino a arreglar.
+    let fx = fixture().await;
+
+    let response = send(&fx.router, get(TEMPLATES, &fx.admin, Some(EDITOR))).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        modules_of(&body_json(response).await["data"]),
+        vec![NEIGHBOUR, WHATSAPP],
+        "con `manage_flows` concedido se sirve la galería entera, como hasta hoy"
+    );
+}
+
+#[tokio::test]
+async fn a_module_is_told_about_its_own_discards_and_nobody_elses() {
+    // `discarded[]` es la otra mitad de la respuesta (hub#1649) y se acota igual: el motivo por el
+    // que ESTE hub no ofrece MI receta es mío y lo tengo que pintar; por qué no ofrece la del
+    // vecino, no.
+    let fx = fixture_with("9.9.9").await;
+
+    let mine = body_json(send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await).await;
+    assert!(
+        mine["data"].as_array().expect("una lista").is_empty(),
+        "su receta está descartada por suelo, así que no se le ofrece"
+    );
+    assert_eq!(
+        modules_of(&mine["discarded"]),
+        vec![WHATSAPP],
+        "y se le dice por qué — solo de la suya"
+    );
+
+    let neighbour =
+        body_json(send(&fx.router, get(TEMPLATES, &fx.admin, Some(NEIGHBOUR))).await).await;
+    assert_eq!(
+        modules_of(&neighbour["data"]),
+        vec![NEIGHBOUR],
+        "el vecino ve la suya, que este hub sí ofrece"
+    );
+    assert!(
+        neighbour["discarded"]
+            .as_array()
+            .expect("una lista")
+            .is_empty(),
+        "y no se entera del descarte ajeno"
     );
 }

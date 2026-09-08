@@ -29,7 +29,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::flows::{agent, approvals, grants, secrets, store, NewFlow};
+use erplora_runtime::flows::{agent, approvals, grants, secrets, store, templates, NewFlow};
 use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::RuntimeError;
 use serde_json::{json, Value};
@@ -118,7 +118,11 @@ fn flow_status(code: &str) -> Option<StatusCode> {
         // person is not the one who may change it.
         grants::ERR_GRANT_DENIED
         | grants::ERR_INTERNAL_COMMAND
-        | approvals::ERR_APPROVAL_NOT_YOURS => StatusCode::FORBIDDEN,
+        | approvals::ERR_APPROVAL_NOT_YOURS
+        // …and the fourth (hub#1677): the caller is a module naming an automation of ANOTHER
+        // module. Authenticated, allowed to administer this hub, and simply not the owner of the
+        // recipe it is pointing at.
+        | templates::ERR_TEMPLATE_NOT_YOURS => StatusCode::FORBIDDEN,
         approvals::ERR_APPROVAL_ALREADY_DECIDED
         | approvals::ERR_APPROVAL_EXPIRED
         | store::ERR_FLOW_DELETED
@@ -297,6 +301,61 @@ macro_rules! admin_session {
         let who = format!("hub_user:{}", admin.id);
         (arc.clone(), who)
     }};
+}
+
+/// The same human door **without** the module capability (hub#1677, ADR-0470).
+///
+/// Three doors use it and no more: turning a factory recipe on, turning it off, and reading the
+/// listing they are turned on from. What they have in common is that the caller does not COMPOSE
+/// anything — it picks which of the recipes its own publisher already wrote, signed and had
+/// validated by the toolkit gate. Asking for `manage_flows` there would be asking for «the
+/// capability with the widest reach of all» in order to press one switch, and it would be asked for
+/// in the very screen the owner went to precisely to avoid Settings → Permissions.
+///
+/// 🔴 **It is not a second copy of the gate — it is the gate with one half deliberately absent, and
+/// the missing half is replaced by a NARROWER rule at the call site**: `activate`/`deactivate`
+/// refuse a module that names an automation which is not its own, and the listing serves such a
+/// module only its own recipes. Nothing here is more permissive than `admin_session!` for anybody
+/// who is not the recipe's own module.
+///
+/// The human half does not move: anonymous is still `401` and a cashier still `403`. Turning an
+/// automation on IS getting the hub's primitives with nobody watching (ADR-0283 §9), and no new
+/// route opens that.
+macro_rules! admin_session_no_capability {
+    ($st:expr, $headers:expr) => {{
+        let arc = match $st.runtime_for(&$st.hub_id()).await {
+            Ok(arc) => arc,
+            Err(e) => return crate::tenant_rejected(e),
+        };
+        let rt = arc.read().await;
+        let admin = match auth::require_admin_session(&$headers, &$st.config, &rt).await {
+            Ok(admin) => admin,
+            Err(e) => return rejected(e),
+        };
+        let who = format!("hub_user:{}", admin.id);
+        (arc.clone(), who)
+    }};
+}
+
+/// **A module may only point at its OWN recipes** (ADR-0470 §1).
+///
+/// A request that names no module passes: the shell is not a module and names none, and it is the
+/// only surface that reaches this without a header today.
+///
+/// ⚠️ Same honest limit as the rest of `X-Erplora-Module`: in the browser the id is DECLARED, not
+/// authenticated. It is one gap and not two — a module that would lie here can already read the
+/// session token out of the same document — and it closes when module components are isolated.
+fn refuse_unless_own(headers: &HeaderMap, module: &str) -> Result<(), Response> {
+    match calling_module(headers) {
+        Some(caller) if caller != module => Err(flow_err(RuntimeError::Domain {
+            code: templates::ERR_TEMPLATE_NOT_YOURS.to_string(),
+            message: format!(
+                "`{caller}` cannot turn the automations of `{module}` on or off: a module only \
+                 activates its own"
+            ),
+        })),
+        _ => Ok(()),
+    }
 }
 
 // ── flows ─────────────────────────────────────────────────────────────────────────────────────
@@ -559,12 +618,45 @@ pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Respo
 /// en este tramo es un permiso ANCHO concedido por un dueño que creyó estar acotándolo, y **sin un
 /// solo error en pantalla**.
 pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let (arc, _) = admin_session!(st, headers);
+    let (arc, _) = admin_session_no_capability!(st, headers);
     let rt = arc.read().await;
+    // 🔴 **Who gets to see WHAT** (hub#1677, ADR-0470 §5). Until here this door asked the caller for
+    // `manage_flows`, and the module that most needs to read it does not declare it on purpose:
+    // `whatsapp_inbox` ships the recipe and paints the screen that turns it on, and asking it for
+    // «the capability with the widest reach of all» to read its own card is the very trip through
+    // Settings → Permissions that ADR-0470 exists to remove.
+    //
+    // So the capability stops being a gate and becomes the SCOPE:
+    //   · no module named (the shell)          → the whole gallery, as before;
+    //   · a module WITH `manage_flows`         → the whole gallery, as before (this is the editor);
+    //   · a module WITHOUT it                  → its own recipes and its own discards, nothing else.
+    // Nobody is served more than they were; the third case used to be a flat `capability_denied`.
+    let only_mine = match calling_module(&headers) {
+        None => None,
+        Some(module) => {
+            if rt
+                .has_module_capability(&module, CapabilityKind::ManageFlows)
+                .await
+            {
+                None
+            } else {
+                Some(module)
+            }
+        }
+    };
+    let mine = |module_id: &str| only_mine.as_deref().is_none_or(|own| own == module_id);
+    // What this hub has already built from a recipe, so the module's card can say «active» or
+    // «paused» instead of guessing by trigger event + command — the heuristic of wi#79, which could
+    // not tell two families of the same module apart.
+    let installed = match rt.installed_flow_templates().await {
+        Ok(installed) => installed,
+        Err(e) => return flow_err(e),
+    };
     let data: Vec<_> = rt
         .registry()
         .flow_templates()
         .into_iter()
+        .filter(|(module_id, _)| mine(module_id))
         .map(|(module_id, tpl)| {
             json!({
                 "module": module_id,
@@ -572,6 +664,12 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
                 "documents": tpl.documents,
                 "grants": tpl.grants,
                 "requires": tpl.requires,
+                // `null` and not absent when it is not installed: the screen has to tell «no» from
+                // «this hub is too old to know», and an absent key reads as the second one.
+                "installed": installed
+                    .get(&templates::template_ref(module_id, &tpl.family))
+                    .map(|(flow_id, enabled)| json!({ "flow_id": flow_id, "enabled": enabled }))
+                    .unwrap_or(Value::Null),
             })
         })
         .collect();
@@ -583,6 +681,7 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
         .registry()
         .flow_template_discards()
         .into_iter()
+        .filter(|(module_id, _)| mine(module_id))
         .map(|(module_id, discard)| {
             json!({
                 "module": module_id,
@@ -593,6 +692,60 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
         })
         .collect();
     Json(json!({ "ok": true, "data": data, "discarded": discarded })).into_response()
+}
+
+/// `POST /api/hub/flows/templates/{module}/{family}/activate` — **the one tap** (hub#1677,
+/// ADR-0470).
+///
+/// Builds the module's own factory recipe (or finds the one already built), gives it EXACTLY the
+/// permissions its sidecar declared — pins included — and leaves it running. `201` when it built
+/// it, `200` when it found it: pressing it twice is one automation, not two.
+///
+/// A recipe this hub discarded refuses with the discard's own code (`409`), the same code the
+/// listing serves, so the module paints the reason instead of a mute failure.
+pub async fn activate_template(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path((module, family)): Path<(String, String)>,
+) -> Response {
+    let (arc, who) = admin_session_no_capability!(st, headers);
+    if let Err(response) = refuse_unless_own(&headers, &module) {
+        return response;
+    }
+    let rt = arc.read().await;
+    match rt.activate_flow_template(&module, &family, &who).await {
+        Ok(activation) => (
+            if activation.created {
+                StatusCode::CREATED
+            } else {
+                StatusCode::OK
+            },
+            Json(json!({ "ok": true, "data": activation.flow })),
+        )
+            .into_response(),
+        Err(e) => flow_err(e),
+    }
+}
+
+/// `POST /api/hub/flows/templates/{module}/{family}/deactivate` — a **pause**, never a delete.
+///
+/// The grants stay and so does the run history: what that automation did needs an owner that still
+/// exists, and turning it back on must not ask the person to authorise again what they already
+/// authorised. A family that was never activated is `404`: there is nothing to pause.
+pub async fn deactivate_template(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path((module, family)): Path<(String, String)>,
+) -> Response {
+    let (arc, who) = admin_session_no_capability!(st, headers);
+    if let Err(response) = refuse_unless_own(&headers, &module) {
+        return response;
+    }
+    let rt = arc.read().await;
+    match rt.deactivate_flow_template(&module, &family, &who).await {
+        Ok(flow) => Json(json!({ "ok": true, "data": flow })).into_response(),
+        Err(e) => flow_err(e),
+    }
 }
 
 // ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────
