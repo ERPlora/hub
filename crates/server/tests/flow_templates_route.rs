@@ -12,8 +12,11 @@
 //!    Anónimo `401`, cajero `403`, API key rechazada. No es cosmética: administrar automatizaciones
 //!    ES conseguir el resto de primitivas del hub sin nadie delante (ADR-0283 §9), y una plantilla
 //!    dice qué commands va a pedir.
-//! 2. **Y `manage_flows` encima** cuando quien llama nombra un módulo (hub#714). Sin el segundo
-//!    gate, cualquier módulo instalado leería qué automatiza el negocio.
+//! 2. **Y `manage_flows` encima** cuando quien llama nombra un módulo (hub#714) — desde hub#1677
+//!    como ALCANCE, no como puerta: quien no la tiene recibe **lo suyo y nada más** en vez de un
+//!    `403`. Lo que el segundo gate protegía sigue protegido (ningún módulo lee qué automatiza el
+//!    negocio) y además la pantalla de un módulo puede saber si su propia receta está puesta, que
+//!    es lo que pide ADR-0470 §5.
 //! 3. **El módulo de origen viaja con cada plantilla**, porque la galería tiene que decir de dónde
 //!    sale lo que ofrece, y porque el suelo de versión se juzga contra los módulos instalados.
 //! 4. **Los grants se ENSEÑAN, no se conceden.** Lo que la ruta devuelve es lo que la plantilla va
@@ -275,8 +278,14 @@ async fn the_limit_the_module_put_on_a_permission_reaches_the_gallery() {
 }
 
 #[tokio::test]
-async fn without_the_capability_the_module_is_refused() {
-    // Sin este gate, cualquier módulo instalado leería qué automatiza el negocio.
+async fn without_the_capability_the_module_reads_none_of_the_business_automations() {
+    // hub#1677 enmienda el SEGUNDO gate de hub#714: `manage_flows` deja de ser PUERTA y pasa a ser
+    // ALCANCE. Lo que protegía sigue protegido y por eso este test sigue aquí: sin la capability,
+    // un módulo NO lee qué automatiza el negocio. Lo que cambia es cómo se le dice — antes un
+    // `403`, ahora lo suyo y nada más, que para `flows` sin permiso conceder es NADA.
+    //
+    // Y es el positivo del filtro: `whatsapp_inbox` SÍ trae una familia en este fixture, así que
+    // servirle la lista entera a quien no tiene la capability se vería aquí como un `1`.
     let fx = fixture(false).await;
 
     let response = send(
@@ -285,17 +294,32 @@ async fn without_the_capability_the_module_is_refused() {
     )
     .await;
 
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    assert_eq!(
-        body_json(response).await["error"]["code"],
-        "capability_denied"
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert!(
+        body["data"]
+            .as_array()
+            .expect("una lista de plantillas")
+            .is_empty(),
+        "sin `manage_flows` concedida, la receta del vecino no es asunto suyo"
+    );
+    assert!(
+        body["discarded"]
+            .as_array()
+            .expect("la lista de descartes viaja siempre")
+            .is_empty(),
+        "y tampoco por la puerta de atrás: los descartes del vecino también son del vecino"
     );
 }
 
 #[tokio::test]
-async fn a_module_that_never_declared_the_capability_is_refused_too() {
-    // `whatsapp_inbox` no declara `manage_flows`: que traiga una plantilla no le da derecho a leer
-    // las de los demás.
+async fn a_module_that_never_declared_the_capability_still_reads_its_own() {
+    // `whatsapp_inbox` no declara `manage_flows` a propósito, y aun así su pantalla (wi#123) tiene
+    // que saber si su receta ya está puesta: es el `installed` de ADR-0470 §5, que le sería inútil
+    // justo a quien lo necesita si esta ruta le contestara `capability_denied`.
+    //
+    // Leer LO SUYO es mucho más estrecho que administrar automatizaciones; lo de los demás sigue
+    // sin ser suyo, y eso lo clava el test de arriba.
     let fx = fixture(true).await;
 
     let response = send(
@@ -304,7 +328,16 @@ async fn a_module_that_never_declared_the_capability_is_refused_too() {
     )
     .await;
 
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    let items = body["data"].as_array().expect("una lista de plantillas");
+    assert_eq!(items.len(), 1, "su familia, la única que publica");
+    assert_eq!(items[0]["module"], WHATSAPP);
+    assert_eq!(items[0]["family"], "appointment-from-whatsapp");
+    assert!(
+        items[0]["installed"].is_null(),
+        "nadie la ha encendido todavía, y eso es justo lo que la pantalla necesita leer"
+    );
 }
 
 #[tokio::test]
