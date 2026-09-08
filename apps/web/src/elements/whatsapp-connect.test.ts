@@ -144,6 +144,27 @@ describe('erp-whatsapp-connect', () => {
     expect(count()).toBe(1);
   });
 
+  it('comes back styled, with ONE copy of its rules, after the owner leaves the screen and returns', async () => {
+    // Leaving the settings screen disconnects the element long enough for Vue to unmount its app
+    // (a microtask later); coming back re-mounts it, and `app.mount` first clears every child of
+    // the element — the `<style>` included. The element must look at the DOM to decide whether
+    // its rules are there: remembering «already styled» in a flag would leave the block unstyled
+    // from the second visit on, and this suite's synchronous re-connect above would never notice.
+    const screen = moduleScreen();
+    const el = await embed(screen);
+    el.remove();
+    await nextTick();
+    await flushPromises();
+    expect(el.querySelector('.whatsapp-connect'), 'Vue did not unmount: this is not a remount').toBeNull();
+
+    screen.appendChild(el);
+    await flushPromises();
+    await nextTick();
+    expect(el.querySelectorAll('style').length).toBe(1);
+    expect(el.textContent).toContain(es.whatsappConnect.intro);
+    expect(getComputedStyle(el.querySelector('.whatsapp-connect') as Element).display).toBe('grid');
+  });
+
   it('cannot be styled from the shell global sheet: that is why it carries its own', async () => {
     // The control for the two tests above: with the same rules in the shell's stylesheet — where
     // they used to live — the block inside a module's shadow root stays unstyled. If this ever
