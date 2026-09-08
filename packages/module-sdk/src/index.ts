@@ -1496,7 +1496,17 @@ export interface RunPage<T = unknown> {
  * path, no method that takes a URL. Adding one turns `flows.test.ts` red on purpose.
  */
 export class FlowsApi {
-  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+  constructor(
+    private readonly send: (req: CoreRequest) => Promise<unknown>,
+    /**
+     * The id of the module this surface belongs to (hub#1677). It is the `{module}` segment of the
+     * template routes, and it comes from `forModule(<id>)` rather than from an argument on purpose:
+     * ADR-0470 §1 says a module turns on **its own** recipes, and a parameter would be an invitation
+     * to name somebody else's — which the hub refuses with `403 flow.template_not_yours`, but only
+     * after the call has been written.
+     */
+    private readonly moduleId: string = '',
+  ) {}
 
   /** `GET /api/hub/flows` */
   async list(): Promise<Flow[]> {
@@ -1667,6 +1677,52 @@ export class FlowsApi {
       ModuleFlowTemplate[]
     >;
   }
+
+  /**
+   * `POST /api/hub/flows/templates/{thisModule}/{family}/activate` — **the one tap** (hub#1677,
+   * ADR-0470).
+   *
+   * Builds this module's own factory recipe (or finds the one already built), gives it exactly the
+   * permissions the family's sidecar declared — the pins included — and leaves it RUNNING. That is
+   * the amendment to ADR-0463 §5 («grants are shown, not granted») and it is limited to this path:
+   * what is granted is what the module's publisher declared and signed, `erplora validate` checked
+   * before publication, and the owner consented to in the one sentence this module paints.
+   *
+   * Pressing it twice lands on the SAME automation. The refusals worth handling by name:
+   * `flow.template_not_found` (nobody ships that family) and the discard codes the listing already
+   * serves — `template_floor_module_too_old` and friends — which arrive as `409` and are the reason
+   * to show instead of a mute failure.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * {@link templates}: `typeof flows.activateTemplate` is the probe.
+   */
+  async activateTemplate(family: string): Promise<Flow> {
+    return this.send({
+      method: 'POST',
+      path: this.templatePath(family, 'activate'),
+    }) as Promise<Flow>;
+  }
+
+  /**
+   * `POST /api/hub/flows/templates/{thisModule}/{family}/deactivate` — a **pause**, never a delete.
+   *
+   * The permissions stay and so does the run history: what that automation did needs an owner that
+   * still exists, and turning it back on must not ask the person to authorise again what they
+   * already authorised. A family that was never activated answers `flow.not_found`.
+   */
+  async deactivateTemplate(family: string): Promise<Flow> {
+    return this.send({
+      method: 'POST',
+      path: this.templatePath(family, 'deactivate'),
+    }) as Promise<Flow>;
+  }
+
+  /** The family is checked before it is pasted into a URL, like every other path segment here. */
+  private templatePath(family: string, gesture: 'activate' | 'deactivate'): string {
+    const own = checkedSegment('module id', this.moduleId, ID_PATTERN);
+    const target = checkedSegment('template family', family, ID_PATTERN);
+    return `${FLOWS_BASE_PATH}/templates/${own}/${target}/${gesture}`;
+  }
 }
 
 /**
@@ -1696,6 +1752,18 @@ export interface ModuleFlowTemplate {
   grants: Array<{ kind: string; value: string; payload?: Record<string, unknown> }>;
   /** Per-template version floor (`module -> SemVer`). Unmet -> do not offer it. */
   requires: Record<string, string>;
+  /**
+   * The flow this hub has already built from it, or `null` when it has not (hub#1677, ADR-0470 §5).
+   *
+   * `null` and not absent, so the card can tell «not installed» from «this hub is too old to know»:
+   * a hub before this field leaves the key out entirely, and `undefined` is the honest answer there.
+   * `enabled: false` is a recipe that IS installed and paused — «paused», not «activate me».
+   *
+   * It replaces the heuristic of wi#79 (guess by trigger event + command), which could not tell two
+   * families of the same module apart: with two appointment recipes and one of them on, both read
+   * as «you already have this one».
+   */
+  installed?: { flow_id: string; enabled: boolean } | null;
 }
 
 /**
@@ -2317,6 +2385,14 @@ export class ErploraClient {
    * checks and this SDK never second-guesses; and the module must have `manage_flows` declared in
    * its `module.json` and granted by the owner in Settings → Permissions. A refusal arrives as
    * `capability_denied`, so the editor can ask for the grant instead of showing «error».
+   *
+   * 🔴 **Three methods are the exception, and on purpose** (hub#1677, ADR-0470): {@link templates},
+   * {@link activateTemplate} and {@link deactivateTemplate} need **no capability at all**. A module
+   * that publishes a recipe does not compose flows or grants — it picks which of its own published
+   * recipes is on — so asking it for `manage_flows`, the widest capability there is, in order to
+   * press one switch would send the owner to the very Settings → Permissions trip this removes.
+   * `templates` answers such a module with **its own** recipes and its own discards, nothing else;
+   * a module that does hold `manage_flows` still gets the whole gallery.
    */
   get flows(): FlowsApi {
     const moduleId = this.moduleId;
@@ -2333,8 +2409,9 @@ export class ErploraClient {
         'this transport cannot reach the core REST surface',
       );
     }
-    return (this.flowsApi ??= new FlowsApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    return (this.flowsApi ??= new FlowsApi(
+      (req) => transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      moduleId,
     ));
   }
 
