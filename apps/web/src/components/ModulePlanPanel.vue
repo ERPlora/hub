@@ -17,8 +17,10 @@
   El botón "comprobar" se queda: quien contrate desde el navegador vuelve aquí y refresca el estado
   (además del recheck-on-focus, que sigue), y es el único control donde el enlace no se ofrece.
 
-  El Cloud NO expone el slug del tier actual (ni module-subscription ni check_ownership lo traen),
-  así que en v1 NO se resalta un tier concreto: se muestra solo el `status` global.
+  Since ERPlora/saas#1921 `module-subscription` also answers `tier` — the slug of the `ModuleTier`
+  THIS hub is on right now — so the panel marks that card (`featured` + «Your plan» badge) and
+  paints the free tier as an active plan rather than «No plan» (hub#1652). See `currentTier` and
+  `displayStatus` below.
 
   ## Por qué aquí no hay una tarjeta propia (hub#1605)
 
@@ -45,8 +47,8 @@
       </div>
       <template v-else>
         <ok-status-pill :tone="statusTone" :label="statusLabel" size="sm" />
-        <!-- Por `displayStatus`, no por `sub.status`: un `trialing` sobre el tier gratuito no es
-             una prueba (ADR-0032), así que tampoco tiene fecha de fin de prueba que anunciar. -->
+        <!-- By `displayStatus`, not `sub.status`: a `trialing` on the free tier is not a trial
+             (ADR-0032), so there is no trial end date to announce either. -->
         <p v-if="displayStatus === 'trialing' && sub?.trialEnd" class="status-line">
           {{ t('modulePlan.trialEnds', { date: fmtDate(sub.trialEnd) }) }}
         </p>
@@ -110,12 +112,12 @@
           size-md="6"
           size-lg="3"
         >
-          <!-- `featured` + `badge` ya venían en la tarjeta y el panel no los usaba: con cuatro
-               precios delante, «Activo» a secas no dice cuál es el tuyo. Es lo que hacen Shopify,
-               Odoo y Square — el plan actual se señala EN su tarjeta.
-               `|| undefined` no es cosmética: `featured="false"` es un ATRIBUTO PRESENTE, y el
-               conversor Boolean de Lit lee presencia, así que marcaría de más justo en la ventana
-               en la que el elemento aún no se ha registrado. Ausente es la única forma de "no". -->
+          <!-- `featured` + `badge` were already on the card and the panel never used them: with
+               four prices in front of you, a bare «Active» does not say which one is yours. It is
+               what Shopify, Odoo and Square do — the current plan is marked ON its card.
+               `|| undefined` is not cosmetic: `featured="false"` is a PRESENT attribute, and Lit's
+               Boolean converter reads presence, so it would over-mark exactly in the window before
+               the element is registered. Absent is the only way to say "no". -->
           <ok-pricing-card
             :name="tier.name"
             :price="priceLabel(tier)"
@@ -181,26 +183,26 @@ const tiers = computed<BillingTierDef[]>(() => props.billing.tiers ?? []);
 const billingLocale = ref<ModuleBillingLocale | undefined>(undefined);
 
 /**
- * El tier gratuito del manifest, si el módulo trae uno.
+ * The manifest's free tier, if the module ships one.
  *
- * ADR-0032: un módulo premium que declara un tier a 0 € es instalable SIN compra y corre en modo
- * gratuito con su cuota aplicada en el proxy (`_has_free_tier()` en
- * `saas/apps/public/modules/entitlement.py`). Hoy TODOS nuestros módulos lo traen, así que por ahí
- * entra la mayoría; la prueba sin tarjeta es la vía de los que NO lo traen — una de las dos, nunca
- * las dos (regla de Ioan del 2026-09-07, guardia al publicar en ERPlora/module-toolkit#228).
+ * ADR-0032: a premium module that declares a tier at 0 € is installable WITHOUT a purchase and runs
+ * in free mode with that tier's quota enforced by the proxy (`_has_free_tier()` in
+ * `saas/apps/public/modules/entitlement.py`). Today ALL our modules ship one, so that is how the
+ * majority come in; the no-card trial is the way in for those that do NOT — one of the two, never
+ * both (Ioan's rule of 2026-09-07, guarded at publish time by ERPlora/module-toolkit#228).
  */
 const freeTier = computed<BillingTierDef | null>(() => tiers.value.find((tier) => !tier.price) ?? null);
 
 /**
- * En qué tier está este hub AHORA, nombrado sobre el manifest que tiene instalado.
+ * Which tier this hub is on RIGHT NOW, named against the manifest it has installed.
  *
- * El slug lo manda el Cloud (`tier`, ERPlora/saas#1921) y es el mismo de `billing.tiers[].slug`.
- * Dos casos que no son el mismo:
- *   · el Cloud NO manda slug (SaaS anterior a saas#1921) → el suelo lo sabe el manifest: el
- *     gratuito, si lo hay;
- *   · el Cloud manda un slug que este manifest no conoce (el módulo se actualizó en el
- *     marketplace y este hub sigue con el bundle anterior) → no se marca NADA, porque marcar por
- *     posición pondría la insignia en el plan de otro.
+ * The Cloud sends the slug (`tier`, ERPlora/saas#1921) and it is the one from
+ * `billing.tiers[].slug`. Two cases that are not the same:
+ *   · the Cloud sends NO slug (SaaS older than saas#1921) → the manifest knows the floor: the free
+ *     tier, if there is one;
+ *   · the Cloud sends a slug this manifest does not know (the module was updated in the
+ *     marketplace and this hub still runs the previous bundle) → NOTHING is marked, because marking
+ *     by position would put the badge on somebody else's plan.
  */
 const currentTier = computed<BillingTierDef | null>(() => {
   const slug = sub.value?.tier ?? null;
@@ -208,26 +210,26 @@ const currentTier = computed<BillingTierDef | null>(() => {
   return freeTier.value;
 });
 
-/** ¿El plan en el que estás es el que no cuesta nada? */
+/** Is the plan you are on the one that costs nothing? */
 const onFreeTier = computed(() => currentTier.value != null && !currentTier.value.price);
 
-/** ¿Es ESTA la tarjeta de tu plan? Lo que decide `featured` y la insignia «Tu plan». */
+/** Is THIS the card of your plan? What decides `featured` and the «Your plan» badge. */
 function isCurrentTier(tier: BillingTierDef): boolean {
   return currentTier.value != null && currentTier.value.slug === tier.slug;
 }
 
 /**
- * Lo que se PINTA, que no siempre es lo que dice `status` (hub#1652).
+ * What gets PAINTED, which is not always what `status` says (hub#1652).
  *
- * `status` describe la SUSCRIPCIÓN y sin compra no hay ninguna, así que el Cloud responde `none`
- * a quien entró por el gratuito — es decir, a casi todo el mundo. Pintarlo tal cual dejaba «Sin
- * plan» en la única pantalla que existe para explicar tu plan. Y `trialing` sobre el gratuito no
- * es un estado de este producto: un módulo con tier a 0 € no lleva prueba (ADR-0032). Las dos
- * respuestas se resuelven en la misma: estás en el gratuito.
+ * `status` describes the SUBSCRIPTION and without a purchase there is none, so the Cloud answers
+ * `none` to whoever came in through the free tier — that is, to almost everybody. Painting it as
+ * is left «No plan» on the one screen that exists to explain your plan. And `trialing` on the free
+ * tier is not a state of this product: a module with a tier at 0 € has no trial (ADR-0032). Both
+ * answers resolve to the same one: you are on the free tier.
  *
- * Lo que NO se toca es `expired`, `canceled` ni `past_due`: el plan de pago caducó de verdad y
- * suavizarlo es cómo un cliente se pierde una renovación fallida. Lo que cambia ahí es DÓNDE te
- * deja, no el hecho.
+ * What is NOT touched is `expired`, `canceled` and `past_due`: the paid plan really did lapse, and
+ * softening that is how a customer misses a failed renewal. What changes there is WHERE it leaves
+ * you, not the fact.
  */
 type DisplayStatus = ModuleSubscriptionStatus | 'free';
 const displayStatus = computed<DisplayStatus>(() => {
@@ -252,10 +254,10 @@ const STATUS_TONE: Record<DisplayStatus, Tone> = {
   past_due: 'warning',
   canceled: 'warning',
   expired: 'danger',
-  // Estar en el gratuito es estar dentro, con su cuota: mismo tono que cualquier plan al día.
+  // Being on the free tier is being in, with its quota: same tone as any plan in good standing.
   free: 'success',
-  // No tener plan no es un fallo, así que no toma un tono de alarma. Solo lo alcanzan los módulos
-  // que NO declaran tier gratuito; para el resto, el suelo es el gratis.
+  // Having no plan is not a failure, so it takes no alarming tone. Only modules that declare NO
+  // free tier ever reach it; for the rest, the floor is the free one.
   none: 'neutral',
 };
 const STATUS_ICON: Record<Tone, string> = {
@@ -264,19 +266,21 @@ const STATUS_ICON: Record<Tone, string> = {
   danger: 'close-circle-outline',
   neutral: 'pricetag-outline',
 };
-// Por `displayStatus` también cuando NO hay respuesta del Cloud: el tono y la palabra tienen que
-// salir del mismo sitio o la pantalla se contradice —bloque gris de «Sin plan» con «Activo» dentro—.
-// Y sin respuesta el gratuito sigue siendo el suelo: ADR-0032 lo da por el manifest, no por lo que
-// conteste el Cloud. Un módulo SIN tier gratuito se queda en `none`, que es su tono neutro de siempre.
+// By `displayStatus` also when there is NO answer from the Cloud: the tone and the word have to
+// come from the same place or the screen contradicts itself — a grey «No plan» block with «Active»
+// inside it. And with no answer the free tier is still the floor: ADR-0032 grants it by the
+// manifest, not by whatever the Cloud replies. A module with NO free tier stays on `none`, its
+// usual neutral tone.
 const statusTone = computed<Tone>(() => STATUS_TONE[displayStatus.value]);
 const statusIcon = computed(() => STATUS_ICON[statusTone.value]);
-// El gratuito toma prestada la palabra de `active`: para quien lo lee es el mismo hecho —está
-// dentro y funcionando—, y dos sinónimos para un estado son peor que uno.
+// The free tier borrows the word of `active`: to the reader it is the same fact — in and working —
+// and two synonyms for one state are worse than one.
 const statusLabel = computed(() =>
   t(`modulePlan.status.${displayStatus.value === 'free' ? 'active' : displayStatus.value}`),
 );
 const statusHint = computed(() => {
-  // Caducar no te deja fuera si el módulo trae gratuito: te devuelve a él, y la frase lo dice.
+  // Expiring does not leave you outside when the module ships a free tier: it drops you back onto
+  // it, and the sentence says so.
   const key =
     displayStatus.value === 'expired' && freeTier.value ? 'expiredOnFree' : displayStatus.value;
   return t(`modulePlan.hint.${key}`, { plan: currentTier.value?.name ?? freeTier.value?.name ?? '' });
@@ -413,14 +417,14 @@ onUnmounted(() => {
 .status-line {
   margin: 0;
 }
-/* Holgura para la insignia «Tu plan». La pinta `ok-pricing-card` FUERA de su propia tarjeta
-   (`.badge { position: absolute; top: -0.8rem }`), y la tarjeta ocupa el alto entero de su
-   columna, así que sobresale por encima del borde de la columna. Como esta rejilla se PARTE en
-   varias filas (`size="12"` en móvil, `size-md="6"` en tablet), sin esta reserva la insignia de tu
-   plan se dibuja sobre la tarjeta de la fila de arriba en cuanto tu plan no es el primero.
-   Va en TODAS las columnas, no solo en la marcada: la insignia se mueve contigo al cambiar de
-   plan, y una reserva condicional haría saltar el alto de la fila. Reservar es trabajo de quien
-   apila las tarjetas — la tarjeta no sabe que la están tejiendo en una rejilla. */
+/* Room for the «Your plan» badge. `ok-pricing-card` draws it OUTSIDE its own card
+   (`.badge { position: absolute; top: -0.8rem }`), and the card fills the whole height of its
+   column, so the badge sticks out above the column's edge. Because this grid WRAPS into several
+   rows (`size="12"` on a phone, `size-md="6"` on a tablet), without this reserve the badge of your
+   plan is drawn over the card in the row above as soon as your plan is not the first one.
+   It goes on ALL columns, not only the marked one: the badge moves with you when your plan
+   changes, and a conditional reserve would make the row height jump. Reserving is the job of
+   whoever stacks the cards — the card does not know it is being tiled into a grid. */
 .tier-col {
   padding-top: 0.8rem;
 }

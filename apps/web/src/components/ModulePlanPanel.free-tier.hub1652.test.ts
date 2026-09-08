@@ -195,6 +195,18 @@ describe('ModulePlanPanel — expiring drops you to the free plan, not out (hub#
     expect(hint(w)).toBe('modulePlan.hint.expired');
     expect(featuredName(w)).toBeNull();
   });
+
+  it('decides where expiring leaves you by the manifest, not by the slug the Cloud named', async () => {
+    // The module was updated in the marketplace and this hub still runs the older bundle, so the
+    // slug the Cloud names matches none of these cards and nothing is marked (see above). But the
+    // manifest DOES ship a tier at 0 €, and that is where expiring leaves you, whatever the Cloud
+    // called it. Reading the current card instead of the manifest here would fall back to the plain
+    // «subscribe again to keep using it» — which is simply not true for this module.
+    const w = await mountWith({ status: 'expired', tier: 'legacy-pro' });
+
+    expect(featuredName(w)).toBeNull();
+    expect(hint(w)).toBe('modulePlan.hint.expiredOnFree');
+  });
 });
 
 describe('ModulePlanPanel — the Cloud is unreachable (hub#1652)', () => {

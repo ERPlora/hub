@@ -894,16 +894,16 @@ export interface CloudModuleSubscription {
   /** Fin del periodo de facturación actual (ISO) o null. */
   periodEnd: string | null;
   /**
-   * Slug del `ModuleTier` en el que está ESTE hub ahora mismo, o `null` (ERPlora/saas#1921).
+   * Slug of the `ModuleTier` THIS hub is on right now, or `null` (ERPlora/saas#1921).
    *
-   * No es la misma pregunta que `status`, que describe la SUSCRIPCIÓN: se está en un plan sin
-   * haber comprado nunca ninguno, porque todos nuestros módulos premium traen un tier a 0 € y por
-   * ahí entra la mayoría (ADR-0032). Por eso el gratuito llega como `status: 'none'` + `tier`
-   * con el slug del gratis, y son dos respuestas a propósito.
+   * Not the same question as `status`, which describes the SUBSCRIPTION: a hub is on a plan
+   * without ever having bought one, because all our premium modules ship a tier at 0 € and that
+   * is how the majority come in (ADR-0032). That is why the free tier arrives as `status: 'none'`
+   * + `tier` with the free slug — two answers, on purpose.
    *
-   * El slug es el mismo de `billing.tiers[].slug` del manifest (el SaaS crea el `ModuleTier` por
-   * ese slug), así que casa directamente con el tier que pinta la pantalla. Es ADITIVO: un SaaS
-   * anterior a saas#1921 no manda la clave y aquí queda `null`.
+   * The slug is the one from `billing.tiers[].slug` of the manifest (the SaaS creates the
+   * `ModuleTier` by that slug), so it matches the tier the screen paints directly. It is
+   * ADDITIVE: a SaaS older than saas#1921 does not send the key and it stays `null` here.
    */
   tier: string | null;
 }
@@ -925,8 +925,8 @@ export async function cloudModuleSubscription(moduleSlug: string): Promise<Cloud
     status: normSubStatus(data.status),
     trialEnd: data.trial_end ?? null,
     periodEnd: data.period_end ?? null,
-    // Cadena vacía = no dice nada, igual que ausente: se normaliza a `null` para que quien lo lea
-    // tenga UNA forma de "no lo sé" y no dos.
+    // Empty string = says nothing, same as absent: normalised to `null` so the reader has ONE form
+    // of "I don't know", not two.
     tier: typeof data.tier === 'string' && data.tier ? data.tier : null,
   };
 }
