@@ -28,8 +28,9 @@
 #                          `:X.Y` or `:X`: a new hub must keep starting on the last final release.
 #   push to develop     → version X.Y.Z-dev.<n>+g<sha>   tags :dev
 #                          (also a manual `workflow_dispatch` from develop — the REF decides, not
-#                          the event.) X.Y.Z is the last reachable `v*` tag and <n> the commits
-#                          since, both from `git describe --tags --long`. This is what pre deploys.
+#                          the event.) X.Y.Z is ONE PATCH ABOVE the newest `v*` tag the repository
+#                          HOLDS (hub#1625 — see below); <n> and <sha> come from
+#                          `git describe --tags --long`. This is what pre deploys.
 #   push to main        → version from Cargo.toml   tags :latest         (unchanged: main = prod)
 #   any other branch    → version X.Y.Z-dev.<n>+g<sha>   tags (sha only) — point ONE hub at it.
 #
@@ -37,10 +38,23 @@
 # binary said `1.0.0` — the Cargo placeholder — because only `v*` tags were stamped. The canary in
 # pre judged capabilities BY VERSION and quarantined an image that had every one of them.
 #
+# Why the `dev` base is NOT `git describe` (hub#1625). `main` is an ORPHAN branch — releases are
+# promoted with `commit-tree` — so from `develop` no `v1.1.8`…`v1.1.17` is reachable and describe
+# stays pinned at `v1.1.7`. Pre therefore ran an image calling itself `1.1.7-dev.N` with TEN
+# releases of code in it, and refused every module declaring a floor above 1.1.7: measured on
+# 2026-09-08, `whatsapp_inbox` (floor 1.1.17) was rejected with "requiere ERPlora 1.1.17 y este
+# hub es 1.1.7" on a hub that could run it perfectly. What corroborates a release is the tag
+# EXISTING, not it being an ancestor — the same call `crates/runtime/src/core_version.rs` already
+# made for the binary (hub#1619). And the base goes one patch AHEAD of that tag, never onto it:
+# in semver 2.0 a prerelease sorts BELOW its release, so `1.1.17-dev.N` would still understate a
+# `develop` that already contains everything `v1.1.17` published.
+#
 # NIEGA la publicación (exit 1) cuando:
 #   · la versión no es semver `X.Y.Z` (o `X.Y.Z-rc.N` en un tag rc), o sigue siendo el hueco `0.0.0`;
 #   · en `develop`/una rama no hay `git describe` utilizable (checkout sin tags): servir el hueco
 #     del Cargo desde ahí es exactamente el bug de hub#1170;
+#   · en `develop`/una rama el repositorio no tiene NI UN tag `vX.Y.Z`: sin él la imagen `:dev` no
+#     sabe contra qué release se numera, y numerarla a ciegas es el bug de hub#1625;
 #   · esa versión YA está en el registro. Un tag inmutable que un segundo build puede mover
 #     convierte «vuelve a 1.2.3» en una promesa vacía — y es el tag del que depende el rollback;
 #   · la versión es MENOR O IGUAL que la última publicada. Retroceder no es un error que se corrija:
@@ -51,13 +65,17 @@
 #
 # Usage:
 #   scripts/image-tags.sh --image ghcr.io/erplora/hub --ref "$GITHUB_REF" --sha "$GITHUB_SHA" \
-#                         [--describe "$(git describe --tags --long --match 'v*')"]
-#   Without `--describe` the script runs that `git describe` itself in the manifest's directory.
+#                         [--describe "$(git describe --tags --long --match 'v*')"] \
+#                         [--git-tags "$(git tag --list 'v*')"]
+#   Without them the script runs that `git describe` / `git tag --list` itself in the manifest's
+#   directory.
 #
 # Seam used by scripts/tests/image-tags.test.sh:
 #   IMAGE_TAGS_PUBLISHED_CMD  <cmd> → escribe en stdout las versiones ya publicadas, una por línea.
 #                                     Exit != 0 = no se pudo leer el registro.
 #   --describe <text>         → la salida de `git describe --tags --long --match 'v*'` (vacío = falló).
+#   --git-tags <text>         → la salida de `git tag --list 'v*'`, un tag por línea. Sin el flag
+#                               el script la pide él mismo en el directorio del manifest.
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -67,6 +85,8 @@ ref=""
 sha=""
 describe=""
 describe_given=0
+git_tags=""
+git_tags_given=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -75,6 +95,7 @@ while [ $# -gt 0 ]; do
         --ref)      ref="$2";      shift 2 ;;
         --sha)      sha="$2";      shift 2 ;;
         --describe) describe="$2"; describe_given=1; shift 2 ;;
+        --git-tags) git_tags="$2"; git_tags_given=1; shift 2 ;;
         *) echo "image-tags: argumento desconocido: $1" >&2; exit 2 ;;
     esac
 done
@@ -98,6 +119,35 @@ version_gt() {
     [ "$a_minor" -gt "$b_minor" ] && return 0
     [ "$a_minor" -lt "$b_minor" ] && return 1
     [ "$a_patch" -gt "$b_patch" ]
+}
+
+# El núcleo `X.Y.Z` más alto entre los tags `v*` que el repositorio TIENE (hub#1625).
+#
+# «Tiene», no «alcanza»: `main` es una rama HUÉRFANA —las releases se promueven con
+# `commit-tree`— así que desde `develop` no hay un solo `v1.1.8`…`v1.1.17` alcanzable y
+# `git describe` se queda clavado diez releases atrás. Lo que corrobora un release es que el
+# tag EXISTA, igual que ya decidió `crates/runtime/src/core_version.rs` (hub#1619).
+#
+# Una candidata `vX.Y.Z-rc.N` cuenta con su núcleo: `develop` ya lleva lo que esa candidata
+# publicó. Cualquier otra cosa en la lista (`nightly`, `v1.1`, `v1.1.18.1`) se ignora en
+# silencio: no es una versión, y hacer fatal un tag ajeno rompería builds por algo que no
+# decide nada.
+newest_tag_core() { # $1 = salida de `git tag --list 'v*'`
+    local newest="" tag core
+    while IFS= read -r tag; do
+        tag="${tag//[[:space:]]/}"
+        core="${tag#v}"; core="${core%%[-+]*}"
+        grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$core" || continue
+        if [ -z "$newest" ] || version_gt "$core" "$newest"; then newest="$core"; fi
+    done <<<"$1"
+    printf '%s' "$newest"
+}
+
+# `X.Y.Z` → `X.Y.(Z+1)`: la siguiente patch, que es lo que `develop` está construyendo.
+next_patch() { # $1 = X.Y.Z
+    local rest
+    rest="${1#*.}"
+    printf '%s.%s.%s' "${1%%.*}" "${rest%%.*}" "$(( ${rest#*.} + 1 ))"
 }
 
 # ── ¿Qué canal es esto? ──────────────────────────────────────────────────────
@@ -137,10 +187,27 @@ elif [ "$channel" = "develop" ] || [ "$channel" = "branch" ]; then
         echo "   exactamente el bug de hub#1170. ¿El checkout trae los tags? (fetch-depth: 0)" >&2
         exit 1
     fi
-    base="${describe#v}"; base="${base%%-*}"
+    # 🔴 La BASE no sale de `git describe` — ese es el bug de hub#1625. Sale del release más
+    # nuevo que el repositorio TIENE, subido UN patch, para que `:dev` quede por DELANTE y no
+    # por debajo: `develop` ya contiene lo que ese tag publicó, y en semver 2.0 una prerelease
+    # va por debajo de su release, así que `1.1.17-dev.N` volvería a mentir en el mismo
+    # sentido. De `git describe` solo se toman `<n>` y `+g<sha>`: el contador que crece commit
+    # a commit dentro del canal.
+    if [ "$git_tags_given" -eq 0 ]; then
+        git_tags=$(git -C "$(dirname -- "$manifest")" tag --list 'v*' 2>/dev/null || true)
+    fi
+    newest_core=$(newest_tag_core "$git_tags")
+    if [ -z "$newest_core" ]; then
+        echo "❌ image-tags: no veo NINGÚN tag \`vX.Y.Z\` en el repositorio para $ref." >&2
+        echo "   Sin él la imagen \`:dev\` no sabe contra qué release se numera, y publicarla a" >&2
+        echo "   ciegas es lo que dejó a pre diez releases por debajo (hub#1625)." >&2
+        echo "   ¿El checkout trae los tags? (fetch-depth: 0)" >&2
+        exit 1
+    fi
+    base=$(next_patch "$newest_core")
     rest="${describe#v*-}"; count="${rest%%-*}"; gsha="${rest#*-g}"
     version="$base-dev.$count+g$gsha"
-    source_of_version="git describe ($describe)"
+    source_of_version="el release más nuevo del repositorio ($newest_core) + 1 patch, con <n>/<sha> de git describe ($describe)"
 else
     stamp=0
     # Anclado a la sección: un `version = "…"` aparece también bajo cada `[dependencies.*]`, y
