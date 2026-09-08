@@ -889,6 +889,48 @@ impl CloudClient {
         )
     }
 
+    /// **The business's WhatsApp templates, with the verdict Meta gave each one** (hub#1610).
+    ///
+    /// `GET /api/v1/hub/device/whatsapp/templates/` with the **machine** credential —
+    /// `{"templates": [{name, language, category, status, rejected_reason, meta_id}], "stale"}`.
+    /// `stale` is the SaaS saying it could not reach Meta and is answering with what it had
+    /// stored, which is not the same as "this is what Meta thinks".
+    ///
+    /// **Read when the tab opens, never on a timer**: the SaaS refreshes against Meta on every
+    /// call and that path has no throttle (reviewer of saas#1905).
+    pub fn whatsapp_templates(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/templates/", auth)
+    }
+
+    /// **Register one template with Meta, or edit the one already there** (hub#1610) —
+    /// `POST /api/v1/hub/device/whatsapp/templates/`. The body
+    /// (`{name, language, category, header?, body, footer?, variables?}`) is the caller's to
+    /// build, verbatim from what the business wrote. `201` = new to Meta, `200` = edited in
+    /// place; either way it goes back to `PENDING`, because an edit is reviewed again.
+    pub fn whatsapp_template_register(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/whatsapp/templates/", self.base_url),
+            auth,
+        )
+    }
+
+    /// **Drop one template from Meta and from the SaaS** — every language of it, as Meta does.
+    /// `DELETE /api/v1/hub/device/whatsapp/templates/<name>/`. The name ends up inside a Cloud
+    /// path, so it is percent-encoded here for the same reason as
+    /// [`Self::whatsapp_disconnect`]: a `/` in it must not steer the request to another endpoint.
+    pub fn whatsapp_template_delete(&self, auth: &Auth, name: &str) -> PreparedRequest {
+        self.signed(
+            "DELETE",
+            format!(
+                "{}/api/v1/hub/device/whatsapp/templates/{}/",
+                self.base_url,
+                encode_path_segment(name)
+            ),
+            auth,
+        )
+    }
+
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -2135,5 +2177,74 @@ mod tests {
             .headers
             .contains(&("X-Hub-Token", "machine-secret".to_string())));
         assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    /// hub#1610 — the door the «Plantillas» tab reaches through the runtime. Machine credential:
+    /// the SaaS keeps the Meta token (ADR-0012) and the browser never gets to hold this one.
+    #[test]
+    fn whatsapp_templates_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_templates(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/templates/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+        // Never the user JWT: the tab is drawn from a local session, which lends no cloud token.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    /// Registering is a POST to the SAME path as the list — the SaaS distinguishes by method, and
+    /// a trailing slash dropped here would be a 301 that loses the body.
+    #[test]
+    fn whatsapp_template_register_posts_to_the_same_door_as_the_list() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_template_register(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/templates/"
+        );
+        assert_eq!(r.url, c.whatsapp_templates(&auth).url);
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    /// The template name ends up INSIDE a Cloud path, so it is percent-encoded: a `/` or a `..`
+    /// in it must not steer the delete at another endpoint of the Cloud (same rule as
+    /// `whatsapp_disconnect`).
+    #[test]
+    fn whatsapp_template_delete_names_the_template_and_encodes_it() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_template_delete(&auth, "table_ready");
+        assert_eq!(r.method, "DELETE");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/templates/table_ready/"
+        );
+        let hostile = c.whatsapp_template_delete(&auth, "../disconnect/123");
+        assert!(
+            !hostile.url.contains("/../") && !hostile.url.contains("/disconnect/"),
+            "a name with a path separator escaped the delete route: {}",
+            hostile.url
+        );
     }
 }

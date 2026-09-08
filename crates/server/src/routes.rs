@@ -239,6 +239,18 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/whatsapp/disconnect/:phone_number_id",
             post(whatsapp_connect::whatsapp_disconnect),
         )
+        // The templates the business promises Meta (hub#1610, saas#1899): same gate and same
+        // machine credential as the four above. The module cannot call the SaaS itself — that
+        // credential is a secret of the runtime (ADR-0003) — so this is its only way to Meta.
+        .route(
+            "/api/hub/whatsapp/templates",
+            get(whatsapp_templates::whatsapp_templates)
+                .post(whatsapp_templates::whatsapp_template_register),
+        )
+        .route(
+            "/api/hub/whatsapp/templates/:name",
+            axum::routing::delete(whatsapp_templates::whatsapp_template_delete),
+        )
         // Qué dice el marketplace de UN módulo (hub#1134). El catálogo de arriba sólo trae lo que
         // se sigue OFRECIENDO, así que no puede contestar por un módulo que este hub corre y el
         // marketplace ha retirado — que es justo el que «Mis apps» tiene que poder marcar.
