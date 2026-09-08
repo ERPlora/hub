@@ -1697,9 +1697,11 @@ export class FlowsApi {
    * {@link templates}: `typeof flows.activateTemplate` is the probe.
    */
   async activateTemplate(family: string): Promise<Flow> {
+    const own = checkedSegment('module id', this.moduleId, ID_PATTERN);
+    const target = checkedSegment('template family', family, ID_PATTERN);
     return this.send({
       method: 'POST',
-      path: this.templatePath(family, 'activate'),
+      path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/activate`,
     }) as Promise<Flow>;
   }
 
@@ -1711,17 +1713,12 @@ export class FlowsApi {
    * already authorised. A family that was never activated answers `flow.not_found`.
    */
   async deactivateTemplate(family: string): Promise<Flow> {
-    return this.send({
-      method: 'POST',
-      path: this.templatePath(family, 'deactivate'),
-    }) as Promise<Flow>;
-  }
-
-  /** The family is checked before it is pasted into a URL, like every other path segment here. */
-  private templatePath(family: string, gesture: 'activate' | 'deactivate'): string {
     const own = checkedSegment('module id', this.moduleId, ID_PATTERN);
     const target = checkedSegment('template family', family, ID_PATTERN);
-    return `${FLOWS_BASE_PATH}/templates/${own}/${target}/${gesture}`;
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/deactivate`,
+    }) as Promise<Flow>;
   }
 }
 
