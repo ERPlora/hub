@@ -14,6 +14,7 @@
 //! with its `en` + `es` strings (ADR-0055). A code translated to prose here is a code the tab can
 //! no longer act on.
 use crate::*;
+use erplora_runtime::host_notify;
 use erplora_runtime::manifest::CapabilityKind;
 
 /// The gate of the three doors: the human **and**, when the caller names a module, the `notify`
@@ -43,12 +44,27 @@ use erplora_runtime::manifest::CapabilityKind;
 /// module may only touch the recipes its own publisher wrote and signed. A Meta template has no
 /// owning module: it belongs to the business, the SaaS stores it per hub, and there is no narrower
 /// rule to put in the gate's place. With nothing to replace it, the default-deny gate stays.
+///
+/// **And the channel, not just the grant.** `notify` is granted as one switch, but the kernel
+/// never lets a module SEND on a channel it did not declare — the outbox checks the grant and then
+/// [`host_notify::assert_channel_declared`] («declaring `email` does not enable WhatsApp»). This
+/// door keeps that second half: a module the owner granted `notify` to send e-mail receipts must
+/// not be able to delete the business's approved WhatsApp templates, a channel it never asked for
+/// and cannot even send on. Same function, same `capability_denied` code (`notify:whatsapp`).
 async fn require_owner_and_notify(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
     whatsapp_connect::require_owner(st, headers).await?;
     let rt = st.runtime.read().await;
-    crate::flows_api::require_module_capability(headers, &rt, CapabilityKind::Notify)
-        .await
-        .map(|_| ())
+    let module =
+        crate::flows_api::require_module_capability(headers, &rt, CapabilityKind::Notify).await?;
+    if let Some(module) = module {
+        host_notify::assert_channel_declared(
+            rt.registry(),
+            &module,
+            host_notify::Channel::Whatsapp,
+        )
+        .map_err(crate::err_response)?;
+    }
+    Ok(())
 }
 
 /// A Meta template name, as the SaaS defines it (`NAME_RE = ^[a-z0-9_]{1,512}$` in

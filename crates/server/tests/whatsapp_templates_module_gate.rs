@@ -46,16 +46,16 @@ const MODULE_HEADER: &str = "x-erplora-module";
 /// The module that owns the «Plantillas» tab and therefore the one that calls this door.
 const WHATSAPP: &str = "whatsapp_inbox";
 
-/// A module on disk that DECLARES `notify`. Declaring is not being granted: the owner still has to
-/// tick it in Settings → Permissions, which is what `granted` does below.
-fn module_dir(root: &FsPath, id: &str) -> PathBuf {
+/// A module on disk that DECLARES `notify` for the given channels. Declaring is not being granted:
+/// the owner still has to tick it in Settings → Permissions, which is what `granted` does below.
+fn module_dir(root: &FsPath, id: &str, channels: &[&str]) -> PathBuf {
     let dir = root.join(id);
     std::fs::create_dir_all(&dir).unwrap();
     let manifest = json!({
         "id": id,
         "name": id,
         "version": "2.1.51",
-        "capabilities": { "notify": {} }
+        "capabilities": { "notify": { "channels": channels } }
     });
     std::fs::write(
         dir.join("module.json"),
@@ -72,7 +72,7 @@ struct Fixture {
     saas_calls: Arc<AtomicUsize>,
 }
 
-async fn fixture(granted: bool, tag: &str) -> Fixture {
+async fn fixture(granted: bool, channels: &[&str], tag: &str) -> Fixture {
     let saas_calls = Arc::new(AtomicUsize::new(0));
     let cloud_base_url = fake_saas(saas_calls.clone()).await;
 
@@ -87,7 +87,7 @@ async fn fixture(granted: bool, tag: &str) -> Fixture {
         std::process::id(),
         granted
     ));
-    rt.install_from_dir(&module_dir(&temp.join("modules"), WHATSAPP))
+    rt.install_from_dir(&module_dir(&temp.join("modules"), WHATSAPP, channels))
         .await
         .unwrap();
     if granted {
@@ -199,7 +199,7 @@ async fn body_json(response: axum::response::Response) -> Value {
 
 #[tokio::test]
 async fn a_module_the_owner_never_granted_notify_reaches_none_of_the_three_doors() {
-    let f = fixture(false, "denied").await;
+    let f = fixture(false, &["whatsapp"], "denied").await;
 
     for (method, uri, body) in doors() {
         let response = f
@@ -230,7 +230,7 @@ async fn a_module_the_owner_never_granted_notify_reaches_none_of_the_three_doors
 
 #[tokio::test]
 async fn the_owner_grants_notify_and_the_module_reaches_meta() {
-    let f = fixture(true, "granted").await;
+    let f = fixture(true, &["whatsapp"], "granted").await;
 
     for (method, uri, body) in doors() {
         let response = f
@@ -254,12 +254,51 @@ async fn the_owner_grants_notify_and_the_module_reaches_meta() {
     );
 }
 
+/// `notify` is granted as ONE switch, but the kernel never lets a module send on a channel it did
+/// not declare: the outbox checks the grant AND `assert_channel_declared` («declaring `email` does
+/// not enable WhatsApp», `crates/runtime/src/host_notify.rs`). The templates door hangs on the same
+/// capability, so it keeps the same second half — otherwise a module the owner granted `notify` to
+/// send e-mail receipts could delete every approved WhatsApp template of the business, a channel it
+/// never asked for and cannot even send on.
+#[tokio::test]
+async fn a_module_that_declared_notify_for_another_channel_is_refused_on_the_three_doors() {
+    for (channels, tag) in [(&["email"][..], "email-only"), (&[][..], "no-channel")] {
+        let f = fixture(true, channels, tag).await;
+
+        for (method, uri, body) in doors() {
+            let response = f
+                .router
+                .clone()
+                .oneshot(request(method, uri, &f.admin, Some(WHATSAPP), body))
+                .await
+                .unwrap();
+
+            assert_eq!(
+                response.status(),
+                StatusCode::FORBIDDEN,
+                "{method} {uri} let a module through that declared notify for {channels:?}, not whatsapp"
+            );
+            let envelope = body_json(response).await;
+            assert_eq!(
+                envelope["error"]["code"], "capability_denied",
+                "the refusal travels as a CODE, the same family as the missing grant: {envelope}"
+            );
+        }
+
+        assert_eq!(
+            f.saas_calls.load(Ordering::SeqCst),
+            0,
+            "a channel the module never declared must not reach Meta ({channels:?})"
+        );
+    }
+}
+
 #[tokio::test]
 async fn the_shell_names_no_module_and_keeps_passing_exactly_as_before() {
     // The tab the owner opens in the shell, `curl` with an admin session and the QA agent are not
     // modules and name none: the capability half of the gate does not apply to them, and hub#1610's
     // behaviour must not move under them.
-    let f = fixture(false, "shell").await;
+    let f = fixture(false, &["whatsapp"], "shell").await;
 
     for (method, uri, body) in doors() {
         let response = f
