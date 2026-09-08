@@ -102,7 +102,14 @@
          contrata. -->
     <ion-grid v-if="tiers.length" class="ion-no-padding">
       <ion-row>
-        <ion-col v-for="tier in tiers" :key="tier.slug" size="12" size-md="6" size-lg="3">
+        <ion-col
+          v-for="tier in tiers"
+          :key="tier.slug"
+          class="tier-col"
+          size="12"
+          size-md="6"
+          size-lg="3"
+        >
           <!-- `featured` + `badge` ya venían en la tarjeta y el panel no los usaba: con cuatro
                precios delante, «Activo» a secas no dice cuál es el tuyo. Es lo que hacen Shopify,
                Odoo y Square — el plan actual se señala EN su tarjeta.
@@ -405,5 +412,16 @@ onUnmounted(() => {
 }
 .status-line {
   margin: 0;
+}
+/* Holgura para la insignia «Tu plan». La pinta `ok-pricing-card` FUERA de su propia tarjeta
+   (`.badge { position: absolute; top: -0.8rem }`), y la tarjeta ocupa el alto entero de su
+   columna, así que sobresale por encima del borde de la columna. Como esta rejilla se PARTE en
+   varias filas (`size="12"` en móvil, `size-md="6"` en tablet), sin esta reserva la insignia de tu
+   plan se dibuja sobre la tarjeta de la fila de arriba en cuanto tu plan no es el primero.
+   Va en TODAS las columnas, no solo en la marcada: la insignia se mueve contigo al cambiar de
+   plan, y una reserva condicional haría saltar el alto de la fila. Reservar es trabajo de quien
+   apila las tarjetas — la tarjeta no sabe que la están tejiendo en una rejilla. */
+.tier-col {
+  padding-top: 0.8rem;
 }
 </style>
