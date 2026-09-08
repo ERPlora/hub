@@ -49,7 +49,13 @@ CANARY_PATH="/api/v1/fleet/canary/"
 VERDICT_PATH='/api/v1/fleet/release/"'
 
 ROLLOUT_PATH="/api/v1/fleet/rollout/"
-TOKEN_HEADER="X-Fleet-Token"
+# ADR-0467 (saas#1928): the credential is an API key of the `ci` superuser carrying exactly
+# `fleet:read fleet:promote fleet:canary` — the one mechanism for everything that is not a
+# browser. `X-Fleet-Token` was the third machine secret the SaaS grew in a week; it is gone.
+TOKEN_HEADER="X-Api-Key"
+RETIRED_HEADER="X-Fleet-Token"
+SECRET_NAME="FLEET_API_KEY"
+RETIRED_SECRET="FLEET_PUBLISH_TOKEN"
 
 pass=0
 fail=0
@@ -115,15 +121,27 @@ for path in "$PROMOTE_PATH" "$CANARY_PATH"; do
 done
 
 if grep -qF "$TOKEN_HEADER" <<<"$code"; then
-    ok "se autentica con \`${TOKEN_HEADER}\` (credencial estrecha, no la del plano hub↔cloud)"
+    ok "se autentica con \`${TOKEN_HEADER}\` (una API key acotada por scopes, no la credencial del plano hub↔cloud)"
 else
-    bad "se autentica con \`${TOKEN_HEADER}\`" "sin ella el SaaS responde 403 y el lazo no existe"
+    bad "se autentica con \`${TOKEN_HEADER}\`" "sin ella el SaaS responde 401 y el lazo no existe"
 fi
 
-if grep -qE 'secrets\.FLEET_PUBLISH_TOKEN' <<<"$code"; then
-    ok "el token sale de \`secrets.FLEET_PUBLISH_TOKEN\`, no del workflow"
+if grep -qF "$RETIRED_HEADER" <<<"$code"; then
+    bad "ya no manda \`${RETIRED_HEADER}\`" "ese header se jubiló con ADR-0467: el SaaS lo retira en cuanto este job deje de mandarlo"
 else
-    bad "el token sale de \`secrets.FLEET_PUBLISH_TOKEN\`" "un secreto en el fichero es un secreto público"
+    ok "ya no manda \`${RETIRED_HEADER}\` (jubilado por ADR-0467)"
+fi
+
+if grep -qE "secrets\.${SECRET_NAME}" <<<"$code"; then
+    ok "la llave sale de \`secrets.${SECRET_NAME}\`, no del workflow"
+else
+    bad "la llave sale de \`secrets.${SECRET_NAME}\`" "un secreto en el fichero es un secreto público"
+fi
+
+if grep -qE "secrets\.${RETIRED_SECRET}" <<<"$code"; then
+    bad "ya no lee \`secrets.${RETIRED_SECRET}\`" "el secreto viejo se borra del repo con este cambio; leerlo lo mantendría vivo"
+else
+    ok "ya no lee \`secrets.${RETIRED_SECRET}\`"
 fi
 
 # ── 4. Lo que separa «lanzar un canario» de «probar la imagen» ───────────────

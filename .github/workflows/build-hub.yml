@@ -243,23 +243,26 @@ jobs:
         id: launch
         env:
           FLEET_API: ${{ vars.FLEET_API_URL || 'https://erplora.com' }}
-          FLEET_TOKEN: ${{ secrets.FLEET_PUBLISH_TOKEN }}
+          FLEET_API_KEY: ${{ secrets.FLEET_API_KEY }}
           VERSION: ${{ needs.build-and-push.outputs.version }}
           IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/hub
         run: |
           set -uo pipefail
           # Falta de configuración = ROJO, nunca un `skip` silencioso: un canario que deja de
           # correr sin decirlo reconstruye exactamente el agujero que este job cierra.
-          if [ -z "${FLEET_TOKEN}" ]; then
-            echo "::error::Falta el secreto FLEET_PUBLISH_TOKEN del repo. Sin él la release queda SIN probar."
-            echo "Ponlo con: gh secret set FLEET_PUBLISH_TOKEN -R ERPlora/hub  (valor = env FLEET_PUBLISH_TOKEN del SaaS en Dokploy)"
+          # La credencial es una API key del SaaS (ADR-0467, saas#1928): la del superusuario `ci`
+          # con exactamente `fleet:read fleet:promote fleet:canary`. Promociona y prueba; el SaaS
+          # le niega vetar y rodar la flota, que siguen siendo actos de una persona.
+          if [ -z "${FLEET_API_KEY}" ]; then
+            echo "::error::Falta el secreto FLEET_API_KEY del repo. Sin él la release queda SIN probar."
+            echo "Ponlo con: gh secret set FLEET_API_KEY -R ERPlora/hub  (valor = una API key del superusuario ci, generada en el admin del SaaS → API keys, scopes fleet:read fleet:promote fleet:canary)"
             exit 1
           fi
 
           ref="${IMAGE_REPO}:${VERSION}"
           echo "Promocionando ${ref} como puntero de la flota…"
           code=$(curl -sS -o /tmp/promote.json -w '%{http_code}' -X POST \
-            -H "X-Fleet-Token: ${FLEET_TOKEN}" -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${FLEET_API_KEY}" -H 'Content-Type: application/json' \
             -d "{\"image\": \"${ref}\", \"note\": \"release ${VERSION} (Actions, run ${GITHUB_RUN_ID})\"}" \
             "${FLEET_API}/api/v1/fleet/release/promote/") || code=000
           cat /tmp/promote.json 2>/dev/null; echo
@@ -280,7 +283,7 @@ jobs:
 
           echo "Lanzando el canario sobre ${digest}…"
           code=$(curl -sS -o /tmp/canary.json -w '%{http_code}' -X POST \
-            -H "X-Fleet-Token: ${FLEET_TOKEN}" -H 'Content-Type: application/json' \
+            -H "X-Api-Key: ${FLEET_API_KEY}" -H 'Content-Type: application/json' \
             -d "{\"image\": \"${digest}\"}" \
             "${FLEET_API}/api/v1/fleet/canary/") || code=000
           cat /tmp/canary.json 2>/dev/null; echo
@@ -295,14 +298,14 @@ jobs:
       - name: Esperar el veredicto
         env:
           FLEET_API: ${{ vars.FLEET_API_URL || 'https://erplora.com' }}
-          FLEET_TOKEN: ${{ secrets.FLEET_PUBLISH_TOKEN }}
+          FLEET_API_KEY: ${{ secrets.FLEET_API_KEY }}
           DIGEST: ${{ steps.launch.outputs.digest }}
         run: |
           set -uo pipefail
           # 20 min de techo: el sondeo del SaaS se rinde a los 10, más el aprovisionamiento.
           deadline=$(( $(date +%s) + 1200 ))
           while [ "$(date +%s)" -lt "$deadline" ]; do
-            curl -sS -H "X-Fleet-Token: ${FLEET_TOKEN}" \
+            curl -sS -H "X-Api-Key: ${FLEET_API_KEY}" \
               "${FLEET_API}/api/v1/fleet/release/" -o /tmp/release.json || true
             verdict=$(python3 - <<'PY'
           import json
