@@ -435,11 +435,23 @@ import {
   refreshDeadLetterCount,
   type DeadEvent,
 } from '../lib/dead-letter';
+import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
 import { toastSuccess, toastError } from '../lib/toast';
 import { formatDateTime } from '../lib/format-datetime';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
+
+/**
+ * hub#1697 — the reason a dead-letter refused, as a sentence.
+ *
+ * The door's own `message` is written for whoever debugs and mixes languages; interpolating it
+ * into a translated sentence made the frame Spanish and the reason the engine's. The code gets a
+ * sentence; without one, the honest answer is that we do not know why.
+ */
+function deadLetterReason(error: unknown): string {
+  return localDoorSentence(error, { t, te }, ['system.errors', 'runtimeErrors'], t('system.reasonUnknown'));
+}
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -823,7 +835,7 @@ async function retryOne(id: string): Promise<void> {
     await loadDeadLetters();
     void refreshDeadLetterCount(); // actualiza el badge de la campana
   } catch (e) {
-    void toastError(t('system.retryFailed', { reason: (e as Error).message }));
+    void toastError(t('system.retryFailed', { reason: deadLetterReason(e) }));
   } finally {
     eventsBusyId.value = null;
   }
@@ -837,7 +849,7 @@ async function retryAll(): Promise<void> {
     await loadDeadLetters();
     void refreshDeadLetterCount();
   } catch (e) {
-    void toastError(t('system.retryFailed', { reason: (e as Error).message }));
+    void toastError(t('system.retryFailed', { reason: deadLetterReason(e) }));
   } finally {
     eventsBusy.value = false;
   }
@@ -855,7 +867,7 @@ async function discardOne(id: string): Promise<void> {
     await loadDeadLetters();
     void refreshDeadLetterCount();
   } catch (e) {
-    void toastError(t('system.discardFailed', { reason: (e as Error).message }));
+    void toastError(t('system.discardFailed', { reason: deadLetterReason(e) }));
   } finally {
     eventsBusyId.value = null;
   }

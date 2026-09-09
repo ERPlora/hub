@@ -1258,6 +1258,9 @@ export default {
     saving: 'Saving…',
   },
   system: {
+    // hub#1697 — when the door gave no code we can turn into a sentence, saying so beats
+    // pasting the line the runtime left for the log.
+    reasonUnknown: 'the reason could not be read',
     // hub#1697 — stable codes of the dead-letter door (`outbox_admin.rs`). Its own prose mixes
     // Spanish and English and was written for whoever debugs, not for whoever runs the shop.
     errors: {

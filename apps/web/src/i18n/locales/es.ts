@@ -1141,6 +1141,8 @@ export default {
   },
   system: {
     // hub#1697 — ver el comentario gemelo en `en.ts`.
+    reasonUnknown: 'no se ha podido leer el motivo',
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
     errors: {
       not_found: 'Ese mensaje ya no está en la cola. Actualiza la lista.',
       invalid_payload: 'A ese mensaje le faltan los datos que necesita para volver a enviarse.',

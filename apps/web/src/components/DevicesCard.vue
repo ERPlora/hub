@@ -192,7 +192,6 @@ import {
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import {
-  DevicesError,
   listDevices,
   renameDevice,
   revokeDevice,

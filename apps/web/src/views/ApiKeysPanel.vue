@@ -219,9 +219,16 @@ import {
   listApiKeys, createApiKey, rotateApiKey, revokeApiKey,
   type ApiKey, type ApiKeyAccess, type ApiKeyScopeEntry,
 } from '../lib/api-keys';
+import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { formatDate } from '../lib/format-datetime';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
+
+/**
+ * hub#1697 — the local `/api/keys` door answers a stable code beside prose written for the log.
+ * Own sentence first, shared transport line second, this panel's own line last.
+ */
+const API_KEY_ERRORS = ['apiKeys.errors', 'runtimeErrors'] as const;
 
 // ── Tipos locales de ok-data-table (OutfitKit no emite .d.ts; mismos shapes que EmployeesPage). ──
 type Row = Record<string, unknown>;
@@ -472,7 +479,7 @@ async function onCreate(): Promise<void> {
     await reloadKeys();
     showSecret(created.secret);
   } catch (err) {
-    void toastError(err instanceof Error ? err.message : t('apiKeys.createError'));
+    void toastError(localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.createError')));
   } finally {
     creating.value = false;
   }
@@ -484,7 +491,7 @@ async function onRotate(id: string): Promise<void> {
     await reloadKeys();
     showSecret(s);
   } catch (err) {
-    void toastError(err instanceof Error ? err.message : t('apiKeys.rotateError'));
+    void toastError(localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.rotateError')));
   }
 }
 
@@ -509,7 +516,7 @@ async function onRevoke(id: string, name: string): Promise<void> {
     await reloadKeys();
     void toastSuccess(t('apiKeys.revoked', { name }));
   } catch (err) {
-    void toastError(err instanceof Error ? err.message : t('apiKeys.revokeError'));
+    void toastError(localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.revokeError')));
   }
 }
 
