@@ -15,6 +15,9 @@
 // that would climb out of that prefix is refused before a request exists.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ErploraClient,
   ErploraError,
@@ -27,6 +30,27 @@ import {
 const SESSION = 's3ss10n-of-a-human-admin';
 const WHATSAPP = 'whatsapp_inbox';
 
+// ── What the RUNTIME puts on the wire (hub#1688) ───────────────────────────────────────────────
+//
+// These two helpers are the whole reason this file can be trusted. Until hub#1688 the fixtures
+// here were `{ ok: true, data: … }` written by hand, and the runtime answered the SaaS's PLAIN
+// body — so every test was green while every real call threw `unknown error`. A test that
+// simulates a server nobody wrote proves the client talks to itself.
+//
+// The runtime now wraps these three doors like every other door module code reaches
+// (`cloud_proxy::cloud_envelope_passthrough`), and the shape below is copied FROM it — with the
+// guard at the bottom of this file comparing the copy against the Rust, the same mechanism
+// `platform-failure.test.ts` uses for the redaction line.
+
+/** The SaaS's payload, as the runtime hands it to a module: whole, inside `data`. */
+const asTheRuntimeAnswers = (saasBody: unknown) => ({ ok: true, data: saasBody });
+
+/** A refusal, as the runtime hands it over: the SaaS's own `code`, never flattened to prose. */
+const asTheRuntimeRefuses = (code: string, message: string) => ({
+  ok: false,
+  error: { code, message },
+});
+
 interface Call {
   url: string;
   method: string;
@@ -35,7 +59,7 @@ interface Call {
 }
 
 /** A client scoped to the WhatsApp module, over a fetch that records and always says `ok`. */
-function scoped(answer: unknown = { ok: true, data: {} }): {
+function scoped(answer: unknown = asTheRuntimeAnswers({})): {
   client: ErploraClient;
   calls: Call[];
 } {
@@ -60,10 +84,9 @@ function scoped(answer: unknown = { ok: true, data: {} }): {
 }
 
 test('hub#1682: the template surface carries the shell session — the module never touches the token', async () => {
-  const { client, calls } = scoped({
-    ok: true,
-    data: { templates: [{ name: 'table_ready', status: 'PENDING' }], stale: false },
-  });
+  const { client, calls } = scoped(
+    asTheRuntimeAnswers({ templates: [{ name: 'table_ready', status: 'PENDING' }], stale: false }),
+  );
 
   const result = await client.whatsappTemplates.list();
 
@@ -169,8 +192,9 @@ test('hub#1682: a template name that would climb out of the prefix never leaves 
 
 // ── The 204 the delete answers with ────────────────────────────────────────────────────────────
 //
-// The runtime hands the SaaS's answer back untouched (`cloud_body_passthrough`), and the SaaS
-// answers a delete `204 No Content`: empty body, NO `content-type`. `HttpWsTransport.send` used to
+// A body-less success needs no envelope and gets none: `cloud_envelope_passthrough` returns the
+// status alone when the SaaS answered empty, and the SaaS answers a delete `204 No Content`:
+// empty body, NO `content-type`. `HttpWsTransport.send` used to
 // call `res.json()` on everything, so a delete that WORKED came back as
 // `server_unavailable: invalid JSON body` — the tab would tell the owner the hub did not answer
 // while Meta had already dropped the template. This is the failure that surface would ship with,
@@ -229,8 +253,9 @@ test('hub#1682: a client scoped again acts as the NEW module — the previous gr
       headers: { get: () => 'application/json' },
       json: async () =>
         ok
-          ? { ok: true, data: { templates: [], stale: false } }
+          ? asTheRuntimeAnswers({ templates: [], stale: false })
           : {
+              // The runtime's OWN refusal — same envelope, plus the `module` the kernel names.
               ok: false,
               error: {
                 code: 'capability_denied',
@@ -251,4 +276,94 @@ test('hub#1682: a client scoped again acts as the NEW module — the previous gr
     (e: unknown) => e instanceof ErploraError && e.code === 'capability_denied',
     'the module that did NOT get the grant must be refused, whichever scope it was built from',
   );
+});
+
+// ── The refusal reaches the module WITH ITS CODE (hub#1688) ────────────────────────────────────
+//
+// The other half of the failure. When Meta says no, the SaaS says WHY as a `code` — `invalid_name`,
+// `missing_example`, `meta_rate_limited` — never as prose, precisely so the module can put the
+// sentence in the owner's language (ADR-0055, saas#1902). Handed the SaaS's plain
+// `{"error": "invalid_name"}`, `unwrap` found no `ok` and threw `error: unknown error`: the owner
+// was told «error desconocido» about a name they could have fixed in two seconds.
+test('hub#1688: a refusal from Meta arrives with its code, which is what lets the tab say WHY', async () => {
+  const refusal = asTheRuntimeRefuses('invalid_name', 'lowercase letters, digits and underscores only');
+  const fetchImpl = (async () => ({
+    status: 400,
+    headers: { get: () => 'application/json' },
+    json: async () => refusal,
+  })) as unknown as typeof fetch;
+  const client = new ErploraClient(
+    new HttpWsTransport({ baseUrl: 'http://hub', fetchImpl }),
+  ).forModule(WHATSAPP);
+
+  await assert.rejects(
+    () =>
+      client.whatsappTemplates.register({
+        name: 'Table Ready',
+        language: 'es',
+        category: 'UTILITY',
+      }),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.equal(e.code, 'invalid_name', 'the code is the contract, not the sentence');
+      assert.equal(e.message, 'lowercase letters, digits and underscores only');
+      return true;
+    },
+  );
+});
+
+test('hub#1688: a template Meta ACCEPTED resolves — the answer is not an error', async () => {
+  // The symptom the business saw: saving worked, Meta had it, and the tab said «error».
+  const { client } = scoped(
+    asTheRuntimeAnswers({ name: 'table_ready', language: 'es', status: 'PENDING' }),
+  );
+
+  const saved = await client.whatsappTemplates.register({
+    name: 'table_ready',
+    language: 'es',
+    category: 'UTILITY',
+  });
+
+  assert.deepEqual(saved, { name: 'table_ready', language: 'es', status: 'PENDING' });
+});
+
+// ── The guard that would have caught hub#1682 ──────────────────────────────────────────────────
+//
+// Every fixture above is a claim about a server written in another language, and the whole reason
+// this file could be green while nothing worked is that nobody compared the claim to the server.
+// So compare it. Same mechanism as `platform-failure.test.ts` for the redaction line, and the same
+// rule: the source file is FOUND, never pinned, because a hard-coded path turns a guard into a red
+// that rides on every push instead of a check that reads the code.
+test('hub#1688: the envelope these fixtures simulate is the one `crates/server` actually writes', () => {
+  const srcRoot = fileURLToPath(new URL('../../../crates/server/src/', import.meta.url));
+  const declaring = readdirSync(srcRoot, { recursive: true, encoding: 'utf8' })
+    .filter((entry) => typeof entry === 'string' && entry.endsWith('.rs'))
+    .sort()
+    .map((entry) => ({ file: entry, text: readFileSync(join(srcRoot, entry), 'utf8') }))
+    // The `(` is load-bearing: without it a rename to `cloud_envelope_passthrough_renamed`
+    // still matches by prefix and this guard passes over a server that no longer exists
+    // (measured — that mutant survived until the paren went in).
+    .filter(({ text }) => text.includes('fn cloud_envelope_passthrough('));
+
+  assert.equal(
+    declaring.length,
+    1,
+    'expected exactly ONE `cloud_envelope_passthrough` under `crates/server/src/`, found ' +
+      `${declaring.length} (${declaring.map((d) => d.file).join(', ') || 'none'}): it is the ` +
+      'function that decides what these three doors put on the wire',
+  );
+
+  // Whitespace-insensitive: `cargo fmt` reflows arguments and that is not a contract change.
+  const rust = declaring[0]!.text.replace(/\s+/g, ' ');
+  for (const written of [
+    'json!({ "ok": true, "data": data })',
+    'json!({ "ok": false, "error": { "code": code, "message": message } })',
+  ]) {
+    assert.ok(
+      rust.includes(written),
+      `the runtime no longer writes \`${written}\`, so the fixtures in this file describe a ` +
+        'server that does not exist — which is exactly how hub#1682 shipped three doors that ' +
+        'threw `unknown error` on every call with the suite green',
+    );
+  }
 });
