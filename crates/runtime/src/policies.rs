@@ -224,7 +224,7 @@ pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
             continue;
         };
 
-        // (2) El vocabulario de consecuencias, cerrado.
+        // (2) The vocabulary of consequences, closed.
         if doc.outcomes.is_empty() {
             scan.discard(
                 &name,

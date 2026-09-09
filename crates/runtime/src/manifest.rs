@@ -1618,11 +1618,9 @@ pub struct Listener {
 // `Manifest` deserialises WITHOUT `deny_unknown_fields` and with `#[serde(default)]` nearly
 // everywhere, which is a deliberate tolerance — a hub must survive a manifest written for a newer
 // core — but it was implemented as SILENCE: anything unknown was dropped with no error, no warning
-// and no log. Twice already that silence shipped: `cash_register` used to carry a top-level
-// `protects` block nothing read — hub#775 gave it a reader, so that half is no longer an example of
-// the silence, only of how long it lasted — and seven commands of `inventory`/`services` declare a
-// `validates` guard the runtime never runs (hub#610): a manifest that reads as if it validates and
-// does not.
+// and no log. Twice already that silence shipped: `cash_register` carries a top-level `protects`
+// block nothing reads, and seven commands of `inventory`/`services` declare a `validates` guard the
+// runtime never runs (hub#610) — a manifest that reads as if it validates and does not.
 //
 // A blanket `deny_unknown_fields` is the wrong fix. The runtime is NOT the only reader of a
 // `module.json`: the shell reads `ui`/`widgets`/`provides_slots`, the SaaS reads
