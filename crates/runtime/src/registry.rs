@@ -347,34 +347,34 @@ pub struct Registry {
     /// `flows/` del paquete al instalar/re-hidratar, igual que `locales`. Vacío = el módulo no
     /// trae ninguna, que es el caso de 26 de los 27 módulos de hoy.
     pub flow_templates: HashMap<String, FlowTemplateScan>,
-    /// **Dónde puede el dueño poner una norma**: `module_id → puntos de control` (hub#1701,
-    /// ADR-0476). Se cargan de `policies/` del paquete al instalar/re-hidratar, igual que
-    /// `locales` y `flow_templates`, y por el mismo motivo — así los módulos ya instalados
-    /// publican sus puntos de control en el primer arranque tras esta release, sin reinstalar.
+    /// **Where the owner may put a rule**: `module_id → checkpoints` (hub#1701, ADR-0476). They are
+    /// loaded from the package's `policies/` at install/re-hydrate time, just like `locales` and
+    /// `flow_templates`, and for the same reason — that way the modules already installed publish
+    /// their checkpoints on the first boot after this release, without reinstalling.
     pub policy_checkpoints: HashMap<String, crate::policies::CheckpointScan>,
-    /// `command → punto de control`, derivado de [`Self::policy_checkpoints`] (hub#1701).
+    /// `command → checkpoint`, derived from [`Self::policy_checkpoints`] (hub#1701).
     ///
-    /// Existe para que el gate de `commands::execute_at` resuelva en **O(1)**: corre en CADA
-    /// comando, y recorrer los módulos instalados buscando quién gatea este nombre sería trabajo por
-    /// venta (la guarda de coste acotado). Lo reconstruye [`Self::rebuild_policy_command_index`],
-    /// que es el ÚNICO sitio que lo escribe y al que llaman los dos únicos mutadores del mapa de
-    /// arriba — así no puede quedarse desfasado respecto a él.
+    /// It exists so the `commands::execute_at` gate resolves in **O(1)**: it runs on EVERY command,
+    /// and walking the installed modules looking for who gates this name would be work per sale (the
+    /// bounded-cost guard). It is rebuilt by [`Self::rebuild_policy_command_index`], which is the
+    /// ONLY place that writes it and the one both of the map's only two mutators above call — so it
+    /// cannot fall out of step with it.
     ///
-    /// No filtra por `is_active`: eso se mira al leer, porque el estado de un módulo cambia sin
-    /// pasar por aquí.
+    /// It does not filter by `is_active`: that is looked at on read, because a module's state
+    /// changes without coming through here.
     policy_checkpoint_by_command: HashMap<String, crate::policies::PolicyCheckpoint>,
-    /// **Las normas en vigor**, indexadas por command (hub#1701).
+    /// **The rules in force**, indexed by command (hub#1701).
     ///
-    /// Vive aquí, y no en un parámetro de la firma, por el mismo motivo que [`Self::demo_hub`]: el
-    /// `&Registry` es la única autoridad que llega a `commands::execute_at` por **todos** los
-    /// caminos (HTTP, API pública, asistente, relay del outbox, scheduler) y que ningún llamador
-    /// puede fabricar. Un parámetro más sería una etiqueta que la próxima puerta nueva podría
-    /// olvidarse de poner, y olvidarla aquí es dejar el gate abierto.
+    /// It lives here, and not in a parameter of the signature, for the same reason as
+    /// [`Self::demo_hub`]: the `&Registry` is the only authority that reaches
+    /// `commands::execute_at` through **every** path (HTTP, public API, assistant, outbox relay,
+    /// scheduler) and that no caller can fabricate. One more parameter would be a label the next new
+    /// door could forget to attach, and forgetting it here means leaving the gate open.
     ///
-    /// Es un índice en MEMORIA con mutabilidad interior: lo reconstruyen el arranque y **cada
-    /// escritura** del CRUD ([`crate::Runtime::reload_policies`]), y el gate solo lee. Que no haya
-    /// que pedir `&mut Registry` para refrescarlo es lo que permite que una norma recién guardada
-    /// esté en vigor en la siguiente venta sin reiniciar.
+    /// It is an IN-MEMORY index with interior mutability: boot and **every write** of the CRUD
+    /// ([`crate::Runtime::reload_policies`]) rebuild it, and the gate only reads. Not having to ask
+    /// for a `&mut Registry` to refresh it is what lets a rule just saved be in force on the next
+    /// sale without restarting.
     pub policies: crate::policies::PolicyIndex,
     /// Observador opcional de eventos (lo pone el server para el WS).
     pub event_sink: Option<std::sync::Arc<dyn EventSink>>,
@@ -572,10 +572,10 @@ impl Registry {
         }
     }
 
-    /// Registra los puntos de control que un módulo declara (hub#1701). Vacío = se olvidan los
-    /// previos, igual que las plantillas de arriba: un checkpoint que una versión nueva del módulo
-    /// ya no declara deja de ofrecerse, en vez de quedarse ahí nombrando un command que quizá ya no
-    /// existe.
+    /// Registers the checkpoints a module declares (hub#1701). Empty = the previous ones are
+    /// forgotten, just like the templates above: a checkpoint a new version of the module no longer
+    /// declares stops being offered, instead of lingering there naming a command that may not exist
+    /// any more.
     pub fn set_policy_checkpoints(&mut self, module_id: &str, scan: crate::policies::CheckpointScan) {
         if scan.is_empty() {
             self.policy_checkpoints.remove(module_id);
@@ -585,8 +585,8 @@ impl Registry {
         self.rebuild_policy_command_index();
     }
 
-    /// Rehace `command → checkpoint` desde cero. Barato (unas decenas de entradas) y llamado solo
-    /// al instalar/quitar un módulo, nunca en el camino de un comando.
+    /// Rebuilds `command → checkpoint` from scratch. Cheap (a few dozen entries) and called only
+    /// when installing/removing a module, never on a command's path.
     fn rebuild_policy_command_index(&mut self) {
         self.policy_checkpoint_by_command = self
             .policy_checkpoints
@@ -596,11 +596,12 @@ impl Registry {
             .collect();
     }
 
-    /// El punto de control que gatea `command`, si lo declara un módulo instalado y **activo**
-    /// (hub#1701). Es lo que lee el gate, y por eso es una búsqueda en un mapa y no un recorrido.
+    /// The checkpoint that gates `command`, if an installed and **active** module declares it
+    /// (hub#1701). It is what the gate reads, and that is why it is a map lookup and not a walk.
     ///
-    /// El filtro por `is_active` es el mismo criterio que `navigation`: un módulo pausado no ofrece
-    /// pantallas y tampoco gatea. Sus normas siguen guardadas y vuelven a aplicar al reactivarlo.
+    /// Filtering by `is_active` is the same criterion as `navigation`: a paused module offers no
+    /// screens and does not gate either. Its rules stay stored and apply again when it is
+    /// reactivated.
     pub fn policy_checkpoint_for_command(
         &self,
         command: &str,

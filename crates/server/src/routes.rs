@@ -445,18 +445,18 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/flows/approvals/:id/reject",
             post(flows_api::reject),
         )
-        // ── Las normas del dueño (hub#1701, ADR-0476) ──────────────────────────────────────
-        // Core REST y no comandos `hub.*`, por el mismo motivo que los flujos (ADR-0283 §9): una
-        // norma no es el dato de un módulo, es la configuración del propio hub.
+        // ── The owner's rules (hub#1701, ADR-0476) ─────────────────────────────────────────
+        // Core REST and not `hub.*` commands, for the same reason as the flows (ADR-0283 §9): a rule
+        // is not a module's data, it is the hub's own configuration.
         //
-        // Puerta = sesión local de un humano owner/admin, NUNCA una API key ni el token de máquina:
-        // una norma decide si una venta se puede cobrar, y una credencial de integración copiable
-        // no decide eso. Y sin capability de módulo — aquí no hay superficie de SDK que abrir.
+        // Door = the local session of a human owner/admin, NEVER an API key nor the machine token: a
+        // rule decides whether a sale can be charged, and a copyable integration credential does not
+        // decide that. And with no module capability — there is no SDK surface to open here.
         //
-        // 🔴 `checkpoints` va ANTES de `/policies/:id`: es un segmento ESTÁTICO y matchit lo
-        // resuelve con prioridad sobre el parámetro, así que servido por `:id` respondería «no
-        // existe esa norma» y la pantalla del dueño se quedaría sin sitios que ofrecer.
-        // `tests/policies_api_test.rs` lo comprueba contra el router de verdad.
+        // 🔴 `checkpoints` goes BEFORE `/policies/:id`: it is a STATIC segment and matchit resolves
+        // it with priority over the parameter, so served by `:id` it would answer «there is no such
+        // rule» and the owner's screen would be left with no places to offer.
+        // `tests/policies_api_test.rs` checks this against the real router.
         .route(
             "/api/hub/policies",
             get(policies_api::list_policies).post(policies_api::create_policy),

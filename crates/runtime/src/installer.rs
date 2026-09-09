@@ -372,16 +372,16 @@ async fn register_module(
     }
     registry.set_flow_templates(&manifest.id, flow_templates);
 
-    // Puntos de control de políticas del módulo (hub#1701, ADR-0476): `policies/` del paquete →
-    // registry. Mismo sitio y mismo carácter best-effort que las traducciones y las plantillas de
-    // arriba, y por el mismo motivo: es contenido de un zip de terceros y esto corre en CADA
-    // arranque (`Runtime::rehydrate_installed`), así que un documento roto no puede impedir que el
-    // hub levante. Que esté aquí es lo que hace que los módulos YA instalados publiquen sus puntos
-    // de control en el primer boot tras esta release, sin republicar ni reinstalar nada.
+    // The module's policy checkpoints (hub#1701, ADR-0476): `policies/` of the package → registry.
+    // Same place and same best-effort character as the translations and the templates above, and
+    // for the same reason: it is the content of a third-party zip and this runs on EVERY boot
+    // (`Runtime::rehydrate_installed`), so a broken document cannot stop the hub from coming up.
+    // Being here is what makes the modules ALREADY installed publish their checkpoints on the first
+    // boot after this release, without republishing or reinstalling anything.
     let checkpoints = crate::policies::scan_checkpoints(dir, &manifest);
-    // hub#1649: best-effort no es mudo. Y aquí menos que en ningún sitio: un checkpoint descartado
-    // es un sitio donde el dueño creía que podía poner una norma y no puede, así que sin esta línea
-    // la norma que quiso escribir simplemente no existiría y nadie sabría por qué.
+    // hub#1649: best-effort is not mute. And here less than anywhere else: a discarded checkpoint is
+    // a place where the owner believed they could put a rule and cannot, so without this line the
+    // rule they meant to write would simply not exist and nobody would know why.
     for discard in &checkpoints.discards {
         eprintln!(
             "⚠ {}: policies/{}: {} — {}",

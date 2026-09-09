@@ -1,27 +1,27 @@
-//! **La puerta HTTP de las normas del dueño** (hub#1701, ADR-0476).
+//! **The HTTP door of the owner's rules** (hub#1701, ADR-0476).
 //!
 //! ```text
-//! GET/POST        /api/hub/policies              lista / crea
-//! GET             /api/hub/policies/checkpoints  dónde se puede poner una norma
+//! GET/POST        /api/hub/policies              list / create
+//! GET             /api/hub/policies/checkpoints  where a rule may be placed
 //! GET/PUT/DELETE  /api/hub/policies/{id}
 //! ```
 //!
-//! **Core REST, no comandos `hub.*`** — mismo reparto que los flujos (`flows_api.rs`, ADR-0283 §9):
-//! una norma no es el dato de un módulo, es la configuración del propio hub, y va en el mismo
-//! estante que las keys, los usuarios o la dead-letter.
+//! **Core REST, not `hub.*` commands** — same split as the flows (`flows_api.rs`, ADR-0283 §9): a
+//! rule is not a module's data, it is the hub's own configuration, and it goes on the same shelf as
+//! the keys, the users or the dead-letter.
 //!
-//! **Puerta = la sesión local de una PERSONA owner/admin**, nunca una API key ni el token de
-//! máquina. Una norma decide si una venta se puede cobrar; una credencial de integración copiable,
-//! guardada en el `.env` de un tercero, no decide eso.
+//! **Door = the local session of a PERSON who is owner/admin**, never an API key nor the machine
+//! token. A rule decides whether a sale can be charged; a copyable integration credential, stored in
+//! a third party's `.env`, does not decide that.
 //!
-//! 🔴 Y **sin capability de módulo**, a diferencia de `admin_session!` de los flujos: allí la
-//! capability existe porque el SDK expone la superficie de flujos a los módulos, y sin ella
-//! cualquier módulo instalado podría escribirse una automatización que corre comandos en nombre del
-//! dueño. Aquí no hay superficie de SDK que abrir —las normas se escriben desde la pantalla del
-//! hub— así que pedir una capability sería pedir permiso para una puerta que no existe.
+//! 🔴 And **without a module capability**, unlike `admin_session!` of the flows: there the
+//! capability exists because the SDK exposes the flows surface to the modules, and without it any
+//! installed module could write itself an automation that runs commands on the owner's behalf. Here
+//! there is no SDK surface to open — the rules are written from the hub's own screen — so asking for
+//! a capability would be asking permission for a door that does not exist.
 //!
-//! `created_by`/`updated_by` salen SIEMPRE de la sesión resuelta, jamás del body (misma regla que
-//! `granted_by` en `flows_api.rs` y `discarded_by` en `outbox_admin.rs`).
+//! `created_by`/`updated_by` ALWAYS come from the resolved session, never from the body (same rule
+//! as `granted_by` in `flows_api.rs` and `discarded_by` in `outbox_admin.rs`).
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -54,42 +54,44 @@ fn bad_request(code: &str, message: &str) -> Response {
         .into_response()
 }
 
-/// El status HTTP que significa un código `policy.*` — **por familia, no caso a caso** (misma regla
-/// que [`crate::flows_api`], hub#734).
+/// The HTTP status a `policy.*` code means — **by family, not case by case** (same rule as
+/// [`crate::flows_api`], hub#734).
 ///
-/// Toda negativa del núcleo viaja como `RuntimeError::Domain`, y `Domain` es `409` en el resto del
-/// hub. Aquí eso sería falso casi siempre: `409` le dice al llamador «reintenta, el estado cambiará»
-/// y ninguna de estas tres cosas cambia sola. La pantalla del dueño decide qué pintar mirando el
-/// status **antes** de mirar el código, así que la distinción tiene que estar ahí:
+/// Every refusal of the core travels as `RuntimeError::Domain`, and `Domain` is `409` in the rest of
+/// the hub. Here that would be false almost always: `409` tells the caller «retry, the state will
+/// change» and none of these three things changes on its own. The owner's screen decides what to
+/// paint by looking at the status **before** looking at the code, so the distinction has to be
+/// there:
 ///
-/// - `…not_found` → **404**. No existe: ni la norma, ni el punto de control que dice gatear.
-/// - `policy.outcome_not_available` → **501**. La consecuencia SÍ está en el vocabulario y este core
-///   todavía no la sabe aplicar (`elevate:`, hub#1710). Es la única de la familia que se arregla
-///   **esperando una release** en vez de corrigiendo la norma, y decirle `400` mandaría al dueño a
-///   reescribir algo que ya está bien.
-/// - el resto de `policy.` → **400**. Lo que el llamador mandó mal.
+/// - `…not_found` → **404**. It does not exist: neither the rule, nor the checkpoint it claims to
+///   gate.
+/// - `policy.outcome_not_available` → **501**. The consequence IS in the vocabulary and this core
+///   does not know how to apply it yet (`elevate:`, hub#1710). It is the only one of the family
+///   fixed by **waiting for a release** instead of by correcting the rule, and telling it `400`
+///   would send the owner off to rewrite something that is already right.
+/// - the rest of `policy.` → **400**. What the caller sent wrong.
 ///
-/// ⚠️ Un código que **no** empiece por `policy.` cae a [`crate::err_response`] sin tocar: el
-/// `not_found` de un módulo no es el de este kernel, y la regla del sufijo lo reclamaría encantada.
-/// Es la primera línea a propósito, antes de mirar ningún sufijo.
+/// ⚠️ A code that does **not** start with `policy.` falls through to [`crate::err_response`]
+/// untouched: a module's `not_found` is not this kernel's, and the suffix rule would happily claim
+/// it. It is the first line on purpose, before looking at any suffix.
 ///
-/// [`policies::ERR_BLOCKED`] no se mapea aquí y no es un olvido: una norma en vigor niega por
-/// `/api/commands/…`, que es la superficie del dispatcher, no esta.
+/// [`policies::ERR_BLOCKED`] is not mapped here and that is not an oversight: a rule in force denies
+/// through `/api/commands/…`, which is the dispatcher's surface, not this one.
 fn policy_status(code: &str) -> Option<StatusCode> {
     if !code.starts_with("policy.") {
         return None;
     }
     let status = match code {
         policies::ERR_OUTCOME_NOT_AVAILABLE => StatusCode::NOT_IMPLEMENTED,
-        // `policy.not_found` lleva un `.` donde los demás llevan `_`, así que el sufijo se compara
-        // sin él — y ningún código de la familia acaba en `not_found` significando otra cosa.
+        // `policy.not_found` carries a `.` where the others carry a `_`, so the suffix is compared
+        // without it — and no code of the family ends in `not_found` meaning anything else.
         _ if code.ends_with("not_found") => StatusCode::NOT_FOUND,
         _ => StatusCode::BAD_REQUEST,
     };
     Some(status)
 }
 
-/// Los errores del núcleo, con el status que [`policy_status`] dice que significan.
+/// The core's errors, with the status [`policy_status`] says they mean.
 fn policy_err(e: RuntimeError) -> Response {
     if let RuntimeError::Domain { code, message } = &e {
         if let Some(status) = policy_status(code) {
@@ -103,11 +105,11 @@ fn policy_err(e: RuntimeError) -> Response {
     crate::err_response(e)
 }
 
-/// Resuelve la sesión de admin y devuelve el runtime más «quién está haciendo esto», ya en la forma
-/// `hub_user:<id>` que guardan las columnas de auditoría.
+/// Resolves the admin session and returns the runtime plus «who is doing this», already in the
+/// `hub_user:<id>` shape the audit columns store.
 ///
-/// Anónimo → `401`; cajero → `403`; API key → `401`/`403`, porque `require_admin_session` solo
-/// mira la sesión local y una key no la trae.
+/// Anonymous → `401`; cashier → `403`; API key → `401`/`403`, because `require_admin_session` only
+/// looks at the local session and a key does not carry one.
 macro_rules! admin_session {
     ($st:expr, $headers:expr) => {{
         let arc = match $st.runtime_for(&$st.hub_id()).await {
@@ -124,22 +126,22 @@ macro_rules! admin_session {
     }};
 }
 
-/// Lee el body de un `POST`/`PUT`.
+/// Reads the body of a `POST`/`PUT`.
 ///
-/// Un body al que le falte un campo —o que traiga `mode` como número— es un error del llamador, no
-/// del dueño: sale como `400 invalid_payload` con el motivo de serde, que dice exactamente qué
-/// campo falta. Los campos que la persona SÍ puede equivocarse escribiendo (el punto de control, la
-/// condición, la consecuencia, el mensaje) los juzga `policies::validate`, con su código propio.
+/// A body missing a field — or carrying `mode` as a number — is the caller's error, not the owner's:
+/// it comes out as `400 invalid_payload` with serde's reason, which says exactly which field is
+/// missing. The fields the person CAN get wrong while writing (the checkpoint, the condition, the
+/// consequence, the message) are judged by `policies::validate`, with its own code.
 fn new_policy(body: &Value) -> Result<NewPolicy, Response> {
     serde_json::from_value::<NewPolicy>(body.clone())
         .map_err(|e| bad_request("invalid_payload", &e.to_string()))
 }
 
-/// `GET /api/hub/policies/checkpoints` — dónde puede el dueño poner una norma.
+/// `GET /api/hub/policies/checkpoints` — where the owner may put a rule.
 ///
-/// Sale del Registry, no de la BD: son los puntos de control que declaran los módulos **instalados
-/// y activos** ahora mismo. Es la lista que la pantalla necesita para ofrecer sitios, y la misma
-/// que decide si una norma guardada sigue aplicándose.
+/// It comes from the Registry, not from the database: these are the checkpoints declared by the
+/// modules **installed and active** right now. It is the list the screen needs in order to offer
+/// places, and the same one that decides whether a stored rule still applies.
 pub async fn list_checkpoints(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let (arc, _) = admin_session!(st, headers);
     let rt = arc.read().await;
@@ -189,8 +191,8 @@ pub async fn get_policy(
     }
 }
 
-/// `PUT /api/hub/policies/{id}` — la norma entera, no un parche: es la misma validación que el alta,
-/// así que promover de `warn` a `enforce` pasa por el mismo aro que escribirla.
+/// `PUT /api/hub/policies/{id}` — the whole rule, not a patch: it is the same validation as the
+/// creation, so promoting from `warn` to `enforce` goes through the same hoop as writing it.
 pub async fn update_policy(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -209,8 +211,8 @@ pub async fn update_policy(
     }
 }
 
-/// `DELETE /api/hub/policies/{id}` — soft-delete: la fila sobrevive porque es el único registro de
-/// que esta norma estuvo en vigor, y deja de aplicarse en el comando siguiente.
+/// `DELETE /api/hub/policies/{id}` — soft-delete: the row survives because it is the only record
+/// that this rule was ever in force, and it stops applying on the very next command.
 pub async fn delete_policy(
     State(st): State<AppState>,
     headers: HeaderMap,

@@ -1,18 +1,17 @@
-//! **Las normas del dueño del negocio** — la cara de [`Runtime`] del gate de hub#1701 (ADR-0476).
+//! **The business owner's rules** — the [`Runtime`] face of the hub#1701 gate (ADR-0476).
 //!
-//! Mismo reparto que los flujos (`flows_api.rs`): aquí solo viven los métodos que la superficie
-//! REST llama; las reglas de qué se puede guardar y cómo se evalúa están en [`crate::policies`],
-//! que es donde tienen que estar juntas — la puerta de escritura rechaza justo lo que el gate no
-//! sabría aplicar.
+//! Same split as the flows (`flows_api.rs`): only the methods the REST surface calls live here; the
+//! rules about what may be stored and how it is evaluated live in [`crate::policies`], which is
+//! where they have to be together — the write door refuses exactly what the gate would not know how
+//! to apply.
 //!
-//! Toda escritura termina reconstruyendo el índice en memoria. No es un detalle de rendimiento: una
-//! norma que el dueño acaba de guardar —o de borrar— tiene que estar en vigor en la venta siguiente,
-//! y no en el próximo despliegue.
+//! Every write ends by rebuilding the in-memory index. That is not a performance detail: a rule the
+//! owner has just saved — or deleted — has to be in force on the next sale, not on the next deploy.
 use crate::*;
 
 impl Runtime {
-    /// Dónde puede el dueño poner una norma: los puntos de control de los módulos instalados y
-    /// activos (hub#1701).
+    /// Where the owner may put a rule: the checkpoints of the installed and active modules
+    /// (hub#1701).
     pub fn policy_checkpoints(&self) -> Vec<policies::PolicyCheckpoint> {
         self.registry
             .policy_checkpoints()
@@ -29,9 +28,9 @@ impl Runtime {
         policies::get(self.db.as_ref(), &self.hub_id, id).await
     }
 
-    /// Guarda una norma. El registro viaja con ella porque lo que se puede escribir depende del
-    /// punto de control que la ofrece: sus `facts` y sus `outcomes` — mismo motivo por el que
-    /// `create_flow` lleva el registro.
+    /// Stores a rule. The registry travels with it because what may be written depends on the
+    /// checkpoint that offers it: its `facts` and its `outcomes` — the same reason `create_flow`
+    /// carries the registry.
     pub async fn create_policy(&self, new: &policies::NewPolicy, by: &str) -> Result<policies::Policy> {
         let saved =
             policies::create(self.db.as_ref(), &self.hub_id, &self.registry, new, by).await?;
@@ -56,12 +55,12 @@ impl Runtime {
         self.reload_policies().await
     }
 
-    /// Reconstruye el índice en memoria del que lee el gate, desde las filas de `_policy`.
+    /// Rebuilds the in-memory index the gate reads from, out of the `_policy` rows.
     ///
-    /// Lo llaman el arranque (`ensure_system_tables`) y cada escritura de aquí arriba. **Nada más
-    /// tiene que llamarlo**: el índice está indexado por punto de control, así que instalar,
-    /// actualizar, pausar o quitar un módulo lo resuelve el Registry al aplicar y no deja el índice
-    /// desfasado (ver la nota de [`policies::PolicyIndex`]).
+    /// Called by boot (`ensure_system_tables`) and by every write above. **Nothing else has to call
+    /// it**: the index is keyed by checkpoint, so installing, updating, pausing or removing a module
+    /// is resolved by the Registry at apply time and does not leave the index stale (see the note on
+    /// [`policies::PolicyIndex`]).
     pub async fn reload_policies(&self) -> Result<()> {
         let by_checkpoint = policies::load_index(self.db.as_ref(), &self.hub_id).await?;
         self.registry.policies.replace(by_checkpoint);
