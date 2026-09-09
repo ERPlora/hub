@@ -474,6 +474,12 @@ export default {
   // know), and it does not promise more than the hub delivers (removing a device is not a ban:
   // anybody with an account can sign in on it again). No "hub" anywhere — ADR-0254.
   devices: {
+    // hub#1697 — the door answers a stable code next to English prose written for the log
+    // (`devices.rs`). The code is what the person gets a sentence for; the prose stays in the log.
+    errors: {
+      device_name_too_long: 'That name is too long. Use a shorter one and save again.',
+      device_not_found: 'That device is no longer registered on this hub. Refresh the list.',
+    },
     title: 'Devices',
     intro:
       'The devices somebody has signed in on. If you lose one, remove it here: its session closes right away and it can no longer sign in with a PIN.',
@@ -1066,6 +1072,11 @@ export default {
     loadError: 'The role catalogue could not be loaded.',
   },
   apiKeys: {
+    // hub#1697 — stable codes of the local `/api/keys` door, so the toast is a sentence.
+    errors: {
+      not_found: 'That key no longer exists. Refresh the list and try again.',
+      rate_limited: 'Too many attempts in a row. Wait a moment and try again.',
+    },
     // List
     searchKey: 'Search API key…',
     empty: 'No API keys yet. Create one so an external system can read or write Hub data.',
@@ -1191,6 +1202,12 @@ export default {
       'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
     errors: {
+      // hub#1697 — the guards of the local `/api/hub/users` door (`hub_users.rs`). Their own
+      // message is prose written into the runtime; these are the sentences the person reads.
+      last_admin: 'You cannot deactivate the last administrator. Name another owner or administrator first.',
+      self_deactivation: 'You cannot deactivate your own account. Ask another administrator to do it.',
+      self_badge_enrollment: 'Nobody enrols their own badge. Ask another administrator to do it.',
+      not_found: 'That person is no longer on this hub. Refresh the list.',
       local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
       account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
       account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
@@ -1241,6 +1258,21 @@ export default {
     saving: 'Saving…',
   },
   system: {
+    // hub#1697 — stable codes of the dead-letter door (`outbox_admin.rs`). Its own prose mixes
+    // Spanish and English and was written for whoever debugs, not for whoever runs the shop.
+    errors: {
+      not_found: 'That message is no longer in the queue. Refresh the list.',
+      invalid_payload: 'That message is missing the data it needs to be sent again.',
+      // Nested, not `'flow.release_revoked'` as a flat key: `vue-i18n` reads a dot in a key as
+      // NESTING, so a flat dotted key is unreachable through `t()`. The runtime's code maps onto
+      // the path exactly.
+      flow: {
+        release_revoked: 'This message cannot be sent again: the permission that produced it was withdrawn. Grant it again and run the automation.',
+      },
+      module: {
+        capability_denied: 'This message cannot be sent again: the app that produced it no longer has permission for it.',
+      },
+    },
     database: 'Database',
     memory: 'Memory',
     connections: 'Connections',

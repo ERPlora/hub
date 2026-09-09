@@ -443,6 +443,11 @@ export default {
     saveError: 'No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
   devices: {
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      device_name_too_long: 'Ese nombre es demasiado largo. Ponle uno más corto y vuelve a guardar.',
+      device_not_found: 'Ese dispositivo ya no está registrado en este hub. Actualiza la lista.',
+    },
     title: 'Dispositivos',
     intro:
       'Los dispositivos en los que alguien ha entrado. Si pierdes uno, quítalo aquí: su sesión se cierra al momento y deja de poder entrar con PIN.',
@@ -970,6 +975,11 @@ export default {
     loadError: 'No se pudo cargar el catálogo de roles.',
   },
   apiKeys: {
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      not_found: 'Esa clave ya no existe. Actualiza la lista y vuelve a intentarlo.',
+      rate_limited: 'Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.',
+    },
     // Lista
     searchKey: 'Buscar API key…',
     empty: 'Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos del Hub.',
@@ -1086,6 +1096,11 @@ export default {
     accountPinHelp:
       'Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {
+      // hub#1697 — ver el comentario gemelo en `en.ts`.
+      last_admin: 'No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.',
+      self_deactivation: 'No puedes darte de baja a ti mismo. Pídeselo a otro administrador.',
+      self_badge_enrollment: 'Nadie da de alta su propia placa. Pídeselo a otro administrador.',
+      not_found: 'Esa persona ya no está en este hub. Actualiza la lista.',
       local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
       account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
       account_role_not_grantable: 'A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.',
@@ -1125,6 +1140,17 @@ export default {
     saving: 'Guardando…',
   },
   system: {
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      not_found: 'Ese mensaje ya no está en la cola. Actualiza la lista.',
+      invalid_payload: 'A ese mensaje le faltan los datos que necesita para volver a enviarse.',
+      flow: {
+        release_revoked: 'Este mensaje no se puede volver a enviar: se retiró el permiso que lo generó. Vuelve a concederlo y lanza la automatización.',
+      },
+      module: {
+        capability_denied: 'Este mensaje no se puede volver a enviar: la app que lo generó ya no tiene permiso para hacerlo.',
+      },
+    },
     database: 'Base de datos',
     memory: 'Memoria',
     connections: 'Conexiones',
