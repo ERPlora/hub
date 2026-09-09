@@ -446,7 +446,7 @@ export default {
     // hub#1697 — ver el comentario gemelo en `en.ts`.
     errors: {
       device_name_too_long: 'Ese nombre es demasiado largo. Ponle uno más corto y vuelve a guardar.',
-      device_not_found: 'Ese dispositivo ya no está registrado en este hub. Actualiza la lista.',
+      device_not_found: 'Ese dispositivo ya no está registrado aquí. Actualiza la lista.',
     },
     title: 'Dispositivos',
     intro:

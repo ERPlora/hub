@@ -478,7 +478,7 @@ export default {
     // (`devices.rs`). The code is what the person gets a sentence for; the prose stays in the log.
     errors: {
       device_name_too_long: 'That name is too long. Use a shorter one and save again.',
-      device_not_found: 'That device is no longer registered on this hub. Refresh the list.',
+      device_not_found: 'That device is no longer registered here. Refresh the list.',
     },
     title: 'Devices',
     intro:
