@@ -216,10 +216,21 @@ async fn the_hubs_own_key_refuses_with_its_own_reason() {
         let status = response.status();
         let body = body_json(response).await;
         assert_eq!(status, StatusCode::CONFLICT, "{method} {uri} → {body}");
+        // The LITERAL, not `ERR_KEY_IS_SYSTEM`: the panel keys its sentence on
+        // `apiKeys.errors.api_key.system_key`, so the value of that constant is a contract with the
+        // catalogue and not an internal name. Asserted against the constant this reads
+        // `X == X` — renaming it travels to the screen, which then has no sentence for the code and
+        // falls back to the generic line, with this suite green (verified: rv-1703 renamed it to
+        // `api_key.owned_by_the_hub` and all 6 still passed).
         assert_eq!(
             code_of(&body),
-            Some(erplora_runtime::api_keys::ERR_KEY_IS_SYSTEM),
+            Some("api_key.system_key"),
             "{method} {uri} → {body}"
+        );
+        assert_eq!(
+            erplora_runtime::api_keys::ERR_KEY_IS_SYSTEM,
+            "api_key.system_key",
+            "the constant the door reads and the code the catalogue translates are the same string"
         );
     }
 }
