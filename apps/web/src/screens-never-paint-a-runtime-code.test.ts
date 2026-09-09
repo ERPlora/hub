@@ -170,6 +170,30 @@ describe('no screen shows the runtime its own error text (hub#1693)', () => {
     expect(rawErrorTextReasons('try { a(); } catch (e) { msg.value = t("x"); }')).toEqual([]);
   });
 
+  it('caza una PANTALLA NUEVA que pinte la clave sin traducir (hub#1697)', () => {
+    // El caso que el revisor de hub#1698 hizo aparecer: el idiom de la casa vive FUERA del `catch`
+    // que lo llama, en un `reasonOf(error: unknown, fallback: string)`. Una pantalla nueva que lo
+    // copie tiene que nacer nombrada, sin que nadie toque esta guardia.
+    const screenBornNextMonth = `
+      <script setup lang="ts">
+      function reasonOf(error: unknown, fallback: string): string {
+        return error instanceof Error && error.message ? error.message : fallback;
+      }
+      async function save(): Promise<void> {
+        try { await client.command('x', {}); } catch (e) { rejection.value = reasonOf(e, 'nope'); }
+      }
+      </script>`;
+    expect(rawErrorTextReasons(screenBornNextMonth)).toContain('error.message');
+
+    // Y la MISMA pantalla, arreglada con el traductor de hub#1697, sale limpia: sin esta mitad la
+    // guardia podría estar diciendo que sí a todo.
+    const fixed = screenBornNextMonth.replace(
+      'error instanceof Error && error.message ? error.message : fallback',
+      "localDoorSentence(error, { t, te }, ['runtimeErrors'], fallback)",
+    );
+    expect(rawErrorTextReasons(fixed)).toEqual([]);
+  });
+
   it('sees the paint wherever the error is BOUND, not only inside a catch (rv-1698)', () => {
     // A `catch` block is not the only place a screen gets hold of the engine's words, and the two
     // other places are not hypothetical: `reasonOf(error: unknown, fallback: string)` is this
