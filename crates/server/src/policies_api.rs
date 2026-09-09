@@ -82,7 +82,12 @@ fn policy_status(code: &str) -> Option<StatusCode> {
         return None;
     }
     let status = match code {
-        policies::ERR_OUTCOME_NOT_AVAILABLE => StatusCode::NOT_IMPLEMENTED,
+        // The two «this core cannot, yet» refusals: a consequence it does not know how to run and
+        // a condition that judges the clock. They are not the caller's mistake, so they are not a
+        // `400` the owner would keep trying to fix by rewriting the rule.
+        policies::ERR_OUTCOME_NOT_AVAILABLE | policies::ERR_CONDITION_NEEDS_CLOCK => {
+            StatusCode::NOT_IMPLEMENTED
+        }
         // `policy.not_found` carries a `.` where the others carry a `_`, so the suffix is compared
         // without it — and no code of the family ends in `not_found` meaning anything else.
         _ if code.ends_with("not_found") => StatusCode::NOT_FOUND,

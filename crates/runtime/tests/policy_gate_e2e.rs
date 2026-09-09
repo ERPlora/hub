@@ -396,6 +396,43 @@ async fn a_stored_outcome_this_core_cannot_run_DENIES_instead_of_passing_hub1701
 }
 
 #[tokio::test]
+async fn a_stored_condition_that_needs_the_CLOCK_DENIES_instead_of_passing_hub1701() {
+    // Third of the same family, and the one that only exists because the language grew under us:
+    // `within_last` (hub#1713) judges an instant against the run clock, and `Condition::matches`
+    // reads that clock FROM THE SCOPE. A policy's scope is the command payload and carries no
+    // clock, so the window would evaluate to a bare `false` — «it did not match» — and a rule the
+    // owner wrote to block would silently never fire. Fail-closed: it denies.
+    // 🔴 MUTANT: let the clock operators through in `evaluate` — this test falls.
+    let rt = fresh_runtime().await;
+    insert_raw_policy(&rt, "block", r#"{"discount_percent":{"within_last":3600}}"#).await;
+    rt.reload_policies().await.unwrap();
+
+    let err = rt
+        .execute_command(
+            "p1701.order.set_discount",
+            &params(json!({ "order_id": "o1", "discount_percent": 5 })),
+            &admin_ctx(),
+        )
+        .await
+        .expect_err("una condición que necesita el reloj DENIEGA");
+
+    assert_eq!(domain_code(&err), policies::ERR_CONDITION_NEEDS_CLOCK);
+    assert_eq!(order_rows(&rt).await, 0);
+}
+
+#[tokio::test]
+async fn a_condition_that_needs_the_CLOCK_is_refused_at_WRITE_time_hub1701() {
+    // And it does not reach the table through this core's door either: refused when written, with
+    // ITS own code, so the owner is not left with a rule that looks saved and gates nothing. Same
+    // family as `elevate:` — it is fixed by waiting for a release, not by rewriting the rule.
+    let rt = fresh_runtime().await;
+    let mut new = over_20("enforce");
+    new.condition = json!({ "discount_percent": { "within_last": 3600 } });
+    let err = rt.create_policy(&new, "u1").await.unwrap_err();
+    assert_eq!(domain_code(&err), policies::ERR_CONDITION_NEEDS_CLOCK);
+}
+
+#[tokio::test]
 async fn a_stored_condition_this_core_cannot_read_DENIES_hub1701() {
     // Same thing: an operator this core does not know can only have come from a later version.
     let rt = fresh_runtime().await;

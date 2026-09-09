@@ -302,6 +302,21 @@ async fn each_refusal_of_the_core_arrives_with_ITS_own_status_hub1701() {
         "policy.outcome_not_available"
     );
 
+    // 501 too, and for the same reason: a window judges the clock and the gate only sees what the
+    // command carries (hub#1713). The owner cannot fix it by rewriting the rule.
+    let mut window = over_20();
+    window["condition"] = json!({ "discount_percent": { "within_last": 3600 } });
+    let response = send(
+        &f.router,
+        request("POST", "/api/hub/policies", Some(&f.admin), Some(window)),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    assert_eq!(
+        body_json(response).await["error"]["code"],
+        "policy.condition_needs_clock"
+    );
+
     // 400 — what the caller sent wrong.
     let mut mute = over_20();
     mute["message"] = json!("   ");

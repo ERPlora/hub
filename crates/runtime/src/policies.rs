@@ -47,7 +47,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
-use crate::flows::def::resolve_path;
+use crate::flows::def::{resolve_path, Op};
 use crate::flows::Condition;
 use crate::manifest::Manifest;
 use crate::registry::{new_id, now_rfc3339};
@@ -510,6 +510,11 @@ pub const ERR_FACT_MISSING: &str = "policy.fact_missing";
 pub const ERR_OUTCOME_NOT_AVAILABLE: &str = "policy.outcome_not_available";
 /// The stored condition cannot be read by this core. **Denies**, for the same reason.
 pub const ERR_CONDITION_UNREADABLE: &str = "policy.condition_unreadable";
+/// The condition judges the CLOCK (`within_last`, hub#1713) and a policy's scope carries none.
+/// **Denies** when stored, and is refused when written: the same two moments as
+/// [`ERR_OUTCOME_NOT_AVAILABLE`], and for the same reason — reading the bare `false` that a window
+/// answers without a clock would let a rule the owner wrote to block silently never fire.
+pub const ERR_CONDITION_NEEDS_CLOCK: &str = "policy.condition_needs_clock";
 
 // ── Codes of the WRITE door (the CRUD) ────────────────────────────────────────────────────────
 /// There is no rule with that id in this hub.
@@ -606,6 +611,26 @@ impl Verdict {
     }
 }
 
+/// Does the condition judge the CLOCK? (`within_last`, hub#1713)
+///
+/// [`Condition::matches`] reads the instant from `now.iso` **in the scope**, and a policy's scope is
+/// the command payload — there is no clock in it. Without one the window answers a bare `false`,
+/// the very same `false` as «it did not match», so a `block` the owner wrote would silently never
+/// fire. Asked as its own question, and never read off the result, for the same reason the presence
+/// of the facts is checked BEFORE evaluating.
+///
+/// 🔴 The `match` is exhaustive **on purpose and with no `_` arm**: an operator added to the frozen
+/// language stops compiling right here until someone says whether it judges the clock. That is what
+/// keeps the next `within_last` from landing in a policy as a silent fail-open, the way this one
+/// did.
+fn needs_clock(condition: &Condition) -> bool {
+    condition.0.values().flatten().any(|(op, _)| match op {
+        Op::WithinLast => true,
+        Op::Eq | Op::Neq | Op::In | Op::Exists | Op::Contains | Op::Gt | Op::Gte | Op::Lt
+        | Op::Lte => false,
+    })
+}
+
 /// `Some(v)` = this rule says NO. `None` = it lets it through.
 ///
 /// 🔴 The order matters and it is half the fix: **first the presence of the declared facts**, and
@@ -638,6 +663,15 @@ fn evaluate(policy: &ActivePolicy, facts: &[String], scope: &Json) -> Option<Ver
             format!("la norma «{}» no se puede leer con este core", policy.message),
         );
     };
+    if needs_clock(condition) {
+        return refuse(
+            ERR_CONDITION_NEEDS_CLOCK,
+            format!(
+                "la norma «{}» juzga el reloj y este hub todavía no sabe aplicarlo aquí",
+                policy.message
+            ),
+        );
+    }
     let Some(outcome) = &policy.outcome else {
         return refuse(
             ERR_OUTCOME_NOT_AVAILABLE,
@@ -782,6 +816,16 @@ fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()>
                 checkpoint.id,
                 checkpoint.facts.join(", ")
             ),
+        ));
+    }
+    // A window judges the clock, and the gate evaluates a policy against the command payload
+    // alone. Refused at the door, and with the `elevate:` family's code and not the `400` family's:
+    // the owner cannot fix this by rewriting the rule, only by waiting for a release.
+    if needs_clock(&condition) {
+        return Err(domain(
+            ERR_CONDITION_NEEDS_CLOCK,
+            "una norma no puede juzgar el reloj todavía: el gate solo ve lo que trae el comando"
+                .to_string(),
         ));
     }
     // The consequence, two different doors on purpose: one is fixed by changing the rule and the
