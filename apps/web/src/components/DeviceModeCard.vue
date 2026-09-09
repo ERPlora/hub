@@ -78,16 +78,15 @@ import { useI18n } from 'vue-i18n';
 import { IonCard, IonCardContent, IonItem, IonLabel, IonList, IonNote, IonRadio, IonRadioGroup } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import {
+  DeviceModeError,
   deviceMode,
   loadDeviceMode,
   setDeviceMode,
   type DeviceMode,
-  DeviceModeError,
 } from '../lib/device-mode';
-import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
 
-const { t, te } = useI18n();
+const { t } = useI18n();
 
 /** El modo EN VIGOR según el hub. Fuente compartida con la pantalla de login (lib/device-mode). */
 const mode = deviceMode;
@@ -96,16 +95,7 @@ const saving = ref(false);
 const rejection = ref('');
 
 /** Motivo REAL del rechazo, o `fallback` si no hubo ninguno (red/500) — igual que `RolesPanel`. */
-/**
- * hub#1697 — `/api/device/mode` is a local door: its words are the runtime's, not a server's. A
- * stable code gets a sentence; anything else is this card's own line.
- */
 function reasonOf(error: unknown, fallback: string): string {
-  // hub#1697 — a stable code we have a sentence for is translated; below that stays rule 2 of
-  // hub#1102: «this hub does not know the device `laptop-9`: sign in online on it once» tells the
-  // person exactly what to do, and no generic line of ours replaces that.
-  const byCode = runtimeErrorKey(error, { t, te }, ['runtimeErrors']);
-  if (byCode) return t(byCode);
   return error instanceof DeviceModeError && error.code && error.message ? error.message : fallback;
 }
 

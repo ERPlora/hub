@@ -46,8 +46,10 @@ const SHOWS_THE_ENGINE_TEXT_ON_PURPOSE: Record<string, string> = {
     'different things of the administrator (see RolesPanel.test.ts), so translating by code would ' +
     'collapse them into one sentence and lose the difference — hub#1102 rule 2.',
   'components/DeviceModeCard.vue':
-    'Local door /api/device/mode. «this hub does not know the device `laptop-9`: sign in online ' +
-    'on it once» tells the person exactly what to do; no generic line of ours replaces it.',
+    'Local door /api/device/mode. Untouched by hub#1697 on purpose: `device_mode.rs` emits no ' +
+    'code this shell has a sentence for, so a translation rung here would be dead config. ' +
+    '«this hub does not know the device `laptop-9`: sign in online on it once» tells the person ' +
+    'exactly what to do, and no generic line of ours replaces it — hub#1102 rule 2.',
   'components/ModuleSettingsForm.vue':
     'The sentence shown is the MODULE\'s own refusal, not the engine\'s: transport codes are ' +
     'translated first (hub#1697) and the codes were redacted back in hub#1074.',

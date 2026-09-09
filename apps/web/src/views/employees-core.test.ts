@@ -76,3 +76,41 @@ describe('Personal (core)', () => {
     expect(formSource).not.toMatch(/isTauri\(\)[^\n]*badge/i);
   });
 });
+
+// ── hub#1697 · el peldaño que faltaba en la escalera ──────────────────────────────────────────
+//
+// Las guardas de `/api/hub/users` (`hub_users.rs`) rechazan con un código estable —`last_admin`,
+// `self_deactivation`, `self_badge_enrollment`, `not_found`— y un `message` escrito DENTRO del
+// runtime. `hubUserErrorKey` no cubre esos códigos (va por prefijo), así que caían al último
+// recurso y la persona leía la prosa del motor. Ahora tienen frase.
+//
+// Se comprueba sobre el FUENTE, como el resto de este fichero: lo que puede regresar aquí es el
+// ORDEN de la escalera, y estas dos pantallas no tienen banco de montaje. El comportamiento del
+// traductor lo prueban `lib/runtime-error-sentence.test.ts` (unidad) y
+// `views/RolesPanel.invalid-field.test.ts` (montado de verdad, mismo patrón).
+describe('la escalera del rechazo traduce el código ANTES de rendirse (hub#1697)', () => {
+  const ladders: ReadonlyArray<readonly [string, string, string]> = [
+    ['EmployeesPage', listSource, 'function rejectionMessage'],
+    ['EmployeeFormPage', formSource, 'function employeeRejection'],
+  ];
+
+  it.each(ladders)('%s traduce por código antes del último recurso', (_name, source, marker) => {
+    const start = source.indexOf(marker);
+    expect(start, `${marker} no está en el fuente`).toBeGreaterThan(-1);
+    const ladder = source.slice(start, source.indexOf('\n}', start));
+
+    const translates = ladder.indexOf('runtimeErrorKey');
+    const lastResort = ladder.indexOf('error.message');
+    expect(translates, 'la escalera no traduce por código').toBeGreaterThan(-1);
+    expect(lastResort, 'el último recurso de la regla 2 de hub#1102 ya no está').toBeGreaterThan(-1);
+    // El orden ES el contrato: traducir DESPUÉS de rendirse no traduciría nunca.
+    expect(translates).toBeLessThan(lastResort);
+  });
+
+  it('el catálogo tiene las cuatro frases que ese peldaño necesita', () => {
+    const catalogue = readFileSync(new URL('../i18n/locales/es.ts', import.meta.url), 'utf8');
+    for (const code of ['last_admin', 'self_deactivation', 'self_badge_enrollment']) {
+      expect(catalogue, `falta la frase de ${code}`).toContain(`${code}: '`);
+    }
+  });
+});
