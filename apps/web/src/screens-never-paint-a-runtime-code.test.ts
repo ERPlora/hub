@@ -38,6 +38,22 @@ const SHOWS_THE_ENGINE_TEXT_ON_PURPOSE: Record<string, string> = {
   'components/ModuleSettingsForm.vue':
     'The refusal arrives in the ErploraError envelope of /api/command, whose codes have been ' +
     'redacted since hub#1074; what is shown is the module refusal, not a transport code.',
+  // The four below share one `reasonOf(error, fallback)` helper shape and were invisible while this
+  // sweep only read `catch` bodies (rv-1698). Same class as the four above and same ticket: local
+  // runtime doors, verified to emit no cloud code at all (`devices.rs`, `device_mode.rs` and
+  // `hub_users.rs` never call `cloud_unreachable`), so no hub#1693 leak can reach them.
+  'components/DeviceModeCard.vue':
+    'Local door /api/device/mode. Shows a DeviceModeError sentence only when it carries a code — ' +
+    'engine prose in front of a person, but never a cloud code — hub#1697.',
+  'components/DevicesCard.vue':
+    'Local door /api/devices. Shows the DevicesError sentence, falling back to its own line when ' +
+    'there is none — hub#1697.',
+  'views/EmployeesPage.vue':
+    'Last resort behind the same ladder as EmployeeFormPage (translated code → platform code → ' +
+    'the sentence that came). Local doors only — hub#1697.',
+  'views/RolesPanel.vue':
+    'Local door /api/hub/roles/<key>. Tries invalid-field and platform translations first and only ' +
+    'then shows the RoleActivationError sentence — hub#1697.',
 };
 
 /** The idiom itself, wherever it lives — `BlueprintHeroCard` kept it in a helper, not in the catch. */
@@ -56,19 +72,42 @@ function vueFiles(dir: string, found: string[] = []): string[] {
   return found;
 }
 
-/** Every `catch (name) { … }` body in a source, paired with the name it bound. */
-function catchBodies(source: string): Array<{ name: string; body: string }> {
+/**
+ * Where a screen gets hold of the engine's words: every body that BINDS an error to a name.
+ *
+ * Three bindings, not one. Scoping this to `catch` blocks alone was measured to miss four screens
+ * that leak today (rv-1698) — because the house idiom for this exact concern, `reasonOf(error:
+ * unknown, fallback: string)`, lives OUTSIDE the catch that calls it. `DeviceModeCard`,
+ * `DevicesCard`, `EmployeesPage` and `RolesPanel` all share it and cross-reference each other in
+ * their comments, so it is the shape the NEXT screen is most likely to copy.
+ *
+ * `unknown` is what this codebase writes when it means «this is a caught error»: that is the
+ * signal, and it is why widening to the whole source is not the answer — a bare sweep for
+ * `.message` also flags `metric.message` and `String(hubPinLength)`, and a guard that cries wolf
+ * gets an allowlist that only grows.
+ */
+function errorBoundBodies(source: string): Array<{ name: string; body: string }> {
   const found: Array<{ name: string; body: string }> = [];
-  const opener = /catch\s*\(\s*([A-Za-z_$][\w$]*)\s*(?::[^)]*)?\)\s*\{/g;
-  for (let m = opener.exec(source); m; m = opener.exec(source)) {
-    let i = opener.lastIndex;
-    let depth = 1;
-    while (i < source.length && depth > 0) {
-      if (source[i] === '{') depth += 1;
-      else if (source[i] === '}') depth -= 1;
-      i += 1;
+  const openers = [
+    // `catch (e) {` and `catch (e: unknown) {`
+    /catch\s*\(\s*([A-Za-z_$][\w$]*)\s*(?::[^)]*)?\)\s*\{/g,
+    // `.catch((e) => {` and `.catch(e => {`. A handler that binds nothing (`.catch(() => [])`,
+    // which this codebase uses everywhere to degrade) has no error to leak and never matches.
+    /\.catch\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*(?::[^)]*)?\)?\s*=>\s*\{/g,
+    // `function reasonOf(error: unknown, fallback: string): string {`
+    /\(\s*([A-Za-z_$][\w$]*)\s*:\s*unknown\b[^)]*\)\s*:?[^{;]*\{/g,
+  ];
+  for (const opener of openers) {
+    for (let m = opener.exec(source); m; m = opener.exec(source)) {
+      let i = opener.lastIndex;
+      let depth = 1;
+      while (i < source.length && depth > 0) {
+        if (source[i] === '{') depth += 1;
+        else if (source[i] === '}') depth -= 1;
+        i += 1;
+      }
+      found.push({ name: m[1], body: source.slice(opener.lastIndex, i - 1) });
     }
-    found.push({ name: m[1], body: source.slice(opener.lastIndex, i - 1) });
   }
   return found;
 }
@@ -76,7 +115,7 @@ function catchBodies(source: string): Array<{ name: string; body: string }> {
 /** Why this file shows the engine's words, or an empty list when it does not. */
 export function rawErrorTextReasons(source: string): string[] {
   const reasons: string[] = [];
-  for (const { name, body } of catchBodies(source)) {
+  for (const { name, body } of errorBoundBodies(source)) {
     const id = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const shapes: Array<[RegExp, string]> = [
       [new RegExp(`\\b${id}\\s*\\.\\s*message\\b`, 'g'), `${name}.message`],
@@ -132,5 +171,29 @@ describe('no screen shows the runtime its own error text (hub#1693)', () => {
       'err instanceof Error ? err.message : String(err)',
     ]);
     expect(rawErrorTextReasons('try { a(); } catch (e) { msg.value = t("x"); }')).toEqual([]);
+  });
+
+  it('sees the paint wherever the error is BOUND, not only inside a catch (rv-1698)', () => {
+    // A `catch` block is not the only place a screen gets hold of the engine's words, and the two
+    // other places are not hypothetical: `reasonOf(error: unknown, fallback: string)` is this
+    // repo's house idiom for exactly this concern (four screens share it, cross-referencing each
+    // other in comments), and it lives OUTSIDE the catch that calls it. A sweep scoped to catch
+    // bodies reads the fixed files and reports zero — the shape it was written from.
+    expect(
+      rawErrorTextReasons(
+        'function reasonOf(error: unknown, fallback: string): string {\n' +
+          '  return error instanceof DevicesError && error.message ? error.message : fallback;\n' +
+          '}',
+      ),
+    ).toEqual(['error.message']);
+    expect(rawErrorTextReasons('void load().catch((e) => { msg.value = e.message; });')).toEqual(['e.message']);
+    expect(rawErrorTextReasons('void load().catch(e => { msg.value = String(e); });')).toEqual(['String(e)']);
+
+    // And the same two bindings still tell a read from a paint: comparing is allowed anywhere.
+    expect(
+      rawErrorTextReasons("function isGone(error: unknown): boolean {\n  return error.message === 'gone';\n}"),
+    ).toEqual([]);
+    // A handler that takes no error cannot leak one: `.catch(() => …)` is all over this codebase.
+    expect(rawErrorTextReasons('void load().catch(() => []);')).toEqual([]);
   });
 });
