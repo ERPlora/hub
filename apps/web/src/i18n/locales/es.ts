@@ -1643,6 +1643,14 @@ export default {
     managePlan: 'Gestionar plan',
     managePlanError: 'No se pudo abrir la gestión del plan. Inténtalo de nuevo.',
     purchaseDetected: 'Confirmado. Tu plan se ha actualizado.',
+    // Lo que este hub lleva GASTADO de lo que incluye su plan (whatsapp_inbox#131). El nombre de
+    // la métrica lo pone el módulo (`lib/module-quota.ts`): aquí nunca se escribe «conversaciones».
+    usageTitle: 'Este mes',
+    usageOfLimit: '{used} de {limit} {metric}',
+    usageNoLimit: '{used} {metric}',
+    usageNearLimit: 'Estás cerca de lo que incluye tu plan.',
+    usageOverLimit: 'Has consumido todo lo que incluye tu plan este mes.',
+    usageUnavailable: 'No se ha podido leer tu consumo. Inténtalo dentro de un momento.',
     status: {
       active: 'Activo',
       trialing: 'En prueba',

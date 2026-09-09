@@ -1834,6 +1834,16 @@ export default {
     managePlan: 'Manage plan',
     managePlanError: 'Could not open plan management. Try again.',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
+    // What the hub has already SPENT of what its plan includes (whatsapp_inbox#131). The tier
+    // cards say what a plan includes; without these the one number that warns a channel is about
+    // to go quiet had no screen at all. The metric itself is named by the module
+    // (`lib/module-quota.ts`), so these strings never spell out «conversations».
+    usageTitle: 'This month',
+    usageOfLimit: '{used} of {limit} {metric}',
+    usageNoLimit: '{used} {metric}',
+    usageNearLimit: 'You are close to what your plan includes.',
+    usageOverLimit: 'You have used everything your plan includes this month.',
+    usageUnavailable: "Couldn't read what you have used. Try again in a moment.",
     status: {
       active: 'Active',
       trialing: 'Trialing',
