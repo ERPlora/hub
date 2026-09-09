@@ -155,6 +155,132 @@ pub(crate) fn cloud_body_passthrough(status: StatusCode, body: axum::body::Bytes
     cloud_json_passthrough(status, body)
 }
 
+// ── The ENVELOPE, for the proxy doors a MODULE can reach (hub#1688) ──────────────────────────
+//
+// Everything above hands the SaaS's body back as it came, and for the doors the SHELL calls that
+// is right: `apps/web/src/lib/runtime.ts` fetches them itself and reads the SaaS's own fields.
+//
+// A door a MODULE reaches is a different contract. Module code never fetches: it goes through
+// `@erplora/module-sdk`, whose transport ends EVERY call in `unwrap(env)` — «the runtime always
+// answers `application/json`, even its 4xx domain refusal travels in an envelope with a `code`»
+// (`packages/module-sdk/src/index.ts`). Query, command, flows, events, print and the media list
+// all answer that way; so must a proxy the SDK can call, or the module gets `unknown error` with
+// the code stripped off, which is exactly what hub#1682 shipped.
+//
+// Wrapping does NOT reinterpret the SaaS: the payload travels whole inside `data` and a refusal
+// keeps its own `code`. It is the opposite — the envelope is the only channel through which that
+// code reaches the module at all, which is what `whatsapp_templates.rs` wanted from the passthrough
+// and did not get.
+
+/// The SaaS answered and said no, and did not name a code (DRF's own throttle and auth failures
+/// answer `detail` and nothing else). Same code the members and fiscal-identity doors use.
+pub(crate) const CLOUD_REJECTED: &str = "cloud_rejected";
+/// The SaaS did not answer at all (network, DNS, timeout): nothing to correct, retry later.
+pub(crate) const CLOUD_UNREACHABLE: &str = "cloud_unreachable";
+/// This hub has no machine credential, so there is no door to knock on (a local `pnpm dev`).
+pub(crate) const HUB_NOT_ENROLLED: &str = "hub_not_enrolled";
+/// The SaaS answered `2xx` with something that is not JSON — a proxy's HTML page, most likely.
+pub(crate) const CLOUD_UNREADABLE: &str = "cloud_unreadable";
+
+/// The runtime's envelope over a Cloud answer, for the doors module code reaches.
+///
+/// Success keeps the Cloud's status and carries its payload whole in `data`; an EMPTY body stays
+/// empty (a `204` is «done» by definition of the status, and the SDK reads it as such). A refusal
+/// keeps the Cloud's status too, and its `code` — `{"error": "invalid_name"}` becomes
+/// `error.code = "invalid_name"` — with `detail` as the sentence for whoever never translated it.
+pub(crate) fn cloud_envelope_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
+    if status.is_success() {
+        if body.is_empty() {
+            return status.into_response();
+        }
+        return match serde_json::from_slice::<Value>(&body) {
+            Ok(data) => (status, Json(json!({ "ok": true, "data": data }))).into_response(),
+            Err(e) => {
+                tracing::warn!(status = status.as_u16(), error = %e, "erplora.com answered a success the hub could not read");
+                envelope_error(
+                    StatusCode::BAD_GATEWAY,
+                    CLOUD_UNREADABLE,
+                    "erplora.com answered with a body the hub could not read",
+                )
+            }
+        };
+    }
+    // A refusal: the Cloud's own `code` is the contract (saas#1902) and travels untouched. What it
+    // never named, we name `cloud_rejected` rather than dropping — a refusal with no code at all is
+    // the `unknown error` this whole envelope exists to stop.
+    let parsed: Option<Value> = serde_json::from_slice(&body).ok();
+    let code = parsed
+        .as_ref()
+        .and_then(|v| v.get("error"))
+        .and_then(Value::as_str)
+        .unwrap_or(CLOUD_REJECTED);
+    let message = parsed
+        .as_ref()
+        .and_then(|v| v.get("detail"))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_else(|| code.to_owned());
+    envelope_error(status, code, &message)
+}
+
+/// One refusal, one shape: `{"ok": false, "error": {"code", "message"}}` — what `unwrap` reads.
+fn envelope_error(status: StatusCode, code: &str, message: &str) -> Response {
+    (
+        status,
+        Json(json!({ "ok": false, "error": { "code": code, "message": message } })),
+    )
+        .into_response()
+}
+
+/// [`cloud_get_error_response`] in the envelope shape, for the same doors.
+///
+/// The `reqwest` detail does NOT travel: it carries the control plane's internal URL
+/// (`error_redaction_door`), and a module has nothing to do with it. It goes to the hub's log,
+/// which is where an operator looks — the caller gets a code it can act on and retry.
+pub(crate) fn cloud_envelope_error_response(e: CloudGetError) -> Response {
+    match e {
+        CloudGetError::NoCredential => envelope_error(
+            StatusCode::UNAUTHORIZED,
+            HUB_NOT_ENROLLED,
+            "this hub has no machine credential for erplora.com",
+        ),
+        CloudGetError::Network(detail) => {
+            tracing::warn!(detail = %detail, "erplora.com did not answer");
+            envelope_error(
+                StatusCode::BAD_GATEWAY,
+                CLOUD_UNREACHABLE,
+                "the hub could not reach erplora.com",
+            )
+        }
+    }
+}
+
+/// [`proxy_cloud_get`] for a door module code reaches: same call, [`cloud_envelope_passthrough`]
+/// on the way out.
+pub(crate) async fn proxy_cloud_get_enveloped(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+) -> Response {
+    match cloud_get_raw(st, headers, req).await {
+        Ok((status, body)) => cloud_envelope_passthrough(status, body),
+        Err(e) => cloud_envelope_error_response(e),
+    }
+}
+
+/// [`proxy_cloud_send`] for a door module code reaches (see [`proxy_cloud_get_enveloped`]).
+pub(crate) async fn proxy_cloud_send_enveloped(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+    body: Option<&Value>,
+) -> Response {
+    match cloud_send_raw(st, headers, req, body).await {
+        Ok((status, bytes)) => cloud_envelope_passthrough(status, bytes),
+        Err(e) => cloud_envelope_error_response(e),
+    }
+}
+
 /// Hands the front the Cloud's JSON as it came: same status, `no-store`, nothing reinterpreted.
 pub(crate) fn cloud_json_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
     (

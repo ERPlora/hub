@@ -9,12 +9,19 @@
 //!
 //! What is asserted: the gate (no session → 401, an employee → 403), the credential on the wire
 //! (`X-Hub-Token`, never the browser's bearer nor the local session), the body reaching the SaaS
-//! verbatim, the SaaS's answer coming back untouched — **status and `code` included**, because the
+//! verbatim, the SaaS's answer reaching the MODULE — **status and `code` included**, because the
 //! module is the one that turns `invalid_name` into a sentence (ADR-0055, saas#1902) — and a
 //! template name that cannot climb out of its route.
+//!
+//! hub#1688 fixed the one that did not hold: the answer travelled as the SaaS's bare body, and the
+//! module-sdk transport reads only the runtime's envelope, so every call — including the ones Meta
+//! ACCEPTED — reached the module as `unknown error`. The block at the end of this file is that
+//! contract; the pattern guard over every module-reachable proxy is
+//! `tests/module_doors_answer_in_one_shape.rs`.
 use axum::body::Body;
 use axum::extract::Path;
 use axum::http::{HeaderMap, Request, StatusCode};
+use axum::response::IntoResponse;
 use axum::routing::{delete, get};
 use axum::{Json, Router};
 use erplora_db::testutil::fresh_db;
@@ -169,7 +176,21 @@ async fn fake_saas(seen: Arc<Mutex<Seen>>) -> String {
             "/api/v1/hub/device/whatsapp/templates/:name/",
             delete(move |Path(name): Path<String>, headers: HeaderMap| async move {
                 record(&s3, &format!("delete:{name}"), &headers, Value::Null);
-                StatusCode::NO_CONTENT
+                match name.as_str() {
+                    // This hub has no template by that name — the SaaS names the reason.
+                    "gone" => (
+                        StatusCode::NOT_FOUND,
+                        Json(json!({ "error": "template_not_found" })),
+                    )
+                        .into_response(),
+                    // DRF's OWN throttle: `detail` and no `error` key anywhere.
+                    "throttled" => (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        Json(json!({ "detail": "Request was throttled. Expected available in 1893 seconds." })),
+                    )
+                        .into_response(),
+                    _ => StatusCode::NO_CONTENT.into_response(),
+                }
             }),
         );
     tokio::spawn(async move { axum::serve(listener, saas).await.unwrap() });
@@ -193,10 +214,12 @@ async fn the_templates_and_the_verdict_meta_gave_them_reach_the_tab() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = body_json(response).await;
-    assert_eq!(body["templates"][0]["name"], "table_ready");
+    // The shape itself is pinned by `the_list_reaches_the_module_in_the_envelope_the_sdk_reads`;
+    // what THIS test is about is the credential on the wire.
+    assert_eq!(body["data"]["templates"][0]["name"], "table_ready");
     // The reason Meta rejected it travels as it came: the tab is what turns it into a sentence.
-    assert_eq!(body["templates"][0]["rejected_reason"], "INVALID_FORMAT");
-    assert_eq!(body["stale"], false);
+    assert_eq!(body["data"]["templates"][0]["rejected_reason"], "INVALID_FORMAT");
+    assert_eq!(body["data"]["stale"], false);
     let s = seen.lock().unwrap();
     assert_eq!(s.path, "list");
     machine_credential_and_nothing_else(&s);
@@ -228,7 +251,7 @@ async fn saving_a_template_reaches_the_saas_verbatim_and_metas_answer_comes_back
 
     // 201 = new to Meta, 200 = edited in place. The status is the answer, so it is not flattened.
     assert_eq!(response.status(), StatusCode::CREATED);
-    assert_eq!(body_json(response).await["status"], "PENDING");
+    assert_eq!(body_json(response).await["data"]["status"], "PENDING");
     let s = seen.lock().unwrap();
     assert_eq!(s.path, "register");
     assert_eq!(
@@ -236,29 +259,6 @@ async fn saving_a_template_reaches_the_saas_verbatim_and_metas_answer_comes_back
         "the SaaS must see exactly what the business wrote, nothing rewritten"
     );
     machine_credential_and_nothing_else(&s);
-}
-
-#[tokio::test]
-async fn a_refusal_keeps_its_status_and_its_code_so_the_module_can_name_it() {
-    let seen = Arc::new(Mutex::new(Seen::default()));
-    let (router, admin, _) = fixture(fake_saas(seen).await, "refusal").await;
-
-    let response = router
-        .oneshot(request(
-            "POST",
-            "/api/hub/whatsapp/templates",
-            Some(&admin),
-            Some(json!({ "name": "Table Ready", "language": "es", "category": "UTILITY", "body": "x" })),
-        ))
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(
-        body_json(response).await["error"],
-        "invalid_name",
-        "the code is the contract; translating it here would leave the module nothing to act on"
-    );
 }
 
 #[tokio::test]
@@ -394,4 +394,171 @@ async fn a_saas_that_does_not_answer_is_an_error_not_a_silent_ok() {
             "{method} {uri} swallowed a SaaS that is not there"
         );
     }
+}
+
+// ── The shape the MODULE receives (hub#1688) ───────────────────────────────────────────────────
+//
+// The three doors above are the only cloud proxy a module can reach (`@erplora/module-sdk`,
+// `erplora.forModule(id).whatsappTemplates`), and every door a module reaches answers in the
+// runtime's ENVELOPE: `{ok:true,data}` or `{ok:false,error:{code,message}}`. That is not a
+// convention of one route — it is the only shape `HttpWsTransport.send` reads, so a body outside
+// it reaches the module as `unknown error` with the code stripped off.
+//
+// Handing the SaaS's plain body back is what hub#1682 shipped, and it turned every one of these
+// calls into an error: a template Meta ACCEPTED was reported as «error» to the business, and a
+// refusal Meta explained (`invalid_name`) arrived with nothing to explain it with.
+
+#[tokio::test]
+async fn the_list_reaches_the_module_in_the_envelope_the_sdk_reads() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (router, admin, _) = fixture(fake_saas(seen.clone()).await, "env-list").await;
+
+    let response = router
+        .oneshot(request(
+            "GET",
+            "/api/hub/whatsapp/templates",
+            Some(&admin),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], true, "a module reads `ok` or it reads nothing");
+    // The SaaS's payload travels WHOLE inside `data`: the verdict Meta gave each template and the
+    // `stale` flag are what the tab draws, and neither is reinterpreted on the way.
+    assert_eq!(body["data"]["templates"][0]["name"], "table_ready");
+    assert_eq!(body["data"]["templates"][0]["rejected_reason"], "INVALID_FORMAT");
+    assert_eq!(body["data"]["stale"], false);
+}
+
+#[tokio::test]
+async fn a_template_meta_accepted_comes_back_as_accepted_not_as_error() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (router, admin, _) = fixture(fake_saas(seen.clone()).await, "env-register").await;
+
+    let response = router
+        .oneshot(request(
+            "POST",
+            "/api/hub/whatsapp/templates",
+            Some(&admin),
+            Some(json!({ "name": "table_ready", "language": "es", "category": "UTILITY", "body": "x" })),
+        ))
+        .await
+        .unwrap();
+
+    // 201 = new to Meta, 200 = edited in place. The status is part of the answer and is not flattened.
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], true);
+    assert_eq!(body["data"]["status"], "PENDING");
+}
+
+#[tokio::test]
+async fn a_saas_refusal_reaches_the_module_with_its_code_so_it_can_say_why() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (router, admin, _) = fixture(fake_saas(seen).await, "env-refusal").await;
+
+    let response = router
+        .oneshot(request(
+            "POST",
+            "/api/hub/whatsapp/templates",
+            Some(&admin),
+            Some(json!({ "name": "Table Ready", "language": "es", "category": "UTILITY", "body": "x" })),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false);
+    assert_eq!(
+        body["error"]["code"], "invalid_name",
+        "the code is the whole point: it is what lets the tab tell the owner WHAT to change"
+    );
+    // The SaaS's `detail` is the fallback sentence for a code the module never translated
+    // (ADR-0055): a code with no words at all reads as «error» just the same.
+    assert_eq!(
+        body["error"]["message"],
+        "lowercase letters, digits and underscores only"
+    );
+}
+
+#[tokio::test]
+async fn a_delete_the_saas_refuses_keeps_its_code_too() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (router, admin, _) = fixture(fake_saas(seen).await, "env-delete-refusal").await;
+
+    let response = router
+        .oneshot(request(
+            "DELETE",
+            "/api/hub/whatsapp/templates/gone",
+            Some(&admin),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false);
+    assert_eq!(body["error"]["code"], "template_not_found");
+}
+
+#[tokio::test]
+async fn a_refusal_the_saas_did_not_name_still_arrives_as_a_refusal_with_a_code() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let (router, admin, _) = fixture(fake_saas(seen).await, "env-throttled").await;
+
+    // DRF's own throttle answers `{"detail": "Request was throttled…"}` — no `error` key at all.
+    // It still has to reach the module as a refusal it can branch on, not as `unknown error`.
+    let response = router
+        .oneshot(request(
+            "DELETE",
+            "/api/hub/whatsapp/templates/throttled",
+            Some(&admin),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false);
+    assert_eq!(body["error"]["code"], "cloud_rejected");
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("throttled"),
+        "what the SaaS did say must survive: {body}"
+    );
+}
+
+#[tokio::test]
+async fn a_saas_that_does_not_answer_reaches_the_module_as_a_code_not_as_a_url() {
+    let (router, admin, _) = fixture("http://127.0.0.1:1/".into(), "env-down").await;
+
+    let response = router
+        .oneshot(request(
+            "GET",
+            "/api/hub/whatsapp/templates",
+            Some(&admin),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false);
+    assert_eq!(body["error"]["code"], "cloud_unreachable");
+    // `error_redaction_door`: the `reqwest` message carries the control plane's internal URL and
+    // must not travel to a module — the detail belongs in the hub's log.
+    let message = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        !message.contains("127.0.0.1") && !message.contains("http://"),
+        "the address the hub dialled must not reach the caller: {message}"
+    );
 }

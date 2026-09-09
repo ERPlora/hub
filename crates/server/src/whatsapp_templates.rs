@@ -7,12 +7,20 @@
 //! secret of the runtime that never reaches the browser (ADR-0003) — so the runtime proxies it.
 //!
 //! Three doors, same gate as the four of [`crate::whatsapp_connect`]: **owner/admin session**,
-//! because what the business promises Meta is management, not the shift. And the same passthrough
-//! rule: status and body come back untouched. That matters more here than anywhere else in this
-//! file's neighbourhood — the SaaS answers refusals as a `code` (`invalid_name`, `missing_example`,
-//! `meta_rate_limited`…, saas#1902/#1905) and it is the MODULE that turns each one into a sentence
-//! with its `en` + `es` strings (ADR-0055). A code translated to prose here is a code the tab can
-//! no longer act on.
+//! because what the business promises Meta is management, not the shift. Nothing the SaaS says is
+//! reinterpreted: the payload travels whole and a refusal keeps its own `code` (`invalid_name`,
+//! `missing_example`, `meta_rate_limited`…, saas#1902/#1905), because it is the MODULE that turns
+//! each one into a sentence with its `en` + `es` strings (ADR-0055). A code translated to prose
+//! here is a code the tab can no longer act on.
+//!
+//! 🔴 **But it travels in the runtime's ENVELOPE, not as the SaaS's bare body** (hub#1688). These
+//! are the only cloud proxies module code can reach, and module code never fetches: it goes
+//! through `@erplora/module-sdk`, whose transport ends every call in `unwrap(env)` and reads
+//! `{ok:true,data}` / `{ok:false,error:{code,message}}`. Handed the SaaS's plain body, that
+//! transport threw `unknown error` on EVERY call — a template Meta had accepted was reported to
+//! the business as «error», and `invalid_name` arrived with the code stripped off. The envelope is
+//! not a reinterpretation of the SaaS: it is the only channel through which its code reaches the
+//! module at all. See [`cloud_proxy::cloud_envelope_passthrough`].
 use crate::*;
 use erplora_runtime::host_notify;
 use erplora_runtime::manifest::CapabilityKind;
@@ -98,7 +106,7 @@ pub(crate) async fn whatsapp_templates(State(st): State<AppState>, headers: Head
         return r;
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    cloud_proxy::proxy_cloud_get(
+    cloud_proxy::proxy_cloud_get_enveloped(
         &st,
         &headers,
         cloud.whatsapp_templates(&whatsapp_connect::placeholder(&st)),
@@ -125,7 +133,7 @@ pub(crate) async fn whatsapp_template_register(
         return refused("whatsapp.invalid_body", "expected a JSON object");
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    cloud_proxy::proxy_cloud_send(
+    cloud_proxy::proxy_cloud_send_enveloped(
         &st,
         &headers,
         cloud.whatsapp_template_register(&whatsapp_connect::placeholder(&st)),
@@ -152,7 +160,7 @@ pub(crate) async fn whatsapp_template_delete(
         );
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
-    cloud_proxy::proxy_cloud_send(
+    cloud_proxy::proxy_cloud_send_enveloped(
         &st,
         &headers,
         cloud.whatsapp_template_delete(&whatsapp_connect::placeholder(&st), &name),
