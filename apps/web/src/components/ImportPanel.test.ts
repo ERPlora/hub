@@ -623,4 +623,69 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
       en.importPage.retryVersionUnavailable,
     );
   });
+  // ── hub#1693 · el código del runtime NUNCA llega a la pantalla ─────────────────────────────
+  //
+  // Desde hub#1689 los proxies del runtime contestan un código estable (`cloud_unreachable`) en vez
+  // del Display de `reqwest`, que arrastraba la dirección del plano de control. El cuerpo dejó de
+  // publicar una dirección interna —y pasó a publicar una palabra en inglés con guion bajo delante
+  // de quien lleva el negocio. Se traduce por código; la prosa honesta del server se conserva.
+
+  it('la nube que no contesta se lee como una FRASE, no como `cloud_unreachable`', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', description: 'TPV', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    fetchImportReport.mockResolvedValue(null);
+    downloadBlueprint.mockRejectedValue(new Error('cloud_unreachable'));
+
+    const w = mountPanelReal();
+    await flushPromises();
+    w.get('[data-testid="import-blueprint-table"]').element.dispatchEvent(
+      new CustomEvent('rowAction', {
+        detail: { actionId: 'use', row: { slug: 'rest', latest_version: '1.0.0' } },
+      }),
+    );
+    await flushPromises();
+
+    const shown = w.get('[data-testid="import-error"]').text();
+    expect(shown).toContain(en.runtimeErrors.cloud_unreachable);
+    expect(shown).not.toContain('cloud_unreachable');
+  });
+
+  it('la prosa HONESTA del server se conserva: solo se traduce lo que es un código', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', description: 'TPV', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    fetchImportReport.mockResolvedValue(null);
+    // Integridad rota: dice QUÉ se rompió, y ninguna frase genérica nuestra dice más.
+    downloadBlueprint.mockRejectedValue(new Error('el SaaS contestó 404 al resolver el blueprint'));
+
+    const w = mountPanelReal();
+    await flushPromises();
+    w.get('[data-testid="import-blueprint-table"]').element.dispatchEvent(
+      new CustomEvent('rowAction', {
+        detail: { actionId: 'use', row: { slug: 'rest', latest_version: '1.0.0' } },
+      }),
+    );
+    await flushPromises();
+
+    expect(w.get('[data-testid="import-error"]').text()).toContain(
+      'el SaaS contestó 404 al resolver el blueprint',
+    );
+  });
+
+  it('el reintento que se cae por la nube tampoco enseña el código', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue(storedReport(partialCatalogReport()));
+    // No es un `RetryRefusedError` (eso ya se traducía): es la puerta del catálogo caída.
+    retryImport.mockRejectedValue(new Error('cloud_unreachable'));
+
+    const w = mountPanelReal();
+    await flushPromises();
+    await w.get('[data-testid="import-report-retry"]').trigger('click');
+    await flushPromises();
+
+    const shown = w.get('[data-testid="import-retry-error"]').text();
+    expect(shown).toContain(en.runtimeErrors.cloud_unreachable);
+    expect(shown).not.toContain('cloud_unreachable');
+  });
 });

@@ -25,6 +25,7 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import ExportPanel from './ExportPanel.vue';
+import en from '../i18n/locales/en';
 
 const i18n = createI18n({
   legacy: false,
@@ -252,5 +253,63 @@ describe('ExportPanel · el propósito atado se queda atado tras un clic (hub#12
     const radios = w.findAll('[data-testid="export-purpose"] ion-radio-stub');
     expect(radios.length).toBe(2);
     for (const r of radios) expect(r.attributes('disabled')).not.toBe('true');
+  });
+});
+
+// ── hub#1693 · el código del runtime NUNCA llega a la pantalla ───────────────────────────────
+//
+// El export habla con el runtime local, pero su cuerpo de error atraviesa el mismo lector
+// (`readErrorMessage`) que las puertas proxy: si lo que vuelve es un código estable
+// (`cloud_unreachable` desde hub#1689), el panel lo pintaba tal cual.
+describe('ExportPanel · el aviso de error es una frase, nunca un código', () => {
+  const i18nReal = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en: en as unknown as Record<string, unknown> },
+  });
+
+  function mountReal() {
+    return mount(ExportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+  }
+
+  it('traduce el código estable que devolvió el runtime', async () => {
+    exportHub.mockRejectedValue(new Error('cloud_unreachable'));
+    const w = mountReal();
+    await flushPromises();
+    await (w.vm as unknown as { doExport: () => Promise<void> }).doExport();
+    await flushPromises();
+
+    const shown = w.get('[data-testid="export-error"]').text();
+    expect(shown).toContain(en.runtimeErrors.cloud_unreachable);
+    expect(shown).not.toContain('cloud_unreachable');
+  });
+
+  it('conserva la frase del server cuando el server dijo una frase', async () => {
+    exportHub.mockRejectedValue(new Error('no hay espacio en disco para empaquetar el hub'));
+    const w = mountReal();
+    await flushPromises();
+    await (w.vm as unknown as { doExport: () => Promise<void> }).doExport();
+    await flushPromises();
+
+    expect(w.get('[data-testid="export-error"]').text()).toContain(
+      'no hay espacio en disco para empaquetar el hub',
+    );
+  });
+
+  it('el timeout sigue teniendo su propia frase (hub#765)', async () => {
+    // Guardia de no-regresión: el deadline del export ya se traducía, y pasar por el traductor
+    // de códigos no puede robarle su sentencia — `export → timeout` no es un código.
+    exportHub.mockRejectedValue(new Error('export → timeout'));
+    const w = mountReal();
+    await flushPromises();
+    await (w.vm as unknown as { doExport: () => Promise<void> }).doExport();
+    await flushPromises();
+
+    expect(w.get('[data-testid="export-error"]').text()).toContain(en.exportPage.timeout);
   });
 });
