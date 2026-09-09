@@ -445,6 +445,32 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/flows/approvals/:id/reject",
             post(flows_api::reject),
         )
+        // ── The owner's rules (hub#1701, ADR-0476) ─────────────────────────────────────────
+        // Core REST and not `hub.*` commands, for the same reason as the flows (ADR-0283 §9): a rule
+        // is not a module's data, it is the hub's own configuration.
+        //
+        // Door = the local session of a human owner/admin, NEVER an API key nor the machine token: a
+        // rule decides whether a sale can be charged, and a copyable integration credential does not
+        // decide that. And with no module capability — there is no SDK surface to open here.
+        //
+        // 🔴 `checkpoints` goes BEFORE `/policies/:id`: it is a STATIC segment and matchit resolves
+        // it with priority over the parameter, so served by `:id` it would answer «there is no such
+        // rule» and the owner's screen would be left with no places to offer.
+        // `tests/policies_api_test.rs` checks this against the real router.
+        .route(
+            "/api/hub/policies",
+            get(policies_api::list_policies).post(policies_api::create_policy),
+        )
+        .route(
+            "/api/hub/policies/checkpoints",
+            get(policies_api::list_checkpoints),
+        )
+        .route(
+            "/api/hub/policies/:id",
+            get(policies_api::get_policy)
+                .put(policies_api::update_policy)
+                .delete(policies_api::delete_policy),
+        )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))

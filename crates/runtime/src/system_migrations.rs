@@ -1909,6 +1909,50 @@ ALTER TABLE _flow_grants ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT 
 ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_ref TEXT;\
 CREATE INDEX IF NOT EXISTS ix_flow_template_ref ON _flow (hub_id, template_ref);",
     },
+    // ── v61 — hub#1701 / ADR-0476: the rules the OWNER of the business writes ─────────────
+    // A module declares WHERE a rule may sit (`policies/*.checkpoint.json`, read at install); this
+    // is where the rule the owner actually wrote lives. The two halves are deliberately apart: the
+    // checkpoint travels in the package and dies with the module version, the rule is the
+    // business's own and survives every update of the module that offers it.
+    //
+    // `checkpoint` is `<module>/<name>` — the same shape and the same reason as `_flow.template_ref`
+    // (v60): it is what the module already knows about itself and it does not change between its
+    // releases. It is TEXT and not a foreign key on purpose: the checkpoint lives in a package, so
+    // there is no table to point at, and a module uninstalled and put back has to find its rules
+    // where it left them.
+    //
+    // `condition` is a JSON object stored as TEXT, the convention of `_flow.definition` (v31) and
+    // `_flow_approvals.payload` — the whole kernel stores documents this way, and the gate parses it
+    // with the frozen condition language of the flows, so no new dialect is stored either.
+    //
+    // `is_active` is the owner's switch and NOT a soft-delete: turning a rule off has to keep it on
+    // the screen so it can be turned back on, which is exactly what `deleted_at` could not express.
+    // Both exist, and they mean different things.
+    //
+    // The index is `(hub_id, checkpoint)` because that is the only read: the boot and every write
+    // rebuild the in-memory index by walking this hub's live rules. The GATE never queries — if it
+    // did, every sale would pay a round trip (`policies.rs`, the bounded-cost guard).
+    //
+    // 🔴 The number is the NEXT ONE AFTER THE MAXIMUM, never a gap: when it was written the maximum
+    // was v60 on `origin/develop` and on every remote branch (checked one by one, none carries a
+    // v61). `apply` compares against the highest applied version and SILENTLY skips anything below
+    // it (hub#573), so a rebase that lands another v61 has to renumber this one.
+    SystemMigration {
+        version: 61,
+        name: "policy",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _policy (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, checkpoint TEXT NOT NULL, \
+  condition TEXT NOT NULL DEFAULT '{}', outcome TEXT NOT NULL, \
+  message TEXT NOT NULL DEFAULT '', mode TEXT NOT NULL DEFAULT 'warn', \
+  is_active INTEGER NOT NULL DEFAULT 1, \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, deleted_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_policy_checkpoint ON _policy (hub_id, checkpoint);",
+    },
 
 ];
 
@@ -3838,7 +3882,16 @@ mod kind_contract_tests {
         // When it was written the maximum was v59 on `origin/develop`, on `main` and across the
         // 183 remote branches that carry the file — none of them asked for a v60 — and no local
         // worktree of the fleet but this one carried it.
-        assert_eq!(MIGRATIONS.len(), 57, "el catálogo cambió de tamaño");
+        // + `policy` (v61, hub#1701 / ADR-0476): `_policy`, the table where the rules the OWNER of
+        // the business writes live — «a discount over 20 % is not allowed» — evaluated by the gate
+        // in `commands::execute_at`. It is a new table, so `CREATE TABLE IF NOT EXISTS` plus its
+        // index is re-runnable and touches nothing that exists; ADR-0269 retires it by leaving it
+        // unwritten, exactly like `_flow`. The rule is stored apart from the checkpoint that offers
+        // it (which travels in the module package) because a rule is the business's own and has to
+        // survive every update of the module. When it was written the maximum was v60 on
+        // `origin/develop` and across every remote branch that carries the file — none of them asks
+        // for a v61.
+        assert_eq!(MIGRATIONS.len(), 58, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

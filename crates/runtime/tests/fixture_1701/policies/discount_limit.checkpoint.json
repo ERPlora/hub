@@ -1,0 +1,5 @@
+{
+  "command": "p1701.order.set_discount",
+  "facts": ["discount_percent", "channel"],
+  "outcomes": ["block", "elevate:p1701.order.discount"]
+}

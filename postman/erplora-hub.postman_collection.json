@@ -2413,6 +2413,177 @@
     {
       "item": [
         {
+          "name": "GET /api/hub/policies",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/policies",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/policies/checkpoints",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "checkpoints"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/checkpoints"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/policies/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/policies/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/hub/policies/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/{{id}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · policies"
+    },
+    {
+      "item": [
+        {
           "name": "POST /api/hub/public-claims",
           "request": {
             "description": "auth: any-credential",

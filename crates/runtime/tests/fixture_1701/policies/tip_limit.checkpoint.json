@@ -1,0 +1,10 @@
+{
+  "command": "p1701.order.set_tip",
+  "facts": [
+    "tip_percent",
+    "approved_by"
+  ],
+  "outcomes": [
+    "block"
+  ]
+}

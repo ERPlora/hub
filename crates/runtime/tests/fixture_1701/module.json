@@ -1,0 +1,52 @@
+{
+  "id": "p1701",
+  "name": "P1701 Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "p1701.order.discount",
+    "p1701.order.close",
+    "p1701.order.tip"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "cashier": [
+      "p1701.order.discount",
+      "p1701.order.tip"
+    ]
+  },
+  "navigation": [],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {},
+  "commands": {
+    "p1701.order.set_discount": {
+      "permission": "p1701.order.discount",
+      "transaction": true,
+      "schema": "schemas/set_discount.json",
+      "sql": [
+        "commands/set_discount.sql"
+      ]
+    },
+    "p1701.order.close": {
+      "permission": "p1701.order.close",
+      "transaction": true,
+      "schema": "schemas/close.json",
+      "sql": [
+        "commands/close.sql"
+      ]
+    },
+    "p1701.order.set_tip": {
+      "permission": "p1701.order.tip",
+      "transaction": true,
+      "schema": "schemas/set_tip.json",
+      "sql": [
+        "commands/set_tip.sql"
+      ]
+    }
+  }
+}
