@@ -1001,9 +1001,10 @@ pub struct ModuleVersion {
     /// SHA256 hex esperado del ZIP. `None` si el Cloud no lo expone en este endpoint.
     #[serde(default)]
     pub sha256: Option<String>,
-    /// Firma ed25519 detached del ZIP (autenticidad, hub#239). `None` si el Cloud aún no la
-    /// expone o el publicador no firmó. Bajo `SignaturePolicy::Enforce` un `None` aquí aborta la
-    /// instalación (DEFAULT deny); TODO: el serializer del Cloud debe exponerla siempre.
+    /// Firma ed25519 detached del ZIP (autenticidad, hub#239). `ModuleVersionSerializer` del SaaS
+    /// la expone desde saas#1722; llega a `None` cuando esa versión se publicó antes de que el
+    /// marketplace tuviera clave. Bajo `SignaturePolicy::Enforce` un `None` aquí aborta la
+    /// instalación (DEFAULT deny) — por eso el catálogo se re-firma ANTES de repartir el anillo.
     #[serde(default)]
     pub signature: Option<ModuleSignature>,
 }

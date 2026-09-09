@@ -236,9 +236,9 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
 /// obligatorio del grant (ADR-0015).
 ///
 /// Este test afirmaba lo contrario (403) porque fijaba el default de hub#239. Ese default **tumbó
-/// producción**: el provisioning nunca inyecta `HUB_MODULE_TRUSTED_KEYS`, así que TODA imagen
-/// quedaba en `Enforce(<anillo vacío>)` = deny-all mientras **nadie firma** (`signing-key/` da 404
-/// y `versions/` no expone `signature`). Resultado: `request-install` devolvía 403 y el import de
+/// producción**: el provisioning no inyectaba `HUB_MODULE_TRUSTED_KEYS`, así que TODA imagen
+/// quedaba en `Enforce(<anillo vacío>)` = deny-all mientras **nadie firma** (`signing-key/` sigue
+/// dando 404 hoy). Resultado: `request-install` devolvía 403 y el import de
 /// blueprint fallaba en 13 de 13 módulos — un hub nuevo no se podía poblar por ninguna vía.
 ///
 /// Y no es una licencia nueva: ADR-0193 ya lo exigía en sus consecuencias — «hasta entonces el Hub
@@ -254,7 +254,8 @@ async fn sin_anillo_desplegado_un_modulo_sin_firma_si_se_instala() {
     std::fs::create_dir_all(base.join("module_cache")).unwrap();
 
     let zip = module_zip("notes");
-    // El mock cloud NO firma (como el serializer del Cloud actual, que aún no expone signature).
+    // El mock cloud NO firma: es la foto de una versión publicada antes de que el marketplace
+    // tuviera clave, que es todo el catálogo de hoy.
     let cloud = spawn_mock_cloud(zip, None).await;
 
     let db = fresh_db().await;
@@ -302,7 +303,7 @@ async fn con_anillo_desplegado_un_modulo_sin_firma_se_rechaza() {
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(base.join("module_cache")).unwrap();
 
-    // El mock cloud NO firma (como el serializer del Cloud de hoy).
+    // El mock cloud NO firma (versión publicada sin clave en el marketplace).
     let cloud = spawn_mock_cloud(module_zip("notes"), None).await;
 
     let db = fresh_db().await;
@@ -449,8 +450,8 @@ async fn spawn_mock_cloud(
     let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha, signature));
 
     async fn versions(State(pkg): State<Pkg>) -> Json<Value> {
-        // Expone sha256 (integridad) y, si la hay, signature (autenticidad). El serializer del
-        // Cloud real aún no expone `signature` (TODO); el mock sí para ejercitar la verificación.
+        // Expone sha256 (integridad) y, si la hay, signature (autenticidad) — la misma forma que
+        // sirve `ModuleVersionSerializer` del SaaS desde saas#1722.
         let mut entry = json!({ "version": "1.0.0", "is_active": true, "sha256": pkg.1 });
         if let Some(sig) = &pkg.2 {
             entry["signature"] = serde_json::to_value(sig).unwrap();

@@ -397,19 +397,27 @@ impl HubConfig {
         roots
     }
 
-    /// Política de verificación de **firma** de módulos (hub#239). DEFAULT **deny**:
+    /// Política de verificación de **firma** de módulos (hub#239, ADR-0193/0194). Tres casos, y el
+    /// que los separa es **si el despliegue dijo algo o no**:
     ///
-    /// - **Producción** (`!dev_mode`): [`SignaturePolicy::Enforce`] con el anillo de claves de
-    ///   `HUB_MODULE_TRUSTED_KEYS`. Anillo vacío ⇒ **deny-all** (fail-closed): ningún módulo del
-    ///   marketplace verifica hasta que el env lleve la clave del marketplace — exactamente el
-    ///   invariante que faltaba. La imagen de producción NUNCA devuelve `DevTrust`.
     /// - **Desarrollo** (`dev_mode`): [`SignaturePolicy::DevTrust`] — acepta módulos sin firmar
     ///   (los módulos horneados del monorepo y los instalados desde carpeta no se firman en local).
     ///   Es el escape hatch **explícito** del flag de dev; si `HUB_MODULE_TRUSTED_KEYS` trae claves,
     ///   se respetan igual (un módulo firmado valida; uno sin firma se admite por el hatch).
+    /// - **Producción con anillo** (una clave o más cargan): [`SignaturePolicy::Enforce`]. Desplegar
+    ///   la clave es el interruptor que enciende la verificación, sin tocar código ni imagen.
+    /// - **Producción sin anillo**: depende de si `HUB_MODULE_TRUSTED_KEYS` venía **vacío/ausente**
+    ///   o **puesto pero ilegible**:
+    ///   - vacío/ausente ⇒ [`SignaturePolicy::Sha256Only`], el modo `warn` de ADR-0193: no hay
+    ///     infraestructura de firma desplegada y la integridad la cubre el SHA256 del grant
+    ///     (ADR-0015). Exigir firma aquí denegaría el 100 % de las instalaciones legítimas
+    ///     (ADR-0194: así se tumbó el arranque de todo hub nuevo el 2026-08-03);
+    ///   - puesto y sin NINGUNA clave legible ⇒ `Enforce` con el anillo vacío (hub#870). Eso no es
+    ///     «no hay firma»: es una configuración rota en un hub que alguien creyó haber protegido,
+    ///     y degradar ahí es fail-open mudo. No instala, pero sigue vendiendo.
     ///
-    /// TODO (rotación de claves): hoy el anillo es estático por arranque, cargado del env. Falta
-    /// fetch desde el Cloud + revocación — ver el commit/message del fix.
+    /// El anillo es **estático por arranque**: cambiarlo o revocar una clave exige redesplegar el
+    /// hub. Es suficiente para el día 1 y es lo que sigue hub#1751.
     pub fn signature_policy(&self) -> cloud_client::SignaturePolicy {
         // El anillo se construye de los `module_trusted_keys` del config (cargados del env en
         // `from_env`, o inyectados por los tests). `from_env` acepta el formato crudo con o sin

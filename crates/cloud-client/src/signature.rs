@@ -18,20 +18,23 @@
 //!   claves ed25519 (32 bytes) cuyo firmante acepta. Default **deny-all**: si el anillo está
 //!   vacío, NINGÚN módulo verifica (fail-closed). En producción se carga de `HUB_MODULE_TRUSTED_KEYS`
 //!   (ver [`TrustedKeyRing::from_env`]).
-//! - La política por defecto es [`SignaturePolicy::Enforce`]: un módulo sin firma, o firmado por
-//!   una clave que no está en el anillo, se **rechaza**.
+//! - Con anillo desplegado la política es [`SignaturePolicy::Enforce`]: un módulo sin firma, o
+//!   firmado por una clave que no está en el anillo, se **rechaza**.
 //! - [`SignaturePolicy::DevTrust`] es el **escape hatch de desarrollo** explícito: acepta módulos
 //!   sin firma. Solo debe construirse tras un flag explícito (`HUB_DEV_MODE`); NUNCA es el
 //!   default. Así `install {dir}` y los módulos horneados siguen siendo instalables en local sin
 //!   firmar nada, pero la imagen de producción (sin el flag) los rechaza.
+//! - [`SignaturePolicy::Sha256Only`] es el degradado de ADR-0194 mientras el marketplace no tenga
+//!   clave: **solo** cuando el despliegue no dijo nada. Quién elige cuál es
+//!   `HubConfig::signature_policy` en el crate `server`, y ahí está la letra pequeña.
 //!
-//! ## TODO (distribución de claves — fuera de alcance de este fix)
+//! ## Distribución de claves
 //!
-//! La rotación/revocación de claves, el fetch del anillo desde el Cloud Portal y la identidad del
-//! publicador por módulo quedan como trabajo pendiente (ver §«Lo que falta» en el commit). Hoy el
-//! anillo es estático y configurable por env; rotar exige redistribuir el env, pero el DEFAULT es
-//! deny y cualquier módulo del marketplace quedará bloqueado hasta que el anillo lleve la clave
-//! del marketplace — que es exactamente el invariante de seguridad que faltaba.
+//! El anillo es **estático por arranque** y llega por env desde el provisioning del SaaS, que es
+//! un canal distinto del que sirve el artefacto — y esa separación es justo lo que hace que la
+//! firma valga algo. Rotar o revocar exige hoy redesplegar el hub: hub#1751. La identidad del
+//! publicador por módulo (firmar cada tercero con SU clave, en vez de re-firmar el marketplace lo
+//! que publica) no está decidida y no la necesita el día 1.
 //!
 //! ## Port a `erplora sign` (toolkit — ERPlora/module-toolkit, repo EXTERNO)
 //!
@@ -175,11 +178,12 @@ impl TrustedKeyRing {
     /// Carga el anillo desde la variable de entorno `HUB_MODULE_TRUSTED_KEYS`:
     /// claves separadas por coma, cada una `key_id=hex|base64` (o solo `hex|base64`, en cuyo caso
     /// el key_id es el hash corto de la clave). Espacios tolerados. Ausencia o vacío ⇒ anillo
-    /// vacío (deny-all). Claves ilegibles se ignoran con WARN (mejor arrancar con menos claves
-    /// que no arrancar), pero se devuelven en el conteo de errores para diagnóstico.
+    /// vacío (deny-all). Claves ilegibles se ignoran (mejor arrancar con menos claves que no
+    /// arrancar) **pero se devuelven**: el llamador las necesita para distinguir «no hay firma
+    /// desplegada» de «la configuración está rota», que es la diferencia entre degradar a propósito
+    /// y degradar sin querer (hub#870, `HubConfig::signature_policy`).
     ///
-    /// TODO (rotación): hoy el anillo es estático por arranque. El siguiente paso es un fetch
-    /// desde el Cloud + revocación; ver commit/message del fix.
+    /// El anillo es estático por arranque; el fetch desde el Cloud + la revocación son hub#1751.
     pub fn from_env(raw: Option<&str>) -> (Self, Vec<String>) {
         let Some(raw) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
             return (Self::empty(), Vec::new());
@@ -238,11 +242,13 @@ pub enum SignaturePolicy {
     /// No es una licencia nueva: **ADR-0193 lo exige explícitamente** en sus consecuencias — «los
     /// ~24 módulos ya publicados no están firmados: hay que re-publicarlos […] **hasta entonces el
     /// Hub debe estar en `warn`, no `enforce`**». La firma es un protocolo de dos partes y el
-    /// emisor NO está desplegado: en producción `GET /api/v1/marketplace/signing-key/` da 404 y
-    /// `versions/` no expone `signature` (verificado 2026-08-03). Un `Enforce` con anillo vacío en
-    /// ese mundo no protege nada: deniega el 100 % de las instalaciones legítimas — 403 en
-    /// `request-install` y en el import de blueprints, que es como se tumbó el arranque de todo hub
-    /// nuevo (ADR-0194).
+    /// emisor sigue sin estar desplegado: en producción `GET /api/v1/marketplace/signing-key/`
+    /// devuelve 404 «module signing is not configured on this deployment» (verificado 2026-09-10).
+    /// El lado SaaS del protocolo ya está: `versions/` **sí** expone `signature` y el marketplace
+    /// firma al publicar; lo que falta es dar de alta la clave en el despliegue (hub#870). Un
+    /// `Enforce` con anillo vacío mientras tanto no protege nada: deniega el 100 % de las
+    /// instalaciones legítimas — 403 en `request-install` y en el import de blueprints, que es como
+    /// se tumbó el arranque de todo hub nuevo (ADR-0194).
     ///
     /// **No es fail-open silencioso:** se anuncia con WARN al arrancar, y basta desplegar la clave
     /// en `HUB_MODULE_TRUSTED_KEYS` para que el hub pase solo a [`Self::Enforce`], sin tocar código.
@@ -278,7 +284,7 @@ impl SignaturePolicy {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Firma (lado del publicador). Aquí para tests y como referencia del `erplora sign`
-// real (el toolkit vive en otro repo: ERPlora/module-toolkit — ver TODO en el fix).
+// real (el toolkit vive en otro repo: ERPlora/module-toolkit).
 // `erplora sign` debe portarse a estos ~10 líneas: cargar el seed/privada, firmar
 // los bytes del zip, escribir `<zip>.sig` = JSON de ModuleSignature.
 // ─────────────────────────────────────────────────────────────────────────────
