@@ -83,6 +83,9 @@ import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';
 import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
+// Sidebar → «Open on your phone» (hub#1715). Pure-JS QR generator: no dependency and no `eval`, so
+// it renders under the hub's strict CSP where a canvas library would not.
+import '@erplora/outfitkit/ok-qr';
 // Tarjeta de plan de los tiers de un módulo (pestaña «Plan», hub#1605): la pieza compartida en
 // vez de una tarjeta a mano por panel.
 import '@erplora/outfitkit/ok-pricing-card';

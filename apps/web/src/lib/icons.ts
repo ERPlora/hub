@@ -28,6 +28,7 @@ import documentTextOutline from "~icons/ion/document-text-outline?raw";
 import downloadOutline from "~icons/ion/download-outline?raw";
 import ellipse from "~icons/ion/ellipse?raw";
 import pricetagOutline from "~icons/ion/pricetag-outline?raw";
+import qrCodeOutline from "~icons/ion/qr-code-outline?raw";
 import removeOutline from "~icons/ion/remove-outline?raw";
 import extensionPuzzleOutline from "~icons/ion/extension-puzzle-outline?raw";
 import fingerPrintOutline from "~icons/ion/finger-print-outline?raw";
@@ -221,6 +222,7 @@ const SVGS: Record<string, string> = {
   "close-circle-outline": closeCircleOutline,
   "remove-circle-outline": removeCircleOutline,
   "phone-portrait-outline": phonePortraitOutline,
+  "qr-code-outline": qrCodeOutline,
   "pulse-outline": pulseOutline,
   "reader-outline": readerOutline,
   "receipt-outline": receiptOutline,
