@@ -1205,9 +1205,13 @@ fn eval(op: Op, actual: &Json, expected: &Json, now: Option<&str>) -> bool {
         Op::WithinLast => match (as_instant(actual), now.and_then(as_instant_str), expected.as_i64())
         {
             (Some(at), Some(now), Some(seconds)) if seconds > 0 => {
-                match now.checked_sub_signed(chrono::Duration::seconds(seconds)) {
+                match chrono::Duration::try_seconds(seconds)
+                    .and_then(|window| now.checked_sub_signed(window))
+                {
                     Some(floor) => at >= floor,
-                    // A window so wide the arithmetic leaves the calendar contains everything.
+                    // A window so wide it leaves the calendar contains everything. `try_seconds`
+                    // and never `seconds`: the latter PANICS above `i64::MAX / 1000`, and a
+                    // number a document is allowed to save must not be able to bring the run down.
                     None => true,
                 }
             }
@@ -4737,6 +4741,26 @@ mod tests {
             );
         }
         assert!(Condition::parse(&json!({ "steps.t.at": { "within_last": 86400 } })).is_ok());
+    }
+
+    /// A window is a whole number of seconds and nothing stops a document from saying a very big
+    /// one. It must answer, not bring the runtime down: `chrono::Duration::seconds` PANICS above
+    /// `i64::MAX / 1000`, so the reading here is the same one the arithmetic already documented —
+    /// a window wider than the calendar contains every instant there is.
+    #[test]
+    fn a_window_wider_than_the_calendar_contains_everything_instead_of_crashing_hub1694() {
+        let scope = json!({
+            "steps": { "t": { "at": "1999-01-01T00:00:00Z" } },
+            "now": { "iso": "2026-09-09T12:00:00Z" },
+        });
+        for seconds in [i64::MAX, i64::MAX / 1_000 + 1, 9_000_000_000_000_000] {
+            let wide = Condition::parse(&json!({ "steps.t.at": { "within_last": seconds } }))
+                .expect("a positive number of seconds is a window");
+            assert!(
+                wide.matches(&scope),
+                "{seconds}s reaches back past any instant this hub stores"
+            );
+        }
     }
 
     /// The right of an operator is LITERAL text (hub#828), so `{"gte": "now.iso"}` would compare a
