@@ -521,6 +521,106 @@ mod tests {
         .expect("mock window")
     }
 
+    // ── …and the LOOP actually drives it ─────────────────────────────────────────────────────────
+
+    /// Answers anything on `port` with a bare 200 for as long as it is alive: the line into the
+    /// bar, coming back. Dropping it stops the thread.
+    struct Origin {
+        stop: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    impl Drop for Origin {
+        fn drop(&mut self) {
+            self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    fn serve(port: u16) -> Origin {
+        use std::sync::atomic::Ordering;
+
+        let listener =
+            std::net::TcpListener::bind(("127.0.0.1", port)).expect("the origin must come back up");
+        listener.set_nonblocking(true).expect("nonblocking listener");
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = stop.clone();
+        std::thread::spawn(move || {
+            while !flag.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut socket, _)) => {
+                        use std::io::{Read, Write};
+                        // Read the request before answering: closing on unread bytes is an RST,
+                        // which reqwest reports as a transport failure — the very thing under test.
+                        let _ = socket.set_nonblocking(false);
+                        let _ = socket.set_read_timeout(Some(Duration::from_millis(500)));
+                        let _ = socket.read(&mut [0u8; 1024]);
+                        let _ = socket.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n");
+                        let _ = socket.flush();
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(20)),
+                }
+            }
+        });
+        Origin { stop }
+    }
+
+    /// Where the window points, polled until it is `expected` or the deadline runs out.
+    fn wait_for_window<R: Runtime>(window: &WebviewWindow<R>, expected: &Url, whose_fault: &str) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        while std::time::Instant::now() < deadline {
+            if window.url().map(|at| at == *expected).unwrap_or(false) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        panic!(
+            "the window is still on {:?} instead of {expected}: {whose_fault}",
+            window.url().map(|at| at.to_string())
+        );
+    }
+
+    #[test]
+    fn the_guard_takes_the_window_off_a_dead_origin_by_itself_and_brings_it_back_by_itself() {
+        // Every assertion above is on a pure function, and pure functions were ALL GREEN through
+        // the version of this guard that shipped broken (hub#1716): `next_screen` was right,
+        // `next_probe_delay` was right, and the app still came up blank because the loop asked
+        // them the wrong question and then slept forever. The loop is the seam that rots silently,
+        // so it is the seam that has to be driven — against a real socket, because "the network
+        // came back and nobody reloaded anything" cannot be asserted against a mock.
+        //
+        // A port we own: with nothing listening every connect is REFUSED instantly, so the network
+        // being down costs no `PROBE_TIMEOUT`; binding it later is the line coming back.
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .expect("bind")
+            .local_addr()
+            .expect("addr")
+            .port();
+        let target = Url::parse(&format!("http://127.0.0.1:{port}/pos/tickets?shell=1"))
+            .expect("target url");
+
+        let window = mock_window();
+        let nav = Arc::new(ShellNav::new(target.clone()));
+        spawn_connectivity_guard(window.clone(), nav.clone());
+
+        // The line is down. Nobody touches anything: the guard has to notice on its own.
+        wait_for_window(
+            &window,
+            &bundled_page_url().expect("bundled page url"),
+            "the guard never moved the window to ERPlora's own offline page, so the till is \
+             looking at the platform's error screen — blank on macOS, grey on Android — with no \
+             way out (hub#1716)",
+        );
+
+        // The line is back. Still nobody touches anything.
+        let _origin = serve(port);
+        wait_for_window(
+            &window,
+            &target,
+            "the window never returned to the hub once the network answered again: somebody has \
+             to reload an app that has no reload button (hub#1716)",
+        );
+        assert_eq!(nav.screen(), ShellScreen::Target);
+    }
+
     #[test]
     fn a_dead_target_leaves_the_window_on_the_bundled_page_and_a_live_one_brings_it_back() {
         // The regression in one test: this is the symptom of hub#1716 (window stuck on the
