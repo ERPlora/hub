@@ -166,3 +166,71 @@ describe('shared Hub page alignment', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * hub#1730 — a module surface is never shorter than a usable working surface.
+ *
+ * `ModuleView.vue` pins `.outlet` to `height: 100%` so that `ok-data-table[fill]` has a DEFINED
+ * height to constrain against (see the comment on the rule itself). The side effect nobody costed:
+ * an element that is exactly `100%` of its scroll container can never OVERFLOW it, so the shell's
+ * `ion-content` always reports `scrollHeight === clientHeight` on a module screen — the page cannot
+ * scroll, by construction. On a tall window nothing is lost. On a landscape tablet — the counter's
+ * everyday posture, not an edge case — the box is 268px and everything past it is clipped and
+ * UNREACHABLE: no scrollbar, no gesture, no way to get to it.
+ *
+ * Measured on the PRE bench (`banco-pre`) at the three viewports of the UI QA contract. The shell
+ * chrome is the same on all three, which is what makes a single floor safe:
+ *
+ *   ion-header 60 + ion-content padding 16+16 + ion-footer 66 = 158px of chrome
+ *   952 x 426 (tablet landscape) -> outlet 268px · scroller 300/300 · canScroll FALSE  <- the bug
+ *   390 x 844 (phone)            -> outlet 686px · scroller 718/718
+ *   1440 x 900 (desktop)         -> outlet 742px · scroller 774/774
+ *
+ * At 952x426 `/m/sales/pos` wants 340px intrinsic (its total and its Charge button fall outside)
+ * and `/m/appointments/appointments` wants 375px, with NO inner scroller of its own — so the floor
+ * has to clear 268px for the shell's scroller to take over, and must stay at or below the phone's
+ * 686px so it stays inert everywhere the layout already worked.
+ */
+const SHELL_CHROME_PX = 158;
+const outletBoxPx = (viewportHeight: number): number => viewportHeight - SHELL_CHROME_PX;
+
+const TABLET_LANDSCAPE_BOX = outletBoxPx(426);
+const PHONE_BOX = outletBoxPx(844);
+
+/** The `min-height` of the `.outlet` rule in px, or 0 when the rule declares no floor at all. */
+function outletFloorPx(source: string): number {
+  const outlet = styleRules(source).find(({ selector }) => selector === '.outlet');
+  if (!outlet) throw new Error('ModuleView.vue no longer has an `.outlet` rule');
+  const floor = outlet.body.match(/(?<![-\w])min-height:\s*([\d.]+)(px|rem)/);
+  if (!floor) return 0;
+  return floor[2] === 'rem' ? Number(floor[1]) * 16 : Number(floor[1]);
+}
+
+describe('module outlet on a short viewport', () => {
+  it('hub#1730: the floor detector reads the rule that regressed and the rule that fixes it', () => {
+    // Positive control: the exact shape that shipped the bug — pinned, with no floor.
+    expect(outletFloorPx('<style scoped>.outlet {\n  height: 100%;\n}</style>')).toBe(0);
+    // …and the shape that fixes it, in either unit.
+    expect(outletFloorPx('<style scoped>.outlet { height: 100%; min-height: 30rem; }</style>')).toBe(480);
+    expect(outletFloorPx('<style scoped>.outlet { height: 100%; min-height: 480px; }</style>')).toBe(480);
+  });
+
+  it('hub#1730: the module outlet overflows ion-content on a landscape tablet, so the shell scrolls', () => {
+    const floor = outletFloorPx(viewSource('ModuleView.vue'));
+    expect(floor).toBeGreaterThan(TABLET_LANDSCAPE_BOX);
+  });
+
+  it('hub#1730: the floor stays inert on the viewports that already fitted', () => {
+    // An over-correction is its own regression: a floor taller than the phone's box would force a
+    // scroll on every device instead of only where the content did not fit.
+    expect(outletFloorPx(viewSource('ModuleView.vue'))).toBeLessThanOrEqual(PHONE_BOX);
+  });
+
+  it('hub#1730: the outlet keeps the DEFINED height that `ok-data-table[fill]` constrains against', () => {
+    // Swapping `height` for `min-height` would fix the clipping and break every `fill` table:
+    // their `:host{height:100%}` would resolve against `auto` again (the regression the rule's own
+    // comment documents). The contract is BOTH: a definite height AND a floor under it.
+    const outlet = styleRules(viewSource('ModuleView.vue')).find(({ selector }) => selector === '.outlet');
+    expect(outlet?.body).toMatch(/(?<![-\w])height:\s*100%/);
+  });
+});

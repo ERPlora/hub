@@ -526,17 +526,29 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* El WC del módulo se monta en `.outlet` y usa `:host{height:100%}`. Sin una altura
-   DEFINIDA aquí, ese 100% resolvía a `auto` (alto del contenido) y el modo `fill` de
-   `ok-data-table` (cabecera sticky + pager fijo + scroll SOLO en el cuerpo) no tenía
-   contra qué constreñir → scrolleaba la página entera.
-   `height:100%` (no `min-height`) fija el outlet al alto del área de `ion-content`:
-   - tablas en modo `fill` → su `:host{height:100%}` resuelve a ese alto y el scroll
-     queda DENTRO del WC (cabecera/pager fijos);
-   - pantallas no-tabla más altas (settings, formularios largos) → su contenido desborda
-     el outlet y sigue scrolleando vía `ion-content` (que es el scroller por defecto). */
+/* The module's WC mounts into `.outlet` and uses `:host{height:100%}`. Without a DEFINED
+   height here that 100% resolved to `auto` (the content's own height), and `ok-data-table`
+   in `fill` mode (sticky header + fixed pager + scroll ONLY in the body) had nothing to
+   constrain against → it scrolled the whole page.
+   `height:100%` pins the outlet to the height of the `ion-content` area:
+   - `fill` tables → their `:host{height:100%}` resolves to that height and the scroll stays
+     INSIDE the WC (header/pager fixed);
+   - taller non-table screens (settings, long forms) → their content overflows the outlet and
+     keeps scrolling via `ion-content` (the default scroller).
+
+   …and never shorter than a usable working surface (hub#1730). `height:100%` alone means the
+   outlet can never be TALLER than the scroll container, so `ion-content` always reports
+   `scrollHeight === clientHeight` and the page CANNOT scroll — on a tall window nothing is
+   lost, but on a tablet in landscape (the counter's everyday posture) the box is 268px and
+   whatever does not fit is clipped with no way to reach it: the till lost its total and its
+   Charge button, the agenda lost the bottom of its day. Under the floor the outlet OVERFLOWS
+   `ion-content` on purpose, so the shell's own scroller takes over.
+   The floor clears the 268px measured at 952x426 and stays below the 686px a phone already
+   gets, so it is inert on every viewport where the layout already fitted. Both halves are
+   guarded in `layout-shell.test.ts`. */
 .outlet {
   height: 100%;
+  min-height: 30rem;
 }
 
 /* Las rutas de módulo usan nombres de producto, no abreviaturas automáticas. Un mínimo más ancho
