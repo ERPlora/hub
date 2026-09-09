@@ -272,6 +272,24 @@ pub async fn probe_and_apply<R: Runtime>(window: &WebviewWindow<R>, nav: &ShellN
     reachability
 }
 
+/// When to probe again after a probe, or `None` to sleep until something asks.
+///
+/// Pure so the schedule is testable: a guard that stops asking is indistinguishable, from the
+/// counter, from no guard at all — which is exactly how the first version of this shipped, keyed
+/// on the screen alone, and why the window still came up blank with the guard armed.
+pub fn next_probe_delay(screen: ShellScreen, consecutive_failures: u32) -> Option<Duration> {
+    match (screen, consecutive_failures) {
+        // Still stranded: keep asking, with backoff, so the window comes back by itself.
+        (ShellScreen::Offline, failures) => Some(retry_delay(failures)),
+        // A strike on the board and the window still on the target: the debounce of
+        // [`OFFLINE_STRIKES`] is waiting for a SECOND probe, so somebody has to schedule it. Skip
+        // this and the debounce silently means "never".
+        (ShellScreen::Target, failures) if failures > 0 => Some(retry_delay(failures)),
+        // On the target and reachable: no timer at all until something happens.
+        (ShellScreen::Target, _) => None,
+    }
+}
+
 /// Watch the connection for as long as the window lives.
 ///
 /// Sleeps on [`ShellNav::wake`] while everything is fine, so a healthy till pays nothing for this;
@@ -292,12 +310,7 @@ pub fn spawn_connectivity_guard<R: Runtime>(window: WebviewWindow<R>, nav: Arc<S
 
             probe_and_apply(&window, &nav).await;
 
-            next_probe_in = match nav.screen() {
-                // Still stranded: keep asking, with backoff, so the window comes back by itself.
-                ShellScreen::Offline => Some(retry_delay(failures_of(&nav))),
-                // On the target and reachable: no timer at all until something happens.
-                ShellScreen::Target => None,
-            };
+            next_probe_in = next_probe_delay(nav.screen(), failures_of(&nav));
         }
     });
 }
@@ -368,6 +381,32 @@ mod tests {
         assert_eq!(retry_delay(u32::MAX), Duration::from_secs(30));
         // Zero can only reach here through a caller bug; it must still be a wait, not a spin.
         assert_eq!(retry_delay(0), Duration::from_secs(2));
+    }
+
+    #[test]
+    fn a_first_failure_still_schedules_the_probe_that_would_confirm_it() {
+        // MEASURED on the real app (hub#1716): with the schedule keyed on the SCREEN alone, the
+        // first failed probe left the window on `Target`, so the guard went back to sleep on the
+        // `Notify` with no timer — and the second strike, the one `OFFLINE_STRIKES` is waiting
+        // for, never came. The window stayed blank for as long as anyone watched it. The debounce
+        // has to cost a wait, not the whole feature.
+        assert_eq!(
+            next_probe_delay(ShellScreen::Target, 1),
+            Some(retry_delay(1)),
+            "a strike on the board with no probe scheduled means the debounce never resolves"
+        );
+    }
+
+    #[test]
+    fn a_clean_target_costs_no_timer_at_all() {
+        // The other half: a healthy till must not poll. This runs on tablets on mobile data.
+        assert_eq!(next_probe_delay(ShellScreen::Target, 0), None);
+    }
+
+    #[test]
+    fn the_offline_page_keeps_asking_with_backoff() {
+        assert_eq!(next_probe_delay(ShellScreen::Offline, 2), Some(retry_delay(2)));
+        assert_eq!(next_probe_delay(ShellScreen::Offline, 9), Some(retry_delay(9)));
     }
 
     // ── What gets probed, and what counts as a target ────────────────────────────────────────────
