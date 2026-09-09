@@ -562,3 +562,37 @@ async fn a_saas_that_does_not_answer_reaches_the_module_as_a_code_not_as_a_url()
         "the address the hub dialled must not reach the caller: {message}"
     );
 }
+
+#[tokio::test]
+async fn a_success_the_hub_cannot_read_reaches_the_module_as_a_code_not_as_an_empty_list() {
+    // An edge in front of the SaaS answering `200` with an HTML page instead of the SaaS's JSON:
+    // `text/html` labelled or not, the bytes do not parse. Handed to the module as `ok: true`
+    // with `data: null`, the tab would draw «no templates» over a business that has ten and be
+    // told nothing went wrong — the envelope must say the hub could not READ the answer.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let edge = Router::new().fallback(|| async {
+        (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "text/html")],
+            "<!DOCTYPE html><html><body>edge</body></html>",
+        )
+    });
+    tokio::spawn(async move { axum::serve(listener, edge).await.unwrap() });
+    let (router, admin, _) = fixture(format!("http://{address}"), "env-unreadable").await;
+
+    let response = router
+        .oneshot(request(
+            "GET",
+            "/api/hub/whatsapp/templates",
+            Some(&admin),
+            None,
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false, "an answer the hub could not read is not a success: {body}");
+    assert_eq!(body["error"]["code"], "cloud_unreadable");
+}
