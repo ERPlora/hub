@@ -428,12 +428,26 @@ impl HubConfig {
             return cloud_client::SignaturePolicy::DevTrust;
         }
         if ring.is_empty() {
+            if !bad.is_empty() {
+                // hub#870: la variable venía CON contenido y no se pudo cargar NINGUNA clave. Eso
+                // no es «no hay firma desplegada» (el caso de abajo): es un despliegue que alguien
+                // creyó haber protegido —un hex truncado al pegarlo, un `key_id` mal partido—.
+                // Degradar aquí sería fail-open justo en el hub que más se confía, y mudo. Se
+                // exige firma con el anillo que se pudo cargar (vacío): **no se instala nada**,
+                // pero el hub sigue vendiendo, que es lo que no puede pararse.
+                tracing::error!(
+                    unreadable = bad.len(),
+                    "`HUB_MODULE_TRUSTED_KEYS` viene puesto pero NINGUNA de sus claves es \
+                     legible: no se instalará ningún módulo hasta corregirlo. Formato esperado: \
+                     `<key_id>=<hex de 64 chars>` (lo que sirve `GET /api/v1/marketplace/signing-key/`)."
+                );
+                return cloud_client::SignaturePolicy::Enforce(ring);
+            }
             // ADR-0194: anillo vacío = **no hay infraestructura de firma desplegada**, no «rechaza
             // todo». Es el modo `warn` que ADR-0193 ya exigía en sus consecuencias. `Enforce` aquí
             // no protegía nada: denegaba el 100 % de las instalaciones legítimas (403 en
-            // `request-install` y en el import de blueprints) porque NADIE firma todavía —
-            // `signing-key/` da 404 y `versions/` no expone `signature`. El control vigente sigue
-            // siendo el SHA256 obligatorio del grant (ADR-0015).
+            // `request-install` y en el import de blueprints) porque NADIE firma todavía. El
+            // control vigente sigue siendo el SHA256 obligatorio del grant (ADR-0015).
             tracing::warn!(
                 "firma de módulos NO verificada: `HUB_MODULE_TRUSTED_KEYS` vacío. La integridad \
                  la garantiza el SHA256 obligatorio del grant (ADR-0015). Despliega la clave \
@@ -516,6 +530,52 @@ mod staging_tests {
     #[test]
     fn en_modo_desarrollo_se_admite_sin_firma() {
         assert!(config(true).signature_policy().check(None, b"zip").is_ok());
+    }
+
+    /// 🔴 hub#870: **el fail-open que queda es el de la configuración rota.** Ausente o vacío,
+    /// `HUB_MODULE_TRUSTED_KEYS` significa «no hay infraestructura de firma desplegada» y degrada
+    /// a propósito (ADR-0194, test de arriba). Pero una variable que SÍ trae contenido y cuyas
+    /// entradas son **todas ilegibles** —un hex truncado al pegarlo, una clave con el `key_id`
+    /// mal partido— es un despliegue que alguien creyó haber protegido: degradar ahí deja al hub
+    /// instalando módulos sin verificar procedencia y con el operador convencido de lo contrario.
+    ///
+    /// Se responde `Enforce` con el anillo (vacío) que se pudo cargar: el hub **deja de instalar**
+    /// —loud, y con el error de firma— pero **sigue vendiendo**, que es lo que no puede pararse.
+    #[test]
+    fn una_clave_de_confianza_ilegible_no_degrada_a_sha256only() {
+        // Las tres formas reales de romper el valor al pegarlo en el env del despliegue.
+        for broken in [
+            "marketplace=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // hex truncado (63)
+            "marketplace=no-es-una-clave",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // sin key_id y truncada
+        ] {
+            let policy = config_with_keys(false, vec![broken.to_string()]).signature_policy();
+
+            assert!(
+                policy.requires_signature(),
+                "`HUB_MODULE_TRUSTED_KEYS` venía puesto ({broken}): el hub tiene que seguir \
+                 exigiendo firma, no degradar a Sha256Only: {policy:?}"
+            );
+            assert!(
+                policy.check(None, b"module.zip").is_err(),
+                "con la única clave del anillo ilegible ({broken}), un módulo SIN firma no puede \
+                 instalarse: {policy:?}"
+            );
+        }
+    }
+
+    /// El envés: si **alguna** clave sí carga, el anillo tiene con qué verificar y las ilegibles
+    /// solo cuestan un WARN. No se degrada ni se aborta por una entrada mala entre varias.
+    #[test]
+    fn una_clave_ilegible_entre_varias_no_tumba_el_anillo() {
+        let good = "a".repeat(64);
+        let policy = config_with_keys(
+            false,
+            vec![format!("rota=zz, marketplace={good}")],
+        )
+        .signature_policy();
+
+        assert!(policy.requires_signature(), "{policy:?}");
     }
 
     /// El `/tmp/modules` que inyecta el despliegue NO es staging válido en producción.
