@@ -340,7 +340,10 @@ test('hub#1688: the envelope these fixtures simulate is the one `crates/server` 
     .filter((entry) => typeof entry === 'string' && entry.endsWith('.rs'))
     .sort()
     .map((entry) => ({ file: entry, text: readFileSync(join(srcRoot, entry), 'utf8') }))
-    .filter(({ text }) => text.includes('fn cloud_envelope_passthrough'));
+    // The `(` is load-bearing: without it a rename to `cloud_envelope_passthrough_renamed`
+    // still matches by prefix and this guard passes over a server that no longer exists
+    // (measured — that mutant survived until the paren went in).
+    .filter(({ text }) => text.includes('fn cloud_envelope_passthrough('));
 
   assert.equal(
     declaring.length,
