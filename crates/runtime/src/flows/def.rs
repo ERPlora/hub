@@ -8,7 +8,7 @@
 //! - **Mapping** — a value is either a literal, a PATH into the run (`input.…`, `steps.<id>.…`,
 //!   `event.…` inside a trigger), or a string with `{{path}}` templates. Same spirit as
 //!   `ReadDef::resolve_params_from_map`, which resolves `payload.<field>` and nothing else.
-//! - **Conditions** — an object `{path: {op: value}}` evaluated in AND. Nine operators, listed
+//! - **Conditions** — an object `{path: {op: value}}` evaluated in AND. Ten operators, listed
 //!   once, refused if unknown.
 //!
 //! What is fuzzy gets resolved by the `ai` step, not by growing a DSL — that was decided so that
@@ -963,7 +963,7 @@ pub struct TriggerDef {
 
 // ── Conditions ────────────────────────────────────────────────────────────────────────────────
 
-/// The nine operators. Frozen and closed: an unknown one is refused at save time, because a
+/// The ten operators. Frozen and closed: an unknown one is refused at save time, because a
 /// filter that silently matches everything is how a flow ends up emailing the whole customer list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {

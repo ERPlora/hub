@@ -307,7 +307,7 @@ async fn candidates(
 /// Does this wait's filter pass AND does every correlated pair agree?
 ///
 /// Both halves are evaluated here rather than in SQL for the same reason the trigger's filter is:
-/// the condition language is the kernel's, and re-expressing nine operators as SQL would be a
+/// the condition language is the kernel's, and re-expressing ten operators as SQL would be a
 /// second implementation to keep in step with the first.
 fn matches(row: &Json, scope: &Json) -> bool {
     let filter = serde_json::from_str::<Json>(&text(row, "filter"))
