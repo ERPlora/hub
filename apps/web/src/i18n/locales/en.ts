@@ -1072,7 +1072,14 @@ export default {
     loadError: 'The role catalogue could not be loaded.',
   },
   apiKeys: {
-    // hub#1697 — stable codes of the local `/api/keys` door, so the toast is a sentence.
+    // hub#1697 — the sentences this panel will read once its door answers a stable code.
+    //
+    // 🔴 NOT reachable yet, and that is not an oversight (rv-1699): `/api/keys*` is `auth:admin`
+    // and its four handlers answer `{"ok":false,"error":"<flat string>"}` with no `code` at all
+    // (`api_keys.rs:47,56,140,160`) — the `rate_limited` / `not_found` codes in that same file
+    // belong to the `auth:api-key` surface a THIRD PARTY calls, not to this panel. Until the door
+    // and `lib/api-keys.ts` carry the code (hub#1700), `localDoorSentence` falls back to the
+    // panel's own line, which is still what hub#1697 asked for: never the engine's words.
     errors: {
       not_found: 'That key no longer exists. Refresh the list and try again.',
       rate_limited: 'Too many attempts in a row. Wait a moment and try again.',
@@ -1263,17 +1270,22 @@ export default {
     reasonUnknown: 'the reason could not be read',
     // hub#1697 — stable codes of the dead-letter door (`outbox_admin.rs`). Its own prose mixes
     // Spanish and English and was written for whoever debugs, not for whoever runs the shop.
+    //
+    // FRAGMENTS, not sentences (rv-1699): every one of these is read INSIDE `retryFailed` /
+    // `discardFailed`, which already announce the failure. A whole sentence here says it twice
+    // («Could not resend: This message cannot be sent again: …»), so they start lowercase and
+    // continue the frame — same register as `reasonUnknown` above. There is a test on it.
     errors: {
-      not_found: 'That message is no longer in the queue. Refresh the list.',
-      invalid_payload: 'That message is missing the data it needs to be sent again.',
+      not_found: 'that message is no longer in the queue; refresh the list.',
+      invalid_payload: 'that message is missing the data it needs to be sent again.',
       // Nested, not `'flow.release_revoked'` as a flat key: `vue-i18n` reads a dot in a key as
       // NESTING, so a flat dotted key is unreachable through `t()`. The runtime's code maps onto
       // the path exactly.
       flow: {
-        release_revoked: 'This message cannot be sent again: the permission that produced it was withdrawn. Grant it again and run the automation.',
+        release_revoked: 'the permission that produced it was withdrawn; grant it again and run the automation.',
       },
       module: {
-        capability_denied: 'This message cannot be sent again: the app that produced it no longer has permission for it.',
+        capability_denied: 'the app that produced it no longer has permission for it.',
       },
     },
     database: 'Database',

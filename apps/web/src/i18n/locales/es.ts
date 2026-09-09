@@ -1144,13 +1144,13 @@ export default {
     reasonUnknown: 'no se ha podido leer el motivo',
     // hub#1697 — ver el comentario gemelo en `en.ts`.
     errors: {
-      not_found: 'Ese mensaje ya no está en la cola. Actualiza la lista.',
-      invalid_payload: 'A ese mensaje le faltan los datos que necesita para volver a enviarse.',
+      not_found: 'ese mensaje ya no está en la cola; actualiza la lista.',
+      invalid_payload: 'a ese mensaje le faltan los datos que necesita para volver a enviarse.',
       flow: {
-        release_revoked: 'Este mensaje no se puede volver a enviar: se retiró el permiso que lo generó. Vuelve a concederlo y lanza la automatización.',
+        release_revoked: 'se retiró el permiso que lo generó; vuelve a concederlo y lanza la automatización.',
       },
       module: {
-        capability_denied: 'Este mensaje no se puede volver a enviar: la app que lo generó ya no tiene permiso para hacerlo.',
+        capability_denied: 'la app que lo generó ya no tiene permiso para hacerlo.',
       },
     },
     database: 'Base de datos',

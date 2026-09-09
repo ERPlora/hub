@@ -215,3 +215,55 @@ describe('catálogo de las puertas locales · cadena `en` + `es` (ADR-0055/0199)
     }
   });
 });
+
+// ── rv-1699 · el motivo de Sistema se LEE DENTRO de otra frase, así que es un fragmento ───────
+//
+// `SystemPage` no enseña estos motivos sueltos: los mete en `system.retryFailed` («No se pudo
+// reenviar: {reason}») y en `system.discardFailed`, que YA dicen el fallo. Una frase entera ahí
+// se lee dos veces —«No se pudo reenviar: Este mensaje no se puede volver a enviar: …»—, y eso es
+// lo que leyó la persona hasta este arreglo.
+//
+// El registro correcto ya estaba elegido en el propio catálogo: `system.reasonUnknown` es un
+// fragmento en minúscula. Este control es el que impide que el siguiente código que se añada a
+// `system.errors` vuelva a nacer como frase entera.
+describe('los motivos de Sistema son FRAGMENTOS, no frases (rv-1699)', () => {
+  const READ_INSIDE_A_FRAME = ['not_found', 'invalid_payload', 'flow.release_revoked', 'module.capability_denied'];
+  const FRAMES = ['system.retryFailed', 'system.discardFailed'];
+
+  it.each(READ_INSIDE_A_FRAME)('system.errors.%s empieza en minúscula en los dos idiomas', (code) => {
+    for (const [language, cat] of [
+      ['en', EN],
+      ['es', ES],
+    ] as const) {
+      const reason = cat.t(`system.errors.${code}`);
+      const first = reason[0];
+      expect(
+        first,
+        `system.errors.${code} (${language}) empieza por «${first}»: se leerá como una segunda ` +
+          'frase dentro de «' + cat.t(FRAMES[0]) + '». Escríbelo como fragmento, igual que ' +
+          '`system.reasonUnknown`.',
+      ).toBe(first.toLowerCase());
+    }
+  });
+
+  it('y el aviso montado no dice el fallo DOS veces', () => {
+    // La otra mitad, y la que caza el defecto tal y como se leía: el marco ya anuncia el fallo con
+    // sus dos puntos, así que un motivo que vuelva a anunciarlo mete un SEGUNDO «…:» en la misma
+    // línea. Sin este caso bastaría con quitar la mayúscula y seguir repitiendo la frase entera.
+    for (const [language, cat] of [
+      ['en', EN],
+      ['es', ES],
+    ] as const) {
+      for (const frame of FRAMES) {
+        for (const code of READ_INSIDE_A_FRAME) {
+          const toast = cat.t(frame).replace('{reason}', cat.t(`system.errors.${code}`));
+          expect(
+            toast.split(':').length - 1,
+            `«${toast}» (${language}) anuncia el fallo dos veces: el motivo tiene que ser un ` +
+              'fragmento que continúe el marco, no otra frase.',
+          ).toBe(1);
+        }
+      }
+    }
+  });
+});

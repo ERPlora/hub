@@ -225,8 +225,12 @@ import { formatDate } from '../lib/format-datetime';
 const { t, te, locale } = useI18n();
 
 /**
- * hub#1697 — the local `/api/keys` door answers a stable code beside prose written for the log.
- * Own sentence first, shared transport line second, this panel's own line last.
+ * hub#1697 — own sentence first, shared transport line second, this panel's own line last.
+ *
+ * 🔴 Today it always lands on the last one, and that is correct, not a hole (rv-1699): the
+ * `/api/keys` handlers answer a flat `error` string with no `code`, so nothing here is
+ * translatable yet. What this call buys already is that the panel stopped painting
+ * `keys.revoke → 404` at a person. The door and the client get their code in hub#1700.
  */
 const API_KEY_ERRORS = ['apiKeys.errors', 'runtimeErrors'] as const;
 
