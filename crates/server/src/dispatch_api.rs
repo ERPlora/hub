@@ -402,11 +402,41 @@ pub(crate) fn auth_rejected(e: auth::AuthError) -> Response {
         .into_response()
 }
 
+/// axum's rejection of a body, said in the shape every other answer of these doors uses (hub#1691).
+///
+/// `Json<T>` refuses a body it cannot read BEFORE the handler runs, and axum answers that on its
+/// own: a line of English prose, no JSON, no `{ok, error}`. Every door this is used on is on the
+/// module surface, and module code reads answers through `unwrap(env)` in `@erplora/module-sdk`,
+/// which looks for `ok` or throws `ErploraError('error', 'unknown error')` — so the sentence
+/// naming the bad field is stripped off on the way and the module is left with nothing to say and
+/// nothing to branch on.
+///
+/// The status is the extractor's own and is NOT flattened: `422` means «read as JSON, a field is
+/// missing» and `400` means «that is not JSON», which is the difference between a body worth
+/// re-sending with a fix and a bug in whatever built the request. The sentence is kept too — it is
+/// the half that names the field — while the code is what a caller branches on (ADR-0055).
+pub(crate) fn invalid_body(rejection: axum::extract::rejection::JsonRejection) -> Response {
+    (
+        rejection.status(),
+        Json(json!({
+            "ok": false,
+            "error": { "code": "invalid_body", "message": rejection.body_text() }
+        })),
+    )
+        .into_response()
+}
+
 pub(crate) async fn query(
     State(st): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<QueryReq>,
+    body: Result<Json<QueryReq>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
+    // Caught rather than left to axum: this is the busiest door a module has, and its rejection
+    // reaches module code as a blank `unknown error` (hub#1691, see `invalid_body`).
+    let Json(req) = match body {
+        Ok(json) => json,
+        Err(rejection) => return invalid_body(rejection),
+    };
     // Tier cloud compartido (ADR-0005): resuelve el runtime de la ORG dueña del `hub_id` de la
     // petición (un pool por org). En single-tenant devuelve el runtime único. El rechazo cross-org
     // (hub_id de org desconocida) ocurre aquí, ANTES de tocar ninguna BD.
@@ -457,8 +487,14 @@ pub(crate) async fn query(
 pub(crate) async fn command(
     State(st): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<CommandReq>,
+    body: Result<Json<CommandReq>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
+    // Caught rather than left to axum: this is the busiest door a module has, and its rejection
+    // reaches module code as a blank `unknown error` (hub#1691, see `invalid_body`).
+    let Json(req) = match body {
+        Ok(json) => json,
+        Err(rejection) => return invalid_body(rejection),
+    };
     // Mismo enrutado por org que `query` (ADR-0005): el `PgAdapter` de la org corre server-side.
     let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
         Ok(rt) => rt,

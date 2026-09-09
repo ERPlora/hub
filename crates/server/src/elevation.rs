@@ -16,6 +16,7 @@
 //!
 //! [`Runtime::approve_elevation`]: erplora_runtime::Runtime::approve_elevation
 //! [`LoginThrottle`]: crate::login_throttle::LoginThrottle
+use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -27,7 +28,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::state::AppState;
-use crate::{auth, err_response, tenant_rejected, unauthorized};
+use crate::{auth, err_response, invalid_body, tenant_rejected, unauthorized};
 
 /// The stable code the runtime uses for «those digits do not approve this» — the only refusal that
 /// is about the PIN, and therefore the only one that spends an attempt.
@@ -89,8 +90,16 @@ impl ApproveReq {
 pub async fn approve(
     State(st): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<ApproveReq>,
+    body: Result<Json<ApproveReq>, JsonRejection>,
 ) -> Response {
+    // The extractor's refusal is caught rather than left to axum, which answers it as a line of
+    // English prose (hub#1691). This door is on the module surface — `@erplora/module-sdk` calls
+    // it through `unwrap(env)`, which reads `ok` or throws `ErploraError('error', 'unknown
+    // error')` — so a body outside the envelope does not degrade here, it goes blank.
+    let Json(req) = match body {
+        Ok(json) => json,
+        Err(rejection) => return invalid_body(rejection),
+    };
     let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
