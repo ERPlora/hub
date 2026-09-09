@@ -611,20 +611,20 @@ impl Registry {
             .filter(|cp| self.is_active(&cp.module_id))
     }
 
-    /// El punto de control con ese `<módulo>/<nombre>`, si lo ofrece un módulo activo (hub#1701).
-    /// Lo usa la puerta de ESCRITURA, no el gate.
+    /// The checkpoint with that `<module>/<name>`, if an active module offers it (hub#1701).
+    /// It is the WRITE door that uses it, not the gate.
     pub fn policy_checkpoint_for_id(&self, id: &str) -> Option<&crate::policies::PolicyCheckpoint> {
         self.policy_checkpoint_by_command
             .values()
             .find(|cp| cp.id == id && self.is_active(&cp.module_id))
     }
 
-    /// Los puntos de control de **todos** los módulos instalados y activos (hub#1701).
+    /// The checkpoints of **every** installed and active module (hub#1701).
     ///
-    /// Filtra por `is_active` con el mismo criterio que [`Self::flow_templates`]: un módulo pausado
-    /// no ofrece pantallas y tampoco debe ofrecer sitios donde poner una norma sobre un command que
-    /// ahora mismo no se puede ejecutar. Orden estable (módulo, luego id) para que la pantalla del
-    /// dueño no baile entre dos peticiones.
+    /// It filters by `is_active` with the same criterion as [`Self::flow_templates`]: a paused
+    /// module offers no screens, and it must not offer places to put a rule on a command that
+    /// cannot be run right now either. Stable order (module, then id) so the owner's screen does
+    /// not dance between two requests.
     pub fn policy_checkpoints(&self) -> Vec<&crate::policies::PolicyCheckpoint> {
         let mut out: Vec<&crate::policies::PolicyCheckpoint> = self
             .policy_checkpoints
@@ -1020,10 +1020,10 @@ impl Registry {
         // hub#1611: sus automatizaciones de fábrica se van con él — una plantilla que sobreviviera
         // a su módulo se ofrecería para siempre, nombrando commands que este hub ya no tiene.
         self.flow_templates.remove(module_id);
-        // hub#1701: sus puntos de control se van con él, por lo mismo. Las NORMAS del dueño no: son
-        // suyas y no del módulo, así que sobreviven a una actualización (que es un remove + install)
-        // y vuelven a estar en vigor con el `reload_policies` de después. Lo que hace que una norma
-        // huérfana no gatee nada es que el índice se reconstruye uniendo filas CON checkpoints.
+        // hub#1701: its checkpoints go with it, for the same reason. The owner's RULES do not: they
+        // are theirs and not the module's, so they survive an update (which is a remove + install)
+        // and are in force again with the `reload_policies` that comes after. What keeps an orphaned
+        // rule from gating anything is that the index is rebuilt by joining rows WITH checkpoints.
         self.policy_checkpoints.remove(module_id);
         self.rebuild_policy_command_index();
         self.queries.retain(|_, q| q.module_id != module_id);

@@ -1,41 +1,41 @@
-#![allow(non_snake_case)] // los nombres gritan la parte que importa, como el resto de la batería
-//! hub#1701 — un módulo declara DÓNDE puede el dueño poner una norma: `policies/*.checkpoint.json`.
+#![allow(non_snake_case)] // the names shout the part that matters, like the rest of the battery
+//! hub#1701 — a module declares WHERE the owner may put a rule: `policies/*.checkpoint.json`.
 //!
-//! El contrato es **convención de carpeta, NO una clave del manifest**, por el mismo motivo que
-//! `flows/` (ADR-0463) y `locales/`: la raíz del manifest es `additionalProperties: false`
-//! (ADR-0286), así que una clave nueva le pondría suelo de versión de hub a **todo** módulo que la
-//! declarase. Por carpeta, un módulo publica sin suelo y sin un solo aviso, y sus checkpoints
-//! aparecen solos en el primer arranque tras esta release, porque `rehydrate_installed` vuelve a
-//! pasar por el instalador en cada boot.
+//! The contract is a **folder convention, NOT a manifest key**, for the same reason as `flows/`
+//! (ADR-0463) and `locales/`: the root of the manifest is `additionalProperties: false`
+//! (ADR-0286), so a new key would put a hub version floor on **every** module that declared it.
+//! By folder, a module publishes with no floor and without a single warning, and its checkpoints
+//! show up on their own on the first boot after this release, because `rehydrate_installed` goes
+//! through the installer again on every boot.
 //!
 //! ```text
 //! policies/
-//!   <nombre>.checkpoint.json   { "command": …, "facts": [ … ], "outcomes": [ … ] }
+//!   <name>.checkpoint.json   { "command": …, "facts": [ … ], "outcomes": [ … ] }
 //! ```
 //!
-//! La carga es **best-effort** —esto sale de un zip de terceros y corre en cada arranque— pero
-//! **no muda** (hub#1649): lo descartado sale con su código y su motivo, porque «este módulo no
-//! declara ningún punto de control» y «lo declara y el hub lo ha tirado» se ven exactamente igual
-//! desde el mostrador.
+//! Loading is **best-effort** —this comes out of a third party's zip and runs on every boot— but
+//! **not mute** (hub#1649): what is discarded comes out with its code and its reason, because
+//! «this module declares no checkpoint at all» and «it declares one and the hub threw it away»
+//! look exactly the same from the counter.
 //!
-//! 🔴 **La válvula de la denegación fail-closed vive AQUÍ.** El gate deniega si al ejecutar falta
-//! un `fact` que el checkpoint declara (architecture/hub/policies.md §6.1). Para que eso no pueda
-//! parar una caja por sorpresa, la carga rechaza un checkpoint cuyos `facts` el command **no
-//! declara en su schema**: se ve al instalar, no en mitad de una venta.
+//! 🔴 **The valve of the fail-closed denial lives HERE.** The gate denies when, at run time, a
+//! `fact` the checkpoint declares is missing (architecture/hub/policies.md §6.1). So that can
+//! never stop a till by surprise, loading rejects a checkpoint whose `facts` the command **does
+//! not declare in its schema**: it shows at install time, not in the middle of a sale.
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use erplora_runtime::manifest::Manifest;
 use erplora_runtime::policies;
 
-/// Carpeta temporal propia, como el resto de tests del runtime (no hay `tempfile` en dev-deps).
+/// Its own temp folder, like the rest of the runtime tests (there is no `tempfile` in dev-deps).
 fn tmp_module() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("erplora-policy-{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
 
-/// Un módulo `sales` con UN command que declara su schema de payload.
+/// A `sales` module with ONE command that declares its payload schema.
 fn write_module(dir: &Path) -> Manifest {
     fs::create_dir_all(dir.join("schemas")).unwrap();
     fs::write(
@@ -110,8 +110,8 @@ fn a_well_formed_checkpoint_is_registered_under_module_slash_name_hub1701() {
     assert!(scan.discards.is_empty(), "nada que descartar: {scan:?}");
     assert_eq!(scan.checkpoints.len(), 1, "{scan:?}");
     let cp = &scan.checkpoints[0];
-    // `<módulo>/<nombre>` — el mismo nombre estable que `_flow.template_ref` (v60): es lo que el
-    // módulo ya sabe de sí mismo y no cambia entre releases suyas.
+    // `<module>/<name>` — the same stable name as `_flow.template_ref` (v60): it is what the
+    // module already knows about itself and does not change between its own releases.
     assert_eq!(cp.id, "sales/discount_limit");
     assert_eq!(cp.command, "sales.order.set_discount");
     assert_eq!(cp.facts, vec!["discount_percent".to_string()]);
@@ -119,9 +119,9 @@ fn a_well_formed_checkpoint_is_registered_under_module_slash_name_hub1701() {
 
 #[test]
 fn a_checkpoint_on_a_command_of_ANOTHER_module_is_refused_hub1701() {
-    // Un módulo solo habla en su namespace — la misma regla del ABI de errores de dominio
-    // (hub#139) y de la elevación (hub#351). Parar los commands de otro ya tiene su puerta, y es
-    // `protects` (hub#775), que el módulo protegido conoce.
+    // A module only speaks in its own namespace — the same rule as the domain error ABI
+    // (hub#139) and as elevation (hub#351). Stopping someone else's commands already has its own
+    // door, and it is `protects` (hub#775), which the protected module knows about.
     let dir = tmp_module();
     let manifest = write_module(&dir);
     write_checkpoint(
@@ -170,8 +170,8 @@ fn a_checkpoint_on_a_command_the_manifest_does_not_declare_is_refused_hub1701() 
 
 #[test]
 fn a_fact_the_commands_schema_does_not_declare_is_refused_at_LOAD_hub1701() {
-    // 🔴 Esta es la válvula que hace segura la denegación fail-closed del gate: un `fact` que el
-    // command no puede aportar se ve al instalar, no en mitad de una venta.
+    // 🔴 This is the valve that makes the gate's fail-closed denial safe: a `fact` the command
+    // cannot supply shows at install time, not in the middle of a sale.
     let dir = tmp_module();
     let manifest = write_module(&dir);
     write_checkpoint(
@@ -197,8 +197,8 @@ fn a_fact_the_commands_schema_does_not_declare_is_refused_at_LOAD_hub1701() {
 
 #[test]
 fn a_nested_fact_is_accepted_by_its_ROOT_property_hub1701() {
-    // `order.total` es un camino punteado del lenguaje congelado de los flujos: su raíz (`order`)
-    // sí la declara el schema, y el resto lo resuelve `resolve_path`.
+    // `order.total` is a dotted path of the flows' frozen language: its root (`order`) IS
+    // declared by the schema, and `resolve_path` resolves the rest.
     let dir = tmp_module();
     let manifest = write_module(&dir);
     write_checkpoint(
@@ -218,8 +218,8 @@ fn a_nested_fact_is_accepted_by_its_ROOT_property_hub1701() {
 
 #[test]
 fn a_collection_fact_the_frozen_language_cannot_resolve_is_refused_hub1701() {
-    // `lines[].margin_pct` NO lo resuelve `flows::def::resolve_path` (camino punteado a secas), así
-    // que aceptarlo sería declarar un hecho que el gate no puede leer NUNCA → denegaría siempre.
+    // `lines[].margin_pct` is NOT resolved by `flows::def::resolve_path` (plain dotted paths
+    // only), so accepting it would declare a fact the gate can NEVER read → it would always deny.
     let dir = tmp_module();
     let manifest = write_module(&dir);
     write_checkpoint(
@@ -243,8 +243,8 @@ fn a_collection_fact_the_frozen_language_cannot_resolve_is_refused_hub1701() {
 
 #[test]
 fn a_command_without_a_payload_schema_cannot_carry_a_checkpoint_hub1701() {
-    // Sin schema no hay `facts` que el command DECLARE, así que no hay nada contra lo que validar
-    // la válvula de arriba — y el gate denegaría en cada ejecución.
+    // With no schema there are no `facts` the command DECLARES, so there is nothing to validate
+    // the valve above against — and the gate would deny on every single run.
     let dir = tmp_module();
     fs::write(
         dir.join("module.json"),
@@ -313,9 +313,9 @@ fn an_outcome_outside_the_closed_vocabulary_is_refused_hub1701() {
 
 #[test]
 fn a_checkpoint_may_still_declare_elevate_even_though_this_core_only_runs_block_hub1701() {
-    // `elevate:<permiso>` ES vocabulario del contrato; lo que este core todavía no sabe es
-    // EJECUTARLO (hub#1710). Tirar el checkpoint entero por nombrarlo dejaría al módulo sin su
-    // `block`, que sí funciona — la puerta que se cierra es la de ESCRIBIR una política así.
+    // `elevate:<permission>` IS contract vocabulary; what this core does not know yet is how to
+    // RUN it (hub#1710). Throwing the whole checkpoint away for naming it would leave the module
+    // without its `block`, which does work — the door that closes is WRITING a policy like that.
     let dir = tmp_module();
     let manifest = write_module(&dir);
     write_checkpoint(
@@ -335,9 +335,9 @@ fn a_checkpoint_may_still_declare_elevate_even_though_this_core_only_runs_block_
 
 #[test]
 fn two_checkpoints_on_the_SAME_command_keep_only_the_first_by_name_hub1701() {
-    // Dos gates sobre el mismo command harían que qué norma se aplica dependiese del orden en que
-    // el sistema de ficheros devuelve las entradas. Se queda el primero por nombre y el otro se
-    // dice; determinista entre dos arranques.
+    // Two gates on the same command would make which rule applies depend on the order in which
+    // the file system returns the entries. The first by name stays and the other one is reported;
+    // deterministic across two boots.
     let dir = tmp_module();
     let manifest = write_module(&dir);
     for name in ["b_second", "a_first"] {

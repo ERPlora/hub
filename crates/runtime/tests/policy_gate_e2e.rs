@@ -1,12 +1,12 @@
-#![allow(non_snake_case)] // los nombres gritan la parte que importa, como el resto de la batería
-//! hub#1701 — **el gate**: una norma que el DUEÑO escribió impide una orden ANTES de guardar nada.
+#![allow(non_snake_case)] // the names shout the part that matters, like the rest of the battery
+//! hub#1701 — **the gate**: a rule the OWNER wrote stops a command BEFORE anything is stored.
 //!
-//! Doc: `architecture/hub/policies.md` (§4.3 el punto exacto, §5 las guardas, §6.1 el fallo
-//! cerrado). El orden as-built de los siete gates del embudo vive en `runtime-dispatcher.md` §2.0
-//! y no se copia aquí.
+//! Doc: `architecture/hub/policies.md` (§4.3 the exact spot, §5 the guards, §6.1 the fail-closed
+//! path). The as-built order of the funnel's seven gates lives in `runtime-dispatcher.md` §2.0 and
+//! is not copied here.
 //!
-//! Esta batería es la que sostiene las tres guardas no negociables. Cada una tiene su mutante
-//! escrito en el test que la cubre — un mutante que se EJECUTA, no que se declara.
+//! This battery is what holds up the three non-negotiable guards. Each one has its mutant written
+//! in the test that covers it — a mutant that is RUN, not one that is declared.
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
@@ -22,7 +22,7 @@ fn admin_ctx() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
 }
 
-/// Un cajero: tiene el permiso del command, y nada más.
+/// A cashier: they have the command's permission, and nothing else.
 fn cashier_ctx() -> RequestContext {
     RequestContext::new("h1", "u2", ["p1701.order.discount".to_string()])
 }
@@ -41,7 +41,7 @@ async fn fresh_runtime() -> Runtime {
     rt
 }
 
-/// La norma de siempre: «un descuento de más del 20 % no se deja».
+/// The usual rule: «a discount over 20 % is not allowed».
 fn over_20(mode: &str) -> policies::NewPolicy {
     policies::NewPolicy {
         checkpoint: "p1701/discount_limit".into(),
@@ -53,7 +53,7 @@ fn over_20(mode: &str) -> policies::NewPolicy {
     }
 }
 
-/// La norma del segundo checkpoint, el que declara un hecho que el command puede no traer.
+/// The rule of the second checkpoint, the one declaring a fact the command may not carry.
 fn tip_over_10(mode: &str) -> policies::NewPolicy {
     policies::NewPolicy {
         checkpoint: "p1701/tip_limit".into(),
@@ -65,8 +65,8 @@ fn tip_over_10(mode: &str) -> policies::NewPolicy {
     }
 }
 
-/// Escribe una fila de `_policy` **saltándose la puerta de escritura**: es la única forma de tener
-/// en la tabla lo que solo un core POSTERIOR habría podido guardar (ADR-0269 permite rodar atrás).
+/// Writes a `_policy` row **skipping the write door**: it is the only way to have in the table
+/// what only a LATER core could have stored (ADR-0269 allows rolling back).
 async fn insert_raw_policy(rt: &Runtime, outcome: &str, condition: &str) {
     let mut p = Params::new();
     p.insert("id".into(), json!("pol-raw"));
@@ -92,16 +92,16 @@ fn domain_code(err: &RuntimeError) -> String {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// El camino completo del `block`
+// The complete path of `block`
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn a_checkpoint_of_an_installed_module_is_offered_to_the_owner_hub1701() {
     let rt = fresh_runtime().await;
     let checkpoints = rt.policy_checkpoints();
-    // Los DOS que el paquete declara y el instalador aceptó, en orden estable. `tip_limit` tiene
-    // que estar aquí: media batería de abajo escribe normas sobre él, y una norma sobre un punto de
-    // control que no se ofrece se rechaza con `ERR_CHECKPOINT_NOT_FOUND`.
+    // The TWO the package declares and the installer accepted, in stable order. `tip_limit` has
+    // to be here: half the battery below writes rules on it, and a rule on a checkpoint that is
+    // not offered is rejected with `ERR_CHECKPOINT_NOT_FOUND`.
     assert_eq!(checkpoints.len(), 2, "{checkpoints:?}");
     assert_eq!(checkpoints[0].id, "p1701/discount_limit");
     assert_eq!(checkpoints[0].command, "p1701.order.set_discount");
@@ -111,10 +111,10 @@ async fn a_checkpoint_of_an_installed_module_is_offered_to_the_owner_hub1701() {
 
 #[tokio::test]
 async fn the_rule_applies_to_the_CASHIER_who_does_have_the_permission_hub1701() {
-    // La otra mitad de «solo restringe», y el caso real por el que existe la función: quien pasa por
-    // aquí no es alguien sin permiso, es la persona del mostrador que SÍ puede aplicar descuentos y
-    // a quien el dueño le pone un tope. Sin este control positivo, «la política nunca abre una
-    // puerta» se cumpliría igual con un gate que no aplica NUNCA.
+    // The other half of «it only restricts», and the real case the feature exists for: whoever
+    // comes through here is not someone without permission, it is the person at the counter who
+    // CAN apply discounts and whom the owner puts a cap on. Without this positive control, «a
+    // policy never opens a door» would hold just as well with a gate that NEVER applies.
     let rt = fresh_runtime().await;
     rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
 
@@ -153,14 +153,14 @@ async fn a_matching_policy_BLOCKS_the_command_before_the_row_exists_hub1701() {
         .expect_err("la norma tiene que impedirlo");
 
     assert_eq!(domain_code(&err), policies::ERR_BLOCKED);
-    // 🔴 «ANTES de guardar nada»: si el gate corriese después de la transacción, la fila estaría.
+    // 🔴 «BEFORE anything is stored»: if the gate ran after the transaction, the row would be there.
     assert_eq!(order_rows(&rt).await, 0, "el gate corre antes de la transacción");
 }
 
 #[tokio::test]
 async fn the_owners_own_words_travel_with_the_refusal_hub1701() {
-    // Un `block` mudo sería peor que no tener la función: la persona del mostrador tiene que leer
-    // POR QUÉ. El código es estable (ADR-0205) y el texto es el que escribió el dueño.
+    // A mute `block` would be worse than not having the feature: the person at the counter has to
+    // read WHY. The code is stable (ADR-0205) and the text is the one the owner wrote.
     let rt = fresh_runtime().await;
     rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
 
@@ -242,17 +242,17 @@ async fn a_policy_only_gates_the_command_of_ITS_checkpoint_hub1701() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Guarda 1 — SOLO RESTRINGE
+// Guard 1 — IT ONLY RESTRICTS
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn a_policy_NEVER_opens_a_door_the_permission_had_shut_hub1701() {
-    // 🔴 MUTANTE de esta guarda: mover la llamada al gate por ENCIMA de `permissions::check_command`
-    // en `commands::execute_at`. Este test cae, porque la persona sin permiso recibiría el veredicto
-    // de la política (o pasaría) en vez de `PermissionDenied`.
+    // 🔴 MUTANT of this guard: move the gate call ABOVE `permissions::check_command` in
+    // `commands::execute_at`. This test falls, because the person without the permission would get
+    // the policy's verdict (or would pass) instead of `PermissionDenied`.
     let rt = fresh_runtime().await;
     rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
-    // Alguien SIN el permiso del command, con un descuento que la norma dejaría pasar.
+    // Someone WITHOUT the command's permission, with a discount the rule would let through.
     let nobody = RequestContext::new("h1", "u3", ["p1701.order.close".to_string()]);
 
     let err = rt
@@ -273,11 +273,11 @@ async fn a_policy_NEVER_opens_a_door_the_permission_had_shut_hub1701() {
 
 #[tokio::test]
 async fn a_policy_of_ANOTHER_hub_does_not_gate_this_one_hub1701() {
-    // Contrato de fila: una norma es del hub que la escribió. 🔴 MUTANTE: quitar el filtro por
-    // `hub_id` de `policies::enforce` — este test cae.
+    // Row contract: a rule belongs to the hub that wrote it. 🔴 MUTANT: drop the `hub_id` filter
+    // from `policies::enforce` — this test falls.
     let rt = fresh_runtime().await;
     rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
-    // Mismo runtime, contexto de OTRO hub.
+    // Same runtime, context of ANOTHER hub.
     let other = RequestContext::new("h2", "u1", ["*".to_string()]);
 
     let err = rt
@@ -296,18 +296,19 @@ async fn a_policy_of_ANOTHER_hub_does_not_gate_this_one_hub1701() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Guarda 2 — FALLO CERRADO
+// Guard 2 — FAIL CLOSED
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn a_DECLARED_fact_the_command_does_not_carry_DENIES_hub1701() {
-    // 🔴 La guarda del §6.1, y su mutante: sustituir la denegación por un `continue` en
-    // `policies::evaluate` — este test cae.
+    // 🔴 The §6.1 guard, and its mutant: replace the denial with a `continue` in
+    // `policies::evaluate` — this test falls.
     //
-    // El checkpoint `tip_limit` declara `approved_by`, que el schema de `set_tip` declara OPCIONAL
-    // y SIN default: un payload que no lo mande llega al gate sin el hecho. Un gate que evaluase la
-    // condición y leyese su `bool` no podría distinguir «falta el hecho» de «no casaba», y dejaría
-    // pasar el command: fail-open mudo por la puerta de atrás.
+    // The `tip_limit` checkpoint declares `approved_by`, which the `set_tip` schema declares
+    // OPTIONAL and WITHOUT a default: a payload that does not send it reaches the gate without the
+    // fact. A gate that evaluated the condition and read its `bool` could not tell «the fact is
+    // missing» from «it did not match», and would let the command through: a mute fail-open
+    // through the back door.
     let rt = fresh_runtime().await;
     rt.create_policy(&tip_over_10("enforce"), "u1").await.unwrap();
 
@@ -326,8 +327,8 @@ async fn a_DECLARED_fact_the_command_does_not_carry_DENIES_hub1701() {
 
 #[tokio::test]
 async fn the_same_command_WITH_the_declared_fact_is_judged_on_its_merits_hub1701() {
-    // El control positivo del test de arriba: con el hecho presente, la norma vuelve a decidir por
-    // la condición. Sin esto, «deniega siempre» pasaría por «fail-closed funciona».
+    // The positive control of the test above: with the fact present, the rule decides by its
+    // condition again. Without this, «it always denies» would pass for «fail-closed works».
     let rt = fresh_runtime().await;
     rt.create_policy(&tip_over_10("enforce"), "u1").await.unwrap();
 
@@ -352,10 +353,10 @@ async fn the_same_command_WITH_the_declared_fact_is_judged_on_its_merits_hub1701
 
 #[tokio::test]
 async fn the_gate_sees_the_payload_AFTER_the_schema_defaults_hub1701() {
-    // 🔴 El punto del embudo, comprobado por su consecuencia: `channel` es un hecho DECLARADO que el
-    // llamador no manda y que el schema rellena con `"counter"` (`commands.rs`, bloque de schema).
-    // Un gate colocado ANTES de ese bloque vería `channel` ausente y —fail-closed— denegaría toda
-    // venta normal. MUTANTE: mover la llamada al gate por encima del bloque de schema; este test cae.
+    // 🔴 The spot in the funnel, checked by its consequence: `channel` is a DECLARED fact the
+    // caller does not send and the schema fills in with `"counter"` (`commands.rs`, schema block).
+    // A gate placed BEFORE that block would see `channel` missing and —fail-closed— would deny
+    // every normal sale. MUTANT: move the gate call above the schema block; this test falls.
     let rt = fresh_runtime().await;
     rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
 
@@ -373,10 +374,10 @@ async fn the_gate_sees_the_payload_AFTER_the_schema_defaults_hub1701() {
 
 #[tokio::test]
 async fn a_stored_outcome_this_core_cannot_run_DENIES_instead_of_passing_hub1701() {
-    // Un hub que rodó atrás encuentra en `_policy` un `elevate:` que este core no ejecuta
-    // (hub#1710). La fila se escribe a mano porque es EXACTAMENTE como llegaría: la puerta de
-    // escritura de este core la rechaza.
-    // 🔴 Fail-closed: no se ignora. MUTANTE: tratar el outcome desconocido como «no aplica» — cae.
+    // A hub that rolled back finds in `_policy` an `elevate:` this core does not run (hub#1710).
+    // The row is written by hand because that is EXACTLY how it would arrive: this core's write
+    // door rejects it.
+    // 🔴 Fail-closed: it is not ignored. MUTANT: treat the unknown outcome as «does not apply» — falls.
     let rt = fresh_runtime().await;
     insert_raw_policy(&rt, "elevate:p1701.order.discount", r#"{"discount_percent":{"gt":20}}"#).await;
     rt.reload_policies().await.unwrap();
@@ -396,7 +397,7 @@ async fn a_stored_outcome_this_core_cannot_run_DENIES_instead_of_passing_hub1701
 
 #[tokio::test]
 async fn a_stored_condition_this_core_cannot_read_DENIES_hub1701() {
-    // Igual: un operador que este core no conoce solo puede haber llegado de una versión posterior.
+    // Same thing: an operator this core does not know can only have come from a later version.
     let rt = fresh_runtime().await;
     insert_raw_policy(&rt, "block", r#"{"discount_percent":{"matches":20}}"#).await;
     rt.reload_policies().await.unwrap();
@@ -414,7 +415,7 @@ async fn a_stored_condition_this_core_cannot_read_DENIES_hub1701() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// mode: warn — la rampa
+// mode: warn — the ramp
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -435,8 +436,8 @@ async fn a_warn_policy_NEVER_stops_the_till_hub1701() {
 
 #[tokio::test]
 async fn a_warn_policy_that_cannot_be_evaluated_does_not_stop_the_till_either_hub1701() {
-    // El fallo cerrado es de `enforce`. En `warn` la norma todavía NO está en vigor, así que ni
-    // siquiera un hecho ausente puede parar una caja: es la rampa, y una rampa que bloquea no lo es.
+    // Fail-closed belongs to `enforce`. In `warn` the rule is NOT in force yet, so not even a
+    // missing fact can stop a till: it is the ramp, and a ramp that blocks is not one.
     let rt = fresh_runtime().await;
     rt.create_policy(&tip_over_10("warn"), "u1").await.unwrap();
 
@@ -451,7 +452,7 @@ async fn a_warn_policy_that_cannot_be_evaluated_does_not_stop_the_till_either_hu
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Guarda 3 — COSTE ACOTADO
+// Guard 3 — BOUNDED COST
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -470,13 +471,13 @@ async fn the_number_of_policies_per_checkpoint_has_a_CEILING_hub1701() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// CRUD — lo que el dueño escribe, y lo que no se le deja escribir
+// CRUD — what the owner writes, and what they are not allowed to write
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn a_policy_survives_a_restart_and_gates_again_hub1701() {
-    // El índice en memoria se reconstruye al arrancar: si no, una norma solo estaría en vigor
-    // hasta el siguiente despliegue.
+    // The in-memory index is rebuilt on boot: otherwise a rule would only be in force until the
+    // next deploy.
     let rt = fresh_runtime().await;
     rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
     rt.reload_policies().await.unwrap();
@@ -518,9 +519,9 @@ async fn a_policy_on_a_checkpoint_that_does_not_exist_is_refused_hub1701() {
 
 #[tokio::test]
 async fn a_condition_on_a_fact_the_checkpoint_does_not_declare_is_refused_hub1701() {
-    // El checkpoint dice CON QUÉ DATOS se puede razonar. Una condición que nombra otra cosa lee
-    // fuera del vocabulario que el módulo declaró — y ese es el mismo agujero que hub#662 cerró en
-    // los flujos con `secret.·`.
+    // The checkpoint says WHICH DATA may be reasoned about. A condition naming something else
+    // reads outside the vocabulary the module declared — and that is the same hole hub#662 closed
+    // in flows with `secret.·`.
     let rt = fresh_runtime().await;
     let mut new = over_20("enforce");
     new.condition = json!({ "order_id": { "eq": "o1" } });
@@ -539,9 +540,9 @@ async fn an_outcome_the_checkpoint_does_not_offer_is_refused_hub1701() {
 
 #[tokio::test]
 async fn the_elevate_outcome_is_refused_by_THIS_core_with_its_own_code_hub1701() {
-    // El checkpoint SÍ lo ofrece; lo que falta es que este core lo sepa ejecutar (hub#1710).
-    // Distinguirlo del de arriba importa: uno se arregla cambiando la norma, el otro esperando una
-    // release.
+    // The checkpoint DOES offer it; what is missing is this core knowing how to run it
+    // (hub#1710). Telling it apart from the one above matters: one is fixed by changing the rule,
+    // the other by waiting for a release.
     let rt = fresh_runtime().await;
     let mut new = over_20("enforce");
     new.outcome = "elevate:p1701.order.discount".into();
@@ -551,7 +552,7 @@ async fn the_elevate_outcome_is_refused_by_THIS_core_with_its_own_code_hub1701()
 
 #[tokio::test]
 async fn a_block_with_no_message_is_refused_hub1701() {
-    // Un `block` mudo sería peor que no tener la función.
+    // A mute `block` would be worse than not having the feature.
     let rt = fresh_runtime().await;
     let mut new = over_20("enforce");
     new.message = "   ".into();
@@ -574,7 +575,7 @@ async fn an_unreadable_condition_is_refused_at_WRITE_time_hub1701() {
     let mut new = over_20("enforce");
     new.condition = json!({ "discount_percent": { "matches": 20 } });
     let err = rt.create_policy(&new, "u1").await.unwrap_err();
-    // Viene del lenguaje congelado: operador desconocido.
+    // It comes from the frozen language: unknown operator.
     assert!(
         matches!(&err, RuntimeError::Domain { code, .. } if code.starts_with("flow.")),
         "{err:?}"
@@ -583,9 +584,9 @@ async fn an_unreadable_condition_is_refused_at_WRITE_time_hub1701() {
 
 #[tokio::test]
 async fn an_empty_condition_is_refused_hub1701() {
-    // Una condición vacía casa SIEMPRE (es el default permisivo de los flujos, explícito allí). En
-    // una política eso es una norma que bloquea el command entero sin decirlo, y el dueño la
-    // escribió creyendo que filtraba algo.
+    // An empty condition matches ALWAYS (it is the flows' permissive default, explicit there). In
+    // a policy that is a rule blocking the whole command without saying so, and the owner wrote it
+    // believing it filtered something.
     let rt = fresh_runtime().await;
     let mut new = over_20("enforce");
     new.condition = json!({});
@@ -610,7 +611,7 @@ async fn listing_and_updating_a_policy_round_trips_hub1701() {
     assert_eq!(all.len(), 1);
     assert_eq!(all[0].id, saved.id);
 
-    // Y la promoción está en vigor sin reiniciar.
+    // And the promotion is in force without restarting.
     let err = rt
         .execute_command(
             "p1701.order.set_discount",
@@ -632,7 +633,7 @@ async fn a_policy_of_another_hub_is_not_listed_nor_readable_hub1701() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// Helpers de lectura
+// Read helpers
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 async fn order_rows(rt: &Runtime) -> i64 {
