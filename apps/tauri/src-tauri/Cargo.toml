@@ -28,8 +28,10 @@ erplora-peripherals = { path = "../../../crates/peripherals" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
-# Canales del worker de la PrintQueue + watchdog (tareas de fondo del shell).
-tokio = { version = "1", features = ["sync"] }
+# Canales del worker de la PrintQueue + watchdog (tareas de fondo del shell). `time` es del
+# guardia de conectividad (hub#1716): espera con backoff sobre un `Notify` mientras la red está
+# caída, y sin timer alguno mientras todo va bien.
+tokio = { version = "1", features = ["sync", "time"] }
 # `device.id` estable por instalación (X-Device-Id del login, §2.9b / sesión única ADR-0154).
 uuid = { version = "1", features = ["v4"] }
 # Notificaciones del SISTEMA: el aviso cuando NADIE mira la pantalla (comanda → cocina). Plugin
