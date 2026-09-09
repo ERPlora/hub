@@ -143,10 +143,12 @@ impl CloudNotifyTransport {
             builder = builder.header(*name, value);
         }
 
-        let response = builder
-            .send()
-            .await
-            .map_err(|e| RuntimeError::Notify(format!("notify proxy unreachable: {e}")))?;
+        let response = builder.send().await.map_err(|e| {
+            RuntimeError::Notify(format!(
+                "notify proxy unreachable: {}",
+                crate::cloud_proxy::cloud_unreachable(&e.to_string())
+            ))
+        })?;
 
         let status = response.status();
         if status.is_success() {

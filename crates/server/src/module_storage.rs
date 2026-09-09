@@ -84,10 +84,12 @@ impl ModuleMediaStorage {
         for (key, value) in headers {
             request = request.header(key, value);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|error| RuntimeError::Storage(format!("Cloud media/folder: {error}")))?;
+        let response = request.send().await.map_err(|error| {
+            RuntimeError::Storage(format!(
+                "Cloud media/folder: {}",
+                crate::cloud_proxy::cloud_unreachable(&error.to_string())
+            ))
+        })?;
         if !response.status().is_success() {
             return Err(RuntimeError::Storage(format!(
                 "Cloud rechazó media/folder ({})",
@@ -181,10 +183,12 @@ impl ModuleStorage for ModuleMediaStorage {
         for (key, value) in headers {
             request = request.header(key, value);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|error| RuntimeError::Storage(format!("Cloud media/upload: {error}")))?;
+        let response = request.send().await.map_err(|error| {
+            RuntimeError::Storage(format!(
+                "Cloud media/upload: {}",
+                crate::cloud_proxy::cloud_unreachable(&error.to_string())
+            ))
+        })?;
         if !response.status().is_success() {
             return Err(RuntimeError::Storage(format!(
                 "Cloud rechazó media/upload ({})",

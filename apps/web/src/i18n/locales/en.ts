@@ -846,6 +846,10 @@ export default {
       no_business_account: 'Facebook did not return a WhatsApp Business account. Try again and pick your business in the window.',
       not_configured: 'WhatsApp is not available on this hub yet. Contact support.',
       sdk_unavailable: 'The Facebook window could not open. Allow pop-ups for this site and try again.',
+      // The runtime's own code when the call never got through (hub#1689). Same fact as
+      // `unreachable`, which the browser raises when ITS fetch fails: for whoever is
+      // connecting, the difference between the two is not actionable.
+      cloud_unreachable: 'Your hub could not reach erplora.com. Check the connection and try again.',
       unreachable: 'Your hub could not reach erplora.com. Check the connection and try again.',
       forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
       default: 'Something went wrong while connecting. Try again in a minute.',

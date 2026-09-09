@@ -423,17 +423,26 @@ async fn send_json(
 async fn read_answer(
     builder: reqwest::RequestBuilder,
 ) -> std::result::Result<(u16, String), EnrolmentRefusal> {
+    // El `Display` de `reqwest` nombra la URL marcada —la dirección del plano de control— y este
+    // `detail` viaja al navegador. Va al log y fuera queda el path, que es lo que sitúa el fallo
+    // sin publicar dónde vive el SaaS (hub#1689).
     let response = builder.send().await.map_err(|error| {
         EnrolmentRefusal::new(
             CLOUD_UNREACHABLE,
-            format!("{LEGAL_DOCUMENTS_PATH}: {error}"),
+            format!(
+                "{LEGAL_DOCUMENTS_PATH}: {}",
+                crate::cloud_proxy::cloud_unreachable(&error.to_string())
+            ),
         )
     })?;
     let status = response.status().as_u16();
     let body = response.text().await.map_err(|error| {
         EnrolmentRefusal::new(
             CLOUD_UNREACHABLE,
-            format!("{LEGAL_DOCUMENTS_PATH}: status {status} ({error})"),
+            format!(
+                "{LEGAL_DOCUMENTS_PATH}: status {status} ({})",
+                crate::cloud_proxy::cloud_unreachable(&error.to_string())
+            ),
         )
     })?;
     Ok((status, body))

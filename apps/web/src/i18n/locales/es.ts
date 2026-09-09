@@ -779,6 +779,7 @@ export default {
       no_business_account: 'Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.',
       not_configured: 'WhatsApp todavía no está disponible en este hub. Contacta con soporte.',
       sdk_unavailable: 'No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.',
+      cloud_unreachable: 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.',
       unreachable: 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.',
       forbidden: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
       default: 'Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.',

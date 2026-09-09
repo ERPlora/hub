@@ -149,11 +149,14 @@ pub(crate) const REDACTED_MESSAGE: &str =
 /// variants we deliberately let speak. Matching the driver's signature covers those without
 /// silencing the half of `Other` that says something a person can act on ("usuario no encontrado").
 pub(crate) fn carries_driver_text(message: &str) -> bool {
-    const MARKS: [&str; 4] = [
+    const MARKS: [&str; 5] = [
         "sqlx",
         "error returned from database",
         "PoolTimedOut",
         " at line ",
+        // hub#1689: the suffix `reqwest` puts on every error that dialled somewhere — the URL,
+        // and with it the address of the control plane. Whatever the variant around it.
+        " for url (",
     ];
     MARKS.iter().any(|mark| message.contains(mark))
 }
@@ -657,6 +660,25 @@ mod error_redaction_tests {
         let error = error_of(e);
         assert_eq!(error["message"], REDACTED_MESSAGE);
         assert_eq!(error["code"], "io");
+    }
+
+    /// hub#1689: the `Display` of a `reqwest` error names the URL it dialled — the address this hub
+    /// calls erplora.com on. `Storage`, `Notify` and `Other` are allowed to speak, so a site that
+    /// wraps that `Display` in an authored sentence would publish it through this door. The URL
+    /// suffix is the mark, whatever the variant and whatever the sentence around it.
+    #[test]
+    fn the_address_of_the_control_plane_smuggled_inside_a_storage_error_is_redacted() {
+        let e = RuntimeError::Storage(
+            "Cloud media/upload: error sending request for url \
+             (http://10.10.1.50:3000/api/v1/hub/device/media/)"
+                .into(),
+        );
+        let error = error_of(e);
+        assert_eq!(error["message"], REDACTED_MESSAGE);
+        assert_eq!(
+            error["code"], "module_storage",
+            "the stable code survives the redaction"
+        );
     }
 
     /// The net under the variants we DO let speak: `Other` is a grab-bag of ~50 sites, half of

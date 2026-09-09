@@ -571,12 +571,22 @@ async fn one_turn(st: &AppState, auth: &cloud_client::Auth, body: &Value) -> Res
         .send()
         .await
         .and_then(|r| r.error_for_status())
-        .map_err(|e| format!("{ERR_UPSTREAM}: the assistant proxy did not answer: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "{ERR_UPSTREAM}: the assistant proxy did not answer: {}",
+                crate::cloud_proxy::cloud_unreachable(&e.to_string())
+            )
+        })?;
 
     let mut aggregator = Aggregator::default();
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("{ERR_UPSTREAM}: the stream broke mid-turn: {e}"))?;
+        let chunk = chunk.map_err(|e| {
+            format!(
+                "{ERR_UPSTREAM}: the stream broke mid-turn: {}",
+                crate::cloud_proxy::cloud_unreachable(&e.to_string())
+            )
+        })?;
         if let Some(error) = aggregator.push(&String::from_utf8_lossy(&chunk)) {
             return Err(format!("{ERR_UPSTREAM}: {error}"));
         }
