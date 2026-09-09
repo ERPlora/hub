@@ -201,6 +201,7 @@ import {
   type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
+import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { fieldRefusalOf, invalidFieldMessage } from '../lib/invalid-field';
 import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
@@ -209,6 +210,18 @@ import { nfcBadgeReady } from '../lib/nfc-badge';
 import { toast } from '../lib/toast';
 
 const { t, te, locale } = useI18n();
+
+/**
+ * hub#1697 — the rung the ladder was missing: a stable code of the `/api/hub/users` guards
+ * (`last_admin`, `self_deactivation`, `self_badge_enrollment`, `not_found`) gets its sentence.
+ * Below it stays rule 2 of hub#1102 — an untranslatable refusal keeps the sentence that came,
+ * because it says more than any generic line of ours.
+ */
+function employeeRejection(error: unknown): string {
+  const byCode = runtimeErrorKey(error, { t, te }, ['employeeForm.errors', 'runtimeErrors']);
+  if (byCode) return t(byCode);
+  return error instanceof Error ? error.message : t('employees.saveError');
+}
 const route = useRoute();
 const router = useRouter();
 const isEdit = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0);
@@ -464,7 +477,7 @@ async function onSave(): Promise<void> {
       ? t(`employeeForm.errors.${key}`)
       : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
         platformFailureMessage(error, locale.value) ??
-        (error instanceof Error ? error.message : t('employees.saveError')));
+        employeeRejection(error));
     const refusal = fieldRefusalOf(error);
     if (!key && refusal && ANCHORED_FIELDS.includes(refusal.field)) {
       fieldRejection.value = { field: refusal.field, message };

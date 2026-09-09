@@ -64,11 +64,20 @@ function stableCode(error: unknown): string | null {
  * `null` covers the two cases the caller must treat differently: real prose (keep it) and a code
  * this shell has never heard of (never paint it).
  */
-export function runtimeErrorKey(error: unknown, i18n: Translator): string | null {
+export function runtimeErrorKey(
+  error: unknown,
+  i18n: Translator,
+  namespaces: readonly string[] = [NAMESPACE],
+): string | null {
   const code = stableCode(error);
   if (!code) return null;
-  const key = `${NAMESPACE}.${code}`;
-  return i18n.te(key) ? key : null;
+  // First namespace that has a sentence wins, so a screen can say what `not_found` means on ITS
+  // door («that key is gone» / «that dead-letter is gone») before the shared line answers for it.
+  for (const namespace of namespaces) {
+    const key = `${namespace}.${code}`;
+    if (i18n.te(key)) return key;
+  }
+  return null;
 }
 
 /** The prose the server actually wrote, or `null` when all it sent was a code. */
@@ -85,4 +94,24 @@ export function runtimeErrorSentence(error: unknown, i18n: Translator, fallback?
   const key = runtimeErrorKey(error, i18n);
   if (key) return i18n.t(key);
   return serverProse(error) ?? fallback ?? i18n.t(RUNTIME_ERROR_DEFAULT_KEY);
+}
+
+/**
+ * What a person reads when a LOCAL door refuses (hub#1697): the translated code, or the screen's
+ * own line. **Never the engine's words.**
+ *
+ * The difference with `runtimeErrorSentence`, and the reason both exist: a cloud-facing door
+ * relays what the SaaS said, and that prose is worth keeping. A local door's prose is the line
+ * whoever wrote the runtime left for the log — in English on purpose (the code-language rule) —
+ * so a Spanish till reading «the device name is at most 40 characters» is reading the log, not a
+ * message. There is nothing to conserve there, and the screen's own sentence always beats it.
+ */
+export function localDoorSentence(
+  error: unknown,
+  i18n: Translator,
+  namespaces: readonly string[],
+  fallback: string,
+): string {
+  const key = runtimeErrorKey(error, i18n, namespaces);
+  return key ? i18n.t(key) : fallback;
 }

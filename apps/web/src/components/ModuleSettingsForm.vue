@@ -176,6 +176,7 @@ import type { ModuleSettingsDef, SettingsSchema, SettingsSchemaProperty } from '
 import { ErploraError, type ErploraClient } from '@erplora/module-sdk';
 import HubIcon from './HubIcon.vue';
 import { getClient } from '../lib/runtime';
+import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
 import { loadInstalledManifests, loadModuleComponent, loadModuleLocale } from '../lib/module-loader';
 import { moduleBase } from '../lib/module-url';
@@ -200,7 +201,7 @@ const props = defineProps<{
   pageTitle?: string;
 }>();
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const client: ErploraClient = getClient();
 
 const status = ref<'loading' | 'ready' | 'error'>('loading');
@@ -457,9 +458,16 @@ async function save(): Promise<void> {
     // lo que contestó el server — que es infinitamente mejor que el genérico de antes.
     const named = e instanceof ErploraError ? (e.fields ?? []) : [];
     invalidFields.value = new Set(named);
+    // hub#1697 — se separa el TRANSPORTE del rechazo: un código estable (la nube caída, un
+    // permiso) tiene su frase; el rechazo que escribió el MÓDULO es prosa de negocio suya y se
+    // conserva tal cual, que es lo que pedía la issue. Por eso este fichero sigue en la lista de
+    // excepciones de la guardia: pinta el mensaje a propósito, y ese mensaje no es del motor.
+    const byCode = runtimeErrorKey(e, { t, te }, ['runtimeErrors']);
     saveRefusal.value = named.length
       ? t('moduleSettings.invalidFields')
-      : (e instanceof Error && e.message) || t('moduleSettings.saveError');
+      : byCode
+        ? t(byCode)
+        : (e instanceof Error && e.message) || t('moduleSettings.saveError');
     await toastError(t('moduleSettings.saveError'));
   } finally {
     saving.value = false;

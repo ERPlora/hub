@@ -474,6 +474,12 @@ export default {
   // know), and it does not promise more than the hub delivers (removing a device is not a ban:
   // anybody with an account can sign in on it again). No "hub" anywhere — ADR-0254.
   devices: {
+    // hub#1697 — the door answers a stable code next to English prose written for the log
+    // (`devices.rs`). The code is what the person gets a sentence for; the prose stays in the log.
+    errors: {
+      device_name_too_long: 'That name is too long. Use a shorter one and save again.',
+      device_not_found: 'That device is no longer registered here. Refresh the list.',
+    },
     title: 'Devices',
     intro:
       'The devices somebody has signed in on. If you lose one, remove it here: its session closes right away and it can no longer sign in with a PIN.',
@@ -1066,6 +1072,18 @@ export default {
     loadError: 'The role catalogue could not be loaded.',
   },
   apiKeys: {
+    // hub#1697 — the sentences this panel will read once its door answers a stable code.
+    //
+    // 🔴 NOT reachable yet, and that is not an oversight (rv-1699): `/api/keys*` is `auth:admin`
+    // and its four handlers answer `{"ok":false,"error":"<flat string>"}` with no `code` at all
+    // (`api_keys.rs:47,56,140,160`) — the `rate_limited` / `not_found` codes in that same file
+    // belong to the `auth:api-key` surface a THIRD PARTY calls, not to this panel. Until the door
+    // and `lib/api-keys.ts` carry the code (hub#1700), `localDoorSentence` falls back to the
+    // panel's own line, which is still what hub#1697 asked for: never the engine's words.
+    errors: {
+      not_found: 'That key no longer exists. Refresh the list and try again.',
+      rate_limited: 'Too many attempts in a row. Wait a moment and try again.',
+    },
     // List
     searchKey: 'Search API key…',
     empty: 'No API keys yet. Create one so an external system can read or write Hub data.',
@@ -1191,6 +1209,12 @@ export default {
       'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
     errors: {
+      // hub#1697 — the guards of the local `/api/hub/users` door (`hub_users.rs`). Their own
+      // message is prose written into the runtime; these are the sentences the person reads.
+      last_admin: 'You cannot deactivate the last administrator. Name another owner or administrator first.',
+      self_deactivation: 'You cannot deactivate your own account. Ask another administrator to do it.',
+      self_badge_enrollment: 'Nobody enrols their own badge. Ask another administrator to do it.',
+      not_found: 'That person is no longer on this hub. Refresh the list.',
       local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
       account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
       account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
@@ -1241,6 +1265,29 @@ export default {
     saving: 'Saving…',
   },
   system: {
+    // hub#1697 — when the door gave no code we can turn into a sentence, saying so beats
+    // pasting the line the runtime left for the log.
+    reasonUnknown: 'the reason could not be read',
+    // hub#1697 — stable codes of the dead-letter door (`outbox_admin.rs`). Its own prose mixes
+    // Spanish and English and was written for whoever debugs, not for whoever runs the shop.
+    //
+    // FRAGMENTS, not sentences (rv-1699): every one of these is read INSIDE `retryFailed` /
+    // `discardFailed`, which already announce the failure. A whole sentence here says it twice
+    // («Could not resend: This message cannot be sent again: …»), so they start lowercase and
+    // continue the frame — same register as `reasonUnknown` above. There is a test on it.
+    errors: {
+      not_found: 'that message is no longer in the queue; refresh the list.',
+      invalid_payload: 'that message is missing the data it needs to be sent again.',
+      // Nested, not `'flow.release_revoked'` as a flat key: `vue-i18n` reads a dot in a key as
+      // NESTING, so a flat dotted key is unreachable through `t()`. The runtime's code maps onto
+      // the path exactly.
+      flow: {
+        release_revoked: 'the permission that produced it was withdrawn; grant it again and run the automation.',
+      },
+      module: {
+        capability_denied: 'the app that produced it no longer has permission for it.',
+      },
+    },
     database: 'Database',
     memory: 'Memory',
     connections: 'Connections',

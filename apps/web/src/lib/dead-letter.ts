@@ -115,11 +115,32 @@ export interface DeadEvent {
 }
 
 /** Generic envelope unwrap for the dead-letter endpoints (all return `{ ok, data }` on success). */
+/**
+ * The refusal a door gave, with its code (hub#1697).
+ *
+ * The code is the only part a screen can show: the `message` beside it is written for whoever
+ * debugs («this dead-letter cannot be replayed: the authorisation that produced it was
+ * withdrawn…»), and it mixes languages because it was never meant for a shop owner.
+ */
+export class DeadLetterError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'DeadLetterError';
+    this.code = code;
+  }
+}
+
 async function unwrap<T>(res: Response): Promise<T> {
-  const body = (await res.json()) as { ok?: boolean; data?: T; error?: { message?: string } };
+  const body = (await res.json()) as {
+    ok?: boolean;
+    data?: T;
+    error?: { message?: string; code?: string };
+  };
   if (!res.ok || !body.ok) {
     const msg = body?.error?.message ?? `error ${res.status}`;
-    throw new Error(msg);
+    throw new DeadLetterError(msg, body?.error?.code);
   }
   return body.data as T;
 }

@@ -26,34 +26,33 @@ const SRC = fileURLToPath(new URL('.', import.meta.url));
  * entry), and a new screen is never on it. Tracked in hub#1697.
  */
 const SHOWS_THE_ENGINE_TEXT_ON_PURPOSE: Record<string, string> = {
+  // hub#1697 closed the three whose prose had no business value: their door writes an English line
+  // for the log next to a stable code, so the code got a sentence and the line stayed in the log
+  // (`DevicesCard`, `ApiKeysPanel`, `SystemPage`).
+  //
+  // The five below are NOT the same case, and this is the distinction the ticket turned on. Their
+  // last rung is rule 2 of hub#1102, which is a decision, not an oversight: a refusal this shell
+  // cannot translate keeps the sentence that CAME, because it says more than any generic line of
+  // ours. All five now translate a stable code FIRST (hub#1697) and only fall through when there
+  // is no sentence to translate — so what is left on screen is always the most specific thing
+  // available, never a code.
   'views/EmployeeFormPage.vue':
-    'Deliberate LAST resort behind a full ladder (hub#1102/#1190/#1258): business code → rejected ' +
-    'field → platform code → the sentence that came. Only reached when none of the three matched.',
-  'views/ApiKeysPanel.vue':
-    'Local runtime doors (/api/keys): they never proxy erplora.com, so no cloud code can reach ' +
-    'this toast. Still engine prose in front of a person — hub#1697.',
-  'views/SystemPage.vue':
-    'Dead-letter retry/discard are local runtime doors: no cloud proxy, no cloud code. The reason ' +
-    'is interpolated into a translated sentence — hub#1697.',
-  'components/ModuleSettingsForm.vue':
-    'The refusal arrives in the ErploraError envelope of /api/command, whose codes have been ' +
-    'redacted since hub#1074; what is shown is the module refusal, not a transport code.',
-  // The four below share one `reasonOf(error, fallback)` helper shape and were invisible while this
-  // sweep only read `catch` bodies (rv-1698). Same class as the four above and same ticket: local
-  // runtime doors, verified to emit no cloud code at all (`devices.rs`, `device_mode.rs` and
-  // `hub_users.rs` never call `cloud_unreachable`), so no hub#1693 leak can reach them.
-  'components/DeviceModeCard.vue':
-    'Local door /api/device/mode. Shows a DeviceModeError sentence only when it carries a code — ' +
-    'engine prose in front of a person, but never a cloud code — hub#1697.',
-  'components/DevicesCard.vue':
-    'Local door /api/devices. Shows the DevicesError sentence, falling back to its own line when ' +
-    'there is none — hub#1697.',
+    'Deliberate LAST resort behind a full ladder (hub#1102/#1190/#1258/#1697): stable code → ' +
+    'rejected field → platform code → the sentence that came. Only reached when none matched.',
   'views/EmployeesPage.vue':
-    'Last resort behind the same ladder as EmployeeFormPage (translated code → platform code → ' +
-    'the sentence that came). Local doors only — hub#1697.',
+    'Same ladder as EmployeeFormPage, same last rung (hub#1102 rule 2). Local doors only.',
   'views/RolesPanel.vue':
-    'Local door /api/hub/roles/<key>. Tries invalid-field and platform translations first and only ' +
-    'then shows the RoleActivationError sentence — hub#1697.',
+    'Local door /api/hub/roles/<key>. Two `invalid_field` refusals share ONE code and ask ' +
+    'different things of the administrator (see RolesPanel.test.ts), so translating by code would ' +
+    'collapse them into one sentence and lose the difference — hub#1102 rule 2.',
+  'components/DeviceModeCard.vue':
+    'Local door /api/device/mode. Untouched by hub#1697 on purpose: `device_mode.rs` emits no ' +
+    'code this shell has a sentence for, so a translation rung here would be dead config. ' +
+    '«this hub does not know the device `laptop-9`: sign in online on it once» tells the person ' +
+    'exactly what to do, and no generic line of ours replaces it — hub#1102 rule 2.',
+  'components/ModuleSettingsForm.vue':
+    'The sentence shown is the MODULE\'s own refusal, not the engine\'s: transport codes are ' +
+    'translated first (hub#1697) and the codes were redacted back in hub#1074.',
 };
 
 /** The idiom itself, wherever it lives — `BlueprintHeroCard` kept it in a helper, not in the catch. */
@@ -171,6 +170,30 @@ describe('no screen shows the runtime its own error text (hub#1693)', () => {
       'err instanceof Error ? err.message : String(err)',
     ]);
     expect(rawErrorTextReasons('try { a(); } catch (e) { msg.value = t("x"); }')).toEqual([]);
+  });
+
+  it('caza una PANTALLA NUEVA que pinte la clave sin traducir (hub#1697)', () => {
+    // El caso que el revisor de hub#1698 hizo aparecer: el idiom de la casa vive FUERA del `catch`
+    // que lo llama, en un `reasonOf(error: unknown, fallback: string)`. Una pantalla nueva que lo
+    // copie tiene que nacer nombrada, sin que nadie toque esta guardia.
+    const screenBornNextMonth = `
+      <script setup lang="ts">
+      function reasonOf(error: unknown, fallback: string): string {
+        return error instanceof Error && error.message ? error.message : fallback;
+      }
+      async function save(): Promise<void> {
+        try { await client.command('x', {}); } catch (e) { rejection.value = reasonOf(e, 'nope'); }
+      }
+      </script>`;
+    expect(rawErrorTextReasons(screenBornNextMonth)).toContain('error.message');
+
+    // Y la MISMA pantalla, arreglada con el traductor de hub#1697, sale limpia: sin esta mitad la
+    // guardia podría estar diciendo que sí a todo.
+    const fixed = screenBornNextMonth.replace(
+      'error instanceof Error && error.message ? error.message : fallback',
+      "localDoorSentence(error, { t, te }, ['runtimeErrors'], fallback)",
+    );
+    expect(rawErrorTextReasons(fixed)).toEqual([]);
   });
 
   it('sees the paint wherever the error is BOUND, not only inside a catch (rv-1698)', () => {

@@ -215,6 +215,7 @@ import {
   type HubRole,
   type HubUser,
 } from '../lib/hub-users';
+import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { invalidFieldMessage } from '../lib/invalid-field';
 import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
@@ -492,6 +493,12 @@ function rejectionMessage(error: unknown, fallback = t('employees.saveError')): 
   if (translated) return translated;
   const platform = platformFailureMessage(error, locale.value);
   if (platform) return platform;
+  // hub#1697 — one rung more before the last: the guards of `/api/hub/users` (`last_admin`,
+  // `self_deactivation`, `self_badge_enrollment`, `not_found`) answer a stable code that
+  // `hubUserErrorKey` does not cover, and their own message is prose written into the runtime.
+  // Below stays rule 2 of hub#1102: what we cannot translate keeps the sentence that came.
+  const byCode = runtimeErrorKey(error, { t, te }, ['employeeForm.errors', 'runtimeErrors']);
+  if (byCode) return t(byCode);
   return error instanceof Error ? error.message : fallback;
 }
 

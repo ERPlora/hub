@@ -255,3 +255,40 @@ describe('renameDevice', () => {
     expect(named).toBe('');
   });
 });
+
+// ── hub#1697 · el código de la puerta no se tira ─────────────────────────────────────────────
+//
+// `/api/devices` contesta `{"ok":false,"error":"<prosa inglesa para el log>","code":"<código>"}`.
+// El cliente leía sólo `error` y descartaba `code`, así que la tarjeta se quedaba con la única
+// cosa que NO se puede enseñar: la frase que escribió quien programó el runtime.
+describe('DevicesError lleva el código estable de la puerta (hub#1697)', () => {
+  async function refuse(body: unknown, status = 422): Promise<unknown> {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+      ),
+    );
+    return listDevices().then(
+      () => null,
+      (e: unknown) => e,
+    );
+  }
+
+  it('conserva el `code` junto al mensaje', async () => {
+    const error = (await refuse({
+      ok: false,
+      error: 'the device name is at most 40 characters',
+      code: 'device_name_too_long',
+    })) as { code?: string; message: string };
+
+    expect(error.code).toBe('device_name_too_long');
+    expect(error.message).toBe('the device name is at most 40 characters');
+  });
+
+  it('sin `code` en el cuerpo no se inventa ninguno', async () => {
+    const error = (await refuse({ ok: false, error: 'nope' })) as { code?: string };
+
+    expect(error.code).toBeUndefined();
+  });
+});
