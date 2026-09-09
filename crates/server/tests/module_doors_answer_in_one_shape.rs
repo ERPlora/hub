@@ -35,7 +35,7 @@
 //! The walk is therefore the union of two DERIVED sets, neither of them a list kept by hand:
 //!
 //! 1. every route in the module gate's class (`auth:admin+capability`), and
-//! 2. every route the SDK **names** (`packages/module-sdk/src/index.ts`, read below).
+//! 2. every route the SDK **names**, read from its sources (`packages/module-sdk/src`, below).
 //!
 //! A door that answers plain now has to be invisible to BOTH to escape: outside the capability
 //! class *and* absent from the SDK — which is to say, not reachable by a module at all.
@@ -61,8 +61,13 @@ mod kernel_snapshot;
 /// One of the two sources of the walk, not the whole of it — see the module docs.
 const MODULE_GATE_CLASS: &str = "auth:admin+capability";
 
-/// The one file module code can reach the runtime through. Its paths ARE the module surface.
-const SDK_SOURCE: &str = "../../packages/module-sdk/src/index.ts";
+/// The sources module code can reach the runtime through. Their paths ARE the module surface.
+///
+/// A DIRECTORY and not `index.ts`, even though `index.ts` is the only one that names a route
+/// today: a scope pinned to one filename goes quiet the day a method moves out of it, and it goes
+/// quiet the same way the permission class did — silently, with the walk still green and narrower.
+/// The floors below are what say the reading happened at all.
+const SDK_SOURCE_DIR: &str = "../../packages/module-sdk/src";
 
 /// Doors the SDK names but never reads with `unwrap(env)`, so the envelope does not apply.
 ///
@@ -249,6 +254,47 @@ fn sdk_path_shape(raw: &str, bases: &BTreeMap<String, String>) -> Option<String>
     path.starts_with("/api/").then_some(path)
 }
 
+/// Every non-test TypeScript source of `@erplora/module-sdk`, concatenated.
+///
+/// `*.test.ts` is left out on purpose: a test names paths that do not exist, and a door in this
+/// walk that no module can call is the first thing that buys an allowlist — after which the
+/// allowlist is where the next real door gets parked.
+fn sdk_source() -> String {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(SDK_SOURCE_DIR);
+    let entries = std::fs::read_dir(&dir).unwrap_or_else(|e| {
+        panic!(
+            "{} is the module surface this guard derives its scope from ({e})",
+            dir.display()
+        )
+    });
+    let mut files: Vec<PathBuf> = entries
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|file| {
+            let name = file
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
+            name.ends_with(".ts") && !name.ends_with(".test.ts")
+        })
+        .collect();
+    files.sort();
+    assert!(
+        files.iter().any(|file| file.ends_with("index.ts")),
+        "`index.ts` is not among the {} source/s read from {} — the surface this guard derives its \
+         scope from is not being read, and the walk is about to narrow with nothing turning red",
+        files.len(),
+        dir.display()
+    );
+    files
+        .iter()
+        .map(|file| {
+            std::fs::read_to_string(file)
+                .unwrap_or_else(|e| panic!("{} is part of the module surface ({e})", file.display()))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Every `/api/…` path shape `@erplora/module-sdk` can build, read from its source.
 ///
 /// Two forms, and both are how the surface is actually written: a quoted literal
@@ -257,13 +303,7 @@ fn sdk_path_shape(raw: &str, bases: &BTreeMap<String, String>) -> Option<String>
 /// than a list kept here is the whole point: a method added to the SDK tomorrow widens this walk
 /// the same day, with nobody remembering to come back.
 fn sdk_named_shapes() -> BTreeSet<String> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(SDK_SOURCE);
-    let source = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        panic!(
-            "{} is the module surface this guard derives its scope from ({e})",
-            path.display()
-        )
-    });
+    let source = sdk_source();
     let literals = string_literals(&source);
 
     // `export const FLOWS_BASE_PATH = '/api/hub/flows';` — the constants the templates start from.
