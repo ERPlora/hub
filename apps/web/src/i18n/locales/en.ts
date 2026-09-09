@@ -104,6 +104,10 @@ export default {
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
   // one noun for two things is how a cashier ends up uninstalling the till.
+  installQr: {
+    title: 'Open on your phone',
+    hint: 'Scan the code. To keep it there, add it to your home screen from your browser menu.',
+  },
   appUpdate: {
     available: 'Update ERPlora ({version})',
     confirmTitle: 'Update ERPlora',

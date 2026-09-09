@@ -102,9 +102,10 @@
           </ion-content>
 
           <!-- Footer: brand (logo + wordmark, click → home) + the app version. The user moved to the
-               header of the menu. There is NOTHING about installing here: the hub is a PWA, and
-               whoever wants it installed installs it from their own browser — the shell does not ask
-               for it (hub#685). -->
+               header of the menu. The shell still does not ASK anyone to install it (hub#685): what
+               it now does is OFFER THE WAY IN, passively — a QR that carries this hub to a phone,
+               sitting there for whoever goes looking. Nothing here interrupts, and nothing captures
+               the browser's own install offer (hub#1715). -->
           <ion-footer class="ion-no-border sidebar-foot">
             <!-- The app on this counter is older than the one we publish (hub#400). In the FOOTER on
                  purpose: it is the one part of the sidebar that never scrolls away, and the issue
@@ -114,6 +115,13 @@
             <ion-menu-toggle :auto-hide="false">
               <SidebarAppUpdate />
             </ion-menu-toggle>
+
+            <!-- The way this hub reaches a phone. UNCONDITIONAL on purpose (hub#1715): no role, no
+                 permission, no plan, no module and nothing to close — «tiene que aparecer siempre».
+                 NOT inside an `ion-menu-toggle`: the code is read by a camera, not pressed, and
+                 closing the menu the instant somebody leans in to scan it is the one thing it must
+                 not do. -->
+            <SidebarInstallQr />
 
             <!-- «Actualizar plan» — la gestión del plan de este hub, que vive en el SaaS.
                  SIN gate de permiso, a propósito (decisión de Ioan 2026-08-09): la salida a gestión
@@ -196,6 +204,7 @@ import AssistantDrawer from './components/AssistantDrawer.vue';
 import ElevationDialog from './components/ElevationDialog.vue';
 import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
+import SidebarInstallQr from './components/SidebarInstallQr.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';

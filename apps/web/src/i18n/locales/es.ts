@@ -101,6 +101,10 @@ export default {
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
   // para dos cosas es como un cajero acaba desinstalando el TPV.
+  installQr: {
+    title: 'Ábrelo en el móvil',
+    hint: 'Escanea el código. Para dejarlo fijo, añádelo a la pantalla de inicio desde el menú del navegador.',
+  },
   appUpdate: {
     available: 'Actualizar ERPlora ({version})',
     confirmTitle: 'Actualizar ERPlora',

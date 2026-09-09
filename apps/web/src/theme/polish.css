@@ -340,6 +340,32 @@ ion-split-pane.rail .nav-item::part(native) { justify-content: center; }
 ion-split-pane.rail .nav-icon { margin-inline-end: 0; }
 ion-split-pane.rail .sidebar-user { justify-content: center; }
 
+/* hub#1715 — «Open on your phone». Sits in the sidebar footer, always, for everyone.
+   NO `max-width` anywhere (hub#1605): the code is sized by its own `size` attribute, and the block
+   just centres what the panel gives it. */
+.sidebar-install-qr { padding: 0.5rem 0.75rem 0.25rem; text-align: center; }
+.sidebar-install-qr-code { display: block; margin-inline: auto; }
+.sidebar-install-qr-title {
+  margin: 0.4rem 0 0.1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ion-color-step-750, #444);
+}
+.sidebar-install-qr-hint {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  color: var(--ion-color-step-550, #737373);
+}
+
+/* The rail is ~72px and a readable code needs ~132px, so the two swap. Done in CSS and not with a
+   `v-if` on purpose: the guard in `SidebarInstallQr.test.ts` forbids conditions on this block, and
+   the rail is a desktop panel the user collapsed themselves — not a gate on who gets the code. */
+.sidebar-install-qr-rail { display: none; }
+ion-split-pane.rail .sidebar-install-qr-full { display: none; }
+ion-split-pane.rail .sidebar-install-qr { padding-inline: 0; }
+ion-split-pane.rail .sidebar-install-qr-rail { display: inline-flex; }
+
 /* ── Área de contenido = superficie tipo tarjeta (unificación del shell) ───────────────────── */
 /* Cada página del shell monta su contenido en el ion-content del outlet principal
    (AppPage → ion-page > AppTopbar + ion-content + tabbar; el outlet es #main y Ionic le añade
