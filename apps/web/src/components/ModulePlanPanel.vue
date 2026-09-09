@@ -98,6 +98,38 @@
       </ion-button>
     </ok-inline-feedback>
 
+    <!-- Lo que este hub lleva GASTADO de lo que incluye su plan (whatsapp_inbox#131). Va ANTES de
+         las tarjetas a propósito: las tarjetas dicen lo que un plan INCLUYE y esta línea dice
+         cuánto queda, que es el dato por el que se entra en esta pantalla cuando el módulo empieza
+         a fallar. Solo aparece si el manifest declara `billing.usage`; el resto de módulos ven
+         exactamente lo de siempre.
+         Sin `ion-card`: su padding vive en `:host` y el preflight de Tailwind lo aplasta (hub#1605).
+         `data-tone` es el mismo vocabulario que la píldora — lo lee el guardia de regresión, que si
+         no tendría que juzgar un color. -->
+    <div v-if="usage" class="usage" data-testid="module-usage" :data-tone="usageToneName">
+      <div class="usage__head">
+        <span class="usage__title">{{ t('modulePlan.usageTitle') }}</span>
+        <!-- Texto SLOTEADO, no `label`: una propiedad de un WC no registrado no está en la pantalla
+             que lee una persona (ni la que lee un test). -->
+        <ok-status-pill :tone="usageToneName" size="sm">{{ usageLabel }}</ok-status-pill>
+      </div>
+      <ion-progress-bar
+        v-if="usageBar !== null"
+        data-testid="module-usage-bar"
+        :value="usageBar"
+        :color="usageColor"
+      ></ion-progress-bar>
+      <p v-if="usageNotice" class="status-line">{{ usageNotice }}</p>
+    </div>
+    <!-- Un fallo del runtime SE DICE. Lo que no se dice es una NEGATIVA de permiso: `usage.get` la
+         gatea el permiso del propio módulo, así que a quien no lo tiene no le falta el contador —
+         no es suyo. Anunciarle un error ahí sería inventarle una avería. -->
+    <p
+      v-else-if="usageFailed"
+      class="status-line opacity-70"
+      data-testid="module-usage-error"
+    >{{ t('modulePlan.usageUnavailable') }}</p>
+
     <!-- Tiers del manifest: rejilla de Ionic, tarjeta de OutfitKit. Aquí vivía el botón
          «Comprar»/«Mejorar» que abría el checkout del SaaS; los tiers se siguen VIENDO —qué incluye
          cada uno y qué cuesta es información, no un camino al pago—, pero desde el hub no se
@@ -144,13 +176,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IonButton, IonCol, IonGrid, IonRow, IonSpinner, IonToast } from '@ionic/vue';
+import { IonButton, IonCol, IonGrid, IonProgressBar, IonRow, IonSpinner, IonToast } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import {
   cloudModuleSubscription,
   type CloudModuleSubscription, type ModuleSubscriptionStatus,
 } from '../lib/cloud';
-import type { ModuleBilling, BillingTierDef } from '@erplora/module-types';
+import type { ModuleBilling, BillingTierDef, ModuleUsageDef } from '@erplora/module-types';
 import { formatAmount } from '../lib/money';
 import { formatDate } from '../lib/format-datetime';
 import { getDeviceContext } from '../lib/device';
@@ -160,7 +192,18 @@ import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
 import { loadModuleLocale } from '../lib/module-loader';
 import { modulePlanPath, modulePlanUrl } from '../lib/module-plan-link';
 import { moduleBase } from '../lib/module-url';
-import { quotaLabel as tierQuotaLabel, type ModuleBillingLocale } from '../lib/module-quota';
+import {
+  quotaLabel as tierQuotaLabel,
+  quotaMetricLabel,
+  type ModuleBillingLocale,
+} from '../lib/module-quota';
+import { getClient } from '../lib/runtime';
+import {
+  readModuleUsage,
+  usageFraction,
+  usageTone,
+  type ModuleUsage,
+} from '../lib/module-usage';
 
 const props = defineProps<{
   /** Slug del módulo (el Hub usa el module_id como slug; el Cloud resuelve por pk|slug|module_id). */
@@ -345,6 +388,97 @@ async function loadStatus(): Promise<void> {
   }
 }
 
+// ── Lo consumido de la cuota (whatsapp_inbox#131) ──────────────────────────────────────────────
+//
+// El manifest DECLARA la query, igual que `settings.get`, `protects[].settings_query` o
+// `widgets.*.query`: el shell no puede adivinar que `inbound_this_month` es un consumo y
+// `conversations_per_month` su cuota — esas palabras son del autor del módulo. La lectura pura y
+// el porqué de cada regla están en `lib/module-usage.ts`.
+
+/** El bloque `billing.usage` del manifest, si el módulo lo trae. */
+const usageDef = computed<ModuleUsageDef | null>(() => props.billing.usage ?? null);
+
+const usage = ref<ModuleUsage | null>(null);
+/** El runtime falló de verdad (no una negativa de permiso), así que el contador no se puede leer. */
+const usageFailed = ref(false);
+
+/** Códigos con los que el runtime dice «esto no es tuyo» (`crates/runtime/src/error_registry.rs`). */
+const REFUSAL_CODES = new Set(['permission_denied', 'requires_elevation']);
+
+function isRefusal(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && REFUSAL_CODES.has(code);
+}
+
+async function loadUsage(): Promise<void> {
+  const def = usageDef.value;
+  // Un bloque a medias (sin query, sin columna o sin métrica que nombrar) no se llama: pintaríamos
+  // un número sin unidad, que dice menos que no pintar nada.
+  if (!def?.query || !def.used || !def.metric) {
+    usage.value = null;
+    usageFailed.value = false;
+    return;
+  }
+  try {
+    usage.value = readModuleUsage(await getClient().query(def.query), def);
+    usageFailed.value = false;
+  } catch (err) {
+    usage.value = null;
+    usageFailed.value = !isRefusal(err);
+  }
+}
+
+/**
+ * El techo contra el que se lee el consumo.
+ *
+ * Si el módulo nombró una columna de límite, manda su respuesta — incluido su «sin tope» (0), que
+ * es una respuesta y no un hueco: sustituirla por la cuota del tier convertiría un «ilimitado» en
+ * un tope inventado. Si NO nombró ninguna, lo único que sabe alguien es lo que promete el plan.
+ */
+const usageLimit = computed<number | null>(() => {
+  if (!usage.value) return null;
+  if (usage.value.limit !== null) return usage.value.limit;
+  if (usageDef.value?.limit) return null;
+  const metric = usageDef.value?.metric;
+  const quota = currentTier.value?.quota as Record<string, unknown> | number | string | undefined;
+  if (!metric || !quota || typeof quota !== 'object') return null;
+  const declared = Number(quota[metric]);
+  return Number.isFinite(declared) && declared > 0 ? declared : null;
+});
+
+/** Cuánto se ha llenado la barra; `null` cuando no hay techo que llenar. */
+const usageBar = computed<number | null>(() =>
+  usage.value ? usageFraction({ used: usage.value.used, limit: usageLimit.value }) : null,
+);
+const usageToneName = computed(() => usageTone(usageBar.value));
+/** Los colores de Ionic para la barra, misma escala que `PlanLimitsPanel`. */
+const USAGE_COLOR: Record<string, string> = {
+  success: 'success',
+  warning: 'warning',
+  danger: 'danger',
+  neutral: 'medium',
+};
+const usageColor = computed(() => USAGE_COLOR[usageToneName.value] ?? 'medium');
+
+/** «24 de 30 conversaciones al mes» — la métrica la nombra el módulo, nunca esta pantalla. */
+const usageLabel = computed(() => {
+  if (!usage.value) return '';
+  const metric = quotaMetricLabel(billingLocale.value, usageDef.value?.metric ?? '');
+  const used = usage.value.used;
+  return usageLimit.value === null
+    ? t('modulePlan.usageNoLimit', { used, metric })
+    : t('modulePlan.usageOfLimit', { used, limit: usageLimit.value, metric });
+});
+
+/** El aviso, solo cuando hay algo que avisar: cerca del tope, o ya sin nada. */
+const usageNotice = computed(() => {
+  const fraction = usageBar.value;
+  if (fraction === null) return '';
+  if (fraction >= 1) return t('modulePlan.usageOverLimit');
+  if (fraction >= 0.8) return t('modulePlan.usageNearLimit');
+  return '';
+});
+
 // Aquí vivía `deepLink` —la página del módulo en el SaaS, con el checkout de Stripe— y los dos
 // controles que la abrían, `onPurchase()` y `onCancel()`. Los tres se fueron con hub#479: una
 // dirección construida aquí para llevar al pago es steering la construya quien la construya, y esa
@@ -386,7 +520,11 @@ async function onCheckPurchase(): Promise<void> {
 // Recheck-on-focus: la compra ocurre en OTRA pestaña/navegador. Al recuperar el foco o la
 // visibilidad, re-consultamos la suscripción para reflejar el nuevo estado sin recargar.
 function onFocusRecheck(): void {
-  if (document.visibilityState === 'visible') void loadStatus();
+  if (document.visibilityState !== 'visible') return;
+  void loadStatus();
+  // El consumo se mueve mientras la pestaña está abierta (cada mensaje que entra lo sube), así que
+  // vuelve por el mismo sitio que el estado de la suscripción.
+  void loadUsage();
 }
 
 watch(locale, () => void refreshLocale());
@@ -394,6 +532,7 @@ watch(locale, () => void refreshLocale());
 onMounted(async () => {
   void loadStatus();
   void refreshLocale();
+  void loadUsage();
   const context = await getDeviceContext();
   canOfferPlanManagement.value = planUpgradeIsOfferable(context?.distribution);
   window.addEventListener('focus', onFocusRecheck);
@@ -427,5 +566,21 @@ onUnmounted(() => {
    whoever stacks the cards — the card does not know it is being tiled into a grid. */
 .tier-col {
   padding-top: 0.8rem;
+}
+/* El contador del mes. Sin tarjeta y sin tope de ancho: fluido como el resto del shell
+   (hub#1605), y el gutter de la página es el único margen. */
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.usage__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.usage__title {
+  font-weight: 600;
 }
 </style>
