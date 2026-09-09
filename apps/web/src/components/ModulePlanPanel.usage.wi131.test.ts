@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-// The «Plan» tab has to say how much of the plan is already SPENT — ERPlora/whatsapp_inbox#131.
+// Regression test for ERPlora/hub#1706 — the «Plan» tab has to say how much of the plan is already
+// SPENT, not only what it includes. The module half, declaring the block, is ERPlora/whatsapp_inbox#131.
 //
 // The panel painted the four tiers and what each one includes, and nowhere what this hub had used.
 // On a metered channel that is the number that matters: a salon on 30 conversations a month found
@@ -84,7 +85,7 @@ beforeEach(() => {
   query.mockResolvedValue([{ inbound_this_month: 24, monthly_limit: 30 }]);
 });
 
-describe('ModulePlanPanel — what you have already spent (whatsapp_inbox#131)', () => {
+describe('ModulePlanPanel — what you have already spent (hub#1706, whatsapp_inbox#131)', () => {
   it('calls the query the manifest declares, and nothing else', async () => {
     await mountPanel('es');
     expect(query).toHaveBeenCalledWith('whatsapp_inbox.usage.get');
