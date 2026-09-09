@@ -99,9 +99,43 @@ fn domain_code(err: &RuntimeError) -> String {
 async fn a_checkpoint_of_an_installed_module_is_offered_to_the_owner_hub1701() {
     let rt = fresh_runtime().await;
     let checkpoints = rt.policy_checkpoints();
-    assert_eq!(checkpoints.len(), 1, "{checkpoints:?}");
+    // Los DOS que el paquete declara y el instalador aceptó, en orden estable. `tip_limit` tiene
+    // que estar aquí: media batería de abajo escribe normas sobre él, y una norma sobre un punto de
+    // control que no se ofrece se rechaza con `ERR_CHECKPOINT_NOT_FOUND`.
+    assert_eq!(checkpoints.len(), 2, "{checkpoints:?}");
     assert_eq!(checkpoints[0].id, "p1701/discount_limit");
     assert_eq!(checkpoints[0].command, "p1701.order.set_discount");
+    assert_eq!(checkpoints[1].id, "p1701/tip_limit");
+    assert_eq!(checkpoints[1].command, "p1701.order.set_tip");
+}
+
+#[tokio::test]
+async fn the_rule_applies_to_the_CASHIER_who_does_have_the_permission_hub1701() {
+    // La otra mitad de «solo restringe», y el caso real por el que existe la función: quien pasa por
+    // aquí no es alguien sin permiso, es la persona del mostrador que SÍ puede aplicar descuentos y
+    // a quien el dueño le pone un tope. Sin este control positivo, «la política nunca abre una
+    // puerta» se cumpliría igual con un gate que no aplica NUNCA.
+    let rt = fresh_runtime().await;
+    rt.create_policy(&over_20("enforce"), "u1").await.unwrap();
+
+    rt.execute_command(
+        "p1701.order.set_discount",
+        &params(json!({ "order_id": "o1", "discount_percent": 10 })),
+        &cashier_ctx(),
+    )
+    .await
+    .expect("un 10 % entra en lo que el dueño dejó");
+
+    let err = rt
+        .execute_command(
+            "p1701.order.set_discount",
+            &params(json!({ "order_id": "o2", "discount_percent": 35 })),
+            &cashier_ctx(),
+        )
+        .await
+        .expect_err("y un 35 % no, aunque tenga el permiso");
+    assert_eq!(domain_code(&err), policies::ERR_BLOCKED);
+    assert_eq!(order_rows(&rt).await, 1, "solo entró la venta que la norma dejó");
 }
 
 #[tokio::test]

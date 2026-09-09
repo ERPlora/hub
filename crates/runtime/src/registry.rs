@@ -347,6 +347,35 @@ pub struct Registry {
     /// `flows/` del paquete al instalar/re-hidratar, igual que `locales`. Vacío = el módulo no
     /// trae ninguna, que es el caso de 26 de los 27 módulos de hoy.
     pub flow_templates: HashMap<String, FlowTemplateScan>,
+    /// **Dónde puede el dueño poner una norma**: `module_id → puntos de control` (hub#1701,
+    /// ADR-0476). Se cargan de `policies/` del paquete al instalar/re-hidratar, igual que
+    /// `locales` y `flow_templates`, y por el mismo motivo — así los módulos ya instalados
+    /// publican sus puntos de control en el primer arranque tras esta release, sin reinstalar.
+    pub policy_checkpoints: HashMap<String, crate::policies::CheckpointScan>,
+    /// `command → punto de control`, derivado de [`Self::policy_checkpoints`] (hub#1701).
+    ///
+    /// Existe para que el gate de `commands::execute_at` resuelva en **O(1)**: corre en CADA
+    /// comando, y recorrer los módulos instalados buscando quién gatea este nombre sería trabajo por
+    /// venta (la guarda de coste acotado). Lo reconstruye [`Self::rebuild_policy_command_index`],
+    /// que es el ÚNICO sitio que lo escribe y al que llaman los dos únicos mutadores del mapa de
+    /// arriba — así no puede quedarse desfasado respecto a él.
+    ///
+    /// No filtra por `is_active`: eso se mira al leer, porque el estado de un módulo cambia sin
+    /// pasar por aquí.
+    policy_checkpoint_by_command: HashMap<String, crate::policies::PolicyCheckpoint>,
+    /// **Las normas en vigor**, indexadas por command (hub#1701).
+    ///
+    /// Vive aquí, y no en un parámetro de la firma, por el mismo motivo que [`Self::demo_hub`]: el
+    /// `&Registry` es la única autoridad que llega a `commands::execute_at` por **todos** los
+    /// caminos (HTTP, API pública, asistente, relay del outbox, scheduler) y que ningún llamador
+    /// puede fabricar. Un parámetro más sería una etiqueta que la próxima puerta nueva podría
+    /// olvidarse de poner, y olvidarla aquí es dejar el gate abierto.
+    ///
+    /// Es un índice en MEMORIA con mutabilidad interior: lo reconstruyen el arranque y **cada
+    /// escritura** del CRUD ([`crate::Runtime::reload_policies`]), y el gate solo lee. Que no haya
+    /// que pedir `&mut Registry` para refrescarlo es lo que permite que una norma recién guardada
+    /// esté en vigor en la siguiente venta sin reiniciar.
+    pub policies: crate::policies::PolicyIndex,
     /// Observador opcional de eventos (lo pone el server para el WS).
     pub event_sink: Option<std::sync::Arc<dyn EventSink>>,
     /// Plugins **nativos first-party** (ADR-0009): `module_id` → motor horneado en el
@@ -541,6 +570,69 @@ impl Registry {
         } else {
             self.flow_templates.insert(module_id.to_string(), scan);
         }
+    }
+
+    /// Registra los puntos de control que un módulo declara (hub#1701). Vacío = se olvidan los
+    /// previos, igual que las plantillas de arriba: un checkpoint que una versión nueva del módulo
+    /// ya no declara deja de ofrecerse, en vez de quedarse ahí nombrando un command que quizá ya no
+    /// existe.
+    pub fn set_policy_checkpoints(&mut self, module_id: &str, scan: crate::policies::CheckpointScan) {
+        if scan.is_empty() {
+            self.policy_checkpoints.remove(module_id);
+        } else {
+            self.policy_checkpoints.insert(module_id.to_string(), scan);
+        }
+        self.rebuild_policy_command_index();
+    }
+
+    /// Rehace `command → checkpoint` desde cero. Barato (unas decenas de entradas) y llamado solo
+    /// al instalar/quitar un módulo, nunca en el camino de un comando.
+    fn rebuild_policy_command_index(&mut self) {
+        self.policy_checkpoint_by_command = self
+            .policy_checkpoints
+            .values()
+            .flat_map(|scan| scan.checkpoints.iter())
+            .map(|cp| (cp.command.clone(), cp.clone()))
+            .collect();
+    }
+
+    /// El punto de control que gatea `command`, si lo declara un módulo instalado y **activo**
+    /// (hub#1701). Es lo que lee el gate, y por eso es una búsqueda en un mapa y no un recorrido.
+    ///
+    /// El filtro por `is_active` es el mismo criterio que `navigation`: un módulo pausado no ofrece
+    /// pantallas y tampoco gatea. Sus normas siguen guardadas y vuelven a aplicar al reactivarlo.
+    pub fn policy_checkpoint_for_command(
+        &self,
+        command: &str,
+    ) -> Option<&crate::policies::PolicyCheckpoint> {
+        self.policy_checkpoint_by_command
+            .get(command)
+            .filter(|cp| self.is_active(&cp.module_id))
+    }
+
+    /// El punto de control con ese `<módulo>/<nombre>`, si lo ofrece un módulo activo (hub#1701).
+    /// Lo usa la puerta de ESCRITURA, no el gate.
+    pub fn policy_checkpoint_for_id(&self, id: &str) -> Option<&crate::policies::PolicyCheckpoint> {
+        self.policy_checkpoint_by_command
+            .values()
+            .find(|cp| cp.id == id && self.is_active(&cp.module_id))
+    }
+
+    /// Los puntos de control de **todos** los módulos instalados y activos (hub#1701).
+    ///
+    /// Filtra por `is_active` con el mismo criterio que [`Self::flow_templates`]: un módulo pausado
+    /// no ofrece pantallas y tampoco debe ofrecer sitios donde poner una norma sobre un command que
+    /// ahora mismo no se puede ejecutar. Orden estable (módulo, luego id) para que la pantalla del
+    /// dueño no baile entre dos peticiones.
+    pub fn policy_checkpoints(&self) -> Vec<&crate::policies::PolicyCheckpoint> {
+        let mut out: Vec<&crate::policies::PolicyCheckpoint> = self
+            .policy_checkpoints
+            .iter()
+            .filter(|(module_id, _)| self.is_active(module_id))
+            .flat_map(|(_, scan)| scan.checkpoints.iter())
+            .collect();
+        out.sort_by(|a, b| (&a.module_id, &a.id).cmp(&(&b.module_id, &b.id)));
+        out
     }
 
     /// Las plantillas de **todos** los módulos instalados y activos, con su módulo de origen
@@ -927,6 +1019,12 @@ impl Registry {
         // hub#1611: sus automatizaciones de fábrica se van con él — una plantilla que sobreviviera
         // a su módulo se ofrecería para siempre, nombrando commands que este hub ya no tiene.
         self.flow_templates.remove(module_id);
+        // hub#1701: sus puntos de control se van con él, por lo mismo. Las NORMAS del dueño no: son
+        // suyas y no del módulo, así que sobreviven a una actualización (que es un remove + install)
+        // y vuelven a estar en vigor con el `reload_policies` de después. Lo que hace que una norma
+        // huérfana no gatee nada es que el índice se reconstruye uniendo filas CON checkpoints.
+        self.policy_checkpoints.remove(module_id);
+        self.rebuild_policy_command_index();
         self.queries.retain(|_, q| q.module_id != module_id);
         self.commands.retain(|_, c| c.module_id != module_id);
         self.navigation.retain(|n| n.module_id != module_id);
@@ -979,6 +1077,11 @@ impl Registry {
                 .get(module_id)
                 .cloned()
                 .unwrap_or_default(),
+            policy_checkpoints: self
+                .policy_checkpoints
+                .get(module_id)
+                .cloned()
+                .unwrap_or_default(),
             seed_natural_keys: self
                 .seed_natural_keys
                 .get(module_id)
@@ -1028,6 +1131,7 @@ impl Registry {
         self.navigation.extend(snapshot.navigation);
         self.set_locales(&module_id, snapshot.locales);
         self.set_flow_templates(&module_id, snapshot.flow_templates);
+        self.set_policy_checkpoints(&module_id, snapshot.policy_checkpoints);
         if !snapshot.seed_natural_keys.is_empty() {
             self.seed_natural_keys
                 .insert(module_id.clone(), snapshot.seed_natural_keys);
@@ -1060,6 +1164,11 @@ pub struct ModuleSnapshot {
     /// module WITHOUT its templates: the rollback puts the till back and silently drops the
     /// gallery entry until the next boot.
     flow_templates: FlowTemplateScan,
+    /// The policy checkpoints the module declared (hub#1701). Same reason as the templates above:
+    /// a failed update would otherwise put the till back WITHOUT the places where the owner's rules
+    /// hang, and every rule written on one of them would stop being enforced until the next boot —
+    /// silently, which is the one way a policy must never stop working.
+    policy_checkpoints: crate::policies::CheckpointScan,
     /// `(event, command)` pairs whose command belongs to the module.
     listeners: Vec<(String, String)>,
     /// The natural keys the module's seed declares, per table (hub#842).

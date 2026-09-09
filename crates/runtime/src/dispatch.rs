@@ -232,6 +232,14 @@ impl Runtime {
         if let Err(e) = access_email::report_unresolved(self.db.as_ref(), &self.hub_id).await {
             eprintln!("[access-email] no se pudo comprobar los emails de acceso (hub#436): {e}");
         }
+        // 5) Las normas del dueño, de `_policy` al índice en memoria del que lee el gate
+        // (hub#1701, ADR-0476). Va aquí —en el camino de arranque que TODO hub recorre— porque un
+        // índice vacío es una norma que no impide nada: el fail-open más caro de todos, porque no
+        // se nota hasta que alguien cuela el descuento que la norma existía para parar.
+        //
+        // No depende de que los módulos estén ya re-hidratados: el índice se llena de FILAS, y quién
+        // gatea qué comando lo resuelve el Registry en el momento de aplicar.
+        self.reload_policies().await?;
         Ok(())
     }
 

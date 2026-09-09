@@ -482,6 +482,27 @@ pub(crate) async fn execute_at(
         payload
     };
 
+    // ── Las normas del DUEÑO (hub#1701, ADR-0476) ───────────────────────────
+    // El gate de las políticas que la persona que manda en el negocio escribió: «un descuento de
+    // más del 20 % no se deja». No es RBAC (eso ya pasó arriba) ni `protects` (eso lo declara un
+    // módulo): es la regla del negocio, escrita desde la pantalla y guardada en `_policy`.
+    //
+    // 🔴 **El punto NO es negociable, y es esta línea.** Va DESPUÉS del bloque de schema porque
+    // solo aquí el payload tiene los `default` del schema (:473), la coerción de números (:478) y
+    // el merge del `patch` (:452-458). Colocado antes, un hecho que el schema rellena llegaría
+    // ausente al gate y —como una política que no puede evaluarse DENIEGA— pararía toda venta
+    // normal. Y va DESPUÉS del RBAC porque una política **solo restringe**: nunca puede abrir una
+    // puerta que el permiso cerró, y el orden es lo que lo garantiza.
+    //
+    // El orden as-built de los siete gates del embudo vive en `architecture/hub/runtime-dispatcher.md`
+    // §2.0 y NO se copia aquí — referenciarlo es la guardia anti-regresión que puso architecture#733
+    // después de que ADR-0476 lo escribiese de memoria y lo publicase invertido.
+    //
+    // Los veredictos que devuelve son los de `mode: warn`, que ya se registran dentro: `warn` avisa
+    // y jamás impide, que es la rampa con la que el dueño ve qué se dispararía antes de ponerlo en
+    // vigor. Sin BD a propósito (guarda de coste acotado): lee de un índice en memoria.
+    crate::policies::enforce(registry, name, payload, &ctx.hub_id)?;
+
     // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
     if let Some(handler) = &cmd.def.handler {
         if handler.kind == "native" {

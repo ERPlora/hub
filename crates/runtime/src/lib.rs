@@ -165,6 +165,7 @@ mod fiscal;
 mod flows_api;
 mod lifecycle;
 mod module_lifecycle;
+mod policies_api;
 mod printing;
 mod settings_api;
 
