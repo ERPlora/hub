@@ -1157,7 +1157,9 @@ fn check_comparand(path: &str, op: Op, expected: &Json) -> Result<()> {
         return Err(invalid(
             ERR_INVALID_DEFINITION,
             format!(
-                "condition on `{path}`: the right of `{}` is literal text, so `{named}` there                  would be compared as the characters `{named}` and never match. A window on the                  clock is written `{{\"within_last\": <seconds>}}`.",
+                "condition on `{path}`: the right of `{}` is literal text, so `{named}` there \
+                 would be compared as the characters `{named}` and never match. A window \
+                 on the clock is written `{{\"within_last\": <seconds>}}`.",
                 op.as_str()
             ),
         ));
@@ -1166,7 +1168,8 @@ fn check_comparand(path: &str, op: Op, expected: &Json) -> Result<()> {
         return Err(invalid(
             ERR_INVALID_DEFINITION,
             format!(
-                "condition on `{path}`: `within_last` is a whole number of SECONDS greater than                  zero (86400 is a day), not {expected}"
+                "condition on `{path}`: `within_last` is a whole number of SECONDS greater \
+                 than zero (86400 is a day), not {expected}"
             ),
         ));
     }
