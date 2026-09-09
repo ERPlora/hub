@@ -1295,7 +1295,7 @@ fn as_text(v: &Json) -> Option<String> {
 
 // ── The mapping language ──────────────────────────────────────────────────────────────────────
 
-/// Is `s` a bare path into the run (`input.…`, `steps.…`, `event.…`, `secret.…`)?
+/// Is `s` a bare path into the run (`input.…`, `steps.…`, `event.…`, `secret.…`, `now.…`)?
 pub fn is_path(s: &str) -> bool {
     matches!(s.split('.').next(), Some(root)
         if (root == ROOT_INPUT
@@ -4708,6 +4708,10 @@ mod tests {
         .unwrap();
         assert!(day.matches(&scope("2026-09-08T12:00:01Z")), "a second inside");
         assert!(!day.matches(&scope("2026-09-08T11:59:59Z")), "a second outside");
+        // The floor ITSELF is inside: the window is `at >= now - seconds`, which is what the
+        // document promises. Bracketing it a second either way leaves the edge unsaid, and an
+        // exclusive `>` would read the same in every other test.
+        assert!(day.matches(&scope("2026-09-08T12:00:00Z")), "the floor instant itself");
         // An instant still to come is recent by any reading of the word, and the clock of whoever
         // wrote the row is not ours: skew must not turn into a message the customer never gets.
         assert!(day.matches(&scope("2026-09-09T12:00:01Z")), "clock skew ahead");
