@@ -344,6 +344,80 @@ async fn the_managers_approval_crosses_the_border_and_the_retry_goes_through() {
     );
 }
 
+/// A body the extractor cannot read still comes back in the envelope (hub#1691).
+///
+/// `Json<T>` refuses a body missing a required field BEFORE the handler runs, and axum answers
+/// that rejection itself: a line of English PROSE — not JSON, and not `{ok, error}`. Module code
+/// reads every answer through `unwrap(env)` in `@erplora/module-sdk`, which looks for `ok` or
+/// throws `ErploraError('error', 'unknown error')`, so the sentence naming the missing field is
+/// stripped off on the way: the module cannot say what is wrong and cannot branch on it either.
+///
+/// The three doors are driven together because the defect is one line of signature repeated, not
+/// three bugs — `query` and `command` are the busiest doors a module has, and they had it too.
+/// `module_doors_answer_in_one_shape` is what finds the NEXT one; this pins what these three say.
+///
+/// The STATUS the extractor chose is kept, because the two rejections are different facts a caller
+/// can act on: `422` is «I read your JSON and a field is missing», `400` is «that is not JSON».
+/// Flattening both to one status throws away the only half that says whether re-sending the same
+/// body could ever work.
+#[tokio::test]
+async fn a_body_the_extractor_cannot_read_is_refused_with_a_code() {
+    let app = app(elevation_app().await);
+
+    let refuses = |uri: &'static str, body: &'static str| {
+        let app = app.clone();
+        async move {
+            let resp = app
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(uri)
+                        .header("content-type", "application/json")
+                        .header("x-hub-id", "h1")
+                        .header("x-user-id", "u-cashier")
+                        .header("x-permissions", "till.view_sale")
+                        .body(Body::from(body))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            (resp.status(), body_json(resp).await)
+        }
+    };
+
+    // Readable JSON, and the one field each body cannot do without.
+    for (uri, body, missing) in [
+        ("/api/query", r#"{"params":{}}"#, "name"),
+        ("/api/command", r#"{"params":{}}"#, "name"),
+        (
+            "/api/elevation/approve",
+            r#"{"approver":"Sofía","pin":"8317"}"#,
+            "command",
+        ),
+    ] {
+        let (status, body) = refuses(uri, body).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}");
+        assert_eq!(body["ok"], json!(false), "{uri}");
+        assert_eq!(body["error"]["code"], json!("invalid_body"), "{uri}");
+        // The extractor's own sentence is what says WHICH field, so it is kept as the message
+        // rather than replaced by a generic one: it is the only actionable half of the answer.
+        assert!(
+            body["error"]["message"]
+                .as_str()
+                .is_some_and(|m| m.contains(missing)),
+            "{uri} has to name the field the body is missing: {body}"
+        );
+    }
+
+    // Not JSON at all — a different fact, and a different status, on every one of them.
+    for uri in ["/api/query", "/api/command", "/api/elevation/approve"] {
+        let (status, body) = refuses(uri, "not json").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{uri}");
+        assert_eq!(body["ok"], json!(false), "{uri}");
+        assert_eq!(body["error"]["code"], json!("invalid_body"), "{uri}");
+    }
+}
+
 /// A PIN is four digits typed in front of customers: without a limit on the attempts, approval is
 /// decorative. The approval door shares the pinpad's guard (`LoginThrottle`), so a script cannot
 /// walk 10,000 combinations here either — and a lock earned at one door holds at the other,
