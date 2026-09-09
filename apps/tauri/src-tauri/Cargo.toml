@@ -70,6 +70,11 @@ base64 = "0.22"
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que
 # Tauri usa en runtime (`RemoteUrlPattern`), en vez de reimplementar el matching en el test.
 tauri-utils = "2"
+# `test` gives us `tauri::test::mock_builder` + `MockRuntime`, whose `navigate()` records the URL
+# and whose `url()` answers with it. That is what lets `connectivity`'s regression test assert the
+# window MOVED to our offline page and back (hub#1716) instead of asserting on a bool. Dev-only:
+# with resolver 2 this feature never reaches the shipped binary.
+tauri = { version = "2", features = ["test"] }
 
 # Desktop only. On Windows and Linux the OS answers a link by LAUNCHING the executable again with
 # the URL appended, so without this a click would start a SECOND till on top of the first one

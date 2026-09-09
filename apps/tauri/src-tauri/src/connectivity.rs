@@ -466,8 +466,12 @@ mod tests {
     /// A real `WebviewWindow` on Tauri's mock runtime, which records `navigate()` and answers
     /// `url()` with it. This is what makes the guard's decision testable as a MOVE.
     fn mock_window() -> WebviewWindow<tauri::test::MockRuntime> {
+        // `mock_context(noop_assets())` and NOT `generate_context!()`: that macro embeds the
+        // Info.plist and the crate already expands it once in `run()`, so a second expansion is a
+        // duplicate `_EMBED_INFO_PLIST` symbol and the test crate does not link. Nothing here
+        // serves an asset anyway — the assertion is on where the window POINTS.
         let app = tauri::test::mock_builder()
-            .build(tauri::generate_context!())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .expect("mock app");
         tauri::WebviewWindowBuilder::new(
             &app,
@@ -487,7 +491,7 @@ mod tests {
         let nav = ShellNav::new(target.clone());
 
         // One failure is not enough to move anybody.
-        let (moving, target_now, _) = nav.record(Reachability::Offline);
+        let (moving, _target_now, _) = nav.record(Reachability::Offline);
         assert_eq!(moving, None);
         assert_eq!(window.url().unwrap().as_str(), target.as_str());
 

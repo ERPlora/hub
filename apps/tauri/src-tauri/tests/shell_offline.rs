@@ -96,16 +96,44 @@ fn the_offline_page_retry_asks_the_app_instead_of_reloading_itself() {
     // reloads THE FALLBACK PAGE: the one control on the only screen the user can reach was a loop
     // back to itself. Retry has to reach the shell, which is the only side that can probe the
     // network and navigate the window.
+    //
+    // Asserted on the CODE and not on the file: the page's own comment explains what it used to do
+    // and names `location.reload()` doing so, so a check over the raw text would fail on a page
+    // that is right. A guard that forces you to stop writing down why is a guard that gets deleted.
+    let code = executable_page_code();
     assert!(
-        SHELL_PAGE.contains("shell_retry"),
+        code.contains("shell_retry"),
         "shell-dist/index.html never invokes `shell_retry`: its retry control cannot reach the \
          shell, so pressing it can only re-render the same dead end (hub#1716)"
     );
     assert!(
-        !SHELL_PAGE.contains("location.reload()"),
+        !code.contains("location.reload()"),
         "shell-dist/index.html still reloads itself: on the bundled fallback page that re-renders \
          the fallback page and the user stays trapped (hub#1716)"
     );
+}
+
+/// The page with its prose removed: HTML comments and whole-line `//` comments gone, so an
+/// assertion about what the page DOES cannot be satisfied — or broken — by what it says about
+/// itself. Only whole-line `//` is stripped: a trailing `//` would eat the `https://` inside a
+/// string literal, and this page has both.
+fn executable_page_code() -> String {
+    let mut out = String::with_capacity(SHELL_PAGE.len());
+    let mut rest = SHELL_PAGE;
+    while let Some(open) = rest.find("<!--") {
+        out.push_str(&rest[..open]);
+        rest = match rest[open..].find("-->") {
+            Some(close) => &rest[open + close + "-->".len()..],
+            // Unterminated comment: the rest of the file is prose.
+            None => "",
+        };
+    }
+    out.push_str(rest);
+
+    out.lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Keys of one of the two inline catalogues (`en: { … }` / `es: { … }`) in the page's script.
