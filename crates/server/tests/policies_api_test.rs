@@ -33,6 +33,8 @@ struct Fixture {
     router: axum::Router,
     /// Sesión de un owner/admin — el único que puede ver o escribir nada de esto.
     admin: String,
+    /// Quién es esa persona. Lo que las columnas de auditoría tienen que acabar guardando.
+    admin_id: String,
     /// Un cajero perfectamente válido que no administra el hub.
     employee: String,
     /// Una API key real y activa de este hub. Vale donde tiene que valer; aquí no.
@@ -86,6 +88,7 @@ async fn fixture() -> Fixture {
     Fixture {
         router: app(AppState::with_config(rt, cfg)),
         admin,
+        admin_id,
         employee,
         api_key,
     }
@@ -347,4 +350,34 @@ async fn a_rule_written_through_the_door_is_in_force_for_the_TILL_hub1701() {
         body["error"]["message"],
         "Los descuentos de más del 20 % los autoriza el encargado"
     );
+}
+
+#[tokio::test]
+async fn the_author_of_a_rule_is_the_SESSION_never_the_body_hub1701() {
+    // 🔴 `created_by`/`updated_by` salen de la sesión resuelta y JAMÁS del body — misma regla que
+    // `granted_by` en los flujos y `discarded_by` en la dead-letter. Aquí es lo esencial: una norma
+    // decide si una venta se puede cobrar, así que su fila ES el registro de quién decidió eso. Un
+    // llamador que pudiera firmar por otro convertiría la auditoría en un campo de texto.
+    //
+    // MUTANTE: leer el autor del body en `policies_api::create_policy` — este test cae.
+    let f = fixture().await;
+    let mut forged = over_20();
+    forged["created_by"] = json!("hub_user:otro");
+    forged["updated_by"] = json!("hub_user:otro");
+    let id = create(&f, forged).await;
+
+    let response = send(
+        &f.router,
+        request(
+            "GET",
+            &format!("/api/hub/policies/{id}"),
+            Some(&f.admin),
+            None,
+        ),
+    )
+    .await;
+    let body = body_json(response).await;
+    let mine = format!("hub_user:{}", f.admin_id);
+    assert_eq!(body["data"]["created_by"], mine, "{body}");
+    assert_eq!(body["data"]["updated_by"], mine, "{body}");
 }
