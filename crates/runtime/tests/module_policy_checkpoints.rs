@@ -314,7 +314,7 @@ fn an_outcome_outside_the_closed_vocabulary_is_refused_hub1701() {
 #[test]
 fn a_checkpoint_may_still_declare_elevate_even_though_this_core_only_runs_block_hub1701() {
     // `elevate:<permiso>` ES vocabulario del contrato; lo que este core todavía no sabe es
-    // EJECUTARLO (hub#1708). Tirar el checkpoint entero por nombrarlo dejaría al módulo sin su
+    // EJECUTARLO (hub#1710). Tirar el checkpoint entero por nombrarlo dejaría al módulo sin su
     // `block`, que sí funciona — la puerta que se cierra es la de ESCRIBIR una política así.
     let dir = tmp_module();
     let manifest = write_module(&dir);

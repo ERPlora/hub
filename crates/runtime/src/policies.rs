@@ -363,7 +363,7 @@ fn schema_roots(dir: &Path, rel: &str) -> Option<Vec<String>> {
 pub enum Outcome {
     /// No dejar. Sale por el canal de errores de dominio (ADR-0205) con el mensaje del dueño.
     Block,
-    /// Pedírselo al encargado. **Este core todavía no lo ejecuta** (hub#1708): se reconoce para que
+    /// Pedírselo al encargado. **Este core todavía no lo ejecuta** (hub#1710): se reconoce para que
     /// un checkpoint que lo declare no pierda su `block`, y escribir una política así se rechaza.
     Elevate(String),
 }
@@ -792,7 +792,7 @@ fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()>
     }
     match Outcome::parse(&new.outcome) {
         Some(Outcome::Block) => {}
-        // `elevate:` está reconocido y todavía no se ejecuta (hub#1708). Se rechaza al escribir —en
+        // `elevate:` está reconocido y todavía no se ejecuta (hub#1710). Se rechaza al escribir —en
         // vez de guardarse y denegar en caja— porque aquí sí hay alguien mirando la pantalla.
         _ => {
             return Err(domain(

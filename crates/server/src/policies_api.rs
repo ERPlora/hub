@@ -64,7 +64,7 @@ fn bad_request(code: &str, message: &str) -> Response {
 ///
 /// - `…not_found` → **404**. No existe: ni la norma, ni el punto de control que dice gatear.
 /// - `policy.outcome_not_available` → **501**. La consecuencia SÍ está en el vocabulario y este core
-///   todavía no la sabe aplicar (`elevate:`, hub#1708). Es la única de la familia que se arregla
+///   todavía no la sabe aplicar (`elevate:`, hub#1710). Es la única de la familia que se arregla
 ///   **esperando una release** en vez de corrigiendo la norma, y decirle `400` mandaría al dueño a
 ///   reescribir algo que ya está bien.
 /// - el resto de `policy.` → **400**. Lo que el llamador mandó mal.

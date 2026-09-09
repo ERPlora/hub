@@ -286,7 +286,7 @@ async fn each_refusal_of_the_core_arrives_with_ITS_own_status_hub1701() {
         "policy.checkpoint_not_found"
     );
 
-    // 501 — el checkpoint SÍ lo ofrece y este core todavía no lo sabe aplicar (hub#1708). Es la
+    // 501 — el checkpoint SÍ lo ofrece y este core todavía no lo sabe aplicar (hub#1710). Es la
     // distinción que importa: una se arregla cambiando la norma, la otra esperando una release.
     let mut elevate = over_20();
     elevate["outcome"] = json!("elevate:p1701.order.discount");

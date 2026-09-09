@@ -374,7 +374,7 @@ async fn the_gate_sees_the_payload_AFTER_the_schema_defaults_hub1701() {
 #[tokio::test]
 async fn a_stored_outcome_this_core_cannot_run_DENIES_instead_of_passing_hub1701() {
     // Un hub que rodó atrás encuentra en `_policy` un `elevate:` que este core no ejecuta
-    // (hub#1708). La fila se escribe a mano porque es EXACTAMENTE como llegaría: la puerta de
+    // (hub#1710). La fila se escribe a mano porque es EXACTAMENTE como llegaría: la puerta de
     // escritura de este core la rechaza.
     // 🔴 Fail-closed: no se ignora. MUTANTE: tratar el outcome desconocido como «no aplica» — cae.
     let rt = fresh_runtime().await;
@@ -539,7 +539,7 @@ async fn an_outcome_the_checkpoint_does_not_offer_is_refused_hub1701() {
 
 #[tokio::test]
 async fn the_elevate_outcome_is_refused_by_THIS_core_with_its_own_code_hub1701() {
-    // El checkpoint SÍ lo ofrece; lo que falta es que este core lo sepa ejecutar (hub#1708).
+    // El checkpoint SÍ lo ofrece; lo que falta es que este core lo sepa ejecutar (hub#1710).
     // Distinguirlo del de arriba importa: uno se arregla cambiando la norma, el otro esperando una
     // release.
     let rt = fresh_runtime().await;
