@@ -1,3 +1,4 @@
+#![allow(non_snake_case)] // los nombres gritan la parte que importa, como el resto de la batería
 //! **La puerta HTTP de las normas del dueño** (hub#1701, ADR-0476).
 //!
 //! ```text
@@ -320,13 +321,21 @@ async fn a_rule_written_through_the_door_is_in_force_for_the_TILL_hub1701() {
     let f = fixture().await;
     create(&f, over_20()).await;
 
+    // La puerta de los comandos del hub es UNA sola (`POST /api/command`, ADR-0005) y el nombre
+    // viaja en el body, no como segmento de la ruta: el enrutado por hub del dispatcher es lo que
+    // decide qué runtime ejecuta, y un nombre en la URL habría abierto una segunda puerta con su
+    // propia autenticación. Pedirlo por `/api/commands/<nombre>` daba `404` con el cuerpo vacío,
+    // que es lo mismo que habría dado un gate que no aplica: este test no probaba nada.
     let response = send(
         &f.router,
         request(
             "POST",
-            "/api/commands/p1701.order.set_discount",
+            "/api/command",
             Some(&f.admin),
-            Some(json!({ "order_id": "o1", "discount_percent": 35 })),
+            Some(json!({
+                "name": "p1701.order.set_discount",
+                "payload": { "order_id": "o1", "discount_percent": 35 }
+            })),
         ),
     )
     .await;

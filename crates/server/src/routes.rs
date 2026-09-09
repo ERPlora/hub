@@ -445,6 +445,32 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/flows/approvals/:id/reject",
             post(flows_api::reject),
         )
+        // ── Las normas del dueño (hub#1701, ADR-0476) ──────────────────────────────────────
+        // Core REST y no comandos `hub.*`, por el mismo motivo que los flujos (ADR-0283 §9): una
+        // norma no es el dato de un módulo, es la configuración del propio hub.
+        //
+        // Puerta = sesión local de un humano owner/admin, NUNCA una API key ni el token de máquina:
+        // una norma decide si una venta se puede cobrar, y una credencial de integración copiable
+        // no decide eso. Y sin capability de módulo — aquí no hay superficie de SDK que abrir.
+        //
+        // 🔴 `checkpoints` va ANTES de `/policies/:id`: es un segmento ESTÁTICO y matchit lo
+        // resuelve con prioridad sobre el parámetro, así que servido por `:id` respondería «no
+        // existe esa norma» y la pantalla del dueño se quedaría sin sitios que ofrecer.
+        // `tests/policies_api_test.rs` lo comprueba contra el router de verdad.
+        .route(
+            "/api/hub/policies",
+            get(policies_api::list_policies).post(policies_api::create_policy),
+        )
+        .route(
+            "/api/hub/policies/checkpoints",
+            get(policies_api::list_checkpoints),
+        )
+        .route(
+            "/api/hub/policies/:id",
+            get(policies_api::get_policy)
+                .put(policies_api::update_policy)
+                .delete(policies_api::delete_policy),
+        )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
         .route("/api/v1/:module/c/:command", post(api_keys::data_command))

@@ -78,6 +78,7 @@ pub mod notify_transport;
 pub mod openapi;
 /// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
 pub mod outbox_admin;
+pub mod policies_api;
 pub mod print;
 pub mod print_ws;
 pub mod profile;
