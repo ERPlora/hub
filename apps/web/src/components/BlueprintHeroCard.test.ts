@@ -637,3 +637,41 @@ describe('the words', () => {
     expect(esCatalogue.setup.hero.body).toMatch(/despu[eé]s|todav[ií]a|luego/i);
   });
 });
+
+// ── hub#1693 · el código del runtime NUNCA llega a la tarjeta ────────────────────────────────
+//
+// «Las palabras del motor, nunca las nuestras» sigue siendo la regla de esta tarjeta — pero
+// `cloud_unreachable` no son palabras: es la clave que el motor y el shell usan para entenderse.
+// Desde hub#1689 es lo que devuelven las puertas proxy, así que la tarjeta la traduce y deja
+// intacta la prosa de verdad.
+describe('un fallo de la nube se lee (hub#1693)', () => {
+  async function outcome(w: ReturnType<typeof mountCard>) {
+    await flushPromises();
+    await w.find('[data-testid="hero-use"]').trigger('click');
+    await flushPromises();
+    return w;
+  }
+
+  it('traduce el código estable en vez de pintarlo', async () => {
+    downloadBlueprint.mockRejectedValue(new Error('cloud_unreachable'));
+    const w = await outcome(mountCard());
+
+    expect(w.find('[data-testid="hero-reason"]').text()).toBe(enCatalogue.runtimeErrors.cloud_unreachable);
+    expect(w.find('[data-testid="hero-outcome"]').text()).not.toContain('cloud_unreachable');
+  });
+
+  it('lo dice en español en un TPV español', async () => {
+    downloadBlueprint.mockRejectedValue(new Error('cloud_unreachable'));
+    const w = await outcome(mountCard(emptyBusiness(), i18nEs));
+
+    expect(w.find('[data-testid="hero-reason"]').text()).toBe(esCatalogue.runtimeErrors.cloud_unreachable);
+  });
+
+  it('conserva la prosa del motor cuando el motor habló de verdad', async () => {
+    // No-regresión de hub#368: `checksum mismatch` dice QUÉ pasó y se queda tal cual.
+    downloadBlueprint.mockRejectedValue(new Error('checksum mismatch'));
+    const w = await outcome(mountCard());
+
+    expect(w.find('[data-testid="hero-reason"]').text()).toBe('checksum mismatch');
+  });
+});

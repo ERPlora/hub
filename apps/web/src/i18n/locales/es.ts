@@ -1,6 +1,10 @@
 // Textos del shell (chrome) en español. Solo cubre la navegación, la topbar y el footer del
 // sidebar — NO los textos de cada vista (eso se irá migrando por pantalla). Mantener plano y
 // agrupado por zona para que sea fácil de extender.
+// Un hecho, una frase (hub#1693). Ver el comentario gemelo en `en.ts`: se declara una vez y se
+// referencia, para que la pantalla de conexión y las del back-office no se separen nunca.
+const CLOUD_UNREACHABLE = 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.';
+
 export default {
   // Nombre del idioma para el selector de Ajustes (se muestra tal cual). Requerido en cada locale.
   _meta: { name: 'Español' },
@@ -779,8 +783,8 @@ export default {
       no_business_account: 'Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.',
       not_configured: 'WhatsApp todavía no está disponible en este hub. Contacta con soporte.',
       sdk_unavailable: 'No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.',
-      cloud_unreachable: 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.',
-      unreachable: 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.',
+      cloud_unreachable: CLOUD_UNREACHABLE,
+      unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
       default: 'Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.',
     },
@@ -1680,6 +1684,16 @@ export default {
       inactive: 'Este valor está apagado en este hub.',
       duplicate: 'Este hub ya tiene ese valor.',
     },
+  },
+  // Traducción de `runtimeErrors` en `en.ts`: lo que el runtime contesta cuando falla una puerta
+  // que habla con la nube. Un código sin frase aquí no se pinta nunca; el llamador cae a `default`.
+  runtimeErrors: {
+    cloud_unreachable: CLOUD_UNREACHABLE,
+    install_cloud_unavailable: CLOUD_UNREACHABLE,
+    cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
+    cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
+    hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+    default: 'No ha funcionado. Vuelve a intentarlo dentro de un minuto.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here (translation of the one in `en.ts`)
   // for what the core says when it refuses at the PLATFORM level — a byte-identical copy of

@@ -379,11 +379,12 @@ import {
   type StoredImportReport,
 } from '../lib/runtime';
 import { retryAvailability, retryErrorKey } from '../lib/import-retry';
+import { runtimeErrorSentence } from '../lib/runtime-error-sentence';
 import { formatAmount } from '../lib/money';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 import { formatDateTime } from '../lib/format-datetime';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const router = useRouter();
 
 /**
@@ -476,8 +477,9 @@ async function inspectAndReview(zip: Blob): Promise<void> {
     seedSelection(res.manifest);
     step.value = 'review';
   } catch (err) {
-    // Mensaje HONESTO del server (inspectBlueprint ya extrajo el envelope/texto).
-    error.value = err instanceof Error ? err.message : String(err);
+    // Mensaje HONESTO del server (inspectBlueprint ya extrajo el envelope/texto) — pero un CÓDIGO
+    // estable del runtime no es un mensaje: se traduce (hub#1693).
+    error.value = runtimeErrorSentence(err, { t, te });
   } finally {
     inspecting.value = false;
   }
@@ -766,7 +768,7 @@ async function doRetry(): Promise<void> {
   } catch (e) {
     // A refusal carries a stable code (translated); anything else shows the server's honest text.
     const key = e instanceof RetryRefusedError ? retryErrorKey(e.code) : null;
-    error.value = key ? t(key) : e instanceof Error ? e.message : String(e);
+    error.value = key ? t(key) : runtimeErrorSentence(e, { t, te });
     step.value = 'report';
   }
 }
@@ -791,7 +793,7 @@ async function pickFromCloud(bp: CatalogBlueprint): Promise<void> {
     const zip = await downloadBlueprint(bp.slug);
     await inspectAndReview(zip);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = runtimeErrorSentence(err, { t, te });
   } finally {
     inspecting.value = false;
     activeSource.value = '';
@@ -884,7 +886,7 @@ async function doImport(): Promise<void> {
     window.dispatchEvent(new CustomEvent('erp:modules-changed'));
   } catch (err) {
     // Rechazo ENTERO (integridad dura / server caído): vuelve al resumen con el motivo del server.
-    error.value = err instanceof Error ? err.message : String(err);
+    error.value = runtimeErrorSentence(err, { t, te });
     step.value = 'review';
   }
 }
