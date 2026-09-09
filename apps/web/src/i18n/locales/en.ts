@@ -1,5 +1,10 @@
 // Shell (chrome) strings in English. Mirrors es.ts key-for-key. Covers shell navigation, the
 // topbar and the sidebar footer only — not per-view copy (that migrates screen by screen).
+// One fact, one sentence (hub#1693). The connect screen wrote this line for hub#1689; the import,
+// export and blueprint screens hit the SAME failure, so they say the SAME words. Declared once and
+// referenced, not copied, so the two never drift apart.
+const CLOUD_UNREACHABLE = 'Your hub could not reach erplora.com. Check the connection and try again.';
+
 export default {
   // Language name shown in the Settings selector (rendered as-is). Required in every locale.
   _meta: { name: 'English' },
@@ -849,8 +854,8 @@ export default {
       // The runtime's own code when the call never got through (hub#1689). Same fact as
       // `unreachable`, which the browser raises when ITS fetch fails: for whoever is
       // connecting, the difference between the two is not actionable.
-      cloud_unreachable: 'Your hub could not reach erplora.com. Check the connection and try again.',
-      unreachable: 'Your hub could not reach erplora.com. Check the connection and try again.',
+      cloud_unreachable: CLOUD_UNREACHABLE,
+      unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
       default: 'Something went wrong while connecting. Try again in a minute.',
     },
@@ -1862,6 +1867,20 @@ export default {
       inactive: 'This value is switched off in this hub.',
       duplicate: 'This hub already has that value.',
     },
+  },
+  // What the runtime answers a screen when a cloud-facing door fails: a short stable code, not a
+  // sentence (hub#1689 made it a code precisely so it COULD be translated). Every back-office
+  // screen turns it into one of these lines through `lib/runtime-error-sentence.ts`; a code with
+  // no line here is never painted, the caller falls back to `default`.
+  runtimeErrors: {
+    cloud_unreachable: CLOUD_UNREACHABLE,
+    // Installing or updating an app fails with its own code for the same fact: the hub never
+    // reached erplora.com. One fact, one sentence.
+    install_cloud_unavailable: CLOUD_UNREACHABLE,
+    cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
+    cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
+    hub_not_enrolled: 'This hub is not connected to erplora.com yet.',
+    default: 'Something went wrong. Try again in a minute.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here for what the core says when it
   // refuses at the PLATFORM level (`db`/`io`/`wasm`/`native`/`schema`/`manifest`,

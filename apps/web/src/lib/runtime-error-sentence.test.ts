@@ -91,14 +91,14 @@ describe('runtimeErrorSentence · what the person actually reads', () => {
 });
 
 describe('runtimeErrors catalogue · a sentence in both languages (ADR-0055/0199)', () => {
-  it.each([...TRANSLATED_CODES, 'default'])('%s reads as a sentence in `en` and in `es`', (code) => {
+  it.each([...TRANSLATED_CODES, 'default'] as const)('%s reads as a sentence in `en` and in `es`', (code) => {
     for (const [language, cat, messages] of [
       ['en', EN, en],
       ['es', ES, es],
     ] as const) {
       const key = `runtimeErrors.${code}`;
       expect(cat.te(key), `${key} has no sentence in \`${language}\``).toBe(true);
-      const sentence = (messages as Record<string, Record<string, string>>).runtimeErrors[code];
+      const sentence = messages.runtimeErrors[code];
       // A sentence, not the code with a coat of paint: it must not contain the key it translates.
       expect(sentence).not.toContain(code);
       expect(sentence.length).toBeGreaterThan(20);

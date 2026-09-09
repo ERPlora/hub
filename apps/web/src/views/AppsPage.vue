@@ -166,7 +166,7 @@ import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const tableLabels = computed(() => dataTableLabels(locale.value));
 import { cloudMarketplaceModules, type CloudMarketplaceModule } from '../lib/cloud';
 import { config } from '../lib/config';
@@ -822,7 +822,7 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
       // What the RUNTIME said, and only if it said anything (hub#673). What matters about the
       // message is still that the module was NOT left half-done — the runtime guarantees that,
       // not the sentence.
-      notify(moduleFailureMessage(e, t('apps.updateError', { name })), 'danger');
+      notify(moduleFailureMessage(e, t('apps.updateError', { name }), { t, te }), 'danger');
     }
   } finally {
     setUpdating(id, false);
@@ -953,7 +953,7 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
       // migration blown up— and this `else` threw it away to print the same line every time. With
       // six causes indistinguishable, the fleet-wide install breakage of 08-09 (saas#1352) was
       // invisible from the till.
-      notify(moduleFailureMessage(e, t('apps.installError', { name: mod.name })), 'danger');
+      notify(moduleFailureMessage(e, t('apps.installError', { name: mod.name }), { t, te }), 'danger');
     }
   } finally {
     clearProgress(mod.id);
@@ -1077,7 +1077,7 @@ async function toggleModule(m: InstalledModule): Promise<void> {
     await loadInstalled();
     void refreshModuleNav();
   } catch (e) {
-    notify(moduleFailureMessage(e, t('apps.toggleError', { name: m.name })), 'danger');
+    notify(moduleFailureMessage(e, t('apps.toggleError', { name: m.name }), { t, te }), 'danger');
   }
 }
 
@@ -1129,7 +1129,7 @@ async function removeModule(m: InstalledModule): Promise<void> {
       await loadInstalled();
       return;
     }
-    notify(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name })), 'danger');
+    notify(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name }), { t, te }), 'danger');
   }
 }
 

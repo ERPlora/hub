@@ -267,7 +267,7 @@ describe('ExportPanel · el aviso de error es una frase, nunca un código', () =
     locale: 'en',
     missingWarn: false,
     fallbackWarn: false,
-    messages: { en: en as unknown as Record<string, unknown> },
+    messages: { en },
   });
 
   function mountReal() {
