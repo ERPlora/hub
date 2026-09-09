@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "order_id": { "type": "string" },
+    "discount_percent": { "type": "number" },
+    "channel": { "type": "string", "default": "counter" },
+    "note": { "type": "string" }
+  },
+  "required": ["order_id", "discount_percent"],
+  "additionalProperties": false
+}
