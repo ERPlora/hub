@@ -397,4 +397,28 @@ async fn the_author_of_a_rule_is_the_SESSION_never_the_body_hub1701() {
     let mine = format!("hub_user:{}", f.admin_id);
     assert_eq!(body["data"]["created_by"], mine, "{body}");
     assert_eq!(body["data"]["updated_by"], mine, "{body}");
+
+    // 🔴 And the SAME through the PUT, which is the door carrying a body every time the owner
+    // touches a rule — promoting it from `warn` to `enforce`, fixing its wording. Asserting it
+    // only at creation left the mutant «`update_policy` reads the author from the body» alive with
+    // the battery green (measured in the review of PR #1741), and it is the EDIT — not the
+    // creation — that the audit trail gets asked about afterwards.
+    let mut forged = over_20();
+    forged["mode"] = json!("warn");
+    forged["created_by"] = json!("hub_user:otro");
+    forged["updated_by"] = json!("hub_user:otro");
+    let response = send(
+        &f.router,
+        request(
+            "PUT",
+            &format!("/api/hub/policies/{id}"),
+            Some(&f.admin),
+            Some(forged),
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["data"]["updated_by"], mine, "{body}");
+    assert_eq!(body["data"]["created_by"], mine, "{body}");
 }

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::policies::{self, Mode};
 use erplora_runtime::{RequestContext, Runtime, RuntimeError};
-use serde_json::json;
+use serde_json::{json, Value as Json};
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_1701")
@@ -82,6 +82,45 @@ async fn insert_raw_policy(rt: &Runtime, outcome: &str, condition: &str) {
         )
         .await
         .expect("insertar la fila del futuro");
+}
+
+/// Writes a `_policy` row belonging to **another hub**, straight into the same table: the write
+/// door will not do it (it always stamps its own `hub_id`), and a neighbour's row is the only
+/// thing isolation can actually be proved against.
+async fn insert_raw_policy_for_hub(rt: &Runtime, hub_id: &str, id: &str) {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
+    rt.db()
+        .execute(
+            "INSERT INTO _policy (id, hub_id, checkpoint, condition, outcome, message, mode, \
+                                  is_active, created_at, created_by, updated_at, updated_by) \
+             VALUES (:id, :hub_id, 'p1701/discount_limit', \
+                     '{\"discount_percent\":{\"gt\":20}}', 'block', 'norma del vecino', \
+                     'enforce', 1, '2026-09-09T00:00:00Z', 'u1', '2026-09-09T00:00:00Z', 'u1')",
+            &p,
+        )
+        .await
+        .expect("insertar la fila del hub vecino");
+}
+
+/// The row exactly as it is stored, with no `hub_id` filter in the way. What a tenancy test has to
+/// assert on is the NEIGHBOUR'S row, not the answer this hub got back.
+async fn raw_policy(rt: &Runtime, id: &str) -> Json {
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    let res = rt
+        .db()
+        .query(
+            "SELECT hub_id, mode, updated_by, deleted_at FROM _policy WHERE id = :id",
+            &p,
+        )
+        .await
+        .expect("leer la fila cruda");
+    res.rows
+        .first()
+        .cloned()
+        .expect("la fila del vecino sigue ahi")
 }
 
 fn domain_code(err: &RuntimeError) -> String {
@@ -667,6 +706,76 @@ async fn a_policy_of_another_hub_is_not_listed_nor_readable_hub1701() {
     let other = Runtime::with_hub_id(Box::new(fresh_db().await), "h2");
     other.ensure_system_tables().await.unwrap();
     assert!(other.list_policies().await.unwrap().is_empty());
+}
+
+/// 🔴 The test above uses a **different database**, so its `is_empty()` holds whether or not the
+/// queries filter by `hub_id`: it cannot see a leak, because there is no neighbour's row to leak.
+/// This one puts the other hub's row in the **SAME table** — the only shape in which tenancy can
+/// be measured (root `CLAUDE.md`: seeding with a helper and calling it an isolation test proves
+/// nothing).
+///
+/// 🔴 MUTANTS it kills, each one applied and run in the review of PR #1741:
+///  - `policies::load_index` without its `WHERE hub_id` — **the serious one**. The `hub_id` filter
+///    of [`policies::enforce`] cannot catch it: `load_index` stamps every `ActivePolicy` with the
+///    hub it was CALLED for and never with the row's own column, so a neighbour's rule loaded here
+///    reaches the gate already wearing this hub's badge and stops this till;
+///  - `policies::list` without its `WHERE hub_id` — the owner's screen would show a stranger's rules;
+///  - `policies::get` without its `WHERE hub_id`, and with it the `update`/`delete` doors, which
+///    both resolve through `get` before touching a row.
+#[tokio::test]
+async fn a_rule_of_ANOTHER_hub_in_the_SAME_table_neither_gates_nor_shows_nor_is_editable_hub1701() {
+    let rt = fresh_runtime().await;
+    insert_raw_policy_for_hub(&rt, "h2", "pol-vecino").await;
+    // The index is rebuilt exactly the way boot does it: this is the path the gate reads from.
+    rt.reload_policies().await.unwrap();
+
+    // 1) It does not GATE: the neighbour's rule blocks a 35 % discount, and this hub charges it.
+    rt.execute_command(
+        "p1701.order.set_discount",
+        &params(json!({ "order_id": "o1", "discount_percent": 35 })),
+        &admin_ctx(),
+    )
+    .await
+    .expect("la norma del hub vecino no puede parar esta venta");
+    assert_eq!(order_rows(&rt).await, 1);
+
+    // 2) It is not LISTED and it is not READABLE.
+    assert!(
+        rt.list_policies().await.unwrap().is_empty(),
+        "la norma del vecino no puede salir en el listado de este hub"
+    );
+    let err = rt.get_policy("pol-vecino").await.unwrap_err();
+    assert_eq!(domain_code(&err), policies::ERR_NOT_FOUND);
+
+    // 3) It cannot be EDITED nor DELETED — and what proves that is the NEIGHBOUR'S ROW, not the
+    // answer: a write door that lost its filter returns this very same error and changes the other
+    // business's database anyway.
+    let err = rt
+        .update_policy("pol-vecino", &over_20("warn"), "u1")
+        .await
+        .unwrap_err();
+    assert_eq!(domain_code(&err), policies::ERR_NOT_FOUND);
+    let err = rt.delete_policy("pol-vecino", "u1").await.unwrap_err();
+    assert_eq!(domain_code(&err), policies::ERR_NOT_FOUND);
+    let neighbour = raw_policy(&rt, "pol-vecino").await;
+    assert_eq!(neighbour["hub_id"], json!("h2"), "{neighbour}");
+    assert_eq!(neighbour["mode"], json!("enforce"), "{neighbour}");
+    assert_eq!(neighbour["updated_by"], json!("u1"), "{neighbour}");
+    assert_eq!(neighbour["deleted_at"], Json::Null, "{neighbour}");
+}
+
+/// The CEILING counts the rules of THIS hub. 🔴 MUTANT: `policies::count_live` without its
+/// `WHERE hub_id` — the neighbour's rules would fill up a checkpoint this hub has never used, and
+/// the owner would be told to delete rules they cannot even see.
+#[tokio::test]
+async fn the_CEILING_does_not_count_the_rules_of_ANOTHER_hub_hub1701() {
+    let rt = fresh_runtime().await;
+    for i in 0..policies::MAX_POLICIES_PER_CHECKPOINT {
+        insert_raw_policy_for_hub(&rt, "h2", &format!("pol-vecino-{i}")).await;
+    }
+    rt.create_policy(&over_20("enforce"), "u1")
+        .await
+        .expect("el techo cuenta las normas de ESTE hub, no las del vecino");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
