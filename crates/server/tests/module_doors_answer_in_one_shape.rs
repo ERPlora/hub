@@ -381,6 +381,41 @@ fn sdk_named_shapes() -> BTreeSet<String> {
          and every door underneath one of them silently drops out of this walk.",
         unseen.len()
     );
+
+    // A THIRD reading, for the half the second one structurally CANNOT see. A path the SDK builds
+    // from a base constant (`` `${FLOWS_BASE_PATH}/templates/${own}/${target}/activate` ``) never
+    // contains the text `/api/`, so the mention scan above is blind to it by construction: a lexer
+    // that stops reading template literals loses every one of them in silence. Measured on the
+    // review of hub#1691 — dropping the backtick arm of the lexer took the shapes from 34 to 9 and
+    // the walk from 39 doors to 36 with EVERY floor still satisfied, and the three doors it took
+    // were `GET /api/hub/flows/templates` and its activate/deactivate: the very doors this guard
+    // was widened for.
+    //
+    // The mark is the interpolation itself, found by plain substring over the raw source: a base
+    // the SDK extends has to have produced at least one shape BELOW it.
+    for (name, base) in &bases {
+        let extended_in_source = source.lines().any(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") || trimmed.starts_with('*') || trimmed.starts_with("/*") {
+                return false;
+            }
+            line.split(" // ")
+                .next()
+                .unwrap_or(line)
+                .contains(&format!("${{{name}}}/"))
+        });
+        if !extended_in_source {
+            continue;
+        }
+        let below = format!("{base}/");
+        assert!(
+            shapes.iter().any(|shape| shape.starts_with(&below)),
+            "the SDK builds paths under `{name}` (`{base}/…`) and the parser read NONE of them. \
+             The template half of the reading is gone, so every door below that base has just \
+             dropped out of the walk — and the mention scan cannot see it, because a path built \
+             from a base never spells `/api/`"
+        );
+    }
     shapes
 }
 
