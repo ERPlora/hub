@@ -52,6 +52,7 @@ pub mod native;
 pub mod outbox;
 pub mod permissions;
 pub mod pin_policy;
+pub mod policies;
 pub mod print_drain;
 pub mod print_hosts;
 pub mod print_queue;
