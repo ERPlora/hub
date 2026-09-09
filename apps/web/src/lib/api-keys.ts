@@ -89,65 +89,134 @@ export interface CreateApiKeyInput {
 interface Envelope<T> {
   ok?: boolean;
   data?: T;
-  error?: { message?: string };
+  /** `{ code, message }` on every refusal of this door since hub#1700; a bare string before it. */
+  error?: unknown;
+  code?: unknown;
+}
+
+/**
+ * A refused call to the API keys door, carrying the runtime's own reason so the screen can show it.
+ *
+ * The `code` is the only part of a refusal that may be put in front of a person (hub#1697): the
+ * `message` beside it is the line whoever wrote `api_keys.rs` left for the log — «API key no
+ * encontrada» — and `ApiKeysPanel` translates the code with `localDoorSentence` instead.
+ *
+ * Until hub#1700 this client threw a bare `Error` built from `error.message` over an `error` that
+ * was a **string**, so `.message` was `undefined` and what reached the panel was `keys.revoke →
+ * 404`: not a code to branch on, not prose to show. Every refusal came out as «check your
+ * connection», whatever it actually was.
+ */
+export class ApiKeysError extends Error {
+  /** The door's stable code (`not_found`, `unauthorized`, `forbidden`, `api_key.system_key`). */
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'ApiKeysError';
+    this.code = code;
+  }
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+/**
+ * The reason a rejection gives, from either shape of the error body.
+ *
+ * Both are read for the same reason `lib/devices.ts` reads both: the code rides INSIDE `error` on
+ * the shared envelope (`err_response`, `auth_rejected`) and beside it on the doors that write the
+ * body by hand (`devices.rs`). A hub running an older build sends neither, and then there is no
+ * code — `localDoorSentence` falls back to the panel's own line, which is the pre-hub#1700
+ * behaviour and not a regression.
+ */
+function rejection(body: unknown, fallback: string): ApiKeysError {
+  const envelope = body as Envelope<unknown> | null;
+  const error = envelope?.error;
+  const flat = text(envelope?.code);
+  if (typeof error === 'string') return new ApiKeysError(error, flat);
+  if (error && typeof error === 'object') {
+    const { message, code } = error as { message?: unknown; code?: unknown };
+    return new ApiKeysError(text(message) ?? fallback, text(code) ?? flat);
+  }
+  return new ApiKeysError(fallback, flat);
+}
+
+/** The body of a refusal, or `null` when the door answered something unreadable. */
+async function refusalBody(res: Response): Promise<unknown> {
+  return res.json().catch(() => null);
 }
 
 /**
  * Tolera ambas formas del runtime: el envelope `{ ok, data }` y el cuerpo plano. Si viene envelope
- * lo desenvuelve; si no, asume que el JSON ES el dato. Lanza con el mensaje del runtime si `ok=false`.
+ * lo desenvuelve; si no, asume que el JSON ES el dato. Lanza con el motivo del runtime si `ok=false`
+ * — con su código, porque un `200 {ok:false}` es una negativa igual que un `404`.
  */
-function unwrap<T>(body: unknown): T {
+function unwrap<T>(body: unknown, fallback: string): T {
   const env = body as Envelope<T>;
   if (env && typeof env === 'object' && ('ok' in env || 'data' in env)) {
-    if (env.ok === false) throw new Error(env.error?.message ?? 'Error del runtime');
+    if (env.ok === false) throw rejection(body, fallback);
     return (env.data ?? (body as T)) as T;
   }
   return body as T;
 }
 
+/**
+ * `fetch` against the door, turning a dead network into an `ApiKeysError` too.
+ *
+ * Nothing here is optimistic: a revocation that never left the browser must not look like one that
+ * happened — the administrator has just cut off a credential they believe is compromised.
+ */
+async function call(url: string, init: RequestInit, where: string): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    throw new ApiKeysError(error instanceof Error ? error.message : `${where} → offline`);
+  }
+}
+
 /** GET /api/keys → lista de keys del hub (sin secretos). Lanza si el runtime falla. */
 export async function listApiKeys(): Promise<ApiKey[]> {
-  const res = await fetch(`${RUNTIME_URL}/api/keys`, { headers: runtimeHeaders() });
-  if (!res.ok) throw new Error(`keys → ${res.status}`);
-  const data = unwrap<ApiKey[]>(await res.json());
+  const res = await call(`${RUNTIME_URL}/api/keys`, { headers: runtimeHeaders() }, 'keys');
+  if (!res.ok) throw rejection(await refusalBody(res), `keys → ${res.status}`);
+  const data = unwrap<ApiKey[]>(await res.json(), `keys → ${res.status}`);
   return Array.isArray(data) ? data : [];
 }
 
 /** POST /api/keys → crea una key y devuelve el secreto (mostrar UNA vez). Lanza si el runtime falla. */
 export async function createApiKey(input: CreateApiKeyInput): Promise<ApiKeyCreated> {
-  const res = await fetch(`${RUNTIME_URL}/api/keys`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const env = (await res.json().catch(() => ({}))) as Envelope<unknown>;
-    throw new Error(env.error?.message ?? `keys.create → ${res.status}`);
-  }
-  return unwrap<ApiKeyCreated>(await res.json());
+  const res = await call(
+    `${RUNTIME_URL}/api/keys`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
+      body: JSON.stringify(input),
+    },
+    'keys.create',
+  );
+  const fallback = `keys.create → ${res.status}`;
+  if (!res.ok) throw rejection(await refusalBody(res), fallback);
+  return unwrap<ApiKeyCreated>(await res.json(), fallback);
 }
 
 /** POST /api/keys/{id}/rotate → nuevo secreto (invalida el anterior). Lanza si el runtime falla. */
 export async function rotateApiKey(id: string): Promise<{ secret: string }> {
-  const res = await fetch(`${RUNTIME_URL}/api/keys/${encodeURIComponent(id)}/rotate`, {
-    method: 'POST',
-    headers: runtimeHeaders(),
-  });
-  if (!res.ok) {
-    const env = (await res.json().catch(() => ({}))) as Envelope<unknown>;
-    throw new Error(env.error?.message ?? `keys.rotate → ${res.status}`);
-  }
-  return unwrap<{ secret: string }>(await res.json());
+  const res = await call(
+    `${RUNTIME_URL}/api/keys/${encodeURIComponent(id)}/rotate`,
+    { method: 'POST', headers: runtimeHeaders() },
+    'keys.rotate',
+  );
+  const fallback = `keys.rotate → ${res.status}`;
+  if (!res.ok) throw rejection(await refusalBody(res), fallback);
+  return unwrap<{ secret: string }>(await res.json(), fallback);
 }
 
 /** DELETE /api/keys/{id} → revoca (kill-switch inmediato). Lanza si el runtime falla. */
 export async function revokeApiKey(id: string): Promise<void> {
-  const res = await fetch(`${RUNTIME_URL}/api/keys/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: runtimeHeaders(),
-  });
-  if (!res.ok) {
-    const env = (await res.json().catch(() => ({}))) as Envelope<unknown>;
-    throw new Error(env.error?.message ?? `keys.revoke → ${res.status}`);
-  }
+  const res = await call(
+    `${RUNTIME_URL}/api/keys/${encodeURIComponent(id)}`,
+    { method: 'DELETE', headers: runtimeHeaders() },
+    'keys.revoke',
+  );
+  if (!res.ok) throw rejection(await refusalBody(res), `keys.revoke → ${res.status}`);
 }

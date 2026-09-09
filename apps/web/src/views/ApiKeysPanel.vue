@@ -24,7 +24,7 @@
       :primaryAction="newKeyAction"
       :search-placeholder="t('apiKeys.searchKey')"
       page-size="10"
-      :empty-message="t('apiKeys.empty')"
+      :empty-message="loadError || t('apiKeys.empty')"
       column-picker
     ></ok-data-table>
 
@@ -434,12 +434,24 @@ function toggleAll(kind: 'read' | 'write', e: Event): void {
 }
 
 // ── Carga de datos ─────────────────────────────────────────────────────────────────────────
+/**
+ * Why the list is empty, when it is empty because the door said no (hub#1700).
+ *
+ * It takes the place of the table's own «no API keys yet» line, which is a CLAIM: telling an
+ * administrator whose session just lapsed that this business has no integrations is worse than
+ * saying nothing. Cleared on every successful read.
+ */
+const loadError = ref('');
+
 async function reloadKeys(): Promise<void> {
   try {
     keys.value = await listApiKeys();
-  } catch {
-    // El endpoint puede no existir aún (otro worker): degrada a lista vacía, sin inventar datos.
+    loadError.value = '';
+  } catch (err) {
+    // A refusal is not «none yet». Until hub#1700 this catch swallowed the reason — the door had
+    // none to give — and the screen invited the person to create a key they may not be allowed to.
     keys.value = [];
+    loadError.value = localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.loadError'));
   }
 }
 

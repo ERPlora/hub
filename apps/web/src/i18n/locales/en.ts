@@ -1072,21 +1072,31 @@ export default {
     loadError: 'The role catalogue could not be loaded.',
   },
   apiKeys: {
-    // hub#1697 — the sentences this panel will read once its door answers a stable code.
+    // The sentences this panel reads when its door refuses (hub#1697, reachable since hub#1700).
     //
-    // 🔴 NOT reachable yet, and that is not an oversight (rv-1699): `/api/keys*` is `auth:admin`
-    // and its four handlers answer `{"ok":false,"error":"<flat string>"}` with no `code` at all
-    // (`api_keys.rs:47,56,140,160`) — the `rate_limited` / `not_found` codes in that same file
-    // belong to the `auth:api-key` surface a THIRD PARTY calls, not to this panel. Until the door
-    // and `lib/api-keys.ts` carry the code (hub#1700), `localDoorSentence` falls back to the
-    // panel's own line, which is still what hub#1697 asked for: never the engine's words.
+    // Written in hub#1697 and dead until hub#1700, because `/api/keys*` answered
+    // `{"ok":false,"error":"<flat string>"}` with no `code` at all: every refusal came out as the
+    // panel's own «check your connection» line. The four handlers now answer the shared envelope
+    // (`err_response` / `auth_rejected`), so `localDoorSentence` finds these.
+    //
+    // `rate_limited` is the one that is still NOT reachable from here, and that is a fact about
+    // the door, not an omission: the quota lives on the `auth:api-key` data surface a THIRD PARTY
+    // calls (`external_principal`), and this admin door has none. The sentence stays because it is
+    // the right one for that code the day this door gets a quota; nothing paints it meanwhile.
     errors: {
       not_found: 'That key no longer exists. Refresh the list and try again.',
       rate_limited: 'Too many attempts in a row. Wait a moment and try again.',
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can manage API keys.',
+      // The code is namespaced by the module that raised it, so the catalogue nests it.
+      api_key: {
+        system_key: 'ERPlora issued this key to itself. It cannot be rotated or deleted.',
+      },
     },
     // List
     searchKey: 'Search API key…',
     empty: 'No API keys yet. Create one so an external system can read or write Hub data.',
+    loadError: 'Could not load your API keys. Try again in a moment.',
     newKey: 'New API key',
     colName: 'Name',
     colPrefix: 'Token',

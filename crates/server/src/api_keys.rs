@@ -40,22 +40,24 @@ fn default_rate_limit() -> i64 {
     erplora_runtime::api_keys::DEFAULT_RATE_LIMIT_PER_MINUTE
 }
 
-/// `401` para fallo de auth del admin (sin sesión / sesión inválida / rol insuficiente).
+/// Refusal of the admin gate, with the **stable code** every other door of this hub sends
+/// (hub#1700): `unauthorized` when there is no usable session, `403 forbidden` when the session is
+/// fine and the role is not (hub#660) — re-authenticating as the same cashier would never help.
+///
+/// One implementation on purpose ([`crate::auth_rejected`], the same one `outbox_admin` and the
+/// assistant use). Until this issue these four handlers had their own copy that flattened both
+/// cases into `401 {"error": "<prose>"}`, and the panel could only say «check your connection».
 fn admin_unauthorized(e: auth::AuthError) -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": e.message() })),
-    )
-        .into_response()
+    crate::auth_rejected(e)
 }
 
 /// Mapea un `RuntimeError` de la gestión de keys a una respuesta HTTP (mismo formato que el resto).
+///
+/// hub#1700: the shared envelope, not a hand-rolled `400 {"error": "<prose>"}`. It is what carries
+/// the code of the refusals this door raises that are neither auth nor "gone" — the hub's own key
+/// (`api_key.system_key`, `409`) and a rate limit out of range — and the status each one deserves.
 fn key_err(e: erplora_runtime::RuntimeError) -> Response {
-    (
-        StatusCode::BAD_REQUEST,
-        Json(json!({ "ok": false, "error": e.to_string() })),
-    )
-        .into_response()
+    crate::err_response(e)
 }
 
 /// GET /api/keys — lista las keys del hub (sin secreto). Auth = sesión admin.
@@ -134,10 +136,17 @@ pub async fn revoke_key(
     }
 }
 
+/// `404` for a key this hub does not have — revoked and forgotten, or never here at all.
+///
+/// The code is what the panel turns into «that key no longer exists» (hub#1700); before it, this
+/// answer was indistinguishable from an unreachable hub for anybody reading the body.
 fn key_not_found() -> Response {
     (
         StatusCode::NOT_FOUND,
-        Json(json!({ "ok": false, "error": "API key no encontrada" })),
+        Json(json!({
+            "ok": false,
+            "error": { "code": "not_found", "message": "API key no encontrada" },
+        })),
     )
         .into_response()
 }
