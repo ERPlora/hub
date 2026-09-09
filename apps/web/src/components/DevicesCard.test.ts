@@ -24,9 +24,12 @@ import { readFileSync } from 'node:fs';
 
 const { DevicesError } = vi.hoisted(() => ({
   DevicesError: class DevicesError extends Error {
-    constructor(message: string) {
+    // Mirrors the real class: hub#1697 made it carry the door's stable `code`.
+    readonly code?: string;
+    constructor(message: string, code?: string) {
       super(message);
       this.name = 'DevicesError';
+      this.code = code;
     }
   },
 }));
@@ -48,6 +51,8 @@ const replace = vi.fn(async () => undefined);
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace }) }));
 
 import DevicesCard from './DevicesCard.vue';
+import enCatalogue from '../i18n/locales/en';
+import esCatalogue from '../i18n/locales/es';
 import { listDevices, renameDevice, revokeDevice } from '../lib/devices';
 import { isAdmin, logout } from '../lib/session';
 
@@ -216,13 +221,17 @@ describe('the list', () => {
   });
 
   it('a failed read says so instead of looking like a business with no devices', async () => {
+    // hub#1697 — el motivo lo da ahora un CÓDIGO, no la prosa del motor: lo que esta prueba fija
+    // (y sigue fijando) es que un fallo de lectura NO se pinta como «este negocio no tiene
+    // dispositivos». Con `boom` —prosa sin código— la tarjeta dice SU frase, que es la correcta.
     vi.mocked(listDevices).mockRejectedValue(new DevicesError('boom'));
 
     const wrapper = await mountCard();
 
     // The distinction matters: "no devices" would tell somebody hunting a stolen tablet that there
     // is nothing to revoke.
-    expect(wrapper.html()).toContain('boom');
+    expect(wrapper.html()).toContain(i18n.global.t('devices.loadError'));
+    expect(wrapper.html()).not.toContain('boom');
     expect(wrapper.html()).not.toContain(i18n.global.t('devices.empty'));
   });
 });
@@ -308,6 +317,9 @@ describe('revoking', () => {
   });
 
   it('a refusal keeps the reason on screen and does not pretend it worked', async () => {
+    // hub#1697 — `AuthError::message()` del runtime es prosa sin código («falta sesión (cabecera
+    // X-Hub-Session)»): nombrarle una cabecera HTTP a quien lleva el negocio es el defecto. Lo que
+    // esta prueba fija sigue intacto: el rechazo se VE y no se hace pasar por un éxito.
     vi.mocked(revokeDevice).mockRejectedValue(new DevicesError('sesión inválida o caducada'));
     const wrapper = await mountCard();
     await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
@@ -315,7 +327,10 @@ describe('revoking', () => {
     await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.html()).toContain('sesión inválida o caducada');
+    // Las DOS mitades: el rechazo se VE (su frase) y la prosa del motor no. Sin la primera, un
+    // fallo tragado en silencio pasaría esta prueba.
+    expect(wrapper.html()).toContain(i18n.global.t('devices.revokeError'));
+    expect(wrapper.html()).not.toContain('sesión inválida o caducada');
   });
 
   it('an employee is told who can do this, instead of finding a dead button', async () => {
@@ -405,6 +420,7 @@ describe('naming a device (hub#494)', () => {
   });
 
   it('a refused rename says why instead of looking like a name that stuck', async () => {
+    // Misma regla que en el revoke de arriba (hub#1697): se ve el rechazo, no la prosa del motor.
     vi.mocked(renameDevice).mockRejectedValue(new DevicesError('sesión inválida o caducada'));
     const wrapper = await mountCard();
 
@@ -413,7 +429,8 @@ describe('naming a device (hub#494)', () => {
     await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.html()).toContain('sesión inválida o caducada');
+    expect(wrapper.html()).toContain(i18n.global.t('devices.renameError'));
+    expect(wrapper.html()).not.toContain('sesión inválida o caducada');
   });
 
   it('naming is never one tap away from disconnecting', async () => {
@@ -426,5 +443,50 @@ describe('naming a device (hub#494)', () => {
     // The two gestures share a row and nothing else: housekeeping must not be able to take a till
     // down because a control was where the other one used to be.
     expect(revokeDevice).not.toHaveBeenCalled();
+  });
+});
+
+// ── hub#1697 · la tarjeta no enseña las palabras del motor ───────────────────────────────────
+//
+// La puerta `/api/devices` contesta un CÓDIGO estable junto a prosa inglesa escrita para el log
+// (`devices.rs`: `{"error":"the device name is at most 40 characters","code":"device_name_too_long"}`).
+// El cliente tiraba el código y la tarjeta pintaba la prosa, así que un TPV en español leía inglés.
+describe('DevicesCard · un rechazo se lee como una frase (hub#1697)', () => {
+  const i18nReal = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en: enCatalogue, es: esCatalogue },
+  });
+
+  async function mountReal() {
+    const w = mount(DevicesCard, {
+      global: { plugins: [i18nReal], stubs: { 'ok-inline-feedback': true }, renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    return w;
+  }
+
+  it('traduce el código en vez de pintar el inglés del motor', async () => {
+    vi.mocked(listDevices).mockRejectedValue(
+      Object.assign(new Error('the device name is at most 40 characters'), {
+        code: 'device_name_too_long',
+      }),
+    );
+
+    const html = (await mountReal()).html();
+    expect(html).toContain(enCatalogue.devices.errors.device_name_too_long);
+    expect(html).not.toContain('at most 40 characters');
+  });
+
+  it('sin código traducible enseña SU frase, nunca la del motor', async () => {
+    // Un `DevicesError` DE VERDAD: con un `Error` pelado `reasonOf` ya caía al fallback, así que
+    // el caso pasaba sin probar nada. Lo que hay que fijar es la rama que SÍ pintaba prosa.
+    vi.mocked(listDevices).mockRejectedValue(new DevicesError('devices → 500'));
+
+    const html = (await mountReal()).html();
+    expect(html).toContain(enCatalogue.devices.loadError);
+    expect(html).not.toContain('devices → 500');
   });
 });

@@ -198,10 +198,11 @@ import {
   revokeDevice,
   type HubDevice,
 } from '../lib/devices';
+import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { isAdmin, logout } from '../lib/session';
 import { formatDateTime } from '../lib/format-datetime';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const router = useRouter();
 
 const devices = ref<HubDevice[]>([]);
@@ -223,8 +224,13 @@ const busy = ref(false);
 const MAX_DEVICE_NAME = 60;
 
 /** Motivo REAL del fallo, o `fallback` si no hubo ninguno (red/500) — igual que `DeviceModeCard`. */
+/**
+ * hub#1697 — a local door's words never reach the business. The door answers a stable code next to
+ * English prose meant for the log, so the code is what gets a sentence and the prose stays behind.
+ * Class-agnostic on purpose: what matters is that a code arrived, not which class wrapped it.
+ */
 function reasonOf(error: unknown, fallback: string): string {
-  return error instanceof DevicesError && error.message ? error.message : fallback;
+  return localDoorSentence(error, { t, te }, ['devices.errors', 'runtimeErrors'], fallback);
 }
 
 /**

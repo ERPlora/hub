@@ -59,21 +59,34 @@ export interface Revocation {
 
 /** A refused read or write, carrying the runtime's own reason so the screen can show it. */
 export class DevicesError extends Error {
-  constructor(message: string) {
+  /**
+   * The door's stable code (hub#1697). It is the only part of the refusal a screen can put in
+   * front of a person: the `message` beside it is English prose written for the log
+   * (`devices.rs`), and a Spanish till reading «the device name is at most 40 characters» is
+   * reading the log.
+   */
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
     super(message);
     this.name = 'DevicesError';
+    this.code = code;
   }
 }
 
 /** The reason a rejection gives, from either shape of the error body (string or object). */
 function rejection(body: unknown, status: number): DevicesError {
-  const error = (body as { error?: unknown } | null)?.error;
-  if (typeof error === 'string') return new DevicesError(error);
+  const envelope = body as { error?: unknown; code?: unknown } | null;
+  const error = envelope?.error;
+  // The code rides beside `error` on this door, and inside it on the enveloped ones.
+  const flat = typeof envelope?.code === 'string' ? envelope.code : undefined;
+  if (typeof error === 'string') return new DevicesError(error, flat);
   if (error && typeof error === 'object') {
-    const { message } = error as { message?: unknown };
-    if (typeof message === 'string') return new DevicesError(message);
+    const { message, code } = error as { message?: unknown; code?: unknown };
+    const nested = typeof code === 'string' ? code : flat;
+    if (typeof message === 'string') return new DevicesError(message, nested);
   }
-  return new DevicesError(`devices → ${status}`);
+  return new DevicesError(`devices → ${status}`, flat);
 }
 
 /**
