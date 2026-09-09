@@ -83,7 +83,10 @@ pub async fn on_event(
         )
         .await?;
 
-    let scope = json!({ "event": Json::Object(payload.clone()) });
+    // `now` for the same reason the executor's scope carries it (hub#1694): the filter speaks the
+    // kernel's condition language, and a `within_last` there with no clock in reach would answer
+    // `false` for ever without saying so.
+    let scope = def::event_scope(payload);
     let mut started = 0usize;
 
     for row in &candidates.rows {
@@ -517,6 +520,46 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(run_count(&db, &flow).await, 1);
+    }
+
+    /// hub#1694 — the filter is the kernel's condition language, so it reaches the clock too.
+    /// Without `now` in this scope a `within_last` here would answer `false` for ever and the
+    /// trigger would look like one that simply never fires.
+    #[tokio::test]
+    async fn a_filter_can_ask_the_clock_because_this_scope_carries_it_hub1694() {
+        let db = db().await;
+        let flow = flow_with(
+            &db,
+            on_sale(json!({ "event.opened_at": { "within_last": 3600 } })),
+        )
+        .await;
+        let at = |seconds: i64| {
+            json!((chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339())
+        };
+
+        on_event(
+            &db,
+            HUB,
+            "evt-stale",
+            "sale.completed",
+            &payload(&[("opened_at", at(7200))]),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(run_count(&db, &flow).await, 0, "two hours old: outside");
+
+        on_event(
+            &db,
+            HUB,
+            "evt-fresh",
+            "sale.completed",
+            &payload(&[("opened_at", at(60))]),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(run_count(&db, &flow).await, 1, "a minute old: inside");
     }
 
     #[tokio::test]

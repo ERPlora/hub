@@ -296,8 +296,14 @@ async fn advance_run(
                 .await
                 .map(|()| None);
         };
-        let scope =
-            json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
+        // The clock travels with the run's own facts (hub#1694): read once per step, so every
+        // clause of one `condition` — and the `{{now.iso}}` of the notify right after it — judge
+        // the same instant instead of landing either side of a tick.
+        let scope = json!({
+            "input": input,
+            "steps": vars.get("steps").cloned().unwrap_or(json!({})),
+            "now": def::clock(),
+        });
 
         match run_step(
             db,
@@ -1739,6 +1745,61 @@ mod tests {
             store::STATUS_DONE,
             "a guard that does not pass is the flow working, not failing"
         );
+    }
+
+    /// hub#1694 — the run knows what time it is, so a guard can be about a WINDOW.
+    ///
+    /// The case it was added for is Meta's: a WhatsApp conversation may be written to for free
+    /// only while the customer's last message is under 24 h old. Before this, the flow had no way
+    /// to ask — it sent, Meta refused, and the only trace was a failed step in a history nobody
+    /// reads.
+    #[tokio::test]
+    async fn a_guard_can_ask_whether_a_timestamp_is_still_inside_its_window_hub1694() {
+        let day_ago = |seconds: i64| {
+            (chrono::Utc::now() - chrono::Duration::seconds(seconds)).to_rfc3339()
+        };
+        for (last_message_at, should_write, why) in [
+            (day_ago(3600), true, "an hour old: inside Meta's 24 h"),
+            (day_ago(90_000), false, "25 h old: outside it"),
+        ] {
+            let db = db().await;
+            let flow_id = flow(
+                &db,
+                json!({
+                    "schema_version": 1,
+                    "steps": [
+                        { "id": "still_open", "kind": "condition",
+                          "when": { "input.last_message_at": { "within_last": 86400 } } },
+                        { "id": "write", "kind": "command", "command": "notes.note.add",
+                          "params": { "text": "reply" } }
+                    ]
+                }),
+            )
+            .await;
+            grant(&db, &flow_id, "notes.note.add").await;
+
+            store::start_run(
+                &db,
+                HUB,
+                &flow_id,
+                "",
+                "manual",
+                "",
+                &json!({ "last_message_at": last_message_at }),
+                0,
+                "t",
+            )
+            .await
+            .unwrap();
+            tick(&db, &registry(), HUB).await.unwrap();
+
+            assert_eq!(!notes(&db).await.is_empty(), should_write, "{why}");
+            assert_eq!(
+                run_of(&db, &flow_id).await.status,
+                store::STATUS_DONE,
+                "{why}: a guard that says no is the flow working, not failing"
+            );
+        }
     }
 
     #[tokio::test]
