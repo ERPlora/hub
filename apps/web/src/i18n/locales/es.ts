@@ -975,14 +975,20 @@ export default {
     loadError: 'No se pudo cargar el catálogo de roles.',
   },
   apiKeys: {
-    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    // hub#1697 + hub#1700 — ver el comentario gemelo en `en.ts`.
     errors: {
       not_found: 'Esa clave ya no existe. Actualiza la lista y vuelve a intentarlo.',
       rate_limited: 'Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.',
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede gestionar las claves de API.',
+      api_key: {
+        system_key: 'Esta clave la emite ERPlora para sí misma. No se puede rotar ni borrar.',
+      },
     },
     // Lista
     searchKey: 'Buscar API key…',
     empty: 'Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos del Hub.',
+    loadError: 'No se pudieron cargar tus claves de API. Vuelve a intentarlo en un momento.',
     newKey: 'Nueva API key',
     colName: 'Nombre',
     colPrefix: 'Token',
