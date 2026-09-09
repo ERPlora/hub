@@ -1761,3 +1761,40 @@ async fn hub1639_a_step_that_owes_data_cannot_end_by_parking_a_proposal() {
         "nothing was written to the business database"
     );
 }
+
+/// **hub#1689 — a proxy that does not answer leaves no address in the run.**
+///
+/// The turn's failure is written for the person who reads the run in the morning, and the
+/// `Display` of a `reqwest` error names the URL it dialled: the address this hub calls erplora.com
+/// on, host and port. That belongs in the hub's log. The reason keeps its stable code, so the
+/// screen can still say WHAT failed.
+#[tokio::test]
+async fn a_proxy_that_does_not_answer_leaves_no_address_in_the_run() {
+    let nowhere = "http://127.0.0.1:1".to_string();
+    let h = hub(nowhere.clone(), "no-answer", agent_step("manual"), &[]).await;
+    let run_id = start_run(&h, json!({ "text": "can I come tomorrow at 10?" })).await;
+
+    perform(&h, &run_id).await;
+
+    let rt = h.state.runtime.read().await;
+    let (run, steps) = rt.get_flow_run(&run_id).await.unwrap();
+    drop(rt);
+    let step = steps
+        .iter()
+        .find(|s| s.step_id == "agent")
+        .expect("the agent step was recorded");
+    for (what, text) in [
+        ("the step's error", step.error.as_str()),
+        ("the run's last_error", run.last_error.as_str()),
+    ] {
+        assert!(
+            !text.contains("127.0.0.1:1") && !text.contains(&nowhere),
+            "{what} names the address of the control plane: {text}"
+        );
+    }
+    assert!(
+        step.error.starts_with(agent_runner::ERR_UPSTREAM),
+        "the reason keeps its stable code: {}",
+        step.error
+    );
+}

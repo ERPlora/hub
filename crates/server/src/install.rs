@@ -156,6 +156,12 @@ async fn resolve_version(
 }
 
 /// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo como texto.
+/// The `Display` of a `reqwest` error names the address this hub calls erplora.com on. It goes
+/// to the hub's log; the person on the marketplace gets the stable code (hub#1689).
+fn cloud_unreachable(e: reqwest::Error) -> InstallError {
+    InstallError::Cloud(crate::cloud_proxy::cloud_unreachable(&e.to_string()).to_string())
+}
+
 async fn send_text(
     http: &reqwest::Client,
     req: &cloud_client::PreparedRequest,
@@ -164,16 +170,9 @@ async fn send_text(
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }
-    let resp = r
-        .send()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp
-        .error_for_status()
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    resp.text()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))
+    let resp = r.send().await.map_err(cloud_unreachable)?;
+    let resp = resp.error_for_status().map_err(cloud_unreachable)?;
+    resp.text().await.map_err(cloud_unreachable)
 }
 
 /// Descarga el ZIP del módulo **en streaming a un temp file** en la caché de módulos (mismo
@@ -194,13 +193,8 @@ async fn download_to_temp_file(
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }
-    let resp = r
-        .send()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp
-        .error_for_status()
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    let resp = r.send().await.map_err(cloud_unreachable)?;
+    let resp = resp.error_for_status().map_err(cloud_unreachable)?;
 
     std::fs::create_dir_all(cache_root).map_err(|e| InstallError::Source(e.into()))?;
     let mut tmp =
@@ -208,7 +202,7 @@ async fn download_to_temp_file(
     let mut hasher = Sha256::new();
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| InstallError::Cloud(e.to_string()))?;
+        let chunk = chunk.map_err(cloud_unreachable)?;
         hasher.update(&chunk);
         tmp.write_all(&chunk)
             .map_err(|e| InstallError::Source(e.into()))?;

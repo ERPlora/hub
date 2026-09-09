@@ -238,3 +238,125 @@ async fn the_guard_sees_a_door_that_hands_back_the_dialled_url() {
         "the marketplace catalogue hands the business the address of the control plane: {text}"
     );
 }
+
+/// The doors the sweep above cannot open with `{}`: each refuses the empty body BEFORE it dials
+/// erplora.com, so a leak behind its validation is invisible to the sweep. They are driven by hand
+/// with the smallest body that gets past the door, and held to the same rule (hub#1689, review).
+///
+///  - `POST /api/auth/courier` — the native shell's boot courier; needs a `code`.
+///  - `POST /api/modules/request-install` — the marketplace's «Install»; needs a module and a
+///    version. `/api/modules/:id/update` and «update all» share its pipeline and its error body.
+const DRIVEN_BY_HAND: [(&str, &str, &str); 2] = [
+    ("POST", "/api/auth/courier", r#"{"code":"abc"}"#),
+    (
+        "POST",
+        "/api/modules/request-install",
+        r#"{"module_id":"not_here","version":"1.0.0"}"#,
+    ),
+];
+
+#[tokio::test]
+async fn the_doors_the_sweep_cannot_open_with_an_empty_body_are_driven_by_hand() {
+    let (cloud_base_url, address) = a_control_plane_that_is_not_listening().await;
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-leak-by-hand");
+    rt.ensure_system_tables().await.unwrap();
+    let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
+    let session = rt.create_session(&admin, 3600, None).await.unwrap();
+    let router = app(AppState::with_config(rt, config(cloud_base_url.clone())));
+
+    let mut leaks: Vec<String> = Vec::new();
+    for (method, path, body) in DRIVEN_BY_HAND {
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(path)
+                    .header("x-hub-session", &session)
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        // The control of THIS control: a 502 is the only answer that proves the body got past
+        // the door and the hub actually dialled erplora.com. A 4xx here would be the door refusing
+        // the body, and a rule that is never reached is green for nothing.
+        assert_eq!(
+            status,
+            StatusCode::BAD_GATEWAY,
+            "{method} {path} did not get as far as dialling erplora.com: {text}"
+        );
+        if [address.as_str(), cloud_base_url.as_str()]
+            .iter()
+            .any(|needle| text.contains(needle))
+        {
+            leaks.push(format!(
+                "{method} {path} answered {status} naming the control plane: {text}"
+            ));
+        }
+    }
+    assert!(
+        leaks.is_empty(),
+        "{} hand-driven door(s) publish the address the hub calls erplora.com on:\n  - {}",
+        leaks.len(),
+        leaks.join("\n  - ")
+    );
+}
+
+/// The same rule for the two sources that never answer over HTTP but whose `Display` reaches a
+/// person all the same: the module storage — its error travels in the `/api/command` envelope to
+/// the module's own screen — and the notify transport — its error is the reason on the dead-letter
+/// row the owner reads. Neither is a route, so the sweep cannot see them (hub#1689, review).
+#[tokio::test]
+async fn the_sources_that_do_not_answer_over_http_keep_the_address_out_of_their_errors() {
+    use erplora_runtime::host_notify::{Channel, NotifyIntent, NotifyTransport, Routing};
+    use erplora_runtime::module_storage::ModuleStorage;
+    use erplora_server::module_storage::ModuleMediaStorage;
+    use erplora_server::notify_transport::CloudNotifyTransport;
+    use std::sync::{Arc, RwLock};
+
+    let (cloud_base_url, address) = a_control_plane_that_is_not_listening().await;
+    let machine_token = Arc::new(RwLock::new(Some("machine-secret".to_string())));
+
+    let storage =
+        ModuleMediaStorage::cloud(cloud_base_url.clone(), "hub-leak", machine_token.clone());
+    let error = storage
+        .write_module_file("hub-leak", "products", "a.txt", b"x", "text/plain")
+        .await
+        .expect_err("nobody is listening on that address");
+    let text = error.to_string();
+    assert!(
+        !text.contains(&address) && !text.contains(&cloud_base_url),
+        "the module storage names the control plane: {text}"
+    );
+
+    let transport = CloudNotifyTransport::new(
+        reqwest::Client::new(),
+        &cloud_base_url,
+        Arc::new(RwLock::new("hub-leak".to_string())),
+        machine_token,
+    );
+    let intent = NotifyIntent {
+        channel: Channel::Whatsapp,
+        to: "+34600000000".into(),
+        template: "reminder".into(),
+        vars: serde_json::Value::Null,
+        interactive: serde_json::Value::Null,
+    };
+    let error = transport
+        .send(&intent, Routing::CloudProxy)
+        .await
+        .expect_err("nobody is listening on that address");
+    let text = error.to_string();
+    assert!(
+        !text.contains(&address) && !text.contains(&cloud_base_url),
+        "the notify transport names the control plane: {text}"
+    );
+}

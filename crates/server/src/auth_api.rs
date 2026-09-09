@@ -492,7 +492,7 @@ pub(crate) async fn auth_courier(
         Err(error) => {
             return (
                 StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": format!("courier no disponible: {error}") })),
+                Json(json!({ "ok": false, "error": crate::cloud_proxy::cloud_unreachable(&error.to_string()) })),
             )
                 .into_response()
         }
