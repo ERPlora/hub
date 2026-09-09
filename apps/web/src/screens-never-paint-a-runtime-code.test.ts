@@ -23,7 +23,7 @@ const SRC = fileURLToPath(new URL('.', import.meta.url));
  * Screens that still show the runtime's own words, each with the reason it is not a hub#1693 leak.
  *
  * The list may only SHRINK: a file that gets fixed must leave (the test below fails on a stale
- * entry), and a new screen is never on it. Tracked in hub#1699.
+ * entry), and a new screen is never on it. Tracked in hub#1697.
  */
 const SHOWS_THE_ENGINE_TEXT_ON_PURPOSE: Record<string, string> = {
   'views/EmployeeFormPage.vue':
@@ -31,10 +31,10 @@ const SHOWS_THE_ENGINE_TEXT_ON_PURPOSE: Record<string, string> = {
     'field → platform code → the sentence that came. Only reached when none of the three matched.',
   'views/ApiKeysPanel.vue':
     'Local runtime doors (/api/keys): they never proxy erplora.com, so no cloud code can reach ' +
-    'this toast. Still engine prose in front of a person — hub#1699.',
+    'this toast. Still engine prose in front of a person — hub#1697.',
   'views/SystemPage.vue':
     'Dead-letter retry/discard are local runtime doors: no cloud proxy, no cloud code. The reason ' +
-    'is interpolated into a translated sentence — hub#1699.',
+    'is interpolated into a translated sentence — hub#1697.',
   'components/ModuleSettingsForm.vue':
     'The refusal arrives in the ErploraError envelope of /api/command, whose codes have been ' +
     'redacted since hub#1074; what is shown is the module refusal, not a transport code.',
