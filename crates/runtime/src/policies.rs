@@ -1,44 +1,44 @@
-//! **Las normas que escribe el CLIENTE** (ERPlora/hub#1701, ADR-0476).
+//! **The rules the CUSTOMER writes** (ERPlora/hub#1701, ADR-0476).
 //!
-//! Doc de diseño: `architecture/hub/policies.md`. El orden as-built de los gates del embudo vive
-//! en `architecture/hub/runtime-dispatcher.md` §2.0 y **no se copia aquí** — se referencia, que es
-//! justo la guardia anti-regresión que architecture#733 puso después de que ADR-0476 lo escribiese
-//! de memoria y lo publicase invertido.
+//! Design doc: `architecture/hub/policies.md`. The as-built order of the funnel's gates lives in
+//! `architecture/hub/runtime-dispatcher.md` §2.0 and is **not copied here** — it is referenced,
+//! which is exactly the anti-regression guard architecture#733 put in after ADR-0476 wrote that
+//! order from memory and published it inverted.
 //!
-//! # Las tres piezas
+//! # The three pieces
 //!
-//! 1. **El módulo declara el punto de control**, por convención de carpeta:
-//!    `<módulo>/policies/<nombre>.checkpoint.json`. Ni una clave nueva del manifest: la raíz es
-//!    `additionalProperties: false` (ADR-0286) y una clave nueva le pondría suelo de versión de hub
-//!    a todo módulo que la declarase (mismo razonamiento que `flows/`, ADR-0463).
-//! 2. **El dueño escribe la norma** en `_policy`, con el lenguaje de condiciones **ya congelado**
-//!    de los flujos ([`crate::flows::Condition`], nueve operadores en AND, conjunto cerrado). No se
-//!    estrena DSL.
-//! 3. **El runtime la aplica** en un punto exacto del embudo, [`enforce`], llamado desde
-//!    [`crate::commands::execute_at`] después del bloque de schema y antes de la bifurcación de
-//!    tier.
+//! 1. **The module declares the checkpoint**, by folder convention:
+//!    `<module>/policies/<name>.checkpoint.json`. Not a new manifest key: the root is
+//!    `additionalProperties: false` (ADR-0286) and a new key would put a hub version floor on every
+//!    module that declared it (same reasoning as `flows/`, ADR-0463).
+//! 2. **The owner writes the rule** into `_policy`, with the **already frozen** condition language
+//!    of the flows ([`crate::flows::Condition`], nine operators in AND, a closed set). No new DSL
+//!    ships.
+//! 3. **The runtime applies it** at one exact point of the funnel, [`enforce`], called from
+//!    [`crate::commands::execute_at`] after the schema block and before the tier fork.
 //!
-//! # Por qué [`enforce`] NO recibe la base de datos
+//! # Why [`enforce`] does NOT receive the database
 //!
-//! No es un olvido: es la guarda de **coste acotado** escrita en el sistema de tipos. El gate corre
-//! en **cada** command, y una lectura por command se paga en cada venta —además de retener el
-//! guard compartido del runtime, que es justo (`crates/server/src/boot.rs`), así que un lector lento
-//! deja esperando al escritor pendiente y a los lectores de detrás. Que la firma no tenga `db` hace
-//! **imposible** añadir I/O aquí de paso; las filas llegan de [`PolicyIndex`], un mapa en memoria
-//! que se refresca al arrancar y en cada escritura del CRUD.
+//! Not an oversight: it is the **bounded-cost** guard written into the type system. The gate runs
+//! on **every** command, and one read per command is paid on every sale — on top of holding the
+//! runtime's shared guard, which is fair (`crates/server/src/boot.rs`), so a slow reader leaves the
+//! pending writer and the readers behind it waiting. A signature without `db` makes it
+//! **impossible** to add I/O here in passing; the rows come from [`PolicyIndex`], an in-memory map
+//! refreshed at boot and on every write of the CRUD.
 //!
-//! # Fallo CERRADO, y por qué no se hereda el del vecino
+//! # Fails CLOSED, and why it does not inherit the neighbour's behaviour
 //!
-//! `protects` —el gate de al lado— degrada **abierto**, y para su caso es correcto: una caja que
-//! deja de cobrar por una lectura rota es peor fallo que una venta que se cuela. Una política es lo
-//! contrario: existe para **impedir**, así que degradarla abierta en silencio la convierte en
-//! decoración. Aquí lo que no se puede evaluar **DENIEGA** (`policies.md` §6.1).
+//! `protects` — the gate next door — degrades **open**, and for its case that is correct: a till
+//! that stops charging because of a broken read is a worse failure than one sale slipping through.
+//! A policy is the opposite: it exists to **forbid**, so degrading it open in silence turns it into
+//! decoration. Here, what cannot be evaluated **DENIES** (`policies.md` §6.1).
 //!
-//! 🔴 Y el hecho ausente se detecta **comprobando presencia ANTES de evaluar**, nunca leyendo el
-//! resultado de la evaluación: [`crate::flows::Condition::matches`] devuelve un `bool` pelado y un
-//! camino ausente da `false`, **el mismo valor** que «la condición no casaba». Un gate que actuase
-//! sobre ese `bool` no podría distinguirlos, y como una política es «si casa → `block`», el hecho
-//! ausente haría que **no dispare y el command pase**: fail-open mudo por la puerta de atrás.
+//! 🔴 And the missing fact is detected by **checking presence BEFORE evaluating**, never by reading
+//! the result of the evaluation: [`crate::flows::Condition::matches`] returns a bare `bool` and an
+//! absent path yields `false`, **the same value** as «the condition did not match». A gate acting
+//! on that `bool` could not tell them apart, and since a policy is «if it matches → `block`», the
+//! missing fact would make it **not fire and let the command through**: a silent fail-open through
+//! the back door.
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use std::sync::RwLock;
@@ -52,54 +52,55 @@ use crate::flows::Condition;
 use crate::manifest::Manifest;
 use crate::registry::{new_id, now_rfc3339};
 
-/// Sufijo de los documentos de la carpeta `policies/`.
+/// Suffix of the documents in the `policies/` folder.
 const CHECKPOINT_SUFFIX: &str = ".checkpoint.json";
 
-/// El documento no se puede leer del paquete.
+/// The document cannot be read out of the package.
 pub const DISCARD_UNREADABLE_DOCUMENT: &str = "unreadable_document";
-/// El documento no se lee como JSON, o sus campos no tienen la forma del contrato.
+/// The document does not read as JSON, or its fields do not have the shape of the contract.
 pub const DISCARD_INVALID_DOCUMENT: &str = "invalid_document";
-/// El `command` no lo declara el manifest de este módulo.
+/// The `command` is not declared by this module's manifest.
 pub const DISCARD_COMMAND_NOT_DECLARED: &str = "command_not_declared";
-/// El `command` es de OTRO módulo. Un módulo solo habla en su namespace (hub#139, hub#351); parar
-/// los commands de otro ya tiene su puerta declarada y consentida, y es `protects` (hub#775).
+/// The `command` belongs to ANOTHER module. A module only speaks in its own namespace (hub#139,
+/// hub#351); stopping another module's commands already has its declared and consented door, and
+/// that door is `protects` (hub#775).
 pub const DISCARD_FOREIGN_COMMAND: &str = "foreign_command";
-/// El command no declara schema de payload, así que no hay `facts` que pueda aportar.
+/// The command declares no payload schema, so there are no `facts` it could supply.
 pub const DISCARD_COMMAND_WITHOUT_SCHEMA: &str = "command_without_schema";
-/// Un `fact` cuya raíz el schema del command no declara. **Esta es la válvula** que hace segura la
-/// denegación fail-closed del gate: se ve al instalar, no en mitad de una venta.
+/// A `fact` whose root the command's schema does not declare. **This is the valve** that makes the
+/// gate's fail-closed denial safe: it shows up at install time, not in the middle of a sale.
 pub const DISCARD_FACT_NOT_DECLARED: &str = "fact_not_declared";
-/// Un `fact` que no es un camino punteado del lenguaje congelado (`lines[].x`, `a..b`, vacío).
+/// A `fact` that is not a dotted path of the frozen language (`lines[].x`, `a..b`, empty).
 pub const DISCARD_INVALID_FACT_PATH: &str = "invalid_fact_path";
-/// El checkpoint no declara ningún `fact`: no hay nada sobre lo que razonar.
+/// The checkpoint declares no `fact`: there is nothing to reason about.
 pub const DISCARD_NO_FACTS: &str = "no_facts";
-/// Un `outcome` fuera del vocabulario cerrado (`block`, `elevate:<permiso>`).
+/// An `outcome` outside the closed vocabulary (`block`, `elevate:<permission>`).
 pub const DISCARD_UNKNOWN_OUTCOME: &str = "unknown_outcome";
-/// El checkpoint no declara ningún `outcome`.
+/// The checkpoint declares no `outcome`.
 pub const DISCARD_NO_OUTCOMES: &str = "no_outcomes";
-/// Otro checkpoint del módulo ya se enganchó a ese command.
+/// Another checkpoint of the module already hooked onto that command.
 pub const DISCARD_DUPLICATE_COMMAND: &str = "duplicate_command";
 
-/// Un punto de control declarado por un módulo: dónde puede el dueño poner una norma, y con qué
-/// datos puede razonar.
+/// A checkpoint declared by a module: where the owner may put a rule, and what data it may reason
+/// about.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct PolicyCheckpoint {
-    /// `<módulo>/<nombre>` — el nombre estable con el que una fila de `_policy` lo referencia. La
-    /// misma forma que `_flow.template_ref` (v60), y por el mismo motivo: es lo que el módulo ya
-    /// sabe de sí mismo y no cambia entre releases suyas.
+    /// `<module>/<name>` — the stable name a `_policy` row references it by. The same shape as
+    /// `_flow.template_ref` (v60), and for the same reason: it is what the module already knows
+    /// about itself and it does not change between its releases.
     pub id: String,
     pub module_id: String,
-    /// El command que este checkpoint gatea. Del propio módulo, siempre.
+    /// The command this checkpoint gates. Always one of the module's own.
     pub command: String,
-    /// Los hechos con los que se puede razonar: caminos punteados dentro del payload del command,
-    /// **ya validado, defaulteado y coercionado** (el gate corre después de ese bloque).
+    /// The facts it may reason about: dotted paths inside the command's payload, **already
+    /// validated, defaulted and coerced** (the gate runs after that block).
     pub facts: Vec<String>,
-    /// El vocabulario que este checkpoint admite. `block` · `elevate:<permiso>`.
+    /// The vocabulary this checkpoint accepts. `block` · `elevate:<permission>`.
     pub outcomes: Vec<String>,
 }
 
-/// Lo que la carpeta `policies/` aportó y lo que **no**, con su motivo (mismo contrato que
-/// [`crate::manifest::FlowTemplateScan`], hub#1649: best-effort no es mudo).
+/// What the `policies/` folder contributed and what it did **not**, with the reason (same contract
+/// as [`crate::manifest::FlowTemplateScan`], hub#1649: best-effort is not mute).
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct CheckpointScan {
     pub checkpoints: Vec<PolicyCheckpoint>,
@@ -108,7 +109,7 @@ pub struct CheckpointScan {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct CheckpointDiscard {
-    /// El nombre del documento (el trozo antes de `.checkpoint.json`).
+    /// The document's name (the part before `.checkpoint.json`).
     pub name: String,
     pub code: String,
     pub detail: String,
@@ -128,7 +129,7 @@ impl CheckpointScan {
     }
 }
 
-/// El documento tal cual viaja en el paquete.
+/// The document exactly as it travels in the package.
 #[derive(serde::Deserialize)]
 struct CheckpointDoc {
     command: String,
@@ -138,21 +139,22 @@ struct CheckpointDoc {
     outcomes: Vec<String>,
 }
 
-/// Lee `<dir>/policies/*.checkpoint.json` y devuelve lo que este hub va a ofrecer.
+/// Reads `<dir>/policies/*.checkpoint.json` and returns what this hub is going to offer.
 ///
-/// **Best-effort y no mudo**: un paquete de terceros roto no puede impedir que el hub levante (esto
-/// corre en cada arranque por `rehydrate_installed`), pero lo descartado sale con su código.
+/// **Best-effort and not mute**: a broken third-party package cannot stop the hub from coming up
+/// (this runs on every boot through `rehydrate_installed`), but whatever is discarded comes out
+/// with its code.
 ///
-/// El resultado va **ordenado por nombre de documento** para que dos arranques den lo mismo: de ahí
-/// depende cuál de dos checkpoints sobre el mismo command sobrevive.
+/// The result is **ordered by document name** so that two boots give the same thing: which of two
+/// checkpoints over the same command survives depends on that order.
 pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
     let mut scan = CheckpointScan::default();
     let Ok(entries) = std::fs::read_dir(dir.join("policies")) else {
         return scan;
     };
 
-    // 1ª pasada: recoger los documentos por nombre. `BTreeMap` = orden estable por bytes, que es lo
-    // que hace determinista el desempate de `DISCARD_DUPLICATE_COMMAND`.
+    // 1st pass: collect the documents by name. `BTreeMap` = stable order by bytes, which is what
+    // makes the `DISCARD_DUPLICATE_COMMAND` tie-break deterministic.
     let mut docs: BTreeMap<String, std::path::PathBuf> = BTreeMap::new();
     for entry in entries.flatten() {
         let path = entry.path();
@@ -169,7 +171,8 @@ pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
         }
     }
 
-    // Cache de los schemas ya leídos: dos checkpoints del mismo command no releen el fichero.
+    // Cache of the schemas already read: two checkpoints of the same command do not re-read the
+    // file.
     let mut schema_props: HashMap<String, Option<Vec<String>>> = HashMap::new();
     let mut taken: HashMap<String, String> = HashMap::new();
 
@@ -197,8 +200,9 @@ pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
             }
         };
 
-        // (1) Namespace ANTES que nada: el `command` de otro módulo no es cosa de este documento,
-        // y decirle «no lo declaras» sería mandarle a mirar el fichero equivocado.
+        // (1) Namespace BEFORE anything else: another module's `command` is none of this
+        // document's business, and telling it «you do not declare it» would send it to look at the
+        // wrong file.
         if !is_own_command(&manifest.id, &doc.command) {
             scan.discard(
                 &name,
@@ -241,8 +245,8 @@ pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
             continue;
         }
 
-        // (3) Los hechos. La válvula de la denegación fail-closed: si el command no puede
-        // aportarlos, se ve AQUÍ —al instalar— y no en mitad de una venta.
+        // (3) The facts. The valve of the fail-closed denial: if the command cannot supply them,
+        // it shows up HERE — at install time — and not in the middle of a sale.
         if doc.facts.is_empty() {
             scan.discard(
                 &name,
@@ -297,7 +301,7 @@ pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
             continue;
         }
 
-        // (4) Un command, un gate. Si no, qué norma se aplica dependería del orden del directorio.
+        // (4) One command, one gate. Otherwise which rule applies would depend on directory order.
         if let Some(first) = taken.get(&doc.command) {
             scan.discard(
                 &name,
@@ -322,21 +326,21 @@ pub fn scan_checkpoints(dir: &Path, manifest: &Manifest) -> CheckpointScan {
     scan
 }
 
-/// ¿`command` pertenece al namespace de `module_id`? Mismo criterio que el resto del kernel: el
-/// nombre de un command empieza por el id de su módulo y un punto.
+/// Does `command` belong to `module_id`'s namespace? Same criterion as the rest of the kernel: a
+/// command's name starts with its module's id and a dot.
 fn is_own_command(module_id: &str, command: &str) -> bool {
     command
         .strip_prefix(module_id)
         .is_some_and(|rest| rest.starts_with('.'))
 }
 
-/// La raíz de un camino punteado: `order.total` → `order`.
+/// The root of a dotted path: `order.total` → `order`.
 fn fact_root(fact: &str) -> &str {
     fact.split('.').next().unwrap_or(fact)
 }
 
-/// ¿Es un camino punteado que [`resolve_path`] sabe resolver? Sin segmentos vacíos y sin nada que
-/// no sea una clave de objeto (los índices y las colecciones no los entiende el lenguaje).
+/// Is it a dotted path [`resolve_path`] knows how to resolve? No empty segments and nothing that is
+/// not an object key (the language does not understand indices or collections).
 fn is_plain_path(path: &str) -> bool {
     !path.is_empty()
         && path.split('.').all(|s| {
@@ -346,8 +350,8 @@ fn is_plain_path(path: &str) -> bool {
         })
 }
 
-/// Las propiedades de primer nivel del JSON Schema de un command. `None` si no hay schema legible o
-/// si no declara `properties` — en los dos casos no hay nada contra lo que validar los `facts`.
+/// The first-level properties of a command's JSON Schema. `None` if there is no readable schema or
+/// if it declares no `properties` — in both cases there is nothing to validate the `facts` against.
 fn schema_roots(dir: &Path, rel: &str) -> Option<Vec<String>> {
     let text = std::fs::read_to_string(dir.join(rel)).ok()?;
     let doc: Json = serde_json::from_str(&text).ok()?;
@@ -358,13 +362,15 @@ fn schema_roots(dir: &Path, rel: &str) -> Option<Vec<String>> {
     Some(props.keys().cloned().collect())
 }
 
-/// La consecuencia que el dueño elige. **Vocabulario cerrado**: uno desconocido no se adivina.
+/// The consequence the owner picks. **Closed vocabulary**: an unknown one is not guessed at.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
-    /// No dejar. Sale por el canal de errores de dominio (ADR-0205) con el mensaje del dueño.
+    /// Do not allow it. Comes out through the domain error channel (ADR-0205) with the owner's
+    /// message.
     Block,
-    /// Pedírselo al encargado. **Este core todavía no lo ejecuta** (hub#1710): se reconoce para que
-    /// un checkpoint que lo declare no pierda su `block`, y escribir una política así se rechaza.
+    /// Ask the manager for it. **This core does not run it yet** (hub#1710): it is recognised so
+    /// that a checkpoint declaring it does not lose its `block`, and writing such a policy is
+    /// refused.
     Elevate(String),
 }
 
@@ -386,9 +392,9 @@ impl Outcome {
     }
 }
 
-/// `warn` avisa; `enforce` impide. La rampa obligatoria antes de poner una norma en vigor — lo que
-/// Stripe Radar llama *Review*, y por el mismo motivo: una norma que bloquea mal en un TPV **para
-/// la caja**, y el dueño la escribió sin poder probarla contra su día real.
+/// `warn` warns; `enforce` forbids. The mandatory ramp before putting a rule into force — what
+/// Stripe Radar calls *Review*, and for the same reason: a rule that blocks wrongly in a POS
+/// **stops the till**, and the owner wrote it without being able to try it against their real day.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Warn,
@@ -412,65 +418,66 @@ impl Mode {
     }
 }
 
-/// Una norma del dueño tal y como está guardada, lista para evaluarse **sin tocar la BD**.
+/// One of the owner's rules exactly as it is stored, ready to be evaluated **without touching the
+/// database**.
 ///
-/// No lleva los `facts`: esos son del **checkpoint**, y el checkpoint vive en el paquete del
-/// módulo. Leerlos del Registry en el momento de aplicar —en vez de congelarlos aquí al cargar—
-/// es lo que hace que desinstalar el módulo deje de aplicar sus normas y reinstalarlo las vuelva a
-/// poner en vigor, sin que nadie tenga que acordarse de refrescar nada.
+/// It does not carry the `facts`: those belong to the **checkpoint**, and the checkpoint lives in
+/// the module's package. Reading them from the Registry at the moment of applying — instead of
+/// freezing them here at load time — is what makes uninstalling the module stop applying its rules
+/// and reinstalling it put them back in force, without anyone having to remember to refresh
+/// anything.
 #[derive(Debug, Clone)]
 pub struct ActivePolicy {
     pub id: String,
     pub hub_id: String,
     pub checkpoint: String,
-    /// `None` = la condición guardada no se puede leer con este core → **deniega** (fail-closed).
+    /// `None` = the stored condition cannot be read by this core → **denies** (fail-closed).
     pub condition: Option<Condition>,
-    /// `None` = la consecuencia guardada no la sabe ejecutar este core → **deniega**.
+    /// `None` = this core does not know how to run the stored consequence → **denies**.
     pub outcome: Option<Outcome>,
     pub message: String,
     pub mode: Mode,
 }
 
-/// Techo de normas por punto de control (guarda de **coste acotado**). El gate compara en memoria,
-/// pero la comparación sigue siendo trabajo por command: sin techo, un hub con cien normas sobre
-/// `sales.complete_sale` las paga en cada venta.
+/// Ceiling of rules per checkpoint (**bounded-cost** guard). The gate compares in memory, but the
+/// comparison is still work per command: with no ceiling, a hub with a hundred rules over
+/// `sales.complete_sale` pays for them on every sale.
 pub const MAX_POLICIES_PER_CHECKPOINT: usize = 20;
 
-/// El índice en memoria del que lee [`enforce`]: `checkpoint → normas activas`.
+/// The in-memory index [`enforce`] reads from: `checkpoint → active rules`.
 ///
-/// Vive en el [`crate::registry::Registry`] por el mismo motivo por el que vive ahí `demo_hub`: es
-/// la única autoridad que llega a `commands::execute_at` por **todos** los caminos (HTTP, API
-/// pública, asistente, relay del outbox, scheduler) y que ningún llamador puede fabricar. Un
-/// parámetro más de la firma sería una etiqueta que la próxima puerta nueva podría olvidarse de
-/// poner, y olvidarla aquí es dejar el gate abierto.
+/// It lives in the [`crate::registry::Registry`] for the same reason `demo_hub` lives there: it is
+/// the only authority that reaches `commands::execute_at` through **every** path (HTTP, public API,
+/// assistant, outbox relay, scheduler) and that no caller can fabricate. One more parameter on the
+/// signature would be a label the next new door could forget to attach, and forgetting it here
+/// means leaving the gate open.
 ///
-/// 🔴 **Está indexado por CHECKPOINT y no por command, y eso no es un detalle.** Con un índice por
-/// command, el mapa dependería de dos cosas que cambian por caminos distintos —las filas de
-/// `_policy` y los módulos instalados—, así que habría que reconstruirlo también en `install`,
-/// `update`, `activate`, `deactivate`, `uninstall` y la re-hidratación del arranque: **ocho sitios**
-/// donde olvidarse de una línea deja normas sin aplicar sin decir nada. Indexado por checkpoint solo
-/// depende de las filas, así que se refresca donde las filas cambian (el arranque y cada escritura
-/// del CRUD) y el resto lo resuelve el Registry en el momento de aplicar.
+/// 🔴 **It is indexed by CHECKPOINT and not by command, and that is not a detail.** With an index
+/// by command, the map would depend on two things that change through different paths — the
+/// `_policy` rows and the installed modules — so it would have to be rebuilt in `install`,
+/// `update`, `activate`, `deactivate`, `uninstall` and the boot re-hydration too: **eight places**
+/// where forgetting one line leaves rules unapplied without saying anything. Indexed by checkpoint
+/// it depends only on the rows, so it is refreshed where the rows change (boot and every write of
+/// the CRUD) and the Registry resolves the rest at the moment of applying.
 #[derive(Debug, Default)]
 pub struct PolicyIndex {
     by_checkpoint: RwLock<HashMap<String, Vec<ActivePolicy>>>,
 }
 
 impl PolicyIndex {
-    /// Sustituye el índice entero. Lo llama el arranque y **cada escritura del CRUD**: una norma que
-    /// el dueño acaba de guardar tiene que estar en vigor en la siguiente venta, no en el próximo
-    /// reinicio.
+    /// Replaces the whole index. Called by boot and by **every write of the CRUD**: a rule the
+    /// owner has just saved has to be in force on the next sale, not on the next restart.
     pub fn replace(&self, by_checkpoint: HashMap<String, Vec<ActivePolicy>>) {
         match self.by_checkpoint.write() {
             Ok(mut guard) => *guard = by_checkpoint,
-            // Un `RwLock` envenenado significa que un hilo entró en pánico con el guard cogido. No
-            // hay estado que salvar aquí —el índice se reconstruye entero— así que se recupera en
-            // vez de propagar el pánico al arranque.
+            // A poisoned `RwLock` means a thread panicked while holding the guard. There is no
+            // state to save here — the index is rebuilt whole — so it recovers instead of
+            // propagating the panic to boot.
             Err(poisoned) => *poisoned.into_inner() = by_checkpoint,
         }
     }
 
-    /// Las normas de un punto de control. Vacío = no hay gate y no se paga nada.
+    /// The rules of one checkpoint. Empty = there is no gate and nothing is paid for.
     fn for_checkpoint<T>(&self, checkpoint: &str, f: impl FnOnce(&[ActivePolicy]) -> T) -> T {
         let guard = match self.by_checkpoint.read() {
             Ok(guard) => guard,
@@ -479,8 +486,7 @@ impl PolicyIndex {
         f(guard.get(checkpoint).map(Vec::as_slice).unwrap_or(&[]))
     }
 
-    /// Cuántas normas hay en vigor en total. Para `/readyz` y los tests; no está en el camino
-    /// caliente.
+    /// How many rules are in force in total. For `/readyz` and the tests; not on the hot path.
     pub fn len(&self) -> usize {
         let guard = match self.by_checkpoint.read() {
             Ok(guard) => guard,
@@ -494,33 +500,33 @@ impl PolicyIndex {
     }
 }
 
-/// Código de dominio (ADR-0205) de una orden que una norma del negocio **impide**. Estable y
-/// namespaced; el texto que lee la persona es el que escribió el dueño y viaja en `message`.
+/// Domain code (ADR-0205) of a command a business rule **forbids**. Stable and namespaced; the text
+/// the person reads is the one the owner wrote and it travels in `message`.
 pub const ERR_BLOCKED: &str = "policy.blocked";
-/// Falta un hecho que el checkpoint declara. **Deniega** — ver el §6.1 del doc.
+/// A fact the checkpoint declares is missing. **Denies** — see §6.1 of the doc.
 pub const ERR_FACT_MISSING: &str = "policy.fact_missing";
-/// La norma guardada nombra una consecuencia que este core no sabe ejecutar (p. ej. `elevate:` en
-/// un hub que rodó atrás). **Deniega**: una política que no se puede aplicar no se ignora.
+/// The stored rule names a consequence this core does not know how to run (e.g. `elevate:` on a hub
+/// that was rolled back). **Denies**: a policy that cannot be applied is not ignored.
 pub const ERR_OUTCOME_NOT_AVAILABLE: &str = "policy.outcome_not_available";
-/// La condición guardada no se puede leer con este core. **Deniega**, por lo mismo.
+/// The stored condition cannot be read by this core. **Denies**, for the same reason.
 pub const ERR_CONDITION_UNREADABLE: &str = "policy.condition_unreadable";
 
-// ── Códigos de la puerta de ESCRITURA (el CRUD) ───────────────────────────────────────────────
-/// No hay ninguna norma con ese id en este hub.
+// ── Codes of the WRITE door (the CRUD) ────────────────────────────────────────────────────────
+/// There is no rule with that id in this hub.
 pub const ERR_NOT_FOUND: &str = "policy.not_found";
-/// El punto de control ya tiene [`MAX_POLICIES_PER_CHECKPOINT`] normas.
+/// The checkpoint already holds [`MAX_POLICIES_PER_CHECKPOINT`] rules.
 pub const ERR_TOO_MANY: &str = "policy.too_many";
-/// Ningún módulo instalado y activo ofrece ese punto de control.
+/// No installed and active module offers that checkpoint.
 pub const ERR_CHECKPOINT_NOT_FOUND: &str = "policy.checkpoint_not_found";
-/// La condición nombra un dato que el checkpoint no declara como `fact`.
+/// The condition names a datum the checkpoint does not declare as a `fact`.
 pub const ERR_FACT_NOT_DECLARED: &str = "policy.fact_not_declared";
-/// El checkpoint no ofrece esa consecuencia.
+/// The checkpoint does not offer that consequence.
 pub const ERR_OUTCOME_NOT_OFFERED: &str = "policy.outcome_not_offered";
-/// Un `block` sin mensaje sería una negativa muda.
+/// A `block` with no message would be a mute refusal.
 pub const ERR_MESSAGE_REQUIRED: &str = "policy.message_required";
-/// `mode` fuera de `warn`/`enforce`.
+/// `mode` outside `warn`/`enforce`.
 pub const ERR_UNKNOWN_MODE: &str = "policy.unknown_mode";
-/// Una condición vacía casa SIEMPRE.
+/// An empty condition matches ALWAYS.
 pub const ERR_EMPTY_CONDITION: &str = "policy.empty_condition";
 
 fn domain(code: &str, message: String) -> RuntimeError {
@@ -530,24 +536,24 @@ fn domain(code: &str, message: String) -> RuntimeError {
     }
 }
 
-/// **El gate.** Corre en [`crate::commands::execute_at`] después del bloque de schema y antes de la
-/// bifurcación de tier — ver `runtime-dispatcher.md` §2.0 para el orden completo y `policies.md`
-/// §4.3 para por qué ese punto no es negociable.
+/// **The gate.** Runs in [`crate::commands::execute_at`] after the schema block and before the tier
+/// fork — see `runtime-dispatcher.md` §2.0 for the full order and `policies.md` §4.3 for why that
+/// point is not negotiable.
 ///
-/// Sin `db` a propósito: ver la nota de módulo. `payload` es el **ya validado, defaulteado y
-/// coercionado**, que es lo que hace que un hecho ausente signifique de verdad «el módulo no lo
-/// aportó» y no «el llamador lo omitió y el schema lo iba a rellenar».
+/// Without `db` on purpose: see the module note. `payload` is the **already validated, defaulted and
+/// coerced** one, which is what makes a missing fact really mean «the module did not supply it» and
+/// not «the caller omitted it and the schema was going to fill it in».
 ///
-/// Devuelve los veredictos de `mode: warn` —los que avisaron sin impedir— para que la rampa sea
-/// observable sin que el gate escriba en la BD.
+/// Returns the verdicts of `mode: warn` — the ones that warned without forbidding — so the ramp is
+/// observable without the gate writing to the database.
 pub fn enforce(
     registry: &crate::registry::Registry,
     command: &str,
     payload: &Params,
     hub_id: &str,
 ) -> Result<Vec<Verdict>> {
-    // Ningún módulo activo declara un punto de control sobre este command: no hay gate, y lo único
-    // que se ha pagado es una búsqueda en un mapa.
+    // No active module declares a checkpoint over this command: there is no gate, and the only
+    // thing paid for is one map lookup.
     let Some(checkpoint) = registry.policy_checkpoint_for_command(command) else {
         return Ok(Vec::new());
     };
@@ -558,15 +564,16 @@ pub fn enforce(
         let scope = Json::Object(payload.clone().into_iter().collect());
         let mut warned = Vec::new();
         for policy in policies {
-            // Tenancy antes que nada: las normas son del hub que las escribió (contrato de fila).
+            // Tenancy before anything else: the rules belong to the hub that wrote them (row
+            // contract).
             if policy.hub_id != hub_id {
                 continue;
             }
             match evaluate(policy, &checkpoint.facts, &scope) {
                 Some(refusal) if policy.mode == Mode::Enforce => return Err(refusal.into_error()),
                 Some(refusal) => {
-                    // `warn`: se registra y NUNCA impide. Es la rampa con la que el dueño ve qué
-                    // se dispararía antes de ponerlo en vigor.
+                    // `warn`: it is logged and NEVER forbids. It is the ramp the owner uses to see
+                    // what would fire before putting it into force.
                     eprintln!(
                         "[policy] warn {} ({}) sobre `{command}`: {} — {}",
                         refusal.policy_id, refusal.checkpoint, refusal.code, refusal.message
@@ -580,8 +587,8 @@ pub fn enforce(
     })
 }
 
-/// Lo que una norma dictaminó. Se devuelve para que `warn` sea observable sin que el gate escriba
-/// en la BD (guarda de coste acotado).
+/// What a rule ruled. Returned so that `warn` is observable without the gate writing to the
+/// database (bounded-cost guard).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Verdict {
     pub policy_id: String,
@@ -599,12 +606,12 @@ impl Verdict {
     }
 }
 
-/// `Some(v)` = esta norma dice que NO. `None` = deja pasar.
+/// `Some(v)` = this rule says NO. `None` = it lets it through.
 ///
-/// 🔴 El orden importa y es la mitad del arreglo: **primero la presencia de los hechos declarados**,
-/// y solo después la condición. [`Condition::matches`] devuelve un `bool` pelado y un camino ausente
-/// da `false`, exactamente igual que «no casaba»; leer ese `bool` para decidir haría que un hecho
-/// ausente dejase pasar el command.
+/// 🔴 The order matters and it is half the fix: **first the presence of the declared facts**, and
+/// only then the condition. [`Condition::matches`] returns a bare `bool` and an absent path yields
+/// `false`, exactly like «it did not match»; reading that `bool` to decide would make a missing fact
+/// let the command through.
 fn evaluate(policy: &ActivePolicy, facts: &[String], scope: &Json) -> Option<Verdict> {
     let refuse = |code: &'static str, message: String| {
         Some(Verdict {
@@ -645,7 +652,7 @@ fn evaluate(policy: &ActivePolicy, facts: &[String], scope: &Json) -> Option<Ver
     }
     match outcome {
         Outcome::Block => refuse(ERR_BLOCKED, policy.message.clone()),
-        // Un `elevate:` que llegó a la tabla (hub rodado atrás) no se ignora: deniega.
+        // An `elevate:` that reached the table (rolled-back hub) is not ignored: it denies.
         Outcome::Elevate(_) => refuse(
             ERR_OUTCOME_NOT_AVAILABLE,
             format!(
@@ -657,11 +664,11 @@ fn evaluate(policy: &ActivePolicy, facts: &[String], scope: &Json) -> Option<Ver
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// La puerta de ESCRITURA: lo que el dueño guarda en `_policy`
+// The WRITE door: what the owner stores in `_policy`
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/// Una norma tal como la ve la API. `condition` viaja como documento, no como cadena: el llamador
-/// mandó JSON y recibe JSON.
+/// A rule as the API sees it. `condition` travels as a document, not as a string: the caller sent
+/// JSON and gets JSON back.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Policy {
     pub id: String,
@@ -677,7 +684,7 @@ pub struct Policy {
     pub updated_by: String,
 }
 
-/// Lo que carga un `POST`/`PUT`.
+/// What a `POST`/`PUT` carries.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct NewPolicy {
     pub checkpoint: String,
@@ -701,8 +708,8 @@ fn policy_row(row: &Json) -> Policy {
     Policy {
         id: text("id"),
         checkpoint: text("checkpoint"),
-        // Una condición ilegible se devuelve como `null` en vez de reventar la lectura: la pantalla
-        // del dueño tiene que poder ENSEÑAR la norma rara para que alguien la borre. El gate ya la
+        // An unreadable condition is returned as `null` instead of blowing up the read: the owner's
+        // screen has to be able to SHOW the odd rule so that someone can delete it. The gate already
         // trata aparte, y denegando.
         condition: serde_json::from_str(&text("condition")).unwrap_or(Json::Null),
         outcome: text("outcome"),
@@ -719,11 +726,11 @@ fn policy_row(row: &Json) -> Policy {
     }
 }
 
-/// Comprueba una norma **antes** de guardarla, contra el punto de control que dice gatear.
+/// Checks a rule **before** storing it, against the checkpoint it claims to gate.
 ///
-/// Es la otra mitad del fallo cerrado: como una norma que no se puede evaluar DENIEGA, todo lo que
-/// se pueda comprobar al escribirla se comprueba AQUÍ —en la pantalla donde el dueño la está
-/// escribiendo— y no en mitad de una venta.
+/// It is the other half of failing closed: since a rule that cannot be evaluated DENIES, everything
+/// that can be checked when writing it is checked HERE — on the screen where the owner is writing
+/// it — and not in the middle of a sale.
 fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()> {
     let Some(mode) = Mode::parse(&new.mode) else {
         return Err(domain(
@@ -740,29 +747,29 @@ fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()>
             ),
         ));
     };
-    // Un `block` mudo sería peor que no tener la función: la persona del mostrador tiene que poder
-    // leer POR QUÉ no se la deja seguir. `warn` va por el mismo aro para que promover la norma a
-    // `enforce` no sea el momento en que aparece el problema.
+    // A mute `block` would be worse than not having the feature at all: the person at the counter
+    // has to be able to read WHY they are not being let through. `warn` goes through the same hoop
+    // so that promoting the rule to `enforce` is not the moment the problem shows up.
     if new.message.trim().is_empty() {
         return Err(domain(
             ERR_MESSAGE_REQUIRED,
             "una norma tiene que decir por qué impide lo que impide".to_string(),
         ));
     }
-    // Una condición vacía casa SIEMPRE (es el default permisivo de los flujos). En una política eso
-    // es una norma que bloquea el command entero sin decirlo, y el dueño la escribió creyendo que
-    // filtraba algo.
+    // An empty condition matches ALWAYS (it is the permissive default of the flows). In a policy
+    // that is a rule blocking the whole command without saying so, and the owner wrote it believing
+    // it filtered something.
     if new.condition.as_object().is_some_and(|o| o.is_empty()) {
         return Err(domain(
             ERR_EMPTY_CONDITION,
             "una condición vacía casaría con TODO: la norma impediría el comando entero".to_string(),
         ));
     }
-    // El lenguaje congelado de los flujos, sin estrenar dialecto: un operador que no conoce devuelve
-    // su propio `flow.*`.
+    // The frozen language of the flows, with no new dialect: an operator it does not know returns
+    // its own `flow.*`.
     let condition = Condition::parse(&new.condition)?;
-    // El checkpoint dice CON QUÉ DATOS se puede razonar. Una condición que nombra otra cosa lee
-    // fuera del vocabulario que el módulo declaró — el mismo agujero que hub#662 cerró en los flujos.
+    // The checkpoint says WHAT DATA may be reasoned about. A condition naming anything else reads
+    // outside the vocabulary the module declared — the same hole hub#662 closed in the flows.
     if let Some(unknown) = condition
         .0
         .keys()
@@ -777,8 +784,9 @@ fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()>
             ),
         ));
     }
-    // La consecuencia, dos puertas distintas a propósito: una se arregla cambiando la norma y la
-    // otra esperando una release, y decirle lo mismo a las dos dejaría al dueño sin saber cuál es.
+    // The consequence, two different doors on purpose: one is fixed by changing the rule and the
+    // other by waiting for a release, and telling both the same thing would leave the owner not
+    // knowing which one they are in.
     if !checkpoint.outcomes.iter().any(|o| o == &new.outcome) {
         return Err(domain(
             ERR_OUTCOME_NOT_OFFERED,
@@ -792,8 +800,9 @@ fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()>
     }
     match Outcome::parse(&new.outcome) {
         Some(Outcome::Block) => {}
-        // `elevate:` está reconocido y todavía no se ejecuta (hub#1710). Se rechaza al escribir —en
-        // vez de guardarse y denegar en caja— porque aquí sí hay alguien mirando la pantalla.
+        // `elevate:` is recognised and not run yet (hub#1710). It is refused at write time —
+        // instead of being stored and denying at the till — because here there IS someone looking
+        // at the screen.
         _ => {
             return Err(domain(
                 ERR_OUTCOME_NOT_AVAILABLE,
@@ -808,7 +817,7 @@ fn validate(registry: &crate::registry::Registry, new: &NewPolicy) -> Result<()>
     Ok(())
 }
 
-/// Las normas de este hub, la recién borrada no.
+/// This hub's rules; the just-deleted one is not among them.
 pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Policy>> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -851,8 +860,8 @@ pub async fn create(
     by: &str,
 ) -> Result<Policy> {
     validate(registry, new)?;
-    // El techo se comprueba con la norma ya validada: una que además esté mal escrita merece que se
-    // le diga qué está mal, no que el punto de control está lleno.
+    // The ceiling is checked with the rule already validated: one that is also badly written
+    // deserves to be told what is wrong with it, not that the checkpoint is full.
     let live = count_live(db, hub_id, &new.checkpoint).await?;
     if live >= MAX_POLICIES_PER_CHECKPOINT as i64 {
         return Err(domain(
@@ -891,8 +900,9 @@ pub async fn update(
 ) -> Result<Policy> {
     validate(registry, new)?;
     get(db, hub_id, id).await?; // 404 antes de tocar nada, y acotado a este hub.
-    // El techo NO se comprueba aquí: un `update` no añade una fila, y negarle al dueño editar el
-    // texto de una de sus 20 normas porque «ya hay 20» sería dejarle sin poder arreglarlas.
+    // The ceiling is NOT checked here: an `update` does not add a row, and refusing to let the
+    // owner edit the text of one of their 20 rules because «there are already 20» would leave them
+    // unable to fix them.
     let mut p = bind(new, by);
     p.insert("id".into(), json!(id));
     p.insert("hub_id".into(), json!(hub_id));
@@ -908,8 +918,8 @@ pub async fn update(
     get(db, hub_id, id).await
 }
 
-/// Borrado **suave**: una norma que impidió una venta es parte de por qué esa venta no está, así
-/// que la fila se marca y no se pierde.
+/// **Soft** delete: a rule that forbade a sale is part of why that sale is not there, so the row is
+/// marked and not lost.
 pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, by: &str) -> Result<()> {
     get(db, hub_id, id).await?;
     let now = now_rfc3339();
@@ -959,15 +969,15 @@ async fn count_live(db: &dyn DatabaseAdapter, hub_id: &str, checkpoint: &str) ->
         .unwrap_or(0))
 }
 
-/// Reconstruye el índice en memoria a partir de las filas VIVAS y ENCENDIDAS de este hub.
+/// Rebuilds the in-memory index from this hub's LIVE and SWITCHED-ON rows.
 ///
-/// Lo llaman el arranque y **cada escritura** del CRUD. Una norma apagada (`is_active = 0`) o
-/// borrada simplemente no entra: apagarla tiene que dejar de gatear en el comando siguiente, no en
-/// el próximo reinicio.
+/// Called by boot and by **every write** of the CRUD. A rule that is switched off (`is_active = 0`)
+/// or deleted simply does not go in: switching it off has to stop gating on the very next command,
+/// not on the next restart.
 ///
-/// Las filas que este core no entiende SÍ entran, con su hueco a `None`, porque el gate las trata
-/// **denegando** (`policies.md` §6.1). Filtrarlas aquí sería el fail-open que el §6.1 cierra: una
-/// norma que el hub no sabe leer desaparecería en silencio.
+/// Rows this core does not understand DO go in, with their gap set to `None`, because the gate
+/// handles them by **denying** (`policies.md` §6.1). Filtering them out here would be the fail-open
+/// §6.1 closes: a rule the hub cannot read would disappear in silence.
 pub async fn load_index(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -986,8 +996,8 @@ pub async fn load_index(
     for row in &res.rows {
         let text = |k: &str| row.get(k).and_then(Json::as_str).unwrap_or("").to_string();
         let checkpoint = text("checkpoint");
-        // Un `mode` que no se entiende se trata como `enforce`, que es el lado seguro: la otra
-        // opción —tratarlo como `warn`— convertiría una norma en vigor en un aviso mudo.
+        // A `mode` that is not understood is treated as `enforce`, which is the safe side: the
+        // other option — treating it as `warn` — would turn a rule in force into a mute notice.
         let mode = Mode::parse(&text("mode")).unwrap_or(Mode::Enforce);
         let condition = serde_json::from_str::<Json>(&text("condition"))
             .ok()
