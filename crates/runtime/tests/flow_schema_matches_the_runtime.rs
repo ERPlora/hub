@@ -432,7 +432,7 @@ fn the_trigger_kinds_are_the_same_four_on_both_sides() {
 }
 
 #[test]
-fn the_condition_operators_are_the_same_nine_on_both_sides() {
+fn the_condition_operators_are_the_same_set_on_both_sides() {
     let declared = keys_at(
         &schema(),
         "/$defs/condition/additionalProperties/properties",

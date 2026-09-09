@@ -2089,7 +2089,10 @@ mod tests {
     #[tokio::test]
     async fn a_pin_may_name_the_run_and_never_a_secret() {
         let db = db_with_schema().await;
-        for reference in ["secret.stripe_key", "event.customer_id"] {
+        // `now.…` joined the mapping language in hub#1694 and this scope is `{input, steps}`: a pin
+        // on the clock could only ever resolve to null and deny everything, so it is refused where
+        // it is written instead of at 3 AM.
+        for reference in ["secret.stripe_key", "event.customer_id", "now.iso"] {
             let err = replace(
                 &db,
                 HUB,
