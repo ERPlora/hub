@@ -4751,8 +4751,29 @@ mod tests {
             "{err}"
         );
         assert!(format!("{err}").contains("within_last"), "{err}");
+
+        // The same refusal wherever the clock is NAMED on the right, not just when the whole
+        // value is the bare path: a `{{now.iso}}` template renders to the instant and is then
+        // compared as text, and `in` takes a LIST, so a clock hidden in one of its items would
+        // slip past a check that only looked at the string as a whole.
+        for right in [
+            json!({ "gte": "{{now.iso}}" }),
+            json!({ "eq": "hoy es {{ now.iso }}" }),
+            json!({ "in": ["2026-01-01", "now.iso"] }),
+            json!({ "in": ["{{now.iso}}"] }),
+        ] {
+            let err = Condition::parse(&json!({ "steps.t.at": right }))
+                .expect_err("the clock on the right never matches, however it is written");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+                "{right}: {err}"
+            );
+        }
+
         // The left is resolved, so the clock is legitimate there.
         assert!(Condition::parse(&json!({ "now.iso": { "gte": "2026-01-01" } })).is_ok());
+        // And a right that merely CONTAINS the word is still ordinary text.
+        assert!(Condition::parse(&json!({ "steps.t.name": { "eq": "nowhere" } })).is_ok());
     }
 
     // ── the `query` step (hub#954) ────────────────────────────────────────────────────────────
