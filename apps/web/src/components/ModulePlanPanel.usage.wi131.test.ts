@@ -90,6 +90,21 @@ describe('ModulePlanPanel — what you have already spent (whatsapp_inbox#131)',
     expect(query).toHaveBeenCalledWith('whatsapp_inbox.usage.get');
   });
 
+  it('calls the name THIS manifest declares, whichever module ships it', async () => {
+    // The published `whatsapp_inbox` name is the one every other case uses, so on its own it
+    // cannot tell «reads `billing.usage.query`» from «knows the name of the module that asked
+    // for this»: a hardcoded `whatsapp_inbox.usage.get` passes the case above word for word
+    // (measured, rv-1707). The whole point of the block is that the other 26 modules get the
+    // counter too, so the guard is a DIFFERENT declared name.
+    const otherModule = {
+      tiers: BILLING.tiers,
+      usage: { query: 'appointments.credits.left', metric: 'conversations_per_month', used: 'inbound_this_month' },
+    } as unknown as ModuleBilling;
+    await mountPanel('es', otherModule);
+    expect(query).toHaveBeenCalledWith('appointments.credits.left');
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('puts both numbers on the screen, with the metric named in the language of the hub', async () => {
     loadModuleLocale.mockResolvedValue({
       billing: { quota: { conversations_per_month: 'conversaciones al mes' } },
@@ -136,6 +151,13 @@ describe('ModulePlanPanel — what you have already spent (whatsapp_inbox#131)',
     const w = await mountPanel('es', BILLING_WITHOUT_USAGE);
     expect(query).not.toHaveBeenCalled();
     expect(w.find('[data-testid="module-usage"]').exists()).toBe(false);
+    // And no APOLOGY either. Dropping the «did the module declare it?» guard makes the read throw
+    // on the absent block, which lands in the same `catch` as an outage — so all 26 modules that
+    // ship no `billing.usage` would start announcing «couldn't read what you have used» on a tab
+    // that is working perfectly. Asserting only the absence of the counter does not see that
+    // (measured, rv-1707): the error line has to be pinned away too.
+    expect(w.find('[data-testid="module-usage-error"]').exists()).toBe(false);
+    expect(visibleText(w)).not.toContain(es.modulePlan.usageUnavailable);
   });
 
   it('paints no counter when the person is not allowed to read it', async () => {
