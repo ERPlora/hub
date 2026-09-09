@@ -73,9 +73,11 @@ pub(crate) fn cloud_get_error_response(e: CloudGetError) -> Response {
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
         )
             .into_response(),
-        CloudGetError::Network(msg) => {
-            (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": msg }))).into_response()
-        }
+        CloudGetError::Network(detail) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": cloud_unreachable(&detail) })),
+        )
+            .into_response(),
     }
 }
 
@@ -177,6 +179,26 @@ pub(crate) fn cloud_body_passthrough(status: StatusCode, body: axum::body::Bytes
 pub(crate) const CLOUD_REJECTED: &str = "cloud_rejected";
 /// The SaaS did not answer at all (network, DNS, timeout): nothing to correct, retry later.
 pub(crate) const CLOUD_UNREACHABLE: &str = "cloud_unreachable";
+
+/// The `reqwest` detail of a call that never got through, sent WHERE IT BELONGS (hub#1689).
+///
+/// Its `Display` is `error sending request for url (http://…/api/v1/…)`: the address this hub
+/// dials erplora.com on, and the path it dialled. An operator needs both — the business does not,
+/// and neither is ours to hand out on a marketplace screen. So the detail goes to the hub's log,
+/// and the caller gets back the stable code it can branch on, translate and retry.
+///
+/// It is the policy `/api/command` and `/api/query` have applied since hub#1074
+/// (`error_redaction_door`) and the WhatsApp template doors since hub#1688; this is the same rule
+/// for the doors that answer outside the envelope. Callers keep their own body shape — the string
+/// IS the code, which is how the shell already reads this key (`refusalCode`, `grantFailure`).
+///
+/// "Network" here is the whole round trip, as [`CloudGetError::Network`] already means: a
+/// connection that was refused and a body that stopped arriving are the same fact for whoever is
+/// looking at the screen — erplora.com did not answer, try again.
+pub(crate) fn cloud_unreachable(detail: &str) -> &'static str {
+    tracing::warn!(detail = %detail, "erplora.com did not answer");
+    CLOUD_UNREACHABLE
+}
 /// This hub has no machine credential, so there is no door to knock on (a local `pnpm dev`).
 pub(crate) const HUB_NOT_ENROLLED: &str = "hub_not_enrolled";
 /// The SaaS answered `2xx` with something that is not JSON — a proxy's HTML page, most likely.
@@ -244,14 +266,11 @@ pub(crate) fn cloud_envelope_error_response(e: CloudGetError) -> Response {
             HUB_NOT_ENROLLED,
             "this hub has no machine credential for erplora.com",
         ),
-        CloudGetError::Network(detail) => {
-            tracing::warn!(detail = %detail, "erplora.com did not answer");
-            envelope_error(
-                StatusCode::BAD_GATEWAY,
-                CLOUD_UNREACHABLE,
-                "the hub could not reach erplora.com",
-            )
-        }
+        CloudGetError::Network(detail) => envelope_error(
+            StatusCode::BAD_GATEWAY,
+            cloud_unreachable(&detail),
+            "the hub could not reach erplora.com",
+        ),
     }
 }
 
@@ -313,7 +332,7 @@ pub(crate) async fn proxy_public_cloud_get(
         Err(error) => {
             return (
                 StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": error.to_string() })),
+                Json(json!({ "ok": false, "error": cloud_unreachable(&error.to_string()) })),
             )
                 .into_response()
         }
@@ -332,7 +351,7 @@ pub(crate) async fn proxy_public_cloud_get(
             .into_response(),
         Err(error) => (
             StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": error.to_string() })),
+            Json(json!({ "ok": false, "error": cloud_unreachable(&error.to_string()) })),
         )
             .into_response(),
     }
@@ -425,9 +444,13 @@ pub(crate) async fn proxy_entitlement(State(st): State<AppState>, headers: Heade
             )
                 .into_response(),
         },
-        Err(CloudGetError::Network(msg)) => (
+        Err(CloudGetError::Network(detail)) => (
             StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": msg, "revalidation": revalidation })),
+            Json(json!({
+                "ok": false,
+                "error": cloud_unreachable(&detail),
+                "revalidation": revalidation,
+            })),
         )
             .into_response(),
         Err(e) => cloud_get_error_response(e),

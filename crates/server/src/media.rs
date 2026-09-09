@@ -43,6 +43,7 @@ use std::path::{Component, Path};
 
 use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
 
+use crate::cloud_proxy::cloud_unreachable;
 use crate::{auth, AppState};
 
 fn unauthorized(error: auth::AuthError) -> Response {
@@ -122,7 +123,7 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     }
     let resp = match r.send().await {
         Ok(x) => x,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     };
     if !resp.status().is_success() {
         return err(
@@ -132,7 +133,7 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     }
     let raw: Value = match resp.json().await {
         Ok(v) => v,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     };
 
     let files: Vec<Value> = raw
@@ -234,7 +235,7 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
         Ok(_) => err(StatusCode::BAD_GATEWAY, "el Cloud rechazó la subida"),
-        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -258,7 +259,7 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
             StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
             "el Cloud no pudo borrar",
         ),
-        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -281,7 +282,7 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
             StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
             "el Cloud no pudo renombrar",
         ),
-        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -301,7 +302,7 @@ async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Respons
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
         Ok(_) => err(StatusCode::BAD_GATEWAY, "el Cloud no pudo crear la carpeta"),
-        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -346,7 +347,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     }
     let resp = match r.send().await {
         Ok(x) => x,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     };
     if !resp.status().is_success() {
         return err(StatusCode::NOT_FOUND, "fichero no encontrado");
@@ -361,7 +362,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     };
     if signed.is_empty() {
         return err(
@@ -372,7 +373,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     let object = match st.http.get(&signed).send().await {
         Ok(o) if o.status().is_success() => o,
         Ok(_) => return err(StatusCode::NOT_FOUND, "fichero no encontrado"),
-        Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     };
     // When the size is declared, refuse an oversized object BEFORE downloading a single byte.
     if object
@@ -429,7 +430,7 @@ async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
             StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
             "el Cloud no pudo mover",
         ),
-        Err(e) => err(StatusCode::BAD_GATEWAY, &e.to_string()),
+        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
     }
 }
 
