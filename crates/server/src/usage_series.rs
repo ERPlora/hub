@@ -6,11 +6,15 @@
 //! `system::cloud_storage`). The upstream JSON is passed through untouched; a 30 s in-memory
 //! cache per range keeps a dashboard left open from hammering the SaaS.
 //!
-//! When the SaaS cannot be reached (or answers anything but a 2xx JSON) the reply is a **502**
-//! whose body says `known: false` for every metric: the UI degrades to «we could not read this»
-//! (ADR-0237 — what we did not measure is never painted as a healthy zero). Upstream error
-//! bodies are deliberately NOT passed through: they are written for us, can echo request
-//! details, and the machine token must never leak into a browser-visible response.
+//! When the SaaS cannot be reached (or answers anything but a 2xx JSON) the reply is a **424
+//! Failed Dependency** whose body says `known: false` for every metric: the UI degrades to «we
+//! could not read this» (ADR-0237 — what we did not measure is never painted as a healthy zero).
+//! It used to be a `502`, and that was the defect of hub#1763: the hub is the ORIGIN, so the edge
+//! is free to replace the body of a `5xx` with its own `error code: 502` page — and the plan-usage
+//! screen got that page instead of the three `known: false`, so it could not even degrade
+//! honestly. Upstream error bodies are deliberately NOT passed through: they are written for us,
+//! can echo request details, and the machine token must never leak into a browser-visible
+//! response.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -23,7 +27,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::{auth, AppState};
+use crate::{auth, cloud_proxy, AppState};
 
 /// How long an upstream answer is served from memory before asking the SaaS again.
 pub const CACHE_TTL: Duration = Duration::from_secs(30);
@@ -107,13 +111,13 @@ async fn fetch_series(
     // Any failure — unreachable, timeout, non-2xx, non-JSON — collapses to the same honest
     // degradation. Upstream error bodies never pass through: see the module doc.
     let Ok(resp) = resp else {
-        return (StatusCode::BAD_GATEWAY, unknown_body());
+        return (cloud_proxy::CLOUD_FAILED, unknown_body());
     };
     if !resp.status().is_success() {
-        return (StatusCode::BAD_GATEWAY, unknown_body());
+        return (cloud_proxy::CLOUD_FAILED, unknown_body());
     }
     let Ok(body) = resp.json::<Value>().await else {
-        return (StatusCode::BAD_GATEWAY, unknown_body());
+        return (cloud_proxy::CLOUD_FAILED, unknown_body());
     };
 
     if let Ok(mut entries) = cache.entries.lock() {
@@ -150,7 +154,7 @@ pub async fn usage_series(
 
     // No machine token = we cannot ask the SaaS at all: same honest degradation as unreachable.
     let Some(token) = st.machine_token() else {
-        return (StatusCode::BAD_GATEWAY, Json(unknown_body())).into_response();
+        return (cloud_proxy::CLOUD_FAILED, Json(unknown_body())).into_response();
     };
 
     static CACHE: OnceLock<SeriesCache> = OnceLock::new();
@@ -323,7 +327,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(status, StatusCode::BAD_GATEWAY);
+        assert_eq!(status, cloud_proxy::CLOUD_FAILED);
         assert_unknown(&body);
     }
 
@@ -388,7 +392,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(status, StatusCode::BAD_GATEWAY);
+        assert_eq!(status, cloud_proxy::CLOUD_FAILED);
         assert_unknown(&body);
         assert!(
             !body.to_string().contains("machine-token-SECRET"),

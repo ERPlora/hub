@@ -340,13 +340,16 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
 ///  - `UnknownOrg` → `403`: el `hub_id` de la petición no pertenece a ninguna org conocida; es un
 ///    intento de acceso cruzado o un hub no provisionado. **No** se cae a ninguna BD.
 ///  - `PoolLimit` → `503`: back-pressure (techo de orgs por proceso alcanzado), reintenta luego.
-///  - `Connect`   → `502`: la Aurora de la org no responde (failover/credencial).
+///  - `Connect`   → `424`: la BD de la org no responde (failover/credencial). Era un `502` hasta
+///    hub#1763: el hub es el ORIGEN, así que el borde SUSTITUYE el cuerpo de un `5xx` por su
+///    página — y con él se va el `code` que el `unwrap(env)` del `module-sdk` necesita, de modo
+///    que el módulo leía `unknown error`. Un `4xx` cruza el proxy con el cuerpo intacto.
 pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     use tenant::TenantError as T;
     let (status, code) = match &e {
         T::UnknownOrg(_) => (StatusCode::FORBIDDEN, "unknown_org"),
         T::PoolLimit(_) => (StatusCode::SERVICE_UNAVAILABLE, "pool_limit"),
-        T::Connect(_) => (StatusCode::BAD_GATEWAY, "org_db_unavailable"),
+        T::Connect(_) => (crate::cloud_proxy::CLOUD_FAILED, "org_db_unavailable"),
     };
     let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
     (status, Json(body)).into_response()

@@ -68,13 +68,14 @@ pub(crate) async fn assistant_checkout(
     }
     match r.json(&body).send().await {
         Ok(resp) => {
-            let status =
-                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status = cloud_proxy::cloud_status(resp.status().as_u16());
             let bytes = resp.bytes().await.unwrap_or_default();
             cloud_json_passthrough(status, bytes)
         }
+        // Never a `5xx` of our own: the edge replaces that body with its page and the assistant
+        // drawer loses the code it translates (hub#1763).
         Err(e) => (
-            StatusCode::BAD_GATEWAY,
+            cloud_proxy::CLOUD_FAILED,
             Json(json!({ "ok": false, "error": cloud_proxy::cloud_unreachable(&e.to_string()) })),
         )
             .into_response(),
