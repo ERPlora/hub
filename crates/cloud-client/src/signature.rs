@@ -146,6 +146,13 @@ impl TrustedKeyRing {
         self.keys.is_empty()
     }
 
+    /// Cuántas claves de confianza cargaron. El arranque lo anuncia (hub#1754) para que quien
+    /// despliega vea CON QUÉ verifica el hub, no solo que verifica: un anillo de 1 cuando se
+    /// pegaron 2 es exactamente el fallo que este número delata.
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
     /// Añade una clave pública en raw 32 bytes. Devuelve error si la longitud no es correcta.
     pub fn add_bytes(
         &mut self,
@@ -250,8 +257,10 @@ pub enum SignaturePolicy {
     /// instalaciones legítimas — 403 en `request-install` y en el import de blueprints, que es como
     /// se tumbó el arranque de todo hub nuevo (ADR-0194).
     ///
-    /// **No es fail-open silencioso:** se anuncia con WARN al arrancar, y basta desplegar la clave
-    /// en `HUB_MODULE_TRUSTED_KEYS` para que el hub pase solo a [`Self::Enforce`], sin tocar código.
+    /// **No es fail-open silencioso:** el arranque lo anuncia con WARN —una línea, siempre, la
+    /// escriba quien la escriba (`HubConfig::announce_signature_policy`, hub#1754)— y basta
+    /// desplegar la clave en `HUB_MODULE_TRUSTED_KEYS` para que el hub pase solo a
+    /// [`Self::Enforce`], sin tocar código.
     Sha256Only,
 }
 

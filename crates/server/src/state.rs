@@ -419,51 +419,155 @@ impl HubConfig {
     /// El anillo es **estático por arranque**: cambiarlo o revocar una clave exige redesplegar el
     /// hub. Es suficiente para el día 1 y es lo que sigue hub#1751.
     pub fn signature_policy(&self) -> cloud_client::SignaturePolicy {
-        // El anillo se construye de los `module_trusted_keys` del config (cargados del env en
-        // `from_env`, o inyectados por los tests). `from_env` acepta el formato crudo con o sin
-        // `key_id=`; reusarlo evita duplicar el parser.
+        self.resolve_signature().0
+    }
+
+    /// What the boot has to TELL about the policy above (hub#1754). Same resolution, different
+    /// question: [`Self::signature_policy`] answers what this hub enforces, this answers what the
+    /// operator is owed about it — including the two cases the policy alone cannot express (a ring
+    /// that loaded with entries dropped, and a ring that loaded with none).
+    pub fn signature_mode(&self) -> SignatureMode {
+        self.resolve_signature().1
+    }
+
+    /// Writes the ONE line that says whether this hub verifies module signatures (hub#1754).
+    ///
+    /// Called once from the composition root, **unconditionally**. Until hub#1754 the policy was
+    /// logged as a side effect of [`Self::signature_policy`] being called, and that only happens
+    /// when something installs: a hub that was just provisioned installs nothing at boot, so the
+    /// deployment whose ring was pasted a minute ago —the one where a typo costs most— was also
+    /// the one that started up mute. Whoever redeploys now sees the mode in the first screen of
+    /// the log instead of discovering it later, through an install that will not go through.
+    pub fn announce_signature_policy(&self) {
+        let mode = self.signature_mode();
+        let tag = mode.tag();
+        let message = mode.message();
+        // The level comes from `SignatureMode::level` and nowhere else, so the boot line and the
+        // test that pins its severity read the same source.
+        match mode.level() {
+            tracing::Level::ERROR => tracing::error!(signature = tag, "{}", message),
+            tracing::Level::WARN => tracing::warn!(signature = tag, "{}", message),
+            _ => tracing::info!(signature = tag, "{}", message),
+        }
+    }
+
+    /// Builds the trust ring ONCE and answers both questions about it at the same time. Splitting
+    /// it in two would let the announced mode and the enforced policy drift apart, which is the
+    /// one bug this whole area cannot afford.
+    fn resolve_signature(&self) -> (cloud_client::SignaturePolicy, SignatureMode) {
+        // The ring is built from the config's `module_trusted_keys` (read from the env in
+        // `from_env`, or injected by tests). `from_env` takes the raw format with or without
+        // `key_id=`; reusing it avoids a second parser.
         let joined = self.module_trusted_keys.join(",");
         let (ring, bad) = cloud_client::TrustedKeyRing::from_env(Some(&joined));
-        if !bad.is_empty() {
-            tracing::warn!(
-                count = bad.len(),
-                "HUB_MODULE_TRUSTED_KEYS: entradas ilegibles ignoradas (arrancando con menos claves)"
-            );
-        }
+
         if self.dev_mode {
-            // Escape hatch explícito: en dev admitimos sin firma. Mantenemos el anillo por si el
-            // flujo de dev quiere probar verificación (no se fuerza aquí).
-            return cloud_client::SignaturePolicy::DevTrust;
+            // Explicit escape hatch: dev accepts unsigned modules. The ring is still built in case
+            // a dev flow wants to exercise verification (nothing is forced here).
+            return (cloud_client::SignaturePolicy::DevTrust, SignatureMode::DevTrust);
         }
         if ring.is_empty() {
             if !bad.is_empty() {
-                // hub#870: la variable venía CON contenido y no se pudo cargar NINGUNA clave. Eso
-                // no es «no hay firma desplegada» (el caso de abajo): es un despliegue que alguien
-                // creyó haber protegido —un hex truncado al pegarlo, un `key_id` mal partido—.
-                // Degradar aquí sería fail-open justo en el hub que más se confía, y mudo. Se
-                // exige firma con el anillo que se pudo cargar (vacío): **no se instala nada**,
-                // pero el hub sigue vendiendo, que es lo que no puede pararse.
-                tracing::error!(
-                    unreadable = bad.len(),
-                    "`HUB_MODULE_TRUSTED_KEYS` viene puesto pero NINGUNA de sus claves es \
-                     legible: no se instalará ningún módulo hasta corregirlo. Formato esperado: \
-                     `<key_id>=<hex de 64 chars>` (lo que sirve `GET /api/v1/marketplace/signing-key/`)."
+                // hub#870: the variable came WITH content and not one key could be loaded. That is
+                // not "no signing deployed" (the case below): it is a deployment somebody believes
+                // is protected —a hex truncated on paste, a `key_id` split in the wrong place—.
+                // Degrading here would be fail-open exactly where trust is highest. Signature is
+                // required against the ring that did load (empty): **nothing installs**, but the
+                // hub keeps selling, which is what cannot stop.
+                return (
+                    cloud_client::SignaturePolicy::Enforce(ring),
+                    SignatureMode::Misconfigured {
+                        unreadable: bad.len(),
+                    },
                 );
-                return cloud_client::SignaturePolicy::Enforce(ring);
             }
-            // ADR-0194: anillo vacío = **no hay infraestructura de firma desplegada**, no «rechaza
-            // todo». Es el modo `warn` que ADR-0193 ya exigía en sus consecuencias. `Enforce` aquí
-            // no protegía nada: denegaba el 100 % de las instalaciones legítimas (403 en
-            // `request-install` y en el import de blueprints) porque NADIE firma todavía. El
-            // control vigente sigue siendo el SHA256 obligatorio del grant (ADR-0015).
-            tracing::warn!(
-                "firma de módulos NO verificada: `HUB_MODULE_TRUSTED_KEYS` vacío. La integridad \
-                 la garantiza el SHA256 obligatorio del grant (ADR-0015). Despliega la clave \
-                 pública del marketplace para activar la verificación de firma (ADR-0194)."
+            // ADR-0194: an empty ring means **no signing infrastructure is deployed**, not "reject
+            // everything". It is the `warn` mode ADR-0193 already required in its consequences.
+            // `Enforce` here protected nothing: it denied 100 % of the legitimate installs (403 on
+            // `request-install` and on blueprint import) because NOBODY signs yet. The control in
+            // force is still the mandatory grant SHA256 (ADR-0015).
+            return (
+                cloud_client::SignaturePolicy::Sha256Only,
+                SignatureMode::NotVerifying,
             );
-            return cloud_client::SignaturePolicy::Sha256Only;
         }
-        cloud_client::SignaturePolicy::Enforce(ring)
+        let mode = SignatureMode::Verifying {
+            keys: ring.len(),
+            ignored: bad.len(),
+        };
+        (cloud_client::SignaturePolicy::Enforce(ring), mode)
+    }
+}
+
+/// How this hub ended up verifying module signatures, as the boot announces it (hub#1754).
+///
+/// It is not a second policy: it is the same resolution seen from the operator's side, carrying
+/// the counters the policy drops (how many keys loaded, how many entries were unreadable) because
+/// those are exactly what tells a ring that was pasted whole from one that was pasted half.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignatureMode {
+    /// A ring loaded: this hub checks WHO signed each module. `ignored` entries were dropped.
+    Verifying { keys: usize, ignored: usize },
+    /// No ring deployed — the whole fleet, today. Integrity is the grant SHA256 (ADR-0015/0194).
+    NotVerifying,
+    /// `HUB_MODULE_TRUSTED_KEYS` is set and not one entry parsed (hub#870): nothing will install.
+    Misconfigured { unreadable: usize },
+    /// `HUB_DEV_MODE`: unsigned modules are accepted on purpose.
+    DevTrust,
+}
+
+impl SignatureMode {
+    /// Greppable tag written as `signature=<tag>`, so the boot line can be found by mode without
+    /// matching on prose (ADR-0055: the code is the contract, not the sentence).
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::Verifying { .. } => "verifying",
+            Self::NotVerifying => "not_verifying",
+            Self::Misconfigured { .. } => "misconfigured",
+            Self::DevTrust => "dev_trust",
+        }
+    }
+
+    /// Severity of the boot line: INFO when the hub verifies, WARN when it does not, ERROR when
+    /// the configuration is broken and no module will install.
+    ///
+    /// A ring that loaded **with entries dropped** verifies, so its mode is `Verifying` — but it
+    /// keeps the WARN it had before hub#1754. Folding it into the INFO would hide a half-pasted
+    /// ring behind good news, which is the same silence this issue came to remove.
+    pub fn level(self) -> tracing::Level {
+        match self {
+            Self::Verifying { ignored: 0, .. } => tracing::Level::INFO,
+            Self::Verifying { .. } | Self::NotVerifying | Self::DevTrust => tracing::Level::WARN,
+            Self::Misconfigured { .. } => tracing::Level::ERROR,
+        }
+    }
+
+    /// The sentence the operator reads, with what to do next when there is something to do.
+    pub fn message(self) -> String {
+        match self {
+            Self::Verifying { keys, ignored: 0 } => format!(
+                "module signatures ARE verified: {keys} trusted key(s) loaded from \
+                 `HUB_MODULE_TRUSTED_KEYS`"
+            ),
+            Self::Verifying { keys, ignored } => format!(
+                "module signatures ARE verified with {keys} trusted key(s), but {ignored} entry \
+                 (entries) of `HUB_MODULE_TRUSTED_KEYS` could not be read and were ignored. \
+                 Expected format per entry: `<key_id>=<64 hex chars>`."
+            ),
+            Self::NotVerifying => "module signatures are NOT verified: `HUB_MODULE_TRUSTED_KEYS` \
+                 is empty, so nothing checks who signed a module. Integrity is the mandatory \
+                 grant SHA256 (ADR-0015). Deploy the marketplace public key to turn verification \
+                 on (ADR-0194)."
+                .to_string(),
+            Self::Misconfigured { unreadable } => format!(
+                "`HUB_MODULE_TRUSTED_KEYS` is set but NONE of its {unreadable} entries can be \
+                 read: no module will install until it is fixed. Expected format: \
+                 `<key_id>=<64 hex chars>` (what `GET /api/v1/marketplace/signing-key/` serves)."
+            ),
+            Self::DevTrust => "module signatures are NOT enforced: `HUB_DEV_MODE` accepts \
+                 unsigned modules on purpose. A production deployment must never boot like this."
+                .to_string(),
+        }
     }
 }
 
@@ -600,6 +704,203 @@ mod staging_tests {
                 PathBuf::from("/tmp/modules")
             ]
         );
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // hub#1754 — the boot announcement of the module-signature policy.
+    //
+    // The policy used to be logged only as a SIDE EFFECT of `signature_policy()` being called,
+    // and that call only happens when something installs. A freshly provisioned hub —exactly the
+    // one whose trust ring was just pasted into the deployment— installs nothing at boot, so it
+    // started up mute: nobody could tell whether it verified signatures until an install failed.
+    // ---------------------------------------------------------------------------------------
+
+    /// A `MakeWriter` that keeps every byte the subscriber formats, so a test can assert on the
+    /// LEVEL that was really emitted and not on a value the code merely returned.
+    #[derive(Clone, Default)]
+    struct CapturedLog(Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl CapturedLog {
+        fn text(&self) -> String {
+            String::from_utf8_lossy(&self.0.lock().expect("captured log poisoned")).into_owned()
+        }
+    }
+
+    impl std::io::Write for CapturedLog {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0
+                .lock()
+                .expect("captured log poisoned")
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CapturedLog {
+        type Writer = Self;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            self.clone()
+        }
+    }
+
+    /// Runs `boot` under a subscriber scoped to this thread and returns what reached the log.
+    fn captured_boot_log(boot: impl FnOnce()) -> String {
+        let sink = CapturedLog::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(sink.clone())
+            .with_ansi(false)
+            .with_max_level(tracing::Level::TRACE)
+            .finish();
+        tracing::subscriber::with_default(subscriber, boot);
+        sink.text()
+    }
+
+    /// How many events the capture holds: the announcement is ONE line, not a paragraph.
+    fn lines(log: &str) -> Vec<&str> {
+        log.lines().filter(|l| !l.trim().is_empty()).collect()
+    }
+
+    fn ring_of_one() -> Vec<String> {
+        vec![format!("marketplace={}", "a".repeat(64))]
+    }
+
+    /// **The silent case that hub#1754 exists for.** A hub with its trust ring deployed verifies
+    /// every module it installs — and said so NOWHERE. Whoever pasted the key had no way of
+    /// telling it had taken, short of provoking an install.
+    #[test]
+    fn a_hub_that_verifies_signatures_announces_it_at_boot() {
+        let config = config_with_keys(false, ring_of_one());
+
+        let log = captured_boot_log(|| config.announce_signature_policy());
+
+        assert_eq!(
+            lines(&log).len(),
+            1,
+            "the boot announcement is exactly one line: {log}"
+        );
+        assert!(
+            log.contains("INFO"),
+            "a hub that DOES verify is good news, not a warning: {log}"
+        );
+        assert!(
+            log.contains(r#"signature="verifying""#),
+            "the line has to be greppable by mode: {log}"
+        );
+    }
+
+    /// The whole fleet, today: no ring deployed. It is not a failure, but the operator has to know
+    /// that nothing is checking WHO signed the modules (ADR-0194: integrity is the grant SHA256).
+    #[test]
+    fn a_hub_without_a_trust_ring_warns_that_it_verifies_nothing() {
+        let config = config_with_keys(false, Vec::new());
+
+        let log = captured_boot_log(|| config.announce_signature_policy());
+
+        assert_eq!(lines(&log).len(), 1, "one line: {log}");
+        assert!(
+            log.contains("WARN"),
+            "not verifying is a warning, never an INFO: {log}"
+        );
+        assert!(
+            log.contains("HUB_MODULE_TRUSTED_KEYS"),
+            "the line names the variable to deploy: {log}"
+        );
+    }
+
+    /// **The case in the issue title.** The key was pasted wrong, so the hub enforces against an
+    /// empty ring (hub#870) and no module will ever install. That is an ERROR at boot, not a
+    /// surprise at the first install.
+    #[test]
+    fn a_hub_with_an_unreadable_trust_ring_errors_at_boot() {
+        let config = config_with_keys(false, vec!["marketplace=no-es-una-clave".into()]);
+
+        let log = captured_boot_log(|| config.announce_signature_policy());
+
+        assert_eq!(lines(&log).len(), 1, "one line: {log}");
+        assert!(
+            log.contains("ERROR"),
+            "a hub that cannot install anything is broken, not merely warned: {log}"
+        );
+        assert!(
+            log.contains(r#"signature="misconfigured""#),
+            "the line has to be greppable by mode: {log}"
+        );
+    }
+
+    /// A ring that loads WITH some unreadable entries still verifies, so the mode is `verifying` —
+    /// but the entries that were dropped keep the WARN they had before hub#1754. Losing that would
+    /// hide a half-pasted ring behind an INFO.
+    #[test]
+    fn a_partly_unreadable_ring_still_verifies_but_keeps_its_warning() {
+        let config = config_with_keys(false, vec![format!("rota=zz, marketplace={}", "a".repeat(64))]);
+
+        let log = captured_boot_log(|| config.announce_signature_policy());
+
+        assert_eq!(lines(&log).len(), 1, "one line: {log}");
+        assert!(
+            log.contains("WARN"),
+            "an ignored key is a warning even though the hub verifies: {log}"
+        );
+        assert!(
+            log.contains(r#"signature="verifying""#),
+            "it still verifies — the mode does not change: {log}"
+        );
+    }
+
+    /// Dev mode accepts unsigned modules on purpose. It still has to say so: `HUB_DEV_MODE` on a
+    /// machine that someone believes is production is the same silence with a different cause.
+    #[test]
+    fn a_dev_hub_says_it_is_not_enforcing_signatures() {
+        let config = config_with_keys(true, ring_of_one());
+
+        let log = captured_boot_log(|| config.announce_signature_policy());
+
+        assert_eq!(lines(&log).len(), 1, "one line: {log}");
+        assert!(log.contains("WARN"), "dev trust is not INFO: {log}");
+        assert!(
+            log.contains(r#"signature="dev_trust""#),
+            "the line has to be greppable by mode: {log}"
+        );
+    }
+
+    /// The announcement must not change WHAT the hub enforces — it only makes it visible. Each
+    /// mode is pinned to the policy it announces, so a future edit cannot drift them apart.
+    #[test]
+    fn announcing_never_changes_the_policy_that_is_enforced() {
+        for (keys, dev, mode) in [
+            (ring_of_one(), false, SignatureMode::Verifying { keys: 1, ignored: 0 }),
+            (Vec::new(), false, SignatureMode::NotVerifying),
+            (
+                vec!["marketplace=no-es-una-clave".to_string()],
+                false,
+                SignatureMode::Misconfigured { unreadable: 1 },
+            ),
+            (Vec::new(), true, SignatureMode::DevTrust),
+        ] {
+            let config = config_with_keys(dev, keys);
+            assert_eq!(config.signature_mode(), mode, "{config:?}");
+            // Same resolution behind both doors: the announcement reads the policy, it does not
+            // invent one.
+            let announced = config.signature_mode();
+            let enforced = config.signature_policy();
+            match (announced, &enforced) {
+                (SignatureMode::Verifying { .. }, cloud_client::SignaturePolicy::Enforce(ring)) => {
+                    assert!(!ring.is_empty())
+                }
+                (
+                    SignatureMode::Misconfigured { .. },
+                    cloud_client::SignaturePolicy::Enforce(ring),
+                ) => assert!(ring.is_empty()),
+                (SignatureMode::NotVerifying, cloud_client::SignaturePolicy::Sha256Only) => {}
+                (SignatureMode::DevTrust, cloud_client::SignaturePolicy::DevTrust) => {}
+                (m, p) => panic!("mode {m:?} does not match the policy it announces: {p:?}"),
+            }
+        }
     }
 }
 
