@@ -843,6 +843,20 @@ export default {
     hostHint: 'Open the ERPlora app on the device connected to this printer.',
     // Never green, no call to action: our failed probe is not the owner's homework (hub#375).
     coverageError: 'Could not check who is printing right now.',
+    // The two warnings the till hears when paper does not come out (hub#1731). They are DIFFERENT
+    // facts and the words say so: the first one lost the paper, the second one only lacks a
+    // printer set up — the job is safe in the queue and comes out on its own once there is one.
+    // Naming what to do next matters more than naming the fault: «did not print» sends the
+    // cashier hunting for a jam that is not there.
+    ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
+    ticketWaitingForPrinter:
+      'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+    comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
+    comandaWaitingForPrinter:
+      'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
+    // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
+    // named in the warning, or the sentence reads «the order for ()».
+    comandaDefaultLabel: 'the floor',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are

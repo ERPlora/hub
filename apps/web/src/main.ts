@@ -200,11 +200,16 @@ const erploraClient = getClient();
           format: job.format ?? 'receipt',
         }),
       });
-      // 200 con ok:true → encolado (nuevo o duplicado, ambos éxito). Cualquier otra cosa → false
-      // (la puerta cae al navegador: una venta no se cae por impresión).
-      if (!res.ok) return false;
+      // 200 con ok:true → encolado (nuevo o duplicado, ambos éxito). Cualquier otra cosa →
+      // `queued:false` (la puerta cae al navegador: una venta no se cae por impresión).
+      if (!res.ok) return { queued: false };
       const body = await res.json().catch(() => ({}));
-      return body?.ok === true;
+      // `liveHosts` = equipos dados de alta y reportando para la estación en la que ha caído el
+      // trabajo (hub#1731). Es lo que separa «sale tarde» de «no sale»: sin él, encolar en un hub
+      // sin impresora se leía como impreso y el fallo era MUDO. Un runtime antiguo no manda la
+      // clave → `undefined`, que NO es «no hay nadie» y por eso no se convierte a 0.
+      const liveHosts = typeof body?.liveHosts === 'number' ? body.liveHosts : undefined;
+      return { queued: body?.ok === true, liveHosts };
     },
   });
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
@@ -216,7 +221,13 @@ const erploraClient = getClient();
 bootPrintOnSale(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   onFailure: (f) => {
-    void toastError(`El tique de la venta ${f.saleId} NO se imprimió: ${f.error}`);
+    // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
+    // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
+    void toastError(
+      f.awaitingHost
+        ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
+        : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
+    );
   },
 });
 
@@ -237,7 +248,12 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   onFailure: (f) => {
-    void toastError(`No se imprimió la comanda de ${f.label || 'sala'} (${f.role}): ${f.error}`);
+    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
+    void toastError(
+      f.awaitingHost
+        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
+        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
+    );
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell

@@ -36,6 +36,15 @@ interface PrintingSettings extends ReceiptSettings {
 export interface SaleTicketFailure {
   saleId: string;
   error: string;
+  /**
+   * El tique está ENCOLADO y no hay ningún equipo dado de alta para sacarlo (hub#1731).
+   *
+   * Separa los dos avisos, que no son el mismo: aquí el papel no se ha perdido —sale solo en
+   * cuanto se dé de alta la impresora— y lo que hay que hacer es darla de alta, no reimprimir.
+   * Quien pinta el aviso elige la frase con esto; sin distinguirlo, la única salida era decir «NO
+   * se imprimió», que manda al cajero a buscar un fallo que no existe.
+   */
+  awaitingHost?: boolean;
 }
 
 interface Deps {
@@ -102,9 +111,17 @@ async function onSaleCompleted(client: ErploraClient, deps: Deps, payload: unkno
     } catch (e) {
       result = { via: 'none', role: 'receipt', error: e instanceof Error ? e.message : String(e) };
     }
-    // Solo la impresora y la cola son entrega. `browser` en la app instalada no imprime nada, y
-    // `none` es explícitamente «por ningún sitio»: las dos se avisan.
-    if (result.via !== 'bridge' && result.via !== 'queue') {
+    // La impresora entrega. La cola entrega **si alguien la drena**: encolar en un hub sin ningún
+    // equipo dado de alta para la estación es lo que hacía MUDO el fallo de hub#1731 —se cobraba,
+    // se decía «aquí tienes» y no salía nada—, porque `via:'queue'` se leía igual que impreso.
+    // `browser` en la app instalada no imprime nada y `none` es «por ningún sitio»: las dos avisan.
+    if (result.via === 'queue') {
+      // `awaitingHost` solo es `true` cuando el runtime CONTESTÓ que no hay nadie. Que no lo
+      // conteste no es un «no» (ver `PrintResult.awaitingHost`).
+      if (result.awaitingHost) {
+        deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora dada de alta', awaitingHost: true });
+      }
+    } else if (result.via !== 'bridge') {
       deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });
     }
   }

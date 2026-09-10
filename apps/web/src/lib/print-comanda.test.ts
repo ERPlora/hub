@@ -124,6 +124,31 @@ describe('impresión de la comanda al dispararla', () => {
     expect(onFailure).toHaveBeenCalledTimes(1);
   });
 
+  it('encolada y SIN NADIE que drene esa estación avisa: el plato no se empieza', async () => {
+    // hub#1731 — el mismo mutismo que el tique, con peor consecuencia: la comanda que nadie saca
+    // es comida que no se cocina. `via:'queue'` se leía como entregada, así que en un local sin
+    // impresora dada de alta la cocina no se enteraba de nada.
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen', awaitingHost: true }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ orderId: 'k-1', role: 'kitchen', awaitingHost: true });
+  });
+
+  it('encolada CON alguien que la drena no avisa: sale tarde, no se pierde', async () => {
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen', awaitingHost: false }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('encolada sin que el runtime conteste la cobertura no avisa: «no lo sé» no es «no hay nadie»', async () => {
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen' }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
   it('una comanda sin líneas no imprime una hoja en blanco', async () => {
     const print = vi.fn();
     const client = fakeClient({ query: vi.fn(async () => []) });

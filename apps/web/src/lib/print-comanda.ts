@@ -75,6 +75,13 @@ export interface ComandaPrintFailure {
   role: string;
   label: string;
   error: string;
+  /**
+   * La hoja está ENCOLADA y no hay ningún equipo dado de alta para esa estación (hub#1731).
+   *
+   * Distingue «sale tarde» de «no sale»: el papel no se ha perdido, pero nadie va a ir a por él,
+   * así que la comida no se empieza. Quien pinta el aviso elige la frase con esto.
+   */
+  awaitingHost?: boolean;
 }
 
 interface Deps {
@@ -209,6 +216,18 @@ export async function onKitchenOrderCreated(
       // cocina sin comida.
       if (result.via === 'none') {
         deps.onFailure?.({ orderId, role: group.role, label, error: result.error ?? 'sin impresora' });
+      } else if (result.via === 'queue' && result.awaitingHost) {
+        // Encolada y sin nadie dado de alta para esa estación (hub#1731): la hoja no se ha perdido
+        // —sale en cuanto se dé de alta la impresora— pero AHORA no va a por ella nadie, y una
+        // comanda que nadie saca es un plato que no se empieza. Callarlo era el fallo mudo: la
+        // cola se leía como entregada. `awaitingHost` sin contestar NO cuenta como «no hay nadie».
+        deps.onFailure?.({
+          orderId,
+          role: group.role,
+          label,
+          error: result.error ?? 'sin impresora dada de alta',
+          awaitingHost: true,
+        });
       }
     } catch (e) {
       deps.onFailure?.({
