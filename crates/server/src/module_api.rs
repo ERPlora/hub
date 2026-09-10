@@ -357,11 +357,7 @@ pub(crate) async fn update_module(
             "warning": { "code": "module.update_failed_kept_previous", "message": error },
         }))
         .into_response(),
-        Outcome::Lost { ref module, ref error } => (
-            update_outcome_status(&outcome),
-            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
-        )
-            .into_response(),
+        Outcome::Lost { ref module, ref error } => update_lost_response(module, error),
     }
 }
 
@@ -568,6 +564,30 @@ pub(crate) fn update_outcome_status(
         // saber siquiera qué módulo se ha ido.
         Outcome::Lost { .. } => cloud_proxy::CLOUD_FAILED,
     }
+}
+
+/// Respuesta de `POST /api/modules/:id/update` cuando la nueva versión falló **y la vuelta atrás
+/// también** ([`erplora_runtime::module_update::Outcome::Lost`]): el hub se quedó sin el módulo.
+///
+/// Mismo sobre **plano** que [`install_error_response`] —`{ok, error, code}`—, porque es el único
+/// que lee la shell (`updateModule` en `apps/web/src/lib/runtime.ts`): `error` es la frase y `code`
+/// el hecho estable. Con el `code` anidado en `error.code` nadie lo leía, y quien pulsó «Actualizar»
+/// leía «sigue funcionando con la versión que tenía» sobre un módulo que acababa de desaparecer
+/// (hub#1763). La frase que ve la persona sale de `runtimeErrors.module.update_lost`, `en`+`es`.
+pub(crate) fn update_lost_response(module: &str, error: &str) -> Response {
+    let outcome = erplora_runtime::module_update::Outcome::Lost {
+        module: module.into(),
+        error: error.into(),
+    };
+    (
+        update_outcome_status(&outcome),
+        Json(json!({
+            "ok": false,
+            "error": format!("`{module}`: {error}"),
+            "code": "module.update_lost",
+        })),
+    )
+        .into_response()
 }
 
 /// Respuesta de un fallo del pipeline, con el canal de errores de dominio (hub#139): además del
@@ -1199,5 +1219,30 @@ mod update_outcome_status_tests {
                 "{t:?} builds a sample of another outcome, so {t:?} never reaches the guard"
             );
         }
+    }
+
+    /// hub#1763 — the answer of `POST /api/modules/:id/update` when the module was LOST reaches the
+    /// shell in the ONE envelope it reads: `{ok, error, code}`, flat, the same as
+    /// [`install_error_response`]. With the code nested in `error.code`, `updateModule`
+    /// (`apps/web/src/lib/runtime.ts`) read `body.code` — nothing — fell back to `update_failed`,
+    /// and the toast said «it keeps running the version it had» about a module that had just
+    /// disappeared from the hub.
+    #[tokio::test]
+    async fn the_update_that_lost_the_module_answers_the_flat_envelope_the_shell_reads() {
+        let response = update_lost_response("sales", "rollback failed");
+        assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["ok"], false, "{body}");
+        assert_eq!(body["code"], "module.update_lost", "{body}");
+        let sentence = body["error"].as_str().unwrap_or_else(|| {
+            panic!("`error` is the sentence the shell shows, not an object: {body}")
+        });
+        assert!(
+            sentence.contains("sales") && sentence.contains("rollback failed"),
+            "{sentence}"
+        );
     }
 }

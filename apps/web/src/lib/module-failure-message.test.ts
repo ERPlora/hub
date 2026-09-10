@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { moduleFailureMessage } from './module-failure-message';
 import { InstallBlockedError, InstallFailedError, ModuleActionError } from './runtime';
 import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
 // The REAL catalogue, read the way `vue-i18n` reads it. Not a stub: hub#1693 turns on whether a
 // code has a sentence, and a fake catalogue would answer «yes» to every code ever invented.
@@ -140,14 +141,34 @@ describe('moduleFailureMessage · cada causa de instalación tiene SU frase, no 
 
     const said = moduleFailureMessage(error, FALLBACK, I18N);
 
-    expect(said).toBe((en.runtimeErrors as Record<string, string>)[code]);
+    expect(said).toBe((en.runtimeErrors as Record<string, unknown>)[code]);
     expect(said).not.toBe(ENGINE_PROSE);
     expect(said).not.toBe(FALLBACK);
   });
 
   it('and the three new causes do NOT share a sentence: telling them apart is the point', () => {
-    const sentences = CAUSES.map((code) => (en.runtimeErrors as Record<string, string>)[code]);
+    const sentences = CAUSES.map((code) => (en.runtimeErrors as Record<string, unknown>)[code]);
 
     expect(new Set(sentences).size).toBe(CAUSES.length);
+  });
+});
+
+// hub#1763 — the gravest answer of `POST /api/modules/:id/update`: the new version failed AND the
+// previous one could not be restored, so the module is GONE from this hub. The runtime says so with
+// `module.update_lost`. What the person must never read there is the fallback of AppsPage — «it
+// keeps running the version it had» — which is a lie about a module that has just disappeared.
+describe('moduleFailureMessage — an update that lost the module', () => {
+  const KEEPS_RUNNING = 'Could not update Sales. It keeps running the version it had.';
+  const lost = new InstallFailedError('`sales`: rollback failed', 'module.update_lost', '`sales`: rollback failed');
+
+  it('says the module is gone, never that it keeps running', () => {
+    const sentence = moduleFailureMessage(lost, KEEPS_RUNNING, I18N);
+    expect(sentence).toBe(en.runtimeErrors.module.update_lost);
+    expect(sentence).not.toContain('keeps running');
+  });
+
+  it('has its Spanish sentence too (en + es, ADR-0055)', () => {
+    expect(typeof es.runtimeErrors.module.update_lost).toBe('string');
+    expect(es.runtimeErrors.module.update_lost).not.toBe(en.runtimeErrors.module.update_lost);
   });
 });

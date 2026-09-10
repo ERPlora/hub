@@ -1983,6 +1983,13 @@ export default {
     cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
     cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
     hub_not_enrolled: 'This hub is not connected to erplora.com yet.',
+    // hub#1763 — `POST /api/modules/:id/update` when the new version failed AND the previous one
+    // could not be restored: the app is gone from this hub. The gravest answer of that door, and the
+    // one thing the toast must never say there is «it keeps running the version it had».
+    module: {
+      update_lost:
+        'The update failed and the previous version could not be restored, so this app is no longer installed. Install it again from Apps; if that fails too, contact support.',
+    },
     default: 'Something went wrong. Try again in a minute.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here for what the core says when it

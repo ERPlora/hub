@@ -23,6 +23,13 @@
 //!     just as invisible to the person: `cloud_json_passthrough` hands the Cloud's `500` straight
 //!     out, and the edge replaces that body too.
 //!
+//! And a third outage that is the hub's OWN, not erplora.com's: **no machine credential**. Same
+//! screen, same edge in front of it — and the doors that report it minted a `503` until hub#1763
+//! while nothing drove them bare, because the two sweeps above run enrolled. It is only reachable
+//! as the DEV hub: a production hub without a credential is stopped by
+//! `require_machine_registration` (`428`) before any handler runs, so those branches only ever
+//! answer on `pnpm dev`. The sweep runs as that hub to reach them.
+//!
 //! The rule is the whole `5xx` class and not the `502` that was counted: hub#1763's own inventory
 //! missed `Outcome::Lost` on `POST /api/modules/:id/update` — an update that failed AND could not
 //! roll back, the gravest answer the door has — because it answers `500` rather than `502`.
@@ -38,7 +45,7 @@ use axum::routing::any;
 use axum::{Json, Router};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{app, AppState, AuthMode, HubConfig};
+use erplora_server::{app, AppState, AuthMode, HubConfig, DEV_HUB_ID};
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -94,16 +101,34 @@ fn concrete(path: &str) -> String {
         .join("/")
 }
 
-fn config(cloud_base_url: String, tag: &str) -> HubConfig {
+/// The machine credential of an ENROLLED hub. `None` is the third outage: the hub's own.
+const MACHINE_TOKEN: &str = "machine-secret";
+
+/// Without a credential the sweep has to BE the dev hub (`AuthMode::Dev` + [`DEV_HUB_ID`]): it is
+/// the only hub `require_machine_registration` lets through without one, and therefore the only
+/// place the «not enrolled» branches of the doors ever run.
+fn hub_id(machine_token: Option<&str>) -> &'static str {
+    if machine_token.is_some() {
+        "hub-1763"
+    } else {
+        DEV_HUB_ID
+    }
+}
+
+fn config(cloud_base_url: String, tag: &str, machine_token: Option<&str>) -> HubConfig {
     let temp = std::env::temp_dir().join(format!("erplora-1763-{tag}-{}", std::process::id()));
     HubConfig {
         demo: false,
-        hub_id: "hub-1763".into(),
+        hub_id: hub_id(machine_token).into(),
         cloud_base_url,
         module_cache: temp.join("modules-cache"),
-        auth_mode: AuthMode::Session,
+        auth_mode: if machine_token.is_some() {
+            AuthMode::Session
+        } else {
+            AuthMode::Dev
+        },
         jwt_public_key: None,
-        cloud_api_token: Some("machine-secret".into()),
+        cloud_api_token: machine_token.map(str::to_string),
         device_trust_enforce: false,
         media_dir: temp,
         sector: None,
@@ -139,9 +164,13 @@ async fn a_control_plane_that_answers_a_server_error() -> String {
 
 /// Drives every door of the kernel contract against `cloud_base_url` and returns the ones that
 /// answered a `5xx`, formatted for the failure message.
-async fn doors_that_answer_a_server_error(cloud_base_url: String, tag: &str) -> (Vec<String>, usize) {
+async fn doors_that_answer_a_server_error(
+    cloud_base_url: String,
+    tag: &str,
+    machine_token: Option<&str>,
+) -> (Vec<String>, usize) {
     let db = fresh_db().await;
-    let rt = Runtime::with_hub_id(Box::new(db), "hub-1763");
+    let rt = Runtime::with_hub_id(Box::new(db), hub_id(machine_token));
     rt.ensure_system_tables().await.unwrap();
     let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
     // One session per door, minted BEFORE the runtime moves into the router: `POST /api/auth/logout`
@@ -152,7 +181,10 @@ async fn doors_that_answer_a_server_error(cloud_base_url: String, tag: &str) -> 
     for _ in &routes {
         sessions.push(rt.create_session(&admin, 3600, None).await.unwrap());
     }
-    let router = app(AppState::with_config(rt, config(cloud_base_url, tag)));
+    let router = app(AppState::with_config(
+        rt,
+        config(cloud_base_url, tag, machine_token),
+    ));
 
     let allowed: BTreeSet<(&str, &str)> = ANSWERS_A_SERVER_ERROR_ON_PURPOSE.into_iter().collect();
     let mut offenders: Vec<String> = Vec::new();
@@ -226,7 +258,12 @@ const ONE_FILE: &str = "--X1763\r\nContent-Disposition: form-data; name=\"folder
 const DRIVEN_BY_HAND: [(&str, &str, &str, &str); 5] = [
     // `Query<PathQuery>`: without `path` the extractor answers `400` and nothing is dialled.
     ("DELETE", "/api/media?path=logo.png", "application/json", ""),
-    ("GET", "/api/media/raw?path=logo.png", "application/json", ""),
+    (
+        "GET",
+        "/api/media/raw?path=logo.png",
+        "application/json",
+        "",
+    ),
     // `name` has no `#[serde(default)]`: `{}` never deserialises.
     (
         "POST",
@@ -254,7 +291,10 @@ async fn hand_driven_doors_that_do_not_report_the_outage(
     rt.ensure_system_tables().await.unwrap();
     let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&admin, 3600, None).await.unwrap();
-    let router = app(AppState::with_config(rt, config(cloud_base_url, tag)));
+    let router = app(AppState::with_config(
+        rt,
+        config(cloud_base_url, tag, Some(MACHINE_TOKEN)),
+    ));
 
     let mut wrong: Vec<String> = Vec::new();
     for (method, uri, content_type, body) in DRIVEN_BY_HAND {
@@ -311,7 +351,8 @@ async fn the_doors_the_sweep_cannot_open_with_an_empty_body_are_driven_by_hand()
 #[tokio::test]
 async fn no_door_answers_a_server_error_when_erplora_com_does_not_answer() {
     let cloud = a_control_plane_that_is_not_listening().await;
-    let (offenders, checked) = doors_that_answer_a_server_error(cloud, "silent").await;
+    let (offenders, checked) =
+        doors_that_answer_a_server_error(cloud, "silent", Some(MACHINE_TOKEN)).await;
     assert!(
         offenders.is_empty(),
         "{} door(s) answer a server error because erplora.com did not answer. The hub is the \
@@ -332,12 +373,40 @@ async fn no_door_answers_a_server_error_when_erplora_com_does_not_answer() {
 #[tokio::test]
 async fn no_door_answers_a_server_error_when_erplora_com_answers_one() {
     let cloud = a_control_plane_that_answers_a_server_error().await;
-    let (offenders, checked) = doors_that_answer_a_server_error(cloud, "crashing").await;
+    let (offenders, checked) =
+        doors_that_answer_a_server_error(cloud, "crashing", Some(MACHINE_TOKEN)).await;
     assert!(
         offenders.is_empty(),
         "{} door(s) RELAY the server error of erplora.com. A passthrough is as invisible as a \
          minted 5xx: the edge replaces that body too, so what the business reads is the proxy's \
          page and not «erplora.com refused». Downgrade the relayed status and keep the code.\n  - {}",
+        offenders.len(),
+        offenders.join("\n  - ")
+    );
+    assert!(
+        checked >= DOORS_THE_SWEEP_MUST_DRIVE,
+        "only {checked} doors answered (floor {DOORS_THE_SWEEP_MUST_DRIVE}); the sweep is \
+         not driving the surface"
+    );
+}
+
+/// The third outage is the hub's OWN: it has no machine credential. Not erplora.com failing, but
+/// the same screen and the same edge in front of it: the doors that report it minted a `503` until
+/// hub#1763 (`GET /api/fiscal/representation-grant`, `POST /api/business/fiscal-identity`,
+/// `POST /api/auth/courier`, `GET /api/system/usage-series`) and NOTHING drove them bare — the two
+/// sweeps above run enrolled, so a `503` on that branch stayed green. Driven as the dev hub, the
+/// only one that reaches those branches (see [`hub_id`]); reverting any of them to a `5xx` is red
+/// here (checked against `GET /api/fiscal/representation-grant` on 2026-09-10).
+#[tokio::test]
+async fn no_door_answers_a_server_error_when_the_hub_has_no_machine_credential() {
+    let cloud = a_control_plane_that_is_not_listening().await;
+    let (offenders, checked) = doors_that_answer_a_server_error(cloud, "bare", None).await;
+    assert!(
+        offenders.is_empty(),
+        "{} door(s) answer a server error because this hub has no machine credential. That is a \
+         fact about the hub, not an outage of the server: answer a 4xx with `hub_not_enrolled` so \
+         the edge leaves the body alone and the screen can say «this hub is not connected \
+         yet».\n  - {}",
         offenders.len(),
         offenders.join("\n  - ")
     );
