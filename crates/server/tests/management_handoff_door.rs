@@ -461,7 +461,9 @@ async fn a_refusal_from_the_saas_is_not_turned_into_an_address() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    // hub#1763: `424`, no `502`. The edge replaces the body of a `5xx` with its own page, and the
+    // `handoff_unavailable` the next line demands would never reach the browser.
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
     let body = body_json(response).await;
     assert_eq!(body["code"], json!("handoff_unavailable"));
     assert!(body.get("url").is_none(), "a refusal is not a door");
@@ -481,7 +483,7 @@ async fn a_cloud_that_cannot_be_reached_says_so_instead_of_failing_silently() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763
     assert_eq!(body_json(response).await["code"], json!("handoff_unavailable"));
 }
 

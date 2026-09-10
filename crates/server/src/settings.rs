@@ -621,10 +621,16 @@ impl PublishFailure {
 
     /// La respuesta HTTP de la puerta explícita (`POST /api/business/fiscal-identity`).
     fn into_response(self) -> Response {
+        // 🔴 Ninguna rama es `5xx` (hub#1763). El hub es el ORIGEN: un `502`/`503` acuñado aquí es
+        // indistinguible del que acuña el borde, que SUSTITUYE el cuerpo por su página — y con él
+        // se va el `code` que la pantalla de identidad fiscal traduce (y el `status` del SaaS, que
+        // es justo lo que convierte «no se pudo» en algo accionable). `424 Failed Dependency`
+        // cruza cualquier proxy con el cuerpo intacto.
         let status = match self {
             Self::NoTaxId => axum::http::StatusCode::BAD_REQUEST,
-            Self::NotEnrolled => axum::http::StatusCode::SERVICE_UNAVAILABLE,
-            Self::Rejected(_) | Self::Unreachable(_) => axum::http::StatusCode::BAD_GATEWAY,
+            Self::NotEnrolled | Self::Rejected(_) | Self::Unreachable(_) => {
+                crate::cloud_proxy::CLOUD_FAILED
+            }
         };
         let mut body = Map::new();
         body.insert("ok".into(), json!(false));
