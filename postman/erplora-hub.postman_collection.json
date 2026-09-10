@@ -2413,6 +2413,38 @@
     {
       "item": [
         {
+          "name": "GET /api/hub/operations",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "operations"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/operations"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · operations"
+    },
+    {
+      "item": [
+        {
           "name": "GET /api/hub/policies",
           "request": {
             "description": "auth: admin",

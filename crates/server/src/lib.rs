@@ -76,6 +76,8 @@ pub mod members;
 pub mod module_storage;
 pub mod notify_transport;
 pub mod openapi;
+/// Catalogue of the operations this hub's dispatcher accepts, by exact name — hub#1757.
+pub mod operations_catalog;
 /// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
 pub mod outbox_admin;
 pub mod policies_api;
