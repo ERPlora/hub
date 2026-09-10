@@ -213,3 +213,31 @@ describe('and when it can, the row is simply not there', () => {
     expect((await mountSystem()).text()).not.toContain(en.system.notices.blockedTitle);
   });
 });
+
+describe('and it notices when the notices come back from the device settings', () => {
+  // The toast after a refused re-ask sends the user to the device settings. Turning the notices on
+  // there and coming back is NOT a navigation: no mount, no ion-view hook fires. Visibility is the
+  // only signal the app gets, so it is what re-reads the state — otherwise the row keeps saying
+  // «off» about a device that has just been fixed, until a second tap or a restart.
+  it('re-reads the system when the app comes back to the foreground', async () => {
+    permissionStatus.value = { [NOTIFICATIONS]: false };
+    const wrapper = await mountSystem();
+    expect(wrapper.text()).toContain(en.system.notices.blockedTitle);
+
+    permissionStatus.value = { [NOTIFICATIONS]: true };
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain(en.system.notices.blockedTitle);
+  });
+
+  it('and stops listening once the screen is gone', async () => {
+    permissionStatus.value = { [NOTIFICATIONS]: false };
+    const wrapper = await mountSystem();
+    const removed = vi.spyOn(document, 'removeEventListener');
+    wrapper.unmount();
+
+    expect(removed.mock.calls.some(([type]) => type === 'visibilitychange')).toBe(true);
+    removed.mockRestore();
+  });
+});

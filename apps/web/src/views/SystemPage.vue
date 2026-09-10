@@ -416,7 +416,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -827,6 +827,21 @@ async function refreshHardware(): Promise<void> {
  * card must reflect what is true now. If the notices are still off, the system will not be asking
  * again — so the only remaining door gets named instead of leaving the tap silent.
  */
+/**
+ * Re-reads the notices when the app comes back to the foreground (hub#1732).
+ *
+ * The toast above sends the user to the device settings, and coming back from them is not a
+ * navigation: no mount, no ion-view hook fires. Visibility is the only signal the app gets, and
+ * without it the row keeps saying «off» about a device that has just been fixed until a second
+ * tap or a restart. Same pattern as the billing screen's recheck-on-focus.
+ */
+function onVisibleAgain(): void {
+  if (document.visibilityState !== 'visible') return;
+  void notificationPermissionState().then((state) => {
+    notices.value = state;
+  });
+}
+
 async function turnOnNotices(): Promise<void> {
   if (askingForNotices.value) return;
   askingForNotices.value = true;
@@ -980,6 +995,11 @@ onMounted(() => {
   void loadSystemInfo();
   void loadUsageSeries();
   void loadUpdateHistory();
+  document.addEventListener('visibilitychange', onVisibleAgain);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibleAgain);
 });
 </script>
 
