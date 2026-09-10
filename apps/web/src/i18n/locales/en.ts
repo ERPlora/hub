@@ -81,6 +81,16 @@ export default {
     changeHubCancel: 'Cancel',
     changeHubConfirm: 'Switch',
   },
+  // Feedback of the CSV buttons every `ok-data-table` carries (inventory#90). The import one talks
+  // about the FILE being read, never about rows created: when it fires the module has not written
+  // anything yet — it is about to show its preview, and its own report is what says what went in.
+  // Plural via vue-i18n (`singular | plural`): the `n` in the options picks the branch.
+  actionFeedback: {
+    csvExported: 'CSV exported',
+    csvExportedRows: 'CSV exported · {n} row | CSV exported · {n} rows',
+    csvImported: 'CSV file read',
+    csvImportedRows: 'CSV file read · {n} row | CSV file read · {n} rows',
+  },
   // hub#1518 — a screen whose code never arrived (the connection dropped, or the file went stale
   // after a deploy). Said in plain words: nobody at a till knows what a "chunk" or a "module" is.
   viewLoad: {

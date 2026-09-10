@@ -78,6 +78,12 @@ export default {
     changeHubCancel: 'Cancelar',
     changeHubConfirm: 'Cambiar',
   },
+  actionFeedback: {
+    csvExported: 'CSV exportado',
+    csvExportedRows: 'CSV exportado · {n} fila | CSV exportado · {n} filas',
+    csvImported: 'Fichero CSV leído',
+    csvImportedRows: 'Fichero CSV leído · {n} fila | Fichero CSV leído · {n} filas',
+  },
   // hub#1518 — una pantalla cuyo código no llegó (se cortó la conexión, o el fichero se quedó
   // viejo tras un despliegue). Dicho en cristiano: en un mostrador nadie sabe qué es un «chunk».
   viewLoad: {
