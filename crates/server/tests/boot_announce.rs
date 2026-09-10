@@ -110,7 +110,7 @@ async fn a_hub_that_is_ready_tells_the_cloud_with_its_machine_credential() {
     assert_eq!(headers["x-hub-token"], "machine-token");
     // Va la versión que corre, como en el latido periódico: el Cloud se entera de qué imagen
     // sirve este hub al arrancar, no hasta 24 h después.
-    assert!(body.get("hub_version").is_some(), "cuerpo: {body}");
+    assert!(body.get("core_version").is_some(), "cuerpo: {body}");
 }
 
 /// **La dirección cara.** A este hub le falta un módulo que `hub_module` dice que debería tener:

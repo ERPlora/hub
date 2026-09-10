@@ -35,20 +35,30 @@ pub struct DailyUsageHeartbeat {
     /// entrado**, y el Cloud debe dejar correr el reloj. Ver `crate::activity`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_user_activity_at: Option<String>,
-    /// Version of the **delegated** certificate this hub holds (ADR-0202 §2.5 — hub#318).
+    /// The binary this container is running, e.g. `1.0.0` (hub#515) — the **same number** the
+    /// `verifactu` engine emits as `SistemaInformatico/Version` in every record, because both read
+    /// [`erplora_runtime::CORE_VERSION`] and there is no second source.
     ///
-    /// The hub version this container is running, e.g. `1.0.0` (hub#515).
+    /// Without it, «is this hub up to date?» can only be answered by guessing from a digest — and a
+    /// digest cannot say whether the jump ahead is a security patch or a new version. It rides THIS
+    /// request because the beat already carries the machine credential at the right cadence: a
+    /// separate call would be one more thing that can break.
     ///
-    /// Sin ella, «¿está este hub al día?» solo se puede contestar adivinando desde un digest — y un
-    /// digest no dice si el salto de delante es un parche de seguridad o una versión nueva. Viaja
-    /// en ESTE request porque el latido ya lleva la credencial de máquina con la cadencia correcta:
-    /// una llamada aparte sería una cosa más que se puede romper.
+    /// **The key is `core_version`, and the name is the contract** (hub#1742). The endpoint picks
+    /// the *declaración responsable* that covers this binary from exactly this field (art. 13.3
+    /// RRSIF: one declaration per version of the system, and there is more than one published), and
+    /// it reads no other key. Until hub#1742 the number travelled as `hub_version`, which nothing on
+    /// the control plane ever read — so it was emitted and dropped, and every hub was linked the
+    /// declaration in force whatever it was running. It was RENAMED rather than doubled: two
+    /// spellings of one number is a drift waiting to happen, and this is the number an inspector
+    /// reads. A beat that omits it is answered with the declaration in force and never fails —
+    /// liveness does not depend on a legal link — so old and new hubs cross over safely.
     ///
-    /// **No es `Option`, y eso es el contrato.** En este body «ausente» significa *no pude leerlo*
-    /// (`orders_today`…) y el Cloud lo guarda distinto; la versión va compilada
-    /// dentro del binario, así que no existe el caso de «no la sé». Va **sin** el `v`: el prefijo
-    /// es para leerlo en un panel, no para que el Cloud tenga que quitarlo antes de comparar.
-    pub hub_version: String,
+    /// **Not an `Option`, and that is the contract.** In this body «absent» means *I could not read
+    /// it* (`orders_today`…) and the Cloud stores that difference; the version is compiled into the
+    /// binary, so «I don't know» is not a state that exists. It travels **without** the `v`: the
+    /// prefix is for reading a panel, not for something the Cloud has to strip before comparing.
+    pub core_version: String,
     /// How much every installed engine still owes its external authority (for the
     /// `verifactu` engine: records the AEAT has not received yet, hub#326).
     ///
@@ -329,7 +339,7 @@ pub async fn collect_daily_usage(
         last_user_activity_at: None,
         // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
         // único sitio honesto para leerla es aquí.
-        hub_version: crate::version::HUB_VERSION.to_string(),
+        core_version: crate::version::HUB_VERSION.to_string(),
         // Lo que cada motor instalado debe a su autoridad externa (hub#326/hub#1406). Lo cuenta
         // el MOTOR vía el registro genérico — la misma pregunta que bloquea una desinstalación
         // (hub#314), así que no pueden discrepar. Un motor ilegible NO tiene entrada: «no lo sé»
@@ -470,7 +480,7 @@ mod tests {
         assert_eq!(usage.terminals, Some(0));
         assert_eq!(
             serde_json::to_value(usage).unwrap(),
-            json!({"terminals": 0, "hub_version": crate::version::HUB_VERSION})
+            json!({"terminals": 0, "core_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -506,7 +516,7 @@ mod tests {
             last_sale_at: Some("2026-07-27T11:30:00Z".into()),
             terminals: Some(3),
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields(vec![(
                 "verifactu".into(),
                 2,
@@ -537,7 +547,7 @@ mod tests {
                 "last_sale_at": "2026-07-27T11:30:00Z",
                 "terminals": 3,
                 "last_user_activity_at": "2026-07-27T11:45:00Z",
-                "hub_version": crate::version::HUB_VERSION,
+                "core_version": crate::version::HUB_VERSION,
                 // hub#326: the queue the SaaS alerts on travels under these exact names.
                 "verifactu_pending_depth": 2,
                 "verifactu_oldest_pending_at": "2026-07-25T08:00:00Z",
@@ -562,7 +572,7 @@ mod tests {
             last_sale_at: None,
             terminals: Some(0),
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -574,7 +584,7 @@ mod tests {
         assert!(body.get("last_user_activity_at").is_none());
         assert_eq!(
             body,
-            json!({"orders_today": 0, "terminals": 0, "hub_version": crate::version::HUB_VERSION})
+            json!({"orders_today": 0, "terminals": 0, "core_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -600,7 +610,7 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -659,7 +669,7 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -703,7 +713,7 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -744,7 +754,7 @@ mod tests {
             last_sale_at: None,
             terminals: Some(1),
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -756,7 +766,7 @@ mod tests {
         assert!(body.get("cert_version").is_none());
         assert_eq!(
             body,
-            json!({"orders_today": 3, "terminals": 1, "hub_version": crate::version::HUB_VERSION})
+            json!({"orders_today": 3, "terminals": 1, "core_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -919,7 +929,7 @@ mod tests {
                 last_sale_at: None,
                 terminals: None,
                 last_user_activity_at: None,
-                hub_version: crate::version::HUB_VERSION.to_string(),
+                core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
                 memory_used_mb: None,
@@ -977,7 +987,7 @@ mod tests {
                 last_sale_at: None,
                 terminals: None,
                 last_user_activity_at: None,
-                hub_version: crate::version::HUB_VERSION.to_string(),
+                core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
                 memory_used_mb: None,
@@ -1007,13 +1017,13 @@ mod tests {
     /// ([`crate::version::HUB_VERSION`]), and it goes on the wire WITHOUT the `v` — the prefix is
     /// for humans reading a panel, not for something the Cloud will compare.
     #[test]
-    fn the_heartbeat_carries_the_running_hub_version() {
+    fn the_heartbeat_carries_the_running_core_version() {
         let body = DailyUsageHeartbeat {
             orders_today: Some(3),
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -1024,9 +1034,9 @@ mod tests {
 
         let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");
 
-        assert_eq!(wire["hub_version"], crate::version::HUB_VERSION);
+        assert_eq!(wire["core_version"], crate::version::HUB_VERSION);
         assert!(
-            !wire["hub_version"].as_str().unwrap().starts_with('v'),
+            !wire["core_version"].as_str().unwrap().starts_with('v'),
             "el `v` es para la pantalla, no para el cable"
         );
     }
@@ -1054,6 +1064,6 @@ mod tests {
 
         let usage = collect_daily_usage(&db, "hub-1", "2026-08-08T10:00:00Z", &[]).await;
 
-        assert_eq!(usage.hub_version, crate::version::HUB_VERSION);
+        assert_eq!(usage.core_version, crate::version::HUB_VERSION);
     }
 }

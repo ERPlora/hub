@@ -21,7 +21,7 @@ fn base() -> DailyUsageHeartbeat {
         last_sale_at: Some("2026-09-01T10:00:00Z".to_string()),
         terminals: Some(2),
         last_user_activity_at: Some("2026-09-01T09:00:00Z".to_string()),
-        hub_version: "1.2.3".to_string(),
+        core_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![(
             "verifactu".to_string(),
             2,
@@ -39,7 +39,7 @@ fn base() -> DailyUsageHeartbeat {
 fn hub1406_full_heartbeat_serializes_byte_identically() {
     let expected = concat!(
         r#"{"orders_today":7,"last_sale_at":"2026-09-01T10:00:00Z","terminals":2,"#,
-        r#""last_user_activity_at":"2026-09-01T09:00:00Z","hub_version":"1.2.3","#,
+        r#""last_user_activity_at":"2026-09-01T09:00:00Z","core_version":"1.2.3","#,
         r#""verifactu_pending_depth":2,"verifactu_oldest_pending_at":"2026-08-30T08:00:00Z","#,
         r#""cpu_pct":1.5,"memory_used_mb":100.0,"memory_limit_mb":512.0,"memory_peak_mb":222.0,"#,
         r#""transmission_route":"delegated"}"#,
@@ -57,7 +57,7 @@ fn hub1406_an_empty_queue_is_a_zero_not_an_absence() {
         last_sale_at: None,
         terminals: None,
         last_user_activity_at: None,
-        hub_version: "1.2.3".to_string(),
+        core_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![("verifactu".to_string(), 0, None)]),
         cpu_pct: None,
         memory_used_mb: None,
@@ -67,7 +67,7 @@ fn hub1406_an_empty_queue_is_a_zero_not_an_absence() {
     };
     assert_eq!(
         serde_json::to_string(&hb).unwrap(),
-        r#"{"hub_version":"1.2.3","verifactu_pending_depth":0}"#
+        r#"{"core_version":"1.2.3","verifactu_pending_depth":0}"#
     );
 }
 
@@ -79,7 +79,7 @@ fn hub1406_an_unreadable_queue_is_absent() {
         last_sale_at: None,
         terminals: None,
         last_user_activity_at: None,
-        hub_version: "1.2.3".to_string(),
+        core_version: "1.2.3".to_string(),
         pending: PendingObligationFields::default(),
         cpu_pct: None,
         memory_used_mb: None,
@@ -89,7 +89,7 @@ fn hub1406_an_unreadable_queue_is_absent() {
     };
     assert_eq!(
         serde_json::to_string(&hb).unwrap(),
-        r#"{"hub_version":"1.2.3"}"#
+        r#"{"core_version":"1.2.3"}"#
     );
 }
 
