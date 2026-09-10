@@ -1948,6 +1948,14 @@ export default {
     // Installing or updating an app fails with its own code for the same fact: the hub never
     // reached erplora.com. One fact, one sentence.
     install_cloud_unavailable: CLOUD_UNREACHABLE,
+    // hub#1720 — the three ways installing fails that are NOT «the hub could not reach
+    // erplora.com», and used to be reported as if they were. Telling them apart is the whole
+    // point: only one of them is fixed by waiting, so only one of them says to try again.
+    install_cloud_denied:
+      'erplora.com did not accept the credentials of this hub, so it cannot install apps. Trying again will not fix it; contact support.',
+    install_not_in_catalog: 'That app is not available in your catalogue.',
+    install_cloud_rejected:
+      'erplora.com could not attend to this installation right now. Try again in a few minutes.',
     cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
     cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
     hub_not_enrolled: 'This hub is not connected to erplora.com yet.',

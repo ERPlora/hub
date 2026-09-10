@@ -246,12 +246,24 @@ async fn the_guard_sees_a_door_that_hands_back_the_dialled_url() {
 ///  - `POST /api/auth/courier` — the native shell's boot courier; needs a `code`.
 ///  - `POST /api/modules/request-install` — the marketplace's «Install»; needs a module and a
 ///    version. `/api/modules/:id/update` and «update all» share its pipeline and its error body.
-const DRIVEN_BY_HAND: [(&str, &str, &str); 2] = [
-    ("POST", "/api/auth/courier", r#"{"code":"abc"}"#),
+///
+/// The fourth column is **the answer that proves the door actually dialled erplora.com**, and it
+/// is per door on purpose: it is what keeps this guard from going green on a door that refused the
+/// body before ever calling out — a rule that is never reached is green for nothing. It is NOT the
+/// same status everywhere: since hub#1720 the install pipeline reports a Cloud that did not answer
+/// as `424 Failed Dependency`, precisely so the edge stops swallowing its body.
+const DRIVEN_BY_HAND: [(&str, &str, &str, StatusCode); 2] = [
+    (
+        "POST",
+        "/api/auth/courier",
+        r#"{"code":"abc"}"#,
+        StatusCode::BAD_GATEWAY,
+    ),
     (
         "POST",
         "/api/modules/request-install",
         r#"{"module_id":"not_here","version":"1.0.0"}"#,
+        StatusCode::FAILED_DEPENDENCY,
     ),
 ];
 
@@ -266,7 +278,7 @@ async fn the_doors_the_sweep_cannot_open_with_an_empty_body_are_driven_by_hand()
     let router = app(AppState::with_config(rt, config(cloud_base_url.clone())));
 
     let mut leaks: Vec<String> = Vec::new();
-    for (method, path, body) in DRIVEN_BY_HAND {
+    for (method, path, body, dialled_and_failed) in DRIVEN_BY_HAND {
         let response = router
             .clone()
             .oneshot(
@@ -285,12 +297,11 @@ async fn the_doors_the_sweep_cannot_open_with_an_empty_body_are_driven_by_hand()
             .await
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
-        // The control of THIS control: a 502 is the only answer that proves the body got past
-        // the door and the hub actually dialled erplora.com. A 4xx here would be the door refusing
+        // The control of THIS control: each door has ONE answer that proves the body got past its
+        // validation and the hub actually dialled erplora.com. Anything else is the door refusing
         // the body, and a rule that is never reached is green for nothing.
         assert_eq!(
-            status,
-            StatusCode::BAD_GATEWAY,
+            status, dialled_and_failed,
             "{method} {path} did not get as far as dialling erplora.com: {text}"
         );
         if [address.as_str(), cloud_base_url.as_str()]
