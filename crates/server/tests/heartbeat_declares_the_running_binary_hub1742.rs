@@ -14,29 +14,34 @@
 //! field with the same value — is the point: two spellings of one number is exactly the drift the
 //! second test below exists to forbid.
 
-use erplora_server::daily_usage::{DailyUsageHeartbeat, PendingObligationFields};
+use erplora_db::testutil::fresh_db;
+use erplora_db::DatabaseAdapter;
+use erplora_server::daily_usage::collect_daily_usage;
 use erplora_server::version::HUB_VERSION;
 use serde_json::{json, Value};
 
-/// A beat carrying nothing but the version, built the way `collect_daily_usage` builds it.
-fn beat() -> DailyUsageHeartbeat {
-    DailyUsageHeartbeat {
-        orders_today: None,
-        last_sale_at: None,
-        terminals: None,
-        last_user_activity_at: None,
-        core_version: HUB_VERSION.to_string(),
-        pending: PendingObligationFields::default(),
-        cpu_pct: None,
-        memory_used_mb: None,
-        memory_limit_mb: None,
-        memory_peak_mb: None,
-        transmission_route: None,
-    }
-}
+/// The body the hub actually posts, built by the **production** collector against a real database
+/// — not a struct this test filled in.
+///
+/// That distinction is the whole test: a beat assembled here would assert that the literal handed
+/// to it survives `serde`, which is true of any literal. What has to hold is that the number
+/// `collect_daily_usage` reads, under the key it serialises to, is this binary's.
+async fn wire() -> Value {
+    let db = fresh_db().await;
+    db.execute_batch(
+        "CREATE TABLE sales_sale (\
+           id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, status TEXT NOT NULL, \
+           is_deleted BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL\
+         );\
+         CREATE TABLE hub_session (\
+           token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
+         );",
+    )
+    .await
+    .expect("the two tables the collector reads");
 
-fn wire() -> Value {
-    serde_json::to_value(beat()).expect("the beat has to serialize")
+    let usage = collect_daily_usage(&db, "hub-1", "2026-08-02T10:00:00Z", &[]).await;
+    serde_json::to_value(&usage).expect("the beat has to serialize")
 }
 
 /// The producer's half of `SistemaInformatico`, as the control plane serves it — without it there
@@ -100,9 +105,9 @@ fn version_in_the_record() -> String {
 /// The name is the contract: `POST /api/v1/hub/device/heartbeat/` picks the covering declaration
 /// from `core_version`, and reads nothing else. A number under any other key is a number the
 /// control plane never sees.
-#[test]
-fn the_beat_names_the_version_the_way_the_saas_reads_it() {
-    let wire = wire();
+#[tokio::test]
+async fn the_beat_names_the_version_the_way_the_saas_reads_it() {
+    let wire = wire().await;
 
     assert_eq!(
         wire["core_version"], HUB_VERSION,
@@ -116,9 +121,9 @@ fn the_beat_names_the_version_the_way_the_saas_reads_it() {
 
 /// It travels WITHOUT the `v`: the prefix is for a panel, and the SaaS compares this against
 /// `covers_from` without stripping anything.
-#[test]
-fn the_version_on_the_wire_has_no_v_prefix() {
-    let wire = wire();
+#[tokio::test]
+async fn the_version_on_the_wire_has_no_v_prefix() {
+    let wire = wire().await;
 
     assert!(
         !wire["core_version"]
@@ -135,9 +140,9 @@ fn the_version_on_the_wire_has_no_v_prefix() {
 /// If they separate, the hub emits `SistemaInformatico/Version` = X in every record and asks the
 /// control plane for the declaration covering Y — so it links the text of a product it is not
 /// running, which is the art. 13.3 failure this whole change exists to close.
-#[test]
-fn the_number_on_the_wire_is_the_one_the_aeat_record_declares() {
-    let reported = wire()["core_version"]
+#[tokio::test]
+async fn the_number_on_the_wire_is_the_one_the_aeat_record_declares() {
+    let reported = wire().await["core_version"]
         .as_str()
         .expect("the version is a string")
         .to_string();
