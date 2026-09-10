@@ -152,6 +152,22 @@ describe('when this device cannot warn anybody', () => {
     expect(wrapper.text()).not.toContain(en.system.notices.blockedTitle);
   });
 
+  it('reads the system back, not its own request: granted in the device settings counts', async () => {
+    // A real sequence, and the reason the state is re-read instead of taken from the ask: the
+    // user goes to the device settings, turns the notices on there, comes back and taps «Not
+    // now» on our sheet. The ask reports the state it saw before all that; the system does not.
+    ensureSpy.mockImplementation(async () => {
+      permissionStatus.value = { [NOTIFICATIONS]: true };
+      return 'denied';
+    });
+    const wrapper = await mountSystem();
+    await wrapper.get('[data-test="notices-turn-on"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain(en.system.notices.blockedTitle);
+    expect(vi.mocked(toast).mock.calls[0]?.[0]).toBe(en.system.notices.turnedOn);
+  });
+
   it('names the device settings when the system will not ask again', async () => {
     // Two refusals and Android stops showing its dialog for good. Leaving the button silent here
     // is the dead end the issue describes: the user taps, nothing happens, nothing is explained.
