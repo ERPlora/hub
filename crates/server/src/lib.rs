@@ -101,7 +101,8 @@ pub mod whatsapp_quota;
 pub mod whatsapp_templates;
 
 pub use state::{
-    AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, WsEvent, DEV_HUB_ID,
+    AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, SignatureMode, WsEvent,
+    DEV_HUB_ID,
 };
 pub use tenant::{
     EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,

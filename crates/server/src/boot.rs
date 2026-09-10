@@ -217,6 +217,16 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
     eprintln!("auth: modo {:?}", cfg.hub.auth_mode);
 
+    // **Y en qué modo de firma se ha quedado este hub** (hub#1754). Una línea, siempre, tenga
+    // módulos o no: INFO si verifica, WARN si no hay anillo desplegado, ERROR si la variable viene
+    // puesta y no parsea (hub#870). Antes solo se sabía como efecto lateral de instalar algo, así
+    // que el hub recién aprovisionado —el que acaba de estrenar la clave— arrancaba callado y el
+    // fallo aparecía después, en otra persona, como una instalación que no pasaba.
+    //
+    // 🔑 Va AQUÍ, en el resumen de configuración del arranque y ANTES de que nada instale: si el
+    // anillo está roto, la causa se lee por encima de sus consecuencias, no por debajo.
+    cfg.hub.announce_signature_policy();
+
     // Índice vectorial del asistente (§9.2b routing + §9.6 ingestión) — Postgres + pgvector
     // (hub#204 / pm#29). Con los 24 módulos instalados el catálogo de tools que viaja en CADA
     // turno son ~58k tokens; el router lo recorta a los módulos relevantes, y para eso necesita
