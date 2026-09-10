@@ -44,7 +44,7 @@ use std::path::{Component, Path};
 use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
 
 use crate::cloud_proxy::cloud_unreachable;
-use crate::{auth, AppState};
+use crate::{auth, cloud_proxy, AppState};
 
 fn unauthorized(error: auth::AuthError) -> Response {
     (
@@ -115,7 +115,7 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         pct_encode(folder)
     );
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     let mut r = st.http.get(&url);
     for (k, v) in headers {
@@ -123,17 +123,17 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     }
     let resp = match r.send().await {
         Ok(x) => x,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
     if !resp.status().is_success() {
         return err(
-            StatusCode::BAD_GATEWAY,
+            cloud_proxy::CLOUD_FAILED,
             "el Cloud rechazó el listado de media",
         );
     }
     let raw: Value = match resp.json().await {
         Ok(v) => v,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
 
     let files: Vec<Value> = raw
@@ -193,7 +193,7 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
 async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     // El multipart se recoge ENTERO antes de decidir: el orden de los campos no está garantizado
     // y la política depende de `folder`, así que no se puede empezar a reenviar y comprobar luego.
@@ -234,8 +234,8 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(_) => err(StatusCode::BAD_GATEWAY, "el Cloud rechazó la subida"),
-        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Ok(_) => err(cloud_proxy::CLOUD_FAILED, "el Cloud rechazó la subida"),
+        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -247,7 +247,7 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
         pct_encode(path)
     );
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     let mut r = st.http.delete(&url);
     for (k, v) in headers {
@@ -256,10 +256,10 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
         Ok(resp) => err(
-            StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+            cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
             "el Cloud no pudo borrar",
         ),
-        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -267,7 +267,7 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
 async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
     let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     let mut r = st
         .http
@@ -279,10 +279,10 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
         Ok(resp) => err(
-            StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+            cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
             "el Cloud no pudo renombrar",
         ),
-        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -290,7 +290,7 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
 async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Response {
     let url = format!("{}/api/v1/hub/device/media/folder/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     let mut r = st
         .http
@@ -301,8 +301,8 @@ async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Respons
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(_) => err(StatusCode::BAD_GATEWAY, "el Cloud no pudo crear la carpeta"),
-        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Ok(_) => err(cloud_proxy::CLOUD_FAILED, "el Cloud no pudo crear la carpeta"),
+        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -339,7 +339,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         pct_encode(path)
     );
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     let mut r = st.http.get(&url);
     for (k, v) in headers {
@@ -347,10 +347,20 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     }
     let resp = match r.send().await {
         Ok(x) => x,
-        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
+    // `404` sigue siendo `404` —el fichero no está—, pero cualquier OTRA negativa del Cloud no lo
+    // es (hub#1763): contar un `500` de erplora.com como «fichero no encontrado» manda a quien
+    // mira la foto a subirla otra vez cuando la foto SÍ está, y esconde la avería.
     if !resp.status().is_success() {
-        return err(StatusCode::NOT_FOUND, "fichero no encontrado");
+        return if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            err(StatusCode::NOT_FOUND, "fichero no encontrado")
+        } else {
+            err(
+                cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
+                cloud_proxy::CLOUD_REJECTED,
+            )
+        };
     }
     // El Cloud responde `{ url }` con una firma temporal de Object Storage. La descarga la hace
     // el runtime, no el navegador: los buckets no tienen CORS (un `fetch` desde el visor se cae) y
@@ -362,18 +372,28 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
     if signed.is_empty() {
         return err(
-            StatusCode::BAD_GATEWAY,
+            cloud_proxy::CLOUD_FAILED,
             "el Cloud no devolvió la URL del fichero",
         );
     }
     let object = match st.http.get(&signed).send().await {
         Ok(o) if o.status().is_success() => o,
-        Ok(_) => return err(StatusCode::NOT_FOUND, "fichero no encontrado"),
-        Err(e) => return err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        // Igual que arriba: el objeto que no está es un `404`; el almacén que falla es una avería
+        // del que guarda la foto, y decir «no encontrado» la daría por perdida (hub#1763).
+        Ok(o) if o.status() == reqwest::StatusCode::NOT_FOUND => {
+            return err(StatusCode::NOT_FOUND, "fichero no encontrado")
+        }
+        Ok(o) => {
+            return err(
+                cloud_proxy::relayed_status(cloud_proxy::cloud_status(o.status().as_u16())),
+                cloud_proxy::CLOUD_REJECTED,
+            )
+        }
+        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
     // When the size is declared, refuse an oversized object BEFORE downloading a single byte.
     if object
@@ -418,7 +438,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
 async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
     let url = format!("{}/api/v1/hub/device/media/move/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
     };
     let mut r = st.http.post(&url).json(&json!({ "from": from, "to": to }));
     for (k, v) in headers {
@@ -427,10 +447,10 @@ async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
         Ok(resp) => err(
-            StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+            cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
             "el Cloud no pudo mover",
         ),
-        Err(e) => err(StatusCode::BAD_GATEWAY, cloud_unreachable(&e.to_string())),
+        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 

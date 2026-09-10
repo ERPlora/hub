@@ -87,8 +87,8 @@ async fn fixture(hub_id: &str, second_admin: bool) -> Fixture {
         demo: false,
         hub_id: hub_id.into(),
         // Unreachable on purpose: a request that gets as far as the SaaS comes back
-        // `502 cloud_unreachable`, which is how these tests tell "the guard let it through and the
-        // local write happened" from "the guard refused before writing anything".
+        // `424 cloud_unreachable` (hub#1763), which is how these tests tell "the guard let it
+        // through and the local write happened" from "the guard refused before writing anything".
         cloud_base_url: "https://example.invalid".into(),
         module_cache: media.join("modules"),
         auth_mode: AuthMode::Session,
@@ -202,7 +202,7 @@ async fn hub1444_demoting_yourself_is_fine_while_another_admin_is_active() {
     let (status, body) = add_member(&fx, &fx.admin_email.clone(), "employee").await;
     assert_eq!(
         status,
-        StatusCode::BAD_GATEWAY,
+        StatusCode::FAILED_DEPENDENCY,
         "the guard let it through and only the (unreachable) SaaS failed: {body}"
     );
     assert_eq!(body["error"]["code"], "cloud_unreachable");
@@ -221,12 +221,12 @@ async fn hub1444_the_ordinary_alta_and_baja_still_go_through() {
     let fx = fixture("hub-1444-d", true).await;
 
     let (status, body) = remove_member(&fx, "luis@example.com").await;
-    assert_eq!(status, StatusCode::BAD_GATEWAY, "{body}");
+    assert_eq!(status, StatusCode::FAILED_DEPENDENCY, "{body}");
     assert_eq!(body["error"]["code"], "cloud_unreachable");
     assert_eq!(member(&fx, "luis@example.com").await["is_active"], false);
 
     let (status, body) = add_member(&fx, "nueva@example.com", "employee").await;
-    assert_eq!(status, StatusCode::BAD_GATEWAY, "{body}");
+    assert_eq!(status, StatusCode::FAILED_DEPENDENCY, "{body}");
     assert_eq!(body["error"]["code"], "cloud_unreachable");
     assert_eq!(member(&fx, "nueva@example.com").await["role"], "employee");
 }

@@ -1778,6 +1778,10 @@ export default {
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
     hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+    module: {
+      update_lost:
+        'La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.',
+    },
     default: 'No ha funcionado. Vuelve a intentarlo dentro de un minuto.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here (translation of the one in `en.ts`)

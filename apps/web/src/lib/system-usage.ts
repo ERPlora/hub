@@ -64,8 +64,9 @@ export interface UsageSeries {
 /**
  * Fetches the usage series for `range` from the runtime proxy.
  *
- * `null` on any failure (non-2xx, network, bad JSON): the runtime already answers 502 with an
- * all-unknown body when the SaaS is unreachable, and the screen treats both the same way.
+ * `null` on any failure (non-2xx, network, bad JSON): the runtime already answers `424` with an
+ * all-unknown body when the SaaS is unreachable (hub#1763 — a `5xx` would be replaced by the edge
+ * with its own page), and the screen treats both the same way.
  */
 export async function fetchUsageSeries(range: UsageRange): Promise<UsageSeries | null> {
   try {
