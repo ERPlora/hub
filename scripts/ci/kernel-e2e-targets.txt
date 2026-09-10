@@ -29,6 +29,7 @@ capability_denied_listener_e2e
 dashboard_widgets_e2e
 emit_schema_contract_hub1076
 export_test
+fixture_quantities_match_the_published_grid
 import_no_duplica_lo_sembrado
 import_report_persist_test
 import_retry_test

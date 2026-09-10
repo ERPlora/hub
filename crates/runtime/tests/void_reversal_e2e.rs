@@ -23,6 +23,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::e2e_support::{on_grid, units};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -141,8 +142,8 @@ async fn create_product(
     rt.execute_command(
         "inventory.products.create",
         &params(json!({
-            "name": name, "sku": sku, "price": 1000, "cost": 500, "stock": stock,
-            "low_stock_threshold": 5, "product_type": "physical",
+            "name": name, "sku": sku, "price": 1000, "cost": 500, "stock": on_grid(stock),
+            "low_stock_threshold": units(5), "product_type": "physical",
             "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
         })),
         ctx,
@@ -476,7 +477,7 @@ async fn service_line_void_reverts_cash_without_touching_stock() {
     let ctx = admin();
     let sid = open_cash_session(&rt, &ctx, 0).await;
     // Un producto físico de control: NO debe variar (la venta es de servicio sin product_id).
-    let pid = create_product(&rt, &ctx, "Control", "CTRL", 5).await;
+    let pid = create_product(&rt, &ctx, "Control", "CTRL", units(5)).await;
 
     seed_sale(&rt, "sale-3", "S-3", 2000, "cash", &[("", 1, 1.0)]).await; // línea servicio, sin product_id
     seed_cash_sale_movement(&rt, &ctx, &sid, "sale-3", 2000).await;
@@ -497,7 +498,7 @@ async fn service_line_void_reverts_cash_without_touching_stock() {
 
     assert_eq!(
         stock_of(&rt, &ctx, &pid).await,
-        5.0,
+        units(5) as f64,
         "ningún stock cambia al anular un servicio"
     );
     // El servicio cash anulado: sale(+2000) + refund(−2000) = 0 → arqueo de vuelta al neto.
