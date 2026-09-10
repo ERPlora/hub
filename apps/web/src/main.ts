@@ -19,8 +19,6 @@ import {
   clientInjectionKey,
   bootHubContext,
   ensureMediaCookie,
-  RUNTIME_URL,
-  runtimeHeaders,
   setOnRuntimeSessionExpired,
 } from './lib/runtime';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
@@ -30,6 +28,7 @@ import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
 import { createPrintService } from './lib/print';
+import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
@@ -187,30 +186,11 @@ const erploraClient = getClient();
 (erploraClient as unknown as { print?: ReturnType<typeof createPrintService> }).print =
   createPrintService(erploraClient as unknown as Parameters<typeof createPrintService>[0], {
     // Vía COLA (hub#344): sin Bridge, el tique térmico se encola en el hub y un print host del rol
-    // lo drene. Reusa el mismo baseURL + auth del resto de llamadas al runtime.
-    enqueue: async (job) => {
-      const res = await fetch(`${RUNTIME_URL}/api/print/jobs`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...runtimeHeaders() },
-        body: JSON.stringify({
-          jobId: job.jobId,
-          role: job.role,
-          documentType: job.documentType,
-          document: job.document,
-          format: job.format ?? 'receipt',
-        }),
-      });
-      // 200 con ok:true → encolado (nuevo o duplicado, ambos éxito). Cualquier otra cosa →
-      // `queued:false` (la puerta cae al navegador: una venta no se cae por impresión).
-      if (!res.ok) return { queued: false };
-      const body = await res.json().catch(() => ({}));
-      // `liveHosts` = equipos dados de alta y reportando para la estación en la que ha caído el
-      // trabajo (hub#1731). Es lo que separa «sale tarde» de «no sale»: sin él, encolar en un hub
-      // sin impresora se leía como impreso y el fallo era MUDO. Un runtime antiguo no manda la
-      // clave → `undefined`, que NO es «no hay nadie» y por eso no se convierte a 0.
-      const liveHosts = typeof body?.liveHosts === 'number' ? body.liveHosts : undefined;
-      return { queued: body?.ok === true, liveHosts };
-    },
+    // lo drena. Reusa el mismo baseURL + auth del resto de llamadas al runtime, y devuelve lo que
+    // contestó el runtime —no solo si lo aceptó—: la cobertura de la estación es lo que separa
+    // «sale tarde» de «no sale» (hub#1731). Vive en `lib/` y no aquí porque este fichero no tiene
+    // tests, y esa traducción es justo la que no puede romperse en silencio.
+    enqueue: createEnqueuePrintJob(),
   });
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
