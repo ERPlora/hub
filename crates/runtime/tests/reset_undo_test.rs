@@ -18,6 +18,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::e2e_support::units;
 use erplora_runtime::reset::{list_import_batches, undo_import};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
@@ -68,9 +69,12 @@ fn demo_sql() -> String {
         .iter()
         .enumerate()
         .map(|(i, id)| {
+            // A blueprint writes the table straight, so it is bound by the published grid exactly
+            // like a command is — this is the very shape inventory#42 was written for.
+            let stock = units(5);
             format!(
                 "INSERT INTO inventory_product (id, hub_id, name, sku, price, cost, stock, created_at) \
-                 SELECT '{id}', '__HUB_ID__', 'Demo {i}', 'DEMO{i}', 100, 50, 5, '2026-07-31T10:00:00Z' \
+                 SELECT '{id}', '__HUB_ID__', 'Demo {i}', 'DEMO{i}', 100, 50, {stock}, '2026-07-31T10:00:00Z' \
                  WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = '{id}');\n"
             )
         })
@@ -106,7 +110,7 @@ async fn deshacer_una_importacion_borra_solo_lo_que_trajo() {
     // El usuario prueba la demo y AÑADE lo suyo.
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": "Mi producto", "sku": "MIO", "price": 900, "cost": 400, "stock": 3, "tax_category_key": "product.generic" })),
+        &params(json!({ "name": "Mi producto", "sku": "MIO", "price": 900, "cost": 400, "stock": units(3), "tax_category_key": "product.generic" })),
         &ctx("h1"),
     )
     .await
@@ -166,7 +170,7 @@ async fn deshacer_un_lote_no_toca_otro_hub() {
     let batch_h1 = import_demo(&rt, "h1", "restaurante_es").await;
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": "Del vecino", "sku": "VEC", "price": 100, "cost": 50, "stock": 1, "tax_category_key": "product.generic" })),
+        &params(json!({ "name": "Del vecino", "sku": "VEC", "price": 100, "cost": 50, "stock": units(1), "tax_category_key": "product.generic" })),
         &ctx("h2"),
     )
     .await
@@ -257,7 +261,7 @@ async fn el_import_real_registra_un_lote_deshacible() {
     for (name, sku) in [("Café", "CAF"), ("Té verde", "TEV")] {
         a.execute_command(
             "inventory.products.create",
-            &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": 10, "tax_category_key": "product.generic" })),
+            &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": units(10), "tax_category_key": "product.generic" })),
             &ctx("h1"),
         )
         .await
@@ -331,7 +335,7 @@ async fn el_import_real_registra_un_lote_deshacible() {
     // Y el usuario añade lo suyo DESPUÉS.
     b.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": "Mío", "sku": "MIO", "price": 900, "cost": 400, "stock": 1, "tax_category_key": "product.generic" })),
+        &params(json!({ "name": "Mío", "sku": "MIO", "price": 900, "cost": 400, "stock": units(1), "tax_category_key": "product.generic" })),
         &ctx("h2"),
     )
     .await

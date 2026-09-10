@@ -19,6 +19,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::e2e_support::units;
 use erplora_runtime::export::{
     export_hub, BundlePurpose, ExportSelection, ModuleDataSelection, HUB_ID_PLACEHOLDER,
     SCHEMA_VERSION,
@@ -58,7 +59,7 @@ async fn fresh() -> Runtime {
 async fn create_product(rt: &Runtime, hub: &str, name: &str, sku: &str) {
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": 10, "tax_category_key": "product.generic" })),
+        &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": units(10), "tax_category_key": "product.generic" })),
         &ctx(hub),
     )
     .await
