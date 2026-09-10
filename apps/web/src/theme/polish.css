@@ -136,6 +136,26 @@ ion-item iconify-icon[slot="start"]:not(.nav-icon):not([width]) {
 ion-item h3 { font-weight: 600; }
 ion-note { font-size: 0.875rem; }
 
+/* Settings row: the VALUE must not strangle the LABEL (hub#1733). `ion-item` lays its slots out in
+   the shadow DOM and the label's box gets whatever the `slot="end"` control leaves, so a long value
+   eats the row: measured on banco-pre at 390px, «Automática · Europe/Madrid, 23:01» took 182 of the
+   252px on offer and left the label 70px, stacking «Zona horaria» into a 125px-tall column while
+   «País» right above it read normally. Capping the value is the ONLY lever — a `min-width` on
+   `ion-label` is an illusion, because the label is not the flex item: it just paints over the
+   select (measured: a 90px overlap).
+   The cap scales so it only bites where the row is actually narrow: 7rem (112px) at 390px leaves
+   the label 140px — one line, like «País» — and stays clear of the values that already fitted
+   («EUR · Euro» 99px, «España» 75px); `50vw - 6rem` overtakes that floor at 416px and clears the
+   whole value at 556px, so above it nothing is capped — measured on the bench, tablet (952) and
+   desktop (1440) laid out row for row the same with the rule and without it.
+   Only `ion-select` and `ion-note`: they truncate or wrap. A blanket `[slot="end"]` cap was
+   measured and REGRESSED the «Dígitos del PIN» row — its `ion-segment` cannot truncate, so 288px →
+   112px just clipped its own options. Rows whose end slot is a control keep their own bug (hub#1794). */
+ion-item > ion-select[slot="end"],
+ion-item > ion-note[slot="end"] {
+  max-width: max(7rem, calc(50vw - 6rem));
+}
+
 /* ── Botones: radio, peso, sin mayúsculas ni sombra dura ──────────────────────────────────── */
 ion-button {
   --border-radius: 10px;
