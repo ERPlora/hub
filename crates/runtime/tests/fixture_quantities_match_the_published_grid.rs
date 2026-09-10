@@ -38,7 +38,7 @@
 use std::path::PathBuf;
 
 use erplora_db::testutil::fresh_db;
-use erplora_runtime::e2e_support::{on_grid, units, QUANTITY_GRID};
+use erplora_runtime::e2e_support::{on_grid, require_published_module_version, units, QUANTITY_GRID};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -52,6 +52,18 @@ fn modules_root() -> PathBuf {
 
 fn ctx() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
+}
+
+/// The release that installed `ck_inventory_product_stock_on_grid` (migration 009, inventory#42).
+const INVENTORY_WITH_THE_GRID_GUARD: &str = "1.2.45";
+
+/// Below that release there is no CHECK to ratchet against, and the two assertions of this file
+/// would read as «the fixture vocabulary of this repo is stale» about a catalogue that simply
+/// predates the guard — a red with no bug behind it, on every machine whose shared module checkout
+/// lags (measured 2026-09-10: `modules-workspace/modules/inventory` sat at v1.2.40 while published
+/// was v1.2.45). The gate skips there, and FAILS LOUD where the published catalogue is mandatory.
+fn catalogue_carries_the_grid_guard() -> bool {
+    require_published_module_version("inventory", INVENTORY_WITH_THE_GRID_GUARD)
 }
 
 async fn fresh() -> Runtime {
@@ -85,7 +97,7 @@ async fn create_with_stock(rt: &Runtime, sku: &str, stock: i64) -> Result<(), St
 /// catalogue takes.
 #[tokio::test]
 async fn a_quantity_built_with_units_is_accepted_by_the_published_catalogue() {
-    if !erplora_runtime::require_modules_workspace() {
+    if !erplora_runtime::require_modules_workspace() || !catalogue_carries_the_grid_guard() {
         return;
     }
     let rt = fresh().await;
@@ -100,7 +112,7 @@ async fn a_quantity_built_with_units_is_accepted_by_the_published_catalogue() {
 /// tests dying on a constraint name.
 #[tokio::test]
 async fn a_value_off_the_grid_is_refused_by_the_published_catalogue() {
-    if !erplora_runtime::require_modules_workspace() {
+    if !erplora_runtime::require_modules_workspace() || !catalogue_carries_the_grid_guard() {
         return;
     }
     let rt = fresh().await;

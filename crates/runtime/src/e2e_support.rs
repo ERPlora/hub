@@ -342,6 +342,49 @@ pub fn require_module_version(module_id: &str, needed: &str) -> bool {
     false
 }
 
+/// The decision behind [`require_published_module_version`], with no disk and no environment in
+/// it — the same shape, and the same reason, as [`decide`]: a policy that can be pinned by a test
+/// running in parallel with everything else.
+pub fn decide_version_gate(on_disk_is_enough: bool, modules_required: bool) -> GuardDecision {
+    if on_disk_is_enough {
+        GuardDecision::Run
+    } else if modules_required {
+        GuardDecision::FailLoud
+    } else {
+        GuardDecision::LegitSkip
+    }
+}
+
+/// [`require_module_version`], for a test that measures against the catalogue a CI job declared
+/// MANDATORY.
+///
+/// The plain version gate is right for a developer: the shared module checkout of the fleet is
+/// usually several releases behind, and a test that asserts something about a newer release has
+/// to skip there — loudly, but skip. In the job that materialises the PUBLISHED catalogue on
+/// purpose (`ERPLORA_E2E_REQUIRE_MODULES=1`, hub#1216) nothing is behind, so a version below the
+/// floor means the materialiser brought the wrong tree, and skipping would report a green that
+/// proved nothing — the very hole that flag exists to close.
+pub fn require_published_module_version(module_id: &str, needed: &str) -> bool {
+    // `require_module_version` already prints WHICH version is on disk and where, so the skip is
+    // never silent; this only decides whether a short catalogue is allowed to be a skip at all.
+    match decide_version_gate(
+        require_module_version(module_id, needed),
+        require_modules_override(),
+    ) {
+        GuardDecision::Run => true,
+        GuardDecision::LegitSkip => false,
+        GuardDecision::FailLoud => panic!(
+            "`{module_id}` en el catálogo de disco está por debajo de {needed}, y\n\
+             ERPLORA_E2E_REQUIRE_MODULES=1 declara que aquí el catálogo PUBLICADO es OBLIGATORIO.\n\
+             \n\
+             O sea que esto NO es el checkout compartido yendo por detrás: es el paso que\n\
+             materializa el catálogo, que se trajo otro árbol. Revísalo — si esto omitiera, el e2e\n\
+             que mide contra lo publicado saldría `ok` sin haber ejecutado su afirmación, que es\n\
+             justo el agujero que hub#1216 cierra."
+        ),
+    }
+}
+
 // ─── The quantity vocabulary of the kernel's fixtures (hub#1772) ─────────────────────────────
 //
 // **The bug this closes.** `inventory` v1.2.45 installed `ck_inventory_product_stock_on_grid`
@@ -419,6 +462,33 @@ mod tests {
         assert!(version_is_at_least("2.3.28", "2.3.27"));
         assert!(version_is_at_least("2.4.0", "2.3.27"));
         assert!(version_is_at_least("3.0.0", "2.3.27"));
+    }
+
+    // ── Y cuando el catálogo es OBLIGATORIO, quedarse corto NO es un skip ─────────────────
+    //
+    // `require_module_version` está pensado para el checkout compartido de la flota, que va por
+    // detrás: ahí omitir es lo correcto. El job que materializa el catálogo PUBLICADO a propósito
+    // (`ERPLORA_E2E_REQUIRE_MODULES=1`, hub#1216) no tiene nada que vaya por detrás, así que una
+    // versión por debajo del suelo significa que se trajo el árbol equivocado — y el test que el
+    // gate protege saldría verde sin haber probado nada. Es el mismo reparto que `decide`.
+
+    #[test]
+    fn el_gate_de_version_corre_cuando_el_disco_llega() {
+        assert_eq!(decide_version_gate(true, false), GuardDecision::Run);
+        assert_eq!(decide_version_gate(true, true), GuardDecision::Run);
+    }
+
+    #[test]
+    fn el_gate_de_version_omite_en_local_cuando_el_disco_se_queda_corto() {
+        assert_eq!(decide_version_gate(false, false), GuardDecision::LegitSkip);
+    }
+
+    /// 🔴 El positivo que hace útil al gate: con los módulos declarados obligatorios, un catálogo
+    /// por debajo del suelo es el fallo del PROPIO job, no un checkout viejo. Si esto omitiera, el
+    /// e2e que mide contra lo publicado reportaría `ok` sin ejecutar su afirmación.
+    #[test]
+    fn con_los_modulos_obligatorios_una_version_corta_es_fallo_del_job() {
+        assert_eq!(decide_version_gate(false, true), GuardDecision::FailLoud);
     }
 
     #[test]
