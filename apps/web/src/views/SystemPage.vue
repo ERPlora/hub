@@ -408,12 +408,13 @@ import { openExternal } from '../lib/open-external';
 import {
   printerLine,
   printerSetupStepKeys,
-  probeFromBridge,
+  probeFromCoverage,
   reportedCount,
   usagePercent,
   type HealthLine,
   type Reading,
 } from '../lib/system-health';
+import { fetchPrintHosts, type PrintRoleCoverage } from '../lib/print-coverage';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { listInstalledModules, type InstalledModule } from '../lib/runtime';
 import {
@@ -510,7 +511,11 @@ const info = ref<SystemInfo | null>(null);
 const hardware = ref<BridgeStatus>({ online: false });
 // The two readings behind the printer sentence (hub#375). `null` in either of them means «we have
 // not been able to ask», which is a different answer from «no» and is never dressed up as one.
-const printerProbe = ref<BridgeStatus | null>(null);
+// The first one is the runtime's print COVERAGE — who is draining each station right now — and no
+// longer this device's hardware probe: the probe answered «online» inside the installed app no
+// matter what, so a hub with no printer registered read «Printer ready» (hub#1731). `hardware`
+// below stays on the probe on purpose: the install steps ask about THIS device, not about cover.
+const printerCoverage = ref<PrintRoleCoverage[] | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
 
 // Qué le hemos cambiado a este hub (hub#564). Vacío es una respuesta legítima y frecuente: la
@@ -550,7 +555,7 @@ const resourcesSource = computed<string | null>(() =>
 );
 /** The one sentence about the printer, or `null` when this hub has nothing that prints (hub#375). */
 const printerHealth = computed<HealthLine | null>(() =>
-  printerLine(probeFromBridge(printerProbe.value), installedModules.value),
+  printerLine(probeFromCoverage(printerCoverage.value), installedModules.value),
 );
 
 const dbEngineLabel = computed<string>(() => {
@@ -745,18 +750,23 @@ async function handleAppDownload(os: DownloadOs): Promise<void> {
 }
 
 /**
- * Re-reads the two things behind the printer sentence (hub#375).
+ * Re-reads the three things behind the printer card (hub#375, hub#1731).
  *
  * Each one fails on its own and each failure is kept as `null` — «we could not ask», which is not
- * «no». `hardware` keeps the raw probe because the install steps below still key off it.
+ * «no». `hardware` keeps the raw probe because the install steps below still key off it: they ask
+ * whether THIS device reaches a printer, which is a different question from whether anybody in the
+ * business is taking paper out — and answering the second with the first is what made the badge
+ * green on a hub that printed nothing.
  */
 async function refreshHardware(): Promise<void> {
   try {
-    const status = await detectPeripherals();
-    printerProbe.value = status;
-    hardware.value = status;
+    printerCoverage.value = (await fetchPrintHosts()).coverage;
   } catch {
-    printerProbe.value = null;
+    printerCoverage.value = null; // we could not ask — NOT «nobody is printing»
+  }
+  try {
+    hardware.value = await detectPeripherals();
+  } catch {
     hardware.value = { online: false };
   }
   try {

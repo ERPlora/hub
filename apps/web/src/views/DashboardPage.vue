@@ -198,8 +198,8 @@ import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { moduleNav, moduleNavState } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
-import { detectPeripherals, type BridgeStatus } from '../lib/bridge-transport';
-import { printerLine, probeFromBridge, type HealthLine } from '../lib/system-health';
+import { printerLine, probeFromCoverage, type HealthLine } from '../lib/system-health';
+import { fetchPrintHosts, type PrintRoleCoverage } from '../lib/print-coverage';
 import { GREETING_KEY, panelHeading } from '../lib/dashboard-heading';
 import { hubSettings } from '../lib/hub-settings';
 import { formatAmount } from '../lib/money';
@@ -399,26 +399,27 @@ const todayLabel = computed<string>(() => {
 // ── Zone 5 — what the hub says about itself (hub#375) ─────────────────────────────────────────
 // The shape of the sentence lives in `lib/system-health.ts`; this only reads the two things it
 // needs and paints the answer. The two readings are kept as «not answered yet» (`null`) until they
-// answer, because that is exactly what they are: a probe that has not come back is not a printer
-// that is off, and a module list we could not read is not a hub without a printer.
-const printerProbe = ref<BridgeStatus | null>(null);
+// answer, because that is exactly what they are: coverage we could not read is not a printer that
+// is off, and a module list we could not read is not a hub without a printer.
+const printerCoverage = ref<PrintRoleCoverage[] | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
 
 /** The one sentence, or `null` when there is nothing honest to say. */
 const printerHealth = computed<HealthLine | null>(() =>
-  printerLine(probeFromBridge(printerProbe.value), installedModules.value),
+  printerLine(probeFromCoverage(printerCoverage.value), installedModules.value),
 );
 
 async function loadSystemHealth(): Promise<void> {
-  // Both fail on their own: printing installed but unreachable is a different sentence from «we do
+  // Both fail on their own: printing installed but uncovered is a different sentence from «we do
   // not even know whether this hub prints», and neither may borrow the other's answer.
-  // `detectPeripherals` asks the door the modules use — `invoke` in the installed app, and an
-  // honest «no hardware here» in a browser. It used to probe `localhost:12321`, where nothing has
-  // listened since ADR-0196, so the badge read «no printer» even with one plugged in (hub#524).
+  // The reading is the runtime's own print COVERAGE — who is draining each station right now —
+  // and not a probe of the local host process (hub#1731). The probe answered «yes» inside the
+  // installed app no matter what, so a hub with no printer registered at all read «Printer ready»
+  // while its receipts piled up in the queue.
   try {
-    printerProbe.value = await detectPeripherals();
+    printerCoverage.value = (await fetchPrintHosts()).coverage;
   } catch {
-    printerProbe.value = null; // we could not ask — NOT «it is off»
+    printerCoverage.value = null; // we could not ask — NOT «nobody is printing»
   }
   try {
     installedModules.value = await listInstalledModules();

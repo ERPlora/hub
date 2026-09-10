@@ -25,10 +25,20 @@
 // The strings are i18n **keys**, resolved by whoever paints them (`system.health.*`). The copy is
 // the feature here, so it is asserted against the real English and Spanish catalogues in the tests.
 //
-// The probe itself is on death row: with ADR-0196 the Bridge stops being a separate process and the
-// printer stops being something a browser guesses at over localhost. This module is the shape that
-// survives that: swap `probeFromBridge` for whatever the runtime ends up reporting and every
-// sentence, every state and every silence above still holds.
+// The Bridge probe it was born with is GONE (hub#1731), and the swap the paragraph above predicted
+// is the one that happened: the sentence now comes from what the RUNTIME reports — per-role print
+// coverage — and every state and every silence above still holds unchanged.
+//
+// Why the probe had to go, and not just be corrected: it asked `GET localhost:12321/status`, i.e.
+// «is the print host process up?», and inside the installed app that is unconditionally yes. So on
+// a hub where nobody had ever registered a printer the badge read **«Printer ready»** while the
+// receipts piled up unread in the queue — the worst version of the rule at the top of this file,
+// because it is the green one. «Somebody is draining the receipt station» is a different question
+// from «this process is alive», and it is the only one the owner is actually asking.
+
+// Type only: this module stays pure logic (no `fetch` pulled in by importing it) while the shape
+// of a coverage row keeps ONE definition — the one `fetchPrintHosts` actually returns.
+import type { PrintRoleCoverage } from './print-coverage';
 
 /** What we could learn about one thing the owner cares about. */
 export type HealthState =
@@ -51,7 +61,7 @@ export const PRINTING_MODULE_ID = 'printing';
 /** Where the owner goes to fix printing — the printing module's own screen (`module.json` `setup.route`). */
 export const PRINTING_ROUTE = '/m/printing/printing';
 
-/** What a probe of the printer host is allowed to conclude. */
+/** What we are allowed to conclude about the receipt printer: somebody is on it, nobody is, or we could not check. */
 export type PrinterProbe = 'ready' | 'not_connected' | 'unknown';
 
 /** Something the owner can do about it, right now. */
@@ -99,16 +109,31 @@ export function isPrintingInstalled(modules: readonly InstalledModuleRef[] | nul
   return (modules ?? []).some((m) => m.id === PRINTING_MODULE_ID && m.status === 'active');
 }
 
+/** The station the badge speaks for: the receipt roll, which is what a till asks about. */
+export const RECEIPT_ROLE = 'receipt';
+
 /**
- * Reads the local probe into what we can honestly say.
+ * Reads the runtime's print coverage into what we can honestly say about the receipt printer.
  *
- * **No answer is not a "no".** `null`/`undefined` is the probe that has not come back yet (boot) or
- * that we never managed to run — which is `unknown`, not `not_connected`. Collapsing the two is the
- * exact move that produced a permanently alarming badge.
+ * **No answer is not a "no".** `null`/`undefined` is coverage we could not read (boot, or the call
+ * failed) — which is `unknown`, not `not_connected`. Collapsing the two is the exact move that
+ * produced a permanently alarming badge (hub#375).
+ *
+ * **But an EMPTY list is an answer, and it is `not_connected`.** That is the hub#1731 case itself:
+ * a hub whose printing module is on and where nobody ever registered a printer reports no rows at
+ * all, and reading that as «I could not check» would put the failure back into the neutral state
+ * where nobody acts on it. We read it fine; there is nobody there.
+ *
+ * Only `receipt` counts. A kitchen printer draining kitchen orders says nothing about the roll the
+ * ticket comes out of, and letting any live host anywhere turn the badge green is how a
+ * half-set-up restaurant would have kept it.
  */
-export function probeFromBridge(status: { online: boolean } | null | undefined): PrinterProbe {
-  if (!status) return 'unknown';
-  return status.online ? 'ready' : 'not_connected';
+export function probeFromCoverage(
+  coverage: readonly PrintRoleCoverage[] | null | undefined,
+): PrinterProbe {
+  if (!coverage) return 'unknown';
+  const receipts = coverage.find((c) => c.role === RECEIPT_ROLE);
+  return (receipts?.liveHosts ?? 0) > 0 ? 'ready' : 'not_connected';
 }
 
 /**
