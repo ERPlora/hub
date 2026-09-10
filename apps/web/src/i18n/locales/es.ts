@@ -1742,6 +1742,11 @@ export default {
   runtimeErrors: {
     cloud_unreachable: CLOUD_UNREACHABLE,
     install_cloud_unavailable: CLOUD_UNREACHABLE,
+    install_cloud_denied:
+      'ERPlora no ha aceptado las credenciales de este hub, así que no puede instalar apps. Reintentar no lo arregla; avisa a soporte.',
+    install_not_in_catalog: 'Esa app no está disponible en tu catálogo.',
+    install_cloud_rejected:
+      'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
     hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',

@@ -115,3 +115,39 @@ describe('moduleFailureMessage · un código estable gana a la prosa técnica de
     expect(moduleFailureMessage(blocked, FALLBACK, I18N)).toBe('Needs: reservations.');
   });
 });
+
+// hub#1720 — **the three causes a person has to be able to tell apart.**
+//
+// Until hub#1720 the install pipeline reported «erplora.com refused this hub's key», «that app is
+// not in your catalogue» and «erplora.com did not answer» as the SAME code, inside a `502` whose
+// body the edge replaced with its own page. Two halves were fixed in the runtime: the status now
+// crosses the proxy, and the codes are three. This is the third half, and it is the only one the
+// person actually reads: a code with no sentence here is never painted — `moduleFailureMessage`
+// falls through to the engine's own prose, which is written in Spanish for the log (the
+// code-language rule), so an English till would read half a sentence in a language it did not pick.
+describe('moduleFailureMessage · cada causa de instalación tiene SU frase, no la del motor', () => {
+  const ENGINE_PROSE = 'el Cloud no aceptó la credencial de este hub';
+
+  const CAUSES = [
+    'install_cloud_unavailable',
+    'install_cloud_denied',
+    'install_not_in_catalog',
+    'install_cloud_rejected',
+  ] as const;
+
+  it.each(CAUSES)('%s reads as a sentence of the catalogue, never as the engine prose', (code) => {
+    const error = new InstallFailedError(`request-install sales → 424`, code, ENGINE_PROSE);
+
+    const said = moduleFailureMessage(error, FALLBACK, I18N);
+
+    expect(said).toBe((en.runtimeErrors as Record<string, string>)[code]);
+    expect(said).not.toBe(ENGINE_PROSE);
+    expect(said).not.toBe(FALLBACK);
+  });
+
+  it('and the three new causes do NOT share a sentence: telling them apart is the point', () => {
+    const sentences = CAUSES.map((code) => (en.runtimeErrors as Record<string, string>)[code]);
+
+    expect(new Set(sentences).size).toBe(CAUSES.length);
+  });
+});

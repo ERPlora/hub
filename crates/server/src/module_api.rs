@@ -509,6 +509,15 @@ pub(crate) async fn list_module_versions(
 /// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por
 /// `request-install` y `update` (hub#516): el mismo fallo tiene que contarse igual por las dos
 /// puertas, o la UI acaba programando contra dos contratos.
+///
+/// 🔴 **Ninguna rama devuelve un 5xx** (hub#1720). El hub es el ORIGEN, no una pasarela: un `502`
+/// emitido aquí es indistinguible del `502` que acuña el proxy que tiene delante, así que el borde
+/// contesta con su propia página `error code: 502` y **sustituye el cuerpo** — llevándose el `code`
+/// estable de hub#139 que la shell traduce. Medido en PRE el 2026-09-09: el motivo quedaba en el
+/// log del contenedor y quien estaba en el marketplace leía una página del borde, sin poder
+/// distinguir «me falta credencial» de «ese módulo no existe» de «el Cloud está caído». Un `4xx`
+/// cruza cualquier proxy con su cuerpo intacto y sigue leyéndose como fallo (`res.ok === false`).
+/// Lo sostiene `no_install_failure_is_reported_as_a_server_error`, que recorre TODAS las variantes.
 pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
     match e {
         install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
@@ -523,9 +532,18 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
         // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
         install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        // hub#1720: el Cloud CONTESTÓ que ese módulo no está en el catálogo de este hub. Es la
+        // misma frase que `VersionNotFound` un escalón más arriba —«eso no existe para ti»—, así
+        // que se cuenta igual y no como una avería.
+        install::InstallError::NotInCatalog { .. } => StatusCode::NOT_FOUND,
+        // El pipeline dependía del Cloud (catálogo, plan, zip, `sha256`) y esa parte falló: el
+        // hub hizo su trabajo y no pudo terminar. `424 Failed Dependency` lo dice tal cual y —al
+        // contrario que el `502` que había aquí— llega al navegador con su `code` dentro.
         install::InstallError::Cloud(_)
         | install::InstallError::Source(_)
-        | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+        | install::InstallError::MissingSha256 { .. }
+        | install::InstallError::CloudDenied
+        | install::InstallError::CloudRejected { .. } => StatusCode::FAILED_DEPENDENCY,
     }
 }
 
@@ -948,5 +966,132 @@ pub(crate) async fn uninstall_module(
             Json(json!({ "ok": true })).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod install_error_status_tests {
+    use super::*;
+
+    /// One label per variant of [`install::InstallError`]. Its only job is to make the guard below
+    /// **mechanical**: `tag()` matches exhaustively over the error enum, so a variant added to the
+    /// pipeline does not compile until it is named here, and `sample()` matches exhaustively over
+    /// this enum, so it does not compile until an instance of it travels through the guard either.
+    /// Adding a failure mode and quietly mapping it back to a 502 is not reachable from here.
+    /// The labels and the list the guard walks are declared **once**: a hand-kept second copy is
+    /// exactly how a guard goes green on a list that quietly lost the case that was failing.
+    /// Dropping a name here deletes the variant too, and `tag()` stops being exhaustive over
+    /// [`install::InstallError`] — it does not compile.
+    macro_rules! every_install_failure {
+        ($($v:ident),+ $(,)?) => {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            enum Tag { $($v),+ }
+
+            const EVERY_TAG: &[Tag] = &[$(Tag::$v),+];
+        };
+    }
+
+    every_install_failure!(
+        Cloud,
+        VersionNotFound,
+        Source,
+        MissingSha256,
+        Blocked,
+        Runtime,
+        NotInstalled,
+        CloudDenied,
+        NotInCatalog,
+        CloudRejected,
+    );
+
+    fn tag(e: &install::InstallError) -> Tag {
+        match e {
+            install::InstallError::Cloud(_) => Tag::Cloud,
+            install::InstallError::VersionNotFound(_) => Tag::VersionNotFound,
+            install::InstallError::Source(_) => Tag::Source,
+            install::InstallError::MissingSha256 { .. } => Tag::MissingSha256,
+            install::InstallError::Blocked { .. } => Tag::Blocked,
+            install::InstallError::Runtime(_) => Tag::Runtime,
+            install::InstallError::NotInstalled(_) => Tag::NotInstalled,
+            install::InstallError::CloudDenied => Tag::CloudDenied,
+            install::InstallError::NotInCatalog { .. } => Tag::NotInCatalog,
+            install::InstallError::CloudRejected { .. } => Tag::CloudRejected,
+        }
+    }
+
+    fn sample(t: Tag) -> install::InstallError {
+        match t {
+            Tag::Cloud => install::InstallError::Cloud("cloud_unreachable".into()),
+            Tag::VersionNotFound => install::InstallError::VersionNotFound("sales@9.9.9".into()),
+            Tag::Source => {
+                install::InstallError::Source(source::SourceError::Fetch("connection reset".into()))
+            }
+            Tag::MissingSha256 => install::InstallError::MissingSha256 {
+                module_id: "sales".into(),
+                version: "1.0.0".into(),
+            },
+            Tag::Blocked => install::InstallError::Blocked {
+                requested: "sales".into(),
+                blocked_on: vec!["taxes".into()],
+                purchase: Vec::new(),
+            },
+            Tag::Runtime => install::InstallError::Runtime("migration failed".into()),
+            Tag::NotInstalled => install::InstallError::NotInstalled("sales".into()),
+            Tag::CloudDenied => install::InstallError::CloudDenied,
+            Tag::NotInCatalog => install::InstallError::NotInCatalog {
+                module_id: "sales".into(),
+            },
+            Tag::CloudRejected => install::InstallError::CloudRejected { status: 500 },
+        }
+    }
+
+    /// **hub#1720 — no failure of the install pipeline is reported as a server error.**
+    ///
+    /// The hub is the ORIGIN, not a gateway. A `5xx` minted here is indistinguishable from a `5xx`
+    /// minted by the proxy in front of it, so the edge answers with its own page and REPLACES the
+    /// body — taking with it the stable `code` of hub#139 that the shell translates. Measured in
+    /// PRE on 2026-09-09: `request-install` answered `502`, the motive was written to the
+    /// container log, and the person on the marketplace read `error code: 502`.
+    ///
+    /// The rule is the whole class, not the three variants that were caught doing it: a `4xx`
+    /// crosses any proxy with its body intact and still reads as a failure (`res.ok === false`)
+    /// for the shell.
+    #[test]
+    fn no_install_failure_is_reported_as_a_server_error() {
+        for &t in EVERY_TAG {
+            let e = sample(t);
+            let status = install_error_status(&e);
+            assert!(
+                !status.is_server_error(),
+                "{:?} answers {status}: an edge is free to replace the body of a 5xx with its own \
+                 page, so `{}` would never reach the browser",
+                t,
+                e.code()
+            );
+            assert!(
+                status.is_client_error(),
+                "{:?} answers {status}: a failed install still has to read as an error for the \
+                 shell (`res.ok === false`)",
+                t
+            );
+        }
+    }
+
+    /// The control of the control: each label really does carry **its own** variant into the
+    /// guard. A `sample()` that answered someone else's variant would leave the case it was
+    /// supposed to cover untested while the guard above stayed green.
+    ///
+    /// The other half of that risk — a label dropped from the walked list — is not testable from
+    /// here on purpose: `every_install_failure!` declares the enum and the list from one source,
+    /// so losing a name is a **compile** error, not a green run.
+    #[test]
+    fn every_label_carries_its_own_variant_into_the_guard() {
+        for &t in EVERY_TAG {
+            assert_eq!(
+                tag(&sample(t)),
+                t,
+                "{t:?} builds a sample of another variant, so {t:?} never reaches the guard"
+            );
+        }
     }
 }
