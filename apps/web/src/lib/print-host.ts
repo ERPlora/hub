@@ -127,6 +127,18 @@ interface BootOptions {
   registerHost?: (role: string, deviceId: string) => Promise<{ heartbeatSeconds: number }>;
   /** `POST /api/print/hosts/heartbeat`. */
   heartbeatHost?: (deviceId: string) => Promise<{ refreshed: number; heartbeatSeconds: number }>;
+  /**
+   * Called ONCE, the first time the hub confirms this device holds a printer role (hub#1732).
+   *
+   * This is the moment the device becomes the one that gets **told** an order came in, and the
+   * moment somebody is standing at the till configuring it — so it is where the shell asks for the
+   * notification permission. Waiting for the first order instead means popping a dialog at a
+   * tablet propped on a shelf with nobody in front of it: the ask goes unanswered and the notice
+   * that prompted it is the one that gets lost.
+   *
+   * Best-effort and never load-bearing: the drain is already running before this is called.
+   */
+  onRegistered?: () => void;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
 }
@@ -250,7 +262,16 @@ export async function bootPrintHost(
             };
           },
     session,
-    onRegistered: () => drain.start(),
+    onRegistered: () => {
+      // The drain first, always: it is what takes the paper out, and a caller that throws must
+      // not be able to leave this device registered as a host that never drains (hub#1732).
+      drain.start();
+      try {
+        options.onRegistered?.();
+      } catch (e) {
+        console.warn('[print-host] the registration hook failed', e);
+      }
+    },
     onDiagnostic: (event) => console.warn('[print-host]', event.kind, event.role ?? '', event.message),
     setTimer: options.setTimer,
     clearTimer: options.clearTimer,

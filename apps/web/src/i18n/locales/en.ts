@@ -1413,6 +1413,31 @@ export default {
         "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
       notMeasured: "We couldn't read this",
     },
+    // hub#1732 — the notices, and the permission that lets them exist at all.
+    //
+    // The sheet that goes in FRONT of Android's dialog. Android's own says «Allow ERPlora to send
+    // you notifications?» and nothing about what for; asked cold it reads as opportunistic and
+    // gets refused, and two refusals close the dialog for the life of the install. So this names
+    // the one thing the till actually notifies about — an order arriving — and never says
+    // «permission», «POST_NOTIFICATIONS» or «Android».
+    notices: {
+      primerHeader: 'Let us warn you about new orders',
+      primerMessage:
+        'When an order comes into the kitchen we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
+      primerLater: 'Not now',
+      primerAllow: 'Turn on notices',
+      // The row on System › your printer, which is where somebody who never got warned would
+      // look. Only ever shown when the notices really are off ON THIS DEVICE.
+      blockedTitle: 'Notices are off',
+      blockedDetail:
+        "This device won't warn you when an order comes in. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
+      blockedAction: 'Turn on notices',
+      // After asking again and still getting nothing: the system stops showing its dialog once
+      // it has been refused, and from then on the only way through is the device's own settings.
+      blockedInSettings:
+        "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
+      turnedOn: 'Done — this device will warn you about new orders.',
+    },
   },
   planLimits: {
     currentPlan: 'Current plan',
