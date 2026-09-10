@@ -820,7 +820,13 @@ async function send(): Promise<void> {
             : spent;
         }
       } else if (!messageText(assistantMsg.value.content)) {
-        assistantMsg.value.content = t('assistant.error');
+        // «No se pudo contactar» solo vale cuando de verdad no se contactó (hub#1738). En PRE el
+        // servicio contestaba `200` con su motivo escrito y el dueño leía que no había conexión:
+        // un diagnóstico falso que le hace perder el rato revisando su red y pulsando «denunciar
+        // un problema» sobre algo que no es suyo.
+        const reason = (failure as { reason?: string })?.reason;
+        assistantMsg.value.content =
+          reason === 'service' ? t('assistant.unavailable') : t('assistant.error');
       }
       saveAssistantHistory();
     },
