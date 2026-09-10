@@ -29,7 +29,7 @@ use serde_json::{json, Value as Json};
 
 use crate::commands::MAX_EVENT_DEPTH;
 use crate::errors::Result;
-use crate::flows::def::{self, Condition};
+use crate::flows::def;
 use crate::flows::store;
 use crate::registry::now_rfc3339;
 use crate::scheduler::cron;
@@ -101,7 +101,22 @@ pub async fn on_event(
 
         // The declarative filter, over `event.<field>` paths. A trigger with no filter matches
         // every occurrence of its event — explicit, because no filter written means none meant.
-        let filter = parse_condition(row["filter"].as_str().unwrap_or("{}"));
+        // That is `{}`, which READS; a filter this core cannot read is the opposite answer and
+        // narrows to nothing (hub#1714). `unwrap_or_default()` for the same reason: the column is
+        // `NOT NULL DEFAULT '{}'`, so a row that hands back something other than text is not a
+        // trigger without a filter, it is one whose filter cannot be read.
+        let owner = def::FilterOwner {
+            kind: "trigger",
+            id: &trigger_id,
+            flow_id: &flow_id,
+        };
+        let Some(filter) = def::read_stored_filter(row["filter"].as_str().unwrap_or_default(), &owner)
+        else {
+            // Booked like any other no: the decision is made, and the next attempt of the same
+            // event must not re-evaluate it (nor report it a second time).
+            mark_delivered(db, hub_id, event_id, &listener).await?;
+            continue;
+        };
         if !filter.matches(&scope) {
             // Not a match is a decision, not a pending job: book it so the next attempt of the
             // same event does not re-evaluate a filter that already said no.
@@ -356,13 +371,6 @@ fn input_from(input_map: &str, scope: &Json, payload: &Params) -> Json {
     }
 }
 
-fn parse_condition(raw: &str) -> Condition {
-    serde_json::from_str::<Json>(raw)
-        .ok()
-        .and_then(|v| Condition::parse(&v).ok())
-        .unwrap_or_default()
-}
-
 /// The marker a trigger books its idempotence under, built by the outbox — the SAME statement the
 /// relay uses for a module's listener, and deliberately not a second copy of it (hub#735): the
 /// column list of `_event_delivery` now includes `hub_id`, and two hand-written inserts are two
@@ -520,6 +528,98 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(run_count(&db, &flow).await, 1);
+    }
+
+    /// Puts a filter this core cannot read into an already-armed trigger.
+    ///
+    /// By SQL and on purpose: the write door refuses anything `Condition::parse` rejects, so the
+    /// only way a row gets into this state is the way the issue describes — saved by a hub that
+    /// accepted a shape this one no longer does, or text that got mangled on its way here.
+    async fn corrupt_the_stored_filter(db: &dyn DatabaseAdapter, flow_id: &str, raw: &str) {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("flow_id".into(), json!(flow_id));
+        p.insert("filter".into(), json!(raw));
+        db.execute(
+            "UPDATE _flow_triggers SET filter = :filter \
+             WHERE hub_id = :hub_id AND flow_id = :flow_id AND deleted_at IS NULL",
+            &p,
+        )
+        .await
+        .expect("the fixture writes the row this guard exists for");
+    }
+
+    /// hub#1714 — **a filter this core cannot read matches NOTHING, never everything.**
+    ///
+    /// The filter is what narrows an automation down to the occurrences its owner meant. Read as
+    /// `Condition::default()` it becomes the empty map, and `matches` is an `all()` over it: the
+    /// trigger fires on EVERY occurrence of its event, which is the widest possible reading of a
+    /// document nobody could read at all. On the recipe that writes to the customer over WhatsApp
+    /// that is a message to everybody.
+    ///
+    /// The shapes below are the ones that actually happen. `{"steps.t.at": {"gte": "now.iso"}}` is
+    /// the one hub#1713 created: it used to store and compare as literal text, and since that PR a
+    /// `now.…` on the right of an operator is refused — so a filter already saved with it stopped
+    /// parsing and, until this guard, started matching everything instead.
+    #[tokio::test]
+    async fn a_filter_this_core_cannot_read_starts_nothing_hub1714() {
+        for raw in [
+            "",
+            "not json",
+            "[]",
+            "7",
+            r#"{"event.total": 100}"#,
+            r#"{"event.total": {"greater_than": "100"}}"#,
+            r#"{"steps.t.at": {"gte": "now.iso"}}"#,
+        ] {
+            let db = db().await;
+            let flow = flow_with(&db, on_sale(json!({ "event.total": { "gte": "100" } }))).await;
+            corrupt_the_stored_filter(&db, &flow, raw).await;
+
+            on_event(
+                &db,
+                HUB,
+                "evt-1",
+                "sale.completed",
+                &payload(&[("total", json!("120.50"))]),
+                0,
+            )
+            .await
+            .expect("an unreadable filter is a trigger that does not fire, never a failed relay");
+
+            assert_eq!(
+                run_count(&db, &flow).await,
+                0,
+                "filter `{raw}` cannot be read, so it must not match"
+            );
+        }
+    }
+
+    /// The control for the test above, and the reason it cannot simply deny every filter: these two
+    /// ARE readable and both mean «no filter written, so no filtering meant» — `Condition::parse`
+    /// answers `null` with the empty condition on purpose, which is also how the document-level
+    /// «no `filter` key» arrives. They have to keep firing, or the guard would silence every
+    /// automation in the hub while passing its own test.
+    #[tokio::test]
+    async fn an_empty_filter_is_readable_and_still_fires_hub1714() {
+        for raw in ["{}", "null"] {
+            let db = db().await;
+            let flow = flow_with(&db, on_sale(json!({}))).await;
+            corrupt_the_stored_filter(&db, &flow, raw).await;
+
+            on_event(
+                &db,
+                HUB,
+                "evt-1",
+                "sale.completed",
+                &payload(&[("total", json!("120.50"))]),
+                0,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(run_count(&db, &flow).await, 1, "filter `{raw}` reads as no filter");
+        }
     }
 
     /// hub#1694 — the filter is the kernel's condition language, so it reaches the clock too.

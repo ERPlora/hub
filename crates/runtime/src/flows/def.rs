@@ -1134,6 +1134,78 @@ impl Condition {
     }
 }
 
+/// Who a stored filter belongs to, so a filter that cannot be read is reported as a row somebody
+/// can go and look at instead of as «one of this hub's automations».
+pub struct FilterOwner<'a> {
+    /// `"trigger"` or `"wait"` — which table the unreadable text is sitting in.
+    pub kind: &'a str,
+    /// `_flow_triggers.id` / `_flow_run_waits.id`.
+    pub id: &'a str,
+    /// The flow whose behaviour changed, which is the only half of this an owner recognises.
+    pub flow_id: &'a str,
+}
+
+/// hub#1714 — the stable code of «a stored automation filter cannot be read by this core». Lives in
+/// the `error_registry` namespace (like [`crate::flows::grants::ERR_UNREADABLE_GRANT_PAYLOAD_EVENT`])
+/// and not in the `flow.…` family: nothing is being answered to a caller here, there is no caller.
+pub const ERR_UNREADABLE_FILTER_EVENT: &str = "flow_filter_unreadable";
+
+/// The report of a stored filter this core cannot read.
+///
+/// Split from the place that sends it so a test can pin its CONTENT — the stable code and the row
+/// it names — instead of pinning that a global sink was called at all (the `failed_install_event`
+/// pattern, hub#1477).
+pub fn unreadable_filter_event(owner: &FilterOwner<'_>) -> crate::error_registry::ErrorEvent {
+    use crate::error_registry::{severity, source, ErrorEvent};
+
+    let FilterOwner { kind, id, flow_id } = *owner;
+    ErrorEvent::new(
+        source::HUB,
+        ERR_UNREADABLE_FILTER_EVENT,
+        format!(
+            "the {kind} `{id}` of flow `{flow_id}` holds a filter this core cannot read; it \
+             narrows to NOTHING — the automation does not fire — until it is saved again"
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_context(serde_json::json!({
+        "kind": kind,
+        "id": id,
+        "flow_id": flow_id,
+    }))
+}
+
+/// A stored filter, as the TEXT the kernel keeps it in, back into the condition it means — or
+/// `None` when this core cannot read it.
+///
+/// **`None` and `Some(Condition::default())` are different answers, and telling them apart is the
+/// whole of hub#1714.** Both call sites used to collapse them with `unwrap_or_default()`: the empty
+/// map, which [`Condition::matches`] evaluates as an `all()` over nothing and answers `true` to. So
+/// a filter that could not be read stopped narrowing anything and the automation fired on EVERY
+/// occurrence of its event — the widest reading of a document nobody could read, on the path that
+/// writes to customers. It is also the opposite of what the rest of the kernel already does: an
+/// unreadable correlation matches nothing ([`crate::flows::waits`]), an unreadable policy condition
+/// denies ([`crate::policies::ERR_CONDITION_UNREADABLE`]), an unreadable grant pin authorises
+/// nothing (hub#1636).
+///
+/// Nothing reachable writes one: the write door refuses anything [`Condition::parse`] rejects. It
+/// exists anyway because the *reader* moves — hub#1713 started refusing a `now.…` on the right of an
+/// operator, so a filter saved by an older hub with one in it parses here no longer. That is why the
+/// refusal is REPORTED and not only applied: an owner whose recipe went quiet has no other thread
+/// back to the row, and the editor still shows the filter as written.
+pub fn read_stored_filter(raw: &str, owner: &FilterOwner<'_>) -> Option<Condition> {
+    if let Some(condition) = serde_json::from_str::<Json>(raw)
+        .ok()
+        .and_then(|v| Condition::parse(&v).ok())
+    {
+        return Some(condition);
+    }
+    let event = unreadable_filter_event(owner);
+    eprintln!("✗ {}", event.message);
+    crate::error_registry::ErrorRegistry::global().report(event);
+    None
+}
+
 /// What the right of an operator is allowed to be.
 ///
 /// Two refusals, both of the same family: a clause that would be stored meaning something other
@@ -4802,6 +4874,74 @@ mod tests {
         assert!(Condition::parse(&json!({ "now.iso": { "gte": "2026-01-01" } })).is_ok());
         // And a right that merely CONTAINS the word is still ordinary text.
         assert!(Condition::parse(&json!({ "steps.t.name": { "eq": "nowhere" } })).is_ok());
+    }
+
+    // ── a stored filter that cannot be read (hub#1714) ────────────────────────────────────────
+
+    fn owner() -> FilterOwner<'static> {
+        FilterOwner {
+            kind: "trigger",
+            id: "trigger-1",
+            flow_id: "flow-1",
+        }
+    }
+
+    /// hub#1714 — the two answers this function exists to keep apart. Every shape below is text no
+    /// `Condition` can be made of, including the two that LOOK like a condition: an object whose
+    /// value is not a map of operators, and a map with an operator this core does not know.
+    ///
+    /// `{"steps.t.at": {"gte": "now.iso"}}` is the one that actually happens: it stored and
+    /// compared as literal text until hub#1713 started refusing a `now.…` on the right, so a filter
+    /// already saved with it parses here no longer.
+    #[test]
+    fn a_stored_filter_that_cannot_be_read_is_none_not_the_empty_condition() {
+        for raw in [
+            "",
+            "not json",
+            "[]",
+            "7",
+            "\"event.total\"",
+            r#"{"event.total": 100}"#,
+            r#"{"event.total": {"greater_than": "100"}}"#,
+            r#"{"steps.t.at": {"gte": "now.iso"}}"#,
+        ] {
+            assert!(
+                read_stored_filter(raw, &owner()).is_none(),
+                "`{raw}` cannot be read, and `Some(empty)` here would match EVERYTHING"
+            );
+        }
+    }
+
+    /// The control, and the reason this cannot simply answer `None` to everything it dislikes: `{}`
+    /// and `null` both READ, and both mean «no filter written, so no filtering meant» — the one
+    /// permissive default of the condition language, which `Condition::parse` states.
+    #[test]
+    fn a_stored_filter_that_reads_as_no_filter_is_still_a_filter_that_matches_everything() {
+        for raw in ["{}", "null"] {
+            let condition = read_stored_filter(raw, &owner())
+                .unwrap_or_else(|| panic!("`{raw}` is readable: it is the absent condition"));
+            assert!(condition.is_empty(), "{raw}");
+            assert!(condition.matches(&json!({ "event": { "total": "1" } })), "{raw}");
+        }
+    }
+
+    /// The CONTENT of the report, pinned by calling its builder — the wiring that SENDS it is
+    /// pinned by `tests/flow_unreadable_filter_report.rs`, because the sink is process-global.
+    #[test]
+    fn the_report_of_an_unreadable_filter_names_the_row_to_save_again() {
+        let event = unreadable_filter_event(&FilterOwner {
+            kind: "wait",
+            id: "wait-7",
+            flow_id: "flow-9",
+        });
+        assert_eq!(event.error_code, ERR_UNREADABLE_FILTER_EVENT);
+        assert_eq!(event.severity, crate::error_registry::severity::UNEXPECTED);
+        assert_eq!(event.context["kind"], json!("wait"));
+        assert_eq!(event.context["id"], json!("wait-7"));
+        assert_eq!(event.context["flow_id"], json!("flow-9"));
+        // Whoever reads this has a row id and nothing else; the message has to carry it too.
+        assert!(event.message.contains("wait-7"), "{}", event.message);
+        assert!(event.message.contains("flow-9"), "{}", event.message);
     }
 
     // ── the `query` step (hub#954) ────────────────────────────────────────────────────────────
