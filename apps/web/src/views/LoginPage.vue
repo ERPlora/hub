@@ -225,8 +225,14 @@
                 </ion-button>
               </form>
 
-              <!-- Paso: login por PIN -->
-              <div v-else-if="step === 'pin'" class="step-form">
+              <!-- Step: PIN login. `step-form--scrolls` ONLY while a person is being chosen: that
+                   list scrolls inside and needs a ceiling. With the keypad on screen it carries no
+                   ceiling at all — that is what was clipping the «0» key (hub#1765). -->
+              <div
+                v-else-if="step === 'pin'"
+                class="step-form"
+                :class="{ 'step-form--scrolls': !pinUser }"
+              >
 
                 <!-- Se dice en los DOS pasos del pinpad: la placa no necesita que se elija a
                      nadie antes (resuelve la persona entera) y tampoco que se toque este campo —
@@ -1034,20 +1040,30 @@ async function onSetupComplete(pin: string): Promise<void> {
 }
 
 /* ---- Pasos ---- */
-/* Card de tamaño FIJO: todos los pasos (email / pin / setup / selección de usuario)
- * reservan la misma altura, así no hay salto al cambiar entre pestañas. El paso más
- * alto es el del teclado PIN (~411px); reservamos algo más y centramos el contenido. */
+/* The steps (email / pin / setup / user picker) reserve the same height, so there is no jump when
+ * switching between tabs. */
 .step-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Altura FIJA: misma en email / pin / setup / selección → sin salto al cambiar de paso.
-   * Cabe el paso más alto (teclado PIN ~411px). El contenido se alinea arriba y, en la
-   * selección de usuario, la lista scrollea dentro (ver .user-grid). */
-  height: 26rem;
-  /* Formulario (email / PIN / setup) CENTRADO vertical. En la selección de usuario,
-   * el .user-scroll lleva flex:1 y rellena el alto, así sus cards quedan ARRIBA. */
+  /* FLOOR, not a fixed height (hub#1765). The reservation is still the same across email / setup /
+   * picker → no jump when switching step; what changes is what happens when a step does NOT fit.
+   * The PIN step measures a real 483px —badge hint 48 + avatar and name 68 + keypad 342, plus two
+   * 12px gaps— against a 416px reservation: with `height` the 67px left over spilled out of BOTH
+   * ends (`justify-content: center`) and `ion-card`, which is `overflow: hidden`, clipped the last
+   * row of keys — the «0» button ended 12px below the card's edge (measured on banco-pre, 390×844).
+   * Inside a container that clips, a fixed height can only lose content: here it grows. */
+  min-height: 26rem;
+  /* Form (email / PIN / setup) vertically CENTRED. In the user picker, .user-scroll carries flex:1
+   * and fills the height, so its cards sit at the TOP. */
   justify-content: center;
+}
+/* The ONLY exception: the user picker scrolls INSIDE (`.user-scroll`, `flex: 1`), and for that it
+ * needs a ceiling — without one the list grows downwards instead of scrolling. It lives in its own
+ * class, applied only while that step is on screen, so the fixed height can never again end up
+ * underneath the keypad. */
+.step-form--scrolls {
+  height: 26rem;
 }
 
 /* ---- Trust row ---- */

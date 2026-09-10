@@ -771,7 +771,7 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language, timezone) = {
+    let (pin_users, currency, currency_decimals, language, timezone, pin_length) = {
         let rt = runtime.read().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
@@ -816,7 +816,28 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
             .timezone_name()
             .await
             .unwrap_or_else(|_| "UTC".to_string());
-        (pin_users, currency, currency_decimals, language, timezone)
+        // How many DIGITS this hub's PIN has (hub#974): 4 or 6. It travels here because the screen
+        // that needs it —the login pinpad— is the only one with NO session, and `/api/settings`
+        // demands one: without this key the shell fell back to its own default and painted four
+        // circles on a six-digit hub, firing the login with a truncated PIN on the fourth digit
+        // (hub#1765).
+        //
+        // No re-check against `PIN_LENGTHS` here on purpose: `get_settings` is `settings::get_all`,
+        // which already degrades a row that no longer validates to that key's default, so a length
+        // nobody can type cannot get this far. The fallback below is for the other case — settings
+        // unreadable, `json!({})` above — where there is no value at all.
+        let pin_length = settings
+            .get(erplora_runtime::pin_policy::PIN_LENGTH_SETTING)
+            .and_then(|v| v.as_i64())
+            .unwrap_or(erplora_runtime::pin_policy::DEFAULT_PIN_LENGTH);
+        (
+            pin_users,
+            currency,
+            currency_decimals,
+            language,
+            timezone,
+            pin_length,
+        )
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -855,6 +876,9 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         "language": language,
         // Nombre IANA del reloj del NEGOCIO (hub#731) — resuelto, nunca `null`.
         "timezone": timezone,
+        // Cuántos dígitos pide el PIN de este hub (hub#974). El pinpad del LOGIN lo lee de aquí:
+        // es la única lectura que puede hacer sin sesión (hub#1765).
+        "pin_length": pin_length,
     }))
     .into_response()
 }
