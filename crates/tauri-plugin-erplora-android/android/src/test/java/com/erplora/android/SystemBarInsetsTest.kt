@@ -66,4 +66,14 @@ class SystemBarInsetsTest {
             "a negative padding is a crash on setPadding, not a smaller margin",
         )
     }
+
+    /**
+     * The caller reads the view out of `findViewById`, which can hand back nothing. Painting a bit
+     * high is a cosmetic problem; a till that will not start is not, so an empty view must be a
+     * logged no-op rather than an exception on the way up from `onCreate`.
+     */
+    @Test
+    fun `does not bring the app down when there is no view to pad`() {
+        SystemBarInsets.applyTopSystemBarPadding(null)
+    }
 }

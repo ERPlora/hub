@@ -1,29 +1,28 @@
 package com.erplora.app
 
 import android.os.Bundle
-import android.webkit.WebView
+import android.view.View
 import androidx.activity.enableEdgeToEdge
 import com.erplora.android.SystemBarInsets
 
 class MainActivity : TauriActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    enableEdgeToEdge()
-    super.onCreate(savedInstanceState)
-  }
-
   /**
    * Reserve the status bar and the cutout before anything is drawn (hub#1719).
    *
-   * `enableEdgeToEdge()` above only asks for the window to extend behind the system bars; nothing
-   * was reserving the strip they sit on, so the WebView started at the physical top of the screen
-   * and every page it loaded — the sign-in page the SaaS serves, the till, a module — painted over
-   * the clock.
+   * `enableEdgeToEdge()` only asks for the window to extend behind the system bars; nothing was
+   * reserving the strip they sit on, so the window's content started at the physical top of the
+   * screen and every page loaded inside it — the sign-in page the SaaS serves, the till, a module
+   * — painted over the clock.
    *
-   * This runs from `WryActivity.setWebView`, which is the only moment the WebView is guaranteed to
-   * exist: the Rust side creates it during `Rust.onActivityCreate`, well after `onCreate` returns.
+   * The padding goes on the activity's content view, which is the WebView's container: it is
+   * already there at this point (the WebView is not — the Rust side creates it later, during
+   * `Rust.onActivityCreate`), it survives the container being handed a different child, and its
+   * transparent background lets the reserved strip show the `DayNight` window background instead
+   * of the WebView's opaque white.
    */
-  override fun onWebViewCreate(webView: WebView) {
-    super.onWebViewCreate(webView)
-    SystemBarInsets.applyTopSystemBarPadding(webView)
+  override fun onCreate(savedInstanceState: Bundle?) {
+    enableEdgeToEdge()
+    super.onCreate(savedInstanceState)
+    SystemBarInsets.applyTopSystemBarPadding(findViewById<View>(android.R.id.content))
   }
 }
