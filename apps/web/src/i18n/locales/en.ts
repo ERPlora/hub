@@ -81,6 +81,13 @@ export default {
     changeHubCancel: 'Cancel',
     changeHubConfirm: 'Switch',
   },
+  // hub#1736 — the two buttons Ionic puts on EVERY selection dialog (`ion-select`). Its own
+  // defaults are these same English literals, hardcoded in the library; the shell localizes them
+  // once for the whole app, modules included (`lib/ionic-select-text.ts`).
+  selectDialog: {
+    ok: 'OK',
+    cancel: 'Cancel',
+  },
   // Feedback of the CSV buttons every `ok-data-table` carries (inventory#90). The import one talks
   // about the FILE being read, never about rows created: when it fires the module has not written
   // anything yet — it is about to show its preview, and its own report is what says what went in.
