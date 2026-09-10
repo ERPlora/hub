@@ -53,6 +53,14 @@ mod kernel_snapshot;
 ///    what is read is the status.
 const ANSWERS_A_SERVER_ERROR_ON_PURPOSE: [(&str, &str); 1] = [("GET", "/readyz")];
 
+/// Suelo de puertas que el barrido tiene que llegar a conducir.
+///
+/// No es un número redondo puesto a ojo: medido el 2026-09-10, `routes.snapshot` da **166** puertas
+/// que contestan. El suelo deja ~26 de holgura para las rutas que entran y salen, y sigue cazando
+/// lo que de verdad rompe este test sin ponerlo rojo — que deje de ENTRAR (una sesión que caduca
+/// hunde el recuento a casi cero y todo lo demás saldría verde por `401`).
+const DOORS_THE_SWEEP_MUST_DRIVE: usize = 140;
+
 /// Every (method, path) the runtime serves, straight from the committed kernel contract.
 fn every_route() -> Vec<(String, String)> {
     let snapshot = std::fs::read_to_string(kernel_snapshot::snapshot_path("routes.snapshot"))
@@ -315,8 +323,9 @@ async fn no_door_answers_a_server_error_when_erplora_com_does_not_answer() {
         offenders.join("\n  - ")
     );
     assert!(
-        checked >= 140,
-        "only {checked} doors answered; the sweep is not driving the surface"
+        checked >= DOORS_THE_SWEEP_MUST_DRIVE,
+        "only {checked} doors answered (floor {DOORS_THE_SWEEP_MUST_DRIVE}); the sweep is \
+         not driving the surface"
     );
 }
 
@@ -333,7 +342,8 @@ async fn no_door_answers_a_server_error_when_erplora_com_answers_one() {
         offenders.join("\n  - ")
     );
     assert!(
-        checked >= 140,
-        "only {checked} doors answered; the sweep is not driving the surface"
+        checked >= DOORS_THE_SWEEP_MUST_DRIVE,
+        "only {checked} doors answered (floor {DOORS_THE_SWEEP_MUST_DRIVE}); the sweep is \
+         not driving the surface"
     );
 }
