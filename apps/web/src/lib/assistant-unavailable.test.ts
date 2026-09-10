@@ -108,3 +108,22 @@ describe('hub#1738 — por qué murió el turno', () => {
     expect(failure.quota?.used).toBe(30);
   });
 });
+
+// The guard on the CRITERION itself (review of hub#1785): the emitter decides, through `code`,
+// never the prose. A SaaS frame may spell the very same words the runtime uses and it still got
+// here because the service answered. Without this, reading `error` instead of `code` passed all
+// three cases above — the runtime frame carries the code in both keys, so the prose looked as
+// good as the code.
+describe('hub#1738 — the SaaS prose never decides the reason', () => {
+  it.each([
+    ['the exact word the runtime uses as its code', 'cloud_unreachable'],
+    ['a sentence that talks about not reaching something', 'LLM call failed: upstream unreachable'],
+  ])('a frame without `code` whose text is %s is still a service refusal', async (_, error) => {
+    const failure = await failureOf([frame({ type: 'error', error })]);
+
+    expect(
+      failure.reason,
+      'no `code` means the SaaS wrote it, and the SaaS only writes when it answered',
+    ).toBe('service');
+  });
+});
