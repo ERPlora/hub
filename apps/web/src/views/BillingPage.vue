@@ -415,6 +415,7 @@ async function downloadInvoice(invoice: CloudInvoice): Promise<void> {
    :host{height:100%} contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo. */
 .fill {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* La pestaña de suscripciones apila CTA de plan + tabla; la tabla resuelve su

@@ -285,6 +285,7 @@ defineExpose({ setActive, columns, rows });
 <style scoped>
 .fill {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 .table-loading {

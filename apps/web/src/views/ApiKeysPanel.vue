@@ -585,6 +585,7 @@ onBeforeUnmount(() => {
    `fill` resuelva su :host{height:100%} → cabecera/pager fijos y scroll solo en el cuerpo. */
 .fill {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* Cabecera de la matriz de scope dentro del modal de creación. */

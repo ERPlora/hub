@@ -1339,7 +1339,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 0;
+  min-height: var(--ok-work-surface-min);
 }
 /* Gana a la regla de documento `ok-data-table[fill] { height: 100% }` (theme/polish.css) por
    especificidad: aquí el alto lo reparte el flex, no un 100% del contenedor entero. */

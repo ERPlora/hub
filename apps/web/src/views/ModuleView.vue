@@ -579,7 +579,7 @@ onBeforeUnmount(() => {
    guarded in `layout-shell.test.ts`. */
 .outlet {
   height: 100%;
-  min-height: 30rem;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* Las rutas de módulo usan nombres de producto, no abreviaturas automáticas. Un mínimo más ancho
