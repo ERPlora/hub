@@ -388,9 +388,11 @@ async fn a_saas_that_does_not_answer_is_an_error_not_a_silent_ok() {
             .oneshot(request(method, uri, Some(&admin), body))
             .await
             .unwrap();
+        // hub#1763: the door reports the outage as `424`, never as a `5xx` the edge would
+        // replace with its own page — the `code` below is what the module programs against.
         assert_eq!(
             response.status(),
-            StatusCode::BAD_GATEWAY,
+            StatusCode::FAILED_DEPENDENCY,
             "{method} {uri} swallowed a SaaS that is not there"
         );
     }
@@ -550,7 +552,7 @@ async fn a_saas_that_does_not_answer_reaches_the_module_as_a_code_not_as_a_url()
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763
     let body = body_json(response).await;
     assert_eq!(body["ok"], false);
     assert_eq!(body["error"]["code"], "cloud_unreachable");
@@ -591,7 +593,7 @@ async fn a_success_the_hub_cannot_read_reaches_the_module_as_a_code_not_as_an_em
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763
     let body = body_json(response).await;
     assert_eq!(body["ok"], false, "an answer the hub could not read is not a success: {body}");
     assert_eq!(body["error"]["code"], "cloud_unreadable");

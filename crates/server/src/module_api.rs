@@ -357,8 +357,8 @@ pub(crate) async fn update_module(
             "warning": { "code": "module.update_failed_kept_previous", "message": error },
         }))
         .into_response(),
-        Outcome::Lost { module, error } => (
-            StatusCode::INTERNAL_SERVER_ERROR,
+        Outcome::Lost { ref module, ref error } => (
+            update_outcome_status(&outcome),
             Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
         )
             .into_response(),
@@ -544,6 +544,29 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         | install::InstallError::MissingSha256 { .. }
         | install::InstallError::CloudDenied
         | install::InstallError::CloudRejected { .. } => StatusCode::FAILED_DEPENDENCY,
+    }
+}
+
+/// Status HTTP con el que se cuenta cómo acabó un intento de actualización
+/// ([`erplora_runtime::module_update::Outcome`]).
+///
+/// El match es **exhaustivo a propósito**: un desenlace nuevo del pipeline no compila hasta que
+/// alguien decide con qué status se cuenta, en vez de heredar en silencio el de al lado.
+pub(crate) fn update_outcome_status(
+    outcome: &erplora_runtime::module_update::Outcome,
+) -> StatusCode {
+    use erplora_runtime::module_update::Outcome;
+    match outcome {
+        // La actualización salió, o no hacía falta.
+        Outcome::AlreadyThere(_) | Outcome::Updated { .. } => StatusCode::OK,
+        // 200, no un error: la actualización no salió, pero **el módulo sigue funcionando**.
+        Outcome::RolledBack { .. } => StatusCode::OK,
+        // hub#1763: la nueva falló Y la vuelta atrás también, así que el hub se quedó sin el
+        // módulo — pero eso se cuenta con el mismo `424` que el resto del pipeline (hub#1720), no
+        // con un `5xx`: el borde sustituye el cuerpo de un `5xx` por su propia página y se lleva
+        // el `module.update_lost` que la shell traduce, dejando a quien pulsó «Actualizar» sin
+        // saber siquiera qué módulo se ha ido.
+        Outcome::Lost { .. } => cloud_proxy::CLOUD_FAILED,
     }
 }
 
@@ -1091,6 +1114,89 @@ mod install_error_status_tests {
                 tag(&sample(t)),
                 t,
                 "{t:?} builds a sample of another variant, so {t:?} never reaches the guard"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod update_outcome_status_tests {
+    use super::*;
+    use erplora_runtime::module_update::Outcome;
+
+    /// One label per desenlace of [`Outcome`], declared **once** so the guard below is mechanical:
+    /// `tag()` matches exhaustively over the runtime enum, so a new outcome does not compile until
+    /// it is named here, and `sample()` matches exhaustively over these labels, so it does not
+    /// compile until an instance of it travels through the guard either. Same mould as
+    /// `every_install_failure!`: a hand-kept second list is exactly how a guard goes green over a
+    /// case it quietly stopped walking.
+    macro_rules! every_update_outcome {
+        ($($v:ident),+ $(,)?) => {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            enum Tag { $($v),+ }
+
+            const EVERY_TAG: &[Tag] = &[$(Tag::$v),+];
+        };
+    }
+
+    every_update_outcome!(AlreadyThere, Updated, RolledBack, Lost);
+
+    fn tag(o: &Outcome) -> Tag {
+        match o {
+            Outcome::AlreadyThere(_) => Tag::AlreadyThere,
+            Outcome::Updated { .. } => Tag::Updated,
+            Outcome::RolledBack { .. } => Tag::RolledBack,
+            Outcome::Lost { .. } => Tag::Lost,
+        }
+    }
+
+    fn sample(t: Tag) -> Outcome {
+        match t {
+            Tag::AlreadyThere => Outcome::AlreadyThere("1.0.0".into()),
+            Tag::Updated => Outcome::Updated {
+                from: "1.0.0".into(),
+                to: "1.1.0".into(),
+            },
+            Tag::RolledBack => Outcome::RolledBack {
+                stayed_on: "1.0.0".into(),
+                error: "migration failed".into(),
+            },
+            Tag::Lost => Outcome::Lost {
+                module: "sales".into(),
+                error: "rollback failed".into(),
+            },
+        }
+    }
+
+    /// **hub#1763 — no outcome of an update is reported as a server error either.**
+    ///
+    /// Same reason as `no_install_failure_is_reported_as_a_server_error` (hub#1720), on the door
+    /// that issue left out: `POST /api/modules/:id/update` answered `500` on [`Outcome::Lost`], and
+    /// an edge is free to replace the body of a `5xx` with its own page — taking with it the
+    /// `module.update_lost` code the shell translates. The person is then told nothing at all about
+    /// the module that just disappeared from their hub.
+    #[test]
+    fn no_update_outcome_is_reported_as_a_server_error() {
+        for &t in EVERY_TAG {
+            let status = update_outcome_status(&sample(t));
+            assert!(
+                !status.is_server_error(),
+                "{t:?} answers {status}: an edge is free to replace the body of a 5xx with its own \
+                 page, so the `code` would never reach the browser"
+            );
+        }
+    }
+
+    /// The control of the control: each label really does carry **its own** outcome into the guard.
+    /// A `sample()` that answered someone else's variant would leave the case it was supposed to
+    /// cover untested while the guard above stayed green.
+    #[test]
+    fn every_update_label_carries_its_own_outcome_into_the_guard() {
+        for &t in EVERY_TAG {
+            assert_eq!(
+                tag(&sample(t)),
+                t,
+                "{t:?} builds a sample of another outcome, so {t:?} never reaches the guard"
             );
         }
     }

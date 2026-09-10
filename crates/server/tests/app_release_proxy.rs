@@ -118,7 +118,10 @@ async fn a_cloud_that_does_not_answer_yields_an_error_and_never_a_version() {
 
     let response = router.oneshot(signed_in(&session)).await.unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    // `424 Failed Dependency`, not `502` (hub#1763): the hub is the ORIGIN, and an edge is free to
+    // replace the body of a `5xx` with its own page — so a `502` minted here reaches the till as
+    // `error code: 502` and never as a reason. A `4xx` crosses the proxy with its body intact.
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
     // The page turns anything that is not a version into `unknown` — silence. What it must never
     // receive is a number the runtime made up, nor a body that reads as "you are up to date".
     assert!(body_json(response).await.get("version").is_none());
@@ -142,7 +145,9 @@ async fn an_error_from_the_cloud_is_passed_on_as_an_error() {
     let (router, session) = fixture(format!("http://{address}"), "5xx").await;
     let response = router.oneshot(signed_in(&session)).await.unwrap();
 
-    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    // The Cloud's own `503` is DEGRADED, not relayed (hub#1763): relaying a `5xx` is as invisible
+    // to the person as minting one, because the edge replaces that body too.
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
     cloud.abort();
 }
 

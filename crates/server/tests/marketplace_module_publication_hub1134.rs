@@ -203,7 +203,7 @@ async fn an_id_that_walks_out_of_the_marketplace_is_refused_hub1134() {
 
 /// A Cloud that is not there is a `502`, never a body the screen could read as a verdict.
 #[tokio::test]
-async fn a_cloud_that_does_not_answer_is_a_bad_gateway_hub1134() {
+async fn a_cloud_that_does_not_answer_is_a_failed_dependency_hub1134() {
     // Port 1 on loopback: nothing listens, so the request fails at connect.
     let (status, body) = ask(
         config("http://127.0.0.1:1".into(), Some("machine-secret"), "down"),
@@ -211,6 +211,9 @@ async fn a_cloud_that_does_not_answer_is_a_bad_gateway_hub1134() {
     )
     .await;
 
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
+    // `424`, not the `502` this door was born with (hub#1763): the hub is the ORIGIN, and an edge
+    // is free to replace the body of a `5xx` with its own page — the marketplace would then read
+    // `error code: 502` instead of «erplora.com did not answer».
+    assert_eq!(status, StatusCode::FAILED_DEPENDENCY);
     assert!(!body.contains("publication_status"), "{body}");
 }

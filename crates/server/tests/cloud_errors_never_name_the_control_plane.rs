@@ -230,8 +230,8 @@ async fn the_guard_sees_a_door_that_hands_back_the_dialled_url() {
 
     assert_eq!(
         status,
-        StatusCode::BAD_GATEWAY,
-        "a control plane that does not answer is a 502, not a catalogue: {text}"
+        StatusCode::FAILED_DEPENDENCY,
+        "a control plane that does not answer is a 424, not a catalogue: {text}"
     );
     assert!(
         !text.contains(&address),
@@ -249,15 +249,16 @@ async fn the_guard_sees_a_door_that_hands_back_the_dialled_url() {
 ///
 /// The fourth column is **the answer that proves the door actually dialled erplora.com**, and it
 /// is per door on purpose: it is what keeps this guard from going green on a door that refused the
-/// body before ever calling out — a rule that is never reached is green for nothing. It is NOT the
-/// same status everywhere: since hub#1720 the install pipeline reports a Cloud that did not answer
-/// as `424 Failed Dependency`, precisely so the edge stops swallowing its body.
+/// body before ever calling out — a rule that is never reached is green for nothing. Since hub#1763
+/// it is `424 Failed Dependency` everywhere a Cloud that did not answer is reported: hub#1720 had
+/// already moved the install pipeline there so the edge would stop swallowing its body, and that is
+/// now the answer of every door, not of one pipeline.
 const DRIVEN_BY_HAND: [(&str, &str, &str, StatusCode); 2] = [
     (
         "POST",
         "/api/auth/courier",
         r#"{"code":"abc"}"#,
-        StatusCode::BAD_GATEWAY,
+        StatusCode::FAILED_DEPENDENCY,
     ),
     (
         "POST",

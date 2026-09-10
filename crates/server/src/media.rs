@@ -349,8 +349,18 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         Ok(x) => x,
         Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
+    // `404` sigue siendo `404` —el fichero no está—, pero cualquier OTRA negativa del Cloud no lo
+    // es (hub#1763): contar un `500` de erplora.com como «fichero no encontrado» manda a quien
+    // mira la foto a subirla otra vez cuando la foto SÍ está, y esconde la avería.
     if !resp.status().is_success() {
-        return err(StatusCode::NOT_FOUND, "fichero no encontrado");
+        return if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            err(StatusCode::NOT_FOUND, "fichero no encontrado")
+        } else {
+            err(
+                cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
+                cloud_proxy::CLOUD_REJECTED,
+            )
+        };
     }
     // El Cloud responde `{ url }` con una firma temporal de Object Storage. La descarga la hace
     // el runtime, no el navegador: los buckets no tienen CORS (un `fetch` desde el visor se cae) y
@@ -372,7 +382,17 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     }
     let object = match st.http.get(&signed).send().await {
         Ok(o) if o.status().is_success() => o,
-        Ok(_) => return err(StatusCode::NOT_FOUND, "fichero no encontrado"),
+        // Igual que arriba: el objeto que no está es un `404`; el almacén que falla es una avería
+        // del que guarda la foto, y decir «no encontrado» la daría por perdida (hub#1763).
+        Ok(o) if o.status() == reqwest::StatusCode::NOT_FOUND => {
+            return err(StatusCode::NOT_FOUND, "fichero no encontrado")
+        }
+        Ok(o) => {
+            return err(
+                cloud_proxy::relayed_status(cloud_proxy::cloud_status(o.status().as_u16())),
+                cloud_proxy::CLOUD_REJECTED,
+            )
+        }
         Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
     // When the size is declared, refuse an oversized object BEFORE downloading a single byte.

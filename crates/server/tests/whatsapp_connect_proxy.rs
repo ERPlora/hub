@@ -342,5 +342,7 @@ async fn a_saas_that_does_not_answer_is_an_error_not_a_silent_ok() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    // hub#1763: `424`, not `502` — a `5xx` minted by the hub is replaced by the edge with its own
+    // page, so the module on the other side would read a proxy page instead of a reason.
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
 }

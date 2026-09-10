@@ -197,6 +197,109 @@ async fn doors_that_answer_a_server_error(cloud_base_url: String, tag: &str) -> 
     (offenders, checked)
 }
 
+/// A `multipart/form-data` with one file, hand-written so `POST /api/media/upload` gets past its
+/// extractor: the sweep sends `{}` as JSON, which the multipart extractor refuses long before the
+/// hub dials erplora.com.
+const MULTIPART: &str = "multipart/form-data; boundary=X1763";
+const ONE_FILE: &str = "--X1763\r\nContent-Disposition: form-data; name=\"folder\"\r\n\r\n\r\n\
+                        --X1763\r\nContent-Disposition: form-data; name=\"files\"; \
+                        filename=\"logo.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n\
+                        --X1763--\r\n";
+
+/// The doors the sweep cannot open with `{}`: each refuses that body BEFORE it dials erplora.com —
+/// a missing query parameter, a required field, a multipart extractor — so whatever they answer
+/// when the control plane is down is invisible to the sweep above. They are driven by hand with the
+/// smallest body that gets past the door, and held to the same rule.
+///
+/// Every one of them is expected to answer **[`FAILED_DEPENDENCY`]**, and that is the control of
+/// this control: it is the answer that proves the door got as far as calling erplora.com. A door
+/// that refused the body first answers `400`/`403`/`404` and fails this table instead of going
+/// green for nothing — which is exactly how a guard ends up covering a rule it never reaches.
+const DRIVEN_BY_HAND: [(&str, &str, &str, &str); 5] = [
+    // `Query<PathQuery>`: without `path` the extractor answers `400` and nothing is dialled.
+    ("DELETE", "/api/media?path=logo.png", "application/json", ""),
+    ("GET", "/api/media/raw?path=logo.png", "application/json", ""),
+    // `name` has no `#[serde(default)]`: `{}` never deserialises.
+    (
+        "POST",
+        "/api/media/folder",
+        "application/json",
+        r#"{"name":"nueva"}"#,
+    ),
+    (
+        "POST",
+        "/api/media/rename",
+        "application/json",
+        r#"{"path":"logo.png","name":"otro.png"}"#,
+    ),
+    ("POST", "/api/media/upload", MULTIPART, ONE_FILE),
+];
+
+/// Drives [`DRIVEN_BY_HAND`] against `cloud_base_url` and returns the doors that did NOT answer
+/// [`StatusCode::FAILED_DEPENDENCY`], with what they answered instead.
+async fn hand_driven_doors_that_do_not_report_the_outage(
+    cloud_base_url: String,
+    tag: &str,
+) -> Vec<String> {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-1763");
+    rt.ensure_system_tables().await.unwrap();
+    let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
+    let session = rt.create_session(&admin, 3600, None).await.unwrap();
+    let router = app(AppState::with_config(rt, config(cloud_base_url, tag)));
+
+    let mut wrong: Vec<String> = Vec::new();
+    for (method, uri, content_type, body) in DRIVEN_BY_HAND {
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(uri)
+                    .header("x-hub-session", &session)
+                    .header("content-type", content_type)
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        if status == StatusCode::FAILED_DEPENDENCY {
+            continue;
+        }
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap_or_default();
+        wrong.push(format!(
+            "{method} {uri} answered {status}: {}",
+            String::from_utf8_lossy(&bytes)
+        ));
+    }
+    wrong
+}
+
+#[tokio::test]
+async fn the_doors_the_sweep_cannot_open_with_an_empty_body_are_driven_by_hand() {
+    for (outage, cloud) in [
+        ("silent", a_control_plane_that_is_not_listening().await),
+        (
+            "crashing",
+            a_control_plane_that_answers_a_server_error().await,
+        ),
+    ] {
+        let wrong = hand_driven_doors_that_do_not_report_the_outage(cloud, outage).await;
+        assert!(
+            wrong.is_empty(),
+            "with erplora.com {outage}, {} hand-driven door(s) did not report the outage as a \
+             `424 Failed Dependency`. Either the door mints a 5xx the edge will swallow, or it \
+             never got as far as dialling erplora.com — and a rule that is never reached is green \
+             for nothing.\n  - {}",
+            wrong.len(),
+            wrong.join("\n  - ")
+        );
+    }
+}
+
 #[tokio::test]
 async fn no_door_answers_a_server_error_when_erplora_com_does_not_answer() {
     let cloud = a_control_plane_that_is_not_listening().await;
