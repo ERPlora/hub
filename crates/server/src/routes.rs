@@ -280,6 +280,16 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        // Qué NOMBRES aceptan las dos rutas de arriba (hub#1757). Los nombres son de cada módulo
+        // instalado, así que ningún fichero del repo puede listarlos: el hub los sabe y no los
+        // decía, y quien no tenía el `module.json` delante solo podía adivinar y cosechar 404.
+        // Nunca anuncia lo que el dispatcher rechazaría (interno, módulo apagado). Misma doble
+        // puerta que `…/events`: sesión admin + `manage_flows` si quien llama nombra un módulo —
+        // el mapa de todas las puertas del hub no lo lee un módulo por estar un admin logueado.
+        .route(
+            "/api/hub/operations",
+            get(operations_catalog::list_operations),
+        )
         // hub#361: the manager approves ONE action. The PIN is verified in the runtime, and the
         // token that comes back is presented on the retry in `X-Elevation-Token` — never in the
         // command payload, so a command body stays pure data.

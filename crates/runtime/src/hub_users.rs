@@ -87,6 +87,22 @@ pub const CORE_QUERIES: &[&str] = &[
     "print.jobs",
 ];
 
+/// The permission [`core_query`] checks before serving `hub.<rest>`.
+///
+/// It is a function and not a table so the gate and the ANSWER to «who may call this?» cannot be
+/// two different sentences: [`core_query`] resolves its gate through here, and so does the
+/// operations catalogue (hub#1757). A second copy of this rule would be the lenient one the day
+/// somebody moves a query between tiers.
+pub fn core_query_permission(rest: &str) -> &'static str {
+    // `approvals.list` requires admin (who approved what is information about the staff, not the
+    // cashier's). The other core queries open with a local session.
+    if rest == "approvals.list" {
+        ADMINISTER_PERMISSION
+    } else {
+        VIEW_USERS_PERMISSION
+    }
+}
+
 /// Default page size of the print queue read through [`core_query`]. Same number the HTTP listing
 /// uses: a hub with more than this waiting has a printer problem, not a paging problem. A caller
 /// may ask for more, and [`crate::print_queue::list`] clamps the ask at 500.
@@ -1035,13 +1051,9 @@ pub async fn core_query(
         // not exist here is a broken contract and must blow up (`queryOptional` does not forgive it).
         return Err(RuntimeError::QueryNotFound(name.to_string()));
     }
-    // Per-query gate: `approvals.list` requires admin (who approved what is information about the
-    // staff, not the cashier's). The other core queries open with a local session.
-    if rest == "approvals.list" {
-        crate::permissions::check(ctx, ADMINISTER_PERMISSION)?;
-    } else {
-        crate::permissions::check(ctx, VIEW_USERS_PERMISSION)?;
-    }
+    // Per-query gate, resolved by the same function the catalogue publishes (hub#1757): the door
+    // and the sign on it are one sentence.
+    crate::permissions::check(ctx, core_query_permission(rest))?;
     // Non-paginated core queries answer with the whole (small) set: `total` = row count, no offset.
     // `approvals.list` is the exception — the audit grows forever, so it pages (hub#884).
     let whole = |rows: Vec<serde_json::Value>| {
