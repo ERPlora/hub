@@ -114,10 +114,24 @@ function fetchedUrls(): string[] {
   return fetchSpy.mock.calls.map((call) => String(call[0]));
 }
 
+/**
+ * Who is draining each print station, as `GET /api/print/hosts` answers it.
+ *
+ * The printer sentence is built from THIS and no longer from the hardware probe (hub#1731): the
+ * probe answers «online» inside the installed app whatever happens, so it could only ever say that
+ * this device's host process is up — never that anybody is taking paper out. Each test below says
+ * which of the two worlds it is in, because they are now different worlds.
+ */
+let coverage: { role: string; waiting: number; liveHosts: number }[] = [];
+
 beforeEach(() => {
   invokeSpy.mockClear();
   vi.mocked(openExternal).mockClear();
-  fetchSpy = vi.fn(async () => {
+  coverage = [];
+  fetchSpy = vi.fn(async (url: unknown) => {
+    if (String(url).includes('/api/print/hosts')) {
+      return { ok: true, status: 200, json: async () => ({ ok: true, hosts: [], coverage }) };
+    }
     throw new Error('the network is not part of this test');
   });
   vi.stubGlobal('fetch', fetchSpy);
@@ -137,6 +151,8 @@ describe('inside the installed app, where the hardware actually lives', () => {
   });
 
   it('does not ask an owner whose printer answers to go and install one', async () => {
+    // This device prints AND is registered as the host draining receipts — the fully set-up till.
+    coverage = [{ role: 'receipt', waiting: 0, liveHosts: 1 }];
     const wrapper = await mountSystem();
 
     // The sentence, and then the absence of everything that contradicts it: no numbered steps,
@@ -144,6 +160,25 @@ describe('inside the installed app, where the hardware actually lives', () => {
     expect(wrapper.text()).toContain(en.system.health.printerReady);
     expect(wrapper.find('.bridge-steps').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('Windows');
+  });
+
+  it('does NOT say the printer is ready when nobody is registered to print (hub#1731)', async () => {
+    // The reported bug, and the reason the sentence changed door. Inside the installed app the
+    // hardware probe answers «online» unconditionally, so this exact hub — printing module on, no
+    // printer ever registered, receipts piling up in the queue unread — read «Printer ready».
+    // `coverage` stays empty: that is a read answer, and it says nobody is there.
+    const wrapper = await mountSystem();
+
+    expect(wrapper.text()).not.toContain(en.system.health.printerReady);
+    expect(wrapper.text()).toContain(en.system.health.printerOffline);
+    // And it hands over the way to fix it, which is the whole point of not lying about it.
+    expect(wrapper.text()).toContain(en.system.health.printerAction);
+  });
+
+  it('asks the runtime who is printing, not the local host process', async () => {
+    await mountSystem();
+
+    expect(fetchedUrls().some((url) => url.includes('/api/print/hosts'))).toBe(true);
   });
 });
 
@@ -153,9 +188,21 @@ describe('in a plain browser, where there is no hardware and that is the truth',
   });
 
   it('says the printer is not connected, and says how to get one', async () => {
+    // No hardware on this device and nobody registered anywhere: the empty coverage of `beforeEach`.
     const wrapper = await mountSystem();
 
     expect(wrapper.text()).toContain(en.system.health.printerOffline);
+    expect(wrapper.find('.bridge-steps').exists()).toBe(true);
+  });
+
+  it('a till printing elsewhere keeps the browser honest about THIS device', async () => {
+    // Somebody IS draining receipts (the counter's till), so the sentence is green — but this
+    // laptop still has no hardware, so the install steps stay. The two answer different questions
+    // and mixing them is what hub#524 and hub#1731 each fixed from their own end.
+    coverage = [{ role: 'receipt', waiting: 0, liveHosts: 1 }];
+    const wrapper = await mountSystem();
+
+    expect(wrapper.text()).toContain(en.system.health.printerReady);
     expect(wrapper.find('.bridge-steps').exists()).toBe(true);
   });
 

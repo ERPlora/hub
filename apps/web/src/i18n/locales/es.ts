@@ -773,6 +773,13 @@ export default {
     ready: 'Imprimiendo en {hosts}',
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
+    ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
+    ticketWaitingForPrinter:
+      'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+    comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
+    comandaWaitingForPrinter:
+      'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
+    comandaDefaultLabel: 'sala',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are

@@ -19,8 +19,6 @@ import {
   clientInjectionKey,
   bootHubContext,
   ensureMediaCookie,
-  RUNTIME_URL,
-  runtimeHeaders,
   setOnRuntimeSessionExpired,
 } from './lib/runtime';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
@@ -35,6 +33,7 @@ import {
   shouldSendNotice,
 } from './lib/notification-permission';
 import { createPrintService } from './lib/print';
+import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
@@ -192,25 +191,11 @@ const erploraClient = getClient();
 (erploraClient as unknown as { print?: ReturnType<typeof createPrintService> }).print =
   createPrintService(erploraClient as unknown as Parameters<typeof createPrintService>[0], {
     // Vía COLA (hub#344): sin Bridge, el tique térmico se encola en el hub y un print host del rol
-    // lo drene. Reusa el mismo baseURL + auth del resto de llamadas al runtime.
-    enqueue: async (job) => {
-      const res = await fetch(`${RUNTIME_URL}/api/print/jobs`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...runtimeHeaders() },
-        body: JSON.stringify({
-          jobId: job.jobId,
-          role: job.role,
-          documentType: job.documentType,
-          document: job.document,
-          format: job.format ?? 'receipt',
-        }),
-      });
-      // 200 con ok:true → encolado (nuevo o duplicado, ambos éxito). Cualquier otra cosa → false
-      // (la puerta cae al navegador: una venta no se cae por impresión).
-      if (!res.ok) return false;
-      const body = await res.json().catch(() => ({}));
-      return body?.ok === true;
-    },
+    // lo drena. Reusa el mismo baseURL + auth del resto de llamadas al runtime, y devuelve lo que
+    // contestó el runtime —no solo si lo aceptó—: la cobertura de la estación es lo que separa
+    // «sale tarde» de «no sale» (hub#1731). Vive en `lib/` y no aquí porque este fichero no tiene
+    // tests, y esa traducción es justo la que no puede romperse en silencio.
+    enqueue: createEnqueuePrintJob(),
   });
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
@@ -236,7 +221,13 @@ function askToWarn(force = false) {
 bootPrintOnSale(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   onFailure: (f) => {
-    void toastError(`El tique de la venta ${f.saleId} NO se imprimió: ${f.error}`);
+    // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
+    // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
+    void toastError(
+      f.awaitingHost
+        ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
+        : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
+    );
   },
 });
 
@@ -268,7 +259,12 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   onFailure: (f) => {
-    void toastError(`No se imprimió la comanda de ${f.label || 'sala'} (${f.role}): ${f.error}`);
+    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
+    void toastError(
+      f.awaitingHost
+        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
+        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
+    );
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell

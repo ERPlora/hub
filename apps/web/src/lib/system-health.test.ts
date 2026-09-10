@@ -33,7 +33,7 @@ import {
   isPrintingInstalled,
   printerLine,
   printerSetupStepKeys,
-  probeFromBridge,
+  probeFromCoverage,
   reportedCount,
   usagePercent,
   type InstalledModuleRef,
@@ -176,14 +176,64 @@ describe('«I could not check» is its own state', () => {
     expect(lookup(esCatalogue, line.titleKey)).toBe('No hemos podido comprobar la impresora');
   });
 
-  it('is what a probe that has not answered yet means — never «not connected»', () => {
-    expect(probeFromBridge(null)).toBe('unknown');
-    expect(probeFromBridge(undefined)).toBe('unknown');
+  it('is what coverage we could not read means — never «not connected»', () => {
+    expect(probeFromCoverage(null)).toBe('unknown');
+    expect(probeFromCoverage(undefined)).toBe('unknown');
   });
 
   it('keeps the two real answers apart', () => {
-    expect(probeFromBridge({ online: true })).toBe('ready');
-    expect(probeFromBridge({ online: false })).toBe('not_connected');
+    expect(probeFromCoverage([{ role: 'receipt', waiting: 0, liveHosts: 1 }])).toBe('ready');
+    expect(probeFromCoverage([{ role: 'receipt', waiting: 0, liveHosts: 0 }])).toBe('not_connected');
+  });
+});
+
+// hub#1731 — the badge read «Printer ready» on a hub where NO printer had ever been registered,
+// so the till was told everything was fine while the receipts piled up in the queue unread. The
+// badge was drawn from the Bridge probe, which inside the installed app answers `online: true`
+// unconditionally: it reported that the local print HOST was up, never that anybody was taking
+// paper out. The only fact that answers the owner's question is per-role coverage.
+describe('the printer badge answers «is my receipt coming out?» (hub#1731)', () => {
+  it('with NOBODY registered for receipts it is NOT ready — it asks for attention', () => {
+    // The reported case: a brand-new hub with the printing module on and no printer set up.
+    // Coverage comes back EMPTY, which is a read answer and not an unread one: nobody is there.
+    const line = printerLine(probeFromCoverage([]), printingInstalled)!;
+
+    expect(line.state).toBe(STATE_ATTENTION);
+    expect(line.tone).not.toBe('success');
+    expect(lookup(enCatalogue, line.titleKey)).not.toBe('Printer ready');
+    // And it says what to do, on the printing module's own screen.
+    expect(line.action?.route).toBe(PRINTING_ROUTE);
+  });
+
+  it('a live host for ANOTHER station does not make the receipt printer ready', () => {
+    // A kitchen printer draining kitchen orders says nothing about the receipt roll — and this is
+    // exactly how a half-set-up restaurant would have kept the green badge.
+    expect(probeFromCoverage([{ role: 'kitchen', waiting: 0, liveHosts: 2 }])).toBe('not_connected');
+  });
+
+  it('a station registered but NOT reporting is not ready either', () => {
+    // `liveHosts` already excludes hosts past the TTL: a till that was unplugged stops covering.
+    expect(probeFromCoverage([{ role: 'receipt', waiting: 3, liveHosts: 0 }])).toBe('not_connected');
+  });
+
+  it('is ready only when somebody is actually draining receipts', () => {
+    const line = printerLine(
+      probeFromCoverage([
+        { role: 'receipt', waiting: 0, liveHosts: 1 },
+        { role: 'kitchen', waiting: 0, liveHosts: 0 },
+      ]),
+      printingInstalled,
+    )!;
+
+    expect(line.state).toBe(STATE_OK);
+    expect(lookup(enCatalogue, line.titleKey)).toBe('Printer ready');
+  });
+
+  it('coverage we could not read is never green (hub#375 still holds)', () => {
+    const line = printerLine(probeFromCoverage(null), printingInstalled)!;
+    expect(line.state).toBe(STATE_UNKNOWN);
+    expect(line.tone).toBe('neutral');
+    expect(line.action).toBeNull();
   });
 });
 
