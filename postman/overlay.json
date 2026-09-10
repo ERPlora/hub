@@ -88,9 +88,13 @@
   "DELETE /api/keys/:id": {
     "name": "Revoke an API key"
   },
+  "GET /api/hub/operations": {
+    "name": "Which commands and queries THIS hub accepts — read this before the two doors below",
+    "description": "The dispatcher's own catalogue: every operation `POST /api/query` and `POST /api/command` take a `name` for, with its `kind`, `module`, the `permission` it checks, `payload` (the raw JSON Schema, or null) and `list` (search/sort/filters/page_size of a list query). Internal commands and deactivated modules are NOT listed — the dispatcher would refuse them. `?module=<id>` narrows to one module, `?module=hub` is the core namespace; an unknown module answers an empty list. Needs an ADMIN session; a request that names a module (`X-Erplora-Module`) also needs `manage_flows`."
+  },
   "POST /api/query": {
     "name": "Run a declarative query of a module",
-    "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.",
+    "description": "`name` is `<module>.<query>` as declared in the module's manifest — take it from `GET /api/hub/operations`; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.",
     "body": {
       "name": "<module>.<query>",
       "params": {}
@@ -98,7 +102,7 @@
   },
   "POST /api/command": {
     "name": "Run a declarative command of a module",
-    "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.",
+    "description": "`name` is `<module>.<command>` — take it from `GET /api/hub/operations`; `payload` follows the command's JSON Schema (the `payload` field of that catalogue). Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.",
     "body": {
       "name": "<module>.<command>",
       "payload": {}
