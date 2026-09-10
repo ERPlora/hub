@@ -396,10 +396,11 @@ export interface ModuleLocaleFile {
    */
   settings?: ModuleSettingsLocale;
   /**
-   * Strings of the module's «Plan» tab (hub#1604): today, how each quota METRIC of
-   * `billing.tiers[].quota` is named. Same story as `settings` — the shell generates that screen out
-   * of the manifest, which is canonical English, so «Incluye 30 conversations per month» is what a
-   * Spanish hub read. Resolved in `lib/module-quota.ts`.
+   * Strings of the module's «Plan» tab: how each quota METRIC of `billing.tiers[].quota` is named
+   * (hub#1604) and how each TIER of `billing.tiers[]` is called, by slug (hub#1748). Same story as
+   * `settings` — the shell generates that screen out of the manifest, which is canonical English,
+   * so «Estás en Free · Incluye 30 conversations per month» is what a Spanish hub read. Resolved in
+   * `lib/module-quota.ts`.
    */
   billing?: ModuleBillingLocale;
 }
