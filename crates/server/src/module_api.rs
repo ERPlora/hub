@@ -978,8 +978,20 @@ mod install_error_status_tests {
     /// pipeline does not compile until it is named here, and `sample()` matches exhaustively over
     /// this enum, so it does not compile until an instance of it travels through the guard either.
     /// Adding a failure mode and quietly mapping it back to a 502 is not reachable from here.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum Tag {
+    /// The labels and the list the guard walks are declared **once**: a hand-kept second copy is
+    /// exactly how a guard goes green on a list that quietly lost the case that was failing.
+    /// Dropping a name here deletes the variant too, and `tag()` stops being exhaustive over
+    /// [`install::InstallError`] — it does not compile.
+    macro_rules! every_install_failure {
+        ($($v:ident),+ $(,)?) => {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            enum Tag { $($v),+ }
+
+            const EVERY_TAG: &[Tag] = &[$(Tag::$v),+];
+        };
+    }
+
+    every_install_failure!(
         Cloud,
         VersionNotFound,
         Source,
@@ -990,20 +1002,7 @@ mod install_error_status_tests {
         CloudDenied,
         NotInCatalog,
         CloudRejected,
-    }
-
-    const EVERY_TAG: [Tag; 10] = [
-        Tag::Cloud,
-        Tag::VersionNotFound,
-        Tag::Source,
-        Tag::MissingSha256,
-        Tag::Blocked,
-        Tag::Runtime,
-        Tag::NotInstalled,
-        Tag::CloudDenied,
-        Tag::NotInCatalog,
-        Tag::CloudRejected,
-    ];
+    );
 
     fn tag(e: &install::InstallError) -> Tag {
         match e {
@@ -1059,7 +1058,7 @@ mod install_error_status_tests {
     /// for the shell.
     #[test]
     fn no_install_failure_is_reported_as_a_server_error() {
-        for t in EVERY_TAG {
+        for &t in EVERY_TAG {
             let e = sample(t);
             let status = install_error_status(&e);
             assert!(
@@ -1078,20 +1077,20 @@ mod install_error_status_tests {
         }
     }
 
-    /// The control of the control: `EVERY_TAG` really does carry one of each variant. Without it
-    /// the guard above could go green on a list that quietly lost the case that was failing.
+    /// The control of the control: each label really does carry **its own** variant into the
+    /// guard. A `sample()` that answered someone else's variant would leave the case it was
+    /// supposed to cover untested while the guard above stayed green.
+    ///
+    /// The other half of that risk — a label dropped from the walked list — is not testable from
+    /// here on purpose: `every_install_failure!` declares the enum and the list from one source,
+    /// so losing a name is a **compile** error, not a green run.
     #[test]
-    fn every_variant_of_the_pipeline_travels_through_the_guard() {
-        let covered: Vec<Tag> = EVERY_TAG.iter().map(|t| tag(&sample(*t))).collect();
-        assert_eq!(
-            covered.len(),
-            EVERY_TAG.len(),
-            "every label has to produce its own variant back"
-        );
-        for t in EVERY_TAG {
-            assert!(
-                covered.contains(&t),
-                "{t:?} is listed but no sample of it reaches the guard"
+    fn every_label_carries_its_own_variant_into_the_guard() {
+        for &t in EVERY_TAG {
+            assert_eq!(
+                tag(&sample(t)),
+                t,
+                "{t:?} builds a sample of another variant, so {t:?} never reaches the guard"
             );
         }
     }
