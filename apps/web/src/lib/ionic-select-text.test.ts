@@ -290,6 +290,29 @@ describe('the premise still holds', () => {
     expect(select).toContain("this.okText = 'OK'");
   });
 
+  it('the REAL `ion-select` of @ionic/core comes out localized once the shell hooked it', async () => {
+    // The probes above are faithful by construction; this one removes the construction. It boots
+    // the hook, registers Ionic's own element and reads the labels Ionic itself would put on the
+    // dialog's buttons. It runs LAST because `customElements.define` cannot be undone.
+    // Control positive, before the element is connected: Ionic's constructor writes the English
+    // literals, which is the bug the issue reports. (There is no second registry in which to mount
+    // an unpatched one — a definition is forever — so the control is taken here.)
+    bootIonicSelectText(spanish);
+    const { defineCustomElement } = await import('@ionic/core/components/ion-select.js');
+    defineCustomElement();
+    const el = document.createElement('ion-select') as HTMLElement & {
+      okText: string;
+      cancelText: string;
+    };
+    expect([el.cancelText, el.okText], 'Ionic still ships English defaults').toEqual([
+      'Cancel',
+      'OK',
+    ]);
+
+    document.body.append(el); // connected: this is where the shell installs the localized default
+    expect([el.cancelText, el.okText]).toEqual(['Cancelar', 'Aceptar']);
+  });
+
   it('the shell hooks element registration BEFORE @ionic/vue registers anything', async () => {
     // `@ionic/vue` registers `ion-select` on import and the HTML spec captures a custom element's
     // lifecycle callbacks inside `define`. Move the import down and the fix vanishes with no error
