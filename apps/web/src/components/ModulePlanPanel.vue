@@ -151,7 +151,7 @@
                Boolean converter reads presence, so it would over-mark exactly in the window before
                the element is registered. Absent is the only way to say "no". -->
           <ok-pricing-card
-            :name="tier.name"
+            :name="tierLabel(tier)"
             :price="priceLabel(tier)"
             :period="periodLabel(tier)"
             :features.prop="tierFeatures(tier)"
@@ -195,6 +195,7 @@ import { moduleBase } from '../lib/module-url';
 import {
   quotaLabel as tierQuotaLabel,
   quotaMetricLabel,
+  tierName,
   type ModuleBillingLocale,
 } from '../lib/module-quota';
 import { getClient } from '../lib/runtime';
@@ -326,7 +327,10 @@ const statusHint = computed(() => {
   // it, and the sentence says so.
   const key =
     displayStatus.value === 'expired' && freeTier.value ? 'expiredOnFree' : displayStatus.value;
-  return t(`modulePlan.hint.${key}`, { plan: currentTier.value?.name ?? freeTier.value?.name ?? '' });
+  // The plan lands INSIDE a Spanish sentence, so its name goes through the module's translation as
+  // well (hub#1748): «Estás en Free» was the same half-translated line as the quota before hub#1604.
+  const plan = currentTier.value ?? freeTier.value;
+  return t(`modulePlan.hint.${key}`, { plan: plan ? tierLabel(plan) : '' });
 });
 
 function fmtDate(iso: string): string {
@@ -345,6 +349,15 @@ function fmtMoney(units: number): string {
 // ajustes (hub#1094)— y el inglés canónico es el respaldo. Detalle en `lib/module-quota.ts`.
 function quotaLabel(tier: BillingTierDef): string {
   return tierQuotaLabel(tier, billingLocale.value);
+}
+
+// The NAME of a plan comes from the same place as its quota (hub#1748): the module author writes
+// `billing.tiers[].name` of the manifest in the source language, so a Spanish hub read «Free ·
+// Basic · Pro · Enterprise» right above a line that was already translated. The module publishes
+// those names in its `locales/<lang>.json` (`billing.tiers` block, by slug); the manifest stays
+// the fallback.
+function tierLabel(tier: BillingTierDef): string {
+  return tierName(tier, billingLocale.value);
 }
 
 /** El importe. El periodo viaja aparte para que la tarjeta pueda componerlo a su manera. */

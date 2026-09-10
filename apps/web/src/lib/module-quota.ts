@@ -27,6 +27,8 @@ import type { BillingTierDef } from '@erplora/module-types';
 export interface ModuleBillingLocale {
   /** One label per quota METRIC, keyed by the metric name written in `billing.tiers[].quota`. */
   quota?: Record<string, string | undefined>;
+  /** One name per TIER, keyed by the slug written in `billing.tiers[].slug` — hub#1748. */
+  tiers?: Record<string, string | undefined>;
 }
 
 /**
@@ -59,6 +61,33 @@ export function quotaMetricLabel(
   // A metric made only of separators humanises to nothing; then its own name is the last resort,
   // because a bare number tells the customer even less than an ugly word does.
   return humanizeQuotaMetric(metric) || metric;
+}
+
+/**
+ * How ONE tier is NAMED on screen — hub#1748.
+ *
+ * The sibling of [`quotaMetricLabel`] one field over: `billing.tiers[].name` is prose the module
+ * author writes in the source language, so a Spanish hub read «Free · Basic · Pro · Enterprise»
+ * right above a quota line that hub#1604 had already translated. The module publishes the names in
+ * the same `billing` block of its `locales/<lang>.json`, keyed by tier SLUG — the shell only has to
+ * read them, and it keeps no table of its own: the plans of every module ever published are not
+ * vocabulary the shell can own.
+ *
+ * Order: **module locale → the name in the manifest → its slug**. The last step is the floor: a
+ * card with no title at all says strictly less than an untranslated one.
+ */
+export function tierName(
+  tier: BillingTierDef,
+  locale: ModuleBillingLocale | undefined,
+): string {
+  const raw = locale?.tiers?.[tier.slug];
+  // Only a string is a name — an author who types the price where the name goes (`"free": 0`) must
+  // not blank the «Plan» tab with a render error, the same promise `quotaMetricLabel` keeps. Blank
+  // counts as absent for the same reason.
+  const translated = typeof raw === 'string' ? raw.trim() : '';
+  if (translated) return translated;
+  const declared = typeof tier.name === 'string' ? tier.name.trim() : '';
+  return declared || tier.slug;
 }
 
 /**
