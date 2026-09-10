@@ -123,6 +123,19 @@ async fn pending_rows(rt: &Runtime) -> i64 {
     .await
 }
 
+/// Two coffees at 200 cents, VAT excluded — and the amount they have to invoice.
+///
+/// The constants are here, next to each other, because the assertion below is the only thing that
+/// makes the quantity of the sale mean anything (hub#1772): `quantity` travels in fixed point
+/// ×10⁶ (ADR-0147, `sales` migration 014), so the bare `2` this fixture used to send was two
+/// MILLIONTHS of a coffee. The sale still charged, the invoice still issued and this test still
+/// passed — on a base of zero.
+const LINE_UNITS: i64 = 2;
+const LINE_PRICE_CENTS: i64 = 200;
+const LINE_TAX_RATE: f64 = 21.0;
+const INVOICED_BASE_CENTS: i64 = LINE_UNITS * LINE_PRICE_CENTS;
+const INVOICED_TOTAL_CENTS: i64 = 484;
+
 async fn charge_one_sale(rt: &Runtime, ctx: &RequestContext) -> String {
     rt.execute_command(
         "sales.complete_sale",
@@ -131,7 +144,12 @@ async fn charge_one_sale(rt: &Runtime, ctx: &RequestContext) -> String {
             "payment_method_id": cash_method_id(rt, ctx).await,
             "customer_name": "Bar Manolo",
             "tax_included": false,
-            "items": [{ "product_name": "Café", "price": 200, "quantity": units(2), "tax_rate": 21.0 }]
+            "items": [{
+                "product_name": "Café",
+                "price": LINE_PRICE_CENTS,
+                "quantity": units(LINE_UNITS),
+                "tax_rate": LINE_TAX_RATE
+            }]
         })),
         ctx,
     )
@@ -146,6 +164,22 @@ async fn charge_one_sale(rt: &Runtime, ctx: &RequestContext) -> String {
         invoices.len(),
         1,
         "the sale IS invoiced — that link has no capability in front of it: {invoices:?}"
+    );
+    // 🔴 The guard for the line above. Without it, a quantity written off the ×10⁶ scale
+    // invoices a different amount and every assertion downstream (the empty chain, the
+    // dead-letter row, the seal) stays just as green — a scale error that no test in this repo
+    // would report.
+    assert_eq!(
+        invoices[0]["base_amount"].as_i64(),
+        Some(INVOICED_BASE_CENTS),
+        "{LINE_UNITS} × {LINE_PRICE_CENTS} cents is what was ordered: {:?}",
+        invoices[0]
+    );
+    assert_eq!(
+        invoices[0]["total_amount"].as_i64(),
+        Some(INVOICED_TOTAL_CENTS),
+        "base + {LINE_TAX_RATE} %: {:?}",
+        invoices[0]
     );
     invoices[0]["id"].as_str().expect("invoice id").to_string()
 }
