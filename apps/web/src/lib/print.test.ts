@@ -546,7 +546,7 @@ describe('la cola dice si hay alguien que la drene (hub#1731)', () => {
     expect(r.awaitingHost).toBeFalsy();
   });
 
-  // Misma regla que `probeFromBridge`: una respuesta que NO llegó no es un «no». Un runtime que no
+  // Misma regla que `probeFromCoverage` (system-health): una respuesta que NO llegó no es un «no». Un runtime que no
   // manda el dato no puede convertirse en «no hay nadie» — eso pondría el aviso en TODOS los tiques
   // de un hub perfectamente montado, y un aviso que sale siempre deja de leerse.
   it('si el runtime no dice cuántos equipos hay, NO se inventa un aviso', async () => {

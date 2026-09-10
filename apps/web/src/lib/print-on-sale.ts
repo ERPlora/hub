@@ -119,7 +119,7 @@ async function onSaleCompleted(client: ErploraClient, deps: Deps, payload: unkno
       // `awaitingHost` solo es `true` cuando el runtime CONTESTÓ que no hay nadie. Que no lo
       // conteste no es un «no» (ver `PrintResult.awaitingHost`).
       if (result.awaitingHost) {
-        deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora dada de alta', awaitingHost: true });
+        deps.onFailure?.({ saleId, error: result.error ?? 'no printer set up for this station', awaitingHost: true });
       }
     } else if (result.via !== 'bridge') {
       deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });

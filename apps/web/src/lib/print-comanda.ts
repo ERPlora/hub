@@ -225,7 +225,7 @@ export async function onKitchenOrderCreated(
           orderId,
           role: group.role,
           label,
-          error: result.error ?? 'sin impresora dada de alta',
+          error: result.error ?? 'no printer set up for this station',
           awaitingHost: true,
         });
       }

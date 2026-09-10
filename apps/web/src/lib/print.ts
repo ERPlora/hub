@@ -95,7 +95,7 @@ export interface PrintResult {
    * nada. Quien imprime lo usa para AVISAR, no para fallar — la venta no se cae por esto.
    *
    * `undefined` es «el runtime no lo dijo», que NO es «no hay nadie» (mismo criterio que
-   * `probeFromBridge`): un aviso inventado sobre un hub bien montado saldría en todos los tiques y
+   * `probeFromCoverage` en `system-health`): un aviso inventado sobre un hub bien montado saldría en todos los tiques y
    * dejaría de leerse.
    */
   awaitingHost?: boolean;
