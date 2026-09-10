@@ -78,6 +78,14 @@ export default {
     changeHubCancel: 'Cancelar',
     changeHubConfirm: 'Cambiar',
   },
+  // hub#1736 — los dos botones que Ionic pone en TODO diálogo de selección (`ion-select`). Sus
+  // valores por defecto son literales ingleses dentro de la propia librería, y los desplegables que
+  // usa el comerciante los pintan los Web Components de los módulos: se traducen una vez, en el
+  // shell, para todos (`lib/ionic-select-text.ts`).
+  selectDialog: {
+    ok: 'Aceptar',
+    cancel: 'Cancelar',
+  },
   actionFeedback: {
     csvExported: 'CSV exportado',
     csvExportedRows: 'CSV exportado · {n} fila | CSV exportado · {n} filas',

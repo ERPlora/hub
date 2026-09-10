@@ -6,6 +6,14 @@
 // Guard: `src/theme/ionic-fill-needs-md.test.ts`. Detalle: `src/lib/ionic-fill.ts`.
 import './lib/ionic-fill.boot';
 
+// 🔴 Segundo import del shell, y por el MISMO motivo que el de arriba (hub#1736): los dos botones
+// de los diálogos de selección de Ionic son literales ingleses («Cancel» / «OK») que no tienen
+// clave de configuración global, así que el shell los traduce enganchando `customElements.define`
+// ANTES de que nadie registre `ion-select`. Si este import baja de `@ionic/vue`, todos los
+// desplegables del hub —los de los módulos incluidos— vuelven al inglés sin un solo error.
+// Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
+import './lib/ionic-select-text.boot';
+
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
 import { addIcons } from 'ionicons';
