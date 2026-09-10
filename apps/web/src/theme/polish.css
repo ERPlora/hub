@@ -440,7 +440,7 @@ html.immersive ion-router-outlet#main.split-pane-main > .ion-page > ion-content:
 }
 .hub-detail-shell--fill {
   height: 100%;
-  min-height: 0;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* ── ok-data-table (OutfitKit): alinea sus tokens con el theme del Hub ────────────────────── */

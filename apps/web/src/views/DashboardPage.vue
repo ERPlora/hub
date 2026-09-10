@@ -551,6 +551,7 @@ function onModulesChanged(): void {
    (cabecera/filtros/pager fijos, scroll solo en el cuerpo). */
 .fill {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* Zona 1 — Cabecera contextual. Da contexto al entrar (saludo + fecha) sin duplicar la topbar.

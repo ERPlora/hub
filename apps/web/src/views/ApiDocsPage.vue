@@ -119,6 +119,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .api-docs-wrap {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
