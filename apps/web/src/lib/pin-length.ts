@@ -22,13 +22,13 @@ export const PIN_LENGTHS = [4, 6] as const;
 export const DEFAULT_PIN_LENGTH = 4;
 
 /**
- * Lo que vale la respuesta de un hub sobre su longitud de PIN: el valor si es una de las dos que
- * ofrece el mercado, y `fallback` para cualquier otra cosa (ausente, `'6'`, 5, `null`).
+ * What a hub's answer about its PIN length is worth: the value itself when it is one of the two the
+ * market offers, and `fallback` for anything else (missing, `'6'`, 5, `null`).
  *
- * El conjunto es CERRADO a propósito, y aquí importa más que en la mayoría de normalizaciones: el
- * teclado **envía en el último círculo**, así que la longitud no decide cuántos puntos se pintan
- * sino cuándo se manda el PIN. Una longitud que nadie puede teclear deja el teclado esperando un
- * dígito que no llega — una caja que no abre.
+ * The set is CLOSED on purpose, and it matters more here than in most normalisations: the keypad
+ * **submits on the last circle**, so the length does not decide how many dots are painted but when
+ * the PIN is sent. A length nobody can type leaves the keypad waiting for a digit that never
+ * arrives — a till that does not open.
  */
 export function normalizePinLength(value: unknown, fallback: number = DEFAULT_PIN_LENGTH): number {
   if (PIN_LENGTHS.includes(value as (typeof PIN_LENGTHS)[number])) return value as number;
@@ -37,5 +37,5 @@ export function normalizePinLength(value: unknown, fallback: number = DEFAULT_PI
     : DEFAULT_PIN_LENGTH;
 }
 
-/** La longitud vigente: la del hub si es una de las dos, el default si no hay o no se entiende. */
+/** The length in force: this hub's when it is one of the two, the default when missing or unreadable. */
 export const hubPinLength = computed<number>(() => normalizePinLength(hubSettings.value?.pin_length));

@@ -816,16 +816,19 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
             .timezone_name()
             .await
             .unwrap_or_else(|_| "UTC".to_string());
-        // Cuántos DÍGITOS tiene el PIN de este hub (hub#974): 4 o 6. Viaja aquí porque la pantalla
-        // que lo necesita —el pinpad del login— es la única que NO tiene sesión, y `/api/settings`
-        // exige una: sin esta clave el shell caía a su default y pintaba 4 círculos en un hub de 6,
-        // enviando el login con el PIN truncado al cuarto dígito (hub#1765). Se normaliza contra el
-        // conjunto CERRADO del runtime, igual que hace el validador de escritura: un valor que no
-        // sea de los dos deja el teclado sin longitud de envío.
+        // How many DIGITS this hub's PIN has (hub#974): 4 or 6. It travels here because the screen
+        // that needs it —the login pinpad— is the only one with NO session, and `/api/settings`
+        // demands one: without this key the shell fell back to its own default and painted four
+        // circles on a six-digit hub, firing the login with a truncated PIN on the fourth digit
+        // (hub#1765).
+        //
+        // No re-check against `PIN_LENGTHS` here on purpose: `get_settings` is `settings::get_all`,
+        // which already degrades a row that no longer validates to that key's default, so a length
+        // nobody can type cannot get this far. The fallback below is for the other case — settings
+        // unreadable, `json!({})` above — where there is no value at all.
         let pin_length = settings
             .get(erplora_runtime::pin_policy::PIN_LENGTH_SETTING)
             .and_then(|v| v.as_i64())
-            .filter(|n| erplora_runtime::pin_policy::PIN_LENGTHS.contains(n))
             .unwrap_or(erplora_runtime::pin_policy::DEFAULT_PIN_LENGTH);
         (
             pin_users,

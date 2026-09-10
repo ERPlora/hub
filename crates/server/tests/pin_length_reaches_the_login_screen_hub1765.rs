@@ -94,3 +94,60 @@ async fn a_hub_that_never_chose_publishes_the_runtimes_own_default() {
          to invent one, which is the bug this closes: {body}"
     );
 }
+
+/// The boot context for a hub whose `pin_length` row holds something the write door would never
+/// have accepted — `set_settings` validates against [`PIN_LENGTHS`], so a row like this can only
+/// come from raw SQL: an imported bundle, a hand-edited database, a migration gone wrong.
+async fn context_with_raw_pin_length_row(raw: &str, tag: &str) -> Value {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-pin");
+    rt.ensure_system_tables().await.unwrap();
+    let mut p = erplora_db::Params::new();
+    p.insert("hub_id".into(), json!("hub-pin"));
+    p.insert("value".into(), json!(raw));
+    rt.db()
+        .execute(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+             VALUES (:hub_id, 'pin_length', :value, '2026-09-10T00:00:00Z', 'raw-sql')",
+            &p,
+        )
+        .await
+        .unwrap();
+    let router = app(AppState::with_config(rt, config(tag)));
+    let response = router
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/context")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+}
+
+/// A length no keypad can type must never reach the login screen.
+///
+/// This is the end of the chain, and it is the reason the guarantee is worth a test of its own:
+/// `ok-pinpad` **submits on the last circle**, so the published length does not decide how many
+/// dots are painted — it decides *when the PIN is sent*. Publish a 5 and the keypad waits forever
+/// for a fifth circle that the four-digit PIN will never fill: a till that cannot be opened, with
+/// nothing on screen saying why. So whatever a row says, the boot context publishes one of the two
+/// lengths a person can actually type.
+#[tokio::test]
+async fn a_length_no_keypad_can_type_never_reaches_the_login_screen() {
+    for (i, raw) in ["5", "0", "-6", "12", "abc", ""].iter().enumerate() {
+        let body = context_with_raw_pin_length_row(raw, &format!("raw{i}")).await;
+        assert_eq!(
+            body["pin_length"],
+            json!(DEFAULT_PIN_LENGTH),
+            "a stored `pin_length` of {raw:?} is not a length anybody can type; the login screen \
+             must be given the default instead of a keypad that never submits: {body}"
+        );
+        assert!(
+            PIN_LENGTHS.contains(&body["pin_length"].as_i64().unwrap_or(0)),
+            "whatever the row says, what reaches the login screen is one of {PIN_LENGTHS:?}: {body}"
+        );
+    }
+}
