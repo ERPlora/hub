@@ -342,6 +342,56 @@ pub fn require_module_version(module_id: &str, needed: &str) -> bool {
     false
 }
 
+// ─── The quantity vocabulary of the kernel's fixtures (hub#1772) ─────────────────────────────
+//
+// **The bug this closes.** `inventory` v1.2.45 installed `ck_inventory_product_stock_on_grid`
+// (migration 009, inventory#42): a CHECK that refuses any quantity off the grid. Fifteen fixtures
+// of this repo still wrote `"stock": 10` — a raw count, not a quantity — and 54 tests across nine
+// binaries died with
+//
+//     db: sqlx: error returned from database: new row for relation "inventory_product"
+//     violates check constraint "ck_inventory_product_stock_on_grid" at line 2076
+//
+// which says nothing about what the fixture did wrong, and had to be dug out of an Actions log.
+// The job stayed red for eighteen hours. So the fixtures stop writing bare numbers and say what
+// they mean: [`units`] to build a quantity, [`on_grid`] to refuse one that is not.
+//
+// **Why the constants live here and not in a module.** The hub is a kernel and knows nothing about
+// inventory's columns — deliberately, which is exactly why migration 009 put the guard in the
+// table, the one door every writer shares. But the hub's own e2e use the PUBLISHED catalogue as a
+// bench, so its fixtures are bound by the published contract like any other writer. This is the
+// bench's half of that contract, and `tests/fixture_quantities_match_the_published_grid.rs` is
+// what keeps the two numbers from drifting apart in silence.
+
+/// Fixed point of every quantity in the registry (ADR-0147): one whole unit is `1_000_000`.
+pub const QUANTITY_SCALE: i64 = 1_000_000;
+
+/// The coarsest step every shipped unit is a multiple of, and what the published CHECK enforces.
+///
+/// The finest grid in the canonical registry is 1/1000 of the base unit (the gram inside `kg`, the
+/// millilitre inside `l`); every other unit is coarser. So a legal quantity, in any unit we ship,
+/// is a multiple of this — and a value that is not cannot be expressed by any of them.
+pub const QUANTITY_GRID: i64 = 1_000;
+
+/// Whole units → the fixed-point value the catalogue accepts. `units(10)` is ten of something.
+pub fn units(whole: i64) -> i64 {
+    whole * QUANTITY_SCALE
+}
+
+/// A fixed-point quantity, checked. Returns it untouched, or panics naming the value and the way
+/// out — so a fixture that writes a raw count fails HERE, in words, instead of travelling to
+/// Postgres and coming back as a constraint name.
+pub fn on_grid(qty: i64) -> i64 {
+    assert!(
+        qty % QUANTITY_GRID == 0,
+        "quantity {qty} is not on the grid: the catalogue stores quantities x{QUANTITY_SCALE} \
+         (ADR-0147) and every legal value is a multiple of {QUANTITY_GRID}. If you meant {qty} \
+         whole units, write units({qty}) = {}.",
+        units(qty)
+    );
+    qty
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -573,5 +623,49 @@ mod tests {
             return;
         }
         assert!(require_modules_workspace());
+    }
+
+    /// ADR-0147 in one number: a whole unit is `QUANTITY_SCALE`, and the vocabulary says so instead
+    /// of every fixture writing `10_000_000` and hoping the reader counts the zeros.
+    #[test]
+    fn units_scales_a_whole_count_to_the_fixed_point_value() {
+        assert_eq!(units(10), 10 * QUANTITY_SCALE);
+        assert_eq!(units(0), 0);
+        assert_eq!(units(-3), -3 * QUANTITY_SCALE, "a correction is a quantity too");
+    }
+
+    /// Whatever `units` returns has to satisfy the guard the published module installs; if the two
+    /// constants ever disagree the vocabulary itself is broken, not the fixture that used it.
+    #[test]
+    fn what_units_produces_is_always_on_the_grid() {
+        for whole in [0, 1, 3, 7, 10, 800] {
+            assert_eq!(units(whole) % QUANTITY_GRID, 0, "units({whole}) fell off the grid");
+        }
+    }
+
+    /// 🔴 The whole point of the helper: an off-grid quantity has to be REFUSED here, where the
+    /// fixture wrote it, and in words. Before this, the same value travelled to Postgres and came
+    /// back as `violates check constraint "ck_inventory_product_stock_on_grid" at line 2076` —
+    /// twelve tests deep in an Actions log (hub#1772).
+    #[test]
+    fn on_grid_refuses_a_raw_count_and_says_so_in_words() {
+        let panic = std::panic::catch_unwind(|| on_grid(10)).expect_err("10 is not a quantity");
+        let said = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .unwrap_or("<not a string>");
+        assert!(
+            said.contains("not on the grid") && said.contains("units(10)"),
+            "the refusal has to name the value AND the way out, said: {said}"
+        );
+    }
+
+    /// The positive control of the test above: a checker that refused everything would satisfy it
+    /// and disarm every fixture in the tree.
+    #[test]
+    fn on_grid_lets_a_real_quantity_through_untouched() {
+        assert_eq!(on_grid(units(10)), units(10));
+        assert_eq!(on_grid(0), 0);
+        assert_eq!(on_grid(QUANTITY_GRID), QUANTITY_GRID, "the grid step itself is legal");
     }
 }
