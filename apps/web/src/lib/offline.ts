@@ -27,13 +27,32 @@ import { computed, readonly, ref, type Ref } from 'vue';
  * because guessing wrong in that direction hides a genuine fault behind «check your wifi».
  */
 const NETWORK_FAILURE_PATTERNS = [
-  'failed to fetch', // Chromium, `fetch` and dynamic `import()` alike
+  'failed to fetch', // Chromium
   'networkerror when attempting to fetch resource', // Firefox
   'load failed', // Safari
   'network connection was lost', // Safari / iOS
   'network request failed',
-  'error loading dynamically imported module',
-  'importing a module script failed',
+];
+
+/**
+ * …and how each engine words «that SCRIPT did not load», which is a different claim and must not be
+ * mistaken for the one above.
+ *
+ * A dynamic `import()` throws these both when nothing answered AND when the server answered 404 or
+ * 500 — the wording is identical, and Chromium's even contains «failed to fetch» word for word. In
+ * this shell the 404 half is not an edge case, it is THE case hub#1743 is about: a module that is
+ * no longer installed (or a bundle url left over from the version before an update, hub#935) makes
+ * `/modules/<id>/dist/<id>.esm.js` answer 404 with the network in perfect health. Reading that as
+ * an outage would print «no internet connection» over exactly the fault whose own sentence —
+ * «check that the module is still installed and active» — this file exists to protect.
+ *
+ * So on their own they claim nothing. `navigator.onLine` still decides above them: with the flag
+ * down, a failed import IS the outage and gets told as one.
+ */
+const SCRIPT_LOAD_FAILURE_PATTERNS = [
+  'failed to fetch dynamically imported module', // Chromium
+  'error loading dynamically imported module', // Firefox
+  'importing a module script failed', // Safari
   'unable to preload css', // Vite's own preload helper, for the stylesheet half
 ];
 
@@ -44,6 +63,9 @@ const NETWORK_FAILURE_PATTERNS = [
 export function isNetworkFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
+  // Checked first and on purpose: «Failed to fetch dynamically imported module» contains «failed to
+  // fetch», so without this the ambiguous wording would be swallowed by the unambiguous list.
+  if (SCRIPT_LOAD_FAILURE_PATTERNS.some((pattern) => message.includes(pattern))) return false;
   return NETWORK_FAILURE_PATTERNS.some((pattern) => message.includes(pattern));
 }
 

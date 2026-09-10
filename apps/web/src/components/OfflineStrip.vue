@@ -27,10 +27,14 @@
 // `SetupBlockingStrip` for the reason that strip already writes down — a warning that scrolls away
 // is not a warning, and putting it in each view means the next view forgets it.
 //
-// **It carries no button, on purpose.** The shell is served over the internet, so reloading the
-// document with no network hands the person the browser's own error page and takes the open till
-// with it. `navigator.onLine` clears itself, so a retry here has nothing to do that waiting does
-// not do better; the retry belongs on the screen that actually failed, and `ModuleView` has it.
+// **It carries no button, on purpose,** and this is where the band departs from the brief
+// («banner … con Reintentar»). The only thing a retry on a shell-wide band can do is reload the
+// document, and that is strictly worse than waiting for two reasons that are both about the till:
+// it throws away whatever the cashier had half-typed, and the service worker passes `/modules/**`
+// straight to the network on purpose (`public/sw.js`), so the shell would come back from cache
+// with every module screen still unable to load its bundle. `navigator.onLine` clears itself, so
+// waiting costs nothing; the retry belongs on the screen that actually failed, and `ModuleView`
+// has it.
 //
 // The announcement is not repeated here: `ok-inline-feedback` already wraps its content in a
 // `role="status"` live region, and a second one on the host makes screen readers say it twice.

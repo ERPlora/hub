@@ -37,10 +37,12 @@ vi.mock('vue-router', () => ({
 }));
 
 const menuAnswers: Array<() => Promise<unknown>> = [];
+/** The bundle, answered separately: the two calls fail for different reasons and say so. */
+const componentAnswers: Array<() => Promise<unknown>> = [];
 vi.mock('../lib/module-loader', () => ({
   loadMenu: () => (menuAnswers.shift() ?? (() => Promise.resolve([])))(),
   loadManifest: vi.fn(async () => ({})),
-  loadComponent: vi.fn(async () => 'erp-sales-orders'),
+  loadComponent: () => (componentAnswers.shift() ?? (async () => 'erp-sales-orders'))(),
 }));
 vi.mock('../lib/runtime', () => ({
   clientInjectionKey: Symbol('runtime-client'),
@@ -110,6 +112,7 @@ function networkFailure(): TypeError {
 
 beforeEach(() => {
   menuAnswers.length = 0;
+  componentAnswers.length = 0;
   goOnline();
 });
 
@@ -162,6 +165,64 @@ describe('a dead network is not a dead module (hub#1743)', () => {
     expect(feedback.attributes('heading')).toBe(enCatalogue.moduleView.loadError);
     expect(wrapper.text()).toContain(enCatalogue.moduleView.loadErrorHint);
     expect(wrapper.text()).not.toContain(enCatalogue.moduleView.offlineHint);
+  });
+
+  it('🔴 still blames the module when the BUNDLE 404s, network in perfect health', async () => {
+    // The mirror image of the defect, and the one that hides best. `mount()` only reaches the
+    // bundle after `/api/navigation` has already answered, so the hub is provably up — and a module
+    // that is no longer installed (or a url left over from the version before an update, hub#935)
+    // makes `/modules/<id>/dist/<id>.esm.js` answer 404. Chromium words that 404 as «Failed to
+    // fetch dynamically imported module», which reads like an outage and is not one. Telling it as
+    // «no internet connection» would print the wrong sentence over the exact fault the RIGHT
+    // sentence was written for, and send the owner to reboot a router that is fine.
+    goOnline();
+    menuAnswers.push(async () => [
+      {
+        moduleId: 'sales',
+        moduleName: 'Sales',
+        nav: { id: 'orders', label: 'Orders', icon: 'cart' },
+        entryUrl: '/modules/sales/dist/sales.esm.js',
+      },
+    ]);
+    componentAnswers.push(() =>
+      Promise.reject(
+        new TypeError(
+          'Failed to fetch dynamically imported module: https://acme.erplora.com/modules/sales/dist/sales.esm.js',
+        ),
+      ),
+    );
+    const wrapper = mountModuleView();
+    await settle();
+
+    const feedback = wrapper.find('ok-inline-feedback');
+    expect(feedback.attributes('heading'), 'a 404 was told as an internet outage').toBe(
+      enCatalogue.moduleView.loadError,
+    );
+    expect(wrapper.text()).toContain(enCatalogue.moduleView.loadErrorHint);
+    expect(wrapper.text()).not.toContain(enCatalogue.moduleView.offlineHint);
+  });
+
+  it('…and that same 404 IS the outage once the browser reports no network', async () => {
+    // The wording is ambiguous on its own; the flag decides. With the network down the person
+    // cannot act on the module, only on the connection.
+    goOffline();
+    menuAnswers.push(async () => [
+      {
+        moduleId: 'sales',
+        moduleName: 'Sales',
+        nav: { id: 'orders', label: 'Orders', icon: 'cart' },
+        entryUrl: '/modules/sales/dist/sales.esm.js',
+      },
+    ]);
+    componentAnswers.push(() =>
+      Promise.reject(new TypeError('Failed to fetch dynamically imported module: /x.js')),
+    );
+    const wrapper = mountModuleView();
+    await settle();
+
+    expect(wrapper.find('ok-inline-feedback').attributes('heading')).toBe(
+      enCatalogue.moduleView.offlineTitle,
+    );
   });
 
   it('says the offline state in Spanish too', async () => {

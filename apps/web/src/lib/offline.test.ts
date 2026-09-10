@@ -29,11 +29,9 @@ describe('isNetworkFailure — what a fetch that reached nobody looks like', () 
   // The wording is engine-specific and there is no code to branch on, so the list IS the contract.
   it.each([
     ['Chromium', new TypeError('Failed to fetch')],
-    ['Chromium, dynamic import', new TypeError('Failed to fetch dynamically imported module: /a.js')],
     ['Firefox', new TypeError('NetworkError when attempting to fetch resource.')],
     ['Safari', new TypeError('Load failed')],
     ['iOS Safari', new TypeError('The network connection was lost.')],
-    ['Vite preload', new Error('Unable to preload CSS for /assets/OrdersPage.css')],
   ])('recognises %s', (_engine, error) => {
     expect(isNetworkFailure(error)).toBe(true);
   });
@@ -46,6 +44,22 @@ describe('isNetworkFailure — what a fetch that reached nobody looks like', () 
     ['nothing at all', undefined],
     ['a bare string', 'Failed to fetch'],
   ])('does not claim the network for %s', (_case, error) => {
+    expect(isNetworkFailure(error)).toBe(false);
+  });
+
+  // 🔴 The other half of the same defect, in reverse. A dynamic `import()` words a dead network and
+  // a plain 404 EXACTLY the same, and Chromium's wording even contains «failed to fetch». In this
+  // shell the 404 half is not an edge case: `ModuleView` only reaches the bundle after
+  // `/api/navigation` already answered, so the hub is provably reachable, and a module that was
+  // uninstalled (or a url left over from the version before an update, hub#935) 404s there every
+  // time. Claiming the network for it prints «no internet connection» over the one fault whose own
+  // sentence — «check that the module is still installed and active» — hub#1743 exists to protect.
+  it.each([
+    ['Chromium', new TypeError('Failed to fetch dynamically imported module: /modules/sales/x.js')],
+    ['Firefox', new TypeError('error loading dynamically imported module: /modules/sales/x.js')],
+    ['Safari', new TypeError('Importing a module script failed.')],
+    ['Vite preload', new Error('Unable to preload CSS for /assets/OrdersPage.css')],
+  ])('🔴 does not claim the network for a script that did not load (%s)', (_engine, error) => {
     expect(isNetworkFailure(error)).toBe(false);
   });
 });
@@ -85,5 +99,22 @@ describe('isOfflineError — the question a screen actually asks', () => {
     // simply swap one wrong sentence for another.
     expect(isOfflineError(new Error('navigation → 500'))).toBe(false);
     expect(isOfflineError(new Error('module manifest is not readable'))).toBe(false);
+  });
+
+  it('🔴 says NO for a bundle that 404s, which is what an uninstalled module looks like', () => {
+    // The 404 wears the wording of an outage. With a network up, it is not one — and this is the
+    // exact fault the sentence hub#1743 protects («check that the module is still installed»).
+    expect(
+      isOfflineError(new TypeError('Failed to fetch dynamically imported module: /modules/x.js')),
+    ).toBe(false);
+  });
+
+  it('…and says YES for that same failure once the browser reports no network', () => {
+    // Ambiguous on its own, decided by the flag: with the network down, a script that did not load
+    // is the outage, and the person needs to hear about the connection.
+    goOffline();
+    expect(
+      isOfflineError(new TypeError('Failed to fetch dynamically imported module: /modules/x.js')),
+    ).toBe(true);
   });
 });

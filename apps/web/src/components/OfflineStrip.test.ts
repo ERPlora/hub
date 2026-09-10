@@ -102,10 +102,13 @@ describe('the shell says out loud that there is no network (hub#1743)', () => {
 
   it('🔴 offers nothing that would throw the app away', async () => {
     // Deliberate, and the one place this band departs from the brief («banner … con Reintentar»).
-    // The shell is served over the internet: reloading the document with no network hands the
-    // person the browser's own error page and takes the open till with it. The browser clears
-    // `navigator.onLine` on its own, so a retry HERE has nothing to do that waiting does not do
-    // better — the retry belongs on the screen that actually failed, and `ModuleView` has it.
+    // The only thing a retry on a shell-wide band can do is reload the document, and that is
+    // strictly worse than waiting, twice over: it throws away whatever the cashier had half-typed,
+    // and `public/sw.js` passes `/modules/**` straight to the network on purpose, so the shell
+    // would come back from its cache with every module screen still unable to load its bundle.
+    // The browser clears `navigator.onLine` on its own, so a retry HERE has nothing to do that
+    // waiting does not do better — the retry belongs on the screen that actually failed, and
+    // `ModuleView` has it.
     const wrapper = mountStrip();
     goOffline();
     await nextTick();
