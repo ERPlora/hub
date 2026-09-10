@@ -592,6 +592,16 @@ mod tests {
                 0,
                 "filter `{raw}` cannot be read, so it must not match"
             );
+
+            // And the refusal is BOOKED like any other no. Without this the relay re-evaluates —
+            // and re-reports — the same unreadable row on every attempt of the same event.
+            let trigger = trigger_row(&db, &flow, "id").await;
+            assert!(
+                delivery_exists(&db, HUB, "evt-1", &synthetic_listener(&trigger))
+                    .await
+                    .unwrap(),
+                "filter `{raw}`: a no that is not remembered is re-decided for ever"
+            );
         }
     }
 
