@@ -258,6 +258,13 @@ export default {
   // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
   // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
   // title travels in English inside its manifest and is used as-is (setup-status.md §7).
+  // hub#1743 — the shell-wide band for «there is no network right now». Says the CONSEQUENCE, not
+  // the state: «offline» on its own reads as a setting somebody turned on. Nothing here names a
+  // module or a screen, because the outage is not about any of them.
+  offline: {
+    title: 'No internet connection',
+    body: 'Anything that needs the internet — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
+  },
   setup: {
     title: 'Finish setting up your business',
     progress: '{done} of {total} done',
@@ -1799,6 +1806,13 @@ export default {
     loading: 'Loading module…',
     loadError: 'Could not load the module.',
     loadErrorHint: 'Check that the module is still installed and active, then try again.',
+    // hub#1743 — the sentence for when NOBODY answered. It must not mention the module: with the
+    // wifi down the module is the one thing that is fine, and the line above sent people looking
+    // for an app that nobody had uninstalled. It also promises the recovery, because the screen
+    // really does come back on its own the moment the network does.
+    offlineTitle: 'No internet connection',
+    offlineHint:
+      'This screen needs the connection to load. Check the network — it comes back on its own as soon as there is internet again.',
     retry: 'Try again',
     blockedTitle: 'Subscription required',
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',

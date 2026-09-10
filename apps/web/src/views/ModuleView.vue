@@ -25,6 +25,24 @@
         aria-hidden="true"
       />
     </div>
+    <!-- hub#1743 — SIN RED, que no es lo mismo que un módulo roto. Con el wifi caído esta pantalla
+         decía «comprueba que el módulo siga instalado y activo»: acusaba a la única pieza que
+         estaba bien, y mandaba al dueño a buscar una app que nadie había tocado. Lo que separa los
+         dos casos ya viene en el fallo (`lib/offline`), así que aquí solo se dice el que es.
+         `warning` y no `danger` a propósito: nada se ha roto y se arregla solo al volver la red —
+         la pantalla se rehace ella misma, sin que nadie pulse nada. -->
+    <ok-inline-feedback
+      v-else-if="status === 'offline'"
+      tone="warning"
+      icon="cloud-offline-outline"
+      :heading="t('moduleView.offlineTitle')"
+      data-testid="module-offline"
+    >
+      {{ t('moduleView.offlineHint') }}
+      <ion-button slot="actions" size="small" fill="outline" @click="mount">
+        {{ t('moduleView.retry') }}
+      </ion-button>
+    </ok-inline-feedback>
     <ok-inline-feedback
       v-else-if="status === 'error'"
       tone="danger"
@@ -157,6 +175,7 @@ import { clientInjectionKey, getClient } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
+import { isOfflineError, isOnline } from '../lib/offline';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -187,9 +206,11 @@ const tabbar = ref<{ $el?: HTMLElement } | null>(null);
 const SKELETON_ROWS = 6;
 /**
  * Lo que la pantalla sabe de su propia carga. `empty` NO es `error`: el módulo contestó y no hay
- * nada que pintar (hub#1169). Son tres frases distintas y la pantalla no puede decir una por otra.
+ * nada que pintar (hub#1169). Y `offline` no es `error` tampoco (hub#1743): ahí no contestó nadie,
+ * así que el módulo no tiene nada que ver. Son cuatro frases distintas y la pantalla no puede
+ * decir una por otra.
  */
-const status = ref<'loading' | 'ready' | 'error' | 'empty'>('loading');
+const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
@@ -437,9 +458,12 @@ async function mount(): Promise<void> {
     if (navId !== entry.nav.id) {
       void router.replace(`/m/${moduleId}/${entry.nav.id}`);
     }
-  } catch {
+  } catch (error) {
     if (generation !== mountGeneration) return;
-    status.value = 'error';
+    // hub#1743 — el fallo se LEE antes de contarlo. Un `fetch` que no llegó a nadie y un hub que
+    // contestó 500 no son la misma frase, y hasta aquí el `catch` tiraba el error y las decía
+    // iguales.
+    status.value = isOfflineError(error) ? 'offline' : 'error';
   }
 }
 
@@ -485,6 +509,13 @@ watch(
     if (route.name === 'module' && params().moduleId) void mount().then(revealActiveTab);
   },
 );
+// hub#1743 — vuelve la red, vuelve la pantalla. Es la mitad que hace honesto al aviso: un mensaje
+// que sigue ahí cuando el wifi ya está bien enseña a no leerlo. Solo desde `offline`: un fallo real
+// del módulo no se arregla porque vuelva la conexión, y remontar ahí sería un bucle silencioso.
+watch(isOnline, (back) => {
+  if (!back || !onScreen) return;
+  if (status.value === 'offline') void mount().then(revealActiveTab);
+});
 
 /**
  * Fuera de pantalla, pero VIVA. Se suelta aquí todo lo que se soltaba en `onBeforeUnmount` y que

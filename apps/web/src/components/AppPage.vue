@@ -35,6 +35,12 @@
          entrar no hay nada que configurar. -->
     <SetupBlockingStrip :status="setupStatus" :checklist-on-screen="setupChecklistOnScreen" />
 
+    <!-- Sin red (hub#1743). Va aquí por lo mismo que la franja de arriba —fuera del scroller, en el
+         layout único— y por una razón propia: la caída de red no la provoca ninguna pantalla, así
+         que no puede vivir en ninguna. Se pinta sola cuando el navegador dice que no hay conexión y
+         se va sola cuando vuelve; no se puede cerrar porque no hay nada que decidir. -->
+    <OfflineStrip />
+
     <!-- fullscreen=false: el ion-content se asienta ESTRICTAMENTE entre la topbar y el tabbar
          (no scrollea por detrás de ellos). Necesario para la tarjeta redondeada del shell
          (polish.css): con fullscreen las 2 esquinas superiores quedaban ocultas tras la topbar
@@ -60,6 +66,7 @@ import { IonPage, IonContent } from '@ionic/vue';
 import { bindTabbar } from '@erplora/outfitkit/tabbar';
 import AppTopbar from './AppTopbar.vue';
 import SetupBlockingStrip from './SetupBlockingStrip.vue';
+import OfflineStrip from './OfflineStrip.vue';
 import { setupStatus } from '../lib/setup-status';
 
 withDefaults(
