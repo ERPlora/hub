@@ -110,7 +110,8 @@ pub async fn on_event(
             id: &trigger_id,
             flow_id: &flow_id,
         };
-        let Some(filter) = def::read_stored_filter(row["filter"].as_str().unwrap_or_default(), &owner)
+        let Some(filter) =
+            def::read_stored_filter(row["filter"].as_str().unwrap_or_default(), &owner)
         else {
             // Booked like any other no: the decision is made, and the next attempt of the same
             // event must not re-evaluate it (nor report it a second time).
@@ -628,7 +629,11 @@ mod tests {
             .await
             .unwrap();
 
-            assert_eq!(run_count(&db, &flow).await, 1, "filter `{raw}` reads as no filter");
+            assert_eq!(
+                run_count(&db, &flow).await,
+                1,
+                "filter `{raw}` reads as no filter"
+            );
         }
     }
 

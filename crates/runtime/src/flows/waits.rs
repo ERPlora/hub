@@ -46,8 +46,8 @@ use erplora_db::{DatabaseAdapter, Params};
 
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{
-    self, DelayStep, ErrorPolicy, PastDuePolicy, WaitKind, ERR_DELAY_HORIZON,
-    ERR_MAX_RESCHEDULES, MAX_RESCHEDULES,
+    self, DelayStep, ErrorPolicy, PastDuePolicy, WaitKind, ERR_DELAY_HORIZON, ERR_MAX_RESCHEDULES,
+    MAX_RESCHEDULES,
 };
 use crate::flows::executor;
 use crate::flows::store;
@@ -783,7 +783,8 @@ mod tests {
             r#"{"event.total": {"greater_than": "100"}}"#,
             r#"{"steps.t.at": {"gte": "now.iso"}}"#,
         ] {
-            let row = json!({ "filter": filter, "correlate": json!({ "event.id": "42" }).to_string() });
+            let row =
+                json!({ "filter": filter, "correlate": json!({ "event.id": "42" }).to_string() });
             assert!(
                 !matches(&row, &json!({ "event": { "id": 42, "total": "120.50" } })),
                 "filter `{filter}` cannot be read, so it must not match"
@@ -797,7 +798,8 @@ mod tests {
     #[test]
     fn a_readable_empty_filter_still_leaves_the_correlation_deciding_hub1714() {
         for filter in ["{}", "null"] {
-            let row = json!({ "filter": filter, "correlate": json!({ "event.id": "42" }).to_string() });
+            let row =
+                json!({ "filter": filter, "correlate": json!({ "event.id": "42" }).to_string() });
             assert!(matches(&row, &json!({ "event": { "id": 42 } })), "{filter}");
             assert!(!matches(&row, &json!({ "event": { "id": 7 } })), "{filter}");
         }

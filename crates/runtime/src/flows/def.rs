@@ -4921,7 +4921,10 @@ mod tests {
             let condition = read_stored_filter(raw, &owner())
                 .unwrap_or_else(|| panic!("`{raw}` is readable: it is the absent condition"));
             assert!(condition.is_empty(), "{raw}");
-            assert!(condition.matches(&json!({ "event": { "total": "1" } })), "{raw}");
+            assert!(
+                condition.matches(&json!({ "event": { "total": "1" } })),
+                "{raw}"
+            );
         }
     }
 
