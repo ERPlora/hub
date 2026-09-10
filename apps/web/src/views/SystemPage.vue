@@ -182,6 +182,40 @@
             </div>
           </ion-card-content>
         </ion-card>
+
+        <!-- ── Notices are off ───────────────────────────────────────────────────────────
+             hub#1732. Android is nearly one-way about the notification permission: refused, the
+             system stops offering its dialog, and the till cannot show a single notice for the
+             life of the install — with nothing anywhere saying so. The symptom is a kitchen that
+             quietly stops hearing about orders.
+
+             So the state is said HERE, next to the printer, which is where somebody who never
+             got warned would come looking, and the ask is offered again (`force`). Only ever
+             rendered on a device that really has the permission and really lacks it: on the
+             desktop app, in a browser and on any Android below 13 the state is `unsupported` and
+             this card does not exist — claiming the notices are off there would be a false alarm
+             about something that works. -->
+        <ion-card v-if="noticesBlocked" class="ion-no-margin">
+          <ion-card-content>
+            <div class="bridge-head">
+              <h3 class="bridge-title">{{ t('system.notices.blockedTitle') }}</h3>
+              <ok-status-pill tone="warning" dot>{{ t('system.notices.blockedTitle') }}</ok-status-pill>
+            </div>
+            <p class="muted-note">{{ t('system.notices.blockedDetail') }}</p>
+            <div class="printer-action">
+              <ion-button
+                size="small"
+                fill="outline"
+                data-test="notices-turn-on"
+                :disabled="askingForNotices"
+                @click="turnOnNotices"
+              >
+                <HubIcon slot="start" name="notifications-outline" />
+                {{ t('system.notices.blockedAction') }}
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
       </template>
 
       <!-- ── Tab: Plan y límites (ADR-0154) — telemetría vs cuota del plan + CTA de upgrade ─── -->
@@ -382,7 +416,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
@@ -437,7 +471,13 @@ import {
 } from '../lib/dead-letter';
 import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
-import { toastSuccess, toastError } from '../lib/toast';
+import { toast, toastSuccess, toastError } from '../lib/toast';
+import {
+  ensureNotificationPermission,
+  notificationPermissionState,
+  primerLabelsFrom,
+  type NotificationPermission,
+} from '../lib/notification-permission';
 import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te, locale } = useI18n();
@@ -512,6 +552,12 @@ const hardware = ref<BridgeStatus>({ online: false });
 // not been able to ask», which is a different answer from «no» and is never dressed up as one.
 const printerProbe = ref<BridgeStatus | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
+// Can this device warn anybody? (hub#1732) `unsupported` is the answer everywhere except an
+// Android 13+ inside the installed app, and it is the reason the card below has to key on the
+// state and never on «is this Android».
+const notices = ref<NotificationPermission>('unsupported');
+const askingForNotices = ref(false);
+const noticesBlocked = computed(() => notices.value === 'denied');
 
 // Qué le hemos cambiado a este hub (hub#564). Vacío es una respuesta legítima y frecuente: la
 // mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
@@ -764,6 +810,52 @@ async function refreshHardware(): Promise<void> {
   } catch {
     installedModules.value = null; // we do not know what is installed → the card stays quiet
   }
+  // Never throws: `notificationPermissionState` answers `unsupported` when it cannot ask, which
+  // keeps the card away rather than warning about a state we failed to read.
+  notices.value = await notificationPermissionState();
+}
+
+/**
+ * Asks for the notices again, on the user's behalf (hub#1732).
+ *
+ * `force` because the boot deliberately asks only once: an answer — «not now» included — is an
+ * answer, and re-asking on every heartbeat burns the two chances Android gives us. This button is
+ * the way back, and it is the only one.
+ *
+ * What comes out is READ BACK from the system rather than taken from the request's answer: the
+ * user can also have granted it in the device settings while the sheet was up, and either way the
+ * card must reflect what is true now. If the notices are still off, the system will not be asking
+ * again — so the only remaining door gets named instead of leaving the tap silent.
+ */
+/**
+ * Re-reads the notices when the app comes back to the foreground (hub#1732).
+ *
+ * The toast above sends the user to the device settings, and coming back from them is not a
+ * navigation: no mount, no ion-view hook fires. Visibility is the only signal the app gets, and
+ * without it the row keeps saying «off» about a device that has just been fixed until a second
+ * tap or a restart. Same pattern as the billing screen's recheck-on-focus.
+ */
+function onVisibleAgain(): void {
+  if (document.visibilityState !== 'visible') return;
+  void notificationPermissionState().then((state) => {
+    notices.value = state;
+  });
+}
+
+async function turnOnNotices(): Promise<void> {
+  if (askingForNotices.value) return;
+  askingForNotices.value = true;
+  try {
+    await ensureNotificationPermission({ labels: primerLabelsFrom(t), force: true });
+    notices.value = await notificationPermissionState();
+    void toast(
+      notices.value === 'denied'
+        ? t('system.notices.blockedInSettings')
+        : t('system.notices.turnedOn'),
+    );
+  } finally {
+    askingForNotices.value = false;
+  }
 }
 
 const logsTable = ref<HTMLElement | null>(null);
@@ -903,6 +995,11 @@ onMounted(() => {
   void loadSystemInfo();
   void loadUsageSeries();
   void loadUpdateHistory();
+  document.addEventListener('visibilitychange', onVisibleAgain);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibleAgain);
 });
 </script>
 

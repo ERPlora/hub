@@ -1267,6 +1267,20 @@ export default {
         'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
       notMeasured: 'No hemos podido leerlo',
     },
+    notices: {
+      primerHeader: 'Deja que te avisemos de las comandas',
+      primerMessage:
+        'Cuando entre una comanda en cocina podemos avisarte, aunque nadie esté mirando esta pantalla. Tu dispositivo te lo preguntará a continuación.',
+      primerLater: 'Ahora no',
+      primerAllow: 'Activar los avisos',
+      blockedTitle: 'Los avisos están desactivados',
+      blockedDetail:
+        'Este dispositivo no te avisará cuando entre una comanda. Actívalos y lo dirá en voz alta, aunque nadie esté mirando la pantalla.',
+      blockedAction: 'Activar los avisos',
+      blockedInSettings:
+        'Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.',
+      turnedOn: 'Listo: este dispositivo te avisará de las comandas nuevas.',
+    },
   },
   planLimits: {
     currentPlan: 'Plan actual',

@@ -29,6 +29,11 @@ import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import {
+  ensureNotificationPermission,
+  primerLabelsFrom,
+  shouldSendNotice,
+} from './lib/notification-permission';
 import { createPrintService } from './lib/print';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
@@ -209,6 +214,21 @@ const erploraClient = getClient();
   });
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
 
+/**
+ * Asks to be allowed to warn, at most once per install (hub#1732).
+ *
+ * `force` is what the System screen passes when the user asks for the notices back after saying
+ * no; the boot never forces. The strings come through `i18n` — the sheet is the only text the
+ * user reads before Android's own dialog, and a hardcoded one would ship English to a Spanish
+ * shop (ADR-0055/0199).
+ */
+function askToWarn(force = false) {
+  return ensureNotificationPermission({
+    labels: primerLabelsFrom((key) => i18n.global.t(key)),
+    force,
+  });
+}
+
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
 // Sale por la MISMA puerta que todo lo demás (hub#862): resolvía él mismo rol→impresora y llamaba al
 // hardware directo, así que con la impresora sin rol —o sin hardware en este equipo— el tique
@@ -228,7 +248,18 @@ bootPrintOnSale(getClient(), {
 // que la cola entera era inalcanzable desde el producto: lo encolado se quedaba encolado para
 // siempre. Lo que sigue faltando es la pantalla de COBERTURA («nadie está imprimiendo lo de
 // cocina»), que se daba por hecha en hub#344 y no se hizo.
-void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0]);
+//
+// The alta is also WHERE THE SHELL ASKS TO BE ALLOWED TO WARN ANYBODY (hub#1732). Until now
+// nothing did: `POST_NOTIFICATIONS` was declared in both manifests and the plugin could ask for
+// it, but the only caller was the kitchen-order notice below — so a clean install used for a full
+// morning was never asked, and Android reports a permission nobody was shown as denied for the
+// life of the install. This moment is the right one twice over: the device has just become the one
+// that gets TOLD an order came in, and somebody is standing at it setting it up. Asked at the
+// first order instead, the dialog appears on a tablet propped on a shelf with nobody in front of
+// it. `ensureNotificationPermission` asks at most once and never throws.
+void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
+  onRegistered: () => void askToWarn(),
+});
 
 // Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
 // tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
@@ -242,7 +273,20 @@ bootPrintComanda(getClient(), {
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
   // en Tauri, el binario/WS en navegador), así que sale igual en escritorio y en Android.
-  notify: (title, body) => getClient().peripherals.notify(title, body),
+  //
+  // The permission first (hub#1732), and this is the FALLBACK trigger: a KDS screen with no
+  // printer never registers as a print host, so the alta above never reaches it. Idempotent —
+  // after the first answer this is one storage read.
+  //
+  // And a refusal STOPS here instead of falling through to `peripherals.notify()`: that call asks
+  // for the permission itself, with no sentence of ours in front of it (hub#758's scope), so
+  // letting it through would pop Android's bare dialog in the middle of a service. Android drops
+  // the notice either way; what the user gets instead is the row on System › your printer, which
+  // says the notices are off and offers to ask again.
+  notify: async (title, body) => {
+    if (!shouldSendNotice(await askToWarn())) return;
+    await getClient().peripherals.notify(title, body);
+  },
 });
 
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
