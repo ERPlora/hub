@@ -329,3 +329,142 @@ async fn an_incomplete_job_is_rejected_and_queues_nothing() {
         .unwrap();
     assert!(body_json(resp).await["jobs"].as_array().unwrap().is_empty());
 }
+
+// ── "Queued" was never the whole answer (hub#1731) ───────────────────────────────────────────────
+//
+// The reported defect: charge with «Print receipt» on, no paper comes out, and the till says
+// nothing. What it got back was `{"ok":true,"status":"queued"}` — indistinguishable from a ticket
+// already on paper — on a hub where no printer had been set up at all, so nobody was ever going to
+// drain that queue. The queue was not wrong: "late, not lost" is its contract. It just could not
+// say that on this hub "late" means "never", and the producer had nothing to warn anyone with.
+//
+// So the answer carries `liveHosts`: devices registered and reporting for the station the job
+// landed on, at this instant. `0` = it is in the queue and nobody is coming for it.
+
+/// Registers `device_id` as a host of `role` through the real door (`X-Device-Id` + the session),
+/// which is how a device becomes live: there is no other way to write that row.
+async fn register_host(router: &axum::Router, session: &str, device_id: &str, role: &str) {
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/print/hosts")
+        .header("x-hub-session", session)
+        .header("x-device-id", device_id)
+        .header("content-type", "application/json")
+        .body(Body::from(
+            json!({ "role": role, "label": device_id }).to_string(),
+        ))
+        .unwrap();
+    let resp = router.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the host registers");
+}
+
+/// The state in the report: a hub with no printer set up. The job queues, and the answer says so
+/// out loud instead of leaving the till to assume.
+#[tokio::test]
+async fn a_job_queued_with_nobody_to_drain_it_says_so_in_the_answer() {
+    let (router, session) = fixture().await;
+
+    let resp = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/print/jobs",
+            Some(&session),
+            Some(ticket("j1", "receipt")),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+
+    // Still a success and still queued: the ticket is not lost and the sale is not blocked.
+    assert_eq!(body["ok"], json!(true));
+    assert_eq!(body["status"], json!("queued"));
+    assert_eq!(
+        body["liveHosts"],
+        json!(0),
+        "nobody is registered for `receipt`: this ticket is going nowhere and the answer has to say it"
+    );
+}
+
+/// The healthy state, and the half that makes the field worth reading: with a till draining
+/// `receipt` the same call answers `1`, so a producer that warns on `0` stays quiet here instead of
+/// crying wolf on every ticket.
+#[tokio::test]
+async fn a_job_queued_for_a_station_a_device_is_draining_reports_that_device() {
+    let (router, session) = fixture().await;
+    register_host(&router, &session, "till-1", "receipt").await;
+
+    let resp = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/print/jobs",
+            Some(&session),
+            Some(ticket("j1", "receipt")),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(body_json(resp).await["liveHosts"], json!(1));
+}
+
+/// **The station, not the registry.** A kitchen printer is not going to hand a customer their
+/// receipt: counting "is there a printer anywhere" would report this hub covered and put the
+/// silence straight back.
+#[tokio::test]
+async fn a_device_draining_another_station_does_not_cover_this_job() {
+    let (router, session) = fixture().await;
+    register_host(&router, &session, "kds-1", "kitchen").await;
+
+    let receipt = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/print/jobs",
+            Some(&session),
+            Some(ticket("j1", "receipt")),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        body_json(receipt).await["liveHosts"],
+        json!(0),
+        "the kitchen's device does not print the counter's receipts"
+    );
+
+    let kitchen = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/print/jobs",
+            Some(&session),
+            Some(ticket("j2", "kitchen")),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(body_json(kitchen).await["liveHosts"], json!(1));
+}
+
+/// A retried POST (`duplicate`) answers the coverage too. The producer that lost the first response
+/// is exactly the one that still has to decide whether to warn the cashier, and answering the
+/// question only on the lucky path would leave it guessing on the retry.
+#[tokio::test]
+async fn a_duplicate_is_answered_with_the_coverage_as_well() {
+    let (router, session) = fixture().await;
+
+    for expected in ["queued", "duplicate"] {
+        let resp = router
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/print/jobs",
+                Some(&session),
+                Some(ticket("j1", "receipt")),
+            ))
+            .await
+            .unwrap();
+        let body = body_json(resp).await;
+        assert_eq!(body["status"], json!(expected));
+        assert_eq!(body["liveHosts"], json!(0), "on the {expected} answer too");
+    }
+}

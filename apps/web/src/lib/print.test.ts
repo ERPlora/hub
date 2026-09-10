@@ -251,7 +251,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
   const noBridge = { getDevices: vi.fn(async () => { throw new Error('hardware_unavailable'); }) };
 
   it('sin Bridge encola el tique en el hub (vía queue)', async () => {
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const browserPrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint });
 
@@ -269,7 +269,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
   // aunque fuera una comanda — y con eso el mapa del hub no habría llegado a resolver nunca. Quien
   // no nombra impresora debe encolar SIN rol, que es como se le pide al hub que enrute.
   it('sin rol nombrado encola sin rol, para que el hub enrute por tipo de documento', async () => {
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
 
     await print({ documentType: 'kitchen_order', jobId: 'k-1', data: { items: [] } });
@@ -282,7 +282,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
 
   // …y quien SÍ lo nombra sigue mandándolo: es un override, en deprecación pero vivo (hub#987).
   it('con rol nombrado lo manda tal cual, como override', async () => {
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
 
     await print({ role: 'bar', documentType: 'kitchen_order', jobId: 'k-2', data: { items: [] } });
@@ -291,7 +291,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
   });
 
   it('un duplicado (mismo jobId) es éxito: la cola es idempotente', async () => {
-    const enqueue = vi.fn(async () => true); // el runtime responde ok:true a un duplicado
+    const enqueue = vi.fn(async () => ({ queued: true })); // el runtime responde ok:true a un duplicado
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
 
     const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
@@ -300,7 +300,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
   });
 
   it('si el runtime rechaza el encolado, cae al navegador (una venta no se cae)', async () => {
-    const enqueue = vi.fn(async () => false); // ok:false → rechazado
+    const enqueue = vi.fn(async () => ({ queued: false })); // ok:false → rechazado
     const browserPrint = vi.fn();
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
@@ -330,7 +330,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
   // caller es el que dedupe entre SUS reintentos, y quien lo trae manda.
   it('el jobId del caller es el que viaja a la cola (es su clave de idempotencia)', async () => {
     const encolados: string[] = [];
-    const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return true; };
+    const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return { queued: true }; };
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint: vi.fn() });
 
     const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
@@ -357,7 +357,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     // veces sale en un servicio— se trataba como una factura A4 y se iba al diálogo del navegador:
     // en la app instalada eso no imprime nada, y en el móvil deja la cola (que existe justo para
     // este caso) sin usar.
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const browserPrint = vi.fn();
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint, iframePrint });
@@ -377,7 +377,7 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
       getDevices: vi.fn(async () => devicesWithReceipt),
       print: vi.fn(async () => { throw new Error('sin papel'); }),
     };
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const browserPrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: failingPrint }), { enqueue, browserPrint });
 
@@ -413,7 +413,7 @@ describe('la puerta ENTREGA (hub#862)', () => {
   it('la ETIQUETA de código de barras es papel TÉRMICO: se encola, no va al navegador', async () => {
     // `barcode_label` está en el vocabulario de la cola del hub (`print_queue::DOCUMENT_TYPES`),
     // así que tiene dónde encolarse. La puerta lo trataba como A4 y lo mandaba al navegador.
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, iframePrint });
 
@@ -424,7 +424,7 @@ describe('la puerta ENTREGA (hub#862)', () => {
   });
 
   it('el arqueo de caja también es térmico: se encola', async () => {
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, iframePrint: vi.fn() });
 
     const r = await print({ documentType: 'cash_session_report', jobId: 'z-1', data: { total_counted: 120 } });
@@ -437,7 +437,7 @@ describe('la puerta ENTREGA (hub#862)', () => {
     // se imprime en ningún sitio», sin una línea en el log del hub. Un tique duplicado se tira; uno
     // que no sale no existe.
     const encolados: string[] = [];
-    const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return true; };
+    const enqueue: EnqueuePrintJob = async (job) => { encolados.push(job.jobId); return { queued: true }; };
     const browserPrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue, browserPrint });
 
@@ -452,7 +452,7 @@ describe('la puerta ENTREGA (hub#862)', () => {
   it('la impresora descubierta SIN ROL manda el documento a la cola, no al vacío', async () => {
     // Exactamente el hub de QA: hay hardware y hay impresora, pero su rol está vacío. La puerta
     // llegaba a `toQueue()` y ahí se caía por no traer `jobId`.
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const print = createPrintService(fakeClient({ peripherals: sinRol }), { enqueue, browserPrint: vi.fn() });
 
     const r = await print({ role: 'receipt', documentType: 'prebill', data: { total: 9 } });
@@ -464,7 +464,7 @@ describe('la puerta ENTREGA (hub#862)', () => {
     // La cola lleva el documento ESTRUCTURADO (hub#501) y el renderizador ESC/POS lee POR CLAVE: un
     // `{}` no falla, saca **papel en blanco** — peor que no imprimir, porque parece que funcionó. Un
     // caller que solo trae `html` (el respaldo del navegador es su destino) va al navegador.
-    const enqueue = vi.fn(async () => true);
+    const enqueue = vi.fn(async () => ({ queued: true }));
     const iframePrint = vi.fn();
     const print = createPrintService(fakeClient({ peripherals: noBridge }), {
       enqueue,
@@ -509,5 +509,64 @@ describe('la puerta ENTREGA (hub#862)', () => {
 
     expect(r.via).toBe('browser');
     expect(iframePrint).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── «Encolado» no era la respuesta entera (hub#1731) ────────────────────────────────────────────
+//
+// El fallo MUDO del TPV: se cobra con «Imprimir tiquet», el tique se encola, no sale papel y nadie
+// dice nada. La puerta devolvía `via:'queue'` a secas, y `via:'queue'` es lo que todos sus callers
+// —el auto-print del shell, la reimpresión del módulo de ventas— tratan como entregado. En un hub
+// sin ninguna impresora dada de alta eso es dar por impreso un papel que no va a salir nunca.
+//
+// La cola no estaba mal: «tarde, no perdido» es su contrato. Lo que faltaba era poder distinguir
+// «tarde» de «nunca», y eso lo sabe el runtime: cuántos equipos están drenando esa estación.
+describe('la cola dice si hay alguien que la drene (hub#1731)', () => {
+  const noBridge = { getDevices: vi.fn(async () => { throw new Error('hardware_unavailable'); }) };
+
+  it('encolado sin ningún equipo drenando esa estación: awaitingHost', async () => {
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 0 }));
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
+
+    // Sigue siendo `queue`: el trabajo ESTÁ en la cola y saldrá en cuanto se dé de alta la
+    // impresora. Lo que se añade es que nadie lo está esperando ahora mismo.
+    expect(r.via).toBe('queue');
+    expect(r.awaitingHost).toBe(true);
+  });
+
+  it('encolado con un equipo drenando: no se avisa de nada', async () => {
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
+
+    expect(r.via).toBe('queue');
+    expect(r.awaitingHost).toBeFalsy();
+  });
+
+  // Misma regla que `probeFromBridge`: una respuesta que NO llegó no es un «no». Un runtime que no
+  // manda el dato no puede convertirse en «no hay nadie» — eso pondría el aviso en TODOS los tiques
+  // de un hub perfectamente montado, y un aviso que sale siempre deja de leerse.
+  it('si el runtime no dice cuántos equipos hay, NO se inventa un aviso', async () => {
+    const enqueue = vi.fn(async () => ({ queued: true }));
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
+
+    expect(r.via).toBe('queue');
+    expect(r.awaitingHost).toBeFalsy();
+  });
+
+  // La vía BRIDGE imprime aquí y ahora: no hay cola que drenar ni nadie a quien esperar.
+  it('lo que sale por el Bridge nunca queda esperando a nadie', async () => {
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 0 }));
+    const print = createPrintService(fakeClient(), { enqueue });
+
+    const r = await print({ role: 'receipt', documentType: 'receipt', jobId: 'sale-42', data: { total: 1 } });
+
+    expect(r.via).toBe('bridge');
+    expect(r.awaitingHost).toBeFalsy();
   });
 });

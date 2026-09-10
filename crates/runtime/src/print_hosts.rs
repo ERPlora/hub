@@ -424,6 +424,41 @@ pub async fn coverage(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Role
         .collect())
 }
 
+/// **Is anybody going to take a job queued for `role`, right now?**
+///
+/// The count [`coverage`] reports for every station, asked for ONE — the station a job just landed
+/// on (hub#1731). `0` is the answer behind the silence this exists to end: the ticket queued fine,
+/// nobody is registered to drain it, and until this number crossed the wire the producer had no way
+/// to tell that apart from a ticket that printed.
+///
+/// **Not [`is_undrained`]**, and the difference is deliberate. That one waits
+/// [`UNDRAINED_ALERT_SECONDS`] before it will call a station stuck, because it drives an *alarm
+/// about a backlog* and must not fire on a till that is merely rebooting. This answers a different
+/// question, asked at a different moment: a cashier is standing at the counter with a customer
+/// waiting for the receipt they just asked for, and "no device is registered for this station" is
+/// already true and already the whole answer. Waiting a minute to say it would only mean saying it
+/// after the customer has left.
+///
+/// Live means the same thing here as everywhere else in this module — [`LIVE_EXPR`] against
+/// [`live_cutoff`], the very same SQL — so this read and [`coverage`] cannot drift into two
+/// definitions of "there". A test pins them together.
+pub async fn live_hosts_for(db: &dyn DatabaseAdapter, hub_id: &str, role: &str) -> Result<i64> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("role".into(), json!(role.trim()));
+    p.insert("cutoff".into(), json!(live_cutoff()));
+    let sql =
+        format!("SELECT SUM({LIVE_EXPR}) AS live FROM _print_host WHERE hub_id = :hub_id AND role = :role");
+    let res = db.query(&sql, &p).await?;
+    // `SUM` over no rows is NULL, not 0 — a station nobody ever registered for. Same answer either
+    // way, but it has to survive the read: `as_i64()` on NULL is `None`.
+    Ok(res
+        .rows
+        .first()
+        .and_then(|row| row["live"].as_i64())
+        .unwrap_or(0))
+}
+
 /// The name of every host that is live as of `cutoff`, per station.
 ///
 /// A second read of `_print_host` and not a column of the aggregate above, because collapsing
@@ -1497,5 +1532,116 @@ mod tests {
         assert_eq!(cov[0].role, "kitchen");
         assert_eq!(cov[0].waiting, 1);
         assert_eq!(cov[0].live_hosts, 1);
+    }
+
+    // ── Is anybody going to take THIS ticket? (hub#1731) ────────────────────────────────────────
+    //
+    // The question `coverage` answers for a screen, asked for ONE station at the instant a job is
+    // queued. It is a different question from `undrained`, on purpose: that one waits
+    // [`UNDRAINED_ALERT_SECONDS`] before it will call a station stuck, because it is an alarm about
+    // a backlog. Here nothing has accumulated yet — the cashier is standing at the till with a
+    // customer waiting for the receipt they just asked for, and "nobody is registered for this
+    // station" is already true and already the whole answer.
+
+    /// The state the issue is about: a hub with no printer set up. The job queues fine, and nobody
+    /// is ever going to take it.
+    #[tokio::test]
+    async fn nobody_is_live_for_a_station_no_device_registered_for() {
+        let db = hosts_db().await;
+        queue(&db, "h1", "j1", "receipt").await;
+
+        assert_eq!(live_hosts_for(&db, "h1", "receipt").await.unwrap(), 0);
+    }
+
+    /// The healthy state, and the reason the count is not just "is the registry empty": a till
+    /// registered for `receipt` covers the receipts.
+    #[tokio::test]
+    async fn a_registered_live_device_counts_for_its_own_station() {
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "receipt", "Counter till", "u1")
+            .await
+            .unwrap();
+
+        assert_eq!(live_hosts_for(&db, "h1", "receipt").await.unwrap(), 1);
+    }
+
+    /// A device that prints the kitchen's orders is NOT going to hand a customer their receipt.
+    /// Counting the registry instead of the station is how "there is a printer somewhere" becomes
+    /// "your ticket printed".
+    #[tokio::test]
+    async fn a_device_registered_for_another_station_does_not_count() {
+        let db = hosts_db().await;
+        register(&db, "h1", "kds-1", "kitchen", "Cocina", "u1")
+            .await
+            .unwrap();
+
+        assert_eq!(live_hosts_for(&db, "h1", "receipt").await.unwrap(), 0);
+        assert_eq!(live_hosts_for(&db, "h1", "kitchen").await.unwrap(), 1);
+    }
+
+    /// Registered once and switched off since is not "there". Same rule as everywhere else in this
+    /// module: absence of news IS the signal, resolved at read time against [`HOST_TTL_SECONDS`].
+    #[tokio::test]
+    async fn a_device_that_stopped_reporting_stops_counting() {
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "receipt", "Counter till", "u1")
+            .await
+            .unwrap();
+        last_seen_seconds_ago(&db, "till-1", HOST_TTL_SECONDS + 60).await;
+
+        assert_eq!(live_hosts_for(&db, "h1", "receipt").await.unwrap(), 0);
+    }
+
+    /// The neighbour's till does not print our receipts. `hub_id` is on the read, not assumed.
+    ///
+    /// Both directions are asserted: `h1` sees its own till so a query that returned nothing at all
+    /// could not pass, and `h2` sees zero so a query that dropped `hub_id` could not either.
+    #[tokio::test]
+    async fn another_hubs_device_never_counts() {
+        let db = hosts_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        register(&db, "h1", "till-1", "receipt", "Counter till", "u1")
+            .await
+            .unwrap();
+
+        assert_eq!(live_hosts_for(&db, "h1", "receipt").await.unwrap(), 1);
+        assert_eq!(
+            live_hosts_for(&db, "h2", "receipt").await.unwrap(),
+            0,
+            "the hub next door has no device of its own, whatever ours has"
+        );
+    }
+
+    /// **The two reads must not be able to disagree.** `live_hosts_for` answers for one station what
+    /// [`coverage`] answers for all of them, and they are two SQL statements: a badge that says
+    /// "1 device active" over a till that just told the cashier "nobody is connected" is worse than
+    /// either answer alone. This pins them together over the states that differ — live, stale, and
+    /// another hub's — so a change to one that does not reach the other fails here.
+    #[tokio::test]
+    async fn the_single_station_count_agrees_with_the_full_coverage_report() {
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "receipt", "Counter till", "u1")
+            .await
+            .unwrap();
+        register(&db, "h1", "till-2", "receipt", "Second till", "u1")
+            .await
+            .unwrap();
+        register(&db, "h1", "kds-1", "kitchen", "Cocina", "u1")
+            .await
+            .unwrap();
+        last_seen_seconds_ago(&db, "till-2", HOST_TTL_SECONDS + 60).await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        register(&db, "h2", "till-next-door", "receipt", "Their till", "u1")
+            .await
+            .unwrap();
+
+        let cov = coverage(&db, "h1").await.unwrap();
+        for role in ["receipt", "kitchen"] {
+            assert_eq!(
+                live_hosts_for(&db, "h1", role).await.unwrap(),
+                of_role(&cov, role).map(|c| c.live_hosts).unwrap_or(0),
+                "the two reads disagree about `{role}`",
+            );
+        }
     }
 }

@@ -139,6 +139,20 @@ pub enum EnqueueOutcome {
     Duplicate,
 }
 
+/// What [`enqueue`] did **and where the job landed**.
+///
+/// The station travels back with the outcome because the producer never knew it: it sends a word
+/// (`Kitchen`, ` kitchen `) or nothing at all, and only the resolution below turns that into the
+/// station this hub actually has. Its caller needs the resolved key to answer the question the
+/// cashier is really asking — *is anybody going to take this?* (hub#1731) — and answering it
+/// against the producer's raw word would report an uncovered station over a covered one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Enqueued {
+    pub outcome: EnqueueOutcome,
+    /// The station's own `key`, exactly as the row stores it (and as `_print_host.role` spells it).
+    pub role: String,
+}
+
 /// A job as the producer submits it. Field names are camelCase over the wire to match the shell's
 /// `PrintRequest` (`apps/web/src/lib/print.ts`), which is the producer that already exists.
 ///
@@ -227,7 +241,7 @@ pub async fn enqueue(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     job: &NewPrintJob,
-) -> Result<EnqueueOutcome> {
+) -> Result<Enqueued> {
     let job_id = job.job_id.trim();
     if job_id.is_empty() {
         return Err(invalid("job_id is required (it is the idempotency key)"));
@@ -339,10 +353,13 @@ pub async fn enqueue(
             &p,
         )
         .await?;
-    Ok(if res.affected > 0 {
-        EnqueueOutcome::Queued
-    } else {
-        EnqueueOutcome::Duplicate
+    Ok(Enqueued {
+        outcome: if res.affected > 0 {
+            EnqueueOutcome::Queued
+        } else {
+            EnqueueOutcome::Duplicate
+        },
+        role: role.to_string(),
     })
 }
 
@@ -1187,7 +1204,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(outcome, EnqueueOutcome::Queued, "the job is NOT refused");
+        assert_eq!(outcome.outcome, EnqueueOutcome::Queued, "the job is NOT refused");
         assert_eq!(
             landed_on(&db, "h1", "j1").await,
             crate::print_stations::PROTECTED_KEY,
@@ -1211,6 +1228,36 @@ mod tests {
         assert_eq!(claimed.job_id, "j1");
     }
 
+    /// **`enqueue` reports WHERE the job landed** (hub#1731), because its caller has to answer
+    /// "is anybody going to take this?" and cannot ask that of the word the producer sent.
+    ///
+    /// The producer says `Kitchen`, ` kitchen ` or nothing at all; only the resolution knows which
+    /// station that is. A caller that counted hosts for the raw word would report "nobody is
+    /// connected" over a kitchen with a device sitting on it — the same class of failure as the
+    /// silence this issue is about, pointed the other way.
+    #[tokio::test]
+    async fn enqueue_reports_the_station_the_job_landed_on_not_the_word_the_producer_sent() {
+        let db = queue_db().await;
+
+        let named = enqueue(&db, "h1", &job("j-spelt", " Kitchen ", "K-1"))
+            .await
+            .unwrap();
+        assert_eq!(
+            named.role, "kitchen",
+            "the canonical station key, not the producer's spelling"
+        );
+
+        // `role` empty = "you decide": the map routes it by document type.
+        let routed = enqueue(&db, "h1", &routed_job("j-routed", "kitchen_order"))
+            .await
+            .unwrap();
+        assert_eq!(
+            routed.role,
+            landed_on(&db, "h1", "j-routed").await,
+            "what enqueue reports is what the row stores"
+        );
+    }
+
     /// **The idempotency guard.** Enqueueing the same `jobId` twice is ONE job: the second call is
     /// a no-op that reports `Duplicate`, and it does not overwrite the document already queued
     /// (a retry must never mutate the ticket the printer is about to produce).
@@ -1221,14 +1268,14 @@ mod tests {
         let first = enqueue(&db, "h1", &job("j1", "receipt", "T-first"))
             .await
             .unwrap();
-        assert_eq!(first, EnqueueOutcome::Queued);
+        assert_eq!(first.outcome, EnqueueOutcome::Queued);
 
         // Same jobId, different body: the retry of a request whose response got lost.
         let second = enqueue(&db, "h1", &job("j1", "receipt", "T-OTHER"))
             .await
             .unwrap();
         assert_eq!(
-            second,
+            second.outcome,
             EnqueueOutcome::Duplicate,
             "a repeated jobId is not an error: it is the idempotency contract"
         );
@@ -1391,7 +1438,7 @@ mod tests {
         let again = enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
-        assert_eq!(again, EnqueueOutcome::Duplicate);
+        assert_eq!(again.outcome, EnqueueOutcome::Duplicate);
         assert!(
             claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
@@ -1532,7 +1579,8 @@ mod tests {
         assert_eq!(
             enqueue(&db, "h2", &job("j1", "receipt", "T-h2"))
                 .await
-                .unwrap(),
+                .unwrap()
+                .outcome,
             EnqueueOutcome::Queued,
             "the same jobId in another hub is another job"
         );
@@ -1892,7 +1940,7 @@ mod tests {
         assert_eq!(exact.document.to_string().len(), MAX_DOCUMENT_BYTES);
 
         assert_eq!(
-            enqueue(&db, "h1", &exact).await.unwrap(),
+            enqueue(&db, "h1", &exact).await.unwrap().outcome,
             EnqueueOutcome::Queued,
             "judged by what it weighs, and the cap is a weight it may reach"
         );

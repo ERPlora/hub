@@ -2,15 +2,51 @@
 
 use crate::*;
 
+/// A queued job, **and whether anything is going to come out of a printer** (hub#1731).
+///
+/// "The job waits — late, not lost" is true of the queue and was, on its own, the whole answer the
+/// producer got. On a hub with no printer set up "late" never arrives, and a cashier who was told
+/// `queued` had no way to tell that from a ticket already on paper: they charged, said "here you
+/// go", and nothing came out. The queue was never wrong; it just was not the whole answer.
+///
+/// So the enqueue reports the other half. Facts, not a sentence — the words belong to the surface
+/// that can translate them (ADR-0055).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnqueueReport {
+    /// Written, or already there under that `jobId`. Both are success.
+    pub outcome: print_queue::EnqueueOutcome,
+    /// The station the job landed on, resolved — never the word the producer sent.
+    pub role: String,
+    /// Devices live for that station at this instant. **`0` means nobody is going to take it.**
+    pub live_hosts: i64,
+}
+
+impl EnqueueReport {
+    /// The state worth telling the person at the till about: it is in the queue and there is
+    /// nobody to drain it.
+    pub fn awaiting_host(&self) -> bool {
+        self.live_hosts == 0
+    }
+}
+
 impl Runtime {
     /// Enqueues a document for a printer role, **idempotently by `jobId`**: repeating the same id
     /// never produces a second ticket (see [`print_queue`]). Scoped to the deployment's `hub_id`.
-    /// With no print host connected the job **waits** — late, not lost.
-    pub async fn enqueue_print_job(
-        &self,
-        job: &print_queue::NewPrintJob,
-    ) -> Result<print_queue::EnqueueOutcome> {
-        print_queue::enqueue(self.db.as_ref(), &self.hub_id, job).await
+    /// With no print host connected the job **waits** — late, not lost — and the report says so
+    /// ([`EnqueueReport::awaiting_host`]), because on a hub with no printer "late" is "never".
+    ///
+    /// The host count is read **after** the write and for the **resolved** station, in that order
+    /// on purpose: before the write there is no station to ask about, and asking about the
+    /// producer's raw word would answer for a station this hub may not have.
+    pub async fn enqueue_print_job(&self, job: &print_queue::NewPrintJob) -> Result<EnqueueReport> {
+        let queued = print_queue::enqueue(self.db.as_ref(), &self.hub_id, job).await?;
+        let live_hosts =
+            print_hosts::live_hosts_for(self.db.as_ref(), &self.hub_id, &queued.role).await?;
+        Ok(EnqueueReport {
+            outcome: queued.outcome,
+            role: queued.role,
+            live_hosts,
+        })
     }
 
     /// The hub's print queue in hand-out order (optional role/status filters). This is the
