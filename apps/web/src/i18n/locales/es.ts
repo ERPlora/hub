@@ -246,6 +246,10 @@ export default {
   // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
   // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
   // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  offline: {
+    title: 'Sin conexión a Internet',
+    body: 'Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
+  },
   setup: {
     title: 'Termina de configurar tu negocio',
     progress: '{done} de {total} hechos',
@@ -1608,6 +1612,9 @@ export default {
     loading: 'Cargando módulo…',
     loadError: 'No se pudo cargar el módulo.',
     loadErrorHint: 'Comprueba que el módulo siga instalado y activo, y vuelve a intentarlo.',
+    offlineTitle: 'Sin conexión a Internet',
+    offlineHint:
+      'Esta pantalla necesita la conexión para cargarse. Revisa la red — vuelve sola en cuanto haya Internet otra vez.',
     retry: 'Reintentar',
     blockedTitle: 'Suscripción necesaria',
     blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
