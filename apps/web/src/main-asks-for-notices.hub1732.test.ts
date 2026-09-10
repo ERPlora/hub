@@ -17,6 +17,21 @@ import { fileURLToPath } from 'node:url';
 
 const MAIN = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
 
+/**
+ * The `bootPrintComanda(...)` call ALONE.
+ *
+ * Scoping matters more than it looks: asserting `shouldSendNotice` against the whole file passes
+ * on the IMPORT line, so reverting the notice back to a bare `peripherals.notify()` — the exact
+ * regression this file exists to stop — left the guard green. Measured: that mutant survived.
+ */
+function comandaCall(source: string): string {
+  const start = source.indexOf('bootPrintComanda(getClient()');
+  expect(start).toBeGreaterThan(-1);
+  const end = source.indexOf('\n});', start);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
 describe('the shell asks for the notification permission', () => {
   it('asks when this device is registered as a print host', () => {
     // The alta is the in-context moment: the device just became the one that gets told an order
@@ -28,9 +43,18 @@ describe('the shell asks for the notification permission', () => {
     // The comanda notice is the fallback trigger for a device that never registers as a host (a
     // KDS screen with no printer). `ensureNotificationPermission` is idempotent, so this costs one
     // storage read once the answer is on record.
+    //
+    // Asserted INSIDE the call, not against the file: an unused import would satisfy the file.
+    expect(comandaCall(MAIN)).toContain('shouldSendNotice');
     expect(MAIN).toContain('ensureNotificationPermission');
-    expect(MAIN).toContain('shouldSendNotice');
     expect(MAIN).toContain('primerLabelsFrom');
+  });
+
+  it('and the region that is asserted really is only that call', () => {
+    // The positive control of the scoping above, placed AFTER the region: a slice that ran to the
+    // end of the file would swallow this and quietly turn the assertion back into a file-wide one.
+    expect(MAIN).toContain('setOnSessionExpired');
+    expect(comandaCall(MAIN)).not.toContain('setOnSessionExpired');
   });
 
   it('never hardcodes the sheet: the strings come through i18n (ADR-0055/0199)', () => {
