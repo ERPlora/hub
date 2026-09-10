@@ -351,10 +351,11 @@ function quotaLabel(tier: BillingTierDef): string {
   return tierQuotaLabel(tier, billingLocale.value);
 }
 
-// El NOMBRE del plan sale del mismo sitio que su cuota (hub#1748): `billing.tiers[].name` del
-// manifest lo escribe el autor en el idioma fuente, así que un hub en español leía «Free · Basic ·
-// Pro · Enterprise» justo encima de una línea ya traducida. El módulo publica esos nombres en su
-// `locales/<lang>.json` (bloque `billing.tiers`, por slug) y el respaldo sigue siendo el manifest.
+// The NAME of a plan comes from the same place as its quota (hub#1748): the module author writes
+// `billing.tiers[].name` of the manifest in the source language, so a Spanish hub read «Free ·
+// Basic · Pro · Enterprise» right above a line that was already translated. The module publishes
+// those names in its `locales/<lang>.json` (`billing.tiers` block, by slug); the manifest stays
+// the fallback.
 function tierLabel(tier: BillingTierDef): string {
   return tierName(tier, billingLocale.value);
 }
