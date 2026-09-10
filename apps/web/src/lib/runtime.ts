@@ -22,6 +22,7 @@ import { getHubSession, logout, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings, hubTimezone, publishHubTimezone } from './hub-settings';
+import { normalizePinLength } from './pin-length';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
@@ -92,6 +93,13 @@ export interface HubContext {
    * fallback (`VITE_CLOUD_API_URL`, dev/local only).
    */
   cloud_base_url?: string | null;
+  /**
+   * Cuántos DÍGITOS tiene el PIN de este hub (hub#974): 4 o 6. Viaja en el context porque la
+   * pantalla que lo necesita —el pinpad del login— es la única SIN sesión, y `GET /api/settings`
+   * exige una: sin esta clave el shell caía a su default y pintaba 4 círculos en un hub de 6,
+   * enviando el login truncado al cuarto dígito (hub#1765). Ausente → se conserva lo ya sabido.
+   */
+  pin_length?: unknown;
 }
 
 /**
@@ -1674,8 +1682,11 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     api_docs_enabled: hubSettings.value?.api_docs_enabled ?? false,
     country_code: hubSettings.value?.country_code ?? 'ES',
     region_code: hubSettings.value?.region_code ?? null,
-    // hub#974: la longitud del PIN es del hub (4 o 6). Sin settings todavía, la de un hub nuevo.
-    pin_length: hubSettings.value?.pin_length ?? 4,
+    // hub#974: la longitud del PIN es del hub (4 o 6). El context SÍ la trae (hub#1765) — es la
+    // única lectura que la pantalla de login, que no tiene sesión, puede hacer. Si esta respuesta
+    // calla (runtime viejo, lectura fallida) se conserva lo ya sabido antes que acortar el PIN:
+    // caer a 4 en un hub de 6 manda el login con el PIN truncado en el cuarto dígito.
+    pin_length: normalizePinLength(ctx.pin_length, hubSettings.value?.pin_length),
     // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
     // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
     business_tax_id: hubSettings.value?.business_tax_id ?? '',

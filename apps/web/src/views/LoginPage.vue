@@ -225,8 +225,14 @@
                 </ion-button>
               </form>
 
-              <!-- Paso: login por PIN -->
-              <div v-else-if="step === 'pin'" class="step-form">
+              <!-- Paso: login por PIN. `step-form--scrolls` SOLO mientras se elige persona: esa
+                   lista scrollea dentro y necesita techo. Con el teclado en pantalla no lleva
+                   techo ninguno — es lo que cortaba el botón «0» (hub#1765). -->
+              <div
+                v-else-if="step === 'pin'"
+                class="step-form"
+                :class="{ 'step-form--scrolls': !pinUser }"
+              >
 
                 <!-- Se dice en los DOS pasos del pinpad: la placa no necesita que se elija a
                      nadie antes (resuelve la persona entera) y tampoco que se toque este campo —
@@ -1034,20 +1040,31 @@ async function onSetupComplete(pin: string): Promise<void> {
 }
 
 /* ---- Pasos ---- */
-/* Card de tamaño FIJO: todos los pasos (email / pin / setup / selección de usuario)
- * reservan la misma altura, así no hay salto al cambiar entre pestañas. El paso más
- * alto es el del teclado PIN (~411px); reservamos algo más y centramos el contenido. */
+/* Los pasos (email / pin / setup / selección de usuario) reservan la misma altura, así no hay
+ * salto al cambiar entre pestañas. */
 .step-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Altura FIJA: misma en email / pin / setup / selección → sin salto al cambiar de paso.
-   * Cabe el paso más alto (teclado PIN ~411px). El contenido se alinea arriba y, en la
-   * selección de usuario, la lista scrollea dentro (ver .user-grid). */
-  height: 26rem;
+  /* SUELO, no alto fijo (hub#1765). La reserva sigue siendo la misma en email / setup /
+   * selección → sin salto al cambiar de paso; lo que cambia es qué pasa cuando un paso NO cabe.
+   * El paso del PIN mide 483px reales —pista de la placa 48 + avatar y nombre 68 + teclado 342,
+   * más dos huecos de 12— y la reserva son 416px: con `height` los 67px que sobran se salían por
+   * los dos extremos (`justify-content: center`) y `ion-card`, que es `overflow: hidden`, cortaba
+   * la última fila de teclas — el botón «0» acababa 12px por debajo del borde de la tarjeta
+   * (medido en banco-pre, 390×844). Dentro de un contenedor que recorta, un alto fijo solo puede
+   * perder contenido: aquí crece. */
+  min-height: 26rem;
   /* Formulario (email / PIN / setup) CENTRADO vertical. En la selección de usuario,
    * el .user-scroll lleva flex:1 y rellena el alto, así sus cards quedan ARRIBA. */
   justify-content: center;
+}
+/* La ÚNICA excepción: la selección de usuario scrollea DENTRO (`.user-scroll`, `flex: 1`), y para
+ * eso necesita un techo — sin él la lista crece hacia abajo en vez de scrollear. Va en su propia
+ * clase, puesta solo mientras ese paso está en pantalla, para que el alto fijo no vuelva nunca a
+ * quedar debajo del teclado. */
+.step-form--scrolls {
+  height: 26rem;
 }
 
 /* ---- Trust row ---- */
