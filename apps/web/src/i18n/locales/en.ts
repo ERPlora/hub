@@ -143,6 +143,11 @@ export default {
     close: 'Close',
     noReply: '(no reply)',
     error: 'Could not reach the assistant.',
+    // hub#1738 — the assistant service ANSWERED and turned the turn down (in PRE, with no LLM
+    // credential configured). Saying «could not reach» there sends the owner to check a network
+    // that is fine and to report a problem that is not theirs: nothing on their side is broken,
+    // and nothing they do changes it.
+    unavailable: 'The assistant is not available right now. Try again in a few minutes.',
     // saas#1540 — running out of messages is a PLAN state, not an outage. Saying «could not
     // reach» turns the one conversion moment of the free tier into a product failure.
     quotaTitle: 'You have used all your assistant messages',

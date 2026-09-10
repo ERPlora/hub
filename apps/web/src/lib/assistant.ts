@@ -129,6 +129,14 @@ export type AssistantEvent =
  *  convendría otro plan». */
 export const QUOTA_EXCEEDED_CODE = 'quota_exceeded';
 
+/** Por qué murió el turno (hub#1738). */
+export type AssistantFailureReason = 'quota' | 'unreachable' | 'service';
+
+/** El `code` con el que el RUNTIME del hub marca sus propios frames cuando no consiguió respuesta
+ *  de erplora.com (hub#1689, hub#1763). Es el único emisor que puede afirmar eso: cualquier otro
+ *  frame `error` llega porque el servicio SÍ contestó. */
+const CLOUD_UNREACHABLE_CODE = 'cloud_unreachable';
+
 /**
  * Consumo del mes tal y como lo cierra el SaaS (frame `usage`, saas#1540).
  *
@@ -193,6 +201,20 @@ export interface StreamCallbacks {
  */
 export interface AssistantFailure {
   message: string;
+  /**
+   * Cuál de las tres formas de morir fue (hub#1738). Sin esto, la pantalla solo podía decir «no
+   * se pudo contactar» — y en PRE eso era falso: erplora.com contestaba `200` y escribía su
+   * motivo (`No active credential for provider 'openai'`). Un diagnóstico equivocado manda al
+   * dueño a revisar su red, a reiniciar el TPV y a denunciar un problema que no es suyo.
+   *
+   *  · `unreachable` — el runtime NO consiguió respuesta (frame `cloud_unreachable`, hub#1689).
+   *  · `service`     — erplora.com contestó y se negó a atender el turno.
+   *  · `quota`       — se acabaron los mensajes del plan; no es una avería (saas#1540).
+   *
+   * Ausente cuando el turno murió en el transporte del propio navegador (`fetch` que revienta,
+   * status no-2xx): eso es `unreachable` por definición y quien lo pinta lo trata como tal.
+   */
+  reason?: AssistantFailureReason;
   /** Presente SOLO si el turno murió por cuota. Un error de transporte no la lleva: pintar un
    *  botón de pagar sobre una caída de red no arregla nada y encima cobra. */
   quota?: {
@@ -445,11 +467,18 @@ async function streamRound(
           upgrade_required?: boolean;
           resets_at?: string;
         };
-        const failure: AssistantFailure = { message: e.error ?? e.message ?? 'assistant error' };
+        const failure: AssistantFailure = {
+          message: e.error ?? e.message ?? 'assistant error',
+          // Quién lo emitió decide el motivo, no la prosa: la del SaaS es inglés sin traducir y
+          // cambia sin avisar. El único frame que significa «no llegué» es el que pone el propio
+          // runtime (hub#1738).
+          reason: e.code === CLOUD_UNREACHABLE_CODE ? 'unreachable' : 'service',
+        };
         // El motivo se LEE del `code` (hub#1183); `upgrade_required` se queda de respaldo para un
         // emisor que aún no lo mande. Inferir el estado de un flag comercial es cómo «no te
         // quedan mensajes» y «te convendría otro plan» acabaron siendo la misma cosa.
         if (e.code === QUOTA_EXCEEDED_CODE || e.upgrade_required) {
+          failure.reason = 'quota';
           failure.quota = {
             limit: e.limit,
             used: e.used,
