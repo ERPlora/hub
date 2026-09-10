@@ -14,12 +14,24 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// The composition root **with its line comments dropped**.
+///
+/// Not a nicety: the first version of this guard scanned the raw text, and commenting the
+/// announcement out —`// cfg.hub.announce_signature_policy();`, the single likeliest way for it to
+/// disappear during a refactor— left the guard green while the hub went back to booting mute. A
+/// check that cannot see the very thing it guards is worse than no check, because nobody looks
+/// again. Only whole-line comments are dropped, so a `//` inside a string literal is left alone.
 fn boot_source() -> (PathBuf, String) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("boot.rs");
     let text = fs::read_to_string(&path).expect("read crates/server/src/boot.rs");
-    (path, text)
+    let code = text
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    (path, code)
 }
 
 #[test]
