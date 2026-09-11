@@ -43,6 +43,16 @@ const ADD_TILE_CELLS = 1;
 /** The «View all apps» tile costs a cell of its own, and only exists once folding is needed. */
 const VIEW_ALL_TILE_CELLS = 1;
 
+/**
+ * Placeholder tiles the grid holds while the list is still on its way (hub#1722).
+ *
+ * Derived from the SAME budget the real tiles obey, not picked by eye: the skeleton stands in for
+ * the grid that is coming, so a card that runs to three rows while loading and then settles back to
+ * two would be its own defect — the panel would jump under the finger of whoever is reading it. The
+ * ＋ Add apps tile is painted in every state, loading included, so its cell is spent here too.
+ */
+export const SKELETON_TILE_COUNT = GRID_BUDGET - ADD_TILE_CELLS;
+
 export interface AppsGridView<T> {
   /** The tiles to render right now, in the caller's own order. */
   tiles: readonly T[];
