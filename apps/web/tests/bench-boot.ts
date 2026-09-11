@@ -31,6 +31,8 @@
 // Guards: `tests/bench-boot.test.ts` (the decision table, and the check that every spec takes its
 // `test` from here) and `tests/e2e/BenchBootRecovery.spec.ts` (the recovery, end to end).
 
+import { readdirSync } from 'node:fs';
+
 import { test as base, expect, request } from '@playwright/test';
 
 // Re-exported so a spec needs ONE import line, not one for the bench and one for Playwright.
@@ -87,6 +89,22 @@ export function isBootTransportFailure(
   if (!TRANSIENT_TRANSPORT_ERRORS.includes(errorText)) return false;
   const origin = originOf(appOrigin);
   return origin !== undefined && originOf(failedUrl) === origin;
+}
+
+/**
+ * Every spec file Playwright would run under `dir`, as paths relative to it.
+ *
+ * It walks SUBDIRECTORIES because Playwright does: `playwright.config.ts` sets `testDir: './e2e'`
+ * and leaves the default `testMatch`, which is recursive. The guard that uses this list is only
+ * worth anything if it sees exactly what Playwright sees — with a flat `readdirSync` a spec one
+ * folder down took `test` straight from Playwright, ran for real, and the guard stayed green
+ * (ERPlora/hub#1820).
+ */
+export function listE2eSpecs(dir: string): string[] {
+  return readdirSync(dir, { recursive: true })
+    .map((entry) => String(entry))
+    .filter((name) => name.endsWith('.spec.ts'))
+    .sort();
 }
 
 /**

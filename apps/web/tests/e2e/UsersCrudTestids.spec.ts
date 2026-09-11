@@ -33,7 +33,7 @@
 // El `Date.now()` del nombre se queda a propósito: si algún día alguien añade un visual que ordene
 // después de éste, la captura saldrá ROJA en voz alta en vez de hornear la fila de un test dentro
 // de un contrato visual sin que nadie se entere.
-import { test, expect, request as pwRequest } from '@playwright/test';
+import { test, expect, request as pwRequest } from '../bench-boot';
 import { loggedInSession, loginByPin } from './shell-visual-helpers';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
