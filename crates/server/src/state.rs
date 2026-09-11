@@ -715,50 +715,7 @@ mod staging_tests {
     // started up mute: nobody could tell whether it verified signatures until an install failed.
     // ---------------------------------------------------------------------------------------
 
-    /// A `MakeWriter` that keeps every byte the subscriber formats, so a test can assert on the
-    /// LEVEL that was really emitted and not on a value the code merely returned.
-    #[derive(Clone, Default)]
-    struct CapturedLog(Arc<std::sync::Mutex<Vec<u8>>>);
-
-    impl CapturedLog {
-        fn text(&self) -> String {
-            String::from_utf8_lossy(&self.0.lock().expect("captured log poisoned")).into_owned()
-        }
-    }
-
-    impl std::io::Write for CapturedLog {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0
-                .lock()
-                .expect("captured log poisoned")
-                .extend_from_slice(buf);
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CapturedLog {
-        type Writer = Self;
-
-        fn make_writer(&'a self) -> Self::Writer {
-            self.clone()
-        }
-    }
-
-    /// Runs `boot` under a subscriber scoped to this thread and returns what reached the log.
-    fn captured_boot_log(boot: impl FnOnce()) -> String {
-        let sink = CapturedLog::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(sink.clone())
-            .with_ansi(false)
-            .with_max_level(tracing::Level::TRACE)
-            .finish();
-        tracing::subscriber::with_default(subscriber, boot);
-        sink.text()
-    }
+    use crate::log_capture::captured as captured_boot_log;
 
     /// How many events the capture holds: the announcement is ONE line, not a paragraph.
     fn lines(log: &str) -> Vec<&str> {
