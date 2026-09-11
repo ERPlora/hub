@@ -1,21 +1,21 @@
 <!--
-  NotFoundPage — la pantalla de una dirección que este hub no tiene (hub#1723).
+  NotFoundPage — the screen for an address this hub does not have (hub#1723).
 
-  Antes no existía: el catch-all del router redirigía CUALQUIER ruta desconocida a `/dashboard`, y
-  un redirect es silencioso por definición —reescribe la barra de direcciones, así que borra de
-  camino la prueba de que el enlace estaba mal—. QA pegaba `/tpv` o `/sales`, veía Inicio con su
-  menú y su contenido, y creía estar donde había pedido. Las pantallas reales viven bajo
-  `/m/<modulo>/<nav>`, pero nada lo sugería.
+  It did not exist before: the router's catch-all redirected ANY unknown route to `/dashboard`, and
+  a redirect is silent by definition — it rewrites the address bar, so it destroys on the way in
+  the evidence that the link was wrong. QA pasted `/tpv` or `/sales`, saw Home with its menu and
+  its content, and believed they were where they had asked for. The real screens live under
+  `/m/<module>/<nav>`, but nothing suggested so.
 
-  La respuesta es la que tiene asentada el mercado y no una propia: Shopify admin, Square
-  Dashboard, Stripe, Odoo y Business Central contestan a una dirección que no tienen con una
-  página que lo dice y UNA salida. Aquí esa salida es Inicio, y la pantalla se pinta DENTRO del
-  layout del shell (AppPage) para que el menú siga a mano: un 404 a pantalla completa dejaría como
-  única salida el botón Atrás del navegador.
+  The answer is the one the market has settled on, not one of our own: Shopify admin, Square
+  Dashboard, Stripe, Odoo and Business Central answer an address they do not have with a page that
+  says so and ONE way out. Here that way out is Home, and the screen is painted INSIDE the shell's
+  layout (AppPage) so the menu stays at hand: a full-screen 404 would leave the browser's Back
+  button as the only exit.
 
-  Sin mapa de alias (`/tpv` → `/m/sales/pos`): el shell es el kernel y no conoce los ids de los
-  módulos —que además se instalan en runtime, así que el alias sería falso en el hub que no tenga
-  ese módulo—. Adivinar la intención de un enlace roto esconde el error en vez de enseñarlo.
+  No alias map (`/tpv` → `/m/sales/pos`): the shell is the kernel and does not know the ids of the
+  modules — which are installed at runtime besides, so the alias would be false on a hub that does
+  not have that module. Guessing the intent of a broken link hides the error instead of showing it.
 -->
 <template>
   <AppPage :title="t('notFound.title')" content-layout="detail">

@@ -50,26 +50,27 @@ export const routes: RouteRecordRaw[] = [
   { path: '/m/:moduleId/:navId?', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
   // Pantalla de activación: hay sesión pero el hub no tiene un entitlement válido (§2.10).
   { path: '/activation', name: 'activation', component: () => import('../views/ActivationPage.vue'), meta: { auth: true } },
-  // Las rutas RETIRADAS conservan su destino, una a una. Vivían del catch-all de abajo mientras
-  // ese catch-all llevaba a Inicio; ahora que contesta 404 (hub#1723), el redirect explícito es lo
-  // único que impide que tres direcciones que funcionaban dejen de funcionar. `/export` e
-  // `/import` son las páginas que ADR-0113/0116 movió DENTRO de Ajustes → Datos, así que van ahí
-  // y no a Inicio, que era solo donde el catch-all las dejaba caer.
+  // The RETIRED routes keep their destination, one by one. They used to live off the catch-all
+  // below while it led to Home; now that it answers 404 (hub#1723), the explicit redirect is the
+  // only thing that keeps three addresses that used to work from breaking. `/export` and
+  // `/import` are the pages ADR-0113/0116 moved INTO Settings → Data, so that is where they go —
+  // not Home, which was merely where the catch-all dropped them.
   { path: '/export', redirect: '/settings#data' },
   { path: '/import', redirect: '/settings#data' },
-  // Y la puesta en marcha vive hoy en Inicio (widget core + pestaña Datos), retirada del 12/07.
+  // And setting up lives on Home today (core widget + Data tab); retired on 12/07.
   { path: '/first-run', redirect: '/dashboard' },
-  // Catch-all: una dirección que este hub NO tiene lo DICE (hub#1723). Redirigía a /dashboard, y un
-  // redirect es silencioso por definición —reescribe la barra de direcciones, así que borra de
-  // camino la prueba de que el enlace estaba mal—: quien pegaba `/tpv` o `/sales` veía Inicio con
-  // su menú y creía estar donde había pedido. Es un `component` y no un `redirect` justamente para
-  // que la dirección pedida SIGA en la barra y la errata se pueda leer.
+  // Catch-all: an address this hub does NOT have SAYS so (hub#1723). It used to redirect to
+  // /dashboard, and a redirect is silent by definition — it rewrites the address bar, so it
+  // destroys on the way in the evidence that the link was wrong: whoever pasted `/tpv` or `/sales`
+  // saw Home with its menu and believed they were where they had asked for. It is a `component`
+  // and not a `redirect` precisely so the requested address STAYS in the bar and the typo can be
+  // read back.
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../views/NotFoundPage.vue'),
-    // Con sesión, como el resto del shell: un desconocido con un enlace roto sigue viendo el login
-    // y no el chrome del hub, exactamente igual que hoy.
+    // Behind a session, like the rest of the shell: a stranger with a broken link keeps seeing the
+    // login screen and not the hub's chrome, exactly as today.
     meta: { auth: true },
   },
 ];

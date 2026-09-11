@@ -457,15 +457,15 @@ async function mount(): Promise<void> {
     // Un navId retirado o mal escrito no puede dejar la URL afirmando una pestaña mientras se
     // muestra otra. Canonizamos al primer tab real (también cubre bookmarks de versiones viejas).
     if (navId !== entry.nav.id) {
-      // hub#1723 — y se DICE. Canonizar en silencio es el mismo defecto que el catch-all del shell
-      // tenía una planta más arriba: `/m/sales/list` pintaba «Vender» como si la dirección hubiera
-      // sido esa, así que quien pegó el enlace se creía en la lista de ventas. Mismo remedio que
-      // hub#1175 le puso al módulo que el entitlement no nombra: se sigue yendo a donde sí hay
-      // pantalla, pero con la frase que explica por qué no es la que pidió.
+      // hub#1723 — and it is SAID. Canonising in silence is the same defect the shell's catch-all
+      // had one floor up: `/m/sales/list` painted «Sell» as if that had been the address, so
+      // whoever pasted the link believed they were on the sales list. Same remedy hub#1175 gave
+      // the module the entitlement never names: still go where there IS a screen, but with the
+      // sentence that explains why it is not the one that was asked for.
       //
-      // Solo cuando la URL AFIRMABA una pestaña: `/m/sales` a secas —la dirección del launcher, de
-      // «Mis apps» y de /apps— no reclama ninguna, así que abrir la primera no corrige nada y un
-      // aviso ahí sería ruido en la pantalla más transitada del producto.
+      // Only when the URL CLAIMED a tab: a bare `/m/sales` — the address the launcher, «My apps»
+      // and /apps all use — claims none, so opening the first one corrects nothing, and a notice
+      // there would be noise on the busiest screen of the product.
       if (navId) void toastInfo(t('moduleView.unknownTabToast', { tab: entry.nav.label }));
       void router.replace(`/m/${moduleId}/${entry.nav.id}`);
     }
