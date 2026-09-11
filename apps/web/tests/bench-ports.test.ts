@@ -22,6 +22,7 @@ import {
   resolveBenchPorts,
   runnerSlot,
   scanStart,
+  shouldReuseExistingServer,
   SLOT_SPAN,
 } from './bench-ports.ts';
 
@@ -42,8 +43,10 @@ afterEach(async () => {
 });
 
 describe('bench-ports (hub#1517)', () => {
-  it('outside CI the bench keeps the well-known ports: reuseExistingServer must find `pnpm dev`', () => {
-    expect(resolveBenchPorts({}, 4242)).toEqual(CLASSIC_BENCH_PORTS);
+  it('a developer who ASKS for their own `pnpm dev` gets the well-known ports (hub#1812)', () => {
+    // The classic ports only make sense together with reuse: they are where `pnpm dev` lives.
+    // Since hub#1812 that pairing is opt-in, so it no longer decides the default for everyone.
+    expect(resolveBenchPorts({ HUB_E2E_REUSE_SERVER: '1' }, 4242)).toEqual(CLASSIC_BENCH_PORTS);
   });
 
   it('in CI the three ports are distinct and inside the bench window', () => {
@@ -154,5 +157,68 @@ describe('bench-ports (hub#1517)', () => {
     const second = scanStart({ RUNNER_NAME: 'ci-runner-1b', GITHUB_RUN_ID: '9' }, 7);
     expect(first).toBe(BENCH_WINDOW_FIRST);
     expect(second - first).toBe(SLOT_SPAN);
+  });
+});
+
+// Regression tests for ERPlora/hub#1812 — two browser-test runs on the SAME machine must not
+// share a bench.
+//
+// The bug this pins: outside CI the bench pinned `8787`/`5173`/`8791` AND `reuseExistingServer`
+// was `!CI`, i.e. always true. So the second run did not fail on the busy port — Playwright took
+// the neighbour's servers for its own and ran the whole suite against ANOTHER WORKTREE'S code.
+// That is the worst shape a failure can take: the spec reports "the hook you just added is not
+// there", so the time goes into the diff instead of into the bench. Measured on 11/09 in #1756;
+// pinning two free ports by hand made the very same spec pass untouched.
+//
+// The decision that closes it: reuse is opt-in (`HUB_E2E_REUSE_SERVER=1`) instead of implied by
+// "not CI". `not CI` stopped telling the two cases apart the day ~44 agents shared this machine —
+// one developer with their own `pnpm dev` (reuse is right) and two concurrent runs (reuse is the
+// bug) look identical to it.
+describe('bench isolation outside CI (hub#1812)', () => {
+  it('REGRESSION: a second local run never lands on the ports the first one holds', async () => {
+    // No `CI` anywhere: this is precisely the environment that used to hand out 8787/5173/8791 to
+    // everybody. Two runs on one machine are two processes, so they differ by pid and nothing else.
+    const first = resolveBenchPorts({}, 4242);
+    await Promise.all([occupy(first.runtime), occupy(first.web), occupy(first.assistant)]);
+
+    const second = resolveBenchPorts({}, 5353);
+    for (const port of [second.runtime, second.web, second.assistant]) {
+      expect([first.runtime, first.web, first.assistant]).not.toContain(port);
+    }
+    // And the second run's ports are real: if any were busy this rejects and the test fails.
+    await Promise.all([occupy(second.runtime), occupy(second.web), occupy(second.assistant)]);
+  });
+
+  it('REGRESSION: outside CI the bench does NOT answer with a server it did not start', () => {
+    expect(shouldReuseExistingServer({})).toBe(false);
+  });
+
+  it('reuse is something you ASK for, and it comes with the ports `pnpm dev` actually uses', () => {
+    expect(shouldReuseExistingServer({ HUB_E2E_REUSE_SERVER: '1' })).toBe(true);
+    expect(resolveBenchPorts({ HUB_E2E_REUSE_SERVER: '1' }, 4242)).toEqual(CLASSIC_BENCH_PORTS);
+  });
+
+  it('CI never reuses, whatever the env asks for: a zombie of another job must not answer', () => {
+    // In CI the bench is the job's own (hub#1517). Letting this flag through would re-open the
+    // exact hole hub#1517 closed, from an env var anybody can export.
+    expect(shouldReuseExistingServer({ CI: '1', HUB_E2E_REUSE_SERVER: '1' })).toBe(false);
+    const ports = resolveBenchPorts({ CI: '1', HUB_E2E_REUSE_SERVER: '1' }, 4242);
+    expect(ports).not.toEqual(CLASSIC_BENCH_PORTS);
+  });
+
+  it('pinning ports by hand still wins outside CI (the #1756 workaround keeps working)', () => {
+    const ports = resolveBenchPorts(
+      { HUB_BIND: '127.0.0.1:8850', HUB_WEB_URL: 'http://localhost:5250', HUB_E2E_ASSISTANT_PORT: '8851' },
+      4242,
+    );
+    expect(ports).toEqual({ runtime: 8850, web: 5250, assistant: 8851 });
+  });
+
+  it('a half-pinned local bench allocates the rest instead of falling back to the classic ports', () => {
+    const ports = resolveBenchPorts({ HUB_BIND: '127.0.0.1:8850' }, 4242);
+    expect(ports.runtime).toBe(8850);
+    expect(ports.web).not.toBe(CLASSIC_BENCH_PORTS.web);
+    expect(ports.assistant).not.toBe(CLASSIC_BENCH_PORTS.assistant);
+    expect(new Set([ports.runtime, ports.web, ports.assistant]).size).toBe(3);
   });
 });

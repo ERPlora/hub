@@ -875,6 +875,54 @@ for (const [command, run] of REACHES_A_BLUETOOTH_PRINTER) {
   });
 }
 
+// ── hub#1803: the test sheet travels with an envelope, like every other document ────────────────
+//
+// `render_test_page` used to receive a printer id and nothing else — the only document in the
+// crate with no envelope behind it. So the one sheet a shop owner prints on purpose came out in
+// English, signed with our product name, while the ticket printed a second later came out in the
+// hub's language under theirs. The language and the shop's name live in the module's screen, and
+// this call is the only way they can reach the renderer.
+
+function fakeShellRecordingInvokeArgs() {
+  const calls: Array<{ cmd: string; args?: unknown }> = [];
+  const tauri = {
+    invoke: async (cmd: string, args?: unknown) => {
+      calls.push({ cmd, args });
+      if (cmd === 'erplora_discover_printers') return { status: 'scanned', printers: [] };
+      return {};
+    },
+    listen: async () => () => {},
+  };
+  return { transport: new IpcBridgeTransport(tauri), calls };
+}
+
+test('testPrint carries the document envelope through to the Tauri command (hub#1803)', async () => {
+  const { transport, calls } = fakeShellRecordingInvokeArgs();
+
+  await transport.testPrint('network:192.168.1.50:9100', {
+    locale: 'es',
+    business_name: 'SALON AURORA SL',
+  });
+
+  const sent = calls.find((c) => c.cmd === 'erplora_test_print');
+  assert.deepEqual(sent?.args, {
+    printerId: 'network:192.168.1.50:9100',
+    data: { locale: 'es', business_name: 'SALON AURORA SL' },
+  });
+});
+
+test('testPrint without an envelope is still a valid call: `data` travels null (hub#1803)', async () => {
+  // The parameter is optional on purpose: a `printing` module older than this app keeps asking
+  // for its sheet, and the renderer reads an empty document exactly as it reads a missing field.
+  // Making it required would stop the sheet printing at all on that pairing.
+  const { transport, calls } = fakeShellRecordingInvokeArgs();
+
+  await transport.testPrint('network:192.168.1.50:9100');
+
+  const sent = calls.find((c) => c.cmd === 'erplora_test_print');
+  assert.deepEqual(sent?.args, { printerId: 'network:192.168.1.50:9100', data: null });
+});
+
 test('notify asks only for the notifications permission — its own context, nothing else (hub#758)', async () => {
   const { transport, requests } = fakeShellRecordingPermissionArgs();
 
