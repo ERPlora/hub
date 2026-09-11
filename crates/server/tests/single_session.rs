@@ -61,6 +61,7 @@ fn claims_with_max_devices(n: u32) -> EntitlementClaims {
         plan: Some("restaurant".into()),
         max_devices: n,
         max_database_size_gb: 0,
+        max_users: 0,
     }
 }
 
