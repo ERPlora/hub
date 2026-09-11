@@ -1305,16 +1305,12 @@ mod tests {
         )
         .await;
 
-        // hub#1796: without the anchor a subscriber-less thread can cache this callsite as
-        // `Interest::never()` and the capture below comes back empty on a healthy commit.
-        crate::log_capture::anchor_the_interest_cache();
-        let sink = crate::log_capture::CapturedLog::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(sink.clone())
-            .with_max_level(tracing::Level::TRACE)
-            .finish();
+        // hub#1796: the capture has to be anchored or a subscriber-less thread can cache this
+        // callsite as `Interest::never()` and it comes back empty on a healthy commit.
+        // `capture_scope` is the async-friendly door and anchors on the way in.
+        let (sink, guard) = crate::log_capture::capture_scope();
         {
-            let _guard = tracing::subscriber::set_default(subscriber);
+            let _guard = guard;
             forward_capture(
                 &reqwest::Client::new(),
                 &base,
