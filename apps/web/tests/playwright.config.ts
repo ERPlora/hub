@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveUpdateSnapshotsMode } from '../src/lib/visual-baseline-gate';
 import { resolveBenchPorts, shouldReuseExistingServer } from './bench-ports';
 import { BENCH_APP_VERSION } from './bench-app-version';
+import { VISUAL_SCREENSHOT_OPTIONS } from './visual-diff-budget';
 
 // E2E del shell del Hub contra el runtime REAL (Axum :8787) y Vite (:5173). Sin mocks (regla del
 // proyecto): el test arranca su propio runtime con BD efímera y un directorio de módulos VACÍO,
@@ -87,10 +88,15 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   expect: {
-    // Las capturas de `toHaveScreenshot` son un contrato de GEOMETRÍA, no de píxel exacto: el
-    // antialiasing de una fuente varía entre versiones del navegador sin que la pantalla cambie.
-    // Un 0,2 % de píxeles (≈2.600 en 1440×900) absorbe eso y sigue cazando un bloque desplazado.
-    toHaveScreenshot: { maxDiffPixelRatio: 0.002, animations: 'disabled', caret: 'hide' },
+    // hub#1823 — the diff budget lives in `visual-diff-budget.ts`, with the measurements that
+    // sized it and a vitest guard that keeps it honest. Until here it was a hand-written
+    // `maxDiffPixelRatio: 0.002` — 0.2 % OF THE SCREEN, 2592 px at 1440x900 — put there to absorb
+    // font antialiasing. Both halves of that were measured on 2026-09-11 and both were wrong: the
+    // noise is ZERO (45 captures, `maxDiffPixels: 0`, not one differing pixel), and what the
+    // margin was really hiding was TEXT — one digit of the sidebar footer moves 33 px and passed
+    // green. A budget expressed as a fraction of the screen cannot police the ink of a letter,
+    // which does not grow with the viewport; so the budget is now absolute.
+    toHaveScreenshot: VISUAL_SCREENSHOT_OPTIONS,
   },
   projects: [
     {

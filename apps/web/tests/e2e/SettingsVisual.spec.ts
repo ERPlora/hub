@@ -4,7 +4,7 @@
 // país, huso horario, moneda e idioma del hub del seed de dev — ninguno depende de módulos
 // instalados, así que la pantalla es determinista con el hub vacío del banco de e2e.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask, waitForVisualSettle } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — ajustes', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -21,6 +21,11 @@ test.describe('contrato visual del shell — ajustes', () => {
       // `v-if`/`v-else-if` por pestaña) y la primera tarjeta de la pestaña «Hub».
       await expect(page.locator('.ok-tabbar')).toBeVisible();
       await expect(page.locator('ion-card').first()).toBeVisible();
+
+      // Y el shell ha TERMINADO: el botón de menú ya ha aparecido (o el sidebar ocupa su sitio),
+      // los iconos tienen su glifo y nada sigue desplazándose solo. Las TRES cosas llegan tarde y
+      // la pantalla pasa por aquí a medio hacer en más de la mitad de las cargas (hub#1823).
+      await waitForVisualSettle(page);
 
       // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde
       // hub#1812: se TAPA, no se compara (`visualSnapshotMask`, hub#1752).
