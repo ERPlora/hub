@@ -10,6 +10,7 @@
 import { expect, request as pwRequest, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { shouldSkipMissingBaselineLocally } from '../../src/lib/visual-baseline-gate';
+import { everyOnScreenIconIsPainted, shellChromeHasSettled } from './visual-settle';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 
@@ -132,4 +133,34 @@ export function skipIfBaselineMissingLocally(testInfo: TestInfo, snapshot: strin
  */
 export function visualSnapshotMask(page: Page): Locator[] {
   return [page.locator('ok-qr')];
+}
+
+/**
+ * Espera a que la pantalla esté REALMENTE terminada antes de fotografiarla (hub#1823).
+ *
+ * Dos cosas del shell se mueven DESPUÉS de que el punto de asentamiento de cada spec se cumpla, y
+ * las dos salían en las capturas a medio hacer; medido el 11/09 contra el banco real:
+ *
+ *   · El CHROME todavía no ha decidido por dónde se entra al menú. `ion-menu` se registra en
+ *     Ionic de forma asíncrona y hasta que lo hace el botón hamburguesa está en `display: none`:
+ *     en 8 de 8 cargas de /settings a 390px seguía oculto en el asentamiento y a +200 ms, y
+ *     aparecía antes de +1,5 s. La captura caía a un lado u otro del salto según la máquina.
+ *   · Los ICONOS todavía no tienen su glifo. `ion-icon` inyecta su `<svg>` tras un
+ *     IntersectionObserver: en 7 de 12 cargas de /dashboard a 390px quedaba uno en pantalla sin
+ *     pintar en ese instante (pinta ~10 ms después).
+ *
+ * Con el presupuesto viejo (`maxDiffPixelRatio: 0.002` = 658 px a 390x844) nada de esto se veía;
+ * con los 20 px absolutos de hub#1823 son 69 px y el contrato entero salía rojo en 2 de 12
+ * corridas. Los predicados viven en `visual-settle.ts`, aparte, porque corren DENTRO del
+ * navegador y tienen su propio guardia en vitest (`tests/visual-settle.test.ts`).
+ *
+ * Los timeouts son cortos A PROPÓSITO: si el chrome no se resuelve en cinco segundos o los glifos
+ * no llegan en uno, lo que hay no es una carrera sino una pantalla rota, y eso tiene que salir
+ * como fallo con su mensaje, no como una espera de 30 s que nadie asocia a su causa.
+ *
+ * Lo exige `tests/visual-baselines-present.test.ts`: un `*Visual.spec.ts` nuevo no puede olvidarlo.
+ */
+export async function waitForVisualSettle(page: Page): Promise<void> {
+  await page.waitForFunction(shellChromeHasSettled, undefined, { timeout: 5_000 });
+  await page.waitForFunction(everyOnScreenIconIsPainted, undefined, { timeout: 1_000 });
 }

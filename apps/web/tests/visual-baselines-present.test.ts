@@ -140,3 +140,27 @@ describe('el contrato visual no fotografía el QR de instalación (hub#1752)', (
     ).toBe(true);
   });
 });
+
+// Regression test for ERPlora/hub#1823 — a capture taken while an icon is still glyph-less.
+//
+// `ion-icon` injects its `<svg>` asynchronously, a frame or two after layout, so "the board is
+// visible" does NOT mean "the screen is finished". Measured on 2026-09-11 over 12 loads of
+// /dashboard at 390px, ONE on-screen icon was still empty at the settle point in SEVEN of them —
+// the hamburger inside `ion-menu-button`, which lives in a shadow root — and it paints ~10 ms
+// later. The old ratio budget (658 px at 390x844) swallowed the 69 px that costs; the absolute
+// 20 px budget of hub#1823 does not, and the whole contract came back red in 2 of 12 runs.
+//
+// So every screenshotting spec waits for the glyphs, the same way it freezes the clock and masks
+// the QR: it is one more thing that moves between runs, and the list of those is the difference
+// between a contract people trust and one they mute.
+describe('el contrato visual no fotografía un shell a medio terminar (hub#1823)', () => {
+  it.each(visualSpecs())('%s espera a que el shell esté terminado antes de capturar', (spec) => {
+    const source = readFileSync(join(E2E_DIR, spec), 'utf8');
+    expect(
+      /waitForVisualSettle\s*\(/.test(source),
+      `${spec} no llama a waitForVisualSettle(page): el botón de menú y los glifos de ion-icon ` +
+        'llegan DESPUÉS del punto de asentamiento, así que la captura puede salir a medio ' +
+        'hacer y poner en rojo una PR que no ha tocado esa pantalla (hub#1823).',
+    ).toBe(true);
+  });
+});

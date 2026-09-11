@@ -26,7 +26,7 @@
 // `tests/visual-baselines-present.test.ts` (hub#1752). Ver `src/lib/visual-baseline-gate.ts`.
 
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, freezeVisualClock, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, skipIfBaselineMissingLocally, visualSnapshotMask, waitForVisualSettle } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — login', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -49,6 +49,11 @@ test.describe('contrato visual del shell — login', () => {
       // Por clase y no por texto ni por rol: la pantalla está traducida (ADR-0055) y una espera
       // que dependa del idioma activo deja de funcionar en cuanto alguien cambia una cadena.
       await expect(page.locator('.trust-row, .setup-hint').first()).toBeVisible();
+
+      // Y el shell ha TERMINADO: el botón de menú ya ha aparecido (o el sidebar ocupa su sitio)
+      // y los iconos tienen su glifo. Las dos cosas llegan tarde y la pantalla pasa por aquí a
+      // medio hacer en más de la mitad de las cargas (hub#1823).
+      await waitForVisualSettle(page);
 
       // `fullPage` NO: en Ionic el scroll vive dentro de `ion-content`, así que una captura de
       // página completa sale del alto del viewport igual y encima añade una fuente de ruido.
