@@ -10,7 +10,7 @@
 // green on an empty hub (no module fires queries) and green on a dev hub with modules installed
 // (widgets/panels fire POSTs that must all succeed).
 
-import { test, expect, request as pwRequest, type Page } from '@playwright/test';
+import { test, expect, request as pwRequest, type Page } from '../bench-boot';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 
