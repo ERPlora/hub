@@ -195,6 +195,16 @@ const NOT_YET_COVERED: Record<string, string> = {
   'components/ModuleSettingsForm.vue': 'hub#1811',
 };
 
+/**
+ * Cuántas pantallas hay en la lista de pendientes HOY. Este número SOLO BAJA: cuando una pantalla
+ * pasa a `COVERED` se resta uno, y nunca se suma. Sin él, la lista de pendientes era una lista de
+ * excepciones: una `.vue` nueva con formulario entraba en `NOT_YET_COVERED` con una issue de adorno
+ * (`hub#999999`) y la guardia seguía en verde — medido como mutante al revisar hub#1813. Con el
+ * número clavado, meter una pantalla nueva en pendientes obliga a subirlo a mano, en una línea cuyo
+ * comentario dice que no se sube.
+ */
+const PENDING_TODAY = 10;
+
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
 const CONTROL_TAGS = [
   'ion-input',
@@ -399,6 +409,16 @@ describe('data-testid — convención del shell (hub#1756)', () => {
     expect(importers, 'si una pantalla viva lo usa, ya no está aparcado: sácalo de parked/').toEqual(
       [],
     );
+  });
+
+  it('la lista de pendientes solo encoge: una pantalla nueva nace cubierta, no pendiente', () => {
+    const pending = Object.keys(NOT_YET_COVERED).length;
+    expect(
+      pending,
+      pending > PENDING_TODAY
+        ? 'una pantalla nueva no entra en NOT_YET_COVERED: ponle sus data-testid y pásala a COVERED'
+        : 'una pendiente salió de la lista: baja PENDING_TODAY a ' + pending,
+    ).toBe(PENDING_TODAY);
   });
 
   it('la lista de pendientes no nombra pantallas que ya no existen', () => {
