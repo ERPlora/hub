@@ -53,7 +53,7 @@ fn main() {
     };
 
     println!("\nsending a test page to `{}`...", target.queue);
-    match send_raw(&SystemCups, &target, &escpos::render_test_page(&printer_id)) {
+    match send_raw(&SystemCups, &target, &escpos::render_test_page(&printer_id, &serde_json::json!({}))) {
         Ok(()) => println!("submitted. Paper out of the printer = the whole chain works."),
         Err(e) => {
             eprintln!("refused: {e}");

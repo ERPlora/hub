@@ -1502,9 +1502,13 @@ fn erplora_test_print(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
+    data: Option<serde_json::Value>,
 ) -> Result<(), HardwareError> {
     let target = discovery::parse_print_target(&printer_id)?;
-    let payload = escpos::render_test_page(&printer_id);
+    // An `erplora-app` newer than the module that calls it gets `None` here — and the renderer
+    // reads an empty document exactly as it reads a missing field, so the sheet still prints.
+    let data = data.unwrap_or_else(|| serde_json::json!({}));
+    let payload = escpos::render_test_page(&printer_id, &data);
     match target {
         discovery::PrintTarget::Network(target) => {
             state.queue.enqueue(PrintJob {

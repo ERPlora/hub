@@ -3130,7 +3130,15 @@ export interface BridgeTransport {
   discoverPrinters(): Promise<BridgePrinter[]>;
   getDevices(): Promise<BridgeDevice[]>;
   print(printerId: string, documentType: string, data: Record<string, unknown>, jobId?: string): Promise<void>;
-  testPrint(printerId: string): Promise<void>;
+  /**
+   * A printer's test sheet.
+   *
+   * `data` is the SAME envelope `print` takes (hub#1803): `locale` decides the language the paper
+   * comes out in (`Locale::from_document`, hub#1159) and `business_name` heads it, exactly as it
+   * heads the ticket. It is optional because the installed app can be newer than the module
+   * calling it — with no envelope the sheet still prints, in the fallback language, never an error.
+   */
+  testPrint(printerId: string, data?: Record<string, unknown>): Promise<void>;
   openDrawer(printerId: string, pin?: number): Promise<void>;
   /**
    * Asigna un rol a un dispositivo. `keyOrMac` es el {@link BridgeDevice.key} — o una MAC, que el
@@ -3344,9 +3352,11 @@ export class IpcBridgeTransport implements BridgeTransport {
     await this.tauri.invoke('erplora_print', { printerId, documentType, data, jobId: jobId ?? null });
   }
 
-  async testPrint(printerId: string): Promise<void> {
+  async testPrint(printerId: string, data?: Record<string, unknown>): Promise<void> {
     await this.ensurePermissions(printerPermissions(printerId));
-    await this.tauri.invoke('erplora_test_print', { printerId });
+    // `null`, not `undefined`: `undefined` disappears when the args are serialised, and the Rust
+    // side declares `Option<Value>` — an explicit null is the shape that arrives as `None`.
+    await this.tauri.invoke('erplora_test_print', { printerId, data: data ?? null });
   }
 
   /** The drawer opens through the printer's ESC/POS kick — so it goes over the local network too. */
