@@ -17,17 +17,14 @@
 //   Actions → «Regenerar baselines visuales (Linux)» (visual-baselines.yml) → Run workflow
 // Ese run corre con `--update-snapshots=all` y sube los PNG como artefacto para commitearlos.
 //
-// Mientras esta pantalla no tenga NINGUNA baseline generada todavía, el caso se SALTA en voz alta
-// en vez de fallar — en cualquier entorno, CI incluido (es justo el estado de este PR: cero PNG
-// commiteados, `visual-baselines.yml` sin poder dispararse hasta llegar a `main`). Fuera de CI eso
-// no cambia nunca (un Mac no va a igualar jamás el PNG de Linux), pero en CI es solo el estado
-// TRANSITORIO de antes de la primera regeneración: en cuanto exista una sola baseline para esta
-// pantalla, que falte ESTE fichero deja de saltarse y pasa a FALLAR (hub#1250: borrar un PNG en
-// una PR no puede volver el caso verde por salto); ese fallo lo produce `updateSnapshots: 'none'`
-// en `playwright.config.ts`. Ver `src/lib/visual-baseline-gate.ts` para la lógica y sus tests.
+// En tu máquina el caso se SALTA en voz alta si no tienes baseline local (un Mac no iguala jamás
+// el PNG de Linux) y la primera corrida te crea una para poder trabajar. En CI NO se salta nunca:
+// una baseline que falta es un FALLO —lo produce `updateSnapshots: 'none'` en
+// `playwright.config.ts`—, y que el repo se quede sin ninguna lo caza antes, en vitest, el guardia
+// `tests/visual-baselines-present.test.ts` (hub#1752). Ver `src/lib/visual-baseline-gate.ts`.
 
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — login', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -35,6 +32,7 @@ test.describe('contrato visual del shell — login', () => {
       const snapshot = `login-${width}.png`;
       skipIfBaselineMissingLocally(testInfo, snapshot);
 
+      await freezeVisualClock(page);
       await page.setViewportSize({ width, height });
       await page.goto('/login');
 

@@ -7,7 +7,7 @@
 // módulos no hay widgets de negocio que varíen entre corridas, solo el widget CORE de
 // export/import, que vive dentro de `<ok-widget-board>` en todos los presets por defecto.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — dashboard', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -15,6 +15,7 @@ test.describe('contrato visual del shell — dashboard', () => {
       const snapshot = `dashboard-${width}.png`;
       skipIfBaselineMissingLocally(testInfo, snapshot);
 
+      await freezeVisualClock(page);
       await page.setViewportSize({ width, height });
       await loggedInSession(page);
       await page.goto('/dashboard');

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveUpdateSnapshotsMode } from '../src/lib/visual-baseline-gate';
-import { resolveBenchPorts } from './bench-ports';
+import { resolveBenchPorts, shouldReuseExistingServer } from './bench-ports';
 
 // E2E del shell del Hub contra el runtime REAL (Axum :8787) y Vite (:5173). Sin mocks (regla del
 // proyecto): el test arranca su propio runtime con BD efímera y un directorio de módulos VACÍO,
@@ -22,9 +22,16 @@ const WEB_DIR = join(HUB_ROOT, 'apps', 'web');
 // misma máquina, así que dos jobs `e2e` se solapan a diario; con `reuseExistingServer: false` (que
 // en CI es deliberado) el segundo no reutilizaba el puerto ocupado: MORÍA en él —
 // «Error: http://127.0.0.1:8787/readyz is already used» — y el rojo caía en la PR que llegase
-// segunda, sin relación con su diff. Fuera de CI siguen siendo los de siempre, que es lo que hace
-// que `reuseExistingServer` encuentre el `pnpm dev` del desarrollador. Ver `bench-ports.ts`.
+// segunda, sin relación con su diff. Ver `bench-ports.ts`.
+//
+// hub#1812 — fuera de CI pasa lo MISMO, y salía peor: ahí los puertos sí eran fijos (8787/5173) y
+// `reuseExistingServer` valía `!CI`, o sea SIEMPRE. La segunda corrida de la máquina no moría en
+// el puerto ocupado: adoptaba los servidores de la primera y probaba la rama del VECINO, sin
+// decirlo. El síntoma es un rojo que miente («no encuentro el gancho que acabo de añadir»), así
+// que el rato se va en el diff y no en el banco — medido el 11/09 en #1756. Ahora reutilizar se
+// PIDE (`HUB_E2E_REUSE_SERVER=1`) y, si no se pide, cada corrida reparte su propio banco.
 const PORTS = resolveBenchPorts(process.env, process.pid);
+const REUSE_EXISTING_SERVER = shouldReuseExistingServer(process.env);
 const RUNTIME_BIND = process.env.HUB_BIND ?? `127.0.0.1:${PORTS.runtime}`;
 const RUNTIME_URL = process.env.HUB_RUNTIME_URL ?? `http://${RUNTIME_BIND}`;
 const WEB_URL = process.env.HUB_WEB_URL ?? `http://localhost:${PORTS.web}`;
@@ -84,11 +91,25 @@ export default defineConfig({
     // Un 0,2 % de píxeles (≈2.600 en 1440×900) absorbe eso y sigue cazando un bloque desplazado.
     toHaveScreenshot: { maxDiffPixelRatio: 0.002, animations: 'disabled', caret: 'hide' },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // hub#1752 — la zona horaria se FIJA, no se hereda de la máquina. El contrato visual
+        // fotografía pantallas que pintan la hora (ajustes: «Automática · Europe/Madrid, 08:51»),
+        // así que con la zona del runner de por medio reprovisionar ese runner pondría en rojo
+        // todas las baselines a la vez, sin que nadie hubiera tocado la UI. El instante lo congela
+        // `freezeVisualClock` (`shell-visual-helpers.ts`); esto fija el huso en el que se pinta.
+        timezoneId: 'Europe/Madrid',
+      },
+    },
+  ],
 
-  // Las dos mitades del banco. `reuseExistingServer` fuera de CI respeta el `pnpm dev` que el
-  // desarrollador ya tenga levantado; en CI se exige arrancarlas aquí, para que un proceso zombi
-  // de otro job no pueda contestar por ellas (el «runtime zombi miente» de los e2e del hub).
+  // Las dos mitades del banco. `reuseExistingServer` solo respeta el `pnpm dev` del desarrollador
+  // cuando ESTE lo pide (`HUB_E2E_REUSE_SERVER=1`, hub#1812); por defecto —y siempre en CI— se
+  // exige arrancarlas aquí, para que ni un proceso zombi de otro job ni el banco de otro worktree
+  // puedan contestar por ellas (el «runtime zombi miente» de los e2e del hub).
   webServer: [
     {
       // `cargo run` y no la ruta del binario: compila si hace falta (no-op cuando ya está) y así
@@ -102,7 +123,7 @@ export default defineConfig({
       // aplica en el arranque, ANTES de atar el listener). Era `/api/system`, que es `auth:session`
       // y en este banco ya no hay puerta de dev que lo abra sin sesión (hub#1249).
       url: `${RUNTIME_URL}/readyz`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: REUSE_EXISTING_SERVER,
       // En CI el binario ya está: 3 min es holgura de arranque (migraciones + seed), no de build.
       // En local el primer arranque SÍ compila el runtime entero, y 15 min es el techo realista.
       timeout: process.env.CI ? 180_000 : 900_000,
@@ -161,7 +182,7 @@ export default defineConfig({
       command: `pnpm exec vite --port ${PORTS.web} --strictPort`,
       cwd: WEB_DIR,
       url: WEB_URL,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: REUSE_EXISTING_SERVER,
       timeout: 120_000,
       stdout: 'pipe',
       stderr: 'pipe',

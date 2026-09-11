@@ -7,8 +7,13 @@
 // red landed on whatever PR happened to be second. The same fix already exists one file over:
 // `test-web.yml` gave its Postgres service a dynamic host port in hub#898, for this exact reason.
 //
-// Outside CI the classic ports stay: `reuseExistingServer: !CI` is what lets a developer keep
-// their own `pnpm dev` running, and that only works if the bench looks for it where it lives.
+// Outside CI the same allocator runs (ERPlora/hub#1812). The classic ports used to stay put here
+// so `reuseExistingServer: !CI` could find a developer's own `pnpm dev` — but "not CI" stopped
+// telling apart the two cases that matter the day ~44 agents shared this machine: ONE developer
+// with their dev server up (reuse is right) and TWO concurrent runs (reuse is a silent bug — the
+// second run tests the first one's branch and reports it as its own failure, #1756). So reuse is
+// now something you ASK for with `HUB_E2E_REUSE_SERVER=1`, and asking for it is what brings the
+// classic ports back: they are only meaningful together.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -154,6 +159,21 @@ function portFromNumber(value: string | undefined, name: string): number | undef
 }
 
 /**
+ * Whether Playwright may answer with a server that is ALREADY listening instead of starting its
+ * own (`webServer[].reuseExistingServer`).
+ *
+ * Opt-in, and never in CI (ERPlora/hub#1812). Reuse is right for exactly one situation — the
+ * developer who keeps `pnpm dev` up and wants the bench to drive it — and that person can say so.
+ * For everyone else it is how a run ends up testing another worktree's code without noticing. In
+ * CI the bench is the job's own by construction (hub#1517), so no env var reopens that door: a
+ * zombie server from the previous job on the slot must never be able to answer.
+ */
+export function shouldReuseExistingServer(env: BenchEnv): boolean {
+  if (env.CI) return false;
+  return env.HUB_E2E_REUSE_SERVER === '1';
+}
+
+/**
  * The three ports this bench will use. An explicit env var always wins — pinning one half of the
  * bench by hand has to keep working — and only the ports left unset are allocated.
  */
@@ -165,8 +185,9 @@ export function resolveBenchPorts(env: BenchEnv, pid: number): BenchPorts {
   };
   const keys: (keyof BenchPorts)[] = ['runtime', 'web', 'assistant'];
 
-  if (!env.CI) {
-    // Local: the well-known ports, so `reuseExistingServer` finds the developer's `pnpm dev`.
+  if (shouldReuseExistingServer(env)) {
+    // The developer asked to drive their own `pnpm dev`: it listens on the well-known ports, so
+    // that is where the bench has to look. Every other run allocates its own (hub#1812).
     return {
       runtime: pinned.runtime ?? CLASSIC_BENCH_PORTS.runtime,
       web: pinned.web ?? CLASSIC_BENCH_PORTS.web,

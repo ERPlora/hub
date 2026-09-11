@@ -36,29 +36,27 @@ export function resolveUpdateSnapshotsMode(env: VisualBaselineEnv): 'all' | 'non
  * Si el caso debe SALTARSE (con motivo) en vez de dejar que la aserción compare contra una
  * baseline ausente.
  *
- * Fuera de CI siempre se salta lo que falte (hub#1240 — un Mac nunca va a igualar el PNG de
- * Linux). En CI la respuesta depende de si esta pantalla ha llegado a tener ALGUNA baseline
- * generada (`baselineDirExists`, el directorio `<Spec>.spec.ts-snapshots/`):
+ * Solo fuera de CI (hub#1240 — un Mac nunca va a igualar el PNG de Linux, así que ahí la primera
+ * corrida crea una baseline local para poder trabajar y las siguientes comparan contra ella).
  *
- * - Directorio inexistente → la pantalla nunca se ha regenerado todavía (es justo el estado de
- *   este PR: cinco specs nuevos, cero PNG en el repo, y `visual-baselines.yml` no se puede
- *   disparar hasta llegar a `main`). Saltar en voz alta aquí es la MISMA razón por la que
- *   saltábamos en cualquier entorno antes de hub#1250: un rojo por un fichero que aún no existe
- *   no es una señal, es ruido — y sin este caso, fusionar este PR pondría en rojo permanente el
- *   job `e2e` de `test-web.yml` para cualquier PR que toque `apps/web/**`, mucho antes de que
- *   nadie haya podido generar nada.
- * - Directorio existente pero falta ESTE fichero → alguien la borró (a propósito o no) en una PR
- *   sobre un contrato que ya funcionaba. Ahí no se salta: cae a la aserción normal, que falla
- *   gracias a `resolveUpdateSnapshotsMode` devolviendo `'none'` — es el hueco que señaló Ioan en
- *   el comentario del 27/08 (hub#1250).
+ * 🔴 En CI NO se salta NUNCA: una baseline que falta es un FALLO. Hasta hub#1752 había aquí una
+ * excepción —si el directorio `<Spec>.spec.ts-snapshots/` no existía, se saltaba también en CI—
+ * pensada para el estado transitorio de hub#1250: cinco specs recién escritos y ningún PNG
+ * todavía, donde un rojo permanente habría sido ruido. El problema es que ese estado no fue
+ * transitorio: `visual-baselines.yml` no llegó a correr NI UNA VEZ, la issue se cerró igual, y
+ * durante doce días cada PR del repo enseñó un `playwright (test:e2e)` en verde que parecía decir
+ * «el aspecto está comprobado» sin haber mirado una sola pantalla. Con las baselines ya
+ * commiteadas, lo único que esa excepción podía seguir tapando era que alguien las borrase
+ * enteras — que es exactamente el caso que hay que ver en rojo.
+ *
+ * El guardia que impide volver al estado sin baselines es `tests/visual-baselines-present.test.ts`,
+ * que corre en vitest (sin navegador) y falla en segundos en vez de veinte minutos.
  */
 export function shouldSkipMissingBaselineLocally(
   env: VisualBaselineEnv,
   baselineExists: boolean,
-  baselineDirExists: boolean,
 ): boolean {
   if (env.HUB_UPDATE_BASELINES === '1') return false;
   if (baselineExists) return false;
-  if (!env.CI) return true;
-  return !baselineDirExists;
+  return !env.CI;
 }

@@ -9,7 +9,6 @@
 
 import { expect, request as pwRequest, type Page, type TestInfo } from '@playwright/test';
 import { existsSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { shouldSkipMissingBaselineLocally } from '../../src/lib/visual-baseline-gate';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
@@ -20,11 +19,7 @@ interface Session {
 }
 
 /** Los tres anchos del contrato de UI del proyecto: escritorio, tablet y móvil. */
-export const VIEWPORTS = [
-  { width: 1440, height: 900 },
-  { width: 834, height: 1112 },
-  { width: 390, height: 844 },
-] as const;
+export { VIEWPORTS } from './viewports';
 
 /** Sesión REAL del runtime vía `/api/auth/pin` (usuario Demo / PIN 0000 del seed de dev). */
 export async function loginByPin(): Promise<Session> {
@@ -60,23 +55,47 @@ export async function loggedInSession(page: Page): Promise<void> {
 }
 
 /**
+ * Instante que ve el navegador en TODA captura del contrato visual.
+ *
+ * Un lunes, laborable, a media mañana y lejos del cambio de hora: el saludo del dashboard sale
+ * «Buenos días» en las dos zonas horarias que este banco usa (UTC en el runner, Europe/Madrid en
+ * un Mac), y la fecha no cae ni en fin de semana ni en festivo, que es lo que cambia la forma de
+ * una pantalla de agenda el día que una entre en el contrato.
+ */
+const VISUAL_CLOCK = new Date('2026-01-12T09:30:00.000Z');
+
+/**
+ * Congela el reloj del navegador ANTES de navegar. Hay que llamarlo en todo `*Visual.spec.ts`, y
+ * lo exige `tests/visual-baselines-present.test.ts`.
+ *
+ * Por qué: dos de las cinco pantallas del contrato pintan la hora —el dashboard su saludo y su
+ * fecha («Buenos días · Hoy, viernes, 11 de septiembre»), ajustes la hora de la zona horaria
+ * («Automática · Europe/Madrid, 08:51»)—. Con el reloj vivo, su baseline caduca sola: la de
+ * ajustes al minuto siguiente y la del dashboard al día siguiente, y el rojo cae sobre PRs que no
+ * han tocado esa pantalla. Es exactamente el fallo que hace que un gate se acabe ignorando.
+ *
+ * `setFixedTime` y no `install()`: solo fija lo que `Date` contesta. `install()` además PARA los
+ * temporizadores, y el shell monta con `setTimeout` de por medio (Ionic hidratando, las
+ * transiciones de vista), así que pausarlos deja la captura a medio pintar.
+ */
+export async function freezeVisualClock(page: Page): Promise<void> {
+  await page.clock.setFixedTime(VISUAL_CLOCK);
+}
+
+/**
  * Salta el caso (con motivo, en voz alta) si la baseline de esta plataforma no existe TODAVÍA.
  *
- * Fuera de CI, siempre (hub#1240: un Mac nunca va a igualar el PNG de Linux). En CI, solo si esta
- * pantalla no ha llegado a tener NINGUNA baseline generada todavía (el directorio
- * `<Spec>.spec.ts-snapshots/` no existe) — que es el estado de hub#1250 hasta que
- * `visual-baselines.yml` corra por primera vez. En cuanto exista una sola baseline para esta
- * pantalla, que falte ESTE fichero deja de saltarse y cae a la aserción normal: alguien la borró
- * en una PR, y eso tiene que fallar (`updateSnapshots: 'none'` en `playwright.config.ts`), no
- * saltarse en silencio.
+ * Fuera de CI, siempre (hub#1240: un Mac nunca va a igualar el PNG de Linux). En CI, NUNCA
+ * (hub#1752): allí una baseline que falta cae a la aserción normal y falla nombrando la captura
+ * —`updateSnapshots: 'none'` en `playwright.config.ts`—, porque alguien la borró en una PR sobre
+ * un contrato que ya funcionaba.
  *
  * `testInfo.skip()` aborta la ejecución del caso en el sitio si corresponde saltar — la llamada
  * es suficiente, no hace falta comprobar un valor de vuelta.
  */
 export function skipIfBaselineMissingLocally(testInfo: TestInfo, snapshot: string): void {
   const baseline = testInfo.snapshotPath(snapshot);
-  const baselineDirExists = existsSync(dirname(baseline));
-  if (shouldSkipMissingBaselineLocally(process.env, existsSync(baseline), baselineDirExists)) {
+  if (shouldSkipMissingBaselineLocally(process.env, existsSync(baseline))) {
     const reason = `falta la baseline ${baseline} — genérala con el workflow visual-baselines.yml (workflow_dispatch, en Linux)`;
     // El reporter `list` pinta un guion por caso saltado y el motivo no lo pinta nadie: sin esta
     // línea, el salto solo se descubre leyendo el log entero. En CI va además como anotación de

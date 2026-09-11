@@ -4,7 +4,7 @@
 // `EmployeesPage.vue`): la lista de `hub_user` del seed de dev (solo el usuario Demo) — no depende
 // de ningún módulo de negocio, así que es determinista con el hub vacío del banco de e2e.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — personal', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -12,6 +12,7 @@ test.describe('contrato visual del shell — personal', () => {
       const snapshot = `employees-${width}.png`;
       skipIfBaselineMissingLocally(testInfo, snapshot);
 
+      await freezeVisualClock(page);
       await page.setViewportSize({ width, height });
       await loggedInSession(page);
       await page.goto('/employees');

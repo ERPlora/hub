@@ -4,7 +4,7 @@
 // país, huso horario, moneda e idioma del hub del seed de dev — ninguno depende de módulos
 // instalados, así que la pantalla es determinista con el hub vacío del banco de e2e.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — ajustes', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -12,6 +12,7 @@ test.describe('contrato visual del shell — ajustes', () => {
       const snapshot = `settings-${width}.png`;
       skipIfBaselineMissingLocally(testInfo, snapshot);
 
+      await freezeVisualClock(page);
       await page.setViewportSize({ width, height });
       await loggedInSession(page);
       await page.goto('/settings');
