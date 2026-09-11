@@ -322,14 +322,18 @@ describe('the tabbar settle point of the visual contract (hub#1823)', () => {
   });
 
   it('REGRESSION: looks INSIDE shadow roots, where the scrolling element of ion-segment lives', () => {
-    // `ion-segment` does not scroll: the `.segment-scroll` inside its shadow root does.
-    // `document.querySelectorAll('*')` never returns it.
+    // `ion-segment` does not scroll: the `.segment-scroll` inside its shadow root does, and
+    // `document.querySelectorAll('*')` never returns it. The case has to be built so that MISSING
+    // it changes the answer — a predicate blind to shadow roots sees an empty page, calls it quiet
+    // after the window, and says YES at 800 ms while the tabbar is visibly sliding. (Written the
+    // obvious way first, it answered the same either way and let the mutant live.)
     const answers = scrollTimeline([
       { at: 100, scrollers: [{ ...TABBAR, scrollLeft: 0, inShadowRootOf: 'ion-segment' }] },
-      { at: 200, scrollers: [{ ...TABBAR, scrollLeft: 28, inShadowRootOf: 'ion-segment' }] },
-      { at: 900, scrollers: [{ ...TABBAR, scrollLeft: 28, inShadowRootOf: 'ion-segment' }] },
+      { at: 800, scrollers: [{ ...TABBAR, scrollLeft: 28, inShadowRootOf: 'ion-segment' }] },
+      { at: 900, scrollers: [{ ...TABBAR, scrollLeft: 14, inShadowRootOf: 'ion-segment' }] },
+      { at: 1600, scrollers: [{ ...TABBAR, scrollLeft: 14, inShadowRootOf: 'ion-segment' }] },
     ]);
-    expect(answers).toEqual([false, false, true]);
+    expect(answers).toEqual([false, false, false, true]);
   });
 
   it('REGRESSION: ignores a box that OVERFLOWS but cannot scroll, like the dashboard meter', () => {
