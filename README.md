@@ -127,8 +127,18 @@ pnpm -F @erplora/web typecheck                  # TS estricto
 ```
 
 Los e2e levantan ELLOS el banco (`webServer` de `tests/playwright.config.ts`: runtime Axum +
-Vite), así que no hace falta un `pnpm dev` al lado — si ya lo tienes, lo reutilizan. Lo único
-que piden es una BD que exista:
+Vite), así que no hace falta un `pnpm dev` al lado. **Cada corrida reparte SUS puertos** y no
+adopta servidores que se encuentre levantados (hub#1812): dos corridas a la vez en la misma
+máquina —lo normal con varios worktrees— probaban antes la misma rama, la del primero, y el
+segundo lo veía como un fallo de su propio código. Si quieres lo contrario —que el banco
+conduzca el `pnpm dev` que ya tienes en 8787/5173— **pídelo**:
+
+```sh
+HUB_E2E_REUSE_SERVER=1 pnpm -F @erplora/web test:e2e    # reutiliza TU `pnpm dev`
+```
+
+En CI esa variable no vale: el banco es siempre el del job (hub#1517). Lo único que los e2e
+piden es una BD que exista:
 
 ```sh
 docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_web'
@@ -136,10 +146,23 @@ docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_as
 export E2E_DATABASE_URL=postgres://postgres:test@localhost:5433/hub_e2e_assistant
 ```
 
-Las capturas de `toHaveScreenshot` **se generan donde corren** (el runner Linux de
-`test-web.yml`: Run workflow → `update_baselines: true` → artefacto `playwright-baselines`).
-Las de un Mac no casan jamás con las de Linux y están en el `.gitignore`; mientras no exista
-la baseline de tu plataforma, el caso visual se salta diciéndolo.
+Las capturas de `toHaveScreenshot` **se generan donde corren**: las baselines que manda el
+repo son las del runner Linux, y se regeneran con el workflow **«Regenerar baselines visuales
+(Linux)»** (Run workflow → `confirm: true` → artefacto `playwright-baselines`, que se commitea
+en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/`). Las de un Mac no casan jamás con las de
+Linux y están en el `.gitignore`; en tu máquina el caso visual se salta diciéndolo (medido: no crea
+nada). Para tener baselines locales con las que trabajar, pídelas una vez —se escriben las de tu
+plataforma y las siguientes corridas comparan contra ellas—:
+
+```sh
+HUB_UPDATE_BASELINES=1 pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts Visual
+```
+
+**En CI una baseline que falte es un FALLO, nunca un salto** (hub#1752): si el repo se queda
+sin las capturas de una pantalla, el banco visual dejaría de comparar nada mientras el check
+sigue en verde — que es justo el agujero que esto cierra. El guardia que lo impide es
+`tests/visual-baselines-present.test.ts`, y corre en `pnpm -F @erplora/web test` (sin
+navegador), así que salta en segundos y no dentro de los 20 minutos del e2e.
 
 ## Decisiones fijadas (ver §14–15 del doc)
 

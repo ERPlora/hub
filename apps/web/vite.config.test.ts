@@ -4,6 +4,8 @@
 // (VITE_PORT, VITE_RUNTIME_TARGET, or derived from HUB_BIND), with today's values as defaults.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { availableParallelism } from 'node:os';
+import { readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const ENV_KEYS = ['VITE_PORT', 'VITE_RUNTIME_TARGET', 'HUB_BIND'] as const;
 let saved: Record<string, string | undefined>;
@@ -227,6 +229,34 @@ describe('the vitest pool is bounded, not sized off the machine (hub#1364)', () 
     } finally {
       vi.doUnmock('node:os');
       vi.resetModules();
+    }
+  });
+});
+
+// Regression test for ERPlora/hub#1752 — a test file nobody runs is a green that means nothing.
+//
+// `test.include` in `vite.config.ts` is an ALLOWLIST, not a glob over the tree, and the four
+// bench files under `tests/` were listed one by one. Adding a fifth and forgetting the line does
+// not fail: vitest reports "No test files found" for that path and the suite stays green without
+// it — which is the same shape of hole this batch is closing in the visual bench.
+describe('vitest include covers tests/ (hub#1752)', () => {
+  it('REGRESIÓN: ningún `tests/*.test.ts` del árbol se queda sin correr', async () => {
+    const cfg = await loadConfig();
+    const testsDir = fileURLToPath(new URL('./tests', import.meta.url));
+    const onDisk = readdirSync(testsDir).filter((f) => f.endsWith('.test.ts'));
+    // If this ever reads zero, the loop below would prove nothing at all.
+    expect(onDisk.length).toBeGreaterThanOrEqual(4);
+
+    const patterns: string[] = cfg.test.include;
+    for (const file of onDisk) {
+      const covered = patterns.some(
+        (p) => p === `tests/${file}` || p === 'tests/*.test.ts' || p === 'tests/**/*.test.ts',
+      );
+      expect(
+        covered,
+        `tests/${file} no lo cubre ningún patrón de test.include → vitest NO lo corre, ` +
+          'y su rojo no lo vería nadie (hub#1752)',
+      ).toBe(true);
     }
   });
 });

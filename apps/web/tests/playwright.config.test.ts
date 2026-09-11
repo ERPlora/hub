@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createServer, type Server } from 'node:net';
 import { BENCH_WINDOW_FIRST, BENCH_WINDOW_LAST } from './bench-ports.ts';
+import { BENCH_APP_VERSION } from './bench-app-version.ts';
 
 // Every key the config READS or WRITES. The ports (hub#1517) matter twice over: the config
 // EXPORTS `HUB_RUNTIME_URL`/`HUB_WEB_URL`/`HUB_E2E_ASSISTANT_PORT` so the specs follow the bench,
@@ -19,6 +20,7 @@ import { BENCH_WINDOW_FIRST, BENCH_WINDOW_LAST } from './bench-ports.ts';
 const ENV_KEYS = [
   'CI',
   'HUB_UPDATE_BASELINES',
+  'HUB_E2E_REUSE_SERVER',
   'HUB_BIND',
   'HUB_RUNTIME_URL',
   'HUB_WEB_URL',
@@ -160,10 +162,68 @@ describe('playwright.config bench ports (hub#1517)', () => {
     expect(worker.webServer[0].env.HUB_BIND).toBe(runner.webServer[0].env.HUB_BIND);
   });
 
-  it('outside CI the bench keeps 8787/5173: reuseExistingServer has to find the developer`s `pnpm dev`', async () => {
+  it('a developer who ASKS to reuse their `pnpm dev` gets 8787/5173 back (hub#1812)', async () => {
+    process.env.HUB_E2E_REUSE_SERVER = '1';
     const cfg = await loadConfig();
     expect(cfg.webServer[0].url).toBe('http://127.0.0.1:8787/readyz');
     expect(cfg.use.baseURL).toBe('http://localhost:5173');
     expect(cfg.webServer[1].command).toContain('--port 5173');
+    for (const server of cfg.webServer) expect(server.reuseExistingServer).toBe(true);
   });
 });
+
+// Regression test for ERPlora/hub#1812 — the config must not let a LOCAL run answer with the
+// bench of another worktree. `bench-ports.test.ts` proves the allocator; this proves the config
+// file wires it, which is the half that was broken: `reuseExistingServer: !process.env.CI` said
+// "true" for every run on a developer's machine, so the second of two concurrent runs silently
+// tested the first one's branch (#1756).
+describe('playwright.config local bench isolation (hub#1812)', () => {
+  it('REGRESSION: outside CI the config starts its OWN bench instead of taking over one it found', async () => {
+    const cfg = await loadConfig();
+    for (const server of cfg.webServer) expect(server.reuseExistingServer).toBe(false);
+
+    const runtimePort = runtimePortOf(cfg);
+    const webPort = Number(new URL(String(cfg.use.baseURL)).port);
+    for (const port of [runtimePort, webPort]) {
+      expect(port).toBeGreaterThanOrEqual(BENCH_WINDOW_FIRST);
+      expect(port).toBeLessThanOrEqual(BENCH_WINDOW_LAST);
+    }
+    // Vite has to be told the port the config advertises, or the bench waits on a URL nothing
+    // serves; `--strictPort` then makes a collision loud instead of silently serving elsewhere.
+    expect(cfg.webServer[1].command).toContain(`--port ${webPort}`);
+    expect(cfg.webServer[1].command).toContain('--strictPort');
+    expect(cfg.webServer[1].url).toBe(cfg.use.baseURL);
+  });
+
+  it('REGRESSION: two local runs on this machine do not ask for the same runtime port', async () => {
+    const first = await loadConfig();
+    const busy = runtimePortOf(first);
+    await occupy(busy);
+
+    // The first load exported its bench into the env; a second load inheriting it would reuse the
+    // same ports and the assertion below would pass for the wrong reason.
+    for (const key of ENV_KEYS) delete process.env[key];
+
+    const second = await loadConfig();
+    expect(runtimePortOf(second)).not.toBe(busy);
+  });
+});
+
+describe('playwright.config visual determinism (hub#1752)', () => {
+  it('REGRESIÓN: el huso horario del navegador está FIJADO, no heredado de la máquina', async () => {
+    const cfg = await loadConfig();
+    expect(cfg.projects[0].use.timezoneId).toBe('Europe/Madrid');
+  });
+
+  // El pie del sidebar entra en las baselines que llevan sesión, y ahí va la versión de la app,
+  // que `vite.config.ts` resuelve por env `APP_VERSION` > último tag de git > package.json. Sin
+  // fijarla, la imagen depende del estado del checkout que la generó (un Mac con tags: `v1.1.7`;
+  // el runner, que clona en superficial: `v0.0.0`), y la baseline commiteada deja de ser
+  // reproducible fuera del sitio exacto donde se horneó. Ver `bench-app-version.ts`, que además
+  // deja medido por qué esto NO es el rojo masivo que parece (el umbral lo absorbe hoy).
+  it('REGRESIÓN: la versión que pinta el sidebar la FIJA el banco, no el estado del checkout', async () => {
+    const cfg = await loadConfig();
+    expect(cfg.webServer[1].env.APP_VERSION).toBe(BENCH_APP_VERSION);
+  });
+});
+
