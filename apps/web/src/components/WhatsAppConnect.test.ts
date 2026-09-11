@@ -79,7 +79,7 @@ describe('what the owner sees', () => {
     const wrapper = mountBlock();
     await flushPromises();
     expect(wrapper.text().trim()).toBe('');
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(false);
   });
 
   it('offers to connect, in Spanish, when no number is connected', async () => {
@@ -88,7 +88,7 @@ describe('what the owner sees', () => {
     expect(wrapper.text()).toContain('Conectar WhatsApp');
     expect(wrapper.text()).not.toContain('Connect WhatsApp');
     expect(wrapper.text()).toContain('WhatsApp Business');
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(true);
   });
 
   it('and in English for an English till', async () => {
@@ -103,8 +103,8 @@ describe('what the owner sees', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('+34 612 345 678');
     expect(wrapper.text()).toContain(es.whatsappConnect.businessApp);
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="whatsapp-disconnect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-disconnect-button"]').exists()).toBe(true);
   });
 
   it('says the hub could not be reached instead of a blank block when the doors fail at mount', async () => {
@@ -114,7 +114,7 @@ describe('what the owner sees', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
     expect(wrapper.text()).toContain(es.whatsappConnect.errors.unreachable);
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(false);
   });
 
   it('tells a cashier this is the owner’s when the runtime refuses the doors', async () => {
@@ -124,22 +124,22 @@ describe('what the owner sees', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
     expect(wrapper.text()).toContain(es.whatsappConnect.errors.forbidden);
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="whatsapp-retry-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-retry-button"]').exists()).toBe(false);
   });
 
   it('offers to retry after a failed mount and recovers when the doors answer', async () => {
     vi.mocked(fetchWhatsAppConfig).mockRejectedValueOnce(new WhatsAppConnectError('unreachable', 0)).mockResolvedValueOnce(CONFIG);
     const wrapper = mountBlock('es');
     await flushPromises();
-    expect(wrapper.find('[data-test="whatsapp-retry-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-retry-button"]').exists()).toBe(true);
 
-    await wrapper.find('[data-test="whatsapp-retry-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-retry-button"]').trigger('click');
     await flushPromises();
 
     expect(vi.mocked(fetchWhatsAppConfig)).toHaveBeenCalledTimes(2);
     expect(wrapper.text()).not.toContain(es.whatsappConnect.errors.unreachable);
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(true);
   });
 
   it('tells a cashier this is the owner’s, without a button', async () => {
@@ -147,7 +147,7 @@ describe('what the owner sees', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
     expect(wrapper.text()).toContain(es.whatsappConnect.adminOnly);
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(false);
   });
 });
 
@@ -160,14 +160,14 @@ describe('connecting', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    await wrapper.find('[data-test="whatsapp-connect-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-connect-button"]').trigger('click');
     await flushPromises();
 
     expect(vi.mocked(loadMetaSdk).mock.calls[0][0]).toMatchObject({ appId: '1534856651538860', graphVersion: 'v25.0', locale: 'es' });
     expect(vi.mocked(openEmbeddedSignup).mock.calls[0][1]).toBe('cfg_987');
     expect(vi.mocked(connectWhatsApp)).toHaveBeenCalledWith(popup);
     expect(wrapper.text()).toContain('+34 612 345 678');
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(false);
   });
 
   it('turns a refusal into a sentence the owner can act on', async () => {
@@ -176,12 +176,12 @@ describe('connecting', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    await wrapper.find('[data-test="whatsapp-connect-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-connect-button"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain(es.whatsappConnect.errors.no_phone_number);
     expect(wrapper.text()).not.toContain('no_phone_number');
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(true);
   });
 
   it('says so, quietly, when the person closes the popup', async () => {
@@ -189,7 +189,7 @@ describe('connecting', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    await wrapper.find('[data-test="whatsapp-connect-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-connect-button"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain(es.whatsappConnect.errors.cancelled);
@@ -201,11 +201,11 @@ describe('connecting', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    await wrapper.find('[data-test="whatsapp-disconnect-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-disconnect-button"]').trigger('click');
     await flushPromises();
 
     expect(vi.mocked(disconnectWhatsApp)).toHaveBeenCalledWith('phone_123');
-    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(true);
   });
 });
 
@@ -233,7 +233,7 @@ describe('when Meta drops the permission (hub#1626)', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain(es.whatsappConnect.reconnectNeeded);
-    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-reconnect-button"]').exists()).toBe(true);
   });
 
   it('and in English for an English till', async () => {
@@ -263,8 +263,8 @@ describe('when Meta drops the permission (hub#1626)', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    expect(wrapper.find('[data-test="whatsapp-status-badge"]').attributes('color')).toBe('danger');
-    expect(wrapper.find('[data-test="whatsapp-reconnect-needed"]').attributes('role')).toBe('alert');
+    expect(wrapper.find('[data-testid="whatsapp-status-badge"]').attributes('color')).toBe('danger');
+    expect(wrapper.find('[data-testid="whatsapp-reconnect-needed"]').attributes('role')).toBe('alert');
   });
 
   it('tells a cashier what is wrong, without a button they cannot use', async () => {
@@ -275,7 +275,7 @@ describe('when Meta drops the permission (hub#1626)', () => {
 
     expect(wrapper.text()).toContain(es.whatsappConnect.reconnectNeeded);
     expect(wrapper.text()).toContain(es.whatsappConnect.adminOnly);
-    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-reconnect-button"]').exists()).toBe(false);
   });
 
   it('reconnects through the same door as the first connection, and the alarm clears', async () => {
@@ -286,13 +286,13 @@ describe('when Meta drops the permission (hub#1626)', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    await wrapper.find('[data-test="whatsapp-reconnect-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-reconnect-button"]').trigger('click');
     await flushPromises();
 
     expect(vi.mocked(connectWhatsApp)).toHaveBeenCalledWith(popup);
     expect(wrapper.text()).toContain(es.whatsappConnect.connected);
     expect(wrapper.text()).not.toContain(es.whatsappConnect.reconnectNeeded);
-    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-reconnect-button"]').exists()).toBe(false);
   });
 
   it('says why a reconnection failed instead of going quiet', async () => {
@@ -301,13 +301,13 @@ describe('when Meta drops the permission (hub#1626)', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    await wrapper.find('[data-test="whatsapp-reconnect-button"]').trigger('click');
+    await wrapper.find('[data-testid="whatsapp-reconnect-button"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).toContain(es.whatsappConnect.errors.sdk_unavailable);
     expect(wrapper.text()).not.toContain('sdk_unavailable');
     // The way out stays open: a failed retry that hides its own button strands the owner.
-    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="whatsapp-reconnect-button"]').exists()).toBe(true);
   });
 
   it('leaves a healthy number alone', async () => {
@@ -319,7 +319,7 @@ describe('when Meta drops the permission (hub#1626)', () => {
 
     expect(wrapper.text()).toContain(es.whatsappConnect.connected);
     expect(wrapper.text()).toContain(es.whatsappConnect.connectedHelp);
-    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="whatsapp-status-badge"]').attributes('color')).toBe('success');
+    expect(wrapper.find('[data-testid="whatsapp-reconnect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="whatsapp-status-badge"]').attributes('color')).toBe('success');
   });
 });

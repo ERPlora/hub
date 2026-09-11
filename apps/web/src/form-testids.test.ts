@@ -37,8 +37,12 @@ const SRC = fileURLToPath(new URL('.', import.meta.url));
  * cobertura) y su contrato escrito (regla de contrato). Añadir un campo a una de estas pantallas
  * obliga a tocar esta lista — a propósito: es el momento en el que alguien decide cómo se va a
  * llamar ese campo para el resto del mundo.
+ *
+ * `computed` is that same contract for the hooks Vue builds at render time (`:data-testid`),
+ * declared by their FIXED part — the head QA can predict, with the row's identity appended. They
+ * used to be invisible here: renaming one stayed green and broke the specs addressing it (hub#1828).
  */
-const COVERED: Record<string, { prefix: string; contract: string[] }> = {
+const COVERED: Record<string, { prefix: string; contract: string[]; computed?: string[] }> = {
   // La pantalla de esta issue: alta, edición y baja de una persona del hub (`/employees/new` y
   // `/employees/:id`). Es la ruta por la que el QA puede montar la plantilla entera —y con ella la
   // matriz de roles del checklist— sin tocar un solo selector por texto.
@@ -113,6 +117,10 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'api-key-secret-modal',
       'api-key-table',
     ],
+    computed: [
+      'api-key-read-',
+      'api-key-write-',
+    ],
   },
   // El flujo de import de blueprints es el patrón de referencia citado por hub#1756: ya era el
   // único que el QA sabía conducir. Queda congelado aquí para que siga siéndolo.
@@ -139,6 +147,9 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'import-section-users',
       'import-submit',
       'import-upload-local',
+    ],
+    computed: [
+      'import-module-',
     ],
   },
   // Regression test for ERPlora/hub#1809 — the hub's front door.
@@ -179,6 +190,9 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'login-trust-info',
       'login-upgrade-plan',
       'login-use-pin',
+    ],
+    computed: [
+      'login-pin-user-',
     ],
   },
   // Regression test for ERPlora/hub#1810 — profile, hub settings, PIN policy, devices and
@@ -252,6 +266,10 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'settings-tabs',
       'settings-timezone',
     ],
+    computed: [
+      'settings-capability-',
+      'settings-capability-breaks-',
+    ],
   },
   // «Ask who is selling» (Settings › Hub): the pinpad toggle, the idle dial and the PIN length.
   // It is the card the PIN e2e depends on.
@@ -275,6 +293,15 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
   'components/DevicesCard.vue': {
     prefix: 'devices-',
     contract: ['devices-admin-only', 'devices-card', 'devices-empty', 'devices-error'],
+    computed: [
+      'devices-cancel-',
+      'devices-cancel-name-',
+      'devices-confirm-',
+      'devices-name-',
+      'devices-rename-',
+      'devices-revoke-',
+      'devices-save-name-',
+    ],
   },
   // «This device» (Settings › Hub): shared or personal, the decision of whether this till asks for a PIN.
   'components/DeviceModeCard.vue': {
@@ -324,6 +351,9 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'export-select-all',
       'export-submit',
     ],
+    computed: [
+      'export-table-',
+    ],
   },
   'components/RepresentationGrantPanel.vue': {
     prefix: 'grant-',
@@ -350,10 +380,18 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'grant-signer-via',
       'grant-submit',
     ],
+    computed: [
+      'grant-state-',
+    ],
   },
   'components/ResetPanel.vue': {
     prefix: 'reset-',
     contract: ['reset-export-first', 'reset-report', 'reset-submit'],
+    computed: [
+      'reset-batch-',
+      'reset-section-',
+      'reset-undo-',
+    ],
   },
   'components/UserSwitchOverlay.vue': {
     prefix: 'user-switch-',
@@ -395,6 +433,13 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'assistant-thread',
       'assistant-voice-error',
     ],
+    computed: [
+      'assistant-goto-',
+      'assistant-grounding-',
+      'assistant-message-',
+      'assistant-suggest-',
+      'assistant-typing-',
+    ],
   },
   // An app's settings. The form is GENERATED from the module manifest, so the hook cannot be a
   // literal per field: it derives from the setting key (`module-settings-field-${key}`), like the
@@ -409,6 +454,11 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'module-settings-loading',
       'module-settings-refusal',
       'module-settings-save',
+    ],
+    computed: [
+      'module-settings-field-',
+      'module-settings-invalid-',
+      'module-settings-preview-',
     ],
   },
   // Control reutilizable: el `data-testid` se lo pone QUIEN lo usa (`:data-testid="testid"`), así
@@ -456,6 +506,23 @@ const CONTROL_OPEN = new RegExp(`<(${CONTROL_TAGS.join('|')})(?=[\\s/>])`, 'g');
 
 /** `data-testid="…"` escrito a mano. El `:data-testid` de Vue (valor calculado) NO cuenta aquí. */
 const LITERAL_TESTID = /(?<![:\w-])data-testid="([^"]*)"/g;
+
+/**
+ * The other half: the hook whose name Vue builds at render time, `:data-testid` with a template.
+ * QA addresses it as «fixed head + the row's identity», so the head is the contract — and the
+ * literal rules above never see it, on purpose (`LITERAL_TESTID` excludes `:data-testid`). That
+ * blind spot is hub#1828: renaming `login-pin-user-` left this file at 11/11 green while the specs
+ * that clicked it broke somewhere else, days later and in another repo.
+ */
+const COMPUTED_TESTID = /(?<![\w-]):data-testid="([^"]*)"/g;
+
+/**
+ * Any `data-test…` attribute, so the guard can tell the hook from the variants that look like one
+ * and are not. Playwright resolves `getByTestId` against `data-testid` and nothing else
+ * (`testIdAttribute` is not overridden in `tests/playwright.config.ts`), so `data-test="x"` is a
+ * hook the robot cannot reach — and the spec that reads it asserts on nothing for ever.
+ */
+const TEST_ATTR = /(?<![\w-])(data-test[\w-]*)\s*=\s*("[^"]*"|'[^']*')?/g;
 
 /** Kebab-case: minúsculas y dígitos separados por un solo guión. */
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -518,6 +585,32 @@ const SURFACES: Array<{ name: string; source: string }> = vueFiles(SRC)
   .map((full) => ({ name: relative(SRC, full), source: readFileSync(full, 'utf8') }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
+/** The Playwright tree: the other half of the shell for the attribute rule below. */
+const TESTS = fileURLToPath(new URL('../tests/', import.meta.url));
+
+/**
+ * Everything the shell is made of AND every spec that drives it — `src/` (`parked/` included: an
+ * unreachable hook is worth nothing there either) plus `tests/`.
+ *
+ * The attribute rule has to reach both halves. A screen that writes `data-test` is a screen the
+ * robot cannot address; a spec that keeps reading `[data-test="…"]` after the screen stopped
+ * writing it asserts `exists() === false` for ever, which is how a rule that never fires disguises
+ * itself as a rule that passes.
+ *
+ * This very file is the only exclusion, and it has to be: a guard that forbids an attribute has to
+ * spell the attribute out in order to forbid it.
+ */
+const SHELL_SOURCES: Array<{ name: string; source: string }> = [
+  ...sourceFiles(SRC).map((full) => ({ root: SRC, full })),
+  ...sourceFiles(TESTS).map((full) => ({ root: TESTS, full })),
+]
+  .map(({ root, full }) => ({
+    name: (root === SRC ? '' : '../tests/') + relative(root, full),
+    source: readFileSync(full, 'utf8'),
+  }))
+  .filter(({ name }) => !name.endsWith('form-testids.test.ts'))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
 const templateOf = (source: string): string =>
   source.match(/<template>([\s\S]*)<\/template>/)?.[1] ?? '';
 
@@ -545,6 +638,40 @@ function literalTestids(source: string): string[] {
   for (let m = LITERAL_TESTID.exec(source); m; m = LITERAL_TESTID.exec(source)) found.push(m[1]);
   return found;
 }
+
+/**
+ * The fixed head of a computed hook: a template `devices-rename-` + the interpolated id → the
+ * string `devices-rename-`.
+ *
+ * `null` means the expression spells out no predictable head, and there are exactly two ways to
+ * write one: a bare prop (`:data-testid="testid"` — the reusable control, whose HOST writes the
+ * name) or a template that opens with the interpolation. The first is legal on a control with no
+ * namespace of its own; the second is addressable by nobody, and the rules below say so.
+ */
+function fixedPartOf(expression: string): string | null {
+  const template = expression.match(/^`([^`]*)`$/);
+  if (!template) return null;
+  const head = template[1].split('${')[0];
+  return head === '' ? null : head;
+}
+
+function computedTestids(source: string): Array<{ expression: string; fixed: string | null }> {
+  const found: Array<{ expression: string; fixed: string | null }> = [];
+  COMPUTED_TESTID.lastIndex = 0;
+  for (let m = COMPUTED_TESTID.exec(source); m; m = COMPUTED_TESTID.exec(source)) {
+    found.push({ expression: m[1], fixed: fixedPartOf(m[1]) });
+  }
+  return found;
+}
+
+/** The fixed heads a screen writes today, deduplicated — every row of a list shares one head. */
+const fixedParts = (source: string): string[] => [
+  ...new Set(
+    computedTestids(source)
+      .map((c) => c.fixed)
+      .filter((fixed): fixed is string => fixed !== null),
+  ),
+];
 
 const uncoveredControls = (source: string): string[] =>
   controls(source)
@@ -599,6 +726,77 @@ describe('data-testid — convención del shell (hub#1756)', () => {
       }
     }
     expect(drift, 'renombrar un data-testid rompe la suite de QA: decláralo aquí').toEqual([]);
+  });
+
+  it('the fixed head of every computed hook is kebab-case', () => {
+    const offenders: string[] = [];
+    for (const { name, source } of SURFACES) {
+      for (const fixed of fixedParts(source)) {
+        if (!KEBAB.test(fixed.replace(/-$/, ''))) offenders.push(`${name}: "${fixed}"`);
+      }
+    }
+    expect(offenders, 'a head that is not kebab-case breaks what QA predicts').toEqual([]);
+  });
+
+  it('the computed contract is EXACTLY the one on the screen', () => {
+    const drift: string[] = [];
+    for (const [name, spec] of Object.entries(COVERED)) {
+      const surface = SURFACES.find((s) => s.name === name);
+      const found = fixedParts(surface?.source ?? '').sort();
+      const declared = [...(spec.computed ?? [])].sort();
+      for (const missing of declared.filter((v) => !found.includes(v))) {
+        drift.push(`${name}: the contract declares "${missing}…" and the screen no longer has it`);
+      }
+      for (const extra of found.filter((v) => !declared.includes(v))) {
+        drift.push(`${name}: the screen has "${extra}…" and the contract does not declare it`);
+      }
+    }
+    expect(drift, 'renaming a computed data-testid breaks the QA suite: declare it here').toEqual(
+      [],
+    );
+  });
+
+  it('every computed hook lives in the namespace of its screen', () => {
+    const offenders: string[] = [];
+    for (const [name, spec] of Object.entries(COVERED)) {
+      if (!spec.prefix) continue;
+      const surface = SURFACES.find((s) => s.name === name);
+      for (const fixed of fixedParts(surface?.source ?? '')) {
+        if (!fixed.startsWith(spec.prefix)) offenders.push(`${name}: "${fixed}…" ≠ ${spec.prefix}*`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('a computed hook with no fixed head only belongs to a reusable control', () => {
+    // A screen with a namespace of its own spells its hooks out; `prefix: ''` is how this register
+    // marks the control that has none, because whoever uses it writes the name (`GrantFilePicker`).
+    const offenders: string[] = [];
+    for (const [name, spec] of Object.entries(COVERED)) {
+      if (!spec.prefix) continue;
+      const surface = SURFACES.find((s) => s.name === name);
+      for (const { expression, fixed } of computedTestids(surface?.source ?? '')) {
+        if (fixed === null) offenders.push(`${name}: :data-testid="${expression}"`);
+      }
+    }
+    expect(
+      offenders,
+      'QA cannot predict a name the screen does not spell out: give the hook a fixed head',
+    ).toEqual([]);
+  });
+
+  it('nothing in the shell writes data-test: Playwright only resolves data-testid', () => {
+    const offenders: string[] = [];
+    for (const { name, source } of SHELL_SOURCES) {
+      TEST_ATTR.lastIndex = 0;
+      for (let m = TEST_ATTR.exec(source); m; m = TEST_ATTR.exec(source)) {
+        if (m[1] !== 'data-testid') offenders.push(`${name}: ${m[1]}=${m[2] ?? ''}`);
+      }
+    }
+    expect(
+      offenders,
+      'getByTestId does not resolve it: write data-testid, prefixed with its screen',
+    ).toEqual([]);
   });
 
   it('cada data-testid vive en el espacio de nombres de su pantalla', () => {

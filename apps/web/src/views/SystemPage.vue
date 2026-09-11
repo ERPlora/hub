@@ -206,7 +206,7 @@
               <ion-button
                 size="small"
                 fill="outline"
-                data-test="notices-turn-on"
+                data-testid="system-notices-turn-on"
                 :disabled="askingForNotices"
                 @click="turnOnNotices"
               >

@@ -130,7 +130,7 @@ describe('when this device cannot warn anybody', () => {
 
   it('offers the ask again, and FORCES it — the boot never asks twice on its own', async () => {
     const wrapper = await mountSystem();
-    await wrapper.get('[data-test="notices-turn-on"]').trigger('click');
+    await wrapper.get('[data-testid="system-notices-turn-on"]').trigger('click');
     await flushPromises();
 
     expect(ensureSpy).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ describe('when this device cannot warn anybody', () => {
       permissionStatus.value = { [NOTIFICATIONS]: true };
       return 'granted';
     });
-    await wrapper.get('[data-test="notices-turn-on"]').trigger('click');
+    await wrapper.get('[data-testid="system-notices-turn-on"]').trigger('click');
     await flushPromises();
 
     expect(vi.mocked(toast).mock.calls[0]?.[0]).toBe(en.system.notices.turnedOn);
@@ -161,7 +161,7 @@ describe('when this device cannot warn anybody', () => {
       return 'denied';
     });
     const wrapper = await mountSystem();
-    await wrapper.get('[data-test="notices-turn-on"]').trigger('click');
+    await wrapper.get('[data-testid="system-notices-turn-on"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.text()).not.toContain(en.system.notices.blockedTitle);
@@ -173,7 +173,7 @@ describe('when this device cannot warn anybody', () => {
     // is the dead end the issue describes: the user taps, nothing happens, nothing is explained.
     ensureSpy.mockResolvedValue('denied');
     const wrapper = await mountSystem();
-    await wrapper.get('[data-test="notices-turn-on"]').trigger('click');
+    await wrapper.get('[data-testid="system-notices-turn-on"]').trigger('click');
     await flushPromises();
 
     expect(vi.mocked(toast).mock.calls[0]?.[0]).toBe(en.system.notices.blockedInSettings);

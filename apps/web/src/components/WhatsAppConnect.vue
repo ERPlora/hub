@@ -128,7 +128,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
   <section v-if="ready && (configured || loadError)" class="whatsapp-connect">
     <template v-if="loadError">
       <p class="whatsapp-connect__status whatsapp-connect__status--error" role="alert">{{ loadError }}</p>
-      <ion-button v-if="!loadRefused" data-test="whatsapp-retry-button" fill="clear" size="small" @click="refresh">
+      <ion-button v-if="!loadRefused" data-testid="whatsapp-retry-button" fill="clear" size="small" @click="refresh">
         {{ t('whatsappConnect.retry') }}
       </ion-button>
     </template>
@@ -141,7 +141,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
                  about it. Ionic colours this itself, which is what makes it survive being embedded
                  in a module's shadow root, where the shell's stylesheet does not reach (hub#1614). -->
             <ion-badge
-              data-test="whatsapp-status-badge"
+              data-testid="whatsapp-status-badge"
               :color.attr="number.needs_reconnect === true ? 'danger' : 'success'"
             >
               {{ number.needs_reconnect === true ? t('whatsappConnect.reconnectBadge') : t('whatsappConnect.connected') }}
@@ -151,7 +151,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
         </div>
         <ion-button
           v-if="isAdmin"
-          data-test="whatsapp-disconnect-button"
+          data-testid="whatsapp-disconnect-button"
           fill="clear"
           size="small"
           color="danger"
@@ -163,7 +163,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
       </div>
       <template v-if="needsReconnect">
         <p
-          data-test="whatsapp-reconnect-needed"
+          data-testid="whatsapp-reconnect-needed"
           class="whatsapp-connect__status whatsapp-connect__status--error"
           role="alert"
         >
@@ -174,7 +174,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
              an owner who would rather stop than reconnect. -->
         <ion-button
           v-if="isAdmin"
-          data-test="whatsapp-reconnect-button"
+          data-testid="whatsapp-reconnect-button"
           :disabled="busy"
           @click="connect"
         >
@@ -189,7 +189,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
     </template>
     <template v-else>
       <p class="whatsapp-connect__intro">{{ t('whatsappConnect.intro') }}</p>
-      <ion-button v-if="isAdmin" data-test="whatsapp-connect-button" :disabled="busy" @click="connect">
+      <ion-button v-if="isAdmin" data-testid="whatsapp-connect-button" :disabled="busy" @click="connect">
         <ion-icon slot="start" name="logo-whatsapp" aria-hidden="true" />
         {{ t('whatsappConnect.connect') }}
       </ion-button>
