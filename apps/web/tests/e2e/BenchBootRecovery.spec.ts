@@ -118,10 +118,18 @@ test.describe('bench boot recovery (hub#1806)', () => {
 
     await page.goto('/settings#data');
 
-    // The first fetch plus one per reload, and not one more.
-    expect(mainRequests, 'the bench did not spend exactly its reload budget').toBe(
-      BOOT_RELOAD_LIMIT + 1,
-    );
+    // The first fetch plus one per reload, and not one more — written OUT rather than derived
+    // from `BOOT_RELOAD_LIMIT`, which is the difference between measuring the ceiling and
+    // measuring nothing (ERPlora/hub#1838). Derived, this line reads "the bench stops at whatever
+    // its budget happens to be", and that is just as true of a budget of 50: moving the constant
+    // to 5 left this spec at `3 passed` and `bench-boot.test.ts` at `87 passed`. Spelled out, it
+    // goes red however the widening is written — the constant moved, the condition turned into
+    // `reload <= BOOT_RELOAD_LIMIT * 2`, or the loop rewritten by hand.
+    //
+    // The bound in the first test IS derived, on purpose: that one is the tolerance for the
+    // runner's own accidents and has to follow the budget wherever it goes. This one is the
+    // budget. Both have to be edited to move it, which is what makes moving it a decision.
+    expect(mainRequests, 'the bench did not spend exactly its two reloads').toBe(3);
 
     // And it gives up honestly: the screen is blank and the spec that asked for it goes red on its
     // own assertions. Recovering is the bench's job; pretending to have recovered is not.

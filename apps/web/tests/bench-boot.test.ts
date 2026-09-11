@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  BOOT_RELOAD_LIMIT,
   declaresTestMatch,
   isBootTransportFailure,
   listE2eSpecs,
@@ -95,6 +96,21 @@ describe('isBootTransportFailure', () => {
       'net::ERR_NETWORK_IO_SUSPENDED',
       'net::ERR_SOCKET_NOT_CONNECTED',
     ]);
+  });
+});
+
+describe('BOOT_RELOAD_LIMIT', () => {
+  // The budget is the only thing between this recovery and the blanket retry the whole file
+  // argues against: every extra reload is one more re-roll of the dice on a REAL defect. The
+  // excused-codes list above is pinned so that widening it has to be a deliberate edit with a
+  // reason; the budget was not, and that asymmetry is ERPlora/hub#1838.
+  //
+  // Measured on develop@04f9a471 before this guard existed: with the budget moved to 5 and
+  // nothing else touched, `BenchBootRecovery.spec.ts` stayed at `3 passed` and this file at
+  // `87 passed`. The bench had quietly become a five-retry gate and the suite had nothing to say
+  // about it. Raising it is allowed — deciding it here, in the open, is the point.
+  it('spends at most two reloads, so a real defect is not re-rolled into green', () => {
+    expect(BOOT_RELOAD_LIMIT).toBe(2);
   });
 });
 
