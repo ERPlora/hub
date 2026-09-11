@@ -8,7 +8,7 @@
 // (`v-if="catalogError && tab !== 'mine'"`) — así que en la pestaña por defecto es invisible y no
 // puede colar ruido en la captura.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask, waitForVisualSettle } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — apps', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -25,6 +25,11 @@ test.describe('contrato visual del shell — apps', () => {
       // `v-show` de pestaña) y la tabla de «Mis apps» (`<ok-data-table>`, primera del DOM).
       await expect(page.locator('.ok-tabbar')).toBeVisible();
       await expect(page.locator('ok-data-table').first()).toBeVisible();
+
+      // Y el shell ha TERMINADO: el botón de menú ya ha aparecido (o el sidebar ocupa su sitio),
+      // los iconos tienen su glifo y nada sigue desplazándose solo. Las TRES cosas llegan tarde y
+      // la pantalla pasa por aquí a medio hacer en más de la mitad de las cargas (hub#1823).
+      await waitForVisualSettle(page);
 
       // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde
       // hub#1812: se TAPA, no se compara (`visualSnapshotMask`, hub#1752).

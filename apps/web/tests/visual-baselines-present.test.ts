@@ -120,9 +120,9 @@ describe('el contrato visual no fotografía el reloj (hub#1752)', () => {
 //
 // Measured on 2026-09-11, regenerating at `HUB_WEB_URL=http://localhost:8850` and comparing at
 // `:8860` with nothing else changed: the four 1440px screens that paint the sidebar — apps,
-// dashboard, employees and settings — all failed (dashboard: 3168 px, ratio 0.01, against a
-// `maxDiffPixelRatio` of 0.002). The 834/390 captures survive only because the sidebar is not on
-// screen at those widths.
+// dashboard, employees and settings — all failed (dashboard: 3168 px against the budget of the
+// day, a ratio of 0.002 = 2592 px at 1440x900; hub#1823 has since replaced it with an absolute
+// 20 px). The 834/390 captures survive only because the sidebar is not on screen at those widths.
 //
 // So the symbol is MASKED, not frozen: what it encodes is genuinely machine-specific, and its
 // content already has unit tests of its own (`lib/install-qr.test.ts`,
@@ -137,6 +137,37 @@ describe('el contrato visual no fotografía el QR de instalación (hub#1752)', (
       `${spec} no pasa visualSnapshotMask(page) a toHaveScreenshot(): el QR del sidebar codifica ` +
         'el puerto del banco, que desde hub#1812 cambia en cada corrida, así que su baseline ' +
         'caduca sola y pone en rojo PRs que no han tocado esa pantalla (hub#1752).',
+    ).toBe(true);
+  });
+});
+
+// Regression test for ERPlora/hub#1823 — a capture taken while the shell is still moving.
+//
+// `waitForVisualSettle` holds THREE invariants, and each one is something that moves after the
+// point where a spec used to give the screen up for finished: the chrome has decided which door
+// into the menu is on screen, every on-screen icon carries its glyph, and no box is still
+// scrolling itself (`ion-segment[scrollable]` nudges its own scroll ~900 ms in). The icon one is
+// spelled out below because it is the cheapest to see:
+//
+// `ion-icon` injects its `<svg>` asynchronously, a frame or two after layout, so "the board is
+// visible" does NOT mean "the screen is finished". Measured on 2026-09-11 over 12 loads of
+// /dashboard at 390px, ONE on-screen icon was still empty at the settle point in SEVEN of them —
+// the hamburger inside `ion-menu-button`, which lives in a shadow root — and it paints ~10 ms
+// later. The old ratio budget (658 px at 390x844) swallowed the 69 px that costs; the absolute
+// 20 px budget of hub#1823 does not, and the whole contract came back red in 2 of 12 runs.
+//
+// So every screenshotting spec waits for the glyphs, the same way it freezes the clock and masks
+// the QR: it is one more thing that moves between runs, and the list of those is the difference
+// between a contract people trust and one they mute.
+describe('el contrato visual no fotografía un shell a medio terminar (hub#1823)', () => {
+  it.each(visualSpecs())('%s espera a que el shell esté terminado antes de capturar', (spec) => {
+    const source = readFileSync(join(E2E_DIR, spec), 'utf8');
+    expect(
+      /waitForVisualSettle\s*\(/.test(source),
+      `${spec} no llama a waitForVisualSettle(page): el botón de menú, los glifos de ion-icon y ` +
+        'el tabbar que se desplaza solo llegan DESPUÉS del punto de asentamiento, así que la ' +
+        'captura puede salir a medio hacer y poner en rojo una PR que no ha tocado esa pantalla ' +
+        '(hub#1823).',
     ).toBe(true);
   });
 });
