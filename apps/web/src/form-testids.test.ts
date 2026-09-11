@@ -362,6 +362,48 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'user-switch-pinpad',
     ],
   },
+  // El drawer ✨ del shell. Los mensajes del hilo se nombran CALCULADOS por su turno
+  // (`assistant-message-${i}`): un hilo de chat solo AÑADE al final —nada se reordena ni se
+  // inserta en medio—, así que el turno ES la identidad de la fila, y es lo que un spec necesita
+  // para leer «la última respuesta». Lo mismo la línea de anclaje y el spinner de «escribiendo»,
+  // que viven dentro del mismo `v-for`.
+  'components/AssistantDrawer.vue': {
+    prefix: 'assistant-',
+    contract: [
+      'assistant-attach',
+      'assistant-attach-error',
+      'assistant-attach-input',
+      'assistant-close',
+      'assistant-drawer',
+      'assistant-empty',
+      'assistant-input',
+      'assistant-mic',
+      'assistant-quota-ask-admin',
+      'assistant-quota-cta',
+      'assistant-quota-warning',
+      'assistant-report',
+      'assistant-send',
+      'assistant-stop',
+      'assistant-suggest-missing',
+      'assistant-thread',
+      'assistant-voice-error',
+    ],
+  },
+  // Los ajustes de una app. El formulario lo GENERA el manifest del módulo, así que el gancho no
+  // puede ser un literal por campo: se deriva de la clave del ajuste
+  // (`module-settings-field-${key}`), igual que las filas del import. Las cuatro ramas de control
+  // —toggle, select, número, texto— son excluyentes, así que comparten nombre: el spec pide el
+  // ajuste por su clave y no tiene que saber con qué control lo pintó el shell.
+  'components/ModuleSettingsForm.vue': {
+    prefix: 'module-settings-',
+    contract: [
+      'module-settings-admin-only',
+      'module-settings-error',
+      'module-settings-loading',
+      'module-settings-refusal',
+      'module-settings-save',
+    ],
+  },
   // Control reutilizable: el `data-testid` se lo pone QUIEN lo usa (`:data-testid="testid"`), así
   // que no tiene nombres propios que congelar. El botón es el disfraz del input y no lleva gancho
   // a propósito — lo que un e2e rellena es el `<input type="file">`.
@@ -375,8 +417,6 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
  * entrada obsoleta falla si se queda). Una `.vue` nueva no nace en esta lista — nace cubierta.
  */
 const NOT_YET_COVERED: Record<string, string> = {
-  'components/AssistantDrawer.vue': 'hub#1811',
-  'components/ModuleSettingsForm.vue': 'hub#1811',
 };
 
 /**
