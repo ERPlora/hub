@@ -118,9 +118,10 @@ test.describe('bench boot recovery (hub#1806)', () => {
 
     await page.goto('/settings#data');
 
-    // The first fetch plus one per reload, and not one more — written OUT rather than derived
-    // from `BOOT_RELOAD_LIMIT`, which is the difference between measuring the ceiling and
-    // measuring nothing (ERPlora/hub#1838). Derived, this line reads "the bench stops at whatever
+    // The first fetch plus one per reload, and not one more. This line is the end-to-end half of
+    // the regression test for ERPlora/hub#1842, and it is written OUT rather than derived from
+    // `BOOT_RELOAD_LIMIT`, which is the difference between measuring the ceiling and measuring
+    // nothing. Derived, this line reads "the bench stops at whatever
     // its budget happens to be", and that is just as true of a budget of 50: moving the constant
     // to 5 left this spec at `3 passed` and `bench-boot.test.ts` at `87 passed`. Spelled out, it
     // goes red however the widening is written — the constant moved, the condition turned into

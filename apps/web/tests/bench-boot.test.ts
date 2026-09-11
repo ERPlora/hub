@@ -99,11 +99,14 @@ describe('isBootTransportFailure', () => {
   });
 });
 
+// Regression test for ERPlora/hub#1842 — the reload budget could be raised with nothing in the
+// suite going red, so a bench quietly turned into a five-retry gate would have shipped green.
 describe('BOOT_RELOAD_LIMIT', () => {
   // The budget is the only thing between this recovery and the blanket retry the whole file
   // argues against: every extra reload is one more re-roll of the dice on a REAL defect. The
   // excused-codes list above is pinned so that widening it has to be a deliberate edit with a
-  // reason; the budget was not, and that asymmetry is ERPlora/hub#1838.
+  // reason; the budget was not, and that asymmetry is hub#1842. It was found by mutating the fix
+  // for hub#1838 rather than by reading it: four of that fix's five mutants died, this one lived.
   //
   // Measured on develop@04f9a471 before this guard existed: with the budget moved to 5 and
   // nothing else touched, `BenchBootRecovery.spec.ts` stayed at `3 passed` and this file at
