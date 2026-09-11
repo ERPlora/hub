@@ -83,6 +83,10 @@ function mountCard(
 const tilePaths = (w: ReturnType<typeof mountCard>): string[] =>
   w.findAll('[data-testid="apps-tile"]').map((t) => t.attributes('data-path') ?? '');
 
+/** Placeholder tiles on screen right now (hub#1722). */
+const skeletonTiles = (w: ReturnType<typeof mountCard>): number =>
+  w.findAll('[data-testid="apps-skeleton-tile"]').length;
+
 /** 25 installed apps — hub#1197's own measurement (26 tiles with the ＋ one included = 7 rows). */
 const manyApps = Array.from({ length: 25 }, (_, n) => ({
   path: `/m/app-${n}`,
@@ -483,7 +487,9 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
     const genuinelyEmpty = mountCard([], i18n, 'ready');
 
     expect(stillAsking.find('[data-testid="apps-skeleton"]').exists()).toBe(true);
+    expect(skeletonTiles(stillAsking)).toBeGreaterThan(0);
     expect(genuinelyEmpty.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(skeletonTiles(genuinelyEmpty)).toBe(0);
     expect(genuinelyEmpty.find('[data-testid="apps-empty"]').exists()).toBe(true);
   });
 
@@ -491,6 +497,9 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
     const w = mountCard([pos, stock], i18n, 'ready');
 
     expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    // The TILES, not just the container's label: grey blocks sitting on top of apps that already
+    // arrived are the same defect wearing the opposite hat.
+    expect(skeletonTiles(w)).toBe(0);
     expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
   });
 
@@ -498,6 +507,7 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
     const w = mountCard([], i18n, 'error');
 
     expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(skeletonTiles(w), 'a skeleton that will never resolve').toBe(0);
     expect(w.find('[data-testid="apps-error"]').exists()).toBe(true);
   });
 
@@ -507,6 +517,7 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
 
     expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
     expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(skeletonTiles(w)).toBe(0);
   });
 
   it('the skeleton obeys the phone row budget it is standing in for (hub#1197)', () => {
