@@ -150,7 +150,9 @@ pub const CATALOG_OFFER_TTL_SECS: i64 = 3600;
 
 /// ⛔ legal — the runtime rejects the operation. *"You need this in order to invoice."*
 pub const LEVEL_LEGAL: &str = "legal";
-/// 🔴 functional — no gate, but the till cannot do its job. *"Without this you cannot sell."*
+/// 🔴 functional — no gate; the till does its job worse. *"This one matters."* It must NOT be
+/// said as an impossibility: this level is a module rating its own configuration, and a manifest
+/// can never make itself a condition for selling (hub#1726). Only ⛔ names a refusal.
 pub const LEVEL_FUNCTIONAL: &str = "functional";
 /// 🟡 recommended — the business runs; you notice it is missing. Never alerts.
 pub const LEVEL_RECOMMENDED: &str = "recommended";
