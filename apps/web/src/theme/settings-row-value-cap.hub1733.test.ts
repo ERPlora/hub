@@ -50,8 +50,16 @@ const BENCH_390: BenchRow[] = [
   },
 ];
 
-/** The same «Zona horaria» row on the two wider viewports, where it already read fine. */
+/**
+ * The same «Zona horaria» row on the wider viewports, where it already read fine. 600 and 768 are
+ * the first two real devices past the width where `50vw - 6rem` clears the whole value (556px): a
+ * small Android tablet and an iPad in portrait. They are here because a cap that scales too slowly
+ * (`40vw` was tried as a mutant) leaves tablet and desktop alone yet still truncates the value on
+ * exactly those two — and only a viewport between 556 and 695 can tell.
+ */
 const TIMEZONE_ON_WIDE = [
+  { viewport: 600, contentBox: 462, valueWants: 182 },
+  { viewport: 768, contentBox: 630, valueWants: 182 },
   { viewport: 952, contentBox: 814, valueWants: 182 },
   { viewport: 1440, contentBox: 1062, valueWants: 182 },
 ];
