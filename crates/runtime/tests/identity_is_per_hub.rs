@@ -164,10 +164,10 @@ async fn the_pin_screen_only_offers_the_people_of_this_business() {
 async fn the_users_screen_does_not_list_the_business_next_door() {
     let (_db, mine, neighbour) = two_hubs_sharing_a_database().await;
     neighbour
-        .create_login_user("ana@next-door.example", "admin")
+        .create_login_user("ana@next-door.example", "admin", 0)
         .await
         .unwrap();
-    mine.create_login_user("bruno@mine.example", "admin")
+    mine.create_login_user("bruno@mine.example", "admin", 0)
         .await
         .unwrap();
 

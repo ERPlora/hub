@@ -543,7 +543,7 @@ async fn an_invited_admin_does_not_land_as_an_employee() {
         .runtime
         .read()
         .await
-        .create_login_user("socia@bar.com", "employee")
+        .create_login_user("socia@bar.com", "employee", 0)
         .await
         .unwrap();
 
@@ -789,8 +789,7 @@ async fn editing_a_revoked_user_without_deciding_about_the_door_keeps_the_revoca
             &erplora_runtime::hub_users::UpdateHubUser {
                 name: Some("Marta Ruiz".into()),
                 ..Default::default()
-            },
-        )
+            }, 0,)
         .await
         .unwrap();
         id
@@ -821,7 +820,7 @@ async fn a_user_the_hub_itself_deactivated_is_not_let_back_in_by_a_token() {
     let (router, state, temp) = fixture().await;
     {
         let rt = state.runtime.read().await;
-        rt.create_login_user("ana@bar.com", "manager")
+        rt.create_login_user("ana@bar.com", "manager", 0)
             .await
             .unwrap();
         assert!(rt.deactivate_login_user("ana@bar.com").await.unwrap());

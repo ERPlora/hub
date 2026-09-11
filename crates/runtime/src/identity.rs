@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
-use erplora_db::{DatabaseAdapter, Params};
+use erplora_db::{DatabaseAdapter, Params, RowGate, TxGatedOutcome};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
@@ -519,6 +519,111 @@ pub async fn create_user(
     )
     .await?;
     Ok(id)
+}
+
+/// Alta que **consume la plaza del plan en el mismo paso que escribe la fila** (hub#1804).
+///
+/// `Ok(None)` = el plan estaba lleno y no se escribió nada. Quien lo llama
+/// ([`crate::hub_users::admit_user`]) es el dueño del código estable
+/// `hub.users.user_limit_reached`: aquí no se habla de planes, solo de plazas.
+///
+/// `max_users == 0` es **ilimitado** y toma el camino de siempre.
+pub async fn try_create_user_within_plan(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    name: &str,
+    pin: &str,
+    role: &str,
+    cloud_user_id: Option<&str>,
+    max_users: u32,
+) -> Result<Option<String>> {
+    if max_users == 0 {
+        return create_user(db, hub_id, name, pin, role, cloud_user_id)
+            .await
+            .map(Some);
+    }
+    let id = new_id();
+    let pin_hash = if pin.is_empty() {
+        String::new()
+    } else {
+        hash_pin_argon2(pin)?
+    };
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("name".into(), json!(name));
+    p.insert("pin_hash".into(), json!(pin_hash));
+    p.insert("role".into(), json!(role));
+    p.insert("cloud_user_id".into(), json!(cloud_user_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("max_users".into(), json!(i64::from(max_users)));
+    let written = write_taking_a_seat(
+        db,
+        hub_id,
+        "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+          SELECT :id, :hub_id, :name, :pin_hash, :role, :cloud_user_id, 1, :now \
+           WHERE ",
+        &p,
+    )
+    .await?;
+    Ok(written.then_some(id))
+}
+
+/// El techo de plazas **tal como lo lee el SQL**: el `0` del entitlement significa *ilimitado*
+/// (plan de pago, o token sin el claim), que en una comparación es «cualquier número» — nunca
+/// «cero plazas». Confundirlos dejaría a un plan de pago sin poder dar de alta a nadie.
+pub(crate) fn seat_ceiling(max_users: u32) -> i64 {
+    if max_users == 0 {
+        i64::MAX
+    } else {
+        i64::from(max_users)
+    }
+}
+
+/// «…y queda plaza en el plan». El trozo de `WHERE` que convierte una escritura en una que
+/// **comprueba el tope mientras escribe**, en vez de confiar en un recuento anterior.
+const SEAT_IS_FREE: &str =
+    "(SELECT count(*) FROM hub_user WHERE hub_id = :hub_id AND is_active = 1) < :max_users";
+
+/// Corre una escritura que **ocupa una plaza del plan**, contando y escribiendo en el mismo paso.
+///
+/// `sql` es el prefijo de la sentencia hasta su `WHERE …` (o `AND …`): aquí se le pega
+/// [`SEAT_IS_FREE`], así que ningún llamador puede olvidarse de la condición. `p` tiene que traer
+/// `hub_id` y `max_users`. `Ok(false)` = el plan estaba lleno y **no se escribió nada**.
+///
+/// ## Por qué hay un candado y no basta la condición
+///
+/// Medido, no supuesto: en READ COMMITTED cada sentencia toma su instantánea al empezar, así que
+/// dos altas que se solapan no se ven la fila de la otra y entran **las dos** (probado en psql con
+/// dos sesiones: 4 activos en un plan de 3). Lo que las serializa es el candado de transacción
+/// —el mismo `pg_advisory_xact_lock` que ya serializa el arranque que migra (hub#539)—, que muere
+/// con la transacción también si esto revienta a medias.
+///
+/// Una transacción y no un guard sostenido desde Rust a propósito: el guard retendría una conexión
+/// del pool mientras el alta calcula su argon2, y el plan Gratis viene con pool 3.
+pub(crate) async fn write_taking_a_seat(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    sql_up_to_the_seat_clause: &str,
+    p: &Params,
+) -> Result<bool> {
+    let mut p = p.clone();
+    // Espacio de claves PROPIO (`<hub>/seats`), nunca `hashtext(hub_id)` a secas: esa es la clave
+    // del candado de arranque (hub#539) y compartirla haría que un alta esperase a una migración.
+    p.insert("seat_key".into(), json!(format!("{hub_id}/seats")));
+    let ops = [
+        (
+            "SELECT pg_advisory_xact_lock(hashtext(:seat_key))".to_string(),
+            p.clone(),
+        ),
+        (format!("{sql_up_to_the_seat_clause}{SEAT_IS_FREE}"), p.clone()),
+    ];
+    // Solo la escritura lleva puerta: el candado afecta 0 filas siempre y sumarlo la haría vacua.
+    let gates = [RowGate { first: 1, count: 1, min: 1 }];
+    Ok(matches!(
+        db.execute_tx_gated(&ops, &gates).await?,
+        TxGatedOutcome::Committed { .. }
+    ))
 }
 
 /// Asegura una identidad fija para `AuthMode::Dev`, donde el frontend es la autoridad de las
@@ -1191,6 +1296,9 @@ pub async fn get_or_link_cloud_user(
         default_role,
         Some(cloud_user_id),
         email,
+        // El primer login cloud NO es una de las tres puertas que el tope del plan gobierna
+        // (hub#1685): es el enlace de una cuenta que el SaaS ya admitió. `0` = sin tope aquí.
+        0,
     )
     .await?;
     let created = HubUser {
@@ -1205,6 +1313,9 @@ pub async fn get_or_link_cloud_user(
 
 /// INSERT de bajo nivel de un `hub_user` con `email` explícito (lo comparten el provisioning por
 /// email y el enlace-o-crea del login). No comprueba duplicados (los llamadores lo hacen).
+/// `max_users`: el tope del plan que esta alta tiene que respetar; `0` = **ilimitado**. La plaza
+/// se comprueba en el mismo paso que se escribe la fila (hub#1804).
+#[allow(clippy::too_many_arguments)]
 async fn create_login_user_row(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -1214,6 +1325,7 @@ async fn create_login_user_row(
     role: &str,
     cloud_user_id: Option<&str>,
     email: &str,
+    max_users: u32,
 ) -> Result<String> {
     let pin_hash = if pin.is_empty() {
         String::new()
@@ -1229,12 +1341,19 @@ async fn create_login_user_row(
     p.insert("cloud_user_id".into(), json!(cloud_user_id));
     p.insert("email".into(), json!(email));
     p.insert("now".into(), json!(now_rfc3339()));
-    db.execute(
+    p.insert("max_users".into(), json!(seat_ceiling(max_users)));
+    let written = write_taking_a_seat(
+        db,
+        hub_id,
         "INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at, email) \
-          VALUES (:id, :hub_id, :name, :pin_hash, :role, :cloud_user_id, 1, :now, :email)",
+          SELECT :id, :hub_id, :name, :pin_hash, :role, :cloud_user_id, 1, :now, :email \
+           WHERE ",
         &p,
     )
     .await?;
+    if !written {
+        return Err(crate::hub_users::user_limit_reached(max_users));
+    }
     Ok(id.to_string())
 }
 
@@ -1248,6 +1367,7 @@ pub async fn create_login_user(
     hub_id: &str,
     email: &str,
     role: &str,
+    max_users: u32,
 ) -> Result<HubUser> {
     let email = email.trim();
     // El rol tiene que ser uno que el SaaS pueda poner en la membresía (hub#356). Es la MISMA
@@ -1273,12 +1393,30 @@ pub async fn create_login_user(
         // `cloud_revoked_at = ''`: reactivar cierra el episodio de la regla D (hub#348). Si no se
         // limpiase, una baja POSTERIOR del admin heredaría la marca del cloud y un login podría
         // reabrirla — el hub dejaría de ser dueño de su propia baja.
-        db.execute(
-            "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
-              WHERE id = :id AND hub_id = :hub_id",
-            &up,
-        )
-        .await?;
+        // Reincorporar a quien estaba de baja **ocupa una plaza**; reescribirle el rol a quien ya
+        // está dentro, no. Por eso la plaza solo se pide en el primer caso — y se pide en el mismo
+        // paso que la escritura (hub#1804), no antes.
+        if user.is_active {
+            db.execute(
+                "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
+                  WHERE id = :id AND hub_id = :hub_id",
+                &up,
+            )
+            .await?;
+        } else {
+            up.insert("max_users".into(), json!(seat_ceiling(max_users)));
+            let reactivated = write_taking_a_seat(
+                db,
+                hub_id,
+                "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
+                  WHERE id = :id AND hub_id = :hub_id AND ",
+                &up,
+            )
+            .await?;
+            if !reactivated {
+                return Err(crate::hub_users::user_limit_reached(max_users));
+            }
+        }
         return Ok(HubUser {
             role: role.to_string(),
             is_active: true,
@@ -1295,6 +1433,7 @@ pub async fn create_login_user(
         role,
         None,
         email,
+        max_users,
     )
     .await?;
     Ok(HubUser {

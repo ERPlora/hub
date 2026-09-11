@@ -670,7 +670,7 @@ async fn only_the_role_the_document_named_may_decide_and_an_administrator_always
             pin: "4731".into(),
             local: true,
             ..Default::default()
-        })
+        }, 0)
         .await
         .unwrap();
     let cashier = rt
@@ -680,7 +680,7 @@ async fn only_the_role_the_document_named_may_decide_and_an_administrator_always
             pin: "5182".into(),
             local: true,
             ..Default::default()
-        })
+        }, 0)
         .await
         .unwrap();
     // An account user, not a local one: administering this hub comes from an ERPlora account and
@@ -691,7 +691,7 @@ async fn only_the_role_the_document_named_may_decide_and_an_administrator_always
             role: "admin".into(),
             email: "duena@ejemplo.com".into(),
             ..Default::default()
-        })
+        }, 0)
         .await
         .unwrap();
 

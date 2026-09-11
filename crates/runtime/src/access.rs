@@ -218,8 +218,21 @@ impl Runtime {
     }
 
     /// Alta de un usuario del hub (nombre, rol, email y PIN opcionales). Devuelve su id.
-    pub async fn create_hub_user(&self, input: &hub_users::NewHubUser) -> Result<String> {
-        hub_users::create(self.db.as_ref(), &self.registry, &self.hub_id, input).await
+    /// `max_users`: el tope del plan (`0` = ilimitado). La plaza se pide **mientras** se escribe la
+    /// fila (hub#1804), así que dos altas a la vez no pueden colar una de más.
+    pub async fn create_hub_user(
+        &self,
+        input: &hub_users::NewHubUser,
+        max_users: u32,
+    ) -> Result<String> {
+        hub_users::create(
+            self.db.as_ref(),
+            &self.registry,
+            &self.hub_id,
+            input,
+            max_users,
+        )
+        .await
     }
 
     /// Cuántos dígitos pide el PIN de este hub (hub#974): 4 o 6, igual para todo el mundo.
@@ -238,10 +251,13 @@ impl Runtime {
     }
 
     /// Edición parcial de un usuario del hub; `is_active: Some(false)` es la baja.
+    /// `max_users`: el tope del plan (`0` = ilimitado). Solo decide cuando la edición **reactiva**
+    /// a alguien, que es la única que vuelve a ocupar plaza (hub#1685/#1804).
     pub async fn update_hub_user(
         &self,
         user_id: &str,
         input: &hub_users::UpdateHubUser,
+        max_users: u32,
     ) -> Result<hub_users::HubUserRow> {
         hub_users::update(
             self.db.as_ref(),
@@ -249,6 +265,7 @@ impl Runtime {
             &self.hub_id,
             user_id,
             input,
+            max_users,
         )
         .await
     }
@@ -320,8 +337,15 @@ impl Runtime {
     }
 
     /// **Alta** de un usuario-login por email + rol (flujo admin, ADR-0157 §7). Upsert por email.
-    pub async fn create_login_user(&self, email: &str, role: &str) -> Result<identity::HubUser> {
-        identity::create_login_user(self.db.as_ref(), &self.hub_id, email, role).await
+    /// `max_users` es el tope del plan (`0` = ilimitado), que trae la capa HTTP: la plaza se pide
+    /// **mientras** se escribe, no antes (hub#1804).
+    pub async fn create_login_user(
+        &self,
+        email: &str,
+        role: &str,
+        max_users: u32,
+    ) -> Result<identity::HubUser> {
+        identity::create_login_user(self.db.as_ref(), &self.hub_id, email, role, max_users).await
     }
 
     /// **Baja** de un usuario-login por email (flujo admin, ADR-0157 §7). Desactiva; `true` si afectó.
