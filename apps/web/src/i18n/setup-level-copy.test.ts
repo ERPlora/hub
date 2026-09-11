@@ -44,17 +44,29 @@ const EN = (en as unknown as Catalogue).setup;
 const ES = (es as unknown as Catalogue).setup;
 
 /**
- * Words that assert the user CANNOT do something. Only the ⛔ badge has a dispatcher behind it, so
- * only the ⛔ badge is allowed to use them.
+ * Words that assert the user CANNOT do something, or MUST do it before something else works. Only
+ * the ⛔ badge has a dispatcher behind it, so only the ⛔ badge is allowed to use them.
+ *
+ * The list is the guard: it has to catch wordings nobody has written yet, in BOTH languages at
+ * once, or a rename to «Mandatory» only dies through the pinned string above and survives the
+ * moment somebody updates that pin. Keep the two halves symmetric.
  */
 const CLAIMS_A_BLOCK: readonly RegExp[] = [
+  // en
   /\bneeded to\b/i,
   /\brequired to\b/i,
-  /\byou (?:can ?not|can't)\b/i,
+  /\bcan ?not\b/i,
+  /\bcan't\b/i,
+  /\bmust\b/i,
+  /\buntil\b/i,
+  /\bmandatory\b/i,
+  /\bessential\b/i,
+  // es
   /\bnecesario para\b/i,
   /\bimprescindible\b/i,
   /\bobligatorio\b/i,
   /\bno puedes\b/i,
+  /\bdebes\b/i,
   /\bhasta que\b/i,
 ];
 
@@ -168,6 +180,16 @@ describe('the assistant tells the owner the same truth as the badge', () => {
       expect(text, `the briefing tells the owner a 🔴 stops the sale: ${word.source}`).not.toMatch(word);
     }
     expect(text).not.toMatch(/\bcannot\b/i);
+
+    // …and the sentence that translates the level — the task line the note hangs from — makes no
+    // claim of a block in ANY wording: the historical one promised a shut till without ever saying
+    // «sell» («the till cannot do its job without it»). Scoped to that line on purpose: the ⛔ note
+    // and the «on us» reason are allowed their «until» / «cannot», and neither is under test here.
+    const taskLine = text.split('\n').find((line) => /^1\. /.test(line));
+    expect(taskLine, 'the briefing lost the task line the level note hangs from').toBeDefined();
+    for (const claim of CLAIMS_A_BLOCK) {
+      expect(taskLine, `the 🔴 note promises a gate that does not exist: ${claim.source}`).not.toMatch(claim);
+    }
   });
 
   it('⛔ keeps its teeth: the one level with a gate still says so', () => {
