@@ -137,8 +137,10 @@ function readTabbarGeometry(segment: HTMLElement): TabbarGeometry | null {
  * Recomputes when the strip changes width (rotating the phone, folding the menu) and when the
  * number of tabs changes without it (a module whose `navigation[]` arrives over the network).
  * Every pass starts by dropping the width it published last time: the floor it has to respect is
- * the one the STYLESHEET declares, and measuring its own previous answer would shrink the tabs a
- * little further on every recompute.
+ * the one the STYLESHEET declares. Measuring its own previous answer instead would make the floor
+ * a ratchet — it could only ever climb, and a higher floor fits fewer whole tabs, so each round
+ * trip of the phone would take one more whole tab off the screen for good (88 → 101.14 → 118.4 →
+ * 143.2 on `/settings`, measured). The width is a function of the strip, never of its last answer.
  */
 export function bindTabbarPeek(segment: HTMLElement | null): () => void {
   if (!segment) return () => {};

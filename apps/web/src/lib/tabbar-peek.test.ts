@@ -78,6 +78,40 @@ describe('hidesTabsSilently — the defect, stated as a contract', () => {
     expect(hidesTabsSilently(desktop)).toBe(false);
   });
 
+  it('a tab that ends exactly on the edge is shown, so the hidden one is the NEXT', () => {
+    // The worst case of the defect, and the cleanest: the strip ends flush with the second tab, so
+    // the third is off screen ENTIRELY — not a sliver, nothing. There is no ink for the fade to
+    // fade and nothing on screen suggests a third tab exists. Reading that flush tab as the first
+    // hidden one would make the check answer about a tab the person can see in full, and it would
+    // call this strip fine.
+    expect(
+      hidesTabsSilently({
+        visibleWidth: 200,
+        contentWidth: 500,
+        firstTabLeft: 0,
+        tabWidth: 100,
+        tabPitch: 100,
+        tabCount: 5,
+      }),
+    ).toBe(true);
+  });
+
+  it('the cut landing exactly on the centre is enough: half a tab is on screen', () => {
+    // The boundary the whole check turns on. Exactly on the centre, the leading half of the tab —
+    // where its icon starts — is on screen, so the fade has something to fade. That is the line
+    // between «shows it continues» and «looks finished»; on the centre it counts as shown.
+    expect(
+      hidesTabsSilently({
+        visibleWidth: 250,
+        contentWidth: 500,
+        firstTabLeft: 0,
+        tabWidth: 100,
+        tabPitch: 100,
+        tabCount: 5,
+      }),
+    ).toBe(false);
+  });
+
   it('is happy when the cut already falls past the centre of the first hidden tab', () => {
     // Same strip, one tab fewer on screen: the cut passes through the fourth tab's icon.
     const peeking: TabbarGeometry = { ...SETTINGS_390, firstTabLeft: 4, tabWidth: 100, tabPitch: 104 };
@@ -125,27 +159,53 @@ describe('peekTabWidth — the width that makes the cut land on the next tab', (
 });
 
 /** A strip whose geometry we control, because happy-dom lays nothing out. */
-function fakeSegment(geometry: TabbarGeometry): HTMLElement {
+interface FakeStrip {
+  segment: HTMLElement;
+  /**
+   * Narrows or widens the strip and lets the binding recompute.
+   *
+   * happy-dom never lays anything out, so its `ResizeObserver` cannot fire — the recompute is
+   * driven through the binding's OTHER trigger, a `childList` mutation, which runs the very same
+   * pass. The marker node is not an `ion-segment-button`, so the tab count stays put and the only
+   * thing that changed between passes is the width.
+   */
+  resizeTo: (visibleWidth: number) => Promise<void>;
+}
+
+function fakeStrip(geometry: TabbarGeometry): FakeStrip {
+  const live = { ...geometry };
   const segment = document.createElement('ion-segment');
   const pitch = () => {
     const declared = segment.style.getPropertyValue('--ok-tabbar-min');
-    const width = declared ? Number.parseFloat(declared) : geometry.tabWidth;
-    return { width, pitch: width + (geometry.tabPitch - geometry.tabWidth) };
+    const width = declared ? Number.parseFloat(declared) : live.tabWidth;
+    return { width, pitch: width + (live.tabPitch - live.tabWidth) };
   };
-  for (let i = 0; i < geometry.tabCount; i += 1) {
+  for (let i = 0; i < live.tabCount; i += 1) {
     const tab = document.createElement('ion-segment-button');
     Object.defineProperty(tab, 'offsetLeft', {
-      get: () => geometry.firstTabLeft + i * pitch().pitch,
+      get: () => live.firstTabLeft + i * pitch().pitch,
     });
     Object.defineProperty(tab, 'offsetWidth', { get: () => pitch().width });
     segment.appendChild(tab);
   }
-  Object.defineProperty(segment, 'clientWidth', { get: () => geometry.visibleWidth });
+  Object.defineProperty(segment, 'clientWidth', { get: () => live.visibleWidth });
   Object.defineProperty(segment, 'scrollWidth', {
-    get: () => geometry.firstTabLeft * 2 + geometry.tabCount * pitch().pitch - (pitch().pitch - pitch().width),
+    get: () => live.firstTabLeft * 2 + live.tabCount * pitch().pitch - (pitch().pitch - pitch().width),
   });
   document.body.appendChild(segment);
-  return segment;
+
+  return {
+    segment,
+    resizeTo: async (visibleWidth: number) => {
+      live.visibleWidth = visibleWidth;
+      segment.appendChild(document.createElement('span'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+  };
+}
+
+function fakeSegment(geometry: TabbarGeometry): HTMLElement {
+  return fakeStrip(geometry).segment;
 }
 
 describe('bindTabbarPeek — wiring it to a live strip', () => {
@@ -161,8 +221,9 @@ describe('bindTabbarPeek — wiring it to a live strip', () => {
   });
 
   it('recomputes from the strip\'s OWN width, so binding twice lands on the same number', () => {
-    // The width it publishes becomes the width it would measure next time. Without re-reading the
-    // strip's declared floor first, every recompute would shrink the tabs a little further.
+    // The width it publishes becomes the width it would measure next time, so every pass has to
+    // start from the floor the STYLESHEET declares. See the round trip below for what happens
+    // when it does not — this one only pins the entry point.
     const segment = fakeSegment(SETTINGS_390);
     bindTabbarPeek(segment)();
     const once = bindTabbarPeek(segment);
@@ -172,6 +233,27 @@ describe('bindTabbarPeek — wiring it to a live strip', () => {
     const twice = bindTabbarPeek(segment);
     expect(segment.style.getPropertyValue('--ok-tabbar-min')).toBe(first);
     twice();
+  });
+
+  it('gives the tabs their width back when the strip widens again, instead of ratcheting up', async () => {
+    // Rotating the phone, folding the side menu: the strip is recomputed on a strip that is ALREADY
+    // carrying the width this binding published. If a pass took that published width for its floor
+    // instead of re-reading the stylesheet's, the floor could only ever climb — and the width with
+    // it, because a higher floor fits fewer whole tabs. Measured on this geometry, a single narrow
+    // -and-back round trip walks 88 → 101.14 → 118.4 → 143.2: the person rotates the phone twice
+    // and the strip comes back showing ONE FEWER whole tab, for good. The width has to be a
+    // function of the strip, not of its own last answer.
+    const strip = fakeStrip(SETTINGS_390);
+    const unbind = bindTabbarPeek(strip.segment);
+    const at390 = strip.segment.style.getPropertyValue('--ok-tabbar-min');
+    expect(at390).toBe('101.14px');
+
+    await strip.resizeTo(320);
+    expect(strip.segment.style.getPropertyValue('--ok-tabbar-min')).toBe('118.4px');
+
+    await strip.resizeTo(382);
+    expect(strip.segment.style.getPropertyValue('--ok-tabbar-min')).toBe(at390);
+    unbind();
   });
 
   it('leaves a strip that fits alone', () => {
