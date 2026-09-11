@@ -14,6 +14,15 @@ use serde::{Deserialize, Serialize};
 /// Ancho de papel estándar en columnas (80mm ≈ 32 chars). Espejo del `padding = 32 - …` de Python.
 pub const LINE_WIDTH: usize = 32;
 
+/// **The name this crate signs paper with when the document does not bring the business's own.**
+///
+/// A constant and not a literal per renderer because it is the name of a PRODUCT, and products get
+/// retired: the test page spent a month signed «ERPlora Bridge» after ADR-0196 retired the daemon
+/// and hub#340 deleted it from the tree (hub#1735), while the receipt beside it already fell back
+/// to the right one. Paper cannot be corrected after it is cut, so the two must not be able to
+/// drift apart again.
+pub const PRODUCT_NAME: &str = "ERPlora";
+
 /// Tipos de documento soportados (espejo del `if document_type == …` de `PrinterManager`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -272,12 +281,18 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
 }
 
 /// Página de prueba. Porta `PrinterManager.test_print`.
+///
+/// **Signed with [`PRODUCT_NAME`], never with the product that printed it a month ago** (hub#1735):
+/// the header used to read «ERPlora Bridge», the standalone daemon ADR-0196 retired and hub#340
+/// deleted from the tree. The business's own name is not available here on purpose — this sheet is
+/// rendered from a printer id alone (`erplora_test_print`), with no document behind it — so it
+/// falls back to the same name the receipt falls back to when `business_name` is missing.
 pub fn render_test_page(printer_id: &str) -> Vec<u8> {
     let mut b = EscposBuilder::new();
     b.set(Align::Center, false, false, false);
     b.text("================================\n");
     b.set(Align::Center, true, true, false);
-    b.text("ERPlora Bridge\n");
+    b.text(&format!("{PRODUCT_NAME}\n"));
     b.set(Align::Center, false, false, false);
     b.text("--------------------------------\n");
     b.text("Test Print OK\n");
@@ -525,7 +540,7 @@ fn modifier_lines(item: &serde_json::Value) -> Vec<String> {
 fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     let t = Locale::from_document(data);
     b.set(Align::Center, true, false, false);
-    let business_name = str_field(data, "business_name", "ERPlora");
+    let business_name = str_field(data, "business_name", PRODUCT_NAME);
     b.text(&format!("{business_name}\n"));
 
     if is_truthy(data, "business_address") {
@@ -722,7 +737,7 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.text(&format!("{}\n", t.label(Label::BillTitle)));
 
     b.set(Align::Center, true, false, false);
-    b.text(&format!("{}\n", str_field(data, "business_name", "ERPlora")));
+    b.text(&format!("{}\n", str_field(data, "business_name", PRODUCT_NAME)));
 
     if is_truthy(data, "business_address") {
         b.set(Align::Center, false, false, false);
@@ -2499,6 +2514,78 @@ mod tests {
         );
         assert!(text.contains("cosa: valor"), "the real fields still print:\n{text}");
         assert!(!text.contains("locale"), "the envelope field is not a line:\n{text}");
+    }
+
+    // ── The paper is signed by a product that EXISTS (hub#1735) ─────────────────────────────────
+
+    /// **The test page used to sign itself «ERPlora Bridge»** — the standalone daemon ADR-0196
+    /// retired and hub#340 deleted from the tree. It is the one sheet a shop owner prints on
+    /// purpose, to check the printer answers, so the dead name went straight into their hands on
+    /// paper: nothing corrects a sheet once it is cut. It now signs with the same name the receipt
+    /// next to it falls back to (`render_receipt`) — the product they actually installed.
+    #[test]
+    fn the_test_page_is_signed_with_a_product_that_still_exists() {
+        let paper = strip_escpos(&render_test_page("network:10.0.2.2:9100"));
+        assert!(
+            paper.lines().any(|l| l.trim() == "ERPlora"),
+            "the sheet is signed by the product that printed it:\n{paper}"
+        );
+        // Everything the sheet is FOR stays on it: a header fix that quietly dropped the outcome
+        // or the printer's address would satisfy the line above and lose the diagnosis, which is
+        // the only reason anybody prints this page.
+        assert!(paper.contains("Test Print OK"), "the outcome is still printed:\n{paper}");
+        assert!(
+            paper.contains("network:10.0.2.2:9100"),
+            "the sheet still names the printer it came out of:\n{paper}"
+        );
+    }
+
+    /// **No paper this crate renders names the retired Bridge**, not just the test page — the
+    /// guard that keeps the dead product from coming back through another renderer (hub#1735).
+    ///
+    /// It reads the RAW bytes rather than the stripped paper on purpose: a receipt carries a QR
+    /// (`GS ( k`), a command of variable length that [`strip_escpos`] refuses by design, so a
+    /// guard written on the stripped text could not cover every document — and the document it
+    /// could not cover is the one the customer takes home.
+    #[test]
+    fn no_paper_this_crate_renders_names_the_retired_bridge() {
+        // A single document that every renderer accepts: `Prebill` is the strict one (it refuses
+        // a bill with no `items`), the rest read what they know and ignore the rest.
+        let data = json!({
+            "business_name": "SALON AURORA SL",
+            "tax_id": "12345678Z",
+            "ticket_number": "TICKET-2026-000001",
+            "title": "Aviso",
+            "items": [{ "name": "Corte", "quantity": 1, "total": 12.0 }],
+            "total": 12.0,
+        });
+        let mut papers: Vec<(String, Vec<u8>)> = Vec::new();
+        for doc in [
+            DocumentType::Receipt,
+            DocumentType::KitchenOrder,
+            DocumentType::Invoice,
+            DocumentType::DeliveryNote,
+            DocumentType::BarcodeLabel,
+            DocumentType::CashSessionReport,
+            DocumentType::Prebill,
+            DocumentType::Generic,
+        ] {
+            papers.push((
+                format!("{doc:?}"),
+                render_document(doc, &data).expect("a valid document"),
+            ));
+        }
+        papers.push((
+            "test page".to_string(),
+            render_test_page("network:10.0.2.2:9100"),
+        ));
+        for (what, bytes) in papers {
+            assert!(
+                !bytes.windows(b"Bridge".len()).any(|w| w == b"Bridge"),
+                "{what}: the paper names the Bridge, a product retired by ADR-0196 and deleted \
+                 from the tree by hub#340"
+            );
+        }
     }
 }
 
