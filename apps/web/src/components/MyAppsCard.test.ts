@@ -29,6 +29,10 @@ const { isPhoneViewport } = await vi.hoisted(async () => {
 });
 vi.mock('../lib/viewport', () => ({ isPhoneViewport }));
 
+// hub#1722 — the placeholder tiles are Ionic's own `ion-skeleton-text`, so the assertion about
+// them being ANIMATED reads the component's prop instead of an attribute that never reflects.
+import { IonSkeletonText } from '@ionic/vue';
+
 import MyAppsCard from './MyAppsCard.vue';
 // The `<style>` block exactly as it ships: happy-dom does not apply an SFC's `scoped` styles, so
 // the CSS contract of hub#1268 is asserted against the source, not against the DOM.
@@ -428,5 +432,106 @@ describe('my apps does not grow past two rows on a phone (hub#1197)', () => {
     isPhoneViewport.value = true;
     const w = mountCard(manyApps, i18nEs);
     expect(w.find('[data-testid="apps-view-all"]').text()).toBe(es.dashboard.appsViewAll);
+  });
+});
+
+// hub#1722 — SILENCE was not enough either.
+//
+// hub#770 stopped the card from lying while it asked, and hub#894 made a failed ask say so out
+// loud. What neither covered is what the card LOOKS LIKE meanwhile: with the message gone, the
+// loading card is a grid whose only tile is «＋ Add apps» — pixel for pixel the empty hub. On a
+// real hub in PRE with twenty-one apps installed that state held for FIFTEEN seconds, and anyone
+// looking at the panel in that window — the owner, or support on a call — reads the only thing on
+// screen: this business has nothing installed.
+//
+// Not saying the wrong sentence is not the same as saying the right one. What every launcher does
+// while its list is on its way — and what this very shell already does one surface away for a
+// module screen (hub#1169, `ModuleView.vue`) — is hold the SHAPE of what is coming with a skeleton,
+// so the wait reads as a wait and the empty state stays reserved for an answer that came back
+// empty.
+describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
+  it('hub1722_my_apps_paints_a_skeleton_while_the_list_is_still_on_its_way', () => {
+    const w = mountCard([], i18n, 'loading');
+
+    const skeleton = w.find('[data-testid="apps-skeleton"]');
+    expect(skeleton.exists(), 'the loading card paints no skeleton at all').toBe(true);
+
+    // Tiles, not one lone bar: the shape of the grid that is coming.
+    const bars = w.findAll('[data-testid="apps-skeleton-tile"]');
+    expect(bars.length, 'too few placeholder tiles to read as a grid').toBeGreaterThanOrEqual(3);
+
+    // `animated` is what separates «this is coming» from «this is broken» — the same assertion the
+    // module screen's skeleton carries (hub#1169).
+    for (const bar of w.findAllComponents(IonSkeletonText)) {
+      expect(bar.props('animated'), 'a still skeleton reads as broken, not as loading').toBe(true);
+    }
+  });
+
+  it('the wait is TOLD to anyone not looking at the screen', () => {
+    const skeleton = mountCard([], i18n, 'loading').find('[data-testid="apps-skeleton"]');
+
+    // Grey tiles say nothing out loud: the bars are decorative and the container carries the
+    // sentence, exactly as `ModuleView.vue` does it.
+    expect(skeleton.attributes('role')).toBe('status');
+    expect(skeleton.attributes('aria-busy')).toBe('true');
+    expect(skeleton.attributes('aria-label')?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('and the empty hub keeps looking DIFFERENT from a hub that is still asking', () => {
+    // The whole defect in one assertion: these two states were indistinguishable.
+    const stillAsking = mountCard([], i18n, 'loading');
+    const genuinelyEmpty = mountCard([], i18n, 'ready');
+
+    expect(stillAsking.find('[data-testid="apps-skeleton"]').exists()).toBe(true);
+    expect(genuinelyEmpty.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(genuinelyEmpty.find('[data-testid="apps-empty"]').exists()).toBe(true);
+  });
+
+  it('the placeholders go away the moment the apps arrive', () => {
+    const w = mountCard([pos, stock], i18n, 'ready');
+
+    expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
+  });
+
+  it('a failed ask shows its failure, never a skeleton that will never resolve', () => {
+    const w = mountCard([], i18n, 'error');
+
+    expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(w.find('[data-testid="apps-error"]').exists()).toBe(true);
+  });
+
+  it('data still wins: a reload behind apps already on screen does not replace them', () => {
+    // hub#770's rule, unchanged — the skeleton is for having NOTHING to show, not for every ask.
+    const w = mountCard([pos, stock], i18n, 'loading');
+
+    expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
+    expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+  });
+
+  it('the skeleton obeys the phone row budget it is standing in for (hub#1197)', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard([], i18n, 'loading');
+
+    // The ＋ tile spends a cell of the same grid, so the placeholders get what is left of the
+    // budget — a card that grows past two rows while LOADING and then shrinks is its own defect.
+    const cells =
+      w.findAll('[data-testid="apps-skeleton-tile"]').length +
+      w.findAll('[data-testid="apps-add"]').length;
+    expect(cells).toBeLessThanOrEqual(PHONE_GRID_COLUMNS * PHONE_VISIBLE_ROWS);
+  });
+
+  it('ships the waiting sentence in both languages', () => {
+    const en = enCatalogue as unknown as { dashboard: Record<string, string> };
+    const es = esCatalogue as unknown as { dashboard: Record<string, string> };
+
+    expect(en.dashboard.appsLoading, 'en.dashboard.appsLoading').toBeTruthy();
+    expect(es.dashboard.appsLoading, 'es.dashboard.appsLoading').toBeTruthy();
+    expect(es.dashboard.appsLoading).not.toBe(en.dashboard.appsLoading);
+
+    const w = mountCard([], i18nEs, 'loading');
+    expect(w.find('[data-testid="apps-skeleton"]').attributes('aria-label')).toBe(
+      es.dashboard.appsLoading,
+    );
   });
 });

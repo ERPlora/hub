@@ -387,6 +387,9 @@ export default {
     // el hub esté vacío, y propone recargar: las apps siguen instaladas.
     appsLoadError:
       'No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.',
+    // hub#1722 — las baldosas del esqueleto son decorativas, así que esta es la frase que lleva la
+    // rejilla para quien no está mirando. Nunca se pinta como texto: eso ya lo dicen las baldosas.
+    appsLoading: 'Cargando tus apps…',
     blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',

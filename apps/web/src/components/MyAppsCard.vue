@@ -30,7 +30,40 @@
       {{ t('dashboard.appsLoadError') }}
     </p>
 
-    <ul class="apps-grid">
+    <!-- hub#1722 — and SILENCE was not enough either.
+         hub#770 stopped the card from lying while it asked; what it left behind is a grid whose
+         only tile is «＋ Add apps», which is pixel for pixel the empty hub. On a hub in PRE with
+         twenty-one apps installed that state held for FIFTEEN seconds, and the only thing anyone
+         looking at the panel could read was «this business has nothing installed». Not saying the
+         wrong sentence is not the same as saying the right one.
+         So while there is nothing to show yet the grid holds the SHAPE of what is coming — the
+         pattern of every launcher, and the one this shell already uses one surface away for a
+         module screen (hub#1169, `ModuleView.vue`). The tiles are decorative (`aria-hidden`); the
+         sentence rides on the grid itself with `role="status"` + `aria-busy`, for whoever is not
+         looking at the screen. -->
+    <ul
+      class="apps-grid"
+      :data-testid="display === 'loading' ? 'apps-skeleton' : undefined"
+      :role="display === 'loading' ? 'status' : undefined"
+      :aria-busy="display === 'loading' ? 'true' : undefined"
+      :aria-label="display === 'loading' ? t('dashboard.appsLoading') : undefined"
+    >
+      <li
+        v-for="cell in display === 'loading' ? SKELETON_TILE_COUNT : 0"
+        :key="`skeleton-${cell}`"
+        class="apps-grid-cell"
+      >
+        <!-- `:animated="true"` and not a bare `animated`: written bare, Vue hands the wrapper the
+             empty string rather than a boolean, so «is this skeleton moving?» could only be asked
+             of a rendered Ionic element and never of the component itself. A STILL skeleton reads
+             as broken, not as loading, so that has to be assertable. -->
+        <ion-skeleton-text
+          :animated="true"
+          class="apps-tile-skeleton"
+          data-testid="apps-skeleton-tile"
+          aria-hidden="true"
+        />
+      </li>
       <li v-for="app in gridView.tiles" :key="app.path" class="apps-grid-cell">
         <ion-button
           class="apps-tile"
@@ -101,11 +134,11 @@
 // never a ranking of ours.
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonSkeletonText } from '@ionic/vue';
 
 import HubIcon from './HubIcon.vue';
 import { orderAppsByUsage, recordAppLaunch } from '../lib/app-usage';
-import { appsGridView } from '../lib/apps-grid';
+import { appsGridView, SKELETON_TILE_COUNT } from '../lib/apps-grid';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import type { ModuleNavItem } from '../lib/nav';
 import { isPhoneViewport } from '../lib/viewport';
@@ -259,6 +292,17 @@ function remember(path: string): void {
   overflow-wrap: normal;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+/* hub#1722 — a placeholder has to occupy the TILE, not a line of text. `ion-skeleton-text` ships as
+   a thin bar sized to a sentence; left at its default the loading grid reads as a few grey dashes
+   above the ＋ tile, which is not the shape of what is coming. Height is pinned to what a real tile
+   measures (icon 1.6rem + gap 0.35rem + two label lines at 0.75rem/1.2 + the tile's 0.7rem padding
+   top and bottom ≈ 5rem) so nothing jumps when the apps land in their place. */
+.apps-tile-skeleton {
+  width: 100%;
+  height: 5rem;
+  margin: 0;
+  border-radius: var(--ok-radius-sm, 10px);
 }
 /* The catalogue tile reads as an offer, not as one more installed app: dashed outline, muted ink. */
 .apps-tile--add {
