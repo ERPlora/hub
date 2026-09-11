@@ -15,6 +15,24 @@
 // Sin mocks: runtime Axum real con BD efímera (ver `e2e/README.md`). La lista `/employees` se lee
 // por API a propósito — su tabla es un `<ok-data-table>` cuyo cromo (botón «Añadir», buscador,
 // acciones de fila) todavía no lleva ganchos, que es el hueco que queda abierto en OutfitKit.
+// 🔴 EL NOMBRE DEL FICHERO ES LOAD-BEARING: tiene que ordenar DESPUÉS de los `*Visual.spec.ts`.
+//
+// Playwright corre los ficheros en orden alfabético con `workers: 1` (`playwright.config.ts`), y
+// este spec da de alta una persona que NO se puede borrar: la baja del core es desactivar, nunca
+// borrar (`DELETE /api/hub/users/{id}`, hub#348), y `GET /api/hub/users` devuelve activos E
+// inactivos. `EmployeesPage.vue` pinta esa lista entera (`:rows="users"`), así que la fila queda a
+// la vista de quien fotografíe `/employees`.
+//
+// Con el nombre anterior (`EmployeeFormTestids.spec.ts`) este spec corría JUSTO ANTES de
+// `EmployeesVisual.spec.ts`, cuyo `toHaveScreenshot` afirma —y su comentario lo dice— que la
+// pestaña «Personal» es determinista «solo el usuario Demo del seed». Le habríamos metido una fila
+// de más cuyo nombre lleva un `Date.now()`: distinta en cada corrida, o sea una baseline envenenada
+// al generarla y un rojo intermitente después. `UsersCrudTestids` ordena tras `ShellVisual`, que es
+// el último visual, así que ningún contrato visual ve lo que este spec crea.
+//
+// El `Date.now()` del nombre se queda a propósito: si algún día alguien añade un visual que ordene
+// después de éste, la captura saldrá ROJA en voz alta en vez de hornear la fila de un test dentro
+// de un contrato visual sin que nadie se entere.
 import { test, expect, request as pwRequest } from '@playwright/test';
 import { loggedInSession, loginByPin } from './shell-visual-helpers';
 
