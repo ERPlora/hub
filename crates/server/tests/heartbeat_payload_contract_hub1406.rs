@@ -20,6 +20,7 @@ fn base() -> DailyUsageHeartbeat {
         orders_today: Some(7),
         last_sale_at: Some("2026-09-01T10:00:00Z".to_string()),
         terminals: Some(2),
+        active_users: Some(3),
         last_user_activity_at: Some("2026-09-01T09:00:00Z".to_string()),
         core_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![(
@@ -39,6 +40,7 @@ fn base() -> DailyUsageHeartbeat {
 fn hub1406_full_heartbeat_serializes_byte_identically() {
     let expected = concat!(
         r#"{"orders_today":7,"last_sale_at":"2026-09-01T10:00:00Z","terminals":2,"#,
+        r#""active_users":3,"#,
         r#""last_user_activity_at":"2026-09-01T09:00:00Z","core_version":"1.2.3","#,
         r#""verifactu_pending_depth":2,"verifactu_oldest_pending_at":"2026-08-30T08:00:00Z","#,
         r#""cpu_pct":1.5,"memory_used_mb":100.0,"memory_limit_mb":512.0,"memory_peak_mb":222.0,"#,
@@ -56,6 +58,7 @@ fn hub1406_an_empty_queue_is_a_zero_not_an_absence() {
         orders_today: None,
         last_sale_at: None,
         terminals: None,
+        active_users: None,
         last_user_activity_at: None,
         core_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![("verifactu".to_string(), 0, None)]),
@@ -78,6 +81,7 @@ fn hub1406_an_unreadable_queue_is_absent() {
         orders_today: None,
         last_sale_at: None,
         terminals: None,
+        active_users: None,
         last_user_activity_at: None,
         core_version: "1.2.3".to_string(),
         pending: PendingObligationFields::default(),
@@ -122,5 +126,46 @@ fn hub1441_an_unknown_route_is_absent_never_an_empty_string() {
     assert!(
         !body.contains("transmission_route"),
         "«I could not read it» is the field not being there at all: {body}"
+    );
+}
+
+/// hub#1814 — the seat census is the number the SaaS cannot obtain on its own: whoever signs in
+/// with a PIN has no ERPlora account, so without this field the invitation gate sees a Free hub
+/// of one where three people work. It travels under the exact name the SaaS ingests (saas#2022).
+#[test]
+fn hub1814_the_seat_census_travels_under_the_name_the_saas_ingests() {
+    let body = serde_json::to_string(&base()).unwrap();
+    assert!(
+        body.contains(r#""active_users":3"#),
+        "the SaaS reads this exact key into `Hub.reported_active_users`: {body}"
+    );
+}
+
+/// And the absence contract, which is the whole reason the field is an `Option`: a hub that could
+/// not read its census sends NOTHING. A fabricated `0` would say «nobody works here» and hand a
+/// free seat to a hub that is already full — the SaaS keeps the value it had (saas#2022).
+#[test]
+fn hub1814_an_uncountable_census_is_absent_never_a_fabricated_zero() {
+    let mut hb = base();
+    hb.active_users = None;
+
+    let body = serde_json::to_string(&hb).unwrap();
+    assert!(
+        !body.contains("active_users"),
+        "«I could not count» is the field not being there at all: {body}"
+    );
+}
+
+/// The other half: a census that WAS read and is empty sends an honest `0`. If the empty case
+/// stayed silent the SaaS could not tell it from a hub whose census would not read, and the two
+/// mean opposite things for the gate.
+#[test]
+fn hub1814_an_empty_census_is_an_honest_zero() {
+    let mut hb = base();
+    hb.active_users = Some(0);
+
+    assert!(
+        serde_json::to_string(&hb).unwrap().contains(r#""active_users":0"#),
+        "an explicit zero is «I counted and nobody is here», and it has to travel"
     );
 }

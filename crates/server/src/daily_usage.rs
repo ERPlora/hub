@@ -27,6 +27,26 @@ pub struct DailyUsageHeartbeat {
     pub last_sale_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminals: Option<u64>,
+    /// How many people hold a seat of this hub's plan right now (hub#1814) — the hub's own census,
+    /// which is the only place the people who sign in with a **PIN** exist.
+    ///
+    /// Without it the SaaS can only see whoever has an ERPlora account, so a Free hub run by an
+    /// owner and two PIN-only staff looks like a hub of one and its fourth invitation goes
+    /// through (saas#2022 stores this into `Hub.reported_active_users` and the seat gate takes
+    /// the larger of the two counts). It rides THIS request for the same reason as everything
+    /// else here: the beat already carries the machine credential at the right cadence.
+    ///
+    /// The number comes from [`erplora_runtime::hub_users::count_active_users`], the SAME count
+    /// that refuses the fourth user inside the hub (hub#1685) and feeds `users.active` on
+    /// `/api/system/metrics` — a second way of counting the same thing is how a screen and a door
+    /// end up disagreeing about who is in.
+    ///
+    /// Same `Option` semantics as the fields above, and here it is the whole point: an explicit
+    /// **`0`** is «I counted and nobody works here», an ABSENT field is «I could not count» — the
+    /// census would not read. A fabricated `0` would hand a free seat to a hub that is already
+    /// full, which is the exact overflow this field exists to close.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_users: Option<u64>,
     /// Última vez que alguien **entró** en el hub (ADR-0175), si la hubo desde el último latido.
     ///
     /// Es la señal con la que el Cloud apaga (60d) y acaba borrando (120d) los hubs free que nadie
@@ -329,10 +349,28 @@ pub async fn collect_daily_usage(
         .and_then(|result| result.rows.into_iter().next())
         .and_then(|row| value_as_u64(&row["terminals"]));
 
+    // Las personas que ocupan plaza del plan (hub#1814). SÍ se lee aquí, como `terminals` y
+    // `transmission_route`: es una consulta barata a la misma BD y los DOS latidos —el de arranque
+    // y el tick— la necesitan igual; rellenarla en un solo llamador dejaría al otro mandando un
+    // cuerpo sin censo, y el SaaS no distingue «este latido no lo trae» de «este hub no lo sabe».
+    //
+    // El recuento lo hace el RUNTIME, que es el dueño del censo y ya lo cuenta igual para aplicar
+    // el tope (hub#1685): dos formas de contar lo mismo acabarían discrepando, y la puerta del
+    // SaaS rechazaría una invitación que el hub sí admite (o al revés).
+    //
+    // `Err` viaja como ausencia y un recuento que no cabe en `u64` también: el contrato reserva la
+    // ausencia para «no pude contar», y un `0` fabricado le regalaría una plaza libre a un hub que
+    // ya está lleno — justo el desbordamiento que este campo viene a cerrar.
+    let active_users = erplora_runtime::hub_users::count_active_users(db, hub_id)
+        .await
+        .ok()
+        .and_then(|n| u64::try_from(n).ok());
+
     DailyUsageHeartbeat {
         orders_today,
         last_sale_at,
         terminals,
+        active_users,
         // La actividad de usuario no se lee AQUÍ: la sirve el `ActivityState`, que la mantiene en
         // un atómico y la respalda en `_hub_activity` (hub#670). La rellena el llamador (`serve`)
         // y solo si hay algo nuevo que reportar.
@@ -463,6 +501,79 @@ mod tests {
         );
     }
 
+    /// hub#1814: quien entra con PIN no tiene cuenta de ERPlora, así que el SaaS no lo ve — y sin
+    /// este número la puerta de invitaciones cuenta solo membresías y le regala plazas a un hub
+    /// lleno. El recuento es el MISMO que aplica el tope (`hub_users::count_active_users`).
+    #[tokio::test]
+    async fn reports_the_people_holding_a_seat_in_this_hub() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_user (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, is_active BIGINT NOT NULL DEFAULT 1\
+             );\
+             INSERT INTO hub_user VALUES\
+               ('owner', 'hub-a', 1),\
+               ('pin-1', 'hub-a', 1),\
+               ('pin-2', 'hub-a', 1),\
+               ('left',  'hub-a', 0),\
+               ('next-door', 'hub-b', 1);",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z", &[]).await;
+        assert_eq!(
+            usage.active_users,
+            Some(3),
+            "el dueño y las dos personas de PIN ocupan plaza; la baja (`left`) no, y la del negocio \
+             de al lado (`next-door`, hub-b) no es nuestra — varios hubs comparten BD (hub#497)"
+        );
+        assert_eq!(
+            serde_json::to_value(&usage).unwrap()["active_users"],
+            json!(3),
+            "viaja con el nombre exacto que el SaaS ingiere (saas#2022)"
+        );
+    }
+
+    /// El contrato de ausencia, gemelo del de `verifactu_pending_depth`: un `0` fabricado diría
+    /// «aquí no trabaja nadie» y le regalaría una plaza libre a un hub lleno, que es justo el
+    /// desbordamiento que hub#1814 viene a cerrar.
+    #[tokio::test]
+    async fn an_uncountable_census_is_absent_never_a_fabricated_zero() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_session (\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
+             );",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z", &[]).await;
+        assert_eq!(usage.active_users, None, "sin censo legible no hay número");
+        assert!(
+            !serde_json::to_string(&usage).unwrap().contains("active_users"),
+            "«no he podido contar» es que el campo NO esté: un cero le abriría una plaza al hub lleno"
+        );
+    }
+
+    /// Y el cero HONESTO sí viaja: censo legible y vacío es `0`, no una ausencia. Es la otra mitad
+    /// del contrato — si el vacío se callara, el SaaS no podría distinguirlo de un hub ilegible.
+    #[tokio::test]
+    async fn an_empty_census_is_an_honest_zero() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_user (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, is_active BIGINT NOT NULL DEFAULT 1\
+             );",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z", &[]).await;
+        assert_eq!(usage.active_users, Some(0));
+    }
+
     #[tokio::test]
     async fn missing_sales_table_omits_usage_instead_of_inventing_zero() {
         let db = fresh_db().await;
@@ -515,6 +626,7 @@ mod tests {
             orders_today: Some(12),
             last_sale_at: Some("2026-07-27T11:30:00Z".into()),
             terminals: Some(3),
+            active_users: Some(4),
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields(vec![(
@@ -546,6 +658,9 @@ mod tests {
                 "orders_today": 12,
                 "last_sale_at": "2026-07-27T11:30:00Z",
                 "terminals": 3,
+                // hub#1814: las personas que ocupan plaza del plan, incluidas las que entran con
+                // PIN y por tanto no tienen cuenta que el SaaS pueda ver.
+                "active_users": 4,
                 "last_user_activity_at": "2026-07-27T11:45:00Z",
                 "core_version": crate::version::HUB_VERSION,
                 // hub#326: the queue the SaaS alerts on travels under these exact names.
@@ -571,6 +686,7 @@ mod tests {
             orders_today: Some(0),
             last_sale_at: None,
             terminals: Some(0),
+            active_users: None,
             last_user_activity_at: None,
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
@@ -609,6 +725,7 @@ mod tests {
             orders_today: None,
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
@@ -668,6 +785,7 @@ mod tests {
             orders_today: None,
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
@@ -712,6 +830,7 @@ mod tests {
             orders_today: None,
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
@@ -753,6 +872,7 @@ mod tests {
             orders_today: Some(3),
             last_sale_at: None,
             terminals: Some(1),
+            active_users: None,
             last_user_activity_at: None,
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
@@ -928,6 +1048,7 @@ mod tests {
                 orders_today: None,
                 last_sale_at: None,
                 terminals: None,
+                active_users: None,
                 last_user_activity_at: None,
                 core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
@@ -986,6 +1107,7 @@ mod tests {
                 orders_today: None,
                 last_sale_at: None,
                 terminals: None,
+                active_users: None,
                 last_user_activity_at: None,
                 core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
@@ -1022,6 +1144,7 @@ mod tests {
             orders_today: Some(3),
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
