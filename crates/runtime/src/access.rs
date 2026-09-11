@@ -447,6 +447,17 @@ impl Runtime {
         identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
+    /// **Why** the session behind `token` is no longer valid, when [`Self::resolve_session`] says
+    /// nothing (hub#1801).
+    ///
+    /// Only the failure path asks, so the happy path pays nothing. `None` means there is nothing to
+    /// explain — unknown token, or it simply ran out of time — and that is deliberately NOT the same
+    /// answer as being thrown out by the device limit, which is the distinction the login screen
+    /// needs in order to say something true.
+    pub async fn session_end_reason(&self, token: &str) -> Result<Option<String>> {
+        identity::session_end_reason(self.db.as_ref(), &self.hub_id, token).await
+    }
+
     /// Resolves a valid session to its `hub_user` **and to the credential it was opened with**.
     ///
     /// Used by the browser handoff door (pm#196): "can administer" and "typed their password" are
