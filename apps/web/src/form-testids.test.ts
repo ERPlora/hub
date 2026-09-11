@@ -183,16 +183,16 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
  * entrada obsoleta falla si se queda). Una `.vue` nueva no nace en esta lista — nace cubierta.
  */
 const NOT_YET_COVERED: Record<string, string> = {
-  'views/EmployeesPage.vue': 'hub#PENDING-employees-list',
-  'views/ApiKeysPanel.vue': 'hub#PENDING-employees-list',
-  'views/LoginPage.vue': 'hub#PENDING-login',
-  'views/ProfilePage.vue': 'hub#PENDING-settings',
-  'views/SettingsPage.vue': 'hub#PENDING-settings',
-  'components/PinPolicyCard.vue': 'hub#PENDING-settings',
-  'components/DevicesCard.vue': 'hub#PENDING-settings',
-  'components/DeviceModeCard.vue': 'hub#PENDING-settings',
-  'components/AssistantDrawer.vue': 'hub#PENDING-assistant',
-  'components/ModuleSettingsForm.vue': 'hub#PENDING-assistant',
+  'views/EmployeesPage.vue': 'hub#1808',
+  'views/ApiKeysPanel.vue': 'hub#1808',
+  'views/LoginPage.vue': 'hub#1809',
+  'views/ProfilePage.vue': 'hub#1810',
+  'views/SettingsPage.vue': 'hub#1810',
+  'components/PinPolicyCard.vue': 'hub#1810',
+  'components/DevicesCard.vue': 'hub#1810',
+  'components/DeviceModeCard.vue': 'hub#1810',
+  'components/AssistantDrawer.vue': 'hub#1811',
+  'components/ModuleSettingsForm.vue': 'hub#1811',
 };
 
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
@@ -239,6 +239,18 @@ function openTag(source: string, start: number): string {
  * deja de ser código aparcado y vuelve al barrido.
  */
 const PARKED = 'parked';
+
+/**
+ * Una referencia de módulo a `parked/`, en las cuatro formas en las que se escribe una: `from`,
+ * `import(...)` en diferido, `import` a secas y `require`.
+ *
+ * Mirar solo `from` dejaba pasar justo la forma REALISTA, y con ella la única manera en que una
+ * pantalla aparcada vuelve a la vida: las rutas del shell son todas
+ * `component: () => import('../views/X.vue')` (`router/index.ts`), así que enrutar una pantalla de
+ * `parked/` no escribe ningún `from` — y la guardia se quedaba verde con la pantalla ya servida a
+ * los usuarios y sin un solo gancho. Medido como mutante al re-verificar hub#1756.
+ */
+const PARKED_IMPORT = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"][^'"]*\bparked\//;
 
 function vueFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -383,7 +395,7 @@ describe('data-testid — convención del shell (hub#1756)', () => {
     const importers = sourceFiles(SRC)
       .map((full) => relative(SRC, full))
       .filter((name) => !name.startsWith(`${PARKED}/`))
-      .filter((name) => /from\s+['"][^'"]*\bparked\//.test(readFileSync(join(SRC, name), 'utf8')));
+      .filter((name) => PARKED_IMPORT.test(readFileSync(join(SRC, name), 'utf8')));
     expect(importers, 'si una pantalla viva lo usa, ya no está aparcado: sácalo de parked/').toEqual(
       [],
     );
@@ -394,5 +406,17 @@ describe('data-testid — convención del shell (hub#1756)', () => {
       (name) => !SURFACES.some((s) => s.name === name),
     );
     expect(ghosts).toEqual([]);
+  });
+
+  it('cada pendiente cita una issue de verdad, no un hueco', () => {
+    // Una pendiente sin issue es una pendiente que no hace nadie: el registro de abajo se lee como
+    // un plan, y un `repo#PENDING-algo` lo convierte en una lista de buenas intenciones que nunca
+    // entra en el board. Forma exacta `repo#N` para que se pueda abrir desde aquí.
+    const placeholders = Object.entries(NOT_YET_COVERED)
+      .filter(([, issue]) => !/^[a-z][a-z0-9-]*#\d+$/.test(issue))
+      .map(([name, issue]) => `${name}: "${issue}"`);
+    expect(placeholders, 'abre la issue y pon su número: el hueco no lo recoge el board').toEqual(
+      [],
+    );
   });
 });
