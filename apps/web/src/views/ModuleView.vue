@@ -176,6 +176,7 @@ import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects'
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
 import { isOfflineError, isOnline } from '../lib/offline';
+import { toastInfo } from '../lib/toast';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -456,6 +457,16 @@ async function mount(): Promise<void> {
     // Un navId retirado o mal escrito no puede dejar la URL afirmando una pestaña mientras se
     // muestra otra. Canonizamos al primer tab real (también cubre bookmarks de versiones viejas).
     if (navId !== entry.nav.id) {
+      // hub#1723 — and it is SAID. Canonising in silence is the same defect the shell's catch-all
+      // had one floor up: `/m/sales/list` painted «Sell» as if that had been the address, so
+      // whoever pasted the link believed they were on the sales list. Same remedy hub#1175 gave
+      // the module the entitlement never names: still go where there IS a screen, but with the
+      // sentence that explains why it is not the one that was asked for.
+      //
+      // Only when the URL CLAIMED a tab: a bare `/m/sales` — the address the launcher, «My apps»
+      // and /apps all use — claims none, so opening the first one corrects nothing, and a notice
+      // there would be noise on the busiest screen of the product.
+      if (navId) void toastInfo(t('moduleView.unknownTabToast', { tab: entry.nav.label }));
       void router.replace(`/m/${moduleId}/${entry.nav.id}`);
     }
   } catch (error) {

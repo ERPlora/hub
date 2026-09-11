@@ -112,6 +112,14 @@ export default {
     // quitaría de vista la comanda que se está tomando. Con sus palabras, por lo mismo que arriba.
     brokenToast: 'No se ha podido abrir esa sección. Algo ha fallado dentro de ERPlora; vuelve a intentarlo.',
   },
+  // hub#1723 — an address this hub does not have. NOT a mistake the person made: nine times out
+  // of ten it is an old link or a guess at the name of an app, so the words point at the address
+  // and then at the way out, without blaming anybody.
+  notFound: {
+    title: 'Esta página no existe',
+    body: 'La dirección que has abierto no forma parte de este hub. Puede ser un enlace antiguo, o el nombre de una app adivinado: tus apps se abren desde el menú o desde Inicio.',
+    action: 'Ir a Inicio',
+  },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
   // para dos cosas es como un cajero acaba desinstalando el TPV.
@@ -1658,6 +1666,10 @@ export default {
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'Esta app no está disponible para este hub.',
+    // hub#1723 — an address that names a screen this app does not have. It is swapped for the one
+    // it does have (an old link keeps working) and the swap is now said out loud, naming what
+    // ended up on screen: a bare «that does not exist» leaves the person wondering what they see.
+    unknownTabToast: 'Esta app no tiene ninguna pantalla en esa dirección; se muestra «{tab}».',
   },
   moduleSettings: {
     tab: 'Ajustes',
