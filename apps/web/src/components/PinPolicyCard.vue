@@ -25,7 +25,7 @@
       el lado restrictivo, en el runtime.
 -->
 <template>
-  <ion-card>
+  <ion-card data-testid="pin-policy-card">
     <ion-card-content class="p-0">
       <ion-list lines="none">
         <ion-item lines="none">
@@ -36,6 +36,7 @@
           </ion-label>
           <ion-toggle
             slot="end"
+            data-testid="pin-policy-pinpad"
             :checked="pinpadOn"
             :disabled="!isAdmin || saving"
             :aria-label="t('pinPolicy.showPinpad')"
@@ -59,6 +60,7 @@
           </ion-item>
           <ion-item lines="none">
             <ion-range
+              data-testid="pin-policy-idle"
               :min="0"
               :max="UNTIL_SIGN_OUT_STOP"
               :step="1"
@@ -85,6 +87,7 @@
             </ion-label>
             <ion-segment
               slot="end"
+              data-testid="pin-policy-length"
               :value="String(hubPinLength)"
               :disabled="!isAdmin || saving"
               @ion-change="onLength($event)"
@@ -101,13 +104,14 @@
 
         <!-- Un control deshabilitado y mudo se lee como una avería; con el motivo es una regla. -->
         <ion-item v-if="!isAdmin" lines="none">
-          <ion-note class="note">{{ t('pinPolicy.adminOnly') }}</ion-note>
+          <ion-note class="note" data-testid="pin-policy-admin-only">{{ t('pinPolicy.adminOnly') }}</ion-note>
         </ion-item>
       </ion-list>
 
       <ok-inline-feedback
         v-if="rejection"
         class="feedback"
+        data-testid="pin-policy-error"
         tone="danger"
         icon="alert-circle-outline"
       >

@@ -12,12 +12,13 @@
         <div class="avatar-actions">
           <input
             ref="avatarInput"
+            data-testid="profile-avatar-input"
             hidden
             type="file"
             accept="image/jpeg,image/png,image/webp"
             @change="onAvatarSelected"
           />
-          <ion-button size="small" fill="outline" :disabled="avatarSaving" @click="avatarInput?.click()">
+          <ion-button size="small" fill="outline" data-testid="profile-change-photo" :disabled="avatarSaving" @click="avatarInput?.click()">
             <HubIcon slot="start" name="camera-outline" />
             {{ t('profile.changePhoto') }}
           </ion-button>
@@ -25,6 +26,7 @@
             v-if="user?.avatarUrl"
             size="small"
             fill="clear"
+            data-testid="profile-remove-photo"
             color="medium"
             :disabled="avatarSaving"
             @click="removeAvatar"
@@ -64,6 +66,7 @@
             <div class="profile-form">
               <ion-input
                 v-model="firstName"
+                data-testid="profile-first-name"
                 mode="md"
                 fill="outline"
                 :label="t('profile.firstName')"
@@ -72,6 +75,7 @@
               />
               <ion-input
                 v-model="lastName"
+                data-testid="profile-last-name"
                 mode="md"
                 fill="outline"
                 :label="t('profile.lastName')"
@@ -80,6 +84,7 @@
               />
               <ion-input
                 v-model="email"
+                data-testid="profile-email"
                 mode="md"
                 fill="outline"
                 type="email"
@@ -91,7 +96,7 @@
                 <span>{{ t('profile.role') }}: <strong>{{ roleLabel }}</strong></span>
                 <span>{{ accountTypeLabel }}</span>
               </div>
-              <ion-button expand="block" :disabled="profileSaving || loading" @click="saveIdentity">
+              <ion-button expand="block" data-testid="profile-save" :disabled="profileSaving || loading" @click="saveIdentity">
                 {{ profileSaving ? t('profile.saving') : t('profile.saveProfile') }}
               </ion-button>
             </div>
@@ -117,6 +122,7 @@
               <ion-select
                 :key="`profile-language-${locale}`"
                 v-model="selectedLocale"
+                data-testid="profile-language"
                 interface="popover"
                 :aria-label="t('profile.language')"
                 @ion-change="onLocaleChange($event.detail.value as string)"
@@ -141,6 +147,7 @@
             </div>
             <ok-theme-picker
               class="profile-theme-picker"
+              data-testid="profile-theme"
               :palette="themePalette"
               :mode="themeMode"
               :labels.prop="pickerLabels"
@@ -151,6 +158,7 @@
               size="small"
               fill="clear"
               class="follow-hub-button"
+              data-testid="profile-use-hub-appearance"
               @click="followHubAppearance"
             >
               {{ t('profile.useHubAppearance') }}
@@ -168,10 +176,11 @@
         </ion-card-header>
         <ion-card-content class="profile-card-content">
           <p class="pin-copy">{{ t(hasPin ? 'profile.pinDesc' : 'profile.pinSetupDesc') }}</p>
-          <form class="profile-form" @submit.prevent="savePin">
+          <form class="profile-form" data-testid="profile-pin-form" @submit.prevent="savePin">
             <ion-input
               v-if="hasPin"
               v-model="currentPin"
+              data-testid="profile-current-pin"
               type="password"
               inputmode="numeric"
               mode="md"
@@ -185,6 +194,7 @@
             </ion-input>
             <ion-input
               v-model="newPin"
+              data-testid="profile-new-pin"
               type="password"
               inputmode="numeric"
               mode="md"
@@ -201,6 +211,7 @@
             </ion-input>
             <ion-input
               v-model="confirmPin"
+              data-testid="profile-confirm-pin"
               type="password"
               inputmode="numeric"
               mode="md"
@@ -212,7 +223,7 @@
             >
               <ion-input-password-toggle slot="end"></ion-input-password-toggle>
             </ion-input>
-            <ion-button expand="block" type="submit" :disabled="pinSaving || !canSavePin">
+            <ion-button expand="block" type="submit" data-testid="profile-save-pin" :disabled="pinSaving || !canSavePin">
               {{ pinSaving ? t('profile.saving') : t(hasPin ? 'profile.changePin' : 'profile.setPin') }}
             </ion-button>
           </form>
@@ -227,7 +238,7 @@
           <h2>{{ t('profile.manageTitle') }}</h2>
           <p>{{ t(cloudLinked ? 'profile.manageCloud' : 'profile.manageLocal') }}</p>
         </div>
-        <ion-button v-if="cloudLinked" fill="outline" @click="manageCloudAccount">
+        <ion-button v-if="cloudLinked" fill="outline" data-testid="profile-manage-account" @click="manageCloudAccount">
           {{ t('profile.manageInSaas') }}
           <HubIcon slot="end" name="open-outline" />
         </ion-button>

@@ -177,6 +177,111 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'login-use-pin',
     ],
   },
+  // La cuenta de quien usa el hub (`/profile`): identidad, idioma, apariencia y el PIN propio.
+  'views/ProfilePage.vue': {
+    prefix: 'profile-',
+    contract: [
+      'profile-avatar-input',
+      'profile-change-photo',
+      'profile-confirm-pin',
+      'profile-current-pin',
+      'profile-email',
+      'profile-first-name',
+      'profile-language',
+      'profile-last-name',
+      'profile-manage-account',
+      'profile-new-pin',
+      'profile-pin-form',
+      'profile-remove-photo',
+      'profile-save',
+      'profile-save-pin',
+      'profile-theme',
+      'profile-use-hub-appearance',
+    ],
+  },
+  // Los ajustes del hub (`/settings`), con sus cinco pestañas. Aquí se decide quién entra y con
+  // qué, así que es la superficie que más caro sale sin conducir: país y moneda del negocio, la
+  // identidad fiscal, el certificado y los permisos de cada app.
+  //
+  // Los tres ganchos de la vía fiscal se llamaban `fiscal-route-*` y pasan a `settings-fiscal-
+  // route-*`: el prefijo de la pantalla es obligatorio (`architecture/hub/apps/testids.md`) y sin
+  // él dos pantallas pueden acuñar el mismo nombre. El único que los usaba —
+  // `views/settings-fiscal-route.test.ts`— cambia en este mismo commit, que es justo lo que la
+  // regla de contrato pide: renombrar rompe aquí, no la suite de QA tres días después.
+  'views/SettingsPage.vue': {
+    prefix: 'settings-',
+    contract: [
+      'settings-api-docs',
+      'settings-autostart',
+      'settings-business-address',
+      'settings-business-legal-name',
+      'settings-business-tax-id',
+      'settings-cert-choose',
+      'settings-cert-delete',
+      'settings-cert-file',
+      'settings-cert-password',
+      'settings-cert-upload',
+      'settings-country',
+      'settings-currency',
+      'settings-declaration-error',
+      'settings-declaration-link',
+      'settings-declaration-pending',
+      'settings-fiscal-route-delegated',
+      'settings-fiscal-route-own',
+      'settings-fiscal-route-segment',
+      'settings-hardware',
+      'settings-hub-language',
+      'settings-hub-palette',
+      'settings-permissions-empty',
+      'settings-permissions-loading',
+      'settings-print-coverage-error',
+      'settings-receipt-template',
+      'settings-save-business',
+      'settings-share-with-erplora',
+      'settings-tab-data',
+      'settings-tab-hub',
+      'settings-tab-permissions',
+      'settings-tab-tax',
+      'settings-tab-tickets',
+      'settings-tabs',
+      'settings-timezone',
+    ],
+  },
+  // «Preguntar quién vende» (Ajustes › Hub): el toggle del pinpad, el dial de inactividad y la
+  // longitud del PIN. Es la tarjeta de la que depende el e2e del PIN.
+  'components/PinPolicyCard.vue': {
+    prefix: 'pin-policy-',
+    contract: [
+      'pin-policy-admin-only',
+      'pin-policy-card',
+      'pin-policy-error',
+      'pin-policy-idle',
+      'pin-policy-length',
+      'pin-policy-pinpad',
+    ],
+  },
+  // El inventario de dispositivos («se me ha perdido la tablet»). Cada fila lleva su `deviceId` al
+  // final, calculado: por índice, revocar apuntaría a otra tablet en cuanto entrara una nueva.
+  //
+  // Las filas llevaban `data-test` —sin `id`—, que ni Playwright resuelve con `getByTestId` ni ve
+  // la guardia. Pasan a `data-testid` con el prefijo de la tarjeta y `DevicesCard.test.ts` se
+  // mueve con ellas, en este mismo commit.
+  'components/DevicesCard.vue': {
+    prefix: 'devices-',
+    contract: ['devices-admin-only', 'devices-card', 'devices-empty', 'devices-error'],
+  },
+  // «Este dispositivo» (Ajustes › Hub): compartido o personal, la decisión de si esta caja pide PIN.
+  'components/DeviceModeCard.vue': {
+    prefix: 'device-mode-',
+    contract: [
+      'device-mode-admin-only',
+      'device-mode-card',
+      'device-mode-error',
+      'device-mode-options',
+      'device-mode-personal',
+      'device-mode-shared',
+    ],
+  },
   // Las cinco de abajo ya estaban completas antes de hub#1756 (medido: ningún control sin gancho).
   // Entran para que no se deshagan solas: el contrato de elevación/export/otorgamiento/reset lo usa
   // hoy la suite e2e del shell.
@@ -270,11 +375,6 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
  * entrada obsoleta falla si se queda). Una `.vue` nueva no nace en esta lista — nace cubierta.
  */
 const NOT_YET_COVERED: Record<string, string> = {
-  'views/ProfilePage.vue': 'hub#1810',
-  'views/SettingsPage.vue': 'hub#1810',
-  'components/PinPolicyCard.vue': 'hub#1810',
-  'components/DevicesCard.vue': 'hub#1810',
-  'components/DeviceModeCard.vue': 'hub#1810',
   'components/AssistantDrawer.vue': 'hub#1811',
   'components/ModuleSettingsForm.vue': 'hub#1811',
 };
@@ -287,7 +387,7 @@ const NOT_YET_COVERED: Record<string, string> = {
  * número clavado, meter una pantalla nueva en pendientes obliga a subirlo a mano, en una línea cuyo
  * comentario dice que no se sube.
  */
-const PENDING_TODAY = 7;
+const PENDING_TODAY = 2;
 
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
 const CONTROL_TAGS = [
