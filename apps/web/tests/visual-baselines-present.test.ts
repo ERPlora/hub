@@ -141,7 +141,13 @@ describe('el contrato visual no fotografía el QR de instalación (hub#1752)', (
   });
 });
 
-// Regression test for ERPlora/hub#1823 — a capture taken while an icon is still glyph-less.
+// Regression test for ERPlora/hub#1823 — a capture taken while the shell is still moving.
+//
+// `waitForVisualSettle` holds THREE invariants, and each one is something that moves after the
+// point where a spec used to give the screen up for finished: the chrome has decided which door
+// into the menu is on screen, every on-screen icon carries its glyph, and no box is still
+// scrolling itself (`ion-segment[scrollable]` nudges its own scroll ~900 ms in). The icon one is
+// spelled out below because it is the cheapest to see:
 //
 // `ion-icon` injects its `<svg>` asynchronously, a frame or two after layout, so "the board is
 // visible" does NOT mean "the screen is finished". Measured on 2026-09-11 over 12 loads of
@@ -158,9 +164,10 @@ describe('el contrato visual no fotografía un shell a medio terminar (hub#1823)
     const source = readFileSync(join(E2E_DIR, spec), 'utf8');
     expect(
       /waitForVisualSettle\s*\(/.test(source),
-      `${spec} no llama a waitForVisualSettle(page): el botón de menú y los glifos de ion-icon ` +
-        'llegan DESPUÉS del punto de asentamiento, así que la captura puede salir a medio ' +
-        'hacer y poner en rojo una PR que no ha tocado esa pantalla (hub#1823).',
+      `${spec} no llama a waitForVisualSettle(page): el botón de menú, los glifos de ion-icon y ` +
+        'el tabbar que se desplaza solo llegan DESPUÉS del punto de asentamiento, así que la ' +
+        'captura puede salir a medio hacer y poner en rojo una PR que no ha tocado esa pantalla ' +
+        '(hub#1823).',
     ).toBe(true);
   });
 });

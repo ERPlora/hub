@@ -22,9 +22,9 @@ test.describe('contrato visual del shell — ajustes', () => {
       await expect(page.locator('.ok-tabbar')).toBeVisible();
       await expect(page.locator('ion-card').first()).toBeVisible();
 
-      // Y el shell ha TERMINADO: el botón de menú ya ha aparecido (o el sidebar ocupa su sitio)
-      // y los iconos tienen su glifo. Las dos cosas llegan tarde y la pantalla pasa por aquí a
-      // medio hacer en más de la mitad de las cargas (hub#1823).
+      // Y el shell ha TERMINADO: el botón de menú ya ha aparecido (o el sidebar ocupa su sitio),
+      // los iconos tienen su glifo y nada sigue desplazándose solo. Las TRES cosas llegan tarde y
+      // la pantalla pasa por aquí a medio hacer en más de la mitad de las cargas (hub#1823).
       await waitForVisualSettle(page);
 
       // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde

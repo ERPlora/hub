@@ -25,11 +25,17 @@
 // them on. The blanket the ratio provided had nothing left to absorb.
 //
 // ── WHAT THIS CONTRACT DOES *NOT* PROMISE ────────────────────────────────────────────────────
-// A change smaller than one character. The budget keeps a small cushion above the measured noise
-// so that a stray pixel from a browser bump does not turn fifteen captures red at once — and a
-// contract that cries wolf is the one that gets muted, which is the disease hub#1752 was closing.
-// Anything from one character upward is caught; below that, the component tests and the i18n
-// strings are the contract. That sentence is the honest reading of the green check.
+// A change smaller than the ink of a LETTER. The budget keeps a small cushion above the measured
+// noise so that a stray pixel from a browser bump does not turn fifteen captures red at once — and
+// a contract that cries wolf is the one that gets muted, which is the disease hub#1752 was closing.
+//
+// Where that cushion actually falls, counted on the committed Linux baseline of `settings-1440`
+// (2026-09-11, review of #1832): in the sidebar footer each digit of `v0.0.0-bench` carries 43-45
+// pixels of ink and each letter 40-50, so swapping, dropping or adding ANY of them clears 20 px —
+// but the dots between the digits carry 4 px each, so a `.` turned into a `,` would still pass.
+// Letters and digits are caught; punctuation that small, and anything below it, is not — for those
+// the component tests and the i18n strings are the contract. That is the honest reading of the
+// green check.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

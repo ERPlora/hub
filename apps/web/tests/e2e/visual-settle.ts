@@ -1,6 +1,6 @@
-// The two settle points the visual contract was missing (ERPlora/hub#1823): the shell chrome has
-// decided how you get into the menu, and every icon on screen has its glyph. Guard:
-// `tests/visual-settle.test.ts`.
+// The three settle points the visual contract was missing (ERPlora/hub#1823): the shell chrome has
+// decided how you get into the menu, every icon on screen has its glyph, and nothing is still
+// scrolling itself. Guard: `tests/visual-settle.test.ts`.
 //
 // 🔴 THIS FILE RUNS IN THE BROWSER, NOT IN NODE. `page.waitForFunction` ships the SOURCE of the
 // function below and the browser rebuilds it with no module scope around it, so the body may not

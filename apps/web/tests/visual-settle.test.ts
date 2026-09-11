@@ -1,7 +1,9 @@
-// Guard for the icon settle point of the visual contract (ERPlora/hub#1823).
+// Guard for the three settle points of the visual contract (ERPlora/hub#1823).
 //
-// Two things move after a screen looks finished, and both were photographed mid-flight until
-// hub#1823 made the budget tight enough to see them.
+// Three things move after a screen looks finished — the chrome's door into the menu, the glyph of
+// every icon, and the tabbar nudging its own scroll — and all three were photographed mid-flight
+// until hub#1823 made the budget tight enough to see them. The icon one is written up first
+// because it is the one this file opened with; the other two have their own blocks below.
 //
 // ── WHAT THIS EXISTS TO STOP ─────────────────────────────────────────────────────────────────
 // `ion-icon` injects its `<svg>` ASYNCHRONOUSLY — ionicons resolves the glyph off an
