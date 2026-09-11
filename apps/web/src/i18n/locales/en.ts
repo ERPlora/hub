@@ -293,9 +293,13 @@ export default {
     configure: 'Set up',
     review: 'Ask the assistant',
     doneLabel: 'Done',
-    // The three levels, said as what they mean for the business — not as a severity word.
+    // The three levels. Only the ⛔ one may name a refusal, because it is the only one with a
+    // dispatcher behind it (`enforce_fiscal_precondition`, ADR-0203) — and the refusal it names is
+    // the INVOICE: a sale without the fiscal identity still closes. 🔴 is a module saying its own
+    // configuration matters, which the core never lets become a condition for selling, so it says
+    // how much it matters and stops there (hub#1726). Guard: `i18n/setup-level-copy.test.ts`.
     levelLegal: 'Needed to invoice',
-    levelFunctional: 'Needed to sell',
+    levelFunctional: 'Important',
     levelRecommended: 'Recommended',
     // The third state: OUR breakdown, not the user's task. It must not read as a chore.
     unavailableLabel: 'Not available yet',

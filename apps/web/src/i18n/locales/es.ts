@@ -275,9 +275,14 @@ export default {
     configure: 'Configurar',
     review: 'Pedírselo al asistente',
     doneLabel: 'Hecho',
-    // Los tres niveles, dichos por lo que significan para el negocio, no por su gravedad.
+    // Los tres niveles. Solo el ⛔ puede nombrar un rechazo, porque es el único que tiene un
+    // dispatcher detrás (`enforce_fiscal_precondition`, ADR-0203) — y lo que rechaza es la FACTURA:
+    // una venta sin identidad fiscal se cierra igual. El 🔴 es un módulo diciendo que su propia
+    // configuración importa, y el core nunca deja que eso se convierta en una condición para
+    // vender: dice cuánto importa y ahí se queda (hub#1726). Guardia:
+    // `i18n/setup-level-copy.test.ts`.
     levelLegal: 'Necesario para facturar',
-    levelFunctional: 'Necesario para vender',
+    levelFunctional: 'Importante',
     levelRecommended: 'Recomendado',
     // El tercer estado: una avería NUESTRA, no una tarea suya. No puede sonar a deber.
     unavailableLabel: 'Todavía no disponible',

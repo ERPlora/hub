@@ -57,7 +57,7 @@ const i18n = createI18n({
         review: 'Review configuration',
         doneLabel: 'Done',
         levelLegal: 'Needed to invoice',
-        levelFunctional: 'Needed to sell',
+        levelFunctional: 'Important',
         levelRecommended: 'Recommended',
         unavailableLabel: 'Not available yet',
         unavailableHint: 'This one is on us. There is nothing to do here yet.',

@@ -275,11 +275,15 @@ describe('⛔ is a rejection of the runtime, not a strong recommendation', () =>
     expect(text).toContain('recommended');
   });
 
-  it('a 🔴 is its own thing: it cannot sell, but nothing rejects it', () => {
+  it('a 🔴 is its own thing: it matters, but nothing rejects it', () => {
     const text = brief(functional);
 
     expect(text).not.toContain('BLOCKS INVOICING');
-    expect(text).toContain('needed to sell');
+    expect(text).toContain('important');
+    // …and it does NOT borrow ⛔'s sentence from the other side (hub#1726): «needed to sell» named a
+    // gate the core forbids a manifest from having. The wording itself is held in
+    // `i18n/setup-level-copy.test.ts`, next to the badge that has to agree with it.
+    expect(text).not.toMatch(/\bsell\b/i);
   });
 
   it('the level is READ, never re-derived from `required`', () => {
