@@ -10,26 +10,27 @@
     back-href="/employees"
     content-layout="detail"
   >
-    <div v-if="loading" class="form-loading">
+    <div v-if="loading" class="form-loading" data-testid="employee-loading">
       <ion-spinner name="crescent" />
     </div>
 
     <ok-inline-feedback
       v-else-if="loadError"
+      data-testid="employee-load-error"
       tone="danger"
       icon="alert-circle-outline"
       :heading="t('employeeForm.loadErrorTitle')"
     >
       {{ t('employeeForm.loadErrorBody') }}
-      <ion-button slot="actions" size="small" fill="outline" @click="load">
+      <ion-button slot="actions" size="small" fill="outline" data-testid="employee-retry" @click="load">
         {{ t('employees.retry') }}
       </ion-button>
     </ok-inline-feedback>
 
     <ion-card v-else class="ion-no-margin employee-card">
       <ion-card-content>
-        <form class="emp-form" @submit.prevent="onSave">
-          <ok-inline-feedback v-if="saveError" tone="danger">
+        <form class="emp-form" data-testid="employee-form" @submit.prevent="onSave">
+          <ok-inline-feedback v-if="saveError" data-testid="employee-error" tone="danger">
             {{ saveError }}
             <!-- hub#1685 — la salida del callejón: sin plaza libre no hay nada que corregir en el
                  formulario. Etiqueta NEUTRA y destino la página de plan de ESTE hub en la cuenta,
@@ -48,6 +49,7 @@
           <div class="form-grid">
             <ion-input
               v-model="form.name"
+              data-testid="employee-name"
               :label="t('employeeForm.fullName')"
               label-placement="floating"
               mode="md"
@@ -63,6 +65,7 @@
             <ion-input
               v-if="!isLocal"
               v-model="form.email"
+              data-testid="employee-email"
               :label="t('employeeForm.email')"
               label-placement="floating"
               mode="md"
@@ -76,6 +79,7 @@
             />
             <ion-select
               v-model="form.role"
+              data-testid="employee-role"
               :label="t('employeeForm.role')"
               label-placement="floating"
               mode="md"
@@ -92,6 +96,7 @@
                  acceso por PIN (seguirá pudiendo entrar por Cloud si tiene cuenta). -->
             <ion-input
               v-model="form.pin"
+              data-testid="employee-pin"
               :label="t('employeeForm.pin')"
               label-placement="floating"
               mode="md"
@@ -110,6 +115,7 @@
                  PIN sigue donde estaba. -->
             <ion-input
               v-model="form.badge"
+              data-testid="employee-badge"
               :label="t('employeeForm.badge')"
               label-placement="floating"
               mode="md"
@@ -127,6 +133,7 @@
           <ion-toggle
             v-if="!isEdit"
             :checked="form.local"
+            data-testid="employee-local"
             label-placement="start"
             justify="space-between"
             class="active-toggle"
@@ -138,6 +145,7 @@
 
           <ion-toggle
             :checked="form.isActive"
+            data-testid="employee-active"
             label-placement="start"
             justify="space-between"
             class="active-toggle"
@@ -152,6 +160,7 @@
             fill="clear"
             size="small"
             class="clear-credential"
+            data-testid="employee-clear-pin"
             :disabled="saving"
             @click="clearPin"
           >
@@ -164,6 +173,7 @@
             fill="clear"
             size="small"
             class="clear-credential"
+            data-testid="employee-clear-badge"
             :disabled="saving"
             @click="clearBadge"
           >
@@ -171,10 +181,16 @@
           </ion-button>
 
           <div class="form-actions">
-            <ion-button type="button" fill="outline" :disabled="saving" @click="onCancel">
+            <ion-button
+              type="button"
+              fill="outline"
+              data-testid="employee-cancel"
+              :disabled="saving"
+              @click="onCancel"
+            >
               {{ t('employeeForm.cancel') }}
             </ion-button>
-            <ion-button type="submit" :disabled="saving || !canSubmit">
+            <ion-button type="submit" data-testid="employee-submit" :disabled="saving || !canSubmit">
               <ion-spinner v-if="saving" slot="start" name="crescent" />
               {{ saving ? t('employeeForm.saving') : isEdit ? t('employeeForm.save') : t('employeeForm.create') }}
             </ion-button>
