@@ -63,6 +63,56 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'employee-submit',
     ],
   },
+  // La lista de personal (`/employees`): las pestañas, la tabla y el alta rápida que vive en el
+  // panel lateral. `employees-` y no `employee-` a propósito — el singular es el formulario de una
+  // persona, y son dos pantallas distintas que el QA recorre una detrás de otra.
+  'views/EmployeesPage.vue': {
+    prefix: 'employees-',
+    contract: [
+      'employees-email',
+      'employees-form',
+      'employees-form-error',
+      'employees-load-error',
+      'employees-loading',
+      'employees-local',
+      'employees-name',
+      'employees-pin',
+      'employees-retry',
+      'employees-role',
+      'employees-submit',
+      'employees-tab-apikeys',
+      'employees-tab-approvals',
+      'employees-tab-roles',
+      'employees-tab-staff',
+      'employees-table',
+      'employees-tabs',
+    ],
+  },
+  // Las claves de API de máquina (pestaña «API keys» de la lista de personal). La matriz de
+  // módulos × {lectura, escritura} se nombra CALCULADA por id de módulo, como las filas del
+  // import: por índice, un módulo instalado de más movería la aserción a otra fila.
+  'views/ApiKeysPanel.vue': {
+    prefix: 'api-key-',
+    contract: [
+      'api-key-access',
+      'api-key-all-read',
+      'api-key-all-write',
+      'api-key-cancel',
+      'api-key-create',
+      'api-key-create-close',
+      'api-key-create-modal',
+      'api-key-modules-loading',
+      'api-key-name',
+      'api-key-no-modules',
+      'api-key-rate-limit',
+      'api-key-secret',
+      'api-key-secret-close',
+      'api-key-secret-copy',
+      'api-key-secret-done',
+      'api-key-secret-modal',
+      'api-key-table',
+    ],
+  },
   // El flujo de import de blueprints es el patrón de referencia citado por hub#1756: ya era el
   // único que el QA sabía conducir. Queda congelado aquí para que siga siéndolo.
   'components/ImportPanel.vue': {
@@ -183,8 +233,6 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
  * entrada obsoleta falla si se queda). Una `.vue` nueva no nace en esta lista — nace cubierta.
  */
 const NOT_YET_COVERED: Record<string, string> = {
-  'views/EmployeesPage.vue': 'hub#1808',
-  'views/ApiKeysPanel.vue': 'hub#1808',
   'views/LoginPage.vue': 'hub#1809',
   'views/ProfilePage.vue': 'hub#1810',
   'views/SettingsPage.vue': 'hub#1810',
@@ -203,7 +251,7 @@ const NOT_YET_COVERED: Record<string, string> = {
  * número clavado, meter una pantalla nueva en pendientes obliga a subirlo a mano, en una línea cuyo
  * comentario dice que no se sube.
  */
-const PENDING_TODAY = 10;
+const PENDING_TODAY = 8;
 
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
 const CONTROL_TAGS = [
