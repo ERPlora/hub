@@ -1,0 +1,185 @@
+// Guard for the icon settle point of the visual contract (ERPlora/hub#1823).
+//
+// Two things move after a screen looks finished, and both were photographed mid-flight until
+// hub#1823 made the budget tight enough to see them.
+//
+// ── WHAT THIS EXISTS TO STOP ─────────────────────────────────────────────────────────────────
+// `ion-icon` injects its `<svg>` ASYNCHRONOUSLY — ionicons resolves the glyph off an
+// IntersectionObserver, a frame or two after the element is in the DOM and laid out. The visual
+// specs settle on `ok-widget-board` being visible, and measured on 2026-09-11 against the real
+// bench (12 consecutive loads of /dashboard at 390px), ONE on-screen icon was still glyph-less at
+// that moment in SEVEN of them: the hamburger inside `ion-menu-button`. It paints ~10 ms later.
+//
+// With the old budget (`maxDiffPixelRatio: 0.002` = 658 px at 390x844) that hole was invisible.
+// With the absolute 20 px budget of hub#1823 it is not: the missing hamburger is 69 px, so the
+// capture goes RED — measured twice in twelve runs of the whole contract. A contract that reds at
+// random is the disease hub#1752 was closing, so the budget could not land without this.
+//
+// ── WHY THE PREDICATE IS TESTED THROUGH `new Function` ───────────────────────────────────────
+// `page.waitForFunction(everyOnScreenIconIsPainted)` does not ship the function: Playwright ships
+// its SOURCE (`toString()`) and the browser rebuilds it there, with no module scope around it. A
+// helper pulled in from an import would therefore blow up at runtime — inside the browser, where
+// the failure reads as a timeout and not as the `ReferenceError` it is. Rebuilding the function
+// from its own source here is what keeps that honest: these cases exercise exactly what the
+// browser will run.
+import { describe, expect, it } from 'vitest';
+
+import { everyOnScreenIconIsPainted, shellChromeHasSettled } from './e2e/visual-settle.ts';
+
+interface FakeNode {
+  tagName: string;
+  shadowRoot?: FakeRoot | null;
+  rect?: { width: number; height: number; top: number; left: number };
+}
+
+interface FakeRoot {
+  children: FakeNode[];
+  svg: boolean;
+}
+
+const VIEWPORT = { innerWidth: 390, innerHeight: 844 };
+
+/** An `<svg>` the walker may run into; it is a leaf, and never an icon. */
+const SVG: FakeNode = { tagName: 'svg' };
+
+/** An `ion-icon` with its glyph already injected. */
+function painted(rect?: FakeNode['rect']): FakeNode {
+  return { tagName: 'ion-icon', rect, shadowRoot: { children: [SVG], svg: true } };
+}
+
+/** An `ion-icon` that is in the DOM and laid out, but whose glyph has not arrived yet. */
+function unpainted(rect?: FakeNode['rect']): FakeNode {
+  return { tagName: 'ion-icon', rect, shadowRoot: { children: [], svg: false } };
+}
+
+/** A host with a shadow DOM of its own — `ion-menu-button`, which is where the defect lives. */
+function host(children: FakeNode[]): FakeNode {
+  return { tagName: 'ion-menu-button', rect: { width: 40, height: 40, top: 12, left: 8 }, shadowRoot: { children, svg: false } };
+}
+
+const ON_SCREEN = { width: 24, height: 24, top: 20, left: 12 };
+
+/**
+ * Runs the predicate the way the BROWSER will: rebuilt from its own source, with `document` and
+ * `window` as the only things it may reach for.
+ */
+function runAgainst(tree: FakeNode[], viewport = VIEWPORT): boolean {
+  const decorate = (node: FakeNode): unknown => ({
+    tagName: node.tagName,
+    getBoundingClientRect: () => ({
+      width: node.rect?.width ?? 0,
+      height: node.rect?.height ?? 0,
+      top: node.rect?.top ?? 0,
+      left: node.rect?.left ?? 0,
+      bottom: (node.rect?.top ?? 0) + (node.rect?.height ?? 0),
+      right: (node.rect?.left ?? 0) + (node.rect?.width ?? 0),
+    }),
+    shadowRoot:
+      node.shadowRoot === undefined || node.shadowRoot === null
+        ? null
+        : {
+            querySelectorAll: () => node.shadowRoot!.children.map(decorate),
+            querySelector: (selector: string) => (selector === 'svg' && node.shadowRoot!.svg ? {} : null),
+          },
+  });
+  const fakeDocument = { querySelectorAll: () => tree.map(decorate) };
+  const rebuild = new Function('document', 'window', `return (${everyOnScreenIconIsPainted.toString()})();`);
+  return rebuild(fakeDocument, viewport) as boolean;
+}
+
+describe('the icon settle point of the visual contract (hub#1823)', () => {
+  it('says YES when every on-screen icon already has its glyph', () => {
+    expect(runAgainst([painted(ON_SCREEN), painted(ON_SCREEN)])).toBe(true);
+  });
+
+  it('REGRESSION: says NO while an on-screen icon is still glyph-less', () => {
+    // The capture taken at this instant is the one that came back 69 px different.
+    expect(runAgainst([painted(ON_SCREEN), unpainted(ON_SCREEN)])).toBe(false);
+  });
+
+  it('REGRESSION: looks INSIDE shadow roots, where the icon that actually flaked lives', () => {
+    // The hamburger is `ion-menu-button`'s own `ion-icon`, so `document.querySelectorAll` does not
+    // reach it. A predicate that does not pierce shadow DOM returns a confident YES here and the
+    // settle point goes back to being decorative — that is this case detecting its own positive.
+    expect(runAgainst([host([unpainted(ON_SCREEN)])])).toBe(false);
+    expect(runAgainst([host([painted(ON_SCREEN)])])).toBe(true);
+  });
+
+  it('ignores what the capture cannot show, so the wait can never hang', () => {
+    // Off-screen icons are never loaded by ionicons (IntersectionObserver), and a capture is the
+    // viewport, not the page. Waiting on them would turn this helper into a 30 s timeout.
+    expect(runAgainst([unpainted({ width: 24, height: 24, top: 2000, left: 12 })])).toBe(true);
+    expect(runAgainst([unpainted({ width: 24, height: 24, top: 20, left: 900 })])).toBe(true);
+    expect(runAgainst([unpainted({ width: 0, height: 0, top: 0, left: 0 })])).toBe(true);
+    expect(runAgainst([unpainted()])).toBe(true);
+  });
+
+  it('counts an icon with no shadow root at all as not painted yet', () => {
+    // Between `<ion-icon>` being parsed and Stencil upgrading it there is no shadow root, and
+    // nothing on screen either — the state right before the glyph, not a state to capture in.
+    expect(runAgainst([{ tagName: 'ion-icon', rect: ON_SCREEN, shadowRoot: null }])).toBe(false);
+  });
+});
+
+interface FakeChrome {
+  menu: boolean;
+  button: 'absent' | 'shown' | 'hidden';
+  splitPaneVisible: boolean;
+}
+
+/** Runs the chrome predicate the way the browser will: rebuilt from its own source. */
+function chromeSettled(chrome: FakeChrome): boolean {
+  const nodes: Record<string, unknown> = {};
+  if (chrome.menu) nodes['ion-menu'] = { tagName: 'ion-menu' };
+  if (chrome.button !== 'absent') nodes['ion-menu-button'] = { tagName: 'ion-menu-button' };
+  nodes['ion-split-pane'] = {
+    tagName: 'ion-split-pane',
+    classList: { contains: (name: string) => name === 'split-pane-visible' && chrome.splitPaneVisible },
+  };
+  const fakeDocument = { querySelector: (selector: string) => nodes[selector] ?? null };
+  const fakeWindow = {
+    getComputedStyle: () => ({ display: chrome.button === 'shown' ? 'block' : 'none' }),
+  };
+  const rebuild = new Function('document', 'window', `return (${shellChromeHasSettled.toString()})();`);
+  return rebuild(fakeDocument, fakeWindow) as boolean;
+}
+
+describe('the shell chrome settle point of the visual contract (hub#1823)', () => {
+  it('REGRESSION: says NO while the phone still has no way into the menu', () => {
+    // The state measured on 8 of 8 fresh loads of /settings at 390px: the drawer is in the DOM,
+    // the split pane is not showing it, and Ionic still has `ion-menu-button` at `display: none`
+    // because the menu has not registered yet. It flips to `block` between 200 ms and 1.5 s —
+    // long after the card the spec settles on. A capture taken here is missing the hamburger, and
+    // that is 69 px: red under the 20 px budget, invisible under the old ratio.
+    expect(chromeSettled({ menu: true, button: 'hidden', splitPaneVisible: false })).toBe(false);
+  });
+
+  it('says YES once the hamburger is on screen (phone and tablet)', () => {
+    expect(chromeSettled({ menu: true, button: 'shown', splitPaneVisible: false })).toBe(true);
+  });
+
+  it('says YES on a desktop, where the sidebar IS the menu and the button stays hidden', () => {
+    // At 1440 the split pane shows the drawer inline (`when="lg"`), so Ionic keeps the button
+    // hidden for good. Demanding a hamburger here would hang every 1440 capture.
+    expect(chromeSettled({ menu: true, button: 'hidden', splitPaneVisible: true })).toBe(true);
+  });
+
+  it('REGRESSION: says NO while BOTH doors are on screen at once', () => {
+    // The other half of the flip: a hamburger still painted over an already-open split pane is a
+    // frame in transit, not a screen. Without this the 1440 captures settle on the wrong instant.
+    expect(chromeSettled({ menu: true, button: 'shown', splitPaneVisible: true })).toBe(false);
+  });
+
+  it('says YES on a screen with no drawer chrome at all, like the login', () => {
+    // `ion-menu` and the topbar both live inside <AuthenticatedChrome>, so the login screen has
+    // neither. Nothing to resolve there, and waiting would hang the login captures.
+    expect(chromeSettled({ menu: false, button: 'absent', splitPaneVisible: false })).toBe(true);
+  });
+
+  it('REGRESSION: says NO while the chrome is only half mounted', () => {
+    // One of the two present means <AuthenticatedChrome> is mid-render: keep waiting, or the
+    // capture freezes whichever half arrived first.
+    expect(chromeSettled({ menu: true, button: 'absent', splitPaneVisible: false })).toBe(false);
+    expect(chromeSettled({ menu: false, button: 'hidden', splitPaneVisible: false })).toBe(false);
+  });
+});
