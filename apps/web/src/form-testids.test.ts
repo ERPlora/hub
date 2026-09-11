@@ -524,6 +524,19 @@ const COMPUTED_TESTID = /(?<![\w-]):data-testid="([^"]*)"/g;
  */
 const TEST_ATTR = /(?<![\w-])(data-test[\w-]*)\s*=\s*("[^"]*"|'[^']*')?/g;
 
+/**
+ * How a hook is WRITTEN. Every rule above reads exactly two spellings — `data-testid="…"` and
+ * `:data-testid="…"` — so any other way of writing the SAME attribute is a hook Vue renders, QA
+ * can address, and this file never sees. Measured on this branch: a brand-new computed hook spelled
+ * `v-bind:data-testid` (the longhand `:` is short for) left the guard at 16/16 green, and so did a
+ * single-quoted value. Both are the hole hub#1828 exists to close, written a different way.
+ *
+ * Teaching four regexes three spellings each would be four places to forget one. The shell writes
+ * ONE form and this rule says so: a guard that reads a single spelling has to forbid the rest, or
+ * it fails open on the next person who types the longhand.
+ */
+const TESTID_SPELLING = /(?<![\w-])(v-bind:data-testid|:?data-testid)\s*=\s*("|'|[^\s"'>])/g;
+
 /** Kebab-case: minúsculas y dígitos separados por un solo guión. */
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
@@ -796,6 +809,20 @@ describe('data-testid — convención del shell (hub#1756)', () => {
     expect(
       offenders,
       'getByTestId does not resolve it: write data-testid, prefixed with its screen',
+    ).toEqual([]);
+  });
+
+  it('a hook is spelled data-testid="…" or :data-testid="…", and nothing else', () => {
+    const offenders: string[] = [];
+    for (const { name, source } of SURFACES) {
+      TESTID_SPELLING.lastIndex = 0;
+      for (let m = TESTID_SPELLING.exec(source); m; m = TESTID_SPELLING.exec(source)) {
+        if (m[1] === 'v-bind:data-testid' || m[2] !== '"') offenders.push(`${name}: ${m[1]}=${m[2]}`);
+      }
+    }
+    expect(
+      offenders,
+      'the rules above read one spelling: any other is a hook with no contract',
     ).toEqual([]);
   });
 
