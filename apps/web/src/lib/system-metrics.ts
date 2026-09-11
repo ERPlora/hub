@@ -42,6 +42,12 @@ export interface SessionMetric {
   maxDevices: number;
 }
 
+/** Personas activas del hub frente al tope de plazas del plan (`0` = ilimitado). */
+export interface UserMetric {
+  active: number;
+  maxUsers: number;
+}
+
 /** Respuesta de `GET /api/system/metrics` (campo `data` del envelope del runtime). */
 export interface SystemMetrics {
   /** Slug del plan contratado (`free`, `restaurant`…) o `null` si el claim no lo trae. */
@@ -50,6 +56,7 @@ export interface SystemMetrics {
   cpu: CpuMetric;
   database: DbMetric;
   sessions: SessionMetric;
+  users: UserMetric;
 }
 
 interface Envelope<T> {
@@ -103,11 +110,14 @@ export function toPct(fraction: number | null | undefined): number | null {
 export function upgradeReason(
   m: SystemMetrics,
   threshold = UPGRADE_THRESHOLD,
-): 'memory' | 'database' | 'devices' | null {
+): 'memory' | 'database' | 'devices' | 'users' | null {
   if (m.plan !== 'free') return null;
   if ((m.memory.fraction ?? 0) >= threshold) return 'memory';
   if ((m.database.fraction ?? 0) >= threshold) return 'database';
   if (m.sessions.maxDevices > 0 && m.sessions.devices >= m.sessions.maxDevices) return 'devices';
+  // Plazas de personal: a diferencia de RAM/BD no tiene umbral del 80 % — una plaza es entera o no
+  // es, así que solo avisa cuando ya están TODAS ocupadas y el alta siguiente se va a rechazar.
+  if (m.users.maxUsers > 0 && m.users.active >= m.users.maxUsers) return 'users';
   return null;
 }
 

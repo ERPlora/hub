@@ -138,6 +138,24 @@
                 </ion-card-content>
               </ion-card>
             </ion-col>
+
+            <!-- Personas del hub vs las plazas del plan (hub#1685): el Gratis promete «3 usuarios»
+                 y hasta ahora no se veían por ningún sitio. Mismo formato «n / tope» que arriba. -->
+            <ion-col size="12" size-md="6">
+              <ion-card class="ion-no-margin pl-card">
+                <ion-card-content>
+                  <div class="pl-card__head">
+                    <HubIcon name="people-outline" class="pl-card__icon" />
+                    <span class="pl-card__title">{{ t('planLimits.users') }}</span>
+                    <ok-status-pill size="sm" :tone="usersTone">
+                      {{ metrics.users.maxUsers > 0 ? t('planLimits.capped') : t('planLimits.unlimited') }}
+                    </ok-status-pill>
+                  </div>
+                  <div class="pl-card__big">{{ usersHeadline }}</div>
+                  <div class="pl-card__foot">{{ t('planLimits.activeUsers', { n: metrics.users.active }) }}</div>
+                </ion-card-content>
+              </ion-card>
+            </ion-col>
           </ion-row>
         </ion-grid>
 
@@ -194,11 +212,22 @@ const devicesTone = computed<string>(() => {
   if (!s || s.maxDevices === 0) return 'neutral';
   return s.devices >= s.maxDevices ? 'warning' : 'success';
 });
+const usersHeadline = computed<string>(() => {
+  const u = metrics.value?.users;
+  if (!u) return '—';
+  return u.maxUsers > 0 ? `${u.active} / ${u.maxUsers}` : String(u.active);
+});
+const usersTone = computed<string>(() => {
+  const u = metrics.value?.users;
+  if (!u || u.maxUsers === 0) return 'neutral';
+  return u.active >= u.maxUsers ? 'warning' : 'success';
+});
 const upgradeMessage = computed<string>(() => {
   switch (reason.value) {
     case 'memory': return t('planLimits.upgradeMemory');
     case 'database': return t('planLimits.upgradeDatabase');
     case 'devices': return t('planLimits.upgradeDevices');
+    case 'users': return t('planLimits.upgradeUsers');
     default: return '';
   }
 });

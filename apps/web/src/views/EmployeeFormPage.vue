@@ -31,6 +31,18 @@
         <form class="emp-form" @submit.prevent="onSave">
           <ok-inline-feedback v-if="saveError" tone="danger">
             {{ saveError }}
+            <!-- hub#1685 — la salida del callejón: sin plaza libre no hay nada que corregir en el
+                 formulario. Etiqueta NEUTRA y destino la página de plan de ESTE hub en la cuenta,
+                 que es la receta permitida (`lib/upgrade-plan-link`), nunca el marketplace. -->
+            <ion-button
+              v-if="offersPlanUpgrade"
+              slot="actions"
+              size="small"
+              fill="outline"
+              @click="onUpgradePlan"
+            >
+              {{ t('nav.upgradePlan') }}
+            </ion-button>
           </ok-inline-feedback>
 
           <div class="form-grid">
@@ -207,7 +219,11 @@ import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
 import { onBadgeScan } from '../lib/badge-scanner';
 import { nfcBadgeReady } from '../lib/nfc-badge';
-import { toast } from '../lib/toast';
+import { toast, toastError } from '../lib/toast';
+import { openExternal } from '../lib/open-external';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
+import { saasDoor } from '../lib/saas-door';
+import { getDeviceContext } from '../lib/device';
 
 const { t, te, locale } = useI18n();
 
@@ -245,6 +261,15 @@ const loading = ref(true);
 const saving = ref(false);
 const loadError = ref(false);
 const saveError = ref('');
+// hub#1685 — el MOTIVO del aviso, no solo su frase: la salida a gestionar el plan pertenece al
+// tope de plazas y a nada más (un PIN repetido no se arregla pagando).
+const saveErrorKey = ref('');
+// hub#756 — quien reparte el binario pone la regla: en una copia de Play no se ofrece la puerta.
+// Sin señal se ofrece (el navegador no manda `distribution` y negar dejaría a casi todos fuera).
+const canOfferPlanUpgrade = ref(true);
+const offersPlanUpgrade = computed(
+  () => saveErrorKey.value === 'user_limit_reached' && canOfferPlanUpgrade.value,
+);
 /**
  * El rechazo del último guardado, **anclado al campo** que lo causó (hub#1190).
  *
@@ -429,6 +454,7 @@ async function onSave(): Promise<void> {
   if (!canSubmit.value) return;
   saving.value = true;
   saveError.value = '';
+  saveErrorKey.value = '';
   fieldRejection.value = null;
   const name = form.name.trim();
   const email = form.email.trim();
@@ -483,9 +509,22 @@ async function onSave(): Promise<void> {
       fieldRejection.value = { field: refusal.field, message };
     } else {
       saveError.value = message;
+      saveErrorKey.value = key ?? '';
     }
   } finally {
     saving.value = false;
+  }
+}
+
+// pm#196 — cruza por la puerta compartida, igual que el menú: dentro de la app instalada el
+// navegador del sistema NO comparte cookies con el webview, así que sin el pase de un solo uso se
+// aterriza en un login justo al ir a mirar el plan. Si el pase no se puede acuñar, `saasDoor`
+// devuelve el enlace de siempre: degradar, nunca un botón muerto.
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+  } catch {
+    await toastError(t('nav.upgradePlanError'));
   }
 }
 
@@ -514,6 +553,9 @@ onBeforeRouteLeave(async () => confirmDiscard());
 // el mercado usa (Square, Toast, Aloha), sin que el número pueda caer en otro campo por el camino.
 let stopBadgeScan: (() => void) | null = null;
 onMounted(async () => {
+  void getDeviceContext().then((context) => {
+    canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  });
   stopBadgeScan = onBadgeScan((badge) => {
     form.badge = badge;
     hasBadge.value = false;

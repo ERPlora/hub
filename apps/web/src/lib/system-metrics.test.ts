@@ -14,7 +14,11 @@ function metrics(over: Partial<SystemMetrics> = {}): SystemMetrics {
     memory: { usedBytes: 12_582_912, limitBytes: 100_663_296, fraction: 0.125 },
     cpu: { usedCores: 0.02, limitCores: 0.5, fraction: 0.04 },
     database: { engine: 'postgres', sizeBytes: 8_388_608, limitBytes: null, fraction: null },
-    sessions: { active: 1, devices: 1, maxDevices: 1 },
+    // Holgado de verdad: 1 dispositivo de 2. Antes valía `devices: 1, maxDevices: 1`, que es el
+    // TOPE — la base disparaba `'devices'` por sí sola y cualquier test de otra dimensión que
+    // esperase `null` era imposible de pasar. Los tests del tope de dispositivos lo pasan
+    // explícitamente, así que nadie dependía de ese default.
+    sessions: { active: 1, devices: 1, maxDevices: 2 },
     users: { active: 1, maxUsers: 0 },
     ...over,
   };
