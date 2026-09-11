@@ -191,6 +191,7 @@
             <ion-list lines="none">
               <ion-item v-for="m in moduleRows" :key="m.id">
                 <ion-checkbox
+                  :data-testid="`import-module-${m.id}`"
                   :checked="m.include"
                   justify="start"
                   label-placement="end"
