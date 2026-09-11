@@ -2485,6 +2485,7 @@ mod tests {
             "owner",
             None,
             "legacy@bar.com",
+            0,
         )
         .await
         .unwrap();
@@ -2546,7 +2547,7 @@ mod tests {
         // the floor applies on the very login that links the row, not only from the second one on.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        create_login_user(&db, HUB, "socia@bar.com", "employee")
+        create_login_user(&db, HUB, "socia@bar.com", "employee", 0)
             .await
             .unwrap();
 
@@ -2694,7 +2695,7 @@ mod tests {
         // signature the presence gate trusts, so it is the key that finds them.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        create_login_user(&db, HUB, "socia@bar.com", "admin")
+        create_login_user(&db, HUB, "socia@bar.com", "admin", 0)
             .await
             .unwrap();
 
@@ -2780,7 +2781,7 @@ mod tests {
         // walk somebody the hub threw out straight back in.
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
-        let user = create_login_user(&db, HUB, "ana@bar.com", "manager")
+        let user = create_login_user(&db, HUB, "ana@bar.com", "manager", 0)
             .await
             .unwrap();
         assert!(deactivate_login_user(&db, HUB, "ana@bar.com")
@@ -2830,7 +2831,7 @@ mod tests {
             .await
             .unwrap();
 
-        create_login_user(&db, HUB, "ada@bar.com", "employee")
+        create_login_user(&db, HUB, "ada@bar.com", "employee", 0)
             .await
             .unwrap();
         assert!(deactivate_login_user(&db, HUB, "ada@bar.com")
@@ -2879,7 +2880,7 @@ mod tests {
         ensure_identity_email(&db).await;
 
         // Alta nueva.
-        let u = create_login_user(&db, HUB, "ana@bar.com", "manager")
+        let u = create_login_user(&db, HUB, "ana@bar.com", "manager", 0)
             .await
             .unwrap();
         assert_eq!(u.role, "manager");
@@ -2890,7 +2891,7 @@ mod tests {
         assert!(u.is_active);
 
         // Re-alta (mismo email, rol nuevo) = upsert: misma fila, rol actualizado.
-        let u2 = create_login_user(&db, HUB, "ana@bar.com", "admin")
+        let u2 = create_login_user(&db, HUB, "ana@bar.com", "admin", 0)
             .await
             .unwrap();
         assert_eq!(u2.id, u.id, "reusa la fila del email (no duplica)");
@@ -2909,7 +2910,7 @@ mod tests {
         assert!(!listed[0].is_active);
 
         // Re-alta reactiva la misma fila.
-        let u3 = create_login_user(&db, HUB, "ana@bar.com", "employee")
+        let u3 = create_login_user(&db, HUB, "ana@bar.com", "employee", 0)
             .await
             .unwrap();
         assert_eq!(u3.id, u.id);
