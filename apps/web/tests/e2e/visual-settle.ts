@@ -82,3 +82,76 @@ export function shellChromeHasSettled(): boolean {
   const buttonIsOnScreen = window.getComputedStyle(button).display !== 'none';
   return splitPaneShowsTheMenu !== buttonIsOnScreen;
 }
+
+/**
+ * Has every scrollable box on screen STOPPED moving?
+ *
+ * `ion-segment[scrollable]` — the tabbar of /settings, /system, /employees and every module
+ * screen — nudges its own scroll position shortly after it mounts, to hint that there are more
+ * tabs off-screen. Measured on 2026-09-11 against the real bench, /settings at 390px, polling
+ * every ~50 ms: still at 0 from 469 ms, `shellChromeHasSettled` and `everyOnScreenIconIsPainted`
+ * both say YES at 772 ms, and only THEN does the hint run — 14 px at 889 ms, 28 px from 947 to
+ * 1251 ms, 13 px at 1309 ms, back to 0 at 1368 ms and still there at 3.8 s.
+ *
+ * So the two predicates above hand the capture over 117 ms before the screen starts moving. The
+ * Linux runner, being slower, photographed the tabbar at 28 px while this Mac photographs it at 0:
+ * 5.239 px of difference on one screen, invisible under the old ratio budget and red under the
+ * 20 px one. That is the same defect as the other two settle points, one layer further in.
+ *
+ * WHY A QUIET WINDOW AND NOT "the scroll is not moving". At 772 ms the position had been perfectly
+ * still for 300 ms and was about to move: one sample, or two identical samples, prove nothing. The
+ * invariant that does hold is the position holding for LONGER than the hint takes to get going
+ * (420 ms between the tabbar coming to rest and the hint starting), so the window is 600 ms.
+ * Landing before the hint or after it gives the SAME pixels — both are the resting position — so
+ * the window does not have to predict which side it is on, only to refuse the middle.
+ *
+ * The key covers WHICH boxes scroll as well as where they are: the tabbar of a module screen is
+ * not in the first paint (at 277 ms there was no `ion-segment` at all), so a predicate comparing
+ * positions alone would have called the empty page quiet and captured before the tabbar existed.
+ *
+ * WHAT COUNTS AS A SCROLLER is `overflow: auto|scroll`, not "its content does not fit". Measured
+ * on /dashboard: the `buffer-circles-container` of the setup card's `ion-progress-bar` animates
+ * forever and its `scrollWidth` breathes around its `clientWidth` (321 px → 330, 327, 323...), so
+ * with the looser test it kept joining and leaving the set, the key never repeated twice, and the
+ * three dashboard captures died on the timeout instead of settling. That box is `overflow: hidden`
+ * — the browser cannot scroll it, so it is not part of this invariant.
+ *
+ * `performance.now()` and NOT `Date.now()`: every visual spec freezes the clock with
+ * `page.clock.setFixedTime` (`freezeVisualClock`), so in the page `Date.now()` answers the same
+ * millisecond forever and a quiet window measured with it would either never close or close at
+ * once. `setFixedTime` does not touch `performance.now()`.
+ */
+export function everyScrollerHasStoppedMoving(): boolean {
+  const QUIET_MS = 600;
+
+  const boxes: Element[] = [];
+  const walk = (root: Document | ShadowRoot): void => {
+    for (const element of Array.from(root.querySelectorAll('*'))) {
+      boxes.push(element);
+      const shadow = (element as HTMLElement).shadowRoot;
+      if (shadow !== null && shadow !== undefined) walk(shadow);
+    }
+  };
+  walk(document);
+
+  const key = boxes
+    .filter((box) => {
+      const style = window.getComputedStyle(box);
+      const scrolls = (overflow: string): boolean => overflow === 'auto' || overflow === 'scroll';
+      return (
+        (scrolls(style.overflowX) && box.scrollWidth > box.clientWidth) ||
+        (scrolls(style.overflowY) && box.scrollHeight > box.clientHeight)
+      );
+    })
+    .map((box) => `${box.tagName}:${box.scrollLeft},${box.scrollTop}`)
+    .join('|');
+
+  const stash = window as unknown as { __erploraVisualScrollQuiet?: { key: string; since: number } };
+  const seen = stash.__erploraVisualScrollQuiet;
+  const now = performance.now();
+  if (seen === undefined || seen.key !== key) {
+    stash.__erploraVisualScrollQuiet = { key, since: now };
+    return false;
+  }
+  return now - seen.since >= QUIET_MS;
+}
