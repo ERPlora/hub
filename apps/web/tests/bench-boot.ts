@@ -100,8 +100,21 @@ export function isBootTransportFailure(
  * directory holding one file per ending (`Total: 24 tests in 24 files`). It stays a copy only
  * while `playwright.config.ts` declares no `testMatch` of its own, which `declaresTestMatch` below
  * is there to keep true.
+ *
+ * The case of that ending is not free either way. `collectFilesForProject`
+ * (`playwright/lib/runner/index.js`) puts a file through TWO gates that disagree about it:
+ * `new Set(['.js', '.ts', '.mjs', '.mts', ...]).has(path.extname(file))`, which is a Set lookup
+ * and so wants the FINAL extension lowercase letter for letter, and then
+ * `minimatch(filePath, testMatch, { nocase: true, dot: true })` (`util.js`, `createFileMatcher`),
+ * which does NOT care how `spec` or `test` is spelled. Measured with 1.62.1: `Cased.Spec.ts` and
+ * `Cased.tEsT.mts` are files Playwright runs; `Shouty.spec.TS` and `Shouty.Spec.Ts` are not.
+ *
+ * So the word is a case-blind class and the extension is literal. Taking the easy road — an `i`
+ * on the whole pattern — buys the first half and loses the second: the guard would then fail the
+ * build over a `Shouty.spec.TS` Playwright never runs, and a guard that cries wolf gets deleted.
+ * `nocase` is minimatch's and not the filesystem's, so this is how CI's Linux behaves too.
  */
-const PLAYWRIGHT_DEFAULT_TEST_MATCH = /\.(spec|test)\.[cm]?[jt]sx?$/;
+const PLAYWRIGHT_DEFAULT_TEST_MATCH = /\.(?:[sS][pP][eE][cC]|[tT][eE][sS][tT])\.[cm]?[jt]sx?$/;
 
 /**
  * Every spec file Playwright would run under `dir`, as paths relative to it.

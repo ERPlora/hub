@@ -238,6 +238,8 @@ describe('listE2eSpecs', () => {
 
   it('covers every ending Playwright collects, and only those', () => {
     // Without this, dropping an ending from the table above would quietly shrink the guard.
+    // These are the canonical SPELLINGS of the 24; Playwright accepts any casing of them, which
+    // is its own block further down.
     expect(PLAYWRIGHT_SPEC_ENDINGS).toHaveLength(24);
   });
 
@@ -257,6 +259,70 @@ describe('listE2eSpecs', () => {
       writeFileSync(join(dir, 'nested', 'deeper', 'Deeper.test.ts'), '');
 
       expect(listE2eSpecs(dir)).toEqual([join('nested', 'deeper', 'Deeper.test.ts')]);
+    });
+  });
+
+  // ── ERPlora/hub#1824, third field over ───────────────────────────────────────────────────────
+  //
+  // The endings above are the canonical SPELLINGS; Playwright does not require that spelling, and
+  // it does not accept every other one either. `collectFilesForProject` (`playwright/lib/runner/
+  // index.js`) puts a file through TWO gates that disagree about case:
+  //
+  //   1. `new Set(['.js','.ts','.mjs','.mts',…]).has(path.extname(file))` — a Set lookup, so the
+  //      FINAL extension has to be lowercase, letter for letter;
+  //   2. `minimatch(filePath, testMatch, { nocase: true, dot: true })` (`util.js`,
+  //      `createFileMatcher`) — so the `spec`/`test` WORD is case-blind.
+  //
+  // Measured with @playwright/test 1.62.1 over one file per name, each in its own directory (a
+  // Mac folds two names that differ only in case into one file, which would have tested nothing):
+  // `Cased.Spec.ts`, `Cased.SPEC.ts`, `Cased.Test.tsx` and `Cased.tEsT.mts` came back in
+  // `Total: 5 tests in 5 files`; `Shouty.spec.TS`, `Shouty.test.MTS`, `Shouty.Spec.Ts` and
+  // `Shouty.spec.tS` did not come back at all.
+  //
+  // Both halves matter and in opposite directions. Missing the first half is the hub#1824 hole
+  // over again — measured on this branch, a `ZZCase.Spec.ts` under `tests/e2e/` was listed by
+  // `playwright --list` inside `Total: 30 tests in 14 files` while this suite stayed at
+  // `77 passed`. Over-reaching on the second is the mirror: the guard would fail the build over a
+  // `Shouty.spec.TS` that Playwright never runs, and the way that gets "fixed" is by deleting the
+  // guard. `nocase` is minimatch's and not the filesystem's, so this is the behaviour on the
+  // case-sensitive Linux of CI too, not a local curiosity.
+  it.each([
+    'Cased.Spec.ts',
+    'Cased.SPEC.ts',
+    'Cased.Test.tsx',
+    'Cased.tEsT.mts',
+  ])('finds %s, because Playwright matches the spec word case-blind', (name) => {
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, name), '');
+
+      expect(listE2eSpecs(dir)).toEqual([name]);
+    });
+  });
+
+  it.each([
+    'Shouty.spec.TS',
+    'Shouty.test.MTS',
+    'Shouty.Spec.Ts',
+    'Shouty.spec.tS',
+  ])('leaves %s alone, because Playwright checks the extension letter for letter', (name) => {
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, name), '');
+
+      expect(listE2eSpecs(dir)).toEqual([]);
+    });
+  });
+
+  it('leaves the near misses behind when they are shouted, too', () => {
+    // Going case-blind on the word must widen the CASE OF THE WORD and nothing else: `.SPEC.txt`
+    // is no more a spec than `.spec.txt` is.
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, 'Real.SPEC.ts'), '');
+      writeFileSync(join(dir, 'Near.SPECT.ts'), '');
+      writeFileSync(join(dir, 'Near.SPECS.ts'), '');
+      writeFileSync(join(dir, 'Near.TESTING.ts'), '');
+      writeFileSync(join(dir, 'Near.SPEC.txt'), '');
+
+      expect(listE2eSpecs(dir)).toEqual(['Real.SPEC.ts']);
     });
   });
 });
