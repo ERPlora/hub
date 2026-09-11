@@ -50,6 +50,16 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
 
 /// Claims verificadas de prueba con los límites del plan dados.
 fn claims(plan: &str, max_devices: u32, max_database_size_gb: u32) -> EntitlementClaims {
+    claims_with_users(plan, max_devices, max_database_size_gb, 0)
+}
+
+/// Como [`claims`] pero fijando además el tope de **usuarios** del plan (hub#1685).
+fn claims_with_users(
+    plan: &str,
+    max_devices: u32,
+    max_database_size_gb: u32,
+    max_users: u32,
+) -> EntitlementClaims {
     EntitlementClaims {
         hub_id: "hub-metrics".into(),
         modules: vec![EntitledModule {
@@ -64,6 +74,7 @@ fn claims(plan: &str, max_devices: u32, max_database_size_gb: u32) -> Entitlemen
         plan: Some(plan.into()),
         max_devices,
         max_database_size_gb,
+        max_users,
     }
 }
 
@@ -99,6 +110,45 @@ async fn session_token(resp: axum::response::Response) -> String {
 async fn json_body(resp: axum::response::Response) -> Value {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     serde_json::from_slice(&bytes).unwrap()
+}
+
+/// El panel «Plan y límites» pinta los dispositivos frente a su tope desde ADR-0154; los usuarios
+/// no salían por ningún sitio, así que el negocio no tenía dónde ver las «3 personas» que le
+/// prometieron (hub#1685). Mismo bloque y misma forma que `sessions`.
+#[tokio::test]
+async fn metrics_report_the_users_in_use_against_the_plan_cap() {
+    let (router, state, temp) = fixture().await;
+    state
+        .entitlement
+        .write()
+        .unwrap()
+        .apply_success(claims_with_users("free", 1, 1, 3), 1_500);
+
+    let tok = session_token(
+        router
+            .clone()
+            .oneshot(pin_login("Admin", "1111", "dev-A"))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let body = json_body(
+        router
+            .clone()
+            .oneshot(get_metrics(Some(&tok)))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let users = &body["data"]["users"];
+    assert_eq!(users["maxUsers"], json!(3), "el tope del plan Gratis");
+    assert_eq!(
+        users["active"],
+        json!(2),
+        "las dos personas del fixture (Admin y Cajero) ocupan plaza"
+    );
+
+    std::fs::remove_dir_all(temp).ok();
 }
 
 #[tokio::test]

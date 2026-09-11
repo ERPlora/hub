@@ -15,6 +15,7 @@ function metrics(over: Partial<SystemMetrics> = {}): SystemMetrics {
     cpu: { usedCores: 0.02, limitCores: 0.5, fraction: 0.04 },
     database: { engine: 'postgres', sizeBytes: 8_388_608, limitBytes: null, fraction: null },
     sessions: { active: 1, devices: 1, maxDevices: 1 },
+    users: { active: 1, maxUsers: 0 },
     ...over,
   };
 }
@@ -87,5 +88,19 @@ describe('upgradeReason (solo plan free)', () => {
 // rechazan Google Play y Microsoft Store. Que NADIE la reintroduzca lo vigila
 // `no-purchase-steering.test.ts`, que es un guard sobre toda la fuente y no sobre esta función.
 //
+describe('upgradeReason — tope de usuarios (hub#1685)', () => {
+  it('avisa cuando el plan Gratis ya tiene sus tres personas dentro', () => {
+    expect(upgradeReason(metrics({ users: { active: 3, maxUsers: 3 } }))).toBe('users');
+  });
+
+  it('no avisa mientras quede plaza', () => {
+    expect(upgradeReason(metrics({ users: { active: 2, maxUsers: 3 } }))).toBeNull();
+  });
+
+  it('un plan sin tope de usuarios (0 = ilimitado) nunca avisa', () => {
+    expect(upgradeReason(metrics({ users: { active: 40, maxUsers: 0 } }))).toBeNull();
+  });
+});
+
 // Lo que sí sigue probado arriba es `upgradeReason()`: saber que el hub roza su techo es útil por sí
 // solo, y es lo que el panel ahora dice con palabras en vez de con un botón.

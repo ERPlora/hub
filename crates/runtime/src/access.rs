@@ -205,6 +205,18 @@ impl Runtime {
         hub_users::list(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// Rechaza admitir **una persona más** si el plan ya está lleno (hub#1685). `max_users = 0` =
+    /// ilimitado. Lo llama la capa HTTP —que es quien conoce el plan— justo antes de cada puerta
+    /// que suma un usuario activo, igual que [`Self::enforce_device_limit`] antes de abrir sesión.
+    pub async fn enforce_user_limit(&self, max_users: u32) -> Result<()> {
+        hub_users::enforce_user_limit(self.db.as_ref(), &self.hub_id, max_users).await
+    }
+
+    /// Cuántas personas ocupan hoy una plaza del plan (usuarios **activos** de este hub).
+    pub async fn count_active_users(&self) -> Result<i64> {
+        hub_users::count_active_users(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// Alta de un usuario del hub (nombre, rol, email y PIN opcionales). Devuelve su id.
     pub async fn create_hub_user(&self, input: &hub_users::NewHubUser) -> Result<String> {
         hub_users::create(self.db.as_ref(), &self.registry, &self.hub_id, input).await

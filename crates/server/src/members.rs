@@ -257,6 +257,11 @@ pub async fn add_member(
         {
             return response;
         }
+        // …y el plan tiene que tener plaza para una persona MÁS (hub#1685). Antes de escribir en
+        // local y antes de llamar al SaaS: una invitación que el hub no puede sostener no sale.
+        if let Some(response) = crate::hub_users::enforce_seat_for_email(&rt, &st, &email).await {
+            return response;
+        }
         match rt.create_login_user(&email, &role).await {
             Ok(user) => user,
             Err(e) => return crate::err_response(e),

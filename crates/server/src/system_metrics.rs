@@ -115,6 +115,16 @@ pub struct SessionMetric {
     pub max_devices: u32,
 }
 
+/// Personas que ocupan plaza del plan frente a su tope (hub#1685). Hermana de [`SessionMetric`]:
+/// la misma forma «lo que uso / lo que me cabe», que es lo que el panel sabe pintar. `max_users`
+/// a `0` = ilimitado (plan de pago, o sin token verificado → fail-open).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserMetric {
+    pub active: i64,
+    pub max_users: u32,
+}
+
 // ─────────────────────────── Parsers de cgroup v2 (puros) ───────────────────────────
 
 fn parse_u64(s: &str) -> Option<u64> {
@@ -316,6 +326,17 @@ async fn read_sessions(
     }
 }
 
+/// Personas activas del hub frente al tope del plan. El recuento lo hace el runtime, que es el
+/// dueño del censo y ya lo cuenta igual para APLICAR el tope (`hub_users::count_active_users`):
+/// dos formas de contar lo mismo acabarían discrepando, y la pantalla enseñaría un número que no
+/// es el que rechaza el alta.
+async fn read_users(rt: &erplora_runtime::Runtime, max_users: u32) -> UserMetric {
+    UserMetric {
+        active: rt.count_active_users().await.unwrap_or(0),
+        max_users,
+    }
+}
+
 /// Ejecuta una query escalar y devuelve el primer valor de la primera fila como `i64` (tolera
 /// número o texto). `None` si falla o no hay filas.
 async fn scalar_i64(db: &dyn DatabaseAdapter, sql: &str, params: &Params) -> Option<i64> {
@@ -353,13 +374,14 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
 
     // Plan + límites del último entitlement verificado. Fail-open: sin claim conocido, plan
     // nulo y límites a 0 (ilimitados), como el resto del gate.
-    let (plan, max_devices, max_database_size_gb) = match st.entitlement.read() {
+    let (plan, max_devices, max_database_size_gb, max_users) = match st.entitlement.read() {
         Ok(g) => (
             g.last_claims.as_ref().and_then(|c| c.plan.clone()),
             g.max_devices(),
             g.max_database_size_gb(),
+            g.max_users(),
         ),
-        Err(_) => (None, 0, 0),
+        Err(_) => (None, 0, 0, 0),
     };
     let database_limit = database_limit_bytes(max_database_size_gb);
 
@@ -370,12 +392,13 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
 
     // BD + sesiones bajo un único lock del runtime.
     let now = chrono::Utc::now().to_rfc3339();
-    let (database, sessions) = {
+    let (database, sessions, users) = {
         let rt = st.runtime.read().await;
         let db = rt.db();
         (
             read_database(db, database_limit).await,
             read_sessions(db, &st.hub_id(), max_devices, &now).await,
+            read_users(&rt, max_users).await,
         )
     };
 
@@ -387,6 +410,7 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
             "cpu": cpu,
             "database": database,
             "sessions": sessions,
+            "users": users,
         }
     }))
     .into_response()
