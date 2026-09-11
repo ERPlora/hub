@@ -1305,9 +1305,12 @@ mod tests {
         )
         .await;
 
-        let captured = Arc::new(Mutex::new(Vec::<u8>::new()));
+        // hub#1796: without the anchor a subscriber-less thread can cache this callsite as
+        // `Interest::never()` and the capture below comes back empty on a healthy commit.
+        crate::log_capture::anchor_the_interest_cache();
+        let sink = crate::log_capture::CapturedLog::default();
         let subscriber = tracing_subscriber::fmt()
-            .with_writer(CapturingWriter(captured.clone()))
+            .with_writer(sink.clone())
             .with_max_level(tracing::Level::TRACE)
             .finish();
         {
@@ -1322,7 +1325,7 @@ mod tests {
             .unwrap();
         }
 
-        let logs = String::from_utf8_lossy(&captured.lock().unwrap().clone()).into_owned();
+        let logs = sink.text();
         for secret in [
             "%PDF",
             "ID card",
@@ -1457,23 +1460,4 @@ mod tests {
         }
     }
 
-    #[derive(Clone)]
-    struct CapturingWriter(Arc<Mutex<Vec<u8>>>);
-
-    impl std::io::Write for CapturingWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CapturingWriter {
-        type Writer = CapturingWriter;
-        fn make_writer(&'a self) -> Self::Writer {
-            self.clone()
-        }
-    }
 }

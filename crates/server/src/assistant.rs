@@ -830,6 +830,7 @@ pub fn sse(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::log_capture::captured;
 
     /// Build a `Manifest` from the JSON a real `module.json` carries. Deserializing (rather
     /// than a struct literal) keeps the fixture honest: it exercises the same parse the
@@ -2004,44 +2005,6 @@ mod tests {
             translate_sse_line("data: {\"type\":\"error\",\"error\":\"boom\"}", &k),
             Some(sse(&json!({"type":"error","error":"boom"})))
         );
-    }
-
-    /// Captures everything that reaches `tracing` on this thread (same shape as `state.rs`).
-    #[derive(Clone, Default)]
-    struct CapturedLog(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
-
-    impl CapturedLog {
-        fn text(&self) -> String {
-            String::from_utf8_lossy(&self.0.lock().unwrap()).to_string()
-        }
-    }
-
-    impl std::io::Write for CapturedLog {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CapturedLog {
-        type Writer = Self;
-        fn make_writer(&'a self) -> Self::Writer {
-            self.clone()
-        }
-    }
-
-    fn captured(run: impl FnOnce()) -> String {
-        let sink = CapturedLog::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(sink.clone())
-            .with_ansi(false)
-            .with_max_level(tracing::Level::TRACE)
-            .finish();
-        tracing::subscriber::with_default(subscriber, run);
-        sink.text()
     }
 
     /// **The mute failure of hub#1738.** In PRE every turn died with
