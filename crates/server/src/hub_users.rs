@@ -196,11 +196,10 @@ pub async fn create_user(
         return forbidden(code, message);
     }
     // …y el plan tiene que tener plaza (hub#1685). El tope lo trae el entitlement, que vive aquí y
-    // no en el runtime; `0` (incluido «aún no hubo refresh exitoso») = sin tope.
-    if let Err(e) = rt.enforce_user_limit(plan_max_users(&st)).await {
-        return crate::err_response(e);
-    }
-    let id = match rt.create_hub_user(&input).await {
+    // no en el runtime; `0` (incluido «aún no hubo refresh exitoso») = sin tope. Viaja CON el alta
+    // y no como comprobación previa (hub#1804): mirarlo antes dejaba una ventana en la que otra
+    // alta simultánea ocupaba la misma plaza y las dos entraban.
+    let id = match rt.create_hub_user(&input, plan_max_users(&st)).await {
         Ok(id) => id,
         Err(e) => return crate::err_response(e),
     };
@@ -290,12 +289,8 @@ async fn apply_update(
     // **Reactivar es dar de alta** (hub#1685): la baja liberó la plaza y puede haberla ocupado otro,
     // así que volver a entrar vuelve a pedirla. Editar a quien ya está dentro (rol, nombre, PIN) no
     // gasta ninguna: si el tope se mirase en toda escritura, un hub Gratis con sus tres usuarios no
-    // podría volver a tocar a ninguno.
-    if input.is_active == Some(true) && !target.is_active {
-        if let Err(e) = rt.enforce_user_limit(plan_max_users(&st)).await {
-            return crate::err_response(e);
-        }
-    }
+    // podría volver a tocar a ninguno. Quién de las dos cosas es esta edición lo decide el runtime
+    // al escribir (hub#1804); aquí solo viaja el tope.
     let plan = access_sync_plan(&target, &input);
     drop(rt); // Suelta el lock ANTES de la I/O de red (mismo patrón que `members::add_member`).
 
@@ -307,7 +302,7 @@ async fn apply_update(
 
     let row = {
         let rt = arc.read().await;
-        match rt.update_hub_user(id, &input).await {
+        match rt.update_hub_user(id, &input, plan_max_users(&st)).await {
             Ok(row) => row,
             Err(e) => return crate::err_response(e),
         }

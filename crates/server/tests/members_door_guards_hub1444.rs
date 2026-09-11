@@ -51,7 +51,7 @@ async fn fixture(hub_id: &str, second_admin: bool) -> Fixture {
             email: "ana@example.com".into(),
             role: "admin".into(),
             ..NewHubUser::default()
-        })
+        }, 0)
         .await
         .unwrap();
     rt.create_hub_user(&NewHubUser {
@@ -59,7 +59,7 @@ async fn fixture(hub_id: &str, second_admin: bool) -> Fixture {
         email: "luis@example.com".into(),
         role: "employee".into(),
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
     let second = if second_admin {
@@ -69,7 +69,7 @@ async fn fixture(hub_id: &str, second_admin: bool) -> Fixture {
                 email: "bea@example.com".into(),
                 role: "admin".into(),
                 ..NewHubUser::default()
-            })
+            }, 0)
             .await
             .unwrap(),
         )

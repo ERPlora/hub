@@ -73,7 +73,7 @@ async fn a_row_that_predates_the_mark_is_marked_by_the_idempotent_path() {
         email: "ioan@example.com".into(),
         role: "admin".into(),
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
     assert!(owners(&rt).await.is_empty());

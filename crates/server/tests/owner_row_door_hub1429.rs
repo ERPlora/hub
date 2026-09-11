@@ -57,7 +57,7 @@ async fn fixture(hub_id: &str) -> Fixture {
             email: "ana@example.com".into(),
             role: "admin".into(),
             ..NewHubUser::default()
-        })
+        }, 0)
         .await
         .unwrap();
     let employee = rt
@@ -66,7 +66,7 @@ async fn fixture(hub_id: &str) -> Fixture {
             email: "luis@example.com".into(),
             role: "employee".into(),
             ..NewHubUser::default()
-        })
+        }, 0)
         .await
         .unwrap();
 

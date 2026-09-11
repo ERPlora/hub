@@ -123,8 +123,7 @@ async fn an_unknown_card_and_a_revoked_one_answer_identically() {
         &UpdateHubUser {
             badge: Some(String::new()),
             ..Default::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
     let revoked = post_badge(&router, json!({ "badge": ANA_BADGE })).await;

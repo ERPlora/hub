@@ -66,7 +66,7 @@ async fn a_staff_member_is_linked_to_a_hub_user() {
             pin: "4821".into(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -117,7 +117,7 @@ async fn the_link_can_be_set_and_cleared_later() {
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -211,7 +211,7 @@ async fn the_module_reaches_the_hub_users_through_the_dispatcher() {
         badge: String::new(),
         local: true,
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
 

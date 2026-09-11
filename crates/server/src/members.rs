@@ -262,7 +262,10 @@ pub async fn add_member(
         if let Some(response) = crate::hub_users::enforce_seat_for_email(&rt, &st, &email).await {
             return response;
         }
-        match rt.create_login_user(&email, &role).await {
+        match rt
+            .create_login_user(&email, &role, crate::hub_users::plan_max_users(&st))
+            .await
+        {
             Ok(user) => user,
             Err(e) => return crate::err_response(e),
         }

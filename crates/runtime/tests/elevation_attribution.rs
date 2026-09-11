@@ -519,8 +519,7 @@ async fn a_deactivated_manager_keeps_their_name_on_every_receipt_they_signed() {
             &erplora_runtime::hub_users::UpdateHubUser {
                 is_active: Some(false),
                 ..Default::default()
-            },
-        )
+            }, 0,)
         .await
         .expect("the manager is deactivated");
     assert!(!row.is_active, "she is out: {row:?}");

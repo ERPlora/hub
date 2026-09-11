@@ -218,8 +218,21 @@ impl Runtime {
     }
 
     /// Alta de un usuario del hub (nombre, rol, email y PIN opcionales). Devuelve su id.
-    pub async fn create_hub_user(&self, input: &hub_users::NewHubUser) -> Result<String> {
-        hub_users::create(self.db.as_ref(), &self.registry, &self.hub_id, input).await
+    /// `max_users`: el tope del plan (`0` = ilimitado). La plaza se pide **mientras** se escribe la
+    /// fila (hub#1804), así que dos altas a la vez no pueden colar una de más.
+    pub async fn create_hub_user(
+        &self,
+        input: &hub_users::NewHubUser,
+        max_users: u32,
+    ) -> Result<String> {
+        hub_users::create(
+            self.db.as_ref(),
+            &self.registry,
+            &self.hub_id,
+            input,
+            max_users,
+        )
+        .await
     }
 
     /// Cuántos dígitos pide el PIN de este hub (hub#974): 4 o 6, igual para todo el mundo.
@@ -238,10 +251,13 @@ impl Runtime {
     }
 
     /// Edición parcial de un usuario del hub; `is_active: Some(false)` es la baja.
+    /// `max_users`: el tope del plan (`0` = ilimitado). Solo decide cuando la edición **reactiva**
+    /// a alguien, que es la única que vuelve a ocupar plaza (hub#1685/#1804).
     pub async fn update_hub_user(
         &self,
         user_id: &str,
         input: &hub_users::UpdateHubUser,
+        max_users: u32,
     ) -> Result<hub_users::HubUserRow> {
         hub_users::update(
             self.db.as_ref(),
@@ -249,6 +265,7 @@ impl Runtime {
             &self.hub_id,
             user_id,
             input,
+            max_users,
         )
         .await
     }
@@ -320,8 +337,15 @@ impl Runtime {
     }
 
     /// **Alta** de un usuario-login por email + rol (flujo admin, ADR-0157 §7). Upsert por email.
-    pub async fn create_login_user(&self, email: &str, role: &str) -> Result<identity::HubUser> {
-        identity::create_login_user(self.db.as_ref(), &self.hub_id, email, role).await
+    /// `max_users` es el tope del plan (`0` = ilimitado), que trae la capa HTTP: la plaza se pide
+    /// **mientras** se escribe, no antes (hub#1804).
+    pub async fn create_login_user(
+        &self,
+        email: &str,
+        role: &str,
+        max_users: u32,
+    ) -> Result<identity::HubUser> {
+        identity::create_login_user(self.db.as_ref(), &self.hub_id, email, role, max_users).await
     }
 
     /// **Baja** de un usuario-login por email (flujo admin, ADR-0157 §7). Desactiva; `true` si afectó.
@@ -421,6 +445,17 @@ impl Runtime {
     /// Resuelve una sesión válida a su `hub_user` activo (o `None`).
     pub async fn resolve_session(&self, token: &str) -> Result<Option<identity::HubUser>> {
         identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
+    }
+
+    /// **Why** the session behind `token` is no longer valid, when [`Self::resolve_session`] says
+    /// nothing (hub#1801).
+    ///
+    /// Only the failure path asks, so the happy path pays nothing. `None` means there is nothing to
+    /// explain — unknown token, or it simply ran out of time — and that is deliberately NOT the same
+    /// answer as being thrown out by the device limit, which is the distinction the login screen
+    /// needs in order to say something true.
+    pub async fn session_end_reason(&self, token: &str) -> Result<Option<String>> {
+        identity::session_end_reason(self.db.as_ref(), &self.hub_id, token).await
     }
 
     /// Resolves a valid session to its `hub_user` **and to the credential it was opened with**.

@@ -56,7 +56,7 @@ async fn a_local_user_is_created_with_a_name_and_a_pin_and_signs_in_with_it() {
     let rt = runtime("hub-local").await;
 
     let id = rt
-        .create_hub_user(&local("Marta Ruiz", "4821", "employee"))
+        .create_hub_user(&local("Marta Ruiz", "4821", "employee"), 0)
         .await
         .expect("name + PIN is all a local user needs");
 
@@ -93,7 +93,7 @@ async fn a_local_user_without_a_pin_is_rejected_with_a_reason() {
     let rt = runtime("hub-local").await;
 
     let err = rt
-        .create_hub_user(&local("Marta Ruiz", "", "employee"))
+        .create_hub_user(&local("Marta Ruiz", "", "employee"), 0)
         .await
         .unwrap_err();
 
@@ -115,7 +115,7 @@ async fn a_local_user_carries_no_email() {
         .create_hub_user(&NewHubUser {
             email: "marta@example.com".into(),
             ..local("Marta Ruiz", "4821", "employee")
-        })
+        }, 0)
         .await
         .unwrap_err();
 
@@ -134,7 +134,7 @@ async fn a_local_user_never_administers_the_hub() {
 
     for role in ["admin", "owner", "ADMIN", "Owner"] {
         let err = rt
-            .create_hub_user(&local("Marta Ruiz", "4821", role))
+            .create_hub_user(&local("Marta Ruiz", "4821", role), 0)
             .await
             .unwrap_err();
         assert_eq!(
@@ -150,7 +150,7 @@ async fn a_local_user_never_administers_the_hub() {
         ("Ana Soto", "4821", "manager"),
         ("Luis Prat", "5390", "employee"),
     ] {
-        rt.create_hub_user(&local(name, pin, role))
+        rt.create_hub_user(&local(name, pin, role), 0)
             .await
             .unwrap_or_else(|e| panic!("`{role}` is a legitimate local role: {e}"));
     }
@@ -163,12 +163,12 @@ async fn two_active_users_never_share_a_pin() {
     // who actually typed is invisible. Uniqueness is checked against ACTIVE users only — a
     // deactivated row cannot sign in, so it holds no digits hostage.
     let rt = runtime("hub-local").await;
-    rt.create_hub_user(&local("Marta Ruiz", "4821", "employee"))
+    rt.create_hub_user(&local("Marta Ruiz", "4821", "employee"), 0)
         .await
         .unwrap();
 
     let err = rt
-        .create_hub_user(&local("Luis Prat", "4821", "employee"))
+        .create_hub_user(&local("Luis Prat", "4821", "employee"), 0)
         .await
         .unwrap_err();
 
@@ -183,11 +183,11 @@ async fn the_pin_of_an_existing_user_cannot_be_changed_into_somebody_elses() {
     // The same rule on the edit door. Without it the alta guard is theatre: create with a free PIN,
     // then edit it into the manager's.
     let rt = runtime("hub-local").await;
-    rt.create_hub_user(&local("Marta Ruiz", "4821", "manager"))
+    rt.create_hub_user(&local("Marta Ruiz", "4821", "manager"), 0)
         .await
         .unwrap();
     let luis = rt
-        .create_hub_user(&local("Luis Prat", "5390", "employee"))
+        .create_hub_user(&local("Luis Prat", "5390", "employee"), 0)
         .await
         .unwrap();
 
@@ -197,8 +197,7 @@ async fn the_pin_of_an_existing_user_cannot_be_changed_into_somebody_elses() {
             &UpdateHubUser {
                 pin: Some("4821".into()),
                 ..UpdateHubUser::default()
-            },
-        )
+            }, 0,)
         .await
         .unwrap_err();
 
@@ -213,8 +212,7 @@ async fn the_pin_of_an_existing_user_cannot_be_changed_into_somebody_elses() {
         &UpdateHubUser {
             pin: Some("5390".into()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .expect("re-typing your own PIN is not a duplicate");
 }
@@ -231,7 +229,7 @@ async fn a_guessable_pin_is_rejected() {
     // midiendo otra puerta.
     for weak in ["0000", "1111", "9999", "1234", "4321", "6789"] {
         let err = rt
-            .create_hub_user(&local("Marta Ruiz", weak, "employee"))
+            .create_hub_user(&local("Marta Ruiz", weak, "employee"), 0)
             .await
             .unwrap_err();
         assert_eq!(
@@ -243,7 +241,7 @@ async fn a_guessable_pin_is_rejected() {
     assert!(rt.list_hub_users().await.unwrap().is_empty());
 
     for good in ["4821", "5390", "1357", "9021"] {
-        rt.create_hub_user(&local(&format!("User {good}"), good, "employee"))
+        rt.create_hub_user(&local(&format!("User {good}"), good, "employee"), 0)
             .await
             .unwrap_or_else(|e| panic!("`{good}` is a legitimate PIN: {e}"));
     }
@@ -259,7 +257,7 @@ async fn the_alta_never_reopens_a_door_the_hub_closed() {
     // explicit, audited decision of the administrator.
     let rt = runtime("hub-local").await;
     let marta = rt
-        .create_hub_user(&local("Marta Ruiz", "4821", "employee"))
+        .create_hub_user(&local("Marta Ruiz", "4821", "employee"), 0)
         .await
         .unwrap();
     rt.update_hub_user(
@@ -267,13 +265,12 @@ async fn the_alta_never_reopens_a_door_the_hub_closed() {
         &UpdateHubUser {
             is_active: Some(false),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
 
     let err = rt
-        .create_hub_user(&local("Marta Ruiz", "5390", "employee"))
+        .create_hub_user(&local("Marta Ruiz", "5390", "employee"), 0)
         .await
         .unwrap_err();
 
@@ -290,7 +287,7 @@ async fn the_alta_never_reopens_a_door_the_hub_closed() {
     for spelling in ["marta ruiz", "MARTA RUIZ", "  Marta Ruiz  "] {
         assert_eq!(
             code_of(
-                &rt.create_hub_user(&local(spelling, "5390", "employee"))
+                &rt.create_hub_user(&local(spelling, "5390", "employee"), 0)
                     .await
                     .unwrap_err()
             ),
@@ -325,7 +322,7 @@ async fn a_membership_revoked_by_the_saas_is_not_worked_around_with_a_local_alta
     );
 
     let err = rt
-        .create_hub_user(&local("Ana Soto", "4821", "employee"))
+        .create_hub_user(&local("Ana Soto", "4821", "employee"), 0)
         .await
         .unwrap_err();
 

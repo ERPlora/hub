@@ -1604,8 +1604,15 @@ export default {
     deviceUnidentified:
       'This browser cannot remember which device it is, so a PIN cannot be used here. Sign in with your account, or allow this site to store data and try again.',
     // ADR-0154: shown when this device's session was taken over by a sign-in on another device
-    // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
+    // (single active device plan). Wired since hub#1801: the runtime names the reason in the `401`
+    // of the probe door, `main.ts` carries it here in the query, and this screen paints it — until
+    // then the displaced device landed on the login with no word about why, which reads as an
+    // outage and ends in a support call.
     sessionTakenOver: 'Session opened on another device',
+    // The BODY says the two things the heading cannot: what the rule is (the plan, not a fault of
+    // theirs) and what to do about it. Both gestures are offered, in the order that is free first.
+    sessionTakenOverBody:
+      'Your plan covers one device at a time, so signing in on another one signed this device out. Sign in again to use it here, or add devices to your plan.',
     setupChoosePin: 'Choose a {n}-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',

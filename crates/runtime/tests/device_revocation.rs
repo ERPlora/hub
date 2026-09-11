@@ -81,6 +81,32 @@ async fn revoking_a_device_kills_the_session_it_had_open() {
     assert_eq!(revocation.sessions_closed, 1);
 }
 
+/// hub#1801 — **what the owner is told they cut off has to be true.**
+///
+/// The single-device plan stopped evicting by DELETE: the row survives, expired and marked, so the
+/// person left outside can be told why. `sessions_closed` counts what this gesture actually closed,
+/// so that tombstone must not be counted — a screen that says "1 session closed" about a device
+/// that had been signed out an hour ago is telling the owner somebody was working on the stolen
+/// laptop when nobody was.
+#[tokio::test]
+async fn revoking_a_device_does_not_count_an_already_evicted_session() {
+    let (rt, _at_till, at_laptop) = hub("hub-1801").await;
+    // The till signs in and the plan of ONE device evicts the laptop.
+    rt.enforce_device_limit(1, Some("till-1")).await.unwrap();
+    assert!(
+        !session_is_alive(&rt, &at_laptop).await,
+        "precondition: the laptop was evicted by the takeover"
+    );
+
+    let revocation = rt.revoke_device("laptop-1").await.unwrap();
+
+    assert!(revocation.was_known, "the hub did know this device");
+    assert_eq!(
+        revocation.sessions_closed, 0,
+        "nothing was open to close: the takeover had already signed that laptop out"
+    );
+}
+
 #[tokio::test]
 async fn revoking_a_device_takes_its_lax_mode_and_its_pin_login_with_it() {
     let (rt, _at_till, _at_laptop) = hub("hub-455").await;

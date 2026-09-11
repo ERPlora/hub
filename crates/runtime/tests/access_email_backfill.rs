@@ -269,7 +269,7 @@ async fn an_email_another_row_already_answers_for_is_never_copied() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
     // Ana is a real account user: her email is where access looks for it.
-    rt.create_login_user("ana@example.com", "admin")
+    rt.create_login_user("ana@example.com", "admin", 0)
         .await
         .unwrap();
     // Bob works the till and typed Ana's address into his own profile.
@@ -311,7 +311,7 @@ async fn an_email_another_row_already_answers_for_is_never_copied() {
 async fn the_refusal_ignores_case() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
-    rt.create_login_user("ana@example.com", "admin")
+    rt.create_login_user("ana@example.com", "admin", 0)
         .await
         .unwrap();
     row_written_before_the_fix(&raw, "u-bob", "Bob Ruiz", "employee", "Ana@Example.com").await;
@@ -351,7 +351,7 @@ async fn a_row_with_its_own_access_key_does_not_block_the_address_its_profile_cl
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
     // Bob has his own access key; his profile says Ana's address (his own doing, `/api/profile`).
     let bob = rt
-        .create_login_user("bob@example.com", "employee")
+        .create_login_user("bob@example.com", "employee", 0)
         .await
         .unwrap();
     rt.update_user_profile(
@@ -491,7 +491,7 @@ async fn a_profile_email_that_diverges_from_the_access_email_is_left_alone() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
     let ana = rt
-        .create_login_user("ana@work.example", "manager")
+        .create_login_user("ana@work.example", "manager", 0)
         .await
         .unwrap();
     rt.update_user_profile(
@@ -538,7 +538,7 @@ async fn a_healthy_hub_is_untouched_and_running_it_twice_changes_nothing() {
         pin: "4821".into(),
         local: true,
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
     rt.create_hub_user(&NewHubUser {
@@ -546,7 +546,7 @@ async fn a_healthy_hub_is_untouched_and_running_it_twice_changes_nothing() {
         email: "ana@example.com".into(),
         role: "manager".into(),
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
     let before = snapshot(&raw).await;
@@ -627,7 +627,7 @@ async fn a_hub_whose_profile_table_is_missing_still_boots() {
     let tdb = TestDb::new().await;
     let rt = reboot(&tdb).await;
     let raw = tdb.adapter().await;
-    rt.create_login_user("ana@example.com", "manager")
+    rt.create_login_user("ana@example.com", "manager", 0)
         .await
         .unwrap();
     raw.execute_batch("DROP TABLE hub_user_profile;")
@@ -666,7 +666,7 @@ async fn no_alta_path_writes_the_profile_email_without_the_access_email() {
         email: "ana@example.com".into(),
         role: "manager".into(),
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
     assert_access_email_is_written(&raw, "after the Personal alta of an account user").await;
@@ -678,14 +678,13 @@ async fn no_alta_path_writes_the_profile_email_without_the_access_email() {
         &UpdateHubUser {
             email: Some("ana.soto@example.com".into()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
     assert_access_email_is_written(&raw, "after editing an email in Personal").await;
 
     // 3) `POST /api/members` (ADR-0157 §7).
-    rt.create_login_user("carla@example.com", "employee")
+    rt.create_login_user("carla@example.com", "employee", 0)
         .await
         .unwrap();
     assert_access_email_is_written(&raw, "after the /api/members alta").await;
@@ -713,7 +712,7 @@ async fn no_alta_path_writes_the_profile_email_without_the_access_email() {
         pin: "4821".into(),
         local: true,
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
     assert_access_email_is_written(&raw, "after the alta of a local user").await;
@@ -749,7 +748,7 @@ async fn editing_your_own_profile_never_writes_the_access_email() {
     let rt = reboot(&tdb).await;
     let raw = tdb.adapter().await;
     let ana = rt
-        .create_login_user("ana@example.com", "manager")
+        .create_login_user("ana@example.com", "manager", 0)
         .await
         .unwrap();
 
@@ -815,7 +814,7 @@ async fn the_staff_list_flags_the_row_whose_email_revokes_nothing() {
 async fn a_row_whose_address_belongs_to_somebody_else_says_so() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
-    rt.create_login_user("ana@example.com", "admin")
+    rt.create_login_user("ana@example.com", "admin", 0)
         .await
         .unwrap();
     row_written_before_the_fix(&raw, "u-bob", "Bob Ruiz", "employee", "ana@example.com").await;
@@ -839,10 +838,10 @@ async fn a_row_whose_address_belongs_to_somebody_else_says_so() {
 async fn nobody_is_flagged_in_a_hub_with_nothing_to_resolve() {
     let tdb = TestDb::new().await;
     let rt = reboot(&tdb).await;
-    rt.create_login_user("ana@example.com", "admin")
+    rt.create_login_user("ana@example.com", "admin", 0)
         .await
         .unwrap();
-    rt.create_login_user("bob@example.com", "employee")
+    rt.create_login_user("bob@example.com", "employee", 0)
         .await
         .unwrap();
 

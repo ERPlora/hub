@@ -817,11 +817,14 @@ pub async fn get(
 /// El PIN es **opcional en las dos** —un usuario de cuenta que atiende la barra lo necesita en el
 /// dispositivo compartido— y, si viene, pasa por el mismo embudo: forma, no adivinable
 /// ([`clean_pin`]) y **suyo** ([`ensure_pin_is_free`]).
+/// `max_users`: el tope del plan (`0` = ilimitado). La plaza se comprueba **en el mismo paso** que
+/// se escribe la fila (hub#1804), no antes.
 pub async fn create(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     hub_id: &str,
     input: &NewHubUser,
+    max_users: u32,
 ) -> Result<String> {
     let name = clean_name(&input.name)?;
     let role = clean_role(&input.role)?;
@@ -838,7 +841,7 @@ pub async fn create(
     ensure_pin_is_free(db, hub_id, &pin, None).await?;
     ensure_badge_is_free(db, hub_id, &badge, None).await?;
 
-    let id = identity::create_user(db, hub_id, &name, &pin, &role, None).await?;
+    let id = admit_user(db, hub_id, max_users, &name, &pin, &role, None).await?;
     if !email.is_empty() {
         write_email(db, hub_id, &id, &name, &email).await?;
     }
@@ -893,13 +896,43 @@ pub async fn enforce_user_limit(
     if count_active_users(db, hub_id).await? < i64::from(max_users) {
         return Ok(());
     }
-    Err(reject(
+    Err(user_limit_reached(max_users))
+}
+
+/// El rechazo del tope, con su **código estable** `hub.users.user_limit_reached` — el que la
+/// pantalla ya sabe traducir y con el que ofrece ampliar el plan. Vive aquí y no en `identity`
+/// porque el plan es vocabulario de esta puerta; abajo solo se habla de plazas.
+pub(crate) fn user_limit_reached(max_users: u32) -> RuntimeError {
+    reject(
         "user_limit_reached",
         format!(
             "this plan covers {max_users} active users and they are all taken: deactivate somebody \
              who no longer works here, or move to a plan with more seats"
         ),
-    ))
+    )
+}
+
+/// Alta que **reserva la plaza del plan en el mismo paso que escribe la fila** (hub#1804).
+///
+/// Es la puerta del alta de Personal. Mirar el tope y escribir eran dos pasos y entre ellos cabía
+/// otra alta (hub#1804); ahora son uno solo, serializado por hub.
+pub async fn admit_user(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    max_users: u32,
+    name: &str,
+    pin: &str,
+    role: &str,
+    cloud_user_id: Option<&str>,
+) -> Result<String> {
+    match identity::try_create_user_within_plan(
+        db, hub_id, name, pin, role, cloud_user_id, max_users,
+    )
+    .await?
+    {
+        Some(id) => Ok(id),
+        None => Err(user_limit_reached(max_users)),
+    }
 }
 
 /// Guarda el email en los **dos** sitios que lo necesitan, siempre a la vez: `hub_user.email` —la
@@ -919,12 +952,16 @@ async fn write_email(
 }
 
 /// Edición parcial de un usuario existente. Devuelve la fila resultante.
+/// `max_users`: el tope del plan (`0` = ilimitado). **Reactivar es dar de alta** (hub#1685), así
+/// que la plaza se comprueba en el mismo paso que se escribe (hub#1804); editar a quien ya está
+/// dentro no gasta ninguna y no pasa por ahí.
 pub async fn update(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     hub_id: &str,
     user_id: &str,
     input: &UpdateHubUser,
+    max_users: u32,
 ) -> Result<HubUserRow> {
     let current = get(db, hub_id, user_id)
         .await?
@@ -998,17 +1035,35 @@ pub async fn update(
     // el rol— la deja como está: reetiquetar de paso una revocación del cloud como baja del hub
     // dejaría al usuario varado, con su membresía de vuelta y la puerta cerrada sin motivo visible.
     let touches_the_door = input.is_active.is_some();
-    db.execute(
-        if touches_the_door {
+    // Reincorporar a quien estaba de baja vuelve a pedir plaza: la baja la liberó y puede haberla
+    // ocupado otro. Se pide MIENTRAS se escribe (hub#1804) para que no quepa otra alta en medio.
+    let reactivating = is_active && !current.is_active;
+    if reactivating {
+        p.insert("max_users".into(), json!(identity::seat_ceiling(max_users)));
+        let readmitted = identity::write_taking_a_seat(
+            db,
+            hub_id,
             "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active, \
-               cloud_revoked_at = '' WHERE id = :id AND hub_id = :hub_id"
-        } else {
-            "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active \
-               WHERE id = :id AND hub_id = :hub_id"
-        },
-        &p,
-    )
-    .await?;
+               cloud_revoked_at = '' WHERE id = :id AND hub_id = :hub_id AND ",
+            &p,
+        )
+        .await?;
+        if !readmitted {
+            return Err(user_limit_reached(max_users));
+        }
+    } else {
+        db.execute(
+            if touches_the_door {
+                "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active, \
+                   cloud_revoked_at = '' WHERE id = :id AND hub_id = :hub_id"
+            } else {
+                "UPDATE hub_user SET name = :name, role = :role, is_active = :is_active \
+                   WHERE id = :id AND hub_id = :hub_id"
+            },
+            &p,
+        )
+        .await?;
+    }
 
     if let Some(email) = email {
         write_email(db, hub_id, user_id, &name, &email).await?;
@@ -1439,6 +1494,142 @@ mod tests {
                 .unwrap();
         }
         enforce_user_limit(&db, HUB, 3).await.unwrap();
+    }
+
+    /// **Varias altas a la vez no pueden colar una plaza de más** (hub#1804).
+    ///
+    /// Mirar el tope y escribir la fila eran dos pasos, y entre ellos no había nada que
+    /// serializase: dos administradores dando de alta al mismo tiempo veían los dos la misma
+    /// plaza libre y entraban los dos. El plan se quedaba con cuatro personas en un plan de tres,
+    /// sin error y sin que nadie se enterase.
+    ///
+    /// Esto es la **invariante** —«nunca más de `max_users` dentro»—, no la guardia de la
+    /// carrera: medido, pasa igual con el candado quitado (5 de 5 corridas), porque la ventana
+    /// entre la instantánea del `INSERT` condicional y su commit es de microsegundos y ocho tareas
+    /// de tokio no se solapan ahí por mucho que se lancen juntas. Quien caza el positivo es
+    /// [`an_admission_waits_for_the_seat_lock_hub1804`]; este fija el efecto que se le promete al
+    /// dueño del hub.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn simultaneous_admissions_cannot_overflow_the_plan_hub1804() {
+        const MAX_USERS: u32 = 3;
+        const CONTENDERS: usize = 8;
+
+        let db = db().await;
+        for (name, pin) in [("Ana", "4729"), ("Bruno", "5183")] {
+            identity::create_user(&db, HUB, name, pin, "employee", None)
+                .await
+                .unwrap();
+        }
+
+        // Queda UNA plaza y entran OCHO a la vez, como varias tablets pulsando «Guardar» a la par.
+        let db = std::sync::Arc::new(db);
+        let racing: Vec<_> = (0..CONTENDERS)
+            .map(|n| {
+                let db = db.clone();
+                tokio::spawn(async move {
+                    admit_user(
+                        db.as_ref(),
+                        HUB,
+                        MAX_USERS,
+                        &format!("Contender {n}"),
+                        "",
+                        "employee",
+                        None,
+                    )
+                    .await
+                })
+            })
+            .collect();
+        let mut outcomes = Vec::with_capacity(CONTENDERS);
+        for handle in racing {
+            outcomes.push(handle.await.expect("ninguna de las altas puede entrar en pánico"));
+        }
+
+        let admitted = outcomes.iter().filter(|r| r.is_ok()).count();
+        let refused = outcomes
+            .iter()
+            .filter(|r| {
+                matches!(r, Err(RuntimeError::Domain { code, .. })
+                         if code == "hub.users.user_limit_reached")
+            })
+            .count();
+        assert_eq!(
+            admitted, 1,
+            "solo queda UNA plaza: exactamente una de las {CONTENDERS} altas simultáneas puede \
+             entrar, las demás salen con `user_limit_reached`: {outcomes:?}"
+        );
+        assert_eq!(
+            refused,
+            CONTENDERS - 1,
+            "las rechazadas tienen que traer el código estable que la pantalla ya sabe pintar, \
+             no un fallo cualquiera: {outcomes:?}"
+        );
+        assert_eq!(
+            count_active_users(db.as_ref(), HUB).await.unwrap(),
+            i64::from(MAX_USERS),
+            "el plan cubre {MAX_USERS} personas y la carrera no puede dejar más dentro"
+        );
+    }
+
+    /// **El alta ESPERA al candado de plazas** (hub#1804) — y esta es la guardia que muere si se
+    /// le quita el candado al alta.
+    ///
+    /// Contar y escribir tienen que ser un solo paso, y lo que los hace uno es el
+    /// `pg_advisory_xact_lock` del hub. Probarlo por carrera no funciona: la ventana real es de
+    /// microsegundos y un test de ocho tareas la salta sin verla. Así que se prueba por el otro
+    /// lado, que sí es determinista: **otra conexión sostiene el candado de plazas de este hub, y
+    /// el alta no puede terminar antes de que lo suelte.** Sin el candado en producción, el alta
+    /// pasa de largo y vuelve en milisegundos — que es exactamente el fallo.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn an_admission_waits_for_the_seat_lock_hub1804() {
+        use std::time::{Duration, Instant};
+
+        const HELD_FOR: Duration = Duration::from_millis(1_500);
+
+        let tdb = erplora_db::testutil::TestDb::new().await;
+        let db = tdb.adapter().await;
+        identity::ensure_tables(&db).await.unwrap();
+        identity::create_user(&db, HUB, "Ana", "4729", "employee", None)
+            .await
+            .unwrap();
+
+        // Otra conexión contra la MISMA base coge el candado de plazas y lo retiene.
+        let holder = tdb.adapter().await;
+        let mut held = Params::new();
+        held.insert("seat_key".into(), json!(format!("{HUB}/seats")));
+        let holding = tokio::spawn(async move {
+            holder
+                .execute_tx_gated(
+                    &[
+                        (
+                            "SELECT pg_advisory_xact_lock(hashtext(:seat_key))".to_string(),
+                            held.clone(),
+                        ),
+                        (
+                            format!("SELECT pg_sleep({})", HELD_FOR.as_secs_f64()),
+                            held.clone(),
+                        ),
+                    ],
+                    &[],
+                )
+                .await
+                .expect("la conexión que sostiene el candado no puede fallar");
+        });
+        // El candado se pide dentro de la transacción de arriba; dale margen a tomarlo.
+        tokio::time::sleep(Duration::from_millis(400)).await;
+
+        let started = Instant::now();
+        admit_user(&db, HUB, 3, "Bruno", "", "employee", None)
+            .await
+            .expect("hay plaza de sobra: el alta entra, solo que después de esperar");
+        let waited = started.elapsed();
+        holding.await.expect("el que sostenía el candado termina");
+
+        assert!(
+            waited >= Duration::from_millis(700),
+            "el alta tiene que ESPERAR a que se suelte el candado de plazas antes de contar y \
+             escribir; volvió en {waited:?}, así que contó sin serializarse con nadie"
+        );
     }
 
     /// The two refusals #1185 left behind (hub#1190, «fleco del mismo #1185»): both were still
