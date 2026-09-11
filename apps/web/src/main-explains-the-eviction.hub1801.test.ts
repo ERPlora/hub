@@ -5,11 +5,11 @@
 // be mounted in a unit test — it opens sockets, registers the service worker and mounts the app —
 // so this reads the SOURCE, the same way `main-asks-for-notices.hub1732.test.ts` does.
 //
-// A weak assertion on purpose: it proves the wire is there, not that it behaves. The behaviour is
-// pinned by `lib/runtime.session-eviction.hub1801.test.ts` (the reason reaches the hook) and by
-// `views/login-session-taken-over.hub1801.test.ts` (the screen explains it). What THIS catches is
-// somebody deleting the wire between them while both of those stay green — which is exactly the
-// shape of the original defect: every piece in place, nothing joined.
+// Assertions on source, so they are scoped to the REGION that carries the reason and never to the
+// file: the behaviour is pinned by `lib/runtime.session-eviction.hub1801.test.ts` (the reason
+// reaches the hook) and by `views/login-session-taken-over.hub1801.test.ts` (the screen explains
+// it). What THIS catches is somebody deleting the wire between them while both of those stay green
+// — which is exactly the shape of the original defect: every piece in place, nothing joined.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -33,11 +33,34 @@ function runtimeHook(source: string): string {
   return source.slice(start, end);
 }
 
+/**
+ * The `query: { … }` of the redirect to the login, ALONE — narrower than the hook on purpose.
+ *
+ * That narrowing is a mutant's lesson, not taste: inside the hook the constant ALSO appears on the
+ * `const evicted = …` line that picks the toast, so hardcoding this query back to the hub#846
+ * `'session-expired'` left every hook-wide assertion green while the login screen lost the reason
+ * for good — the toast still said the right sentence, and the screen behind it explained nothing.
+ */
+function loginQuery(source: string): string {
+  const hook = runtimeHook(source);
+  const start = hook.indexOf('query:');
+  expect(start).toBeGreaterThan(-1);
+  const end = hook.indexOf('}', start);
+  expect(end).toBeGreaterThan(start);
+  return hook.slice(start, end);
+}
+
 describe('the shell carries the eviction reason to the login screen', () => {
-  it('takes the reason the hook now hands it and puts it in the query', () => {
-    const hook = runtimeHook(MAIN);
-    expect(hook).toContain('reason');
-    expect(hook).toContain('SESSION_EVICTED_DEVICE_LIMIT');
+  it('puts the reason in the QUERY the login reads, not only in the toast that fades', () => {
+    expect(loginQuery(MAIN)).toContain('SESSION_EVICTED_DEVICE_LIMIT');
+  });
+
+  it('and the region asserted above really is only that query', () => {
+    // Positive control of THIS scoping: `const evicted` is the other place the constant lives, so a
+    // region that reached it would pass on a query that had lost the reason — which is exactly how
+    // the first version of this file let that mutant through.
+    expect(runtimeHook(MAIN)).toContain('const evicted');
+    expect(loginQuery(MAIN)).not.toContain('const evicted');
   });
 
   it('names the reason through the shared constant, never a literal of its own', () => {
