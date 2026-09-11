@@ -26,14 +26,27 @@ interface HubUser {
   is_active?: boolean;
 }
 
-/** La lista de personas tal como la ve el runtime, con la sesión de la cajera del seed. */
+/**
+ * La lista de personas tal como la ve el runtime, con la sesión de la cajera del seed.
+ *
+ * El core contesta con el SOBRE del hub —`{ ok, data }`, ver `crates/server/tests/hub_users_api.rs`—,
+ * no con el array pelado: desenvolverlo aquí es lo que hace que un cambio de sobre falle con un
+ * mensaje que se lee, en vez de con un `find is not a function` a mitad del recorrido.
+ */
 async function hubUsers(token: string): Promise<HubUser[]> {
   const api = await pwRequest.newContext();
   const res = await api.get(`${RUNTIME}/api/hub/users`, { headers: { 'X-Hub-Session': token } });
   expect(res.ok(), `GET /api/hub/users: ${res.status()} ${await res.text()}`).toBeTruthy();
-  const body = (await res.json()) as HubUser[];
+  const body = (await res.json()) as { ok?: boolean; data?: HubUser[] };
   await api.dispose();
-  return body;
+  expect(body.ok, `GET /api/hub/users no vino en el sobre del hub: ${JSON.stringify(body)}`).toBe(
+    true,
+  );
+  expect(
+    Array.isArray(body.data),
+    `GET /api/hub/users: \`data\` no es la lista: ${JSON.stringify(body)}`,
+  ).toBeTruthy();
+  return body.data as HubUser[];
 }
 
 /**
@@ -45,11 +58,43 @@ async function hubUsers(token: string): Promise<HubUser[]> {
  */
 const PIN_DIGITS = '481725';
 
+/** Prefijo del nombre de la persona que este spec da de alta. También es su etiqueta de limpieza. */
+const QA_PREFIX = 'QA Testid ';
+
+/**
+ * Deja el banco sin personas ACTIVAS de corridas anteriores, y por una razón concreta: la BD del
+ * banco (`hub_e2e_web`) **no es efímera entre corridas**, y un PIN solo puede abrir la sesión de
+ * un usuario activo (`hub.users.pin_in_use`, `identity::pin_is_taken`). Una corrida que muera a
+ * mitad —antes de la baja, que es el último paso— deja su persona activa con este PIN puesto, y
+ * la siguiente ya no falla por lo que se está probando: falla porque el PIN está cogido. Eso es
+ * un rojo que miente, que es peor que no tener el test.
+ *
+ * Dar de baja NO borra la fila (hub#348): sigue en la lista, inactiva, y su PIN queda libre.
+ */
+async function deactivateLeftovers(token: string): Promise<void> {
+  const stale = (await hubUsers(token)).filter(
+    (u) => u.name.startsWith(QA_PREFIX) && u.is_active !== false,
+  );
+  if (stale.length === 0) return;
+  const api = await pwRequest.newContext();
+  for (const user of stale) {
+    const res = await api.delete(`${RUNTIME}/api/hub/users/${user.id}`, {
+      headers: { 'X-Hub-Session': token },
+    });
+    expect(
+      res.ok(),
+      `no se pudo dar de baja el resto de una corrida anterior (${user.name}): ${res.status()} ${await res.text()}`,
+    ).toBeTruthy();
+  }
+  await api.dispose();
+}
+
 test.describe('la ficha de una persona se conduce por data-testid (hub#1756)', () => {
   test('alta, edición y baja sin un solo selector por texto', async ({ page }) => {
     const session = await loginByPin();
+    await deactivateLeftovers(session.token);
     const before = await hubUsers(session.token);
-    const name = `QA Testid ${Date.now()}`;
+    const name = `${QA_PREFIX}${Date.now()}`;
 
     // ── Alta ──────────────────────────────────────────────────────────────────────────────────
     await loggedInSession(page);
