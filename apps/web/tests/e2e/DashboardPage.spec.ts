@@ -10,7 +10,7 @@
 // hay guard que desvíe a una pantalla de primer arranque — la puesta en marcha vive en core
 // (este widget + la pestaña Datos de Ajustes). Por eso el test NO instala ningún módulo.
 
-import { test, expect, request as pwRequest, type Page } from '@playwright/test';
+import { test, expect, request as pwRequest, type Page } from '../bench-boot';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 

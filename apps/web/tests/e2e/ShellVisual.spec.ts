@@ -26,7 +26,7 @@
 // una PR no puede volver el caso verde por salto); ese fallo lo produce `updateSnapshots: 'none'`
 // en `playwright.config.ts`. Ver `src/lib/visual-baseline-gate.ts` para la lógica y sus tests.
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../bench-boot';
 import { VIEWPORTS, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — login', () => {

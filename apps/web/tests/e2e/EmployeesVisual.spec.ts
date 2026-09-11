@@ -3,7 +3,7 @@
 // `/employees` sin hash aterriza en la pestaña «Personal» (`tab = ref<EmployeeTab>(... ?? 'staff')`,
 // `EmployeesPage.vue`): la lista de `hub_user` del seed de dev (solo el usuario Demo) — no depende
 // de ningún módulo de negocio, así que es determinista con el hub vacío del banco de e2e.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../bench-boot';
 import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — personal', () => {

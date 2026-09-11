@@ -3,7 +3,7 @@
 // `/settings` sin hash aterriza en la pestaña «Hub» (`resolveSettingsTab('')`, `SettingsPage.vue`):
 // país, huso horario, moneda e idioma del hub del seed de dev — ninguno depende de módulos
 // instalados, así que la pantalla es determinista con el hub vacío del banco de e2e.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../bench-boot';
 import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — ajustes', () => {

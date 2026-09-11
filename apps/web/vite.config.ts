@@ -208,6 +208,7 @@ export default defineConfig({
       'outfitkit-version.test.ts',
       'tests/playwright.config.test.ts',
       'tests/bench-ports.test.ts',
+      'tests/bench-boot.test.ts',
     ],
     environment: 'node',
     // hub#1367 — these two are anti-hang BACKSTOPS, not assertions, and vitest's defaults

@@ -6,7 +6,7 @@
 // `DashboardPage.spec.ts`). Ese estado vacío es justo lo que hace la captura determinista: sin
 // módulos no hay widgets de negocio que varíen entre corridas, solo el widget CORE de
 // export/import, que vive dentro de `<ok-widget-board>` en todos los presets por defecto.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../bench-boot';
 import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — dashboard', () => {

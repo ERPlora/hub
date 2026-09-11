@@ -7,7 +7,7 @@
 // red, y el aviso de error de esa llamada solo se pinta cuando `tab !== 'mine'`
 // (`v-if="catalogError && tab !== 'mine'"`) — así que en la pestaña por defecto es invisible y no
 // puede colar ruido en la captura.
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../bench-boot';
 import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — apps', () => {

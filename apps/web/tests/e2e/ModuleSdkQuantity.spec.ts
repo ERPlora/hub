@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../bench-boot';
 import { resolve } from 'node:path';
 
 const quantityModule = `/@fs/${resolve(

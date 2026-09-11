@@ -18,7 +18,7 @@
 // El runtime se arranca AQUÍ (no el de `pnpm dev`): necesita HUB_CLOUD_API_URL apuntando al
 // fixture. Hub VACÍO a propósito — es exactamente el estado del cliente nuevo del caso real.
 
-import { test, expect, request as pwRequest } from '@playwright/test';
+import { test, expect, request as pwRequest } from '../bench-boot';
 import { createServer, type Server } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
