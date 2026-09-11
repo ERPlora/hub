@@ -29,6 +29,7 @@ import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
+import { sessionEndReason } from './session-end-reason';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -180,14 +181,31 @@ export class RuntimeSessionExpiredError extends Error {
  * module, so importing the router back would be a cycle. Closing the session itself is not
  * delegated to the hook — `handleRuntime401` calls `logout()` directly, so the invalidation
  * happens even before `main.ts` has registered anything.
+ *
+ * It receives the REASON the session ended when the runtime knows one (hub#1801, today only
+ * `session_evicted_device_limit`) and `null` when there is nothing to explain. Passing it on
+ * instead of deciding here is deliberate: this module cannot reach the router or the catalogue,
+ * and a reason is only worth anything on the screen that has both.
  */
-let onRuntimeSessionExpired: (() => void) | null = null;
-export function setOnRuntimeSessionExpired(fn: (() => void) | null): void {
+let onRuntimeSessionExpired: ((reason: string | null) => void) | null = null;
+export function setOnRuntimeSessionExpired(fn: ((reason: string | null) => void) | null): void {
   onRuntimeSessionExpired = fn;
 }
 
+/**
+ * What the probe found out. `dead` is the verdict of hub#846; `reason` is what hub#1801 added —
+ * the two are separate on purpose, because «dead, and I can say why» and «dead» must not collapse
+ * into one truthy value that a later reader mistakes for the other.
+ */
+interface SessionVerdict {
+  dead: boolean;
+  reason: string | null;
+}
+
+const ALIVE: SessionVerdict = { dead: false, reason: null };
+
 /** Single-flight death confirmation: one probe per burst, not one per call in flight. */
-let sessionProbe: Promise<boolean> | null = null;
+let sessionProbe: Promise<SessionVerdict> | null = null;
 
 /**
  * Is the local session actually DEAD? A raw `401` is not enough to know: several admin-gated
@@ -198,14 +216,19 @@ let sessionProbe: Promise<boolean> | null = null;
  * session itself is gone. A probe that cannot be read (network failure) answers "not dead":
  * death is proven, never presumed — connectivity must stay a retryable error (hub#770).
  */
-function probeSessionDead(): Promise<boolean> {
+function probeSessionDead(): Promise<SessionVerdict> {
   if (!sessionProbe) {
     sessionProbe = (async () => {
       try {
         const res = await fetch(`${RUNTIME_URL}/api/settings`, { headers: runtimeHeaders() });
-        return res.status === 401;
+        if (res.status !== 401) return ALIVE;
+        // The refusal names WHY, as data (hub#1801). Read only on the death path, and never
+        // allowed to change the verdict: a body that cannot be parsed still means dead — the
+        // session is gone either way, and `sessionEndReason` answers `null` for every silence.
+        const body = await res.json().catch(() => null);
+        return { dead: true, reason: sessionEndReason(body) };
       } catch {
-        return false;
+        return ALIVE;
       }
     })();
     void sessionProbe.finally(() => {
@@ -223,14 +246,14 @@ async function handleRuntime401(): Promise<boolean> {
   // Only a shell that believes it is signed in can be signed out. The login screen probes the
   // runtime without a session and collects 401s legitimately — nothing to react to.
   if (!getHubSession() && !user.value) return false;
-  const dead = await probeSessionDead();
-  if (!dead) return false;
+  const verdict = await probeSessionDead();
+  if (!verdict.dead) return false;
   // Invalidate ONCE: a screen load has dozens of calls in flight and they all hit this on the
   // same dead session. `logout()` clears the local session synchronously, so the first arrival
   // closes it and every other in-flight 401 falls out at this guard.
   if (getHubSession() || user.value) {
     logout();
-    onRuntimeSessionExpired?.();
+    onRuntimeSessionExpired?.(verdict.reason);
   }
   return true;
 }

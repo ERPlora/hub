@@ -37,6 +37,33 @@
             </p>
           </div>
 
+          <!-- hub#1801 — POR QUÉ está aquí quien no pidió estar aquí.
+               El desalojo por el límite de dispositivos del plan es el único motivo que el hub
+               sabe nombrar, y sin esto se devolvía a esa persona al login en silencio: no había
+               tocado nada, así que la lectura a mano es «se ha caído» o «me han cambiado la
+               contraseña». La salida a gestionar el plan va gateada por quién reparte el binario
+               (hub#756) y apunta a la cuenta, nunca al marketplace (hub#479). -->
+          <ok-inline-feedback
+            v-if="sessionEndedNotice"
+            data-testid="login-session-ended"
+            tone="warning"
+            icon="phone-portrait-outline"
+            :heading="t('login.sessionTakenOver')"
+            class="mb-5"
+          >
+            {{ t('login.sessionTakenOverBody') }}
+            <ion-button
+              v-if="offersPlanUpgrade"
+              slot="actions"
+              data-testid="login-upgrade-plan"
+              size="small"
+              fill="outline"
+              @click="onUpgradePlan"
+            >
+              {{ t('nav.upgradePlan') }}
+            </ion-button>
+          </ok-inline-feedback>
+
           <!-- Tarjeta principal -->
           <ion-card class="ion-no-margin login-card">
             <ion-card-content>
@@ -378,6 +405,11 @@ import { deviceMode, deviceTrusted, loadDeviceMode, offersPinLogin } from '../li
 import { pinPolicy } from '../lib/pin-policy';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
+import { SESSION_EVICTED_DEVICE_LIMIT } from '../lib/session-end-reason';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
+import { saasDoor } from '../lib/saas-door';
+import { openExternal } from '../lib/open-external';
+import { getDeviceContext } from '../lib/device';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -505,6 +537,36 @@ watch(
 // EmailForm state
 // ---------------------------------------------------------------------------
 const router = useRouter();
+
+// ---------------------------------------------------------------------------
+// hub#1801 — el motivo por el que esta pantalla está delante de alguien.
+//
+// Llega en la query porque quien lo sabe es el interceptor del runtime
+// (`lib/runtime.ts` → `main.ts`), que no puede pintar nada, y esta pantalla no puede preguntarlo:
+// la sesión de la que se habla ya está cerrada. Solo se pinta lo que el catálogo sabe explicar —
+// `lib/session-end-reason` filtra, así que un código de una release posterior degrada al silencio
+// de hub#846 en vez de acabar en la pantalla en inglés y con guiones bajos.
+// ---------------------------------------------------------------------------
+const sessionEndedNotice = computed(
+  () => router.currentRoute.value.query.reason === SESSION_EVICTED_DEVICE_LIMIT,
+);
+// hub#756 — la regla la pone quien reparte el binario: en una copia de Play no se ofrece la puerta.
+// Sin señal se ofrece (el navegador no manda `distribution`, y negar dejaría a casi todos fuera).
+const canOfferPlanUpgrade = ref(true);
+const offersPlanUpgrade = computed(() => sessionEndedNotice.value && canOfferPlanUpgrade.value);
+
+// pm#196 — por la puerta compartida, igual que el menú de la app: dentro de la app instalada el
+// navegador del sistema NO comparte cookies con el webview, así que sin el pase de un solo uso se
+// aterrizaría en OTRO login justo al ir a mirar el plan. Si el pase no se puede acuñar, `saasDoor`
+// devuelve el enlace de siempre: degradar, nunca un botón muerto.
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+  } catch {
+    emailError.value = t('nav.upgradePlanError');
+  }
+}
+
 const emailVal = ref<string>('');
 const passwordVal = ref<string>('');
 const trust = ref<boolean>(true);
@@ -753,6 +815,13 @@ onMounted(() => {
     void signInWithBadge(badge);
   });
   void handleGoogleCallback();
+  // Solo cuando hay algo que ofrecer: la distribución se pregunta al host de la app, y en una
+  // visita normal al login no hay ningún botón que gatear con su respuesta.
+  if (sessionEndedNotice.value) {
+    void getDeviceContext().then((context) => {
+      canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+    });
+  }
   // Qué clase de dispositivo es este lo dice el HUB (hub#357). Se pregunta aquí, antes de que
   // exista sesión alguna —esta pantalla ES quien decide si se pinta el pinpad—, y la respuesta
   // solo puede quitar fricción: mientras no llegue, o si falla, el dispositivo es `shared`.

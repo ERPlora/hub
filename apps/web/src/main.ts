@@ -29,6 +29,7 @@ import {
   ensureMediaCookie,
   setOnRuntimeSessionExpired,
 } from './lib/runtime';
+import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
@@ -304,13 +305,25 @@ setOnSessionExpired(() => {
 // CONFIRMED dead (expired, or displaced by another device on the single-device plan) already
 // closed the local session inside lib/runtime.ts — the invalidation is ONE and lives there. Here
 // the shell EXPLAINS it (i18n toast, not a failure with a «Retry» that could never help) and
-// leads to the login. `reason` travels in the query so LoginPage can adopt it later (the key
-// `login.sessionTakenOver` already sits waiting for that wire). The login screen keeps deciding
-// on its own what to offer — pinpad in the demo or on a trusted device (ADR-0329: the runtime's
-// `demo_would_adopt` rule stays untouched and keeps answering that question).
-setOnRuntimeSessionExpired(() => {
-  void toast(i18n.global.t('auth.sessionEnded'), 'warning', 6000);
-  void router.replace({ name: 'login', query: { reason: 'session-expired' } });
+// leads to the login. The login screen keeps deciding on its own what to offer — pinpad in the
+// demo or on a trusted device (ADR-0329: the runtime's `demo_would_adopt` rule stays untouched and
+// keeps answering that question).
+//
+// **And it says WHICH of the two it was** (hub#1801). The hook now receives the reason the runtime
+// gave, so when the plan displaced this device the hedged sentence gives way to the real one and
+// the reason travels in the query, where `LoginPage.vue` turns it into an explanation and a way
+// out. With no reason — an ordinary expiry, or a hub older than this shell — nothing changes.
+setOnRuntimeSessionExpired((reason) => {
+  const evicted = reason === SESSION_EVICTED_DEVICE_LIMIT;
+  void toast(
+    i18n.global.t(evicted ? 'login.sessionTakenOver' : 'auth.sessionEnded'),
+    'warning',
+    6000,
+  );
+  void router.replace({
+    name: 'login',
+    query: { reason: evicted ? SESSION_EVICTED_DEVICE_LIMIT : 'session-expired' },
+  });
 });
 
 // El Cloud reportó que el hub fue borrado/revocado (410 hub_not_found, vía el gate de

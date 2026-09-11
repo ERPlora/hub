@@ -1428,8 +1428,15 @@ export default {
     deviceUnidentified:
       'Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.',
     // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
-    // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
+    // otro dispositivo (plan de un solo dispositivo activo). Cableado desde hub#1801: el runtime
+    // nombra el motivo en el 401 de la puerta que sondea el shell, `main.ts` lo trae en la query y
+    // esta pantalla lo pinta. Antes, al desalojado se le devolvía al login sin una palabra, que se
+    // lee como una caída del hub y acaba en una llamada a soporte.
     sessionTakenOver: 'Sesión abierta en otro dispositivo',
+    // El CUERPO dice lo que el título no puede: cuál es la regla (es el plan, no un fallo suyo) y
+    // qué hacer. Se ofrecen los dos gestos, y primero el que no cuesta nada.
+    sessionTakenOverBody:
+      'Tu plan cubre un dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí, o amplía los dispositivos de tu plan.',
     setupChoosePin: 'Elige un PIN de {n} dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
