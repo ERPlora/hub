@@ -114,7 +114,8 @@ export function skipIfBaselineMissingLocally(testInfo: TestInfo, snapshot: strin
  * corrida toma su propio puerto (`bench-ports.ts`), así que el símbolo sale DISTINTO cada vez.
  * Medido el 11/09 regenerando en `:8850` y comparando en `:8860`, sin tocar nada más: las cuatro
  * pantallas de 1440px que pintan el sidebar —apps, dashboard, personal y ajustes— en rojo
- * (dashboard: 3.168 px, ratio 0,01, contra un `maxDiffPixelRatio` de 0,002).
+ * (dashboard: 3.168 px contra el presupuesto de entonces, un ratio de 0,002 = 2.592 px a
+ * 1440×900; desde hub#1823 el presupuesto es absoluto, 20 px — `visual-diff-budget.ts`).
  *
  * Se TAPA en vez de fijarse porque lo que codifica es legítimamente propio de cada máquina, y su
  * contenido ya tiene tests propios que no dependen de una foto (`lib/install-qr.test.ts`,

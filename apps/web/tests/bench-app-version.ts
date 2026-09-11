@@ -6,13 +6,14 @@
 // `v1.1.7` y un runner que clona en superficial pinta `v0.0.0` — medido el 11/09 comparando las dos
 // capturas del dashboard a 1440px.
 //
-// ⚠️ Lo que esto NO es: una defensa contra un rojo masivo. Se midió antes de escribir esto, y la
-// verdad es la contraria — con `maxDiffPixelRatio: 0.002` (≈2.600 px a 1440×900) el cambio de
-// `v1.1.7` a `v0.0.0-bench` (≈600 px de texto) pasa la comparación EN VERDE. O sea que hoy el
-// contrato visual ni siquiera ve este cambio; se fija por DETERMINISMO y por paridad local↔CI, no
-// porque estuviera tumbando nada. Que el umbral lo absorba es suerte del tamaño de la cadena, no
-// diseño: una versión más larga sí puede reflotar el pie. El agujero del umbral —los cambios de
-// texto pequeños que el contrato no ve— se sigue aparte, en hub#1823.
+// ⚠️ What this is NOT: a defence against a mass red. It is pinned for DETERMINISM and for
+// local<->CI parity, not because it was ever knocking anything over — when this was written the
+// bench could not even SEE the change: with the budget of the day (`maxDiffPixelRatio: 0.002`,
+// 2592 px at 1440x900) going from `v1.1.7` to `v0.0.0-bench` passed GREEN.
+//
+// That hole is closed since hub#1823: the budget is an absolute 20 px (`visual-diff-budget.ts`),
+// and the same change is now measured at 106 px — one single digit is 33 px — so the footer is
+// back inside the contract and this constant is what keeps it from moving on its own.
 //
 // El valor NO es un número de versión real a propósito: nadie debe leer una baseline y creer que
 // afirma algo sobre la versión que se publica.
