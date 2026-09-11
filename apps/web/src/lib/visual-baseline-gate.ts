@@ -36,8 +36,10 @@ export function resolveUpdateSnapshotsMode(env: VisualBaselineEnv): 'all' | 'non
  * Si el caso debe SALTARSE (con motivo) en vez de dejar que la aserción compare contra una
  * baseline ausente.
  *
- * Solo fuera de CI (hub#1240 — un Mac nunca va a igualar el PNG de Linux, así que ahí la primera
- * corrida crea una baseline local para poder trabajar y las siguientes comparan contra ella).
+ * Solo fuera de CI (hub#1240 — un Mac nunca va a igualar el PNG de Linux). Saltar NO crea nada: el
+ * `testInfo.skip()` aborta el caso antes de que `updateSnapshots: 'missing'` llegue a escribir. Para
+ * tener baselines locales con las que trabajar se piden una vez con `HUB_UPDATE_BASELINES=1`, que
+ * escribe las de tu plataforma; las siguientes corridas comparan contra ellas.
  *
  * 🔴 En CI NO se salta NUNCA: una baseline que falta es un FALLO. Hasta hub#1752 había aquí una
  * excepción —si el directorio `<Spec>.spec.ts-snapshots/` no existía, se saltaba también en CI—

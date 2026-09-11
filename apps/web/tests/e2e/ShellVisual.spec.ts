@@ -18,7 +18,9 @@
 // Ese run corre con `--update-snapshots=all` y sube los PNG como artefacto para commitearlos.
 //
 // En tu máquina el caso se SALTA en voz alta si no tienes baseline local (un Mac no iguala jamás
-// el PNG de Linux) y la primera corrida te crea una para poder trabajar. En CI NO se salta nunca:
+// el PNG de Linux) y NO crea nada: para tener una con la que trabajar, pídela una vez con
+// `HUB_UPDATE_BASELINES=1` (escribe la de tu plataforma; las siguientes corridas comparan). En CI NO
+// se salta nunca:
 // una baseline que falta es un FALLO —lo produce `updateSnapshots: 'none'` en
 // `playwright.config.ts`—, y que el repo se quede sin ninguna lo caza antes, en vitest, el guardia
 // `tests/visual-baselines-present.test.ts` (hub#1752). Ver `src/lib/visual-baseline-gate.ts`.

@@ -150,8 +150,13 @@ Las capturas de `toHaveScreenshot` **se generan donde corren**: las baselines qu
 repo son las del runner Linux, y se regeneran con el workflow **«Regenerar baselines visuales
 (Linux)»** (Run workflow → `confirm: true` → artefacto `playwright-baselines`, que se commitea
 en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/`). Las de un Mac no casan jamás con las de
-Linux y están en el `.gitignore`; en tu máquina el caso visual se salta diciéndolo, y la
-primera corrida te crea una baseline local para poder trabajar.
+Linux y están en el `.gitignore`; en tu máquina el caso visual se salta diciéndolo (medido: no crea
+nada). Para tener baselines locales con las que trabajar, pídelas una vez —se escriben las de tu
+plataforma y las siguientes corridas comparan contra ellas—:
+
+```sh
+HUB_UPDATE_BASELINES=1 pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts Visual
+```
 
 **En CI una baseline que falte es un FALLO, nunca un salto** (hub#1752): si el repo se queda
 sin las capturas de una pantalla, el banco visual dejaría de comparar nada mientras el check
