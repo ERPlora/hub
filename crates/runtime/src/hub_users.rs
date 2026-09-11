@@ -848,6 +848,60 @@ pub async fn create(
     Ok(id)
 }
 
+// ── Tope de usuarios del plan (hub#1685, ADR-0474 punto 1) ──────────────────────────────────
+
+/// Cuántas personas ocupan hoy una plaza del plan: los `hub_user` **activos** de ESTE hub.
+///
+/// Activos y no todas las filas a propósito: una baja no se borra —sesiones, auditoría e historial
+/// de ventas apuntan a ese id (ver [`update`])— pero tampoco ocupa plaza, que es lo que espera
+/// quien rota personal. El `WHERE hub_id` no es decorativo: varios hubs comparten base de datos
+/// (hub#497) y sin él un hub lleno dejaría al de al lado sin poder dar de alta a nadie.
+pub async fn count_active_users(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<i64> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT count(*) AS n FROM hub_user WHERE hub_id = :hub_id AND is_active = 1",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["n"].as_i64().or_else(|| r["n"].as_str()?.trim().parse().ok()))
+        .unwrap_or(0))
+}
+
+/// Rechaza admitir **una persona más** cuando el plan ya está lleno (hub#1685).
+///
+/// Gemelo de `identity::enforce_device_limit` y con su misma forma: el tope lo trae el claim
+/// `max_users` del entitlement y lo pasa la capa HTTP, que es la que conoce el plan —el runtime no
+/// habla con el SaaS—. `0` = **ilimitado**, y sin un token verificado la capa HTTP pasa `0`, así
+/// que el hub no aplica nada (fail-open): la autoridad del plan es el SaaS.
+///
+/// Se llama SOLO desde las puertas que de verdad suman un activo (alta de Personal, alta de un
+/// usuario-login que no existía, reactivación de una baja). Reescribir el rol de alguien que ya
+/// está dentro no gasta plaza y no pasa por aquí.
+pub async fn enforce_user_limit(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    max_users: u32,
+) -> Result<()> {
+    if max_users == 0 {
+        return Ok(());
+    }
+    if count_active_users(db, hub_id).await? < i64::from(max_users) {
+        return Ok(());
+    }
+    Err(reject(
+        "user_limit_reached",
+        format!(
+            "this plan covers {max_users} active users and they are all taken: deactivate somebody \
+             who no longer works here, or move to a plan with more seats"
+        ),
+    ))
+}
+
 /// Guarda el email en los **dos** sitios que lo necesitan, siempre a la vez: `hub_user.email` —la
 /// clave por la que se administra el ACCESO (login por email, revocación, `/api/members`)— y
 /// `hub_user_profile` —lo que la persona ve en su perfil—. Son campos distintos, y escribir uno
@@ -1306,6 +1360,85 @@ mod tests {
         let db = fresh_db().await;
         identity::ensure_tables(&db).await.unwrap();
         db
+    }
+
+    // ── Tope de usuarios del plan (hub#1685, ADR-0474) ─────────────────────────────────────
+
+    /// El plan Gratis promete «3 usuarios» y el hub no lo aplicaba: el cuarto entraba callando.
+    #[tokio::test]
+    async fn admitting_one_more_user_is_refused_once_the_plan_is_full() {
+        let db = db().await;
+        for (name, pin) in [("Ana", "4729"), ("Bruno", "5183"), ("Carla", "7261")] {
+            identity::create_user(&db, HUB, name, pin, "employee", None)
+                .await
+                .unwrap();
+        }
+        let err = enforce_user_limit(&db, HUB, 3).await.unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. }
+                     if code == "hub.users.user_limit_reached"),
+            "el rechazo tiene que traer un código distinguible para que la pantalla ofrezca \
+             ampliar el plan: {err}"
+        );
+    }
+
+    /// Por debajo del tope no se rechaza nada — la guarda mide, no estorba.
+    #[tokio::test]
+    async fn there_is_room_while_the_plan_is_not_full() {
+        let db = db().await;
+        for (name, pin) in [("Ana", "4729"), ("Bruno", "5183")] {
+            identity::create_user(&db, HUB, name, pin, "employee", None)
+                .await
+                .unwrap();
+        }
+        enforce_user_limit(&db, HUB, 3).await.unwrap();
+    }
+
+    /// `0` = ilimitado (plan de pago, o token antiguo sin el claim). Gemelo de `max_devices`.
+    #[tokio::test]
+    async fn a_plan_without_a_cap_never_refuses() {
+        let db = db().await;
+        for (name, pin) in [("Ana", "4729"), ("Bruno", "5183"), ("Carla", "7261")] {
+            identity::create_user(&db, HUB, name, pin, "employee", None)
+                .await
+                .unwrap();
+        }
+        enforce_user_limit(&db, HUB, 0).await.unwrap();
+    }
+
+    /// **Dar de baja libera plaza.** Es lo que espera quien rota personal: la ficha del que se fue
+    /// sigue ahí —la auditoría y las ventas apuntan a su id— pero ya no ocupa una de las tres.
+    #[tokio::test]
+    async fn a_deactivated_user_frees_their_seat() {
+        let db = db().await;
+        for (name, pin) in [("Ana", "4729"), ("Bruno", "5183"), ("Carla", "7261")] {
+            identity::create_user(&db, HUB, name, pin, "employee", None)
+                .await
+                .unwrap();
+        }
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        db.execute(
+            "UPDATE hub_user SET is_active = 0 WHERE hub_id = :hub_id AND name = 'Carla'",
+            &p,
+        )
+        .await
+        .unwrap();
+        enforce_user_limit(&db, HUB, 3).await.unwrap();
+    }
+
+    /// **El tope es de ESTE hub** (hub#497): los usuarios de otro hub de la misma base de datos no
+    /// gastan sus plazas. Sin el `hub_id` en el `WHERE`, un hub lleno dejaría al de al lado sin
+    /// poder dar de alta a nadie.
+    #[tokio::test]
+    async fn users_of_another_hub_do_not_spend_this_hubs_seats() {
+        let db = db().await;
+        for (name, pin) in [("Ana", "4729"), ("Bruno", "5183"), ("Carla", "7261")] {
+            identity::create_user(&db, "other-hub", name, pin, "employee", None)
+                .await
+                .unwrap();
+        }
+        enforce_user_limit(&db, HUB, 3).await.unwrap();
     }
 
     /// The two refusals #1185 left behind (hub#1190, «fleco del mismo #1185»): both were still

@@ -111,6 +111,7 @@ fn claims(modules: &[&str]) -> EntitlementClaims {
         plan: None,
         max_devices: 0,
         max_database_size_gb: 0,
+        max_users: 0,
     }
 }
 

@@ -80,6 +80,12 @@ pub struct EntitlementClaims {
     /// `0` = ilimitado/autoscaling, y también el fallback retrocompatible para tokens antiguos.
     #[serde(default)]
     pub max_database_size_gb: u32,
+    /// Claim ADITIVO (saas#1953, ADR-0474): nº máximo de **usuarios activos** que permite el plan
+    /// (3 en Gratis). `0` = **ilimitado** (plan de pago, o token antiguo sin el claim → default).
+    /// Gemelo exacto de [`Self::max_devices`], y con la misma dirección: sin un token verificado
+    /// el hub no aplica nada (fail-open), porque la autoridad del plan es el SaaS.
+    #[serde(default)]
+    pub max_users: u32,
 }
 
 impl EntitlementClaims {

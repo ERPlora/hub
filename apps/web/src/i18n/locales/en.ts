@@ -1291,6 +1291,10 @@ export default {
       account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
       account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
       email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
+      // hub#1685 — the seat cap of the plan. No number in the sentence on purpose: this screen
+      // calls `t(`employeeForm.errors.${key}`)` with no params for every key, and the cap lives in
+      // the entitlement, not in the rejection. «Plan y límites» is where the exact «n / cap» is.
+      user_limit_reached: 'Your plan has every seat taken. Deactivate somebody who no longer works here, or move to a plan with more seats.',
       role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
       // hub#1429 — the account owner's record is theirs alone. Every other administrator sees it,
       // nobody else edits it, and ownership changes in the ERPlora account, not on this screen.
@@ -1489,6 +1493,7 @@ export default {
     cpu: 'CPU',
     database: 'Database',
     devices: 'Devices',
+    users: 'People',
     na: 'n/a',
     naHint: 'Not available on this device',
     capped: 'Plan limit',
@@ -1499,6 +1504,7 @@ export default {
     cores: '{used} cores',
     dbNoQuota: 'No plan quota',
     activeSessions: '{n} active sessions',
+    activeUsers: '{n} active people',
     liveNote: 'Live — refreshes every few seconds while this page is open.',
     loadErrorTitle: 'Resource metrics are unavailable',
     loadErrorBody: "The Hub couldn't report its resource usage right now. You can try again.",
@@ -1507,6 +1513,7 @@ export default {
     upgradeMemory: 'This hub is close to its memory limit. More room would let it run smoothly.',
     upgradeDatabase: 'Your database is close to its plan limit.',
     upgradeDevices: "You're using every device your plan allows.",
+    upgradeUsers: 'Every seat on your plan is taken, so you cannot add another person.',
     // Says WHERE, and stays a sentence: a link from here to the plans page is a link to somewhere
     // money changes hands, and that is what both stores reject (hub#479).
     upgradeWhere: 'Plans are managed from your ERPlora account at erplora.com.',

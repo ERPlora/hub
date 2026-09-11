@@ -129,6 +129,14 @@ impl RevalidationState {
             .unwrap_or(0)
     }
 
+    /// Nº máximo de **usuarios activos** del plan según el último token válido (saas#1953,
+    /// ADR-0474): 3 en Gratis. `0` = ilimitado, y también el default fail-open sin refresh exitoso
+    /// previo — misma dirección que [`Self::max_devices`]: sin claim conocido el hub no inventa un
+    /// tope, porque quien conoce el plan es el SaaS. Lo leen las puertas que dan de alta gente.
+    pub fn max_users(&self) -> u32 {
+        self.last_claims.as_ref().map(|c| c.max_users).unwrap_or(0)
+    }
+
     /// Cuota de base de datos del plan en GiB según el último token válido (saas#817).
     /// `0` = ilimitado/autoscaling y también el default fail-open para tokens antiguos o cuando
     /// aún no hubo un refresh exitoso.
@@ -506,6 +514,7 @@ mod tests {
             plan: None,
             max_devices: 0,
             max_database_size_gb: 0,
+            max_users: 0,
         }
     }
 
@@ -528,6 +537,7 @@ mod tests {
             plan: None,
             max_devices: 0,
             max_database_size_gb: 0,
+            max_users: 0,
         }
     }
 
@@ -798,6 +808,20 @@ mod tests {
         c.max_devices = 1;
         st2.apply_success(c, 1_500);
         assert_eq!(st2.max_devices(), 1);
+    }
+
+    #[test]
+    fn max_users_viene_del_ultimo_token_o_cero_sin_estado() {
+        // saas#1953/ADR-0474: el tope de usuarios lo aporta el claim `max_users`. Sin refresh
+        // exitoso previo → 0 (ilimitado, fail-open), igual que el de dispositivos.
+        let st = RevalidationState::default();
+        assert_eq!(st.max_users(), 0);
+
+        let mut st2 = RevalidationState::default();
+        let mut c = claims(&["pos"], 9_000);
+        c.max_users = 3;
+        st2.apply_success(c, 1_500);
+        assert_eq!(st2.max_users(), 3);
     }
 
     #[test]
