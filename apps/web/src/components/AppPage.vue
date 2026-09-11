@@ -120,11 +120,11 @@ let desatar: (() => void) | null = null;
 let cableado: HTMLElement | null = null;
 
 function sincronizarTabbar() {
+  if (cableado?.isConnected) return; // el de siempre sigue en pantalla: nada que rehacer
   const segment =
     (page.value?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>(
       'ion-footer ion-segment',
     ) ?? null;
-  if (segment === cableado) return; // el de siempre (o ninguno, en la mayoría de vistas)
   desatar?.(); // el anterior se fue de la pantalla: no dejamos su escucha colgando
   desatar = null;
   cableado = segment;
@@ -136,7 +136,8 @@ function sincronizarTabbar() {
 // enterarse de que el footer apareció (comprobado: no se dispara ni una vez). El observador mira el
 // DOM, que es donde el footer aparece se renderice desde donde se renderice.
 // Coste: una consulta al DOM por tanda de mutaciones, y ni eso mientras el tabbar cableado siga en
-// pantalla, que es el caso normal.
+// pantalla, que es el caso normal — de ahí la salida rápida de `sincronizarTabbar`, que es también
+// lo que impide cablear dos veces la misma barra.
 let observador: MutationObserver | null = null;
 
 onMounted(async () => {
@@ -144,10 +145,7 @@ onMounted(async () => {
   sincronizarTabbar();
   const raiz = page.value?.$el as HTMLElement | undefined;
   if (!raiz) return;
-  observador = new MutationObserver(() => {
-    if (cableado?.isConnected) return; // el de siempre sigue ahí: nada que rehacer
-    sincronizarTabbar();
-  });
+  observador = new MutationObserver(sincronizarTabbar);
   observador.observe(raiz, { childList: true, subtree: true });
 });
 

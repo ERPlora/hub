@@ -20,7 +20,8 @@
 //   • a footer already there at mount stays wired exactly once — no double binding;
 //   • a footer that goes away is unwired — a module with a single tab, or a switch between
 //     modules, must not leave a listener on a detached element;
-//   • leaving the screen unwires — `bindTabbar` returns the undo and it has to be called.
+//   • leaving the screen unwires — `bindTabbar` returns the undo and it has to be called;
+//   • and leaving the screen also stops the watching, or every visit leaks one observer.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, nextTick, ref } from 'vue';
@@ -151,5 +152,27 @@ describe('the shell wires the footer tabbar whenever it appears (hub#1734)', () 
 
     screen.unmount();
     expect(untie).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops watching the DOM when leaving the screen', async () => {
+    // The watcher holds the page subtree and this component's closure for as long as it is
+    // observing, so a screen that never disconnects leaks one per visit — and the POS lives for a
+    // whole shift jumping between modules.
+    const observe = vi.spyOn(MutationObserver.prototype, 'observe');
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+    try {
+      const screen = mountScreen();
+      await nextTick();
+      const watcher = observe.mock.contexts[0];
+      expect(watcher, 'the layout watches its page for a tabbar arriving late').toBeInstanceOf(
+        MutationObserver,
+      );
+
+      screen.unmount();
+      expect(disconnect.mock.contexts).toContain(watcher);
+    } finally {
+      observe.mockRestore();
+      disconnect.mockRestore();
+    }
   });
 });
