@@ -107,17 +107,55 @@ withDefaults(
 // —lo comparten Hub y SaaS, que antes lo tenían duplicado y divergente (outfitkit#29)—; aquí solo
 // se cablea. Va en AppPage y no en cada vista porque es quien posee el slot `#footer`, así que las
 // 9 vistas con tabbar lo heredan sin repetir nada.
+//
+// Y se cablea CUANDO APARECE el tabbar, no solo al montar (hub#1734). Una vista estática (Ajustes,
+// Sistema) trae el suyo puesto desde el primer render, pero un módulo lo saca de `navigation[]` del
+// manifest, que llega por red: `ModuleView` lo pinta tras un `v-if`, y el hijo monta ANTES que el
+// padre, así que en `onMounted` ese footer todavía no existe. Mirar una sola vez dejaba TODAS las
+// pantallas de módulo con un `ion-segment` en crudo —sin aviso de desbordamiento y con la pestaña
+// activa fuera de la pantalla— por muy arreglado que estuviera OutfitKit debajo.
 const page = ref<{ $el?: HTMLElement } | null>(null);
 let desatar: (() => void) | null = null;
+/** El `ion-segment` que ya está cableado, para no cablearlo dos veces ni dejar uno suelto. */
+let cableado: HTMLElement | null = null;
+
+function sincronizarTabbar() {
+  const segment =
+    (page.value?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>(
+      'ion-footer ion-segment',
+    ) ?? null;
+  if (segment === cableado) return; // el de siempre (o ninguno, en la mayoría de vistas)
+  desatar?.(); // el anterior se fue de la pantalla: no dejamos su escucha colgando
+  desatar = null;
+  cableado = segment;
+  if (segment) desatar = bindTabbar(segment);
+}
+
+// Un observador del DOM, y no `onUpdated`: el slot `#footer` va DENTRO de `ion-page`, así que lo
+// renderiza el efecto de `IonPage` y no el de este componente — `onUpdated` de AppPage no llega a
+// enterarse de que el footer apareció (comprobado: no se dispara ni una vez). El observador mira el
+// DOM, que es donde el footer aparece se renderice desde donde se renderice.
+// Coste: una consulta al DOM por tanda de mutaciones, y ni eso mientras el tabbar cableado siga en
+// pantalla, que es el caso normal.
+let observador: MutationObserver | null = null;
 
 onMounted(async () => {
   await nextTick();
-  const segment = (page.value?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>(
-    'ion-footer ion-segment',
-  );
-  if (!segment) return; // la mayoría de vistas no tienen tabbar
-  desatar = bindTabbar(segment);
+  sincronizarTabbar();
+  const raiz = page.value?.$el as HTMLElement | undefined;
+  if (!raiz) return;
+  observador = new MutationObserver(() => {
+    if (cableado?.isConnected) return; // el de siempre sigue ahí: nada que rehacer
+    sincronizarTabbar();
+  });
+  observador.observe(raiz, { childList: true, subtree: true });
 });
 
-onBeforeUnmount(() => desatar?.());
+onBeforeUnmount(() => {
+  observador?.disconnect();
+  observador = null;
+  desatar?.();
+  desatar = null;
+  cableado = null;
+});
 </script>
