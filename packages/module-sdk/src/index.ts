@@ -3131,12 +3131,12 @@ export interface BridgeTransport {
   getDevices(): Promise<BridgeDevice[]>;
   print(printerId: string, documentType: string, data: Record<string, unknown>, jobId?: string): Promise<void>;
   /**
-   * Hoja de prueba de una impresora.
+   * A printer's test sheet.
    *
-   * `data` es el MISMO sobre que `print` (hub#1803): de él salen `locale` —el idioma en que se
-   * imprime el papel, `Locale::from_document` (hub#1159)— y `business_name` —la cabecera, igual
-   * que en el tique—. Es opcional porque la app instalada puede ser más nueva que el módulo que
-   * la llama: sin sobre sale la hoja de siempre, nunca un fallo.
+   * `data` is the SAME envelope `print` takes (hub#1803): `locale` decides the language the paper
+   * comes out in (`Locale::from_document`, hub#1159) and `business_name` heads it, exactly as it
+   * heads the ticket. It is optional because the installed app can be newer than the module
+   * calling it — with no envelope the sheet still prints, in the fallback language, never an error.
    */
   testPrint(printerId: string, data?: Record<string, unknown>): Promise<void>;
   openDrawer(printerId: string, pin?: number): Promise<void>;
