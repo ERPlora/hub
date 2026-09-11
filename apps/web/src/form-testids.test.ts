@@ -64,9 +64,9 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
     ],
   },
   // Regression test for ERPlora/hub#1808 — the staff list and the API keys panel.
-  // La lista de personal (`/employees`): las pestañas, la tabla y el alta rápida que vive en el
-  // panel lateral. `employees-` y no `employee-` a propósito — el singular es el formulario de una
-  // persona, y son dos pantallas distintas que el QA recorre una detrás de otra.
+  // The staff list (`/employees`): the tabs, the table and the quick-add form that lives in the
+  // side panel. `employees-` and not `employee-` on purpose — the singular is one person's form,
+  // and they are two different screens the QA walks through one after the other.
   'views/EmployeesPage.vue': {
     prefix: 'employees-',
     contract: [
@@ -89,9 +89,9 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'employees-tabs',
     ],
   },
-  // Las claves de API de máquina (pestaña «API keys» de la lista de personal). La matriz de
-  // módulos × {lectura, escritura} se nombra CALCULADA por id de módulo, como las filas del
-  // import: por índice, un módulo instalado de más movería la aserción a otra fila.
+  // Machine API keys (the «API keys» tab of the staff list). The modules × {read, write} matrix
+  // is named COMPUTED by module id, like the import rows: by index, one extra installed module
+  // would move the assertion to another row.
   'views/ApiKeysPanel.vue': {
     prefix: 'api-key-',
     contract: [
@@ -142,10 +142,10 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
     ],
   },
   // Regression test for ERPlora/hub#1809 — the hub's front door.
-  // La puerta del hub (`/login` y `/auth/google/callback`): los cuatro pasos —email+contraseña,
-  // 2FA por correo, PIN y alta de PIN— viven en la misma pantalla, así que el nombre lleva el paso
-  // dentro (`login-2fa-code`, `login-setup-pinpad`). Sin estos ganchos ningún recorrido podía
-  // entrar por la puerta real: se inyectaba la sesión por API y el login quedaba sin probar.
+  // The hub's front door (`/login` and `/auth/google/callback`): the four steps —email+password,
+  // 2FA by email, PIN and PIN setup— live on the same screen, so the name carries the step
+  // (`login-2fa-code`, `login-setup-pinpad`). Without these hooks no journey could enter through
+  // the real door: the session was injected by API and the login itself went untested.
   'views/LoginPage.vue': {
     prefix: 'login-',
     contract: [
@@ -181,7 +181,7 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
   },
   // Regression test for ERPlora/hub#1810 — profile, hub settings, PIN policy, devices and
   // device mode.
-  // La cuenta de quien usa el hub (`/profile`): identidad, idioma, apariencia y el PIN propio.
+  // The account of whoever uses the hub (`/profile`): identity, language, appearance and own PIN.
   'views/ProfilePage.vue': {
     prefix: 'profile-',
     contract: [
@@ -203,15 +203,15 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'profile-use-hub-appearance',
     ],
   },
-  // Los ajustes del hub (`/settings`), con sus cinco pestañas. Aquí se decide quién entra y con
-  // qué, así que es la superficie que más caro sale sin conducir: país y moneda del negocio, la
-  // identidad fiscal, el certificado y los permisos de cada app.
+  // The hub settings (`/settings`), with their five tabs. This is where who gets in and with what
+  // is decided, so it is the most expensive surface to leave undriven: the business country and
+  // currency, the fiscal identity, the certificate and each app's permissions.
   //
-  // Los tres ganchos de la vía fiscal se llamaban `fiscal-route-*` y pasan a `settings-fiscal-
-  // route-*`: el prefijo de la pantalla es obligatorio (`architecture/hub/apps/testids.md`) y sin
-  // él dos pantallas pueden acuñar el mismo nombre. El único que los usaba —
-  // `views/settings-fiscal-route.test.ts`— cambia en este mismo commit, que es justo lo que la
-  // regla de contrato pide: renombrar rompe aquí, no la suite de QA tres días después.
+  // The three hooks of the fiscal route were called `fiscal-route-*` and become
+  // `settings-fiscal-route-*`: the screen prefix is mandatory (`architecture/hub/apps/testids.md`)
+  // and without it two screens can coin the same name. Their only consumer
+  // —`views/settings-fiscal-route.test.ts`— changes in this same commit, which is exactly what the
+  // contract rule asks for: a rename breaks here, not the QA suite three days later.
   'views/SettingsPage.vue': {
     prefix: 'settings-',
     contract: [
@@ -251,8 +251,8 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'settings-timezone',
     ],
   },
-  // «Preguntar quién vende» (Ajustes › Hub): el toggle del pinpad, el dial de inactividad y la
-  // longitud del PIN. Es la tarjeta de la que depende el e2e del PIN.
+  // «Ask who is selling» (Settings › Hub): the pinpad toggle, the idle dial and the PIN length.
+  // It is the card the PIN e2e depends on.
   'components/PinPolicyCard.vue': {
     prefix: 'pin-policy-',
     contract: [
@@ -264,17 +264,17 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'pin-policy-pinpad',
     ],
   },
-  // El inventario de dispositivos («se me ha perdido la tablet»). Cada fila lleva su `deviceId` al
-  // final, calculado: por índice, revocar apuntaría a otra tablet en cuanto entrara una nueva.
+  // The device inventory («I lost the tablet»). Each row carries its `deviceId` at the end,
+  // computed: by index, revoking would point at another tablet as soon as a new one came in.
   //
-  // Las filas llevaban `data-test` —sin `id`—, que ni Playwright resuelve con `getByTestId` ni ve
-  // la guardia. Pasan a `data-testid` con el prefijo de la tarjeta y `DevicesCard.test.ts` se
-  // mueve con ellas, en este mismo commit.
+  // The rows carried `data-test` —without `id`—, which neither Playwright resolves with
+  // `getByTestId` nor the guard sees. They become `data-testid` with the card prefix, and
+  // `DevicesCard.test.ts` moves with them, in this same commit.
   'components/DevicesCard.vue': {
     prefix: 'devices-',
     contract: ['devices-admin-only', 'devices-card', 'devices-empty', 'devices-error'],
   },
-  // «Este dispositivo» (Ajustes › Hub): compartido o personal, la decisión de si esta caja pide PIN.
+  // «This device» (Settings › Hub): shared or personal, the decision of whether this till asks for a PIN.
   'components/DeviceModeCard.vue': {
     prefix: 'device-mode-',
     contract: [
@@ -367,11 +367,11 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
     ],
   },
   // Regression test for ERPlora/hub#1811 — the assistant drawer and a module's settings form.
-  // El drawer ✨ del shell. Los mensajes del hilo se nombran CALCULADOS por su turno
-  // (`assistant-message-${i}`): un hilo de chat solo AÑADE al final —nada se reordena ni se
-  // inserta en medio—, así que el turno ES la identidad de la fila, y es lo que un spec necesita
-  // para leer «la última respuesta». Lo mismo la línea de anclaje y el spinner de «escribiendo»,
-  // que viven dentro del mismo `v-for`.
+  // The shell's ✨ drawer. Thread messages are named COMPUTED by their turn
+  // (`assistant-message-${i}`): a chat thread only APPENDS —nothing is reordered or inserted in
+  // the middle—, so the turn IS the row identity, and it is what a spec needs to read «the last
+  // answer». Same for the grounding line and the «typing» spinner, which live inside the same
+  // `v-for`.
   'components/AssistantDrawer.vue': {
     prefix: 'assistant-',
     contract: [
@@ -394,11 +394,11 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'assistant-voice-error',
     ],
   },
-  // Los ajustes de una app. El formulario lo GENERA el manifest del módulo, así que el gancho no
-  // puede ser un literal por campo: se deriva de la clave del ajuste
-  // (`module-settings-field-${key}`), igual que las filas del import. Las cuatro ramas de control
-  // —toggle, select, número, texto— son excluyentes, así que comparten nombre: el spec pide el
-  // ajuste por su clave y no tiene que saber con qué control lo pintó el shell.
+  // An app's settings. The form is GENERATED from the module manifest, so the hook cannot be a
+  // literal per field: it derives from the setting key (`module-settings-field-${key}`), like the
+  // import rows. The four control branches —toggle, select, number, text— are mutually exclusive,
+  // so they share the name: the spec asks for the setting by its key and does not need to know
+  // which control the shell painted it with.
   'components/ModuleSettingsForm.vue': {
     prefix: 'module-settings-',
     contract: [
