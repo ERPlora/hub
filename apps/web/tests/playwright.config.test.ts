@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createServer, type Server } from 'node:net';
 import { BENCH_WINDOW_FIRST, BENCH_WINDOW_LAST } from './bench-ports.ts';
+import { BENCH_APP_VERSION } from './bench-app-version.ts';
 
 // Every key the config READS or WRITES. The ports (hub#1517) matter twice over: the config
 // EXPORTS `HUB_RUNTIME_URL`/`HUB_WEB_URL`/`HUB_E2E_ASSISTANT_PORT` so the specs follow the bench,
@@ -212,6 +213,17 @@ describe('playwright.config visual determinism (hub#1752)', () => {
   it('REGRESIÓN: el huso horario del navegador está FIJADO, no heredado de la máquina', async () => {
     const cfg = await loadConfig();
     expect(cfg.projects[0].use.timezoneId).toBe('Europe/Madrid');
+  });
+
+  // El pie del sidebar entra en las baselines que llevan sesión, y ahí va la versión de la app,
+  // que `vite.config.ts` resuelve por env `APP_VERSION` > último tag de git > package.json. Sin
+  // fijarla, la imagen depende del estado del checkout que la generó (un Mac con tags: `v1.1.7`;
+  // el runner, que clona en superficial: `v0.0.0`), y la baseline commiteada deja de ser
+  // reproducible fuera del sitio exacto donde se horneó. Ver `bench-app-version.ts`, que además
+  // deja medido por qué esto NO es el rojo masivo que parece (el umbral lo absorbe hoy).
+  it('REGRESIÓN: la versión que pinta el sidebar la FIJA el banco, no el estado del checkout', async () => {
+    const cfg = await loadConfig();
+    expect(cfg.webServer[1].env.APP_VERSION).toBe(BENCH_APP_VERSION);
   });
 });
 

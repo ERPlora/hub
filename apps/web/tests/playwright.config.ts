@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveUpdateSnapshotsMode } from '../src/lib/visual-baseline-gate';
 import { resolveBenchPorts, shouldReuseExistingServer } from './bench-ports';
+import { BENCH_APP_VERSION } from './bench-app-version';
 
 // E2E del shell del Hub contra el runtime REAL (Axum :8787) y Vite (:5173). Sin mocks (regla del
 // proyecto): el test arranca su propio runtime con BD efímera y un directorio de módulos VACÍO,
@@ -190,6 +191,11 @@ export default defineConfig({
         // El shell alcanza el runtime por el proxy de Vite (`/api` + `/ws`), que se apunta con el
         // mismo `HUB_BIND` que el runtime de arriba — así los dos hablan del mismo puerto.
         HUB_BIND: RUNTIME_BIND,
+        // hub#1752 — el pie del sidebar sale en las CINCO pantallas del contrato visual, y pinta
+        // `__APP_VERSION__`. Sin fijarlo, `vite.config.ts` lo resuelve del último tag de git, así
+        // que las quince baselines dependerían del estado del checkout que las generó. Ver
+        // `bench-app-version.ts`.
+        APP_VERSION: BENCH_APP_VERSION,
       },
     },
   ],
