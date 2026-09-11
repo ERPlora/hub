@@ -30,6 +30,11 @@ pub enum AuthError {
     /// same cashier will never help. Handlers that care about the distinction map this to `403`;
     /// every handler that predates it maps the whole enum to `401` and is unaffected.
     Forbidden(String),
+    /// The session is gone and the hub **knows why** (hub#1801) — today: the plan covers one device
+    /// and a second one took the till over. Carries the stable code the shell branches on, so the
+    /// login screen can say what happened instead of looking like an outage. Still a `401`: the way
+    /// out really is to sign in again (or to buy a bigger plan).
+    SessionEnded(String),
 }
 
 impl AuthError {
@@ -38,12 +43,45 @@ impl AuthError {
             AuthError::MissingSession => "falta sesión (cabecera X-Hub-Session)".to_string(),
             AuthError::Invalid(e) => format!("no autenticado: {e}"),
             AuthError::Forbidden(e) => e.clone(),
+            AuthError::SessionEnded(_) => "no autenticado: sesión cerrada".to_string(),
+        }
+    }
+
+    /// El **código estable** del rechazo, para el cuerpo de la respuesta. La UI ramifica por aquí y
+    /// nunca por la prosa de [`Self::message`] (hub#1241, ADR-0055): `unauthorized` = «vuelve a
+    /// entrar», `forbidden` = «no eres tú», y cualquier otro valor es un motivo concreto que la
+    /// pantalla de entrada sabe explicar (hoy solo `session_evicted_device_limit`, hub#1801).
+    pub fn code(&self) -> &str {
+        match self {
+            AuthError::Forbidden(_) => "forbidden",
+            AuthError::SessionEnded(code) => code,
+            _ => "unauthorized",
         }
     }
 
     /// ¿Es un fallo de **rol** (sesión válida, permiso insuficiente) y no de autenticación?
     pub fn is_forbidden(&self) -> bool {
         matches!(self, AuthError::Forbidden(_))
+    }
+}
+
+/// El rechazo de una sesión que no resuelve, **preguntando antes por qué** (hub#1801).
+///
+/// Se llama SOLO cuando [`Runtime::resolve_session`] ya ha dicho que no hay nadie ahí, así que el
+/// camino bueno no paga la consulta. Si el hub tiene una razón guardada —hoy, que el plan cubre un
+/// dispositivo y entró otro— el rechazo la lleva; si no la tiene, o si la propia consulta falla, el
+/// rechazo es el de siempre: **nunca** deja de rechazar por no saber explicarse. Una sola
+/// implementación a propósito — tres copias de un rechazo es cómo una acaba siendo la permisiva.
+async fn session_rejected(rt: &Runtime, token: &str) -> AuthError {
+    match rt.session_end_reason(token).await {
+        Ok(Some(code)) => AuthError::SessionEnded(code),
+        Ok(None) => AuthError::Invalid("sesión inválida o caducada".into()),
+        Err(error) => {
+            // Visible, no muda: la persona se queda sin explicación (vuelve al 401 de siempre) y
+            // eso hay que poder verlo desde fuera, porque desde dentro se ve igual que un desalojo.
+            tracing::warn!(%error, "auth: no se pudo leer el motivo del cierre de sesión");
+            AuthError::Invalid("sesión inválida o caducada".into())
+        }
     }
 }
 
@@ -139,11 +177,13 @@ pub async fn authenticate(
         AuthMode::Dev => Ok(context_from_headers(headers)),
         AuthMode::Session => {
             let token = session_token(headers).ok_or(AuthError::MissingSession)?;
-            let user = rt
+            let resolved = rt
                 .resolve_session(&token)
                 .await
-                .map_err(|e| AuthError::Invalid(e.to_string()))?
-                .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+                .map_err(|e| AuthError::Invalid(e.to_string()))?;
+            let Some(user) = resolved else {
+                return Err(session_rejected(rt, &token).await);
+            };
             // hub_id del runtime (no del header, no spoofable). Durante el primer bootstrap puede
             // haber sido adoptado en caliente después de construir `HubConfig`.
             let perms = rt.session_permissions(&user.role);
@@ -177,11 +217,13 @@ pub async fn require_user_session(
         AuthMode::Dev => Ok(context_from_headers(headers)),
         AuthMode::Session => {
             let token = session_token(headers).ok_or(AuthError::MissingSession)?;
-            let user = rt
+            let resolved = rt
                 .resolve_session(&token)
                 .await
-                .map_err(|e| AuthError::Invalid(e.to_string()))?
-                .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+                .map_err(|e| AuthError::Invalid(e.to_string()))?;
+            let Some(user) = resolved else {
+                return Err(session_rejected(rt, &token).await);
+            };
             let perms = rt.session_permissions(&user.role);
             Ok(RequestContext::new(rt.hub_id().to_string(), user.id, perms))
         }
@@ -213,11 +255,13 @@ pub async fn require_admin_session(
         });
     }
     let token = session_token(headers).ok_or(AuthError::MissingSession)?;
-    let user = rt
+    let resolved = rt
         .resolve_session(&token)
         .await
-        .map_err(|e| AuthError::Invalid(e.to_string()))?
-        .ok_or_else(|| AuthError::Invalid("sesión inválida o caducada".into()))?;
+        .map_err(|e| AuthError::Invalid(e.to_string()))?;
+    let Some(user) = resolved else {
+        return Err(session_rejected(rt, &token).await);
+    };
     if is_admin_role(&user.role) {
         Ok(user)
     } else {

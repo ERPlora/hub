@@ -482,6 +482,28 @@ pub(crate) async fn execute_at(
         payload
     };
 
+    // ── The OWNER's rules (hub#1701, ADR-0476) ──────────────────────────────
+    // The gate of the policies the person who runs the business wrote: «a discount over 20 % is not
+    // allowed». It is not RBAC (that already happened above) nor `protects` (that one a module
+    // declares): it is the business's own rule, written from the screen and stored in `_policy`.
+    //
+    // 🔴 **The point is NOT negotiable, and it is this line.** It goes AFTER the schema block
+    // because only here does the payload carry the schema `default`s (:473), the number coercion
+    // (:478) and the `patch` merge (:452-458). Placed before, a fact the schema fills in would reach
+    // the gate absent and — since a policy that cannot be evaluated DENIES — it would stop every
+    // normal sale. And it goes AFTER the RBAC because a policy **only restricts**: it can never open
+    // a door the permission shut, and the order is what guarantees that.
+    //
+    // The as-built order of the funnel's seven gates lives in
+    // `architecture/hub/runtime-dispatcher.md` §2.0 and is NOT copied here — referencing it is the
+    // anti-regression guard architecture#733 put in after ADR-0476 wrote it from memory and
+    // published it inverted.
+    //
+    // The verdicts it returns are the `mode: warn` ones, already logged inside: `warn` warns and
+    // never forbids, which is the ramp the owner uses to see what would fire before putting it into
+    // force. Without a database on purpose (bounded-cost guard): it reads from an in-memory index.
+    crate::policies::enforce(registry, name, payload, &ctx.hub_id)?;
+
     // ── Plugin nativo first-party (ADR-0009) ────────────────────────────────
     if let Some(handler) = &cmd.def.handler {
         if handler.kind == "native" {

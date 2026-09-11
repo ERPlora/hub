@@ -65,6 +65,7 @@ fn claims(modules: &[&str], grace_until: i64) -> EntitlementClaims {
         plan: None,
         max_devices: 0,
         max_database_size_gb: 0,
+        max_users: 0,
     }
 }
 
@@ -156,7 +157,8 @@ async fn sin_refresh_exitoso_el_gate_es_fail_open() {
 #[tokio::test]
 async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
     // Cloud inalcanzable (puerto de descarte, conexión rechazada): el proxy sigue devolviendo su
-    // error (502, contrato actual) pero con el bloque ADITIVO `revalidation`, para que la UI
+    // error —desde hub#1763, `424`: un `5xx` acuñado por el hub se lo come el borde, que sustituye
+    // el cuerpo por su propia página— pero con el bloque ADITIVO `revalidation`, para que la UI
     // pueda pintar «funcionará hasta {fecha}» incluso offline.
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
@@ -194,7 +196,7 @@ async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::BAD_GATEWAY); // contrato actual intacto
+    assert_eq!(resp.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763: el borde no lo pisa
     let body = body_json(resp).await;
     assert_eq!(body["ok"], json!(false)); // contrato actual intacto
     assert_eq!(body["revalidation"]["grace_until"], json!(9_000)); // bloque aditivo nuevo

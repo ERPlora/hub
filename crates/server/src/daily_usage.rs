@@ -27,6 +27,26 @@ pub struct DailyUsageHeartbeat {
     pub last_sale_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminals: Option<u64>,
+    /// How many people hold a seat of this hub's plan right now (hub#1814) — the hub's own census,
+    /// which is the only place the people who sign in with a **PIN** exist.
+    ///
+    /// Without it the SaaS can only see whoever has an ERPlora account, so a Free hub run by an
+    /// owner and two PIN-only staff looks like a hub of one and its fourth invitation goes
+    /// through (saas#2022 stores this into `Hub.reported_active_users` and the seat gate takes
+    /// the larger of the two counts). It rides THIS request for the same reason as everything
+    /// else here: the beat already carries the machine credential at the right cadence.
+    ///
+    /// The number comes from [`erplora_runtime::hub_users::count_active_users`], the SAME count
+    /// that refuses the fourth user inside the hub (hub#1685) and feeds `users.active` on
+    /// `/api/system/metrics` — a second way of counting the same thing is how a screen and a door
+    /// end up disagreeing about who is in.
+    ///
+    /// Same `Option` semantics as the fields above, and here it is the whole point: an explicit
+    /// **`0`** is «I counted and nobody works here», an ABSENT field is «I could not count» — the
+    /// census would not read. A fabricated `0` would hand a free seat to a hub that is already
+    /// full, which is the exact overflow this field exists to close.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_users: Option<u64>,
     /// Última vez que alguien **entró** en el hub (ADR-0175), si la hubo desde el último latido.
     ///
     /// Es la señal con la que el Cloud apaga (60d) y acaba borrando (120d) los hubs free que nadie
@@ -35,20 +55,30 @@ pub struct DailyUsageHeartbeat {
     /// entrado**, y el Cloud debe dejar correr el reloj. Ver `crate::activity`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_user_activity_at: Option<String>,
-    /// Version of the **delegated** certificate this hub holds (ADR-0202 §2.5 — hub#318).
+    /// The binary this container is running, e.g. `1.0.0` (hub#515) — the **same number** the
+    /// `verifactu` engine emits as `SistemaInformatico/Version` in every record, because both read
+    /// [`erplora_runtime::CORE_VERSION`] and there is no second source.
     ///
-    /// The hub version this container is running, e.g. `1.0.0` (hub#515).
+    /// Without it, «is this hub up to date?» can only be answered by guessing from a digest — and a
+    /// digest cannot say whether the jump ahead is a security patch or a new version. It rides THIS
+    /// request because the beat already carries the machine credential at the right cadence: a
+    /// separate call would be one more thing that can break.
     ///
-    /// Sin ella, «¿está este hub al día?» solo se puede contestar adivinando desde un digest — y un
-    /// digest no dice si el salto de delante es un parche de seguridad o una versión nueva. Viaja
-    /// en ESTE request porque el latido ya lleva la credencial de máquina con la cadencia correcta:
-    /// una llamada aparte sería una cosa más que se puede romper.
+    /// **The key is `core_version`, and the name is the contract** (hub#1742). The endpoint picks
+    /// the *declaración responsable* that covers this binary from exactly this field (art. 13.3
+    /// RRSIF: one declaration per version of the system, and there is more than one published), and
+    /// it reads no other key. Until hub#1742 the number travelled as `hub_version`, which nothing on
+    /// the control plane ever read — so it was emitted and dropped, and every hub was linked the
+    /// declaration in force whatever it was running. It was RENAMED rather than doubled: two
+    /// spellings of one number is a drift waiting to happen, and this is the number an inspector
+    /// reads. A beat that omits it is answered with the declaration in force and never fails —
+    /// liveness does not depend on a legal link — so old and new hubs cross over safely.
     ///
-    /// **No es `Option`, y eso es el contrato.** En este body «ausente» significa *no pude leerlo*
-    /// (`orders_today`…) y el Cloud lo guarda distinto; la versión va compilada
-    /// dentro del binario, así que no existe el caso de «no la sé». Va **sin** el `v`: el prefijo
-    /// es para leerlo en un panel, no para que el Cloud tenga que quitarlo antes de comparar.
-    pub hub_version: String,
+    /// **Not an `Option`, and that is the contract.** In this body «absent» means *I could not read
+    /// it* (`orders_today`…) and the Cloud stores that difference; the version is compiled into the
+    /// binary, so «I don't know» is not a state that exists. It travels **without** the `v`: the
+    /// prefix is for reading a panel, not for something the Cloud has to strip before comparing.
+    pub core_version: String,
     /// How much every installed engine still owes its external authority (for the
     /// `verifactu` engine: records the AEAT has not received yet, hub#326).
     ///
@@ -319,17 +349,35 @@ pub async fn collect_daily_usage(
         .and_then(|result| result.rows.into_iter().next())
         .and_then(|row| value_as_u64(&row["terminals"]));
 
+    // Las personas que ocupan plaza del plan (hub#1814). SÍ se lee aquí, como `terminals` y
+    // `transmission_route`: es una consulta barata a la misma BD y los DOS latidos —el de arranque
+    // y el tick— la necesitan igual; rellenarla en un solo llamador dejaría al otro mandando un
+    // cuerpo sin censo, y el SaaS no distingue «este latido no lo trae» de «este hub no lo sabe».
+    //
+    // El recuento lo hace el RUNTIME, que es el dueño del censo y ya lo cuenta igual para aplicar
+    // el tope (hub#1685): dos formas de contar lo mismo acabarían discrepando, y la puerta del
+    // SaaS rechazaría una invitación que el hub sí admite (o al revés).
+    //
+    // `Err` viaja como ausencia y un recuento que no cabe en `u64` también: el contrato reserva la
+    // ausencia para «no pude contar», y un `0` fabricado le regalaría una plaza libre a un hub que
+    // ya está lleno — justo el desbordamiento que este campo viene a cerrar.
+    let active_users = erplora_runtime::hub_users::count_active_users(db, hub_id)
+        .await
+        .ok()
+        .and_then(|n| u64::try_from(n).ok());
+
     DailyUsageHeartbeat {
         orders_today,
         last_sale_at,
         terminals,
+        active_users,
         // La actividad de usuario no se lee AQUÍ: la sirve el `ActivityState`, que la mantiene en
         // un atómico y la respalda en `_hub_activity` (hub#670). La rellena el llamador (`serve`)
         // y solo si hay algo nuevo que reportar.
         last_user_activity_at: None,
         // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
         // único sitio honesto para leerla es aquí.
-        hub_version: crate::version::HUB_VERSION.to_string(),
+        core_version: crate::version::HUB_VERSION.to_string(),
         // Lo que cada motor instalado debe a su autoridad externa (hub#326/hub#1406). Lo cuenta
         // el MOTOR vía el registro genérico — la misma pregunta que bloquea una desinstalación
         // (hub#314), así que no pueden discrepar. Un motor ilegible NO tiene entrada: «no lo sé»
@@ -453,6 +501,79 @@ mod tests {
         );
     }
 
+    /// hub#1814: quien entra con PIN no tiene cuenta de ERPlora, así que el SaaS no lo ve — y sin
+    /// este número la puerta de invitaciones cuenta solo membresías y le regala plazas a un hub
+    /// lleno. El recuento es el MISMO que aplica el tope (`hub_users::count_active_users`).
+    #[tokio::test]
+    async fn reports_the_people_holding_a_seat_in_this_hub() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_user (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, is_active BIGINT NOT NULL DEFAULT 1\
+             );\
+             INSERT INTO hub_user VALUES\
+               ('owner', 'hub-a', 1),\
+               ('pin-1', 'hub-a', 1),\
+               ('pin-2', 'hub-a', 1),\
+               ('left',  'hub-a', 0),\
+               ('next-door', 'hub-b', 1);",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z", &[]).await;
+        assert_eq!(
+            usage.active_users,
+            Some(3),
+            "el dueño y las dos personas de PIN ocupan plaza; la baja (`left`) no, y la del negocio \
+             de al lado (`next-door`, hub-b) no es nuestra — varios hubs comparten BD (hub#497)"
+        );
+        assert_eq!(
+            serde_json::to_value(&usage).unwrap()["active_users"],
+            json!(3),
+            "viaja con el nombre exacto que el SaaS ingiere (saas#2022)"
+        );
+    }
+
+    /// El contrato de ausencia, gemelo del de `verifactu_pending_depth`: un `0` fabricado diría
+    /// «aquí no trabaja nadie» y le regalaría una plaza libre a un hub lleno, que es justo el
+    /// desbordamiento que hub#1814 viene a cerrar.
+    #[tokio::test]
+    async fn an_uncountable_census_is_absent_never_a_fabricated_zero() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_session (\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
+             );",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z", &[]).await;
+        assert_eq!(usage.active_users, None, "sin censo legible no hay número");
+        assert!(
+            !serde_json::to_string(&usage).unwrap().contains("active_users"),
+            "«no he podido contar» es que el campo NO esté: un cero le abriría una plaza al hub lleno"
+        );
+    }
+
+    /// Y el cero HONESTO sí viaja: censo legible y vacío es `0`, no una ausencia. Es la otra mitad
+    /// del contrato — si el vacío se callara, el SaaS no podría distinguirlo de un hub ilegible.
+    #[tokio::test]
+    async fn an_empty_census_is_an_honest_zero() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_user (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, is_active BIGINT NOT NULL DEFAULT 1\
+             );",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-07-27T15:00:00Z", &[]).await;
+        assert_eq!(usage.active_users, Some(0));
+    }
+
     #[tokio::test]
     async fn missing_sales_table_omits_usage_instead_of_inventing_zero() {
         let db = fresh_db().await;
@@ -470,7 +591,7 @@ mod tests {
         assert_eq!(usage.terminals, Some(0));
         assert_eq!(
             serde_json::to_value(usage).unwrap(),
-            json!({"terminals": 0, "hub_version": crate::version::HUB_VERSION})
+            json!({"terminals": 0, "core_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -505,8 +626,9 @@ mod tests {
             orders_today: Some(12),
             last_sale_at: Some("2026-07-27T11:30:00Z".into()),
             terminals: Some(3),
+            active_users: Some(4),
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields(vec![(
                 "verifactu".into(),
                 2,
@@ -536,8 +658,11 @@ mod tests {
                 "orders_today": 12,
                 "last_sale_at": "2026-07-27T11:30:00Z",
                 "terminals": 3,
+                // hub#1814: las personas que ocupan plaza del plan, incluidas las que entran con
+                // PIN y por tanto no tienen cuenta que el SaaS pueda ver.
+                "active_users": 4,
                 "last_user_activity_at": "2026-07-27T11:45:00Z",
-                "hub_version": crate::version::HUB_VERSION,
+                "core_version": crate::version::HUB_VERSION,
                 // hub#326: the queue the SaaS alerts on travels under these exact names.
                 "verifactu_pending_depth": 2,
                 "verifactu_oldest_pending_at": "2026-07-25T08:00:00Z",
@@ -561,8 +686,9 @@ mod tests {
             orders_today: Some(0),
             last_sale_at: None,
             terminals: Some(0),
+            active_users: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -574,7 +700,7 @@ mod tests {
         assert!(body.get("last_user_activity_at").is_none());
         assert_eq!(
             body,
-            json!({"orders_today": 0, "terminals": 0, "hub_version": crate::version::HUB_VERSION})
+            json!({"orders_today": 0, "terminals": 0, "core_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -599,8 +725,9 @@ mod tests {
             orders_today: None,
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -658,8 +785,9 @@ mod tests {
             orders_today: None,
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -702,8 +830,9 @@ mod tests {
             orders_today: None,
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -743,8 +872,9 @@ mod tests {
             orders_today: Some(3),
             last_sale_at: None,
             terminals: Some(1),
+            active_users: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -756,7 +886,7 @@ mod tests {
         assert!(body.get("cert_version").is_none());
         assert_eq!(
             body,
-            json!({"orders_today": 3, "terminals": 1, "hub_version": crate::version::HUB_VERSION})
+            json!({"orders_today": 3, "terminals": 1, "core_version": crate::version::HUB_VERSION})
         );
     }
 
@@ -918,8 +1048,9 @@ mod tests {
                 orders_today: None,
                 last_sale_at: None,
                 terminals: None,
+                active_users: None,
                 last_user_activity_at: None,
-                hub_version: crate::version::HUB_VERSION.to_string(),
+                core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
                 memory_used_mb: None,
@@ -976,8 +1107,9 @@ mod tests {
                 orders_today: None,
                 last_sale_at: None,
                 terminals: None,
+                active_users: None,
                 last_user_activity_at: None,
-                hub_version: crate::version::HUB_VERSION.to_string(),
+                core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
                 memory_used_mb: None,
@@ -1007,13 +1139,14 @@ mod tests {
     /// ([`crate::version::HUB_VERSION`]), and it goes on the wire WITHOUT the `v` — the prefix is
     /// for humans reading a panel, not for something the Cloud will compare.
     #[test]
-    fn the_heartbeat_carries_the_running_hub_version() {
+    fn the_heartbeat_carries_the_running_core_version() {
         let body = DailyUsageHeartbeat {
             orders_today: Some(3),
             last_sale_at: None,
             terminals: None,
+            active_users: None,
             last_user_activity_at: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
+            core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
             memory_used_mb: None,
@@ -1024,9 +1157,9 @@ mod tests {
 
         let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");
 
-        assert_eq!(wire["hub_version"], crate::version::HUB_VERSION);
+        assert_eq!(wire["core_version"], crate::version::HUB_VERSION);
         assert!(
-            !wire["hub_version"].as_str().unwrap().starts_with('v'),
+            !wire["core_version"].as_str().unwrap().starts_with('v'),
             "el `v` es para la pantalla, no para el cable"
         );
     }
@@ -1054,6 +1187,6 @@ mod tests {
 
         let usage = collect_daily_usage(&db, "hub-1", "2026-08-08T10:00:00Z", &[]).await;
 
-        assert_eq!(usage.hub_version, crate::version::HUB_VERSION);
+        assert_eq!(usage.core_version, crate::version::HUB_VERSION);
     }
 }

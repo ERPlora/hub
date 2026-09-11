@@ -280,6 +280,16 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/query", post(query))
         .route("/api/command", post(command))
+        // Qué NOMBRES aceptan las dos rutas de arriba (hub#1757). Los nombres son de cada módulo
+        // instalado, así que ningún fichero del repo puede listarlos: el hub los sabe y no los
+        // decía, y quien no tenía el `module.json` delante solo podía adivinar y cosechar 404.
+        // Nunca anuncia lo que el dispatcher rechazaría (interno, módulo apagado). Misma doble
+        // puerta que `…/events`: sesión admin + `manage_flows` si quien llama nombra un módulo —
+        // el mapa de todas las puertas del hub no lo lee un módulo por estar un admin logueado.
+        .route(
+            "/api/hub/operations",
+            get(operations_catalog::list_operations),
+        )
         // hub#361: the manager approves ONE action. The PIN is verified in the runtime, and the
         // token that comes back is presented on the retry in `X-Elevation-Token` — never in the
         // command payload, so a command body stays pure data.
@@ -444,6 +454,32 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/hub/flows/approvals/:id/reject",
             post(flows_api::reject),
+        )
+        // ── The owner's rules (hub#1701, ADR-0476) ─────────────────────────────────────────
+        // Core REST and not `hub.*` commands, for the same reason as the flows (ADR-0283 §9): a rule
+        // is not a module's data, it is the hub's own configuration.
+        //
+        // Door = the local session of a human owner/admin, NEVER an API key nor the machine token: a
+        // rule decides whether a sale can be charged, and a copyable integration credential does not
+        // decide that. And with no module capability — there is no SDK surface to open here.
+        //
+        // 🔴 `checkpoints` goes BEFORE `/policies/:id`: it is a STATIC segment and matchit resolves
+        // it with priority over the parameter, so served by `:id` it would answer «there is no such
+        // rule» and the owner's screen would be left with no places to offer.
+        // `tests/policies_api_test.rs` checks this against the real router.
+        .route(
+            "/api/hub/policies",
+            get(policies_api::list_policies).post(policies_api::create_policy),
+        )
+        .route(
+            "/api/hub/policies/checkpoints",
+            get(policies_api::list_checkpoints),
+        )
+        .route(
+            "/api/hub/policies/:id",
+            get(policies_api::get_policy)
+                .put(policies_api::update_policy)
+                .delete(policies_api::delete_policy),
         )
         // Superficie de datos (auth = Auth::ApiKey, capa A genérica). Doble puerta `expose_api`.
         .route("/api/v1/:module/q/:query", post(api_keys::data_query))
@@ -745,7 +781,7 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language, timezone) = {
+    let (pin_users, currency, currency_decimals, language, timezone, pin_length) = {
         let rt = runtime.read().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
@@ -790,7 +826,28 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
             .timezone_name()
             .await
             .unwrap_or_else(|_| "UTC".to_string());
-        (pin_users, currency, currency_decimals, language, timezone)
+        // How many DIGITS this hub's PIN has (hub#974): 4 or 6. It travels here because the screen
+        // that needs it —the login pinpad— is the only one with NO session, and `/api/settings`
+        // demands one: without this key the shell fell back to its own default and painted four
+        // circles on a six-digit hub, firing the login with a truncated PIN on the fourth digit
+        // (hub#1765).
+        //
+        // No re-check against `PIN_LENGTHS` here on purpose: `get_settings` is `settings::get_all`,
+        // which already degrades a row that no longer validates to that key's default, so a length
+        // nobody can type cannot get this far. The fallback below is for the other case — settings
+        // unreadable, `json!({})` above — where there is no value at all.
+        let pin_length = settings
+            .get(erplora_runtime::pin_policy::PIN_LENGTH_SETTING)
+            .and_then(|v| v.as_i64())
+            .unwrap_or(erplora_runtime::pin_policy::DEFAULT_PIN_LENGTH);
+        (
+            pin_users,
+            currency,
+            currency_decimals,
+            language,
+            timezone,
+            pin_length,
+        )
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas
     // claves con el mismo valor. `None` → `null` (degradación elegante: el board no aplica preset).
@@ -829,6 +886,9 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         "language": language,
         // Nombre IANA del reloj del NEGOCIO (hub#731) — resuelto, nunca `null`.
         "timezone": timezone,
+        // Cuántos dígitos pide el PIN de este hub (hub#974). El pinpad del LOGIN lo lee de aquí:
+        // es la única lectura que puede hacer sin sesión (hub#1765).
+        "pin_length": pin_length,
     }))
     .into_response()
 }

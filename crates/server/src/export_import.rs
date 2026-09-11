@@ -1079,18 +1079,22 @@ pub async fn retry_import(
     // Same-version guarantee: the catalogue download has no version pin, so this fetches what the
     // SaaS serves TODAY and refuses if it is not the version the report imported.
     let Some(cred) = auth::hub_scoped_auth(&headers, &st) else {
+        // 424, never a `5xx` (hub#1763): the retry panel reads this answer, and the edge is free
+        // to replace the body of a `5xx` with its own `error code: 502` page.
         return err(
-            StatusCode::BAD_GATEWAY,
+            crate::cloud_proxy::CLOUD_FAILED,
             "hub has no cloud credential (neither machine token nor Bearer)",
         );
     };
     let fetched =
         match crate::fetch_blueprint(&st, &cred, &origin.slug, origin.locale.as_deref()).await {
             Ok(f) => f,
+            // The SaaS's own refusal, relayed by the one place that decides what a `5xx` of
+            // erplora.com becomes (hub#1763).
             Err(crate::BlueprintFetchError::Cloud { status, body }) => {
-                return (status, [(header::CONTENT_TYPE, "application/json")], body).into_response()
+                return crate::cloud_proxy::cloud_json_passthrough(status, body)
             }
-            Err(e) => return err(StatusCode::BAD_GATEWAY, &e.message()),
+            Err(e) => return err(crate::cloud_proxy::CLOUD_FAILED, &e.message()),
         };
     if fetched.version != origin.version {
         return coded_err(

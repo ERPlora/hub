@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string"
+    },
+    "tip_percent": {
+      "type": "number"
+    },
+    "approved_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "order_id",
+    "tip_percent"
+  ],
+  "additionalProperties": false
+}

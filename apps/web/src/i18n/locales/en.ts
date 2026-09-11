@@ -1,5 +1,10 @@
 // Shell (chrome) strings in English. Mirrors es.ts key-for-key. Covers shell navigation, the
 // topbar and the sidebar footer only — not per-view copy (that migrates screen by screen).
+// One fact, one sentence (hub#1693). The connect screen wrote this line for hub#1689; the import,
+// export and blueprint screens hit the SAME failure, so they say the SAME words. Declared once and
+// referenced, not copied, so the two never drift apart.
+const CLOUD_UNREACHABLE = 'Your hub could not reach erplora.com. Check the connection and try again.';
+
 export default {
   // Language name shown in the Settings selector (rendered as-is). Required in every locale.
   _meta: { name: 'English' },
@@ -76,6 +81,23 @@ export default {
     changeHubCancel: 'Cancel',
     changeHubConfirm: 'Switch',
   },
+  // hub#1736 — the two buttons Ionic puts on EVERY selection dialog (`ion-select`). Its own
+  // defaults are these same English literals, hardcoded in the library; the shell localizes them
+  // once for the whole app, modules included (`lib/ionic-select-text.ts`).
+  selectDialog: {
+    ok: 'OK',
+    cancel: 'Cancel',
+  },
+  // Feedback of the CSV buttons every `ok-data-table` carries (inventory#90). The import one talks
+  // about the FILE being read, never about rows created: when it fires the module has not written
+  // anything yet — it is about to show its preview, and its own report is what says what went in.
+  // Plural via vue-i18n (`singular | plural`): the `n` in the options picks the branch.
+  actionFeedback: {
+    csvExported: 'CSV exported',
+    csvExportedRows: 'CSV exported · {n} row | CSV exported · {n} rows',
+    csvImported: 'CSV file read',
+    csvImportedRows: 'CSV file read · {n} row | CSV file read · {n} rows',
+  },
   // hub#1518 — a screen whose code never arrived (the connection dropped, or the file went stale
   // after a deploy). Said in plain words: nobody at a till knows what a "chunk" or a "module" is.
   viewLoad: {
@@ -96,9 +118,21 @@ export default {
     // sight of the order being taken. Its own words for the same reason as `broken*` above.
     brokenToast: 'That section could not be opened. Something inside ERPlora failed — try again.',
   },
+  // hub#1723 — an address this hub does not have. NOT an error the person made something wrong
+  // with: nine times out of ten it is an old link or a guess at the name of an app, so the words
+  // point at the address and then at the way out, without blaming anybody.
+  notFound: {
+    title: 'This page does not exist',
+    body: 'The address you opened is not part of this hub. It may be an old link, or a guess at the name of an app — your apps open from the menu or from Home.',
+    action: 'Go to Home',
+  },
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
   // one noun for two things is how a cashier ends up uninstalling the till.
+  installQr: {
+    title: 'Open on your phone',
+    hint: 'Scan the code. To keep it there, add it to your home screen from your browser menu.',
+  },
   appUpdate: {
     available: 'Update ERPlora ({version})',
     confirmTitle: 'Update ERPlora',
@@ -124,6 +158,11 @@ export default {
     close: 'Close',
     noReply: '(no reply)',
     error: 'Could not reach the assistant.',
+    // hub#1738 — the assistant service ANSWERED and turned the turn down (in PRE, with no LLM
+    // credential configured). Saying «could not reach» there sends the owner to check a network
+    // that is fine and to report a problem that is not theirs: nothing on their side is broken,
+    // and nothing they do changes it.
+    unavailable: 'The assistant is not available right now. Try again in a few minutes.',
     // saas#1540 — running out of messages is a PLAN state, not an outage. Saying «could not
     // reach» turns the one conversion moment of the free tier into a product failure.
     quotaTitle: 'You have used all your assistant messages',
@@ -239,6 +278,13 @@ export default {
   // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
   // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
   // title travels in English inside its manifest and is used as-is (setup-status.md §7).
+  // hub#1743 — the shell-wide band for «there is no network right now». Says the CONSEQUENCE, not
+  // the state: «offline» on its own reads as a setting somebody turned on. Nothing here names a
+  // module or a screen, because the outage is not about any of them.
+  offline: {
+    title: 'No internet connection',
+    body: 'Anything that needs the internet — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
+  },
   setup: {
     title: 'Finish setting up your business',
     progress: '{done} of {total} done',
@@ -247,9 +293,13 @@ export default {
     configure: 'Set up',
     review: 'Ask the assistant',
     doneLabel: 'Done',
-    // The three levels, said as what they mean for the business — not as a severity word.
+    // The three levels. Only the ⛔ one may name a refusal, because it is the only one with a
+    // dispatcher behind it (`enforce_fiscal_precondition`, ADR-0203) — and the refusal it names is
+    // the INVOICE: a sale without the fiscal identity still closes. 🔴 is a module saying its own
+    // configuration matters, which the core never lets become a condition for selling, so it says
+    // how much it matters and stops there (hub#1726). Guard: `i18n/setup-level-copy.test.ts`.
     levelLegal: 'Needed to invoice',
-    levelFunctional: 'Needed to sell',
+    levelFunctional: 'Important',
     levelRecommended: 'Recommended',
     // The third state: OUR breakdown, not the user's task. It must not read as a chore.
     unavailableLabel: 'Not available yet',
@@ -385,6 +435,9 @@ export default {
     // hub#894 — said INSTEAD of `appsEmpty` when the list could not be loaded. It never claims the
     // hub is empty, and it names reloading as the move, because the apps are still installed.
     appsLoadError: 'Could not load your apps. Reload the page; if it keeps failing, sign in again.',
+    // hub#1722 — the skeleton tiles are decorative, so this is the sentence a visually hidden status
+    // line beside the grid carries for anyone not looking at it: the placeholders say it on screen.
+    appsLoading: 'Loading your apps…',
     blueprintTitle: 'Set up your business',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',
     blueprintCta: 'Set up',
@@ -469,6 +522,12 @@ export default {
   // know), and it does not promise more than the hub delivers (removing a device is not a ban:
   // anybody with an account can sign in on it again). No "hub" anywhere — ADR-0254.
   devices: {
+    // hub#1697 — the door answers a stable code next to English prose written for the log
+    // (`devices.rs`). The code is what the person gets a sentence for; the prose stays in the log.
+    errors: {
+      device_name_too_long: 'That name is too long. Use a shorter one and save again.',
+      device_not_found: 'That device is no longer registered here. Refresh the list.',
+    },
     title: 'Devices',
     intro:
       'The devices somebody has signed in on. If you lose one, remove it here: its session closes right away and it can no longer sign in with a PIN.',
@@ -811,6 +870,20 @@ export default {
     hostHint: 'Open the ERPlora app on the device connected to this printer.',
     // Never green, no call to action: our failed probe is not the owner's homework (hub#375).
     coverageError: 'Could not check who is printing right now.',
+    // The two warnings the till hears when paper does not come out (hub#1731). They are DIFFERENT
+    // facts and the words say so: the first one lost the paper, the second one only lacks a
+    // printer set up — the job is safe in the queue and comes out on its own once there is one.
+    // Naming what to do next matters more than naming the fault: «did not print» sends the
+    // cashier hunting for a jam that is not there.
+    ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
+    ticketWaitingForPrinter:
+      'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+    comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
+    comandaWaitingForPrinter:
+      'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
+    // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
+    // named in the warning, or the sentence reads «the order for ()».
+    comandaDefaultLabel: 'the floor',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
@@ -846,7 +919,11 @@ export default {
       no_business_account: 'Facebook did not return a WhatsApp Business account. Try again and pick your business in the window.',
       not_configured: 'WhatsApp is not available on this hub yet. Contact support.',
       sdk_unavailable: 'The Facebook window could not open. Allow pop-ups for this site and try again.',
-      unreachable: 'Your hub could not reach erplora.com. Check the connection and try again.',
+      // The runtime's own code when the call never got through (hub#1689). Same fact as
+      // `unreachable`, which the browser raises when ITS fetch fails: for whoever is
+      // connecting, the difference between the two is not actionable.
+      cloud_unreachable: CLOUD_UNREACHABLE,
+      unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
       default: 'Something went wrong while connecting. Try again in a minute.',
     },
@@ -1057,9 +1134,31 @@ export default {
     loadError: 'The role catalogue could not be loaded.',
   },
   apiKeys: {
+    // The sentences this panel reads when its door refuses (hub#1697, reachable since hub#1700).
+    //
+    // Written in hub#1697 and dead until hub#1700, because `/api/keys*` answered
+    // `{"ok":false,"error":"<flat string>"}` with no `code` at all: every refusal came out as the
+    // panel's own «check your connection» line. The four handlers now answer the shared envelope
+    // (`err_response` / `auth_rejected`), so `localDoorSentence` finds these.
+    //
+    // `rate_limited` is the one that is still NOT reachable from here, and that is a fact about
+    // the door, not an omission: the quota lives on the `auth:api-key` data surface a THIRD PARTY
+    // calls (`external_principal`), and this admin door has none. The sentence stays because it is
+    // the right one for that code the day this door gets a quota; nothing paints it meanwhile.
+    errors: {
+      not_found: 'That key no longer exists. Refresh the list and try again.',
+      rate_limited: 'Too many attempts in a row. Wait a moment and try again.',
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can manage API keys.',
+      // The code is namespaced by the module that raised it, so the catalogue nests it.
+      api_key: {
+        system_key: 'ERPlora issued this key to itself. It cannot be rotated or deleted.',
+      },
+    },
     // List
     searchKey: 'Search API key…',
     empty: 'No API keys yet. Create one so an external system can read or write Hub data.',
+    loadError: 'Could not load your API keys. Try again in a moment.',
     newKey: 'New API key',
     colName: 'Name',
     colPrefix: 'Token',
@@ -1182,10 +1281,20 @@ export default {
       'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
     errors: {
+      // hub#1697 — the guards of the local `/api/hub/users` door (`hub_users.rs`). Their own
+      // message is prose written into the runtime; these are the sentences the person reads.
+      last_admin: 'You cannot deactivate the last administrator. Name another owner or administrator first.',
+      self_deactivation: 'You cannot deactivate your own account. Ask another administrator to do it.',
+      self_badge_enrollment: 'Nobody enrols their own badge. Ask another administrator to do it.',
+      not_found: 'That person is no longer on this hub. Refresh the list.',
       local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
       account_needs_email: 'An account user signs in with their ERPlora account, so an email is required. Tick «Local user» to create somebody who works this hub with a PIN.',
       account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
       email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
+      // hub#1685 — the seat cap of the plan. No number in the sentence on purpose: this screen
+      // calls `t(`employeeForm.errors.${key}`)` with no params for every key, and the cap lives in
+      // the entitlement, not in the rejection. «Plan y límites» is where the exact «n / cap» is.
+      user_limit_reached: 'Your plan has every seat taken. Deactivate somebody who no longer works here, or move to a plan with more seats.',
       role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
       // hub#1429 — the account owner's record is theirs alone. Every other administrator sees it,
       // nobody else edits it, and ownership changes in the ERPlora account, not on this screen.
@@ -1232,6 +1341,29 @@ export default {
     saving: 'Saving…',
   },
   system: {
+    // hub#1697 — when the door gave no code we can turn into a sentence, saying so beats
+    // pasting the line the runtime left for the log.
+    reasonUnknown: 'the reason could not be read',
+    // hub#1697 — stable codes of the dead-letter door (`outbox_admin.rs`). Its own prose mixes
+    // Spanish and English and was written for whoever debugs, not for whoever runs the shop.
+    //
+    // FRAGMENTS, not sentences (rv-1699): every one of these is read INSIDE `retryFailed` /
+    // `discardFailed`, which already announce the failure. A whole sentence here says it twice
+    // («Could not resend: This message cannot be sent again: …»), so they start lowercase and
+    // continue the frame — same register as `reasonUnknown` above. There is a test on it.
+    errors: {
+      not_found: 'that message is no longer in the queue; refresh the list.',
+      invalid_payload: 'that message is missing the data it needs to be sent again.',
+      // Nested, not `'flow.release_revoked'` as a flat key: `vue-i18n` reads a dot in a key as
+      // NESTING, so a flat dotted key is unreachable through `t()`. The runtime's code maps onto
+      // the path exactly.
+      flow: {
+        release_revoked: 'the permission that produced it was withdrawn; grant it again and run the automation.',
+      },
+      module: {
+        capability_denied: 'the app that produced it no longer has permission for it.',
+      },
+    },
     database: 'Database',
     memory: 'Memory',
     connections: 'Connections',
@@ -1326,6 +1458,31 @@ export default {
         "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
       notMeasured: "We couldn't read this",
     },
+    // hub#1732 — the notices, and the permission that lets them exist at all.
+    //
+    // The sheet that goes in FRONT of Android's dialog. Android's own says «Allow ERPlora to send
+    // you notifications?» and nothing about what for; asked cold it reads as opportunistic and
+    // gets refused, and two refusals close the dialog for the life of the install. So this names
+    // the one thing the till actually notifies about — an order arriving — and never says
+    // «permission», «POST_NOTIFICATIONS» or «Android».
+    notices: {
+      primerHeader: 'Let us warn you about new orders',
+      primerMessage:
+        'When an order comes into the kitchen we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
+      primerLater: 'Not now',
+      primerAllow: 'Turn on notices',
+      // The row on System › your printer, which is where somebody who never got warned would
+      // look. Only ever shown when the notices really are off ON THIS DEVICE.
+      blockedTitle: 'Notices are off',
+      blockedDetail:
+        "This device won't warn you when an order comes in. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
+      blockedAction: 'Turn on notices',
+      // After asking again and still getting nothing: the system stops showing its dialog once
+      // it has been refused, and from then on the only way through is the device's own settings.
+      blockedInSettings:
+        "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
+      turnedOn: 'Done — this device will warn you about new orders.',
+    },
   },
   planLimits: {
     currentPlan: 'Current plan',
@@ -1336,6 +1493,7 @@ export default {
     cpu: 'CPU',
     database: 'Database',
     devices: 'Devices',
+    users: 'People',
     na: 'n/a',
     naHint: 'Not available on this device',
     capped: 'Plan limit',
@@ -1346,6 +1504,7 @@ export default {
     cores: '{used} cores',
     dbNoQuota: 'No plan quota',
     activeSessions: '{n} active sessions',
+    activeUsers: '{n} active people',
     liveNote: 'Live — refreshes every few seconds while this page is open.',
     loadErrorTitle: 'Resource metrics are unavailable',
     loadErrorBody: "The Hub couldn't report its resource usage right now. You can try again.",
@@ -1354,6 +1513,7 @@ export default {
     upgradeMemory: 'This hub is close to its memory limit. More room would let it run smoothly.',
     upgradeDatabase: 'Your database is close to its plan limit.',
     upgradeDevices: "You're using every device your plan allows.",
+    upgradeUsers: 'Every seat on your plan is taken, so you cannot add another person.',
     // Says WHERE, and stays a sentence: a link from here to the plans page is a link to somewhere
     // money changes hands, and that is what both stores reject (hub#479).
     upgradeWhere: 'Plans are managed from your ERPlora account at erplora.com.',
@@ -1444,8 +1604,15 @@ export default {
     deviceUnidentified:
       'This browser cannot remember which device it is, so a PIN cannot be used here. Sign in with your account, or allow this site to store data and try again.',
     // ADR-0154: shown when this device's session was taken over by a sign-in on another device
-    // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
+    // (single active device plan). Wired since hub#1801: the runtime names the reason in the `401`
+    // of the probe door, `main.ts` carries it here in the query, and this screen paints it — until
+    // then the displaced device landed on the login with no word about why, which reads as an
+    // outage and ends in a support call.
     sessionTakenOver: 'Session opened on another device',
+    // The BODY says the two things the heading cannot: what the rule is (the plan, not a fault of
+    // theirs) and what to do about it. Both gestures are offered, in the order that is free first.
+    sessionTakenOverBody:
+      'Your plan covers one device at a time, so signing in on another one signed this device out. Sign in again to use it here, or add devices to your plan.',
     setupChoosePin: 'Choose a {n}-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',
@@ -1719,6 +1886,13 @@ export default {
     loading: 'Loading module…',
     loadError: 'Could not load the module.',
     loadErrorHint: 'Check that the module is still installed and active, then try again.',
+    // hub#1743 — the sentence for when NOBODY answered. It must not mention the module: with the
+    // wifi down the module is the one thing that is fine, and the line above sent people looking
+    // for an app that nobody had uninstalled. It also promises the recovery, because the screen
+    // really does come back on its own the moment the network does.
+    offlineTitle: 'No internet connection',
+    offlineHint:
+      'This screen needs the connection to load. Check the network — it comes back on its own as soon as there is internet again.',
     retry: 'Try again',
     blockedTitle: 'Subscription required',
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
@@ -1729,6 +1903,11 @@ export default {
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'This app is not available for this hub.',
+    // hub#1723 — an address that names a screen this app does not have. It is swapped for the one
+    // it does have (an old bookmark keeps working), and the swap is now said out loud, naming what
+    // ended up on screen: «that does not exist» on its own leaves the person wondering what they
+    // are looking at instead.
+    unknownTabToast: 'This app has no screen at that address — showing «{tab}».',
   },
   moduleSettings: {
     tab: 'Settings',
@@ -1768,6 +1947,16 @@ export default {
     managePlan: 'Manage plan',
     managePlanError: 'Could not open plan management. Try again.',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
+    // What the hub has already SPENT of what its plan includes (whatsapp_inbox#131). The tier
+    // cards say what a plan includes; without these the one number that warns a channel is about
+    // to go quiet had no screen at all. The metric itself is named by the module
+    // (`lib/module-quota.ts`), so these strings never spell out «conversations».
+    usageTitle: 'This month',
+    usageOfLimit: '{used} of {limit} {metric}',
+    usageNoLimit: '{used} {metric}',
+    usageNearLimit: 'You are close to what your plan includes.',
+    usageOverLimit: 'You have used everything your plan includes this month.',
+    usageUnavailable: "Couldn't read what you have used. Try again in a moment.",
     status: {
       active: 'Active',
       trialing: 'Trialing',
@@ -1858,6 +2047,35 @@ export default {
       inactive: 'This value is switched off in this hub.',
       duplicate: 'This hub already has that value.',
     },
+  },
+  // What the runtime answers a screen when a cloud-facing door fails: a short stable code, not a
+  // sentence (hub#1689 made it a code precisely so it COULD be translated). Every back-office
+  // screen turns it into one of these lines through `lib/runtime-error-sentence.ts`; a code with
+  // no line here is never painted, the caller falls back to `default`.
+  runtimeErrors: {
+    cloud_unreachable: CLOUD_UNREACHABLE,
+    // Installing or updating an app fails with its own code for the same fact: the hub never
+    // reached erplora.com. One fact, one sentence.
+    install_cloud_unavailable: CLOUD_UNREACHABLE,
+    // hub#1720 — the three ways installing fails that are NOT «the hub could not reach
+    // erplora.com», and used to be reported as if they were. Telling them apart is the whole
+    // point: only one of them is fixed by waiting, so only one of them says to try again.
+    install_cloud_denied:
+      'erplora.com did not accept the credentials of this hub, so it cannot install apps. Trying again will not fix it; contact support.',
+    install_not_in_catalog: 'That app is not available in your catalogue.',
+    install_cloud_rejected:
+      'erplora.com could not attend to this installation right now. Try again in a few minutes.',
+    cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
+    cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
+    hub_not_enrolled: 'This hub is not connected to erplora.com yet.',
+    // hub#1763 — `POST /api/modules/:id/update` when the new version failed AND the previous one
+    // could not be restored: the app is gone from this hub. The gravest answer of that door, and the
+    // one thing the toast must never say there is «it keeps running the version it had».
+    module: {
+      update_lost:
+        'The update failed and the previous version could not be restored, so this app is no longer installed. Install it again from Apps; if that fails too, contact support.',
+    },
+    default: 'Something went wrong. Try again in a minute.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here for what the core says when it
   // refuses at the PLATFORM level (`db`/`io`/`wasm`/`native`/`schema`/`manifest`,

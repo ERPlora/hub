@@ -114,7 +114,7 @@ async fn smoke_imprime_pagina_de_prueba() {
 
     println!("imprimiendo en {} ({})", destino.id, destino.name);
     let target = parse_printer_id(&destino.id).expect("id parseable");
-    let bytes = render_test_page(&destino.id);
+    let bytes = render_test_page(&destino.id, &serde_json::json!({}));
     // Por la MISMA vía que la app instalable: `erplora_print` encola y el worker de `PrintQueue`
     // envía. Aquí no hace falta el worker — `send_once` es el envío que ese worker hace.
     PrintQueue::new(RetryPolicy::default())

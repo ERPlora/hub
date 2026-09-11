@@ -21,7 +21,15 @@ const source = readFileSync(new URL('./EmployeesPage.vue', import.meta.url), 'ut
 
 describe('People › Approvals · the way in', () => {
   it('offers the tab, and only to an administrator', () => {
-    expect(source).toMatch(/<ion-segment-button\s+v-if="isAdmin"\s+value="approvals">/);
+    // Two lookaheads, both fenced by `[^>]*` so neither can leave THIS tag: what is asserted is
+    // the pairing —the Approvals tab is gated by `isAdmin`— in any attribute order. Order-pinning
+    // is what made this assertion fall the day the tab got its `data-testid` (hub#1808) with the
+    // gate untouched, and pinning `v-if` to the tag name only moved that trap one attribute to the
+    // right: it still went red on an intact gate. A test that fails when nothing broke gets
+    // loosened by whoever trips on it, and THEN it stops catching the real thing.
+    expect(source).toMatch(
+      /<ion-segment-button(?=[^>]*\sv-if="isAdmin")(?=[^>]*\svalue="approvals")[^>]*>/,
+    );
   });
 
   it('is deep-linkable: `approvals` is one of the page tabs', () => {

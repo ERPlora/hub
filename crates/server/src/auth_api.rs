@@ -475,8 +475,10 @@ pub(crate) async fn auth_courier(
             .into_response();
     }
     let Some(machine_auth) = auth::machine_auth(&st) else {
+        // 424 and not a `5xx` (hub#1763): the shell reads this answer to decide whether to fall
+        // back to the login form, and the edge replaces the body of a `5xx` with its own page.
         return (
-            StatusCode::SERVICE_UNAVAILABLE,
+            crate::cloud_proxy::CLOUD_FAILED,
             Json(json!({ "ok": false, "error": "hub sin credencial de máquina" })),
         )
             .into_response();
@@ -491,8 +493,8 @@ pub(crate) async fn auth_courier(
         Ok(response) => response,
         Err(error) => {
             return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": format!("courier no disponible: {error}") })),
+                crate::cloud_proxy::CLOUD_FAILED,
+                Json(json!({ "ok": false, "error": crate::cloud_proxy::cloud_unreachable(&error.to_string()) })),
             )
                 .into_response()
         }
@@ -501,7 +503,7 @@ pub(crate) async fn auth_courier(
         let status = if response.status().as_u16() == 400 {
             StatusCode::BAD_REQUEST
         } else {
-            StatusCode::BAD_GATEWAY
+            crate::cloud_proxy::CLOUD_FAILED
         };
         return (
             status,
@@ -513,7 +515,7 @@ pub(crate) async fn auth_courier(
         Ok(grant) if !grant.access.is_empty() && !grant.refresh.is_empty() => grant,
         _ => {
             return (
-                StatusCode::BAD_GATEWAY,
+                crate::cloud_proxy::CLOUD_FAILED,
                 Json(json!({ "ok": false, "error": "respuesta courier inválida" })),
             )
                 .into_response()
@@ -790,22 +792,22 @@ pub(crate) async fn auth_handoff(
                     Some(code) if !code.is_empty() => code.to_string(),
                     _ => {
                         eprintln!("[handoff] the SaaS answered without a one-time code");
-                        return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+                        return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
                     }
                 },
                 Err(e) => {
                     eprintln!("[handoff] unreadable answer from the SaaS: {e}");
-                    return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+                    return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
                 }
             }
         }
         Ok(response) => {
             eprintln!("[handoff] the SaaS refused the pass: {}", response.status());
-            return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+            return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
         }
         Err(e) => {
             eprintln!("[handoff] could not ask the SaaS for the pass: {e}");
-            return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+            return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
         }
     };
 

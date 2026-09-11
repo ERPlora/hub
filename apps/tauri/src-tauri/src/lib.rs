@@ -14,8 +14,13 @@
 //! ES el bridge, ADR-0050 §2.7).
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::Serialize;
+
+/// What the window shows when the network dies under it (hub#1716).
+mod connectivity;
+use connectivity::{ShellNav, spawn_connectivity_guard};
 
 /// Id de dispositivo estable por instalación (`X-Device-Id` del login; sesión única ADR-0154).
 const DEVICE_ID_FILE: &str = "device.id";
@@ -956,10 +961,29 @@ fn navigate_main_window(app: &tauri::AppHandle, url: &str) {
     }
 }
 
+/// The retry button of the offline page (hub#1716).
+///
+/// The button used to be `location.reload()`, which on the bundled fallback page reloads THE
+/// FALLBACK PAGE: the only control on the only screen the user could reach led back to itself.
+/// Retry has to happen on this side, because this is the side that can ask the network and move
+/// the window. Answers whether the target is reachable so the page can say "still nothing" instead
+/// of pretending it did something.
+///
+/// Granted to the bundled page ONLY (`capabilities/degraded.json`, `local: true`): a command that
+/// navigates the main window is not something a remote origin should be able to call.
+#[tauri::command]
+async fn shell_retry(
+    window: tauri::WebviewWindow,
+    nav: tauri::State<'_, Arc<ShellNav>>,
+) -> Result<bool, ShellError> {
+    let reachability = connectivity::probe_and_apply(&window, nav.inner()).await;
+    Ok(reachability == connectivity::Reachability::Online)
+}
+
 /// Crea la ventana principal apuntando a [`initial_url_for`] y registra el `on_navigation` que
 /// captura `?shell=1` → persiste el origen como `hub.url` (una sola escritura por cambio).
 fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Result<()> {
-    use tauri::{WebviewUrl, WebviewWindowBuilder};
+    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
     let persisted = cache_dir.as_deref().and_then(load_hub_url);
     let override_url = std::env::var(ENV_SHELL_URL)
@@ -998,8 +1022,23 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
         }
     }
 
+    // Where the window is MEANT to be, so the connectivity guard can put it back there. Seeded
+    // with the URL the window is about to load; `on_navigation` keeps it current afterwards.
+    let initial_target = match &url {
+        WebviewUrl::External(u) => u.clone(),
+        // The degraded arm above: the env URL is unusable, so the address to come back to is the
+        // one the app is meant to boot at. Baked literal, not `saas_base_url()`, because what put
+        // us in this arm is precisely an env var that does not parse.
+        _ => DEFAULT_SAAS_URL
+            .parse()
+            .map_err(tauri::Error::InvalidUrl)?,
+    };
+    let nav_state = Arc::new(ShellNav::new(initial_target));
+    app.manage(nav_state.clone());
+
     let last = std::sync::Mutex::new(persisted);
-    WebviewWindowBuilder::new(app, "main", url)
+    let watched = nav_state.clone();
+    let window = WebviewWindowBuilder::new(app, "main", url)
         .title("ERPlora")
         .inner_size(1280.0, 800.0)
         .min_inner_size(960.0, 600.0)
@@ -1014,9 +1053,18 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
                     }
                 }
             }
+            // Wherever the webview goes on its own — a link, a redirect, the login chain — that is
+            // the page the guard has to keep alive (hub#1716). Our own bundled page is filtered
+            // out inside `remote_target`, or the offline screen would end up watching itself.
+            if let Some(target) = connectivity::remote_target(nav) {
+                watched.set_target(target);
+            }
             true // el shell nunca bloquea la navegación; solo observa el marcador
         })
         .build()?;
+
+    // From here on, a load that never lands has an answer (hub#1716).
+    spawn_connectivity_guard(window, nav_state);
     Ok(())
 }
 
@@ -1454,9 +1502,13 @@ fn erplora_test_print(
     app: tauri::AppHandle,
     state: tauri::State<'_, PeripheralsState>,
     printer_id: String,
+    data: Option<serde_json::Value>,
 ) -> Result<(), HardwareError> {
     let target = discovery::parse_print_target(&printer_id)?;
-    let payload = escpos::render_test_page(&printer_id);
+    // An `erplora-app` newer than the module that calls it gets `None` here — and the renderer
+    // reads an empty document exactly as it reads a missing field, so the sheet still prints.
+    let data = data.unwrap_or_else(|| serde_json::json!({}));
+    let payload = escpos::render_test_page(&printer_id, &data);
     match target {
         discovery::PrintTarget::Network(target) => {
             state.queue.enqueue(PrintJob {
@@ -1797,6 +1849,8 @@ pub fn run() {
             forget_hub,
             open_external_url,
             save_download,
+            // The way out when the network dies under the window (hub#1716).
+            shell_retry,
             // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
             // Camino de hardware: impresoras de red ESC/POS + cajón → peripherals.
             erplora_bridge_status,

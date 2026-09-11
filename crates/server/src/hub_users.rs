@@ -69,6 +69,13 @@ fn forbidden(code: &str, message: &str) -> Response {
         .into_response()
 }
 
+/// Tope de usuarios del plan según el último entitlement verificado (hub#1685). `0` = ilimitado,
+/// y también lo que sale con el candado envenenado o sin refresh previo: fail-open, como el resto
+/// del gate — la autoridad del plan es el SaaS, no este proceso.
+pub(crate) fn plan_max_users(st: &AppState) -> u32 {
+    st.entitlement.read().map(|g| g.max_users()).unwrap_or(0)
+}
+
 fn not_found() -> Response {
     (
         StatusCode::NOT_FOUND,
@@ -188,7 +195,11 @@ pub async fn create_user(
     if let Some(Guard::Forbidden { code, message }) = grant_decision(&actor.role, &input.role) {
         return forbidden(code, message);
     }
-    let id = match rt.create_hub_user(&input).await {
+    // …y el plan tiene que tener plaza (hub#1685). El tope lo trae el entitlement, que vive aquí y
+    // no en el runtime; `0` (incluido «aún no hubo refresh exitoso») = sin tope. Viaja CON el alta
+    // y no como comprobación previa (hub#1804): mirarlo antes dejaba una ventana en la que otra
+    // alta simultánea ocupaba la misma plaza y las dos entraban.
+    let id = match rt.create_hub_user(&input, plan_max_users(&st)).await {
         Ok(id) => id,
         Err(e) => return crate::err_response(e),
     };
@@ -275,6 +286,11 @@ async fn apply_update(
         Ok(target) => target,
         Err(response) => return response,
     };
+    // **Reactivar es dar de alta** (hub#1685): la baja liberó la plaza y puede haberla ocupado otro,
+    // así que volver a entrar vuelve a pedirla. Editar a quien ya está dentro (rol, nombre, PIN) no
+    // gasta ninguna: si el tope se mirase en toda escritura, un hub Gratis con sus tres usuarios no
+    // podría volver a tocar a ninguno. Quién de las dos cosas es esta edición lo decide el runtime
+    // al escribir (hub#1804); aquí solo viaja el tope.
     let plan = access_sync_plan(&target, &input);
     drop(rt); // Suelta el lock ANTES de la I/O de red (mismo patrón que `members::add_member`).
 
@@ -286,7 +302,7 @@ async fn apply_update(
 
     let row = {
         let rt = arc.read().await;
-        match rt.update_hub_user(id, &input).await {
+        match rt.update_hub_user(id, &input, plan_max_users(&st)).await {
             Ok(row) => row,
             Err(e) => return crate::err_response(e),
         }
@@ -348,6 +364,33 @@ pub(crate) async fn guard_members_door_by_email(
         Some(Guard::Forbidden { code, message }) => Some(forbidden(code, message)),
         None => None,
     }
+}
+
+/// El tope del plan en la puerta de `/api/members` (hub#1685), que es **idempotente por email**:
+/// `create_login_user` escribe sobre la fila que encuentra (`SET role = :role, is_active = 1`).
+///
+/// Por eso no vale mirar el tope siempre: reescribir el rol de quien YA está activo no suma a nadie
+/// —y con el plan lleno es justo lo normal—, mientras que invitar a alguien nuevo o reincorporar a
+/// quien estaba de baja sí. Gemelo de la decisión que toma [`apply_update`] con `is_active`.
+pub(crate) async fn enforce_seat_for_email(
+    rt: &Runtime,
+    st: &AppState,
+    email: &str,
+) -> Option<Response> {
+    let users = match rt.list_hub_users().await {
+        Ok(users) => users,
+        Err(e) => return Some(crate::err_response(e)),
+    };
+    let already_inside = census_id_by_access_email(&users, email)
+        .and_then(|id| users.into_iter().find(|u| u.id == id))
+        .is_some_and(|u| u.is_active);
+    if already_inside {
+        return None;
+    }
+    rt.enforce_user_limit(plan_max_users(st))
+        .await
+        .err()
+        .map(crate::err_response)
 }
 
 /// El id de la fila del censo cuyo email de **ACCESO** es `email`.

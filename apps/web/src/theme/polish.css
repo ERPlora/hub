@@ -136,6 +136,26 @@ ion-item iconify-icon[slot="start"]:not(.nav-icon):not([width]) {
 ion-item h3 { font-weight: 600; }
 ion-note { font-size: 0.875rem; }
 
+/* Settings row: the VALUE must not strangle the LABEL (hub#1733). `ion-item` lays its slots out in
+   the shadow DOM and the label's box gets whatever the `slot="end"` control leaves, so a long value
+   eats the row: measured on banco-pre at 390px, «Automática · Europe/Madrid, 23:01» took 182 of the
+   252px on offer and left the label 70px, stacking «Zona horaria» into a 125px-tall column while
+   «País» right above it read normally. Capping the value is the ONLY lever — a `min-width` on
+   `ion-label` is an illusion, because the label is not the flex item: it just paints over the
+   select (measured: a 90px overlap).
+   The cap scales so it only bites where the row is actually narrow: 7rem (112px) at 390px leaves
+   the label 140px — one line, like «País» — and stays clear of the values that already fitted
+   («EUR · Euro» 99px, «España» 75px); `50vw - 6rem` overtakes that floor at 416px and clears the
+   whole value at 556px, so above it nothing is capped — measured on the bench, tablet (952) and
+   desktop (1440) laid out row for row the same with the rule and without it.
+   Only `ion-select` and `ion-note`: they truncate or wrap. A blanket `[slot="end"]` cap was
+   measured and REGRESSED the «Dígitos del PIN» row — its `ion-segment` cannot truncate, so 288px →
+   112px just clipped its own options. Rows whose end slot is a control keep their own bug (hub#1794). */
+ion-item > ion-select[slot="end"],
+ion-item > ion-note[slot="end"] {
+  max-width: max(7rem, calc(50vw - 6rem));
+}
+
 /* ── Botones: radio, peso, sin mayúsculas ni sombra dura ──────────────────────────────────── */
 ion-button {
   --border-radius: 10px;
@@ -340,6 +360,37 @@ ion-split-pane.rail .nav-item::part(native) { justify-content: center; }
 ion-split-pane.rail .nav-icon { margin-inline-end: 0; }
 ion-split-pane.rail .sidebar-user { justify-content: center; }
 
+/* hub#1715 — «Open on your phone». Sits in the sidebar footer, always, for everyone.
+   NO `max-width` anywhere (hub#1605): the code is sized by its own `size` attribute, and the block
+   just centres what the panel gives it. */
+.sidebar-install-qr { padding: 0.5rem 0.75rem 0.25rem; text-align: center; }
+/* `width: fit-content` is load-bearing, not tidiness: `ok-qr` is a block-level custom element,
+   so without it the host stretches to the full panel width and `margin-inline: auto` has nothing
+   left to centre — the symbol paints flush LEFT under a centred caption. The symbol itself stays
+   square either way, so this never breaks scanning; it just looks broken. NOT a `max-width`
+   (hub#1605): the code is sized by its own `size` attribute. */
+.sidebar-install-qr-code { display: block; width: fit-content; margin-inline: auto; }
+.sidebar-install-qr-title {
+  margin: 0.4rem 0 0.1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ion-color-step-750, #444);
+}
+.sidebar-install-qr-hint {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  color: var(--ion-color-step-550, #737373);
+}
+
+/* The rail is ~72px and a readable code needs ~132px, so the two swap. Done in CSS and not with a
+   `v-if` on purpose: the guard in `SidebarInstallQr.test.ts` forbids conditions on this block, and
+   the rail is a desktop panel the user collapsed themselves — not a gate on who gets the code. */
+.sidebar-install-qr-rail { display: none; }
+ion-split-pane.rail .sidebar-install-qr-full { display: none; }
+ion-split-pane.rail .sidebar-install-qr { padding-inline: 0; }
+ion-split-pane.rail .sidebar-install-qr-rail { display: inline-flex; }
+
 /* ── Área de contenido = superficie tipo tarjeta (unificación del shell) ───────────────────── */
 /* Cada página del shell monta su contenido en el ion-content del outlet principal
    (AppPage → ion-page > AppTopbar + ion-content + tabbar; el outlet es #main y Ionic le añade
@@ -409,7 +460,7 @@ html.immersive ion-router-outlet#main.split-pane-main > .ion-page > ion-content:
 }
 .hub-detail-shell--fill {
   height: 100%;
-  min-height: 0;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* ── ok-data-table (OutfitKit): alinea sus tokens con el theme del Hub ────────────────────── */

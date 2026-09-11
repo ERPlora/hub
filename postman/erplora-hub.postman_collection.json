@@ -877,7 +877,7 @@
               },
               "raw": "{\n  \"name\": \"<module>.<command>\",\n  \"payload\": {}\n}"
             },
-            "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
+            "description": "`name` is `<module>.<command>` — take it from `GET /api/hub/operations`; `payload` follows the command's JSON Schema (the `payload` field of that catalogue). Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -2409,6 +2409,209 @@
         }
       ],
       "name": "hub · import"
+    },
+    {
+      "item": [
+        {
+          "name": "Which commands and queries THIS hub accepts — read this before the two doors below",
+          "request": {
+            "description": "The dispatcher's own catalogue: every operation `POST /api/query` and `POST /api/command` take a `name` for, with its `kind`, `module`, the `permission` it checks, `payload` (the raw JSON Schema, or null) and `list` (search/sort/filters/page_size of a list query). Internal commands and deactivated modules are NOT listed — the dispatcher would refuse them. `?module=<id>` narrows to one module, `?module=hub` is the core namespace; an unknown module answers an empty list. Needs an ADMIN session; a request that names a module (`X-Erplora-Module`) also needs `manage_flows`.\n\n(auth: admin+capability)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "operations"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/operations"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · operations"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/hub/policies",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/policies",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/policies/checkpoints",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "checkpoints"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/checkpoints"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/policies/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/policies/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/hub/policies/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "policies",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/policies/{{id}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · policies"
     },
     {
       "item": [
@@ -4356,7 +4559,7 @@
               },
               "raw": "{\n  \"name\": \"<module>.<query>\",\n  \"params\": {}\n}"
             },
-            "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
+            "description": "`name` is `<module>.<query>` as declared in the module's manifest — take it from `GET /api/hub/operations`; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
             "header": [
               {
                 "key": "X-Hub-Session",

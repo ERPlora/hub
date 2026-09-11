@@ -101,4 +101,13 @@ escalonado (`status: inProgress` + `userFraction`), que hoy no está cableado.
 - Los permisos de runtime son **parte del producto**, no empaquetado (ADR-0180 §2): sin
   `ACCESS_LOCAL_NETWORK` el descubrimiento devuelve `[]` —indistinguible de «no hay
   impresoras»— y sin `POST_NOTIFICATIONS` la comanda entra en cocina sin avisar. Ninguno de
-  los dos da error. Se piden **en contexto**.
+  los dos da error. Dónde se pide cada uno, a día de hoy:
+  - **Notificaciones** (hub#1732): al darse de alta este equipo como **puesto de impresión** y,
+    de reserva, antes de la **primera comanda** (una pantalla de KDS sin impresora no se da de
+    alta). Lleva **frase propia antes** del diálogo de Android, y la respuesta se recuerda antes
+    de abrirlo, así que no se vuelve a preguntar sola. Si se deniega, la pantalla **Sistema**
+    dice que los avisos están apagados y ofrece volver a pedirlo o abrir los Ajustes.
+  - **Red local**: al descubrir o imprimir, desde la pantalla de **Impresión** del módulo
+    `printing`. Sale **en frío**, sin frase previa, y Android lo redacta como «buscar …
+    dispositivos cercanos», que suena a rastreo — pendiente en hub#1773 (fuera de hub#1732:
+    el disparo vive en el `module-sdk` y mover su contrato arrastra el espejo del toolkit).

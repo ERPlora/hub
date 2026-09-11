@@ -25,10 +25,18 @@ use crate::gateway_enrolment;
 use crate::state::AppState;
 
 /// `401` para fallo de auth (sin sesión / sesión inválida / rol insuficiente).
+///
+/// Lleva el **código** junto al mensaje (hub#1801). Esta es la puerta que el shell usa para
+/// confirmar que una sesión está muerta (`probeSessionDead` en `apps/web/src/lib/runtime.ts` pide
+/// `GET /api/settings` justo porque acepta cualquier rol), así que es el sitio donde el hub tiene
+/// que poder decir **por qué**: sin el código, a un desalojo por el límite de dispositivos del plan
+/// y a una sesión caducada por tiempo les queda la misma respuesta, y la pantalla de entrada solo
+/// puede callarse. Va como campo **hermano** de `error`, que sigue siendo una cadena: los demás
+/// consumidores de esta puerta no se enteran.
 fn unauthorized(e: auth::AuthError) -> Response {
     (
         StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": e.message() })),
+        Json(json!({ "ok": false, "error": e.message(), "code": e.code() })),
     )
         .into_response()
 }
@@ -621,10 +629,16 @@ impl PublishFailure {
 
     /// La respuesta HTTP de la puerta explícita (`POST /api/business/fiscal-identity`).
     fn into_response(self) -> Response {
+        // 🔴 Ninguna rama es `5xx` (hub#1763). El hub es el ORIGEN: un `502`/`503` acuñado aquí es
+        // indistinguible del que acuña el borde, que SUSTITUYE el cuerpo por su página — y con él
+        // se va el `code` que la pantalla de identidad fiscal traduce (y el `status` del SaaS, que
+        // es justo lo que convierte «no se pudo» en algo accionable). `424 Failed Dependency`
+        // cruza cualquier proxy con el cuerpo intacto.
         let status = match self {
             Self::NoTaxId => axum::http::StatusCode::BAD_REQUEST,
-            Self::NotEnrolled => axum::http::StatusCode::SERVICE_UNAVAILABLE,
-            Self::Rejected(_) | Self::Unreachable(_) => axum::http::StatusCode::BAD_GATEWAY,
+            Self::NotEnrolled | Self::Rejected(_) | Self::Unreachable(_) => {
+                crate::cloud_proxy::CLOUD_FAILED
+            }
         };
         let mut body = Map::new();
         body.insert("ok".into(), json!(false));

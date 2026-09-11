@@ -100,8 +100,7 @@ async fn the_badge_of_a_deactivated_person_opens_nothing() {
         &erplora_runtime::hub_users::UpdateHubUser {
             is_active: Some(false),
             ..Default::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
 
@@ -397,8 +396,7 @@ async fn the_pin_cannot_be_removed_from_somebody_whose_only_other_way_in_is_a_ba
             &erplora_runtime::hub_users::UpdateHubUser {
                 pin: Some(String::new()),
                 ..Default::default()
-            },
-        )
+            }, 0,)
         .await
         .expect_err("that would leave the card as her only credential");
 
@@ -429,8 +427,7 @@ async fn removing_the_badge_and_the_pin_together_is_allowed() {
             pin: Some(String::new()),
             badge: Some(String::new()),
             ..Default::default()
-        },
-    )
+        }, 0,)
     .await
     .expect("a person who signs in nowhere is a legitimate record");
 
@@ -451,7 +448,7 @@ async fn an_account_user_may_drop_their_pin_while_keeping_a_badge() {
             pin: "8317".into(),
             badge: SOFIA_BADGE.into(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -460,8 +457,7 @@ async fn an_account_user_may_drop_their_pin_while_keeping_a_badge() {
         &erplora_runtime::hub_users::UpdateHubUser {
             pin: Some(String::new()),
             ..Default::default()
-        },
-    )
+        }, 0,)
     .await
     .expect("her account is the fallback the badge needs");
 

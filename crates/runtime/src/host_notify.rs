@@ -572,7 +572,7 @@ mod tests {
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
 
-        crate::identity::create_login_user(&db, "h1", "empleado@hub.com", "employee")
+        crate::identity::create_login_user(&db, "h1", "empleado@hub.com", "employee", 0)
             .await
             .unwrap();
         assert_recipient_allowed(&db, "h1", &intent(Channel::Email, "Empleado@Hub.com"))

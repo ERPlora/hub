@@ -71,11 +71,12 @@ import { useI18n } from 'vue-i18n';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { dataTableLabels } from '../lib/data-table-labels';
 import {
-  RoleActivationError,
   listHubRoles,
   setRoleActivation,
   type HubRole,
+  RoleActivationError,
 } from '../lib/hub-users';
+import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { invalidFieldMessage } from '../lib/invalid-field';
 import { platformFailureMessage } from '../lib/platform-failure';
 import { isAdmin } from '../lib/session';
@@ -207,6 +208,13 @@ const columns = computed<DataTableColumn[]>(() => [
 function reasonOf(error: unknown, fallback: string): string {
   const translated = invalidFieldMessage(error, t, te) ?? platformFailureMessage(error, locale.value);
   if (translated) return translated;
+  // hub#1697 — one more rung BEFORE the last one: a stable code this shell has a sentence for is
+  // translated. What is deliberately NOT touched is the rung below, which is rule 2 of hub#1102:
+  // a refusal we cannot translate keeps the sentence that came, because it says more than any
+  // generic line of ours — and two `invalid_field` refusals with the same code ask different
+  // things of the administrator, so collapsing them into one sentence would lose the difference.
+  const byCode = runtimeErrorKey(error, { t, te }, ['employeeForm.errors', 'runtimeErrors']);
+  if (byCode) return t(byCode);
   return error instanceof RoleActivationError && error.code && error.message
     ? error.message
     : fallback;
@@ -277,6 +285,7 @@ defineExpose({ setActive, columns, rows });
 <style scoped>
 .fill {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 .table-loading {

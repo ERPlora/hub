@@ -14,6 +14,15 @@ use serde::{Deserialize, Serialize};
 /// Ancho de papel estándar en columnas (80mm ≈ 32 chars). Espejo del `padding = 32 - …` de Python.
 pub const LINE_WIDTH: usize = 32;
 
+/// **The name this crate signs paper with when the document does not bring the business's own.**
+///
+/// A constant and not a literal per renderer because it is the name of a PRODUCT, and products get
+/// retired: the test page spent a month signed «ERPlora Bridge» after ADR-0196 retired the daemon
+/// and hub#340 deleted it from the tree (hub#1735), while the receipt beside it already fell back
+/// to the right one. Paper cannot be corrected after it is cut, so the two must not be able to
+/// drift apart again.
+pub const PRODUCT_NAME: &str = "ERPlora";
+
 /// Tipos de documento soportados (espejo del `if document_type == …` de `PrinterManager`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -272,18 +281,39 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
 }
 
 /// Página de prueba. Porta `PrinterManager.test_print`.
-pub fn render_test_page(printer_id: &str) -> Vec<u8> {
+///
+/// **Signed with [`PRODUCT_NAME`], never with the product that printed it a month ago** (hub#1735):
+/// the header used to read «ERPlora Bridge», the standalone daemon ADR-0196 retired and hub#340
+/// deleted from the tree.
+///
+/// **And it is paper like the rest of the paper** (hub#1803). This sheet used to be rendered from
+/// a printer id alone, so it was the only document in this file with no envelope: its two lines
+/// were English literals and its header was the product's name, while the ticket printed a second
+/// later came out in the hub's language under the shop's own name. It now takes the same `data`
+/// every other renderer takes and reads the same two fields off it:
+///
+/// - `locale` → [`Locale::from_document`], the catalogue of this file (hub#1159). English is the
+///   SOURCE language, never the paper's (ADR-0055/0199).
+/// - `business_name` → the header, falling back to [`PRODUCT_NAME`] exactly as `render_receipt`
+///   does. A shop owner checking which printer answered recognises their own name, not ours.
+///
+/// The envelope is OPTIONAL at the door (`erplora_test_print` takes `Option<Value>`): an
+/// `erplora-app` newer than the module that calls it prints the fallback sheet rather than
+/// nothing — and the fallback is Spanish, like every other document without a `locale`, which is
+/// already the right answer for the fleet this ships to.
+pub fn render_test_page(printer_id: &str, data: &serde_json::Value) -> Vec<u8> {
+    let t = Locale::from_document(data);
     let mut b = EscposBuilder::new();
     b.set(Align::Center, false, false, false);
     b.text("================================\n");
     b.set(Align::Center, true, true, false);
-    b.text("ERPlora Bridge\n");
+    b.text(&format!("{}\n", str_field(data, "business_name", PRODUCT_NAME)));
     b.set(Align::Center, false, false, false);
     b.text("--------------------------------\n");
-    b.text("Test Print OK\n");
+    b.text(&format!("{}\n", t.label(Label::TestPageOk)));
     b.text(&format!("{}\n", now_ymd_hms()));
     b.text("--------------------------------\n");
-    b.text(&format!("Printer: {printer_id}\n"));
+    b.text(&format!("{}{printer_id}\n", t.label(Label::TestPagePrinter)));
     b.text("================================\n");
     b.cut();
     b.finish()
@@ -383,6 +413,9 @@ enum Label {
     Difference,
     // Anything else.
     GenericTitle,
+    // The test sheet (hub#1803).
+    TestPageOk,
+    TestPagePrinter,
 }
 
 /// **The language the paper is printed in** (hub#1159).
@@ -480,6 +513,11 @@ impl Locale {
             Label::Closing => ("Closing", "Cierre"),
             Label::Difference => ("Difference", "Diferencia"),
             Label::GenericTitle => ("Document", "Documento"),
+            // The two lines of the test sheet (hub#1803). Unaccented like every other `es` entry
+            // above: the column is ASCII from end to end, which is also what lets the tests read
+            // the paper back (`strip_escpos` decodes the cp437 bytes as UTF-8).
+            Label::TestPageOk => ("Test Print OK", "Prueba de impresion correcta"),
+            Label::TestPagePrinter => ("Printer: ", "Impresora: "),
         };
         match self {
             Locale::En => en,
@@ -525,7 +563,7 @@ fn modifier_lines(item: &serde_json::Value) -> Vec<String> {
 fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     let t = Locale::from_document(data);
     b.set(Align::Center, true, false, false);
-    let business_name = str_field(data, "business_name", "ERPlora");
+    let business_name = str_field(data, "business_name", PRODUCT_NAME);
     b.text(&format!("{business_name}\n"));
 
     if is_truthy(data, "business_address") {
@@ -722,7 +760,7 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.text(&format!("{}\n", t.label(Label::BillTitle)));
 
     b.set(Align::Center, true, false, false);
-    b.text(&format!("{}\n", str_field(data, "business_name", "ERPlora")));
+    b.text(&format!("{}\n", str_field(data, "business_name", PRODUCT_NAME)));
 
     if is_truthy(data, "business_address") {
         b.set(Align::Center, false, false, false);
@@ -2499,6 +2537,171 @@ mod tests {
         );
         assert!(text.contains("cosa: valor"), "the real fields still print:\n{text}");
         assert!(!text.contains("locale"), "the envelope field is not a line:\n{text}");
+    }
+
+    // ── The paper is signed by a product that EXISTS (hub#1735) ─────────────────────────────────
+
+    /// **The test page used to sign itself «ERPlora Bridge»** — the standalone daemon ADR-0196
+    /// retired and hub#340 deleted from the tree. It is the one sheet a shop owner prints on
+    /// purpose, to check the printer answers, so the dead name went straight into their hands on
+    /// paper: nothing corrects a sheet once it is cut. It now signs with the same name the receipt
+    /// next to it falls back to (`render_receipt`) — the product they actually installed.
+    #[test]
+    fn the_test_page_is_signed_with_a_product_that_still_exists() {
+        // An EMPTY document: the sheet an `erplora-app` prints when whatever asked for it is older
+        // than this binary and sends no envelope (hub#1803). That is the case this guard is for —
+        // with a `business_name` the header is the shop's, which the next test pins.
+        let paper = strip_escpos(&render_test_page("network:10.0.2.2:9100", &json!({})));
+        assert!(
+            paper.lines().any(|l| l.trim() == "ERPlora"),
+            "the sheet is signed by the product that printed it:\n{paper}"
+        );
+        // Everything the sheet is FOR stays on it: a header fix that quietly dropped the outcome
+        // or the printer's address would satisfy the line above and lose the diagnosis, which is
+        // the only reason anybody prints this page. The wording is now the catalogue's (hub#1803),
+        // so the assertion follows the fallback language rather than the retired English literal.
+        assert!(
+            paper.contains("Prueba de impresion correcta"),
+            "the outcome is still printed:\n{paper}"
+        );
+        assert!(
+            paper.contains("network:10.0.2.2:9100"),
+            "the sheet still names the printer it came out of:\n{paper}"
+        );
+    }
+
+    // ── The test page speaks the hub's language and carries its name (hub#1803) ──────────────────
+
+    /// **The one sheet that was never translated.**
+    ///
+    /// Every other document this crate renders takes its language off the envelope
+    /// ([`Locale::from_document`], hub#1159); the test page could not, because it was rendered
+    /// from a printer id with NO document behind it. So a Spanish salon pressed «Probar» and got
+    /// «Test Print OK» out of the printer while the ticket beside it came out in Spanish. English
+    /// is the SOURCE language, not the paper's (ADR-0055/0199) — a sheet hardcoded in either
+    /// language is what the rule forbids.
+    #[test]
+    fn the_test_page_is_printed_in_the_language_the_document_carries() {
+        let english = strip_escpos(&render_test_page(
+            "network:10.0.2.2:9100",
+            &json!({ "locale": "en" }),
+        ));
+        assert!(
+            english.contains("Test Print OK"),
+            "an English hub gets the English outcome:\n{english}"
+        );
+        assert!(
+            english.contains("Printer: network:10.0.2.2:9100"),
+            "and the English label for the printer it came out of:\n{english}"
+        );
+
+        let spanish = strip_escpos(&render_test_page(
+            "network:10.0.2.2:9100",
+            &json!({ "locale": "es" }),
+        ));
+        assert!(
+            spanish.contains("Prueba de impresion correcta"),
+            "a Spanish hub gets the Spanish outcome:\n{spanish}"
+        );
+        assert!(
+            spanish.contains("Impresora: network:10.0.2.2:9100"),
+            "and the Spanish label for the printer it came out of:\n{spanish}"
+        );
+
+        // The point of the whole change: the two sheets are NOT the same paper. A translation that
+        // resolved both keys to the same literal would satisfy every assertion above one by one.
+        assert_ne!(english, spanish, "the sheet actually changes with the language");
+    }
+
+    /// The region is dropped like everywhere else — `es-ES` is Spanish, `en_GB` is English.
+    ///
+    /// Worth its own case because the shell hands out full BCP-47 tags (`es-ES`), not bare
+    /// languages: a test page that only understood `es` would be English for every real hub.
+    #[test]
+    fn the_test_page_reads_a_language_tag_with_its_region() {
+        let spanish = strip_escpos(&render_test_page("usb:001:002", &json!({ "locale": "es-ES" })));
+        assert!(
+            spanish.contains("Prueba de impresion correcta"),
+            "`es-ES` is Spanish:\n{spanish}"
+        );
+        let english = strip_escpos(&render_test_page("usb:001:002", &json!({ "locale": "en_GB" })));
+        assert!(english.contains("Test Print OK"), "`en_GB` is English:\n{english}");
+    }
+
+    /// **Headed by the business, like the ticket next to it** (hub#1803).
+    ///
+    /// hub#1735 replaced a dead product name («ERPlora Bridge») with a live one, which was the
+    /// bug of the day but left the sheet signed by the SOFTWARE. The shop owner holding it wants
+    /// to know which of their printers answered, and the name they recognise is their own — the
+    /// receipt has headed itself that way all along (`render_receipt`), from the very same
+    /// `business_name` field.
+    #[test]
+    fn the_test_page_is_headed_by_the_business_that_printed_it() {
+        let paper = strip_escpos(&render_test_page(
+            "network:10.0.2.2:9100",
+            &json!({ "business_name": "SALON AURORA SL", "locale": "es" }),
+        ));
+        assert!(
+            paper.lines().any(|l| l.trim() == "SALON AURORA SL"),
+            "the shop's own name heads the sheet:\n{paper}"
+        );
+        assert!(
+            !paper.lines().any(|l| l.trim() == "ERPlora"),
+            "and it replaces the product name rather than being added under it:\n{paper}"
+        );
+        // The diagnosis survives the new header, same as above.
+        assert!(
+            paper.contains("network:10.0.2.2:9100"),
+            "the sheet still names the printer it came out of:\n{paper}"
+        );
+    }
+
+    /// **No paper this crate renders names the retired Bridge**, not just the test page — the
+    /// guard that keeps the dead product from coming back through another renderer (hub#1735).
+    ///
+    /// It reads the RAW bytes rather than the stripped paper on purpose: a receipt carries a QR
+    /// (`GS ( k`), a command of variable length that [`strip_escpos`] refuses by design, so a
+    /// guard written on the stripped text could not cover every document — and the document it
+    /// could not cover is the one the customer takes home.
+    #[test]
+    fn no_paper_this_crate_renders_names_the_retired_bridge() {
+        // A single document that every renderer accepts: `Prebill` is the strict one (it refuses
+        // a bill with no `items`), the rest read what they know and ignore the rest.
+        let data = json!({
+            "business_name": "SALON AURORA SL",
+            "tax_id": "12345678Z",
+            "ticket_number": "TICKET-2026-000001",
+            "title": "Aviso",
+            "items": [{ "name": "Corte", "quantity": 1, "total": 12.0 }],
+            "total": 12.0,
+        });
+        let mut papers: Vec<(String, Vec<u8>)> = Vec::new();
+        for doc in [
+            DocumentType::Receipt,
+            DocumentType::KitchenOrder,
+            DocumentType::Invoice,
+            DocumentType::DeliveryNote,
+            DocumentType::BarcodeLabel,
+            DocumentType::CashSessionReport,
+            DocumentType::Prebill,
+            DocumentType::Generic,
+        ] {
+            papers.push((
+                format!("{doc:?}"),
+                render_document(doc, &data).expect("a valid document"),
+            ));
+        }
+        papers.push((
+            "test page".to_string(),
+            render_test_page("network:10.0.2.2:9100", &json!({})),
+        ));
+        for (what, bytes) in papers {
+            assert!(
+                !bytes.windows(b"Bridge".len()).any(|w| w == b"Bridge"),
+                "{what}: the paper names the Bridge, a product retired by ADR-0196 and deleted \
+                 from the tree by hub#340"
+            );
+        }
     }
 }
 

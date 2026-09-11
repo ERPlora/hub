@@ -10,6 +10,45 @@ pub(crate) enum CloudGetError {
     Network(String),
 }
 
+// ── The status a Cloud failure is REPORTED with (hub#1763) ──────────────────────────────────
+//
+// The hub is the ORIGIN, not a gateway. A `5xx` minted here is indistinguishable from the `5xx`
+// the proxy in front of it mints on its own, so the edge answers with its OWN page and replaces
+// the body — taking with it the stable `code` of hub#139 that the shell translates. What the
+// business reads is `error code: 502`, on the marketplace, on its photos, on the staff tab, on the
+// plan usage, on a blueprint import, on the assistant and on the account screen; and «it is down»,
+// «this hub's credential was refused» and «that does not exist» all read the same, so the answer
+// is to retry forever on a sentence that says nothing.
+//
+// hub#1720 closed this for the install pipeline (`install_error_status`); this is the same rule
+// for the doors that PROXY. It applies to a status the hub RELAYS just as much as to one it mints:
+// handing back the Cloud's own `500` puts the same page on the same screen.
+
+/// What the hub answers when the thing that failed was the call to erplora.com: the hub did its
+/// job and could not finish, which is what `424 Failed Dependency` says. A `4xx` crosses any proxy
+/// with its body intact and still reads as a failure (`res.ok === false`) for the shell, so the
+/// `code` survives the trip. Same status the install pipeline answers since hub#1720.
+pub(crate) const CLOUD_FAILED: StatusCode = StatusCode::FAILED_DEPENDENCY;
+
+/// The status the hub answers for an answer of erplora.com it is RELAYING. A `4xx` travels
+/// untouched — «you are not allowed», «that does not exist» are facts about the request and read
+/// the same from either end. A `5xx` does not: it becomes [`CLOUD_FAILED`], because a relayed
+/// server error is swallowed by the edge exactly like a minted one.
+pub(crate) fn relayed_status(cloud: StatusCode) -> StatusCode {
+    if cloud.is_server_error() {
+        CLOUD_FAILED
+    } else {
+        cloud
+    }
+}
+
+/// The status erplora.com answered, as an `http::StatusCode`. A code outside 100–999 cannot cross
+/// the wire, so the fallback is unreachable in practice; it stands for «the Cloud failed» and
+/// [`relayed_status`] turns it into [`CLOUD_FAILED`] like any other server error.
+pub(crate) fn cloud_status(raw: u16) -> StatusCode {
+    StatusCode::from_u16(raw).unwrap_or(StatusCode::BAD_GATEWAY)
+}
+
 /// GET hub-scoped al Cloud con la credencial de máquina (o JWT de usuario como fallback).
 /// Devuelve status + body crudos del Cloud. El **secreto de máquina nunca sale al navegador**:
 /// el web llama a estas rutas del runtime y es el runtime quien firma la petición al Cloud.
@@ -49,7 +88,7 @@ pub(crate) async fn cloud_get_raw_full(
         .send()
         .await
         .map_err(|e| CloudGetError::Network(e.to_string()))?;
-    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let status = cloud_status(resp.status().as_u16());
     // `Retry-After` admite segundos o una fecha HTTP; DRF manda siempre segundos. Una fecha o un
     // valor ilegible se ignoran (=> `None`) y el llamador aplica su default acotado: preferimos
     // una ventana nuestra a una interpretación inventada de la ajena.
@@ -73,9 +112,11 @@ pub(crate) fn cloud_get_error_response(e: CloudGetError) -> Response {
             Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
         )
             .into_response(),
-        CloudGetError::Network(msg) => {
-            (StatusCode::BAD_GATEWAY, Json(json!({ "ok": false, "error": msg }))).into_response()
-        }
+        CloudGetError::Network(detail) => (
+            CLOUD_FAILED,
+            Json(json!({ "ok": false, "error": cloud_unreachable(&detail) })),
+        )
+            .into_response(),
     }
 }
 
@@ -124,7 +165,7 @@ pub(crate) async fn cloud_send_raw(
         .send()
         .await
         .map_err(|e| CloudGetError::Network(e.to_string()))?;
-    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let status = cloud_status(resp.status().as_u16());
     let bytes = resp
         .bytes()
         .await
@@ -177,6 +218,26 @@ pub(crate) fn cloud_body_passthrough(status: StatusCode, body: axum::body::Bytes
 pub(crate) const CLOUD_REJECTED: &str = "cloud_rejected";
 /// The SaaS did not answer at all (network, DNS, timeout): nothing to correct, retry later.
 pub(crate) const CLOUD_UNREACHABLE: &str = "cloud_unreachable";
+
+/// The `reqwest` detail of a call that never got through, sent WHERE IT BELONGS (hub#1689).
+///
+/// Its `Display` is `error sending request for url (http://…/api/v1/…)`: the address this hub
+/// dials erplora.com on, and the path it dialled. An operator needs both — the business does not,
+/// and neither is ours to hand out on a marketplace screen. So the detail goes to the hub's log,
+/// and the caller gets back the stable code it can branch on, translate and retry.
+///
+/// It is the policy `/api/command` and `/api/query` have applied since hub#1074
+/// (`error_redaction_door`) and the WhatsApp template doors since hub#1688; this is the same rule
+/// for the doors that answer outside the envelope. Callers keep their own body shape — the string
+/// IS the code, which is how the shell already reads this key (`refusalCode`, `grantFailure`).
+///
+/// "Network" here is the whole round trip, as [`CloudGetError::Network`] already means: a
+/// connection that was refused and a body that stopped arriving are the same fact for whoever is
+/// looking at the screen — erplora.com did not answer, try again.
+pub(crate) fn cloud_unreachable(detail: &str) -> &'static str {
+    tracing::warn!(detail = %detail, "erplora.com did not answer");
+    CLOUD_UNREACHABLE
+}
 /// This hub has no machine credential, so there is no door to knock on (a local `pnpm dev`).
 pub(crate) const HUB_NOT_ENROLLED: &str = "hub_not_enrolled";
 /// The SaaS answered `2xx` with something that is not JSON — a proxy's HTML page, most likely.
@@ -198,12 +259,25 @@ pub(crate) fn cloud_envelope_passthrough(status: StatusCode, body: axum::body::B
             Err(e) => {
                 tracing::warn!(status = status.as_u16(), error = %e, "erplora.com answered a success the hub could not read");
                 envelope_error(
-                    StatusCode::BAD_GATEWAY,
+                    CLOUD_FAILED,
                     CLOUD_UNREADABLE,
                     "erplora.com answered with a body the hub could not read",
                 )
             }
         };
+    }
+    // erplora.com CRASHED. There is no domain code to carry — DRF answers `{"detail": "Server
+    // Error (500)"}`, its own English prose — and relaying the `5xx` hands the edge licence to
+    // replace this body with its page (hub#1763). One code, one sentence, and a status that
+    // crosses: what the module reads is «erplora.com could not attend to this», not `unknown
+    // error`.
+    if status.is_server_error() {
+        tracing::warn!(status = status.as_u16(), "erplora.com answered a server error");
+        return envelope_error(
+            CLOUD_FAILED,
+            CLOUD_REJECTED,
+            "erplora.com could not attend to this request",
+        );
     }
     // A refusal: the Cloud's own `code` is the contract (saas#1902) and travels untouched. What it
     // never named, we name `cloud_rejected` rather than dropping — a refusal with no code at all is
@@ -244,14 +318,11 @@ pub(crate) fn cloud_envelope_error_response(e: CloudGetError) -> Response {
             HUB_NOT_ENROLLED,
             "this hub has no machine credential for erplora.com",
         ),
-        CloudGetError::Network(detail) => {
-            tracing::warn!(detail = %detail, "erplora.com did not answer");
-            envelope_error(
-                StatusCode::BAD_GATEWAY,
-                CLOUD_UNREACHABLE,
-                "the hub could not reach erplora.com",
-            )
-        }
+        CloudGetError::Network(detail) => envelope_error(
+            CLOUD_FAILED,
+            cloud_unreachable(&detail),
+            "the hub could not reach erplora.com",
+        ),
     }
 }
 
@@ -282,7 +353,23 @@ pub(crate) async fn proxy_cloud_send_enveloped(
 }
 
 /// Hands the front the Cloud's JSON as it came: same status, `no-store`, nothing reinterpreted.
+///
+/// With ONE exception, and it is the point of hub#1763: a `5xx` of erplora.com is not relayed.
+/// Relaying it hands the edge licence to replace this body with its own `error code: 502` page, so
+/// what the business reads on the marketplace, on its photos or on the plan usage is the proxy's
+/// page instead of a reason. The status becomes [`CLOUD_FAILED`] and the body becomes OURS: the
+/// Cloud's crash carries no domain code, only DRF's English prose, and that prose is not for a
+/// Spanish screen (hub#1214).
 pub(crate) fn cloud_json_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
+    if status.is_server_error() {
+        tracing::warn!(status = status.as_u16(), "erplora.com answered a server error");
+        return (
+            CLOUD_FAILED,
+            [(axum::http::header::CACHE_CONTROL, "no-store")],
+            Json(json!({ "ok": false, "error": CLOUD_REJECTED })),
+        )
+            .into_response();
+    }
     (
         status,
         [
@@ -312,27 +399,21 @@ pub(crate) async fn proxy_public_cloud_get(
         Ok(response) => response,
         Err(error) => {
             return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "ok": false, "error": error.to_string() })),
+                CLOUD_FAILED,
+                Json(json!({ "ok": false, "error": cloud_unreachable(&error.to_string()) })),
             )
                 .into_response()
         }
     };
-    let status =
-        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let status = cloud_status(response.status().as_u16());
     match response.bytes().await {
-        Ok(body) => (
-            status,
-            [
-                (axum::http::header::CONTENT_TYPE, "application/json"),
-                (axum::http::header::CACHE_CONTROL, "no-store"),
-            ],
-            body,
-        )
-            .into_response(),
+        // Same rule as the hub-scoped doors: a `5xx` of erplora.com does not travel, or the edge
+        // replaces it with its page and the marketplace catalogue reads `error code: 502`
+        // (hub#1763). `cloud_json_passthrough` is the one place that decides it.
+        Ok(body) => cloud_json_passthrough(status, body),
         Err(error) => (
-            StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": error.to_string() })),
+            CLOUD_FAILED,
+            Json(json!({ "ok": false, "error": cloud_unreachable(&error.to_string()) })),
         )
             .into_response(),
     }
@@ -405,6 +486,22 @@ pub(crate) async fn proxy_entitlement(State(st): State<AppState>, headers: Heade
                 None => rate_limited_response(revalidation),
             }
         }
+        // erplora.com crashed. Its body carries no entitlement and no code — and relayed as a
+        // `5xx` it would be replaced by the edge's page (hub#1763), so the shell could not even
+        // read `revalidation`, which is the ONE thing it needs here: «this hub works until
+        // {date}». Same shape as the branch below, which is the other way this call fails.
+        Ok((status, _retry_after, _body)) if status.is_server_error() => {
+            tracing::warn!(status = status.as_u16(), "erplora.com answered a server error");
+            (
+                CLOUD_FAILED,
+                Json(json!({
+                    "ok": false,
+                    "error": CLOUD_REJECTED,
+                    "revalidation": revalidation,
+                })),
+            )
+                .into_response()
+        }
         Ok((status, _retry_after, body)) => match serde_json::from_slice::<Value>(&body) {
             // Body objeto JSON → se le inyecta la clave aditiva.
             Ok(Value::Object(obj)) => {
@@ -425,9 +522,13 @@ pub(crate) async fn proxy_entitlement(State(st): State<AppState>, headers: Heade
             )
                 .into_response(),
         },
-        Err(CloudGetError::Network(msg)) => (
-            StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": msg, "revalidation": revalidation })),
+        Err(CloudGetError::Network(detail)) => (
+            CLOUD_FAILED,
+            Json(json!({
+                "ok": false,
+                "error": cloud_unreachable(&detail),
+                "revalidation": revalidation,
+            })),
         )
             .into_response(),
         Err(e) => cloud_get_error_response(e),
@@ -719,16 +820,13 @@ pub(crate) async fn download_blueprint(
             fetched.zip,
         )
             .into_response(),
-        Err(BlueprintFetchError::Cloud { status, body }) => (
-            status,
-            [(axum::http::header::CONTENT_TYPE, "application/json")],
-            body,
-        )
-            .into_response(),
+        // The SaaS's own refusal (a slug in two languages is a 400 the panel shows), relayed by
+        // the one place that decides what a `5xx` of erplora.com becomes (hub#1763).
+        Err(BlueprintFetchError::Cloud { status, body }) => cloud_json_passthrough(status, body),
         Err(BlueprintFetchError::Network(msg)) => {
             cloud_get_error_response(CloudGetError::Network(msg))
         }
-        Err(BlueprintFetchError::Other(msg)) => bad_gateway(msg),
+        Err(BlueprintFetchError::Other(msg)) => cloud_failed(msg),
     }
 }
 
@@ -790,7 +888,7 @@ pub(crate) async fn fetch_blueprint(
         .send()
         .await
         .map_err(|e| BlueprintFetchError::Network(e.to_string()))?;
-    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let status = cloud_status(resp.status().as_u16());
     let body = resp
         .bytes()
         .await
@@ -843,10 +941,12 @@ pub(crate) async fn fetch_blueprint(
     Ok(FetchedBlueprint { zip, version })
 }
 
-/// 502 con el motivo en JSON (contrato de error del resto de proxies).
-pub(crate) fn bad_gateway(reason: String) -> Response {
+/// «La llamada a erplora.com es lo que falló», con el motivo en JSON: mismo contrato de error que
+/// el resto de proxies y el mismo status, [`CLOUD_FAILED`] — un `5xx` aquí se lo comería el borde
+/// y el motivo no llegaría a la pantalla (hub#1763).
+pub(crate) fn cloud_failed(reason: String) -> Response {
     (
-        StatusCode::BAD_GATEWAY,
+        CLOUD_FAILED,
         Json(json!({ "ok": false, "error": reason })),
     )
         .into_response()

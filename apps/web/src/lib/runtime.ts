@@ -22,12 +22,14 @@ import { getHubSession, logout, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
 import { hubSettings, hubTimezone, publishHubTimezone } from './hub-settings';
+import { normalizePinLength } from './pin-length';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
+import { sessionEndReason } from './session-end-reason';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -92,6 +94,14 @@ export interface HubContext {
    * fallback (`VITE_CLOUD_API_URL`, dev/local only).
    */
   cloud_base_url?: string | null;
+  /**
+   * How many DIGITS this hub's PIN has (hub#974): 4 or 6. It travels in the context because the
+   * screen that needs it —the login pinpad— is the only one WITHOUT a session, and
+   * `GET /api/settings` demands one: without this key the shell fell back to its own default and
+   * painted four circles on a six-digit hub, firing a truncated login on the fourth digit
+   * (hub#1765). Missing → whatever was already known is kept.
+   */
+  pin_length?: unknown;
 }
 
 /**
@@ -171,14 +181,31 @@ export class RuntimeSessionExpiredError extends Error {
  * module, so importing the router back would be a cycle. Closing the session itself is not
  * delegated to the hook — `handleRuntime401` calls `logout()` directly, so the invalidation
  * happens even before `main.ts` has registered anything.
+ *
+ * It receives the REASON the session ended when the runtime knows one (hub#1801, today only
+ * `session_evicted_device_limit`) and `null` when there is nothing to explain. Passing it on
+ * instead of deciding here is deliberate: this module cannot reach the router or the catalogue,
+ * and a reason is only worth anything on the screen that has both.
  */
-let onRuntimeSessionExpired: (() => void) | null = null;
-export function setOnRuntimeSessionExpired(fn: (() => void) | null): void {
+let onRuntimeSessionExpired: ((reason: string | null) => void) | null = null;
+export function setOnRuntimeSessionExpired(fn: ((reason: string | null) => void) | null): void {
   onRuntimeSessionExpired = fn;
 }
 
+/**
+ * What the probe found out. `dead` is the verdict of hub#846; `reason` is what hub#1801 added —
+ * the two are separate on purpose, because «dead, and I can say why» and «dead» must not collapse
+ * into one truthy value that a later reader mistakes for the other.
+ */
+interface SessionVerdict {
+  dead: boolean;
+  reason: string | null;
+}
+
+const ALIVE: SessionVerdict = { dead: false, reason: null };
+
 /** Single-flight death confirmation: one probe per burst, not one per call in flight. */
-let sessionProbe: Promise<boolean> | null = null;
+let sessionProbe: Promise<SessionVerdict> | null = null;
 
 /**
  * Is the local session actually DEAD? A raw `401` is not enough to know: several admin-gated
@@ -189,14 +216,19 @@ let sessionProbe: Promise<boolean> | null = null;
  * session itself is gone. A probe that cannot be read (network failure) answers "not dead":
  * death is proven, never presumed — connectivity must stay a retryable error (hub#770).
  */
-function probeSessionDead(): Promise<boolean> {
+function probeSessionDead(): Promise<SessionVerdict> {
   if (!sessionProbe) {
     sessionProbe = (async () => {
       try {
         const res = await fetch(`${RUNTIME_URL}/api/settings`, { headers: runtimeHeaders() });
-        return res.status === 401;
+        if (res.status !== 401) return ALIVE;
+        // The refusal names WHY, as data (hub#1801). Read only on the death path, and never
+        // allowed to change the verdict: a body that cannot be parsed still means dead — the
+        // session is gone either way, and `sessionEndReason` answers `null` for every silence.
+        const body = await res.json().catch(() => null);
+        return { dead: true, reason: sessionEndReason(body) };
       } catch {
-        return false;
+        return ALIVE;
       }
     })();
     void sessionProbe.finally(() => {
@@ -214,14 +246,14 @@ async function handleRuntime401(): Promise<boolean> {
   // Only a shell that believes it is signed in can be signed out. The login screen probes the
   // runtime without a session and collects 401s legitimately — nothing to react to.
   if (!getHubSession() && !user.value) return false;
-  const dead = await probeSessionDead();
-  if (!dead) return false;
+  const verdict = await probeSessionDead();
+  if (!verdict.dead) return false;
   // Invalidate ONCE: a screen load has dozens of calls in flight and they all hit this on the
   // same dead session. `logout()` clears the local session synchronously, so the first arrival
   // closes it and every other in-flight 401 falls out at this guard.
   if (getHubSession() || user.value) {
     logout();
-    onRuntimeSessionExpired?.();
+    onRuntimeSessionExpired?.(verdict.reason);
   }
   return true;
 }
@@ -1674,8 +1706,11 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     api_docs_enabled: hubSettings.value?.api_docs_enabled ?? false,
     country_code: hubSettings.value?.country_code ?? 'ES',
     region_code: hubSettings.value?.region_code ?? null,
-    // hub#974: la longitud del PIN es del hub (4 o 6). Sin settings todavía, la de un hub nuevo.
-    pin_length: hubSettings.value?.pin_length ?? 4,
+    // hub#974: the PIN length belongs to the hub (4 or 6). The context DOES carry it (hub#1765) —
+    // it is the only read the login screen, which has no session, can make. When this response is
+    // silent (older runtime, failed read) what is already known is kept rather than shortening the
+    // PIN: falling back to 4 on a six-digit hub fires the login truncated at the fourth digit.
+    pin_length: normalizePinLength(ctx.pin_length, hubSettings.value?.pin_length),
     // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
     // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
     business_tax_id: hubSettings.value?.business_tax_id ?? '',

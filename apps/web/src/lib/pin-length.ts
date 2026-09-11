@@ -21,10 +21,21 @@ export const PIN_LENGTHS = [4, 6] as const;
  */
 export const DEFAULT_PIN_LENGTH = 4;
 
-/** La longitud vigente: la del hub si es una de las dos, el default si no hay o no se entiende. */
-export const hubPinLength = computed<number>(() => {
-  const declared = hubSettings.value?.pin_length;
-  return PIN_LENGTHS.includes(declared as (typeof PIN_LENGTHS)[number])
-    ? (declared as number)
+/**
+ * What a hub's answer about its PIN length is worth: the value itself when it is one of the two the
+ * market offers, and `fallback` for anything else (missing, `'6'`, 5, `null`).
+ *
+ * The set is CLOSED on purpose, and it matters more here than in most normalisations: the keypad
+ * **submits on the last circle**, so the length does not decide how many dots are painted but when
+ * the PIN is sent. A length nobody can type leaves the keypad waiting for a digit that never
+ * arrives — a till that does not open.
+ */
+export function normalizePinLength(value: unknown, fallback: number = DEFAULT_PIN_LENGTH): number {
+  if (PIN_LENGTHS.includes(value as (typeof PIN_LENGTHS)[number])) return value as number;
+  return PIN_LENGTHS.includes(fallback as (typeof PIN_LENGTHS)[number])
+    ? fallback
     : DEFAULT_PIN_LENGTH;
-});
+}
+
+/** The length in force: this hub's when it is one of the two, the default when missing or unreadable. */
+export const hubPinLength = computed<number>(() => normalizePinLength(hubSettings.value?.pin_length));

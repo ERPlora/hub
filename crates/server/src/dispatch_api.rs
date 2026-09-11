@@ -149,11 +149,14 @@ pub(crate) const REDACTED_MESSAGE: &str =
 /// variants we deliberately let speak. Matching the driver's signature covers those without
 /// silencing the half of `Other` that says something a person can act on ("usuario no encontrado").
 pub(crate) fn carries_driver_text(message: &str) -> bool {
-    const MARKS: [&str; 4] = [
+    const MARKS: [&str; 5] = [
         "sqlx",
         "error returned from database",
         "PoolTimedOut",
         " at line ",
+        // hub#1689: the suffix `reqwest` puts on every error that dialled somewhere — the URL,
+        // and with it the address of the control plane. Whatever the variant around it.
+        " for url (",
     ];
     MARKS.iter().any(|mark| message.contains(mark))
 }
@@ -337,13 +340,16 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
 ///  - `UnknownOrg` → `403`: el `hub_id` de la petición no pertenece a ninguna org conocida; es un
 ///    intento de acceso cruzado o un hub no provisionado. **No** se cae a ninguna BD.
 ///  - `PoolLimit` → `503`: back-pressure (techo de orgs por proceso alcanzado), reintenta luego.
-///  - `Connect`   → `502`: la Aurora de la org no responde (failover/credencial).
+///  - `Connect`   → `424`: la BD de la org no responde (failover/credencial). Era un `502` hasta
+///    hub#1763: el hub es el ORIGEN, así que el borde SUSTITUYE el cuerpo de un `5xx` por su
+///    página — y con él se va el `code` que el `unwrap(env)` del `module-sdk` necesita, de modo
+///    que el módulo leía `unknown error`. Un `4xx` cruza el proxy con el cuerpo intacto.
 pub(crate) fn tenant_rejected(e: tenant::TenantError) -> Response {
     use tenant::TenantError as T;
     let (status, code) = match &e {
         T::UnknownOrg(_) => (StatusCode::FORBIDDEN, "unknown_org"),
         T::PoolLimit(_) => (StatusCode::SERVICE_UNAVAILABLE, "pool_limit"),
-        T::Connect(_) => (StatusCode::BAD_GATEWAY, "org_db_unavailable"),
+        T::Connect(_) => (crate::cloud_proxy::CLOUD_FAILED, "org_db_unavailable"),
     };
     let body = json!({ "ok": false, "error": { "code": code, "message": e.to_string() } });
     (status, Json(body)).into_response()
@@ -402,11 +408,41 @@ pub(crate) fn auth_rejected(e: auth::AuthError) -> Response {
         .into_response()
 }
 
+/// axum's rejection of a body, said in the shape every other answer of these doors uses (hub#1691).
+///
+/// `Json<T>` refuses a body it cannot read BEFORE the handler runs, and axum answers that on its
+/// own: a line of English prose, no JSON, no `{ok, error}`. Every door this is used on is on the
+/// module surface, and module code reads answers through `unwrap(env)` in `@erplora/module-sdk`,
+/// which looks for `ok` or throws `ErploraError('error', 'unknown error')` — so the sentence
+/// naming the bad field is stripped off on the way and the module is left with nothing to say and
+/// nothing to branch on.
+///
+/// The status is the extractor's own and is NOT flattened: `422` means «read as JSON, a field is
+/// missing» and `400` means «that is not JSON», which is the difference between a body worth
+/// re-sending with a fix and a bug in whatever built the request. The sentence is kept too — it is
+/// the half that names the field — while the code is what a caller branches on (ADR-0055).
+pub(crate) fn invalid_body(rejection: axum::extract::rejection::JsonRejection) -> Response {
+    (
+        rejection.status(),
+        Json(json!({
+            "ok": false,
+            "error": { "code": "invalid_body", "message": rejection.body_text() }
+        })),
+    )
+        .into_response()
+}
+
 pub(crate) async fn query(
     State(st): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<QueryReq>,
+    body: Result<Json<QueryReq>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
+    // Caught rather than left to axum: this is the busiest door a module has, and its rejection
+    // reaches module code as a blank `unknown error` (hub#1691, see `invalid_body`).
+    let Json(req) = match body {
+        Ok(json) => json,
+        Err(rejection) => return invalid_body(rejection),
+    };
     // Tier cloud compartido (ADR-0005): resuelve el runtime de la ORG dueña del `hub_id` de la
     // petición (un pool por org). En single-tenant devuelve el runtime único. El rechazo cross-org
     // (hub_id de org desconocida) ocurre aquí, ANTES de tocar ninguna BD.
@@ -457,8 +493,14 @@ pub(crate) async fn query(
 pub(crate) async fn command(
     State(st): State<AppState>,
     headers: HeaderMap,
-    Json(req): Json<CommandReq>,
+    body: Result<Json<CommandReq>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
+    // Caught rather than left to axum: this is the busiest door a module has, and its rejection
+    // reaches module code as a blank `unknown error` (hub#1691, see `invalid_body`).
+    let Json(req) = match body {
+        Ok(json) => json,
+        Err(rejection) => return invalid_body(rejection),
+    };
     // Mismo enrutado por org que `query` (ADR-0005): el `PgAdapter` de la org corre server-side.
     let arc = match st.runtime_for(&auth::hub_id(&headers, &st.hub_id())).await {
         Ok(rt) => rt,
@@ -657,6 +699,25 @@ mod error_redaction_tests {
         let error = error_of(e);
         assert_eq!(error["message"], REDACTED_MESSAGE);
         assert_eq!(error["code"], "io");
+    }
+
+    /// hub#1689: the `Display` of a `reqwest` error names the URL it dialled — the address this hub
+    /// calls erplora.com on. `Storage`, `Notify` and `Other` are allowed to speak, so a site that
+    /// wraps that `Display` in an authored sentence would publish it through this door. The URL
+    /// suffix is the mark, whatever the variant and whatever the sentence around it.
+    #[test]
+    fn the_address_of_the_control_plane_smuggled_inside_a_storage_error_is_redacted() {
+        let e = RuntimeError::Storage(
+            "Cloud media/upload: error sending request for url \
+             (http://10.10.1.50:3000/api/v1/hub/device/media/)"
+                .into(),
+        );
+        let error = error_of(e);
+        assert_eq!(error["message"], REDACTED_MESSAGE);
+        assert_eq!(
+            error["code"], "module_storage",
+            "the stable code survives the redaction"
+        );
     }
 
     /// The net under the variants we DO let speak: `Other` is a grab-bag of ~50 sites, half of

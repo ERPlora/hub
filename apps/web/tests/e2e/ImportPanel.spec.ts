@@ -12,7 +12,7 @@
 // completo se genera con el PROPIO `POST /api/hub/export` del runtime (round-trip real, cero
 // fixtures). Un hub vacío es EXACTAMENTE el caso de uso del import y navega a /settings sin desvíos.
 
-import { test, expect, request as pwRequest, type Page } from '@playwright/test';
+import { test, expect, request as pwRequest, type Page } from '../bench-boot';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 

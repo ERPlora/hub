@@ -28,8 +28,10 @@ erplora-peripherals = { path = "../../../crates/peripherals" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
-# Canales del worker de la PrintQueue + watchdog (tareas de fondo del shell).
-tokio = { version = "1", features = ["sync"] }
+# Canales del worker de la PrintQueue + watchdog (tareas de fondo del shell). `time` es del
+# guardia de conectividad (hub#1716): espera con backoff sobre un `Notify` mientras la red está
+# caída, y sin timer alguno mientras todo va bien.
+tokio = { version = "1", features = ["sync", "time"] }
 # `device.id` estable por instalación (X-Device-Id del login, §2.9b / sesión única ADR-0154).
 uuid = { version = "1", features = ["v4"] }
 # Notificaciones del SISTEMA: el aviso cuando NADIE mira la pantalla (comanda → cocina). Plugin
@@ -68,6 +70,11 @@ base64 = "0.22"
 # `tests/remote_acl.rs` valida los patrones de `capabilities/default.json` con el MISMO motor que
 # Tauri usa en runtime (`RemoteUrlPattern`), en vez de reimplementar el matching en el test.
 tauri-utils = "2"
+# `test` gives us `tauri::test::mock_builder` + `MockRuntime`, whose `navigate()` records the URL
+# and whose `url()` answers with it. That is what lets `connectivity`'s regression test assert the
+# window MOVED to our offline page and back (hub#1716) instead of asserting on a bool. Dev-only:
+# with resolver 2 this feature never reaches the shipped binary.
+tauri = { version = "2", features = ["test"] }
 
 # Desktop only. On Windows and Linux the OS answers a link by LAUNCHING the executable again with
 # the URL appended, so without this a click would start a SECOND till on top of the first one

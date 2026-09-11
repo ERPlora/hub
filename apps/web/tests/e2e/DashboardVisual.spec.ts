@@ -6,8 +6,8 @@
 // `DashboardPage.spec.ts`). Ese estado vacío es justo lo que hace la captura determinista: sin
 // módulos no hay widgets de negocio que varíen entre corridas, solo el widget CORE de
 // export/import, que vive dentro de `<ok-widget-board>` en todos los presets por defecto.
-import { test, expect } from '@playwright/test';
-import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { test, expect } from '../bench-boot';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — dashboard', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -15,6 +15,7 @@ test.describe('contrato visual del shell — dashboard', () => {
       const snapshot = `dashboard-${width}.png`;
       skipIfBaselineMissingLocally(testInfo, snapshot);
 
+      await freezeVisualClock(page);
       await page.setViewportSize({ width, height });
       await loggedInSession(page);
       await page.goto('/dashboard');
@@ -25,7 +26,9 @@ test.describe('contrato visual del shell — dashboard', () => {
       await expect(page.locator('ok-widget-board')).toBeVisible();
 
       // `fullPage` NO: en Ionic el scroll vive dentro de `ion-content` (mismo criterio que login).
-      await expect(page).toHaveScreenshot(snapshot);
+      // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde
+      // hub#1812: se TAPA, no se compara (`visualSnapshotMask`, hub#1752).
+      await expect(page).toHaveScreenshot(snapshot, { mask: visualSnapshotMask(page) });
     });
   }
 });

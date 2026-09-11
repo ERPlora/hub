@@ -1,6 +1,10 @@
 // Textos del shell (chrome) en español. Solo cubre la navegación, la topbar y el footer del
 // sidebar — NO los textos de cada vista (eso se irá migrando por pantalla). Mantener plano y
 // agrupado por zona para que sea fácil de extender.
+// Un hecho, una frase (hub#1693). Ver el comentario gemelo en `en.ts`: se declara una vez y se
+// referencia, para que la pantalla de conexión y las del back-office no se separen nunca.
+const CLOUD_UNREACHABLE = 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.';
+
 export default {
   // Nombre del idioma para el selector de Ajustes (se muestra tal cual). Requerido en cada locale.
   _meta: { name: 'Español' },
@@ -74,6 +78,20 @@ export default {
     changeHubCancel: 'Cancelar',
     changeHubConfirm: 'Cambiar',
   },
+  // hub#1736 — los dos botones que Ionic pone en TODO diálogo de selección (`ion-select`). Sus
+  // valores por defecto son literales ingleses dentro de la propia librería, y los desplegables que
+  // usa el comerciante los pintan los Web Components de los módulos: se traducen una vez, en el
+  // shell, para todos (`lib/ionic-select-text.ts`).
+  selectDialog: {
+    ok: 'Aceptar',
+    cancel: 'Cancelar',
+  },
+  actionFeedback: {
+    csvExported: 'CSV exportado',
+    csvExportedRows: 'CSV exportado · {n} fila | CSV exportado · {n} filas',
+    csvImported: 'Fichero CSV leído',
+    csvImportedRows: 'Fichero CSV leído · {n} fila | Fichero CSV leído · {n} filas',
+  },
   // hub#1518 — una pantalla cuyo código no llegó (se cortó la conexión, o el fichero se quedó
   // viejo tras un despliegue). Dicho en cristiano: en un mostrador nadie sabe qué es un «chunk».
   viewLoad: {
@@ -94,9 +112,21 @@ export default {
     // quitaría de vista la comanda que se está tomando. Con sus palabras, por lo mismo que arriba.
     brokenToast: 'No se ha podido abrir esa sección. Algo ha fallado dentro de ERPlora; vuelve a intentarlo.',
   },
+  // hub#1723 — an address this hub does not have. NOT a mistake the person made: nine times out
+  // of ten it is an old link or a guess at the name of an app, so the words point at the address
+  // and then at the way out, without blaming anybody.
+  notFound: {
+    title: 'Esta página no existe',
+    body: 'La dirección que has abierto no forma parte de este hub. Puede ser un enlace antiguo, o el nombre de una app adivinado: tus apps se abren desde el menú o desde Inicio.',
+    action: 'Ir a Inicio',
+  },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
   // para dos cosas es como un cajero acaba desinstalando el TPV.
+  installQr: {
+    title: 'Ábrelo en el móvil',
+    hint: 'Escanea el código. Para dejarlo fijo, añádelo a la pantalla de inicio desde el menú del navegador.',
+  },
   appUpdate: {
     available: 'Actualizar ERPlora ({version})',
     confirmTitle: 'Actualizar ERPlora',
@@ -122,6 +152,7 @@ export default {
     close: 'Cerrar',
     noReply: '(sin respuesta)',
     error: 'No se pudo contactar con el asistente.',
+    unavailable: 'El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.',
     // saas#1540 — quedarse sin mensajes es un estado del PLAN, no una avería. Decir «no se
     // pudo contactar» convierte el único momento de conversión del tier gratuito en un fallo.
     quotaTitle: 'Has usado todos tus mensajes del asistente',
@@ -232,6 +263,10 @@ export default {
   // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
   // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
   // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  offline: {
+    title: 'Sin conexión a Internet',
+    body: 'Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
+  },
   setup: {
     title: 'Termina de configurar tu negocio',
     progress: '{done} de {total} hechos',
@@ -240,9 +275,14 @@ export default {
     configure: 'Configurar',
     review: 'Pedírselo al asistente',
     doneLabel: 'Hecho',
-    // Los tres niveles, dichos por lo que significan para el negocio, no por su gravedad.
+    // Los tres niveles. Solo el ⛔ puede nombrar un rechazo, porque es el único que tiene un
+    // dispatcher detrás (`enforce_fiscal_precondition`, ADR-0203) — y lo que rechaza es la FACTURA:
+    // una venta sin identidad fiscal se cierra igual. El 🔴 es un módulo diciendo que su propia
+    // configuración importa, y el core nunca deja que eso se convierta en una condición para
+    // vender: dice cuánto importa y ahí se queda (hub#1726). Guardia:
+    // `i18n/setup-level-copy.test.ts`.
     levelLegal: 'Necesario para facturar',
-    levelFunctional: 'Necesario para vender',
+    levelFunctional: 'Importante',
     levelRecommended: 'Recomendado',
     // El tercer estado: una avería NUESTRA, no una tarea suya. No puede sonar a deber.
     unavailableLabel: 'Todavía no disponible',
@@ -360,6 +400,9 @@ export default {
     // el hub esté vacío, y propone recargar: las apps siguen instaladas.
     appsLoadError:
       'No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.',
+    // hub#1722 — las baldosas del esqueleto son decorativas, así que esta es la frase que lleva una
+    // línea de estado oculta junto a la rejilla para quien no está mirando: en pantalla la dicen las baldosas.
+    appsLoading: 'Cargando tus apps…',
     blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',
@@ -439,6 +482,11 @@ export default {
     saveError: 'No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
   devices: {
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      device_name_too_long: 'Ese nombre es demasiado largo. Ponle uno más corto y vuelve a guardar.',
+      device_not_found: 'Ese dispositivo ya no está registrado aquí. Actualiza la lista.',
+    },
     title: 'Dispositivos',
     intro:
       'Los dispositivos en los que alguien ha entrado. Si pierdes uno, quítalo aquí: su sesión se cierra al momento y deja de poder entrar con PIN.',
@@ -750,6 +798,13 @@ export default {
     ready: 'Imprimiendo en {hosts}',
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
+    ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
+    ticketWaitingForPrinter:
+      'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+    comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
+    comandaWaitingForPrinter:
+      'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
+    comandaDefaultLabel: 'sala',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
@@ -779,7 +834,8 @@ export default {
       no_business_account: 'Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.',
       not_configured: 'WhatsApp todavía no está disponible en este hub. Contacta con soporte.',
       sdk_unavailable: 'No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.',
-      unreachable: 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.',
+      cloud_unreachable: CLOUD_UNREACHABLE,
+      unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
       default: 'Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.',
     },
@@ -965,9 +1021,20 @@ export default {
     loadError: 'No se pudo cargar el catálogo de roles.',
   },
   apiKeys: {
+    // hub#1697 + hub#1700 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      not_found: 'Esa clave ya no existe. Actualiza la lista y vuelve a intentarlo.',
+      rate_limited: 'Demasiados intentos seguidos. Espera un momento y vuelve a intentarlo.',
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede gestionar las claves de API.',
+      api_key: {
+        system_key: 'Esta clave la emite ERPlora para sí misma. No se puede rotar ni borrar.',
+      },
+    },
     // Lista
     searchKey: 'Buscar API key…',
     empty: 'Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos del Hub.',
+    loadError: 'No se pudieron cargar tus claves de API. Vuelve a intentarlo en un momento.',
     newKey: 'Nueva API key',
     colName: 'Nombre',
     colPrefix: 'Token',
@@ -1081,10 +1148,16 @@ export default {
     accountPinHelp:
       'Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {
+      // hub#1697 — ver el comentario gemelo en `en.ts`.
+      last_admin: 'No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.',
+      self_deactivation: 'No puedes darte de baja a ti mismo. Pídeselo a otro administrador.',
+      self_badge_enrollment: 'Nadie da de alta su propia placa. Pídeselo a otro administrador.',
+      not_found: 'Esa persona ya no está en este hub. Actualiza la lista.',
       local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
       account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
       account_role_not_grantable: 'A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.',
       email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
+      user_limit_reached: 'Tu plan tiene todas las plazas ocupadas. Da de baja a alguien que ya no trabaje aquí, o pasa a un plan con más plazas.',
       role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
       owner_row: 'Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido. Para traspasar el negocio, transfiere la cuenta en ERPlora.',
       invalid_email: 'Introduce un email válido.',
@@ -1120,6 +1193,19 @@ export default {
     saving: 'Guardando…',
   },
   system: {
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    reasonUnknown: 'no se ha podido leer el motivo',
+    // hub#1697 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      not_found: 'ese mensaje ya no está en la cola; actualiza la lista.',
+      invalid_payload: 'a ese mensaje le faltan los datos que necesita para volver a enviarse.',
+      flow: {
+        release_revoked: 'se retiró el permiso que lo generó; vuelve a concederlo y lanza la automatización.',
+      },
+      module: {
+        capability_denied: 'la app que lo generó ya no tiene permiso para hacerlo.',
+      },
+    },
     database: 'Base de datos',
     memory: 'Memoria',
     connections: 'Conexiones',
@@ -1214,6 +1300,20 @@ export default {
         'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
       notMeasured: 'No hemos podido leerlo',
     },
+    notices: {
+      primerHeader: 'Deja que te avisemos de las comandas',
+      primerMessage:
+        'Cuando entre una comanda en cocina podemos avisarte, aunque nadie esté mirando esta pantalla. Tu dispositivo te lo preguntará a continuación.',
+      primerLater: 'Ahora no',
+      primerAllow: 'Activar los avisos',
+      blockedTitle: 'Los avisos están desactivados',
+      blockedDetail:
+        'Este dispositivo no te avisará cuando entre una comanda. Actívalos y lo dirá en voz alta, aunque nadie esté mirando la pantalla.',
+      blockedAction: 'Activar los avisos',
+      blockedInSettings:
+        'Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.',
+      turnedOn: 'Listo: este dispositivo te avisará de las comandas nuevas.',
+    },
   },
   planLimits: {
     currentPlan: 'Plan actual',
@@ -1224,6 +1324,7 @@ export default {
     cpu: 'CPU',
     database: 'Base de datos',
     devices: 'Dispositivos',
+    users: 'Personas',
     na: 'n/d',
     naHint: 'No disponible en este equipo',
     capped: 'Límite del plan',
@@ -1234,6 +1335,7 @@ export default {
     cores: '{used} núcleos',
     dbNoQuota: 'Sin cuota de plan',
     activeSessions: '{n} sesiones activas',
+    activeUsers: '{n} personas activas',
     liveNote: 'En vivo — se actualiza cada pocos segundos mientras esta página está abierta.',
     loadErrorTitle: 'Las métricas de recursos no están disponibles',
     loadErrorBody: 'El Hub no ha podido informar de su uso de recursos ahora mismo. Puedes reintentarlo.',
@@ -1242,6 +1344,7 @@ export default {
     upgradeMemory: 'Este hub está cerca de su límite de memoria. Con más margen funcionaría con soltura.',
     upgradeDatabase: 'Tu base de datos está cerca del límite de tu plan.',
     upgradeDevices: 'Estás usando todos los dispositivos que permite tu plan.',
+    upgradeUsers: 'Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más.',
     upgradeWhere: 'Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.',
   },
   billing: {
@@ -1325,8 +1428,15 @@ export default {
     deviceUnidentified:
       'Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.',
     // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
-    // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
+    // otro dispositivo (plan de un solo dispositivo activo). Cableado desde hub#1801: el runtime
+    // nombra el motivo en el 401 de la puerta que sondea el shell, `main.ts` lo trae en la query y
+    // esta pantalla lo pinta. Antes, al desalojado se le devolvía al login sin una palabra, que se
+    // lee como una caída del hub y acaba en una llamada a soporte.
     sessionTakenOver: 'Sesión abierta en otro dispositivo',
+    // El CUERPO dice lo que el título no puede: cuál es la regla (es el plan, no un fallo suyo) y
+    // qué hacer. Se ofrecen los dos gestos, y primero el que no cuesta nada.
+    sessionTakenOverBody:
+      'Tu plan cubre un dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí, o amplía los dispositivos de tu plan.',
     setupChoosePin: 'Elige un PIN de {n} dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
@@ -1559,6 +1669,9 @@ export default {
     loading: 'Cargando módulo…',
     loadError: 'No se pudo cargar el módulo.',
     loadErrorHint: 'Comprueba que el módulo siga instalado y activo, y vuelve a intentarlo.',
+    offlineTitle: 'Sin conexión a Internet',
+    offlineHint:
+      'Esta pantalla necesita la conexión para cargarse. Revisa la red — vuelve sola en cuanto haya Internet otra vez.',
     retry: 'Reintentar',
     blockedTitle: 'Suscripción necesaria',
     blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
@@ -1569,6 +1682,10 @@ export default {
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'Esta app no está disponible para este hub.',
+    // hub#1723 — an address that names a screen this app does not have. It is swapped for the one
+    // it does have (an old link keeps working) and the swap is now said out loud, naming what
+    // ended up on screen: a bare «that does not exist» leaves the person wondering what they see.
+    unknownTabToast: 'Esta app no tiene ninguna pantalla en esa dirección; se muestra «{tab}».',
   },
   moduleSettings: {
     tab: 'Ajustes',
@@ -1604,6 +1721,14 @@ export default {
     managePlan: 'Gestionar plan',
     managePlanError: 'No se pudo abrir la gestión del plan. Inténtalo de nuevo.',
     purchaseDetected: 'Confirmado. Tu plan se ha actualizado.',
+    // Lo que este hub lleva GASTADO de lo que incluye su plan (whatsapp_inbox#131). El nombre de
+    // la métrica lo pone el módulo (`lib/module-quota.ts`): aquí nunca se escribe «conversaciones».
+    usageTitle: 'Este mes',
+    usageOfLimit: '{used} de {limit} {metric}',
+    usageNoLimit: '{used} {metric}',
+    usageNearLimit: 'Estás cerca de lo que incluye tu plan.',
+    usageOverLimit: 'Has consumido todo lo que incluye tu plan este mes.',
+    usageUnavailable: 'No se ha podido leer tu consumo. Inténtalo dentro de un momento.',
     status: {
       active: 'Activo',
       trialing: 'En prueba',
@@ -1679,6 +1804,25 @@ export default {
       inactive: 'Este valor está apagado en este hub.',
       duplicate: 'Este hub ya tiene ese valor.',
     },
+  },
+  // Traducción de `runtimeErrors` en `en.ts`: lo que el runtime contesta cuando falla una puerta
+  // que habla con la nube. Un código sin frase aquí no se pinta nunca; el llamador cae a `default`.
+  runtimeErrors: {
+    cloud_unreachable: CLOUD_UNREACHABLE,
+    install_cloud_unavailable: CLOUD_UNREACHABLE,
+    install_cloud_denied:
+      'ERPlora no ha aceptado las credenciales de este hub, así que no puede instalar apps. Reintentar no lo arregla; avisa a soporte.',
+    install_not_in_catalog: 'Esa app no está disponible en tu catálogo.',
+    install_cloud_rejected:
+      'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
+    cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
+    cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
+    hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+    module: {
+      update_lost:
+        'La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.',
+    },
+    default: 'No ha funcionado. Vuelve a intentarlo dentro de un minuto.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here (translation of the one in `en.ts`)
   // for what the core says when it refuses at the PLATFORM level — a byte-identical copy of

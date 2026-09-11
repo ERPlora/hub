@@ -43,6 +43,15 @@ describe('PlanLimitsPanel', () => {
     expect(source).not.toContain('openExternal');
   });
 
+  // hub#1685 — el plan Gratis promete «3 usuarios» y el panel no los enseñaba por ningún sitio:
+  // el negocio veía su RAM, su BD y sus dispositivos, pero no cuántas personas le caben. Mismo
+  // formato «n / tope» que la tarjeta de dispositivos, que es la que ya funciona.
+  it('pinta las personas del hub frente al tope del plan', () => {
+    expect(source).toContain('metrics.users');
+    expect(source).toContain('maxUsers');
+    expect(source).toContain("t('planLimits.users')");
+  });
+
   it('usa el sistema de i18n (namespace planLimits)', () => {
     expect(source).toContain("t('planLimits.");
   });

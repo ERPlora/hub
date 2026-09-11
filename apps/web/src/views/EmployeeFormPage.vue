@@ -10,32 +10,46 @@
     back-href="/employees"
     content-layout="detail"
   >
-    <div v-if="loading" class="form-loading">
+    <div v-if="loading" class="form-loading" data-testid="employee-loading">
       <ion-spinner name="crescent" />
     </div>
 
     <ok-inline-feedback
       v-else-if="loadError"
+      data-testid="employee-load-error"
       tone="danger"
       icon="alert-circle-outline"
       :heading="t('employeeForm.loadErrorTitle')"
     >
       {{ t('employeeForm.loadErrorBody') }}
-      <ion-button slot="actions" size="small" fill="outline" @click="load">
+      <ion-button slot="actions" size="small" fill="outline" data-testid="employee-retry" @click="load">
         {{ t('employees.retry') }}
       </ion-button>
     </ok-inline-feedback>
 
     <ion-card v-else class="ion-no-margin employee-card">
       <ion-card-content>
-        <form class="emp-form" @submit.prevent="onSave">
-          <ok-inline-feedback v-if="saveError" tone="danger">
+        <form class="emp-form" data-testid="employee-form" @submit.prevent="onSave">
+          <ok-inline-feedback v-if="saveError" data-testid="employee-error" tone="danger">
             {{ saveError }}
+            <!-- hub#1685 — la salida del callejón: sin plaza libre no hay nada que corregir en el
+                 formulario. Etiqueta NEUTRA y destino la página de plan de ESTE hub en la cuenta,
+                 que es la receta permitida (`lib/upgrade-plan-link`), nunca el marketplace. -->
+            <ion-button
+              v-if="offersPlanUpgrade"
+              slot="actions"
+              size="small"
+              fill="outline"
+              @click="onUpgradePlan"
+            >
+              {{ t('nav.upgradePlan') }}
+            </ion-button>
           </ok-inline-feedback>
 
           <div class="form-grid">
             <ion-input
               v-model="form.name"
+              data-testid="employee-name"
               :label="t('employeeForm.fullName')"
               label-placement="floating"
               mode="md"
@@ -51,6 +65,7 @@
             <ion-input
               v-if="!isLocal"
               v-model="form.email"
+              data-testid="employee-email"
               :label="t('employeeForm.email')"
               label-placement="floating"
               mode="md"
@@ -64,6 +79,7 @@
             />
             <ion-select
               v-model="form.role"
+              data-testid="employee-role"
               :label="t('employeeForm.role')"
               label-placement="floating"
               mode="md"
@@ -80,6 +96,7 @@
                  acceso por PIN (seguirá pudiendo entrar por Cloud si tiene cuenta). -->
             <ion-input
               v-model="form.pin"
+              data-testid="employee-pin"
               :label="t('employeeForm.pin')"
               label-placement="floating"
               mode="md"
@@ -98,6 +115,7 @@
                  PIN sigue donde estaba. -->
             <ion-input
               v-model="form.badge"
+              data-testid="employee-badge"
               :label="t('employeeForm.badge')"
               label-placement="floating"
               mode="md"
@@ -115,6 +133,7 @@
           <ion-toggle
             v-if="!isEdit"
             :checked="form.local"
+            data-testid="employee-local"
             label-placement="start"
             justify="space-between"
             class="active-toggle"
@@ -126,6 +145,7 @@
 
           <ion-toggle
             :checked="form.isActive"
+            data-testid="employee-active"
             label-placement="start"
             justify="space-between"
             class="active-toggle"
@@ -140,6 +160,7 @@
             fill="clear"
             size="small"
             class="clear-credential"
+            data-testid="employee-clear-pin"
             :disabled="saving"
             @click="clearPin"
           >
@@ -152,6 +173,7 @@
             fill="clear"
             size="small"
             class="clear-credential"
+            data-testid="employee-clear-badge"
             :disabled="saving"
             @click="clearBadge"
           >
@@ -159,10 +181,16 @@
           </ion-button>
 
           <div class="form-actions">
-            <ion-button type="button" fill="outline" :disabled="saving" @click="onCancel">
+            <ion-button
+              type="button"
+              fill="outline"
+              data-testid="employee-cancel"
+              :disabled="saving"
+              @click="onCancel"
+            >
               {{ t('employeeForm.cancel') }}
             </ion-button>
-            <ion-button type="submit" :disabled="saving || !canSubmit">
+            <ion-button type="submit" data-testid="employee-submit" :disabled="saving || !canSubmit">
               <ion-spinner v-if="saving" slot="start" name="crescent" />
               {{ saving ? t('employeeForm.saving') : isEdit ? t('employeeForm.save') : t('employeeForm.create') }}
             </ion-button>
@@ -201,14 +229,31 @@ import {
   type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
+import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { fieldRefusalOf, invalidFieldMessage } from '../lib/invalid-field';
 import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
 import { onBadgeScan } from '../lib/badge-scanner';
 import { nfcBadgeReady } from '../lib/nfc-badge';
-import { toast } from '../lib/toast';
+import { toast, toastError } from '../lib/toast';
+import { openExternal } from '../lib/open-external';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
+import { saasDoor } from '../lib/saas-door';
+import { getDeviceContext } from '../lib/device';
 
 const { t, te, locale } = useI18n();
+
+/**
+ * hub#1697 — the rung the ladder was missing: a stable code of the `/api/hub/users` guards
+ * (`last_admin`, `self_deactivation`, `self_badge_enrollment`, `not_found`) gets its sentence.
+ * Below it stays rule 2 of hub#1102 — an untranslatable refusal keeps the sentence that came,
+ * because it says more than any generic line of ours.
+ */
+function employeeRejection(error: unknown): string {
+  const byCode = runtimeErrorKey(error, { t, te }, ['employeeForm.errors', 'runtimeErrors']);
+  if (byCode) return t(byCode);
+  return error instanceof Error ? error.message : t('employees.saveError');
+}
 const route = useRoute();
 const router = useRouter();
 const isEdit = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0);
@@ -232,6 +277,15 @@ const loading = ref(true);
 const saving = ref(false);
 const loadError = ref(false);
 const saveError = ref('');
+// hub#1685 — el MOTIVO del aviso, no solo su frase: la salida a gestionar el plan pertenece al
+// tope de plazas y a nada más (un PIN repetido no se arregla pagando).
+const saveErrorKey = ref('');
+// hub#756 — quien reparte el binario pone la regla: en una copia de Play no se ofrece la puerta.
+// Sin señal se ofrece (el navegador no manda `distribution` y negar dejaría a casi todos fuera).
+const canOfferPlanUpgrade = ref(true);
+const offersPlanUpgrade = computed(
+  () => saveErrorKey.value === 'user_limit_reached' && canOfferPlanUpgrade.value,
+);
 /**
  * El rechazo del último guardado, **anclado al campo** que lo causó (hub#1190).
  *
@@ -416,6 +470,7 @@ async function onSave(): Promise<void> {
   if (!canSubmit.value) return;
   saving.value = true;
   saveError.value = '';
+  saveErrorKey.value = '';
   fieldRejection.value = null;
   const name = form.name.trim();
   const email = form.email.trim();
@@ -464,15 +519,28 @@ async function onSave(): Promise<void> {
       ? t(`employeeForm.errors.${key}`)
       : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
         platformFailureMessage(error, locale.value) ??
-        (error instanceof Error ? error.message : t('employees.saveError')));
+        employeeRejection(error));
     const refusal = fieldRefusalOf(error);
     if (!key && refusal && ANCHORED_FIELDS.includes(refusal.field)) {
       fieldRejection.value = { field: refusal.field, message };
     } else {
       saveError.value = message;
+      saveErrorKey.value = key ?? '';
     }
   } finally {
     saving.value = false;
+  }
+}
+
+// pm#196 — cruza por la puerta compartida, igual que el menú: dentro de la app instalada el
+// navegador del sistema NO comparte cookies con el webview, así que sin el pase de un solo uso se
+// aterriza en un login justo al ir a mirar el plan. Si el pase no se puede acuñar, `saasDoor`
+// devuelve el enlace de siempre: degradar, nunca un botón muerto.
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+  } catch {
+    await toastError(t('nav.upgradePlanError'));
   }
 }
 
@@ -501,6 +569,9 @@ onBeforeRouteLeave(async () => confirmDiscard());
 // el mercado usa (Square, Toast, Aloha), sin que el número pueda caer en otro campo por el camino.
 let stopBadgeScan: (() => void) | null = null;
 onMounted(async () => {
+  void getDeviceContext().then((context) => {
+    canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  });
   stopBadgeScan = onBadgeScan((badge) => {
     form.badge = badge;
     hasBadge.value = false;

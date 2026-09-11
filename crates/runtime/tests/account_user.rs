@@ -60,7 +60,7 @@ async fn an_account_user_is_created_with_an_email_and_no_pin_is_required() {
     let rt = runtime("hub-account").await;
 
     let id = rt
-        .create_hub_user(&account("Ana Soto", "ana@example.com", "manager"))
+        .create_hub_user(&account("Ana Soto", "ana@example.com", "manager"), 0)
         .await
         .expect("name + email + role is all an account user needs");
 
@@ -92,7 +92,7 @@ async fn an_account_user_without_an_email_is_rejected_with_a_reason() {
     let rt = runtime("hub-account").await;
 
     let err = rt
-        .create_hub_user(&account("Ana Soto", "", "employee"))
+        .create_hub_user(&account("Ana Soto", "", "employee"), 0)
         .await
         .unwrap_err();
 
@@ -112,7 +112,7 @@ async fn the_invited_email_is_the_one_the_login_looks_for() {
     // default role — two identities for one person, and the role the admin granted silently lost.
     let rt = runtime("hub-account").await;
     let id = rt
-        .create_hub_user(&account("Ana Soto", "ana@example.com", "manager"))
+        .create_hub_user(&account("Ana Soto", "ana@example.com", "manager"), 0)
         .await
         .unwrap();
 
@@ -147,13 +147,13 @@ async fn an_email_this_hub_already_knows_is_never_invited_twice() {
     let rt = runtime("hub-account").await;
     // Stored exactly as the administrator typed it, mixed case and all — nothing normalises it on
     // the way in, so the guard has to be case-insensitive on BOTH sides or half of it is decorative.
-    rt.create_hub_user(&account("Ana Soto", "Ana@Example.com", "employee"))
+    rt.create_hub_user(&account("Ana Soto", "Ana@Example.com", "employee"), 0)
         .await
         .unwrap();
 
     for typed_again in ["ana@example.com", "ANA@EXAMPLE.COM", "Ana@Example.com"] {
         let err = rt
-            .create_hub_user(&account("Ana S.", typed_again, "admin"))
+            .create_hub_user(&account("Ana S.", typed_again, "admin"), 0)
             .await
             .unwrap_err();
         assert_eq!(
@@ -179,7 +179,7 @@ async fn a_membership_that_was_revoked_is_not_resurrected_by_the_alta() {
     // alta is a silent un-revocation that also re-grants whatever role is typed.
     let rt = runtime("hub-account").await;
     let id = rt
-        .create_hub_user(&account("Ana Soto", "ana@example.com", "employee"))
+        .create_hub_user(&account("Ana Soto", "ana@example.com", "employee"), 0)
         .await
         .unwrap();
     let closed = rt
@@ -189,7 +189,7 @@ async fn a_membership_that_was_revoked_is_not_resurrected_by_the_alta() {
     assert_eq!(closed, 1, "the SaaS revoked her membership");
 
     let err = rt
-        .create_hub_user(&account("Ana Soto Gil", "ana@example.com", "admin"))
+        .create_hub_user(&account("Ana Soto Gil", "ana@example.com", "admin"), 0)
         .await
         .unwrap_err();
 
@@ -206,8 +206,7 @@ async fn a_membership_that_was_revoked_is_not_resurrected_by_the_alta() {
             &UpdateHubUser {
                 is_active: Some(true),
                 ..UpdateHubUser::default()
-            },
-        )
+            }, 0,)
         .await
         .expect("reinstating is the door, and it is the administrator who opens it");
     assert!(back.is_active);
@@ -225,7 +224,7 @@ async fn an_account_user_only_carries_a_role_the_saas_can_actually_grant() {
 
     for refused in ["kitchen", "owner", "cashier"] {
         let err = rt
-            .create_hub_user(&account("Ana Soto", "ana@example.com", refused))
+            .create_hub_user(&account("Ana Soto", "ana@example.com", refused), 0)
             .await
             .unwrap_err();
         assert_eq!(
@@ -243,7 +242,7 @@ async fn an_account_user_only_carries_a_role_the_saas_can_actually_grant() {
         ("Luis Prat", "manager"),
         ("Marta Ruiz", "admin"),
     ] {
-        rt.create_hub_user(&account(name, &format!("{granted}@example.com"), granted))
+        rt.create_hub_user(&account(name, &format!("{granted}@example.com"), granted), 0)
             .await
             .unwrap_or_else(|e| panic!("`{granted}` is grantable: {e}"));
     }
@@ -260,7 +259,7 @@ async fn an_account_user_pin_is_optional_but_falls_under_the_same_rules_as_a_loc
     rt.create_hub_user(&NewHubUser {
         pin: "4821".into(),
         ..account("Ana Soto", "ana@example.com", "employee")
-    })
+    }, 0)
     .await
     .expect("an account user may also work the till");
 
@@ -268,7 +267,7 @@ async fn an_account_user_pin_is_optional_but_falls_under_the_same_rules_as_a_loc
         .create_hub_user(&NewHubUser {
             pin: "1234".into(),
             ..account("Luis Prat", "luis@example.com", "employee")
-        })
+        }, 0)
         .await
         .unwrap_err();
     assert_eq!(code_of(&guessable), "hub.users.pin_too_simple");
@@ -277,7 +276,7 @@ async fn an_account_user_pin_is_optional_but_falls_under_the_same_rules_as_a_loc
         .create_hub_user(&NewHubUser {
             pin: "4821".into(),
             ..account("Marta Ruiz", "marta@example.com", "employee")
-        })
+        }, 0)
         .await
         .unwrap_err();
     assert_eq!(code_of(&shared), "hub.users.pin_in_use");
@@ -297,11 +296,11 @@ async fn moving_an_email_onto_one_the_hub_already_knows_is_rejected_too() {
     // without it, the alta guard is theatre — two altas with distinct emails, then one edited onto
     // the other's, and the hub has two rows fighting over one membership.
     let rt = runtime("hub-account").await;
-    rt.create_hub_user(&account("Ana Soto", "ana@example.com", "employee"))
+    rt.create_hub_user(&account("Ana Soto", "ana@example.com", "employee"), 0)
         .await
         .unwrap();
     let luis = rt
-        .create_hub_user(&account("Luis Prat", "luis@example.com", "employee"))
+        .create_hub_user(&account("Luis Prat", "luis@example.com", "employee"), 0)
         .await
         .unwrap();
 
@@ -311,8 +310,7 @@ async fn moving_an_email_onto_one_the_hub_already_knows_is_rejected_too() {
             &UpdateHubUser {
                 email: Some("ana@example.com".into()),
                 ..UpdateHubUser::default()
-            },
-        )
+            }, 0,)
         .await
         .unwrap_err();
     assert_eq!(code_of(&err), "hub.users.email_taken");
@@ -324,8 +322,7 @@ async fn moving_an_email_onto_one_the_hub_already_knows_is_rejected_too() {
             email: Some("luis@example.com".into()),
             role: Some("manager".into()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .expect("editing yourself does not collide with yourself");
 }
@@ -338,7 +335,7 @@ async fn editing_the_email_keeps_the_access_plane_and_the_profile_in_step() {
     // including their baja — keeps pointing at the old one.
     let rt = runtime("hub-account").await;
     let id = rt
-        .create_hub_user(&account("Ana Soto", "ana@example.com", "employee"))
+        .create_hub_user(&account("Ana Soto", "ana@example.com", "employee"), 0)
         .await
         .unwrap();
 
@@ -347,8 +344,7 @@ async fn editing_the_email_keeps_the_access_plane_and_the_profile_in_step() {
         &UpdateHubUser {
             email: Some("a.soto@example.com".into()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
 
@@ -380,7 +376,7 @@ async fn personal_shows_the_email_access_is_administered_by_when_the_two_disagre
     // an administrator reads before deciding.
     let rt = runtime("hub-account").await;
     let id = rt
-        .create_hub_user(&account("Ana Soto", "ana@example.com", "employee"))
+        .create_hub_user(&account("Ana Soto", "ana@example.com", "employee"), 0)
         .await
         .unwrap();
 
@@ -407,7 +403,7 @@ async fn personal_shows_the_email_of_a_user_the_cloud_provisioned() {
     // screen. That is not cosmetic: the server skips the SaaS call for a row with an empty email,
     // so their baja never revoked their membership — they kept seeing this hub in their payload.
     let rt = runtime("hub-account").await;
-    rt.create_login_user("owner@example.com", "admin")
+    rt.create_login_user("owner@example.com", "admin", 0)
         .await
         .unwrap();
 
@@ -427,13 +423,13 @@ async fn no_door_of_the_hub_invites_with_a_role_the_saas_would_refuse() {
     let rt = runtime("hub-account").await;
 
     let err = rt
-        .create_login_user("chef@example.com", "kitchen")
+        .create_login_user("chef@example.com", "kitchen", 0)
         .await
         .unwrap_err();
     assert_eq!(code_of(&err), "hub.users.account_role_not_grantable");
     assert!(rt.list_login_users().await.unwrap().is_empty());
 
-    rt.create_login_user("ana@example.com", "manager")
+    rt.create_login_user("ana@example.com", "manager", 0)
         .await
         .expect("a role the SaaS knows goes through");
 }

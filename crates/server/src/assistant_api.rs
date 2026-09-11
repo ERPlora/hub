@@ -68,14 +68,15 @@ pub(crate) async fn assistant_checkout(
     }
     match r.json(&body).send().await {
         Ok(resp) => {
-            let status =
-                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status = cloud_proxy::cloud_status(resp.status().as_u16());
             let bytes = resp.bytes().await.unwrap_or_default();
             cloud_json_passthrough(status, bytes)
         }
+        // Never a `5xx` of our own: the edge replaces that body with its page and the assistant
+        // drawer loses the code it translates (hub#1763).
         Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            Json(json!({ "ok": false, "error": e.to_string() })),
+            cloud_proxy::CLOUD_FAILED,
+            Json(json!({ "ok": false, "error": cloud_proxy::cloud_unreachable(&e.to_string()) })),
         )
             .into_response(),
     }
@@ -171,8 +172,11 @@ pub(crate) async fn assistant_chat_stream(
     let upstream = match r.send().await.and_then(|resp| resp.error_for_status()) {
         Ok(resp) => resp,
         Err(e) => {
-            // Devuelve un único frame de error en el propio stream SSE.
-            let frame = assistant::sse(&json!({ "type": "error", "error": e.to_string() }));
+            // Devuelve un único frame de error en el propio stream SSE. `error` viaja como CÓDIGO
+            // estable, no como la prosa de `reqwest`: esa nombra la dirección del plano de control
+            // (hub#1689) y el drawer la trata como el motivo del fallo.
+            let code = cloud_proxy::cloud_unreachable(&e.to_string());
+            let frame = assistant::sse(&json!({ "type": "error", "error": code, "code": code }));
             return sse_response(Body::from(frame));
         }
     };
@@ -200,7 +204,10 @@ pub(crate) async fn assistant_chat_stream(
                     buf.push_str(&String::from_utf8_lossy(&chunk));
                 }
                 Poll::Ready(Some(Err(e))) => {
-                    let frame = assistant::sse(&json!({ "type": "error", "error": e.to_string() }));
+                    // El stream se cortó a mitad: mismo criterio que al abrirlo (hub#1689).
+                    let code = cloud_proxy::cloud_unreachable(&e.to_string());
+                    let frame =
+                        assistant::sse(&json!({ "type": "error", "error": code, "code": code }));
                     return Poll::Ready(Some(Ok(bytes_from(frame))));
                 }
                 Poll::Ready(None) => {

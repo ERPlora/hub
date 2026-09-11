@@ -17,6 +17,7 @@
                 <ion-select
                   v-if="isAdmin"
                   v-model="hubCountry"
+                  data-testid="settings-country"
                   interface="popover"
                   :aria-label="t('settings.country')"
                   slot="end"
@@ -43,6 +44,7 @@
                 <ion-select
                   v-if="isAdmin"
                   class="hub-timezone"
+                  data-testid="settings-timezone"
                   v-model="hubTimezoneSetting"
                   interface="popover"
                   :aria-label="t('settings.timezone')"
@@ -75,6 +77,7 @@
                 <ion-select
                   v-if="isAdmin"
                   v-model="hubCurrency"
+                  data-testid="settings-currency"
                   interface="popover"
                   :aria-label="t('settings.currency')"
                   slot="end"
@@ -98,6 +101,7 @@
                 <ion-select
                   v-if="isAdmin"
                   v-model="hubLanguage"
+                  data-testid="settings-hub-language"
                   interface="popover"
                   :aria-label="t('settings.hubLanguage')"
                   slot="end"
@@ -124,6 +128,7 @@
               <div v-if="isAdmin" class="ion-padding-horizontal ion-padding-bottom">
                 <ok-theme-picker
                   hide-mode
+                  data-testid="settings-hub-palette"
                   :palette="hubPalette"
                   :labels.prop="pickerLabels"
                   @ok-change="onHubPaletteChange"
@@ -145,6 +150,7 @@
                 <p>{{ t('settings.showApiDocsDesc') }}</p>
               </ion-label>
               <ion-toggle
+                data-testid="settings-api-docs"
                 :checked="showApiDocs"
                 :disabled="!isAdmin"
                 :aria-label="t('settings.showApiDocs')"
@@ -191,7 +197,7 @@
              que es a donde lleva la fila (antes tenía flecha de «se pulsa» y no hacía nada). -->
         <ion-card>
           <ion-card-content class="p-0">
-            <ion-item button detail lines="none" @click="router.push('/system')">
+            <ion-item button detail lines="none" data-testid="settings-hardware" @click="router.push('/system')">
               <HubIcon slot="start" name="hardware-chip-outline" />
               <ion-label>
                 <h2>{{ t('settings.hardwareTitle') }}</h2>
@@ -249,6 +255,7 @@
               fill="outline"
               label-placement="floating"
               :label="t('settings.fiscalNif')"
+              data-testid="settings-business-tax-id"
               :readonly="!isAdmin"
               v-model="businessTaxId"
               placeholder="B12345678 · FR…"
@@ -259,6 +266,7 @@
               fill="outline"
               label-placement="floating"
               :label="t('settings.fiscalName')"
+              data-testid="settings-business-legal-name"
               :readonly="!isAdmin"
               v-model="businessLegalName"
               placeholder="Mi Empresa SL"
@@ -269,6 +277,7 @@
               fill="outline"
               label-placement="floating"
               :label="t('settings.fiscalAddress')"
+              data-testid="settings-business-address"
               :readonly="!isAdmin"
               auto-grow
               v-model="businessAddress"
@@ -281,6 +290,7 @@
                 <p>{{ t('settings.shareWithErploraDesc') }}</p>
               </ion-label>
               <ion-toggle
+                data-testid="settings-share-with-erplora"
                 :checked="shareWithErplora"
                 :disabled="!isAdmin || sharingFiscalIdentity"
                 :aria-label="t('settings.shareWithErplora')"
@@ -323,14 +333,14 @@
                  barra de pestañas del footer y la cablea `bindTabbar()`, no el consumidor. -->
             <ion-segment
               class="fiscal-route-segment mt-2"
-              data-testid="fiscal-route-segment"
+              data-testid="settings-fiscal-route-segment"
               :value="fiscalRoute"
               @ion-change="onFiscalRouteChange($event)"
             >
-              <ion-segment-button value="delegated" data-testid="fiscal-route-delegated">
+              <ion-segment-button value="delegated" data-testid="settings-fiscal-route-delegated">
                 <ion-label>{{ t('settings.fiscalRouteDelegated') }}</ion-label>
               </ion-segment-button>
-              <ion-segment-button value="own" data-testid="fiscal-route-own">
+              <ion-segment-button value="own" data-testid="settings-fiscal-route-own">
                 <ion-label>{{ t('settings.fiscalRouteOwn') }}</ion-label>
               </ion-segment-button>
             </ion-segment>
@@ -374,6 +384,7 @@
               <!-- Selector de fichero oculto disparado por un ion-button (patrón CSP-safe). -->
               <input
                 ref="certFileInput"
+                data-testid="settings-cert-file"
                 type="file"
                 accept=".p12,.pfx"
                 class="cert-file-input"
@@ -384,6 +395,7 @@
                 expand="block"
                 fill="outline"
                 class="mt-2"
+                data-testid="settings-cert-choose"
                 :disabled="!isAdmin"
                 @click="triggerCertFilePicker"
               >
@@ -398,6 +410,7 @@
                 fill="outline"
                 label-placement="floating"
                 :label="t('settings.certPassword')"
+                data-testid="settings-cert-password"
                 :disabled="!isAdmin"
                 v-model="certPassword"
               />
@@ -405,6 +418,7 @@
               <ion-button
                 expand="block"
                 class="mt-3"
+                data-testid="settings-cert-upload"
                 :disabled="!isAdmin || certBusy"
                 @click="uploadCert"
               >
@@ -418,6 +432,7 @@
                 color="danger"
                 fill="outline"
                 class="mt-2"
+                data-testid="settings-cert-delete"
                 :disabled="!isAdmin || certBusy"
                 @click="removeCert"
               >
@@ -446,7 +461,7 @@
               <p>{{ t('settings.declarationDesc') }}</p>
             </ion-label>
 
-            <p v-if="declarationError" class="responsible-declaration-error mt-2">
+            <p v-if="declarationError" class="responsible-declaration-error mt-2" data-testid="settings-declaration-error">
               {{ t('settings.declarationError') }}
             </p>
 
@@ -461,6 +476,7 @@
               <div class="responsible-declaration-ref mt-2">
                 <a
                   class="responsible-declaration-link"
+                  data-testid="settings-declaration-link"
                   :href="declaration.declarationUrl"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -482,6 +498,7 @@
               <p
                 v-if="!declaration.sistemaInformatico"
                 class="responsible-declaration-pending mt-1"
+                data-testid="settings-declaration-pending"
               >
                 {{ t('settings.declarationPending') }}
               </p>
@@ -522,6 +539,7 @@
                  que aquí solo se resuelve a dónde llevar; y si la app no está, se DICE y se lleva a
                  instalarla, en vez de enseñar un botón mudo. -->
             <ion-item button detail lines="none" class="receipt-template"
+                      data-testid="settings-receipt-template"
                       @click="router.push(receiptTemplate.route)">
               <HubIcon slot="start" name="ticket-outline" />
               <ion-label>
@@ -545,7 +563,7 @@
               <h2>{{ t('print.coverageTitle') }}</h2>
               <p>{{ t('print.coverageDesc') }}</p>
             </ion-label>
-            <p v-if="printCoverageError" class="print-coverage-error mt-2">
+            <p v-if="printCoverageError" class="print-coverage-error mt-2" data-testid="settings-print-coverage-error">
               {{ t('print.coverageError') }}
             </p>
             <ion-list v-else lines="none">
@@ -590,13 +608,14 @@
           </ion-card-content>
         </ion-card>
 
-        <div v-if="permsLoading" class="flex justify-center py-6">
+        <div v-if="permsLoading" class="flex justify-center py-6" data-testid="settings-permissions-loading">
           <ion-spinner name="dots" />
         </div>
 
         <ion-card v-else-if="modulesWithCaps.length === 0">
           <ion-card-content>
             <ok-empty-state
+              data-testid="settings-permissions-empty"
               icon="shield-checkmark-outline"
               :message="t('settings.permissionsNoModules')"
             />
@@ -625,13 +644,14 @@
                     v-if="!cap.granted"
                     color="medium"
                     class="cap-breaks"
-                    :data-testid="`cap-breaks-${cap.id}`"
+                    :data-testid="`settings-capability-breaks-${cap.id}`"
                   >
                     <HubIcon name="warning-outline" class="cap-breaks-icon" />
                     {{ t(capabilityBreaksKey(cap.id)) }}
                   </ion-note>
                 </ion-label>
                 <ion-toggle
+                  :data-testid="`settings-capability-${m.moduleId}-${cap.id}`"
                   :checked="cap.granted"
                   :disabled="!isAdmin"
                   :aria-label="`${cap.label} · ${m.name}`"
@@ -655,20 +675,20 @@
     <template #footer>
       <ion-footer class="ion-no-border">
       <ion-toolbar>
-        <ion-segment class="ok-tabbar" :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
-          <ion-segment-button value="hub">
+        <ion-segment class="ok-tabbar" data-testid="settings-tabs" :value="tab" @ion-change="tab = ($event.detail.value as Tab)">
+          <ion-segment-button value="hub" data-testid="settings-tab-hub">
             <HubIcon name="business-outline" />
             <ion-label>{{ t('settings.tabHub') }}</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="tax">
+          <ion-segment-button value="tax" data-testid="settings-tab-tax">
             <HubIcon name="wallet-outline" />
             <ion-label>{{ t('settings.tabTax') }}</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="tickets">
+          <ion-segment-button value="tickets" data-testid="settings-tab-tickets">
             <HubIcon name="ticket-outline" />
             <ion-label>{{ t('settings.tabTickets') }}</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="permissions">
+          <ion-segment-button value="permissions" data-testid="settings-tab-permissions">
             <HubIcon name="shield-checkmark-outline" />
             <ion-label>{{ t('settings.tabPermissions') }}</ion-label>
           </ion-segment-button>

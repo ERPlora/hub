@@ -17,6 +17,7 @@
   <div class="fill">
     <ok-data-table
       ref="table"
+      data-testid="api-key-table"
       fill
       :columns="columns"
       :rows="rows"
@@ -24,17 +25,17 @@
       :primaryAction="newKeyAction"
       :search-placeholder="t('apiKeys.searchKey')"
       page-size="10"
-      :empty-message="t('apiKeys.empty')"
+      :empty-message="loadError || t('apiKeys.empty')"
       column-picker
     ></ok-data-table>
 
     <!-- ── Modal: crear key (Nombre + matriz módulos × {Lectura, Escritura}) ──────────────── -->
-    <ion-modal :is-open="createOpen" @did-dismiss="closeCreate">
+    <ion-modal :is-open="createOpen" data-testid="api-key-create-modal" @did-dismiss="closeCreate">
       <ion-header class="ion-no-border">
         <ion-toolbar>
           <ion-title>{{ t('apiKeys.newTitle') }}</ion-title>
           <ion-buttons slot="end">
-            <ion-button @click="closeCreate" :aria-label="t('apiKeys.cancel')">
+            <ion-button data-testid="api-key-create-close" @click="closeCreate" :aria-label="t('apiKeys.cancel')">
               <HubIcon name="close-outline" slot="icon-only" />
             </ion-button>
           </ion-buttons>
@@ -95,12 +96,13 @@
           <span class="matrix-hint">{{ t('apiKeys.scopeHint') }}</span>
         </div>
 
-        <div v-if="loadingModules" class="matrix-loading">
+        <div v-if="loadingModules" class="matrix-loading" data-testid="api-key-modules-loading">
           <ion-spinner name="dots" />
           <span>{{ t('apiKeys.loadingModules') }}</span>
         </div>
         <ok-empty-state
           v-else-if="!modules.length"
+          data-testid="api-key-no-modules"
           icon="cube-outline"
           :heading="t('apiKeys.noApiModulesTitle')"
           :message="t('apiKeys.noApiModulesHint')"
@@ -112,6 +114,7 @@
               <th class="m-rw">
                 <span>{{ t('apiKeys.colRead') }}</span>
                 <ion-checkbox
+                  data-testid="api-key-all-read"
                   :checked="allRead"
                   :indeterminate="someRead && !allRead"
                   @ion-change="toggleAll('read', $event)"
@@ -121,6 +124,7 @@
               <th class="m-rw">
                 <span>{{ t('apiKeys.colWrite') }}</span>
                 <ion-checkbox
+                  data-testid="api-key-all-write"
                   :checked="allWrite"
                   :indeterminate="someWrite && !allWrite"
                   @ion-change="toggleAll('write', $event)"
@@ -137,6 +141,7 @@
               </td>
               <td class="m-rw">
                 <ion-checkbox
+                  :data-testid="`api-key-read-${m.id}`"
                   :checked="form.scope[m.id]?.read ?? false"
                   @ion-change="setCell(m.id, 'read', $event)"
                   :aria-label="t('apiKeys.readOf', { module: m.name })"
@@ -144,6 +149,7 @@
               </td>
               <td class="m-rw">
                 <ion-checkbox
+                  :data-testid="`api-key-write-${m.id}`"
                   :checked="form.scope[m.id]?.write ?? false"
                   @ion-change="setCell(m.id, 'write', $event)"
                   :aria-label="t('apiKeys.writeOf', { module: m.name })"
@@ -157,7 +163,7 @@
       <ion-footer class="ion-no-border">
         <ion-toolbar>
           <div class="footer-actions">
-            <ion-button fill="outline" @click="closeCreate">{{ t('apiKeys.cancel') }}</ion-button>
+            <ion-button fill="outline" data-testid="api-key-cancel" @click="closeCreate">{{ t('apiKeys.cancel') }}</ion-button>
             <ion-button data-testid="api-key-create" :disabled="!canCreate || creating" @click="onCreate">
               <ion-spinner v-if="creating" name="dots" slot="start" />
               <HubIcon v-else name="add-outline" slot="start" />
@@ -169,12 +175,12 @@
     </ion-modal>
 
     <!-- ── Modal: secreto generado (se muestra UNA sola vez: crear o rotar) ───────────────── -->
-    <ion-modal :is-open="!!secret" @did-dismiss="closeSecret">
+    <ion-modal :is-open="!!secret" data-testid="api-key-secret-modal" @did-dismiss="closeSecret">
       <ion-header class="ion-no-border">
         <ion-toolbar>
           <ion-title>{{ t('apiKeys.secretTitle') }}</ion-title>
           <ion-buttons slot="end">
-            <ion-button @click="closeSecret" :aria-label="t('apiKeys.done')">
+            <ion-button data-testid="api-key-secret-close" @click="closeSecret" :aria-label="t('apiKeys.done')">
               <HubIcon name="close-outline" slot="icon-only" />
             </ion-button>
           </ion-buttons>
@@ -186,7 +192,7 @@
         </ok-inline-feedback>
         <div class="secret-box">
           <code class="secret-code" data-testid="api-key-secret">{{ secret }}</code>
-          <ion-button fill="solid" @click="copySecret">
+          <ion-button fill="solid" data-testid="api-key-secret-copy" @click="copySecret">
             <HubIcon :name="copied ? 'checkmark-circle-outline' : 'copy-outline'" slot="start" />
             {{ copied ? t('apiKeys.copied') : t('apiKeys.copy') }}
           </ion-button>
@@ -195,7 +201,7 @@
       <ion-footer class="ion-no-border">
         <ion-toolbar>
           <div class="footer-actions">
-            <ion-button @click="closeSecret">{{ t('apiKeys.done') }}</ion-button>
+            <ion-button data-testid="api-key-secret-done" @click="closeSecret">{{ t('apiKeys.done') }}</ion-button>
           </div>
         </ion-toolbar>
       </ion-footer>
@@ -219,9 +225,20 @@ import {
   listApiKeys, createApiKey, rotateApiKey, revokeApiKey,
   type ApiKey, type ApiKeyAccess, type ApiKeyScopeEntry,
 } from '../lib/api-keys';
+import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { formatDate } from '../lib/format-datetime';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
+
+/**
+ * hub#1697 — own sentence first, shared transport line second, this panel's own line last.
+ *
+ * 🔴 Today it always lands on the last one, and that is correct, not a hole (rv-1699): the
+ * `/api/keys` handlers answer a flat `error` string with no `code`, so nothing here is
+ * translatable yet. What this call buys already is that the panel stopped painting
+ * `keys.revoke → 404` at a person. The door and the client get their code in hub#1700.
+ */
+const API_KEY_ERRORS = ['apiKeys.errors', 'runtimeErrors'] as const;
 
 // ── Tipos locales de ok-data-table (OutfitKit no emite .d.ts; mismos shapes que EmployeesPage). ──
 type Row = Record<string, unknown>;
@@ -423,12 +440,24 @@ function toggleAll(kind: 'read' | 'write', e: Event): void {
 }
 
 // ── Carga de datos ─────────────────────────────────────────────────────────────────────────
+/**
+ * Why the list is empty, when it is empty because the door said no (hub#1700).
+ *
+ * It takes the place of the table's own «no API keys yet» line, which is a CLAIM: telling an
+ * administrator whose session just lapsed that this business has no integrations is worse than
+ * saying nothing. Cleared on every successful read.
+ */
+const loadError = ref('');
+
 async function reloadKeys(): Promise<void> {
   try {
     keys.value = await listApiKeys();
-  } catch {
-    // El endpoint puede no existir aún (otro worker): degrada a lista vacía, sin inventar datos.
+    loadError.value = '';
+  } catch (err) {
+    // A refusal is not «none yet». Until hub#1700 this catch swallowed the reason — the door had
+    // none to give — and the screen invited the person to create a key they may not be allowed to.
     keys.value = [];
+    loadError.value = localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.loadError'));
   }
 }
 
@@ -472,7 +501,7 @@ async function onCreate(): Promise<void> {
     await reloadKeys();
     showSecret(created.secret);
   } catch (err) {
-    void toastError(err instanceof Error ? err.message : t('apiKeys.createError'));
+    void toastError(localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.createError')));
   } finally {
     creating.value = false;
   }
@@ -484,7 +513,7 @@ async function onRotate(id: string): Promise<void> {
     await reloadKeys();
     showSecret(s);
   } catch (err) {
-    void toastError(err instanceof Error ? err.message : t('apiKeys.rotateError'));
+    void toastError(localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.rotateError')));
   }
 }
 
@@ -509,7 +538,7 @@ async function onRevoke(id: string, name: string): Promise<void> {
     await reloadKeys();
     void toastSuccess(t('apiKeys.revoked', { name }));
   } catch (err) {
-    void toastError(err instanceof Error ? err.message : t('apiKeys.revokeError'));
+    void toastError(localDoorSentence(err, { t, te }, API_KEY_ERRORS, t('apiKeys.revokeError')));
   }
 }
 
@@ -562,6 +591,7 @@ onBeforeUnmount(() => {
    `fill` resuelva su :host{height:100%} → cabecera/pager fijos y scroll solo en el cuerpo. */
 .fill {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* Cabecera de la matriz de scope dentro del modal de creación. */

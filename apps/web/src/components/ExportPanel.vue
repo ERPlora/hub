@@ -278,8 +278,9 @@ import {
   type BundlePurpose,
   type ExportSelection,
 } from '../lib/runtime';
+import { runtimeErrorSentence } from '../lib/runtime-error-sentence';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 
 // ── Nombre + idioma del blueprint ──
 const name = ref<string>('hub');
@@ -517,7 +518,9 @@ async function doExport(): Promise<void> {
     } else if (e instanceof Error && e.message === 'export → timeout') {
       error.value = t('exportPage.timeout');
     } else {
-      error.value = e instanceof Error ? e.message : String(e);
+      // Y un CÓDIGO estable del runtime (`cloud_unreachable` desde hub#1689) tampoco es una frase:
+      // se traduce, y la prosa honesta del server sigue conservándose (hub#1693).
+      error.value = runtimeErrorSentence(e, { t, te });
     }
   } finally {
     exporting.value = false;

@@ -126,6 +126,44 @@ describe('the ticket on payment (hub#862)', () => {
     expect(onFailure).not.toHaveBeenCalled();
   });
 
+  // hub#1731 — the SILENT failure. `via:'queue'` was read as delivered, so a hub with NO printer
+  // registered took the money, said nothing, and no paper ever came out. Queued and drained is
+  // "late"; queued with nobody registered for the station is "never", and the till has to hear it.
+  it('queued with NOBODY draining the station warns: the paper is not coming out', async () => {
+    const gate = fakeGate({ via: 'queue', role: 'receipt', awaitingHost: true });
+    const onFailure = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: gate.print, onFailure });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    // The warning must say WHICH of the two it is: the ticket is safe in the queue and what is
+    // missing is registering the printer — not the same thing as "it did not print".
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ saleId: '42', awaitingHost: true });
+  });
+
+  it('queued WITH somebody draining it keeps quiet (it comes out late, it is not lost)', async () => {
+    const onFailure = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: fakeGate({ via: 'queue', role: 'receipt', awaitingHost: false }).print, onFailure });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('queued and the runtime did NOT answer coverage keeps quiet (unknown is not "nobody")', async () => {
+    // A warning invented over a well-built hub would show on every ticket and stop being read.
+    const onFailure = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: fakeGate({ via: 'queue', role: 'receipt' }).print, onFailure });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
   it('with the setting off it prints nothing', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 0 } });

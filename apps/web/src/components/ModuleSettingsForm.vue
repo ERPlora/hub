@@ -5,10 +5,18 @@
        lo visible es el botón del shell, no el elemento del módulo. -->
   <div ref="previewHost" hidden />
 
-  <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
+  <div
+    v-if="status === 'loading'"
+    class="flex items-center gap-2 py-8 opacity-70"
+    data-testid="module-settings-loading"
+  >
     <ion-spinner name="crescent" /> {{ t('moduleSettings.loading') }}
   </div>
-  <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
+  <p
+    v-else-if="status === 'error'"
+    class="text-[color:var(--ion-color-danger)]"
+    data-testid="module-settings-error"
+  >
     {{ t('moduleSettings.loadError') }}
   </p>
 
@@ -29,7 +37,11 @@
               <p v-if="field.description">{{ field.description }}</p>
               <!-- El motivo POR CAMPO. El runtime nombra los campos que rechazó (`error.fields`,
                    hub#1094); la frase de cada violación viaja en el mensaje y se pinta arriba. -->
-              <p v-if="invalidFields.has(field.key)" class="field-invalid">
+              <p
+                v-if="invalidFields.has(field.key)"
+                class="field-invalid"
+                :data-testid="`module-settings-invalid-${field.key}`"
+              >
                 {{ t('moduleSettings.fieldInvalid') }}
               </p>
             </ion-label>
@@ -38,6 +50,7 @@
             <ion-toggle
               v-if="field.control === 'toggle'"
               slot="end"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :checked="model[field.key] === true"
@@ -50,6 +63,7 @@
               v-else-if="field.control === 'select'"
               slot="end"
               interface="popover"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :disabled="!canEdit"
@@ -74,6 +88,7 @@
               slot="end"
               class="text-right"
               type="number"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :readonly="!canEdit"
@@ -86,6 +101,7 @@
             <ion-input
               v-else
               slot="end"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :placeholder="t('moduleSettings.textPlaceholder')"
@@ -106,6 +122,7 @@
               slot="end"
               fill="clear"
               size="small"
+              :data-testid="`module-settings-preview-${field.key}`"
               :disabled="previewing === field.key"
               @click="runPreview(field.key)"
             >
@@ -123,6 +140,7 @@
     <ok-inline-feedback
       v-if="saveRefusal"
       class="save-refusal"
+      data-testid="module-settings-refusal"
       tone="danger"
       icon="alert-circle-outline"
       :heading="t('moduleSettings.saveError')"
@@ -130,9 +148,18 @@
       {{ saveRefusal }}
     </ok-inline-feedback>
 
-    <p v-if="!canEdit" class="text-sm opacity-70 mt-2 px-1">{{ t('moduleSettings.adminOnly') }}</p>
+    <p v-if="!canEdit" class="text-sm opacity-70 mt-2 px-1" data-testid="module-settings-admin-only">
+      {{ t('moduleSettings.adminOnly') }}
+    </p>
 
-    <ion-button v-if="canEdit" class="mt-3" expand="block" :disabled="saving" @click="save">
+    <ion-button
+      v-if="canEdit"
+      class="mt-3"
+      expand="block"
+      data-testid="module-settings-save"
+      :disabled="saving"
+      @click="save"
+    >
       <HubIcon slot="start" name="save-outline" />
       {{ t('moduleSettings.save') }}
     </ion-button>
@@ -176,6 +203,7 @@ import type { ModuleSettingsDef, SettingsSchema, SettingsSchemaProperty } from '
 import { ErploraError, type ErploraClient } from '@erplora/module-sdk';
 import HubIcon from './HubIcon.vue';
 import { getClient } from '../lib/runtime';
+import { runtimeErrorKey } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
 import { loadInstalledManifests, loadModuleComponent, loadModuleLocale } from '../lib/module-loader';
 import { moduleBase } from '../lib/module-url';
@@ -200,7 +228,7 @@ const props = defineProps<{
   pageTitle?: string;
 }>();
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const client: ErploraClient = getClient();
 
 const status = ref<'loading' | 'ready' | 'error'>('loading');
@@ -457,9 +485,16 @@ async function save(): Promise<void> {
     // lo que contestó el server — que es infinitamente mejor que el genérico de antes.
     const named = e instanceof ErploraError ? (e.fields ?? []) : [];
     invalidFields.value = new Set(named);
+    // hub#1697 — se separa el TRANSPORTE del rechazo: un código estable (la nube caída, un
+    // permiso) tiene su frase; el rechazo que escribió el MÓDULO es prosa de negocio suya y se
+    // conserva tal cual, que es lo que pedía la issue. Por eso este fichero sigue en la lista de
+    // excepciones de la guardia: pinta el mensaje a propósito, y ese mensaje no es del motor.
+    const byCode = runtimeErrorKey(e, { t, te }, ['runtimeErrors']);
     saveRefusal.value = named.length
       ? t('moduleSettings.invalidFields')
-      : (e instanceof Error && e.message) || t('moduleSettings.saveError');
+      : byCode
+        ? t(byCode)
+        : (e instanceof Error && e.message) || t('moduleSettings.saveError');
     await toastError(t('moduleSettings.saveError'));
   } finally {
     saving.value = false;

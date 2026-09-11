@@ -266,7 +266,7 @@ async fn uninstalling_a_module_retires_its_roles_and_clears_their_activation() {
             // membresía, así que un usuario de CUENTA no puede llevarlo (hub#356).
             local: true,
             ..Default::default()
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -403,7 +403,7 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
             // membresía, así que un usuario de CUENTA no puede llevarlo (hub#356).
             local: true,
             ..Default::default()
-        })
+        }, 0)
         .await
         .expect_err("a role nobody switched on is not live in this hub")
         .to_string();
@@ -419,7 +419,7 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
         pin: "4821".into(),
         local: true,
         ..Default::default()
-    })
+    }, 0)
     .await
     .expect("once it is live, it can be handed out");
 }
@@ -437,7 +437,7 @@ async fn a_free_role_no_module_declares_keeps_being_assignable() {
         pin: "4821".into(),
         local: true,
         ..Default::default()
-    })
+    }, 0)
     .await
     .expect("a role no installed module declares is not gated by the catalogue");
 }

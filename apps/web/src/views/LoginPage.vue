@@ -8,6 +8,7 @@
       <!-- Botón de tema: esquina superior derecha -->
       <ion-button
         fill="clear"
+        data-testid="login-theme"
         :aria-label="t('login.toggleTheme')"
         class="theme-btn"
         @click="toggleTheme"
@@ -37,6 +38,33 @@
             </p>
           </div>
 
+          <!-- hub#1801 — POR QUÉ está aquí quien no pidió estar aquí.
+               El desalojo por el límite de dispositivos del plan es el único motivo que el hub
+               sabe nombrar, y sin esto se devolvía a esa persona al login en silencio: no había
+               tocado nada, así que la lectura a mano es «se ha caído» o «me han cambiado la
+               contraseña». La salida a gestionar el plan va gateada por quién reparte el binario
+               (hub#756) y apunta a la cuenta, nunca al marketplace (hub#479). -->
+          <ok-inline-feedback
+            v-if="sessionEndedNotice"
+            data-testid="login-session-ended"
+            tone="warning"
+            icon="phone-portrait-outline"
+            :heading="t('login.sessionTakenOver')"
+            class="mb-5"
+          >
+            {{ t('login.sessionTakenOverBody') }}
+            <ion-button
+              v-if="offersPlanUpgrade"
+              slot="actions"
+              data-testid="login-upgrade-plan"
+              size="small"
+              fill="outline"
+              @click="onUpgradePlan"
+            >
+              {{ t('nav.upgradePlan') }}
+            </ion-button>
+          </ok-inline-feedback>
+
           <!-- Tarjeta principal -->
           <ion-card class="ion-no-margin login-card">
             <ion-card-content>
@@ -44,24 +72,26 @@
               <!-- Tabs PIN | Email (solo cuando el dispositivo es de confianza y no en setup) -->
               <ion-segment
                 v-if="showTabs"
+                data-testid="login-tabs"
                 :value="step"
                 class="mb-5"
                 @ion-change="step = ($event as CustomEvent<{ value: Step }>).detail.value"
               >
-                <ion-segment-button value="pin">
+                <ion-segment-button value="pin" data-testid="login-tab-pin">
                   <HubIcon name="keypad-outline" />
                   <ion-label>{{ t('login.tabPin') }}</ion-label>
                 </ion-segment-button>
-                <ion-segment-button value="email">
+                <ion-segment-button value="email" data-testid="login-tab-email">
                   <HubIcon name="mail-outline" />
                   <ion-label>{{ t('login.tabEmail') }}</ion-label>
                 </ion-segment-button>
               </ion-segment>
 
               <!-- Paso: login por email+contraseña -->
-              <form v-if="step === 'email'" class="step-form" @submit.prevent="submitEmail">
+              <form v-if="step === 'email'" class="step-form" data-testid="login-email-form" @submit.prevent="submitEmail">
                 <ion-input
                   v-model="emailVal"
+                  data-testid="login-email"
                   :label="t('login.emailLabel')"
                   label-placement="floating"
                   type="email"
@@ -74,6 +104,7 @@
                 />
                 <ion-input
                   v-model="passwordVal"
+                  data-testid="login-password"
                   :label="t('login.passwordLabel')"
                   label-placement="floating"
                   type="password"
@@ -92,6 +123,7 @@
                      marcó un administrador— y ofrecerla haría creer que la casilla cambia algo. -->
                 <div v-if="pinAvailable" class="trust-row">
                   <ion-checkbox
+                    data-testid="login-trust"
                     :checked="trust"
                     label-placement="end"
                     @ion-change="trust = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
@@ -100,6 +132,7 @@
                   </ion-checkbox>
                   <ion-button
                     id="trust-info-btn"
+                    data-testid="login-trust-info"
                     fill="clear"
                     size="small"
                     :aria-label="t('login.trustInfoAria')"
@@ -127,13 +160,14 @@
                   <p>{{ t('login.personalDeviceNote') }}</p>
                 </ion-text>
 
-                <ion-note v-if="emailError" color="danger" class="error-note">
+                <ion-note v-if="emailError" color="danger" class="error-note" data-testid="login-error">
                   {{ emailError }}
                 </ion-note>
 
                 <ion-button
                   type="submit"
                   expand="block"
+                  data-testid="login-submit"
                   :disabled="emailLoading || googleLoading"
                   :aria-label="t('login.signIn')"
                   :aria-busy="emailLoading"
@@ -152,6 +186,7 @@
                   type="button"
                   expand="block"
                   fill="outline"
+                  data-testid="login-google"
                   :disabled="emailLoading || googleLoading"
                   :aria-label="t('login.continueWithGoogle')"
                   :aria-busy="googleLoading"
@@ -169,6 +204,7 @@
                   v-if="pinAvailable && !showTabs"
                   fill="clear"
                   size="small"
+                  data-testid="login-use-pin"
                   @click="step = 'pin'"
                 >
                   {{ t('login.usePinInstead') }}
@@ -179,13 +215,14 @@
                    SOLO en memoria (nunca localStorage): es monouso y transitorio. Un código
                    erróneo devuelve un ticket NUEVO desde el Cloud; lo adoptamos y dejamos
                    reintentar sin pedir de nuevo la contraseña. -->
-              <form v-else-if="step === 'twoFactor'" class="step-form" @submit.prevent="submitTwoFactor">
+              <form v-else-if="step === 'twoFactor'" class="step-form" data-testid="login-2fa-form" @submit.prevent="submitTwoFactor">
                 <ion-text color="medium" class="setup-hint">
                   <p>{{ t('login.twoFactorHint') }}</p>
                 </ion-text>
 
                 <ion-input
                   v-model="twoFactorCode"
+                  data-testid="login-2fa-code"
                   :label="t('login.twoFactorCodeLabel')"
                   label-placement="floating"
                   type="text"
@@ -198,13 +235,14 @@
                   @ion-input="twoFactorCode = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
                 />
 
-                <ion-note v-if="twoFactorError" color="danger" class="error-note">
+                <ion-note v-if="twoFactorError" color="danger" class="error-note" data-testid="login-2fa-error">
                   {{ twoFactorError }}
                 </ion-note>
 
                 <ion-button
                   type="submit"
                   expand="block"
+                  data-testid="login-2fa-submit"
                   :disabled="twoFactorLoading"
                   :aria-label="t('login.twoFactorVerify')"
                   :aria-busy="twoFactorLoading"
@@ -219,14 +257,22 @@
                 <ion-button
                   fill="clear"
                   size="small"
+                  data-testid="login-2fa-back"
                   @click="cancelTwoFactor"
                 >
                   {{ t('login.twoFactorBack') }}
                 </ion-button>
               </form>
 
-              <!-- Paso: login por PIN -->
-              <div v-else-if="step === 'pin'" class="step-form">
+              <!-- Step: PIN login. `step-form--scrolls` ONLY while a person is being chosen: that
+                   list scrolls inside and needs a ceiling. With the keypad on screen it carries no
+                   ceiling at all — that is what was clipping the «0» key (hub#1765). -->
+              <div
+                v-else-if="step === 'pin'"
+                class="step-form"
+                data-testid="login-pin-step"
+                :class="{ 'step-form--scrolls': !pinUser }"
+              >
 
                 <!-- Se dice en los DOS pasos del pinpad: la placa no necesita que se elija a
                      nadie antes (resuelve la persona entera) y tampoco que se toque este campo —
@@ -237,7 +283,7 @@
 
                 <!-- Paso 1: elegir usuario (cuando hay varios en el dispositivo) -->
                 <template v-if="!pinUser">
-                  <ion-text color="medium" class="pin-choose-title">
+                  <ion-text color="medium" class="pin-choose-title" data-testid="login-choose-user">
                     <p>{{ t('login.chooseUser') }}</p>
                   </ion-text>
                   <div class="user-scroll">
@@ -247,6 +293,7 @@
                         :key="u.id"
                         button
                         class="user-card"
+                        :data-testid="`login-pin-user-${u.id}`"
                         @click="selectPinUser(u)"
                       >
                         <ion-card-content class="ion-text-center">
@@ -261,6 +308,7 @@
                     v-if="!showTabs"
                     fill="clear"
                     size="small"
+                    data-testid="login-choose-user-to-email"
                     @click="step = 'email'"
                   >
                     {{ t('login.signInWithEmail') }}
@@ -279,6 +327,7 @@
                   <div class="pinpad-wrap">
                     <ok-pinpad
                       ref="mainPinpadRef"
+                      data-testid="login-pinpad"
                       dots
                       :length="hubPinLength"
                       :error="pinError"
@@ -291,13 +340,14 @@
                     ></ok-pinpad>
                   </div>
 
-                  <ion-note v-if="pinError" color="danger" class="error-note">
+                  <ion-note v-if="pinError" color="danger" class="error-note" data-testid="login-pin-error">
                     {{ t(pinErrorKey) }}
                   </ion-note>
                   <ion-button
                     v-if="!showTabs"
                     fill="clear"
                     size="small"
+                    data-testid="login-pin-to-email"
                     @click="onPinToEmail"
                   >
                     {{ t('login.signInWithEmail') }}
@@ -306,7 +356,7 @@
               </div>
 
               <!-- Paso: alta del PIN (primer login con "Confiar en este dispositivo") -->
-              <div v-else-if="step === 'setup'" class="step-form">
+              <div v-else-if="step === 'setup'" class="step-form" data-testid="login-setup-step">
                 <ion-text color="medium" class="setup-hint">
                   <p>{{ setupPhase === 'first' ? t('login.setupChoosePin', { n: hubPinLength }) : t('login.setupConfirmPin') }}</p>
                 </ion-text>
@@ -315,6 +365,7 @@
                 <div class="pinpad-wrap">
                   <ok-pinpad
                     ref="setupPinpadRef"
+                    data-testid="login-setup-pinpad"
                     dots
                     :length="hubPinLength"
                     :error="setupError"
@@ -322,7 +373,7 @@
                   ></ok-pinpad>
                 </div>
 
-                <ion-note v-if="setupError" color="danger" class="error-note">
+                <ion-note v-if="setupError" color="danger" class="error-note" data-testid="login-setup-error">
                   {{ setupErrorMessage }}
                 </ion-note>
               </div>
@@ -372,6 +423,11 @@ import { deviceMode, deviceTrusted, loadDeviceMode, offersPinLogin } from '../li
 import { pinPolicy } from '../lib/pin-policy';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
+import { SESSION_EVICTED_DEVICE_LIMIT } from '../lib/session-end-reason';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
+import { saasDoor } from '../lib/saas-door';
+import { openExternal } from '../lib/open-external';
+import { getDeviceContext } from '../lib/device';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -499,6 +555,36 @@ watch(
 // EmailForm state
 // ---------------------------------------------------------------------------
 const router = useRouter();
+
+// ---------------------------------------------------------------------------
+// hub#1801 — el motivo por el que esta pantalla está delante de alguien.
+//
+// Llega en la query porque quien lo sabe es el interceptor del runtime
+// (`lib/runtime.ts` → `main.ts`), que no puede pintar nada, y esta pantalla no puede preguntarlo:
+// la sesión de la que se habla ya está cerrada. Solo se pinta lo que el catálogo sabe explicar —
+// `lib/session-end-reason` filtra, así que un código de una release posterior degrada al silencio
+// de hub#846 en vez de acabar en la pantalla en inglés y con guiones bajos.
+// ---------------------------------------------------------------------------
+const sessionEndedNotice = computed(
+  () => router.currentRoute.value.query.reason === SESSION_EVICTED_DEVICE_LIMIT,
+);
+// hub#756 — la regla la pone quien reparte el binario: en una copia de Play no se ofrece la puerta.
+// Sin señal se ofrece (el navegador no manda `distribution`, y negar dejaría a casi todos fuera).
+const canOfferPlanUpgrade = ref(true);
+const offersPlanUpgrade = computed(() => sessionEndedNotice.value && canOfferPlanUpgrade.value);
+
+// pm#196 — por la puerta compartida, igual que el menú de la app: dentro de la app instalada el
+// navegador del sistema NO comparte cookies con el webview, así que sin el pase de un solo uso se
+// aterrizaría en OTRO login justo al ir a mirar el plan. Si el pase no se puede acuñar, `saasDoor`
+// devuelve el enlace de siempre: degradar, nunca un botón muerto.
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+  } catch {
+    emailError.value = t('nav.upgradePlanError');
+  }
+}
+
 const emailVal = ref<string>('');
 const passwordVal = ref<string>('');
 const trust = ref<boolean>(true);
@@ -747,6 +833,13 @@ onMounted(() => {
     void signInWithBadge(badge);
   });
   void handleGoogleCallback();
+  // Solo cuando hay algo que ofrecer: la distribución se pregunta al host de la app, y en una
+  // visita normal al login no hay ningún botón que gatear con su respuesta.
+  if (sessionEndedNotice.value) {
+    void getDeviceContext().then((context) => {
+      canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+    });
+  }
   // Qué clase de dispositivo es este lo dice el HUB (hub#357). Se pregunta aquí, antes de que
   // exista sesión alguna —esta pantalla ES quien decide si se pinta el pinpad—, y la respuesta
   // solo puede quitar fricción: mientras no llegue, o si falla, el dispositivo es `shared`.
@@ -1034,20 +1127,30 @@ async function onSetupComplete(pin: string): Promise<void> {
 }
 
 /* ---- Pasos ---- */
-/* Card de tamaño FIJO: todos los pasos (email / pin / setup / selección de usuario)
- * reservan la misma altura, así no hay salto al cambiar entre pestañas. El paso más
- * alto es el del teclado PIN (~411px); reservamos algo más y centramos el contenido. */
+/* The steps (email / pin / setup / user picker) reserve the same height, so there is no jump when
+ * switching between tabs. */
 .step-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Altura FIJA: misma en email / pin / setup / selección → sin salto al cambiar de paso.
-   * Cabe el paso más alto (teclado PIN ~411px). El contenido se alinea arriba y, en la
-   * selección de usuario, la lista scrollea dentro (ver .user-grid). */
-  height: 26rem;
-  /* Formulario (email / PIN / setup) CENTRADO vertical. En la selección de usuario,
-   * el .user-scroll lleva flex:1 y rellena el alto, así sus cards quedan ARRIBA. */
+  /* FLOOR, not a fixed height (hub#1765). The reservation is still the same across email / setup /
+   * picker → no jump when switching step; what changes is what happens when a step does NOT fit.
+   * The PIN step measures a real 483px —badge hint 48 + avatar and name 68 + keypad 342, plus two
+   * 12px gaps— against a 416px reservation: with `height` the 67px left over spilled out of BOTH
+   * ends (`justify-content: center`) and `ion-card`, which is `overflow: hidden`, clipped the last
+   * row of keys — the «0» button ended 12px below the card's edge (measured on banco-pre, 390×844).
+   * Inside a container that clips, a fixed height can only lose content: here it grows. */
+  min-height: 26rem;
+  /* Form (email / PIN / setup) vertically CENTRED. In the user picker, .user-scroll carries flex:1
+   * and fills the height, so its cards sit at the TOP. */
   justify-content: center;
+}
+/* The ONLY exception: the user picker scrolls INSIDE (`.user-scroll`, `flex: 1`), and for that it
+ * needs a ceiling — without one the list grows downwards instead of scrolling. It lives in its own
+ * class, applied only while that step is on screen, so the fixed height can never again end up
+ * underneath the keypad. */
+.step-form--scrolls {
+  height: 26rem;
 }
 
 /* ---- Trust row ---- */

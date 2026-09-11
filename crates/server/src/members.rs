@@ -33,6 +33,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::auth;
+use crate::cloud_proxy;
 use crate::state::AppState;
 
 /// Body del **alta** (`POST members/`): identifica al usuario por **email** + su **rol Hub**. El rol
@@ -161,7 +162,9 @@ pub(crate) fn members_error_response(e: MembersError) -> Response {
     let (status, code) = match &e {
         // Bootstrap incompleto: el hub no está enrolado → no puede administrar el acceso en el SaaS.
         MembersError::NoMachineToken => (StatusCode::CONFLICT, NOT_ENROLLED),
-        MembersError::Transport(_) => (StatusCode::BAD_GATEWAY, CLOUD_UNREACHABLE),
+        // 424, never a `5xx`: the hub is the ORIGIN, so an edge replaces the body of a `502`
+        // with its own page and `cloud_unreachable` never reaches the staff tab (hub#1763).
+        MembersError::Transport(_) => (cloud_proxy::CLOUD_FAILED, CLOUD_UNREACHABLE),
         // Un 429 NO es un rechazo de negocio: «espera y reintenta» y «arregla lo que has escrito»
         // son acciones opuestas para quien administra, así que llevan códigos distintos. Es el
         // mismo código que ya emite el proxy de entitlement (`entitlement::CLOUD_RATE_LIMITED`).
@@ -169,12 +172,14 @@ pub(crate) fn members_error_response(e: MembersError) -> Response {
             StatusCode::TOO_MANY_REQUESTS,
             crate::entitlement::CLOUD_RATE_LIMITED,
         ),
-        // Reenvía un 4xx del SaaS como 4xx (p. ej. email ya invitado); cualquier otro → 502.
+        // Reenvía un 4xx del SaaS como 4xx (p. ej. email ya invitado); cualquier otro —incluido
+        // un 5xx del SaaS, que relayado se lo comería el borde igual que uno acuñado aquí
+        // (hub#1763)— se cuenta como «la dependencia falló».
         MembersError::Cloud(status, _) => (
             StatusCode::from_u16(*status)
                 .ok()
                 .filter(StatusCode::is_client_error)
-                .unwrap_or(StatusCode::BAD_GATEWAY),
+                .unwrap_or(cloud_proxy::CLOUD_FAILED),
             CLOUD_REJECTED,
         ),
     };
@@ -252,7 +257,15 @@ pub async fn add_member(
         {
             return response;
         }
-        match rt.create_login_user(&email, &role).await {
+        // …y el plan tiene que tener plaza para una persona MÁS (hub#1685). Antes de escribir en
+        // local y antes de llamar al SaaS: una invitación que el hub no puede sostener no sale.
+        if let Some(response) = crate::hub_users::enforce_seat_for_email(&rt, &st, &email).await {
+            return response;
+        }
+        match rt
+            .create_login_user(&email, &role, crate::hub_users::plan_max_users(&st))
+            .await
+        {
             Ok(user) => user,
             Err(e) => return crate::err_response(e),
         }

@@ -195,7 +195,8 @@ function levelNote(item: SetupItem): string {
   if (item.level === LEVEL_LEGAL) {
     return ' — BLOCKS INVOICING: the hub rejects the operation until this is done. This is not advice, it is what the runtime does.';
   }
-  if (item.level === LEVEL_FUNCTIONAL) return ' — needed to sell: the till cannot do its job without it.';
+  if (item.level === LEVEL_FUNCTIONAL)
+    return ' — important: the till does its job worse without it, and nothing is rejected while it is pending.';
   if (item.level === LEVEL_RECOMMENDED) return ' — recommended: the business runs without it.';
   // A level this shell does not know is not guessed into a promise about the runtime.
   return '';

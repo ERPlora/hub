@@ -632,6 +632,36 @@ pub fn last_user_message(frontend: &Value) -> String {
     }
 }
 
+/// The code the SaaS sends when the hub has spent its monthly messages (`QuotaExceeded`).
+const QUOTA_EXCEEDED_CODE: &str = "quota_exceeded";
+
+/// Writes down a turn that erplora.com refused — hub#1738.
+///
+/// The refusal travels INSIDE a `200` stream, so nothing else in the hub sees it: not the status,
+/// not the proxy layer, not the metrics. Relaying it to the drawer and saying nothing left a dead
+/// assistant with no trace anywhere — in PRE every turn had been dying on `No active credential
+/// for provider 'openai'` and the only signal was a person complaining. The reason the SaaS wrote
+/// is the ONLY copy of it: the drawer never shows that prose (ADR-0055), so if the log drops it
+/// too, it is gone.
+///
+/// Quota is excluded on purpose: spending the messages of a plan is that plan working as sold
+/// (saas#1540), and a warning per free hub per month is how the warning that matters gets
+/// ignored.
+fn log_upstream_refusal(ev: &Value) {
+    let code = ev.get("code").and_then(Value::as_str);
+    if code == Some(QUOTA_EXCEEDED_CODE) {
+        return;
+    }
+    // Both fields are resolved BEFORE the macro: inside `warn!` the name `Value` binds to
+    // tracing's own `Value` trait, not to `serde_json::Value`.
+    let detail = ev.get("error").and_then(Value::as_str).unwrap_or("-");
+    tracing::warn!(
+        code = code.unwrap_or("-"),
+        detail = detail,
+        "erplora.com refused the assistant turn"
+    );
+}
+
 /// Traduce **una línea** SSE del Cloud (`data: …`) al frame del frontend.
 ///
 /// Devuelve `Some(frame)` con la línea SSE ya formateada (incluye `\n\n`), o `None` si la línea
@@ -668,7 +698,10 @@ pub fn translate_sse_line(
     }
 
     match ev.get("type").and_then(Value::as_str) {
-        Some("error") => Some(sse(&ev)),
+        Some("error") => {
+            log_upstream_refusal(&ev);
+            Some(sse(&ev))
+        }
         // The POST-turn counters that close every stream (saas#1540, hub#1183). Forwarded
         // VERBATIM like `error`: they are the SaaS's own numbers and the runtime has no business
         // reinterpreting them. It has to be a FRAME and not the `X-Assistant-Usage` header,
@@ -797,6 +830,7 @@ pub fn sse(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::log_capture::captured;
 
     /// Build a `Manifest` from the JSON a real `module.json` carries. Deserializing (rather
     /// than a struct literal) keeps the fixture honest: it exercises the same parse the
@@ -1970,6 +2004,50 @@ mod tests {
         assert_eq!(
             translate_sse_line("data: {\"type\":\"error\",\"error\":\"boom\"}", &k),
             Some(sse(&json!({"type":"error","error":"boom"})))
+        );
+    }
+
+    /// **The mute failure of hub#1738.** In PRE every turn died with
+    /// `{"error":"No active credential for provider 'openai'"}` — erplora.com answering `200`
+    /// with its reason written down — and the hub relayed it to the drawer without writing a
+    /// single line anywhere. The one place that knows the turn was refused said nothing, so the
+    /// only trace of a dead assistant was a person complaining. A failure nobody can see does
+    /// not exist (root CLAUDE.md, «Fallos»).
+    #[test]
+    fn a_refused_turn_is_not_mute_in_the_hub_log() {
+        let k = std::collections::HashMap::new();
+        let refusal = "data: {\"type\":\"error\",\"error\":\"No active credential for provider 'openai'\"}";
+
+        let log = captured(|| {
+            translate_sse_line(refusal, &k);
+        });
+
+        assert!(
+            log.contains("WARN"),
+            "a turn erplora.com refused is a warning, not silence: {log}"
+        );
+        assert!(
+            log.contains("No active credential"),
+            "the log carries the reason the SaaS wrote, which is the only copy of it: {log}"
+        );
+    }
+
+    /// The other half: running out of messages is NOT a breakdown (saas#1540), so it must not
+    /// fill the log with warnings every time a free hub hits its monthly limit. Without this,
+    /// the check above would be satisfied by warning on every single `error` frame — and the
+    /// warning that matters would drown in the expected ones.
+    #[test]
+    fn running_out_of_messages_is_not_logged_as_a_breakdown() {
+        let k = std::collections::HashMap::new();
+        let quota = "data: {\"type\":\"error\",\"code\":\"quota_exceeded\",\"error\":\"Monthly message quota exhausted\"}";
+
+        let log = captured(|| {
+            translate_sse_line(quota, &k);
+        });
+
+        assert!(
+            !log.contains("WARN"),
+            "quota is the plan working as sold, not an incident: {log}"
         );
     }
 

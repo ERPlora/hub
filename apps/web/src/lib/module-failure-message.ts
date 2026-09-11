@@ -17,6 +17,7 @@
 // private to one function. One rule, one place, three callers.
 
 import { ModuleActionError } from './runtime';
+import { runtimeErrorKey, type Translator } from './runtime-error-sentence';
 
 /** The sentence the runtime sent, or `null` when it did not speak. */
 function serverSentence(error: unknown): string | null {
@@ -40,8 +41,17 @@ function serverSentence(error: unknown): string | null {
  *
  * A blank or whitespace-only sentence counts as none: an empty toast is a worse answer than a vague
  * one.
+ *
+ * hub#1693: a STABLE CODE comes first. With erplora.com down, installing answers
+ * `{"code":"install_cloud_unavailable","error":"cloud: cloud_unreachable"}` — `detail` is
+ * sentence-shaped but it is not a sentence, and the toast used to read «cloud: cloud_unreachable».
+ * The translator is required, not optional: an optional argument is exactly the silent path a code
+ * escapes through.
  */
-export function moduleFailureMessage(error: unknown, fallback: string): string {
+export function moduleFailureMessage(error: unknown, fallback: string, i18n: Translator): string {
+  const key = runtimeErrorKey(error, i18n);
+  if (key) return i18n.t(key);
+
   const sentence = serverSentence(error);
   return sentence && sentence.trim() ? sentence : fallback;
 }

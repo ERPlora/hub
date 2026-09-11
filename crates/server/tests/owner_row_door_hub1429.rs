@@ -57,7 +57,7 @@ async fn fixture(hub_id: &str) -> Fixture {
             email: "ana@example.com".into(),
             role: "admin".into(),
             ..NewHubUser::default()
-        })
+        }, 0)
         .await
         .unwrap();
     let employee = rt
@@ -66,7 +66,7 @@ async fn fixture(hub_id: &str) -> Fixture {
             email: "luis@example.com".into(),
             role: "employee".into(),
             ..NewHubUser::default()
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -266,7 +266,7 @@ async fn a_refused_role_change_leaves_the_local_row_untouched() {
     .await;
     assert_eq!(
         status,
-        StatusCode::BAD_GATEWAY,
+        StatusCode::FAILED_DEPENDENCY,
         "the SaaS is unreachable, so the change cannot be honoured: {body}"
     );
     assert_eq!(body["error"]["code"], "cloud_unreachable");
@@ -310,7 +310,7 @@ async fn a_baja_closes_the_local_door_even_with_the_cloud_down() {
         .body(Body::empty())
         .unwrap();
     let response = fx.router.clone().oneshot(request).await.unwrap();
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763
     assert_eq!(
         row(&fx, &fx.employee_id).await["is_active"],
         false,

@@ -26,6 +26,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::e2e_support::units;
 use erplora_runtime::outbox::{RetryOutcome, FAILURE_CAPABILITY_DENIED};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
@@ -130,7 +131,7 @@ async fn charge_one_sale(rt: &Runtime, ctx: &RequestContext) -> String {
             "payment_method_id": cash_method_id(rt, ctx).await,
             "customer_name": "Bar Manolo",
             "tax_included": false,
-            "items": [{ "product_name": "Café", "price": 200, "quantity": 2, "tax_rate": 21.0 }]
+            "items": [{ "product_name": "Café", "price": 200, "quantity": units(2), "tax_rate": 21.0 }]
         })),
         ctx,
     )

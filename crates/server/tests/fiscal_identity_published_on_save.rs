@@ -361,7 +361,9 @@ async fn the_explicit_door_reports_an_unreachable_control_plane_by_code_too() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    // hub#1763: `424`, no `502` — el borde sustituye el cuerpo de un `5xx` por su propia página, y
+    // con él se iría el `cloud_unreachable` que la línea de abajo exige que llegue al navegador.
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
     let body = body_json(response).await;
     assert_eq!(body["error"], json!("cloud_unreachable"), "{body}");
     let text = body.to_string();

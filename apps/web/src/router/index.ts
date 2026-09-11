@@ -13,7 +13,7 @@ import { browserRecoveryStorage, clearViewLoadRecovery, recoverFromViewLoadError
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
-const routes: RouteRecordRaw[] = [
+export const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: () => import('../views/LoginPage.vue') },
   // Callback del OAuth de Google del SaaS (ADR-0157 §8): el SaaS redirige aquí con un `?code=` de
@@ -50,10 +50,29 @@ const routes: RouteRecordRaw[] = [
   { path: '/m/:moduleId/:navId?', name: 'module', component: () => import('../views/ModuleView.vue'), meta: { auth: true } },
   // Pantalla de activación: hay sesión pero el hub no tiene un entitlement válido (§2.10).
   { path: '/activation', name: 'activation', component: () => import('../views/ActivationPage.vue'), meta: { auth: true } },
-  // Catch-all: cualquier ruta desconocida (incl. las retiradas /export y /import → ahora en
-  // Ajustes → Datos, ADR-0116, y la retirada /first-run) cae al inicio en vez de dejar el
-  // outlet en blanco.
-  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+  // The RETIRED routes keep their destination, one by one. They used to live off the catch-all
+  // below while it led to Home; now that it answers 404 (hub#1723), the explicit redirect is the
+  // only thing that keeps three addresses that used to work from breaking. `/export` and
+  // `/import` are the pages ADR-0113/0116 moved INTO Settings → Data, so that is where they go —
+  // not Home, which was merely where the catch-all dropped them.
+  { path: '/export', redirect: '/settings#data' },
+  { path: '/import', redirect: '/settings#data' },
+  // And setting up lives on Home today (core widget + Data tab); retired on 12/07.
+  { path: '/first-run', redirect: '/dashboard' },
+  // Catch-all: an address this hub does NOT have SAYS so (hub#1723). It used to redirect to
+  // /dashboard, and a redirect is silent by definition — it rewrites the address bar, so it
+  // destroys on the way in the evidence that the link was wrong: whoever pasted `/tpv` or `/sales`
+  // saw Home with its menu and believed they were where they had asked for. It is a `component`
+  // and not a `redirect` precisely so the requested address STAYS in the bar and the typo can be
+  // read back.
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('../views/NotFoundPage.vue'),
+    // Behind a session, like the rest of the shell: a stranger with a broken link keeps seeing the
+    // login screen and not the hub's chrome, exactly as today.
+    meta: { auth: true },
+  },
 ];
 
 // DO NOT MOVE THIS BELOW `createWebHistory()` — it is the whole fix for hub#755.

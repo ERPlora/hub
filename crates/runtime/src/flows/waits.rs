@@ -46,8 +46,8 @@ use erplora_db::{DatabaseAdapter, Params};
 
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{
-    self, Condition, DelayStep, ErrorPolicy, PastDuePolicy, WaitKind, ERR_DELAY_HORIZON,
-    ERR_MAX_RESCHEDULES, MAX_RESCHEDULES,
+    self, DelayStep, ErrorPolicy, PastDuePolicy, WaitKind, ERR_DELAY_HORIZON, ERR_MAX_RESCHEDULES,
+    MAX_RESCHEDULES,
 };
 use crate::flows::executor;
 use crate::flows::store;
@@ -218,7 +218,9 @@ pub async fn on_event(
     event_name: &str,
     payload: &Params,
 ) -> Result<usize> {
-    let scope = json!({ "event": Json::Object(payload.clone()) });
+    // Same scope the trigger's filter gets, clock included (hub#1694): a hook's `filter` is the
+    // same language, judged the same way.
+    let scope = def::event_scope(payload);
     let candidates = candidates(db, hub_id, event_name, &scope).await?;
     let mut fired = 0usize;
 
@@ -305,13 +307,21 @@ async fn candidates(
 /// Does this wait's filter pass AND does every correlated pair agree?
 ///
 /// Both halves are evaluated here rather than in SQL for the same reason the trigger's filter is:
-/// the condition language is the kernel's, and re-expressing nine operators as SQL would be a
+/// the condition language is the kernel's, and re-expressing ten operators as SQL would be a
 /// second implementation to keep in step with the first.
 fn matches(row: &Json, scope: &Json) -> bool {
-    let filter = serde_json::from_str::<Json>(&text(row, "filter"))
-        .ok()
-        .and_then(|v| Condition::parse(&v).ok())
-        .unwrap_or_default();
+    // A filter this core cannot read narrows to NOTHING (hub#1714), the same answer the
+    // correlation below has always given — and for the same reason: read as the empty condition it
+    // is an `all()` over nothing, so it used to wave through every occurrence of the event and
+    // leave the correlation as the only narrowing left.
+    let owner = def::FilterOwner {
+        kind: "wait",
+        id: &text(row, "id"),
+        flow_id: &text(row, "flow_id"),
+    };
+    let Some(filter) = def::read_stored_filter(&text(row, "filter"), &owner) else {
+        return false;
+    };
     if !filter.matches(scope) {
         return false;
     }
@@ -752,6 +762,46 @@ mod tests {
                 !matches(&row, &json!({ "event": { "id": 42 } })),
                 "{correlate}"
             );
+        }
+    }
+
+    /// hub#1714 — the OTHER half of the rule the test above states, and the one that was missing:
+    /// a filter this core cannot read must match NOTHING either. Read as `Condition::default()` it
+    /// is the empty map, and `matches` is an `all()` over it — so an unreadable filter used to wave
+    /// through every occurrence of the event, leaving the correlation as the only narrowing left.
+    ///
+    /// `{"steps.t.at": {"gte": "now.iso"}}` is the shape hub#1713 created: stored fine by an older
+    /// hub, refused by `Condition::parse` since that PR.
+    #[test]
+    fn an_unreadable_filter_matches_nothing_hub1714() {
+        for filter in [
+            "",
+            "not json",
+            "[]",
+            "7",
+            r#"{"event.total": 100}"#,
+            r#"{"event.total": {"greater_than": "100"}}"#,
+            r#"{"steps.t.at": {"gte": "now.iso"}}"#,
+        ] {
+            let row =
+                json!({ "filter": filter, "correlate": json!({ "event.id": "42" }).to_string() });
+            assert!(
+                !matches(&row, &json!({ "event": { "id": 42, "total": "120.50" } })),
+                "filter `{filter}` cannot be read, so it must not match"
+            );
+        }
+    }
+
+    /// The control: `{}` and an absent filter ARE readable and mean «no filter written», so the
+    /// correlation alone decides. Without this, a guard that refused every filter would disarm
+    /// every wait in the hub and still look green.
+    #[test]
+    fn a_readable_empty_filter_still_leaves_the_correlation_deciding_hub1714() {
+        for filter in ["{}", "null"] {
+            let row =
+                json!({ "filter": filter, "correlate": json!({ "event.id": "42" }).to_string() });
+            assert!(matches(&row, &json!({ "event": { "id": 42 } })), "{filter}");
+            assert!(!matches(&row, &json!({ "event": { "id": 7 } })), "{filter}");
         }
     }
 

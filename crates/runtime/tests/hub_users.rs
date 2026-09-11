@@ -72,7 +72,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
             pin: "4821".into(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -93,8 +93,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
             email: Some("m.ruiz@example.com".into()),
             role: Some("manager".into()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
 
@@ -110,8 +109,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
         &UpdateHubUser {
             is_active: Some(false),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
 
@@ -140,7 +138,7 @@ async fn resets_the_pin_and_clears_it_when_empty() {
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
     assert!(!row(&rt, &id).await.has_pin, "alta sin PIN");
@@ -150,8 +148,7 @@ async fn resets_the_pin_and_clears_it_when_empty() {
         &UpdateHubUser {
             pin: Some("4242".into()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
     assert!(row(&rt, &id).await.has_pin);
@@ -162,8 +159,7 @@ async fn resets_the_pin_and_clears_it_when_empty() {
         &UpdateHubUser {
             pin: Some(String::new()),
             ..UpdateHubUser::default()
-        },
-    )
+        }, 0,)
     .await
     .unwrap();
     assert!(!row(&rt, &id).await.has_pin, "PIN vacío = se retira");
@@ -181,7 +177,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap_err();
     assert!(
@@ -197,7 +193,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             pin: "12".into(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap_err();
     assert!(
@@ -213,7 +209,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap_err();
     assert!(
@@ -229,7 +225,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap_err();
     assert!(
@@ -352,7 +348,7 @@ async fn a_module_reads_the_hub_users_through_the_dispatcher() {
         badge: String::new(),
         local: true,
         ..NewHubUser::default()
-    })
+    }, 0)
     .await
     .unwrap();
 
@@ -491,7 +487,7 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -542,7 +538,7 @@ async fn the_self_service_pin_door_requires_the_current_pin_once_one_exists() {
             pin: "3216".into(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
     assert!(row(&rt, &id).await.has_pin);
@@ -607,7 +603,7 @@ async fn the_self_service_pin_door_refuses_a_pin_another_active_user_already_has
         pin: "4455".into(),
         badge: String::new(),
         local: false,
-    })
+    }, 0)
     .await
     .unwrap();
     let id = rt
@@ -618,7 +614,7 @@ async fn the_self_service_pin_door_refuses_a_pin_another_active_user_already_has
             pin: String::new(),
             badge: String::new(),
             local: false,
-        })
+        }, 0)
         .await
         .unwrap();
 
@@ -657,7 +653,7 @@ async fn the_length_is_the_hubs_and_a_pin_of_another_length_is_refused() {
             pin: "2580".into(), // cuatro, en un hub que pide seis
             badge: String::new(),
             local: true,
-        })
+        }, 0)
         .await
         .expect_err("la longitud es fija: cuatro no cuela en un hub de seis");
     assert!(
@@ -672,7 +668,7 @@ async fn the_length_is_the_hubs_and_a_pin_of_another_length_is_refused() {
         pin: "258013".into(),
         badge: String::new(),
         local: true,
-    })
+    }, 0)
     .await
     .expect("seis dígitos sí");
 }
@@ -692,7 +688,7 @@ async fn a_hub_that_says_nothing_keeps_the_length_its_pins_were_typed_with() {
             pin: "2580".into(),
             badge: String::new(),
             local: true,
-        })
+        }, 0)
         .await
         .expect("cuatro dígitos siguen valiendo");
     assert!(rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some());
@@ -710,8 +706,7 @@ async fn a_hub_that_says_nothing_keeps_the_length_its_pins_were_typed_with() {
             &UpdateHubUser {
                 pin: Some("2580".into()),
                 ..UpdateHubUser::default()
-            },
-        )
+            }, 0,)
         .await
         .expect_err("pero uno nuevo ya tiene que ser de seis");
     assert!(format!("{err}").contains('6'), "{err}");

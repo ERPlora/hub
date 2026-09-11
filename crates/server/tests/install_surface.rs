@@ -236,9 +236,9 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
 /// obligatorio del grant (ADR-0015).
 ///
 /// Este test afirmaba lo contrario (403) porque fijaba el default de hub#239. Ese default **tumbó
-/// producción**: el provisioning nunca inyecta `HUB_MODULE_TRUSTED_KEYS`, así que TODA imagen
-/// quedaba en `Enforce(<anillo vacío>)` = deny-all mientras **nadie firma** (`signing-key/` da 404
-/// y `versions/` no expone `signature`). Resultado: `request-install` devolvía 403 y el import de
+/// producción**: el provisioning no inyectaba `HUB_MODULE_TRUSTED_KEYS`, así que TODA imagen
+/// quedaba en `Enforce(<anillo vacío>)` = deny-all mientras **nadie firma** (`signing-key/` sigue
+/// dando 404 hoy). Resultado: `request-install` devolvía 403 y el import de
 /// blueprint fallaba en 13 de 13 módulos — un hub nuevo no se podía poblar por ninguna vía.
 ///
 /// Y no es una licencia nueva: ADR-0193 ya lo exigía en sus consecuencias — «hasta entonces el Hub
@@ -254,7 +254,8 @@ async fn sin_anillo_desplegado_un_modulo_sin_firma_si_se_instala() {
     std::fs::create_dir_all(base.join("module_cache")).unwrap();
 
     let zip = module_zip("notes");
-    // El mock cloud NO firma (como el serializer del Cloud actual, que aún no expone signature).
+    // El mock cloud NO firma: es la foto de una versión publicada antes de que el marketplace
+    // tuviera clave, que es todo el catálogo de hoy.
     let cloud = spawn_mock_cloud(zip, None).await;
 
     let db = fresh_db().await;
@@ -302,7 +303,7 @@ async fn con_anillo_desplegado_un_modulo_sin_firma_se_rechaza() {
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(base.join("module_cache")).unwrap();
 
-    // El mock cloud NO firma (como el serializer del Cloud de hoy).
+    // El mock cloud NO firma (versión publicada sin clave en el marketplace).
     let cloud = spawn_mock_cloud(module_zip("notes"), None).await;
 
     let db = fresh_db().await;
@@ -339,6 +340,82 @@ async fn con_anillo_desplegado_un_modulo_sin_firma_se_rechaza() {
     let _ = std::fs::remove_dir_all(&base);
 }
 
+/// 🔒 **hub#870 — guardia de regresión permanente: una firma INVÁLIDA no instala nada.**
+///
+/// Los tests de arriba cubren «sin firma» (ausente). Este cubre el caso que motiva la firma y que
+/// el SHA256 del grant **no** puede cubrir: el zip lo sirve la misma API que publica su hash, así
+/// que quien controle el Object Storage puede sustituir el artefacto *y* su hash. Lo único que lo
+/// detecta es que la firma no case, y hay dos formas de que no case:
+///
+///  1. **Artefacto manipulado** — la firma del catálogo es auténtica pero cubre OTROS bytes.
+///  2. **Firmante ajeno** — la firma es impecable, pero de una clave que no está en el anillo
+///     (un tercero firmando con la suya: exactamente lo que abre el marketplace a terceros).
+///
+/// El control positivo va DENTRO del test a propósito: con el mismo anillo y el mismo zip, la
+/// firma BUENA sí instala. Sin él, un mock roto (o un 403 por cualquier otro motivo) haría pasar
+/// las dos mitades negativas sin probar nada.
+#[tokio::test]
+async fn con_anillo_desplegado_una_firma_invalida_no_instala() {
+    let rng = ring::rand::SystemRandom::new();
+    let (marketplace, _) = cloud_client::Signer::generate(&rng);
+    let (impostor, _) = cloud_client::Signer::generate(&rng);
+    let trusted = vec![format!("marketplace={}", hex::encode(marketplace.public_key()))];
+    let zip = module_zip("notes");
+
+    // (1) firma auténtica del marketplace, pero sobre OTROS bytes que los que se descargan.
+    let tampered = marketplace.sign("marketplace", b"otro artefacto entero");
+    // (2) firma perfecta sobre ESTOS bytes, de una clave que el hub no confía.
+    let foreign = impostor.sign("marketplace", &zip);
+    // (3) control positivo: la firma que sí debe pasar.
+    let good = marketplace.sign("marketplace", &zip);
+
+    for (tag, signature, esperado) in [
+        ("tampered", tampered, StatusCode::FORBIDDEN),
+        ("foreign", foreign, StatusCode::FORBIDDEN),
+        ("good", good, StatusCode::OK),
+    ] {
+        let base = std::env::temp_dir().join(format!(
+            "erplora-install-surface-badsig-{tag}-{pid}",
+            pid = std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&base);
+        // Cache LIMPIO: con cache-hit el hub no descargaría y se saltaría la verificación.
+        std::fs::create_dir_all(base.join("module_cache")).unwrap();
+
+        let cloud = spawn_mock_cloud(zip.clone(), Some(signature)).await;
+        let db = fresh_db().await;
+        let rt = Runtime::with_hub_id(Box::new(db), "hub-install");
+        rt.ensure_system_tables().await.unwrap();
+        let mut cfg = config(&base, false); // producción
+        cfg.cloud_base_url = cloud;
+        cfg.module_trusted_keys = trusted.clone();
+        let router = app(AppState::with_config(rt, cfg));
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/modules/request-install")
+            .header("content-type", "application/json")
+            .header("x-permissions", "*")
+            .body(Body::from(json!({ "module_id": "notes" }).to_string()))
+            .unwrap();
+        let resp = router.clone().oneshot(req).await.unwrap();
+        assert_eq!(
+            resp.status(),
+            esperado,
+            "caso `{tag}`: una firma que no verifica contra el anillo NO puede instalar, y la \
+             buena SÍ tiene que instalar (si esto falla en `good`, el test negativo no prueba nada)"
+        );
+
+        let quedo_instalado = installed_ids(&router).await.contains(&"notes".to_string());
+        assert_eq!(
+            quedo_instalado,
+            esperado == StatusCode::OK,
+            "caso `{tag}`: el módulo solo puede quedar instalado con firma válida"
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
 /// `module.zip` mínimo publicable (mismo patrón que `tests/install_progress.rs`).
 fn module_zip(id: &str) -> Vec<u8> {
     let manifest = json!({ "id": id, "name": id, "version": "1.0.0" });
@@ -373,8 +450,8 @@ async fn spawn_mock_cloud(
     let pkg: Pkg = std::sync::Arc::new((zip_bytes, sha, signature));
 
     async fn versions(State(pkg): State<Pkg>) -> Json<Value> {
-        // Expone sha256 (integridad) y, si la hay, signature (autenticidad). El serializer del
-        // Cloud real aún no expone `signature` (TODO); el mock sí para ejercitar la verificación.
+        // Expone sha256 (integridad) y, si la hay, signature (autenticidad) — la misma forma que
+        // sirve `ModuleVersionSerializer` del SaaS desde saas#1722.
         let mut entry = json!({ "version": "1.0.0", "is_active": true, "sha256": pkg.1 });
         if let Some(sig) = &pkg.2 {
             entry["signature"] = serde_json::to_value(sig).unwrap();

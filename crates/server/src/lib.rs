@@ -70,14 +70,20 @@ pub mod ingest;
 pub mod install;
 pub mod install_guard;
 pub mod logging;
+/// Shared `tracing` capture for the tests of this crate (hub#1796). Test-only: it never ships.
+#[cfg(test)]
+mod log_capture;
 pub mod login_throttle;
 pub mod media;
 pub mod members;
 pub mod module_storage;
 pub mod notify_transport;
 pub mod openapi;
+/// Catalogue of the operations this hub's dispatcher accepts, by exact name — hub#1757.
+pub mod operations_catalog;
 /// Operable dead-letter of the event outbox: list · retry · discard — hub#660 (ADR-0127 phase 2).
 pub mod outbox_admin;
+pub mod policies_api;
 pub mod print;
 pub mod print_ws;
 pub mod profile;
@@ -100,7 +106,8 @@ pub mod whatsapp_quota;
 pub mod whatsapp_templates;
 
 pub use state::{
-    AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, WsEvent, DEV_HUB_ID,
+    AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, SignatureMode, WsEvent,
+    DEV_HUB_ID,
 };
 pub use tenant::{
     EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,

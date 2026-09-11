@@ -357,11 +357,7 @@ pub(crate) async fn update_module(
             "warning": { "code": "module.update_failed_kept_previous", "message": error },
         }))
         .into_response(),
-        Outcome::Lost { module, error } => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
-        )
-            .into_response(),
+        Outcome::Lost { ref module, ref error } => update_lost_response(module, error),
     }
 }
 
@@ -509,6 +505,15 @@ pub(crate) async fn list_module_versions(
 /// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por
 /// `request-install` y `update` (hub#516): el mismo fallo tiene que contarse igual por las dos
 /// puertas, o la UI acaba programando contra dos contratos.
+///
+/// 🔴 **Ninguna rama devuelve un 5xx** (hub#1720). El hub es el ORIGEN, no una pasarela: un `502`
+/// emitido aquí es indistinguible del `502` que acuña el proxy que tiene delante, así que el borde
+/// contesta con su propia página `error code: 502` y **sustituye el cuerpo** — llevándose el `code`
+/// estable de hub#139 que la shell traduce. Medido en PRE el 2026-09-09: el motivo quedaba en el
+/// log del contenedor y quien estaba en el marketplace leía una página del borde, sin poder
+/// distinguir «me falta credencial» de «ese módulo no existe» de «el Cloud está caído». Un `4xx`
+/// cruza cualquier proxy con su cuerpo intacto y sigue leyéndose como fallo (`res.ok === false`).
+/// Lo sostiene `no_install_failure_is_reported_as_a_server_error`, que recorre TODAS las variantes.
 pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
     match e {
         install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
@@ -523,10 +528,66 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
         // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
         install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        // hub#1720: el Cloud CONTESTÓ que ese módulo no está en el catálogo de este hub. Es la
+        // misma frase que `VersionNotFound` un escalón más arriba —«eso no existe para ti»—, así
+        // que se cuenta igual y no como una avería.
+        install::InstallError::NotInCatalog { .. } => StatusCode::NOT_FOUND,
+        // El pipeline dependía del Cloud (catálogo, plan, zip, `sha256`) y esa parte falló: el
+        // hub hizo su trabajo y no pudo terminar. `424 Failed Dependency` lo dice tal cual y —al
+        // contrario que el `502` que había aquí— llega al navegador con su `code` dentro.
         install::InstallError::Cloud(_)
         | install::InstallError::Source(_)
-        | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+        | install::InstallError::MissingSha256 { .. }
+        | install::InstallError::CloudDenied
+        | install::InstallError::CloudRejected { .. } => StatusCode::FAILED_DEPENDENCY,
     }
+}
+
+/// Status HTTP con el que se cuenta cómo acabó un intento de actualización
+/// ([`erplora_runtime::module_update::Outcome`]).
+///
+/// El match es **exhaustivo a propósito**: un desenlace nuevo del pipeline no compila hasta que
+/// alguien decide con qué status se cuenta, en vez de heredar en silencio el de al lado.
+pub(crate) fn update_outcome_status(
+    outcome: &erplora_runtime::module_update::Outcome,
+) -> StatusCode {
+    use erplora_runtime::module_update::Outcome;
+    match outcome {
+        // La actualización salió, o no hacía falta.
+        Outcome::AlreadyThere(_) | Outcome::Updated { .. } => StatusCode::OK,
+        // 200, no un error: la actualización no salió, pero **el módulo sigue funcionando**.
+        Outcome::RolledBack { .. } => StatusCode::OK,
+        // hub#1763: la nueva falló Y la vuelta atrás también, así que el hub se quedó sin el
+        // módulo — pero eso se cuenta con el mismo `424` que el resto del pipeline (hub#1720), no
+        // con un `5xx`: el borde sustituye el cuerpo de un `5xx` por su propia página y se lleva
+        // el `module.update_lost` que la shell traduce, dejando a quien pulsó «Actualizar» sin
+        // saber siquiera qué módulo se ha ido.
+        Outcome::Lost { .. } => cloud_proxy::CLOUD_FAILED,
+    }
+}
+
+/// Respuesta de `POST /api/modules/:id/update` cuando la nueva versión falló **y la vuelta atrás
+/// también** ([`erplora_runtime::module_update::Outcome::Lost`]): el hub se quedó sin el módulo.
+///
+/// Mismo sobre **plano** que [`install_error_response`] —`{ok, error, code}`—, porque es el único
+/// que lee la shell (`updateModule` en `apps/web/src/lib/runtime.ts`): `error` es la frase y `code`
+/// el hecho estable. Con el `code` anidado en `error.code` nadie lo leía, y quien pulsó «Actualizar»
+/// leía «sigue funcionando con la versión que tenía» sobre un módulo que acababa de desaparecer
+/// (hub#1763). La frase que ve la persona sale de `runtimeErrors.module.update_lost`, `en`+`es`.
+pub(crate) fn update_lost_response(module: &str, error: &str) -> Response {
+    let outcome = erplora_runtime::module_update::Outcome::Lost {
+        module: module.into(),
+        error: error.into(),
+    };
+    (
+        update_outcome_status(&outcome),
+        Json(json!({
+            "ok": false,
+            "error": format!("`{module}`: {error}"),
+            "code": "module.update_lost",
+        })),
+    )
+        .into_response()
 }
 
 /// Respuesta de un fallo del pipeline, con el canal de errores de dominio (hub#139): además del
@@ -948,5 +1009,240 @@ pub(crate) async fn uninstall_module(
             Json(json!({ "ok": true })).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod install_error_status_tests {
+    use super::*;
+
+    /// One label per variant of [`install::InstallError`]. Its only job is to make the guard below
+    /// **mechanical**: `tag()` matches exhaustively over the error enum, so a variant added to the
+    /// pipeline does not compile until it is named here, and `sample()` matches exhaustively over
+    /// this enum, so it does not compile until an instance of it travels through the guard either.
+    /// Adding a failure mode and quietly mapping it back to a 502 is not reachable from here.
+    /// The labels and the list the guard walks are declared **once**: a hand-kept second copy is
+    /// exactly how a guard goes green on a list that quietly lost the case that was failing.
+    /// Dropping a name here deletes the variant too, and `tag()` stops being exhaustive over
+    /// [`install::InstallError`] — it does not compile.
+    macro_rules! every_install_failure {
+        ($($v:ident),+ $(,)?) => {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            enum Tag { $($v),+ }
+
+            const EVERY_TAG: &[Tag] = &[$(Tag::$v),+];
+        };
+    }
+
+    every_install_failure!(
+        Cloud,
+        VersionNotFound,
+        Source,
+        MissingSha256,
+        Blocked,
+        Runtime,
+        NotInstalled,
+        CloudDenied,
+        NotInCatalog,
+        CloudRejected,
+    );
+
+    fn tag(e: &install::InstallError) -> Tag {
+        match e {
+            install::InstallError::Cloud(_) => Tag::Cloud,
+            install::InstallError::VersionNotFound(_) => Tag::VersionNotFound,
+            install::InstallError::Source(_) => Tag::Source,
+            install::InstallError::MissingSha256 { .. } => Tag::MissingSha256,
+            install::InstallError::Blocked { .. } => Tag::Blocked,
+            install::InstallError::Runtime(_) => Tag::Runtime,
+            install::InstallError::NotInstalled(_) => Tag::NotInstalled,
+            install::InstallError::CloudDenied => Tag::CloudDenied,
+            install::InstallError::NotInCatalog { .. } => Tag::NotInCatalog,
+            install::InstallError::CloudRejected { .. } => Tag::CloudRejected,
+        }
+    }
+
+    fn sample(t: Tag) -> install::InstallError {
+        match t {
+            Tag::Cloud => install::InstallError::Cloud("cloud_unreachable".into()),
+            Tag::VersionNotFound => install::InstallError::VersionNotFound("sales@9.9.9".into()),
+            Tag::Source => {
+                install::InstallError::Source(source::SourceError::Fetch("connection reset".into()))
+            }
+            Tag::MissingSha256 => install::InstallError::MissingSha256 {
+                module_id: "sales".into(),
+                version: "1.0.0".into(),
+            },
+            Tag::Blocked => install::InstallError::Blocked {
+                requested: "sales".into(),
+                blocked_on: vec!["taxes".into()],
+                purchase: Vec::new(),
+            },
+            Tag::Runtime => install::InstallError::Runtime("migration failed".into()),
+            Tag::NotInstalled => install::InstallError::NotInstalled("sales".into()),
+            Tag::CloudDenied => install::InstallError::CloudDenied,
+            Tag::NotInCatalog => install::InstallError::NotInCatalog {
+                module_id: "sales".into(),
+            },
+            Tag::CloudRejected => install::InstallError::CloudRejected { status: 500 },
+        }
+    }
+
+    /// **hub#1720 — no failure of the install pipeline is reported as a server error.**
+    ///
+    /// The hub is the ORIGIN, not a gateway. A `5xx` minted here is indistinguishable from a `5xx`
+    /// minted by the proxy in front of it, so the edge answers with its own page and REPLACES the
+    /// body — taking with it the stable `code` of hub#139 that the shell translates. Measured in
+    /// PRE on 2026-09-09: `request-install` answered `502`, the motive was written to the
+    /// container log, and the person on the marketplace read `error code: 502`.
+    ///
+    /// The rule is the whole class, not the three variants that were caught doing it: a `4xx`
+    /// crosses any proxy with its body intact and still reads as a failure (`res.ok === false`)
+    /// for the shell.
+    #[test]
+    fn no_install_failure_is_reported_as_a_server_error() {
+        for &t in EVERY_TAG {
+            let e = sample(t);
+            let status = install_error_status(&e);
+            assert!(
+                !status.is_server_error(),
+                "{:?} answers {status}: an edge is free to replace the body of a 5xx with its own \
+                 page, so `{}` would never reach the browser",
+                t,
+                e.code()
+            );
+            assert!(
+                status.is_client_error(),
+                "{:?} answers {status}: a failed install still has to read as an error for the \
+                 shell (`res.ok === false`)",
+                t
+            );
+        }
+    }
+
+    /// The control of the control: each label really does carry **its own** variant into the
+    /// guard. A `sample()` that answered someone else's variant would leave the case it was
+    /// supposed to cover untested while the guard above stayed green.
+    ///
+    /// The other half of that risk — a label dropped from the walked list — is not testable from
+    /// here on purpose: `every_install_failure!` declares the enum and the list from one source,
+    /// so losing a name is a **compile** error, not a green run.
+    #[test]
+    fn every_label_carries_its_own_variant_into_the_guard() {
+        for &t in EVERY_TAG {
+            assert_eq!(
+                tag(&sample(t)),
+                t,
+                "{t:?} builds a sample of another variant, so {t:?} never reaches the guard"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod update_outcome_status_tests {
+    use super::*;
+    use erplora_runtime::module_update::Outcome;
+
+    /// One label per desenlace of [`Outcome`], declared **once** so the guard below is mechanical:
+    /// `tag()` matches exhaustively over the runtime enum, so a new outcome does not compile until
+    /// it is named here, and `sample()` matches exhaustively over these labels, so it does not
+    /// compile until an instance of it travels through the guard either. Same mould as
+    /// `every_install_failure!`: a hand-kept second list is exactly how a guard goes green over a
+    /// case it quietly stopped walking.
+    macro_rules! every_update_outcome {
+        ($($v:ident),+ $(,)?) => {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            enum Tag { $($v),+ }
+
+            const EVERY_TAG: &[Tag] = &[$(Tag::$v),+];
+        };
+    }
+
+    every_update_outcome!(AlreadyThere, Updated, RolledBack, Lost);
+
+    fn tag(o: &Outcome) -> Tag {
+        match o {
+            Outcome::AlreadyThere(_) => Tag::AlreadyThere,
+            Outcome::Updated { .. } => Tag::Updated,
+            Outcome::RolledBack { .. } => Tag::RolledBack,
+            Outcome::Lost { .. } => Tag::Lost,
+        }
+    }
+
+    fn sample(t: Tag) -> Outcome {
+        match t {
+            Tag::AlreadyThere => Outcome::AlreadyThere("1.0.0".into()),
+            Tag::Updated => Outcome::Updated {
+                from: "1.0.0".into(),
+                to: "1.1.0".into(),
+            },
+            Tag::RolledBack => Outcome::RolledBack {
+                stayed_on: "1.0.0".into(),
+                error: "migration failed".into(),
+            },
+            Tag::Lost => Outcome::Lost {
+                module: "sales".into(),
+                error: "rollback failed".into(),
+            },
+        }
+    }
+
+    /// **hub#1763 — no outcome of an update is reported as a server error either.**
+    ///
+    /// Same reason as `no_install_failure_is_reported_as_a_server_error` (hub#1720), on the door
+    /// that issue left out: `POST /api/modules/:id/update` answered `500` on [`Outcome::Lost`], and
+    /// an edge is free to replace the body of a `5xx` with its own page — taking with it the
+    /// `module.update_lost` code the shell translates. The person is then told nothing at all about
+    /// the module that just disappeared from their hub.
+    #[test]
+    fn no_update_outcome_is_reported_as_a_server_error() {
+        for &t in EVERY_TAG {
+            let status = update_outcome_status(&sample(t));
+            assert!(
+                !status.is_server_error(),
+                "{t:?} answers {status}: an edge is free to replace the body of a 5xx with its own \
+                 page, so the `code` would never reach the browser"
+            );
+        }
+    }
+
+    /// The control of the control: each label really does carry **its own** outcome into the guard.
+    /// A `sample()` that answered someone else's variant would leave the case it was supposed to
+    /// cover untested while the guard above stayed green.
+    #[test]
+    fn every_update_label_carries_its_own_outcome_into_the_guard() {
+        for &t in EVERY_TAG {
+            assert_eq!(
+                tag(&sample(t)),
+                t,
+                "{t:?} builds a sample of another outcome, so {t:?} never reaches the guard"
+            );
+        }
+    }
+
+    /// hub#1763 — the answer of `POST /api/modules/:id/update` when the module was LOST reaches the
+    /// shell in the ONE envelope it reads: `{ok, error, code}`, flat, the same as
+    /// [`install_error_response`]. With the code nested in `error.code`, `updateModule`
+    /// (`apps/web/src/lib/runtime.ts`) read `body.code` — nothing — fell back to `update_failed`,
+    /// and the toast said «it keeps running the version it had» about a module that had just
+    /// disappeared from the hub.
+    #[tokio::test]
+    async fn the_update_that_lost_the_module_answers_the_flat_envelope_the_shell_reads() {
+        let response = update_lost_response("sales", "rollback failed");
+        assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["ok"], false, "{body}");
+        assert_eq!(body["code"], "module.update_lost", "{body}");
+        let sentence = body["error"].as_str().unwrap_or_else(|| {
+            panic!("`error` is the sentence the shell shows, not an object: {body}")
+        });
+        assert!(
+            sentence.contains("sales") && sentence.contains("rollback failed"),
+            "{sentence}"
+        );
     }
 }

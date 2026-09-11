@@ -71,6 +71,17 @@
   --ok-touch-min: 48px;
   --ok-touch-lg: 56px;
 
+  /* Suelo de una SUPERFICIE DE TRABAJO del shell (hub#1730, hub#1745). Una superficie clavada a
+     `height: 100%` no puede desbordar el scroller del shell, así que en una ventana baja —la
+     tablet apaisada del mostrador— la página no scrollea y la pantalla se trabaja por una rendija.
+     El suelo la deja crecer y le devuelve el scroll a la página.
+     El número sale de medir, no de heredarse (banco-pre, 952x426, 10/09): la caja del contenido
+     es 268px con tabbar y 334px sin él, el contenido ACOTADO de estas pantallas cabe en 319px, y
+     en el móvil (390x844) la caja es 686px. 480px está por encima de las tres cajas cortas y por
+     debajo de la del móvil, así que solo actúa donde la ventana es baja. En px y no en rem porque
+     las cajas que tiene que despejar son px (cabecera 60, tabbar 66, padding 16). */
+  --ok-work-surface-min: 480px;
+
   /* Ring de selección con el acento de marca (cat-segment, pm-btn). Scrim unificado
      para backdrops (antes había .45/.5/.6 sueltos). On-accent = texto sobre color de marca. */
   --ok-ring-accent: inset 0 0 0 1px var(--ion-color-primary);

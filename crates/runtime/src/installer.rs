@@ -372,6 +372,24 @@ async fn register_module(
     }
     registry.set_flow_templates(&manifest.id, flow_templates);
 
+    // The module's policy checkpoints (hub#1701, ADR-0476): `policies/` of the package → registry.
+    // Same place and same best-effort character as the translations and the templates above, and
+    // for the same reason: it is the content of a third-party zip and this runs on EVERY boot
+    // (`Runtime::rehydrate_installed`), so a broken document cannot stop the hub from coming up.
+    // Being here is what makes the modules ALREADY installed publish their checkpoints on the first
+    // boot after this release, without republishing or reinstalling anything.
+    let checkpoints = crate::policies::scan_checkpoints(dir, &manifest);
+    // hub#1649: best-effort is not mute. And here less than anywhere else: a discarded checkpoint is
+    // a place where the owner believed they could put a rule and cannot, so without this line the
+    // rule they meant to write would simply not exist and nobody would know why.
+    for discard in &checkpoints.discards {
+        eprintln!(
+            "⚠ {}: policies/{}: {} — {}",
+            manifest.id, discard.name, discard.code, discard.detail
+        );
+    }
+    registry.set_policy_checkpoints(&manifest.id, checkpoints);
+
     // Vuelca las scheduled tasks del manifest a `_scheduled_tasks` (ADR-0011). Idempotente:
     // preserva el reloj (next_run/last_run) de las tareas ya existentes en una reinstalación y
     // borra las retiradas del manifest. El `command` de cada tarea debe ser del propio módulo.

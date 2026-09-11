@@ -9,7 +9,7 @@
 // Sin mocks: runtime Axum real con BD efímera y `HUB_MODULES_DIR` vacío (ver `e2e/README.md`).
 // Un hub vacío PUEDE exportar (usuarios/ajustes) y navega a /settings sin desvíos.
 
-import { test, expect, request as pwRequest, type Page } from '@playwright/test';
+import { test, expect, request as pwRequest, type Page } from '../bench-boot';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 

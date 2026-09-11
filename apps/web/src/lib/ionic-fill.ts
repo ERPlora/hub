@@ -28,7 +28,8 @@
 //     assumed: it is what the `too late` case in the tests reproduces.)
 //   · Wrapping `customElements.define` therefore is the hook: it runs before the class is
 //     registered, it is synchronous (no `whenDefined` microtask racing the first render) and it
-//     works on the element, so it crosses shadow boundaries.
+//     works on the element, so it crosses shadow boundaries. That wrapper is shared with the other
+//     feature that needs it (hub#1736, the localized select buttons) — see `./ionic-registry-hook`.
 //
 // This does NOT change ADR-0143: the shell is still `ios`, and only the three form controls that
 // explicitly ask for a `fill` render Material — which is exactly what the per-control rule already
@@ -36,15 +37,13 @@
 // its twin in the SaaS, `erplora validate` for modules) stay: keeping the attribute explicit in
 // code we own is still better, and they are what tells us the day Ionic changes its mind.
 
+import { patchIonicOnDefine } from './ionic-registry-hook';
+
 /** Ionic controls whose `fill` is a no-op outside `md`. `ion-button`/`ion-chip` honour it in `ios`. */
 export const FILL_MODE_CONTROLS = ['ion-input', 'ion-select', 'ion-textarea'] as const;
 
 /** Marks a prototype we already patched, so a second boot is a no-op instead of a double call. */
 const PATCHED = Symbol.for('erplora.ionic-fill-mode.patched');
-/** Holds, on the registry, the set of tags to normalize. */
-const WATCHED = Symbol.for('erplora.ionic-fill-mode.watched');
-/** Marks the registry whose `define` we already wrapped. */
-const WRAPPED = Symbol.for('erplora.ionic-fill-mode.wrapped');
 
 type IonicControl = HTMLElement & { fill?: string; mode?: string; connectedCallback?: () => void };
 
@@ -83,13 +82,7 @@ function patchConstructor(ctor: CustomElementConstructor): void {
  * Booting late cannot be fixed silently, so it is reported.
  */
 export function bootIonicFillMode(tags: readonly string[] = FILL_MODE_CONTROLS): void {
-  const registry = globalThis.customElements;
-  if (!registry) return; // SSR / unit tests without a DOM: nothing to normalize.
-
-  const watched = ((registry as unknown as Record<symbol, Set<string>>)[WATCHED] ??= new Set());
-  for (const tag of tags) watched.add(tag);
-
-  const tooLate = tags.filter((tag) => registry.get(tag));
+  const tooLate = patchIonicOnDefine(tags, patchConstructor);
   if (tooLate.length > 0) {
     // Invisible by nature — the form simply renders without a box — so it has to be said out loud.
     console.error(
@@ -98,12 +91,4 @@ export function bootIonicFillMode(tags: readonly string[] = FILL_MODE_CONTROLS):
         '`./lib/ionic-fill.boot` before `@ionic/vue` in main.ts.',
     );
   }
-
-  if (Object.prototype.hasOwnProperty.call(registry, WRAPPED)) return;
-  const original = registry.define.bind(registry);
-  Object.defineProperty(registry, WRAPPED, { value: true, enumerable: false });
-  registry.define = (name: string, ctor: CustomElementConstructor, options?: ElementDefinitionOptions) => {
-    if (watched.has(name)) patchConstructor(ctor);
-    return original(name, ctor, options);
-  };
 }

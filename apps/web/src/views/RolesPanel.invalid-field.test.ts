@@ -228,3 +228,37 @@ describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub
     expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'es'));
   });
 });
+
+// ── hub#1697 · el peldaño NUEVO: un código conocido se traduce antes de la regla 2 ────────────
+describe('RolesPanel · un código con frase se traduce (hub#1697)', () => {
+  it('lo dice en español en vez de enseñar la prosa del motor', async () => {
+    // `last_admin` es una guarda de `/api/hub/users` (`hub_users.rs`) cuyo `message` viajaba en
+    // prosa escrita dentro del runtime. Ahora tiene frase, así que gana a la regla 2.
+    setRoleActivation.mockRejectedValue(
+      new RoleActivationError('the hub would be left without any active administrator', 'last_admin'),
+    );
+    const panel = panelIn('es');
+    await flushPromises();
+
+    await panel.vm.setActive({ name: 'kitchen', source: { kind: 'module' } }, true);
+    await flushPromises();
+
+    expect(panel.text()).toContain(es.employeeForm.errors.last_admin);
+    expect(panel.text()).not.toContain('without any active administrator');
+  });
+
+  it('y la regla 2 de hub#1102 SIGUE viva por debajo', async () => {
+    // La otra mitad: sin frase que traducir, la específica que vino gana al genérico. Sin este
+    // caso, el de arriba pasaría igual si hubiéramos aplanado todo a una frase única.
+    setRoleActivation.mockRejectedValue(
+      new RoleActivationError('Solo un administrador puede tocar el catálogo', 'permission_denied'),
+    );
+    const panel = panelIn('es');
+    await flushPromises();
+
+    await panel.vm.setActive({ name: 'kitchen', source: { kind: 'module' } }, true);
+    await flushPromises();
+
+    expect(panel.text()).toContain('Solo un administrador puede tocar el catálogo');
+  });
+});

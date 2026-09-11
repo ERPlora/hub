@@ -6,6 +6,14 @@
 // Guard: `src/theme/ionic-fill-needs-md.test.ts`. Detalle: `src/lib/ionic-fill.ts`.
 import './lib/ionic-fill.boot';
 
+// 🔴 Segundo import del shell, y por el MISMO motivo que el de arriba (hub#1736): los dos botones
+// de los diálogos de selección de Ionic son literales ingleses («Cancel» / «OK») que no tienen
+// clave de configuración global, así que el shell los traduce enganchando `customElements.define`
+// ANTES de que nadie registre `ion-select`. Si este import baja de `@ionic/vue`, todos los
+// desplegables del hub —los de los módulos incluidos— vuelven al inglés sin un solo error.
+// Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
+import './lib/ionic-select-text.boot';
+
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
 import { addIcons } from 'ionicons';
@@ -19,17 +27,22 @@ import {
   clientInjectionKey,
   bootHubContext,
   ensureMediaCookie,
-  RUNTIME_URL,
-  runtimeHeaders,
   setOnRuntimeSessionExpired,
 } from './lib/runtime';
+import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import {
+  ensureNotificationPermission,
+  primerLabelsFrom,
+  shouldSendNotice,
+} from './lib/notification-permission';
 import { createPrintService } from './lib/print';
+import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
@@ -83,6 +96,9 @@ import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';
 import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
+// Sidebar → «Open on your phone» (hub#1715). Pure-JS QR generator: no dependency and no `eval`, so
+// it renders under the hub's strict CSP where a canvas library would not.
+import '@erplora/outfitkit/ok-qr';
 // Tarjeta de plan de los tiers de un módulo (pestaña «Plan», hub#1605): la pieza compartida en
 // vez de una tarjeta a mano por panel.
 import '@erplora/outfitkit/ok-pricing-card';
@@ -184,27 +200,28 @@ const erploraClient = getClient();
 (erploraClient as unknown as { print?: ReturnType<typeof createPrintService> }).print =
   createPrintService(erploraClient as unknown as Parameters<typeof createPrintService>[0], {
     // Vía COLA (hub#344): sin Bridge, el tique térmico se encola en el hub y un print host del rol
-    // lo drene. Reusa el mismo baseURL + auth del resto de llamadas al runtime.
-    enqueue: async (job) => {
-      const res = await fetch(`${RUNTIME_URL}/api/print/jobs`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...runtimeHeaders() },
-        body: JSON.stringify({
-          jobId: job.jobId,
-          role: job.role,
-          documentType: job.documentType,
-          document: job.document,
-          format: job.format ?? 'receipt',
-        }),
-      });
-      // 200 con ok:true → encolado (nuevo o duplicado, ambos éxito). Cualquier otra cosa → false
-      // (la puerta cae al navegador: una venta no se cae por impresión).
-      if (!res.ok) return false;
-      const body = await res.json().catch(() => ({}));
-      return body?.ok === true;
-    },
+    // lo drena. Reusa el mismo baseURL + auth del resto de llamadas al runtime, y devuelve lo que
+    // contestó el runtime —no solo si lo aceptó—: la cobertura de la estación es lo que separa
+    // «sale tarde» de «no sale» (hub#1731). Vive en `lib/` y no aquí porque este fichero no tiene
+    // tests, y esa traducción es justo la que no puede romperse en silencio.
+    enqueue: createEnqueuePrintJob(),
   });
 (globalThis as typeof globalThis & { erplora: ReturnType<typeof getClient> }).erplora = erploraClient;
+
+/**
+ * Asks to be allowed to warn, at most once per install (hub#1732).
+ *
+ * `force` is what the System screen passes when the user asks for the notices back after saying
+ * no; the boot never forces. The strings come through `i18n` — the sheet is the only text the
+ * user reads before Android's own dialog, and a hardcoded one would ship English to a Spanish
+ * shop (ADR-0055/0199).
+ */
+function askToWarn(force = false) {
+  return ensureNotificationPermission({
+    labels: primerLabelsFrom((key) => i18n.global.t(key)),
+    force,
+  });
+}
 
 // Auto-impresión del ticket al cerrar venta (escucha `sale.completed` en el shell, no en sales).
 // Sale por la MISMA puerta que todo lo demás (hub#862): resolvía él mismo rol→impresora y llamaba al
@@ -213,7 +230,13 @@ const erploraClient = getClient();
 bootPrintOnSale(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   onFailure: (f) => {
-    void toastError(`El tique de la venta ${f.saleId} NO se imprimió: ${f.error}`);
+    // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
+    // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
+    void toastError(
+      f.awaitingHost
+        ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
+        : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
+    );
   },
 });
 
@@ -225,7 +248,18 @@ bootPrintOnSale(getClient(), {
 // que la cola entera era inalcanzable desde el producto: lo encolado se quedaba encolado para
 // siempre. Lo que sigue faltando es la pantalla de COBERTURA («nadie está imprimiendo lo de
 // cocina»), que se daba por hecha en hub#344 y no se hizo.
-void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0]);
+//
+// The alta is also WHERE THE SHELL ASKS TO BE ALLOWED TO WARN ANYBODY (hub#1732). Until now
+// nothing did: `POST_NOTIFICATIONS` was declared in both manifests and the plugin could ask for
+// it, but the only caller was the kitchen-order notice below — so a clean install used for a full
+// morning was never asked, and Android reports a permission nobody was shown as denied for the
+// life of the install. This moment is the right one twice over: the device has just become the one
+// that gets TOLD an order came in, and somebody is standing at it setting it up. Asked at the
+// first order instead, the dialog appears on a tablet propped on a shelf with nobody in front of
+// it. `ensureNotificationPermission` asks at most once and never throws.
+void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
+  onRegistered: () => void askToWarn(),
+});
 
 // Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
 // tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
@@ -234,12 +268,30 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   onFailure: (f) => {
-    void toastError(`No se imprimió la comanda de ${f.label || 'sala'} (${f.role}): ${f.error}`);
+    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
+    void toastError(
+      f.awaitingHost
+        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
+        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
+    );
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
   // en Tauri, el binario/WS en navegador), así que sale igual en escritorio y en Android.
-  notify: (title, body) => getClient().peripherals.notify(title, body),
+  //
+  // The permission first (hub#1732), and this is the FALLBACK trigger: a KDS screen with no
+  // printer never registers as a print host, so the alta above never reaches it. Idempotent —
+  // after the first answer this is one storage read.
+  //
+  // And a refusal STOPS here instead of falling through to `peripherals.notify()`: that call asks
+  // for the permission itself, with no sentence of ours in front of it (hub#758's scope), so
+  // letting it through would pop Android's bare dialog in the middle of a service. Android drops
+  // the notice either way; what the user gets instead is the row on System › your printer, which
+  // says the notices are off and offers to ask again.
+  notify: async (title, body) => {
+    if (!shouldSendNotice(await askToWarn())) return;
+    await getClient().peripherals.notify(title, body);
+  },
 });
 
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
@@ -253,13 +305,25 @@ setOnSessionExpired(() => {
 // CONFIRMED dead (expired, or displaced by another device on the single-device plan) already
 // closed the local session inside lib/runtime.ts — the invalidation is ONE and lives there. Here
 // the shell EXPLAINS it (i18n toast, not a failure with a «Retry» that could never help) and
-// leads to the login. `reason` travels in the query so LoginPage can adopt it later (the key
-// `login.sessionTakenOver` already sits waiting for that wire). The login screen keeps deciding
-// on its own what to offer — pinpad in the demo or on a trusted device (ADR-0329: the runtime's
-// `demo_would_adopt` rule stays untouched and keeps answering that question).
-setOnRuntimeSessionExpired(() => {
-  void toast(i18n.global.t('auth.sessionEnded'), 'warning', 6000);
-  void router.replace({ name: 'login', query: { reason: 'session-expired' } });
+// leads to the login. The login screen keeps deciding on its own what to offer — pinpad in the
+// demo or on a trusted device (ADR-0329: the runtime's `demo_would_adopt` rule stays untouched and
+// keeps answering that question).
+//
+// **And it says WHICH of the two it was** (hub#1801). The hook now receives the reason the runtime
+// gave, so when the plan displaced this device the hedged sentence gives way to the real one and
+// the reason travels in the query, where `LoginPage.vue` turns it into an explanation and a way
+// out. With no reason — an ordinary expiry, or a hub older than this shell — nothing changes.
+setOnRuntimeSessionExpired((reason) => {
+  const evicted = reason === SESSION_EVICTED_DEVICE_LIMIT;
+  void toast(
+    i18n.global.t(evicted ? 'login.sessionTakenOver' : 'auth.sessionEnded'),
+    'warning',
+    6000,
+  );
+  void router.replace({
+    name: 'login',
+    query: { reason: evicted ? SESSION_EVICTED_DEVICE_LIMIT : 'session-expired' },
+  });
 });
 
 // El Cloud reportó que el hub fue borrado/revocado (410 hub_not_found, vía el gate de

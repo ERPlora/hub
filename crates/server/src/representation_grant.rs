@@ -38,7 +38,7 @@ use axum::Json;
 use serde_json::{json, Value};
 
 use crate::state::AppState;
-use crate::{auth, unauthorized};
+use crate::{auth, cloud_proxy, unauthorized};
 
 /// Ceiling for each document, mirroring the control plane's own limit (`MAX_GRANT_DOCUMENT_BYTES`).
 ///
@@ -516,8 +516,11 @@ pub async fn get_representation_grant(State(st): State<AppState>, headers: Heade
         }
     }
     let Some(machine) = auth::machine_auth(&st) else {
+        // 424, not 503: the hub is the ORIGIN, and an edge is free to replace the body of a `5xx`
+        // with its own page — which would take `hub_not_enrolled` with it and leave the fiscal
+        // screen reading `error code: 502` (hub#1763).
         return (
-            StatusCode::SERVICE_UNAVAILABLE,
+            cloud_proxy::CLOUD_FAILED,
             Json(json!({ "ok": false, "error": "hub_not_enrolled" })),
         )
             .into_response();
@@ -553,10 +556,15 @@ pub async fn get_representation_grant(State(st): State<AppState>, headers: Heade
             );
             let stored = stored_state(&st).await;
             (
-                StatusCode::BAD_GATEWAY,
+                // Never a `5xx`: the edge replaces that body with its page and the screen loses
+                // both the code and the stored copy it needs to keep painting (hub#1763).
+                cloud_proxy::CLOUD_FAILED,
                 Json(json!({
                     "ok": false,
-                    "error": "cloud_unreachable",
+                    // Two different facts, and only one of them is fixed by waiting: nobody
+                    // answered (`status_code` is absent) or somebody answered and said no. They
+                    // used to share `cloud_unreachable`, which is what hub#1763 is about.
+                    "error": refusal.status_code.map_or(cloud_proxy::CLOUD_UNREACHABLE, |_| cloud_proxy::CLOUD_REJECTED),
                     "status_code": refusal.status_code,
                     "status": stored.0,
                     "at": stored.1,
@@ -591,8 +599,11 @@ pub async fn post_representation_grant_model(
             .into_response();
     }
     let Some(machine) = auth::machine_auth(&st) else {
+        // 424, not 503: the hub is the ORIGIN, and an edge is free to replace the body of a `5xx`
+        // with its own page — which would take `hub_not_enrolled` with it and leave the fiscal
+        // screen reading `error code: 502` (hub#1763).
         return (
-            StatusCode::SERVICE_UNAVAILABLE,
+            cloud_proxy::CLOUD_FAILED,
             Json(json!({ "ok": false, "error": "hub_not_enrolled" })),
         )
             .into_response();
@@ -621,10 +632,12 @@ pub async fn post_representation_grant_model(
                 "el plano de control no sirvió el modelo del otorgamiento"
             );
             (
-                StatusCode::BAD_GATEWAY,
+                // Never a `5xx` (hub#1763): `status_code` is exactly what the screen turns into a
+                // sentence, and the edge would replace the body that carries it.
+                cloud_proxy::CLOUD_FAILED,
                 Json(json!({
                     "ok": false,
-                    "error": "cloud_rejected",
+                    "error": refusal.status_code.map_or(cloud_proxy::CLOUD_UNREACHABLE, |_| cloud_proxy::CLOUD_REJECTED),
                     "status_code": refusal.status_code,
                 })),
             )
@@ -666,8 +679,11 @@ pub async fn post_representation_grant(
         return refused(reason);
     }
     let Some(machine) = auth::machine_auth(&st) else {
+        // 424, not 503: the hub is the ORIGIN, and an edge is free to replace the body of a `5xx`
+        // with its own page — which would take `hub_not_enrolled` with it and leave the fiscal
+        // screen reading `error code: 502` (hub#1763).
         return (
-            StatusCode::SERVICE_UNAVAILABLE,
+            cloud_proxy::CLOUD_FAILED,
             Json(json!({ "ok": false, "error": "hub_not_enrolled" })),
         )
             .into_response();
@@ -693,10 +709,12 @@ pub async fn post_representation_grant(
                 "el plano de control rechazó el otorgamiento"
             );
             (
-                StatusCode::BAD_GATEWAY,
+                // Never a `5xx` (hub#1763): `status_code` is exactly what the screen turns into a
+                // sentence, and the edge would replace the body that carries it.
+                cloud_proxy::CLOUD_FAILED,
                 Json(json!({
                     "ok": false,
-                    "error": "cloud_rejected",
+                    "error": refusal.status_code.map_or(cloud_proxy::CLOUD_UNREACHABLE, |_| cloud_proxy::CLOUD_REJECTED),
                     "status_code": refusal.status_code,
                 })),
             )
@@ -1287,13 +1305,12 @@ mod tests {
         )
         .await;
 
-        let captured = Arc::new(Mutex::new(Vec::<u8>::new()));
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(CapturingWriter(captured.clone()))
-            .with_max_level(tracing::Level::TRACE)
-            .finish();
+        // hub#1796: the capture has to be anchored or a subscriber-less thread can cache this
+        // callsite as `Interest::never()` and it comes back empty on a healthy commit.
+        // `capture_scope` is the async-friendly door and anchors on the way in.
+        let (sink, guard) = crate::log_capture::capture_scope();
         {
-            let _guard = tracing::subscriber::set_default(subscriber);
+            let _guard = guard;
             forward_capture(
                 &reqwest::Client::new(),
                 &base,
@@ -1304,7 +1321,7 @@ mod tests {
             .unwrap();
         }
 
-        let logs = String::from_utf8_lossy(&captured.lock().unwrap().clone()).into_owned();
+        let logs = sink.text();
         for secret in [
             "%PDF",
             "ID card",
@@ -1439,23 +1456,4 @@ mod tests {
         }
     }
 
-    #[derive(Clone)]
-    struct CapturingWriter(Arc<Mutex<Vec<u8>>>);
-
-    impl std::io::Write for CapturingWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CapturingWriter {
-        type Writer = CapturingWriter;
-        fn make_writer(&'a self) -> Self::Writer {
-            self.clone()
-        }
-    }
 }

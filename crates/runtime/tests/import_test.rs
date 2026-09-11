@@ -19,6 +19,7 @@ use erplora_db::{
     testutil::{fresh_db, TestDb},
     Params,
 };
+use erplora_runtime::e2e_support::units;
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -69,7 +70,7 @@ async fn fresh_as(hub: &str) -> Runtime {
 async fn create_product(rt: &Runtime, hub: &str, name: &str, sku: &str) {
     rt.execute_command(
         "inventory.products.create",
-        &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": 10, "tax_category_key": "product.generic" })),
+        &params(json!({ "name": name, "sku": sku, "price": 450, "cost": 200, "stock": units(10), "tax_category_key": "product.generic" })),
         &ctx(hub),
     )
     .await
@@ -326,8 +327,7 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
             badge: String::new(),
 
             local: false,
-        },
-    )
+        }, 0,)
     .await
     .expect("crear el usuario admin del hub de origen");
     create_product(&a, "h1", "Café", "CAF").await;
@@ -415,8 +415,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
                 email: format!("{}@example.com", name.to_lowercase()),
                 badge: String::new(),
                 local: false,
-            },
-        )
+            }, 0,)
         .await
         .unwrap_or_else(|e| panic!("create {name} in the origin hub: {e}"));
     }
@@ -453,8 +452,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
             badge: String::new(),
 
             local: false,
-        },
-    )
+        }, 0,)
     .await
     .expect("create the destination hub's own user");
 
@@ -546,8 +544,7 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
             badge: String::new(),
 
             local: false,
-        },
-    )
+        }, 0,)
     .await
     .expect("create the manager in the origin hub");
 

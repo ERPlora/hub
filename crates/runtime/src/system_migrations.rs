@@ -1909,6 +1909,76 @@ ALTER TABLE _flow_grants ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT 
 ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_ref TEXT;\
 CREATE INDEX IF NOT EXISTS ix_flow_template_ref ON _flow (hub_id, template_ref);",
     },
+    // ── v61 — hub#1701 / ADR-0476: the rules the OWNER of the business writes ─────────────
+    // A module declares WHERE a rule may sit (`policies/*.checkpoint.json`, read at install); this
+    // is where the rule the owner actually wrote lives. The two halves are deliberately apart: the
+    // checkpoint travels in the package and dies with the module version, the rule is the
+    // business's own and survives every update of the module that offers it.
+    //
+    // `checkpoint` is `<module>/<name>` — the same shape and the same reason as `_flow.template_ref`
+    // (v60): it is what the module already knows about itself and it does not change between its
+    // releases. It is TEXT and not a foreign key on purpose: the checkpoint lives in a package, so
+    // there is no table to point at, and a module uninstalled and put back has to find its rules
+    // where it left them.
+    //
+    // `condition` is a JSON object stored as TEXT, the convention of `_flow.definition` (v31) and
+    // `_flow_approvals.payload` — the whole kernel stores documents this way, and the gate parses it
+    // with the frozen condition language of the flows, so no new dialect is stored either.
+    //
+    // `is_active` is the owner's switch and NOT a soft-delete: turning a rule off has to keep it on
+    // the screen so it can be turned back on, which is exactly what `deleted_at` could not express.
+    // Both exist, and they mean different things.
+    //
+    // The index is `(hub_id, checkpoint)` because that is the only read: the boot and every write
+    // rebuild the in-memory index by walking this hub's live rules. The GATE never queries — if it
+    // did, every sale would pay a round trip (`policies.rs`, the bounded-cost guard).
+    //
+    // 🔴 The number is the NEXT ONE AFTER THE MAXIMUM, never a gap: when it was written the maximum
+    // was v60 on `origin/develop` and on every remote branch (checked one by one, none carries a
+    // v61). `apply` compares against the highest applied version and SILENTLY skips anything below
+    // it (hub#573), so a rebase that lands another v61 has to renumber this one.
+    SystemMigration {
+        version: 61,
+        name: "policy",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _policy (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, checkpoint TEXT NOT NULL, \
+  condition TEXT NOT NULL DEFAULT '{}', outcome TEXT NOT NULL, \
+  message TEXT NOT NULL DEFAULT '', mode TEXT NOT NULL DEFAULT 'warn', \
+  is_active INTEGER NOT NULL DEFAULT 1, \
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT '', \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  deleted_at TEXT, deleted_by TEXT, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_policy_checkpoint ON _policy (hub_id, checkpoint);",
+    },
+    // hub#1801 — **por qué murió esta sesión.** El límite de un dispositivo del plan Gratis
+    // desalojaba borrando la fila de `hub_session`, así que el desalojado volvía a llamar, no había
+    // nada que mirar, y el hub contestaba el mismo `401` que para una sesión caducada por tiempo.
+    // Desde donde lo ve la persona, el hub se había caído: llamaba a soporte.
+    //
+    // La columna es la lápida. `''` (el default) = esta sesión no murió desalojada — que es la
+    // verdad para toda fila anterior a esta migración y para toda sesión viva, así que el backfill
+    // es el propio DEFAULT y no hace falta un `UPDATE`.
+    //
+    // Va en `hub_session` y no en una tabla aparte a propósito: la pregunta es «¿por qué murió ESTA
+    // sesión?» y la sesión es la fila que ya tiene el token, el `hub_id`, el dispositivo y la hora
+    // — la misma razón por la que la traza de credencial (v48) vive aquí. Una tabla nueva habría
+    // duplicado el token muerto en un segundo sitio.
+    //
+    // `ALTER TABLE ADD COLUMN` con su default basta (como v9/v16): no recrea la tabla.
+    //
+    // 🔴 El número es el SIGUIENTE AL MÁXIMO, nunca un hueco: al escribirla el máximo era v61 en
+    // `origin/develop` y en **las 196 ramas remotas** (comprobadas una a una, ninguna trae v62).
+    // `apply` compara contra la versión más alta aplicada y se salta EN SILENCIO cualquier cosa por
+    // debajo (hub#573), así que un rebase que traiga otra v62 obliga a renumerar esta.
+    SystemMigration {
+        version: 62,
+        name: "hub_session_ended_reason",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS ended_reason TEXT NOT NULL DEFAULT '';",
+    },
 
 ];
 
@@ -3838,7 +3908,24 @@ mod kind_contract_tests {
         // When it was written the maximum was v59 on `origin/develop`, on `main` and across the
         // 183 remote branches that carry the file — none of them asked for a v60 — and no local
         // worktree of the fleet but this one carried it.
-        assert_eq!(MIGRATIONS.len(), 57, "el catálogo cambió de tamaño");
+        // + `policy` (v61, hub#1701 / ADR-0476): `_policy`, the table where the rules the OWNER of
+        // the business writes live — «a discount over 20 % is not allowed» — evaluated by the gate
+        // in `commands::execute_at`. It is a new table, so `CREATE TABLE IF NOT EXISTS` plus its
+        // index is re-runnable and touches nothing that exists; ADR-0269 retires it by leaving it
+        // unwritten, exactly like `_flow`. The rule is stored apart from the checkpoint that offers
+        // it (which travels in the module package) because a rule is the business's own and has to
+        // survive every update of the module. When it was written the maximum was v60 on
+        // `origin/develop` and across every remote branch that carries the file — none of them asks
+        // for a v61.
+        // + `hub_session_ended_reason` (v62, hub#1801): the `ended_reason` column of `hub_session`,
+        // the tombstone that lets an evicted session say WHY it died. The single-device plan used to
+        // evict by deleting the row, so the person left outside got the same bare `401` as a session
+        // expired by time and the login screen had nothing to explain. `''` is the default and the
+        // truth for every row that already exists, so `ALTER … ADD COLUMN IF NOT EXISTS` with its
+        // default is re-runnable and needs no backfill. When it was written the maximum was v61 on
+        // `origin/develop` and across the 196 remote branches that carry the file — none asks for a
+        // v62.
+        assert_eq!(MIGRATIONS.len(), 59, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO
@@ -3862,11 +3949,44 @@ mod kind_contract_tests {
     /// no solo un parche.
     #[test]
     fn every_hub_user_column_a_migration_adds_is_in_the_identity_unit_test_fixture() {
-        let fixture = crate::identity::UNIT_TEST_HUB_USER_COLUMNS;
+        assert_fixture_is_up_to_date(
+            "hub_user",
+            crate::identity::UNIT_TEST_HUB_USER_COLUMNS,
+            "identity::UNIT_TEST_HUB_USER_COLUMNS",
+            HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED,
+        );
+    }
+
+    /// El mismo guardia sobre `hub_session` (hub#1801). La v62 le añadió `ended_reason` y la fixture
+    /// de las sesiones estaba **copiada en dos sitios**, que es exactamente la forma del olvido de
+    /// la v56: el guardia solo miraba `hub_user`, así que la segunda copia se podía quedar atrás sin
+    /// que nada avisara. Un guardia que cubre una tabla de dos no es un guardia, es una casualidad.
+    #[test]
+    fn every_hub_session_column_a_migration_adds_is_in_the_identity_unit_test_fixture() {
+        assert_fixture_is_up_to_date(
+            "hub_session",
+            crate::identity::UNIT_TEST_HUB_SESSION_COLUMNS,
+            "identity::UNIT_TEST_HUB_SESSION_COLUMNS",
+            HUB_SESSION_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED,
+        );
+    }
+
+    /// Columnas que una migración añade a `hub_session` y que los unit tests de `identity` NO
+    /// necesitan montar. `hub_id` ya viene en el baseline v0, igual que en `hub_user`.
+    const HUB_SESSION_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED: &[&str] = &["hub_id"];
+
+    /// El cuerpo compartido de los dos guardias: qué columnas añade el catálogo a `table` y cuáles
+    /// de ellas la fixture de los unit tests no monta.
+    fn assert_fixture_is_up_to_date(
+        table: &str,
+        fixture: &str,
+        fixture_name: &str,
+        exempt: &[&str],
+    ) {
         let mut missing = Vec::new();
         for m in MIGRATIONS {
-            for column in hub_user_columns_added_by(m.postgres) {
-                if HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED.contains(&column.as_str())
+            for column in columns_added_by(m.postgres, table) {
+                if exempt.contains(&column.as_str())
                     || fixture.contains(&format!("ADD COLUMN {column} "))
                 {
                     continue;
@@ -3876,24 +3996,24 @@ mod kind_contract_tests {
         }
         assert!(
             missing.is_empty(),
-            "`identity::UNIT_TEST_HUB_USER_COLUMNS` se quedó atrás: las migraciones añaden a \
-             `hub_user` columnas que la fixture de los unit tests no monta, así que todo test que \
-             escriba o lea esa columna morirá 42703 «column does not exist». Añádelas a la fixture \
-             (`crates/runtime/src/identity.rs`) o, si ningún unit test las toca, a \
-             `HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED`. Faltan: {missing:?}"
+            "`{fixture_name}` se quedó atrás: las migraciones añaden a `{table}` columnas que la \
+             fixture de los unit tests no monta, así que todo test que escriba o lea esa columna \
+             morirá 42703 «column does not exist». Añádelas a la fixture \
+             (`crates/runtime/src/identity.rs`) o, si ningún unit test las toca, a la lista de \
+             exentas de este módulo. Faltan: {missing:?}"
         );
     }
 
-    /// Los nombres de columna que un SQL de migración añade a `hub_user`. Reconoce las dos formas
+    /// Los nombres de columna que un SQL de migración añade a `table`. Reconoce las dos formas
     /// que usa el catálogo (`ADD COLUMN x` y `ADD COLUMN IF NOT EXISTS x`) y nada más: si algún día
     /// aparece otra, esta función deja de verla y el guardia calla — por eso
     /// [`the_parser_sees_the_column_the_catalogue_actually_adds`] comprueba que caza el positivo
-    /// contra el SQL REAL de la v56.
-    fn hub_user_columns_added_by(sql: &str) -> Vec<String> {
+    /// contra el SQL REAL de la v56 y de la v62.
+    fn columns_added_by(sql: &str, table: &str) -> Vec<String> {
         let mut found = Vec::new();
         for statement in sql.split(';') {
             let flat = statement.split_whitespace().collect::<Vec<_>>().join(" ");
-            let Some(rest) = flat.strip_prefix("ALTER TABLE hub_user ADD COLUMN ") else {
+            let Some(rest) = flat.strip_prefix(&format!("ALTER TABLE {table} ADD COLUMN ")) else {
                 continue;
             };
             let rest = rest.strip_prefix("IF NOT EXISTS ").unwrap_or(rest);
@@ -3913,12 +4033,25 @@ mod kind_contract_tests {
             .find(|m| m.name == "hub_user_account_owner")
             .expect("la v56 sigue en el catálogo");
         assert_eq!(
-            hub_user_columns_added_by(v56.postgres),
+            columns_added_by(v56.postgres, "hub_user"),
             vec!["is_account_owner".to_string()],
             "el parser dejó de reconocer la forma del `ALTER` del catálogo: el guardia quedaría mudo"
         );
         // Y una fixture a la que le falta esa columna NO cuela por el `contains`.
         let incomplete = "ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';";
         assert!(!incomplete.contains("ADD COLUMN is_account_owner "));
+
+        // La otra tabla y la otra forma del `ALTER` (`IF NOT EXISTS`, v62): el guardia de
+        // `hub_session` también tiene que VER su columna, o sería verde por vacío.
+        let v62 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_session_ended_reason")
+            .expect("la v62 sigue en el catálogo");
+        assert_eq!(
+            columns_added_by(v62.postgres, "hub_session"),
+            vec!["ended_reason".to_string()]
+        );
+        // Y no confunde una tabla con otra: el SQL de la v56 no añade nada a `hub_session`.
+        assert!(columns_added_by(v56.postgres, "hub_session").is_empty());
     }
 }

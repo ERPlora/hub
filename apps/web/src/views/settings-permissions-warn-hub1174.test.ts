@@ -138,7 +138,7 @@ describe('Settings → Permissions · what breaks while the switch is off (hub#1
   it('a denied permission says what BREAKS, not only what it allows — a_denied_permission_says_what_breaks_not_only_what_it_allows_hub1174', async () => {
     const wrapper = await mountPermissions([cap('certificate', false)]);
 
-    const warn = wrapper.find('[data-testid="cap-breaks-certificate"]');
+    const warn = wrapper.find('[data-testid="settings-capability-breaks-certificate"]');
     expect(warn.exists(), 'the denied permission card shows no consequence at all').toBe(true);
     expect(warn.text()).toContain(CERT_BREAKS);
     // The sentence is the CONSEQUENCE, not a second copy of what the permission allows.
@@ -149,20 +149,20 @@ describe('Settings → Permissions · what breaks while the switch is off (hub#1
 
   it('a GRANTED permission shows no warning: the card stays as it is today (hub#1174)', async () => {
     const wrapper = await mountPermissions([cap('certificate', true)]);
-    expect(wrapper.find('[data-testid="cap-breaks-certificate"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="settings-capability-breaks-certificate"]').exists()).toBe(false);
   });
 
   it('each denied capability gets ITS OWN consequence, not one generic line (hub#1174)', async () => {
     const wrapper = await mountPermissions([cap('certificate', false), cap('printer', false)]);
-    expect(wrapper.find('[data-testid="cap-breaks-certificate"]').text()).toContain(CERT_BREAKS);
-    expect(wrapper.find('[data-testid="cap-breaks-printer"]').text()).toContain(PRINTER_BREAKS);
+    expect(wrapper.find('[data-testid="settings-capability-breaks-certificate"]').text()).toContain(CERT_BREAKS);
+    expect(wrapper.find('[data-testid="settings-capability-breaks-printer"]').text()).toContain(PRINTER_BREAKS);
   });
 
   it('a capability the shell does not know still says something, never an empty box (hub#1174)', async () => {
     // A new core capability that this mirror has not learnt yet must not paint a blank warning:
     // that is how a screen ends up shouting at the owner without telling them anything.
     const wrapper = await mountPermissions([cap('some_future_capability', false)]);
-    const warn = wrapper.find('[data-testid="cap-breaks-some_future_capability"]');
+    const warn = wrapper.find('[data-testid="settings-capability-breaks-some_future_capability"]');
     expect(warn.exists()).toBe(true);
     expect(warn.text()).toContain(UNKNOWN_BREAKS);
   });
@@ -170,7 +170,7 @@ describe('Settings → Permissions · what breaks while the switch is off (hub#1
   it('a non-admin sees the consequence too: knowing WHY it is broken is not an admin privilege (hub#1174)', async () => {
     isAdmin.value = false;
     const wrapper = await mountPermissions([cap('certificate', false)]);
-    expect(wrapper.find('[data-testid="cap-breaks-certificate"]').text()).toContain(CERT_BREAKS);
+    expect(wrapper.find('[data-testid="settings-capability-breaks-certificate"]').text()).toContain(CERT_BREAKS);
   });
 
   // Ionic's `--ion-color-warning` (#ffc409) renders at ~1.6:1 contrast on white — and its
@@ -181,7 +181,7 @@ describe('Settings → Permissions · what breaks while the switch is off (hub#1
   // reads the sentence in the theme's normal/muted text colour.
   it('the consequence sentence is legible: never rendered in the raw warning yellow (hub#1174)', async () => {
     const wrapper = await mountPermissions([cap('certificate', false)]);
-    const warn = wrapper.find('[data-testid="cap-breaks-certificate"]');
+    const warn = wrapper.find('[data-testid="settings-capability-breaks-certificate"]');
     expect(warn.attributes('color'), 'warning-yellow text is ~1.6:1 on white, under WCAG AA 4.5:1').not.toBe('warning');
   });
 });

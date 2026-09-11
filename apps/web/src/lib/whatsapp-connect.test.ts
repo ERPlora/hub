@@ -16,6 +16,8 @@ vi.mock('./runtime', () => ({
   runtimeHeaders: () => ({ 'X-Hub-Session': 'session-123', 'X-Hub-Id': 'hub-wa' }),
 }));
 
+import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 import {
   BUSINESS_APP_FEATURE,
   WhatsAppConnectError,
@@ -244,6 +246,29 @@ describe('the runtime doors', () => {
 
     answer(502, { error: 'Could not identify WhatsApp Business Account' });
     await expect(connectWhatsApp(POPUP)).rejects.toMatchObject({ code: 'default', status: 502 });
+  });
+
+  it('names the erplora.com outage the runtime reports, in both languages (hub#1689)', async () => {
+    // Since hub#1689 the runtime no longer hands the business the `reqwest` prose — which carried
+    // the address of the control plane and, having spaces in it, never passed `CODE_SHAPE` and so
+    // landed on the generic sentence. It answers the stable code instead, and a stable code that
+    // reaches `whatsappConnect.errors.<code>` with no entry there is worse than the sentence it
+    // replaced: vue-i18n paints the key path at the counter.
+    answer(502, { ok: false, error: 'cloud_unreachable' });
+    await expect(fetchWhatsAppConfig()).rejects.toMatchObject({
+      code: 'cloud_unreachable',
+      status: 502,
+    });
+
+    for (const [language, catalogue] of Object.entries({ en, es })) {
+      // Reached by property, not through a cast: a locale that drops the key stops compiling AND
+      // fails here. A cast to `Record<string, …>` would have swallowed both.
+      const sentence: string = catalogue.whatsappConnect.errors.cloud_unreachable;
+      expect(
+        sentence.length > 0,
+        `whatsappConnect.errors.cloud_unreachable has no sentence in \`${language}\``,
+      ).toBe(true);
+    }
   });
 
   it("lands the runtime's own refusal, prose too, on `forbidden`", async () => {

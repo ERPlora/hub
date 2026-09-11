@@ -10,7 +10,7 @@
 # Why a test and not another paragraph: prose has no regression test, but BOTH claims are decidable
 # from this repository's own code, so the prose can be pinned to it. That is what this file does.
 #
-#   1. Is `sdk.print` wired to enqueue?      answered by apps/web/src/main.ts + apps/web/src/lib/print.ts
+#   1. Is `sdk.print` wired to enqueue?      answered by apps/web/src/main.ts (+ lib/print-enqueue.ts since hub#1731) + apps/web/src/lib/print.ts
 #   2. How many crates consume peripherals?  answered by the Cargo manifests, dev-dependencies excluded
 #
 # It runs in BOTH directions on purpose. A guard that only banned the stale sentence would go green
@@ -96,15 +96,28 @@ def scan(pattern):
 
 
 def producer_is_wired():
-    """Does `sdk.print` enqueue today? Read the shell, not the docs (hub#344)."""
+    """Does `sdk.print` enqueue today? Read the shell, not the docs (hub#344).
+
+    Two shapes count as wired. Until hub#1731 `main.ts` did the POST inline; since then the POST
+    lives in `lib/print-enqueue.ts` (so the one line that carries the runtime's answer across has
+    tests) and `main.ts` only hands the gate `enqueue: createEnqueuePrintJob()`. Reading `main.ts`
+    alone called the producer deleted while it was alive — a red CI over a correct change.
+    """
     main_ts = os.path.join(ROOT, 'apps/web/src/main.ts')
     print_ts = os.path.join(ROOT, 'apps/web/src/lib/print.ts')
+    enqueue_ts = os.path.join(ROOT, 'apps/web/src/lib/print-enqueue.ts')
     try:
         main = open(main_ts, encoding='utf-8', errors='replace').read()
         cascade = open(print_ts, encoding='utf-8', errors='replace').read()
     except OSError:
         return None  # not a hub tree: the caller decides
-    wired = 'enqueue:' in main and '/api/print/jobs' in main
+    try:
+        enqueue_lib = open(enqueue_ts, encoding='utf-8', errors='replace').read()
+    except OSError:
+        enqueue_lib = ''  # no such module: only the inline shape can be wired
+    posts_inline = '/api/print/jobs' in main
+    posts_via_lib = 'createEnqueuePrintJob' in main and '/api/print/jobs' in enqueue_lib
+    wired = 'enqueue:' in main and (posts_inline or posts_via_lib)
     return wired and "via: 'queue'" in cascade
 
 
@@ -144,10 +157,10 @@ findings = []
 if wired is True:
     for path, line, text in scan(PENDING):
         findings.append(f'{path}:{line}: `sdk.print` DOES enqueue (hub#344, wired in '
-                        f'apps/web/src/main.ts) but this line calls the chain pending: {text}')
+                        f'apps/web/src/main.ts → lib/print-enqueue.ts) but this line calls the chain pending: {text}')
 elif wired is False:
     if not scan(PENDING):
-        findings.append('apps/web/src/main.ts no longer wires the `enqueue` producer, so '
+        findings.append('apps/web/src/main.ts (or lib/print-enqueue.ts) no longer wires the `enqueue` producer, so '
                         '`sdk.print` does NOT enqueue — and no document says so. Say it, or put '
                         'the producer back (hub#344).')
 
@@ -218,6 +231,37 @@ printf 'As-built (hub#344): `sdk.print` ENCOLA.\n' > "$d/ARQUITECTURA.md"
 out=$(check "$d")
 case "$out" in *"no longer wires"*) ok "si se borra el productor y nadie lo dice, salta" ;;
     *) bad "si se borra el productor y nadie lo dice, salta" "un FINDING" "$out" ;; esac
+
+# hub#1731 movió el POST a `lib/print-enqueue.ts` (para que la línea que cruza la respuesta del
+# runtime tenga tests) y `main.ts` pasó a cablear `enqueue: createEnqueuePrintJob()`. El guard leía
+# SOLO `main.ts` y dio el productor por borrado con el productor vivo — CI roja sobre un cambio
+# correcto. Esta forma también es «cableado», y sigue teniendo que cazar el positivo.
+d=$(mkfix wiredlib)
+printf 'const s = { enqueue: createEnqueuePrintJob() };\n' > "$d/apps/web/src/main.ts"
+printf 'export function createEnqueuePrintJob() { return async () => fetch("/api/print/jobs"); }\n' \
+    > "$d/apps/web/src/lib/print-enqueue.ts"
+printf 'As-built (hub#344): `sdk.print` ENCOLA.\n' > "$d/ARQUITECTURA.md"
+out=$(check "$d")
+case "$out" in *"wired=True"*) ok "el productor cableado a través de lib/print-enqueue.ts cuenta como cableado (hub#1731)" ;;
+    *) bad "el productor cableado a través de lib/print-enqueue.ts cuenta como cableado" "wired=True" "$out" ;; esac
+
+# …y el control ve el positivo: el mismo `main.ts` con una lib que ya NO hace el POST es un
+# productor borrado, aunque el símbolo siga nombrado.
+d=$(mkfix libunplugged)
+printf 'const s = { enqueue: createEnqueuePrintJob() };\n' > "$d/apps/web/src/main.ts"
+printf 'export function createEnqueuePrintJob() { return async () => ({ queued: false }); }\n' \
+    > "$d/apps/web/src/lib/print-enqueue.ts"
+printf 'As-built (hub#344): `sdk.print` ENCOLA.\n' > "$d/ARQUITECTURA.md"
+out=$(check "$d")
+case "$out" in *"no longer wires"*) ok "una lib que ya no hace el POST es un productor borrado: salta" ;;
+    *) bad "una lib que ya no hace el POST es un productor borrado: salta" "un FINDING" "$out" ;; esac
+
+d=$(mkfix libmissing)
+printf 'const s = { enqueue: createEnqueuePrintJob() };\n' > "$d/apps/web/src/main.ts"
+printf 'As-built (hub#344): `sdk.print` ENCOLA.\n' > "$d/ARQUITECTURA.md"
+out=$(check "$d")
+case "$out" in *"no longer wires"*) ok "main.ts nombra la lib pero la lib no existe: salta" ;;
+    *) bad "main.ts nombra la lib pero la lib no existe: salta" "un FINDING" "$out" ;; esac
 
 echo "4. el recuento de consumidores sale de los Cargo.toml, no de la prosa"
 d=$(mkfix twoclaim)

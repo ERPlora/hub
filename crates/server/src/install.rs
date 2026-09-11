@@ -62,6 +62,21 @@ pub enum InstallError {
     /// es una puerta trasera para instalar: un id mal escrito debe decirlo, no instalar algo nuevo.
     #[error("el módulo `{0}` no está instalado en este hub: no hay nada que actualizar")]
     NotInstalled(String),
+    /// El Cloud **contestó**, y rechazó la credencial de máquina de este hub (`401`/`403`)
+    /// — hub#1720. No es lo mismo que no contestar: aquí no hay nada que reintentar, hay una
+    /// credencial que arreglar, y decirle a la tienda «inténtalo en unos minutos» la deja en
+    /// bucle. La causa que destapó la issue: un hub con llave nueva cruzaba a una cabecera que el
+    /// SaaS no reconocía.
+    #[error("el Cloud no aceptó la credencial de este hub")]
+    CloudDenied,
+    /// El Cloud **contestó** `404`: ese módulo no está en el catálogo que este hub puede ver
+    /// (hub#1720). Es un id que no existe o que este hub no tiene contratado — no una caída.
+    #[error("el módulo `{module_id}` no está en el catálogo de este hub")]
+    NotInCatalog { module_id: String },
+    /// El Cloud **contestó** con otro error (`5xx`, `429`, …) — hub#1720. Contestó, así que no es
+    /// «no llegué»; y no dijo cuál de los dos casos de arriba es, así que solo cabe reintentar.
+    #[error("el Cloud contestó con un error ({status})")]
+    CloudRejected { status: u16 },
 }
 
 impl InstallError {
@@ -77,6 +92,9 @@ impl InstallError {
             InstallError::Blocked { .. } => "install_blocked",
             InstallError::Runtime(_) => "install_runtime_failed",
             InstallError::NotInstalled(_) => "update_not_installed",
+            InstallError::CloudDenied => "install_cloud_denied",
+            InstallError::NotInCatalog { .. } => "install_not_in_catalog",
+            InstallError::CloudRejected { .. } => "install_cloud_rejected",
         }
     }
 }
@@ -136,7 +154,7 @@ async fn resolve_version(
     requested: &str,
 ) -> Result<ModuleVersion, InstallError> {
     let req = cloud.versions(auth, module_id);
-    let body = send_text(http, &req).await?;
+    let body = send_text(http, &req, module_id).await?;
     let mut versions = ModuleVersion::parse_list(&body)
         .map_err(|e| InstallError::Cloud(format!("versions/ inválido: {e}")))?;
     versions.retain(|v| v.is_active);
@@ -156,24 +174,65 @@ async fn resolve_version(
 }
 
 /// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo como texto.
+/// The `Display` of a `reqwest` error names the address this hub calls erplora.com on. It goes
+/// to the hub's log; the person on the marketplace gets the stable code (hub#1689).
+fn cloud_unreachable(e: reqwest::Error) -> InstallError {
+    InstallError::Cloud(crate::cloud_proxy::cloud_unreachable(&e.to_string()).to_string())
+}
+
+/// Lo contrario: el Cloud **sí** contestó, y contestó un error (hub#1720).
+///
+/// Contestar no es caerse, y para quien está delante del marketplace no significan lo mismo: una
+/// credencial rechazada no se arregla esperando, y un módulo que no está en su catálogo no se
+/// arregla nunca. Hasta hub#1720 las tres cruzaban por `cloud_unreachable` y salían con el mismo
+/// código —«tu hub no ha podido llegar a erplora.com, inténtalo de nuevo»—, así que un hub con la
+/// credencial rechazada reintentaba en bucle leyendo una frase falsa. El status va al log del hub;
+/// la persona recibe el código estable, nunca la dirección que se marcó (hub#1689).
+fn cloud_refused(status: reqwest::StatusCode, module_id: &str) -> InstallError {
+    tracing::warn!(
+        module_id = %module_id,
+        status = %status,
+        "erplora.com answered the install pipeline with an error"
+    );
+    match status {
+        reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
+            InstallError::CloudDenied
+        }
+        reqwest::StatusCode::NOT_FOUND => InstallError::NotInCatalog {
+            module_id: module_id.to_string(),
+        },
+        other => InstallError::CloudRejected {
+            status: other.as_u16(),
+        },
+    }
+}
+
+/// El status de una respuesta del Cloud, o el fallo que le toca. Misma condición que
+/// `error_for_status()` —4xx y 5xx—, para que un `3xx` que `reqwest` ya siguió no cambie de
+/// significado al pasar por aquí.
+fn ok_or_refused(
+    resp: reqwest::Response,
+    module_id: &str,
+) -> Result<reqwest::Response, InstallError> {
+    let status = resp.status();
+    if status.is_client_error() || status.is_server_error() {
+        return Err(cloud_refused(status, module_id));
+    }
+    Ok(resp)
+}
+
 async fn send_text(
     http: &reqwest::Client,
     req: &cloud_client::PreparedRequest,
+    module_id: &str,
 ) -> Result<String, InstallError> {
     let mut r = http.request(method(req), &req.url);
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }
-    let resp = r
-        .send()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp
-        .error_for_status()
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    resp.text()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))
+    let resp = r.send().await.map_err(cloud_unreachable)?;
+    let resp = ok_or_refused(resp, module_id)?;
+    resp.text().await.map_err(cloud_unreachable)
 }
 
 /// Descarga el ZIP del módulo **en streaming a un temp file** en la caché de módulos (mismo
@@ -185,6 +244,7 @@ async fn download_to_temp_file(
     http: &reqwest::Client,
     req: &cloud_client::PreparedRequest,
     cache_root: &std::path::Path,
+    module_id: &str,
 ) -> Result<(tempfile::NamedTempFile, String), InstallError> {
     use futures_util::StreamExt;
     use sha2::{Digest, Sha256};
@@ -194,13 +254,8 @@ async fn download_to_temp_file(
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }
-    let resp = r
-        .send()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    let resp = resp
-        .error_for_status()
-        .map_err(|e| InstallError::Cloud(e.to_string()))?;
+    let resp = r.send().await.map_err(cloud_unreachable)?;
+    let resp = ok_or_refused(resp, module_id)?;
 
     std::fs::create_dir_all(cache_root).map_err(|e| InstallError::Source(e.into()))?;
     let mut tmp =
@@ -208,7 +263,7 @@ async fn download_to_temp_file(
     let mut hasher = Sha256::new();
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| InstallError::Cloud(e.to_string()))?;
+        let chunk = chunk.map_err(cloud_unreachable)?;
         hasher.update(&chunk);
         tmp.write_all(&chunk)
             .map_err(|e| InstallError::Source(e.into()))?;
@@ -406,7 +461,7 @@ async fn published_versions(
     module_id: &str,
 ) -> Result<Vec<erplora_runtime::module_update::Available>, InstallError> {
     let cloud = CloudClient::new(cloud_base_url);
-    let body = send_text(http, &cloud.versions(auth, module_id)).await?;
+    let body = send_text(http, &cloud.versions(auth, module_id), module_id).await?;
     let versions = ModuleVersion::parse_list(&body)
         .map_err(|e| InstallError::Cloud(format!("versions/ inválido: {e}")))?;
     Ok(versions
@@ -1099,7 +1154,8 @@ async fn execute_plan(
 
         on_progress(&node.module_id, "downloading");
         let dl_req = cloud.download(auth, &node.module_id, &node.version);
-        let (zip_file, downloaded_sha) = download_to_temp_file(http, &dl_req, cache_root).await?;
+        let (zip_file, downloaded_sha) =
+            download_to_temp_file(http, &dl_req, cache_root, &node.module_id).await?;
 
         on_progress(&node.module_id, "verifying");
         // ADR-0015, mismo contrato que siempre: el SHA calculado sobre la marcha debe casar con
@@ -1262,7 +1318,8 @@ fn install_recursive<'a>(
         //     calculado sobre la marcha: el archivo no se bufferiza en RAM.
         on_progress(&module_id, "downloading");
         let dl_req = cloud.download(auth, &module_id, &version.version);
-        let (zip_file, downloaded_sha) = download_to_temp_file(http, &dl_req, cache_root).await?;
+        let (zip_file, downloaded_sha) =
+            download_to_temp_file(http, &dl_req, cache_root, &module_id).await?;
 
         // (3) Verificar SHA256 (ADR-0015, ANTES de tocar nada; un fallo suelta el temp file, que
         //     se borra solo) + firma ed25519 (hub#239, DEFAULT deny según policy) + descomprimir

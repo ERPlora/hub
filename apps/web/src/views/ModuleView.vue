@@ -25,6 +25,24 @@
         aria-hidden="true"
       />
     </div>
+    <!-- hub#1743 — SIN RED, que no es lo mismo que un módulo roto. Con el wifi caído esta pantalla
+         decía «comprueba que el módulo siga instalado y activo»: acusaba a la única pieza que
+         estaba bien, y mandaba al dueño a buscar una app que nadie había tocado. Lo que separa los
+         dos casos ya viene en el fallo (`lib/offline`), así que aquí solo se dice el que es.
+         `warning` y no `danger` a propósito: nada se ha roto y se arregla solo al volver la red —
+         la pantalla se rehace ella misma, sin que nadie pulse nada. -->
+    <ok-inline-feedback
+      v-else-if="status === 'offline'"
+      tone="warning"
+      icon="cloud-offline-outline"
+      :heading="t('moduleView.offlineTitle')"
+      data-testid="module-offline"
+    >
+      {{ t('moduleView.offlineHint') }}
+      <ion-button slot="actions" size="small" fill="outline" @click="mount">
+        {{ t('moduleView.retry') }}
+      </ion-button>
+    </ok-inline-feedback>
     <ok-inline-feedback
       v-else-if="status === 'error'"
       tone="danger"
@@ -157,6 +175,8 @@ import { clientInjectionKey, getClient } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
+import { isOfflineError, isOnline } from '../lib/offline';
+import { toastInfo } from '../lib/toast';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -187,9 +207,11 @@ const tabbar = ref<{ $el?: HTMLElement } | null>(null);
 const SKELETON_ROWS = 6;
 /**
  * Lo que la pantalla sabe de su propia carga. `empty` NO es `error`: el módulo contestó y no hay
- * nada que pintar (hub#1169). Son tres frases distintas y la pantalla no puede decir una por otra.
+ * nada que pintar (hub#1169). Y `offline` no es `error` tampoco (hub#1743): ahí no contestó nadie,
+ * así que el módulo no tiene nada que ver. Son cuatro frases distintas y la pantalla no puede
+ * decir una por otra.
  */
-const status = ref<'loading' | 'ready' | 'error' | 'empty'>('loading');
+const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
@@ -435,11 +457,24 @@ async function mount(): Promise<void> {
     // Un navId retirado o mal escrito no puede dejar la URL afirmando una pestaña mientras se
     // muestra otra. Canonizamos al primer tab real (también cubre bookmarks de versiones viejas).
     if (navId !== entry.nav.id) {
+      // hub#1723 — and it is SAID. Canonising in silence is the same defect the shell's catch-all
+      // had one floor up: `/m/sales/list` painted «Sell» as if that had been the address, so
+      // whoever pasted the link believed they were on the sales list. Same remedy hub#1175 gave
+      // the module the entitlement never names: still go where there IS a screen, but with the
+      // sentence that explains why it is not the one that was asked for.
+      //
+      // Only when the URL CLAIMED a tab: a bare `/m/sales` — the address the launcher, «My apps»
+      // and /apps all use — claims none, so opening the first one corrects nothing, and a notice
+      // there would be noise on the busiest screen of the product.
+      if (navId) void toastInfo(t('moduleView.unknownTabToast', { tab: entry.nav.label }));
       void router.replace(`/m/${moduleId}/${entry.nav.id}`);
     }
-  } catch {
+  } catch (error) {
     if (generation !== mountGeneration) return;
-    status.value = 'error';
+    // hub#1743 — el fallo se LEE antes de contarlo. Un `fetch` que no llegó a nadie y un hub que
+    // contestó 500 no son la misma frase, y hasta aquí el `catch` tiraba el error y las decía
+    // iguales.
+    status.value = isOfflineError(error) ? 'offline' : 'error';
   }
 }
 
@@ -485,6 +520,13 @@ watch(
     if (route.name === 'module' && params().moduleId) void mount().then(revealActiveTab);
   },
 );
+// hub#1743 — vuelve la red, vuelve la pantalla. Es la mitad que hace honesto al aviso: un mensaje
+// que sigue ahí cuando el wifi ya está bien enseña a no leerlo. Solo desde `offline`: un fallo real
+// del módulo no se arregla porque vuelva la conexión, y remontar ahí sería un bucle silencioso.
+watch(isOnline, (back) => {
+  if (!back || !onScreen) return;
+  if (status.value === 'offline') void mount().then(revealActiveTab);
+});
 
 /**
  * Fuera de pantalla, pero VIVA. Se suelta aquí todo lo que se soltaba en `onBeforeUnmount` y que
@@ -526,17 +568,29 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* El WC del módulo se monta en `.outlet` y usa `:host{height:100%}`. Sin una altura
-   DEFINIDA aquí, ese 100% resolvía a `auto` (alto del contenido) y el modo `fill` de
-   `ok-data-table` (cabecera sticky + pager fijo + scroll SOLO en el cuerpo) no tenía
-   contra qué constreñir → scrolleaba la página entera.
-   `height:100%` (no `min-height`) fija el outlet al alto del área de `ion-content`:
-   - tablas en modo `fill` → su `:host{height:100%}` resuelve a ese alto y el scroll
-     queda DENTRO del WC (cabecera/pager fijos);
-   - pantallas no-tabla más altas (settings, formularios largos) → su contenido desborda
-     el outlet y sigue scrolleando vía `ion-content` (que es el scroller por defecto). */
+/* The module's WC mounts into `.outlet` and uses `:host{height:100%}`. Without a DEFINED
+   height here that 100% resolved to `auto` (the content's own height), and `ok-data-table`
+   in `fill` mode (sticky header + fixed pager + scroll ONLY in the body) had nothing to
+   constrain against → it scrolled the whole page.
+   `height:100%` pins the outlet to the height of the `ion-content` area:
+   - `fill` tables → their `:host{height:100%}` resolves to that height and the scroll stays
+     INSIDE the WC (header/pager fixed);
+   - taller non-table screens (settings, long forms) → their content overflows the outlet and
+     keeps scrolling via `ion-content` (the default scroller).
+
+   …and never shorter than a usable working surface (hub#1730). `height:100%` alone means the
+   outlet can never be TALLER than the scroll container, so `ion-content` always reports
+   `scrollHeight === clientHeight` and the page CANNOT scroll — on a tall window nothing is
+   lost, but on a tablet in landscape (the counter's everyday posture) the box is 268px and
+   whatever does not fit is clipped with no way to reach it: the till lost its total and its
+   Charge button, the agenda lost the bottom of its day. Under the floor the outlet OVERFLOWS
+   `ion-content` on purpose, so the shell's own scroller takes over.
+   The floor clears the 268px measured at 952x426 and stays below the 686px a phone already
+   gets, so it is inert on every viewport where the layout already fitted. Both halves are
+   guarded in `layout-shell.test.ts`. */
 .outlet {
   height: 100%;
+  min-height: var(--ok-work-surface-min);
 }
 
 /* Las rutas de módulo usan nombres de producto, no abreviaturas automáticas. Un mínimo más ancho

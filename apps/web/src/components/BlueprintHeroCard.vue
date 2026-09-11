@@ -178,6 +178,7 @@ import {
   inspectBlueprint,
   type CatalogBlueprint,
 } from '../lib/runtime';
+import { runtimeErrorSentence } from '../lib/runtime-error-sentence';
 import { user } from '../lib/session';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 import type { SetupStatus } from '../lib/setup-status';
@@ -187,7 +188,7 @@ const props = defineProps<{
   status: SetupStatus | null;
 }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 const catalog = ref<CatalogBlueprint[]>([]);
 const requested = ref<boolean>(false);
@@ -387,9 +388,13 @@ async function use(blueprint: CatalogBlueprint): Promise<void> {
   window.dispatchEvent(new CustomEvent('erp:modules-changed'));
 }
 
-/** The engine's own words. Ours would be a paraphrase nobody can act on. */
+/**
+ * The engine's own words. Ours would be a paraphrase nobody can act on — EXCEPT when the engine did
+ * not send words at all but a stable code (`cloud_unreachable` since hub#1689), which is a token the
+ * runtime and the shell agree on and means nothing to whoever is opening a shop (hub#1693).
+ */
 function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  return runtimeErrorSentence(err, { t, te });
 }
 </script>
 

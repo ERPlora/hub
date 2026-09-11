@@ -232,6 +232,14 @@ impl Runtime {
         if let Err(e) = access_email::report_unresolved(self.db.as_ref(), &self.hub_id).await {
             eprintln!("[access-email] no se pudo comprobar los emails de acceso (hub#436): {e}");
         }
+        // 5) The owner's rules, from `_policy` into the in-memory index the gate reads from
+        // (hub#1701, ADR-0476). It goes here — on the boot path EVERY hub walks — because an empty
+        // index is a rule that forbids nothing: the most expensive fail-open of all, because it is
+        // not noticed until someone slips through the discount the rule existed to stop.
+        //
+        // It does not depend on the modules being re-hydrated already: the index is filled with
+        // ROWS, and who gates which command is resolved by the Registry at apply time.
+        self.reload_policies().await?;
         Ok(())
     }
 

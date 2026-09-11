@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::e2e_support::units;
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -32,7 +33,7 @@ async fn fresh_with_products(names_prices: &[(&str, f64)]) -> Runtime {
             "inventory.products.create",
             &params(json!({
                 "name": name, "sku": format!("SKU-{i}"), "price": price, "cost": 0,
-                "stock": (i as i64) + 1, "low_stock_threshold": 5, "product_type": "physical",
+                "stock": units((i as i64) + 1), "low_stock_threshold": units(5), "product_type": "physical",
                 "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
             })),
             &ctx(),
@@ -193,7 +194,7 @@ async fn eq_filter_on_is_active() {
         "inventory.products.update",
         &params(json!({
             "product_id": id_b, "name": "B", "price": 2.0, "cost": 0,
-            "low_stock_threshold": 5, "is_active": 0,
+            "low_stock_threshold": units(5), "is_active": 0,
             // products.update es un REEMPLAZO completo (#178): lo no enviado se borraría en
             // silencio, así que el contrato exige ean13/description/tax_category_key explícitos.
             "ean13": null, "description": "", "tax_category_key": "product.generic"

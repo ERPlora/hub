@@ -11,7 +11,9 @@
 //!    routes it by `documentType` through its own map; sent, it is a full override in deprecation.
 //!    **Idempotent by `jobId`**: a retry answers `200` with `status: "duplicate"` instead of
 //!    queueing a second ticket. The document travels **structured** — the shape
-//!    `escpos::render_document` reads — never as HTML (hub#501).
+//!    `escpos::render_document` reads — never as HTML (hub#501). The answer also carries `role`
+//!    (the station it landed on, resolved) and **`liveHosts`** — devices draining that station right
+//!    now. `0` is the state hub#1731 was about: queued, and nobody is coming for it.
 //!  - `GET  /api/print/jobs?role=&status=&limit=` → the queue as a **status view**: what is waiting,
 //!    what is printing, what died and why. It deliberately omits the document, which travels to the
 //!    print host that claims the job (hub#343), not to whoever polls the queue.
@@ -155,7 +157,7 @@ pub async fn enqueue_job(
     match rt.enqueue_print_job(&job).await {
         // A duplicate is a SUCCESS: `jobId` did its job. The caller shows "queued" either way — it
         // asked for one ticket and there is exactly one ticket.
-        Ok(outcome) => {
+        Ok(report) => {
             // Nudge the print hosts of that role (hub#343) so the ticket comes out now instead of
             // on the next poll. **Only on a real enqueue**: waking every host for a duplicate would
             // send them all to an empty queue for a job that is already out.
@@ -165,7 +167,7 @@ pub async fn enqueue_job(
             // credential at all (hub#504, found here, not caused here). So this frame must not say
             // what the ticket is: the document only ever leaves through `/ws/print`, past both
             // guards.
-            if outcome == EnqueueOutcome::Queued {
+            if report.outcome == EnqueueOutcome::Queued {
                 st.broadcast(json!({
                     "type": crate::print_ws::EVENT_JOB_QUEUED,
                     "role": job.role.trim(),
@@ -174,10 +176,21 @@ pub async fn enqueue_job(
             Json(json!({
                 "ok": true,
                 "jobId": job.job_id.trim(),
-                "status": match outcome {
+                "status": match report.outcome {
                     EnqueueOutcome::Queued => "queued",
                     EnqueueOutcome::Duplicate => "duplicate",
                 },
+                // **`queued` was never the whole answer** (hub#1731). It says the ticket is safe;
+                // it does not say anything is going to come out of a printer, and on a hub with no
+                // printer set up those two read identically to whoever asked. So the answer also
+                // carries where it landed and how many devices are draining that station right
+                // now: `0` means it is waiting for somebody who is not there.
+                //
+                // Facts, not a sentence: the words the cashier reads belong to the surface that can
+                // translate them (ADR-0055). And it rides the enqueue answer rather than a second
+                // call so the producer cannot end up warning about a state that changed in between.
+                "role": report.role,
+                "liveHosts": report.live_hosts,
             }))
             .into_response()
         }

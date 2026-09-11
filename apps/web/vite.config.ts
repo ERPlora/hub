@@ -206,8 +206,12 @@ export default defineConfig({
       'sync-modules.test.mjs',
       'vite.config.test.ts',
       'outfitkit-version.test.ts',
-      'tests/playwright.config.test.ts',
-      'tests/bench-ports.test.ts',
+      // hub#1752 — un GLOB, no la lista de ficheros que había aquí: `include` es un allowlist,
+      // así que un test nuevo en `tests/` que nadie acordase añadir a esta lista no fallaba, se
+      // quedaba SIN CORRER y la suite seguía verde. Es la misma forma de agujero que el banco
+      // visual sin baselines. Los e2e de Playwright siguen fuera: son `.spec.ts`, no `.test.ts`,
+      // y además cuelgan de `tests/e2e/`, que este patrón (un solo `*`) no recorre.
+      'tests/*.test.ts',
     ],
     environment: 'node',
     // hub#1367 — these two are anti-hang BACKSTOPS, not assertions, and vitest's defaults

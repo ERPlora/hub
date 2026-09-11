@@ -86,6 +86,19 @@ export interface PrintResult {
   printerId?: string;
   /** Motivo por el que no se pudo usar el Bridge (si aplica). */
   error?: string;
+  /**
+   * `via: 'queue'` **y ningún equipo dado de alta para esa estación** (hub#1731).
+   *
+   * El trabajo está a salvo —saldrá en cuanto se dé de alta la impresora— pero AHORA MISMO no hay
+   * nadie que lo drene, así que el papel no va a salir. Es la diferencia entre «tarde» y «nunca»,
+   * y sin ella `via:'queue'` se leía como entregado: se cobraba, se decía «aquí tienes» y no salía
+   * nada. Quien imprime lo usa para AVISAR, no para fallar — la venta no se cae por esto.
+   *
+   * `undefined` es «el runtime no lo dijo», que NO es «no hay nadie» (mismo criterio que
+   * `probeFromCoverage` en `system-health`): un aviso inventado sobre un hub bien montado saldría en todos los tiques y
+   * dejaría de leerse.
+   */
+  awaitingHost?: boolean;
 }
 
 /**
@@ -94,7 +107,9 @@ export interface PrintResult {
  * `RUNTIME_URL` + `runtimeHeaders()`.
  *
  * Un duplicado (mismo `jobId`) es ÉXITO, no error: la cola es idempotente por `(hub_id, job_id)`.
- * Devuelve `true` si el trabajo quedó encolado (nuevo o duplicado), `false` si el runtime lo rechazó.
+ * `queued: true` si el trabajo entró (nuevo o duplicado), `false` si el runtime lo rechazó — y
+ * `liveHosts` con cuántos equipos están drenando esa estación, que es lo que decide si esto se
+ * queda callado o avisa (hub#1731).
  */
 export type EnqueuePrintJob = (job: {
   jobId: string;
@@ -102,7 +117,18 @@ export type EnqueuePrintJob = (job: {
   documentType: string;
   document: Record<string, unknown>;
   format?: PrintFormat;
-}) => Promise<boolean>;
+}) => Promise<QueuedJob>;
+
+/** Lo que contesta el runtime al encolar: entró, y si hay alguien que vaya a sacarlo. */
+export interface QueuedJob {
+  /** ¿Lo aceptó el runtime? Un duplicado (mismo `jobId`) es `true`: la cola es idempotente. */
+  queued: boolean;
+  /**
+   * Equipos dados de alta y reportando para la estación en la que ha caído el trabajo, AHORA.
+   * `0` = está encolado y no va a venir nadie a por él. `undefined` = el runtime no lo dijo.
+   */
+  liveHosts?: number;
+}
 
 /**
  * ¿Este documento sale por impresora TÉRMICA (y por tanto tiene cola en el hub) o es papel A4?
@@ -257,14 +283,18 @@ export function createPrintService(
         // busca un equipo por rol, y el `PrintResult` lo reporta—, pero mandárselo a la cola sería
         // el shell nombrando el periférico del comerciante: TODO saldría por la caja, comandas
         // incluidas, y el mapa del hub no llegaría a resolver nunca. Vacío = «decídelo tú».
-        const ok = await enqueue({
+        const outcome = await enqueue({
           jobId,
           role: req.role || '',
           documentType,
           document: data,
           format: req.format,
         });
-        return ok ? { via: 'queue', role } : toBrowser('el runtime rechazó el encolado');
+        if (!outcome.queued) return toBrowser('el runtime rechazó el encolado');
+        // Encolado: el trabajo está a salvo. Lo que decide si esto sale CALLADO o con aviso es si
+        // hay alguien drenando esa estación (hub#1731). `undefined` no cuenta como «nadie»: un
+        // runtime que no contesta la pregunta no la contesta en negativo.
+        return { via: 'queue', role, awaitingHost: outcome.liveHosts === 0 };
       } catch (e) {
         return toBrowser(e instanceof Error ? e.message : String(e));
       }

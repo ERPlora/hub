@@ -188,6 +188,26 @@ export interface ModuleBilling {
   trial_days?: number;
   /** Lista de tiers/planos ofertados. El shell pinta uno por tarjeta. */
   tiers?: BillingTierDef[];
+  /**
+   * De dónde saca el shell lo que este hub lleva CONSUMIDO de su cuota
+   * (ERPlora/whatsapp_inbox#131). Sin este bloque la pestaña «Plan» solo dice lo que un plan
+   * INCLUYE, que es la mitad del dato: el consumo es lo que avisa de que el módulo va a dejar de
+   * responder. La query es del propio módulo y su permiso sigue decidiendo quién la lee; el
+   * runtime no la ejecuta por su cuenta (`billing` es opaco para él).
+   */
+  usage?: ModuleUsageDef;
+}
+
+/** El bloque `billing.usage` de un manifest: de dónde sale el consumo de UNA métrica. */
+export interface ModuleUsageDef {
+  /** Query namespaced del módulo que devuelve el consumo (la gatea su propio permiso). */
+  query: string;
+  /** Qué clave de `billing.tiers[].quota` cuenta, para poder nombrarla y traducirla. */
+  metric: string;
+  /** Columna de la respuesta con lo consumido en el periodo en curso. */
+  used: string;
+  /** Columna con el límite que de verdad se aplica. Ausente → solo se pinta el consumo. */
+  limit?: string;
 }
 
 /** Un chequeo sobre una fila del resultado de la query de `setup`. "Configurado" exige que TODOS

@@ -8,7 +8,7 @@
 //! - **Mapping** — a value is either a literal, a PATH into the run (`input.…`, `steps.<id>.…`,
 //!   `event.…` inside a trigger), or a string with `{{path}}` templates. Same spirit as
 //!   `ReadDef::resolve_params_from_map`, which resolves `payload.<field>` and nothing else.
-//! - **Conditions** — an object `{path: {op: value}}` evaluated in AND. Nine operators, listed
+//! - **Conditions** — an object `{path: {op: value}}` evaluated in AND. Ten operators, listed
 //!   once, refused if unknown.
 //!
 //! What is fuzzy gets resolved by the `ai` step, not by growing a DSL — that was decided so that
@@ -37,6 +37,17 @@ pub const SCHEMA_VERSION: i64 = 1;
 const ROOT_INPUT: &str = "input";
 const ROOT_STEPS: &str = "steps";
 const ROOT_EVENT: &str = "event";
+/// The run clock (hub#1694). A document could say what to do and to whom, never **when**: the
+/// roots above are all facts somebody else wrote, so a `condition` had no way to ask whether a
+/// timestamp was recent. Meta refuses a free WhatsApp message once the customer's last one is over
+/// 24 h old, and the flow that sends it anyway pays for the call and learns nothing.
+///
+/// Shaped as an object with one field, `now.iso`, so it reads like every other path and so the
+/// pieces a clock has (a local date, a local time) can be added later without moving anything.
+const ROOT_NOW: &str = "now";
+/// The instant, RFC-3339 in UTC — the same shape every timestamp this hub stores has, which is
+/// what makes `gt`/`lt` order them correctly.
+pub const CLOCK_ISO: &str = "iso";
 /// `_flow_secrets` (ADR-0283 §4, hub#662). Legal ONLY inside an `http` step: that is the one place
 /// a credential has a reason to exist, and anywhere else it is refused at save time rather than
 /// silently treated as a literal string — a step that thinks it is sending a secret and sends the
@@ -952,7 +963,7 @@ pub struct TriggerDef {
 
 // ── Conditions ────────────────────────────────────────────────────────────────────────────────
 
-/// The nine operators. Frozen and closed: an unknown one is refused at save time, because a
+/// The ten operators. Frozen and closed: an unknown one is refused at save time, because a
 /// filter that silently matches everything is how a flow ends up emailing the whole customer list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
@@ -965,6 +976,11 @@ pub enum Op {
     Gte,
     Lt,
     Lte,
+    /// «Is this instant at most N seconds old?» (hub#1694). The tenth, and the only one whose
+    /// answer depends on the clock instead of on two values the document already has: a window is
+    /// the one comparison a frozen language cannot express by naming both sides, because one of
+    /// them does not exist until the run reaches the step.
+    WithinLast,
 }
 
 impl Op {
@@ -979,6 +995,7 @@ impl Op {
             Op::Gte => "gte",
             Op::Lt => "lt",
             Op::Lte => "lte",
+            Op::WithinLast => "within_last",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
@@ -992,6 +1009,7 @@ impl Op {
             "gte" => Op::Gte,
             "lt" => Op::Lt,
             "lte" => Op::Lte,
+            "within_last" => Op::WithinLast,
             _ => return None,
         })
     }
@@ -1005,6 +1023,7 @@ impl Op {
         Op::Gte,
         Op::Lt,
         Op::Lte,
+        Op::WithinLast,
     ];
 }
 
@@ -1055,6 +1074,7 @@ impl Condition {
                         ),
                     )
                 })?;
+                check_comparand(path, op, expected)?;
                 parsed.push((op, expected.clone()));
             }
             out.insert(path.clone(), parsed);
@@ -1078,10 +1098,16 @@ impl Condition {
     /// except `exists: false` and an explicit `eq: null` — a filter must not match by accident on
     /// a field the event does not carry.
     pub fn matches(&self, scope: &Json) -> bool {
+        // One instant for the whole condition: two clauses about the same window must not land on
+        // either side of a tick.
+        let now = scope
+            .get(ROOT_NOW)
+            .and_then(|c| c.get(CLOCK_ISO))
+            .and_then(|v| v.as_str());
         self.0.iter().all(|(path, ops)| {
             let actual = resolve_path(path, scope).unwrap_or(Json::Null);
             ops.iter()
-                .all(|(op, expected)| eval(*op, &actual, expected))
+                .all(|(op, expected)| eval(*op, &actual, expected, now))
         })
     }
 
@@ -1108,8 +1134,123 @@ impl Condition {
     }
 }
 
-/// One operator against one pair of values.
-fn eval(op: Op, actual: &Json, expected: &Json) -> bool {
+/// Who a stored filter belongs to, so a filter that cannot be read is reported as a row somebody
+/// can go and look at instead of as «one of this hub's automations».
+pub struct FilterOwner<'a> {
+    /// `"trigger"` or `"wait"` — which table the unreadable text is sitting in.
+    pub kind: &'a str,
+    /// `_flow_triggers.id` / `_flow_run_waits.id`.
+    pub id: &'a str,
+    /// The flow whose behaviour changed, which is the only half of this an owner recognises.
+    pub flow_id: &'a str,
+}
+
+/// hub#1714 — the stable code of «a stored automation filter cannot be read by this core». Lives in
+/// the `error_registry` namespace (like [`crate::flows::grants::ERR_UNREADABLE_GRANT_PAYLOAD_EVENT`])
+/// and not in the `flow.…` family: nothing is being answered to a caller here, there is no caller.
+pub const ERR_UNREADABLE_FILTER_EVENT: &str = "flow_filter_unreadable";
+
+/// The report of a stored filter this core cannot read.
+///
+/// Split from the place that sends it so a test can pin its CONTENT — the stable code and the row
+/// it names — instead of pinning that a global sink was called at all (the `failed_install_event`
+/// pattern, hub#1477).
+pub fn unreadable_filter_event(owner: &FilterOwner<'_>) -> crate::error_registry::ErrorEvent {
+    use crate::error_registry::{severity, source, ErrorEvent};
+
+    let FilterOwner { kind, id, flow_id } = *owner;
+    ErrorEvent::new(
+        source::HUB,
+        ERR_UNREADABLE_FILTER_EVENT,
+        format!(
+            "the {kind} `{id}` of flow `{flow_id}` holds a filter this core cannot read; it \
+             narrows to NOTHING — the automation does not fire — until it is saved again"
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_context(serde_json::json!({
+        "kind": kind,
+        "id": id,
+        "flow_id": flow_id,
+    }))
+}
+
+/// A stored filter, as the TEXT the kernel keeps it in, back into the condition it means — or
+/// `None` when this core cannot read it.
+///
+/// **`None` and `Some(Condition::default())` are different answers, and telling them apart is the
+/// whole of hub#1714.** Both call sites used to collapse them with `unwrap_or_default()`: the empty
+/// map, which [`Condition::matches`] evaluates as an `all()` over nothing and answers `true` to. So
+/// a filter that could not be read stopped narrowing anything and the automation fired on EVERY
+/// occurrence of its event — the widest reading of a document nobody could read, on the path that
+/// writes to customers. It is also the opposite of what the rest of the kernel already does: an
+/// unreadable correlation matches nothing ([`crate::flows::waits`]), an unreadable policy condition
+/// denies ([`crate::policies::ERR_CONDITION_UNREADABLE`]), an unreadable grant pin authorises
+/// nothing (hub#1636).
+///
+/// Nothing reachable writes one: the write door refuses anything [`Condition::parse`] rejects. It
+/// exists anyway because the *reader* moves — hub#1713 started refusing a `now.…` on the right of an
+/// operator, so a filter saved by an older hub with one in it parses here no longer. That is why the
+/// refusal is REPORTED and not only applied: an owner whose recipe went quiet has no other thread
+/// back to the row, and the editor still shows the filter as written.
+pub fn read_stored_filter(raw: &str, owner: &FilterOwner<'_>) -> Option<Condition> {
+    if let Some(condition) = serde_json::from_str::<Json>(raw)
+        .ok()
+        .and_then(|v| Condition::parse(&v).ok())
+    {
+        return Some(condition);
+    }
+    let event = unreadable_filter_event(owner);
+    eprintln!("✗ {}", event.message);
+    crate::error_registry::ErrorRegistry::global().report(event);
+    None
+}
+
+/// What the right of an operator is allowed to be.
+///
+/// Two refusals, both of the same family: a clause that would be stored meaning something other
+/// than what it says.
+///
+/// - **The clock on the right.** The right is never resolved (hub#828), so `{"gte": "now.iso"}`
+///   would compare a timestamp against the seven characters `now.iso` — `false` for ever, no error
+///   and nothing in the run's history saying why. [`Op::WithinLast`] is what a window is written
+///   with, and the message says so.
+/// - **A window that is not a number of seconds.** `"24h"` is the shape everybody reaches for and
+///   the kernel has no duration grammar (durations are seconds here: `delay.seconds`, `max_wait`).
+///   Read as «not comparable», a window answers `false` and the guard silently stops letting
+///   anything through; read as zero, it lets everything. Both are worse than not saving.
+fn check_comparand(path: &str, op: Op, expected: &Json) -> Result<()> {
+    let mut paths = Vec::new();
+    template_paths(expected, &mut paths);
+    if let Some(named) = paths
+        .iter()
+        .find(|p| p.split('.').next() == Some(ROOT_NOW))
+    {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "condition on `{path}`: the right of `{}` is literal text, so `{named}` there \
+                 would be compared as the characters `{named}` and never match. A window \
+                 on the clock is written `{{\"within_last\": <seconds>}}`.",
+                op.as_str()
+            ),
+        ));
+    }
+    if op == Op::WithinLast && !expected.as_i64().is_some_and(|s| s > 0) {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "condition on `{path}`: `within_last` is a whole number of SECONDS greater \
+                 than zero (86400 is a day), not {expected}"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// One operator against one pair of values. `now` is the run clock the whole condition is being
+/// judged at, absent when the scope carries none.
+fn eval(op: Op, actual: &Json, expected: &Json, now: Option<&str>) -> bool {
     match op {
         Op::Eq => json_eq(actual, expected),
         Op::Neq => !json_eq(actual, expected),
@@ -1127,6 +1268,25 @@ fn eval(op: Op, actual: &Json, expected: &Json) -> bool {
                 Some(needle) => s.contains(&needle),
                 None => false,
             },
+            _ => false,
+        },
+        // A scope with no clock, a left that is not an instant, a window that is not a number:
+        // every way of not knowing answers **no**. This is the clause of an AND that guards a
+        // message going out, and a guard that cannot judge must not be the one that waves it
+        // through.
+        Op::WithinLast => match (as_instant(actual), now.and_then(as_instant_str), expected.as_i64())
+        {
+            (Some(at), Some(now), Some(seconds)) if seconds > 0 => {
+                match chrono::Duration::try_seconds(seconds)
+                    .and_then(|window| now.checked_sub_signed(window))
+                {
+                    Some(floor) => at >= floor,
+                    // A window so wide it leaves the calendar contains everything. `try_seconds`
+                    // and never `seconds`: the latter PANICS above `i64::MAX / 1000`, and a
+                    // number a document is allowed to save must not be able to bring the run down.
+                    None => true,
+                }
+            }
             _ => false,
         },
         Op::Gt | Op::Gte | Op::Lt | Op::Lte => match compare(actual, expected) {
@@ -1184,6 +1344,18 @@ fn as_number(v: &Json) -> Option<f64> {
     }
 }
 
+/// An RFC-3339 instant, as UTC. Only a string is one: a number here is an amount of something,
+/// and guessing it is an epoch is how a total became a date.
+fn as_instant(v: &Json) -> Option<chrono::DateTime<chrono::Utc>> {
+    v.as_str().and_then(as_instant_str)
+}
+
+fn as_instant_str(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    chrono::DateTime::parse_from_rfc3339(s.trim())
+        .ok()
+        .map(|t| t.with_timezone(&chrono::Utc))
+}
+
 fn as_text(v: &Json) -> Option<String> {
     match v {
         Json::String(s) => Some(s.clone()),
@@ -1195,11 +1367,42 @@ fn as_text(v: &Json) -> Option<String> {
 
 // ── The mapping language ──────────────────────────────────────────────────────────────────────
 
-/// Is `s` a bare path into the run (`input.…`, `steps.…`, `event.…`, `secret.…`)?
+/// Is `s` a bare path into the run (`input.…`, `steps.…`, `event.…`, `secret.…`, `now.…`)?
 pub fn is_path(s: &str) -> bool {
     matches!(s.split('.').next(), Some(root)
-        if (root == ROOT_INPUT || root == ROOT_STEPS || root == ROOT_EVENT || root == ROOT_SECRET)
+        if (root == ROOT_INPUT
+            || root == ROOT_STEPS
+            || root == ROOT_EVENT
+            || root == ROOT_SECRET
+            || root == ROOT_NOW)
             && s.len() > root.len() + 1)
+}
+
+/// The run clock as the mapping language addresses it, ready to be merged into a scope.
+///
+/// Read **once per evaluation** and carried in the scope rather than read from the system clock
+/// deep inside [`Condition::matches`]: every clause of one condition then judges the same instant,
+/// and a test can say what time it is.
+pub fn clock() -> Json {
+    clock_at(&crate::registry::now_rfc3339())
+}
+
+/// [`clock`] at a given instant. Public so the sites that already have the instant they are
+/// working with (a step's `now`, the moment an event was delivered) hand it the same one.
+pub fn clock_at(instant: &str) -> Json {
+    let mut m = Map::new();
+    m.insert(CLOCK_ISO.to_string(), Json::String(instant.to_string()));
+    Json::Object(m)
+}
+
+/// The scope an ARRIVING event is judged against: a trigger's `filter` and a wait hook's are the
+/// same language and must see the same world, so both get it from here rather than each building
+/// its own object — that is how one of the two ends up without a clock.
+pub fn event_scope(payload: &Map<String, Json>) -> Json {
+    let mut m = Map::new();
+    m.insert(ROOT_EVENT.to_string(), Json::Object(payload.clone()));
+    m.insert(ROOT_NOW.to_string(), clock());
+    Json::Object(m)
 }
 
 /// Is this an absolute `http(s)` URL? **Syntax only.** Whether the hub may talk to that host is the
@@ -4519,6 +4722,229 @@ mod tests {
         let err = Condition::parse(&json!({ "event.total": { "greater_than": 100 } }))
             .expect_err("a filter that silently matches everything emails the whole customer list");
         assert!(format!("{err}").contains("greater_than"), "{err}");
+    }
+
+    // ── the run clock (hub#1694) ──────────────────────────────────────────────────────────────
+
+    /// The scope every step, trigger and wait hook is evaluated against carries the instant the
+    /// engine is looking at, so a document can say something about WHEN it is running.
+    #[test]
+    fn the_run_clock_is_a_root_of_the_mapping_language_hub1694() {
+        let scope = json!({
+            "input": {}, "steps": {}, "now": { "iso": "2026-09-09T12:00:00Z" }
+        });
+        assert!(is_path("now.iso"));
+        assert_eq!(
+            resolve(&json!("now.iso"), &scope),
+            json!("2026-09-09T12:00:00Z")
+        );
+        assert_eq!(
+            render("enviado {{now.iso}}", &scope),
+            "enviado 2026-09-09T12:00:00Z"
+        );
+    }
+
+    /// Both doors an arriving event knocks on — a trigger's `filter` and a wait hook's — read the
+    /// clock from the SAME builder. Two objects built by hand is how one of them ends up without
+    /// it, and a `within_last` there would answer `false` for ever, silently.
+    #[test]
+    fn the_scope_an_arriving_event_is_judged_against_carries_the_clock_hub1694() {
+        let Json::Object(payload) = json!({ "total": "9.90" }) else {
+            unreachable!()
+        };
+        let scope = event_scope(&payload);
+        assert_eq!(resolve(&json!("event.total"), &scope), json!("9.90"));
+        let instant = resolve(&json!("now.iso"), &scope);
+        assert!(
+            instant
+                .as_str()
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .is_some(),
+            "`now.iso` is an RFC-3339 instant, not {instant}"
+        );
+    }
+
+    /// The case this root was added for: Meta refuses a free WhatsApp message when the last one
+    /// the customer sent is older than 24 h, and the flow could not tell.
+    #[test]
+    fn a_window_on_the_clock_is_written_with_within_last_hub1694() {
+        let scope = |last: &str| {
+            json!({
+                "steps": { "thread": { "last_message_at": last } },
+                "now": { "iso": "2026-09-09T12:00:00Z" },
+            })
+        };
+        let day = Condition::parse(&json!({
+            "steps.thread.last_message_at": { "within_last": 86400 }
+        }))
+        .unwrap();
+        assert!(day.matches(&scope("2026-09-08T12:00:01Z")), "a second inside");
+        assert!(!day.matches(&scope("2026-09-08T11:59:59Z")), "a second outside");
+        // The floor ITSELF is inside: the window is `at >= now - seconds`, which is what the
+        // document promises. Bracketing it a second either way leaves the edge unsaid, and an
+        // exclusive `>` would read the same in every other test.
+        assert!(day.matches(&scope("2026-09-08T12:00:00Z")), "the floor instant itself");
+        // An instant still to come is recent by any reading of the word, and the clock of whoever
+        // wrote the row is not ours: skew must not turn into a message the customer never gets.
+        assert!(day.matches(&scope("2026-09-09T12:00:01Z")), "clock skew ahead");
+    }
+
+    /// Every way of not knowing answers **no**. A window that cannot be evaluated must not be the
+    /// one clause of an AND that quietly passes.
+    #[test]
+    fn a_window_that_cannot_be_evaluated_does_not_match_hub1694() {
+        let day = Condition::parse(&json!({ "steps.t.at": { "within_last": 86400 } })).unwrap();
+        let now = json!({ "iso": "2026-09-09T12:00:00Z" });
+        // the field is absent
+        assert!(!day.matches(&json!({ "steps": { "t": {} }, "now": now })));
+        // the field is not an instant
+        assert!(!day.matches(&json!({ "steps": { "t": { "at": "ayer" } }, "now": now })));
+        // the scope carries no clock at all
+        assert!(!day.matches(&json!({ "steps": { "t": { "at": "2026-09-09T11:00:00Z" } } })));
+    }
+
+    /// The window is a number of SECONDS, like every other duration in this document
+    /// (`delay.seconds`, `max_wait`). Anything else is refused at save time: a window nobody can
+    /// evaluate is a guard that would let every message through.
+    #[test]
+    fn a_window_is_a_positive_number_of_seconds_or_it_is_refused_hub1694() {
+        for bad in [json!("24h"), json!(0), json!(-1), json!(1.5), json!(true)] {
+            let err = Condition::parse(&json!({ "steps.t.at": { "within_last": bad } }))
+                .expect_err("a window that cannot be read is refused, not guessed");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+                "{bad}: {err}"
+            );
+        }
+        assert!(Condition::parse(&json!({ "steps.t.at": { "within_last": 86400 } })).is_ok());
+    }
+
+    /// A window is a whole number of seconds and nothing stops a document from saying a very big
+    /// one. It must answer, not bring the runtime down: `chrono::Duration::seconds` PANICS above
+    /// `i64::MAX / 1000`, so the reading here is the same one the arithmetic already documented —
+    /// a window wider than the calendar contains every instant there is.
+    #[test]
+    fn a_window_wider_than_the_calendar_contains_everything_instead_of_crashing_hub1694() {
+        let scope = json!({
+            "steps": { "t": { "at": "1999-01-01T00:00:00Z" } },
+            "now": { "iso": "2026-09-09T12:00:00Z" },
+        });
+        for seconds in [i64::MAX, i64::MAX / 1_000 + 1, 9_000_000_000_000_000] {
+            let wide = Condition::parse(&json!({ "steps.t.at": { "within_last": seconds } }))
+                .expect("a positive number of seconds is a window");
+            assert!(
+                wide.matches(&scope),
+                "{seconds}s reaches back past any instant this hub stores"
+            );
+        }
+    }
+
+    /// The right of an operator is LITERAL text (hub#828), so `{"gte": "now.iso"}` would compare a
+    /// timestamp against the seven characters `now.iso` and answer `false` for ever, with nothing
+    /// saying why. Refused at save time, naming the operator that does mean it.
+    #[test]
+    fn the_clock_on_the_right_of_an_operator_is_refused_hub1694() {
+        let err = Condition::parse(&json!({ "steps.t.at": { "gte": "now.iso" } }))
+            .expect_err("a comparison against the literal text `now.iso` never matches");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+            "{err}"
+        );
+        assert!(format!("{err}").contains("within_last"), "{err}");
+
+        // The same refusal wherever the clock is NAMED on the right, not just when the whole
+        // value is the bare path: a `{{now.iso}}` template renders to the instant and is then
+        // compared as text, and `in` takes a LIST, so a clock hidden in one of its items would
+        // slip past a check that only looked at the string as a whole.
+        for right in [
+            json!({ "gte": "{{now.iso}}" }),
+            json!({ "eq": "hoy es {{ now.iso }}" }),
+            json!({ "in": ["2026-01-01", "now.iso"] }),
+            json!({ "in": ["{{now.iso}}"] }),
+        ] {
+            let err = Condition::parse(&json!({ "steps.t.at": right }))
+                .expect_err("the clock on the right never matches, however it is written");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+                "{right}: {err}"
+            );
+        }
+
+        // The left is resolved, so the clock is legitimate there.
+        assert!(Condition::parse(&json!({ "now.iso": { "gte": "2026-01-01" } })).is_ok());
+        // And a right that merely CONTAINS the word is still ordinary text.
+        assert!(Condition::parse(&json!({ "steps.t.name": { "eq": "nowhere" } })).is_ok());
+    }
+
+    // ── a stored filter that cannot be read (hub#1714) ────────────────────────────────────────
+
+    fn owner() -> FilterOwner<'static> {
+        FilterOwner {
+            kind: "trigger",
+            id: "trigger-1",
+            flow_id: "flow-1",
+        }
+    }
+
+    /// hub#1714 — the two answers this function exists to keep apart. Every shape below is text no
+    /// `Condition` can be made of, including the two that LOOK like a condition: an object whose
+    /// value is not a map of operators, and a map with an operator this core does not know.
+    ///
+    /// `{"steps.t.at": {"gte": "now.iso"}}` is the one that actually happens: it stored and
+    /// compared as literal text until hub#1713 started refusing a `now.…` on the right, so a filter
+    /// already saved with it parses here no longer.
+    #[test]
+    fn a_stored_filter_that_cannot_be_read_is_none_not_the_empty_condition() {
+        for raw in [
+            "",
+            "not json",
+            "[]",
+            "7",
+            "\"event.total\"",
+            r#"{"event.total": 100}"#,
+            r#"{"event.total": {"greater_than": "100"}}"#,
+            r#"{"steps.t.at": {"gte": "now.iso"}}"#,
+        ] {
+            assert!(
+                read_stored_filter(raw, &owner()).is_none(),
+                "`{raw}` cannot be read, and `Some(empty)` here would match EVERYTHING"
+            );
+        }
+    }
+
+    /// The control, and the reason this cannot simply answer `None` to everything it dislikes: `{}`
+    /// and `null` both READ, and both mean «no filter written, so no filtering meant» — the one
+    /// permissive default of the condition language, which `Condition::parse` states.
+    #[test]
+    fn a_stored_filter_that_reads_as_no_filter_is_still_a_filter_that_matches_everything() {
+        for raw in ["{}", "null"] {
+            let condition = read_stored_filter(raw, &owner())
+                .unwrap_or_else(|| panic!("`{raw}` is readable: it is the absent condition"));
+            assert!(condition.is_empty(), "{raw}");
+            assert!(
+                condition.matches(&json!({ "event": { "total": "1" } })),
+                "{raw}"
+            );
+        }
+    }
+
+    /// The CONTENT of the report, pinned by calling its builder — the wiring that SENDS it is
+    /// pinned by `tests/flow_unreadable_filter_report.rs`, because the sink is process-global.
+    #[test]
+    fn the_report_of_an_unreadable_filter_names_the_row_to_save_again() {
+        let event = unreadable_filter_event(&FilterOwner {
+            kind: "wait",
+            id: "wait-7",
+            flow_id: "flow-9",
+        });
+        assert_eq!(event.error_code, ERR_UNREADABLE_FILTER_EVENT);
+        assert_eq!(event.severity, crate::error_registry::severity::UNEXPECTED);
+        assert_eq!(event.context["kind"], json!("wait"));
+        assert_eq!(event.context["id"], json!("wait-7"));
+        assert_eq!(event.context["flow_id"], json!("flow-9"));
+        // Whoever reads this has a row id and nothing else; the message has to carry it too.
+        assert!(event.message.contains("wait-7"), "{}", event.message);
+        assert!(event.message.contains("flow-9"), "{}", event.message);
     }
 
     // ── the `query` step (hub#954) ────────────────────────────────────────────────────────────
