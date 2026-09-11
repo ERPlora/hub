@@ -120,9 +120,9 @@ describe('el contrato visual no fotografía el reloj (hub#1752)', () => {
 //
 // Measured on 2026-09-11, regenerating at `HUB_WEB_URL=http://localhost:8850` and comparing at
 // `:8860` with nothing else changed: the four 1440px screens that paint the sidebar — apps,
-// dashboard, employees and settings — all failed (dashboard: 3168 px, ratio 0.01, against a
-// `maxDiffPixelRatio` of 0.002). The 834/390 captures survive only because the sidebar is not on
-// screen at those widths.
+// dashboard, employees and settings — all failed (dashboard: 3168 px against the budget of the
+// day, a ratio of 0.002 = 2592 px at 1440x900; hub#1823 has since replaced it with an absolute
+// 20 px). The 834/390 captures survive only because the sidebar is not on screen at those widths.
 //
 // So the symbol is MASKED, not frozen: what it encodes is genuinely machine-specific, and its
 // content already has unit tests of its own (`lib/install-qr.test.ts`,
