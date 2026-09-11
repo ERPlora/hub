@@ -26,7 +26,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, nextTick, ref } from 'vue';
 
 const untie = vi.fn();
-const bindTabbar = vi.fn(() => untie);
+const bindTabbar = vi.fn((_segment: HTMLElement) => untie);
 vi.mock('@erplora/outfitkit/tabbar', () => ({ bindTabbar: (el: HTMLElement) => bindTabbar(el) }));
 
 // The layout is what is under test; its three fixed pieces are not.
