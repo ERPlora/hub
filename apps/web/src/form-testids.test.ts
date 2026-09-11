@@ -63,6 +63,7 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'employee-submit',
     ],
   },
+  // Regression test for ERPlora/hub#1808 — the staff list and the API keys panel.
   // La lista de personal (`/employees`): las pestañas, la tabla y el alta rápida que vive en el
   // panel lateral. `employees-` y no `employee-` a propósito — el singular es el formulario de una
   // persona, y son dos pantallas distintas que el QA recorre una detrás de otra.
@@ -140,6 +141,7 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'import-upload-local',
     ],
   },
+  // Regression test for ERPlora/hub#1809 — the hub's front door.
   // La puerta del hub (`/login` y `/auth/google/callback`): los cuatro pasos —email+contraseña,
   // 2FA por correo, PIN y alta de PIN— viven en la misma pantalla, así que el nombre lleva el paso
   // dentro (`login-2fa-code`, `login-setup-pinpad`). Sin estos ganchos ningún recorrido podía
@@ -177,6 +179,8 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'login-use-pin',
     ],
   },
+  // Regression test for ERPlora/hub#1810 — profile, hub settings, PIN policy, devices and
+  // device mode.
   // La cuenta de quien usa el hub (`/profile`): identidad, idioma, apariencia y el PIN propio.
   'views/ProfilePage.vue': {
     prefix: 'profile-',
@@ -362,6 +366,7 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'user-switch-pinpad',
     ],
   },
+  // Regression test for ERPlora/hub#1811 — the assistant drawer and a module's settings form.
   // El drawer ✨ del shell. Los mensajes del hilo se nombran CALCULADOS por su turno
   // (`assistant-message-${i}`): un hilo de chat solo AÑADE al final —nada se reordena ni se
   // inserta en medio—, así que el turno ES la identidad de la fila, y es lo que un spec necesita
