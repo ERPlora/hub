@@ -64,6 +64,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import { bindTabbar } from '@erplora/outfitkit/tabbar';
+import { bindTabbarPeek } from '../lib/tabbar-peek';
 import AppTopbar from './AppTopbar.vue';
 import SetupBlockingStrip from './SetupBlockingStrip.vue';
 import OfflineStrip from './OfflineStrip.vue';
@@ -128,7 +129,19 @@ function sincronizarTabbar() {
   desatar?.(); // el anterior se fue de la pantalla: no dejamos su escucha colgando
   desatar = null;
   cableado = segment;
-  if (segment) desatar = bindTabbar(segment);
+  if (!segment) return;
+
+  // Two bindings, because they answer two different questions. OutfitKit's says WHETHER the strip
+  // hides tabs and paints the edge fade; `bindTabbarPeek` sizes the tabs so that fade has ink to
+  // fade — without it the cut lands on a tab's padding and, at rest, a strip with two hidden tabs
+  // looks exactly like one that ends there (hub#1830). Unbound in the reverse order: the peek gives
+  // the strip back its stylesheet width before OutfitKit stops listening to it.
+  const desatarOutfitkit = bindTabbar(segment);
+  const desatarAsomo = bindTabbarPeek(segment);
+  desatar = () => {
+    desatarAsomo();
+    desatarOutfitkit();
+  };
 }
 
 // Un observador del DOM, y no `onUpdated`: el slot `#footer` va DENTRO de `ion-page`, así que lo
