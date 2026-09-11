@@ -92,6 +92,31 @@ export function isBootTransportFailure(
 }
 
 /**
+ * The endings Playwright's default `testMatch` collects, as a regex.
+ *
+ * The glob is `**\/*.@(spec|test).?(c|m)[jt]s?(x)` — `spec` OR `test`, an optional `c`/`m`, `j` or
+ * `t`, and an optional `x`, which is 24 endings and not the one this guard used to look for. The
+ * count is not a reading of the glob: it is what @playwright/test 1.62.1 collected from a
+ * directory holding one file per ending (`Total: 24 tests in 24 files`). It stays a copy only
+ * while `playwright.config.ts` declares no `testMatch` of its own, which `declaresTestMatch` below
+ * is there to keep true.
+ *
+ * The case of that ending is not free either way. `collectFilesForProject`
+ * (`playwright/lib/runner/index.js`) puts a file through TWO gates that disagree about it:
+ * `new Set(['.js', '.ts', '.mjs', '.mts', ...]).has(path.extname(file))`, which is a Set lookup
+ * and so wants the FINAL extension lowercase letter for letter, and then
+ * `minimatch(filePath, testMatch, { nocase: true, dot: true })` (`util.js`, `createFileMatcher`),
+ * which does NOT care how `spec` or `test` is spelled. Measured with 1.62.1: `Cased.Spec.ts` and
+ * `Cased.tEsT.mts` are files Playwright runs; `Shouty.spec.TS` and `Shouty.Spec.Ts` are not.
+ *
+ * So the word is a case-blind class and the extension is literal. Taking the easy road — an `i`
+ * on the whole pattern — buys the first half and loses the second: the guard would then fail the
+ * build over a `Shouty.spec.TS` Playwright never runs, and a guard that cries wolf gets deleted.
+ * `nocase` is minimatch's and not the filesystem's, so this is how CI's Linux behaves too.
+ */
+const PLAYWRIGHT_DEFAULT_TEST_MATCH = /\.(?:[sS][pP][eE][cC]|[tT][eE][sS][tT])\.[cm]?[jt]sx?$/;
+
+/**
  * Every spec file Playwright would run under `dir`, as paths relative to it.
  *
  * It walks SUBDIRECTORIES because Playwright does: `playwright.config.ts` sets `testDir: './e2e'`
@@ -99,12 +124,87 @@ export function isBootTransportFailure(
  * worth anything if it sees exactly what Playwright sees — with a flat `readdirSync` a spec one
  * folder down took `test` straight from Playwright, ran for real, and the guard stayed green
  * (ERPlora/hub#1820).
+ *
+ * And it matches every ENDING Playwright runs, not just `.spec.ts`, for the same reason one field
+ * over: with `endsWith('.spec.ts')` a `ZZMutant.test.ts` dropped in here took `test` straight from
+ * Playwright, was listed by `playwright --list` as a test it would run, and left this guard at
+ * `41 passed` (ERPlora/hub#1824).
  */
 export function listE2eSpecs(dir: string): string[] {
   return readdirSync(dir, { recursive: true })
     .map((entry) => String(entry))
-    .filter((name) => name.endsWith('.spec.ts'))
+    .filter((name) => PLAYWRIGHT_DEFAULT_TEST_MATCH.test(name))
     .sort();
+}
+
+/**
+ * Source of `playwright.config.ts` minus its comments, with string literals left as they are.
+ *
+ * Comments have to go because this config EXPLAINS the default `testMatch` in prose, and a reader
+ * that counts prose as a declaration cries wolf until someone deletes it. Strings have to stay
+ * because `{ "testMatch": … }` is a legal key.
+ *
+ * Which is why this is a scanner and not a pair of `replace()` calls: the config is full of URLs,
+ * and the `//` in `http://127.0.0.1:1` starts no comment. A stripper that does not know it is
+ * inside a string would drop the rest of that line — and report "no `testMatch` here" about a
+ * config that declares one, which is a miss shaped exactly like a pass.
+ */
+function stripComments(source: string): string {
+  let out = '';
+  let i = 0;
+
+  while (i < source.length) {
+    const pair = source.slice(i, i + 2);
+
+    if (pair === '//') {
+      while (i < source.length && source[i] !== '\n') i += 1;
+      continue;
+    }
+
+    if (pair === '/*') {
+      i += 2;
+      while (i < source.length && source.slice(i, i + 2) !== '*/') i += 1;
+      i += 2;
+      continue;
+    }
+
+    const quote = source[i];
+    if (quote === "'" || quote === '"' || quote === '`') {
+      out += quote;
+      i += 1;
+      while (i < source.length && source[i] !== quote) {
+        // An escaped quote does not close the literal, and skipping the pair is what keeps the
+        // scanner from reading the rest of the file as if it were still inside a string.
+        if (source[i] === '\\') {
+          out += source[i];
+          i += 1;
+        }
+        out += source[i] ?? '';
+        i += 1;
+      }
+      out += quote;
+      i += 1;
+      continue;
+    }
+
+    out += source[i];
+    i += 1;
+  }
+
+  return out;
+}
+
+/**
+ * Does this Playwright config take a position on `testMatch`?
+ *
+ * `listE2eSpecs` COPIES Playwright's default, and a copy is true only while the original does not
+ * move. Declaring a `testMatch` is a one-line change nobody would think to weigh against a guard
+ * two files away, and the day it happens the list stops describing the set of files Playwright
+ * runs — with no symptom, because the guard goes on passing. The decision table is in
+ * `tests/bench-boot.test.ts` (ERPlora/hub#1824).
+ */
+export function declaresTestMatch(source: string): boolean {
+  return /\btestMatch\b/.test(stripComments(source));
 }
 
 /**
