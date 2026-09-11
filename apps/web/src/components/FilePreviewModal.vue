@@ -25,7 +25,7 @@
         <ion-buttons slot="end">
           <ion-button
             v-if="zoomable"
-            data-test="preview-zoom-out"
+            data-testid="preview-zoom-out"
             :aria-label="t('files.previewZoomOut')"
             :title="t('files.previewZoomOut')"
             @click="zoomBy(-0.25)"
@@ -34,7 +34,7 @@
           </ion-button>
           <ion-button
             v-if="zoomable"
-            data-test="preview-zoom-in"
+            data-testid="preview-zoom-in"
             :aria-label="t('files.previewZoomIn')"
             :title="t('files.previewZoomIn')"
             @click="zoomBy(0.25)"
@@ -42,7 +42,7 @@
             <HubIcon name="add-outline" />
           </ion-button>
           <ion-button
-            data-test="preview-download"
+            data-testid="preview-download"
             :aria-label="t('files.download')"
             :title="t('files.download')"
             @click="emit('download')"
@@ -50,7 +50,7 @@
             <HubIcon name="download-outline" />
           </ion-button>
           <ion-button
-            data-test="preview-close"
+            data-testid="preview-close"
             :aria-label="t('files.close')"
             :title="t('files.close')"
             @click="emit('close')"

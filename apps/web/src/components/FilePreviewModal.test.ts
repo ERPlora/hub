@@ -149,8 +149,8 @@ describe('FilePreviewModal', () => {
   it('deja descargar el fichero desde el propio modal y cerrarlo', async () => {
     const wrapper = mountModal({ id: 'a.txt', name: 'a.txt' });
     await flushPromises();
-    await wrapper.find('[data-test="preview-download"]').trigger('click');
-    await wrapper.find('[data-test="preview-close"]').trigger('click');
+    await wrapper.find('[data-testid="preview-download"]').trigger('click');
+    await wrapper.find('[data-testid="preview-close"]').trigger('click');
     expect(wrapper.emitted('download')).toHaveLength(1);
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
