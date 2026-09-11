@@ -93,6 +93,19 @@ ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
 ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';\
 ALTER TABLE hub_user ADD COLUMN is_account_owner INTEGER NOT NULL DEFAULT 0;";
 
+/// El gemelo de [`UNIT_TEST_HUB_USER_COLUMNS`] para `hub_session`: `device_id` (**v8**, ADR-0154),
+/// las dos de la traza de credencial (**v48**, hub#658) y `ended_reason` (**v62**, hub#1801).
+///
+/// Estaba copiada palabra por palabra en dos fixtures de este módulo; una sola definición para que
+/// añadir una columna sea un sitio, y para que el guardia de `system_migrations` pueda leerla y
+/// avisar del olvido nombrando la columna en vez de dejar un `42703` de Postgres sin interpretar.
+#[cfg(test)]
+pub(crate) const UNIT_TEST_HUB_SESSION_COLUMNS: &str = "\
+ALTER TABLE hub_session ADD COLUMN device_id TEXT;\
+ALTER TABLE hub_session ADD COLUMN credential_kind TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_session ADD COLUMN credential_ref TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_session ADD COLUMN ended_reason TEXT NOT NULL DEFAULT '';";
+
 /// Crea las tablas de identidad (idempotente).
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
     db.execute_batch(ENSURE_TABLES).await?;
@@ -1576,9 +1589,14 @@ pub async fn create_session_with_credential(
 ///
 /// *Single active device session*: con `max_devices == 1` y un `device_id` presente, el hub solo
 /// admite **un dispositivo activo** a la vez. Al abrir sesión en un dispositivo nuevo se
-/// **desalojan** (borran) todas las sesiones cuyo `device_id` **difiera** del nuevo —incluidas las
+/// **desalojan** todas las sesiones cuyo `device_id` **difiera** del nuevo —incluidas las
 /// `NULL` de logins que no aportaron device_id—; las del mismo dispositivo se conservan. El
 /// dispositivo desalojado deja de resolver su token → 401 en su siguiente petición (takeover).
+///
+/// **Desalojar no es borrar** (hub#1801): la fila se caduca y se marca con su motivo, en vez de
+/// desaparecer. Borrarla dejaba al desalojado sin forma de enterarse —volvía a llamar, no había
+/// nada, y el hub contestaba el mismo 401 que para una sesión caducada— así que la pantalla de
+/// entrada solo podía callarse. Ahora [`session_end_reason`] lee la marca y el shell lo explica.
 ///
 /// Con `max_devices == 0` (**ilimitado**: Hub Cloud multi-dispositivo, o token de entitlement
 /// antiguo sin el claim) o sin `device_id` (login que no identifica el dispositivo) es un **no-op**
@@ -1602,15 +1620,75 @@ pub async fn enforce_device_limit(
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("reason".into(), json!(EVICTED_BY_DEVICE_LIMIT));
+    // Primero se barren las lápidas de la vez ANTERIOR. El desalojo dejó de borrar la fila (hub#1801)
+    // para poder explicarse, así que sin esto un hub de un dispositivo con dos tablets turnándose
+    // acumularía una fila por login, para siempre. La generación que se barre es la que ya nadie va
+    // a leer: quien la habría leído volvió a entrar —y por eso hay un desalojo nuevo— o no volvió.
+    db.execute(
+        "DELETE FROM hub_session WHERE hub_id = :hub_id AND ended_reason != ''",
+        &p,
+    )
+    .await?;
     // `!=` no casa NULL en SQL (NULL != 'x' es NULL, no TRUE): expandimos a «NULL o distinto» para
     // desalojar también las sesiones sin device_id. Portable SQLite/Postgres (sin `IS DISTINCT FROM`).
+    //
+    // Caducarla **es** desalojarla: cada lectura de sesión filtra por `expires_at > now`
+    // (`resolve_session`, `resolve_session_with_credential`, `devices::list`, las métricas), así que
+    // la fila deja de autenticar en el mismo instante y por el mismo camino que antes. Lo único que
+    // cambia es que ahora queda algo que leer para saber POR QUÉ.
     db.execute(
-        "DELETE FROM hub_session \
-          WHERE hub_id = :hub_id AND (device_id IS NULL OR device_id != :device_id)",
+        "UPDATE hub_session SET expires_at = :now, ended_reason = :reason \
+          WHERE hub_id = :hub_id AND (device_id IS NULL OR device_id != :device_id) \
+            AND expires_at > :now",
         &p,
     )
     .await?;
     Ok(())
+}
+
+/// El código estable que viaja hasta la pantalla de entrada cuando a alguien lo desalojó otro
+/// dispositivo (hub#1801). Es **dato**, no prosa: la frase la pone el shell con su catálogo
+/// (ADR-0055), y por eso el mismo código vale en los dos idiomas.
+pub const SESSION_EVICTED_DEVICE_LIMIT: &str = "session_evicted_device_limit";
+
+/// Lo que se guarda en la columna. Corto a propósito —es una clave de fila, no un mensaje—; el
+/// código público de arriba es el que sale por la API.
+const EVICTED_BY_DEVICE_LIMIT: &str = "device_limit";
+
+/// **Por qué murió** la sesión de `token`, para cuando [`resolve_session`] no la resuelve.
+///
+/// Se consulta SOLO en el camino de fallo, así que el camino bueno no paga nada. `None` = no hay
+/// nada que explicar: el token no existe, o la sesión simplemente caducó por tiempo — y eso NO es
+/// lo mismo que un desalojo, que es justo la distinción que hub#1801 vino a dar.
+///
+/// Scoped por `hub_id` como toda lectura de `hub_session` (hub#497): el hub de al lado de la misma
+/// base no contesta por una sesión que no es suya.
+pub async fn session_end_reason(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    token: &str,
+) -> Result<Option<String>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("token".into(), json!(token));
+    let res = db
+        .query(
+            "SELECT ended_reason FROM hub_session \
+              WHERE hub_id = :hub_id AND token = :token",
+            &p,
+        )
+        .await?;
+    let stored = res
+        .rows
+        .first()
+        .and_then(|row| row["ended_reason"].as_str())
+        .unwrap_or_default();
+    Ok(match stored {
+        EVICTED_BY_DEVICE_LIMIT => Some(SESSION_EVICTED_DEVICE_LIMIT.to_string()),
+        _ => None,
+    })
 }
 
 /// Resuelve una sesión válida (no caducada) a su `hub_user` activo. `None` si no existe/caducó.
@@ -1892,18 +1970,15 @@ mod tests {
     /// statement that lost its `hub_id` fails here rather than silently reading the whole table.
     const HUB: &str = "hub-identity";
 
-    /// Prepara la identidad para los unit tests. La columna `hub_session.device_id` la añade la
-    /// **migración de sistema v8** (ADR-0154); en los unit tests de identidad la creamos a mano
-    /// tras el baseline, igual que `device_trust_gate` monta `hub_trusted_device` (v2) a mano.
+    /// Prepara la identidad para los unit tests. Las columnas posteriores de `hub_session` las
+    /// añaden migraciones de sistema ([`UNIT_TEST_HUB_SESSION_COLUMNS`]); en los unit tests de
+    /// identidad las creamos a mano tras el baseline, igual que `device_trust_gate` monta
+    /// `hub_trusted_device` (v2) a mano.
     async fn setup_identity(db: &PgAdapter) {
         ensure_tables(db).await.unwrap();
-        db.execute_batch(
-            "ALTER TABLE hub_session ADD COLUMN device_id TEXT;\
-             ALTER TABLE hub_session ADD COLUMN credential_kind TEXT NOT NULL DEFAULT '';\
-             ALTER TABLE hub_session ADD COLUMN credential_ref TEXT NOT NULL DEFAULT '';",
-        )
-        .await
-        .unwrap();
+        db.execute_batch(UNIT_TEST_HUB_SESSION_COLUMNS)
+            .await
+            .unwrap();
     }
 
     /// `ensure_tables` + [`UNIT_TEST_HUB_USER_COLUMNS`]: las columnas que el login cloud necesita y
@@ -1915,18 +1990,14 @@ mod tests {
         db.execute_batch(UNIT_TEST_HUB_USER_COLUMNS).await.unwrap();
     }
 
-    /// Como [`ensure_identity_email`] pero además con `hub_session.device_id` (v8) y las dos
-    /// columnas de la traza de credencial (**v48**, hub#658), para los tests de revocación que
-    /// abren una sesión de verdad y comprueban que muere con la membresía.
+    /// Como [`ensure_identity_email`] pero además con las columnas posteriores de `hub_session`
+    /// ([`UNIT_TEST_HUB_SESSION_COLUMNS`]), para los tests de revocación que abren una sesión de
+    /// verdad y comprueban que muere con la membresía.
     async fn ensure_identity_with_sessions(db: &PgAdapter) {
         ensure_identity_email(db).await;
-        db.execute_batch(
-            "ALTER TABLE hub_session ADD COLUMN device_id TEXT;\
-             ALTER TABLE hub_session ADD COLUMN credential_kind TEXT NOT NULL DEFAULT '';\
-             ALTER TABLE hub_session ADD COLUMN credential_ref TEXT NOT NULL DEFAULT '';",
-        )
-        .await
-        .unwrap();
+        db.execute_batch(UNIT_TEST_HUB_SESSION_COLUMNS)
+            .await
+            .unwrap();
     }
 
     /// `true` si el `hub_user` sigue activo.
@@ -2214,6 +2285,150 @@ mod tests {
         assert!(
             resolve_session(&db, HUB, &tok_b).await.unwrap().is_some(),
             "B (mismo device) sobrevive"
+        );
+    }
+
+    /// hub#1801 — **la sesión desalojada dice por qué murió.**
+    ///
+    /// El desalojo era un `DELETE`: el que se quedaba fuera volvía a llamar, su fila ya no existía
+    /// y el hub solo podía contestar el 401 de siempre, idéntico al de una sesión caducada. Desde
+    /// donde lo ve la persona, el hub se cayó. Ahora la fila **sobrevive marcada**, así que la
+    /// pantalla de entrada puede decir lo que pasó de verdad.
+    #[tokio::test]
+    async fn an_evicted_session_says_why_it_died_hub1801() {
+        let db = fresh_db().await;
+        setup_identity(&db).await;
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None)
+            .await
+            .unwrap();
+        let evicted = create_session(&db, HUB, &uid, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        let evicted_null = create_session(&db, HUB, &uid, 3600, None).await.unwrap();
+
+        enforce_device_limit(&db, HUB, 1, Some("dev-B"))
+            .await
+            .unwrap();
+
+        // Sigue sin resolver: el desalojo no se ablanda por dejar rastro.
+        for token in [&evicted, &evicted_null] {
+            assert!(
+                resolve_session(&db, HUB, token).await.unwrap().is_none(),
+                "una sesión desalojada NO puede autenticar"
+            );
+            assert_eq!(
+                session_end_reason(&db, HUB, token).await.unwrap().as_deref(),
+                Some(SESSION_EVICTED_DEVICE_LIMIT),
+                "…y tiene que poder decir por qué murió"
+            );
+        }
+    }
+
+    /// El motivo es **distinguible**, que es todo el punto: una sesión que simplemente caducó por
+    /// tiempo no puede contestar «te echó otro dispositivo». Si las dos dijeran lo mismo, la
+    /// pantalla volvería a mentir, solo que en la otra dirección.
+    #[tokio::test]
+    async fn a_session_that_merely_expired_has_no_eviction_notice_hub1801() {
+        let db = fresh_db().await;
+        setup_identity(&db).await;
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None)
+            .await
+            .unwrap();
+        // TTL negativo: nace caducada, sin que nadie la desaloje.
+        let stale = create_session(&db, HUB, &uid, -60, Some("dev-A"))
+            .await
+            .unwrap();
+
+        assert!(resolve_session(&db, HUB, &stale).await.unwrap().is_none());
+        assert_eq!(
+            session_end_reason(&db, HUB, &stale).await.unwrap(),
+            None,
+            "caducar por tiempo no es que te echen"
+        );
+        // Y un token que no existe tampoco inventa un motivo.
+        assert_eq!(
+            session_end_reason(&db, HUB, "no-such-token").await.unwrap(),
+            None
+        );
+    }
+
+    /// La lápida es una fila del hub como cualquier otra (hub#497): se lee **con su `hub_id`**. Sin
+    /// eso, el hub de al lado de la misma base contestaría por una sesión que no es suya.
+    #[tokio::test]
+    async fn the_eviction_notice_is_read_within_its_hub_hub1801() {
+        let db = fresh_db().await;
+        setup_identity(&db).await;
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None)
+            .await
+            .unwrap();
+        let evicted = create_session(&db, HUB, &uid, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        enforce_device_limit(&db, HUB, 1, Some("dev-B"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            session_end_reason(&db, HUB, &evicted).await.unwrap().as_deref(),
+            Some(SESSION_EVICTED_DEVICE_LIMIT)
+        );
+        assert_eq!(
+            session_end_reason(&db, "hub-next-door", &evicted)
+                .await
+                .unwrap(),
+            None,
+            "el negocio de al lado no contesta por una sesión que no es suya"
+        );
+    }
+
+    /// La lápida no puede crecer sin freno: el desalojo dejó de borrar filas, así que un hub de un
+    /// solo dispositivo con dos tablets turnándose acumularía una por cada login. El propio
+    /// desalojo **barre las lápidas de la vez anterior**, así que a lo sumo vive una generación —
+    /// que es la única que alguien puede estar a punto de leer.
+    #[tokio::test]
+    async fn a_new_takeover_sweeps_the_previous_notice_hub1801() {
+        let db = fresh_db().await;
+        setup_identity(&db).await;
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None)
+            .await
+            .unwrap();
+
+        let first = create_session(&db, HUB, &uid, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        enforce_device_limit(&db, HUB, 1, Some("dev-B"))
+            .await
+            .unwrap();
+        let second = create_session(&db, HUB, &uid, 3600, Some("dev-B"))
+            .await
+            .unwrap();
+        enforce_device_limit(&db, HUB, 1, Some("dev-C"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            session_end_reason(&db, HUB, &second).await.unwrap().as_deref(),
+            Some(SESSION_EVICTED_DEVICE_LIMIT),
+            "el último desalojado sí tiene su explicación"
+        );
+        assert_eq!(
+            session_end_reason(&db, HUB, &first).await.unwrap(),
+            None,
+            "la lápida de la vez anterior se barre: la fila ya no está"
+        );
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        let left = db
+            .query(
+                "SELECT count(*) AS n FROM hub_session WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            left.rows[0]["n"].as_i64().unwrap(),
+            1,
+            "solo queda la generación viva de lápidas, no una por login"
         );
     }
 

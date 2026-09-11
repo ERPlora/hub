@@ -266,12 +266,30 @@ pub async fn revoke(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> 
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("device_id".into(), json!(device_id));
-    let closed = db
-        .execute(
-            "DELETE FROM hub_session WHERE hub_id = :hub_id AND device_id = :device_id",
+    p.insert("now".into(), json!(now_rfc3339()));
+    // What the owner is told they cut off has to be TRUE, so the count is taken BEFORE the delete
+    // and only over sessions that were actually open (hub#1801). The delete still sweeps every row
+    // of the device — expired ones and the tombstone a takeover leaves (`ended_reason`) included,
+    // because revoking a device forgets it whole — but neither of those was somebody signed in, and
+    // counting them would report a thief at work on a laptop nobody had touched in a month.
+    let open = db
+        .query(
+            "SELECT count(*) AS n FROM hub_session \
+              WHERE hub_id = :hub_id AND device_id = :device_id AND expires_at > :now",
             &p,
         )
         .await?;
+    let closed = open
+        .rows
+        .first()
+        .and_then(|row| row["n"].as_i64())
+        .unwrap_or_default()
+        .max(0) as usize;
+    db.execute(
+        "DELETE FROM hub_session WHERE hub_id = :hub_id AND device_id = :device_id",
+        &p,
+    )
+    .await?;
     let forgotten = db
         .execute(
             "DELETE FROM hub_trusted_device WHERE hub_id = :hub_id AND device_id = :device_id",
@@ -280,7 +298,7 @@ pub async fn revoke(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> 
         .await?;
     Ok(Revocation {
         was_known: forgotten.affected > 0,
-        sessions_closed: closed.affected as usize,
+        sessions_closed: closed,
     })
 }
 
