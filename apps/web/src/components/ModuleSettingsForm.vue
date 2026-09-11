@@ -5,10 +5,18 @@
        lo visible es el botón del shell, no el elemento del módulo. -->
   <div ref="previewHost" hidden />
 
-  <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
+  <div
+    v-if="status === 'loading'"
+    class="flex items-center gap-2 py-8 opacity-70"
+    data-testid="module-settings-loading"
+  >
     <ion-spinner name="crescent" /> {{ t('moduleSettings.loading') }}
   </div>
-  <p v-else-if="status === 'error'" class="text-[color:var(--ion-color-danger)]">
+  <p
+    v-else-if="status === 'error'"
+    class="text-[color:var(--ion-color-danger)]"
+    data-testid="module-settings-error"
+  >
     {{ t('moduleSettings.loadError') }}
   </p>
 
@@ -29,7 +37,11 @@
               <p v-if="field.description">{{ field.description }}</p>
               <!-- El motivo POR CAMPO. El runtime nombra los campos que rechazó (`error.fields`,
                    hub#1094); la frase de cada violación viaja en el mensaje y se pinta arriba. -->
-              <p v-if="invalidFields.has(field.key)" class="field-invalid">
+              <p
+                v-if="invalidFields.has(field.key)"
+                class="field-invalid"
+                :data-testid="`module-settings-invalid-${field.key}`"
+              >
                 {{ t('moduleSettings.fieldInvalid') }}
               </p>
             </ion-label>
@@ -38,6 +50,7 @@
             <ion-toggle
               v-if="field.control === 'toggle'"
               slot="end"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :checked="model[field.key] === true"
@@ -50,6 +63,7 @@
               v-else-if="field.control === 'select'"
               slot="end"
               interface="popover"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :disabled="!canEdit"
@@ -74,6 +88,7 @@
               slot="end"
               class="text-right"
               type="number"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :readonly="!canEdit"
@@ -86,6 +101,7 @@
             <ion-input
               v-else
               slot="end"
+              :data-testid="`module-settings-field-${field.key}`"
               :aria-label="field.label"
               :aria-invalid="ariaInvalid(field.key)"
               :placeholder="t('moduleSettings.textPlaceholder')"
@@ -106,6 +122,7 @@
               slot="end"
               fill="clear"
               size="small"
+              :data-testid="`module-settings-preview-${field.key}`"
               :disabled="previewing === field.key"
               @click="runPreview(field.key)"
             >
@@ -123,6 +140,7 @@
     <ok-inline-feedback
       v-if="saveRefusal"
       class="save-refusal"
+      data-testid="module-settings-refusal"
       tone="danger"
       icon="alert-circle-outline"
       :heading="t('moduleSettings.saveError')"
@@ -130,9 +148,18 @@
       {{ saveRefusal }}
     </ok-inline-feedback>
 
-    <p v-if="!canEdit" class="text-sm opacity-70 mt-2 px-1">{{ t('moduleSettings.adminOnly') }}</p>
+    <p v-if="!canEdit" class="text-sm opacity-70 mt-2 px-1" data-testid="module-settings-admin-only">
+      {{ t('moduleSettings.adminOnly') }}
+    </p>
 
-    <ion-button v-if="canEdit" class="mt-3" expand="block" :disabled="saving" @click="save">
+    <ion-button
+      v-if="canEdit"
+      class="mt-3"
+      expand="block"
+      data-testid="module-settings-save"
+      :disabled="saving"
+      @click="save"
+    >
       <HubIcon slot="start" name="save-outline" />
       {{ t('moduleSettings.save') }}
     </ion-button>

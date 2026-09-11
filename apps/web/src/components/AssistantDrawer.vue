@@ -14,6 +14,7 @@
 
     <aside
       class="assistant-drawer"
+      data-testid="assistant-drawer"
       :data-open="assistantOpen ? 'true' : 'false'"
       role="dialog"
       :aria-label="t('assistant.title')"
@@ -24,26 +25,37 @@
           <HubIcon name="sparkles-outline" class="text-primary" />
           {{ t('assistant.title') }}
         </div>
-        <ion-button fill="clear" size="small" :aria-label="t('assistant.close')" @click="closeAssistant">
+        <ion-button
+          fill="clear"
+          size="small"
+          data-testid="assistant-close"
+          :aria-label="t('assistant.close')"
+          @click="closeAssistant"
+        >
           <HubIcon slot="icon-only" name="close-outline" />
         </ion-button>
       </header>
 
-      <div ref="threadEl" class="assistant-body">
-        <div v-if="messages.length === 0 && !streaming" class="chat-empty">
+      <div ref="threadEl" class="assistant-body" data-testid="assistant-thread">
+        <div v-if="messages.length === 0 && !streaming" class="chat-empty" data-testid="assistant-empty">
           <HubIcon name="sparkles-outline" class="chat-empty-icon" />
           <p>{{ setupChat ? t('assistant.emptySetup') : t('assistant.empty') }}</p>
           <!-- Quick chips when the chat opened on the configuration: one per PENDING item of
                `hub.setup.status` (never an `unavailable` — there is nothing to ask about something
                nobody can do) plus the overall one. Picking one loads the chat ON that item. -->
           <div v-if="setupChat" class="chat-suggestions">
-            <button class="chat-suggestion" @click="askAboutSetup(null)">
+            <button
+              class="chat-suggestion"
+              data-testid="assistant-suggest-missing"
+              @click="askAboutSetup(null)"
+            >
               {{ t('assistant.suggestWhatsMissing') }}
             </button>
             <button
               v-for="task in quickTasks"
               :key="task.key"
               class="chat-suggestion"
+              :data-testid="`assistant-suggest-${task.key}`"
               @click="askAboutSetup(task.key)"
             >{{ t('assistant.suggestHowTo') }} {{ itemTitle(task) }}?</button>
           </div>
@@ -53,6 +65,7 @@
           v-for="(m, i) in messages"
           :key="i"
           class="chat-row"
+          :data-testid="`assistant-message-${i}`"
           :class="m.role === 'user' ? 'is-user' : 'is-assistant'"
         >
           <div class="chat-msg">
@@ -103,7 +116,12 @@
                   </p>
                 </template>
               </div>
-              <ion-spinner v-else-if="m.role === 'assistant'" name="dots" class="chat-typing" />
+              <ion-spinner
+                v-else-if="m.role === 'assistant'"
+                name="dots"
+                class="chat-typing"
+                :data-testid="`assistant-typing-${i}`"
+              />
             </div>
             <!-- The grounding notice (hub#1038, #1039, #1048). Written by the RUNTIME from the
                  turn's receipts, never by the model: the answer claimed a change no tool made,
@@ -134,7 +152,12 @@
             <!-- hub#1291: the sentence used to inherit `.chat-grounding-line`'s warning yellow
                  (~2.1:1 on white even with the `-shade`, under WCAG AA); it now reads `medium`
                  and the warning accent lives only on `.chat-grounding-icon`. -->
-            <div v-if="m.role === 'assistant' && m.grounding" class="chat-grounding" role="status">
+            <div
+              v-if="m.role === 'assistant' && m.grounding"
+              class="chat-grounding"
+              role="status"
+              :data-testid="`assistant-grounding-${i}`"
+            >
               <p v-if="m.grounding.claimedWithoutEffect" class="chat-grounding-line">
                 <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.claimedWithoutEffect') }}
@@ -159,6 +182,7 @@
                 size="small"
                 fill="outline"
                 class="chat-nav-btn"
+                :data-testid="`assistant-goto-${r.url}`"
                 @click="navigateTo(r.url)"
               >
                 <HubIcon slot="start" name="arrow-forward-circle-outline" />
@@ -209,8 +233,8 @@
               <HubIcon name="close-outline" />
             </button>
           </span>
-          <span v-if="attachError" class="attach-error">{{ attachError }}</span>
-          <span v-if="voiceError" class="attach-error">{{ voiceError }}</span>
+          <span v-if="attachError" class="attach-error" data-testid="assistant-attach-error">{{ attachError }}</span>
+          <span v-if="voiceError" class="attach-error" data-testid="assistant-voice-error">{{ voiceError }}</span>
         </div>
 
         <div class="assistant-foot-row">
@@ -218,6 +242,7 @@
             ref="fileInput"
             type="file"
             class="attach-input"
+            data-testid="assistant-attach-input"
             multiple
             accept="image/*,application/pdf,.doc,.docx,.txt,.csv,.md"
             @change="onFilesSelected"
@@ -225,6 +250,7 @@
           <ion-button
             fill="clear"
             size="small"
+            data-testid="assistant-attach"
             :disabled="streaming"
             :aria-label="t('assistant.attach')"
             @click="openAttach"
@@ -237,6 +263,7 @@
           <ion-button
             fill="clear"
             size="small"
+            data-testid="assistant-mic"
             :disabled="streaming || transcribing"
             :color="recording ? 'danger' : undefined"
             :aria-label="recording ? t('assistant.micStop') : t('assistant.mic')"
@@ -248,6 +275,7 @@
           <ion-textarea
             v-model="draft"
             class="chat-input"
+            data-testid="assistant-input"
             :placeholder="t('assistant.placeholder')"
             :auto-grow="true"
             :rows="1"
@@ -257,13 +285,20 @@
           <ion-button
             v-if="!streaming"
             fill="solid"
+            data-testid="assistant-send"
             :disabled="!draft.trim() && pendingAttachments.length === 0"
             :aria-label="t('assistant.send')"
             @click="send"
           >
             <HubIcon slot="icon-only" name="send" />
           </ion-button>
-          <ion-button v-else fill="clear" :aria-label="t('assistant.stop')" @click="stop">
+          <ion-button
+            v-else
+            fill="clear"
+            data-testid="assistant-stop"
+            :aria-label="t('assistant.stop')"
+            @click="stop"
+          >
             <HubIcon slot="icon-only" name="stop-circle-outline" />
           </ion-button>
         </div>

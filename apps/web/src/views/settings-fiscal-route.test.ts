@@ -95,7 +95,7 @@ async function mountBusinessTab() {
 
 /** Cambia de vía como lo hace Ionic de verdad: `ionChange` con su `CustomEvent`. */
 async function pickRoute(wrapper: VueWrapper, value: string) {
-  (wrapper.getComponent('[data-testid="fiscal-route-segment"]') as VueWrapper).vm.$emit(
+  (wrapper.getComponent('[data-testid="settings-fiscal-route-segment"]') as VueWrapper).vm.$emit(
     'ionChange',
     new CustomEvent('ionChange', { detail: { value } }),
   );
@@ -117,11 +117,11 @@ describe('Ajustes › Negocio · la vía hacia la AEAT es UNA de dos (hub#1314)'
 
     const wrapper = await mountBusinessTab();
 
-    const segment = wrapper.find('[data-testid="fiscal-route-segment"]');
+    const segment = wrapper.find('[data-testid="settings-fiscal-route-segment"]');
     expect(segment.exists(), 'la pregunta se hace con un segmento de dos opciones').toBe(true);
     expect(segment.attributes('value')).toBe('delegated');
-    expect(wrapper.find('[data-testid="fiscal-route-delegated"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="fiscal-route-own"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="settings-fiscal-route-delegated"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="settings-fiscal-route-own"]').exists()).toBe(true);
     // La vía delegada enseña el otorgamiento y NADA del `.p12`: pedir las dos cosas es el bug.
     expect(wrapper.find('.fiscal-grant').exists()).toBe(true);
     expect(wrapper.find('.fiscal-certificate').exists()).toBe(false);
@@ -137,7 +137,7 @@ describe('Ajustes › Negocio · la vía hacia la AEAT es UNA de dos (hub#1314)'
 
     const wrapper = await mountBusinessTab();
 
-    expect(wrapper.find('[data-testid="fiscal-route-segment"]').attributes('value')).toBe('own');
+    expect(wrapper.find('[data-testid="settings-fiscal-route-segment"]').attributes('value')).toBe('own');
     expect(wrapper.find('.fiscal-certificate').exists()).toBe(true);
     // 🔴 Y con él NO aparece «no puedes pasar a producción hasta que lo firmes»: ese texto vive en
     // el panel del otorgamiento, que en esta vía no se pinta. Es el síntoma exacto de la issue.

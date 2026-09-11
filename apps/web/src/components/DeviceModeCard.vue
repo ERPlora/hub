@@ -18,7 +18,7 @@
   Reutiliza ion-card/ion-radio-group/ion-radio + ok-inline-feedback (mismo patrón que RolesPanel).
 -->
 <template>
-  <ion-card>
+  <ion-card data-testid="device-mode-card">
     <ion-card-content class="p-0">
       <ion-list lines="none">
         <ion-item lines="none">
@@ -30,12 +30,13 @@
         </ion-item>
 
         <ion-radio-group
+          data-testid="device-mode-options"
           :value="mode"
           :allow-empty-selection="false"
           @ion-change="onPick($event)"
         >
           <ion-item lines="none">
-            <ion-radio :value="'shared'" :disabled="!isAdmin || saving" justify="start" label-placement="end">
+            <ion-radio :value="'shared'" data-testid="device-mode-shared" :disabled="!isAdmin || saving" justify="start" label-placement="end">
               <span class="option">
                 <span class="option-title">{{ t('deviceMode.shared') }}</span>
                 <span class="option-consequence">{{ t('deviceMode.sharedConsequence') }}</span>
@@ -43,7 +44,7 @@
             </ion-radio>
           </ion-item>
           <ion-item lines="none">
-            <ion-radio :value="'personal'" :disabled="!isAdmin || saving" justify="start" label-placement="end">
+            <ion-radio :value="'personal'" data-testid="device-mode-personal" :disabled="!isAdmin || saving" justify="start" label-placement="end">
               <span class="option">
                 <span class="option-title">{{ t('deviceMode.personal') }}</span>
                 <span class="option-consequence">{{ t('deviceMode.personalConsequence') }}</span>
@@ -54,7 +55,7 @@
 
         <!-- Un control deshabilitado y mudo se lee como una avería; con el motivo es una regla. -->
         <ion-item v-if="!isAdmin" lines="none">
-          <ion-note class="note">{{ t('deviceMode.adminOnly') }}</ion-note>
+          <ion-note class="note" data-testid="device-mode-admin-only">{{ t('deviceMode.adminOnly') }}</ion-note>
         </ion-item>
       </ion-list>
 
@@ -63,6 +64,7 @@
       <ok-inline-feedback
         v-if="rejection"
         class="feedback"
+        data-testid="device-mode-error"
         tone="danger"
         icon="alert-circle-outline"
       >

@@ -27,7 +27,7 @@
   Solo un administrador escribe (espejo del gate del runtime, ADR-0248); el runtime revalida SIEMPRE.
 -->
 <template>
-  <ion-card>
+  <ion-card data-testid="devices-card">
     <ion-card-content class="p-0">
       <ion-list lines="none">
         <ion-item lines="none">
@@ -40,11 +40,11 @@
 
         <!-- Un botón que no está y no se explica se lee como una avería; con el motivo es una regla. -->
         <ion-item v-if="!isAdmin" lines="none">
-          <ion-note class="note">{{ t('devices.adminOnly') }}</ion-note>
+          <ion-note class="note" data-testid="devices-admin-only">{{ t('devices.adminOnly') }}</ion-note>
         </ion-item>
 
         <ion-item v-if="!loading && !loadError && devices.length === 0" lines="none">
-          <ion-note class="note">{{ t('devices.empty') }}</ion-note>
+          <ion-note class="note" data-testid="devices-empty">{{ t('devices.empty') }}</ion-note>
         </ion-item>
 
         <template v-for="device in devices" :key="device.deviceId">
@@ -73,7 +73,7 @@
               fill="clear"
               :disabled="busy"
               :aria-label="t('devices.rename')"
-              :data-test="`rename-${device.deviceId}`"
+              :data-testid="`devices-rename-${device.deviceId}`"
               @click="startNaming(device)"
             >
               <HubIcon slot="icon-only" name="create-outline" />
@@ -85,7 +85,7 @@
               color="danger"
               :disabled="busy"
               :aria-label="t('devices.revoke')"
-              :data-test="`revoke-${device.deviceId}`"
+              :data-testid="`devices-revoke-${device.deviceId}`"
               @click="ask(device.deviceId)"
             >
               <HubIcon slot="icon-only" name="trash-outline" />
@@ -104,14 +104,14 @@
                 :maxlength="MAX_DEVICE_NAME"
                 :aria-label="t('devices.rename')"
                 :value="draftName"
-                :data-test="`name-${device.deviceId}`"
+                :data-testid="`devices-name-${device.deviceId}`"
                 @ionInput="onType"
               />
               <div class="actions">
                 <ion-button
                   size="small"
                   :disabled="busy"
-                  :data-test="`save-name-${device.deviceId}`"
+                  :data-testid="`devices-save-name-${device.deviceId}`"
                   @click="rename(device)"
                 >
                   {{ t('devices.save') }}
@@ -120,7 +120,7 @@
                   size="small"
                   fill="clear"
                   :disabled="busy"
-                  :data-test="`cancel-name-${device.deviceId}`"
+                  :data-testid="`devices-cancel-name-${device.deviceId}`"
                   @click="naming = ''"
                 >
                   {{ t('devices.cancel') }}
@@ -141,7 +141,7 @@
                   size="small"
                   color="danger"
                   :disabled="busy"
-                  :data-test="`confirm-${device.deviceId}`"
+                  :data-testid="`devices-confirm-${device.deviceId}`"
                   @click="revoke(device)"
                 >
                   {{ t('devices.revoke') }}
@@ -150,7 +150,7 @@
                   size="small"
                   fill="clear"
                   :disabled="busy"
-                  :data-test="`cancel-${device.deviceId}`"
+                  :data-testid="`devices-cancel-${device.deviceId}`"
                   @click="asking = ''"
                 >
                   {{ t('devices.cancel') }}
@@ -166,6 +166,7 @@
       <ok-inline-feedback
         v-if="loadError"
         class="feedback"
+        data-testid="devices-error"
         tone="danger"
         icon="alert-circle-outline"
       >
