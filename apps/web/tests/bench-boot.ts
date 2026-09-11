@@ -90,6 +90,34 @@ export function isBootTransportFailure(
 }
 
 /**
+ * Does this spec's source take `test` from `@playwright/test` — and so opt out of the bench?
+ *
+ * Every way of reaching it counts: a named import in either quote style (nothing in this package
+ * pins one), aliased or multi-line; Playwright's DEFAULT export, which IS `test`; and a namespace
+ * import, from which `pw.test` is one dot away. Type-only imports are fine: a type cannot run a
+ * test. Only a line that STARTS with `import` counts, so a comment quoting the forbidden line is
+ * not a violation. The decision table lives in `tests/bench-boot.test.ts`.
+ */
+export function specTakesTestFromPlaywright(source: string): boolean {
+  const imports = source.matchAll(/^\s*import\s+([^;]*?)\s*from\s*["']@playwright\/test["']/gm);
+  for (const [, clause] of imports) {
+    const spec = clause.trim();
+    if (spec.startsWith('type ')) continue;
+    if (spec.startsWith('*')) return true;
+    const brace = spec.indexOf('{');
+    const defaultImport = (brace === -1 ? spec : spec.slice(0, brace)).replace(/,\s*$/, '').trim();
+    if (defaultImport.length > 0) return true;
+    if (brace === -1) continue;
+    const named = spec.slice(brace + 1, spec.lastIndexOf('}')).split(',');
+    for (const specifier of named) {
+      const name = specifier.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim();
+      if (name === 'test') return true;
+    }
+  }
+  return false;
+}
+
+/**
  * The bench's `test`. Same Playwright `test` as ever, with one difference: a navigation whose own
  * code died on the wire is fetched again instead of being handed to the spec as a blank page.
  *

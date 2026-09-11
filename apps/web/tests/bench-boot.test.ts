@@ -9,7 +9,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isBootTransportFailure, TRANSIENT_TRANSPORT_ERRORS } from './bench-boot';
+import {
+  isBootTransportFailure,
+  specTakesTestFromPlaywright,
+  TRANSIENT_TRANSPORT_ERRORS,
+} from './bench-boot';
 
 const APP_ORIGIN = 'http://localhost:8915';
 const MODULE_URL = `${APP_ORIGIN}/src/lib/money.ts`;
@@ -107,10 +111,43 @@ describe('every e2e spec takes its `test` from the bench', () => {
 
   it.each(specs)('%s does not import `test` from @playwright/test', (name) => {
     const source = readFileSync(join(E2E_DIR, name), 'utf8');
-    const playwrightImports = source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@playwright\/test'/g);
-    for (const [, clause] of playwrightImports) {
-      const named = clause.split(',').map((part) => part.trim().split(/\s+as\s+/)[0].trim());
-      expect(named, `${name} must take \`test\` from '../bench-boot'`).not.toContain('test');
-    }
+    expect(
+      specTakesTestFromPlaywright(source),
+      `${name} must take \`test\` from '../bench-boot'`,
+    ).toBe(false);
+  });
+});
+
+// The detector behind the directory guard above, as a decision table. Measured while reviewing
+// hub#1815: with the check written as one regex over `import { … } from '@playwright/test'`, a
+// spec written with double quotes — nothing in this package pins the quote style — or with
+// Playwright's DEFAULT export (`import test from '@playwright/test'`, which IS `test`) passed the
+// guard in green. That is the silent opt-out the guard exists to stop, so every way of reaching
+// `test` is pinned here, one line each.
+describe('specTakesTestFromPlaywright', () => {
+  it.each([
+    ['named import, single quotes', "import { test, expect } from '@playwright/test';"],
+    ['named import, double quotes', 'import { test, expect } from "@playwright/test";'],
+    ['named import, aliased', "import { test as base } from '@playwright/test';"],
+    ['named import, multi-line', "import {\n  expect,\n  test,\n} from '@playwright/test';"],
+    ['named import next to an inline type', "import { type Page, test } from '@playwright/test';"],
+    ["the default export (Playwright's default export IS `test`)", "import test from '@playwright/test';"],
+    ['the default export next to named ones', "import test, { expect } from '@playwright/test';"],
+    ['a namespace import (`pw.test` is one dot away)', "import * as pw from '@playwright/test';"],
+  ])('is true for %s', (_, source) => {
+    expect(specTakesTestFromPlaywright(source)).toBe(true);
+  });
+
+  it.each([
+    ['the bench', "import { test, expect } from '../bench-boot';"],
+    ['a type-only import', "import type { Page } from '@playwright/test';"],
+    ['inline type specifiers only', "import { type Page, type Locator } from '@playwright/test';"],
+    ['`expect` alone', "import { expect } from '@playwright/test';"],
+    [
+      'a comment that quotes the forbidden line',
+      "// never: import { test } from '@playwright/test'\nimport { test } from '../bench-boot';",
+    ],
+  ])('is false for %s', (_, source) => {
+    expect(specTakesTestFromPlaywright(source)).toBe(false);
   });
 });
