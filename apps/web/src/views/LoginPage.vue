@@ -8,6 +8,7 @@
       <!-- Botón de tema: esquina superior derecha -->
       <ion-button
         fill="clear"
+        data-testid="login-theme"
         :aria-label="t('login.toggleTheme')"
         class="theme-btn"
         @click="toggleTheme"
@@ -44,24 +45,26 @@
               <!-- Tabs PIN | Email (solo cuando el dispositivo es de confianza y no en setup) -->
               <ion-segment
                 v-if="showTabs"
+                data-testid="login-tabs"
                 :value="step"
                 class="mb-5"
                 @ion-change="step = ($event as CustomEvent<{ value: Step }>).detail.value"
               >
-                <ion-segment-button value="pin">
+                <ion-segment-button value="pin" data-testid="login-tab-pin">
                   <HubIcon name="keypad-outline" />
                   <ion-label>{{ t('login.tabPin') }}</ion-label>
                 </ion-segment-button>
-                <ion-segment-button value="email">
+                <ion-segment-button value="email" data-testid="login-tab-email">
                   <HubIcon name="mail-outline" />
                   <ion-label>{{ t('login.tabEmail') }}</ion-label>
                 </ion-segment-button>
               </ion-segment>
 
               <!-- Paso: login por email+contraseña -->
-              <form v-if="step === 'email'" class="step-form" @submit.prevent="submitEmail">
+              <form v-if="step === 'email'" class="step-form" data-testid="login-email-form" @submit.prevent="submitEmail">
                 <ion-input
                   v-model="emailVal"
+                  data-testid="login-email"
                   :label="t('login.emailLabel')"
                   label-placement="floating"
                   type="email"
@@ -74,6 +77,7 @@
                 />
                 <ion-input
                   v-model="passwordVal"
+                  data-testid="login-password"
                   :label="t('login.passwordLabel')"
                   label-placement="floating"
                   type="password"
@@ -92,6 +96,7 @@
                      marcó un administrador— y ofrecerla haría creer que la casilla cambia algo. -->
                 <div v-if="pinAvailable" class="trust-row">
                   <ion-checkbox
+                    data-testid="login-trust"
                     :checked="trust"
                     label-placement="end"
                     @ion-change="trust = ($event as CustomEvent<{ checked: boolean }>).detail.checked"
@@ -100,6 +105,7 @@
                   </ion-checkbox>
                   <ion-button
                     id="trust-info-btn"
+                    data-testid="login-trust-info"
                     fill="clear"
                     size="small"
                     :aria-label="t('login.trustInfoAria')"
@@ -127,13 +133,14 @@
                   <p>{{ t('login.personalDeviceNote') }}</p>
                 </ion-text>
 
-                <ion-note v-if="emailError" color="danger" class="error-note">
+                <ion-note v-if="emailError" color="danger" class="error-note" data-testid="login-error">
                   {{ emailError }}
                 </ion-note>
 
                 <ion-button
                   type="submit"
                   expand="block"
+                  data-testid="login-submit"
                   :disabled="emailLoading || googleLoading"
                   :aria-label="t('login.signIn')"
                   :aria-busy="emailLoading"
@@ -152,6 +159,7 @@
                   type="button"
                   expand="block"
                   fill="outline"
+                  data-testid="login-google"
                   :disabled="emailLoading || googleLoading"
                   :aria-label="t('login.continueWithGoogle')"
                   :aria-busy="googleLoading"
@@ -169,6 +177,7 @@
                   v-if="pinAvailable && !showTabs"
                   fill="clear"
                   size="small"
+                  data-testid="login-use-pin"
                   @click="step = 'pin'"
                 >
                   {{ t('login.usePinInstead') }}
@@ -179,13 +188,14 @@
                    SOLO en memoria (nunca localStorage): es monouso y transitorio. Un código
                    erróneo devuelve un ticket NUEVO desde el Cloud; lo adoptamos y dejamos
                    reintentar sin pedir de nuevo la contraseña. -->
-              <form v-else-if="step === 'twoFactor'" class="step-form" @submit.prevent="submitTwoFactor">
+              <form v-else-if="step === 'twoFactor'" class="step-form" data-testid="login-2fa-form" @submit.prevent="submitTwoFactor">
                 <ion-text color="medium" class="setup-hint">
                   <p>{{ t('login.twoFactorHint') }}</p>
                 </ion-text>
 
                 <ion-input
                   v-model="twoFactorCode"
+                  data-testid="login-2fa-code"
                   :label="t('login.twoFactorCodeLabel')"
                   label-placement="floating"
                   type="text"
@@ -198,13 +208,14 @@
                   @ion-input="twoFactorCode = ($event as CustomEvent<{ value: string }>).detail.value ?? ''"
                 />
 
-                <ion-note v-if="twoFactorError" color="danger" class="error-note">
+                <ion-note v-if="twoFactorError" color="danger" class="error-note" data-testid="login-2fa-error">
                   {{ twoFactorError }}
                 </ion-note>
 
                 <ion-button
                   type="submit"
                   expand="block"
+                  data-testid="login-2fa-submit"
                   :disabled="twoFactorLoading"
                   :aria-label="t('login.twoFactorVerify')"
                   :aria-busy="twoFactorLoading"
@@ -219,6 +230,7 @@
                 <ion-button
                   fill="clear"
                   size="small"
+                  data-testid="login-2fa-back"
                   @click="cancelTwoFactor"
                 >
                   {{ t('login.twoFactorBack') }}
@@ -231,6 +243,7 @@
               <div
                 v-else-if="step === 'pin'"
                 class="step-form"
+                data-testid="login-pin-step"
                 :class="{ 'step-form--scrolls': !pinUser }"
               >
 
@@ -243,7 +256,7 @@
 
                 <!-- Paso 1: elegir usuario (cuando hay varios en el dispositivo) -->
                 <template v-if="!pinUser">
-                  <ion-text color="medium" class="pin-choose-title">
+                  <ion-text color="medium" class="pin-choose-title" data-testid="login-choose-user">
                     <p>{{ t('login.chooseUser') }}</p>
                   </ion-text>
                   <div class="user-scroll">
@@ -253,6 +266,7 @@
                         :key="u.id"
                         button
                         class="user-card"
+                        :data-testid="`login-pin-user-${u.id}`"
                         @click="selectPinUser(u)"
                       >
                         <ion-card-content class="ion-text-center">
@@ -267,6 +281,7 @@
                     v-if="!showTabs"
                     fill="clear"
                     size="small"
+                    data-testid="login-choose-user-to-email"
                     @click="step = 'email'"
                   >
                     {{ t('login.signInWithEmail') }}
@@ -285,6 +300,7 @@
                   <div class="pinpad-wrap">
                     <ok-pinpad
                       ref="mainPinpadRef"
+                      data-testid="login-pinpad"
                       dots
                       :length="hubPinLength"
                       :error="pinError"
@@ -297,13 +313,14 @@
                     ></ok-pinpad>
                   </div>
 
-                  <ion-note v-if="pinError" color="danger" class="error-note">
+                  <ion-note v-if="pinError" color="danger" class="error-note" data-testid="login-pin-error">
                     {{ t(pinErrorKey) }}
                   </ion-note>
                   <ion-button
                     v-if="!showTabs"
                     fill="clear"
                     size="small"
+                    data-testid="login-pin-to-email"
                     @click="onPinToEmail"
                   >
                     {{ t('login.signInWithEmail') }}
@@ -312,7 +329,7 @@
               </div>
 
               <!-- Paso: alta del PIN (primer login con "Confiar en este dispositivo") -->
-              <div v-else-if="step === 'setup'" class="step-form">
+              <div v-else-if="step === 'setup'" class="step-form" data-testid="login-setup-step">
                 <ion-text color="medium" class="setup-hint">
                   <p>{{ setupPhase === 'first' ? t('login.setupChoosePin', { n: hubPinLength }) : t('login.setupConfirmPin') }}</p>
                 </ion-text>
@@ -321,6 +338,7 @@
                 <div class="pinpad-wrap">
                   <ok-pinpad
                     ref="setupPinpadRef"
+                    data-testid="login-setup-pinpad"
                     dots
                     :length="hubPinLength"
                     :error="setupError"
@@ -328,7 +346,7 @@
                   ></ok-pinpad>
                 </div>
 
-                <ion-note v-if="setupError" color="danger" class="error-note">
+                <ion-note v-if="setupError" color="danger" class="error-note" data-testid="login-setup-error">
                   {{ setupErrorMessage }}
                 </ion-note>
               </div>

@@ -140,6 +140,43 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'import-upload-local',
     ],
   },
+  // La puerta del hub (`/login` y `/auth/google/callback`): los cuatro pasos —email+contraseña,
+  // 2FA por correo, PIN y alta de PIN— viven en la misma pantalla, así que el nombre lleva el paso
+  // dentro (`login-2fa-code`, `login-setup-pinpad`). Sin estos ganchos ningún recorrido podía
+  // entrar por la puerta real: se inyectaba la sesión por API y el login quedaba sin probar.
+  'views/LoginPage.vue': {
+    prefix: 'login-',
+    contract: [
+      'login-2fa-back',
+      'login-2fa-code',
+      'login-2fa-error',
+      'login-2fa-form',
+      'login-2fa-submit',
+      'login-box',
+      'login-choose-user',
+      'login-choose-user-to-email',
+      'login-email',
+      'login-email-form',
+      'login-error',
+      'login-google',
+      'login-password',
+      'login-pin-error',
+      'login-pin-step',
+      'login-pin-to-email',
+      'login-pinpad',
+      'login-setup-error',
+      'login-setup-pinpad',
+      'login-setup-step',
+      'login-submit',
+      'login-tab-email',
+      'login-tab-pin',
+      'login-tabs',
+      'login-theme',
+      'login-trust',
+      'login-trust-info',
+      'login-use-pin',
+    ],
+  },
   // Las cinco de abajo ya estaban completas antes de hub#1756 (medido: ningún control sin gancho).
   // Entran para que no se deshagan solas: el contrato de elevación/export/otorgamiento/reset lo usa
   // hoy la suite e2e del shell.
@@ -233,7 +270,6 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
  * entrada obsoleta falla si se queda). Una `.vue` nueva no nace en esta lista — nace cubierta.
  */
 const NOT_YET_COVERED: Record<string, string> = {
-  'views/LoginPage.vue': 'hub#1809',
   'views/ProfilePage.vue': 'hub#1810',
   'views/SettingsPage.vue': 'hub#1810',
   'components/PinPolicyCard.vue': 'hub#1810',
@@ -251,7 +287,7 @@ const NOT_YET_COVERED: Record<string, string> = {
  * número clavado, meter una pantalla nueva en pendientes obliga a subirlo a mano, en una línea cuyo
  * comentario dice que no se sube.
  */
-const PENDING_TODAY = 8;
+const PENDING_TODAY = 7;
 
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
 const CONTROL_TAGS = [
