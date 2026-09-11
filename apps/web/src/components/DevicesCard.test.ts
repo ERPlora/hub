@@ -104,7 +104,7 @@ function device(overrides: Record<string, unknown> = {}) {
  */
 function type(wrapper: ReturnType<typeof mount>, value: string): void {
   wrapper
-    .get('[data-test="name-dev_abc"]')
+    .get('[data-testid="devices-name-dev_abc"]')
     .element.dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
 }
 
@@ -240,7 +240,7 @@ describe('revoking', () => {
   it('never disconnects on a single tap: it asks, and says what will happen', async () => {
     const wrapper = await mountCard();
 
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
     expect(revokeDevice).not.toHaveBeenCalled();
     expect(wrapper.html()).toContain(i18n.global.t('devices.confirm'));
@@ -253,16 +253,16 @@ describe('revoking', () => {
     vi.mocked(listDevices).mockResolvedValue([device({ current: true })]);
     const wrapper = await mountCard();
 
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
     expect(wrapper.html()).toContain(i18n.global.t('devices.confirmCurrent'));
   });
 
   it('backing out of the confirmation calls nothing', async () => {
     const wrapper = await mountCard();
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
-    await wrapper.get('[data-test="cancel-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-cancel-dev_abc"]').trigger('click');
 
     expect(revokeDevice).not.toHaveBeenCalled();
     expect(wrapper.html()).not.toContain(i18n.global.t('devices.confirm'));
@@ -270,9 +270,9 @@ describe('revoking', () => {
 
   it('confirming disconnects that device and reloads the list', async () => {
     const wrapper = await mountCard();
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
-    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-confirm-dev_abc"]').trigger('click');
     await flushPromises();
 
     expect(revokeDevice).toHaveBeenCalledWith('dev_abc');
@@ -292,9 +292,9 @@ describe('revoking', () => {
       wasCurrent: true,
     });
     const wrapper = await mountCard();
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
-    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-confirm-dev_abc"]').trigger('click');
     await flushPromises();
 
     // The session it was using is gone server-side; keeping the screen up would mean every next tap
@@ -305,9 +305,9 @@ describe('revoking', () => {
 
   it('cutting off ANOTHER device leaves you exactly where you were', async () => {
     const wrapper = await mountCard();
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
-    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-confirm-dev_abc"]').trigger('click');
     await flushPromises();
 
     // The other half of the branch above, and the one that would be caught late: signing the owner
@@ -322,9 +322,9 @@ describe('revoking', () => {
     // esta prueba fija sigue intacto: el rechazo se VE y no se hace pasar por un éxito.
     vi.mocked(revokeDevice).mockRejectedValue(new DevicesError('sesión inválida o caducada'));
     const wrapper = await mountCard();
-    await wrapper.get('[data-test="revoke-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-revoke-dev_abc"]').trigger('click');
 
-    await wrapper.get('[data-test="confirm-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-confirm-dev_abc"]').trigger('click');
     await flushPromises();
 
     // Las DOS mitades: el rechazo se VE (su frase) y la prosa del motor no. Sin la primera, un
@@ -339,7 +339,7 @@ describe('revoking', () => {
     const wrapper = await mountCard();
 
     expect(wrapper.html()).toContain(i18n.global.t('devices.adminOnly'));
-    expect(wrapper.find('[data-test="revoke-dev_abc"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="devices-revoke-dev_abc"]').exists()).toBe(false);
     // The mirror stops here too, exactly like `DeviceModeCard.choose`; the runtime revalidates.
     expect(revokeDevice).not.toHaveBeenCalled();
   });
@@ -398,9 +398,9 @@ describe('naming a device (hub#494)', () => {
   it('an administrator names it from the row, and the list comes back from the hub', async () => {
     const wrapper = await mountCard();
 
-    await wrapper.get('[data-test="rename-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-rename-dev_abc"]').trigger('click');
     type(wrapper, 'Cocina');
-    await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-save-name-dev_abc"]').trigger('click');
     await flushPromises();
 
     expect(renameDevice).toHaveBeenCalledWith('dev_abc', 'Cocina');
@@ -416,7 +416,7 @@ describe('naming a device (hub#494)', () => {
 
     // Mirror of the runtime gate (ADR-0248), which revalidates anyway: a name that whoever holds a
     // device could write would be worth exactly what `label` is worth — nothing.
-    expect(wrapper.find('[data-test="rename-dev_abc"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="devices-rename-dev_abc"]').exists()).toBe(false);
   });
 
   it('a refused rename says why instead of looking like a name that stuck', async () => {
@@ -424,9 +424,9 @@ describe('naming a device (hub#494)', () => {
     vi.mocked(renameDevice).mockRejectedValue(new DevicesError('sesión inválida o caducada'));
     const wrapper = await mountCard();
 
-    await wrapper.get('[data-test="rename-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-rename-dev_abc"]').trigger('click');
     type(wrapper, 'Cocina');
-    await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-save-name-dev_abc"]').trigger('click');
     await flushPromises();
 
     expect(wrapper.html()).toContain(i18n.global.t('devices.renameError'));
@@ -436,8 +436,8 @@ describe('naming a device (hub#494)', () => {
   it('naming is never one tap away from disconnecting', async () => {
     const wrapper = await mountCard();
 
-    await wrapper.get('[data-test="rename-dev_abc"]').trigger('click');
-    await wrapper.get('[data-test="save-name-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-rename-dev_abc"]').trigger('click');
+    await wrapper.get('[data-testid="devices-save-name-dev_abc"]').trigger('click');
     await flushPromises();
 
     // The two gestures share a row and nothing else: housekeeping must not be able to take a till

@@ -14,7 +14,7 @@
 <template>
   <AppPage :title="t('nav.employees')">
     <div class="fill">
-      <div v-if="loading" class="table-loading">
+      <div v-if="loading" class="table-loading" data-testid="employees-loading">
         <ion-spinner name="crescent" />
       </div>
 
@@ -22,12 +22,13 @@
         <ok-inline-feedback
           v-if="loadError"
           class="load-feedback"
+          data-testid="employees-load-error"
           tone="warning"
           icon="cloud-offline-outline"
           :heading="t('employees.loadErrorTitle')"
         >
           {{ t('employees.loadErrorBody') }}
-          <ion-button slot="actions" size="small" fill="outline" @click="load">
+          <ion-button slot="actions" size="small" fill="outline" data-testid="employees-retry" @click="load">
             {{ t('employees.retry') }}
           </ion-button>
         </ok-inline-feedback>
@@ -36,6 +37,7 @@
         <ok-data-table
           v-show="tab === 'staff'"
           ref="staffTable"
+          data-testid="employees-table"
           fill
           :addable="isAdmin && !loadError"
           :columns="userColumns"
@@ -50,12 +52,13 @@
           csv-name="personal"
           column-picker
         >
-          <form slot="create" class="table-form" @submit.prevent="createUser">
-            <ok-inline-feedback v-if="formError" tone="danger">
+          <form slot="create" class="table-form" data-testid="employees-form" @submit.prevent="createUser">
+            <ok-inline-feedback v-if="formError" tone="danger" data-testid="employees-form-error">
               {{ formError }}
             </ok-inline-feedback>
             <ion-input
               v-model="form.name"
+              data-testid="employees-name"
               mode="md"
               fill="outline"
               label-placement="floating"
@@ -67,6 +70,7 @@
                  identidad del personal de barra; el usuario de CUENTA lleva email e invitación. -->
             <ion-toggle
               :checked="form.local"
+              data-testid="employees-local"
               label-placement="start"
               justify="space-between"
               class="local-toggle"
@@ -77,6 +81,7 @@
             <ion-input
               v-if="!form.local"
               v-model="form.email"
+              data-testid="employees-email"
               mode="md"
               fill="outline"
               label-placement="floating"
@@ -90,6 +95,7 @@
             />
             <ion-select
               v-model="form.role"
+              data-testid="employees-role"
               mode="md"
               fill="outline"
               label-placement="floating"
@@ -106,6 +112,7 @@
             </ion-select>
             <ion-input
               v-model="form.pin"
+              data-testid="employees-pin"
               mode="md"
               fill="outline"
               label-placement="floating"
@@ -118,6 +125,7 @@
             />
             <ion-button
               type="submit"
+              data-testid="employees-submit"
               size="small"
               :disabled="saving || !form.name.trim() || Boolean(altaIssue)"
             >
@@ -148,23 +156,24 @@
         <ion-toolbar>
           <ion-segment
             class="ok-tabbar"
+            data-testid="employees-tabs"
             :value="tab"
             scrollable
             @ion-change="tab = ($event as CustomEvent<{ value: EmployeeTab }>).detail.value"
           >
-            <ion-segment-button value="staff">
+            <ion-segment-button value="staff" data-testid="employees-tab-staff">
               <HubIcon name="people-outline" />
               <ion-label>{{ t('employees.tabStaff') }}</ion-label>
             </ion-segment-button>
-            <ion-segment-button value="roles">
+            <ion-segment-button value="roles" data-testid="employees-tab-roles">
               <HubIcon name="shield-checkmark-outline" />
               <ion-label>{{ t('employees.tabRoles') }}</ion-label>
             </ion-segment-button>
-            <ion-segment-button v-if="isAdmin" value="apikeys">
+            <ion-segment-button v-if="isAdmin" value="apikeys" data-testid="employees-tab-apikeys">
               <HubIcon name="keypad-outline" />
               <ion-label>{{ t('employees.tabApiKeys') }}</ion-label>
             </ion-segment-button>
-            <ion-segment-button v-if="isAdmin" value="approvals">
+            <ion-segment-button v-if="isAdmin" value="approvals" data-testid="employees-tab-approvals">
               <HubIcon name="finger-print-outline" />
               <ion-label>{{ t('employees.tabApprovals') }}</ion-label>
             </ion-segment-button>

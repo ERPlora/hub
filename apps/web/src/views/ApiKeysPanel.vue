@@ -17,6 +17,7 @@
   <div class="fill">
     <ok-data-table
       ref="table"
+      data-testid="api-key-table"
       fill
       :columns="columns"
       :rows="rows"
@@ -29,12 +30,12 @@
     ></ok-data-table>
 
     <!-- ── Modal: crear key (Nombre + matriz módulos × {Lectura, Escritura}) ──────────────── -->
-    <ion-modal :is-open="createOpen" @did-dismiss="closeCreate">
+    <ion-modal :is-open="createOpen" data-testid="api-key-create-modal" @did-dismiss="closeCreate">
       <ion-header class="ion-no-border">
         <ion-toolbar>
           <ion-title>{{ t('apiKeys.newTitle') }}</ion-title>
           <ion-buttons slot="end">
-            <ion-button @click="closeCreate" :aria-label="t('apiKeys.cancel')">
+            <ion-button data-testid="api-key-create-close" @click="closeCreate" :aria-label="t('apiKeys.cancel')">
               <HubIcon name="close-outline" slot="icon-only" />
             </ion-button>
           </ion-buttons>
@@ -95,12 +96,13 @@
           <span class="matrix-hint">{{ t('apiKeys.scopeHint') }}</span>
         </div>
 
-        <div v-if="loadingModules" class="matrix-loading">
+        <div v-if="loadingModules" class="matrix-loading" data-testid="api-key-modules-loading">
           <ion-spinner name="dots" />
           <span>{{ t('apiKeys.loadingModules') }}</span>
         </div>
         <ok-empty-state
           v-else-if="!modules.length"
+          data-testid="api-key-no-modules"
           icon="cube-outline"
           :heading="t('apiKeys.noApiModulesTitle')"
           :message="t('apiKeys.noApiModulesHint')"
@@ -112,6 +114,7 @@
               <th class="m-rw">
                 <span>{{ t('apiKeys.colRead') }}</span>
                 <ion-checkbox
+                  data-testid="api-key-all-read"
                   :checked="allRead"
                   :indeterminate="someRead && !allRead"
                   @ion-change="toggleAll('read', $event)"
@@ -121,6 +124,7 @@
               <th class="m-rw">
                 <span>{{ t('apiKeys.colWrite') }}</span>
                 <ion-checkbox
+                  data-testid="api-key-all-write"
                   :checked="allWrite"
                   :indeterminate="someWrite && !allWrite"
                   @ion-change="toggleAll('write', $event)"
@@ -137,6 +141,7 @@
               </td>
               <td class="m-rw">
                 <ion-checkbox
+                  :data-testid="`api-key-read-${m.id}`"
                   :checked="form.scope[m.id]?.read ?? false"
                   @ion-change="setCell(m.id, 'read', $event)"
                   :aria-label="t('apiKeys.readOf', { module: m.name })"
@@ -144,6 +149,7 @@
               </td>
               <td class="m-rw">
                 <ion-checkbox
+                  :data-testid="`api-key-write-${m.id}`"
                   :checked="form.scope[m.id]?.write ?? false"
                   @ion-change="setCell(m.id, 'write', $event)"
                   :aria-label="t('apiKeys.writeOf', { module: m.name })"
@@ -157,7 +163,7 @@
       <ion-footer class="ion-no-border">
         <ion-toolbar>
           <div class="footer-actions">
-            <ion-button fill="outline" @click="closeCreate">{{ t('apiKeys.cancel') }}</ion-button>
+            <ion-button fill="outline" data-testid="api-key-cancel" @click="closeCreate">{{ t('apiKeys.cancel') }}</ion-button>
             <ion-button data-testid="api-key-create" :disabled="!canCreate || creating" @click="onCreate">
               <ion-spinner v-if="creating" name="dots" slot="start" />
               <HubIcon v-else name="add-outline" slot="start" />
@@ -169,12 +175,12 @@
     </ion-modal>
 
     <!-- ── Modal: secreto generado (se muestra UNA sola vez: crear o rotar) ───────────────── -->
-    <ion-modal :is-open="!!secret" @did-dismiss="closeSecret">
+    <ion-modal :is-open="!!secret" data-testid="api-key-secret-modal" @did-dismiss="closeSecret">
       <ion-header class="ion-no-border">
         <ion-toolbar>
           <ion-title>{{ t('apiKeys.secretTitle') }}</ion-title>
           <ion-buttons slot="end">
-            <ion-button @click="closeSecret" :aria-label="t('apiKeys.done')">
+            <ion-button data-testid="api-key-secret-close" @click="closeSecret" :aria-label="t('apiKeys.done')">
               <HubIcon name="close-outline" slot="icon-only" />
             </ion-button>
           </ion-buttons>
@@ -186,7 +192,7 @@
         </ok-inline-feedback>
         <div class="secret-box">
           <code class="secret-code" data-testid="api-key-secret">{{ secret }}</code>
-          <ion-button fill="solid" @click="copySecret">
+          <ion-button fill="solid" data-testid="api-key-secret-copy" @click="copySecret">
             <HubIcon :name="copied ? 'checkmark-circle-outline' : 'copy-outline'" slot="start" />
             {{ copied ? t('apiKeys.copied') : t('apiKeys.copy') }}
           </ion-button>
@@ -195,7 +201,7 @@
       <ion-footer class="ion-no-border">
         <ion-toolbar>
           <div class="footer-actions">
-            <ion-button @click="closeSecret">{{ t('apiKeys.done') }}</ion-button>
+            <ion-button data-testid="api-key-secret-done" @click="closeSecret">{{ t('apiKeys.done') }}</ion-button>
           </div>
         </ion-toolbar>
       </ion-footer>

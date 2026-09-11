@@ -63,6 +63,57 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'employee-submit',
     ],
   },
+  // Regression test for ERPlora/hub#1808 — the staff list and the API keys panel.
+  // The staff list (`/employees`): the tabs, the table and the quick-add form that lives in the
+  // side panel. `employees-` and not `employee-` on purpose — the singular is one person's form,
+  // and they are two different screens the QA walks through one after the other.
+  'views/EmployeesPage.vue': {
+    prefix: 'employees-',
+    contract: [
+      'employees-email',
+      'employees-form',
+      'employees-form-error',
+      'employees-load-error',
+      'employees-loading',
+      'employees-local',
+      'employees-name',
+      'employees-pin',
+      'employees-retry',
+      'employees-role',
+      'employees-submit',
+      'employees-tab-apikeys',
+      'employees-tab-approvals',
+      'employees-tab-roles',
+      'employees-tab-staff',
+      'employees-table',
+      'employees-tabs',
+    ],
+  },
+  // Machine API keys (the «API keys» tab of the staff list). The modules × {read, write} matrix
+  // is named COMPUTED by module id, like the import rows: by index, one extra installed module
+  // would move the assertion to another row.
+  'views/ApiKeysPanel.vue': {
+    prefix: 'api-key-',
+    contract: [
+      'api-key-access',
+      'api-key-all-read',
+      'api-key-all-write',
+      'api-key-cancel',
+      'api-key-create',
+      'api-key-create-close',
+      'api-key-create-modal',
+      'api-key-modules-loading',
+      'api-key-name',
+      'api-key-no-modules',
+      'api-key-rate-limit',
+      'api-key-secret',
+      'api-key-secret-close',
+      'api-key-secret-copy',
+      'api-key-secret-done',
+      'api-key-secret-modal',
+      'api-key-table',
+    ],
+  },
   // El flujo de import de blueprints es el patrón de referencia citado por hub#1756: ya era el
   // único que el QA sabía conducir. Queda congelado aquí para que siga siéndolo.
   'components/ImportPanel.vue': {
@@ -88,6 +139,151 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'import-section-users',
       'import-submit',
       'import-upload-local',
+    ],
+  },
+  // Regression test for ERPlora/hub#1809 — the hub's front door.
+  // The hub's front door (`/login` and `/auth/google/callback`): the four steps —email+password,
+  // 2FA by email, PIN and PIN setup— live on the same screen, so the name carries the step
+  // (`login-2fa-code`, `login-setup-pinpad`). Without these hooks no journey could enter through
+  // the real door: the session was injected by API and the login itself went untested.
+  'views/LoginPage.vue': {
+    prefix: 'login-',
+    contract: [
+      'login-2fa-back',
+      'login-2fa-code',
+      'login-2fa-error',
+      'login-2fa-form',
+      'login-2fa-submit',
+      'login-box',
+      'login-choose-user',
+      'login-choose-user-to-email',
+      'login-email',
+      'login-email-form',
+      'login-error',
+      'login-google',
+      'login-password',
+      'login-pin-error',
+      'login-pin-step',
+      'login-pin-to-email',
+      'login-pinpad',
+      'login-setup-error',
+      'login-setup-pinpad',
+      'login-setup-step',
+      'login-submit',
+      'login-tab-email',
+      'login-tab-pin',
+      'login-tabs',
+      'login-theme',
+      'login-trust',
+      'login-trust-info',
+      'login-use-pin',
+    ],
+  },
+  // Regression test for ERPlora/hub#1810 — profile, hub settings, PIN policy, devices and
+  // device mode.
+  // The account of whoever uses the hub (`/profile`): identity, language, appearance and own PIN.
+  'views/ProfilePage.vue': {
+    prefix: 'profile-',
+    contract: [
+      'profile-avatar-input',
+      'profile-change-photo',
+      'profile-confirm-pin',
+      'profile-current-pin',
+      'profile-email',
+      'profile-first-name',
+      'profile-language',
+      'profile-last-name',
+      'profile-manage-account',
+      'profile-new-pin',
+      'profile-pin-form',
+      'profile-remove-photo',
+      'profile-save',
+      'profile-save-pin',
+      'profile-theme',
+      'profile-use-hub-appearance',
+    ],
+  },
+  // The hub settings (`/settings`), with their five tabs. This is where who gets in and with what
+  // is decided, so it is the most expensive surface to leave undriven: the business country and
+  // currency, the fiscal identity, the certificate and each app's permissions.
+  //
+  // The three hooks of the fiscal route were called `fiscal-route-*` and become
+  // `settings-fiscal-route-*`: the screen prefix is mandatory (`architecture/hub/apps/testids.md`)
+  // and without it two screens can coin the same name. Their only consumer
+  // —`views/settings-fiscal-route.test.ts`— changes in this same commit, which is exactly what the
+  // contract rule asks for: a rename breaks here, not the QA suite three days later.
+  'views/SettingsPage.vue': {
+    prefix: 'settings-',
+    contract: [
+      'settings-api-docs',
+      'settings-autostart',
+      'settings-business-address',
+      'settings-business-legal-name',
+      'settings-business-tax-id',
+      'settings-cert-choose',
+      'settings-cert-delete',
+      'settings-cert-file',
+      'settings-cert-password',
+      'settings-cert-upload',
+      'settings-country',
+      'settings-currency',
+      'settings-declaration-error',
+      'settings-declaration-link',
+      'settings-declaration-pending',
+      'settings-fiscal-route-delegated',
+      'settings-fiscal-route-own',
+      'settings-fiscal-route-segment',
+      'settings-hardware',
+      'settings-hub-language',
+      'settings-hub-palette',
+      'settings-permissions-empty',
+      'settings-permissions-loading',
+      'settings-print-coverage-error',
+      'settings-receipt-template',
+      'settings-save-business',
+      'settings-share-with-erplora',
+      'settings-tab-data',
+      'settings-tab-hub',
+      'settings-tab-permissions',
+      'settings-tab-tax',
+      'settings-tab-tickets',
+      'settings-tabs',
+      'settings-timezone',
+    ],
+  },
+  // «Ask who is selling» (Settings › Hub): the pinpad toggle, the idle dial and the PIN length.
+  // It is the card the PIN e2e depends on.
+  'components/PinPolicyCard.vue': {
+    prefix: 'pin-policy-',
+    contract: [
+      'pin-policy-admin-only',
+      'pin-policy-card',
+      'pin-policy-error',
+      'pin-policy-idle',
+      'pin-policy-length',
+      'pin-policy-pinpad',
+    ],
+  },
+  // The device inventory («I lost the tablet»). Each row carries its `deviceId` at the end,
+  // computed: by index, revoking would point at another tablet as soon as a new one came in.
+  //
+  // The rows carried `data-test` —without `id`—, which neither Playwright resolves with
+  // `getByTestId` nor the guard sees. They become `data-testid` with the card prefix, and
+  // `DevicesCard.test.ts` moves with them, in this same commit.
+  'components/DevicesCard.vue': {
+    prefix: 'devices-',
+    contract: ['devices-admin-only', 'devices-card', 'devices-empty', 'devices-error'],
+  },
+  // «This device» (Settings › Hub): shared or personal, the decision of whether this till asks for a PIN.
+  'components/DeviceModeCard.vue': {
+    prefix: 'device-mode-',
+    contract: [
+      'device-mode-admin-only',
+      'device-mode-card',
+      'device-mode-error',
+      'device-mode-options',
+      'device-mode-personal',
+      'device-mode-shared',
     ],
   },
   // Las cinco de abajo ya estaban completas antes de hub#1756 (medido: ningún control sin gancho).
@@ -170,6 +366,49 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
       'user-switch-pinpad',
     ],
   },
+  // Regression test for ERPlora/hub#1811 — the assistant drawer and a module's settings form.
+  // The shell's ✨ drawer. Thread messages are named COMPUTED by their turn
+  // (`assistant-message-${i}`): a chat thread only APPENDS —nothing is reordered or inserted in
+  // the middle—, so the turn IS the row identity, and it is what a spec needs to read «the last
+  // answer». Same for the grounding line and the «typing» spinner, which live inside the same
+  // `v-for`.
+  'components/AssistantDrawer.vue': {
+    prefix: 'assistant-',
+    contract: [
+      'assistant-attach',
+      'assistant-attach-error',
+      'assistant-attach-input',
+      'assistant-close',
+      'assistant-drawer',
+      'assistant-empty',
+      'assistant-input',
+      'assistant-mic',
+      'assistant-quota-ask-admin',
+      'assistant-quota-cta',
+      'assistant-quota-warning',
+      'assistant-report',
+      'assistant-send',
+      'assistant-stop',
+      'assistant-suggest-missing',
+      'assistant-thread',
+      'assistant-voice-error',
+    ],
+  },
+  // An app's settings. The form is GENERATED from the module manifest, so the hook cannot be a
+  // literal per field: it derives from the setting key (`module-settings-field-${key}`), like the
+  // import rows. The four control branches —toggle, select, number, text— are mutually exclusive,
+  // so they share the name: the spec asks for the setting by its key and does not need to know
+  // which control the shell painted it with.
+  'components/ModuleSettingsForm.vue': {
+    prefix: 'module-settings-',
+    contract: [
+      'module-settings-admin-only',
+      'module-settings-error',
+      'module-settings-loading',
+      'module-settings-refusal',
+      'module-settings-save',
+    ],
+  },
   // Control reutilizable: el `data-testid` se lo pone QUIEN lo usa (`:data-testid="testid"`), así
   // que no tiene nombres propios que congelar. El botón es el disfraz del input y no lleva gancho
   // a propósito — lo que un e2e rellena es el `<input type="file">`.
@@ -183,16 +422,6 @@ const COVERED: Record<string, { prefix: string; contract: string[] }> = {
  * entrada obsoleta falla si se queda). Una `.vue` nueva no nace en esta lista — nace cubierta.
  */
 const NOT_YET_COVERED: Record<string, string> = {
-  'views/EmployeesPage.vue': 'hub#1808',
-  'views/ApiKeysPanel.vue': 'hub#1808',
-  'views/LoginPage.vue': 'hub#1809',
-  'views/ProfilePage.vue': 'hub#1810',
-  'views/SettingsPage.vue': 'hub#1810',
-  'components/PinPolicyCard.vue': 'hub#1810',
-  'components/DevicesCard.vue': 'hub#1810',
-  'components/DeviceModeCard.vue': 'hub#1810',
-  'components/AssistantDrawer.vue': 'hub#1811',
-  'components/ModuleSettingsForm.vue': 'hub#1811',
 };
 
 /**
@@ -203,7 +432,7 @@ const NOT_YET_COVERED: Record<string, string> = {
  * número clavado, meter una pantalla nueva en pendientes obliga a subirlo a mano, en una línea cuyo
  * comentario dice que no se sube.
  */
-const PENDING_TODAY = 10;
+const PENDING_TODAY = 0;
 
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
 const CONTROL_TAGS = [
