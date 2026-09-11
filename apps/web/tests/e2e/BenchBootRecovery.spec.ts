@@ -57,21 +57,27 @@ test.describe('bench boot recovery (hub#1806)', () => {
     await expect(page.locator('#app > *').first()).toBeVisible();
   });
 
-  test('a request the browser blocked is NOT retried away', async ({ page }) => {
+  test('a failure that is NOT a lost connection is not retried away', async ({ page }) => {
     // The other half of the contract, and the one that keeps this from becoming a blanket retry:
-    // a failure that is a defect of OURS has to stay red. `ERR_BLOCKED_BY_CLIENT` stands in for
-    // the CSP violations the root CLAUDE.md calls defects.
-    let blocked = 0;
+    // a failure that is a defect of OURS has to stay red, first time, every time.
+    //
+    // `net::ERR_FAILED` and not a blocked request, and that choice is measured rather than
+    // assumed: `route.abort('blockedbyclient')` is reported by this Chromium as
+    // `net::ERR_BLOCKED_BY_CLIENT.Inspector` — suffix included — so a list widened with the plain
+    // `net::ERR_BLOCKED_BY_CLIENT` would never have matched it and this test would have passed
+    // while the guard it is meant to be was gone. `ERR_FAILED` is reported verbatim, and it is the
+    // catch-all a careless widening reaches for first.
+    let failed = 0;
 
     await page.route('**/src/main.ts', async (route) => {
-      blocked += 1;
-      await route.abort('blockedbyclient');
+      failed += 1;
+      await route.abort('failed');
     });
 
     await page.goto('/settings#data');
 
     // Exactly one attempt: no reload was spent on it.
-    expect(blocked, 'a blocked request must not be reloaded away').toBe(1);
+    expect(failed, 'a failure that is not a lost connection must not be reloaded away').toBe(1);
     await expect(page.locator('#app')).toBeEmpty();
   });
 });

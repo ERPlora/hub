@@ -39,8 +39,19 @@ describe('isBootTransportFailure', () => {
 
   it('is false when the browser blocked the request', () => {
     // A CSP violation is a defect of ours (root CLAUDE.md), never something to retry away.
+    // `.Inspector` is not a typo: it is what this Chromium reports verbatim for a blocked request
+    // (measured against the shipped binary), and the reason the list excludes by allow-list rather
+    // than by a deny-list — a deny-list of exact spellings is a guard that misses by one suffix.
     expect(isBootTransportFailure(MODULE_URL, 'net::ERR_BLOCKED_BY_CSP', APP_ORIGIN)).toBe(false);
-    expect(isBootTransportFailure(MODULE_URL, 'net::ERR_BLOCKED_BY_CLIENT', APP_ORIGIN)).toBe(false);
+    expect(
+      isBootTransportFailure(MODULE_URL, 'net::ERR_BLOCKED_BY_CLIENT.Inspector', APP_ORIGIN),
+    ).toBe(false);
+  });
+
+  it('is false for the generic failure the browser reports when it gives no reason', () => {
+    // The code a careless widening of the list reaches for first, and the one
+    // `BenchBootRecovery.spec.ts` injects to prove the reload does not fire.
+    expect(isBootTransportFailure(MODULE_URL, 'net::ERR_FAILED', APP_ORIGIN)).toBe(false);
   });
 
   it('is false when nothing is listening on the dev server', () => {
