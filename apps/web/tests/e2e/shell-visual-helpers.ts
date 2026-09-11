@@ -7,7 +7,7 @@
 // ser tolerable: una divergencia silenciosa entre copias es exactamente el tipo de defecto que un
 // contrato visual existe para cazar.
 
-import { expect, request as pwRequest, type Page, type TestInfo } from '@playwright/test';
+import { expect, request as pwRequest, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { shouldSkipMissingBaselineLocally } from '../../src/lib/visual-baseline-gate';
 
@@ -103,4 +103,32 @@ export function skipIfBaselineMissingLocally(testInfo: TestInfo, snapshot: strin
     console.log(process.env.CI ? `::warning file=${testInfo.file}::${reason}` : `SKIP: ${reason}`);
     testInfo.skip(true, reason);
   }
+}
+
+/**
+ * Lo que TODA captura del contrato visual tiene que TAPAR, y por qué solo esto.
+ *
+ * El QR del sidebar codifica la dirección del hub que está en pantalla — en el banco,
+ * `http://localhost:<puerto>` (`lib/install-qr.ts`: `hubUrl(host) ?? origin`). Hasta hub#1812 el
+ * banco clavaba 8787/5173 y esa dirección era la misma en cada corrida; desde hub#1812 cada
+ * corrida toma su propio puerto (`bench-ports.ts`), así que el símbolo sale DISTINTO cada vez.
+ * Medido el 11/09 regenerando en `:8850` y comparando en `:8860`, sin tocar nada más: las cuatro
+ * pantallas de 1440px que pintan el sidebar —apps, dashboard, personal y ajustes— en rojo
+ * (dashboard: 3.168 px, ratio 0,01, contra un `maxDiffPixelRatio` de 0,002).
+ *
+ * Se TAPA en vez de fijarse porque lo que codifica es legítimamente propio de cada máquina, y su
+ * contenido ya tiene tests propios que no dependen de una foto (`lib/install-qr.test.ts`,
+ * `components/sidebar-qr-symbol.test.ts`). Tapar NO saca el QR del contrato: Playwright pinta un
+ * rectángulo sólido sobre el locator, así que un código que desaparezca, se mueva o cambie de
+ * tamaño sigue poniendo la captura en rojo. Lo único que deja de compararse es el ruido de píxeles
+ * de la dirección.
+ *
+ * `ok-qr` y no el bloque entero (`[data-testid="sidebar-install-qr"]`) a propósito: el título y la
+ * pista («Ábrelo en el móvil», «Escanea el código…») son copy traducido que SÍ tiene que seguir en
+ * la foto. Tapar el contenedor los sacaría del contrato de paso.
+ *
+ * Lo exige `tests/visual-baselines-present.test.ts`: un `*Visual.spec.ts` nuevo no puede olvidarlo.
+ */
+export function visualSnapshotMask(page: Page): Locator[] {
+  return [page.locator('ok-qr')];
 }

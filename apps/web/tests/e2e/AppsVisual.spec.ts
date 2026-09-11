@@ -8,7 +8,7 @@
 // (`v-if="catalogError && tab !== 'mine'"`) — así que en la pestaña por defecto es invisible y no
 // puede colar ruido en la captura.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — apps', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -26,7 +26,9 @@ test.describe('contrato visual del shell — apps', () => {
       await expect(page.locator('.ok-tabbar')).toBeVisible();
       await expect(page.locator('ok-data-table').first()).toBeVisible();
 
-      await expect(page).toHaveScreenshot(snapshot);
+      // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde
+      // hub#1812: se TAPA, no se compara (`visualSnapshotMask`, hub#1752).
+      await expect(page).toHaveScreenshot(snapshot, { mask: visualSnapshotMask(page) });
     });
   }
 });

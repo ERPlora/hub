@@ -24,7 +24,7 @@
 // `tests/visual-baselines-present.test.ts` (hub#1752). Ver `src/lib/visual-baseline-gate.ts`.
 
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, freezeVisualClock, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — login', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -50,7 +50,9 @@ test.describe('contrato visual del shell — login', () => {
 
       // `fullPage` NO: en Ionic el scroll vive dentro de `ion-content`, así que una captura de
       // página completa sale del alto del viewport igual y encima añade una fuente de ruido.
-      await expect(page).toHaveScreenshot(snapshot);
+      // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde
+      // hub#1812: se TAPA, no se compara (`visualSnapshotMask`, hub#1752).
+      await expect(page).toHaveScreenshot(snapshot, { mask: visualSnapshotMask(page) });
     });
   }
 });

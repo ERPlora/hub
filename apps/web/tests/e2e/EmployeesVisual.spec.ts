@@ -4,7 +4,7 @@
 // `EmployeesPage.vue`): la lista de `hub_user` del seed de dev (solo el usuario Demo) — no depende
 // de ningún módulo de negocio, así que es determinista con el hub vacío del banco de e2e.
 import { test, expect } from '../bench-boot';
-import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — personal', () => {
   for (const { width, height } of VIEWPORTS) {
@@ -23,7 +23,9 @@ test.describe('contrato visual del shell — personal', () => {
       await expect(page.locator('.ok-tabbar')).toBeVisible();
       await expect(page.locator('ok-data-table').first()).toBeVisible();
 
-      await expect(page).toHaveScreenshot(snapshot);
+      // El QR del sidebar codifica el puerto del banco, que cambia en cada corrida desde
+      // hub#1812: se TAPA, no se compara (`visualSnapshotMask`, hub#1752).
+      await expect(page).toHaveScreenshot(snapshot, { mask: visualSnapshotMask(page) });
     });
   }
 });

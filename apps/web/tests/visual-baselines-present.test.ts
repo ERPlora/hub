@@ -108,3 +108,35 @@ describe('el contrato visual no fotografía el reloj (hub#1752)', () => {
     ).toBe(true);
   });
 });
+
+// Regression test for ERPlora/hub#1752 — a baseline that contains the install QR is a booby trap,
+// and hub#1812 (this same branch) is what armed it.
+//
+// The sidebar QR encodes the address of the hub ON SCREEN, which in the bench is
+// `http://localhost:<port>` (`lib/install-qr.ts` → `hubUrl(host) ?? origin`). Until hub#1812 the
+// bench pinned 8787/5173, so that address — and therefore every module of the symbol — was the
+// same on every run. Now each run allocates its own port (`bench-ports.ts`), so the QR is
+// different EVERY TIME.
+//
+// Measured on 2026-09-11, regenerating at `HUB_WEB_URL=http://localhost:8850` and comparing at
+// `:8860` with nothing else changed: the four 1440px screens that paint the sidebar — apps,
+// dashboard, employees and settings — all failed (dashboard: 3168 px, ratio 0.01, against a
+// `maxDiffPixelRatio` of 0.002). The 834/390 captures survive only because the sidebar is not on
+// screen at those widths.
+//
+// So the symbol is MASKED, not frozen: what it encodes is genuinely machine-specific, and its
+// content already has unit tests of its own (`lib/install-qr.test.ts`,
+// `components/sidebar-qr-symbol.test.ts`). Masking keeps the QR's BOX in the contract — Playwright
+// paints a solid rectangle over the locator — so a code that disappears, moves or changes size
+// still turns the capture red. What stops being compared is only the pixel noise of the address.
+describe('el contrato visual no fotografía el QR de instalación (hub#1752)', () => {
+  it.each(visualSpecs())('%s tapa el QR antes de capturar', (spec) => {
+    const source = readFileSync(join(E2E_DIR, spec), 'utf8');
+    expect(
+      /visualSnapshotMask\s*\(/.test(source),
+      `${spec} no pasa visualSnapshotMask(page) a toHaveScreenshot(): el QR del sidebar codifica ` +
+        'el puerto del banco, que desde hub#1812 cambia en cada corrida, así que su baseline ' +
+        'caduca sola y pone en rojo PRs que no han tocado esa pantalla (hub#1752).',
+    ).toBe(true);
+  });
+});
