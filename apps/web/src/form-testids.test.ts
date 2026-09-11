@@ -427,7 +427,7 @@ const NOT_YET_COVERED: Record<string, string> = {
  * número clavado, meter una pantalla nueva en pendientes obliga a subirlo a mano, en una línea cuyo
  * comentario dice que no se sube.
  */
-const PENDING_TODAY = 2;
+const PENDING_TODAY = 0;
 
 /** Lo que una persona rellena. No son botones: los botones se declaran en el contrato. */
 const CONTROL_TAGS = [
