@@ -30,6 +30,13 @@
       {{ t('dashboard.appsLoadError') }}
     </p>
 
+    <!-- hub#1722 — and while the list is on its way, the wait is TOLD, not only shown. The skeleton
+         tiles below are decorative; this line is the sentence, visually hidden (the tiles already say
+         it on screen), in a status region of its own so it is announced when it appears. -->
+    <p v-else-if="display === 'loading'" class="apps-card-loading" data-testid="apps-loading" role="status">
+      {{ t('dashboard.appsLoading') }}
+    </p>
+
     <!-- hub#1722 — and SILENCE was not enough either.
          hub#770 stopped the card from lying while it asked; what it left behind is a grid whose
          only tile is «＋ Add apps», which is pixel for pixel the empty hub. On a hub in PRE with
@@ -39,15 +46,12 @@
          So while there is nothing to show yet the grid holds the SHAPE of what is coming — the
          pattern of every launcher, and the one this shell already uses one surface away for a
          module screen (hub#1169, `ModuleView.vue`). The tiles are decorative (`aria-hidden`); the
-         sentence rides on the grid itself with `role="status"` + `aria-busy`, for whoever is not
-         looking at the screen. -->
-    <ul
-      class="apps-grid"
-      :data-testid="display === 'loading' ? 'apps-skeleton' : undefined"
-      :role="display === 'loading' ? 'status' : undefined"
-      :aria-busy="display === 'loading' ? 'true' : undefined"
-      :aria-label="display === 'loading' ? t('dashboard.appsLoading') : undefined"
-    >
+         grid says it is being updated (`aria-busy`), and the sentence for whoever is not looking at
+         the screen is the visually hidden status line above — NOT a `role="status"` on the `<ul>`:
+         that override would cost the grid its list role, leave every `<li>` (the ＋ button's among
+         them) without a list to sit in, and a busy live region is one the reader waits to announce
+         until it is gone. -->
+    <ul class="apps-grid" :aria-busy="display === 'loading' ? 'true' : undefined">
       <li
         v-for="cell in display === 'loading' ? SKELETON_TILE_COUNT : 0"
         :key="`skeleton-${cell}`"
@@ -292,6 +296,19 @@ function remember(path: string): void {
   overflow-wrap: normal;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+/* hub#1722 — the waiting sentence is for the screen reader; on screen the skeleton tiles say it.
+   Visually hidden, not `display: none`, so it stays in the accessibility tree. */
+.apps-card-loading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 /* hub#1722 — a placeholder has to occupy the TILE, not a line of text. `ion-skeleton-text` ships as
    a thin bar sized to a sentence; left at its default the loading grid reads as a few grey dashes

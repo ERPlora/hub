@@ -423,8 +423,8 @@ export default {
     // hub#894 — said INSTEAD of `appsEmpty` when the list could not be loaded. It never claims the
     // hub is empty, and it names reloading as the move, because the apps are still installed.
     appsLoadError: 'Could not load your apps. Reload the page; if it keeps failing, sign in again.',
-    // hub#1722 — the skeleton tiles are decorative, so this is the sentence the card's grid carries
-    // for anyone who is not looking at it. Never on screen as text: the placeholders say it there.
+    // hub#1722 — the skeleton tiles are decorative, so this is the sentence a visually hidden status
+    // line beside the grid carries for anyone not looking at it: the placeholders say it on screen.
     appsLoading: 'Loading your apps…',
     blueprintTitle: 'Set up your business',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',

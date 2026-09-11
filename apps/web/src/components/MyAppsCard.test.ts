@@ -457,7 +457,7 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
   it('hub1722_my_apps_paints_a_skeleton_while_the_list_is_still_on_its_way', () => {
     const w = mountCard([], i18n, 'loading');
 
-    const skeleton = w.find('[data-testid="apps-skeleton"]');
+    const skeleton = w.find('[data-testid="apps-loading"]');
     expect(skeleton.exists(), 'the loading card paints no skeleton at all').toBe(true);
 
     // Tiles, not one lone bar: the shape of the grid that is coming.
@@ -472,13 +472,14 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
   });
 
   it('the wait is TOLD to anyone not looking at the screen', () => {
-    const skeleton = mountCard([], i18n, 'loading').find('[data-testid="apps-skeleton"]');
+    const w = mountCard([], i18n, 'loading');
 
-    // Grey tiles say nothing out loud: the bars are decorative and the container carries the
-    // sentence, exactly as `ModuleView.vue` does it.
-    expect(skeleton.attributes('role')).toBe('status');
-    expect(skeleton.attributes('aria-busy')).toBe('true');
-    expect(skeleton.attributes('aria-label')?.length ?? 0).toBeGreaterThan(0);
+    // Grey tiles say nothing out loud: the tiles are decorative, the grid says it is being updated,
+    // and a status line beside it carries the sentence.
+    expect(w.find('ul.apps-grid').attributes('aria-busy')).toBe('true');
+    const status = w.find('[data-testid="apps-loading"]');
+    expect(status.attributes('role')).toBe('status');
+    expect(status.text().length).toBeGreaterThan(0);
   });
 
   it('and the empty hub keeps looking DIFFERENT from a hub that is still asking', () => {
@@ -486,9 +487,9 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
     const stillAsking = mountCard([], i18n, 'loading');
     const genuinelyEmpty = mountCard([], i18n, 'ready');
 
-    expect(stillAsking.find('[data-testid="apps-skeleton"]').exists()).toBe(true);
+    expect(stillAsking.find('[data-testid="apps-loading"]').exists()).toBe(true);
     expect(skeletonTiles(stillAsking)).toBeGreaterThan(0);
-    expect(genuinelyEmpty.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(genuinelyEmpty.find('[data-testid="apps-loading"]').exists()).toBe(false);
     expect(skeletonTiles(genuinelyEmpty)).toBe(0);
     expect(genuinelyEmpty.find('[data-testid="apps-empty"]').exists()).toBe(true);
   });
@@ -496,7 +497,7 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
   it('the placeholders go away the moment the apps arrive', () => {
     const w = mountCard([pos, stock], i18n, 'ready');
 
-    expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(w.find('[data-testid="apps-loading"]').exists()).toBe(false);
     // The TILES, not just the container's label: grey blocks sitting on top of apps that already
     // arrived are the same defect wearing the opposite hat.
     expect(skeletonTiles(w)).toBe(0);
@@ -506,7 +507,7 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
   it('a failed ask shows its failure, never a skeleton that will never resolve', () => {
     const w = mountCard([], i18n, 'error');
 
-    expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(w.find('[data-testid="apps-loading"]').exists()).toBe(false);
     expect(skeletonTiles(w), 'a skeleton that will never resolve').toBe(0);
     expect(w.find('[data-testid="apps-error"]').exists()).toBe(true);
   });
@@ -516,7 +517,7 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
     const w = mountCard([pos, stock], i18n, 'loading');
 
     expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
-    expect(w.find('[data-testid="apps-skeleton"]').exists()).toBe(false);
+    expect(w.find('[data-testid="apps-loading"]').exists()).toBe(false);
     expect(skeletonTiles(w)).toBe(0);
   });
 
@@ -541,8 +542,35 @@ describe('waiting looks like waiting, not like an empty hub (hub#1722)', () => {
     expect(es.dashboard.appsLoading).not.toBe(en.dashboard.appsLoading);
 
     const w = mountCard([], i18nEs, 'loading');
-    expect(w.find('[data-testid="apps-skeleton"]').attributes('aria-label')).toBe(
-      es.dashboard.appsLoading,
-    );
+    expect(w.find('[data-testid="apps-loading"]').text()).toBe(es.dashboard.appsLoading);
+  });
+  // rv-1798 — the sentence must not cost the grid its LIST. `role="status"` on the `<ul>` itself
+  // orphans every `<li>` in it (a `listitem` needs a `list` to sit in — axe flags it as serious) and
+  // puts the «＋ Add apps» button inside a live region. And `aria-busy` on the very element that
+  // carries the sentence tells the reader to WAIT before announcing it; by the time it is no longer
+  // busy the element is gone. So: `aria-busy` on what is being updated (the grid), the sentence in a
+  // status element BESIDE it, as its text — what Polaris and MUI do for a skeleton.
+  it('the grid stays a LIST while it waits: the sentence sits beside it, not on it', () => {
+    const w = mountCard([], i18n, 'loading');
+    const grid = w.find('ul.apps-grid');
+
+    expect(grid.exists()).toBe(true);
+    expect(grid.attributes('role'), 'the grid must keep its list role').toBeUndefined();
+    expect(grid.attributes('aria-busy'), 'the grid is what is being updated').toBe('true');
+
+    const status = w.find('[data-testid="apps-loading"]');
+    expect(status.exists()).toBe(true);
+    expect(status.element.tagName).not.toBe('UL');
+    expect(status.attributes('role')).toBe('status');
+    expect(status.attributes('aria-busy'), 'busy on the sentence delays its own announcement').toBeUndefined();
+    expect(status.text()).toBe((enCatalogue as { dashboard: { appsLoading: string } }).dashboard.appsLoading);
+  });
+
+  it('every placeholder tile is decorative for a screen reader', () => {
+    const tiles = mountCard([], i18n, 'loading').findAll('[data-testid="apps-skeleton-tile"]');
+    expect(tiles.length).toBeGreaterThan(0);
+    for (const tile of tiles) {
+      expect(tile.attributes('aria-hidden'), 'a grey block read out loud is noise').toBe('true');
+    }
   });
 });
