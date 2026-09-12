@@ -44,8 +44,19 @@ export interface HubSettings {
   business_tax_id: string;
   /** Razón social / nombre legal del negocio. */
   business_legal_name: string;
-  /** Dirección fiscal (texto libre, una o varias líneas). */
+  /**
+   * Dirección fiscal en UNA línea. Desde hub#1846 la COMPONE el runtime a partir de las partes de
+   * abajo; se lee (la imprimen facturas y tiques) y ya no se escribe desde aquí.
+   */
   business_address: string;
+  /** Vía pública del domicilio fiscal (hub#1846). */
+  business_street: string;
+  /** Número. Puede faltar de verdad (un «s/n»). */
+  business_street_number: string;
+  /** Código postal. */
+  business_postal_code: string;
+  /** Municipio. */
+  business_city: string;
   /** Paleta de tema GLOBAL del hub (ADR-0138): valor de `data-ok-palette` de OutfitKit
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
    *  `hub_user_pref` y gana a esta. */
@@ -145,6 +156,10 @@ function setHubSettings(raw: unknown): HubSettings {
     business_tax_id: typeof r.business_tax_id === 'string' ? r.business_tax_id : '',
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',
+    business_street: typeof r.business_street === 'string' ? r.business_street : '',
+    business_street_number: typeof r.business_street_number === 'string' ? r.business_street_number : '',
+    business_postal_code: typeof r.business_postal_code === 'string' ? r.business_postal_code : '',
+    business_city: typeof r.business_city === 'string' ? r.business_city : '',
     theme_palette: typeof r.theme_palette === 'string' && r.theme_palette.trim() ? r.theme_palette.trim() : 'erplora',
     // El dial «pedir PIN» (hub#359). Lo normaliza `publishPinPolicy` —cerrado, sin trim ni
     // minúsculas— porque lo que NO se puede leer no puede degradar a `never`: esa es la posición

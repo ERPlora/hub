@@ -18,6 +18,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Map, Value};
 
+use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, ProducerFactsCache};
 
 use crate::auth;
@@ -227,8 +228,37 @@ pub async fn put_module_capabilities(
 
 // ── Certificado fiscal del negocio (ADR-0079) ───────────────────────────────────────────────────
 
+/// El **sobre** que lee `unwrap(env)` de `@erplora/module-sdk` (hub#1688).
+///
+/// Estas tres puertas las abrió el shell, que hace su propio `fetch` y leía el cuerpo pelado. Desde
+/// hub#1844 también las llama la PANTALLA del módulo de cumplimiento —el certificado es del negocio
+/// pero su pantalla es del país, y el hub es país-agnóstico (ADR-0424)—, y el SDK solo sabe leer
+/// `{ok, data}`: un cuerpo fuera del sobre le llega como `unknown error`, con lo que dijera de
+/// verdad ya arrancado. Una sola forma para los dos llamantes, no dos.
+fn enveloped<T: serde::Serialize>(data: T) -> Response {
+    Json(json!({ "ok": true, "data": data })).into_response()
+}
+
+/// La mitad de MÓDULO del gate, en las tres puertas del certificado (hub#1844).
+///
+/// Quien **no** nombra módulo pasa: el shell no es un módulo y no nombra ninguno. Quien lo nombra
+/// necesita `certificate` declarada en su manifest y concedida por el dueño (ADR-0079) — que es la
+/// misma concesión que ya necesita para firmar con esa clave, así que esto no abre ninguna puerta
+/// nueva a nadie. Sin este gate, darle la superficie al SDK se la habría dado a **todos** los
+/// módulos instalados: cualquiera podría haber borrado el certificado del negocio y dejado sus
+/// facturas sin salida, con un admin logueado y sin que nadie lo pidiera.
+async fn certificate_capability(
+    headers: &HeaderMap,
+    rt: &erplora_runtime::Runtime,
+) -> Result<(), Response> {
+    crate::flows_api::require_module_capability(headers, rt, CapabilityKind::Certificate)
+        .await
+        .map(|_| ())
+}
+
 /// GET /api/business/certificate — estado del certificado del negocio (presente/ausente + metadatos,
-/// SIN bytes ni contraseña). Auth = sesión de usuario (cualquier rol).
+/// SIN bytes ni contraseña). Auth = sesión de usuario (cualquier rol) **+ la capability
+/// `certificate`** si quien llama nombra un módulo (hub#1844).
 pub async fn get_business_certificate(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
@@ -236,10 +266,13 @@ pub async fn get_business_certificate(State(st): State<AppState>, headers: Heade
     };
     let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
+        return crate::auth_rejected(e);
+    }
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
     }
     match rt.business_certificate_status().await {
-        Ok(s) => Json(s).into_response(),
+        Ok(s) => enveloped(s),
         Err(e) => crate::err_response(e),
     }
 }
@@ -263,9 +296,16 @@ pub async fn put_business_certificate(
         .unwrap_or("")
         .to_string();
     if b64.trim().is_empty() {
+        // hub#1844: el código va DENTRO de `error`, que es donde `unwrap(env)` del `module-sdk` lo
+        // busca. Sin él, la pantalla del módulo que sube el fichero recibe `unknown error` y no
+        // puede decir cuál de los dos campos falta.
         return (
             StatusCode::UNPROCESSABLE_ENTITY,
-            Json(json!({ "ok": false, "error": "falta pkcs12_b64 (base64 del .p12)" })),
+            Json(json!({ "ok": false, "error": {
+                "code": "invalid_field",
+                "field": "pkcs12_b64",
+                "message": "falta pkcs12_b64 (base64 del .p12)",
+            }})),
         )
             .into_response();
     }
@@ -276,14 +316,17 @@ pub async fn put_business_certificate(
     let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(u) => u,
-        Err(e) => return unauthorized(e),
+        Err(e) => return crate::auth_rejected(e),
     };
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
+    }
     let by = format!("hub_user:{}", admin.id);
     if let Err(e) = rt.set_business_certificate(&b64, &password, &by).await {
         return crate::err_response(e);
     }
     match rt.business_certificate_status().await {
-        Ok(s) => Json(s).into_response(),
+        Ok(s) => enveloped(s),
         Err(e) => crate::err_response(e),
     }
 }
@@ -508,7 +551,8 @@ pub async fn delete_gateway_identity(State(st): State<AppState>, headers: Header
     }
 }
 
-/// DELETE /api/business/certificate — elimina el certificado del negocio. Auth = sesión admin.
+/// DELETE /api/business/certificate — elimina el certificado del negocio. Auth = sesión admin
+/// **+ la capability `certificate`** si quien llama nombra un módulo (hub#1844).
 pub async fn delete_business_certificate(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -519,13 +563,16 @@ pub async fn delete_business_certificate(
     };
     let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
+        return crate::auth_rejected(e);
+    }
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
     }
     if let Err(e) = rt.delete_business_certificate().await {
         return crate::err_response(e);
     }
     match rt.business_certificate_status().await {
-        Ok(s) => Json(s).into_response(),
+        Ok(s) => enveloped(s),
         Err(e) => crate::err_response(e),
     }
 }

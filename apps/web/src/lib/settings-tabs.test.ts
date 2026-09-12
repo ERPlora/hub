@@ -36,8 +36,28 @@ describe('navegación de Ajustes', () => {
   });
 
   it('no ofrece una pestaña Tienda duplicada', () => {
-    expect(SETTINGS_TABS).toEqual(['hub', 'tax', 'tickets', 'permissions', 'data']);
+    expect(SETTINGS_TABS).toEqual(['hub', 'business', 'tickets', 'permissions', 'data']);
     expect(SETTINGS_TABS).not.toContain('store');
+  });
+
+  // hub#1845 — la pestaña se llamaba `tax` desde que nació (PR #198, 24/07/2026) y nunca se
+  // renombró, mientras su RÓTULO sí se movía: la clave i18n seguía siendo `tabTax` y su valor ya
+  // era «Negocio»/«Business». Y lo que hay dentro no es «impuestos»: son los datos de la empresa y
+  // su certificado. Un id que no dice lo que contiene es el que acaba en un enlace equivocado.
+  it('la pestaña de los datos de la empresa se llama `business`, no `tax`', () => {
+    expect(SETTINGS_TABS).toContain('business');
+    expect(SETTINGS_TABS).not.toContain('tax');
+    expect(resolveSettingsTab('#business')).toBe('business');
+  });
+
+  // 🔴 El alias NO es cortesía: `verifactu` v1.5.35 está PUBLICADA con
+  // `setup.route: "/settings#tax"` y los hubs en producción la tienen instalada. Un hash que esta
+  // función no conoce degrada a `hub` EN SILENCIO, así que sin el alias el botón «Configura
+  // VeriFactu» de cada módulo ya instalado aterrizaría en General, sin nada que tocar — que es
+  // exactamente el defecto que verifactu#49 tuvo que arreglar. El alias se queda para siempre:
+  // un manifest publicado no se puede reescribir (las rutas de S3 son inmutables).
+  it('el hash antiguo `#tax` sigue llevando a la misma pestaña — hay manifests publicados con él', () => {
+    expect(resolveSettingsTab('#tax')).toBe('business');
   });
 
   it('redirige el enlace antiguo de Tienda a los ajustes del Hub', () => {
@@ -46,10 +66,40 @@ describe('navegación de Ajustes', () => {
   });
 
   it('conserva los enlaces de las pestañas vigentes', () => {
-    expect(resolveSettingsTab('#tax')).toBe('tax');
+    expect(resolveSettingsTab('#business')).toBe('business');
     expect(resolveSettingsTab('#tickets')).toBe('tickets');
     expect(resolveSettingsTab('#permissions')).toBe('permissions');
     expect(resolveSettingsTab('#data')).toBe('data');
+  });
+
+  // hub#1846 — el core del hub es país-agnóstico: el motor fiscal, el certificado y los papeles
+  // que exige la AEAT viven en el módulo de cumplimiento de cada país, no en la base de LEGO.
+  // Ajustes → Negocio llevaba tres cosas que solo existen en España: la elección de vía de envío a
+  // la Agencia Tributaria, el otorgamiento de representación (con sus tres adjuntos) y la
+  // declaración responsable del art. 13.2 RRSIF — y las enseñaba **aunque no hubiera ni un módulo
+  // fiscal instalado**. La pestaña de al lado, «Tiques», ya hacía lo correcto: «Instala la app
+  // Impresión para configurar tu tique».
+  //
+  // Esta guarda es mecánica a propósito. El guard del gate que fija lo mismo para el Rust
+  // (`crates/server/tests/country_agnostic_core_hub1407.rs`) NO mira `apps/web`, que es justo por
+  // lo que el shell acumuló lo que a los crates ya no se les permite.
+  it('la pantalla de Ajustes no nombra la AEAT ni ningún régimen fiscal', () => {
+    for (const termino of ['AEAT', 'Agencia Tributaria', 'verifactu', 'VERI*FACTU', 'RRSIF']) {
+      expect(
+        settingsSource.toLowerCase(),
+        `Ajustes nombra «${termino}»: eso vive en el módulo de su país, no en el core`,
+      ).not.toContain(termino.toLowerCase());
+    }
+  });
+
+  it('Ajustes no conserva el otorgamiento ni la declaración responsable', () => {
+    expect(settingsSource).not.toContain('RepresentationGrantPanel');
+    expect(settingsSource).not.toContain('responsible-declaration');
+    expect(settingsSource).not.toContain('declarationRows');
+    // Y tampoco el formulario del `.p12`: la custodia sigue siendo del core y la API también, pero
+    // la PANTALLA es de quien la necesita (decisión de Ioan, 12/09).
+    expect(settingsSource).not.toContain('certFileInput');
+    expect(settingsSource).not.toContain('putBusinessCertificate');
   });
 
   it('mantiene exactamente una paleta global en Ajustes y una personal en Perfil', () => {
@@ -60,6 +110,9 @@ describe('navegación de Ajustes', () => {
   it('no conserva el contenido ni el selector de la antigua Tienda', () => {
     expect(settingsSource).not.toContain("tab === 'store'");
     expect(settingsSource).not.toContain('value="store"');
+    // Y la pestaña renombrada no deja atrás su id viejo en la plantilla (hub#1845).
+    expect(settingsSource).not.toContain("tab === 'tax'");
+    expect(settingsSource).not.toContain('value="tax"');
     expect(settingsSource).not.toContain('storeType');
     expect(settingsSource).not.toContain('storeLocale');
   });

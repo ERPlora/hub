@@ -35,7 +35,7 @@ vi.mock('../components/HubIcon.vue', () => ({ default: { name: 'HubIcon', templa
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useRoute: () => ({ hash: '#tax', query: {} }),
+  useRoute: () => ({ hash: '#business', query: {} }),
 }));
 vi.mock('../lib/nav', () => ({ moduleNav: ref([]) }));
 
