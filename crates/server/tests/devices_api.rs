@@ -210,7 +210,11 @@ async fn a_refusal_names_why_an_expired_session_and_a_missing_role_apart() {
 
     for (method, uri) in [("GET", "/api/devices"), ("DELETE", "/api/devices/till-1")] {
         let no_session = call(&router, method, uri, Some("expired-or-forged"), &[]).await;
-        assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED, "{method} {uri}");
+        assert_eq!(
+            no_session.status(),
+            StatusCode::UNAUTHORIZED,
+            "{method} {uri}"
+        );
         assert_eq!(
             refusal_code(&body_json(no_session).await),
             Some("unauthorized"),
@@ -776,9 +780,15 @@ async fn only_an_administrator_can_name_a_device() {
     // when deciding which till to cut off, so whoever holds a device cannot write it. `403` for the
     // employee since hub#1702: the session is valid, the role is not.
     assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(refusal_code(&body_json(no_session).await), Some("unauthorized"));
+    assert_eq!(
+        refusal_code(&body_json(no_session).await),
+        Some("unauthorized")
+    );
     assert_eq!(as_employee.status(), StatusCode::FORBIDDEN);
-    assert_eq!(refusal_code(&body_json(as_employee).await), Some("forbidden"));
+    assert_eq!(
+        refusal_code(&body_json(as_employee).await),
+        Some("forbidden")
+    );
     assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "");
 }
 
