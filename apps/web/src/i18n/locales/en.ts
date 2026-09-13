@@ -599,10 +599,6 @@ export default {
     // message is written in English for the log; what the person in front of the screen reads has
     // to be their language, so the code — not the message — is what travels.
     saveRefused: {
-      demo_fiscal_identity_locked:
-        'This is a demo, so it invoices as “{name}”. Create your own business at erplora.com to invoice under your own details.',
-      demo_business_certificate_locked:
-        'A demo cannot take your certificate: it never files anything for real. Create your own business at erplora.com to invoice with it.',
       demo_fiscal_environment_locked:
         'A demo always stays in the tax authority’s test environment. Create your own business at erplora.com to file for real.',
       business_tax_id_frozen:

@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value};
 
-use crate::errors::{DemoLock, Result, RuntimeError};
+use crate::errors::{Result, RuntimeError};
 use crate::registry::now_rfc3339;
 
 /// Una clave de setting conocida: su nombre, el valor por defecto (JSON) y un validador que, dado
@@ -902,14 +902,6 @@ fn validate_recipient_list(v: &Value) -> std::result::Result<String, String> {
     Ok(out.join(","))
 }
 
-/// Las claves de `hub_settings` que SON la identidad fiscal del obligado tributario (ADR-0061).
-///
-/// Mismos dos nombres que `commands::FISCAL_IDENTITY_PARAMS` — y no es coincidencia: el dispatcher
-/// los inyecta como `:business_tax_id`/`:business_legal_name` leyéndolos de AQUÍ, así que la clave
-/// y el parámetro son literalmente el mismo dato visto desde los dos lados. `business_address` se
-/// queda fuera, igual que allí: no identifica a nadie.
-pub(crate) const FISCAL_IDENTITY_SETTINGS: [&str; 2] = ["business_tax_id", "business_legal_name"];
-
 /// Las partes del domicilio fiscal, en el orden en que se leen (hub#1846).
 ///
 /// 🔴 `business_address` NO se retira: se inyecta como `:business_address` en el SQL de TODOS los
@@ -940,32 +932,6 @@ fn compose_address(street: &str, number: &str, postal_code: &str, city: &str) ->
         .join(", ")
 }
 
-/// La identidad fiscal de un hub de DEMO es de SOLO LECTURA (ADR-0197 §4, hub#376).
-///
-/// Un hub de demo es anónimo, sin registro y dura una hora: el NIF y la razón social que se
-/// tecleen ahí no son de nadie. Dejarlos escribir tiene dos consecuencias concretas, no teóricas:
-/// los documentos que emita la demo saldrían a nombre de un negocio real que no ha pedido nada, y
-/// `POST /api/business/fiscal-identity` publicaría ese NIF como `BillingProfile` en el SaaS
-/// (ADR-0201 decisión 5) — un desconocido escribiendo en la facturación de ERPlora.
-///
-/// La guarda es al REVÉS de lo que parece: no protege a la demo, protege al negocio cuyo NIF
-/// alguien teclearía en ella.
-fn enforce_demo_fiscal_identity_lock(
-    updates: &serde_json::Map<String, Value>,
-    demo_hub: bool,
-) -> Result<()> {
-    if demo_hub
-        && FISCAL_IDENTITY_SETTINGS
-            .iter()
-            .any(|k| updates.contains_key(*k))
-    {
-        return Err(RuntimeError::DemoLocked {
-            lock: DemoLock::FiscalIdentity,
-        });
-    }
-    Ok(())
-}
-
 /// The tax id a DEMO hub boots with (hub#684, changed by hub#985 §1 E2E on 2026-09-02).
 ///
 /// It used to be the all-zero `B00000000` — deliberately nobody's. Measured against the AEAT
@@ -983,8 +949,8 @@ pub const DEMO_BUSINESS_TAX_ID: &str = "B27593136";
 /// visitor makes, and that ticket has to be readable as an example, not as a real business's.
 pub const DEMO_BUSINESS_LEGAL_NAME: &str = "ERPlora Demo SL";
 /// The address a DEMO hub boots with. Not part of the fiscal gate (`business_address` is not in
-/// [`FISCAL_IDENTITY_SETTINGS`]) and not locked either — it is here so the demo's ticket is a
-/// COMPLETE document instead of one with a blank where the address goes.
+/// `commands::FISCAL_IDENTITY_PARAMS`) — it is here so the demo's ticket is a COMPLETE document
+/// instead of one with a blank where the address goes.
 pub const DEMO_BUSINESS_ADDRESS: &str = "Calle de la Demo 1, 28013 Madrid";
 
 /// `updated_by` of the rows this writes: the core did it, no user did.
@@ -993,34 +959,28 @@ const DEMO_IDENTITY_AUTHOR: &str = "system:demo";
 /// **A DEMO hub boots with its fiscal identity already filled in** (hub#684).
 ///
 /// The onboarding checklist and the fiscal gate read the SAME two settings
-/// (`business_legal_name` ∧ `business_tax_id`), and in a demo both were empty and both had to stay
-/// empty: [`enforce_demo_fiscal_identity_lock`] refuses the only door that writes them. The visitor
-/// was therefore shown a ⛔ *"you need this in order to invoice"* whose button led to a `409`, and
-/// —the expensive half— **their sale went through and the invoice did not**:
-/// `invoice.create_from_sale` stamps `:business_tax_id`, so `commands::enforce_fiscal_precondition`
-/// rejected it and the document died in the outbox. Money taken, nothing issued.
+/// (`business_legal_name` ∧ `business_tax_id`). A demo visitor who never opens Settings would
+/// otherwise be shown a ⛔ *"you need this in order to invoice"* and —the expensive half— **their
+/// sale would go through and the invoice would not**: `invoice.create_from_sale` stamps
+/// `:business_tax_id`, so `commands::enforce_fiscal_precondition` rejects it and the document dies
+/// in the outbox. Money taken, nothing issued.
 ///
-/// The fix is to put the data there, and it has to be *that* rather than any of the shortcuts:
+/// The fix is to put the data there rather than any of the shortcuts:
 ///
 /// * **Hiding the item** would make the checklist lie — the gate still refuses, so the first sale
 ///   would fail with `fiscal_precondition_failed` and no screen would have warned anybody. The
 ///   invariant of [`crate::setup_status`] («the checklist and the gate must answer identically»)
 ///   exists for exactly this.
-/// * **Exempting the demo from the fiscal precondition** would open a third hole in the one gate
-///   that stops a hub selling without registering, to save writing two rows.
+/// * **Exempting the demo from the fiscal precondition** would open a hole in the one gate that
+///   stops a hub selling without registering, to save writing two rows.
 ///
-/// With the rows written, nothing else has to know: the item is done because it IS done, the gate
-/// passes because it has what it asks for, and `setup_status` never learns what a demo is.
+/// It is a DEFAULT, not a lock (hub#1848): the admin replaces it with their own business through
+/// Settings like on any hub. What keeps a demo sale away from the real AEAT is the environment
+/// pinned to `testing` (`demo_fiscal_environment_locked`).
 ///
-/// ⚠️ **This does not open any of the three closures of ADR-0197 §4.** It is the core writing the
-/// demo's own placeholder at boot, not a door: the visitor still cannot CHANGE the identity
-/// (`demo_fiscal_identity_locked`), still cannot upload an `own` certificate
-/// (`demo_business_certificate_locked`) and is still pinned to `testing`
-/// (`demo_fiscal_environment_locked`) — which is what keeps a demo sale away from the real AEAT.
-///
-/// **Never overwrites.** Only an EMPTY key is filled, so a demo that got an identity another way (a
-/// blueprint of its own, a restore) keeps it — a default must not outrank a decision. Returns
-/// whether it wrote anything, so the boot can say so once instead of every time.
+/// **Never overwrites.** Only an EMPTY key is filled, so a demo that got an identity another way (its
+/// admin, a blueprint of its own, a restore) keeps it — a default must not outrank a decision.
+/// Returns whether it wrote anything, so the boot can say so once instead of every time.
 pub async fn ensure_demo_fiscal_identity(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
     let defaults = [
         ("business_tax_id", DEMO_BUSINESS_TAX_ID),
@@ -1334,13 +1294,7 @@ pub async fn set_many(
     hub_id: &str,
     updates: &serde_json::Map<String, Value>,
     updated_by: &str,
-    demo_hub: bool,
 ) -> Result<Value> {
-    // 0) Fiscal identity is READ-ONLY in a demo hub (ADR-0197 §4, hub#376). Before validation and
-    //    before the DB, and the whole PUT is refused, not the offending key: settings are already
-    //    atomic here, and a partial apply would leave the caller guessing which half landed.
-    enforce_demo_fiscal_identity_lock(updates, demo_hub)?;
-
     // 1) Validación de TODO el lote antes de tocar la BD (rechazo total si algo no cuadra).
     let mut normalized: Vec<(&'static str, String)> = Vec::with_capacity(updates.len());
     for (key, value) in updates {
@@ -1762,7 +1716,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!("ZZZ999"));
         updates.insert("business_legal_name".into(), json!("ACME SL"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap_err();
         assert!(
@@ -1816,7 +1770,7 @@ mod tests {
         ] {
             let mut updates = serde_json::Map::new();
             updates.insert("theme_palette".into(), json!(id));
-            let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            let result = set_many(&db, "hub-1", &updates, "hub_user:1")
                 .await
                 .unwrap();
             assert_eq!(result["theme_palette"], json!(id));
@@ -1825,7 +1779,7 @@ mod tests {
         // Un id que no existe en palettes.css se rechaza (p. ej. el set viejo del Cloud).
         let mut updates = serde_json::Map::new();
         updates.insert("theme_palette".into(), json!("glass"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap_err();
         assert!(
@@ -1843,7 +1797,7 @@ mod tests {
         updates.insert("currency".into(), json!("usd")); // se normaliza a USD
         updates.insert("language".into(), json!("en"));
         updates.insert("api_docs_enabled".into(), json!(true));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap();
         assert_eq!(result["currency"], json!("USD"));
@@ -1853,7 +1807,7 @@ mod tests {
         // Persistido: una nueva lectura lo refleja, y un PUT parcial sólo cambia su clave.
         let mut partial = serde_json::Map::new();
         partial.insert("language".into(), json!("es"));
-        let result = set_many(&db, "hub-1", &partial, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &partial, "hub_user:1")
             .await
             .unwrap();
         assert_eq!(result["language"], json!("es"));
@@ -1871,7 +1825,7 @@ mod tests {
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("not_a_setting".into(), json!("x"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap_err();
         assert!(
@@ -1890,7 +1844,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("GBP"));
         updates.insert("language".into(), json!("fr")); // no soportado
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap_err();
         assert!(
@@ -1924,7 +1878,6 @@ mod tests {
                 ("region_code", json!("ES-CN")),
             ]),
             "hub_user:1",
-            false,
         )
         .await
         .expect("una región de tu propio país es la que se pide");
@@ -1938,7 +1891,6 @@ mod tests {
                 ("region_code", json!("ES-CN")),
             ]),
             "hub_user:1",
-            false,
         )
         .await
         .unwrap_err();
@@ -1953,7 +1905,6 @@ mod tests {
             "hub-1",
             &map(&[("region_code", json!("FR-IDF"))]),
             "hub_user:1",
-            false,
         )
         .await
         .unwrap_err();
@@ -1973,7 +1924,6 @@ mod tests {
             "hub-1",
             &map(&[("region_code", json!(""))]),
             "hub_user:1",
-            false,
         )
         .await
         .expect("vaciar la región es volver a «todo el país»");
@@ -1991,7 +1941,6 @@ mod tests {
             "hub-1",
             &map(&[("country_code", json!("ZZ")), ("currency", json!("USD"))]),
             "hub_user:1",
-            false,
         )
         .await
         .unwrap_err();
@@ -2027,86 +1976,11 @@ mod tests {
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("USD"));
-        set_many(&db, "hub-a", &updates, "x", false).await.unwrap();
+        set_many(&db, "hub-a", &updates, "x").await.unwrap();
 
         // El hub B no ve los settings del hub A (sigue en sus defaults).
         let b = get_all(&db, "hub-b").await.unwrap();
         assert_eq!(b["currency"], json!("EUR"));
-    }
-
-    // ── Identidad fiscal de SOLO LECTURA en un hub de DEMO (ADR-0197 §4 · hub#376) ─────────
-
-    /// 🔴 La guarda, por la puerta que la APLICA: `set_many` es lo que llama
-    /// `PUT /api/settings`, no un helper de siembra.
-    #[tokio::test]
-    async fn a_demo_hub_cannot_write_its_fiscal_identity() {
-        let db = fresh_db().await;
-        ensure_table(&db).await;
-
-        for key in ["business_tax_id", "business_legal_name"] {
-            let mut updates = serde_json::Map::new();
-            updates.insert(key.into(), json!("B12345674"));
-            let err = set_many(&db, "hub-1", &updates, "hub_user:1", true)
-                .await
-                .unwrap_err();
-            assert!(
-                matches!(
-                    err,
-                    RuntimeError::DemoLocked {
-                        lock: DemoLock::FiscalIdentity
-                    }
-                ),
-                "`{key}` must stay read-only in a demo: {err:?}"
-            );
-            // Y NO se escribió: el rechazo es antes de tocar la BD.
-            let all = get_all(&db, "hub-1").await.unwrap();
-            assert_eq!(all[key], json!(""), "`{key}` must still be empty");
-        }
-    }
-
-    /// Colar la identidad dentro de un lote con claves inocentes tampoco cuela — y el lote entero
-    /// se rechaza, así que la moneda que iba de acompañante tampoco se aplica.
-    #[tokio::test]
-    async fn the_lock_survives_being_hidden_in_a_batch() {
-        let db = fresh_db().await;
-        ensure_table(&db).await;
-        let mut updates = serde_json::Map::new();
-        updates.insert("currency".into(), json!("USD"));
-        updates.insert("business_tax_id".into(), json!("B12345674"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1", true)
-            .await
-            .unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RuntimeError::DemoLocked {
-                    lock: DemoLock::FiscalIdentity
-                }
-            ),
-            "got {err:?}"
-        );
-        let all = get_all(&db, "hub-1").await.unwrap();
-        assert_eq!(all["currency"], json!("EUR"), "the batch is refused whole");
-        assert_eq!(all["business_tax_id"], json!(""));
-    }
-
-    /// La demo sigue siendo un hub USABLE: todo lo que no es la identidad fiscal se configura
-    /// igual (el visitante elige idioma, paleta, moneda…). La bandera no es un modo de solo
-    /// lectura, es un cierre de tres cosas concretas.
-    #[tokio::test]
-    async fn a_demo_hub_configures_everything_else_normally() {
-        let db = fresh_db().await;
-        ensure_table(&db).await;
-        let mut updates = serde_json::Map::new();
-        updates.insert("currency".into(), json!("USD"));
-        updates.insert("language".into(), json!("en"));
-        updates.insert("theme_palette".into(), json!("ocean"));
-        updates.insert("business_address".into(), json!("Calle Falsa 123"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", true)
-            .await
-            .expect("a demo hub is a hub: only its fiscal identity is frozen");
-        assert_eq!(result["currency"], json!("USD"));
-        assert_eq!(result["business_address"], json!("Calle Falsa 123"));
     }
 
     // ── El DOMICILIO FISCAL en campos (hub#1846) ────────────────────────────────────────────────
@@ -2133,7 +2007,7 @@ mod tests {
         updates.insert("business_street_number".into(), json!("10"));
         updates.insert("business_postal_code".into(), json!("36202"));
         updates.insert("business_city".into(), json!("Vigo"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .expect("the four parts are known settings");
 
@@ -2152,7 +2026,9 @@ mod tests {
         updates.insert("business_street_number".into(), json!("10"));
         updates.insert("business_postal_code".into(), json!("36202"));
         updates.insert("business_city".into(), json!("Vigo"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
+            .await
+            .unwrap();
 
         assert_eq!(
             result["business_address"],
@@ -2171,11 +2047,13 @@ mod tests {
         first.insert("business_street_number".into(), json!("10"));
         first.insert("business_postal_code".into(), json!("36202"));
         first.insert("business_city".into(), json!("Vigo"));
-        set_many(&db, "hub-1", &first, "hub_user:1", false).await.unwrap();
+        set_many(&db, "hub-1", &first, "hub_user:1").await.unwrap();
 
         let mut only_number = serde_json::Map::new();
         only_number.insert("business_street_number".into(), json!("12"));
-        let result = set_many(&db, "hub-1", &only_number, "hub_user:1", false).await.unwrap();
+        let result = set_many(&db, "hub-1", &only_number, "hub_user:1")
+            .await
+            .unwrap();
 
         assert_eq!(result["business_address"], json!("Rúa do Príncipe 12, 36202 Vigo"));
     }
@@ -2188,11 +2066,13 @@ mod tests {
         ensure_table(&db).await;
         let mut legacy = serde_json::Map::new();
         legacy.insert("business_address".into(), json!("Calle Falsa 123, Madrid"));
-        set_many(&db, "hub-1", &legacy, "hub_user:1", false).await.unwrap();
+        set_many(&db, "hub-1", &legacy, "hub_user:1").await.unwrap();
 
         let mut unrelated = serde_json::Map::new();
         unrelated.insert("currency".into(), json!("EUR"));
-        let result = set_many(&db, "hub-1", &unrelated, "hub_user:1", false).await.unwrap();
+        let result = set_many(&db, "hub-1", &unrelated, "hub_user:1")
+            .await
+            .unwrap();
 
         assert_eq!(result["business_address"], json!("Calle Falsa 123, Madrid"));
     }
@@ -2205,7 +2085,9 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_street".into(), json!("Plaza Mayor"));
         updates.insert("business_city".into(), json!("Madrid"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
+            .await
+            .unwrap();
 
         assert_eq!(result["business_address"], json!("Plaza Mayor, Madrid"));
     }
@@ -2221,7 +2103,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!("B12345674"));
         updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .expect("a real hub configures the tax id it invoices with");
         assert_eq!(result["business_tax_id"], json!("B12345674"));
@@ -2267,7 +2149,7 @@ mod tests {
     async fn write_tax_id(db: &PgAdapter, hub_id: &str, value: &str) -> Result<Value> {
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!(value));
-        set_many(db, hub_id, &updates, "hub_user:1", false).await
+        set_many(db, hub_id, &updates, "hub_user:1").await
     }
 
     /// 🔴 With a record already emitted, a DIFFERENT tax id is refused — and nothing moves.
@@ -2325,7 +2207,7 @@ mod tests {
         updates.insert("business_tax_id".into(), json!(" b12345674 "));
         updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
         updates.insert("business_address".into(), json!("Calle Nueva 1"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .expect("re-posting the same identifier is not a change of taxpayer");
 
@@ -2347,7 +2229,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_legal_name".into(), json!("Bar Manolo SLU"));
         updates.insert("currency".into(), json!("USD"));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .expect("only the identifier is frozen");
         assert_eq!(result["business_legal_name"], json!("Bar Manolo SLU"));
@@ -2417,7 +2299,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("USD"));
         updates.insert("business_tax_id".into(), json!("B99999997"));
-        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap_err();
         assert_eq!(
@@ -2441,7 +2323,7 @@ mod tests {
         for key in ["demo", "is_demo", "demo_hub"] {
             let mut updates = serde_json::Map::new();
             updates.insert(key.into(), json!(true));
-            let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            let err = set_many(&db, "hub-1", &updates, "hub_user:1")
                 .await
                 .unwrap_err();
             assert!(
@@ -2480,7 +2362,7 @@ mod tests {
         for n in [1, 5, 10, 15, 30, 7] {
             let mut updates = serde_json::Map::new();
             updates.insert("pin_inactivity_minutes".into(), json!(n));
-            let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            let result = set_many(&db, "hub-1", &updates, "hub_user:1")
                 .await
                 .unwrap();
             assert_eq!(result["pin_inactivity_minutes"], json!(n));
@@ -2502,7 +2384,7 @@ mod tests {
         ] {
             let mut updates = serde_json::Map::new();
             updates.insert("pin_inactivity_minutes".into(), bad.clone());
-            let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            let err = set_many(&db, "hub-1", &updates, "hub_user:1")
                 .await
                 .unwrap_err();
             assert!(
@@ -2513,7 +2395,7 @@ mod tests {
         // And the refusals above are about the VALUE, not an unknown key: a sane write lands.
         let mut updates = serde_json::Map::new();
         updates.insert("pin_inactivity_minutes".into(), json!(10));
-        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap();
         assert_eq!(result["pin_inactivity_minutes"], json!(10));
@@ -2580,7 +2462,7 @@ mod tests {
 
         let mut updates = serde_json::Map::new();
         updates.insert("country_code".into(), json!("PT"));
-        set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap();
         assert_eq!(
@@ -2591,7 +2473,7 @@ mod tests {
         // An explicit zone WINS over the derivation — that is the point of having it.
         let mut updates = serde_json::Map::new();
         updates.insert("timezone".into(), json!("Atlantic/Azores"));
-        set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap();
         assert_eq!(
@@ -2741,7 +2623,6 @@ mod tests {
             "hub-1",
             &map(&[("country_code", json!("PT"))]),
             "owner",
-            false,
         )
         .await
         .unwrap();
@@ -2810,7 +2691,6 @@ mod tests {
             "hub-live",
             &map(&[("country_code", json!("FR"))]),
             "hub_user:1",
-            false,
         )
         .await
         .expect_err("a hub that went live cannot move country");
@@ -2841,7 +2721,6 @@ mod tests {
             "hub-live",
             &map(&[("country_code", json!("es")), ("currency", json!("USD"))]),
             "hub_user:1",
-            false,
         )
         .await
         .expect("the same country, normalised, is a no-op and the batch goes through");
@@ -2867,7 +2746,6 @@ mod tests {
             "hub-setup",
             &map(&[("country_code", json!("FR"))]),
             "hub_user:1",
-            false,
         )
         .await
         .expect("a hub still setting itself up may say where it is");

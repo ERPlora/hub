@@ -547,10 +547,6 @@ export default {
     saved: 'Ajustes guardados',
     saveError: 'No se pudieron guardar los ajustes',
     saveRefused: {
-      demo_fiscal_identity_locked:
-        'Esto es una demo, así que factura como «{name}». Crea tu propio negocio en erplora.com para facturar con tus datos.',
-      demo_business_certificate_locked:
-        'Una demo no puede quedarse tu certificado: no remite nada de verdad. Crea tu propio negocio en erplora.com para facturar con él.',
       demo_fiscal_environment_locked:
         'Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio negocio en erplora.com para remitir de verdad.',
       business_tax_id_frozen:

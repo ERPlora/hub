@@ -88,17 +88,15 @@ impl Runtime {
     /// opinión que discrepe — el contenedor es la única fuente. Un negocio que suba un **sello de
     /// entidad** propio entra por `www10` sin tocar nada, que es justamente lo que la AEAT segrega.
     ///
-    /// **Un hub de DEMO no sube certificado** (ADR-0197 §4, hub#376). No se queda sin facturar por
-    /// ello: sin certificado propio va por la vía de la celda (`ROUTE_DELEGATED`, ADR-0320), como
-    /// cualquier otro hub que no haya subido el suyo. Lo que no puede es tener identidad fiscal
-    /// PROPIA.
+    /// **A DEMO hub uploads its certificate too** (hub#1848, amends ADR-0197 §4): every PRE hub
+    /// carries the demo flag, and that is where a business tests its own certificate. What keeps a
+    /// demo away from the real AEAT is the environment pinned to `testing`, not this door.
     pub async fn set_business_certificate(
         &self,
         pkcs12_b64: &str,
         password: &str,
         by: &str,
     ) -> Result<()> {
-        self.refuse_if_demo(DemoLock::BusinessCertificate)?;
         certificate::set(
             self.db.as_ref(),
             &self.hub_id,
@@ -117,12 +115,9 @@ impl Runtime {
         certificate::status(self.db.as_ref(), &self.hub_id).await
     }
 
-    /// Elimina el certificado **del negocio**. El delegado no se toca: no es del cliente.
-    ///
-    /// Cerrado también en una demo (hub#376): «no reemplazable» sin «no borrable» sería un
-    /// reemplazo en dos pasos.
+    /// Removes the **business** certificate. The delegated one is not touched: it is not the
+    /// customer's.
     pub async fn delete_business_certificate(&self) -> Result<()> {
-        self.refuse_if_demo(DemoLock::BusinessCertificate)?;
         certificate::delete(
             self.db.as_ref(),
             &self.hub_id,
@@ -155,67 +150,60 @@ mod tests {
     use super::*;
     use erplora_db::testutil::fresh_db;
 
-    // ── Certificado del negocio CERRADO en una demo (ADR-0197 §4 · hub#376) ────────────────
+    // ── A DEMO hub holds its own business certificate like any hub (hub#1848) ─────────────
 
-    /// 🔴 Por la puerta que la APLICA: `set_business_certificate` es lo que llama
-    /// `PUT /api/business/certificate`. Y falla ANTES de la clave maestra: la demo no llega
-    /// siquiera a intentar cifrar (`HUB_SECRETS_KEY` ni hace falta).
+    /// 🔴 Through the door that APPLIES it: `set_business_certificate` is what
+    /// `PUT /api/business/certificate` calls. A demo gets exactly the refusal a real hub gets for
+    /// the same bytes (here the missing master key, the guard next door) and never a demo closure.
     #[tokio::test]
-    async fn a_demo_hub_cannot_upload_a_business_certificate() {
-        let mut rt = Runtime::new(Box::new(fresh_db().await));
-        rt.set_demo_hub(true);
-        let err = rt
+    async fn a_demo_hub_uploads_a_business_certificate_like_a_real_hub() {
+        let real = Runtime::new(Box::new(fresh_db().await));
+        let mut demo = Runtime::new(Box::new(fresh_db().await));
+        demo.set_demo_hub(true);
+
+        let real_err = real
+            .set_business_certificate("Zm9v", "s3cret", "hub_user:1")
+            .await
+            .unwrap_err();
+        let demo_err = demo
             .set_business_certificate("Zm9v", "s3cret", "hub_user:1")
             .await
             .unwrap_err();
         assert!(
-            matches!(
-                err,
-                RuntimeError::DemoLocked {
-                    lock: DemoLock::BusinessCertificate
-                }
-            ),
-            "got {err:?}"
+            !matches!(demo_err, RuntimeError::DemoLocked { .. }),
+            "a demo admin is not refused their own certificate: {demo_err:?}"
         );
+        assert_eq!(demo_err.to_string(), real_err.to_string());
     }
 
-    /// «No reemplazable» sin «no borrable» sería un reemplazo en dos pasos: borrar y subir.
+    /// Removing it is open too: the admin who uploaded the wrong file takes it back.
     #[tokio::test]
-    async fn a_demo_hub_cannot_delete_the_business_certificate_either() {
+    async fn a_demo_hub_deletes_its_business_certificate() {
         let mut rt = Runtime::new(Box::new(fresh_db().await));
+        rt.ensure_system_tables().await.expect("system tables");
         rt.set_demo_hub(true);
-        let err = rt.delete_business_certificate().await.unwrap_err();
-        assert!(
-            matches!(
-                err,
-                RuntimeError::DemoLocked {
-                    lock: DemoLock::BusinessCertificate
-                }
-            ),
-            "got {err:?}"
-        );
+        rt.delete_business_certificate()
+            .await
+            .expect("a demo removes its own certificate like any hub");
     }
 
-    /// 🔴 La otra dirección: un hub REAL sube su `.p12` como siempre. Si esta guarda se escapase a
-    /// un hub de pago, el negocio no podría remitir a la AEAT — el peor fallo posible, y mudo.
-    /// (Aquí falla por la clave maestra ausente, que es la guarda de al lado: lo que importa es
-    /// que NO es `DemoLocked`, o sea que la puerta está abierta para él.)
+    /// 🔴 A REAL hub uploads its `.p12` as always. (It fails here on the missing master key, the
+    /// guard next door: what matters is that it is NOT `DemoLocked`.)
     #[tokio::test]
     async fn a_real_hub_uploads_its_certificate_as_always() {
         let rt = Runtime::new(Box::new(fresh_db().await));
-        assert!(!rt.is_demo_hub(), "el default de un runtime es hub normal");
+        assert!(!rt.is_demo_hub(), "a runtime defaults to a normal hub");
         let err = rt
             .set_business_certificate("Zm9v", "s3cret", "hub_user:1")
             .await
             .unwrap_err();
         assert!(
             !matches!(err, RuntimeError::DemoLocked { .. }),
-            "un hub real no puede toparse con el cierre de la demo: {err:?}"
+            "a real hub never meets a demo closure: {err:?}"
         );
     }
 
-    /// Leer el estado del certificado NO se cierra: la demo tiene que poder EXPLICAR que no tiene
-    /// uno (es media pantalla de VeriFactu). El cierre es de escritura, no un modo ciego.
+    /// A demo reads its certificate status: it is half of the VeriFactu screen.
     #[tokio::test]
     async fn a_demo_hub_still_reads_its_certificate_status() {
         let mut rt = Runtime::new(Box::new(fresh_db().await));
@@ -224,7 +212,7 @@ mod tests {
         let status = rt
             .business_certificate_status()
             .await
-            .expect("el estado del certificado se lee siempre");
+            .expect("the certificate status is always readable");
         assert_eq!(status["present"], serde_json::json!(false));
     }
 }

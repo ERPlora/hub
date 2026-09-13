@@ -130,7 +130,7 @@ async fn authorize(db: &PgAdapter, reg: &Registry, to: &str) {
         .unwrap();
     let mut s = Params::new();
     s.insert(ALLOWED_RECIPIENTS_SETTING.into(), json!(to));
-    settings::set_many(db, HUB, &s, "hub_user:admin", false)
+    settings::set_many(db, HUB, &s, "hub_user:admin")
         .await
         .unwrap();
 }
@@ -185,7 +185,7 @@ async fn a_module_without_the_notify_grant_never_reaches_the_network() {
     // Recipient allowlisted, capability NOT granted.
     let mut s = Params::new();
     s.insert(ALLOWED_RECIPIENTS_SETTING.into(), json!("cliente@x.com"));
-    settings::set_many(&db, HUB, &s, "hub_user:admin", false)
+    settings::set_many(&db, HUB, &s, "hub_user:admin")
         .await
         .unwrap();
 

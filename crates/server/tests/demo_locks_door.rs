@@ -1,24 +1,21 @@
-//! **Qué NO puede cambiar un hub de DEMO efímera**, por las puertas HTTP reales (ADR-0197 §4 —
-//! ERPlora/hub#376).
+//! **What an ephemeral DEMO hub can and cannot change**, through the real HTTP doors (ADR-0197 §4,
+//! amended by hub#1848).
 //!
-//! La demo es un hub DE VERDAD que se le entrega a un desconocido durante una hora, sin registro y
-//! sin tarjeta. Lo único que no puede hacer es actuar como el negocio de alguien: `PUT
-//! /api/settings` y `PUT /api/business/certificate` son las dos puertas por las que un admin
-//! configura precisamente eso, y en la demo el que está al otro lado es `admin` (ADR-0197 §4: los
-//! cierres son del HUB, no del rol — abrir `is_admin_role` habría dado ajustes, usuarios, API keys
-//! y módulos a cada `manager` de **cada hub real**).
+//! A demo is a REAL hub handed to a stranger for an hour, and every PRE hub carries the same flag
+//! (`HUB_DEMO`). Since hub#1848 its admin saves the business's fiscal identity and its own
+//! certificate exactly like a real hub does: blocking them left PRE unable to test the one flow a
+//! paying business needs on day one (address by parts, representation grant, own certificate).
 //!
-//! Lo que fija este fichero, y que los tests del runtime no pueden fijar:
+//! The only closure left is the one that keeps a demo away from the real AEAT: the fiscal
+//! environment stays pinned to `testing` (`demo_fiscal_environment_locked`, tested in the
+//! dispatcher, `commands.rs`).
 //!
-//!  - el **código de estado y el código estable** que ve el cliente (`409` + el sujeto del cierre),
-//!    porque es contra eso contra lo que la UI se explica;
-//!  - que los **tres cierres se distinguen** entre sí: si los tres contestaran lo mismo, dos se
-//!    podrían borrar con la suite en verde;
-//!  - que la bandera **no la pone el que llama**: ni cabecera, ni cuerpo, ni sesión. La escribe el
-//!    despliegue (`HUB_DEMO`) y el `AppState` la sella al construirse.
+//! What this file pins, and what runtime tests cannot:
 //!
-//! Y la mitad que no puede romperse: **un hub REAL configura su identidad fiscal como siempre**.
-//! Un cierre que se escapase a un hub de pago le impediría facturar, y en silencio.
+//!  - that the demo answers the identity and certificate doors **exactly like a real hub** — same
+//!    status, same code — so a demo-only refusal cannot creep back in with the suite green;
+//!  - that the flag is **not set by the caller**: no header, no body, no session. The deployment
+//!    writes it (`HUB_DEMO`) and `AppState` seals it when it is built.
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
@@ -114,9 +111,56 @@ fn error_code(body: &Value) -> String {
         .to_string()
 }
 
-/// 🔴 Identidad fiscal: **de solo lectura** en una demo, por la puerta que la escribe.
+async fn get_settings(router: &axum::Router, session: &str) -> Value {
+    let read = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/settings")
+                .header("x-hub-session", session)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    body_json(read).await
+}
+
+/// 🔴 hub#1848, the symptom as it was reported: in Settings → Business the screen sends the WHOLE
+/// form — tax id and legal name unchanged, the address by parts new — and a demo answered
+/// `409 demo_fiscal_identity_locked`, so nothing was saved and the representation grant could never
+/// get the address it asks for.
 #[tokio::test]
-async fn a_demo_refuses_to_write_the_fiscal_identity_over_http() {
+async fn a_demo_admin_saves_the_business_form_with_its_address_by_parts() {
+    let (router, admin) = fixture(true, "address-parts").await;
+
+    let response = put(
+        &router,
+        "/api/settings",
+        &admin,
+        json!({
+            "business_tax_id": erplora_runtime::settings::DEMO_BUSINESS_TAX_ID,
+            "business_legal_name": erplora_runtime::settings::DEMO_BUSINESS_LEGAL_NAME,
+            "business_street": "Calle Mayor",
+            "business_street_number": "7",
+            "business_postal_code": "28013",
+            "business_city": "Madrid",
+        }),
+    )
+    .await;
+
+    let status = response.status();
+    let body = body_json(response).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let settings = get_settings(&router, &admin).await;
+    assert_eq!(settings["business_street"], json!("Calle Mayor"));
+    assert_eq!(settings["business_city"], json!("Madrid"));
+}
+
+/// 🔴 hub#1848: the admin of a demo writes its OWN fiscal identity, through the door that writes
+/// it, and it stays written.
+#[tokio::test]
+async fn a_demo_admin_saves_the_fiscal_identity_over_http() {
     let (router, admin) = fixture(true, "identity").await;
 
     let response = put(
@@ -127,77 +171,36 @@ async fn a_demo_refuses_to_write_the_fiscal_identity_over_http() {
     )
     .await;
 
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let status = response.status();
     let body = body_json(response).await;
-    assert_eq!(
-        error_code(&body),
-        "demo_fiscal_identity_locked",
-        "el cliente tiene que poder distinguir CUÁL de los tres cierres se negó: {body}"
-    );
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let settings = get_settings(&router, &admin).await;
+    assert_eq!(settings["business_tax_id"], json!("B12345674"));
+    assert_eq!(settings["business_legal_name"], json!("Bar Manolo SL"));
+}
 
-    // Y no se escribió: la demo conserva la identidad con la que ARRANCÓ (hub#684). Antes aquí se
-    // afirmaba que seguía vacía; ahora la demo nace con la suya puesta y lo que este test fija es
-    // que el 409 no la mueve — el cierre sigue siendo un cierre, no un hueco.
-    let read = router
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/api/settings")
-                .header("x-hub-session", &admin)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let settings = body_json(read).await;
+/// 🔴 **hub#684 and hub#1848 in the same test.** The demo boots with a fiscal identity —so the
+/// checklist does not stop the visitor and their first sale issues a document— and that identity is
+/// a DEFAULT, not a lock: the admin replaces it with their own and the replacement sticks.
+#[tokio::test]
+async fn the_demo_boots_with_an_identity_and_its_admin_can_replace_it() {
+    let (router, admin) = fixture(true, "seeded").await;
+
+    // (a) The identity is there: it is what the fiscal gate of ADR-0203 reads and what the
+    //     checklist marks as done. Without it, `invoice.create_from_sale` died in the outbox.
+    let settings = get_settings(&router, &admin).await;
     assert_eq!(
         settings["business_tax_id"],
-        json!(erplora_runtime::settings::DEMO_BUSINESS_TAX_ID)
+        json!(erplora_runtime::settings::DEMO_BUSINESS_TAX_ID),
+        "a demo boots with a tax id: {settings}"
     );
     assert_eq!(
         settings["business_legal_name"],
-        json!(erplora_runtime::settings::DEMO_BUSINESS_LEGAL_NAME)
-    );
-}
-
-/// 🔴 **Las DOS mitades de hub#684, en la misma prueba.** La demo arranca con identidad fiscal —así
-/// la checklist no le pide al visitante lo único que el producto le prohíbe, y su venta llega a
-/// emitir documento— **y los tres cierres siguen puestos**. Si un día alguien "arregla" la demo
-/// abriendo el cierre en vez de sembrar el dato, este test se cae.
-#[tokio::test]
-async fn the_demo_boots_with_an_identity_and_still_refuses_to_let_anyone_change_it() {
-    let (router, admin) = fixture(true, "seeded").await;
-
-    // (a) La identidad está puesta: es lo que lee el gate fiscal de ADR-0203 y lo que la checklist
-    //     marca como hecho. Sin ella, `invoice.create_from_sale` moría en el outbox.
-    let read = router
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/api/settings")
-                .header("x-hub-session", &admin)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let settings = body_json(read).await;
-    assert!(
-        !settings["business_tax_id"]
-            .as_str()
-            .unwrap_or_default()
-            .is_empty(),
-        "una demo arranca con NIF: {settings}"
-    );
-    assert!(
-        !settings["business_legal_name"]
-            .as_str()
-            .unwrap_or_default()
-            .is_empty(),
-        "…y con razón social: {settings}"
+        json!(erplora_runtime::settings::DEMO_BUSINESS_LEGAL_NAME),
+        "…and with a legal name: {settings}"
     );
 
-    // (b) …y sigue siendo de solo lectura. Sembrar el dato NO es abrir la puerta.
+    // (b) …and the admin replaces it with their own.
     let response = put(
         &router,
         "/api/settings",
@@ -205,26 +208,9 @@ async fn the_demo_boots_with_an_identity_and_still_refuses_to_let_anyone_change_
         json!({ "business_tax_id": "B12345674" }),
     )
     .await;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
-    assert_eq!(
-        error_code(&body_json(response).await),
-        "demo_fiscal_identity_locked"
-    );
-
-    // (c) …y el certificado propio sigue cerrado. Es uno de los dos cierres que de verdad impiden
-    //     que una venta de la demo llegue a la AEAT real, y no se ha tocado.
-    let response = put(
-        &router,
-        "/api/business/certificate",
-        &admin,
-        json!({ "pkcs12_b64": "Zm9v", "password": "x" }),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
-    assert_eq!(
-        error_code(&body_json(response).await),
-        "demo_business_certificate_locked"
-    );
+    assert_eq!(response.status(), StatusCode::OK);
+    let settings = get_settings(&router, &admin).await;
+    assert_eq!(settings["business_tax_id"], json!("B12345674"));
 }
 
 /// 🔴 La otra dirección de hub#684: **un hub REAL nace con la identidad VACÍA**. Es su ⛔ pendiente
@@ -249,80 +235,52 @@ async fn a_real_hub_is_never_handed_a_fiscal_identity_at_boot() {
     assert_eq!(settings["business_legal_name"], json!(""));
 }
 
-/// 🔴 Certificado del negocio: ni se sube ni se reemplaza en una demo.
-#[tokio::test]
-async fn a_demo_refuses_to_take_a_business_certificate_over_http() {
-    let (router, admin) = fixture(true, "cert").await;
+/// Status and stable error code of a response: what a client can tell apart.
+async fn outcome(response: Response) -> (StatusCode, String) {
+    let status = response.status();
+    (status, error_code(&body_json(response).await))
+}
 
-    let response = put(
-        &router,
-        "/api/business/certificate",
-        &admin,
-        json!({ "pkcs12_b64": "Zm9v", "password": "s3cret" }),
+/// 🔴 hub#1848: the business certificate door answers a demo **exactly like a real hub**, uploading
+/// and removing. The payload is not a valid PKCS#12, so both hubs refuse it — for the same reason,
+/// which is the point: whatever a real hub says about a certificate, a demo says too, and there is
+/// no `demo_business_certificate_locked` left to say.
+#[tokio::test]
+async fn a_demo_answers_the_certificate_door_exactly_like_a_real_hub() {
+    let (demo, demo_admin) = fixture(true, "cert-demo").await;
+    let (real, real_admin) = fixture(false, "cert-real").await;
+    let upload = json!({ "pkcs12_b64": "Zm9v", "password": "s3cret" });
+
+    let demo_upload = outcome(
+        put(
+            &demo,
+            "/api/business/certificate",
+            &demo_admin,
+            upload.clone(),
+        )
+        .await,
     )
     .await;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
-    let body = body_json(response).await;
+    let real_upload =
+        outcome(put(&real, "/api/business/certificate", &real_admin, upload).await).await;
+    assert_ne!(demo_upload.1, "demo_business_certificate_locked");
     assert_eq!(
-        error_code(&body),
-        "demo_business_certificate_locked",
-        "{body}"
+        demo_upload, real_upload,
+        "upload: a demo is refused only what a real hub is"
     );
 
-    // Borrar tampoco: si no, reemplazar sería borrar y volver a subir.
-    let response = delete(&router, "/api/business/certificate", &admin).await;
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let demo_delete = outcome(delete(&demo, "/api/business/certificate", &demo_admin).await).await;
+    let real_delete = outcome(delete(&real, "/api/business/certificate", &real_admin).await).await;
+    assert_ne!(demo_delete.1, "demo_business_certificate_locked");
     assert_eq!(
-        error_code(&body_json(response).await),
-        "demo_business_certificate_locked"
+        demo_delete, real_delete,
+        "delete: a demo is refused only what a real hub is"
     );
 }
 
-/// Los tres cierres tienen **códigos distintos**. Es lo que impide que borrar uno pase inadvertido
-/// porque otro contesta lo mismo — y lo que le permite a la UI decir qué pasa en vez de «409».
+/// The demo **is still a hub**: everything else is configured as usual too.
 #[tokio::test]
-async fn the_three_locks_answer_with_three_different_codes() {
-    let (router, admin) = fixture(true, "codes").await;
-
-    let identity = error_code(
-        &body_json(
-            put(
-                &router,
-                "/api/settings",
-                &admin,
-                json!({ "business_tax_id": "B1" }),
-            )
-            .await,
-        )
-        .await,
-    );
-    let certificate = error_code(
-        &body_json(
-            put(
-                &router,
-                "/api/business/certificate",
-                &admin,
-                json!({ "pkcs12_b64": "Zm9v", "password": "x" }),
-            )
-            .await,
-        )
-        .await,
-    );
-
-    assert_ne!(identity, certificate, "dos cierres, dos respuestas");
-    assert_eq!(identity, "demo_fiscal_identity_locked");
-    assert_eq!(certificate, "demo_business_certificate_locked");
-    // El tercero (entorno fiscal) vive en el dispatcher y se prueba en `commands.rs`; su código
-    // completa el trío y aquí solo se afirma que no colisiona con estos dos.
-    for taken in [identity.as_str(), certificate.as_str()] {
-        assert_ne!(taken, "demo_fiscal_environment_locked");
-    }
-}
-
-/// La demo **sigue siendo un hub**: todo lo que no es identidad fiscal se configura igual. El
-/// cierre no es un modo de solo lectura — si lo fuera, el visitante no podría ni cambiar el idioma.
-#[tokio::test]
-async fn a_demo_configures_everything_that_is_not_the_fiscal_identity() {
+async fn a_demo_configures_everything_else_as_usual() {
     let (router, admin) = fixture(true, "usable").await;
     let response = put(
         &router,

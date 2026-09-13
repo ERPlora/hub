@@ -3573,7 +3573,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!("B12345674"));
         updates.insert("business_legal_name".into(), json!("ACME SL"));
-        crate::settings::set_many(db, hub_id, &updates, "hub_user:1", false)
+        crate::settings::set_many(db, hub_id, &updates, "hub_user:1")
             .await
             .unwrap();
     }
