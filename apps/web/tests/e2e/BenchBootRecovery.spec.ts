@@ -19,7 +19,7 @@
 // `route.abort()` has no code for a network change; both are in `TRANSIENT_TRANSPORT_ERRORS` and
 // take the same path. The real code is pinned by name in `tests/bench-boot.test.ts`.
 
-import { BOOT_RELOAD_LIMIT, expect, test } from '../bench-boot';
+import { BOOT_RELOAD_LIMIT, bootReloadsOf, expect, test } from '../bench-boot';
 
 test.describe('bench boot recovery (hub#1806)', () => {
   test('a network change that kills the module graph costs a reload, not a red build', async ({
@@ -91,8 +91,48 @@ test.describe('bench boot recovery (hub#1806)', () => {
 
     await page.goto('/settings#data');
 
-    // Exactly one attempt: no reload was spent on it.
-    expect(failed, 'a failure that is not a lost connection must not be reloaded away').toBe(1);
+    // hub#1839: «no reload was spent on IT», not «no reload at all». A genuine accident of the
+    // runner inside this navigation makes the bench reload — that is its job — and the next
+    // request for `main.ts` fails again, so a bare `toBe(1)` went red on a PR that touched none of
+    // this. The bench now keeps its books: every reload it spent, and on which codes.
+    const reloads = bootReloadsOf(page);
+    expect(
+      reloads.flatMap((reload) => reload.codes),
+      'a failure that is not a lost connection must not be reloaded away',
+    ).not.toContain('net::ERR_FAILED');
+    expect(
+      failed,
+      'every extra attempt at the bootstrap has to be a reload the bench accounted for',
+    ).toBe(1 + reloads.length);
+    await expect(page.locator('#app')).toBeEmpty();
+  });
+
+  test('a real accident during our own failure is recovered, and our failure still stays red', async ({
+    page,
+  }) => {
+    // hub#1839, reproduced instead of waited for: the runner's network drops ONE request while the
+    // bootstrap is failing for a reason of ours. The bench reloads for the accident; it does not
+    // reload for `ERR_FAILED`; and the screen stays blank, because our defect is still there.
+    let failed = 0;
+    let accidents = 0;
+
+    await page.route('**/src/main.ts', async (route) => {
+      failed += 1;
+      await route.abort('failed');
+    });
+    await page.route('**/@vite/client', async (route) => {
+      accidents += 1;
+      if (accidents === 1) return route.abort('connectionreset');
+      return route.continue();
+    });
+
+    await page.goto('/settings#data');
+
+    const reloads = bootReloadsOf(page);
+    expect(reloads.length, 'the accident was not recovered').toBeGreaterThanOrEqual(1);
+    expect(reloads.flatMap((reload) => reload.codes)).toContain('net::ERR_CONNECTION_RESET');
+    expect(reloads.flatMap((reload) => reload.codes)).not.toContain('net::ERR_FAILED');
+    expect(failed).toBe(1 + reloads.length);
     await expect(page.locator('#app')).toBeEmpty();
   });
 
