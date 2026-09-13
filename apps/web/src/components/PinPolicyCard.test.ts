@@ -139,6 +139,29 @@ describe('reading', () => {
   });
 });
 
+// hub#1794 — the digits row kept its title at no width: the segment sat in the item's `end` slot
+// and took the whole row (label 0 × 265 px at 390, 952 and 1440). A choice of several options goes
+// on its own line under its title, like every settings screen does; a control on the right is for a
+// switch. Structural on purpose: happy-dom cannot measure, but it can tell where the control lives.
+describe('the PIN digits row keeps its title (hub#1794)', () => {
+  it('puts the digits choice on its own line under the title, not squeezed into the title row', async () => {
+    const wrapper = mountCard(); // pinpad on: the row is shown
+    await flushPromises();
+
+    const title = wrapper.find('[data-testid="pin-policy-length-title"]');
+    const choice = wrapper.find('[data-testid="pin-policy-length"]');
+    expect(title.exists(), 'the row has a title of its own').toBe(true);
+    expect(choice.exists()).toBe(true);
+    expect(choice.attributes('slot'), 'a segment in `end` swallows the title').toBeUndefined();
+
+    const itemOf = (el: Element) => el.closest('ion-item');
+    expect(itemOf(title.element)).not.toBeNull();
+    expect(itemOf(choice.element)).not.toBe(itemOf(title.element));
+    // And the title reads BEFORE the choice.
+    expect(title.element.compareDocumentPosition(choice.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 describe('writing', () => {
   it('turning the pinpad OFF sends `never`, and only the dial', async () => {
     vi.mocked(updateHubSettings).mockResolvedValue({ pin_policy: 'never' } as never);

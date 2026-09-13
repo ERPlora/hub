@@ -274,6 +274,8 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'pin-policy-error',
       'pin-policy-idle',
       'pin-policy-length',
+      // hub#1794: the title of the digits row, now on its own line above the choice.
+      'pin-policy-length-title',
       'pin-policy-pinpad',
     ],
   },
