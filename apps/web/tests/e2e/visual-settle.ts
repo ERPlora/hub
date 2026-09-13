@@ -62,6 +62,10 @@ export function everyOnScreenIconIsPainted(): boolean {
  * which the old ratio budget swallowed and the 20 px budget of hub#1823 reports, correctly, as a
  * screen that is not the one in the baseline.
  *
+ * hub#1831 fixed that for people: the button no longer auto-hides (`AppTopbar.vue`) and the
+ * stylesheet hides it where the menu is pinned, so it is there from the first frame. This predicate
+ * stays as the bench's guard for the invariant below, which still holds.
+ *
  * The invariant is EXACTLY ONE door, which is what makes one predicate work at all three widths:
  * at 1440 the split pane shows the drawer inline (`when="lg"` in `App.vue`) and the button stays
  * hidden for good; below that the pane is closed and the hamburger has to be there. Waiting for
