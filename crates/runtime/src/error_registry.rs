@@ -438,11 +438,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // each of the four has its own translation (es/en).
         E::InvalidTaxId { code, .. } => code,
         // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
-        // `demo_locked` could not tell which of the three doors refused.
+        // `demo_locked` could not tell which door refused.
         E::DemoLocked { lock } => lock.as_str(),
-        // hub#554: its own code, NOT a flavour of `demo_fiscal_identity_locked`. Two guards on the
-        // same key that mean opposite things ("this hub is nobody's" vs "this hub already emitted
-        // and cannot change taxpayer"), and only one of them has a way out.
+        // hub#554: its own code — "this hub already emitted and cannot change taxpayer", on every
+        // hub, demo or not.
         E::BusinessTaxIdFrozen { .. } => "business_tax_id_frozen",
         // hub#69: its own code, not a flavour of the tax-id freeze. Two different keys frozen by
         // two different facts, and the screen has to name the one that refused.
@@ -763,64 +762,25 @@ mod tests {
     // el único sitio que los mira estuviera en `erplora-server`, este crate podría cambiarlos —o
     // vaciarlos— con su propia suite en verde.
 
-    /// El código de cada cierre, LITERAL. Un valor distinto es una regresión de contrato, no un
-    /// detalle interno: el 409 que llega al navegador deja de significar lo que la UI espera.
+    /// The code of each lock, LITERAL. A different value is a contract regression, not an internal
+    /// detail: the 409 that reaches the browser stops meaning what the UI expects.
     #[test]
     fn each_demo_lock_carries_its_own_stable_code() {
         assert_eq!(
             DemoLock::FiscalEnvironment.as_str(),
             "demo_fiscal_environment_locked"
         );
-        assert_eq!(
-            DemoLock::BusinessCertificate.as_str(),
-            "demo_business_certificate_locked"
-        );
-        assert_eq!(
-            DemoLock::FiscalIdentity.as_str(),
-            "demo_fiscal_identity_locked"
-        );
     }
 
-    /// Y los tres son DISTINTOS entre sí y no vacíos. Es lo que impide que borrar uno de los tres
-    /// cierres pase inadvertido porque otro contesta lo mismo — y un código vacío sería un 409 que
-    /// no le dice nada a nadie.
-    #[test]
-    fn the_three_demo_locks_never_collapse_into_one_answer() {
-        let codes = [
-            DemoLock::FiscalEnvironment.as_str(),
-            DemoLock::BusinessCertificate.as_str(),
-            DemoLock::FiscalIdentity.as_str(),
-        ];
-        for code in codes {
-            assert!(
-                !code.trim().is_empty(),
-                "un cierre sin código es un 409 mudo"
-            );
-        }
-        let mut unique = codes.to_vec();
-        unique.sort_unstable();
-        unique.dedup();
-        assert_eq!(
-            unique.len(),
-            3,
-            "dos cierres con la misma respuesta: {codes:?}"
-        );
-    }
-
-    /// `error_code_of` publica el SUJETO del cierre, no un `demo_locked` plano: es lo que viaja al
-    /// registro de errores y a la respuesta HTTP.
+    /// `error_code_of` publishes the SUBJECT of the lock, not a flat `demo_locked`: it is what
+    /// travels to the error registry and the HTTP response.
     #[test]
     fn the_error_code_of_a_demo_lock_is_its_subject() {
-        for lock in [
-            DemoLock::FiscalEnvironment,
-            DemoLock::BusinessCertificate,
-            DemoLock::FiscalIdentity,
-        ] {
-            let err = RuntimeError::DemoLocked { lock };
-            assert_eq!(error_code_of(&err), lock.as_str());
-            // Y es cosa esperable del estado del hub, nunca un bug del Hub que abra una issue.
-            assert_eq!(severity_of(&err), severity::USER);
-        }
+        let lock = DemoLock::FiscalEnvironment;
+        let err = RuntimeError::DemoLocked { lock };
+        assert_eq!(error_code_of(&err), lock.as_str());
+        // An expected state of the hub, never a Hub bug that opens an issue.
+        assert_eq!(severity_of(&err), severity::USER);
     }
 
     // ── El NIF CONGELADO de un hub que ya emitió (hub#554) ─────────────────────────────────
@@ -836,9 +796,6 @@ mod tests {
         };
         assert_eq!(error_code_of(&err), "business_tax_id_frozen");
         assert_eq!(severity_of(&err), severity::USER);
-        // Y NO es el cierre de la demo: dos guardas sobre la misma clave que significan cosas
-        // opuestas, y solo una de las dos tiene salida.
-        assert_ne!(error_code_of(&err), DemoLock::FiscalIdentity.as_str());
     }
 
     /// hub#1088: the refusal of an invalid tax id carries its own code PER FAILURE KIND — the
@@ -908,11 +865,7 @@ mod tests {
     /// que es la única acción que le queda al que se topa con el cierre.
     #[test]
     fn a_demo_lock_explains_itself_and_names_the_way_out() {
-        for lock in [
-            DemoLock::FiscalEnvironment,
-            DemoLock::BusinessCertificate,
-            DemoLock::FiscalIdentity,
-        ] {
+        for lock in [DemoLock::FiscalEnvironment] {
             let message = RuntimeError::DemoLocked { lock }.to_string();
             assert!(
                 message.contains("demo hub"),

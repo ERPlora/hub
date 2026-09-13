@@ -205,7 +205,7 @@ export async function getHubSettings(): Promise<HubSettings> {
  * guardar los ajustes» plano: la única explicación que el producto tenía no llegaba a nadie.
  */
 export class HubSettingsError extends Error {
-  /** Código estable del runtime (`demo_fiscal_identity_locked`, `business_tax_id_frozen`…). */
+  /** Stable runtime code (`business_tax_id_frozen`, `hub_country_frozen`…). */
   readonly code: string;
   /** Estado HTTP, para quien necesite distinguir un 409 de un 403 sin mirar el código. */
   readonly status: number;

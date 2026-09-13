@@ -851,10 +851,9 @@ async function persistHubSettings(
 /**
  * Lo que se lee cuando el runtime dice que NO (hub#684).
  *
- * El rechazo viaja con un código ESTABLE (`demo_fiscal_identity_locked`…) y ese código tiene su
- * cadena traducida; el `message` del runtime va en inglés y es para el log, no para la pantalla. Un
- * código sin traducción cae en el genérico de siempre, así que un motivo nuevo nunca deja el toast
- * en blanco — se lee peor, pero se lee.
+ * The refusal travels with a STABLE code (`business_tax_id_frozen`…) and that code has its translated
+ * string; the runtime's `message` is English and meant for the log, not the screen. A code without a
+ * translation falls back to the usual generic one, so a new reason never leaves the toast blank.
  */
 function refusalMessage(error: unknown): string {
   const code = (error as { code?: string } | null)?.code;

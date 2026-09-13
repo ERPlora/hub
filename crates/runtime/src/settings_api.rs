@@ -29,14 +29,7 @@ impl Runtime {
         updates: &serde_json::Map<String, Json>,
         updated_by: &str,
     ) -> Result<Json> {
-        settings::set_many(
-            self.db.as_ref(),
-            &self.hub_id,
-            updates,
-            updated_by,
-            self.registry.demo_hub,
-        )
-        .await
+        settings::set_many(self.db.as_ref(), &self.hub_id, updates, updated_by).await
     }
 
     /// Capabilities DECLARADAS por un módulo con su estado de grant (ADR-0079). Para
