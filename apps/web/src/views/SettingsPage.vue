@@ -239,7 +239,7 @@
       </template>
 
       <!-- ── Tab: Negocio (identidad fiscal genérica) ── -->
-      <template v-else-if="tab === 'tax'">
+      <template v-else-if="tab === 'business'">
         <!-- Identidad de NEGOCIO GLOBAL (fuente única país-agnóstica, ADR-0061): identificador fiscal
              (NIF/CIF/VAT…) + razón social + dirección. La leen invoice (emisor) y los módulos fiscales
              por país. Lo específico de país (IVA/IGIC, e-factura) vive en módulos, no aquí. Solo admin. -->
@@ -271,17 +271,63 @@
               v-model="businessLegalName"
               placeholder="Mi Empresa SL"
             />
-            <ion-textarea
-              class="mt-2"
-              mode="md"
-              fill="outline"
-              label-placement="floating"
-              :label="t('settings.fiscalAddress')"
-              data-testid="settings-business-address"
-              :readonly="!isAdmin"
-              auto-grow
-              v-model="businessAddress"
-            />
+            <!-- El domicilio fiscal EN PARTES (hub#1846): los papeles oficiales lo piden partido, y
+                 sin partes que leer una app lo volvía a pedir — un domicilio tecleado dos veces
+                 acaba siendo dos. La línea que imprimen facturas y tiques la compone el runtime. -->
+            <div class="business-address-row mt-2">
+              <ion-input
+                class="business-address-street"
+                mode="md"
+                fill="outline"
+                label-placement="floating"
+                :label="t('settings.businessStreet')"
+                data-testid="settings-business-street"
+                :readonly="!isAdmin"
+                v-model="businessStreet"
+              />
+              <ion-input
+                class="business-address-number"
+                mode="md"
+                fill="outline"
+                label-placement="floating"
+                :label="t('settings.businessStreetNumber')"
+                data-testid="settings-business-street-number"
+                :readonly="!isAdmin"
+                v-model="businessStreetNumber"
+              />
+            </div>
+            <div class="business-address-row business-address-row--postal mt-2">
+              <ion-input
+                class="business-address-number"
+                mode="md"
+                fill="outline"
+                label-placement="floating"
+                :label="t('settings.businessPostalCode')"
+                data-testid="settings-business-postal-code"
+                :readonly="!isAdmin"
+                v-model="businessPostalCode"
+              />
+              <ion-input
+                class="business-address-street"
+                mode="md"
+                fill="outline"
+                label-placement="floating"
+                :label="t('settings.businessCity')"
+                data-testid="settings-business-city"
+                :readonly="!isAdmin"
+                v-model="businessCity"
+              />
+            </div>
+            <!-- Un negocio que escribió su dirección en UNA línea antes de las partes no la pierde:
+                 con los campos vacíos, la pantalla diría «no tienes dirección». Se enseña hasta que
+                 rellene las partes. -->
+            <ion-note
+              v-if="legacyAddress"
+              class="business-address-legacy mt-1"
+              data-testid="settings-business-address-legacy"
+            >
+              {{ t('settings.businessAddressLegacy', { address: legacyAddress }) }}
+            </ion-note>
             <!-- ADR-0201 (7/11): the identity is written ONCE here and the copy goes UP. The
                  runtime makes the call (the machine token never reaches this webview). -->
             <ion-item lines="none" class="mt-2">
@@ -312,222 +358,6 @@
           {{ t('settings.saveChanges') }}
         </ion-button>
 
-        <!-- 🔴 UNA pregunta, dos respuestas EXCLUYENTES (ADR-0320 §1 — hub#1314): o firma y remite
-             el propio obligado con su `.p12`, o lo hace ERPlora en su nombre con el Sello y para eso
-             firma el Anexo I. Nunca las dos. Apiladas como dos tarjetas se leían como dos cosas que
-             rellenar, y a quien ya tenía su certificado subido el otorgamiento le decía «no puedes
-             pasar a producción hasta que lo firmes» — un muro delante de un papel que la AEAT no le
-             pide y que ERPlora nunca usaría, porque su ruta es `direct`.
-             La vía NO es un ajuste nuevo que se guarde: la dicta el slot activo del certificado
-             (`transmission_route`, del mismo `route_of` con el que decide `go_live`), y cambiar de
-             pestaña solo cambia lo que se enseña. Es el patrón de Holded/Sage/Quipu: colaborador
-             social por defecto, certificado propio como opción. -->
-        <ion-card class="mt-3">
-          <ion-card-content>
-            <ion-label>
-              <h2>{{ t('settings.fiscalRouteTitle') }}</h2>
-              <p>{{ t('settings.fiscalRouteLead') }}</p>
-            </ion-label>
-
-            <!-- Segmento de ELECCIÓN, no tabbar de navegación: nada de `.ok-tabbar`, que es la
-                 barra de pestañas del footer y la cablea `bindTabbar()`, no el consumidor. -->
-            <ion-segment
-              class="fiscal-route-segment mt-2"
-              data-testid="settings-fiscal-route-segment"
-              :value="fiscalRoute"
-              @ion-change="onFiscalRouteChange($event)"
-            >
-              <ion-segment-button value="delegated" data-testid="settings-fiscal-route-delegated">
-                <ion-label>{{ t('settings.fiscalRouteDelegated') }}</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="own" data-testid="settings-fiscal-route-own">
-                <ion-label>{{ t('settings.fiscalRouteOwn') }}</ion-label>
-              </ion-segment-button>
-            </ion-segment>
-
-            <!-- ── Vía DELEGADA: el otorgamiento (hub#817), y nada del `.p12` ───────────────── -->
-            <div v-if="fiscalRoute === 'delegated'" class="fiscal-grant mt-3">
-              <ion-label>
-                <h3>{{ t('settings.grantTitle') }}</h3>
-                <p>{{ t('settings.grantDesc') }}</p>
-              </ion-label>
-              <RepresentationGrantPanel
-                class="mt-2"
-                :obligado-nif="businessTaxId"
-                :obligado-name="businessLegalName"
-                :obligado-address="businessAddress"
-              />
-            </div>
-
-            <!-- ── Vía PROPIA: el `.p12` del negocio, y ningún otorgamiento que firmar ──────── -->
-            <div v-else class="fiscal-certificate mt-3">
-              <ion-label>
-                <h3>{{ t('settings.certTitle') }}</h3>
-                <p>{{ t('settings.certDesc') }}</p>
-              </ion-label>
-              <ion-note class="fiscal-route-hint">{{ t('settings.fiscalRouteOwnHint') }}</ion-note>
-
-              <ion-item lines="none" class="mt-2">
-                <HubIcon
-                  slot="start"
-                  :name="cert.present ? 'shield-checkmark-outline' : 'shield-outline'"
-                />
-                <ion-label>
-                  <p v-if="cert.present">
-                    {{ t('settings.certPresent', { date: certUploadedLabel }) }}
-                  </p>
-                  <p v-else>{{ t('settings.certAbsent') }}</p>
-                  <p v-if="cert.present && cert.subject">{{ cert.subject }}</p>
-                </ion-label>
-              </ion-item>
-
-              <!-- Selector de fichero oculto disparado por un ion-button (patrón CSP-safe). -->
-              <input
-                ref="certFileInput"
-                data-testid="settings-cert-file"
-                type="file"
-                accept=".p12,.pfx"
-                class="cert-file-input"
-                @change="onCertFileChange"
-              />
-
-              <ion-button
-                expand="block"
-                fill="outline"
-                class="mt-2"
-                data-testid="settings-cert-choose"
-                :disabled="!isAdmin"
-                @click="triggerCertFilePicker"
-              >
-                <HubIcon slot="start" name="document-attach-outline" />
-                {{ certFileName || t('settings.certChooseFile') }}
-              </ion-button>
-
-              <ion-input
-                class="mt-2"
-                type="password"
-                mode="md"
-                fill="outline"
-                label-placement="floating"
-                :label="t('settings.certPassword')"
-                data-testid="settings-cert-password"
-                :disabled="!isAdmin"
-                v-model="certPassword"
-              />
-
-              <ion-button
-                expand="block"
-                class="mt-3"
-                data-testid="settings-cert-upload"
-                :disabled="!isAdmin || certBusy"
-                @click="uploadCert"
-              >
-                <HubIcon slot="start" name="cloud-upload-outline" />
-                {{ t('settings.certUpload') }}
-              </ion-button>
-
-              <ion-button
-                v-if="cert.present"
-                expand="block"
-                color="danger"
-                fill="outline"
-                class="mt-2"
-                data-testid="settings-cert-delete"
-                :disabled="!isAdmin || certBusy"
-                @click="removeCert"
-              >
-                <HubIcon slot="start" name="trash-outline" />
-                {{ t('settings.certDelete') }}
-              </ion-button>
-            </div>
-          </ion-card-content>
-        </ion-card>
-
-        <!-- The responsible declaration INSIDE the product (art. 13.2 RRSIF — hub#528): the rule
-             requires it to appear «de modo visible en el propio sistema informático en cada una de
-             sus versiones». The public half (the erplora.com archive, handed to the customer and
-             the reseller at purchase) already existed; this is the one the business shows from ITS
-             OWN till when asked. It goes last in this tab, after the fiscal identity, the
-             certificate and the grant: those are the four things an inspection looks at, and this
-             is the only one that is not filled in — only read.
-             The data comes from `GET /api/system/declaration`, which projects the SAME
-             `SistemaInformatico` block that travels in every record. Never constants: a screen
-             with a hand-copied identity looks the same as this one until the day they diverge, and
-             then the till certifies one thing and the tax agency receives another. -->
-        <ion-card class="mt-3 responsible-declaration">
-          <ion-card-content>
-            <ion-label>
-              <h2>{{ t('settings.declarationTitle') }}</h2>
-              <p>{{ t('settings.declarationDesc') }}</p>
-            </ion-label>
-
-            <p v-if="declarationError" class="responsible-declaration-error mt-2" data-testid="settings-declaration-error">
-              {{ t('settings.declarationError') }}
-            </p>
-
-            <template v-else-if="declaration">
-              <!-- The link and the name of the text it points at, as ONE unit (hub#1510): art.
-                   13.3 RRSIF lets several declarations coexist — one per range of versions — so
-                   «read the declaration» on its own does not say WHICH one an inspector is about
-                   to open. Shown together, the panel can be checked against the text without
-                   following the URL and comparing folder names. Absent when the control plane
-                   named none: the link then falls back to the archive root, which has no version,
-                   and an empty label would read as «this declaration has no version». -->
-              <div class="responsible-declaration-ref mt-2">
-                <a
-                  class="responsible-declaration-link"
-                  data-testid="settings-declaration-link"
-                  :href="declaration.declarationUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {{ t('settings.declarationRead') }}
-                </a>
-                <span v-if="declaration.declarationVersion" class="responsible-declaration-version">
-                  {{ t('settings.declarationTextVersion') }}
-                  <strong>{{ declaration.declarationVersion }}</strong>
-                </span>
-              </div>
-
-              <h3 class="text-base font-semibold mt-4 mb-1">
-                {{ t('settings.declarationDataTitle') }}
-              </h3>
-              <!-- Without the manufacturer's facts there is no block to show, and the gap is not
-                   filled: the fiscal engine does not build the envelope in that state either. What
-                   this hub knows about itself (version and installation) is still shown. -->
-              <p
-                v-if="!declaration.sistemaInformatico"
-                class="responsible-declaration-pending mt-1"
-                data-testid="settings-declaration-pending"
-              >
-                {{ t('settings.declarationPending') }}
-              </p>
-              <ion-list lines="none">
-                <ion-item
-                  v-for="row in declarationRows"
-                  :key="row.field"
-                  class="responsible-declaration-field"
-                >
-                  <!-- Label → VALUE → element name, stacked in one column. The value does NOT go
-                       in `slot="end"`: the longest one is a 36-character UUID and at 390 px it sat
-                       on top of the element name, which wraps too. Stacked, it reads the same at
-                       the three widths and the value being shown stays whole. -->
-                  <ion-label>
-                    <h2>{{ row.label }}</h2>
-                    <p class="responsible-declaration-value">{{ row.value }}</p>
-                    <!-- The LITERAL name of the invoicing record element: it is what an inspection
-                         asks for, and it is not translated. -->
-                    <p class="responsible-declaration-element">{{ row.field }}</p>
-                  </ion-label>
-                </ion-item>
-              </ion-list>
-            </template>
-
-            <div v-else class="flex justify-center py-4">
-              <ion-spinner name="dots" />
-            </div>
-          </ion-card-content>
-        </ion-card>
       </template>
 
       <!-- ── Tab: Tickets ── -->
@@ -680,9 +510,9 @@
             <HubIcon name="business-outline" />
             <ion-label>{{ t('settings.tabHub') }}</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="tax" data-testid="settings-tab-tax">
+          <ion-segment-button value="business" data-testid="settings-tab-business">
             <HubIcon name="wallet-outline" />
-            <ion-label>{{ t('settings.tabTax') }}</ion-label>
+            <ion-label>{{ t('settings.tabBusiness') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tickets" data-testid="settings-tab-tickets">
             <HubIcon name="ticket-outline" />
@@ -710,14 +540,6 @@ import { isTauri } from '../lib/device';
 // hub#761: la plantilla del tique la configura el módulo `printing`; el shell solo resuelve a
 // dónde llevar, y si la app falta lo dice en vez de enseñar un botón mudo.
 import { receiptTemplateTarget } from '../lib/receipt-template';
-// hub#528 (art. 13.2 RRSIF): the responsible declaration of the installed version, read from the
-// runtime — which projects the same `SistemaInformatico` block that travels in every record.
-import {
-  DECLARATION_FIELDS,
-  fetchResponsibleDeclaration,
-  type DeclarationField,
-  type SystemDeclaration,
-} from '../lib/responsible-declaration';
 import { moduleNav } from '../lib/nav';
 // hub#1174: la consecuencia de un permiso denegado se nombra UNA vez, en el catálogo de
 // capabilities, y esta pantalla solo la traduce — nunca la escribe.
@@ -739,7 +561,6 @@ import {
   IonToggle,
   IonButton,
   IonInput,
-  IonTextarea,
   IonSpinner,
   IonListHeader,
 } from '@ionic/vue';
@@ -749,7 +570,6 @@ import DataPanel from '../components/DataPanel.vue';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
 import DevicesCard from '../components/DevicesCard.vue';
 import PinPolicyCard from '../components/PinPolicyCard.vue';
-import RepresentationGrantPanel from '../components/RepresentationGrantPanel.vue';
 import { bootHubLanguage, availableLocales, type Locale } from '../i18n';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';
@@ -772,17 +592,11 @@ import {
   listInstalledModules,
   getModuleCapabilities,
   putModuleCapabilities,
-  getBusinessCertificate,
   publishFiscalIdentity,
-  putBusinessCertificate,
-  deleteBusinessCertificate,
   refreshHubTimezone,
   type ModuleCapability,
-  type BusinessCertificate,
-  type FiscalTransmissionRoute,
 } from '../lib/runtime';
 import { zoneClock, zoneOptions } from '../lib/timezone';
-import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te } = useI18n();
 
@@ -905,7 +719,10 @@ watch(hubSettings, (s) => {
   hubTimezoneSetting.value = s.timezone ?? 'auto';
   businessTaxId.value = s.business_tax_id;
   businessLegalName.value = s.business_legal_name;
-  businessAddress.value = s.business_address;
+  businessStreet.value = s.business_street;
+  businessStreetNumber.value = s.business_street_number;
+  businessPostalCode.value = s.business_postal_code;
+  businessCity.value = s.business_city;
 });
 
 // El reloj de las opciones de zona horaria avanza mientras Ajustes está abierta (hub#1154), y se
@@ -951,11 +768,24 @@ async function onAutostartToggle(e: Event): Promise<void> {
 
 // ── Estado: Negocio (identidad fiscal genérica, server-side /api/settings — ADR-0061) ──
 // FUENTE ÚNICA país-agnóstica que usan invoice (emisor) y los módulos fiscales por país. Se siembra
-// de la cache y se sincroniza con el watch de abajo. (IVA/régimen/VeriFactu salieron del core: el
-// Hub es internacional → viven en el módulo `taxes` y en los módulos de compliance por país.)
+// de la cache y se sincroniza con el watch de abajo. Los impuestos, el régimen y el cumplimiento
+// fiscal salieron del core: el Hub es internacional, así que viven en el módulo `taxes` y en el
+// módulo de cumplimiento de cada país.
 const businessTaxId = ref<string>(hubSettings.value?.business_tax_id ?? '');
 const businessLegalName = ref<string>(hubSettings.value?.business_legal_name ?? '');
-const businessAddress = ref<string>(hubSettings.value?.business_address ?? '');
+const businessStreet = ref<string>(hubSettings.value?.business_street ?? '');
+const businessStreetNumber = ref<string>(hubSettings.value?.business_street_number ?? '');
+const businessPostalCode = ref<string>(hubSettings.value?.business_postal_code ?? '');
+const businessCity = ref<string>(hubSettings.value?.business_city ?? '');
+
+/** La dirección en una línea de antes de hub#1846, mientras las partes sigan vacías. `''` = nada. */
+const legacyAddress = computed<string>(() => {
+  const s = hubSettings.value;
+  if (!s) return '';
+  const hasParts = [s.business_street, s.business_street_number, s.business_postal_code, s.business_city]
+    .some((part) => (part ?? '').trim());
+  return hasParts ? '' : (s.business_address ?? '').trim();
+});
 
 // ADR-0201 (7/11): «usar estos datos también para mi factura de ERPlora». No es un ajuste que se
 // guarde: es una ACCIÓN puntual (sube una copia de la identidad al SaaS, que crea/actualiza el
@@ -1021,10 +851,9 @@ async function persistHubSettings(
 /**
  * Lo que se lee cuando el runtime dice que NO (hub#684).
  *
- * El rechazo viaja con un código ESTABLE (`demo_fiscal_identity_locked`…) y ese código tiene su
- * cadena traducida; el `message` del runtime va en inglés y es para el log, no para la pantalla. Un
- * código sin traducción cae en el genérico de siempre, así que un motivo nuevo nunca deja el toast
- * en blanco — se lee peor, pero se lee.
+ * The refusal travels with a STABLE code (`business_tax_id_frozen`…) and that code has its translated
+ * string; the runtime's `message` is English and meant for the log, not the screen. A code without a
+ * translation falls back to the usual generic one, so a new reason never leaves the toast blank.
  */
 function refusalMessage(error: unknown): string {
   const code = (error as { code?: string } | null)?.code;
@@ -1127,23 +956,24 @@ async function onShareWithErploraToggle(e: Event): Promise<void> {
 }
 
 async function saveTaxSettings(): Promise<void> {
-  // Persiste la identidad de NEGOCIO GLOBAL (server-side, /api/settings — ADR-0061). Solo admin (el
-  // runtime revalida); el tax_id se normaliza en el runtime. Impuestos/e-factura ya no viven aquí.
-  const prev = {
-    business_tax_id: hubSettings.value?.business_tax_id ?? '',
-    business_legal_name: hubSettings.value?.business_legal_name ?? '',
-    business_address: hubSettings.value?.business_address ?? '',
-  };
+  // Persists the GLOBAL business identity (server-side, /api/settings — ADR-0061). Admin only (the
+  // runtime re-checks); the tax id is normalised by the runtime. Taxes/e-invoicing no longer live here.
+  // `business_address` is NOT sent: the runtime composes it from the parts (hub#1846). Sending it too
+  // would be two sources for the same line in the same save.
   const saved = await persistHubSettings(
     {
       business_tax_id: businessTaxId.value.trim(),
       business_legal_name: businessLegalName.value.trim(),
-      business_address: businessAddress.value.trim(),
+      business_street: businessStreet.value.trim(),
+      business_street_number: businessStreetNumber.value.trim(),
+      business_postal_code: businessPostalCode.value.trim(),
+      business_city: businessCity.value.trim(),
     },
     () => {
-      businessTaxId.value = prev.business_tax_id;
-      businessLegalName.value = prev.business_legal_name;
-      businessAddress.value = prev.business_address;
+      // Nothing to roll back: this is a form with a Save button, so until a save lands the fields
+      // hold the admin's draft. Putting the stored values back on a refusal wiped all six fields
+      // and made the admin type them again to fix the one that was wrong (`banco-pre`, hub#1848).
+      // A save that DOES land re-syncs the fields from the cache through the `hubSettings` watch.
     },
   );
   // hub#1306 — guardar la identidad la PUBLICA en el SaaS, que es lo que le permite nombrar al
@@ -1156,191 +986,6 @@ async function saveTaxSettings(): Promise<void> {
   }
 }
 
-// ── Estado: Certificado fiscal del negocio (server-side /api/business/certificate) ──
-// El certificado de empresa (.p12) es un recurso del NEGOCIO/hub (salió del módulo verifactu): se
-// sube aquí junto al VAT y el nombre de la tienda. El runtime nunca devuelve los bytes; solo el
-// estado. Subir/eliminar es solo admin (el runtime revalida → 401 si no).
-const cert = ref<BusinessCertificate>({ present: false, transmission_route: 'delegated' });
-const certFileInput = ref<HTMLInputElement | null>(null);
-const certFile = ref<File | null>(null);
-const certFileName = ref<string>('');
-const certPassword = ref<string>('');
-const certBusy = ref<boolean>(false);
-
-// ── La VÍA hacia la AEAT: una de dos, nunca las dos (ADR-0320 §1 — hub#1314) ──────────────────
-// 🔴 NO es un ajuste que se guarde. Es lo que el runtime ya sabe —qué slot de certificado firma—
-// puesto delante del usuario como pregunta, con la misma respuesta (`transmission_route`) que usa
-// `go_live` para decidir si pide el Anexo I. Cambiar de pestaña solo cambia lo que se enseña; lo
-// que mueve la vía de verdad es subir o borrar el `.p12`, y eso llega por `cert`.
-const fiscalRoute = ref<FiscalTransmissionRoute>('delegated');
-
-/** El segmento solo cambia la vista; nada viaja al runtime. */
-function onFiscalRouteChange(e: Event): void {
-  const value = (e as CustomEvent<{ value?: string | null }>).detail?.value;
-  if (value === 'own' || value === 'delegated') fiscalRoute.value = value;
-}
-
-// Lo que diga el runtime MANDA sobre lo que el usuario estuviera mirando, y solo cuando cambia:
-// al abrir la pantalla, al subir el `.p12` (pasa a «propio») y al borrarlo (vuelve a «ERPlora»).
-// Sin esto, quien acaba de subir su certificado se quedaría mirando el formulario del otorgamiento.
-watch(
-  () => cert.value.transmission_route,
-  (route) => {
-    if (route) fiscalRoute.value = route;
-  },
-  { immediate: true },
-);
-
-/** Fecha de subida formateada para el estado "Certificado configurado (subido el …)". */
-const certUploadedLabel = computed<string>(() => {
-  const raw = cert.value.uploaded_at;
-  if (!raw) return '';
-  // Sin `locale` explícito: esta pantalla no lo destructura y el helper cae al locale activo.
-  return formatDateTime(raw) ?? raw;
-});
-
-// Lee el estado del certificado al abrir Ajustes (best-effort; degrada a "Sin certificado").
-onMounted(() => {
-  void getBusinessCertificate()
-    .then((c) => {
-      // Una respuesta vacía NO sustituye a la que ya hay: dejar `cert` en nada tira abajo cuanto
-      // cuelga de ella —la vía hacia la AEAT, la primera— por un runtime que no contestó.
-      if (c) cert.value = c;
-    })
-    .catch(() => null);
-});
-
-function triggerCertFilePicker(): void {
-  certFileInput.value?.click();
-}
-
-function onCertFileChange(e: Event): void {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0] ?? null;
-  certFile.value = file;
-  certFileName.value = file?.name ?? '';
-}
-
-/** Lee un fichero como base64 (sin el prefijo dataURL `data:...;base64,`). */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const comma = result.indexOf(',');
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('FileReader error'));
-    reader.readAsDataURL(file);
-  });
-}
-
-// Sube/reemplaza el certificado: lee el .p12 como base64 y hace PUT con {pkcs12_b64, password}.
-// Solo admin (el runtime revalida). Refresca el estado y limpia el formulario al terminar.
-async function uploadCert(): Promise<void> {
-  if (!isAdmin.value) return; // defensa: los botones ya están disabled para no-admin
-  if (!certFile.value) {
-    await toastError(t('settings.certNoFile'));
-    return;
-  }
-  certBusy.value = true;
-  try {
-    const b64 = await fileToBase64(certFile.value);
-    await putBusinessCertificate(b64, certPassword.value);
-    await toastSuccess(t('settings.certUploaded'));
-    certFile.value = null;
-    certFileName.value = '';
-    certPassword.value = '';
-    if (certFileInput.value) certFileInput.value.value = '';
-    // El PUT ya devolvió 2xx: el `.p12` está subido, así que la vía es la propia aunque la relectura
-    // falle. Decir `delegated` aquí devolvería al usuario al otorgamiento que acaba de dejar atrás.
-    cert.value = await getBusinessCertificate().catch(
-      (): BusinessCertificate => ({ present: true, transmission_route: 'own' }),
-    );
-  } catch {
-    await toastError(t('settings.certUploadError'));
-  } finally {
-    certBusy.value = false;
-  }
-}
-
-// Elimina el certificado (DELETE). Solo admin. Refresca el estado al terminar.
-async function removeCert(): Promise<void> {
-  if (!isAdmin.value) return;
-  certBusy.value = true;
-  try {
-    await deleteBusinessCertificate();
-    await toastSuccess(t('settings.certDeleted'));
-    // Borrado el propio, el hub vuelve a firmar con el Sello de ERPlora (ADR-0202 §2.1): la vía
-    // pasa a ser la delegada, y con ella el otorgamiento vuelve a hacer falta.
-    cert.value = await getBusinessCertificate().catch(
-      (): BusinessCertificate => ({ present: false, transmission_route: 'delegated' }),
-    );
-  } catch {
-    await toastError(t('settings.certDeleteError'));
-  } finally {
-    certBusy.value = false;
-  }
-}
-
-// ── Responsible declaration (hub#528, art. 13.2 RRSIF) ──────────────────────────────────────
-// Read on entering the Business tab, the way print coverage is read on entering Receipts: the
-// manufacturer's facts arrive on the heartbeat and may not be there yet on a freshly started hub,
-// so a read latched forever would keep showing «data pending» after it has already arrived.
-const declaration = ref<SystemDeclaration | null>(null);
-const declarationError = ref<boolean>(false);
-
-/** Readable label of each element; the element name is painted next to it, untranslated. */
-const DECLARATION_LABELS = computed<Record<DeclarationField, string>>(() => ({
-  NombreRazon: t('settings.declarationNombreRazon'),
-  NIF: t('settings.declarationNIF'),
-  NombreSistemaInformatico: t('settings.declarationNombreSistemaInformatico'),
-  IdSistemaInformatico: t('settings.declarationIdSistemaInformatico'),
-  Version: t('settings.declarationVersion'),
-  NumeroInstalacion: t('settings.declarationNumeroInstalacion'),
-  TipoUsoPosibleSoloVerifactu: t('settings.declarationTipoUsoPosibleSoloVerifactu'),
-  TipoUsoPosibleMultiOT: t('settings.declarationTipoUsoPosibleMultiOT'),
-  IndicadorMultiplesOT: t('settings.declarationIndicadorMultiplesOT'),
-}));
-
-/**
- * The rows that are painted, in XSD order so they can be read next to a record. Without the
- * manufacturer's block the two this hub declares by itself remain (version and installation):
- * they are its own and they are true, and hiding them would turn a missing fact into an empty screen.
- */
-const declarationRows = computed(() => {
-  const current = declaration.value;
-  if (!current) return [];
-  const block: Partial<Record<DeclarationField, string>> = current.sistemaInformatico ?? {
-    Version: current.version,
-    NumeroInstalacion: current.numeroInstalacion,
-  };
-  return DECLARATION_FIELDS.filter((field) => !!block[field]).map((field) => ({
-    field,
-    label: DECLARATION_LABELS.value[field],
-    value: block[field] as string,
-  }));
-});
-
-async function loadResponsibleDeclaration(): Promise<void> {
-  try {
-    declaration.value = await fetchResponsibleDeclaration();
-    declarationError.value = false;
-  } catch {
-    // «Could not load» is its own state: never an empty card that reads as «this system declares
-    // nothing» on the very screen that is shown to an inspection (hub#375).
-    declaration.value = null;
-    declarationError.value = true;
-  }
-}
-
-watch(
-  tab,
-  (current) => {
-    if (current === 'tax') void loadResponsibleDeclaration();
-  },
-  { immediate: true },
-);
 
 // ── Print coverage (hub#800): the read model of `GET /api/print/hosts` for the Receipts tab ──
 // Reloaded EVERY time the tab is entered, not latched like the permissions below: whether the
@@ -1466,79 +1111,6 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 </script>
 
 <style scoped>
-/* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
-.cert-file-input {
-  display: none;
-}
-
-/* La vía hacia la AEAT (hub#1314). El segmento ocupa el ancho: son DOS opciones y la elección es
-   la pregunta de la tarjeta, no un filtro al margen — en modo `ios` Ionic lo encogería al contenido
-   y quedaría flotando en medio. Las etiquetas envuelven en vez de truncarse: «Con mi propio
-   certificado» no cabe en una línea a 390 px, y media frase no es una opción que se pueda elegir. */
-.fiscal-route-segment {
-  width: 100%;
-}
-
-.fiscal-route-segment ion-label {
-  white-space: normal;
-  line-height: 1.2;
-}
-
-/* La consecuencia de elegir la vía propia —«no hace falta ningún otorgamiento»— es lo que quita el
-   miedo a quien acaba de leer que sin firmar no puede facturar. Va suelta y con aire, no pegada al
-   título, para que se lea antes que el formulario del `.p12`. */
-.fiscal-route-hint {
-  display: block;
-  margin-top: 0.5rem;
-}
-
-/* Responsible declaration (hub#528). The value is what gets read, so it stands out over the label
-   and over the element name; qualified with `ion-label` because Ionic paints a label's `p` in
-   secondary grey and here the hierarchy is the opposite. Wraps wherever needed: the longest value
-   is `NumeroInstalacion`, a 36-character UUID, and a value shown to an inspection has to be read
-   WHOLE on the phone at the counter. */
-ion-label p.responsible-declaration-value {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  color: var(--ion-text-color);
-  font-weight: 600;
-}
-
-/* Link to the signed text: it reads as a link (which is what it is), not as a mute button. */
-/* Link + which text it points at, on one line that WRAPS: at 390 px the label and the link do not
-   fit side by side, and the version must not be pushed off the card — it is half of what an
-   inspection reads here (hub#1510). */
-.responsible-declaration-ref {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.75rem;
-}
-
-.responsible-declaration-version {
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-}
-
-.responsible-declaration-link {
-  display: inline-block;
-  color: var(--ion-color-primary);
-  text-decoration: underline;
-}
-
-/* The two states that are NOT the full card. Neither is painted green: a failed read and data
-   that has not arrived yet are different things, and both are said. */
-.responsible-declaration-pending,
-.responsible-declaration-error {
-  color: var(--ion-color-medium-shade);
-}
-
-/* The literal name of the record element (`IdSistemaInformatico`…): read as technical data, in
-   monospace, so it can be checked character by character against an XML. */
-.responsible-declaration-element {
-  font-family: var(--ion-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace);
-}
-
 /* hub#1174: el aviso de «qué se rompe» de un permiso denegado. Mismo patrón que la nota fiscal de
    ExportPanel: icono + frase, dentro de la propia tarjeta del permiso. */
 .cap-breaks {
@@ -1555,5 +1127,26 @@ ion-label p.responsible-declaration-value {
   margin-top: 0.1rem;
   /* El texto lee en `--ion-color-medium` (AA); el icono se queda con el acento de aviso. */
   color: var(--ion-color-warning-shade, var(--ion-color-warning));
+}
+
+/* hub#1846 — el domicilio en partes: la vía / el municipio ocupan lo que sobra y el número / el
+   código postal lo justo. En un móvil cada campo va en su línea: dos inputs de 150 px no caben. */
+.business-address-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
+  gap: 0.5rem;
+}
+/* El código postal va DELANTE y estrecho, el municipio detrás y ancho: es el orden en que se
+   escribe en un sobre y lo que cabe en cada uno. */
+.business-address-row--postal {
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+}
+@media (max-width: 560px) {
+  .business-address-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.business-address-legacy {
+  display: block;
 }
 </style>

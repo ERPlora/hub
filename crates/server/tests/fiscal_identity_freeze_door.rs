@@ -14,9 +14,8 @@
 //!
 //!  - el **código de estado y el código estable** que ve el cliente (`409` + `business_tax_id_frozen`),
 //!    porque es contra eso contra lo que la UI se explica;
-//!  - que se distingue del cierre de la DEMO (`demo_fiscal_identity_locked`): son dos guardas
-//!    distintas en la misma clave, y si contestaran lo mismo se podría borrar una con la suite en
-//!    verde;
+//!  - that it holds in a DEMO too: the demo closure on the identity is gone (hub#1848), the freeze
+//!    is the integrity of the chain and is not;
 //!  - las **dos mitades que no pueden romperse**: un hub que aún NO ha emitido escribe su NIF como
 //!    siempre, y uno que SÍ ha emitido sigue pudiendo corregir el resto del formulario de Negocio
 //!    (razón social y dirección) — que va en el MISMO `PUT`.
@@ -198,18 +197,17 @@ async fn the_business_form_still_saves_with_the_tax_id_unchanged() {
     assert_eq!(body["business_address"], json!("Calle Nueva 1"));
 }
 
-/// El congelado y el cierre de la DEMO son **dos guardas distintas** sobre la misma clave, con dos
-/// respuestas distintas. Si contestaran lo mismo, borrar una pasaría inadvertido — y significan
-/// cosas opuestas: «este hub no es de nadie» vs «este hub ya emitió y no puede cambiar de dueño».
+/// hub#1848: a demo admin writes the fiscal identity like any admin, but once the demo EMITTED its
+/// tax id is frozen exactly like a real hub's — the freeze is the integrity of the chain, not a
+/// demo closure, and lifting the demo closures must not have taken it along.
 #[tokio::test]
-async fn the_freeze_is_not_the_demo_lock() {
+async fn a_demo_that_already_emitted_keeps_its_tax_id_frozen() {
     let (router, admin) = fixture("codes", true).await;
     let code = error_code(
         &body_json(put(&router, &admin, json!({ "business_tax_id": "A58818501" })).await).await,
     );
 
     assert_eq!(code, "business_tax_id_frozen");
-    assert_ne!(code, "demo_fiscal_identity_locked");
 }
 
 // ── Y su HERMANA: el PAÍS se congela en el go-live (ADR-0273, hub#69) ─────────────────────────

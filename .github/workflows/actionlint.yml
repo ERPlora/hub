@@ -77,6 +77,9 @@ on:
       # El contrato del job que crea el canario al publicar (saas#1895), por lo mismo: vive fuera
       # de `.github/`, así que sin esta ruta una PR que solo lo tocara no lo ejecutaría.
       - 'scripts/tests/canary-on-publish.test.sh'
+      # El veredicto que obedece ese job (hub#1790): el script y su test, por lo mismo.
+      - 'scripts/ci/fleet-canary-verdict.py'
+      - 'scripts/tests/fleet-canary-verdict.test.sh'
       # El guardia de los puertos de los service containers (hub#898). La regla que vigila vive
       # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
       # toque ÚNICAMENTE el guardia ejecute sus propios casos.
@@ -312,6 +315,7 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/canary-on-publish.test.sh
+          bash ./scripts/tests/fleet-canary-verdict.test.sh
 
       # ── Los puertos de los service containers (hub#898) ───────────────────────────────
       # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y

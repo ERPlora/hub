@@ -29,23 +29,22 @@ describe('updateHubSettings carries the runtime refusal', () => {
     vi.restoreAllMocks();
   });
 
-  it('keeps the message the runtime wrote, so the screen can explain the demo', async () => {
+  it('keeps the message the runtime wrote, so the screen can explain the refusal', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
         answer(409, {
           ok: false,
           error: {
-            code: 'demo_fiscal_identity_locked',
-            message:
-              'this is a demo hub: its tax id and legal name are read-only — to issue real invoices, create your own hub',
+            code: 'business_tax_id_frozen',
+            message: 'the tax id is frozen to B12345674 since 2026-08-08T10:00:00Z',
           },
         }),
       ),
     );
 
     await expect(updateHubSettings({ business_tax_id: 'B12345678' })).rejects.toThrow(
-      /create your own hub/,
+      /frozen to B12345674/,
     );
   });
 
@@ -53,12 +52,12 @@ describe('updateHubSettings carries the runtime refusal', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
-        answer(409, { ok: false, error: { code: 'demo_fiscal_identity_locked', message: 'nope' } }),
+        answer(409, { ok: false, error: { code: 'business_tax_id_frozen', message: 'nope' } }),
       ),
     );
 
     const error = await updateHubSettings({ business_tax_id: 'B1' }).catch((e) => e);
-    expect((error as { code?: string }).code).toBe('demo_fiscal_identity_locked');
+    expect((error as { code?: string }).code).toBe('business_tax_id_frozen');
   });
 
   it('degrades to the status when the body says nothing — never to an empty message', async () => {

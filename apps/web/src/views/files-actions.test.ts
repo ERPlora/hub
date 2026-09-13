@@ -10,7 +10,10 @@ import { createI18n } from 'vue-i18n';
 const fetchMedia = vi.fn();
 const deleteMedia = vi.fn();
 const renameMedia = vi.fn();
-vi.mock('../lib/media', () => ({
+vi.mock('../lib/media', async () => ({
+  // hub#1776: the real helpers that read a refusal; only the network calls are simulated.
+  isMediaFailure: (await vi.importActual<typeof import('../lib/media')>('../lib/media')).isMediaFailure,
+  mediaFailureSentence: (await vi.importActual<typeof import('../lib/media')>('../lib/media')).mediaFailureSentence,
   fetchMedia: (...a: unknown[]) => fetchMedia(...a),
   deleteMedia: (...a: unknown[]) => deleteMedia(...a),
   renameMedia: (...a: unknown[]) => renameMedia(...a),
@@ -64,8 +67,8 @@ function emitFromManager(wrapper: VueWrapper, name: string, detail: unknown): vo
 
 beforeEach(() => {
   fetchMedia.mockReset();
-  deleteMedia.mockReset().mockResolvedValue(true);
-  renameMedia.mockReset().mockResolvedValue(true);
+  deleteMedia.mockReset().mockResolvedValue({ ok: true });
+  renameMedia.mockReset().mockResolvedValue({ ok: true });
   dialog.role = 'confirm';
   dialog.data = { values: { name: 'nuevo' } };
 });

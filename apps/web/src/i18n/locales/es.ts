@@ -217,6 +217,22 @@ export default {
     failed: 'No se ha podido descargar el archivo.',
   },
   files: {
+    // hub#1776 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede cambiar los archivos.',
+      not_found: 'Ese archivo o carpeta ya no existe. Actualiza la lista.',
+      media: {
+        no_files: 'No se ha elegido ningún archivo para subir.',
+        busy: 'Ahora mismo se están procesando demasiados archivos. Inténtalo de nuevo en un momento.',
+        too_large: 'Ese archivo es demasiado grande para abrirlo aquí. Descárgalo.',
+        invalid_name: 'Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.',
+        missing_path: 'Elige antes un archivo o una carpeta.',
+        same_path: 'El archivo ya está en esa carpeta.',
+        move_into_itself: 'Una carpeta no se puede mover dentro de sí misma.',
+        read_only_folder: 'Esta carpeta es de una app que no permite cambiar sus archivos.',
+      },
+    },
     title: 'Archivos',
     subtitle: 'Todo lo que se guarda en la carpeta media: adjuntos de las apps, registros y actividad.',
     upload: 'Subir archivo',
@@ -486,6 +502,8 @@ export default {
     errors: {
       device_name_too_long: 'Ese nombre es demasiado largo. Ponle uno más corto y vuelve a guardar.',
       device_not_found: 'Ese dispositivo ya no está registrado aquí. Actualiza la lista.',
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede gestionar los dispositivos.',
     },
     title: 'Dispositivos',
     intro:
@@ -538,76 +556,6 @@ export default {
     saveError: 'No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.',
   },
   // Ver la nota del bloque equivalente en `en.ts`.
-  grant: {
-    intro:
-      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado: el modelo oficial del acuerdo de colaboración social. Lo descargas, lo firmas fuera de esta pantalla y lo vuelves a subir.',
-    stateVigente: 'Aprobado el {date}. ERPlora puede remitir en tu nombre.',
-    statePendiente: 'Subido el {date}. Lo estamos revisando y te avisamos por email en 24-72 horas.',
-    stateRejected: 'Devuelto el {date}. Corrige lo que se indica abajo y vuelve a subirlo.',
-    stateRevoked: 'Revocado el {date}. ERPlora no puede remitir en tu nombre.',
-    stateAbsent: 'Sin firmar. Tu negocio no puede pasar a producción hasta que lo firmes.',
-    stateUnknown: 'Consultando con ERPlora…',
-    stateUnreachable: 'No hemos podido contactar con ERPlora, así que no podemos decirte cómo va.',
-    step1Title: '1 · Consigue el modelo oficial',
-    step1Hint:
-      'Te lo rellenamos con tus datos. Su texto lo fija la Agencia Tributaria y no se puede modificar.',
-    step2Title: '2 · Sube el modelo firmado',
-    step2Hint: 'Lo revisa una persona de ERPlora y te avisa por email en 24-72 horas.',
-    partyObligado: 'Tu negocio',
-    partySigner: 'Quien firma',
-    obligadoNif: 'NIF del obligado (tu negocio)',
-    obligadoName: 'Razón social (tu negocio)',
-    municipio: 'Municipio',
-    via: 'Vía pública',
-    numero: 'Número',
-    signerNif: 'NIF/NIE de quien firma',
-    signerName: 'Nombre y apellidos de quien firma',
-    downloadModel: 'Descargar el modelo',
-    howToByHand:
-      'A mano: imprímelo, fírmalo, ponle el sello de la entidad si tu negocio es una sociedad, y escanéalo a PDF.',
-    howToElectronic:
-      'Electrónicamente: firma el PDF con AutoFirma usando tu propio certificado cualificado. Una firma dibujada no vale.',
-    privacyTitle: 'Protección de datos — información básica (art. 13 RGPD)',
-    privacyController:
-      'Responsable: ERPLORA CLOUD SL (B27593136). Custodiamos estos documentos como representante tuyo.',
-    privacyPurpose:
-      'Finalidad y base: remitir en tu nombre los registros de facturación a la Agencia Tributaria, al amparo del otorgamiento que firmas y de nuestras obligaciones legales. Los conservamos mientras dure la representación y durante los plazos tributarios.',
-    privacyRights:
-      "Tus derechos: acceso, rectificación, supresión, oposición y portabilidad en privacy{'@'}erplora.com.",
-    documentType: 'Documento de identidad',
-    documentTypeDni: 'DNI',
-    documentTypeNie: 'NIE',
-    signedDocumentChoose: 'Adjuntar el modelo firmado (PDF)',
-    dniChoose: 'Adjuntar copia del documento de identidad',
-    signatureSampleWhy:
-      'Muchos NIE no llevan firma impresa, así que necesitamos una hoja con tu firma manuscrita para poder compararla.',
-    signatureSampleChoose: 'Adjuntar muestra de firma',
-    representationProofWhy:
-      'Tu negocio es una sociedad, así que necesitamos el documento que acredita quién puede firmar por ella.',
-    representationProofChoose: 'Adjuntar el justificante de representación',
-    submit: 'Enviar a revisión',
-    preferComputer: 'Prefiero hacerlo desde el ordenador',
-    errors: {
-      obligado_nif_required: 'Tu negocio necesita un NIF antes de poder hacer esto.',
-      signer_required: 'Rellena el nombre y el NIF de quien firma.',
-      document_type_invalid: 'Elige el tipo de documento de identidad.',
-      signed_document_required: 'Adjunta el modelo firmado.',
-      signed_document_not_pdf:
-        'El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.',
-      dni_copy_required: 'Adjunta una copia del documento de identidad.',
-      signature_sample_required: 'Con NIE necesitamos además una muestra de tu firma manuscrita.',
-      representation_proof_required:
-        'Adjunta el documento que acredita que puedes firmar por la sociedad.',
-      document_too_large: 'Cada fichero tiene que ocupar menos de 10 MB.',
-      invalid_via: 'Esa vía no es una por la que podamos remitir.',
-      cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
-      hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
-      identity_not_shared:
-        'No hemos podido decirle a ERPlora quién es el obligado. Si la página te pide tus datos fiscales, guárdalos otra vez en Ajustes → Negocio.',
-      open_external_failed: 'No hemos podido abrir tu navegador.',
-      unknown: 'No ha funcionado. Vuelve a intentarlo.',
-    },
-  },
   settings: {
     hubWide: 'Ajustes generales',
     currency: 'Moneda',
@@ -617,10 +565,6 @@ export default {
     saved: 'Ajustes guardados',
     saveError: 'No se pudieron guardar los ajustes',
     saveRefused: {
-      demo_fiscal_identity_locked:
-        'Esto es una demo, así que factura como «{name}». Crea tu propio negocio en erplora.com para facturar con tus datos.',
-      demo_business_certificate_locked:
-        'Una demo no puede quedarse tu certificado: no remite nada de verdad. Crea tu propio negocio en erplora.com para facturar con él.',
       demo_fiscal_environment_locked:
         'Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio negocio en erplora.com para remitir de verdad.',
       business_tax_id_frozen:
@@ -671,34 +615,17 @@ export default {
     fiscalIdentityDesc: 'Identidad del obligado tributario (la usan las facturas y las apps fiscales).',
     fiscalNif: 'Identificador fiscal (NIF/CIF/VAT)',
     fiscalName: 'Razón social / nombre',
+    businessStreet: 'Vía pública',
+    businessStreetNumber: 'Número',
+    businessPostalCode: 'Código postal',
+    businessCity: 'Municipio',
+    businessAddressLegacy: 'Dirección actual: {address}. Rellena los campos de arriba para sustituirla.',
     fiscalAddress: 'Dirección fiscal',
     shareWithErplora: 'Usar estos datos también para mi factura de ERPlora',
     shareWithErploraDesc: 'Envía tu razón social, NIF y dirección a ERPlora para que sus facturas hacia ti los lleven. Tu negocio sigue facturando a sus clientes con estos mismos datos — no se comparte nada más.',
     shareWithErploraDone: 'Datos compartidos con ERPlora.',
     shareWithErploraError: 'No se han podido compartir los datos con ERPlora.',
     shareWithErploraNeedsTaxId: 'Rellena antes el NIF.',
-    fiscalRouteTitle: 'Envío a la Agencia Tributaria',
-    fiscalRouteLead: 'Tus facturas llegan a la AEAT por una de estas dos vías.',
-    fiscalRouteDelegated: 'Lo hace ERPlora por ti',
-    fiscalRouteOwn: 'Con mi propio certificado',
-    fiscalRouteOwnHint:
-      'Firmas y envías con tu certificado; no hace falta ningún otorgamiento a ERPlora.',
-    grantTitle: 'Otorgamiento de representación',
-    grantDesc:
-      'Tu consentimiento firmado para que ERPlora remita tus registros de facturación a la Agencia Tributaria en tu nombre. Obligatorio antes de que el negocio pase a producción.',
-    certTitle: 'Certificado fiscal',
-    certDesc: 'Certificado de empresa (.p12) para la firma fiscal de facturas. Lo usan las apps de cumplimiento de cada país.',
-    certPresent: 'Certificado configurado (subido el {date})',
-    certAbsent: 'Sin certificado',
-    certChooseFile: 'Elegir certificado (.p12)',
-    certPassword: 'Contraseña del certificado',
-    certUpload: 'Subir certificado',
-    certDelete: 'Eliminar',
-    certNoFile: 'Selecciona primero un fichero .p12',
-    certUploaded: 'Certificado subido',
-    certUploadError: 'No se pudo subir el certificado',
-    certDeleted: 'Certificado eliminado',
-    certDeleteError: 'No se pudo eliminar el certificado',
     defaultVat: 'IVA por defecto',
     defaultVatDesc: 'Tipo aplicado a productos nuevos',
     vatGeneral: '21% (general)',
@@ -708,12 +635,11 @@ export default {
     taxRegimeDesc: 'Régimen de facturación',
     regimeGeneral: 'Régimen general',
     regimeEquivalence: 'Recargo de equivalencia',
-    verifactuDesc: 'Reporte de facturas conforme a la normativa',
     receiptTemplate: 'Plantilla de tique',
     receiptTemplateDesc: 'Configuración del recibo impreso y digital',
     receiptTemplateMissing: 'Instala la app Impresión para configurar tu tique',
     tabHub: 'General',
-    tabTax: 'Negocio',
+    tabBusiness: 'Negocio',
     tabTickets: 'Tiques',
     tabPermissions: 'Permisos',
     tabData: 'Datos y copias',
@@ -757,24 +683,6 @@ export default {
     // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
     // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
     // invoicing record and the screen exists to be read next to one.
-    declarationTitle: 'Declaración responsable',
-    declarationDesc:
-      'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
-    declarationRead: 'Leer la declaración firmada',
-    declarationTextVersion: 'Versión de la declaración',
-    declarationDataTitle: 'Datos identificativos de este sistema',
-    declarationPending:
-      'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
-    declarationError: 'No se ha podido cargar la declaración responsable.',
-    declarationNombreRazon: 'Productor',
-    declarationNIF: 'NIF del productor',
-    declarationNombreSistemaInformatico: 'Nombre del sistema',
-    declarationIdSistemaInformatico: 'Código del sistema',
-    declarationVersion: 'Versión instalada',
-    declarationNumeroInstalacion: 'Número de instalación',
-    declarationTipoUsoPosibleSoloVerifactu: 'Solo VERI*FACTU',
-    declarationTipoUsoPosibleMultiOT: 'Puede dar servicio a varios obligados',
-    declarationIndicadorMultiplesOT: 'Da servicio a varios obligados',
     // hub#1174 — qué DEJA DE FUNCIONAR mientras el interruptor está apagado.
     capabilityBreaks: {
       network: 'Sin esto, la app no puede salir a internet: lo que sincroniza, envía o comprueba en línea se queda sin hacer.',
@@ -1150,6 +1058,8 @@ export default {
     errors: {
       // hub#1697 — ver el comentario gemelo en `en.ts`.
       last_admin: 'No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.',
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede gestionar el personal y los roles.',
       self_deactivation: 'No puedes darte de baja a ti mismo. Pídeselo a otro administrador.',
       self_badge_enrollment: 'Nadie da de alta su propia placa. Pídeselo a otro administrador.',
       not_found: 'Esa persona ya no está en este hub. Actualiza la lista.',

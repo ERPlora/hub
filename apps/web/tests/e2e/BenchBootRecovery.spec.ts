@@ -19,7 +19,7 @@
 // `route.abort()` has no code for a network change; both are in `TRANSIENT_TRANSPORT_ERRORS` and
 // take the same path. The real code is pinned by name in `tests/bench-boot.test.ts`.
 
-import { expect, test } from '../bench-boot';
+import { BOOT_RELOAD_LIMIT, bootReloadsOf, expect, test } from '../bench-boot';
 
 test.describe('bench boot recovery (hub#1806)', () => {
   test('a network change that kills the module graph costs a reload, not a red build', async ({
@@ -46,10 +46,25 @@ test.describe('bench boot recovery (hub#1806)', () => {
 
     await page.goto('/settings#data');
 
-    // The bootstrap was asked for TWICE: the bench saw its own code die on the wire and went back
+    // The bootstrap was asked for AGAIN: the bench saw its own code die on the wire and went back
     // for it. This is the assertion that fails if the recovery is removed — before the fix this
     // was 1, and `#app` below stayed empty.
-    expect(mainRequests, 'the bench did not re-fetch the bootstrap it lost').toBe(2);
+    //
+    // 🔴 Bounded, NOT exact, and that is the whole point of hub#1838. `toBe(2)` also asserted that
+    // nothing else went wrong on the machine while this navigation was in flight — which is not a
+    // fact about our recovery, and is exactly the fact `ci-runner-1` does not provide. Measured on
+    // run 34626218384 (job 103351855601), on PR #1834, whose diff is four `data-testid` renames:
+    //   [bench] 1 request(s) … died on the wire (net::ERR_CONNECTION_RESET) … reloading (1/2)
+    //   [bench] 50 request(s) … died on the wire (net::ERR_NETWORK_CHANGED) … reloading (2/2)
+    // The first reload is this spec's injected failure; the second is a REAL network change — the
+    // very accident hub#1806 exists for — landing inside the recovery. The bench did its job and
+    // the shell mounted, and the spec still went red on `Expected: 2, Received: 3`, putting a PR
+    // that touches none of this in red. So this spec had become the flake it was written to cure.
+    expect(mainRequests, 'the bench did not re-fetch the bootstrap it lost').toBeGreaterThan(1);
+    expect(
+      mainRequests,
+      'the bench re-fetched the bootstrap past its own limit',
+    ).toBeLessThanOrEqual(BOOT_RELOAD_LIMIT + 1);
 
     // And the shell is on screen. `#app` with children IS the mount: while it was empty every
     // `getByTestId` in the suite reported "element(s) not found", which is the red that landed on
@@ -76,8 +91,89 @@ test.describe('bench boot recovery (hub#1806)', () => {
 
     await page.goto('/settings#data');
 
-    // Exactly one attempt: no reload was spent on it.
-    expect(failed, 'a failure that is not a lost connection must not be reloaded away').toBe(1);
+    // hub#1839: «no reload was spent on IT», not «no reload at all». A genuine accident of the
+    // runner inside this navigation makes the bench reload — that is its job — and the next
+    // request for `main.ts` fails again, so a bare `toBe(1)` went red on a PR that touched none of
+    // this. The bench now keeps its books: every reload it spent, and on which codes.
+    const reloads = bootReloadsOf(page);
+    expect(
+      reloads.flatMap((reload) => reload.codes),
+      'a failure that is not a lost connection must not be reloaded away',
+    ).not.toContain('net::ERR_FAILED');
+    expect(
+      failed,
+      'every extra attempt at the bootstrap has to be a reload the bench accounted for',
+    ).toBe(1 + reloads.length);
+    await expect(page.locator('#app')).toBeEmpty();
+  });
+
+  test('a real accident during our own failure is recovered, and our failure still stays red', async ({
+    page,
+  }) => {
+    // hub#1839, reproduced instead of waited for: the runner's network drops ONE request while the
+    // bootstrap is failing for a reason of ours. The bench reloads for the accident; it does not
+    // reload for `ERR_FAILED`; and the screen stays blank, because our defect is still there.
+    let failed = 0;
+    let accidents = 0;
+
+    await page.route('**/src/main.ts', async (route) => {
+      failed += 1;
+      await route.abort('failed');
+    });
+    await page.route('**/@vite/client', async (route) => {
+      accidents += 1;
+      if (accidents === 1) return route.abort('connectionreset');
+      return route.continue();
+    });
+
+    await page.goto('/settings#data');
+
+    const reloads = bootReloadsOf(page);
+    expect(reloads.length, 'the accident was not recovered').toBeGreaterThanOrEqual(1);
+    expect(reloads.flatMap((reload) => reload.codes)).toContain('net::ERR_CONNECTION_RESET');
+    expect(reloads.flatMap((reload) => reload.codes)).not.toContain('net::ERR_FAILED');
+    expect(failed).toBe(1 + reloads.length);
+    await expect(page.locator('#app')).toBeEmpty();
+  });
+
+  test('a run of accidents costs the bench its limit and then stops, it does not loop', async ({
+    page,
+  }) => {
+    // The path the CI red of hub#1838 actually took, pinned so it cannot come back untested: the
+    // connection dies on MORE than one load of the same navigation. `ci-runner-1` serves six runner
+    // slots, so a second network change inside one spec is ordinary, not exotic.
+    //
+    // Two things are under test here and both are load-bearing:
+    //   · the bench keeps going past the first accident — the case the old exact count forbade;
+    //   · and it STOPS at `BOOT_RELOAD_LIMIT`. A dev server that keeps dying transiently has to end
+    //     as a red test, not as a bench that reloads forever; delete the `reload <=` condition from
+    //     `bench-boot.ts` and this test hangs until Playwright kills it, which is how it says so.
+    let mainRequests = 0;
+
+    // Never served. Unlike the first test there is no `once`: this is the outage, not the blip.
+    await page.route('**/src/main.ts', async (route) => {
+      mainRequests += 1;
+      await route.abort('connectionreset');
+    });
+
+    await page.goto('/settings#data');
+
+    // The first fetch plus one per reload, and not one more. This line is the end-to-end half of
+    // the regression test for ERPlora/hub#1842, and it is written OUT rather than derived from
+    // `BOOT_RELOAD_LIMIT`, which is the difference between measuring the ceiling and measuring
+    // nothing. Derived, this line reads "the bench stops at whatever
+    // its budget happens to be", and that is just as true of a budget of 50: moving the constant
+    // to 5 left this spec at `3 passed` and `bench-boot.test.ts` at `87 passed`. Spelled out, it
+    // goes red however the widening is written — the constant moved, the condition turned into
+    // `reload <= BOOT_RELOAD_LIMIT * 2`, or the loop rewritten by hand.
+    //
+    // The bound in the first test IS derived, on purpose: that one is the tolerance for the
+    // runner's own accidents and has to follow the budget wherever it goes. This one is the
+    // budget. Both have to be edited to move it, which is what makes moving it a decision.
+    expect(mainRequests, 'the bench did not spend exactly its two reloads').toBe(3);
+
+    // And it gives up honestly: the screen is blank and the spec that asked for it goes red on its
+    // own assertions. Recovering is the bench's job; pretending to have recovered is not.
     await expect(page.locator('#app')).toBeEmpty();
   });
 });

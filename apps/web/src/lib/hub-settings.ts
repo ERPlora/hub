@@ -44,8 +44,19 @@ export interface HubSettings {
   business_tax_id: string;
   /** Razón social / nombre legal del negocio. */
   business_legal_name: string;
-  /** Dirección fiscal (texto libre, una o varias líneas). */
+  /**
+   * Dirección fiscal en UNA línea. Desde hub#1846 la COMPONE el runtime a partir de las partes de
+   * abajo; se lee (la imprimen facturas y tiques) y ya no se escribe desde aquí.
+   */
   business_address: string;
+  /** Vía pública del domicilio fiscal (hub#1846). */
+  business_street: string;
+  /** Número. Puede faltar de verdad (un «s/n»). */
+  business_street_number: string;
+  /** Código postal. */
+  business_postal_code: string;
+  /** Municipio. */
+  business_city: string;
   /** Paleta de tema GLOBAL del hub (ADR-0138): valor de `data-ok-palette` de OutfitKit
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
    *  `hub_user_pref` y gana a esta. */
@@ -145,6 +156,10 @@ function setHubSettings(raw: unknown): HubSettings {
     business_tax_id: typeof r.business_tax_id === 'string' ? r.business_tax_id : '',
     business_legal_name: typeof r.business_legal_name === 'string' ? r.business_legal_name : '',
     business_address: typeof r.business_address === 'string' ? r.business_address : '',
+    business_street: typeof r.business_street === 'string' ? r.business_street : '',
+    business_street_number: typeof r.business_street_number === 'string' ? r.business_street_number : '',
+    business_postal_code: typeof r.business_postal_code === 'string' ? r.business_postal_code : '',
+    business_city: typeof r.business_city === 'string' ? r.business_city : '',
     theme_palette: typeof r.theme_palette === 'string' && r.theme_palette.trim() ? r.theme_palette.trim() : 'erplora',
     // El dial «pedir PIN» (hub#359). Lo normaliza `publishPinPolicy` —cerrado, sin trim ni
     // minúsculas— porque lo que NO se puede leer no puede degradar a `never`: esa es la posición
@@ -182,15 +197,14 @@ export async function getHubSettings(): Promise<HubSettings> {
 }
 
 /**
- * El rechazo del runtime, tal y como lo escribió (hub#684).
+ * The runtime refusal, as the runtime wrote it (hub#684).
  *
- * `PUT /api/settings` contesta `{error:{code,message}}` y ese `message` está redactado para leerlo
- * —el de la demo es *«this is a demo hub: its tax id and legal name are read-only — to issue real
- * invoices, create your own hub»*—. Antes se tiraba entero y la pantalla pintaba un «no se pudieron
- * guardar los ajustes» plano: la única explicación que el producto tenía no llegaba a nadie.
+ * `PUT /api/settings` answers `{error:{code,message}}` and that `message` is written to be read (e.g.
+ * the frozen tax id names the id and the date it froze). It used to be thrown away and the screen
+ * painted a flat «could not save settings»: the only explanation the product had reached nobody.
  */
 export class HubSettingsError extends Error {
-  /** Código estable del runtime (`demo_fiscal_identity_locked`, `business_tax_id_frozen`…). */
+  /** Stable runtime code (`business_tax_id_frozen`, `hub_country_frozen`…). */
   readonly code: string;
   /** Estado HTTP, para quien necesite distinguir un 409 de un 403 sin mirar el código. */
   readonly status: number;
@@ -206,7 +220,7 @@ export class HubSettingsError extends Error {
 /**
  * Actualiza (parcial) los settings del hub (`PUT /api/settings`). El runtime exige owner/admin y
  * devuelve el objeto COMPLETO, que cacheamos. Lanza [`HubSettingsError`] si falla (403 si no es
- * admin, 409 si el cierre de la demo o el congelado del NIF se niegan…).
+ * admin, 409 si el congelado del NIF o del país se niegan…).
  */
 export async function updateHubSettings(partial: Partial<HubSettings>): Promise<HubSettings> {
   const res = await fetch(`${RUNTIME_URL}/api/settings`, {

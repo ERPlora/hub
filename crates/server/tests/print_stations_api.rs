@@ -181,9 +181,10 @@ async fn an_employee_cannot_add_rename_or_delete_a_station() {
         ("DELETE", format!("/api/print/stations/{bar}"), None),
     ] {
         let (status, _) = call(&router, method, &uri, Some(&employee), body).await;
+        // hub#1705: a valid session without the role is `403 forbidden` — signing in again would not help.
         assert_eq!(
             status,
-            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
             "{method} {uri} must take an admin session"
         );
     }

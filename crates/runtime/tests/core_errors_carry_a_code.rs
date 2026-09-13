@@ -254,7 +254,7 @@ fn census(db: RuntimeError) -> Vec<RuntimeError> {
             since: s("2026-08-01"),
         },
         E::DemoLocked {
-            lock: DemoLock::FiscalIdentity,
+            lock: DemoLock::FiscalEnvironment,
         },
         // hub#1209: the half-migrated hub the euros→cents backfill refuses to guess about.
         E::MoneyUnitAmbiguous {

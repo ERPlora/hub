@@ -90,7 +90,7 @@ describe('erp-whatsapp-connect', () => {
     // the owner is left staring at an empty box where the «Connect» button should be.
     const el = await embed(moduleScreen());
     expect(el.textContent).toContain(es.whatsappConnect.intro);
-    expect(el.querySelector('[data-test="whatsapp-connect-button"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="whatsapp-connect-button"]')).not.toBeNull();
   });
 
   it('reads the failure sentence in red inside a module shadow root', async () => {

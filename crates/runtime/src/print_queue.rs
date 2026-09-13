@@ -1037,7 +1037,7 @@ mod tests {
         let db = queue_db().await;
         let mut updates = serde_json::Map::new();
         updates.insert("language".into(), json!("en"));
-        crate::settings::set_many(&db, "h1", &updates, "test", false)
+        crate::settings::set_many(&db, "h1", &updates, "test")
             .await
             .expect("the hub speaks English now");
 
@@ -1074,7 +1074,7 @@ mod tests {
         let db = queue_db().await;
         let mut updates = serde_json::Map::new();
         updates.insert("language".into(), json!("en"));
-        crate::settings::set_many(&db, "h1", &updates, "test", false)
+        crate::settings::set_many(&db, "h1", &updates, "test")
             .await
             .expect("the hub speaks English");
 

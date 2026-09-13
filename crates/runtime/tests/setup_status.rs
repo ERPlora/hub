@@ -303,7 +303,7 @@ fn identity_stamping_module(id: &str) -> PathBuf {
 // ── The DEMO: no wall, because it BOOTS with its fiscal identity (hub#684) ────────────────────
 //
 // The demo used to show the visitor a ⛔ «you need this in order to invoice» whose button led to a
-// `409 demo_fiscal_identity_locked` — the screen asking for the one thing the product forbids. And
+// `409` — back then the demo could not write its identity (that closure was lifted by hub#1848). And
 // the expensive half: the sale went through and `invoice.create_from_sale` did not, because it
 // stamps `:business_tax_id` and the gate rejected it. Money taken, no document.
 //

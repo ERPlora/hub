@@ -150,15 +150,6 @@ impl Runtime {
             .to_string()
     }
 
-    /// Cierra una puerta en un hub de demo (ADR-0197 §4). Devuelve el error con el SUJETO del
-    /// cierre, para que el cliente sepa cuál de los tres se negó.
-    pub(crate) fn refuse_if_demo(&self, lock: DemoLock) -> Result<()> {
-        if self.registry.demo_hub {
-            return Err(RuntimeError::DemoLocked { lock });
-        }
-        Ok(())
-    }
-
     /// Registra el backend persistente de módulos. El server lo resuelve a disco (Local) o al
     /// proxy Cloud→S3 (Cloud); el runtime y los módulos solo ven rutas bajo `media/modules/`.
     pub fn set_module_storage(&mut self, storage: Arc<dyn module_storage::ModuleStorage>) {

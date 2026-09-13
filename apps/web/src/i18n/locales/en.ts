@@ -232,6 +232,25 @@ export default {
     failed: 'The file could not be downloaded.',
   },
   files: {
+    // hub#1776 — the stable codes the media doors send (`crates/server/src/media.rs`). The shared
+    // `runtimeErrors` already says `cloud_unreachable`, `cloud_rejected`, `cloud_unreadable` and
+    // `hub_not_enrolled`; these are the reasons that belong to Files. Only the ones that retrying
+    // can fix say to try again.
+    errors: {
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can change the files.',
+      not_found: 'That file or folder no longer exists. Refresh the list.',
+      media: {
+        no_files: 'No file was selected to upload.',
+        busy: 'Too many files are being handled right now. Try again in a moment.',
+        too_large: 'That file is too large to open here. Download it instead.',
+        invalid_name: 'That name is not valid. Use a name without slashes or dots on their own.',
+        missing_path: 'Choose a file or folder first.',
+        same_path: 'The file is already in that folder.',
+        move_into_itself: 'A folder cannot be moved inside itself.',
+        read_only_folder: 'This folder belongs to an app that does not allow changing its files.',
+      },
+    },
     title: 'Files',
     subtitle: "Everything stored in the media folder: app attachments, logs and activity.",
     upload: 'Upload file',
@@ -527,6 +546,10 @@ export default {
     errors: {
       device_name_too_long: 'That name is too long. Use a shorter one and save again.',
       device_not_found: 'That device is no longer registered here. Refresh the list.',
+      // hub#1702 — the door's auth refusals. A dead session is fixed by signing in again; a role
+      // without the permission is not, so the second sentence never suggests it.
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can manage the devices.',
     },
     title: 'Devices',
     intro:
@@ -587,76 +610,6 @@ export default {
   // puede remitir sus registros VERI*FACTU en su nombre. El TEXTO del Anexo I no está aquí: lo
   // sirve el runtime, que es quien lo archiva — una copia en el bundle sería el mismo documento
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
-  grant: {
-    intro:
-      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that: the official form of the colaboración social agreement. You download it, sign it away from this screen, and upload it back.',
-    stateVigente: 'Approved on {date}. ERPlora may file on your behalf.',
-    statePendiente:
-      'Uploaded on {date}. We are checking it and will email you within 24-72 hours.',
-    stateRejected: 'Sent back on {date}. Fix what is noted below and upload it again.',
-    stateRevoked: 'Revoked on {date}. ERPlora cannot file on your behalf.',
-    stateAbsent: 'Not signed yet. Your business cannot go live until it is.',
-    stateUnknown: 'Checking with ERPlora…',
-    stateUnreachable: 'We could not reach ERPlora, so we cannot tell you where this stands.',
-    step1Title: '1 · Get the official form',
-    step1Hint:
-      'We fill it in with your details. Its wording is set by the tax authority and cannot be changed.',
-    step2Title: '2 · Upload the signed form',
-    step2Hint: 'A person at ERPlora checks it and emails you within 24-72 hours.',
-    partyObligado: 'Your business',
-    partySigner: 'The person signing',
-    obligadoNif: 'Taxpayer ID (your business)',
-    obligadoName: 'Legal name (your business)',
-    municipio: 'Town or city',
-    via: 'Street',
-    numero: 'Number',
-    signerNif: 'ID number of the person signing',
-    signerName: 'Full name of the person signing',
-    downloadModel: 'Download the form',
-    howToByHand:
-      'By hand: print it, sign it, stamp it with the company seal if your business is a company, and scan it back to PDF.',
-    howToElectronic:
-      'Electronically: sign the PDF with AutoFirma using your own qualified certificate. A drawn signature is not accepted.',
-    privacyTitle: 'Data protection — the essentials (art. 13 GDPR)',
-    privacyController:
-      'Controller: ERPLORA CLOUD SL (B27593136). We hold these documents as your representative.',
-    privacyPurpose:
-      'Purpose and basis: to file your invoicing records with the Spanish tax authority on your behalf, under the grant you sign and our legal duties. We keep them while the grant lasts and for the tax retention periods.',
-    privacyRights:
-      "Your rights: access, rectification, erasure, objection and portability at privacy{'@'}erplora.com.",
-    documentType: 'Identity document',
-    documentTypeDni: 'DNI (Spanish national ID)',
-    documentTypeNie: 'NIE (foreign resident ID)',
-    signedDocumentChoose: 'Attach the signed form (PDF)',
-    dniChoose: 'Attach a copy of the ID',
-    signatureSampleWhy:
-      'A NIE often carries no printed signature, so we need a sheet with your handwritten signature to compare it against.',
-    signatureSampleChoose: 'Attach a signature sample',
-    representationProofWhy:
-      'Your business is a company, so we need the document that names the person allowed to sign for it.',
-    representationProofChoose: 'Attach the proof of representation',
-    submit: 'Send for review',
-    preferComputer: 'I would rather do this from my computer',
-    errors: {
-      obligado_nif_required: 'Your business needs a taxpayer ID before you can do this.',
-      signer_required: 'Fill in the name and ID number of the person signing.',
-      document_type_invalid: 'Pick the kind of identity document.',
-      signed_document_required: 'Attach the signed form.',
-      signed_document_not_pdf: 'The signed form has to be a PDF — scan it or sign it with AutoFirma.',
-      dni_copy_required: 'Attach a copy of the identity document.',
-      signature_sample_required: 'With a NIE we also need a sample of your handwritten signature.',
-      representation_proof_required:
-        'Attach the document that proves you may sign for the company.',
-      document_too_large: 'Each file has to be under 10 MB.',
-      invalid_via: 'That route is not one we can file through.',
-      cloud_rejected: 'ERPlora could not handle this right now. Try again in a few minutes.',
-      hub_not_enrolled: 'This hub is not connected to ERPlora yet.',
-      identity_not_shared:
-        'We could not tell ERPlora who the taxpayer is. If the page asks for your tax details, save them again in Settings → Business.',
-      open_external_failed: 'We could not open your browser.',
-      unknown: 'It did not work. Try again.',
-    },
-  },
   settings: {
     hubWide: 'General settings',
     currency: 'Currency',
@@ -669,10 +622,6 @@ export default {
     // message is written in English for the log; what the person in front of the screen reads has
     // to be their language, so the code — not the message — is what travels.
     saveRefused: {
-      demo_fiscal_identity_locked:
-        'This is a demo, so it invoices as “{name}”. Create your own business at erplora.com to invoice under your own details.',
-      demo_business_certificate_locked:
-        'A demo cannot take your certificate: it never files anything for real. Create your own business at erplora.com to invoice with it.',
       demo_fiscal_environment_locked:
         'A demo always stays in the tax authority’s test environment. Create your own business at erplora.com to file for real.',
       business_tax_id_frozen:
@@ -727,6 +676,11 @@ export default {
     fiscalIdentityDesc: 'Taxpayer identity (used by invoices and the fiscal apps).',
     fiscalNif: 'Tax ID (NIF/VAT)',
     fiscalName: 'Legal name',
+    businessStreet: 'Street',
+    businessStreetNumber: 'Number',
+    businessPostalCode: 'Postal code',
+    businessCity: 'City',
+    businessAddressLegacy: 'Current address: {address}. Fill in the fields above to replace it.',
     fiscalAddress: 'Fiscal address',
     shareWithErplora: 'Use these details for my ERPlora invoice too',
     shareWithErploraDesc: 'Sends your legal name, tax id and address to ERPlora so its invoices to you carry them. Your business keeps invoicing its own customers with these same details — nothing else is shared.',
@@ -735,28 +689,6 @@ export default {
     shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
     // One question, two EXCLUSIVE answers (ADR-0320 §1 — hub#1314): either the business files with
     // its own certificate, or ERPlora files on its behalf with the signed grant. Never both.
-    fiscalRouteTitle: 'Filing with the tax authority',
-    fiscalRouteLead: 'Your invoices reach the tax authority through one of these two routes.',
-    fiscalRouteDelegated: 'ERPlora does it for you',
-    fiscalRouteOwn: 'With my own certificate',
-    fiscalRouteOwnHint:
-      'You sign and file with your own certificate; no grant to ERPlora is needed.',
-    grantTitle: 'Representation grant',
-    grantDesc:
-      'Your signed consent for ERPlora to file your invoicing records with the tax authority on your behalf. Required before your business can go live.',
-    certTitle: 'Fiscal certificate',
-    certDesc: 'Company certificate (.p12) for fiscal signing of invoices. Used by the per-country compliance apps.',
-    certPresent: 'Certificate configured (uploaded on {date})',
-    certAbsent: 'No certificate',
-    certChooseFile: 'Choose certificate (.p12)',
-    certPassword: 'Certificate password',
-    certUpload: 'Upload certificate',
-    certDelete: 'Delete',
-    certNoFile: 'Select a .p12 file first',
-    certUploaded: 'Certificate uploaded',
-    certUploadError: 'Could not upload the certificate',
-    certDeleted: 'Certificate deleted',
-    certDeleteError: 'Could not delete the certificate',
     defaultVat: 'Default VAT',
     defaultVatDesc: 'Rate applied to new products',
     vatGeneral: '21% (standard)',
@@ -766,12 +698,11 @@ export default {
     taxRegimeDesc: 'Invoicing regime',
     regimeGeneral: 'General regime',
     regimeEquivalence: 'Equivalence surcharge',
-    verifactuDesc: 'Invoice reporting compliant with regulations',
     receiptTemplate: 'Receipt template',
     receiptTemplateDesc: 'Printed and digital receipt settings',
     receiptTemplateMissing: 'Install the Printing app to set up your receipt',
     tabHub: 'General',
-    tabTax: 'Business',
+    tabBusiness: 'Business',
     tabTickets: 'Receipts',
     tabPermissions: 'Permissions',
     tabData: 'Data & backups',
@@ -815,26 +746,8 @@ export default {
     // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
     // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
     // invoicing record and the screen exists to be read next to one.
-    declarationTitle: 'Responsible declaration',
-    declarationDesc:
-      'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
-    declarationRead: 'Read the signed declaration',
     // WHICH signed text covers this release (`v1`, `v2`…), next to the link — hub#1510. Art. 13.3
     // RRSIF lets several declarations coexist, so the link alone does not identify the text.
-    declarationTextVersion: 'Declaration version',
-    declarationDataTitle: 'Identifying data of this system',
-    declarationPending:
-      'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',
-    declarationError: 'Could not load the responsible declaration.',
-    declarationNombreRazon: 'Producer',
-    declarationNIF: 'Producer tax id',
-    declarationNombreSistemaInformatico: 'System name',
-    declarationIdSistemaInformatico: 'System code',
-    declarationVersion: 'Installed version',
-    declarationNumeroInstalacion: 'Installation number',
-    declarationTipoUsoPosibleSoloVerifactu: 'VERI*FACTU only',
-    declarationTipoUsoPosibleMultiOT: 'Can serve several taxpayers',
-    declarationIndicadorMultiplesOT: 'Serving several taxpayers',
     // hub#1174 — what STOPS WORKING while the switch is off. Default-deny (ADR-0079) is right; an
     // invisible consequence is not. One sentence per capability id; the catalogue in
     // `lib/module-capabilities.ts` names the key and the card only translates it. The action that
@@ -1284,6 +1197,10 @@ export default {
       // hub#1697 — the guards of the local `/api/hub/users` door (`hub_users.rs`). Their own
       // message is prose written into the runtime; these are the sentences the person reads.
       last_admin: 'You cannot deactivate the last administrator. Name another owner or administrator first.',
+      // hub#1705 — the gate of the people and roles doors. A dead session is fixed by signing in
+      // again; a role without the permission is not, so the second sentence never suggests it.
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can manage staff and roles.',
       self_deactivation: 'You cannot deactivate your own account. Ask another administrator to do it.',
       self_badge_enrollment: 'Nobody enrols their own badge. Ask another administrator to do it.',
       not_found: 'That person is no longer on this hub. Refresh the list.',

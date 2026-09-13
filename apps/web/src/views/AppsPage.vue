@@ -39,7 +39,7 @@
            patrón que el aviso de plugin cerrado de WordPress: chip en la fila, explicación arriba. -->
       <ok-inline-feedback
         v-if="tab === 'mine' && retiredInstalled.length > 0"
-        data-test="apps-retired-notice"
+        data-testid="apps-retired-notice"
         tone="warning"
         class="mb-3"
       >

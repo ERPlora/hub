@@ -233,7 +233,7 @@ describe('the publication status the SaaS already knows (hub#1134)', () => {
     const wrapper = mountApps();
     await settle();
 
-    const notice = wrapper.find('[data-test="apps-retired-notice"]');
+    const notice = wrapper.find('[data-testid="apps-retired-notice"]');
     expect(notice.exists(), 'a chip alone does not explain anything').toBe(true);
     expect(notice.text()).toContain('Online booking');
   });
@@ -247,7 +247,7 @@ describe('the publication status the SaaS already knows (hub#1134)', () => {
     const row = (mineTable(wrapper).rows ?? [])[0]!;
     expect(row.publicationStatus).toBe('listed');
     expect(nameCellText(wrapper, row)).not.toContain(enCatalogue.apps.publicationRetired);
-    expect(wrapper.find('[data-test="apps-retired-notice"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="apps-retired-notice"]').exists()).toBe(false);
     expect(asked, 'the catalogue already answered for it — asking again is pure cost').toEqual([]);
   });
 
@@ -260,7 +260,7 @@ describe('the publication status the SaaS already knows (hub#1134)', () => {
     const row = (mineTable(wrapper).rows ?? [])[0]!;
     expect(row.publicationStatus).toBe('unlisted');
     expect(nameCellText(wrapper, row)).not.toContain(enCatalogue.apps.publicationRetired);
-    expect(wrapper.find('[data-test="apps-retired-notice"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="apps-retired-notice"]').exists()).toBe(false);
   });
 
   it('a Cloud that does not answer says NOTHING — silence is never painted as a verdict', async () => {
@@ -274,7 +274,7 @@ describe('the publication status the SaaS already knows (hub#1134)', () => {
     const row = (mineTable(wrapper).rows ?? [])[0]!;
     expect(row.publicationStatus).toBeNull();
     expect(nameCellText(wrapper, row)).not.toContain(enCatalogue.apps.publicationRetired);
-    expect(wrapper.find('[data-test="apps-retired-notice"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="apps-retired-notice"]').exists()).toBe(false);
   });
 
   it('does not go asking when the CATALOGUE itself failed — everything would look retired', async () => {
@@ -288,6 +288,6 @@ describe('the publication status the SaaS already knows (hub#1134)', () => {
     expect(asked, 'a catalogue that did not answer lists nothing: that is not "retired"').toEqual(
       [],
     );
-    expect(wrapper.find('[data-test="apps-retired-notice"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="apps-retired-notice"]').exists()).toBe(false);
   });
 });

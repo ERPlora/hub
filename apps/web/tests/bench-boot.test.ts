@@ -7,10 +7,13 @@
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  BOOT_RELOAD_LIMIT,
+  declaredTestDir,
+  declaresTestMatch,
   isBootTransportFailure,
   listE2eSpecs,
   specTakesTestFromPlaywright,
@@ -97,12 +100,42 @@ describe('isBootTransportFailure', () => {
   });
 });
 
+// Regression test for ERPlora/hub#1842 — the reload budget could be raised with nothing in the
+// suite going red, so a bench quietly turned into a five-retry gate would have shipped green.
+describe('BOOT_RELOAD_LIMIT', () => {
+  // The budget is the only thing between this recovery and the blanket retry the whole file
+  // argues against: every extra reload is one more re-roll of the dice on a REAL defect. The
+  // excused-codes list above is pinned so that widening it has to be a deliberate edit with a
+  // reason; the budget was not, and that asymmetry is hub#1842. It was found by mutating the fix
+  // for hub#1838 rather than by reading it: four of that fix's five mutants died, this one lived.
+  //
+  // Measured on develop@04f9a471 before this guard existed: with the budget moved to 5 and
+  // nothing else touched, `BenchBootRecovery.spec.ts` stayed at `3 passed` and this file at
+  // `87 passed`. The bench had quietly become a five-retry gate and the suite had nothing to say
+  // about it. Raising it is allowed — deciding it here, in the open, is the point.
+  it('spends at most two reloads, so a real defect is not re-rolled into green', () => {
+    expect(BOOT_RELOAD_LIMIT).toBe(2);
+  });
+});
+
 // The mechanical half of the guard (root CLAUDE.md: when the incident is a PATTERN, the fix
 // includes the rule that stops it reappearing in ANY new file). The recovery only reaches a spec
 // that takes `test` from the bench, so a spec that imports it straight from Playwright opts out of
 // it in silence — which is how this would come back a third time in a spec nobody has written yet.
 describe('every e2e spec takes its `test` from the bench', () => {
-  const E2E_DIR = fileURLToPath(new URL('./e2e', import.meta.url));
+  // hub#1835: the directory is READ from the Playwright config, never retyped here. A copy is true
+  // only while nobody moves the original, and moving it is one line two files away.
+  const CONFIG = fileURLToPath(new URL('./playwright.config.ts', import.meta.url));
+  const declared = declaredTestDir(readFileSync(CONFIG, 'utf8'));
+  const E2E_DIR = resolve(dirname(CONFIG), declared ?? '<testDir is not a literal>');
+
+  it('reads the directory Playwright collects from out of its config', () => {
+    expect(
+      declared,
+      'playwright.config.ts declares `testDir` as something other than a plain string: make ' +
+        '`declaredTestDir` understand it, or this guard walks a directory Playwright does not.',
+    ).not.toBeNull();
+  });
 
   const specs = listE2eSpecs(E2E_DIR);
 
@@ -182,9 +215,239 @@ describe('listE2eSpecs', () => {
       writeFileSync(join(dir, 'shell-visual-helpers.ts'), '');
       writeFileSync(join(dir, 'notes.md'), '');
       writeFileSync(join(dir, 'nested', 'helper.ts'), '');
+      // Near misses of the widened pattern below. Each one is a file Playwright does NOT collect,
+      // so the guard must not claim it does either — a list that over-reaches would read a helper
+      // as a spec and fail the build over an import it is entitled to have.
+      writeFileSync(join(dir, 'Near.spect.ts'), '');
+      writeFileSync(join(dir, 'Near.specs.ts'), '');
+      writeFileSync(join(dir, 'Near.testing.ts'), '');
+      writeFileSync(join(dir, 'Near.spec.ts.bak'), '');
+      writeFileSync(join(dir, 'Near.spec.txt'), '');
 
       expect(listE2eSpecs(dir)).toEqual(['Real.spec.ts']);
     });
+  });
+
+  // ── ERPlora/hub#1824 ─────────────────────────────────────────────────────────────────────────
+  //
+  // The guard above is only worth what its file list is worth (same lesson as hub#1820, one field
+  // over): the list matched `.spec.ts` and nothing else, while Playwright's default `testMatch` is
+  // `**/*.@(spec|test).?(c|m)[jt]s?(x)` — TWENTY-FOUR endings, not one. Measured on this branch
+  // before the fix: a `ZZMutant.test.ts` dropped under `tests/e2e/` taking `test` straight from
+  // Playwright left this file at `41 passed` while `playwright --list` reported
+  // `ZZMutant.test.ts:2:1 › x` in `30 tests in 14 files`. It ran for real, outside the boot
+  // recovery, in silence — which is exactly the hole hub#1816 cost us, reopened by a file suffix.
+  //
+  // The list below is not derived from the glob: it is what @playwright/test 1.62.1 COLLECTED from
+  // a directory holding one file per ending (`Total: 24 tests in 24 files`), with the near misses
+  // in the case above left behind. Deriving it would only restate our own reading of the glob.
+  const PLAYWRIGHT_SPEC_ENDINGS = [
+    '.spec.js',
+    '.spec.jsx',
+    '.spec.cjs',
+    '.spec.cjsx',
+    '.spec.mjs',
+    '.spec.mjsx',
+    '.spec.ts',
+    '.spec.tsx',
+    '.spec.cts',
+    '.spec.ctsx',
+    '.spec.mts',
+    '.spec.mtsx',
+    '.test.js',
+    '.test.jsx',
+    '.test.cjs',
+    '.test.cjsx',
+    '.test.mjs',
+    '.test.mjsx',
+    '.test.ts',
+    '.test.tsx',
+    '.test.cts',
+    '.test.ctsx',
+    '.test.mts',
+    '.test.mtsx',
+  ];
+
+  it('covers every ending Playwright collects, and only those', () => {
+    // Without this, dropping an ending from the table above would quietly shrink the guard.
+    // These are the canonical SPELLINGS of the 24; Playwright accepts any casing of them, which
+    // is its own block further down.
+    expect(PLAYWRIGHT_SPEC_ENDINGS).toHaveLength(24);
+  });
+
+  it.each(PLAYWRIGHT_SPEC_ENDINGS)('finds Spec%s, because Playwright runs it', (ending) => {
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, `Spec${ending}`), '');
+
+      expect(listE2eSpecs(dir)).toEqual([`Spec${ending}`]);
+    });
+  });
+
+  it('finds a mis-named spec in a subdirectory too', () => {
+    // The two holes compose: hub#1820 was the walk, this is the suffix. A `.test.ts` one folder
+    // down is the file that slips through both at once.
+    withTempE2eDir((dir) => {
+      mkdirSync(join(dir, 'nested', 'deeper'), { recursive: true });
+      writeFileSync(join(dir, 'nested', 'deeper', 'Deeper.test.ts'), '');
+
+      expect(listE2eSpecs(dir)).toEqual([join('nested', 'deeper', 'Deeper.test.ts')]);
+    });
+  });
+
+  // ── ERPlora/hub#1824, third field over ───────────────────────────────────────────────────────
+  //
+  // The endings above are the canonical SPELLINGS; Playwright does not require that spelling, and
+  // it does not accept every other one either. `collectFilesForProject` (`playwright/lib/runner/
+  // index.js`) puts a file through TWO gates that disagree about case:
+  //
+  //   1. `new Set(['.js','.ts','.mjs','.mts',…]).has(path.extname(file))` — a Set lookup, so the
+  //      FINAL extension has to be lowercase, letter for letter;
+  //   2. `minimatch(filePath, testMatch, { nocase: true, dot: true })` (`util.js`,
+  //      `createFileMatcher`) — so the `spec`/`test` WORD is case-blind.
+  //
+  // Measured with @playwright/test 1.62.1 over one file per name, each in its own directory (a
+  // Mac folds two names that differ only in case into one file, which would have tested nothing):
+  // `Cased.Spec.ts`, `Cased.SPEC.ts`, `Cased.Test.tsx` and `Cased.tEsT.mts` came back in
+  // `Total: 5 tests in 5 files`; `Shouty.spec.TS`, `Shouty.test.MTS`, `Shouty.Spec.Ts` and
+  // `Shouty.spec.tS` did not come back at all.
+  //
+  // Both halves matter and in opposite directions. Missing the first half is the hub#1824 hole
+  // over again — measured on this branch, a `ZZCase.Spec.ts` under `tests/e2e/` was listed by
+  // `playwright --list` inside `Total: 30 tests in 14 files` while this suite stayed at
+  // `77 passed`. Over-reaching on the second is the mirror: the guard would fail the build over a
+  // `Shouty.spec.TS` that Playwright never runs, and the way that gets "fixed" is by deleting the
+  // guard. `nocase` is minimatch's and not the filesystem's, so this is the behaviour on the
+  // case-sensitive Linux of CI too, not a local curiosity.
+  it.each([
+    'Cased.Spec.ts',
+    'Cased.SPEC.ts',
+    'Cased.Test.tsx',
+    'Cased.tEsT.mts',
+  ])('finds %s, because Playwright matches the spec word case-blind', (name) => {
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, name), '');
+
+      expect(listE2eSpecs(dir)).toEqual([name]);
+    });
+  });
+
+  it.each([
+    'Shouty.spec.TS',
+    'Shouty.test.MTS',
+    'Shouty.Spec.Ts',
+    'Shouty.spec.tS',
+  ])('leaves %s alone, because Playwright checks the extension letter for letter', (name) => {
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, name), '');
+
+      expect(listE2eSpecs(dir)).toEqual([]);
+    });
+  });
+
+  it('leaves the near misses behind when they are shouted, too', () => {
+    // Going case-blind on the word must widen the CASE OF THE WORD and nothing else: `.SPEC.txt`
+    // is no more a spec than `.spec.txt` is.
+    withTempE2eDir((dir) => {
+      writeFileSync(join(dir, 'Real.SPEC.ts'), '');
+      writeFileSync(join(dir, 'Near.SPECT.ts'), '');
+      writeFileSync(join(dir, 'Near.SPECS.ts'), '');
+      writeFileSync(join(dir, 'Near.TESTING.ts'), '');
+      writeFileSync(join(dir, 'Near.SPEC.txt'), '');
+
+      expect(listE2eSpecs(dir)).toEqual(['Real.SPEC.ts']);
+    });
+  });
+});
+
+// The other half of ERPlora/hub#1824, and the one that keeps the half above honest.
+//
+// `listE2eSpecs` COPIES Playwright's default `testMatch`, and a copy is only true while the
+// original does not move. `playwright.config.ts` leaves `testMatch` unset today, so the default
+// rules; the day someone declares one — a `testMatch: '**/*.e2e.ts'` is a one-line change nobody
+// would think to weigh against this file — the copy silently describes a set of files that is no
+// longer the set Playwright runs, and the guard goes back to passing over specs it never read.
+// That failure has no symptom: it is green.
+//
+// So the config is pinned. If this goes red, the fix is NOT to delete the check: it is to make
+// `listE2eSpecs` follow the `testMatch` the config now declares.
+// hub#1835 — where Playwright looks, as a decision table. The guard above walks the directory this
+// returns; if it guessed, a half-moved suite would be run by Playwright and read by nobody, in green.
+// Not symmetric with `declaresTestMatch`: `testDir` is always declared, so it is its VALUE that
+// matters, and a value this reader cannot know statically has to be said out loud (`null`).
+describe('declaredTestDir', () => {
+  it.each([
+    ['a top-level literal', "export default defineConfig({ testDir: './e2e' });", './e2e'],
+    ['double quotes', 'export default defineConfig({ testDir: "./e2e" });', './e2e'],
+    ['a quoted key', 'export default defineConfig({ "testDir": "./specs" });', './specs'],
+    ['a space before the colon', "export default defineConfig({ testDir : './specs' });", './specs'],
+    ['a template literal with nothing to interpolate', 'export default defineConfig({ testDir: `./e2e` });', './e2e'],
+    [
+      'the declaration after a URL on the same line',
+      "const url = 'http://127.0.0.1:1'; export default defineConfig({ testDir: './moved' });",
+      './moved',
+    ],
+    [
+      'an old value left in a comment',
+      "// testDir: './old' until hub#1835\nexport default defineConfig({ testDir: './e2e' });",
+      './e2e',
+    ],
+    // Playwright's own default: the directory the config lives in.
+    ['no declaration at all', 'export default defineConfig({ workers: 1 });', '.'],
+  ])('reads %s', (_, source, expected) => {
+    expect(declaredTestDir(source)).toBe(expected);
+  });
+
+  it.each([
+    ['a computed path', "export default defineConfig({ testDir: path.join(__dirname, 'e2e') });"],
+    ['a template literal that interpolates', 'export default defineConfig({ testDir: `${root}/e2e` });'],
+    ['two declarations that disagree', "projects: [{ testDir: './a' }, { testDir: './b' }]"],
+  ])('says it cannot know when the config has %s', (_, source) => {
+    expect(declaredTestDir(source)).toBeNull();
+  });
+});
+
+describe('declaresTestMatch', () => {
+  it.each([
+    ['a top-level key', "export default defineConfig({ testDir: './e2e', testMatch: '**/*.e2e.ts' });"],
+    ['a key on a project', "projects: [{ name: 'chromium', testMatch: /.*\\.e2e\\.ts/ }]"],
+    // Legal JS, and the spelling a regex over `testMatch:` would miss by one character.
+    ['a quoted key', 'export default defineConfig({ "testMatch": ["**/*.e2e.ts"] });'],
+    ['a key with space before the colon', 'export default defineConfig({ testMatch : [] });'],
+    // 🔴 The case that decides whether the reader is worth having. This config is full of URLs,
+    // and a comment stripper that does not know it is inside a string treats the `//` of
+    // `http://` as the start of a comment and drops THE REST OF THE LINE — including the
+    // declaration. The guard would then report "no testMatch here" about a config that declares
+    // one: a miss that reads exactly like a pass. Same class of mute parser bug as ERPlora/sales#291.
+    [
+      'a key sitting after a URL on the same line',
+      "const url = 'http://127.0.0.1:1'; export default defineConfig({ testMatch: '**/*.e2e.ts' });",
+    ],
+  ])('is true when the config declares %s', (_, source) => {
+    expect(declaresTestMatch(source)).toBe(true);
+  });
+
+  it.each([
+    ['the config says nothing about it', "export default defineConfig({ testDir: './e2e' });"],
+    // This very file, and `bench-boot.ts`, explain the default in prose. Prose is not a decision:
+    // a guard that reads it as one cries wolf until someone deletes the guard.
+    ['a line comment mentions it', "// leaves the default `testMatch`, which is recursive\nexport default {};"],
+    ['a block comment mentions it', '/* testMatch is left at its default */\nexport default {};'],
+    ['a comment mentions it after a URL', "const u = 'http://x'; // the default testMatch applies\nexport default {};"],
+  ])('is false when %s', (_, source) => {
+    expect(declaresTestMatch(source)).toBe(false);
+  });
+
+  it('the bench config leaves `testMatch` at its default, which is what listE2eSpecs copies', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('./playwright.config.ts', import.meta.url)),
+      'utf8',
+    );
+
+    expect(
+      declaresTestMatch(source),
+      'playwright.config.ts now declares `testMatch`: make `listE2eSpecs` follow THAT pattern, ' +
+        'because the default it copies is no longer what Playwright runs.',
+    ).toBe(false);
   });
 });
 

@@ -1355,17 +1355,7 @@ async fn persist_handler_output(
 
     // Las intenciones + los INSERT de outbox (eventos declarados por el command + eventos
     // devueltos por el handler) + `extra_ops` (marcador de entrega del relay) → UNA transacción.
-    let declared_payload = crate::system_params(payload, ctx);
-    for event in &cmd.def.emit {
-        tx_ops.push(outbox::insert_op(
-            ctx,
-            &cmd.module_id,
-            event.event(),
-            &declared_payload,
-            depth + 1,
-            event.dedup_key(),
-        ));
-    }
+    //
     // Los eventos que devuelve el handler se validan contra el `module.json` ANTES de encolarlos
     // (hub#240): un nombre no declarado hace fallar el command entero — no se encola en silencio.
     let mut handler_events: Vec<(String, Params)> = Vec::with_capacity(output.events.len());
@@ -1392,6 +1382,31 @@ async fn persist_handler_output(
             }
         };
         handler_events.push((ev.name.clone(), payload));
+    }
+    // hub#1786: a declared event the handler ALSO emitted is announced once — the handler's copy,
+    // which carries the real document (`refund_ref`, ids), not the command's params. Enqueuing both
+    // made every refund die in the dead-letter: `cash_register` refused the params-only copy while
+    // every other listener reacted to an event that should not exist.
+    let declared_payload = crate::system_params(payload, ctx);
+    let declared: Vec<&crate::manifest::EmitDef> = cmd
+        .def
+        .emit
+        .iter()
+        .filter(|event| {
+            !handler_events
+                .iter()
+                .any(|(name, _)| name.trim() == event.event())
+        })
+        .collect();
+    for event in &declared {
+        tx_ops.push(outbox::insert_op(
+            ctx,
+            &cmd.module_id,
+            event.event(),
+            &declared_payload,
+            depth + 1,
+            event.dedup_key(),
+        ));
     }
     for (name, payload) in &handler_events {
         tx_ops.push(outbox::insert_op(
@@ -1434,7 +1449,7 @@ async fn persist_handler_output(
     // eventos del handler salen con el módulo del command (hub#529) — que es también el único
     // namespace en el que hub#240 les deja llamarse.
     let source = crate::registry::EventSource::Module(&cmd.module_id);
-    for event in &cmd.def.emit {
+    for event in &declared {
         events::notify_sink(registry, source, event.event(), &declared_payload);
     }
     for (name, payload) in &handler_events {
@@ -3573,7 +3588,7 @@ mod tests {
         let mut updates = serde_json::Map::new();
         updates.insert("business_tax_id".into(), json!("B12345674"));
         updates.insert("business_legal_name".into(), json!("ACME SL"));
-        crate::settings::set_many(db, hub_id, &updates, "hub_user:1", false)
+        crate::settings::set_many(db, hub_id, &updates, "hub_user:1")
             .await
             .unwrap();
     }

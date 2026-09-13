@@ -31,8 +31,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/module-types
       '@erplora/outfitkit':
-        specifier: ^0.1.52
-        version: 0.1.52
+        specifier: ^0.1.72
+        version: 0.1.72
       '@iconify/vue':
         specifier: ^5.0.1
         version: 5.0.1(vue@3.5.35(typescript@5.9.3))
@@ -140,8 +140,8 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@erplora/outfitkit@0.1.52':
-    resolution: {integrity: sha512-UqzEOr5ln9W88bTR46wE7d1PwYoOTpbTkepA9gxkOoOtSF1IUwnJm9WntETycZc0/RFIxDZM0S2SZe/oafEgCg==}
+  '@erplora/outfitkit@0.1.72':
+    resolution: {integrity: sha512-8mM+Y3foCipsD8wnrfy0MtLtVPAY7xOlJGiHylFQ7LyKHICLYk740GVIm7/TllhuLpjEroDASrdvZoUX6fzwpw==}
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -918,6 +918,7 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abbrev@2.0.0:
     resolution: {integrity: sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apAf5oB7UB7E19ol2R2LKH8hQ==}
@@ -1677,7 +1678,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@erplora/outfitkit@0.1.52':
+  '@erplora/outfitkit@0.1.72':
     dependencies:
       lit: 3.3.3
 

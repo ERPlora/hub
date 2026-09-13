@@ -617,7 +617,7 @@
         {
           "name": "GET /api/business/certificate",
           "request": {
-            "description": "auth: session",
+            "description": "auth: capability+session",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -644,7 +644,7 @@
         {
           "name": "PUT /api/business/certificate",
           "request": {
-            "description": "auth: admin",
+            "description": "auth: admin+capability",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -671,7 +671,7 @@
         {
           "name": "DELETE /api/business/certificate",
           "request": {
-            "description": "auth: admin",
+            "description": "auth: admin+capability",
             "header": [
               {
                 "key": "X-Hub-Session",

@@ -23,8 +23,11 @@
   <ion-header class="ion-no-border app-topbar">
     <ion-toolbar>
       <ion-buttons slot="start">
-        <!-- Drawer móvil. Ionic lo oculta en ≥lg (menú fijo). -->
-        <ion-menu-button :aria-label="t('topbar.menu')" />
+        <!-- Mobile drawer. hub#1831: `auto-hide` off — Ionic hides the button until its `ion-menu`
+             registers, which happens asynchronously after the screen is painted, so a phone showed
+             the page with no way out of it for up to a second. Hiding it where the menu is fixed
+             (≥lg, the `ion-split-pane` breakpoint) is the stylesheet's job: `polish.css`. -->
+        <ion-menu-button class="menu-toggle" :auto-hide="false" :aria-label="t('topbar.menu')" />
         <!-- Back contextual: solo en vistas de detalle (cuando hay `backHref`). -->
         <ion-button
           v-if="backHref"

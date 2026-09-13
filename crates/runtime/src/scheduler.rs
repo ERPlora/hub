@@ -1157,7 +1157,7 @@ mod tests {
         .unwrap();
         let mut updates = serde_json::Map::new();
         updates.insert("timezone".into(), json!("Asia/Kolkata"));
-        crate::settings::set_many(&db, "hub-1", &updates, "hub_user:1", false)
+        crate::settings::set_many(&db, "hub-1", &updates, "hub_user:1")
             .await
             .unwrap();
 

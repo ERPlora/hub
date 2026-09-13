@@ -868,18 +868,13 @@ async fn apply_section(
     // Same question as hub#331, not a new one: not «what does this bundle claim to be» but «whose
     // hub is this». A hub restoring its own backup writes its own identity back (ADR-0113 §1);
     // everyone else's stays out, whatever the manifest says about itself.
-    // hub#376: en un hub de DEMO el filtro se aplica SIEMPRE, venga el bundle de donde venga. El
-    // `same_hub` de arriba se lee del `manifest.json` que va DENTRO del zip, y en una demo el
-    // visitante conoce su propio `hub_id` (está en el subdominio y en `/api/hub/context`): un
-    // bundle hecho a mano que se declare «de este mismo hub» pasaría el filtro y escribiría un NIF
-    // ajeno, dejando en nada el cierre de `settings::set_many`. Una demo no tiene identidad fiscal
-    // propia por ninguna puerta (ADR-0197 §4).
+    // A DEMO hub is filtered like any other (hub#1848): its admin writes the identity through
+    // Settings, so its own backup brings it back instead of being filtered «always» as hub#376 did.
     //
-    // hub#753: y la numeración de OTRA instalación tampoco entra — ver `drop_foreign_numbering`.
-    // `reason` es el código estable que explicará el descarte en el informe; solo se lee cuando de
-    // verdad se descartó algo (`None` = no había filtro que aplicar, así que no hay nada que decir).
-    let demo_hub = rt.registry().demo_hub;
-    let (sql, discarded, reason) = if section == "hub_settings" && (!same_hub || demo_hub) {
+    // hub#753: the numbering of ANOTHER installation stays out too — see `drop_foreign_numbering`.
+    // `reason` is the stable code that explains the discard in the report; it is only read when
+    // something was really discarded (`None` = no filter applied, nothing to say).
+    let (sql, discarded, reason) = if section == "hub_settings" && !same_hub {
         match keep_portable_settings(&sql, &scope) {
             Ok((sql, dropped)) => (sql, dropped, Some(ignore_reason::SETTINGS_NOT_PORTABLE)),
             // Invalid section: it fails WHOLE and without touching the BD, exactly as it did

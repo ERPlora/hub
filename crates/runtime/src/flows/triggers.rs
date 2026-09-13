@@ -887,7 +887,7 @@ mod tests {
     async fn set_zone(db: &dyn DatabaseAdapter, zone: &str) {
         let mut updates = serde_json::Map::new();
         updates.insert("timezone".into(), json!(zone));
-        crate::settings::set_many(db, HUB, &updates, "hub_user:1", false)
+        crate::settings::set_many(db, HUB, &updates, "hub_user:1")
             .await
             .unwrap();
     }
