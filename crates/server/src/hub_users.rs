@@ -40,12 +40,12 @@ use erplora_runtime::Runtime;
 use crate::auth::{self, is_admin_role};
 use crate::state::AppState;
 
+/// Refusal of the gate with the stable code every other door of this hub sends (hub#1705, the
+/// recipe of hub#1700): `401 unauthorized` with no usable session, `403 forbidden` when the session
+/// is fine and the role is not. Until then the people and roles doors flattened both into `401 {"error": "<prose>"}`,
+/// and the screen read `roles/cashier → 401` or `/api/print/hosts → HTTP 401` instead of a reason.
 fn unauthorized(e: auth::AuthError) -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": e.message() })),
-    )
-        .into_response()
+    crate::auth_rejected(e)
 }
 
 /// `400` de una barandilla de gestión. No es un fallo de payload —el cuerpo es válido— sino un

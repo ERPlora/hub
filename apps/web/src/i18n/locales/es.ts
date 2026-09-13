@@ -1040,6 +1040,8 @@ export default {
     errors: {
       // hub#1697 — ver el comentario gemelo en `en.ts`.
       last_admin: 'No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.',
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede gestionar el personal y los roles.',
       self_deactivation: 'No puedes darte de baja a ti mismo. Pídeselo a otro administrador.',
       self_badge_enrollment: 'Nadie da de alta su propia placa. Pídeselo a otro administrador.',
       not_found: 'Esa persona ya no está en este hub. Actualiza la lista.',

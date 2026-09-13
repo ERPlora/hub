@@ -165,11 +165,17 @@ async function postToRuntime(path: string, deviceId: string, body?: unknown): Pr
     headers: { 'Content-Type': 'application/json', ...runtimeHeaders(), 'X-Device-Id': deviceId },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: { message?: string } } | null;
+  const payload = (await res.json().catch(() => null)) as
+    | { ok?: boolean; error?: { code?: string; message?: string } }
+    | null;
   // A refusal must THROW, never resolve: a swallowed one would leave this device believing it
   // drains a role the hub never gave it, and the queue with nobody taking its paper out.
   if (!res.ok || payload?.ok !== true) {
-    throw new Error(payload?.error?.message || `${path} → HTTP ${res.status}`);
+    // hub#1705: the stable code leads. This path runs unattended, so the diagnostic line is all
+    // that is left of a refusal — `unauthorized: …` says «the session expired», `→ HTTP 401` did not.
+    const code = typeof payload?.error?.code === 'string' ? payload.error.code : undefined;
+    const message = payload?.error?.message || `${path} → HTTP ${res.status}`;
+    throw Object.assign(new Error(code ? `${code}: ${message}` : message), { code });
   }
   return payload;
 }

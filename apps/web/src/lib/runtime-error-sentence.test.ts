@@ -197,7 +197,8 @@ describe('catálogo de las puertas locales · cadena `en` + `es` (ADR-0055/0199)
     // hub#1700 added the three the door started sending once it answered the shared envelope.
     ['apiKeys.errors', ['not_found', 'rate_limited', 'unauthorized', 'forbidden', 'api_key.system_key']],
     ['system.errors', ['not_found', 'invalid_payload', 'flow.release_revoked', 'module.capability_denied']],
-    ['employeeForm.errors', ['last_admin', 'self_deactivation', 'self_badge_enrollment', 'not_found']],
+    // hub#1705: the gate of the people and roles doors, once they answered the shared envelope.
+    ['employeeForm.errors', ['last_admin', 'self_deactivation', 'self_badge_enrollment', 'not_found', 'unauthorized', 'forbidden']],
   ];
 
   it.each(NEW_SENTENCES)('%s tiene frase en los DOS idiomas, sin huérfanas', (ns, codes) => {
