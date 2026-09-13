@@ -22,9 +22,6 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-/// A till whose `slowtill.sale.create` spends 400 ms inside Postgres (`pg_sleep`), so overlap is
-/// measurable without trusting timestamps finer than the scheduler's jitter.
-const SLOW_MS: u64 = 400;
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(name)
@@ -63,31 +60,32 @@ fn command_request(till: &str, name: &str, payload: Value) -> Request<Body> {
         .unwrap()
 }
 
-/// Two tills take a payment at the same instant. Each command spends [`SLOW_MS`] inside the
-/// database; if the server lets them overlap the pair finishes in ≈ 1× `SLOW_MS`, if it queues
-/// them on a global lock it takes ≈ 2×. The bound sits in the middle so scheduler jitter cannot
-/// flip it either way.
+/// Two tills take a payment at the same instant, and each command waits INSIDE the database until
+/// it sees the other one arrive (`sale_create_meeting.sql`). Let in together, they meet within
+/// milliseconds; queued on a global lock, the first gives up alone after its 10 s wait, because the
+/// second cannot start until the first is done.
+///
+/// hub#1680: this used to decide by wall clock (total under 600 ms = overlap, over = queued), and a
+/// loaded CI runner turned two overlapping commands into 610 ms and a red nobody believed. What the
+/// test proves now is the ORDER — «the other one was in flight while I was» — which no load changes.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn hub978_two_concurrent_commands_overlap_instead_of_queueing() {
     let app = slow_till_app().await;
 
-    let started = Instant::now();
     let first = tokio::spawn(app.clone().oneshot(command_request(
         "till-1",
-        "slowtill.sale.create",
+        "slowtill.sale.create_meeting",
         json!({ "label": "table 1" }),
     )));
     let second = tokio::spawn(app.clone().oneshot(command_request(
         "till-2",
-        "slowtill.sale.create",
+        "slowtill.sale.create_meeting",
         json!({ "label": "table 2" }),
     )));
     let (first, second) = (
         first.await.unwrap().unwrap(),
         second.await.unwrap().unwrap(),
     );
-    let elapsed = started.elapsed();
-
     assert_eq!(
         first.status(),
         StatusCode::OK,
@@ -100,21 +98,49 @@ async fn hub978_two_concurrent_commands_overlap_instead_of_queueing() {
         "{:?}",
         body_json(second).await
     );
-    let queued = Duration::from_millis(2 * SLOW_MS);
-    let overlapping = Duration::from_millis(SLOW_MS + SLOW_MS / 2);
+
+    let listed = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/query")
+                .header("content-type", "application/json")
+                .header("x-hub-id", "h1")
+                .header("x-user-id", "till-1")
+                .header("x-permissions", "*")
+                .body(Body::from(
+                    json!({ "name": "slowtill.sales.list" }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = body_json(listed).await;
+    let labels: Vec<String> = body["data"]
+        .as_array()
+        .or_else(|| body["data"]["rows"].as_array())
+        .expect("the two sales are listed")
+        .iter()
+        .map(|row| row["label"].as_str().unwrap_or_default().to_string())
+        .collect();
+    assert_eq!(labels.len(), 2, "{body}");
+    // Both meet, deterministically: the first does not depart until it has seen the second arrive,
+    // so the second always arrives with the first still in. Queued on a lock, NEITHER meets anybody.
     assert!(
-        elapsed < overlapping,
-        "two concurrent commands took {elapsed:?}: they queued on the runtime lock \
-         (serialised ≈ {queued:?}, overlapping ≈ {}ms)",
-        SLOW_MS
+        labels.iter().all(|label| label.ends_with(":met")),
+        "two concurrent commands never saw each other in flight: they queued on the runtime lock \
+         ({labels:?})"
     );
 }
 
 /// The relay tick (`process_outbox` + `process_scheduler` + `process_flows`) used to take the
 /// SAME lock as the commands, so a backlog drain froze every till. It now runs under a shared
 /// read guard: a command in flight and a relay pass overlap instead of waiting on each other.
-/// Modelled from the command's side — while a 400 ms command is running, a second reader (the
-/// relay is one) gets in immediately.
+///
+/// hub#1680: proven by ORDER, not by milliseconds. A meeting command stays in flight until a second
+/// one arrives; once it has arrived, a relay pass runs — and the command must STILL be in flight
+/// when the pass returns. Under an exclusive lock the pass could only start after the command had
+/// given up and finished. Then a second command lets the first one go.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn hub978_a_relay_pass_does_not_wait_for_a_command_in_flight() {
     let db = fresh_db().await;
@@ -128,29 +154,74 @@ async fn hub978_a_relay_pass_does_not_wait_for_a_command_in_flight() {
 
     let command = tokio::spawn(router.clone().oneshot(command_request(
         "till-1",
-        "slowtill.sale.create",
+        "slowtill.sale.create_meeting",
         json!({ "label": "table 1" }),
     )));
-    // Give the command time to reach the database before the relay pass asks for the runtime.
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let started = Instant::now();
+    // Wait until the command is INSIDE the database (its arrival is recorded), however long the
+    // machine takes to get it there — no sleep that a loaded runner can outlast.
+    let arrivals = || {
+        let router = router.clone();
+        async move {
+            let resp = router
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/query")
+                        .header("content-type", "application/json")
+                        .header("x-hub-id", "h1")
+                        .header("x-user-id", "till-1")
+                        .header("x-permissions", "*")
+                        .body(Body::from(
+                            json!({ "name": "slowtill.arrivals" }).to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let body = body_json(resp).await;
+            body["data"][0]["arrived"].as_i64().unwrap_or(0)
+        }
+    };
+    while arrivals().await < 1 {
+        assert!(
+            !command.is_finished(),
+            "the command finished before it was seen arriving"
+        );
+        tokio::task::yield_now().await;
+    }
+
     let relayed = {
         let rt = state.runtime.read().await;
         rt.process_outbox().await.unwrap()
     };
-    let waited = started.elapsed();
-
-    let resp = command.await.unwrap().unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "{:?}", body_json(resp).await);
     assert_eq!(
         relayed, 0,
         "nothing was pending; the pass is about the wait, not the work"
     );
     assert!(
-        waited < Duration::from_millis(SLOW_MS / 2),
-        "the relay pass waited {waited:?} for a command that holds the database, not the runtime"
+        !command.is_finished(),
+        "the relay pass only got the runtime after the command in flight had finished: they queued"
     );
+
+    // Let the first command go: a second arrival is the company it is waiting for.
+    let release = router
+        .clone()
+        .oneshot(command_request(
+            "till-2",
+            "slowtill.sale.create_meeting",
+            json!({ "label": "table 2" }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        release.status(),
+        StatusCode::OK,
+        "{:?}",
+        body_json(release).await
+    );
+    let resp = command.await.unwrap().unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "{:?}", body_json(resp).await);
 }
 
 // ── Approvals (hub#361) keep their exactly-once spend without the request lock ──────────────
