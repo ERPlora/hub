@@ -208,6 +208,35 @@ export function declaresTestMatch(source: string): boolean {
 }
 
 /**
+ * The directory this Playwright config collects specs from, as written in it — or `null` when it
+ * cannot be known without running the config.
+ *
+ * The e2e guard walks this directory instead of a copy of it (ERPlora/hub#1835): a copy is true only
+ * while nobody moves the original, and a half-moved suite would be run by Playwright and read by
+ * the guard in green. Not symmetric with {@link declaresTestMatch}: `testDir` is always declared, so
+ * what matters is its VALUE. A plain string or a template with nothing to interpolate is read; a
+ * computed path, an interpolating template or two declarations that disagree answer `null`, and the
+ * guard says so out loud. No declaration is Playwright's default: the config's own directory (`.`).
+ * The decision table is in `tests/bench-boot.test.ts`.
+ */
+export function declaredTestDir(source: string): string | null {
+  const code = stripComments(source);
+  const keys = [...code.matchAll(/["']?\btestDir["']?\s*:\s*/g)];
+  if (keys.length === 0) return '.';
+
+  const values = new Set<string>();
+  for (const key of keys) {
+    const rest = code.slice((key.index ?? 0) + key[0].length);
+    const literal = /^(['"`])((?:(?!\1)[^\\\n]|\\.)*)\1/.exec(rest);
+    if (!literal) return null;
+    const [, quote, value] = literal;
+    if (quote === '`' && value.includes('${')) return null;
+    values.add(value);
+  }
+  return values.size === 1 ? [...values][0] : null;
+}
+
+/**
  * Does this spec's source take `test` from `@playwright/test` — and so opt out of the bench?
  *
  * Every way of reaching it counts: a named import in either quote style (nothing in this package

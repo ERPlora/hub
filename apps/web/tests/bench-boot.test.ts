@@ -7,11 +7,12 @@
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
   BOOT_RELOAD_LIMIT,
+  declaredTestDir,
   declaresTestMatch,
   isBootTransportFailure,
   listE2eSpecs,
@@ -122,7 +123,19 @@ describe('BOOT_RELOAD_LIMIT', () => {
 // that takes `test` from the bench, so a spec that imports it straight from Playwright opts out of
 // it in silence — which is how this would come back a third time in a spec nobody has written yet.
 describe('every e2e spec takes its `test` from the bench', () => {
-  const E2E_DIR = fileURLToPath(new URL('./e2e', import.meta.url));
+  // hub#1835: the directory is READ from the Playwright config, never retyped here. A copy is true
+  // only while nobody moves the original, and moving it is one line two files away.
+  const CONFIG = fileURLToPath(new URL('./playwright.config.ts', import.meta.url));
+  const declared = declaredTestDir(readFileSync(CONFIG, 'utf8'));
+  const E2E_DIR = resolve(dirname(CONFIG), declared ?? '<testDir is not a literal>');
+
+  it('reads the directory Playwright collects from out of its config', () => {
+    expect(
+      declared,
+      'playwright.config.ts declares `testDir` as something other than a plain string: make ' +
+        '`declaredTestDir` understand it, or this guard walks a directory Playwright does not.',
+    ).not.toBeNull();
+  });
 
   const specs = listE2eSpecs(E2E_DIR);
 
@@ -357,6 +370,42 @@ describe('listE2eSpecs', () => {
 //
 // So the config is pinned. If this goes red, the fix is NOT to delete the check: it is to make
 // `listE2eSpecs` follow the `testMatch` the config now declares.
+// hub#1835 — where Playwright looks, as a decision table. The guard above walks the directory this
+// returns; if it guessed, a half-moved suite would be run by Playwright and read by nobody, in green.
+// Not symmetric with `declaresTestMatch`: `testDir` is always declared, so it is its VALUE that
+// matters, and a value this reader cannot know statically has to be said out loud (`null`).
+describe('declaredTestDir', () => {
+  it.each([
+    ['a top-level literal', "export default defineConfig({ testDir: './e2e' });", './e2e'],
+    ['double quotes', 'export default defineConfig({ testDir: "./e2e" });', './e2e'],
+    ['a quoted key', 'export default defineConfig({ "testDir": "./specs" });', './specs'],
+    ['a space before the colon', "export default defineConfig({ testDir : './specs' });", './specs'],
+    ['a template literal with nothing to interpolate', 'export default defineConfig({ testDir: `./e2e` });', './e2e'],
+    [
+      'the declaration after a URL on the same line',
+      "const url = 'http://127.0.0.1:1'; export default defineConfig({ testDir: './moved' });",
+      './moved',
+    ],
+    [
+      'an old value left in a comment',
+      "// testDir: './old' until hub#1835\nexport default defineConfig({ testDir: './e2e' });",
+      './e2e',
+    ],
+    // Playwright's own default: the directory the config lives in.
+    ['no declaration at all', 'export default defineConfig({ workers: 1 });', '.'],
+  ])('reads %s', (_, source, expected) => {
+    expect(declaredTestDir(source)).toBe(expected);
+  });
+
+  it.each([
+    ['a computed path', "export default defineConfig({ testDir: path.join(__dirname, 'e2e') });"],
+    ['a template literal that interpolates', 'export default defineConfig({ testDir: `${root}/e2e` });'],
+    ['two declarations that disagree', "projects: [{ testDir: './a' }, { testDir: './b' }]"],
+  ])('says it cannot know when the config has %s', (_, source) => {
+    expect(declaredTestDir(source)).toBeNull();
+  });
+});
+
 describe('declaresTestMatch', () => {
   it.each([
     ['a top-level key', "export default defineConfig({ testDir: './e2e', testMatch: '**/*.e2e.ts' });"],
