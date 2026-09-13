@@ -382,7 +382,8 @@ fi
 # jobs that verify the shell run the image's own resolution command, taken from the
 # Dockerfile (not retyped here), between the install and what they verify.
 dockerfile="$repo_root/docker/Dockerfile"
-image_resolution=$(grep -oE 'pnpm --filter @erplora/web add @erplora/outfitkit@[^[:space:]"]+' "$dockerfile" | head -1)
+# awk reads the FILE and stops at the first match: no pipe into a reader that cuts (hub#1534).
+image_resolution=$(awk 'match($0, /pnpm --filter @erplora\/web add @erplora\/outfitkit@[^[:space:]"]+/) { print substr($0, RSTART, RLENGTH); exit }' "$dockerfile")
 if [ -z "$image_resolution" ]; then
     bad "la imagen resuelve OutfitKit con un comando reconocible (hub#1793)" \
         "no encuentro \`pnpm --filter @erplora/web add @erplora/outfitkit@…\` en docker/Dockerfile: si la imagen cambió de forma de resolverla, este control y los jobs de test-web.yml tienen que seguirla"
