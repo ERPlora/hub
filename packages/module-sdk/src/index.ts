@@ -2260,6 +2260,80 @@ export class WhatsappTemplatesApi {
   }
 }
 
+/** Where the business certificate lives. Every path {@link CertificateApi} can build is this one. */
+export const CERTIFICATE_BASE_PATH = '/api/business/certificate';
+
+/** One certificate slot, as the runtime publishes it: presence and who put it there, never bytes. */
+export interface CertificateSlot {
+  present: boolean;
+  uploaded_at?: string | null;
+  /** `hub_user:<id>` of the admin who uploaded it. */
+  uploaded_by?: string | null;
+}
+
+/**
+ * What the three certificate doors answer: the state the certificate is in (or was left in).
+ *
+ * The root fields describe the business's OWN certificate. `active` is the slot that signs (`null`
+ * when there is none) and `transmission_route` is how records reach the tax authority right now
+ * (`own` with an own certificate, `delegated` through ERPlora's cell without one).
+ */
+export interface CertificateStatus extends CertificateSlot {
+  slots: Record<string, CertificateSlot>;
+  active: string | null;
+  transmission_route: string;
+  [field: string]: unknown;
+}
+
+/** An upload: the `.p12` / `.pfx` file as base64 and the password that opens it. */
+export interface CertificateUpload {
+  pkcs12Base64: string;
+  password: string;
+}
+
+/**
+ * **The business certificate** (hub#1844) — read its state, upload or replace it, remove it.
+ *
+ * Three methods and one path, pinned by `certificate.test.ts`. The custody does not move: the bytes
+ * and the password go to the core, which encrypts them at rest, and nothing that comes back carries
+ * either — only presence, who uploaded it and which road the records take.
+ *
+ * The session is never here. The shell puts `X-Hub-Session` on the transport, so a compliance
+ * module's screen stops reading the token out of `localStorage` to reach this door.
+ */
+export class CertificateApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /** `GET /api/business/certificate` — the state of the certificate. Never its bytes. */
+  async get(): Promise<CertificateStatus> {
+    return this.send({ method: 'GET', path: CERTIFICATE_BASE_PATH }) as Promise<CertificateStatus>;
+  }
+
+  /**
+   * `PUT /api/business/certificate` — upload or replace the business's own certificate. Needs an
+   * owner/admin session. A file the runtime cannot open comes back as an {@link ErploraError} with
+   * its code, so the screen can say whether it was the file or the password.
+   */
+  async put(upload: CertificateUpload): Promise<CertificateStatus> {
+    return this.send({
+      method: 'PUT',
+      path: CERTIFICATE_BASE_PATH,
+      body: { pkcs12_b64: upload.pkcs12Base64, password: upload.password },
+    }) as Promise<CertificateStatus>;
+  }
+
+  /**
+   * `DELETE /api/business/certificate` — remove the business's own certificate. The hub goes back
+   * to the delegated road; it does not stop invoicing. Answers the state it leaves.
+   */
+  async remove(): Promise<CertificateStatus> {
+    return this.send({
+      method: 'DELETE',
+      path: CERTIFICATE_BASE_PATH,
+    }) as Promise<CertificateStatus>;
+  }
+}
+
 /** Where the hub's print queue lives. Every path {@link PrintApi} can build starts here. */
 export const PRINT_JOBS_BASE_PATH = '/api/print/jobs';
 
@@ -2375,6 +2449,7 @@ export class ErploraClient {
   private eventsApi?: EventsApi;
   private printApi?: PrintApi;
   private whatsappTemplatesApi?: WhatsappTemplatesApi;
+  private certificateApi?: CertificateApi;
 
   constructor(
     private readonly transport: ErploraTransport,
@@ -2508,6 +2583,7 @@ export class ErploraClient {
     scoped.eventsApi = undefined;
     scoped.printApi = undefined;
     scoped.whatsappTemplatesApi = undefined;
+    scoped.certificateApi = undefined;
     return scoped;
   }
 
@@ -2624,6 +2700,36 @@ export class ErploraClient {
       );
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
+  /**
+   * **The business certificate** (hub#1844) — read its state, upload or replace it, remove it.
+   *
+   * The certificate belongs to the business, but the screen that manages it belongs to a compliance
+   * module (the hub is country-agnostic, ADR-0424). Module-scoped and gated twice: an owner/admin
+   * session the runtime checks (a user session is enough to read), plus **`certificate`** declared
+   * in the module's `module.json` and granted by the owner — the same grant the module already needs
+   * to sign with that key. A refusal arrives as `capability_denied`, so the screen can ask for the
+   * grant instead of showing «error».
+   */
+  get certificate(): CertificateApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the business certificate is module-scoped: use `erplora.forModule("<your module id>").certificate`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.certificateApi ??= new CertificateApi((req) =>
       transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
     ));
   }
