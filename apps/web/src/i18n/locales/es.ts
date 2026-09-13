@@ -486,6 +486,8 @@ export default {
     errors: {
       device_name_too_long: 'Ese nombre es demasiado largo. Ponle uno más corto y vuelve a guardar.',
       device_not_found: 'Ese dispositivo ya no está registrado aquí. Actualiza la lista.',
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede gestionar los dispositivos.',
     },
     title: 'Dispositivos',
     intro:
