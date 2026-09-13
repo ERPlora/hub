@@ -125,12 +125,12 @@ pub(crate) fn user_agent_of(headers: &HeaderMap) -> &str {
         .unwrap_or_default()
 }
 
+/// Refusal of the admin gate with the stable code every other door of this hub sends (hub#1702,
+/// the recipe of hub#1700): `401 unauthorized` when there is no usable session, `403 forbidden` when
+/// the session is fine and the role is not. Until then this door flattened both into
+/// `401 {"error": "<prose>"}` and Settings → Devices could only say «check the connection».
 fn unauthorized(e: auth::AuthError) -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": e.message() })),
-    )
-        .into_response()
+    crate::auth_rejected(e)
 }
 
 async fn runtime(st: &AppState) -> Result<crate::state::SharedRuntime, Response> {

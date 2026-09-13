@@ -346,6 +346,10 @@ ion-menu.dash-menu ion-content.sidebar-content { --background: var(--ion-backgro
 /* ── Rail colapsado (escritorio, icon-only) ───────────────────────────────────────────────── */
 .rail-toggle { display: none; }            /* el toggle solo aparece en escritorio */
 @media (min-width: 992px) { .rail-toggle { display: inline-flex; } }
+/* hub#1831: the drawer button is the opposite door — phone and tablet only. It no longer auto-hides
+   (that is what left it hidden for up to a second after the first paint), so the breakpoint that
+   hides it is this one, the same `lg` (992px) at which `ion-split-pane when="lg"` pins the menu. */
+@media (min-width: 992px) { .app-topbar ion-menu-button.menu-toggle { display: none; } }
 ion-split-pane.rail .erp-wordmark,
 ion-split-pane.rail .nav-label,
 ion-split-pane.rail .sidebar-user-meta { display: none; }

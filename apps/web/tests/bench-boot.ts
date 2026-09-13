@@ -208,6 +208,35 @@ export function declaresTestMatch(source: string): boolean {
 }
 
 /**
+ * The directory this Playwright config collects specs from, as written in it — or `null` when it
+ * cannot be known without running the config.
+ *
+ * The e2e guard walks this directory instead of a copy of it (ERPlora/hub#1835): a copy is true only
+ * while nobody moves the original, and a half-moved suite would be run by Playwright and read by
+ * the guard in green. Not symmetric with {@link declaresTestMatch}: `testDir` is always declared, so
+ * what matters is its VALUE. A plain string or a template with nothing to interpolate is read; a
+ * computed path, an interpolating template or two declarations that disagree answer `null`, and the
+ * guard says so out loud. No declaration is Playwright's default: the config's own directory (`.`).
+ * The decision table is in `tests/bench-boot.test.ts`.
+ */
+export function declaredTestDir(source: string): string | null {
+  const code = stripComments(source);
+  const keys = [...code.matchAll(/["']?\btestDir["']?\s*:\s*/g)];
+  if (keys.length === 0) return '.';
+
+  const values = new Set<string>();
+  for (const key of keys) {
+    const rest = code.slice((key.index ?? 0) + key[0].length);
+    const literal = /^(['"`])((?:(?!\1)[^\\\n]|\\.)*)\1/.exec(rest);
+    if (!literal) return null;
+    const [, quote, value] = literal;
+    if (quote === '`' && value.includes('${')) return null;
+    values.add(value);
+  }
+  return values.size === 1 ? [...values][0] : null;
+}
+
+/**
  * Does this spec's source take `test` from `@playwright/test` — and so opt out of the bench?
  *
  * Every way of reaching it counts: a named import in either quote style (nothing in this package
@@ -235,6 +264,27 @@ export function specTakesTestFromPlaywright(source: string): boolean {
   return false;
 }
 
+/** One reload the bench spent on a navigation, and the transport codes that made it spend it. */
+export interface BootReload {
+  url: string;
+  codes: string[];
+}
+
+const booksByPage = new WeakMap<object, BootReload[]>();
+
+/**
+ * The reloads the bench spent on this page, in order (ERPlora/hub#1839).
+ *
+ * A spec that injects a failure of OURS has to prove the bench did not reload for IT — not that the
+ * bench did not reload at all, because a genuine accident of the runner inside the same navigation
+ * makes it reload, correctly. The warning line says why, but it is printed by the bench's Node
+ * process, where `page.on('console')` never sees it; these are the same facts, readable from the
+ * spec. Reset on every `goto`, like the reloads themselves.
+ */
+export function bootReloadsOf(page: object): readonly BootReload[] {
+  return booksByPage.get(page) ?? [];
+}
+
 /**
  * The bench's `test`. Same Playwright `test` as ever, with one difference: a navigation whose own
  * code died on the wire is fetched again instead of being handed to the spec as a blank page.
@@ -257,6 +307,8 @@ export const test = base.extend({
 
     page.goto = async (url, options) => {
       lost.length = 0;
+      const books: BootReload[] = [];
+      booksByPage.set(page, books);
       let response = await navigate(url, options);
 
       for (let reload = 1; lost.length > 0 && reload <= BOOT_RELOAD_LIMIT; reload += 1) {
@@ -269,6 +321,7 @@ export const test = base.extend({
             `(${[...new Set(lost)].join(', ')}) while loading ${url} — reloading ` +
             `(${reload}/${BOOT_RELOAD_LIMIT}). See hub#1806.`,
         );
+        books.push({ url, codes: [...new Set(lost)] });
         lost.length = 0;
         response = await page.reload(options);
       }

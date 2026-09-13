@@ -1,0 +1,18 @@
+{
+  "id": "eo",
+  "name": "Emit-once fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "eo.refund": {
+      "permission": "",
+      "transaction": true,
+      "emit": ["eo.refunded", "eo.audited"],
+      "handler": {
+        "type": "native",
+        "function": "refund"
+      }
+    }
+  }
+}

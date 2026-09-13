@@ -128,6 +128,11 @@ jobs:
       - name: Contrato del job fleet-canary (saas#1895)
         run: bash ./scripts/tests/canary-on-publish.test.sh
 
+      # hub#1790: el veredicto que ese job obedece, probado con los casos reales (el verde de
+      # v1.1.22 sobre su propia cuarentena incluido). ~1 s.
+      - name: Veredicto del canario por digest (hub#1790)
+        run: bash ./scripts/tests/fleet-canary-verdict.test.sh
+
       # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
       #
       # El MISMO tag `v*` dispara también `tauri-release.yml`, que publica la app en **Microsoft
@@ -244,6 +249,10 @@ jobs:
     # segundos), más el aprovisionamiento del hub. 25 deja margen sin dejar el runner colgado.
     timeout-minutes: 25
     steps:
+      # hub#1790: el veredicto lo decide `scripts/ci/fleet-canary-verdict.py`, que vive en el repo.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Promocionar el tag y lanzar el canario
         id: launch
         env:
@@ -307,34 +316,35 @@ jobs:
           DIGEST: ${{ steps.launch.outputs.digest }}
         run: |
           set -uo pipefail
+          # hub#1790: el veredicto es el de ESTE digest. Se pregunta por él (`?image=`) y decide
+          # `scripts/ci/fleet-canary-verdict.py`, que entiende el SaaS con `release` y el que solo
+          # tiene `current`. Leer `current` a secas dio verde en v1.1.22 sobre un veto: tras vetar,
+          # `current` es OTRA release. Contrato: scripts/tests/fleet-canary-verdict.test.sh.
           # 20 min de techo: el sondeo del SaaS se rinde a los 10, más el aprovisionamiento.
           deadline=$(( $(date +%s) + 1200 ))
           while [ "$(date +%s)" -lt "$deadline" ]; do
-            curl -sS -H "X-Api-Key: ${FLEET_API_KEY}" \
+            curl -sS -G -H "X-Api-Key: ${FLEET_API_KEY}" --data-urlencode "image=${DIGEST}" \
               "${FLEET_API}/api/v1/fleet/release/" -o /tmp/release.json || true
-            verdict=$(python3 - <<'PY'
-          import json
-          try:
-              cur = (json.load(open("/tmp/release.json")) or {}).get("current") or {}
-          except Exception:
-              print("unknown"); raise SystemExit
-          # `canary_verified` ya lleva el veto dentro: un digest probado a las 10:00 y vetado a las
-          # 11:00 NO está verificado, porque la evidencia posterior gana.
-          if cur.get("quarantined"):
-              print("quarantined")
-          elif cur.get("canary_verified"):
-              print("verified")
-          else:
-              print("pending")
-          PY
-          )
+            answer=$(python3 ./scripts/ci/fleet-canary-verdict.py /tmp/release.json "${DIGEST}")
+            verdict=${answer%%$'\t'*}
+            detail=${answer#*$'\t'}
             case "$verdict" in
               verified)
-                echo "🐤 El canario aprobó ${DIGEST} — versión servida: $(python3 -c 'import json;print(json.load(open("/tmp/release.json"))["current"].get("canary_version_seen",""))')"
+                echo "🐤 El canario aprobó ${DIGEST} — versión servida: ${detail}"
                 exit 0
                 ;;
               quarantined)
-                echo "::error::El canario VETÓ ${DIGEST}: el puntero cayó solo a la release anterior y ningún hub nuevo nace ya con esta imagen."
+                echo "::error::El canario VETÓ ${DIGEST} (${detail}): el puntero cayó solo a la release anterior y ningún hub nuevo nace ya con esta imagen."
+                cat /tmp/release.json
+                exit 1
+                ;;
+              refused|errored|failed)
+                echo "::error::El canario sobre ${DIGEST} acabó en «${verdict}»: ${detail}. La release NO está probada."
+                cat /tmp/release.json
+                exit 1
+                ;;
+              moved|missing|mismatch)
+                echo "::error::No hay veredicto para ${DIGEST} (${verdict}): ${detail}. La release NO está probada."
                 cat /tmp/release.json
                 exit 1
                 ;;

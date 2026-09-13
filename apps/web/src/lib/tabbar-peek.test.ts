@@ -208,6 +208,55 @@ function fakeSegment(geometry: TabbarGeometry): HTMLElement {
   return fakeStrip(geometry).segment;
 }
 
+// ── hub#1841 — the two promises the fix makes, pinned ───────────────────────────────────────
+
+describe('peekTabWidth — the floor is a contract, not a hope (hub#1841)', () => {
+  it('never answers a width below the floor, even on a strip too narrow for a tab and a peek', () => {
+    // 140px: one whole 88px tab plus half of the next plus the margin does not fit. The search used
+    // to fall back to one whole tab and return (140 - 12 - 4 - 4) / 1.5 = 80px — squeezing the label
+    // it promises never to squeeze. Unreachable with the phones served today (the narrowest strip is
+    // 312px); the invariant is what the next person who raises the floor relies on.
+    const narrow: TabbarGeometry = { ...SETTINGS_390, visibleWidth: 140 };
+    const width = peekTabWidth(narrow);
+    expect(width).not.toBeNull();
+    expect(width as number).toBeGreaterThanOrEqual(narrow.tabWidth);
+  });
+
+  it('holds the same floor on a module screen, where it is 116px', () => {
+    const narrow: TabbarGeometry = { ...MODULE_390, visibleWidth: 180 };
+    expect(peekTabWidth(narrow) as number).toBeGreaterThanOrEqual(MODULE_390.tabWidth);
+  });
+});
+
+describe('peekTabWidth — a pixel of rounding is not an overflow (hub#1841)', () => {
+  it('leaves alone a strip whose content exceeds the visible width only by the engine rounding', () => {
+    // `scrollWidth` and `clientWidth` are rounded differently: a strip that fits reads one pixel wider
+    // than it shows. Resizing its tabs over that would move the whole strip for nothing.
+    const rounding: TabbarGeometry = {
+      visibleWidth: 382,
+      contentWidth: 383,
+      firstTabLeft: 4,
+      tabWidth: 94,
+      tabPitch: 96,
+      tabCount: 4,
+    };
+    expect(peekTabWidth(rounding)).toBeNull();
+    expect(hidesTabsSilently(rounding)).toBe(false);
+  });
+
+  it('but acts on a strip that really overflows by two pixels', () => {
+    const real: TabbarGeometry = {
+      visibleWidth: 382,
+      contentWidth: 384,
+      firstTabLeft: 4,
+      tabWidth: 94,
+      tabPitch: 96,
+      tabCount: 4,
+    };
+    expect(peekTabWidth(real)).not.toBeNull();
+  });
+});
+
 describe('bindTabbarPeek — wiring it to a live strip', () => {
   it('publishes the width on the strip so OutfitKit lays the tabs out with it', () => {
     const segment = fakeSegment(SETTINGS_390);

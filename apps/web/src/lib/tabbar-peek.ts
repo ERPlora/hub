@@ -88,8 +88,9 @@ export function hidesTabsSilently(geometry: TabbarGeometry): boolean {
  *
  * and takes the largest `whole` whose answer still respects the width the tabs already had — that
  * floor is what keeps a label from being squeezed, and it is set per product (88px in OutfitKit,
- * 116px for a module screen). Fewer whole tabs means wider ones, so there is always an answer;
- * showing at least one whole tab plus the peek is the floor of the search.
+ * 116px for a module screen). Fewer whole tabs means wider ones; showing at least one whole tab
+ * plus the peek is the floor of the search, and when not even that fits at the floor, the floor
+ * stands and there is no peek (hub#1841) — a squeezed label is worse than a strip that does not hint.
  */
 export function peekTabWidth(geometry: TabbarGeometry): number | null {
   if (geometry.contentWidth <= geometry.visibleWidth + EPSILON) return null;
@@ -100,13 +101,17 @@ export function peekTabWidth(geometry: TabbarGeometry): number | null {
 
   const widthFor = (whole: number): number => (room - whole * gap) / (whole + 0.5);
 
-  let chosen = 1;
+  let chosen: number | null = null;
   for (let whole = geometry.tabCount - 1; whole >= 1; whole -= 1) {
     if (widthFor(whole) >= geometry.tabWidth) {
       chosen = whole;
       break;
     }
   }
+  // hub#1841: a strip too narrow for even one whole tab and the peek at the floor keeps the floor.
+  // Falling back to «one whole tab» there answered a width BELOW it — squeezing the label this
+  // function promises never to squeeze. No peek is better than a broken label.
+  if (chosen === null) return geometry.tabWidth;
 
   // Rounded DOWN: a narrower tab moves the cut further past the centre, never short of it, so the
   // margin above survives the engine's own rounding of the column width.

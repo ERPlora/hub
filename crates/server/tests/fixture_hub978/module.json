@@ -13,13 +13,14 @@
     "postgres": ["migrations/postgres/001_init.sql"]
   },
   "queries": {
-    "slowtill.sales.list": { "permission": "slowtill.view_sale", "sql": "queries/sales_list.sql" }
+    "slowtill.sales.list": { "permission": "slowtill.view_sale", "sql": "queries/sales_list.sql" },
+    "slowtill.arrivals": { "permission": "slowtill.view_sale", "sql": "queries/arrivals.sql" }
   },
   "commands": {
-    "slowtill.sale.create": {
+    "slowtill.sale.create_meeting": {
       "permission": "slowtill.add_sale",
       "transaction": true,
-      "sql": ["commands/sale_create_slow.sql"]
+      "sql": ["commands/sale_create_meeting.sql"]
     },
     "slowtill.sale.create_fast": {
       "permission": "slowtill.add_sale",
