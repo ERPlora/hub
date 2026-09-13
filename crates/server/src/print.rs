@@ -102,12 +102,12 @@ pub struct QueueFilter {
 }
 
 /// `401` for an auth failure (no session / invalid session).
+/// Refusal of the gate with the stable code every other door of this hub sends (hub#1705, the
+/// recipe of hub#1700): `401 unauthorized` with no usable session, `403 forbidden` when the session
+/// is fine and the role is not. Until then the print doors flattened both into `401 {"error": "<prose>"}`,
+/// and the screen read `roles/cashier → 401` or `/api/print/hosts → HTTP 401` instead of a reason.
 fn unauthorized(e: auth::AuthError) -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": e.message() })),
-    )
-        .into_response()
+    crate::auth_rejected(e)
 }
 
 /// A queued job as the listing reports it: everything **except** the document, and the stamp only

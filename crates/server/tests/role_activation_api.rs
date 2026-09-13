@@ -161,11 +161,14 @@ async fn only_an_administrator_switches_a_role_on() {
         json!({ "active": true }),
     )
     .await;
+    // hub#1705: `403 forbidden`, not `401`. The session is valid and the role is not; the screen
+    // must say who can do this instead of «sign in again», which would never help.
     assert_eq!(
         denied.status(),
-        StatusCode::UNAUTHORIZED,
+        StatusCode::FORBIDDEN,
         "deciding which roles exist in the business is administration"
     );
+    assert_eq!(body_json(denied).await["error"]["code"], "forbidden");
     assert_eq!(
         roles(&router, &employee)
             .await
@@ -185,6 +188,7 @@ async fn only_an_administrator_switches_a_role_on() {
     )
     .await;
     assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(body_json(anonymous).await["error"]["code"], "unauthorized");
 
     let granted = put(
         &router,

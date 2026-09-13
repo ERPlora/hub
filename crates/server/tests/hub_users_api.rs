@@ -233,9 +233,10 @@ async fn a_non_admin_cannot_manage_users() {
             json!({ "name": "Hackeo", "role": "owner" }),
         )
         .await;
+        // hub#1705: a valid session without the role is `403 forbidden` — signing in again would not help.
         assert_eq!(
             response.status(),
-            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
             "{method} {uri} no puede hacerlo una cajera"
         );
     }
@@ -456,7 +457,8 @@ async fn only_an_administrator_creates_a_local_user() {
         json!({ "name": "Luis Prat", "role": "employee", "pin": "5390", "local": true }),
     )
     .await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    // hub#1705: a valid session without the role is `403 forbidden` — signing in again would not help.
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
     let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
     assert_eq!(
         users["data"].as_array().unwrap().len(),
@@ -545,7 +547,8 @@ async fn only_an_administrator_invites_anybody() {
         json!({ "name": "Luis Prat", "email": "luis@example.com", "role": "manager" }),
     )
     .await;
-    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    // hub#1705: a valid session without the role is `403 forbidden` — signing in again would not help.
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
     let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
     assert_eq!(
         users["data"].as_array().unwrap().len(),

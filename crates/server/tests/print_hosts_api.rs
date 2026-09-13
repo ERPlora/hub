@@ -171,6 +171,13 @@ async fn the_print_host_registry_requires_a_user_session() {
             StatusCode::UNAUTHORIZED,
             "{method} {uri} must not be anonymous"
         );
+        // hub#1705: with the code the device can say «the session expired», not `→ HTTP 401`.
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+        assert_eq!(
+            body["error"]["code"], "unauthorized",
+            "{method} {uri}: {body}"
+        );
     }
 }
 
@@ -363,9 +370,10 @@ async fn retiring_another_device_takes_an_admin_session() {
         ))
         .await
         .unwrap();
+    // hub#1705: a valid session without the role is `403 forbidden` — signing in again would not help.
     assert_eq!(
         resp.status(),
-        StatusCode::UNAUTHORIZED,
+        StatusCode::FORBIDDEN,
         "a cashier cannot retire a till they are not holding"
     );
     assert_eq!(
