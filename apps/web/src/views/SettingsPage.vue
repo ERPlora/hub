@@ -956,18 +956,10 @@ async function onShareWithErploraToggle(e: Event): Promise<void> {
 }
 
 async function saveTaxSettings(): Promise<void> {
-  // Persiste la identidad de NEGOCIO GLOBAL (server-side, /api/settings — ADR-0061). Solo admin (el
-  // runtime revalida); el tax_id se normaliza en el runtime. Impuestos/e-factura ya no viven aquí.
-  const prev = {
-    business_tax_id: hubSettings.value?.business_tax_id ?? '',
-    business_legal_name: hubSettings.value?.business_legal_name ?? '',
-    business_street: hubSettings.value?.business_street ?? '',
-    business_street_number: hubSettings.value?.business_street_number ?? '',
-    business_postal_code: hubSettings.value?.business_postal_code ?? '',
-    business_city: hubSettings.value?.business_city ?? '',
-  };
-  // `business_address` NO se manda: la compone el runtime con las partes (hub#1846). Mandarla a la
-  // vez sería dos fuentes para la misma línea en el mismo guardado.
+  // Persists the GLOBAL business identity (server-side, /api/settings — ADR-0061). Admin only (the
+  // runtime re-checks); the tax id is normalised by the runtime. Taxes/e-invoicing no longer live here.
+  // `business_address` is NOT sent: the runtime composes it from the parts (hub#1846). Sending it too
+  // would be two sources for the same line in the same save.
   const saved = await persistHubSettings(
     {
       business_tax_id: businessTaxId.value.trim(),
@@ -978,12 +970,10 @@ async function saveTaxSettings(): Promise<void> {
       business_city: businessCity.value.trim(),
     },
     () => {
-      businessTaxId.value = prev.business_tax_id;
-      businessLegalName.value = prev.business_legal_name;
-      businessStreet.value = prev.business_street;
-      businessStreetNumber.value = prev.business_street_number;
-      businessPostalCode.value = prev.business_postal_code;
-      businessCity.value = prev.business_city;
+      // Nothing to roll back: this is a form with a Save button, so until a save lands the fields
+      // hold the admin's draft. Putting the stored values back on a refusal wiped all six fields
+      // and made the admin type them again to fix the one that was wrong (`banco-pre`, hub#1848).
+      // A save that DOES land re-syncs the fields from the cache through the `hubSettings` watch.
     },
   );
   // hub#1306 — guardar la identidad la PUBLICA en el SaaS, que es lo que le permite nombrar al
