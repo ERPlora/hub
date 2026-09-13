@@ -973,7 +973,7 @@ async function saveTaxSettings(): Promise<void> {
     () => {
       // Nothing to roll back: this is a form with a Save button, so until a save lands the fields
       // hold the admin's draft. Putting the stored values back on a refusal wiped all six fields
-      // and made her type them again to fix the one that was wrong (seen on `banco-pre`, hub#1848).
+      // and made the admin type them again to fix the one that was wrong (`banco-pre`, hub#1848).
       // A save that DOES land re-syncs the fields from the cache through the `hubSettings` watch.
     },
   );

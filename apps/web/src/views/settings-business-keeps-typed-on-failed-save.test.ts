@@ -3,12 +3,13 @@
 //
 // Measured on `banco-pre` on 2026-09-13 (hub#1848): the admin filled in the fiscal address in parts,
 // pressed «Save changes», the runtime said no, and every field went back to what the server had —
-// empty. The toast explained the refusal, but the form she had just typed was gone, so fixing the
-// one field that was wrong meant typing all six again.
+// empty. The toast explained the refusal, but the form the admin had just typed was gone, so fixing
+// the one field that was wrong meant typing all six again.
 //
 // The instant settings (currency, palette, language) roll back on a refusal because the control IS
 // the stored value. This is a form with an explicit «Save» button: until the save lands, what is on
-// screen is her draft, and a refusal must leave the draft where it was — like every admin form does.
+// screen is the admin's draft, and a refusal must leave the draft where it was — like every admin
+// form does.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
@@ -195,7 +196,7 @@ describe('Settings › Business · a refused save keeps the draft', () => {
 
       expect(toastSuccess).not.toHaveBeenCalled();
       expect(toastError, 'the refusal is still explained').toHaveBeenCalledTimes(1);
-      expect(formOf(vm), 'a refused save must not wipe what she typed').toEqual(TYPED);
+      expect(formOf(vm), 'a refused save must not wipe what the admin typed').toEqual(TYPED);
       expect(hubSettings.value.business_street, 'and nothing was stored').toBe('');
     });
   }
