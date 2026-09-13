@@ -232,6 +232,25 @@ export default {
     failed: 'The file could not be downloaded.',
   },
   files: {
+    // hub#1776 — the stable codes the media doors send (`crates/server/src/media.rs`). The shared
+    // `runtimeErrors` already says `cloud_unreachable`, `cloud_rejected`, `cloud_unreadable` and
+    // `hub_not_enrolled`; these are the reasons that belong to Files. Only the ones that retrying
+    // can fix say to try again.
+    errors: {
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can change the files.',
+      not_found: 'That file or folder no longer exists. Refresh the list.',
+      media: {
+        no_files: 'No file was selected to upload.',
+        busy: 'Too many files are being handled right now. Try again in a moment.',
+        too_large: 'That file is too large to open here. Download it instead.',
+        invalid_name: 'That name is not valid. Use a name without slashes or dots on their own.',
+        missing_path: 'Choose a file or folder first.',
+        same_path: 'The file is already in that folder.',
+        move_into_itself: 'A folder cannot be moved inside itself.',
+        read_only_folder: 'This folder belongs to an app that does not allow changing its files.',
+      },
+    },
     title: 'Files',
     subtitle: "Everything stored in the media folder: app attachments, logs and activity.",
     upload: 'Upload file',

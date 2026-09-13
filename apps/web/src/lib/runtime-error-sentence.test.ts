@@ -200,6 +200,8 @@ describe('catálogo de las puertas locales · cadena `en` + `es` (ADR-0055/0199)
     ['system.errors', ['not_found', 'invalid_payload', 'flow.release_revoked', 'module.capability_denied']],
     // hub#1705: the gate of the people and roles doors, once they answered the shared envelope.
     ['employeeForm.errors', ['last_admin', 'self_deactivation', 'self_badge_enrollment', 'not_found', 'unauthorized', 'forbidden']],
+    // hub#1776: the reasons of the media doors that belong to Files.
+    ['files.errors', ['unauthorized', 'forbidden', 'not_found', 'media.no_files', 'media.busy', 'media.too_large', 'media.invalid_name', 'media.missing_path', 'media.same_path', 'media.move_into_itself', 'media.read_only_folder']],
   ];
 
   it.each(NEW_SENTENCES)('%s tiene frase en los DOS idiomas, sin huérfanas', (ns, codes) => {

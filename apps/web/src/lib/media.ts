@@ -19,10 +19,12 @@
 //     - `path`    = breadcrumb de la raíz a `folder`.
 //     - `quota`   = espacio usado/total (opcional; disco en single, plan en cloud).
 //
-// Mientras el endpoint no exista (404) o el runtime no responda, `fetchMedia` devuelve `null`:
-// la pantalla muestra su estado vacío propio (sin ficheros), nunca datos inventados.
+// A refusal is returned, never invented away (hub#1776): every call answers either its data or a
+// `MediaFailure` carrying the runtime's stable code, and the screen turns that code into a sentence
+// (`mediaFailureSentence`). Only a request that never reached the hub comes back without a code.
 
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
+import { localDoorSentence, type Translator } from './runtime-error-sentence';
 
 /** Carpeta del árbol lateral (recursiva). Shape directo de `OkFmFolder` del file-manager. */
 export interface MediaFolder {
@@ -104,62 +106,103 @@ export interface MediaListing {
 interface Envelope<T> {
   ok: boolean;
   data?: T;
-  error?: { message?: string };
+  error?: { code?: string; message?: string };
+}
+
+/**
+ * A media door said no (hub#1776). `code` is the runtime's stable reason (`media.read_only_folder`,
+ * `cloud_unreachable`…); it is absent only when the request never reached the hub (`status` 0) or
+ * an old hub answered without one.
+ */
+export interface MediaFailure {
+  ok: false;
+  status: number;
+  code?: string;
+}
+
+/** What an action on media answers: done, or refused with its reason. */
+export type MediaOutcome = { ok: true } | MediaFailure;
+
+/** Whether a listing call came back refused rather than with the listing. */
+export function isMediaFailure(value: unknown): value is MediaFailure {
+  return typeof value === 'object' && value !== null && (value as { ok?: unknown }).ok === false;
+}
+
+/** The refusal of a response that is not a success, with the code the runtime put in it. */
+async function failureOf(res: Response): Promise<MediaFailure> {
+  const env = (await res.json().catch(() => null)) as Envelope<unknown> | null;
+  const code = typeof env?.error?.code === 'string' ? env.error.code : undefined;
+  return { ok: false, status: res.status, code };
+}
+
+/** A request that never reached the hub: the one failure that IS the connection. */
+const UNREACHED: MediaFailure = { ok: false, status: 0, code: undefined };
+
+/** The outcome of an action call. */
+async function outcomeOf(request: () => Promise<Response>): Promise<MediaOutcome> {
+  let res: Response;
+  try {
+    res = await request();
+  } catch {
+    return { ...UNREACHED };
+  }
+  return res.ok ? { ok: true } : failureOf(res);
+}
+
+/**
+ * The sentence a person reads for a refusal of Files (hub#1776): the catalogue's sentence for the
+ * code (`files.errors.*`, then the shared `runtimeErrors.*`), or `fallback` — the screen's own line —
+ * when there is no code or this shell has no sentence for it.
+ */
+export function mediaFailureSentence(failure: MediaFailure, i18n: Translator, fallback: string): string {
+  if (!failure.code) return fallback;
+  return localDoorSentence({ code: failure.code }, i18n, ['files.errors', 'runtimeErrors'], fallback);
 }
 
 /**
  * Lista el contenido de una carpeta de `media/` (raíz si `folder` se omite).
  *
- * NO lanza ni inventa datos: si el endpoint todavía no existe (404) o el runtime no responde,
- * devuelve `null` para que la UI muestre su estado vacío real en vez de mock.
+ * Never throws and never invents data: a refusal comes back as a {@link MediaFailure} with the
+ * runtime's code, so the screen can say why instead of «check the connection» (hub#1776).
  */
-export async function fetchMedia(folder = ''): Promise<MediaListing | null> {
+export async function fetchMedia(folder = ''): Promise<MediaListing | MediaFailure> {
+  const qs = folder ? `?folder=${encodeURIComponent(folder)}` : '';
+  let res: Response;
   try {
-    const qs = folder ? `?folder=${encodeURIComponent(folder)}` : '';
-    const res = await fetch(`${RUNTIME_URL}/api/media${qs}`, { headers: runtimeHeaders() });
-    if (!res.ok) return null;
-    const env = (await res.json()) as Envelope<MediaListing>;
-    return env.ok && env.data ? env.data : null;
+    res = await fetch(`${RUNTIME_URL}/api/media${qs}`, { headers: runtimeHeaders() });
   } catch {
-    return null;
+    return { ...UNREACHED };
   }
+  if (!res.ok) return failureOf(res);
+  const env = (await res.json().catch(() => null)) as Envelope<MediaListing> | null;
+  return env?.ok && env.data ? env.data : { ok: false, status: res.status, code: 'cloud_unreadable' };
 }
 
 /**
  * Sube ficheros a una carpeta de `media/` vía `POST /api/media/upload` (multipart).
- * Devuelve `true` si el runtime aceptó la subida. Degrada a `false` si el endpoint no existe.
+ * Answers `{ ok: true }` or the refusal with its code (hub#1776).
  */
-export async function uploadMedia(folder: string, files: File[]): Promise<boolean> {
-  try {
-    const form = new FormData();
-    if (folder) form.append('folder', folder);
-    for (const f of files) form.append('files', f, f.name);
-    // No fijar Content-Type: el navegador pone el boundary del multipart.
-    const res = await fetch(`${RUNTIME_URL}/api/media/upload`, {
-      method: 'POST',
-      headers: runtimeHeaders(),
-      body: form,
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+export async function uploadMedia(folder: string, files: File[]): Promise<MediaOutcome> {
+  const form = new FormData();
+  if (folder) form.append('folder', folder);
+  for (const f of files) form.append('files', f, f.name);
+  // No fijar Content-Type: el navegador pone el boundary del multipart.
+  return outcomeOf(() =>
+    fetch(`${RUNTIME_URL}/api/media/upload`, { method: 'POST', headers: runtimeHeaders(), body: form }),
+  );
 }
 
 /**
  * Elimina un fichero de `media/` vía `DELETE /api/media?path=<id>`.
- * Devuelve `true` si el runtime lo aceptó. Degrada a `false` si el endpoint no existe.
+ * Answers `{ ok: true }` or the refusal with its code (hub#1776).
  */
-export async function deleteMedia(id: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${RUNTIME_URL}/api/media?path=${encodeURIComponent(id)}`, {
+export async function deleteMedia(id: string): Promise<MediaOutcome> {
+  return outcomeOf(() =>
+    fetch(`${RUNTIME_URL}/api/media?path=${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: runtimeHeaders(),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+    }),
+  );
 }
 
 /**
@@ -190,53 +233,44 @@ export async function fetchMediaBytes(file: MediaFile): Promise<ArrayBuffer | nu
 /**
  * Renombra un fichero o una carpeta vía `POST /api/media/rename` (ADR-0172).
  * `name` es un NOMBRE, no una ruta: renombrar nunca mueve nada de sitio.
- * Devuelve `true` si el runtime lo aceptó; `false` si lo rechazó (p. ej. carpeta de solo lectura).
+ * Answers `{ ok: true }` or the refusal with its code, e.g. `media.read_only_folder` (hub#1776).
  */
-export async function renameMedia(path: string, name: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${RUNTIME_URL}/api/media/rename`, {
+export async function renameMedia(path: string, name: string): Promise<MediaOutcome> {
+  return outcomeOf(() =>
+    fetch(`${RUNTIME_URL}/api/media/rename`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ path, name }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+    }),
+  );
 }
 
 /**
  * Crea una sub-carpeta dentro de `parent` vía `POST /api/media/folder`.
- * Devuelve `true` si el runtime la creó. Degrada a `false` si el endpoint no existe.
+ * Answers `{ ok: true }` or the refusal with its code (hub#1776).
  */
-export async function createMediaFolder(parent: string, name: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${RUNTIME_URL}/api/media/folder`, {
+export async function createMediaFolder(parent: string, name: string): Promise<MediaOutcome> {
+  return outcomeOf(() =>
+    fetch(`${RUNTIME_URL}/api/media/folder`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ parent, name }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+    }),
+  );
 }
 
 /**
  * Mueve un fichero o carpeta de `from` a `to` vía `POST /api/media/move` (ADR-0172).
  * El runtime valida que el origen pueda modificarse (sacarlo = delete) y el destino recibir
  * escritura (meterlo = upload): las carpetas de solo lectura no se mueven ni reciben drops.
- * `to` es la carpeta destino (relativa a `media/`; `''` = raíz). Devuelve `true` si se movió.
+ * `to` es la carpeta destino (relativa a `media/`; `''` = raíz). Answers `{ ok: true }` or the refusal.
  */
-export async function moveMedia(from: string, to: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${RUNTIME_URL}/api/media/move`, {
+export async function moveMedia(from: string, to: string): Promise<MediaOutcome> {
+  return outcomeOf(() =>
+    fetch(`${RUNTIME_URL}/api/media/move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
       body: JSON.stringify({ from, to }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+    }),
+  );
 }

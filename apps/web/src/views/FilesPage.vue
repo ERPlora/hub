@@ -18,7 +18,7 @@
       icon="cloud-offline-outline"
       :heading="t('files.loadErrorTitle')"
     >
-      {{ t('files.loadErrorBody') }}
+      {{ loadReason }}
       <ion-button slot="actions" size="small" fill="outline" @click="load(selected)">
         {{ t('files.retry') }}
       </ion-button>
@@ -54,6 +54,9 @@ import { RUNTIME_URL, runtimeHeaders } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import {
   fetchMedia,
+  isMediaFailure,
+  mediaFailureSentence,
+  type MediaOutcome,
   uploadMedia,
   deleteMedia,
   createMediaFolder,
@@ -67,7 +70,16 @@ import {
 } from '../lib/media';
 import { saveDownload, saveDownloadMessageKey } from '../lib/save-download';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+
+/**
+ * The sentence for a refusal of a media door, or the screen's own line (hub#1776). Retrying only
+ * makes sense for some reasons — a read-only folder or a deleted file will not come back — so the
+ * person reads WHICH one it was instead of «check the connection» for all of them.
+ */
+function reasonFor(outcome: MediaOutcome, fallbackKey: string): string {
+  return outcome.ok ? '' : mediaFailureSentence(outcome, { t, te }, t(fallbackKey));
+}
 
 // El elemento Lit con sus props reactivas (asignación imperativa: robusto para objetos/eventos).
 type FmElement = HTMLElement & {
@@ -97,6 +109,7 @@ let query = '';
 const toastOpen = ref(false);
 const toastMessage = ref('');
 const loadFailed = ref(false);
+const loadReason = ref('');
 function toast(msg: string): void {
   toastMessage.value = msg;
   toastOpen.value = true;
@@ -137,8 +150,10 @@ async function load(folder = ''): Promise<void> {
   const el = fmEl.value;
   if (el) el.loading = true;
   const data = await fetchMedia(folder);
-  loadFailed.value = !data;
-  if (data) {
+  const failed = isMediaFailure(data);
+  loadFailed.value = failed;
+  loadReason.value = failed ? reasonFor(data, 'files.loadErrorBody') : '';
+  if (!failed) {
     folders = data.folders ?? [];
     allFiles = data.files ?? [];
     path = data.path ?? [];
@@ -234,8 +249,9 @@ async function onUpload(e: Event): Promise<void> {
   }
   const files = (e as CustomEvent<{ files: File[] }>).detail.files ?? [];
   if (!files.length) return;
-  const ok = await uploadMedia(selected, files);
-  toast(ok ? t('files.uploadSuccess') : t('files.uploadError'));
+  const outcome = await uploadMedia(selected, files);
+  const ok = outcome.ok;
+  toast(ok ? t('files.uploadSuccess') : reasonFor(outcome, 'files.uploadError'));
   if (ok) await load(selected);
 }
 /** Carpeta que contiene a `path` (cadena vacía = la raíz de `media/`). */
@@ -265,8 +281,9 @@ async function onDelete(e: Event): Promise<void> {
   await alert.present();
   const result = await alert.onDidDismiss();
   if (result.role !== 'confirm') return;
-  const ok = await deleteMedia(id);
-  toast(ok ? t('files.deleteSuccess') : t('files.deleteError'));
+  const outcome = await deleteMedia(id);
+  const ok = outcome.ok;
+  toast(ok ? t('files.deleteSuccess') : reasonFor(outcome, 'files.deleteError'));
   // Si se ha borrado la carpeta donde estabas, quedarte ahí sería quedarse en algo que ya no
   // existe: se sube a la de arriba.
   if (ok) await load(isFolder && id === selected ? parentOf(id) : selected);
@@ -300,8 +317,9 @@ async function onRename(e: Event): Promise<void> {
   if (result.role !== 'confirm') return;
   const next = result.data?.values?.name?.trim();
   if (!next || next === name) return;
-  const ok = await renameMedia(id, next);
-  toast(ok ? t('files.renameSuccess') : t('files.renameError'));
+  const outcome = await renameMedia(id, next);
+  const ok = outcome.ok;
+  toast(ok ? t('files.renameSuccess') : reasonFor(outcome, 'files.renameError'));
   if (!ok) return;
   // Renombrar la carpeta en la que estás cambia su ruta: hay que seguirla, no recargar la vieja.
   const renamedCurrent = kind === 'folder' && id === selected;
@@ -334,8 +352,9 @@ async function onCreateFolder(e: Event): Promise<void> {
   if (result.role !== 'confirm') return;
   const name = result.data?.values?.folderName?.trim();
   if (!name) return;
-  const ok = await createMediaFolder(parent, name);
-  toast(ok ? t('files.folderCreated') : t('files.folderError'));
+  const outcome = await createMediaFolder(parent, name);
+  const ok = outcome.ok;
+  toast(ok ? t('files.folderCreated') : reasonFor(outcome, 'files.folderError'));
   if (ok) await load(selected);
 }
 
@@ -346,8 +365,9 @@ async function onMove(e: Event): Promise<void> {
   }
   const { from, to } = (e as CustomEvent<{ from: string; to: string }>).detail;
   if (from === to) return;
-  const ok = await moveMedia(from, to);
-  toast(ok ? t('files.moveSuccess') : t('files.moveError'));
+  const outcome = await moveMedia(from, to);
+  const ok = outcome.ok;
+  toast(ok ? t('files.moveSuccess') : reasonFor(outcome, 'files.moveError'));
   if (!ok) return;
   // Si movimos la carpeta en la que estamos (o algo dentro de la vista actual), recargamos la
   // carpeta actual; si movimos la propia carpeta activa a otra parte, subimos a su padre.

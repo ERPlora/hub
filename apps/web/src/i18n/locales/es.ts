@@ -217,6 +217,22 @@ export default {
     failed: 'No se ha podido descargar el archivo.',
   },
   files: {
+    // hub#1776 — ver el comentario gemelo en `en.ts`.
+    errors: {
+      unauthorized: 'Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.',
+      forbidden: 'Solo el propietario o un administrador puede cambiar los archivos.',
+      not_found: 'Ese archivo o carpeta ya no existe. Actualiza la lista.',
+      media: {
+        no_files: 'No se ha elegido ningún archivo para subir.',
+        busy: 'Ahora mismo se están procesando demasiados archivos. Inténtalo de nuevo en un momento.',
+        too_large: 'Ese archivo es demasiado grande para abrirlo aquí. Descárgalo.',
+        invalid_name: 'Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.',
+        missing_path: 'Elige antes un archivo o una carpeta.',
+        same_path: 'El archivo ya está en esa carpeta.',
+        move_into_itself: 'Una carpeta no se puede mover dentro de sí misma.',
+        read_only_folder: 'Esta carpeta es de una app que no permite cambiar sus archivos.',
+      },
+    },
     title: 'Archivos',
     subtitle: 'Todo lo que se guarda en la carpeta media: adjuntos de las apps, registros y actividad.',
     upload: 'Subir archivo',
