@@ -152,10 +152,28 @@ else
         "lanzar un canario no prueba nada: el veredicto tarda minutos (un pull en frío no son segundos) y es el producto del job"
 fi
 
-if grep -qE 'canary_verified' <<<"$code"; then
-    ok "lee \`canary_verified\` — que ya incluye el veto: un digest probado a las 10:00 y vetado a las 11:00 NO está verificado"
+# hub#1790: the verdict is about THIS digest. `current` after a veto is another release, and reading
+# it gave v1.1.22 a green over its own quarantine (2026-09-11). The decision lives in a script with
+# a behaviour test (`fleet-canary-verdict.test.sh`); here only the wiring is pinned.
+if grep -qF 'image=${DIGEST}' <<<"$code"; then
+    ok "pregunta por SU digest (\`?image=\`), no por la release vigente"
 else
-    bad "lee \`canary_verified\`" "sin mirar el veredicto, el job va verde pase lo que pase"
+    bad "pregunta por su digest (\`?image=\`)" "tras un veto, la vigente es OTRA release: leerla dio verde en v1.1.22 sobre su propia cuarentena"
+fi
+if grep -qE 'uses:\s*actions/checkout@' <<<"$code"; then
+    ok "hace checkout del repo (el script del veredicto vive en él)"
+else
+    bad "hace checkout del repo" "sin checkout, \`scripts/ci/fleet-canary-verdict.py\` no existe en el runner y el sondeo muere en el primer intento"
+fi
+if grep -qF 'scripts/ci/fleet-canary-verdict.py' <<<"$code"; then
+    ok "decide con \`scripts/ci/fleet-canary-verdict.py\` (probado con los casos reales en fleet-canary-verdict.test.sh)"
+else
+    bad "decide con \`scripts/ci/fleet-canary-verdict.py\`" "un veredicto escrito a mano en el YAML no tiene test que lo pruebe — así se coló el verde de v1.1.22"
+fi
+if grep -qE "current\"\)|get\(\"current\"\)" <<<"$code"; then
+    bad "no lee \`current\` en el YAML" "\`current\` no habla de este digest después de un veto"
+else
+    ok "no decide leyendo \`current\` en el YAML"
 fi
 
 if grep -qE '^\s+continue-on-error:\s*true' <<<"$code"; then
