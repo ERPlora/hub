@@ -143,6 +143,34 @@ const KNOWN: &[Setting] = &[
         validate: validate_text,
         parse_stored: |s| json!(s),
     },
+    // El domicilio fiscal EN PARTES (hub#1846). Los papeles oficiales lo piden partido —el modelo
+    // del otorgamiento de la AEAT dice «(municipio) … (vía pública) … nº …»— y sin partes que leer
+    // un módulo lo volvía a pedir. Vía, número, código postal y municipio existen en cualquier país.
+    // `business_address` se COMPONE a partir de ellas en `set_many`: ver `ADDRESS_PARTS`.
+    Setting {
+        key: "business_street",
+        default: || json!(""),
+        validate: validate_text,
+        parse_stored: |s| json!(s),
+    },
+    Setting {
+        key: "business_street_number",
+        default: || json!(""),
+        validate: validate_text,
+        parse_stored: |s| json!(s),
+    },
+    Setting {
+        key: "business_postal_code",
+        default: || json!(""),
+        validate: validate_text,
+        parse_stored: |s| json!(s),
+    },
+    Setting {
+        key: "business_city",
+        default: || json!(""),
+        validate: validate_text,
+        parse_stored: |s| json!(s),
+    },
     // ¿Cada cuánto pregunta el hub QUIÉN está en la caja? (`always` | `per_shift` | `never`,
     // hub#359). Es del NEGOCIO —una afirmación sobre si se identifica a quien vende—, mientras que
     // el modo del dispositivo (hub#357/#358) es de cada terminal; se componen por el lado
@@ -882,6 +910,36 @@ fn validate_recipient_list(v: &Value) -> std::result::Result<String, String> {
 /// queda fuera, igual que allí: no identifica a nadie.
 pub(crate) const FISCAL_IDENTITY_SETTINGS: [&str; 2] = ["business_tax_id", "business_legal_name"];
 
+/// Las partes del domicilio fiscal, en el orden en que se leen (hub#1846).
+///
+/// 🔴 `business_address` NO se retira: se inyecta como `:business_address` en el SQL de TODOS los
+/// módulos (la factura y el tique lo imprimen), así que es contrato del kernel. Se compone a partir
+/// de estas partes al guardarlas, y así el parámetro sigue siendo la misma cadena que cada módulo
+/// publicado ya sabe leer.
+pub(crate) const ADDRESS_PARTS: [&str; 4] = [
+    "business_street",
+    "business_street_number",
+    "business_postal_code",
+    "business_city",
+];
+
+/// `{vía} {número}, {CP} {municipio}`, sin espacios ni comas sueltas cuando falta un trozo: un
+/// número puede no existir de verdad (un «s/n»), y un código postal también.
+fn compose_address(street: &str, number: &str, postal_code: &str, city: &str) -> String {
+    let join = |a: &str, b: &str| {
+        [a.trim(), b.trim()]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    [join(street, number), join(postal_code, city)]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// La identidad fiscal de un hub de DEMO es de SOLO LECTURA (ADR-0197 §4, hub#376).
 ///
 /// Un hub de demo es anónimo, sin registro y dura una hora: el NIF y la razón social que se
@@ -1359,6 +1417,24 @@ pub async fn set_many(
                 detail: format!("región `{region}`: no pertenece al país del hub (`{country}`)"),
             });
         }
+    }
+
+    // 1e) El domicilio en PARTES recompone la línea que imprime cada módulo (hub#1846). Solo cuando
+    //     el lote trae alguna parte: un guardado de la moneda no puede borrar la dirección de un
+    //     negocio que la escribió en una sola línea antes de que existieran las partes. Las partes
+    //     que el lote no trae salen de lo ya guardado — cambiar el número no deja la calle en blanco.
+    if normalized.iter().any(|(k, _)| ADDRESS_PARTS.contains(k)) {
+        let mut parts = Vec::with_capacity(ADDRESS_PARTS.len());
+        for key in ADDRESS_PARTS {
+            let value = match normalized.iter().find(|(k, _)| *k == key) {
+                Some((_, v)) => v.clone(),
+                None => stored_value(db, hub_id, key).await?,
+            };
+            parts.push(value);
+        }
+        let composed = compose_address(&parts[0], &parts[1], &parts[2], &parts[3]);
+        normalized.retain(|(k, _)| *k != "business_address");
+        normalized.push(("business_address", composed));
     }
 
     // 2) Upsert por clave (mismo SQL en SQLite y Postgres: ON CONFLICT sobre la PK compuesta).
@@ -2031,6 +2107,107 @@ mod tests {
             .expect("a demo hub is a hub: only its fiscal identity is frozen");
         assert_eq!(result["currency"], json!("USD"));
         assert_eq!(result["business_address"], json!("Calle Falsa 123"));
+    }
+
+    // ── El DOMICILIO FISCAL en campos (hub#1846) ────────────────────────────────────────────────
+    //
+    // `business_address` era una línea de texto libre, y un documento oficial la pide en trozos: el
+    // modelo del otorgamiento de la AEAT dice «con domicilio fiscal en (municipio) … (vía pública) …
+    // nº …». Un módulo que la necesita partida no podía sacarla de la fuente única, así que la PEDÍA
+    // otra vez — y un domicilio tecleado dos veces es un domicilio que acaba siendo dos.
+    //
+    // Es el modelo de todo ERP (Odoo guarda `street`, `zip`, `city`; Business Central, Address/Post
+    // Code/City) y no tiene nada de un país: vía, número, código postal y municipio existen en todos.
+    //
+    // 🔴 `business_address` NO se retira ni cambia de forma: se inyecta como `:business_address` en el
+    // SQL de TODOS los módulos (la factura y el tique lo imprimen), así que es contrato del kernel.
+    // Se COMPONE a partir de las partes al guardarlas: un solo origen, y el parámetro sigue siendo la
+    // misma cadena que cada módulo publicado ya sabe leer.
+
+    #[tokio::test]
+    async fn the_fiscal_address_is_stored_in_parts() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_street".into(), json!("Rúa do Príncipe"));
+        updates.insert("business_street_number".into(), json!("10"));
+        updates.insert("business_postal_code".into(), json!("36202"));
+        updates.insert("business_city".into(), json!("Vigo"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .expect("the four parts are known settings");
+
+        assert_eq!(result["business_street"], json!("Rúa do Príncipe"));
+        assert_eq!(result["business_street_number"], json!("10"));
+        assert_eq!(result["business_postal_code"], json!("36202"));
+        assert_eq!(result["business_city"], json!("Vigo"));
+    }
+
+    #[tokio::test]
+    async fn writing_the_parts_composes_the_single_line_every_module_prints() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_street".into(), json!("Rúa do Príncipe"));
+        updates.insert("business_street_number".into(), json!("10"));
+        updates.insert("business_postal_code".into(), json!("36202"));
+        updates.insert("business_city".into(), json!("Vigo"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
+
+        assert_eq!(
+            result["business_address"],
+            json!("Rúa do Príncipe 10, 36202 Vigo"),
+            "`:business_address` is what the invoice and the ticket print: it has to follow the parts"
+        );
+    }
+
+    /// Editing ONE part recomposes with the ones already stored, not with blanks.
+    #[tokio::test]
+    async fn changing_one_part_keeps_the_others_in_the_composed_line() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut first = serde_json::Map::new();
+        first.insert("business_street".into(), json!("Rúa do Príncipe"));
+        first.insert("business_street_number".into(), json!("10"));
+        first.insert("business_postal_code".into(), json!("36202"));
+        first.insert("business_city".into(), json!("Vigo"));
+        set_many(&db, "hub-1", &first, "hub_user:1", false).await.unwrap();
+
+        let mut only_number = serde_json::Map::new();
+        only_number.insert("business_street_number".into(), json!("12"));
+        let result = set_many(&db, "hub-1", &only_number, "hub_user:1", false).await.unwrap();
+
+        assert_eq!(result["business_address"], json!("Rúa do Príncipe 12, 36202 Vigo"));
+    }
+
+    /// 🔴 A hub that never touched the parts keeps the line it typed. Recomposing from four blanks
+    /// would wipe the address off every invoice of a business that simply saved its currency.
+    #[tokio::test]
+    async fn a_write_without_parts_never_touches_a_legacy_address() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut legacy = serde_json::Map::new();
+        legacy.insert("business_address".into(), json!("Calle Falsa 123, Madrid"));
+        set_many(&db, "hub-1", &legacy, "hub_user:1", false).await.unwrap();
+
+        let mut unrelated = serde_json::Map::new();
+        unrelated.insert("currency".into(), json!("EUR"));
+        let result = set_many(&db, "hub-1", &unrelated, "hub_user:1", false).await.unwrap();
+
+        assert_eq!(result["business_address"], json!("Calle Falsa 123, Madrid"));
+    }
+
+    /// A number may be missing for real (an «s/n»), and a postal code too: the line stays readable.
+    #[tokio::test]
+    async fn missing_parts_leave_no_stray_commas_or_spaces() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_street".into(), json!("Plaza Mayor"));
+        updates.insert("business_city".into(), json!("Madrid"));
+        let result = set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
+
+        assert_eq!(result["business_address"], json!("Plaza Mayor, Madrid"));
     }
 
     /// 🔴 La otra dirección: un hub REAL escribe su identidad fiscal como siempre. Si la guarda se

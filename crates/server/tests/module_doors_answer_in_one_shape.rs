@@ -426,7 +426,10 @@ fn module_reachable_routes() -> Vec<(String, String)> {
     let mut beyond_the_gate = 0usize;
     let mut inside_the_gate = 0usize;
     for (method, path, class) in snapshot_routes() {
-        let in_gate_class = class == MODULE_GATE_CLASS;
+        // Any class that carries `capability`, not one spelling of it (hub#1844): a capability gate
+        // only exists for a module caller, and the snapshot writes it combined with whatever the
+        // human half is (`admin+capability`, `capability+session`).
+        let in_gate_class = class.split(['+', ':']).any(|part| part == "capability");
         let named_by_the_sdk = sdk.contains(&shape(&path));
         if !in_gate_class && !named_by_the_sdk {
             continue;
@@ -528,6 +531,25 @@ async fn fake_plain_saas() -> String {
     });
     tokio::spawn(async move { axum::serve(listener, saas).await.unwrap() });
     format!("http://{address}")
+}
+
+/// 🔴 A door gated on a module CAPABILITY is module-reachable whatever else its class says, and
+/// whether or not the SDK spells its path (hub#1844).
+///
+/// `GET /api/business/certificate` gates on `certificate` for a caller that names a module, and it
+/// is read by the VeriFactu screen through its own fetch, not through the SDK — so it is in neither
+/// half of the union as the union was written: its class is `auth:capability+session`, not the
+/// exact `auth:admin+capability` string, and no SDK source names it. This is the case the floor
+/// comment below warned about: «the first module door the SDK does not spell out, and then it is
+/// gone with every test green». A capability gate only exists FOR a module caller, so the class
+/// half is «carries `capability`», not one spelling of it.
+#[test]
+fn a_capability_gated_door_is_walked_even_when_the_sdk_does_not_name_it() {
+    let walked = module_reachable_routes();
+    assert!(
+        walked.iter().any(|(m, p)| m == "GET" && p == "/api/business/certificate"),
+        "the certificate a module screen reads is outside the walk: its envelope is unguarded"
+    );
 }
 
 #[tokio::test]

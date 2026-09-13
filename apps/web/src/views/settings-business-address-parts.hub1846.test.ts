@@ -1,18 +1,14 @@
 // @vitest-environment happy-dom
-// **Saving the business details and NOT reaching ERPlora is something she has to be told** (hub#1306).
+// **The fiscal address is typed in parts** (hub#1846).
 //
-// Saving the tax id publishes the fiscal identity to the control plane — that publication is what
-// lets the dashboard name the *obligado* on the grant of representation (Annex I). It is
-// best-effort by design: the settings are already stored, so a control plane that is down cannot
-// cost the customer her save, and the runtime answers `200` with a stable code
-// (`fiscal_identity_publish_error`) instead of a refusal.
+// Settings → Business kept the address as ONE free line, and official papers ask for it in parts:
+// the tax authority's grant model reads «con domicilio fiscal en (municipio) … (vía pública) … nº …».
+// With no parts to read, the VeriFactu app asked for the address AGAIN under the tax id and the
+// legal name that already live here — and an address typed in two places ends up being two.
 //
-// The failure mode that made hub#1306 expensive was silence. She saved, read «Saved», walked over
-// to `…/fiscal/representation-grant/`, and found «set your tax details first» — the thing she had
-// just done. Nothing on either screen could tell her that the save had worked and the sharing had
-// not, so the only move left was to save again, and again.
-//
-// So: a save that published says nothing extra, and a save that did not says so out loud.
+// So the address is written here once, in fields: street, number, postal code and city. The single
+// line every invoice prints is composed from them by the runtime, and a business that never touches
+// the fields keeps the line it typed (it is shown, so it is not silently lost).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
@@ -44,6 +40,10 @@ const hubSettings = ref({
   business_tax_id: '',
   business_legal_name: '',
   business_address: '',
+  business_street: '',
+  business_street_number: '',
+  business_postal_code: '',
+  business_city: '',
   theme_palette: 'erplora',
   pin_policy: 'never',
   pin_inactivity_minutes: 5,
@@ -137,39 +137,69 @@ beforeEach(() => {
   toastError.mockReset();
 });
 
-describe('Settings › Business · the save says whether ERPlora was told (hub#1306)', () => {
-  it('🔴 says it out loud when the identity could not be published', async () => {
-    updateHubSettings.mockImplementation(async () => {
-      hubSettings.value = { ...hubSettings.value, fiscal_identity_publish_error: 'cloud_rejected' };
-      return hubSettings.value;
+describe('Settings › Business · the fiscal address, in parts (hub#1846)', () => {
+  it('asks for street, number, postal code and city — not for one free line', async () => {
+    const wrapper = await mountBusinessTab();
+
+    for (const id of [
+      'settings-business-street',
+      'settings-business-street-number',
+      'settings-business-postal-code',
+      'settings-business-city',
+    ]) {
+      expect(wrapper.find(`[data-testid="${id}"]`).exists(), `the Business tab has no «${id}»`).toBe(true);
+    }
+    expect(
+      wrapper.find('[data-testid="settings-business-address"]').exists(),
+      'the free-text line is still editable: two addresses that can disagree',
+    ).toBe(false);
+  });
+
+  it('saves the four parts, which is what the runtime composes the printed line from', async () => {
+    const wrapper = await mountBusinessTab();
+    const vm = wrapper.vm as unknown as {
+      businessStreet: string;
+      businessStreetNumber: string;
+      businessPostalCode: string;
+      businessCity: string;
+    };
+    vm.businessStreet = ' Rúa do Príncipe ';
+    vm.businessStreetNumber = '10';
+    vm.businessPostalCode = '36202';
+    vm.businessCity = 'Vigo';
+
+    await save(wrapper);
+
+    expect(updateHubSettings).toHaveBeenCalledTimes(1);
+    expect(updateHubSettings.mock.calls[0][0]).toMatchObject({
+      business_street: 'Rúa do Príncipe',
+      business_street_number: '10',
+      business_postal_code: '36202',
+      business_city: 'Vigo',
     });
-
-    const wrapper = await mountBusinessTab();
-    await save(wrapper);
-
-    // The save DID happen — she is not sent to type it all again.
-    expect(toastSuccess).toHaveBeenCalledTimes(1);
-    expect(toastError, 'a failed publication cannot be silent').toHaveBeenCalledTimes(1);
-    expect(toastError.mock.calls[0][0]).toBe(en.settings.shareWithErploraError);
+    expect(updateHubSettings.mock.calls[0][0]).not.toHaveProperty('business_address');
   });
 
-  it('says nothing extra when the identity did reach ERPlora', async () => {
+  // 🔴 A hub that typed its address as one line before this change must not see it vanish: the
+  // fields are empty, and an empty form reads as «you have no address». The old line is shown.
+  it('shows the old one-line address until the parts are filled, so it is not silently lost', async () => {
+    hubSettings.value = { ...hubSettings.value, business_address: 'Calle Falsa 123, Madrid' };
     const wrapper = await mountBusinessTab();
-    await save(wrapper);
 
-    expect(toastSuccess).toHaveBeenCalledTimes(1);
-    expect(toastError, 'a save that worked has nothing to warn about').not.toHaveBeenCalled();
+    const legacy = wrapper.find('[data-testid="settings-business-address-legacy"]');
+    expect(legacy.exists()).toBe(true);
+    expect(legacy.text()).toContain('Calle Falsa 123, Madrid');
   });
 
-  it('a refused save warns about the refusal, not about the sharing', async () => {
-    // The identity never left because it was never stored: the one thing to say is the refusal.
-    updateHubSettings.mockRejectedValue(new Error('403'));
-
+  it('once the parts exist, the old line is not shown twice', async () => {
+    hubSettings.value = {
+      ...hubSettings.value,
+      business_address: 'Rúa do Príncipe 10, 36202 Vigo',
+      business_street: 'Rúa do Príncipe',
+      business_city: 'Vigo',
+    };
     const wrapper = await mountBusinessTab();
-    await save(wrapper);
 
-    expect(toastSuccess).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledTimes(1);
-    expect(toastError.mock.calls[0][0]).not.toBe(en.settings.shareWithErploraError);
+    expect(wrapper.find('[data-testid="settings-business-address-legacy"]').exists()).toBe(false);
   });
 });
