@@ -185,14 +185,47 @@ async fn an_employee_can_neither_see_the_devices_nor_disconnect_one() {
     .await;
 
     // Same gate as settings, API keys and the role catalogue (ADR-0248): who administers the
-    // business, not whoever happens to be holding a device.
-    assert_eq!(read.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(write.status(), StatusCode::UNAUTHORIZED);
+    // business, not whoever happens to be holding a device. Since hub#1702 the answer is `403`, not
+    // `401`: the session is fine and the role is not, and signing in again as the same employee
+    // would never help — the same split `api_keys.rs` got in hub#1700.
+    assert_eq!(read.status(), StatusCode::FORBIDDEN);
+    assert_eq!(write.status(), StatusCode::FORBIDDEN);
     assert_eq!(
         listed_ids(&router, &sessions.admin).await.len(),
         2,
         "nothing was disconnected"
     );
+}
+
+/// The stable code of a refusal, wherever the envelope puts it.
+fn refusal_code(body: &Value) -> Option<&str> {
+    body["error"]["code"].as_str()
+}
+
+/// 🔴 hub#1702: a refusal of this door carries the code the screen translates. Without it, Settings →
+/// Devices could only say «check the connection» to somebody whose session had simply expired.
+#[tokio::test]
+async fn a_refusal_names_why_an_expired_session_and_a_missing_role_apart() {
+    let (router, sessions) = fixture("hub-1702").await;
+
+    for (method, uri) in [("GET", "/api/devices"), ("DELETE", "/api/devices/till-1")] {
+        let no_session = call(&router, method, uri, Some("expired-or-forged"), &[]).await;
+        assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED, "{method} {uri}");
+        assert_eq!(
+            refusal_code(&body_json(no_session).await),
+            Some("unauthorized"),
+            "{method} {uri}: a dead session is `unauthorized` — the screen says «sign in again»"
+        );
+
+        let wrong_role = call(&router, method, uri, Some(&sessions.employee), &[]).await;
+        assert_eq!(wrong_role.status(), StatusCode::FORBIDDEN, "{method} {uri}");
+        assert_eq!(
+            refusal_code(&body_json(wrong_role).await),
+            Some("forbidden"),
+            "{method} {uri}: a valid session without the role is `forbidden` — signing in again as \
+             the same person would never help"
+        );
+    }
 }
 
 #[tokio::test]
@@ -226,7 +259,8 @@ async fn a_caller_that_declares_itself_an_administrator_is_still_not_one() {
     let reading = call(&router, "GET", "/api/devices", None, &self_proclaimed).await;
 
     assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(as_employee.status(), StatusCode::UNAUTHORIZED);
+    // A declared role is still the employee's real one: `403` (hub#1702), and nothing moved.
+    assert_eq!(as_employee.status(), StatusCode::FORBIDDEN);
     assert_eq!(reading.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(listed_ids(&router, &sessions.admin).await.len(), 2);
 }
@@ -468,7 +502,7 @@ async fn disconnecting_a_device_closes_the_session_it_had_open_right_away() {
         call(&router, "GET", "/api/devices", Some(&sessions.employee), &[])
             .await
             .status(),
-        StatusCode::UNAUTHORIZED,
+        StatusCode::FORBIDDEN,
         "(the employee still cannot read the list — but for the role, not because they were cut off)"
     );
     assert_eq!(
@@ -739,9 +773,12 @@ async fn only_an_administrator_can_name_a_device() {
     .await;
 
     // Same gate as the read and the revocation (ADR-0248): the name is what an owner will trust
-    // when deciding which till to cut off, so whoever holds a device cannot write it.
+    // when deciding which till to cut off, so whoever holds a device cannot write it. `403` for the
+    // employee since hub#1702: the session is valid, the role is not.
     assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED);
-    assert_eq!(as_employee.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(refusal_code(&body_json(no_session).await), Some("unauthorized"));
+    assert_eq!(as_employee.status(), StatusCode::FORBIDDEN);
+    assert_eq!(refusal_code(&body_json(as_employee).await), Some("forbidden"));
     assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "");
 }
 

@@ -527,6 +527,10 @@ export default {
     errors: {
       device_name_too_long: 'That name is too long. Use a shorter one and save again.',
       device_not_found: 'That device is no longer registered here. Refresh the list.',
+      // hub#1702 — the door's auth refusals. A dead session is fixed by signing in again; a role
+      // without the permission is not, so the second sentence never suggests it.
+      unauthorized: 'Your session has expired. Sign in again and retry.',
+      forbidden: 'Only an owner or an administrator can manage the devices.',
     },
     title: 'Devices',
     intro:

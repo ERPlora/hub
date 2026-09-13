@@ -490,3 +490,50 @@ describe('DevicesCard · un rechazo se lee como una frase (hub#1697)', () => {
     expect(html).not.toContain('devices → 500');
   });
 });
+
+// hub#1702 — a dead session and a missing role read as what they are, not «check the connection».
+// The door sends `unauthorized` / `forbidden` since this issue (`crates/server/src/devices.rs`), and
+// the card needs a sentence for each in BOTH catalogues: the till runs in Spanish.
+describe('DevicesCard · la sesión caducada y el rol no se leen como «comprueba la conexión» (hub#1702)', () => {
+  const localized = (locale: 'en' | 'es') =>
+    createI18n({
+      legacy: false,
+      locale,
+      missingWarn: false,
+      fallbackWarn: false,
+      messages: { en: enCatalogue, es: esCatalogue },
+    });
+
+  async function mountIn(locale: 'en' | 'es') {
+    const w = mount(DevicesCard, {
+      global: { plugins: [localized(locale)], stubs: { 'ok-inline-feedback': true }, renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    return w;
+  }
+
+  for (const locale of ['en', 'es'] as const) {
+    const catalogue = locale === 'en' ? enCatalogue : esCatalogue;
+
+    it(`[${locale}] a session that expired says to sign in again`, async () => {
+      vi.mocked(listDevices).mockRejectedValue(new DevicesError('sesión inválida o caducada', 'unauthorized'));
+
+      const html = (await mountIn(locale)).html();
+      const sentence = (catalogue.devices.errors as Record<string, string>).unauthorized;
+      expect(sentence, `devices.errors.unauthorized is missing in ${locale}`).toBeTruthy();
+      expect(html).toContain(sentence);
+      expect(html).not.toContain(catalogue.devices.loadError);
+    });
+
+    it(`[${locale}] a role without the permission says who can, without inviting to sign in again`, async () => {
+      vi.mocked(listDevices).mockRejectedValue(new DevicesError('rol insuficiente', 'forbidden'));
+
+      const html = (await mountIn(locale)).html();
+      const sentence = (catalogue.devices.errors as Record<string, string>).forbidden;
+      expect(sentence, `devices.errors.forbidden is missing in ${locale}`).toBeTruthy();
+      expect(html).toContain(sentence);
+      expect(html).not.toContain((catalogue.devices.errors as Record<string, string>).unauthorized);
+      expect(html).not.toContain(catalogue.devices.loadError);
+    });
+  }
+});
