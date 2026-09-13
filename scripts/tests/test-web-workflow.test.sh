@@ -372,5 +372,39 @@ else
     ok "este fichero no canaliza hacia un lector que corta (hub#1534)"
 fi
 
+# ── OutfitKit: the CI verifies the version the image SHIPS (hub#1793) ────────
+#
+# `docker/Dockerfile` re-resolves `@erplora/outfitkit@latest` on every image
+# (product decision, 2026-06-22), ignoring the lockfile pin. With only
+# `pnpm install --frozen-lockfile` here, `vue-tsc`, vitest and the e2e ran against
+# the LOCKFILE's OutfitKit (0.1.52) while the image shipped 0.1.72: a change of the
+# library that breaks a hub screen went through with everything green. So both
+# jobs that verify the shell run the image's own resolution command, taken from the
+# Dockerfile (not retyped here), between the install and what they verify.
+dockerfile="$repo_root/docker/Dockerfile"
+image_resolution=$(grep -oE 'pnpm --filter @erplora/web add @erplora/outfitkit@[^[:space:]"]+' "$dockerfile" | head -1)
+if [ -z "$image_resolution" ]; then
+    bad "la imagen resuelve OutfitKit con un comando reconocible (hub#1793)" \
+        "no encuentro \`pnpm --filter @erplora/web add @erplora/outfitkit@…\` en docker/Dockerfile: si la imagen cambió de forma de resolverla, este control y los jobs de test-web.yml tienen que seguirla"
+else
+    for pair in "verify:pnpm verify" "e2e:test:e2e"; do
+        job=${pair%%:*}
+        verifies=${pair#*:}
+        block=$(job_block "$job")
+        install_at=$(awk '/pnpm install --frozen-lockfile/ {print NR; exit}' <<<"$block")
+        resolve_at=$(awk -v cmd="$image_resolution" 'index($0, cmd) && !/^[[:space:]]*#/ {print NR; exit}' <<<"$block")
+        verify_at=$(awk -v cmd="$verifies" 'index($0, "run:") && index($0, cmd) {print NR; exit}' <<<"$block")
+        if [ -z "$resolve_at" ]; then
+            bad "el job \`$job\` verifica la OutfitKit que publica la imagen (hub#1793)" \
+                "falta \`$image_resolution\` en el job: verifica la del lockfile y la imagen publica otra"
+        elif [ -z "$install_at" ] || [ -z "$verify_at" ] || [ "$resolve_at" -le "$install_at" ] || [ "$resolve_at" -ge "$verify_at" ]; then
+            bad "el job \`$job\` resuelve OutfitKit ENTRE el install y \`$verifies\` (hub#1793)" \
+                "orden encontrado — install: ${install_at:-?}, resolución: $resolve_at, verificación: ${verify_at:-?}"
+        else
+            ok "el job \`$job\` verifica la OutfitKit que publica la imagen (hub#1793)"
+        fi
+    done
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

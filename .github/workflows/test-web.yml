@@ -171,6 +171,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # hub#1793 — verify the OutfitKit the image SHIPS, not the lockfile's. `docker/Dockerfile`
+      # re-resolves it to `@latest` on every build; without the same step here the shell was
+      # type-checked and tested against an older library than the one customers get.
+      # Contract: scripts/tests/test-web-workflow.test.sh.
+      - name: OutfitKit as the image resolves it (docker/Dockerfile)
+        run: pnpm --filter @erplora/web add @erplora/outfitkit@latest
+
       # `pnpm verify` = vue-tsc --noEmit + vitest run (@erplora/web) + node:test (@erplora/module-sdk).
       # The SDK suite is what pins the `.ts` specifiers of its ESM barrel: its runner
       # (`node --experimental-transform-types --test`) demands fully specified relative paths, so
@@ -255,6 +262,13 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # hub#1793 — verify the OutfitKit the image SHIPS, not the lockfile's. `docker/Dockerfile`
+      # re-resolves it to `@latest` on every build; without the same step here the shell was
+      # type-checked and tested against an older library than the one customers get.
+      # Contract: scripts/tests/test-web-workflow.test.sh.
+      - name: OutfitKit as the image resolves it (docker/Dockerfile)
+        run: pnpm --filter @erplora/web add @erplora/outfitkit@latest
 
       - name: Toolchain (rust-toolchain.toml)
         run: |
