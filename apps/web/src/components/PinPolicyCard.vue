@@ -81,12 +81,17 @@
              longitudes que ofrece el mercado son 4 y 6, y la uniformidad es lo que permite que el
              teclado envíe al último dígito en vez de pedir un «Aceptar». -->
         <template v-if="pinpadOn">
+          <!-- hub#1794: the title on its own line and the choice under it. In the `end` slot the
+               segment took the whole row and left the title 0 px wide at every viewport; a choice of
+               several options goes under its title in any settings screen — the right-hand side
+               is for a switch. -->
           <ion-item lines="none">
             <ion-label>
-              <h2>{{ t('pinPolicy.lengthTitle') }}</h2>
+              <h2 data-testid="pin-policy-length-title">{{ t('pinPolicy.lengthTitle') }}</h2>
             </ion-label>
+          </ion-item>
+          <ion-item lines="none">
             <ion-segment
-              slot="end"
               data-testid="pin-policy-length"
               :value="String(hubPinLength)"
               :disabled="!isAdmin || saving"
