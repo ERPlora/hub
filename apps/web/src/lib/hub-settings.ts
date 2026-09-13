@@ -197,12 +197,11 @@ export async function getHubSettings(): Promise<HubSettings> {
 }
 
 /**
- * El rechazo del runtime, tal y como lo escribió (hub#684).
+ * The runtime refusal, as the runtime wrote it (hub#684).
  *
- * `PUT /api/settings` contesta `{error:{code,message}}` y ese `message` está redactado para leerlo
- * —el de la demo es *«this is a demo hub: its tax id and legal name are read-only — to issue real
- * invoices, create your own hub»*—. Antes se tiraba entero y la pantalla pintaba un «no se pudieron
- * guardar los ajustes» plano: la única explicación que el producto tenía no llegaba a nadie.
+ * `PUT /api/settings` answers `{error:{code,message}}` and that `message` is written to be read (e.g.
+ * the frozen tax id names the id and the date it froze). It used to be thrown away and the screen
+ * painted a flat «could not save settings»: the only explanation the product had reached nobody.
  */
 export class HubSettingsError extends Error {
   /** Stable runtime code (`business_tax_id_frozen`, `hub_country_frozen`…). */
@@ -221,7 +220,7 @@ export class HubSettingsError extends Error {
 /**
  * Actualiza (parcial) los settings del hub (`PUT /api/settings`). El runtime exige owner/admin y
  * devuelve el objeto COMPLETO, que cacheamos. Lanza [`HubSettingsError`] si falla (403 si no es
- * admin, 409 si el cierre de la demo o el congelado del NIF se niegan…).
+ * admin, 409 si el congelado del NIF o del país se niegan…).
  */
 export async function updateHubSettings(partial: Partial<HubSettings>): Promise<HubSettings> {
   const res = await fetch(`${RUNTIME_URL}/api/settings`, {
