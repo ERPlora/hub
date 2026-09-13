@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// **A refused save on Settings → Business keeps what the admin typed.**
+// **A refused save on Settings → Business keeps what the admin typed** (hub#1850).
 //
 // Measured on `banco-pre` on 2026-09-13 (hub#1848): the admin filled in the fiscal address in parts,
 // pressed «Save changes», the runtime said no, and every field went back to what the server had —
@@ -180,7 +180,7 @@ beforeEach(() => {
   toastError.mockReset();
 });
 
-describe('Settings › Business · a refused save keeps the draft', () => {
+describe('Settings › Business · a refused save keeps the draft (hub#1850)', () => {
   // The refusal has the shape `HubSettingsError` gives it: a stable code and the HTTP status.
   for (const [what, refusal] of [
     ['a 409 from the runtime', Object.assign(new Error('refused'), { code: 'business_tax_id_frozen', status: 409 })],
