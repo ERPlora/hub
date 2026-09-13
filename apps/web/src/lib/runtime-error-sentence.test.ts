@@ -193,7 +193,8 @@ describe('localDoorSentence · una puerta local nunca enseña las palabras del m
 
 describe('catálogo de las puertas locales · cadena `en` + `es` (ADR-0055/0199)', () => {
   const NEW_SENTENCES: ReadonlyArray<readonly [string, readonly string[]]> = [
-    ['devices.errors', ['device_name_too_long', 'device_not_found']],
+    // hub#1702: the door's auth refusals, once it answered the shared envelope.
+    ['devices.errors', ['device_name_too_long', 'device_not_found', 'unauthorized', 'forbidden']],
     // hub#1700 added the three the door started sending once it answered the shared envelope.
     ['apiKeys.errors', ['not_found', 'rate_limited', 'unauthorized', 'forbidden', 'api_key.system_key']],
     ['system.errors', ['not_found', 'invalid_payload', 'flow.release_revoked', 'module.capability_denied']],
