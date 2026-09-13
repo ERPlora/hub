@@ -46,12 +46,10 @@ use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
 use crate::cloud_proxy::cloud_unreachable;
 use crate::{auth, cloud_proxy, AppState};
 
+/// The gate's refusal with its code (hub#1776, the recipe of hub#1700): `401 unauthorized` with no
+/// usable session, `403 forbidden` when the session is fine and the role is not.
 fn unauthorized(error: auth::AuthError) -> Response {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(json!({ "ok": false, "error": error.message() })),
-    )
-        .into_response()
+    crate::auth_rejected(error)
 }
 
 async fn require_user(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
@@ -115,7 +113,11 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
         pct_encode(folder)
     );
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     let mut r = st.http.get(&url);
     for (k, v) in headers {
@@ -123,17 +125,30 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     }
     let resp = match r.send().await {
         Ok(x) => x,
-        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
+        Err(e) => {
+            return err(
+                cloud_proxy::CLOUD_FAILED,
+                cloud_unreachable(&e.to_string()),
+                "erplora.com did not answer",
+            )
+        }
     };
     if !resp.status().is_success() {
         return err(
             cloud_proxy::CLOUD_FAILED,
-            "el Cloud rechazó el listado de media",
+            cloud_proxy::CLOUD_REJECTED,
+            "erplora.com refused the media listing",
         );
     }
     let raw: Value = match resp.json().await {
         Ok(v) => v,
-        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
+        Err(e) => {
+            return err(
+                cloud_proxy::CLOUD_FAILED,
+                cloud_unreachable(&e.to_string()),
+                "erplora.com did not answer",
+            )
+        }
     };
 
     let files: Vec<Value> = raw
@@ -193,7 +208,11 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
 async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     // El multipart se recoge ENTERO antes de decidir: el orden de los campos no está garantizado
     // y la política depende de `folder`, así que no se puede empezar a reenviar y comprobar luego.
@@ -219,7 +238,11 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
         return response;
     }
     if files.is_empty() {
-        return err(StatusCode::BAD_REQUEST, "no se enviaron ficheros");
+        return err(
+            StatusCode::BAD_REQUEST,
+            "media.no_files",
+            "no files were sent",
+        );
     }
     let mut form = reqwest::multipart::Form::new().text("folder", folder);
     for (fname, data) in files {
@@ -234,8 +257,16 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(_) => err(cloud_proxy::CLOUD_FAILED, "el Cloud rechazó la subida"),
-        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
+        Ok(_) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::CLOUD_REJECTED,
+            "erplora.com refused the upload",
+        ),
+        Err(e) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_unreachable(&e.to_string()),
+            "erplora.com did not answer",
+        ),
     }
 }
 
@@ -247,7 +278,11 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
         pct_encode(path)
     );
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     let mut r = st.http.delete(&url);
     for (k, v) in headers {
@@ -255,11 +290,12 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(resp) => err(
-            cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
-            "el Cloud no pudo borrar",
+        Ok(resp) => relayed(resp.status().as_u16(), "erplora.com could not delete"),
+        Err(e) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_unreachable(&e.to_string()),
+            "erplora.com did not answer",
         ),
-        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -267,7 +303,11 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
 async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
     let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     let mut r = st
         .http
@@ -278,11 +318,12 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(resp) => err(
-            cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
-            "el Cloud no pudo renombrar",
+        Ok(resp) => relayed(resp.status().as_u16(), "erplora.com could not rename"),
+        Err(e) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_unreachable(&e.to_string()),
+            "erplora.com did not answer",
         ),
-        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -290,7 +331,11 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
 async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Response {
     let url = format!("{}/api/v1/hub/device/media/folder/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     let mut r = st
         .http
@@ -301,8 +346,16 @@ async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Respons
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(_) => err(cloud_proxy::CLOUD_FAILED, "el Cloud no pudo crear la carpeta"),
-        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
+        Ok(_) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::CLOUD_REJECTED,
+            "erplora.com could not create the folder",
+        ),
+        Err(e) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_unreachable(&e.to_string()),
+            "erplora.com did not answer",
+        ),
     }
 }
 
@@ -331,7 +384,11 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     // `acquire_owned` queues excess requests instead of shedding them; the semaphore is never
     // closed, so an `Err` can only mean shutdown.
     let Ok(permit) = st.media_fetch_limiter.clone().acquire_owned().await else {
-        return err(StatusCode::SERVICE_UNAVAILABLE, "media limiter closed");
+        return err(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "media.busy",
+            "media limiter closed",
+        );
     };
     let url = format!(
         "{}/api/v1/hub/device/media/raw?path={}",
@@ -339,7 +396,11 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         pct_encode(path)
     );
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     let mut r = st.http.get(&url);
     for (k, v) in headers {
@@ -347,19 +408,22 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     }
     let resp = match r.send().await {
         Ok(x) => x,
-        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
+        Err(e) => {
+            return err(
+                cloud_proxy::CLOUD_FAILED,
+                cloud_unreachable(&e.to_string()),
+                "erplora.com did not answer",
+            )
+        }
     };
     // `404` sigue siendo `404` —el fichero no está—, pero cualquier OTRA negativa del Cloud no lo
     // es (hub#1763): contar un `500` de erplora.com como «fichero no encontrado» manda a quien
     // mira la foto a subirla otra vez cuando la foto SÍ está, y esconde la avería.
     if !resp.status().is_success() {
         return if resp.status() == reqwest::StatusCode::NOT_FOUND {
-            err(StatusCode::NOT_FOUND, "fichero no encontrado")
+            err(StatusCode::NOT_FOUND, "not_found", "file not found")
         } else {
-            err(
-                cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
-                cloud_proxy::CLOUD_REJECTED,
-            )
+            relayed(resp.status().as_u16(), cloud_proxy::CLOUD_REJECTED)
         };
     }
     // El Cloud responde `{ url }` con una firma temporal de Object Storage. La descarga la hace
@@ -372,12 +436,19 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
+        Err(e) => {
+            return err(
+                cloud_proxy::CLOUD_FAILED,
+                cloud_unreachable(&e.to_string()),
+                "erplora.com did not answer",
+            )
+        }
     };
     if signed.is_empty() {
         return err(
             cloud_proxy::CLOUD_FAILED,
-            "el Cloud no devolvió la URL del fichero",
+            cloud_proxy::CLOUD_UNREADABLE,
+            "erplora.com returned no URL for the file",
         );
     }
     let object = match st.http.get(&signed).send().await {
@@ -385,15 +456,16 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
         // Igual que arriba: el objeto que no está es un `404`; el almacén que falla es una avería
         // del que guarda la foto, y decir «no encontrado» la daría por perdida (hub#1763).
         Ok(o) if o.status() == reqwest::StatusCode::NOT_FOUND => {
-            return err(StatusCode::NOT_FOUND, "fichero no encontrado")
+            return err(StatusCode::NOT_FOUND, "not_found", "file not found")
         }
-        Ok(o) => {
+        Ok(o) => return relayed(o.status().as_u16(), cloud_proxy::CLOUD_REJECTED),
+        Err(e) => {
             return err(
-                cloud_proxy::relayed_status(cloud_proxy::cloud_status(o.status().as_u16())),
-                cloud_proxy::CLOUD_REJECTED,
+                cloud_proxy::CLOUD_FAILED,
+                cloud_unreachable(&e.to_string()),
+                "erplora.com did not answer",
             )
         }
-        Err(e) => return err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     };
     // When the size is declared, refuse an oversized object BEFORE downloading a single byte.
     if object
@@ -402,6 +474,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     {
         return err(
             StatusCode::PAYLOAD_TOO_LARGE,
+            "media.too_large",
             "media object exceeds the size cap",
         );
     }
@@ -430,7 +503,13 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
             format!("inline; filename=\"{}\"", name.replace('"', "")),
         )
         .body(Body::from_stream(stream))
-        .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "respuesta inválida"))
+        .unwrap_or_else(|_| {
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                cloud_proxy::CLOUD_UNREADABLE,
+                "unreadable answer",
+            )
+        })
 }
 
 /// `POST …/media/move/` en el Cloud (que hace el copy+delete sobre Object Storage). Mueve un
@@ -438,7 +517,11 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
 async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
     let url = format!("{}/api/v1/hub/device/media/move/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
-        return err(cloud_proxy::CLOUD_FAILED, "hub sin token de máquina");
+        return err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_proxy::HUB_NOT_ENROLLED,
+            "this hub has no machine credential",
+        );
     };
     let mut r = st.http.post(&url).json(&json!({ "from": from, "to": to }));
     for (k, v) in headers {
@@ -446,11 +529,12 @@ async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
     }
     match r.send().await {
         Ok(resp) if resp.status().is_success() => Json(json!({ "ok": true })).into_response(),
-        Ok(resp) => err(
-            cloud_proxy::relayed_status(cloud_proxy::cloud_status(resp.status().as_u16())),
-            "el Cloud no pudo mover",
+        Ok(resp) => relayed(resp.status().as_u16(), "erplora.com could not move"),
+        Err(e) => err(
+            cloud_proxy::CLOUD_FAILED,
+            cloud_unreachable(&e.to_string()),
+            "erplora.com did not answer",
         ),
-        Err(e) => err(cloud_proxy::CLOUD_FAILED, cloud_unreachable(&e.to_string())),
     }
 }
 
@@ -679,11 +763,16 @@ pub async fn media_rename(
     if !valid_file_name(&req.name) {
         return err(
             StatusCode::BAD_REQUEST,
-            "el nombre nuevo no es válido (debe ser un nombre, no una ruta)",
+            "media.invalid_name",
+            "the new name is not valid (a name, not a path)",
         );
     }
     if req.path.trim_matches('/').is_empty() {
-        return err(StatusCode::BAD_REQUEST, "falta la ruta a renombrar");
+        return err(
+            StatusCode::BAD_REQUEST,
+            "media.missing_path",
+            "missing path to rename",
+        );
     }
     if let Err(response) = require_action(&st, &req.path, UserFileAction::Rename).await {
         return response;
@@ -715,16 +804,25 @@ pub async fn media_move(
         return response;
     }
     if req.from.trim_matches('/').is_empty() {
-        return err(StatusCode::BAD_REQUEST, "falta la ruta de origen");
+        return err(
+            StatusCode::BAD_REQUEST,
+            "media.missing_path",
+            "missing source path",
+        );
     }
     if req.from == req.to {
-        return err(StatusCode::BAD_REQUEST, "origen y destino coinciden");
+        return err(
+            StatusCode::BAD_REQUEST,
+            "media.same_path",
+            "source and destination are the same",
+        );
     }
     // No se puede mover algo al interior de sí mismo (carpeta dentro de su subcarpeta).
     if is_within(&req.from, &req.to) {
         return err(
             StatusCode::BAD_REQUEST,
-            "no se puede mover una carpeta dentro de sí misma",
+            "media.move_into_itself",
+            "a folder cannot be moved into itself",
         );
     }
     // Sacar el elemento del origen cuenta como borrado; meterlo, como subida.
@@ -1232,13 +1330,35 @@ fn fmt_decimal(value: f64, decimals: usize) -> String {
     s.replace('.', ",")
 }
 
-/// Respuesta de error en el envelope estándar (`{ ok:false, error:{ message } }`).
-fn err(code: StatusCode, msg: &str) -> Response {
+/// A refusal in the envelope every door of this hub answers: `{ ok:false, error:{ code, message } }`.
+///
+/// hub#1776: the `code` is required. Before it this helper emitted only a Spanish `message`, so Files
+/// could only say «check the connection» whatever had failed — erplora.com down, a hub with no
+/// machine credential, a folder that no longer exists, a read-only module folder. The screen
+/// translates the code (`files.errors.*`, `runtimeErrors.*`); the message is for the log.
+fn err(status: StatusCode, code: &str, message: &str) -> Response {
     (
-        code,
-        Json(json!({ "ok": false, "error": { "message": msg } })),
+        status,
+        Json(json!({ "ok": false, "error": { "code": code, "message": message } })),
     )
         .into_response()
+}
+
+/// The code of an answer of erplora.com the hub RELAYS: «that does not exist» keeps meaning that
+/// from either end; anything else it refused is `cloud_rejected`.
+fn relayed_code(status: StatusCode) -> &'static str {
+    if status == StatusCode::NOT_FOUND {
+        "not_found"
+    } else {
+        cloud_proxy::CLOUD_REJECTED
+    }
+}
+
+/// A refusal of erplora.com the hub relays, with the status [`cloud_proxy::relayed_status`] gives it
+/// and the code that status means.
+fn relayed(raw_status: u16, message: &str) -> Response {
+    let status = cloud_proxy::relayed_status(cloud_proxy::cloud_status(raw_status));
+    err(status, relayed_code(status), message)
 }
 
 // ─────────────────────────── Política de acciones del usuario (ADR-0172) ───────────────────────────
@@ -1365,7 +1485,8 @@ async fn require_action(st: &AppState, rel: &str, action: UserFileAction) -> Res
     }
     Err(err(
         StatusCode::FORBIDDEN,
-        "esta carpeta es de solo lectura: su módulo no permite esa acción",
+        "media.read_only_folder",
+        "this folder is read-only: its module does not allow that action",
     ))
 }
 

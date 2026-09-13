@@ -8,7 +8,10 @@ import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
 const fetchMedia = vi.fn();
-vi.mock('../lib/media', () => ({
+vi.mock('../lib/media', async () => ({
+  // hub#1776: the real helpers that read a refusal; only the network calls are simulated.
+  isMediaFailure: (await vi.importActual<typeof import('../lib/media')>('../lib/media')).isMediaFailure,
+  mediaFailureSentence: (await vi.importActual<typeof import('../lib/media')>('../lib/media')).mediaFailureSentence,
   fetchMedia: (...a: unknown[]) => fetchMedia(...a),
   uploadMedia: vi.fn(),
   deleteMedia: vi.fn(),

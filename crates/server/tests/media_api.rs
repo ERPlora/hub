@@ -42,6 +42,72 @@ async fn spawn_mock_cloud() -> (String, Captured) {
 
 /// Fixture: BD Postgres efímera (esquema propio) + Cloud simulado. Devuelve el router, las sesiones
 /// de admin y empleado, y la captura de peticiones del Cloud.
+/// The stable code of a refusal (`{"ok": false, "error": {"code", "message"}}`), if any.
+async fn code_of(response: axum::response::Response<Body>) -> Option<String> {
+    let bytes = http_body_util::BodyExt::collect(response.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    body["error"]["code"].as_str().map(str::to_string)
+}
+
+/// A hub the business can reach, but that cannot reach erplora.com the way `cloud` says.
+async fn hub_whose_cloud_is(
+    cloud_base_url: String,
+    cloud_api_token: Option<String>,
+) -> (axum::Router, String) {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-media-cloud");
+    rt.ensure_system_tables().await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
+    let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
+    let cfg = HubConfig {
+        demo: false,
+        hub_id: "hub-media-cloud".into(),
+        cloud_base_url,
+        module_cache: std::env::temp_dir().join("erplora-media-api-cache"),
+        auth_mode: AuthMode::Session,
+        jwt_public_key: None,
+        cloud_api_token,
+        device_trust_enforce: false,
+        media_dir: std::env::temp_dir().join("erplora-media-api-scratch"),
+        sector: None,
+        dev_mode: false,
+        dev_modules_dir: None,
+        module_trusted_keys: Vec::new(),
+    };
+    (app(AppState::with_config(rt, cfg)), admin)
+}
+
+fn list_request(session: &str) -> Request {
+    Request::builder()
+        .uri("/api/media")
+        .header("x-hub-session", session)
+        .body(Body::empty())
+        .unwrap()
+}
+
+/// 🔴 hub#1776: a listing that cannot reach erplora.com says so by code, not «check the connection».
+///
+/// (The other half of that failure, `hub_not_enrolled`, cannot be reached over HTTP here: a hub with
+/// no machine credential answers `428` to every door before this one runs — the registration gate.
+/// It only exists on a development hub, and it carries its code all the same.)
+#[tokio::test]
+async fn a_listing_that_cannot_reach_erplora_says_so_by_code() {
+    let (unreachable, admin) =
+        hub_whose_cloud_is("http://127.0.0.1:1".into(), Some("machine".into())).await;
+    let response = send(&unreachable, list_request(&admin)).await;
+    assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY);
+    assert_eq!(
+        code_of(response).await.as_deref(),
+        Some("cloud_unreachable")
+    );
+}
+
 async fn fixture() -> (axum::Router, String, String, Captured) {
     let (cloud_base_url, captured) = spawn_mock_cloud().await;
 
@@ -99,6 +165,8 @@ async fn media_requires_a_human_session_even_for_reads() {
         .await
         .unwrap();
     assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    // hub#1776: with its code, so Files can say «sign in again» instead of «check the connection».
+    assert_eq!(code_of(anonymous).await.as_deref(), Some("unauthorized"));
 
     // Sesión de usuario → 200; el listado se proxya al Cloud.
     let authenticated = router
@@ -142,7 +210,9 @@ async fn only_admin_can_modify_media() {
         )
         .await
         .unwrap();
-    assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+    // hub#1776: a valid session without the role is `403 forbidden` — signing in again would not help.
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    assert_eq!(code_of(denied).await.as_deref(), Some("forbidden"));
     assert!(
         captured.lock().unwrap().is_empty(),
         "un 401 no debe llegar a proxyar al Cloud",
@@ -278,6 +348,11 @@ async fn a_module_folder_is_read_only_for_the_user_by_default() {
     .await;
 
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        code_of(response).await.as_deref(),
+        Some("media.read_only_folder"),
+        "hub#1776: the screen says WHY the folder refuses, not «check the connection»"
+    );
     // Y el rechazo ocurre ANTES de tocar el Cloud: no hay borrado a medias.
     assert!(
         !captured.lock().unwrap().iter().any(|(m, _)| m == "DELETE"),
@@ -400,6 +475,11 @@ async fn renaming_cannot_move_a_file_out_of_its_folder() {
             response.status(),
             StatusCode::BAD_REQUEST,
             "nombre rechazado: {bad:?}"
+        );
+        assert_eq!(
+            code_of(response).await.as_deref(),
+            Some("media.invalid_name"),
+            "hub#1776: {bad:?}"
         );
     }
 }
