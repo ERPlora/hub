@@ -97,6 +97,45 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     }
 }
 
+/// **Tells the SaaS the route changed, right now** (Ioan, 2026-09-15).
+///
+/// The SaaS keeps its own copy of the route this hub files by (`Hub.fiscal_transmission_route`) and
+/// only the heartbeat writes it. With the heartbeat on its 24-hour tick, a hub that stopped filing
+/// with its own certificate — deleting it, or switching it off — kept getting
+/// `409 own_certificate_direct` from the gateway-token door for up to a day, and every record in
+/// between stayed pending. So the three certificate doors (PUT, PATCH, DELETE) fire one heartbeat
+/// the moment they succeed.
+///
+/// Spawned: the door answers the owner without waiting for the SaaS, and a SaaS that does not answer
+/// changes nothing the owner just did. Best-effort and logged, like the boot announce: the daily
+/// tick is still there behind it.
+pub fn announce_route_change(state: &AppState) {
+    let Some(auth) = auth::machine_auth(state) else {
+        return;
+    };
+    let state = state.clone();
+    tokio::spawn(async move {
+        let usage = {
+            let runtime = state.runtime.read().await;
+            let now = chrono::Utc::now().to_rfc3339();
+            let pending = runtime.pending_obligations().await;
+            daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now, &pending).await
+        };
+        match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
+            .await
+        {
+            Ok(_) => tracing::info!(
+                route = ?usage.transmission_route,
+                "fiscal route changed: the SaaS has been told"
+            ),
+            Err(error) => tracing::warn!(
+                %error,
+                "fiscal route changed but the SaaS could not be told: the daily heartbeat will"
+            ),
+        }
+    });
+}
+
 /// Sondea `ready` hasta que diga que sí o se agote `timeout`. `true` = llegó a estar listo.
 ///
 /// **El primer vistazo es inmediato**, y no es un detalle: cuando esto corre, el arranque ya hizo

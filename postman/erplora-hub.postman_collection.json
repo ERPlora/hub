@@ -669,6 +669,47 @@
           "response": []
         },
         {
+          "name": "Use my own certificate — switch on or off (keeps the .p12)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"use_for_transmission\": false\n}"
+            },
+            "description": "«Usar mi propio certificado». `false` keeps the uploaded .p12 but stops filing with it: the hub files through ERPlora's Sello (the delegated route). `true` files with the own certificate again. Refusals travel as 409 with a stable code: `fiscal.own_certificate_not_uploaded` (on with nothing uploaded), `fiscal.no_representation_grant` (off in production without an approved grant), `fiscal.gateway_not_enrolled` (off in production without the signed secure connection). On success the SaaS is told the new route at once.\n\n(auth: admin+capability)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "PATCH",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "certificate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/certificate"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "DELETE /api/business/certificate",
           "request": {
             "description": "auth: admin+capability",
