@@ -131,6 +131,7 @@ pub fn app(state: AppState) -> Router {
             "/api/business/certificate",
             get(settings::get_business_certificate)
                 .put(settings::put_business_certificate)
+                .patch(settings::patch_business_certificate)
                 .delete(settings::delete_business_certificate),
         )
         // Identidad de MÁQUINA para la pasarela fiscal (hub#1432): la clave nace en el hub y no

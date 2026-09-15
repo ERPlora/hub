@@ -249,5 +249,12 @@
   "DELETE /api/hub/whatsapp/templates/:name": {
     "name": "Delete a template from Meta",
     "description": "Drops the template from Meta and from the SaaS — every language of it, as Meta does. `204` on success; a name this hub does not have is a `404` whether it belongs to another business or to nobody. The name is lowercase letters, digits and underscores: anything else the hub refuses before calling. A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).whatsappTemplates`) also needs the `notify` capability, declared in its `module.json` with the `whatsapp` channel and granted by the owner in Settings → Permissions; without either the answer is `403 capability_denied`. The shell names no module and is unaffected."
+  },
+  "PATCH /api/business/certificate": {
+    "name": "Use my own certificate — switch on or off (keeps the .p12)",
+    "description": "«Usar mi propio certificado». `false` keeps the uploaded .p12 but stops filing with it: the hub files through ERPlora's Sello (the delegated route). `true` files with the own certificate again. Refusals travel as 409 with a stable code: `fiscal.own_certificate_not_uploaded` (on with nothing uploaded), `fiscal.no_representation_grant` (off in production without an approved grant), `fiscal.gateway_not_enrolled` (off in production without the signed secure connection). On success the SaaS is told the new route at once.",
+    "body": {
+      "use_for_transmission": false
+    }
   }
 }

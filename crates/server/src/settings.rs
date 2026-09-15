@@ -325,6 +325,54 @@ pub async fn put_business_certificate(
     if let Err(e) = rt.set_business_certificate(&b64, &password, &by).await {
         return crate::err_response(e);
     }
+    crate::boot_announce::announce_route_change(&st);
+    match rt.business_certificate_status().await {
+        Ok(s) => enveloped(s),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// PATCH /api/business/certificate — **«Usar mi propio certificado»** on or off, keeping the
+/// certificate (Ioan, 2026-09-15). Body `{ "use_for_transmission": true|false }`. Auth = admin
+/// session **+ the `certificate` capability** when the caller names a module, exactly like PUT and
+/// DELETE. The runtime decides whether the switch is allowed (production needs an approved grant and
+/// the enrolled machine identity) and answers with the domain code the screen translates; on success
+/// the SaaS is told the new route at once.
+pub async fn patch_business_certificate(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<Map<String, Value>>>,
+) -> Response {
+    let Some(enabled) = body
+        .as_ref()
+        .and_then(|b| b.0.get("use_for_transmission"))
+        .and_then(Value::as_bool)
+    else {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "ok": false, "error": {
+                "code": "invalid_field",
+                "field": "use_for_transmission",
+                "message": "use_for_transmission must be true or false",
+            }})),
+        )
+            .into_response();
+    };
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return crate::auth_rejected(e);
+    }
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
+    }
+    if let Err(e) = rt.set_business_certificate_use(enabled).await {
+        return crate::err_response(e);
+    }
+    crate::boot_announce::announce_route_change(&st);
     match rt.business_certificate_status().await {
         Ok(s) => enveloped(s),
         Err(e) => crate::err_response(e),
@@ -571,6 +619,7 @@ pub async fn delete_business_certificate(
     if let Err(e) = rt.delete_business_certificate().await {
         return crate::err_response(e);
     }
+    crate::boot_announce::announce_route_change(&st);
     match rt.business_certificate_status().await {
         Ok(s) => enveloped(s),
         Err(e) => crate::err_response(e),
