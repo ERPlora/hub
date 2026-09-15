@@ -124,6 +124,11 @@ on:
       - 'apps/web/src/lib/print.ts'
       - 'crates/peripherals/**'
       - 'crates/runtime/src/print_*.rs'
+      # El SUJETO del guardia de lote aplastado (hub#1878). Su test ya entra por el glob
+      # `scripts/tests/*.test.sh` de arriba, y el workflow que lo lleva por
+      # `.github/workflows/**`; esta ruta es para el script en sí, que vive en `scripts/` y no
+      # dispararía nada por su cuenta.
+      - 'scripts/branch_drift.py'
   workflow_dispatch:
 
 permissions:
@@ -382,3 +387,17 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/print-chain-doc-truth.test.sh
+
+      # ── Un lote develop → main que entra APLASTADO se caza (hub#1878) ─────────────────
+      # `develop-main-drift.yml` solo se dispara por cron, por push a `main` y a mano, así que
+      # una PR que rompiera el script o le quitara el `fetch` de las refs no encontraría ni un
+      # rojo: se enteraría el cron de la mañana siguiente, o —peor— nadie, porque la señal
+      # muda se lee igual que «no hay nada». Aquí sí corre en cada PR, y cuesta segundos:
+      # los casos montan repos de git de verdad (un lote mergeado, uno aplastado, deriva
+      # normal, un hotfix) y comprueban el veredicto y su código de salida.
+      #
+      # pyyaml ya lo instaló el paso del contrato de `test-hub-modules.yml` de más arriba.
+      - name: "Contrato: el lote aplastado develop → main se caza (hub#1878)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/branch_drift.test.sh

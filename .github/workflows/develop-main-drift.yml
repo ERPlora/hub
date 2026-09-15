@@ -1,0 +1,103 @@
+# ==============================================================================
+# ERPlora Hub — señal de deriva `develop` → `main` y de lote APLASTADO (hub#1878)
+# ==============================================================================
+#
+# `main` es la rama que despliega: mergear en ella publica `ghcr.io/erplora/hub:latest`,
+# que es la imagen que corre la flota y con la que arranca un hub nuevo. Así que lo que
+# está en `develop` y no en `main` es trabajo terminado con efecto cero para cualquier
+# cliente, y merece medirse.
+#
+# ── Pero el fallo que trajo esto aquí es el CALLADO ───────────────────────────
+#
+# Un lote de release mergeado con `--squash` por fuera de `merge-pr.sh` no rompe nada
+# que se vea: la CI pasa, el contenido sí llega a producción y el board da el trabajo
+# por hecho. Lo único que se estropea es la FORMA de la historia —`main` deja de
+# descender de `develop`— y nadie miraba la forma. Las 15 promociones del 30/08 al
+# 13/09 entraron con un solo padre y no se supo durante dos semanas: la factura llegó
+# como hub#1876, una PR de release CONFLICTING en 12 ficheros que no eran conflictos
+# de verdad. El daño no es el conflicto, es que resolverlo con prisa «a favor de
+# develop» pisa lo que el otro lado tenía.
+#
+# Este job FALLA (código 4) cuando lo detecta, y el fallo no se traga: los rulesets y
+# la branch protection están de pago en repos privados con la org en Free, así que no
+# se puede impedir el squash desde la UI de GitHub — solo cazarlo el día que pasa.
+#
+# ── Cómo se dispara ───────────────────────────────────────────────────────────
+#
+# Con `schedule` (07:00 UTC), con `push` a `main` y a mano con `workflow_dispatch`.
+# El `push` a `main` está para que la señal se CIERRE en el acto al salir el lote, sin
+# esperar al cron de mañana. No lleva `pull_request` a propósito: no decide ni bloquea
+# ningún merge — mide el estado de las dos ramas, que en una PR todavía no ha cambiado.
+# Lo que sí corre en cada PR es su test de contrato, `scripts/tests/branch_drift.test.sh`,
+# como paso de `actionlint.yml`.
+#
+# ⚠️ Los workflows programados SOLO corren desde la rama por defecto (`main`). Así que
+# esta señal no empieza a vigilar hasta que el primer lote la lleve allí — el mismo
+# lote que motivó la issue.
+#
+# Coste: sin dependencias, clon sin blobs y unas llamadas a `gh` → ~30 s por ejecución.
+# Se elige a propósito frente a un job pesado: Actions está en overage (pm#61) y una
+# señal que cuesta dinero acaba desactivándose.
+# ==============================================================================
+
+name: Deriva develop → main
+
+on:
+  schedule:
+    # 07:00 UTC = 09:00 Europe/Madrid: la señal está puesta al empezar el día, no al acabarlo.
+    - cron: "0 7 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Dos ejecuciones a la vez (cron + push del lote) podrían crear DOS issues: las dos
+  # mirarían antes de que la otra escribiese.
+  group: develop-main-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    name: Medir la deriva y la forma del último lote
+    # Mismo interruptor que el resto de workflows del repo: el runner dedicado cuando la
+    # Variable de la org está puesta, y los de GitHub si no. Este corre por cron, que es justo
+    # lo que el presupuesto agotado apaga sin avisar: la señal deja de emitirse y su silencio se
+    # lee igual que «no hay deriva».
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout (historial completo, sin blobs)
+        uses: actions/checkout@v4
+        with:
+          # Hacen falta las dos ramas para comparar, y el historial ENTERO: con un clon shallow
+          # `main` parece huérfano —sin merge-base con `develop`— y esa lectura falsa es la que
+          # hizo creer durante semanas que aquí no se podía medir nada (hub#1877).
+          # `blob:none` se trae solo los commits: no se lee ni un fichero del árbol.
+          fetch-depth: 0
+          filter: blob:none
+
+      # `fetch-depth: 0` no basta. El runner dedicado reutiliza su `_work` entre jobs (el
+      # "checkout" tarda segundos: no reclona), y un workspace que venga sin
+      # `refs/remotes/origin/develop` deja la señal muda detrás de un traceback. Traer las dos
+      # refs a mano cuesta nada y no depende de cómo dejara el workspace el job anterior.
+      - name: Asegurar las refs a comparar
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --filter=blob:none origin \
+            main:refs/remotes/origin/main \
+            develop:refs/remotes/origin/develop
+          git rev-parse --verify --quiet origin/main^{commit} >/dev/null
+          git rev-parse --verify --quiet origin/develop^{commit} >/dev/null
+
+      # Sin instalar nada: el script es stdlib pura a propósito, para que la señal no dependa de
+      # resolver los toolchains de este repo (Rust, pnpm) para decir si la historia está sana.
+      # Y sin `continue-on-error`: un guardia cuyo rojo se ignora es un adorno.
+      - name: Señal de deriva y de lote aplastado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/branch_drift.py --repo "${{ github.repository }}"
