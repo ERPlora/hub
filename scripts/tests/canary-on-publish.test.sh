@@ -194,9 +194,9 @@ fi
 # `ghcr.io/ERPlora/hub:X.Y.Z` left the canary hub unable to pull, never booted, and vetoed 1.1.20 to
 # 1.1.23 for a capital letter (2026-09-09 → 2026-09-15). The job may read the owner, but only lowered
 # BEFORE the reference it promotes is built.
-owner_line=$(grep -nF 'repository_owner' <<<"$code" | head -1 | cut -d: -f1)
-lower_line=$(grep -nE "IMAGE_REPO=.*tr '\[:upper:\]' '\[:lower:\]'|IMAGE_REPO=\"\\\$\{IMAGE_REPO,,\}\"" <<<"$code" | head -1 | cut -d: -f1)
-ref_line=$(grep -nF 'ref="${IMAGE_REPO}' <<<"$code" | head -1 | cut -d: -f1)
+owner_line=$(grep -m1 -nF 'repository_owner' <<<"$code" | cut -d: -f1)
+lower_line=$(grep -m1 -nE "IMAGE_REPO=.*tr '\[:upper:\]' '\[:lower:\]'|IMAGE_REPO=\"\\\$\{IMAGE_REPO,,\}\"" <<<"$code" | cut -d: -f1)
+ref_line=$(grep -m1 -nF 'ref="${IMAGE_REPO}' <<<"$code" | cut -d: -f1)
 if [ -z "$owner_line" ]; then
     if grep -qE 'ghcr\.io/[^"$ ]*[A-Z]' <<<"$code"; then
         bad "promociona una referencia en minúsculas" "hay una imagen ghcr.io con mayúsculas escrita en el job"
