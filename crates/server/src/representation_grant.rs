@@ -30,6 +30,16 @@
 //!    be approving something the customer never signed.
 //! 3. **No document goes anywhere near a log.** Not their bytes, not their names, not on the error
 //!    path — which is the branch that most invites «let me show you what I sent».
+//!
+//! # What the screen may show about a submission (hub#1873)
+//!
+//! Holding no document is not the same as saying nothing. The `GET` door carries up the control
+//! plane's **facts about the submission** — the attempt's `version`, when it was `submitted_at` and
+//! `reviewed_at`, which of the four parts arrived (`documents`, a boolean each) and the earlier
+//! attempts with the reason each came back (`history`) — because otherwise the panel can only say
+//! «pendiente», and a customer whose otorgamiento was rejected has no way to tell what to change or
+//! whether the escritura even uploaded. They are **metadata**: rule 2 above still holds, and not a
+//! byte of any document travels through here.
 
 use axum::extract::{Multipart, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -545,6 +555,19 @@ pub async fn get_representation_grant(State(st): State<AppState>, headers: Heade
                 "rejected_reason": body.get("rejected_reason").and_then(Value::as_str).unwrap_or(""),
                 "signature_kind": body.get("signature_kind").and_then(Value::as_str).unwrap_or(""),
                 "document_type": body.get("document_type").and_then(Value::as_str).unwrap_or(""),
+                // What was sent and when it was looked at (hub#1873). Forwarded as they come — the
+                // control plane is the source — and given the EMPTY value of their own shape when
+                // they are absent, so an older SaaS reads as «nothing to show» instead of handing
+                // the screen a `null` to defend against.
+                "version": body.get("version").and_then(Value::as_u64).unwrap_or(0),
+                "submitted_at": body.get("submitted_at").and_then(Value::as_str).unwrap_or(""),
+                "reviewed_at": body.get("reviewed_at").and_then(Value::as_str).unwrap_or(""),
+                // 🔒 Which of the four parts the control plane holds — a boolean each, NEVER their
+                // bytes. Rule 2 of this module does not bend for a panel.
+                "documents": body.get("documents").filter(|value| value.is_object()).cloned().unwrap_or_else(|| json!({})),
+                // The earlier submissions, so a customer whose grant came back rejected can read
+                // what the reviewer said instead of guessing what to change.
+                "history": body.get("history").filter(|value| value.is_array()).cloned().unwrap_or_else(|| json!([])),
             }))
             .into_response()
         }
