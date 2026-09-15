@@ -150,6 +150,10 @@ def evaluate(
     if drift.oldest_commit_at is not None:
         age_days = (now - drift.oldest_commit_at).total_seconds() / 86400
 
+    # These reasons are the ONLY Spanish strings outside the issue bodies, and for the same
+    # reason: they are pasted verbatim into the body `render_issue_body` publishes. Everything
+    # this script says to a console — help text, measurements, the flattening report — is English,
+    # as the repo requires of any log.
     reasons: list[str] = []
     if drift.commits > max_commits:
         reasons.append(f"{drift.commits} commits sin desplegar (umbral: {max_commits})")
@@ -341,15 +345,22 @@ def measure_flattened_batch(
     here.
 
     **The probe is the tree, not the commit count.** After a squash the counters never reach zero,
-    so they cannot tell a flattened batch from an ordinary one; the tree can. Find the commit
+    so they cannot tell a flattened batch from an ordinary one; the tree can. Find the commits
     reachable from `develop` whose tree `main` is serving, then ask whether `main` descends from
-    it:
+    any of them:
 
-    - not an ancestor → the batch was flattened (what this reports);
-    - an ancestor → a healthy merge, silence;
+    - one of them is an ancestor → a healthy merge, silence;
+    - none is → the batch was flattened (what this reports, naming the newest);
     - no commit of `develop` has that tree → `main` carries something of its own. That is an
       unreturned hotfix, a different fault with its own signal (:func:`measure_unreturned`);
       reporting it here would fire on every hotfix and teach everyone to ignore this.
+
+    **ALL of them, not the first one found.** `develop` does not carry one commit per tree: a
+    retro-merge done with `-s ours` has the exact tree of its first parent, and so does an empty
+    commit. Stopping at the newest match would then judge a release by a commit that did not exist
+    when it was made — and a commit made after the merge is never an ancestor of it, so a
+    perfectly healthy batch would be called flattened. That is not a remote shape here: hub#1877
+    is exactly a `-s ours` merge into `develop`.
 
     ⚠️ It measures repos whose `main` INTEGRATES `develop`, which this one does: `main` has a root
     commit of its own and shares history with `develop` up to `3d8359fa`, and `125da1ac` is a real
@@ -380,6 +391,7 @@ def measure_flattened_batch(
         env=env,
     ).stdout
 
+    orphaned: list[tuple[str, str]] = []
     for line in out.splitlines():
         if not line.strip():
             continue
@@ -392,14 +404,18 @@ def measure_flattened_batch(
             ).returncode
             == 0
         )
-        return (
-            None
-            if descends
-            else FlattenedBatch(
-                main_sha=main_sha, develop_sha=sha, develop_subject=subject
-            )
-        )
-    return None
+        if descends:
+            # `main` descends from a commit of `develop` carrying this very tree: the ancestry
+            # the release had to keep is there, whatever the other matches look like.
+            return None
+        orphaned.append((sha, subject))
+
+    if not orphaned:
+        return None
+    # `git log` walks newest-first, so the head of the list is the newest match: the commit whose
+    # content `main` is serving today, which is the one worth naming.
+    sha, subject = orphaned[0]
+    return FlattenedBatch(main_sha=main_sha, develop_sha=sha, develop_subject=subject)
 
 
 def render_return_issue_body(verdict: Verdict) -> str:
@@ -580,50 +596,50 @@ def _print_flattened(flattened: FlattenedBatch, *, base: str, head: str) -> None
     merge that registers the ancestry WITHOUT changing a single line of content.
     """
     print()
-    print(f"  ❌ el lote de release entró APLASTADO en `{base}`:")
+    print(f"  ❌ the release batch landed FLATTENED on `{base}`:")
     print(
-        f"     {base} = {flattened.main_sha[:8]} lleva el árbol de {flattened.develop_sha[:8]}"
+        f"     {base} = {flattened.main_sha[:8]} serves the tree of {flattened.develop_sha[:8]}"
     )
     print(f"     ({flattened.develop_subject})")
+    print("     …but does NOT descend from it, so the NEXT batch will 3-way against an")
     print(
-        "     …pero NO desciende de él, así que el SIGUIENTE lote conflictará contra una"
-    )
-    print(
-        "     base cada vez más vieja, y ahí un conflicto mal resuelto pisa a otro worker."
+        "     ever-older base, and a conflict resolved in a hurry there overwrites another worker."
     )
     print()
     print(
-        "     Se repara con un retro-merge que registre la ascendencia SIN cambiar contenido"
+        "     The repair is a retro-merge that registers the ancestry WITHOUT changing content"
     )
-    print("     (es lo que hizo hub#1877, con el árbol verificado antes de mergear):")
+    print("     (what hub#1877 did, with the resulting tree verified before merging):")
     print(f"       git switch -c chore/retro-merge-main-into-develop {head}")
     print(
-        f"       git merge -s ours --no-commit {base}   # el árbol queda EXACTAMENTE el de {head}"
+        f"       git merge -s ours --no-commit {base}   # tree stays EXACTLY {head}'s"
     )
     print(
-        f"       git diff --quiet {head} && git commit  # y no se commitea sin comprobarlo"
+        f"       git diff --quiet {head} && git commit  # and it is not committed unchecked"
     )
     print(
-        f"     La PR va contra `{head}` y se mergea SIN squash: lleva un merge commit cuyo 2.º"
+        f"     The PR goes against `{head}` and is merged WITHOUT squash: it carries a merge"
     )
-    print(f"     padre es `{base}`, y aplastarla borraría el único enlace que aporta.")
     print(
-        "     El lote se mergea SOLO con merge-pr.sh: fue saltárselo lo que produjo esto."
+        f"     commit whose 2nd parent is `{base}`, and squashing it would erase the only link"
+    )
+    print(
+        "     it adds. Batches are merged ONLY with merge-pr.sh: skipping it caused this."
     )
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--repo", default="ERPlora/hub", help="owner/name donde vive la issue-señal"
+        "--repo", default="ERPlora/hub", help="owner/name where the signal issue lives"
     )
-    parser.add_argument("--repo-path", default=".", help="checkout de git a medir")
+    parser.add_argument("--repo-path", default=".", help="git checkout to measure")
     parser.add_argument("--base", default="origin/main")
     parser.add_argument("--head", default="origin/develop")
     parser.add_argument("--max-commits", type=int, default=DEFAULT_MAX_COMMITS)
     parser.add_argument("--max-age-days", type=float, default=DEFAULT_MAX_AGE_DAYS)
     parser.add_argument(
-        "--dry-run", action="store_true", help="mide e imprime; no toca ninguna issue"
+        "--dry-run", action="store_true", help="measure and print; touch no issue"
     )
     args = parser.parse_args(argv)
 
@@ -646,7 +662,7 @@ def main(argv=None) -> int:
         drift, now=now, max_commits=args.max_commits, max_age_days=args.max_age_days
     )
     print(
-        f"{args.base}..{args.head}: {verdict.commits} commits, {verdict.age_days:.1f} días esperando"
+        f"{args.base}..{args.head}: {verdict.commits} commits, {verdict.age_days:.1f} days waiting"
     )
     for reason in verdict.reasons:
         print(f"  ⚠️  {reason}")
@@ -658,7 +674,7 @@ def main(argv=None) -> int:
         max_age_days=DEFAULT_RETURN_MAX_AGE_DAYS,
     )
     print(
-        f"{args.head}..{args.base} (sin retorno): {unreturned.commits} commits, {unreturned.age_days:.1f} días"
+        f"{args.head}..{args.base} (unreturned): {unreturned.commits} commits, {unreturned.age_days:.1f} days"
     )
     for reason in unreturned.reasons:
         print(f"  ⚠️  {reason}")
@@ -667,14 +683,14 @@ def main(argv=None) -> int:
         _print_flattened(flattened, base=args.base, head=args.head)
 
     if args.dry_run:
-        print("(--dry-run: no se toca ninguna issue)")
+        print("(--dry-run: no issue is touched)")
         return EXIT_FLATTENED_BATCH if flattened is not None else 0
 
     issues = GhIssues(args.repo)
     action = sync_issue(
         verdict, title=ISSUE_TITLE, body=render_issue_body(verdict), issues=issues
     )
-    print(f"issue-señal (deriva): {action}")
+    print(f"signal issue (drift): {action}")
     action = sync_issue(
         unreturned,
         title=RETURN_ISSUE_TITLE,
@@ -683,7 +699,7 @@ def main(argv=None) -> int:
         marker=RETURN_MARKER,
         close_comment=RETURN_CLOSE_COMMENT,
     )
-    print(f"issue-señal (hotfix sin retorno): {action}")
+    print(f"signal issue (unreturned hotfix): {action}")
     # LAST, after keeping both signal issues: the finding fails the job, and returning earlier
     # would leave the drift signal unrefreshed on exactly the day it is looked at most.
     return EXIT_FLATTENED_BATCH if flattened is not None else 0

@@ -160,8 +160,8 @@ if [ -f "$signal" ]; then
     # capitalisation it happens to be said in today.
     said=$(printf '%s' "$output" | tr '[:upper:]' '[:lower:]')
     case "$said" in
-        (*aplastado*) ok ;;
-        (*) fail "the finding has to be SAID, not only returned — 'aplastado' missing from the output: $output" ;;
+        (*flattened*) ok ;;
+        (*) fail "the finding has to be SAID, not only returned — 'flattened' missing from the output: $output" ;;
     esac
 
     # ── …and it is still found after `develop` moves on ───────────────────────
@@ -190,9 +190,45 @@ if [ -f "$signal" ]; then
         fail "drift with no batch landed is not a flattening: expected 0, got $status: $output"
     fi
     case "$output" in
-        (*"días esperando"*) ok ;;
+        (*"days waiting"*) ok ;;
         (*) fail "plain drift must still be MEASURED and printed: $output" ;;
     esac
+
+    # ── Two commits of `develop` with the SAME tree: the batch is still healthy ───
+    #
+    # `develop` does not carry one commit per tree. A retro-merge done with `-s ours` has the
+    # exact tree of its first parent, and so does an empty commit — so the tree `main` serves can
+    # match SEVERAL commits of `develop`, and the newest of them is by definition not an ancestor
+    # of a `main` that was merged before it existed. Deciding on the first match found therefore
+    # calls a perfectly healthy release flattened, and it is not a remote shape: hub#1877 is
+    # precisely a `-s ours` merge into `develop`.
+    repo=$(new_repo healthy_then_identical_tree)
+    commit_on "$repo" develop feature.txt "newest"
+    merge_release "$repo"
+    git_q "$repo" checkout develop
+    git_q "$repo" commit --allow-empty -m "same tree as the batch (retro-merge / empty commit)"
+    run_signal "$repo"
+    if [ "$status" -eq 0 ]; then
+        ok
+    else
+        fail "a healthy batch must stay healthy when develop grows a second commit with the SAME tree: expected 0, got $status: $output"
+    fi
+
+    # ── …and the other way round: several matches, NONE an ancestor, is still a squash ──
+    # The symmetric case of the one above, and the one that proves widening the search did not
+    # blunt the detector: a flattened batch plus an empty commit on top is two commits carrying
+    # `main`'s tree, neither of which `main` descends from. That is still the disease.
+    repo=$(new_repo flattened_with_identical_trees)
+    commit_on "$repo" develop feature.txt "newest"
+    squash_release "$repo"
+    git_q "$repo" checkout develop
+    git_q "$repo" commit --allow-empty -m "same tree, still not an ancestor of main"
+    run_signal "$repo"
+    if [ "$status" -eq 4 ]; then
+        ok
+    else
+        fail "several commits with main's tree and NONE an ancestor is still a flattened batch: expected 4, got $status: $output"
+    fi
 
     # ── A hotfix on `main` is a different fault, with its own signal ──────────
     repo=$(new_repo hotfix)
