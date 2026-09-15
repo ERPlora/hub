@@ -273,6 +273,9 @@ jobs:
             exit 1
           fi
 
+          # hub#1869: `repository_owner` is `ERPlora`, and Docker cannot pull a repository with
+          # capitals — the canary hub never booted and 1.1.20→1.1.23 were vetoed for a capital letter.
+          IMAGE_REPO=$(printf '%s' "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
           ref="${IMAGE_REPO}:${VERSION}"
           echo "Promocionando ${ref} como puntero de la flota…"
           code=$(curl -sS -o /tmp/promote.json -w '%{http_code}' -X POST \
