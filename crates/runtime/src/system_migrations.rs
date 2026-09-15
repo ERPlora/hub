@@ -1979,6 +1979,22 @@ CREATE INDEX IF NOT EXISTS ix_policy_checkpoint ON _policy (hub_id, checkpoint);
         kind: Kind::Expand,
         postgres: "ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS ended_reason TEXT NOT NULL DEFAULT '';",
     },
+    // ── v63 — «Usar mi propio certificado» is a CHOICE (Ioan, 2026-09-15) ────────────────────────
+    // The route used to be «own if a `.p12` is uploaded»: the owner could not file through ERPlora's
+    // Sello while keeping their certificate, and the switch on the screen only navigated. The flag
+    // lives on the certificate's OWN row because that is the row the signing selection
+    // (`certificate::active_kind`) already reads — no second round trip on the dispatcher's path —
+    // and it goes away with the certificate. Default 1: every certificate uploaded before this keeps
+    // filing exactly as it did. Additive and re-runnable, so the auto-rollback can leave it behind.
+    // `apply` compares against the highest applied version: a rebase that brings another v63 moves
+    // this one above it, never below.
+    SystemMigration {
+        version: 63,
+        name: "hub_certificate_use_for_transmission",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _hub_certificate \
+                     ADD COLUMN IF NOT EXISTS use_for_transmission INTEGER NOT NULL DEFAULT 1;",
+    },
 
 ];
 
@@ -3925,7 +3941,16 @@ mod kind_contract_tests {
         // default is re-runnable and needs no backfill. When it was written the maximum was v61 on
         // `origin/develop` and across the 196 remote branches that carry the file — none asks for a
         // v62.
-        assert_eq!(MIGRATIONS.len(), 59, "el catálogo cambió de tamaño");
+        // + `hub_certificate_use_for_transmission` (v63, Ioan 2026-09-15): the `use_for_transmission`
+        // column of `_hub_certificate`, which turns «Usar mi propio certificado» into a choice — an
+        // uploaded `.p12` can be switched off and the hub files through ERPlora's Sello while keeping
+        // it. It lives on the certificate's row because `certificate::active_kind` already reads that
+        // row. Default `1` is the truth for every certificate that exists (they all file today), so
+        // `ALTER … ADD COLUMN IF NOT EXISTS` with its default is re-runnable and needs no backfill;
+        // additive, so ADR-0269 retires it by leaving it unwritten. When it was written the maximum
+        // was v62 on `origin/develop` and across the 98 remote branches that carry the file — none
+        // asks for a v63.
+        assert_eq!(MIGRATIONS.len(), 60, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

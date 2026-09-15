@@ -205,14 +205,19 @@ pub(crate) async fn set(
         // retired delegated certificate (ADR-0202 §2.5), and nothing rotates a certificate centrally
         // any more. The column stays — a system migration retires structure by leaving it alone
         // (ADR-0269) — and stays NULL for every row written from here on.
+        // Uploading a certificate IS choosing it: the upsert switches it back on
+        // (`use_for_transmission = 1`), so a `.p12` replaced while switched off does not sit there
+        // unused with nobody knowing why.
         "INSERT INTO _hub_certificate \
-           (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, certificate_type) \
+           (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, certificate_type, \
+            use_for_transmission) \
          VALUES (:hub_id, :kind, :pkcs12_b64, :password, :uploaded_at, :uploaded_by, \
-                 :certificate_type) \
+                 :certificate_type, 1) \
          ON CONFLICT (hub_id, kind) DO UPDATE SET \
            pkcs12_b64 = excluded.pkcs12_b64, password = excluded.password, \
            uploaded_at = excluded.uploaded_at, uploaded_by = excluded.uploaded_by, \
-           certificate_type = excluded.certificate_type",
+           certificate_type = excluded.certificate_type, \
+           use_for_transmission = 1",
         &p,
     )
     .await?;
@@ -253,7 +258,7 @@ async fn occupied_slots(
     p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
-            "SELECT kind, uploaded_at, uploaded_by FROM _hub_certificate \
+            "SELECT kind, uploaded_at, uploaded_by, use_for_transmission FROM _hub_certificate \
              WHERE hub_id = :hub_id AND pkcs12_b64 <> ''",
             &p,
         )
@@ -273,11 +278,32 @@ async fn occupied_slots(
                     "present": true,
                     "uploaded_at": r.get("uploaded_at").cloned().unwrap_or(Value::Null),
                     "uploaded_by": r.get("uploaded_by").cloned().unwrap_or(Value::Null),
+                    "use_for_transmission": in_use(r.get("use_for_transmission")),
                 }),
             ));
         }
     }
     Ok(out)
+}
+
+/// `use_for_transmission` as stored (`0`/`1`, or a boolean on a driver that maps it). Anything that
+/// is not an explicit «off» reads as ON: a row written before the column existed keeps filing.
+fn in_use(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_i64() != Some(0),
+        Some(Value::String(s)) => s.trim() != "0",
+        _ => true,
+    }
+}
+
+/// The occupied slot that SIGNS: the first one in [`SLOTS`] order whose owner has not switched it
+/// off. The ONE place the choice is applied, so [`status`] and [`active_kind`] cannot disagree.
+fn signing_slot(occupied: &[(CertificateKind, Value)]) -> Option<CertificateKind> {
+    occupied
+        .iter()
+        .find(|(_, v)| v.get("use_for_transmission").and_then(Value::as_bool).unwrap_or(true))
+        .map(|(k, _)| *k)
 }
 
 /// State of ONE slot (never its bytes nor its password): `{ present, uploaded_at, uploaded_by }`.
@@ -328,9 +354,10 @@ pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
             .unwrap_or_else(|| json!({ "present": false }))
     };
     let own = of(CertificateKind::Own);
-    // `active` = the first occupied slot in SLOTS order — the same rule as `active_kind`, answered
-    // from the rows already in hand.
-    let active = occupied.first().map(|(k, _)| k.as_str());
+    // `active` = the slot that SIGNS — the same rule as `active_kind`, answered from the rows already
+    // in hand. An uploaded certificate its owner switched off is `present` and NOT `active`.
+    let signing = signing_slot(&occupied);
+    let active = signing.map(CertificateKind::as_str);
     let mut out = own.clone();
     if let Some(o) = out.as_object_mut() {
         o.insert(
@@ -344,7 +371,7 @@ pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
         // with the same `route_of`. A screen that deduced it on its own would be a second rule.
         o.insert(
             "transmission_route".into(),
-            json!(route_of(occupied.first().map(|(k, _)| *k))),
+            json!(route_of(signing)),
         );
     }
     Ok(out)
@@ -368,10 +395,10 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKin
 /// Which certificate signs for this hub — **the own one if it was uploaded, otherwise the delegated
 /// one** (ADR-0202 §2.1). `None` if the hub holds neither.
 ///
-/// A fallback, not an option: there is no setting, no prompt and no stored preference. It is the
-/// order of [`SLOTS`], read fresh every time, so uploading your own certificate takes over on the
-/// next signature and deleting it hands the hub back to the delegated one — both directions, with
-/// nothing to reconfigure.
+/// **Since 2026-09-15 it is also a choice** (Ioan): the owner can switch an uploaded certificate off
+/// and file through ERPlora while keeping it ([`set_use_for_transmission`]). Read fresh every time,
+/// so uploading a certificate (which switches it on), switching it and deleting it all take effect
+/// on the next signature, in both directions.
 ///
 /// **«Can this hub issue?» is NOT this function** — that is [`can_transmit`], which the dispatcher
 /// gate and the ⛔ arm of the setup checklist both go through (hub#319, hub#1489) and which the
@@ -381,7 +408,34 @@ pub async fn active_kind(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
 ) -> Result<Option<CertificateKind>> {
-    Ok(occupied_slots(db, hub_id).await?.first().map(|(k, _)| *k))
+    Ok(signing_slot(&occupied_slots(db, hub_id).await?))
+}
+
+/// Switches ONE uploaded certificate on or off for filing, keeping the certificate itself (Ioan,
+/// 2026-09-15). Off, [`active_kind`] skips it and the hub files through ERPlora's fiscal cell;
+/// on, it signs again. Returns whether a certificate was there to switch.
+///
+/// **`pub(crate)`**: the guards that decide whether the switch is allowed (production needs an
+/// approved grant and the enrolled machine identity) live in
+/// [`crate::Runtime::set_business_certificate_use`], the only door that calls this.
+pub(crate) async fn set_use_for_transmission(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    kind: CertificateKind,
+    enabled: bool,
+) -> Result<bool> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("kind".into(), json!(kind.as_str()));
+    p.insert("enabled".into(), json!(if enabled { 1 } else { 0 }));
+    let affected = db
+        .execute(
+            "UPDATE _hub_certificate SET use_for_transmission = :enabled \
+             WHERE hub_id = :hub_id AND kind = :kind AND pkcs12_b64 <> ''",
+            &p,
+        )
+        .await?;
+    Ok(affected.affected > 0)
 }
 
 /// **The two EXCLUSIVE ways a hub's records reach the tax authority** (ADR-0320 §1 — hub#1314).
@@ -395,6 +449,13 @@ pub async fn active_kind(
 ///
 /// Stable words: they cross to the browser and the screen programs against them.
 pub const ROUTE_OWN: &str = "own";
+
+/// Refusal of switching the own certificate ON when none is uploaded.
+pub const OWN_CERTIFICATE_NOT_UPLOADED: &str = "fiscal.own_certificate_not_uploaded";
+
+/// Refusal of switching the own certificate OFF in production while the machine identity the fiscal
+/// cell needs is not enrolled.
+pub const GATEWAY_NOT_ENROLLED: &str = "fiscal.gateway_not_enrolled";
 pub const ROUTE_DELEGATED: &str = "delegated";
 
 /// [`ROUTE_OWN`]/[`ROUTE_DELEGATED`] from the slot that signs — **the rule, in one place**.

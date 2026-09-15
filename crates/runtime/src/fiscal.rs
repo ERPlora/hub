@@ -109,6 +109,75 @@ impl Runtime {
         .await
     }
 
+    /// **«Usar mi propio certificado»: on or off, keeping the certificate** (Ioan, 2026-09-15 —
+    /// amends ADR-0202 §2.4 and ADR-0320 §1).
+    ///
+    /// The two routes to the tax authority are EXCLUSIVE and the owner PICKS one: their own `.p12`,
+    /// or ERPlora's Sello on their behalf. Before this, the route was «own if uploaded» and the only
+    /// way to hand filing to ERPlora was deleting the certificate.
+    ///
+    /// * **On** needs an uploaded certificate — otherwise [`certificate::OWN_CERTIFICATE_NOT_UPLOADED`]
+    ///   and nothing changes.
+    /// * **Off** in PRODUCTION needs ERPlora to be able to file for real on the taxpayer's behalf, so
+    ///   the switch never leaves a live hub without a road: an approved (`vigente`) representation
+    ///   grant — otherwise [`fiscal_profile::NO_REPRESENTATION`] — AND the enrolled machine identity
+    ///   of the fiscal cell — otherwise [`certificate::GATEWAY_NOT_ENROLLED`]. In `testing` it is
+    ///   allowed without either, so the ERPlora road can be tried before the paperwork is done
+    ///   (records stay pending until it is).
+    /// * Off with nothing uploaded is a no-op: there is nothing to stop using.
+    pub async fn set_business_certificate_use(&self, enabled: bool) -> Result<()> {
+        let db = self.db.as_ref();
+        let uploaded = certificate::slot_status(db, &self.hub_id, certificate::CertificateKind::Own)
+            .await?
+            .get("present")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if enabled {
+            if !uploaded {
+                return Err(RuntimeError::Domain {
+                    code: certificate::OWN_CERTIFICATE_NOT_UPLOADED.to_string(),
+                    message: "there is no business certificate uploaded to file with: upload the \
+                              .p12 first"
+                        .to_string(),
+                });
+            }
+        } else {
+            if !uploaded {
+                return Ok(());
+            }
+            let production = fiscal_profile::load(db, &self.hub_id)
+                .await?
+                .filter(|profile| profile.environment == fiscal_profile::ENV_PRODUCTION);
+            if let Some(profile) = production {
+                if profile.representation_status != fiscal_profile::REPRESENTATION_VIGENTE {
+                    return Err(RuntimeError::Domain {
+                        code: fiscal_profile::NO_REPRESENTATION.to_string(),
+                        message: "this hub files for real: ERPlora can only file on the \
+                                  taxpayer's behalf once their representation grant is approved"
+                            .to_string(),
+                    });
+                }
+                if !crate::gateway_identity::is_enrolled(db, &self.hub_id).await? {
+                    return Err(RuntimeError::Domain {
+                        code: certificate::GATEWAY_NOT_ENROLLED.to_string(),
+                        message: "this hub files for real and its secure connection to ERPlora \
+                                  is not signed yet: switching the certificate off would leave \
+                                  it with no way to file"
+                            .to_string(),
+                    });
+                }
+            }
+        }
+        certificate::set_use_for_transmission(
+            db,
+            &self.hub_id,
+            certificate::CertificateKind::Own,
+            enabled,
+        )
+        .await?;
+        Ok(())
+    }
+
     /// Estado de los certificados del hub (sin bytes ni contraseña): el del negocio en la raíz —
     /// como siempre— más `slots`/`active` (ADR-0202 §2.1).
     pub async fn business_certificate_status(&self) -> Result<Json> {
