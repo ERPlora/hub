@@ -189,6 +189,27 @@ else
     bad "falla el job cuando el canario veta" "un job que nunca sale en rojo no informa de nada"
 fi
 
+# ── 5b. Una referencia que Docker pueda descargar (hub#1869) ─────────────────
+# `github.repository_owner` is `ERPlora`. Docker refuses a repository with capitals, so a promoted
+# `ghcr.io/ERPlora/hub:X.Y.Z` left the canary hub unable to pull, never booted, and vetoed 1.1.20 to
+# 1.1.23 for a capital letter (2026-09-09 → 2026-09-15). The job may read the owner, but only lowered
+# BEFORE the reference it promotes is built.
+owner_line=$(grep -m1 -nF 'repository_owner' <<<"$code" | cut -d: -f1)
+lower_line=$(grep -m1 -nE "IMAGE_REPO=.*tr '\[:upper:\]' '\[:lower:\]'|IMAGE_REPO=\"\\\$\{IMAGE_REPO,,\}\"" <<<"$code" | cut -d: -f1)
+ref_line=$(grep -m1 -nF 'ref="${IMAGE_REPO}' <<<"$code" | cut -d: -f1)
+if [ -z "$owner_line" ]; then
+    if grep -qE 'ghcr\.io/[^"$ ]*[A-Z]' <<<"$code"; then
+        bad "promociona una referencia en minúsculas" "hay una imagen ghcr.io con mayúsculas escrita en el job"
+    else
+        ok "promociona una referencia en minúsculas (no depende de \`repository_owner\`)"
+    fi
+elif [ -n "$lower_line" ] && [ -n "$ref_line" ] && [ "$lower_line" -lt "$ref_line" ]; then
+    ok "pasa \`repository_owner\` a minúsculas antes de construir la referencia que promociona"
+else
+    bad "pasa \`repository_owner\` a minúsculas antes de promocionar" \
+        "\`ghcr.io/ERPlora/hub\` no se puede descargar: el hub canario no arranca y la release se veta sola (hub#1869)"
+fi
+
 # ── 5. El límite del plano de CI ─────────────────────────────────────────────
 if grep -qF "$ROLLOUT_PATH" <<<"$code"; then
     bad "NO llama a \`${ROLLOUT_PATH}\`" \
