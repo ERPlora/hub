@@ -282,10 +282,10 @@ const canOfferPlanUpgrade = ref(true);
 onMounted(async () => {
   const context = await getDeviceContext();
   canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
-  // hub#1897 — la misma respuesta gobierna la puerta a erplora.com del topbar, que hasta ahora se
-  // pintaba sin mirarla: desde el TPV se llegaba a la pantalla de facturación del SaaS en tres
-  // toques y con la sesión ya abierta. Se resuelve aquí, con el contexto que ya está pedido, para
-  // no preguntarle al shell lo mismo dos veces en el arranque.
+  // hub#1897 — the same answer governs the topbar's door to erplora.com, which until now was painted
+  // without consulting it: from the till one reached the SaaS's billing screen in three taps, with the
+  // session already open. It is resolved here, with the context already requested, so the shell is
+  // not asked the same thing twice at boot.
   setManagementDistribution(context?.distribution);
 });
 

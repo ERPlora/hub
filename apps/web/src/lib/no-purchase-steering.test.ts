@@ -88,10 +88,10 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
   // the signed-in SaaS through `saasDoor` has to consult who distributed this copy, because that is
   // who sets the rule (`planUpgradeIsOfferable`, hub#756; `managementIsOfferable`, hub#1897). The
   // browser and a sideloaded install keep every door — nobody governs them.
-  // 🪤 Se exige la LLAMADA, no el nombre suelto: `managementIsOfferable` escrito en una prosa que
-  // explica la regla satisface un `includes` y deja pasar el fichero. Comprobado mutando —
-  // renombrando la reja de `management-link.ts`, con la aserción floja el mutante SOBREVIVÍA
-  // porque su propio comentario nombra a la hermana.
+  // 🪤 The CALL is required, not the bare name: `managementIsOfferable` written in prose that
+  // explains the rule satisfies an `includes` and lets the file through. Verified by mutation —
+  // renaming the gate in `management-link.ts`, with the loose assertion the mutant SURVIVED
+  // because its own comment names the sibling.
   const DISTRIBUTION_GATES = /(?:planUpgradeIsOfferable|managementIsOfferable)\(/;
 
   /**

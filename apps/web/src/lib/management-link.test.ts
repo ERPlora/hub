@@ -98,8 +98,8 @@ beforeEach(() => {
     'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
   );
   reportClientError.mockClear();
-  // `null` es el estado de arranque: el shell todavía no ha dicho de dónde viene esta copia
-  // (hub#1897). Se restaura en cada test para que ninguno herede la respuesta del anterior.
+  // `null` is the boot state: the shell has not yet said where this copy comes from (hub#1897).
+  // Restored before every test so none inherits the previous one's answer.
   setManagementDistribution(null);
 });
 
@@ -277,72 +277,72 @@ describe('canOpenManagement', () => {
   });
 });
 
-// ── hub#1897: la copia que reparte Google Play no lleva esta puerta ─────────────────────────────
+// ── hub#1897: the copy Google Play hands out does not carry this door ───────────────────────────
 //
-// El razonamiento de arriba —gestión de cuenta, no escaparate— sigue en pie para el navegador y
-// para Windows. Lo que lo derogó en Play no es un argumento sino una MEDIDA: la QA sobre la app
-// publicada (v1.1.25) cronometró **tres toques** desde el TPV hasta `/dashboard/billing/invoices/`,
-// y el primero de ellos es este botón — que además aterriza YA AUTENTICADA, porque cruza con el
-// pase de un solo uso. El panel al que sale lleva «Facturación» en su menú lateral, así que el
-// destino no es una página que no vende: es la puerta de al lado de la que sí.
+// The reasoning above — account management, not a storefront — still stands for the browser and
+// for Windows. What derogated it on Play is not an argument but a MEASUREMENT: the QA over the
+// published app (v1.1.25) timed **three taps** from the till to `/dashboard/billing/invoices/`,
+// the first of them this button — which also lands ALREADY SIGNED IN, because it crosses with the
+// one-time pass. The panel it leaves for carries «Billing» in its sidebar, so the destination is
+// not a page that does not sell: it is the door next to the one that does.
 //
-// El corte es el MISMO que el de `planUpgradeIsOfferable` (hub#756), y a propósito: la regla la
-// pone quien reparte el binario, no el sistema operativo. Un APK instalado de lado corre en el
-// mismo Android y Google no lo gobierna; esconderle ahí su cuenta al dueño sería quitarle algo por
-// una regla que no le aplica.
-describe('en la copia que reparte una tienda', () => {
-  it('Google Play NO la recibe: es quien la trata como steering hacia el pago', () => {
+// The cut is the SAME as `planUpgradeIsOfferable` (hub#756), on purpose: the rule is set by whoever
+// hands out the binary, not by the operating system. A sideloaded APK runs on the same Android and
+// Google does not govern it; hiding the owner's own account there would be taking something away
+// under a rule that does not apply to them.
+describe('in the copy a store hands out', () => {
+  it('Google Play does NOT get it: it is the one that treats it as steering towards payment', () => {
     expect(managementIsOfferable('play')).toBe(false);
   });
 
-  it('Microsoft SÍ la recibe: su política 10.8.2 lo permite por escrito', () => {
+  it('Microsoft DOES get it: its policy 10.8.2 allows it in writing', () => {
     expect(managementIsOfferable('msstore')).toBe(true);
   });
 
-  it('una instalación directa la conserva: ninguna tienda la gobierna', () => {
+  it('a direct install keeps it: no store governs it', () => {
     expect(managementIsOfferable('direct')).toBe(true);
   });
 
-  it('sin señal se OFRECE, que es lo que un shell anterior a hub#757 contesta', () => {
-    // Quitarla ahí dejaría sin su cuenta a todo el que abre el hub en un navegador, que es la
-    // mayoría, y por un riesgo que en el navegador no existe.
+  it('with no signal it is OFFERED, which is what a shell older than hub#757 answers', () => {
+    // Removing it there would lock everyone who opens the hub in a browser — the majority — out of
+    // their account, over a risk that does not exist in the browser.
     expect(managementIsOfferable(undefined)).toBe(true);
   });
 
-  it('cierra la puerta del TPV a una administradora cuando la copia viene de Play', () => {
-    // El defecto exacto de hub#1897: permiso y método de login eran suficientes, y el botón se
-    // pintaba sin mirar de dónde venía la app.
+  it('closes the door of the till to an administrator when the copy comes from Play', () => {
+    // The exact defect of hub#1897: permission and login method were enough, and the button was
+    // painted without looking at where the app came from.
     session.value = { permissions: ['hub.administer'] };
     setManagementDistribution('play');
 
     expect(canOpenManagement.value).toBe(false);
   });
 
-  it('la deja abierta en la misma sesión cuando la copia no viene de una tienda', () => {
+  it('keeps it open in the same session when the copy does not come from a store', () => {
     session.value = { permissions: ['hub.administer'] };
     setManagementDistribution('direct');
 
     expect(canOpenManagement.value).toBe(true);
   });
 
-  // Mientras el shell no ha contestado no se sabe qué copia es esta, y el topbar ya está pintado:
-  // ofrecerla «por defecto» sería enseñar el botón en Play en cada arranque y quitarlo un frame
-  // después — el mismo defecto, con salto de maquetación de regalo. Un NAVEGADOR sí se sabe desde
-  // el primer frame: ninguna tienda reparte una pestaña de Chrome.
-  it('la app instalada la mantiene cerrada mientras el shell no dice de dónde viene la copia', () => {
+  // Until the shell has answered it is unknown which copy this is, and the topbar is already painted:
+  // offering it "by default" would show the button on Play at every start and remove it a frame
+  // later — the same defect, with a layout jump on top. A BROWSER is known from the first frame:
+  // no store hands out a Chrome tab.
+  it('the installed app keeps it closed while the shell has not said where the copy comes from', () => {
     session.value = { permissions: ['*'] };
     vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
 
     expect(canOpenManagement.value).toBe(false);
   });
 
-  it('el navegador la abre desde el primer frame, sin esperar a nadie', () => {
+  it('the browser opens it from the first frame, waiting for nobody', () => {
     session.value = { permissions: ['*'] };
 
     expect(canOpenManagement.value).toBe(true);
   });
 
-  it('App.vue le da la respuesta del shell al arrancar, no la deja sin cablear', () => {
+  it('App.vue hands it the shell answer at boot instead of leaving it unwired', () => {
     const appSource = readFileSync(new URL('../App.vue', import.meta.url), 'utf8');
 
     expect(appSource).toContain('setManagementDistribution(context?.distribution)');
