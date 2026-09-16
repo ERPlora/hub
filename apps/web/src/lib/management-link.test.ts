@@ -14,6 +14,7 @@
 //     from the session the runtime resolved. A waiter has no business — and often no account — at
 //     erplora.com.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 // A mutable stand-in for the boot-time config: `hubId` is resolved from the runtime at boot
 // (`bootHubContext`), so the URL must be built when it is ASKED for, not when this module loads.
@@ -74,7 +75,14 @@ vi.mock('./cloud', () => ({ runtimeBrowserHandoff }));
 const { reportClientError } = vi.hoisted(() => ({ reportClientError: vi.fn() }));
 vi.mock('./error-report', () => ({ reportClientError }));
 
-import { canOpenManagement, managementPath, managementUrl, openManagement } from './management-link';
+import {
+  canOpenManagement,
+  managementIsOfferable,
+  managementPath,
+  managementUrl,
+  openManagement,
+  setManagementDistribution,
+} from './management-link';
 import { user, setHubSession } from './session';
 
 const session = user as unknown as { value: { permissions?: string[] } | null };
@@ -90,6 +98,9 @@ beforeEach(() => {
     'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
   );
   reportClientError.mockClear();
+  // `null` is the boot state: the shell has not yet said where this copy comes from (hub#1897).
+  // Restored before every test so none inherits the previous one's answer.
+  setManagementDistribution(null);
 });
 
 afterEach(() => {
@@ -263,5 +274,77 @@ describe('canOpenManagement', () => {
     setHubSession('runtime-token');
 
     expect(canOpenManagement.value).toBe(false);
+  });
+});
+
+// ── hub#1897: the copy Google Play hands out does not carry this door ───────────────────────────
+//
+// The reasoning above — account management, not a storefront — still stands for the browser and
+// for Windows. What derogated it on Play is not an argument but a MEASUREMENT: the QA over the
+// published app (v1.1.25) timed **three taps** from the till to `/dashboard/billing/invoices/`,
+// the first of them this button — which also lands ALREADY SIGNED IN, because it crosses with the
+// one-time pass. The panel it leaves for carries «Billing» in its sidebar, so the destination is
+// not a page that does not sell: it is the door next to the one that does.
+//
+// The cut is the SAME as `planUpgradeIsOfferable` (hub#756), on purpose: the rule is set by whoever
+// hands out the binary, not by the operating system. A sideloaded APK runs on the same Android and
+// Google does not govern it; hiding the owner's own account there would be taking something away
+// under a rule that does not apply to them.
+describe('in the copy a store hands out', () => {
+  it('Google Play does NOT get it: it is the one that treats it as steering towards payment', () => {
+    expect(managementIsOfferable('play')).toBe(false);
+  });
+
+  it('Microsoft DOES get it: its policy 10.8.2 allows it in writing', () => {
+    expect(managementIsOfferable('msstore')).toBe(true);
+  });
+
+  it('a direct install keeps it: no store governs it', () => {
+    expect(managementIsOfferable('direct')).toBe(true);
+  });
+
+  it('with no signal it is OFFERED, which is what a shell older than hub#757 answers', () => {
+    // Removing it there would lock everyone who opens the hub in a browser — the majority — out of
+    // their account, over a risk that does not exist in the browser.
+    expect(managementIsOfferable(undefined)).toBe(true);
+  });
+
+  it('closes the door of the till to an administrator when the copy comes from Play', () => {
+    // The exact defect of hub#1897: permission and login method were enough, and the button was
+    // painted without looking at where the app came from.
+    session.value = { permissions: ['hub.administer'] };
+    setManagementDistribution('play');
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  it('keeps it open in the same session when the copy does not come from a store', () => {
+    session.value = { permissions: ['hub.administer'] };
+    setManagementDistribution('direct');
+
+    expect(canOpenManagement.value).toBe(true);
+  });
+
+  // Until the shell has answered it is unknown which copy this is, and the topbar is already painted:
+  // offering it "by default" would show the button on Play at every start and remove it a frame
+  // later — the same defect, with a layout jump on top. A BROWSER is known from the first frame:
+  // no store hands out a Chrome tab.
+  it('the installed app keeps it closed while the shell has not said where the copy comes from', () => {
+    session.value = { permissions: ['*'] };
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  it('the browser opens it from the first frame, waiting for nobody', () => {
+    session.value = { permissions: ['*'] };
+
+    expect(canOpenManagement.value).toBe(true);
+  });
+
+  it('App.vue hands it the shell answer at boot instead of leaving it unwired', () => {
+    const appSource = readFileSync(new URL('../App.vue', import.meta.url), 'utf8');
+
+    expect(appSource).toContain('setManagementDistribution(context?.distribution)');
   });
 });

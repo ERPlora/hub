@@ -206,6 +206,7 @@ import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import SidebarInstallQr from './components/SidebarInstallQr.vue';
 import { user, isAuthed, logout } from './lib/session';
+import { setManagementDistribution } from './lib/management-link';
 import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
@@ -281,6 +282,11 @@ const canOfferPlanUpgrade = ref(true);
 onMounted(async () => {
   const context = await getDeviceContext();
   canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  // hub#1897 — the same answer governs the topbar's door to erplora.com, which until now was painted
+  // without consulting it: from the till one reached the SaaS's billing screen in three taps, with the
+  // session already open. It is resolved here, with the context already requested, so the shell is
+  // not asked the same thing twice at boot.
+  setManagementDistribution(context?.distribution);
 });
 
 // pm#196 — cruza por la puerta compartida: dentro de la app instalada el navegador del sistema NO
