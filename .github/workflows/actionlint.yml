@@ -401,3 +401,17 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/branch_drift.test.sh
+
+      # ── Nadie se fía del paquete por defecto del SDK de Android (hub#1881) ────────────
+      # El 16/09 TODAS las PRs del hub salieron en rojo —una de solo `.md` incluida— porque el
+      # paso `Setup Android SDK` usaba la acción a pelo y su default es `packages: tools
+      # platform-tools`: Google retiró `tools` del repositorio remoto y `sdkmanager` sale con 1.
+      # Aquí nadie usó nunca `tools`. Dos `with:` son memoria, no guardia: el workflow siguiente
+      # que necesite Android se escribirá copiando uno de estos ficheros, y la copia que pierda
+      # el `with:` está verde en todas partes menos el día del tag — que es justo lo que le pasaba
+      # a `tauri-release.yml`, con el mismo paso a pelo y su rojo esperando en plena release.
+      # Segundos, y lee el YAML de verdad: un comentario que hable del incidente no lo dispara.
+      - name: "Contrato: ningún workflow hereda el paquete `tools` del SDK de Android (hub#1881)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/setup-android-packages.test.sh
