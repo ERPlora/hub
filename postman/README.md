@@ -12,7 +12,7 @@ cargo test -p erplora-server --test postman_collection_hub1613                  
 
 | Fichero | Qué es |
 |---|---|
-| `erplora-hub.postman_collection.json` | Las **151 rutas** del core (`{slug}.a.erplora.com`), con la credencial que pide cada clase de auth del snapshot: `X-Hub-Session` (session/admin/any-credential), `Authorization: Bearer erpl_live_…` (api-key), nada (none) |
+| `erplora-hub.postman_collection.json` | Las rutas del core (`{slug}.a.erplora.com`, **169** el 2026-09-16 — cuenta con `contracts/kernel/routes.snapshot`, que drifta con cada PR), con la credencial que pide cada clase de auth del snapshot: `X-Hub-Session` (session/admin/any-credential), `Authorization: Bearer erpl_live_…` (api-key), nada (none) |
 | `overlay.json` | Lo que el snapshot no lleva, por `MÉTODO ruta`: nombre, descripción, cuerpo de ejemplo, cabeceras extra y el script `test` que guarda variables. Solo puede nombrar rutas que existen — una entrada huérfana rompe el test. Ampliar la colección es editar este JSON, no Rust |
 
 **Empieza aquí** (primera carpeta): `GET /api/hub/context` → `POST /api/auth/cloud` con el JWT del

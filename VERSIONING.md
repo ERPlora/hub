@@ -29,19 +29,33 @@ versión nueva. Tampoco se puede ofrecer «vuelve a la última `1.x`» ni compar
   del build (paso *Stamp Cargo version from tag*), igual que `tauri-release.yml` hace con
   `tauri.conf.json`. Así la imagen publicada reporta `1.2.3`, no `0.1.0-en-desarrollo`.
 
-## Tags de imagen (GHCR)
+## Tags de imagen (GHCR) y canales de release (hub#1176, decisión 2026-08-25)
 
-`build-hub.yml` publica, en un tag `v1.2.3`:
+`build-hub.yml` publica `ghcr.io/erplora/hub` en **tres canales móviles**, siempre acompañados
+del `:<sha>` inmutable (pin/rollback). La lógica vive en
+[`scripts/image-tags.sh`](scripts/image-tags.sh) (tests de contrato en
+[`scripts/tests/image-tags.test.sh`](scripts/tests/image-tags.test.sh); detalle completo en
+[`ARQUITECTURA.md` §13.1](ARQUITECTURA.md)):
 
-| Tag | Movilidad | Para qué |
-|-----|-----------|----------|
-| `:latest` | móvil | el que consume el provisioning (Cloud/Dokploy) |
-| `:<git-sha>` | inmutable | pin/rollback exacto por commit |
-| `:1.2.3` | inmutable | la release concreta |
-| `:1.2` | móvil | «la última 1.2.x» — para parches dentro de una minor |
-| `:1` | móvil | «la última 1.x» — la línea de mantenimiento |
+| Canal | Lo dispara | Versión horneada | Tags |
+|---|---|---|---|
+| **`dev`** | push/dispatch en `develop` — lo despliega **PRE** | `X.Y.Z-dev.<n>+g<sha>` — `X.Y.Z` es **un patch por encima** del tag `v*` más nuevo que el repo **tiene** (`git tag --list`, no `git describe`: `main` es huérfano y desde `develop` los tags de release no son alcanzables — hub#1625) | `:dev` |
+| **`canary`** | tag `vX.Y.Z-rc.N` — candidata para un **subconjunto** de hubs de prod | `X.Y.Z-rc.N` | `:X.Y.Z-rc.N` `:canary` (NO mueve `:latest`, `:X.Y` ni `:X`) |
+| **`stable` = `latest`** | tag `vX.Y.Z` final — lo que estrena todo hub nuevo | `X.Y.Z` | `:X.Y.Z` `:X.Y` `:X` `:latest` `:stable` (alias, mismo digest) |
 
-En `main` (entre releases) solo se publican `:latest` y `:<sha>`.
+`main` sigue publicando solo `:latest` + `:<sha>` (versión del Cargo: `main` = prod). El guard
+rechaza un tag no semver, ya publicado, no monótono, o una rc de una versión ya cerrada; en
+`develop` se **niega** a publicar sin `git describe` utilizable o sin un solo tag `v*` en el
+repo — hornear el hueco `1.0.0` a ciegas es exactamente el bug que abrió hub#1170. Publicar un
+tag de release **dispara el canario y espera su veredicto** antes de nada más (hub#1659); un tag
+`-rc.N` **no** dispara `tauri-release.yml` (las stores son irreversibles). Publicar también
+comprueba que **el `module-toolkit` ya conoce esa versión** — module-toolkit#226, hub#1648 — para
+que el suelo `compatibility.min_erplora_version` de un módulo nunca apunte a un hub que el
+toolkit todavía no sabe validar.
+
+> **OutfitKit lo publica el propio hub** (ADR-0451, hub#1589/#1853): la variable `HUB_OUTFITKIT`
+> del toolkit fija qué versión de `@erplora/outfitkit` lleva cada imagen (hub v1.1.22 → outfitkit
+> 0.1.72 es el par verificado a fecha de este documento).
 
 ## Criterio MAJOR / MINOR / PATCH
 

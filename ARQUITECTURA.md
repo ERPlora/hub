@@ -6,22 +6,28 @@
 >
 > **Documento de diseño.** Define el Hub de
 > ERPlora: **Vue 3 + Ionic + Rust/Axum + módulos declarativos (module.json) +
-> WASM + SDK**, con **PostgreSQL per-hub — una BD por hub** (ADR-0201; decidido, provisioning
-> SaaS en migración 9/11) en cloud (Hetzner `db-a`; AWS: Aurora, fallback).
+> WASM + SDK**, con **PostgreSQL per-hub — una BD por hub** (ADR-0201, **completo, 11/11**,
+> aterrizado 2026-08-06 — la `Organization` ya no existe) en cloud (Hetzner; AWS: Aurora,
+> fallback).
 >
 > **hub ES el Hub de ERPlora.**
 >
 > Fuentes: diseño AI/RAG [architecture/hub/crates/vector.md](../architecture/hub/crates/vector.md) (ADR-0033), mapa del monorepo
 > [CLAUDE.md](../CLAUDE.md), repo de arquitectura seccionado [architecture/](../architecture/).
 >
-> **Estado:** en producción — 25 módulos (`ls modules-workspace/modules`; entró `flows`, ADR-0283 — ⚠️ el worktree `.wt-*` no cuenta), runtime con suites e2e amplias, imagen Docker del
-> tenant, instalación E2E por marketplace con SHA256. Estado vivo: `/estado`.
-> Última actualización: 2026-08-06.
+> **Estado:** en producción — **27 módulos** (source en `modules-workspace/modules/<id>/`, cada
+> uno su propio repo git; ⚠️ `ls modules-workspace/modules` ya no cuenta bien porque la flota deja
+> worktrees ahí dentro — cuenta los que tienen `.git` como DIRECTORIO, no fichero), runtime con
+> suites e2e amplias, imagen Docker del tenant, instalación E2E por marketplace con SHA256.
+> Estado vivo: `/estado`.
+> Última actualización: 2026-09-16 (recuento de módulos, ADR-0201, canales de imagen, `http.fetch`
+> y hardware pasados por verificación contra `origin/develop` — ver `crates/README.md` y `§14`).
 >
-> 🏗️ **Infra cloud (jul-2026):** donde este doc dice **Aurora/ECS** como backend del Hub Cloud, el
-> proveedor **ACTIVO es Hetzner** — Postgres 18 per-hub, una BD por hub (ADR-0201; decidido,
-> provisioning SaaS en migración 9/11) (`db-a` + standby `db-b`) desplegado como
-> **Dokploy application en el cluster Swarm**; **AWS (ECS + Aurora) = fallback seleccionable, sin infra
+> 🏗️ **Infra cloud:** donde este doc dice **Aurora/ECS** como backend del Hub Cloud, el
+> proveedor **ACTIVO es Hetzner** — Postgres per-hub, una BD por hub (ADR-0201, completo), con
+> **failover automático** (Patroni + etcd×3, dirección fija `lb-db` — ADR-0415, nunca la IP de un
+> nodo), desplegado como **Dokploy application en el Swarm `hubs-a`** (uno de los tres Swarms de
+> la flota: `hubs-a`/`plat`/control-plane); **AWS (ECS + Aurora) = fallback seleccionable, sin infra
 > viva** (`get_provider`). Ver [CLAUDE.md](CLAUDE.md) y [architecture/hub/overview.md](../architecture/hub/overview.md).
 >
 > ⚠️ **Varias secciones citadas en este documento se reubicaron:** §2.3 (auth) →
@@ -414,26 +420,40 @@ de otros módulos** (con permisos) vía host functions, sin importar su código.
 > el evento en su misma transacción; un relay lo entrega at-least-once con idempotencia exactly-once
 > (`_event_delivery`). Aplica tanto al fan-out declarativo como a la cascada de handlers Tier 2.
 
-### 5.5 Capacidades del host (Tier 1) — incl. `http.fetch` mediado (Opción A, decidida)
+### 5.5 Capacidades del host (Tier 1) — `http.fetch`: el host es DECORADOR, no cortafuegos (ADR-0431/0432)
 
 El host (Rust) expone un conjunto **cerrado** de capacidades que un módulo Tier 0/1 puede
 usar de forma declarativa, sin WASM y sin acceso crudo a recursos:
 
-- **`http.fetch` mediado (red saliente, Opción A — decidida en §6):**
-  1. El módulo declara en `module.json` una **allowlist** de dominios + los secretos que
-     necesita (por nombre lógico, **nunca** el valor):
-     ```jsonc
-     "network": { "allow": ["api.stripe.com", "graph.facebook.com"], "secrets": ["stripe_api_key"] }
-     ```
-  2. El usuario/admin **concede** el permiso al instalar.
-  3. En runtime el módulo llama `host.http_fetch({ url, method, headers, body, secret_ref })`.
-     **El host hace la llamada**: valida el dominio contra la allowlist, **inyecta la
-     credencial** desde el almacén cifrado (`secret_ref` → valor; el módulo **nunca** ve el
-     secreto), aplica timeouts/rate-limit y **audita** (módulo, destino, resultado).
-  4. El secreto vive cifrado (Fernet/KMS) y solo lo desreferencia el host.
+- **`http.fetch` es abierto por diseño (ADR-0431, 2026-09-02 — enmienda la allowlist descrita
+  aquí hasta esa fecha, que nunca llegó a construirse: `crates/runtime/src/capabilities.rs::require`
+  solo comprueba que el módulo declare la capability `network` y que el usuario la haya
+  concedido, ninguna URL).** El módulo elige el destino con total libertad; el campo
+  `"network": { "allow": [...] }` del manifest es **documentación para la pantalla de
+  consentimiento**, no un control del runtime — un filtro real habría dejado sin salida a la AEAT
+  al propio `verifactu`, que no declara `network`.
+  1. El módulo declara en `module.json` los secretos del tenant que necesita (por nombre lógico,
+     **nunca** el valor): `"network": { "secrets": ["stripe_api_key"] }`.
+  2. El usuario/admin **concede** la capability al instalar.
+  3. En runtime el módulo llama `host.http_fetch({ url, method, headers, body, secret_ref })` a
+     la URL que quiera. El host ejecuta la llamada, **inyecta el secreto del tenant** cuando
+     `secret_ref` lo pide (el módulo nunca ve el valor), aplica timeouts/rate-limit y audita
+     (módulo, destino, resultado).
+  4. **Lo que SÍ acota el host son SUS PROPIAS credenciales** (ADR-0431 §2): `X-Hub-Id`,
+     `X-Hub-Token`/`X-Api-Key`, el `Authorization: Bearer` del usuario y `X-Webhook-Secret` solo
+     viajan a hosts de confianza (`HUB_CLOUD_API_URL` + `HUB_TRUSTED_HOSTS`); a cualquier otro
+     destino la petición sale **sin** esas cabeceras (con un `warn`). `http.fetch` nace **sin**
+     credenciales de ERPlora — si un módulo necesita hablar con NUESTRO Cloud con identidad de
+     máquina usa el primitivo separado `cloud_call`, nunca `http.fetch`.
+  5. **`identity: "machine"` es la única identidad de `http.fetch` que sí acota destino** (ADR-0432,
+     2026-09-03) — precisamente porque presta una credencial de ERPlora, no porque desconfíe de la
+     URL: se limita a la misma lista de hosts de confianza y solo la conceden módulos
+     first-party firmados (`capabilities.certificate.purposes: channel-machine`/`cloud-call`).
+  6. Los secretos del tenant viven cifrados (Fernet/KMS) y solo los desreferencia el host.
 
-Así un **tercero puede publicar integraciones** (pago, envío, mensajería) sin abrir red
-arbitraria ni exponer secretos.
+Así un **tercero puede publicar integraciones** (pago, envío, mensajería) contra cualquier
+destino de su elección, sin que el hub le preste jamás una credencial de ERPlora ni le exponga
+un secreto del tenant en claro.
 
 > **Lo que NO es una capacidad del host: `render.pdf`/`render.xlsx`** (hub#1237). Esta sección las
 > anunció durante toda la Fase 5 y nunca se implementaron: no hay `CapabilityKind` para ellas, no
@@ -558,15 +578,21 @@ toca la BD. Sin esto, escribir WASM es inviable.
 > Por defecto **Rust-first**, con la puerta abierta a más lenguajes sin rediseñar el host
 > (decisión en §14).
 
-### 7.4 CLI `erplora module …`
+### 7.4 CLI `@erplora/module-toolkit` (repo propio en la raíz del monorepo)
+
+El CLI vigente es **`erplora`**, sin subcomando `module` (ese prefijo es sintaxis vieja que ya
+no existe):
 
 ```
-erplora module create <id>      # scaffolding (module.json + carpetas + ejemplo WC/WASM)
-erplora module build <id>       # compila WC (Lit) + WASM, valida SQL/schema
-erplora module validate <id>    # valida manifest contra JSON Schema + linters
-erplora module pack <id>        # genera manifest.lock + module.zip
-erplora module sign <id>        # firma + SHA256
-erplora module publish <id>     # sube al marketplace del SaaS (§2.2)
+erplora startproject <n>        # workspace de dev que puede contener varios módulos
+erplora g module <id>           # genera un módulo (repo propio): manifest + WC Lit + SQL + fixtures
+erplora dev <id|dir> [puerto]   # preview del WC con transporte mock, CSP estricta, watch
+erplora build <id|dir>          # compila el WC (Lit) a dist/, y el handler WASM si aplica
+erplora validate <id|dir> [--pg] # valida manifest + CSP + handlers WASM; con --pg, prepara el SQL contra un Postgres efímero
+erplora pack <id|dir>           # module.zip + manifest.lock.json + SHA256
+erplora sign <id|dir>           # (re)calcula el SHA256 del zip
+erplora publish <id|dir>        # imprime el flujo de publicación al marketplace del SaaS (§2.2)
+erplora test <id|dir> --against-hub  # baterías e2e del módulo contra un hub real (hub#1264/#1381)
 ```
 
 ### 7.5 Transporte y comunicación — ¿todo por WebSocket?
@@ -697,27 +723,27 @@ rechaza un tag no semver, ya publicado, no monótono o una rc de una versión ya
 
 | Tema | Estado |
 |------|--------|
-| **Multi-tenancy** | ✅ **Decidido**: BD por **organización** compartida entre hubs; `hub_id` por fila, scope inyectado por el runtime (§2.5). No es `tenant_id`. |
-| **IDs de fila** | ✅ **Decidido (ADR-0035)**: **PK = UUID v4 (`TEXT`) en TODO** el dato de negocio (PostgreSQL per-org), no autoincremental; `hub_id` (UUID) sigue siendo el discriminador de tenant. UUID globalmente único (§2.5). |
+| **Multi-tenancy** | ✅ **Decidido y completo (ADR-0201, 11/11, 2026-08-06)**: **una BD Postgres por HUB** (`Hub.database_name`), no por organización — la `Organization` **ya no existe**; `hub_id` por fila, scope inyectado por el runtime (§2.5). No es `tenant_id`. |
+| **IDs de fila** | ✅ **Decidido (ADR-0035)**: **PK = UUID v4 (`TEXT`) en TODO** el dato de negocio (PostgreSQL per-hub, ADR-0201), no autoincremental; `hub_id` (UUID) sigue siendo el discriminador de tenant. UUID globalmente único (§2.5). |
 | **Transporte cloud** | ✅ **Decidido**: HTTP (RPC) + canal de push dedicado (§7.5). WS-only descartado como default. |
 | **Canal de eventos (push)** | 🔶 **Abierto**: **WS (actual) vs SSE** para el push servidor→cliente. El push es **unidireccional** (los envíos van por HTTP) ⇒ SSE encaja: da **reconexión + Last-Event-ID gratis** (ayuda con el idle timeout del ALB), mantiene **HTTP estándar** (criterio §7.5) y es el formato natural para el **futuro streaming del assistant**. Plan: implementar **ambos** y elegir por situación; al hacerlo, **unificar la forma del JSON del evento** (`name` server vs `event` cliente — hoy desalineado) entre WS y SSE. |
 | **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. **Implementado + verificado** (`crates/runtime/src/outbox.rs` + relay en server). |
 | **Documentos de venta / POS** | ✅ **Decidido (2026-06-09)**: tiquet/factura = **FORMATO** de render (`ok-receipt` 80mm / `ok-invoice` A4 en OutfitKit), no módulo; `sales` = libro mayor; pantallas POS **seleccionables** por el negocio; impresión térmica por bridge ESC/POS (§15). |
-| **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
-| **Hardware / periféricos** | ✅ **Decidido (ADR-0196, sustituye a ADR-0050)**: el `bridge/` standalone **se retiró** (hub#340) → el hardware lo aporta la **app instalable** por `invoke` in-process, §2.7.1. ✅ **Tres transportes** (§2.7): red (TCP 9100) en todas las plataformas, **SPP en Android** (ADR-0204, hub#388) y la **cola RAW del SO** por USB en escritorio (hub#1083). Fuera: Windows (hub#1269), USB en Android, `libusb`/WebUSB. Abierto: multi-dispositivo (primary↔satellite). |
+| **Red saliente de módulos** | ✅ **Decidido (ADR-0431/0432)**: `http.fetch` **no acota destinos** — el host es un decorador, no un cortafuegos; solo acota **sus propias** credenciales (hosts de confianza) y la identidad de máquina de `cloud_call`/`identity:"machine"` (§5.5). **B (nativo)** sigue para lo crítico-fiscal. |
+| **Hardware / periféricos** | ✅ **Decidido (ADR-0196, sustituye a ADR-0050)**: el `bridge/` standalone **se retiró** (hub#340) → el hardware lo aporta la **app instalable** por `invoke` in-process, §2.7.1. ✅ **Tres transportes** (§2.7): red (TCP 9100) en todas las plataformas, **SPP en Android** (ADR-0204, hub#388 — cerrada, `BluetoothSpp.kt` implementado) y la **cola RAW del SO** por USB en escritorio (hub#1083, ADR-0441). Fuera: Windows (hub#1269), USB en Android, `libusb`/WebUSB. Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
 | **Offline** | ✅ **Decidido (ADR-0154): un solo Hub, Cloud/Postgres, online-only.** Se retiró el producto **Hub Local** (SQLite, offline) — ya no hay dos productos ni motor de sync (ADR-0040 «sin sync» sigue en pie). Los backups son responsabilidad del Cloud (pgBackRest/PITR), no del Hub. |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
 | **Reactividad UI** | ✅ **Decidido**: eventos WS → el WC re-consulta (§7.7). Sustituye a LiveComponent. |
-| **ABI WASM** | Extism (recomendado) vs WASI vs propia. Validar en Fase 0. |
+| **ABI WASM** | ✅ **Decidido: Extism.** As-built en `crates/wasm-host` (sandbox real, no hay otra ABI en el árbol); WASI/propia descartadas de facto. |
 | **Paridad de framework** | Abierto: slots, hooks/filters, scheduled tasks, i18n → equivalentes declarativos/WASM (§5.6). Multi-fase. |
 | **Entitlement en runtime** | Abierto: qué pasa con un módulo (y sus datos) si caduca su suscripción (desactivar / read-only). |
 | **Credencial de dispositivo de confianza** | Abierto: formato/rotación de la credencial que habilita el PIN offline (§2.9). |
 | **SQL portable** | ✅ **Resuelto (ADR-0154)**: Postgres-only; el dialecto `sqlite` quedó deprecado/ignorado. Sin capa de portabilidad. |
-| **RAG / vector** | Prod: pgvector es **follow-up** (hub#204 / pm#29); hoy el índice del asistente es `None` (degrada a "todas las tools"). `MemoryVectorStore` es solo referencia/test (§9.5). |
+| **RAG / vector** | ✅ **Implementado y en boot**: `PgVectorStore` (`crates/vector/src/pg.rs`) se instancia en `crates/server/src/boot.rs` cuando la BD del hub tiene `pgvector`; si no lo tiene (imagen sin la extensión, o el rol del hub no puede crearla — ADR-0201 da a cada hub su propia BD/rol) el arranque **nunca aborta**: el índice queda `None` y el asistente degrada a ofrecer todas las tools. `MemoryVectorStore` sigue siendo solo referencia/test (§9.5). |
 | **UI de módulos (Lit vs Stencil)** | ✅ **Recomendado Lit** (§3.1, default 2026; no necesitamos wrappers multi-framework). Confirmar con PoC de ambos en Fase 0. |
 | **Guest WASM lenguaje** | Rust-only (recomendado, WASM pequeño/rápido) vs multi-lenguaje (JS/Go/Python vía Extism, baja la barrera de autoría). |
-| **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía **Bridge standalone (red-only)** (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
+| **Impresión / primary-satellite** | ✅ Impresoras de red por terminal; hardware vía la **app instalable** (`invoke` in-process, ADR-0196) con **tres transportes** — red, USB (cola RAW del SO) y Bluetooth SPP en Android (§2.7). Abierto: descubrimiento primary↔satellite y promoción si cae el primario (§2.7b). |
 | **Agrupación de módulos** | ✅ Se conserva la clasificación/grupos del catálogo (vive en el SaaS, §2.4/§13). |
 | **Esfuerzo total** | Cambio de plataforma completo; plan de recursos/tiempo realista. |
 
@@ -798,19 +824,19 @@ con ella; viaja en `sale.completed` para que `invoice` emita F1/F2).
 module.json = contrato del módulo (lo técnico; la clasificación vive en el SaaS)
 WebComponent = pantalla del módulo (Lit; §3.1)
 Rust = autoridad / runtime genérico (execute_command / execute_query)
-PostgreSQL (per-org en cloud) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
+PostgreSQL (per-hub en cloud, ADR-0201) = solo Rust accede; hub_id (UUID) por fila + PK = UUID v4 (TEXT)
 WASM (Extism) = lógica avanzada y batch, en sandbox (sin red/BD libres)
 SDK TS = puente para la UI (HttpWsTransport contra el runtime Axum; sin IpcTransport, ADR-0050)
-Hub = un solo producto (ADR-0154): Cloud, PostgreSQL, online-only (PWA + Bridge). Sin Hub Local ni SQLite ni sync. Backups = responsabilidad del Cloud (pgBackRest/PITR)
+Hub = un solo producto (ADR-0154): Cloud, PostgreSQL, online-only (PWA + app instalable Tauri). Sin Hub Local ni SQLite ni sync. Backups = responsabilidad del Cloud (pgBackRest/PITR)
 Login = email+password online (setup) → dispositivo de confianza → PIN (offline a futuro)
 Reactividad = evento (WS; ADR-0050) → el WC re-consulta (no server-render)
 Eventos = transactional outbox (escritura atómica + relay async at-least-once + _event_delivery); WS solo push UI (§4.1)
 Venta = sales (libro mayor) → sale.completed; tiquet/factura = FORMATO (ok-receipt/ok-invoice), no módulo; pantallas POS seleccionables (§15)
-RAG = solo conocimiento (docs); vector store pgvector = follow-up (hub#204); hoy índice None → todas las tools
+RAG = PgVectorStore implementado y wireado en boot (crates/server/src/boot.rs); sin pgvector en la BD degrada a None → todas las tools
 AI = embeddings + generación SIEMPRE por el proxy del SaaS (medido)
-Red de módulos = http.fetch mediado por el host (Opción A) / nativo para fiscal
-1 producto = Hub Cloud (PostgreSQL, PWA, online) — ADR-0154 retiró Hub Local/Tauri/SQLite (§1)
-Impresión/hardware = Bridge standalone (red-only) por localhost HTTP/WS desde la web shell; §2.7
+Red de módulos = http.fetch ABIERTO (el host no acota destino, solo SUS credenciales — ADR-0431/0432) / nativo para fiscal
+1 producto = Hub Cloud (PostgreSQL, PWA, online) — ADR-0154 retiró Hub Local/Tauri-como-backend/SQLite (§1)
+Impresión/hardware = app instalable (invoke in-process, ADR-0196), tres transportes: red/USB/Bluetooth Android; §2.7
 Primary/Satellite = varios terminales del mismo hub; cobrar/imprimir solo el primario
 Migración = gradual, POS-first, manteniendo la agrupación actual de módulos
 SaaS (Django) = marketplace + billing + provisioning + proxy AI (no cambia)

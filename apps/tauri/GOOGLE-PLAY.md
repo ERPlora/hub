@@ -89,7 +89,10 @@ escalonado (`status: inProgress` + `userFraction`), que hoy no está cableado.
 ## Verificación
 
 - `bundletool build-apks --mode=universal` + instalar en dispositivo real: la webview carga el
-  Hub y la impresora de **red** imprime (TCP:9100). Sin Bluetooth: ADR-0180 retiró el SPP.
+  Hub y la impresora de **red** imprime (TCP:9100). El Bluetooth Classic SPP que ADR-0180 había
+  retirado **volvió** para Android (ADR-0204, hub#388, `BluetoothSpp.kt` en
+  `crates/tauri-plugin-erplora-android`): verificar también contra una impresora `bluetooth:{mac}`
+  emparejada.
 - ADR-0180 deja la validación en **dispositivo real sobre una LAN con impresora** como puerta
   —el emulador no puede darla, su red es NAT— junto con la actualización OTA por encima del
   APK instalado.
