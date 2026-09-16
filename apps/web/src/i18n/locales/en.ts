@@ -1910,6 +1910,28 @@ export default {
     // whole point — this is the one sentence that turns "it does not work" into a next step.
     unavailable:
       'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
+    // hub#1773 — the sentence that goes in front of Android's local-network dialog, and the row
+    // that says so afterwards. Android's own wording («find, connect to and determine the
+    // relative position of nearby devices») reads like tracking and gets refused; ours says what
+    // it is for. Never mentions the permission by name: what the owner recognises is the printer.
+    localNetwork: {
+      primerHeader: 'Let us look for your printer',
+      primerMessage:
+        'To find your printer we have to look at the devices on your network. Your device will ask you next.',
+      primerLater: 'Not now',
+      primerAllow: 'Look for my printer',
+      // The row on System › your printer, which is where somebody whose printer is never found
+      // would look. Only ever shown when the search really is blocked ON THIS DEVICE.
+      blockedTitle: 'Printer search is blocked',
+      blockedDetail:
+        'This device is not allowed to reach the printers on your network, so a search comes back empty however many printers are switched on.',
+      blockedAction: 'Allow the search',
+      // After asking again and still getting nothing: the system stops showing its dialog once it
+      // has been refused, and from then on the only way through is the device's own settings.
+      blockedInSettings:
+        "Your device didn't ask again. Open its settings, find ERPlora and turn local network access on.",
+      turnedOn: 'Done — this device can look for printers on your network now.',
+    },
   },
   // What the CORE says when it refuses ONE field (hub#1190, ADR-0398 §6).
   //

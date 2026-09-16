@@ -1671,6 +1671,21 @@ export default {
     // la app es lo importante: es la frase que convierte «no funciona» en un paso siguiente.
     unavailable:
       'Desde el navegador, este dispositivo no puede llegar a las impresoras. Instala la app de ERPlora en el dispositivo conectado a la impresora y abre tu negocio desde ahí.',
+    // hub#1773 — traducción de `localNetwork` de `en.ts` (el inglés es la fuente, ADR-0055).
+    localNetwork: {
+      primerHeader: 'Vamos a buscar tu impresora',
+      primerMessage:
+        'Para encontrar tu impresora tenemos que mirar los aparatos de tu red. Tu dispositivo te lo preguntará a continuación.',
+      primerLater: 'Ahora no',
+      primerAllow: 'Buscar mi impresora',
+      blockedTitle: 'La búsqueda de impresoras está bloqueada',
+      blockedDetail:
+        'Este dispositivo no tiene permiso para llegar a las impresoras de tu red, así que la búsqueda vuelve vacía por muchas impresoras que haya encendidas.',
+      blockedAction: 'Permitir la búsqueda',
+      blockedInSettings:
+        'Tu dispositivo no ha vuelto a preguntar. Abre sus ajustes, busca ERPlora y concédele el acceso a la red local.',
+      turnedOn: 'Listo: este dispositivo ya puede buscar impresoras en tu red.',
+    },
   },
   // Lo que dice el CORE cuando rechaza UN campo (hub#1190, ADR-0398 §6). Traducción de
   // `invalidField` de `en.ts` — el inglés es la fuente (ADR-0055).
