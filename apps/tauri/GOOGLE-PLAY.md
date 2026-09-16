@@ -31,6 +31,19 @@ landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a 
 
 **Orden que queda**, y no se salta ninguno:
 
+0. **Antes de enviar nada a revisión, correr la guardia de la cuenta del revisor** (hub#1718):
+
+   ```bash
+   python3 scripts/ci/play-reviewer-preflight.py
+   ```
+
+   Entra con `PLAY_REVIEWER_EMAIL`/`PLAY_REVIEWER_PASSWORD` del `.env` de la raíz —las mismas
+   credenciales que recorre Google— y **para el envío** si la cuenta no tiene negocio, si
+   `PLAY_REVIEWER_HUB` nombra un hub que no es suyo, si ese hub no responde `status: UP` o si está
+   vacío de módulos. Los cuatro son el mismo rechazo: el revisor no ve la app. **Sale en rojo si
+   faltan las credenciales**, nunca en verde por no poder comprobarlo. Si falla, se arregla el hub
+   o la variable y se vuelve a correr: **no se envía con esto en rojo.**
+
 1. Enviar a revisión el lote de la Alpha cerrada (botón «Submit N changes for review»).
 2. Aprobada: crear release de **Producción** y enviarla también. Hasta que Producción esté LIVE,
    `play.google.com/store/apps/details?id=com.erplora.app` responde **404**.

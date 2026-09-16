@@ -80,6 +80,9 @@ on:
       # El veredicto que obedece ese job (hub#1790): el script y su test, por lo mismo.
       - 'scripts/ci/fleet-canary-verdict.py'
       - 'scripts/tests/fleet-canary-verdict.test.sh'
+      # La guardia previa al envío a Google Play (hub#1718): el control y su test, por lo mismo.
+      - 'scripts/ci/play-reviewer-preflight.py'
+      - 'scripts/tests/play-reviewer-preflight.test.sh'
       # El guardia de los puertos de los service containers (hub#898). La regla que vigila vive
       # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
       # toque ÚNICAMENTE el guardia ejecute sus propios casos.
@@ -321,6 +324,19 @@ jobs:
           set -euo pipefail
           bash ./scripts/tests/canary-on-publish.test.sh
           bash ./scripts/tests/fleet-canary-verdict.test.sh
+
+      # ── La guardia previa al envío a Google Play (hub#1718) ───────────────────────────
+      # El 09/09 se entró con la cuenta de revisión y no había negocio: el revisor veía la
+      # pantalla de alta, y después un hub VACÍO. La app se podía volver a enviar así, porque
+      # nada en el repo hacía la pregunta. Lo que corre aquí son los casos HERMÉTICOS del
+      # control —SaaS y hub falsos en 127.0.0.1, sin red ni credenciales—: que caza el slug que
+      # no es de la cuenta, el hub caído, el hub sin módulos y la falta de configuración, y que
+      # nunca imprime la contraseña. El control DE VERDAD lo corre una persona antes de enviar
+      # (apps/tauri/GOOGLE-PLAY.md); aquí solo se prueba que sabe decir que NO.
+      - name: Contrato de la guardia del revisor de Play (hub#1718)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/play-reviewer-preflight.test.sh
 
       # ── Los puertos de los service containers (hub#898) ───────────────────────────────
       # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y
