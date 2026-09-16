@@ -22,11 +22,11 @@ para el de tests, `cargo test -p <crate>`. Tabla orientativa:
 | `erplora-cloud-client` | Cliente del SaaS: auth (X-Hub-Token/JWT/webhook), marketplace, **SHA256**. | ✅ implementado |
 | `erplora-source` | Descarga `module.zip` (S3, fetcher inyectable) + verifica SHA256 + descomprime (anti zip-slip) + cache. | ✅ implementado |
 | `erplora-installer` | **Flujo E2E**: grant(SaaS) → descarga/verifica(source) → instala(runtime). | ✅ implementado |
-| `erplora-vector` | `VectorStore` para RAG. Hoy `MemoryVectorStore` (in-memory, referencia/test); el store Postgres/pgvector es **follow-up** (hub#204 / pm#29). | 🔶 referencia |
+| `erplora-vector` | `VectorStore` para RAG. `PgVectorStore` (Postgres/pgvector) es la implementación de producción, instanciada en `crates/server/src/boot.rs`; si la BD del hub no tiene `pgvector` el arranque no aborta — degrada a `None` (todas las tools). `MemoryVectorStore` sigue siendo solo referencia/test. | ✅ implementado |
 | `erplora-guest-sdk` | Contrato host↔guest WASM (Input/Operation/Event/Output) para autores de plugins. | ✅ implementado |
 | `erplora-wasm-host` | **Tier 2**: ejecuta handlers WASM en sandbox (Extism), devuelve *intenciones*. | ✅ implementado |
 | `erplora-sync` | Cliente de eventos en vivo (consume `/ws`) con reconexión + backoff. | ✅ implementado |
-| `erplora-peripherals` | Hardware POS red-only (ESC/POS, cajón, discovery, cola/reintentos) — ver [`peripherals/README.md`](peripherals/README.md). | ✅ implementado |
+| `erplora-peripherals` | Hardware POS, tres transportes — red (ESC/POS), USB (cola RAW del SO, hub#1083) y Bluetooth SPP en Android (ADR-0204) — cajón, discovery, cola/reintentos. Ver [`peripherals/README.md`](peripherals/README.md). | ✅ implementado |
 | `erplora-verifactu` | Lógica fiscal VeriFactu (encadenado, XML, hashing). Vive en **`crates/plugins/`** (convención de abajo). | ✅ implementado |
 | `tauri-plugin-erplora-android` | Plugin Tauri para Android: permisos de runtime en contexto (`ACCESS_LOCAL_NETWORK`, `POST_NOTIFICATIONS`) y el Kotlin que Rust no alcanza (ADR-0180 §2). Lleva además el `AndroidManifest.xml` que los DECLARA fuera del proyecto generado, para que regenerar `gen/android` no se los lleve (ADR-0241). | ✅ implementado |
 
@@ -67,9 +67,16 @@ node demos/hotplug/run.mjs
 
 ## Pendiente
 
-- **Transportes reales**: inyectar reqwest en `cloud-client`/`source`/`installer`; cliente WS
-  real (tungstenite) en `erplora-sync`.
-- **Auth server-side real**: validar JWT/`X-Hub-Token` contra el SaaS (hoy lee cabeceras en dev).
+- **`erplora-sync` sigue huérfano**: su feature `ws` (cliente tungstenite real) existe pero
+  ningún binario del workspace depende de este crate — `crates/server` no lo lista como
+  dependencia. Las descargas reales de `module.zip` **ya están resueltas**: `crates/server` trae
+  su **propia** dependencia `reqwest` (no la de `cloud-client`/`source`/`installer`, que siguen
+  con su transporte real detrás de la feature opcional `reqwest-transport`, sin habilitar en el
+  workspace) y `crates/server/src/install.rs` la usa directamente.
+- **Auth de sesión es la ruta real de producción**: el JWT de usuario cloud se verifica RS256 de
+  verdad (`cloud_client::verify_user_jwt`) y abre una `hub_session` server-side (`crates/server/src/auth.rs`).
+  El modo que «lee cabeceras sin validar» (`HubConfig::auth_mode == Dev`) es un **modo aparte,
+  explícito y confinado a desarrollo local** (`HUB_DEV_MODE`), nunca lo que sirve el provisioning.
 
 ## Notas de diseño
 

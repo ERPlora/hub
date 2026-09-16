@@ -42,7 +42,7 @@ entonces con la clave documentada que corresponda).
 | Canal | Artefacto | Acceso de lanzamiento |
 | --- | --- | --- |
 | Windows NSIS (S3, canal secundario) | `erplora-app-setup.exe` | Acceso directo en **Escritorio + Menú Inicio** (default del template NSIS de Tauri v2) |
-| Windows Microsoft Store (canal principal, ADR-0136) | MSIX | Entrada en **Menú Inicio** (convención Store; sin icono de escritorio) |
+| Windows Microsoft Store (canal principal, ADR-0421) | MSIX | Entrada en **Menú Inicio** (convención Store; sin icono de escritorio) |
 | Linux `.deb` (S3) | `erplora-app.deb` | Entrada en el **menú de aplicaciones** (fichero `.desktop` autogenerado por el bundler) |
 | Linux AppImage (S3, canal de QA) | `erplora-app.AppImage` | **Portable**: no instala nada ni crea accesos; se ejecuta directamente |
 | macOS (build local) | `.app`/`.dmg` | Arrastrar a `/Applications` (convención macOS; sin instalador) |
@@ -81,7 +81,10 @@ que el Cloud ya contesta — y es justo la que el usuario puede editar en su pro
 > impresión vive en el Hub. Lo de abajo describe el único camino que hay.
 
 En la app, el shell **es el bridge**: no hay proceso aparte ni segundo install. La lógica de
-hardware vive en el crate compartido **`crates/peripherals`** (red-only, ESC/POS sobre TCP:9100).
+hardware vive en el crate compartido **`crates/peripherals`**, con **tres transportes**: red
+(ESC/POS sobre TCP:9100, todas las plataformas), USB por la cola RAW del SO en escritorio
+(macOS/Linux, hub#1083, ADR-0441 — enmienda el «red-only» original de ADR-0196 §4) y Bluetooth
+SPP solo Android (ADR-0204, hub#388).
 
 Los DATOS NO van por `invoke` (ADR-0050): el front habla HTTP+WS **con su hub cloud** (no hay
 runtime embebido — ADR-0154). `invoke` queda solo para lo nativo y para el HARDWARE — handlers que

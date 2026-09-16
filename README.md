@@ -170,6 +170,6 @@ navegador), así que salta en segundos y no dentro de los 20 minutos del e2e.
 - **Lit** para los Web Components de módulos · **pnpm** + Cargo workspaces (raíz compartida).
 - **Un solo Hub** (§1; ADR-0154): **Hub Cloud** — PWA/web shell + **PostgreSQL por hub** (ADR-0201; migración en curso). Se retiró Hub Local (Tauri) y el backend SQLite; ya no hay ejes `single`/`cloud`.
 - Transporte de datos **HTTP (RPC) + WS (eventos)** contra el runtime Axum (ADR-0050; no hay `invoke`/IPC para datos).
-- Multi-tenant **`hub_id` por fila**, **una BD por hub** (ADR-0201). Hardware por la **app instalable** vía `invoke` in-process (ADR-0196); cola de impresión en el hub (§6); en Android vuelve el Bluetooth SPP (ADR-0204, pendiente hub#388).
-- Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
+- Multi-tenant **`hub_id` por fila**, **una BD por hub** (ADR-0201, completo 11/11). Hardware por la **app instalable** vía `invoke` in-process (ADR-0196); cola de impresión en el hub (§6); en Android el Bluetooth SPP ya está de vuelta (ADR-0204, hub#388 cerrada).
+- Red de módulos: **`http.fetch` abierto** — el host es decorador, no cortafuegos: no acota destino, solo protege sus propias credenciales (ADR-0431/0432). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza (enforce, sin bypass — hub#330) → PIN con rate-limit (hub#329); usuarios cloud y solo-locales.
