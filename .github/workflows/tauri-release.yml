@@ -384,8 +384,13 @@ jobs:
       # la máquina, y le pasa a cualquier acción JS que descargue de Google (hub#878).
       # Sin `cmdline-tools-version`: el default de la acción es correcto y clavarlo aquí habría
       # sido tratar el síntoma.
+      # Only `platform-tools`: the action's default is `tools platform-tools`, and Google
+      # retired the legacy `tools` package on 2026-09-16 — `sdkmanager` exits 1 on it and
+      # takes the job down with it (hub#1881). Nothing here ever used `tools`.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install NDK
         run: |

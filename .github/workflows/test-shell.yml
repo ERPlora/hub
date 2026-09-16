@@ -165,8 +165,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Only `platform-tools`: the action's default is `tools platform-tools`, and Google
+      # retired the legacy `tools` package on 2026-09-16 — `sdkmanager` exits 1 on it and
+      # takes the job down with it (hub#1881). Nothing here ever used `tools`.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       # Solo la plataforma y las build-tools: el NDK es para compilar Rust a Android y aquí no se
       # compila Rust. Es la diferencia entre un paso de segundos y el job de release.
