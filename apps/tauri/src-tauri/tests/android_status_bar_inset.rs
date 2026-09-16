@@ -84,18 +84,18 @@ fn the_activity_still_opts_into_edge_to_edge() {
     );
 }
 
-/// The helper must cover the cutout too, and must not swallow the insets.
+/// The helper must cover the cutout too, and must not swallow the insets whole.
 ///
 /// Neither is reachable from a JVM unit test — `WindowInsetsCompat` is an `android.jar` stub
 /// there — and both fail quietly:
 ///
 /// - asking only for `systemBars()` leaves a notch painting over the content on a cutout device,
 ///   because the status bar can be hidden while the cutout stays carved into the panel;
-/// - returning `CONSUMED` would zero the insets for the WebView below, so the page's own
+/// - returning `CONSUMED` would zero EVERY inset for the WebView below, so the page's own
 ///   `env(safe-area-inset-*)` rules — the bottom gesture bar, the assistant drawer — would go flat
 ///   and we would trade a top overlap for a bottom one.
 #[test]
-fn the_helper_covers_the_cutout_and_passes_the_insets_on() {
+fn the_helper_covers_the_cutout_and_keeps_the_other_insets_alive() {
     let helper = code_of(&read(INSETS_HELPER));
 
     assert!(
@@ -110,8 +110,38 @@ fn the_helper_covers_the_cutout_and_passes_the_insets_on() {
     );
     assert!(
         !helper.contains("CONSUMED"),
-        "{INSETS_HELPER} must return the insets it received: consuming them zeroes \
-         env(safe-area-inset-*) for every page in the WebView, which is how a fixed top overlap \
-         becomes a new bottom one (hub#1719)",
+        "{INSETS_HELPER} must not consume every inset: that zeroes env(safe-area-inset-bottom) \
+         too, and the tabbar goes back under the gesture bar (hub#1719)",
+    );
+}
+
+/// And the strip it just reserved must be SPENT on the way down, or it gets reserved twice.
+///
+/// hub#1719 padded the window and handed the insets on untouched, so the WebView still reported
+/// the full `env(safe-area-inset-top)` and Ionic added it a second time on the first toolbar
+/// (`ion-header ion-toolbar:first-of-type { padding-top: var(--ion-safe-area-top) }`). QA measured
+/// the result with CDP on 2026-09-16 over the APK of `fb3b48a`: `screen.height` 952 against
+/// `innerHeight` 900 on `Pixel_10_Pro` and 800 against 776 on `Pixel_Tablet` — the window already
+/// started 52 / 24 CSS px down — while `env(safe-area-inset-top)` still reported those same 52 / 24.
+/// The header floated half a bar below the clock on every screen (hub#1895).
+///
+/// `WindowInsetsCompat.inset(0, reserved, 0, 0)` subtracts the strip from the top of every inset
+/// type — the status bar and the cutout — clamping at zero, and leaves left, right, bottom and the
+/// IME exactly as they came. Exactly one party reserves the top, and the bottom still reaches the
+/// page.
+#[test]
+fn the_helper_spends_the_strip_it_reserved_before_handing_the_insets_down() {
+    let helper = code_of(&read(INSETS_HELPER));
+
+    assert!(
+        helper.contains("insets.inset(0, reserved, 0, 0)"),
+        "{INSETS_HELPER} hands the page the insets it already spent on padding: the WebView \
+         reports the full env(safe-area-inset-top) and Ionic reserves the status bar a second \
+         time, leaving an empty strip under the clock on every screen (hub#1895)",
+    );
+    assert!(
+        helper.contains("topInset(bars.top, cutout.top)"),
+        "{INSETS_HELPER} must spend the strip THIS device reports — 52 CSS px on a Pixel 10 Pro, \
+         24 on a Pixel Tablet. A fixed number fits one of the two and breaks the other (hub#1895)",
     );
 }
