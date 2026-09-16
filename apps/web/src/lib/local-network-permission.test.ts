@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 // hub#1773 — the local-network permission, asked ONCE, IN CONTEXT, with a sentence of our own first.
 //
 // `ACCESS_LOCAL_NETWORK` (API 37+) is what stands between the till and every printer on the venue's
@@ -31,6 +32,11 @@ import {
   localNetworkPrimerLabelsFrom,
 } from './local-network-permission';
 import type { PermissionPrimerLabels } from './device-permission';
+import {
+  ANDROID_NOTIFICATIONS_PERMISSION,
+  NOTIFICATION_PRIMER_ANSWERED_KEY,
+  ensureNotificationPermission,
+} from './notification-permission';
 
 const LABELS: PermissionPrimerLabels = {
   header: 'Let ERPlora look for your printer',
@@ -233,5 +239,52 @@ describe('the copy', () => {
   it('the sheet does NOT reuse the notices copy: they ask for different things', () => {
     expect(en.hardware.localNetwork.primerMessage).not.toBe(en.system.notices.primerMessage);
     expect(es.hardware.localNetwork.primerMessage).not.toBe(es.system.notices.primerMessage);
+  });
+});
+
+describe('its memory is its OWN — the notices sheet cannot answer for it', () => {
+  // Through the two PRODUCTION wrappers and the real storage, with nothing about memory injected:
+  // this pins the wiring, not the core (`device-permission.test.ts` already pins the core honours
+  // whatever key it is handed). A shared key would mean: «Not now» to the notices sheet during
+  // setup, and the printer sheet never appears again for the life of the install — the dialog
+  // goes back to popping cold, which is the whole of hub#1773 undone and invisible.
+  afterEach(() => {
+    localStorage.removeItem(NOTIFICATION_PRIMER_ANSWERED_KEY);
+  });
+
+  it('the two keys are two', () => {
+    expect(LOCAL_NETWORK_PRIMER_ANSWERED_KEY).not.toBe(NOTIFICATION_PRIMER_ANSWERED_KEY);
+  });
+
+  it('«not now» to the notices sheet leaves the printer sheet still to come', async () => {
+    const sheets: string[] = [];
+    const denied = {
+      [ANDROID_NOTIFICATIONS_PERMISSION]: false,
+      [ANDROID_LOCAL_NETWORK_PERMISSION]: false,
+    };
+
+    await ensureNotificationPermission({
+      labels: LABELS,
+      check: async () => denied,
+      request: async () => denied,
+      confirm: async () => {
+        sheets.push('notices');
+        return false;
+      },
+    });
+    await ensureLocalNetworkPermission({
+      labels: LABELS,
+      check: async () => denied,
+      request: async () => denied,
+      confirm: async () => {
+        sheets.push('printer');
+        return false;
+      },
+    });
+
+    expect(sheets).toEqual(['notices', 'printer']);
+    // And each answer landed in ITS key.
+    expect(localStorage.getItem(NOTIFICATION_PRIMER_ANSWERED_KEY)).toBe('1');
+    expect(localStorage.getItem(LOCAL_NETWORK_PRIMER_ANSWERED_KEY)).toBe('1');
   });
 });

@@ -195,3 +195,43 @@ describe('«find my printer» explains itself before Android asks (hub#1773)', (
     expect(i18n.global.locale.value).toBeTruthy();
   });
 });
+
+describe('every operation that reaches the LAN explains itself first — not only the scan', () => {
+  // A till hardly ever scans: the printer is assigned once and remembered, and a freshly installed
+  // device goes install → sell → print with no discovery anywhere in it (hub#337). If only the
+  // scan had the sentence in front, the first ticket of that device would still pop Android's
+  // dialog cold, in the middle of a sale. The adapter is ONE door for the four operations; this
+  // pins that it stays one — an adapter keyed on the discovery batch (LAN + Bluetooth) would let
+  // the single-permission asks of printing through untouched, and nothing above would notice.
+  const NETWORK_PRINTER = '192.168.1.50:9100';
+
+  it.each<[string, (t: ReturnType<typeof makeBridgeTransport>) => Promise<unknown>]>([
+    ['print', (t) => t.print(NETWORK_PRINTER, 'ticket', {})],
+    ['testPrint', (t) => t.testPrint(NETWORK_PRINTER)],
+    ['openDrawer', (t) => t.openDrawer(NETWORK_PRINTER)],
+  ])('%s on a device that was never asked: our sheet, then Android', async (_name, op) => {
+    await op(makeBridgeTransport());
+
+    const confirmAt = calls.indexOf('confirm');
+    const requestAt = calls.indexOf('plugin:erplora-android|request_permissions');
+    expect(confirmAt, 'the in-app explanation never went up').toBeGreaterThanOrEqual(0);
+    expect(requestAt, 'Android was never asked').toBeGreaterThanOrEqual(0);
+    expect(confirmAt).toBeLessThan(requestAt);
+    // And it asked for the LAN alone: the sentence is about the printer, not about a batch.
+    expect(lanAsks).toEqual([[ANDROID_LOCAL_NETWORK_PERMISSION]]);
+  });
+
+  it('a Bluetooth printer has nothing to do with the LAN: no sheet, no LAN ask', async () => {
+    await makeBridgeTransport().print('bluetooth:AA:BB:CC:DD:EE:FF', 'ticket', {});
+
+    expect(calls).not.toContain('confirm');
+    expect(lanAsks).toEqual([]);
+  });
+
+  it('notifying has nothing to do with the LAN either: no sheet, no LAN ask (hub#758 scope)', async () => {
+    await makeBridgeTransport().notify('New order', 'Table 4');
+
+    expect(calls).not.toContain('confirm');
+    expect(lanAsks).toEqual([]);
+  });
+});
