@@ -180,10 +180,16 @@ ion-badge {
 }
 
 /* ── Segment (tabs de footer): moderno, sin mayúsculas ────────────────────────────────────── */
-/* #278 — reservar la barra de gestos/home-indicator en iOS/Android: sin este padding las pestañas
-   (min-height 46px, labels de 2 líneas) quedan bajo ella y se recortan. Mismo patrón que
-   ok-app-launcher/ok-notification-center. En escritorio env() resuelve a 0 (sin efecto). */
-ion-footer { box-shadow: none; padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* #278 — reservar la barra de gestos/home-indicator en iOS/Android: sin reservarla las pestañas
+   (min-height 46px, labels de 2 líneas) quedan bajo ella y se recortan. En escritorio env()
+   resuelve a 0 (sin efecto).
+   Solo cuando el pie NO lleva toolbar, que es donde Ionic no llega: el tabbar por módulo es
+   `ion-footer > ion-toolbar > ion-segment` y ahí Ionic ya la reserva él
+   (`ion-footer.footer-toolbar-padding ion-toolbar:last-of-type`). Reservarla otra vez aquí era lo
+   que dejaba ~50 dp muertos sobre el gesto de navegación en Android (hub#1895). El único pie sin
+   toolbar es el del menú lateral (App.vue), y ese sí la reserva el shell. */
+ion-footer { box-shadow: none; }
+ion-footer:not(:has(ion-toolbar)) { padding-bottom: env(safe-area-inset-bottom, 0px); }
 ion-footer ion-toolbar { --border-width: 0; }
 ion-segment { --background: transparent; padding: 4px; gap: 4px; }
 /* El tabbar de footer (ADR-0022: `navigation[]` → ion-segment) lo estiliza ahora OutfitKit:
