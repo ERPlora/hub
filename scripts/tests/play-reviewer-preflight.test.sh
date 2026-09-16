@@ -19,8 +19,12 @@
 #                                   a LOUD red naming the variables to set — the same criterion
 #                                   `FLEET_API_KEY` gets in `build-hub.yml` (canary-on-publish).
 #   · a hardcoded slug            → it would keep passing after the `.env` is pointed somewhere
-#                                   else, which is precisely how `PLAY_REVIEWER_HUB=salon-aurora`
-#                                   survived while that address answered 404.
+#                                   else, which is precisely how a stale `PLAY_REVIEWER_HUB`
+#                                   survived in the `.env` while its address answered 404 (09/09).
+#   · a stub that says yes to all → the fake SaaS CHECKS email + password on the login and
+#                                   demands the Bearer on `/api/v1/hubs/`, like the real one. With a
+#                                   stub that accepted anything, «send no password» and «list the
+#                                   hubs without the session» survived as mutants (rv-1885).
 #   · trusting «the hub exists»   → creating the hub was not enough on 09/09. A hub with zero
 #                                   modules is the shell Google saw: `checks.modules.registered`
 #                                   is what separates «there is a hub» from «there is an app».
@@ -55,8 +59,13 @@ bad() { printf '  \033[31m✗\033[0m %s\n     %s\n' "$1" "$2"; fail=$((fail + 1)
 
 # A password shaped like a real one, so «the output never leaks it» is a real assertion and not a
 # match on an empty string. It is fake: it only ever reaches the stub on 127.0.0.1.
+FAKE_EMAIL='reviewer@example.invalid'
 FAKE_PASSWORD='s3cr3t-not-a-real-one-8f2c'
-REAL_SLUG='restaurante-demo-play'
+# The account's hub in every scenario, and a slug that is NOT the account's. Both fake on purpose:
+# the production slug lives ONLY in the root `.env` (PLAY_REVIEWER_HUB) — not here, not in the
+# control, not in the doc. A test that carried it would be one more place to keep in sync.
+FAKE_SLUG='negocio-de-prueba'
+GHOST_SLUG='hub-que-no-es-suyo'
 
 echo "hub#1718 — la guardia previa al envío a Google Play"
 
@@ -77,6 +86,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 scenario = json.load(open(sys.argv[1]))
 port_file, ua_log = sys.argv[2], sys.argv[3]
+expected_email, expected_password = sys.argv[4], sys.argv[5]
+TOKEN = "tok"
 
 
 class H(BaseHTTPRequestHandler):
@@ -92,15 +103,28 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/v1/auth/login/":
             with open(ua_log, "a") as fh:
                 fh.write(self.headers.get("User-Agent", "") + "\n")
-            self.rfile.read(int(self.headers.get("content-length", 0) or 0))
+            raw = self.rfile.read(int(self.headers.get("content-length", 0) or 0))
+            try:
+                sent = json.loads(raw or b"{}")
+            except ValueError:
+                sent = {}
             code = scenario.get("login_status", 200)
             if code != 200:
                 return self._send(code, {"detail": "no"})
-            return self._send(200, {"access": "tok", "refresh": "r", "user": {"email": "x", "id": "1"}})
+            # The real SaaS checks the credentials; so does this one. A control that stopped
+            # sending the password (or sent it under another name) must not pass the good case.
+            if sent.get("email") != expected_email or sent.get("password") != expected_password:
+                return self._send(401, {"detail": "bad credentials"})
+            if scenario.get("login_without_access"):
+                return self._send(200, {"user": {"email": expected_email, "id": "1"}})
+            return self._send(200, {"access": TOKEN, "refresh": "r", "user": {"email": expected_email, "id": "1"}})
         self._send(404, {"detail": "nope"})
 
     def do_GET(self):
         if self.path == "/api/v1/hubs/":
+            # JWT-only door, like the real one: without the session token the list is a 401.
+            if self.headers.get("Authorization") != f"Bearer {TOKEN}":
+                return self._send(401, {"detail": "Authentication credentials were not provided."})
             return self._send(
                 scenario.get("hubs_status", 200),
                 {"hubs": [{"id": "1", "slug": s, "name": s} for s in scenario.get("hubs", [])]},
@@ -131,7 +155,7 @@ start_stub() { # $1 = scenario json
     stub_pid=""
     rm -f "$tmp/port" "$tmp/ua"
     printf '%s' "$1" > "$tmp/scenario.json"
-    python3 "$tmp/stub.py" "$tmp/scenario.json" "$tmp/port" "$tmp/ua" &
+    python3 "$tmp/stub.py" "$tmp/scenario.json" "$tmp/port" "$tmp/ua" "$FAKE_EMAIL" "$FAKE_PASSWORD" &
     stub_pid=$!
     for _ in $(seq 1 100); do
         [ -s "$tmp/port" ] && break
@@ -144,13 +168,14 @@ start_stub() { # $1 = scenario json
     port=$(cat "$tmp/port")
 }
 
-# run_preflight <env-file> → captures stdout+stderr in $out and the exit code in $rc.
-# The env file is what the control reads when the variables are not already exported: pointing it
-# at a scratch file is what keeps the real root `.env` (and the real credentials) out of the test.
+# run_preflight <env-file> [hub-url-template] [saas-url] → captures stdout+stderr in $out and the
+# exit code in $rc. The env file is what the control reads when the variables are not already
+# exported: pointing it at a scratch file is what keeps the real root `.env` (and the real
+# credentials) out of the test.
 run_preflight() {
     out=$(env -u PLAY_REVIEWER_EMAIL -u PLAY_REVIEWER_PASSWORD -u PLAY_REVIEWER_HUB \
         PLAY_REVIEWER_ENV_FILE="$1" \
-        PLAY_REVIEWER_SAAS_URL="http://127.0.0.1:$port" \
+        PLAY_REVIEWER_SAAS_URL="${3:-http://127.0.0.1:$port}" \
         PLAY_REVIEWER_HUB_URL="${2:-http://127.0.0.1:$port/hub/{slug\}}" \
         python3 "$script" 2>&1)
     rc=$?
@@ -158,16 +183,16 @@ run_preflight() {
 
 write_env() { # $1=file, $2=slug  (the credentials live only in this scratch file)
     cat > "$1" <<EOF
-PLAY_REVIEWER_EMAIL=reviewer@example.invalid
+PLAY_REVIEWER_EMAIL=$FAKE_EMAIL
 PLAY_REVIEWER_PASSWORD=$FAKE_PASSWORD
 PLAY_REVIEWER_HUB=$2
 EOF
 }
 
-# expect_fail <case> <env-file> <expected code>
+# expect_fail <case> <env-file> <expected code> [hub-url-template] [saas-url]
 expect_fail() {
-    local name=$1 envfile=$2 want=$3 hub_url=${4:-}
-    run_preflight "$envfile" "$hub_url"
+    local name=$1 envfile=$2 want=$3 hub_url=${4:-} saas_url=${5:-}
+    run_preflight "$envfile" "$hub_url" "$saas_url"
     if [ "$rc" -eq 0 ]; then
         bad "$name" "el control salió en VERDE (exit 0): dejaría enviar la app a Google con esto roto"
     elif [[ "$out" != *"$want"* ]]; then
@@ -182,8 +207,10 @@ expect_fail() {
 }
 
 # ── 1. El caso bueno: la cuenta entra y cae dentro de un negocio vivo ────────
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
-write_env "$tmp/env.ok" "$REAL_SLUG"
+# Y es también la prueba de que el control MANDA lo que dice: el servidor falso rechaza el login
+# si no llegan email y contraseña exactos, y la lista de hubs si no llega el Bearer de la sesión.
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.ok" "$FAKE_SLUG"
 run_preflight "$tmp/env.ok"
 if [ "$rc" -eq 0 ]; then
     ok "cuenta con su hub, /readyz UP y 14 módulos → VERDE"
@@ -213,12 +240,13 @@ fi
 # Un control que solo sabe decir que sí no es un control. Cada caso de aquí abajo es un fallo real
 # que Google vería, y el control tiene que salir en ROJO en todos.
 
-# 2a. Un slug que no es de la cuenta — el caso `salon-aurora` del `.env`, que respondía 404.
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
-write_env "$tmp/env.ghost" "salon-aurora"
+# 2a. Un slug que no es de la cuenta — el caso real del 09/09: un `.env` apuntando a un hub que
+# respondía 404.
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.ghost" "$GHOST_SLUG"
 expect_fail "🔴 un slug que no es de la cuenta → ROJO" "$tmp/env.ghost" "hub_not_in_account"
 # Y lo dice con el slug que SÍ lo es: si no, quien lo lea no sabe qué poner en el `.env`.
-if [[ "$out" == *"$REAL_SLUG"* ]]; then
+if [[ "$out" == *"$FAKE_SLUG"* ]]; then
     ok "al fallar, nombra el slug que SÍ es de la cuenta"
 else
     bad "al fallar, nombra el slug que SÍ es de la cuenta" \
@@ -226,8 +254,8 @@ else
 fi
 
 # 2b. El hub caído — un 502 del runtime.
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 502, \"body\": {}}}}"
-write_env "$tmp/env.down" "$REAL_SLUG"
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 502, \"body\": {}}}}"
+write_env "$tmp/env.down" "$FAKE_SLUG"
 expect_fail "🔴 el hub contesta 502 → ROJO" "$tmp/env.down" "hub_not_ready"
 # Y el mensaje dice 502, no «200». Sin esto el caso lo aprueba igual el siguiente control —el
 # `status` de dentro—, así que borrar la comprobación del código HTTP se quedaba en verde: lo
@@ -240,37 +268,37 @@ else
 fi
 
 # 2c. El hub que no contesta nada — nada escuchando en esa dirección.
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {}}"
-write_env "$tmp/env.404" "$REAL_SLUG"
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {}}"
+write_env "$tmp/env.404" "$FAKE_SLUG"
 expect_fail "🔴 el hub no existe en esa dirección (404) → ROJO" "$tmp/env.404" "hub_not_ready"
 
-# 2c-bis. La dirección muerta: nada escuchando al otro lado. Es la forma real del `salon-aurora`
-# del `.env`, y la que deja el control colgado si no trata el error de conexión.
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
-write_env "$tmp/env.dead" "$REAL_SLUG"
+# 2c-bis. La dirección muerta: nada escuchando al otro lado. Es la forma real del hub muerto del
+# `.env` del 09/09, y la que deja el control colgado si no trata el error de conexión.
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.dead" "$FAKE_SLUG"
 expect_fail "🔴 la dirección del hub no responde (nadie escuchando) → ROJO" \
     "$tmp/env.dead" "hub_unreachable" 'http://127.0.0.1:1/{slug}'
 
 # 2d. Responde 200, pero el runtime se declara caído. El código HTTP no es el veredicto.
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 200, \"body\": {\"status\": \"DOWN\", \"checks\": {\"modules\": {\"registered\": 14}}}}}}"
-write_env "$tmp/env.degraded" "$REAL_SLUG"
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": {\"status\": \"DOWN\", \"checks\": {\"modules\": {\"registered\": 14}}}}}}"
+write_env "$tmp/env.degraded" "$FAKE_SLUG"
 expect_fail "🔴 200 pero \`status: DOWN\` → ROJO (el 200 no es el veredicto)" "$tmp/env.degraded" "hub_not_ready"
 
 # 2e. 🔴 EL FALLO DEL 09/09: el hub está vivo y VACÍO. «Aquí aparecerán tus apps».
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 200, \"body\": {\"status\": \"UP\", \"version\": \"1.1.23\", \"checks\": {\"modules\": {\"registered\": 0, \"expected\": 0, \"status\": \"UP\"}}}}}}"
-write_env "$tmp/env.empty" "$REAL_SLUG"
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": {\"status\": \"UP\", \"version\": \"1.1.23\", \"checks\": {\"modules\": {\"registered\": 0, \"expected\": 0, \"status\": \"UP\"}}}}}}"
+write_env "$tmp/env.empty" "$FAKE_SLUG"
 expect_fail "🔴 hub vivo pero con CERO módulos → ROJO (es el cascarón que vio Google el 09/09)" \
     "$tmp/env.empty" "hub_without_modules"
 
 # 2f. La cuenta se quedó sin ningún hub — el punto de partida de la issue.
 start_stub '{"hubs": [], "readyz": {}}'
-write_env "$tmp/env.nohubs" "$REAL_SLUG"
+write_env "$tmp/env.nohubs" "$FAKE_SLUG"
 expect_fail "🔴 la cuenta no tiene ningún hub → ROJO (la pantalla de alta que vio el revisor)" \
     "$tmp/env.nohubs" "no_hubs"
 
 # 2g. Las credenciales dejaron de valer.
 start_stub '{"login_status": 401, "hubs": [], "readyz": {}}'
-write_env "$tmp/env.badcreds" "$REAL_SLUG"
+write_env "$tmp/env.badcreds" "$FAKE_SLUG"
 expect_fail "🔴 el SaaS rechaza el login → ROJO" "$tmp/env.badcreds" "login_rejected"
 # Mismo motivo que en el 502: sin nombrar el 401, borrar la comprobación del código dejaba el caso
 # en verde porque lo recogía el «200 sin access» de después. También lo cazó un mutante.
@@ -281,8 +309,19 @@ else
         "el control no miró el código HTTP del login — $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-160)"
 fi
 
+# 2g-bis. El SaaS contesta 200 al login pero sin sesión (`access`): no hay con qué seguir.
+start_stub "{\"login_without_access\": true, \"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.noaccess" "$FAKE_SLUG"
+expect_fail "🔴 login 200 pero sin \`access\` → ROJO" "$tmp/env.noaccess" "login_rejected"
+
+# 2h. El SaaS no contesta nada — nadie escuchando. Sin este caso «SaaS caído = verde» sobrevivía
+# como mutante (rv-1885): el control no podía comprobar nada y aun así dejaba enviar.
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.saasdown" "$FAKE_SLUG"
+expect_fail "🔴 el SaaS no responde (nadie escuchando) → ROJO" "$tmp/env.saasdown" "saas_unreachable" "" "http://127.0.0.1:1"
+
 # ── 3. Sin válvula: faltar configuración es ROJO, nunca un skip silencioso ───
-start_stub "{\"hubs\": [\"$REAL_SLUG\"], \"readyz\": {\"$REAL_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
 : > "$tmp/env.empty-file"
 expect_fail "🔴 sin credenciales → ROJO, no un skip en verde" "$tmp/env.empty-file" "missing_credentials"
 # Y dice CÓMO ponerlas: un rojo que no dice qué falta se «arregla» borrando el control.
@@ -306,10 +345,12 @@ expect_fail "🔴 falta solo PLAY_REVIEWER_HUB → ROJO" "$tmp/env.half" "missin
 
 # ── 4. El slug sale del `.env`, no del código ───────────────────────────────
 # Si el control llevara el slug escrito dentro, seguiría en verde con el `.env` apuntando a otro
-# sitio — que es exactamente cómo `salon-aurora` sobrevivió apuntando a un 404.
-if grep -qF "$REAL_SLUG" "$script"; then
+# sitio — que es exactamente cómo el hub muerto del `.env` sobrevivió apuntando a un 404. Se mira
+# el slug de este test y cualquier host de tenant escrito a pelo (`<slug>.a.erplora.com`); la
+# plantilla `{slug}.a.erplora.com` del control no casa porque no lleva un slug delante.
+if grep -qE "$FAKE_SLUG|[a-z0-9]([a-z0-9-]*[a-z0-9])?\.a\.erplora\.com" "$script"; then
     bad "el slug no está escrito en el código" \
-        "\`$REAL_SLUG\` aparece en el propio control: con el \`.env\` apuntando a otro hub seguiría dando verde"
+        "un slug o un host de tenant aparece en el propio control: con el \`.env\` apuntando a otro hub seguiría dando verde"
 else
     ok "el slug no está escrito en el código (sale de PLAY_REVIEWER_HUB)"
 fi

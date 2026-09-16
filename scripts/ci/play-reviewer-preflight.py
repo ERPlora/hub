@@ -21,8 +21,8 @@ Exits 0 only when ALL of it holds, and 1 naming the first thing that does not:
   hub_without_modules  it is up and EMPTY                               → the 09/09 shell
 
 The slug is never written here: it comes from `PLAY_REVIEWER_HUB`. A hardcoded one would keep
-passing after the `.env` is pointed elsewhere, which is exactly how `PLAY_REVIEWER_HUB=salon-aurora`
-survived while that address answered 404.
+passing after the `.env` is pointed elsewhere, which is exactly how a stale `PLAY_REVIEWER_HUB`
+survived in the `.env` while its address answered 404 (2026-09-09).
 
 The password is read and sent, never printed — not even on the failure paths.
 
