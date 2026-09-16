@@ -183,6 +183,41 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- ── The printer search is blocked ─────────────────────────────────────────────
+             hub#1773. Android is nearly one-way about the local-network permission: refused, the
+             system stops presenting its dialog, and from then on every search comes back empty
+             however many printers are switched on. The Printing screen does say why when a search
+             runs (hub#338), but the owner who already dismissed that sentence has nowhere left to
+             go — and somebody whose printer is «not found» comes HERE, next to the printer card.
+
+             Only ever rendered on a device that really has the permission and really lacks it: on
+             the desktop app, in a browser and on any Android below 17 the state is `unsupported`
+             and this card does not exist — claiming the search is blocked there would be a false
+             alarm about something that works. -->
+        <ion-card v-if="localNetworkBlocked" class="ion-no-margin">
+          <ion-card-content>
+            <div class="bridge-head">
+              <h3 class="bridge-title">{{ t('hardware.localNetwork.blockedTitle') }}</h3>
+              <ok-status-pill tone="warning" dot>
+                {{ t('hardware.localNetwork.blockedTitle') }}
+              </ok-status-pill>
+            </div>
+            <p class="muted-note">{{ t('hardware.localNetwork.blockedDetail') }}</p>
+            <div class="printer-action">
+              <ion-button
+                size="small"
+                fill="outline"
+                data-testid="system-local-network-allow"
+                :disabled="askingForLocalNetwork"
+                @click="allowPrinterSearch"
+              >
+                <HubIcon slot="start" name="print-outline" />
+                {{ t('hardware.localNetwork.blockedAction') }}
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <!-- ── Notices are off ───────────────────────────────────────────────────────────
              hub#1732. Android is nearly one-way about the notification permission: refused, the
              system stops offering its dialog, and the till cannot show a single notice for the
@@ -479,6 +514,12 @@ import {
   primerLabelsFrom,
   type NotificationPermission,
 } from '../lib/notification-permission';
+import {
+  ensureLocalNetworkPermission,
+  localNetworkPermissionState,
+  localNetworkPrimerLabelsFrom,
+  type LocalNetworkPermission,
+} from '../lib/local-network-permission';
 import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te, locale } = useI18n();
@@ -563,6 +604,12 @@ const installedModules = ref<InstalledModule[] | null>(null);
 const notices = ref<NotificationPermission>('unsupported');
 const askingForNotices = ref(false);
 const noticesBlocked = computed(() => notices.value === 'denied');
+// Can this device look for a printer at all? (hub#1773) Same reading and the same reason as the
+// notices above: `unsupported` everywhere except an Android 17+ inside the installed app, so the
+// card keys on the state and never on «is this Android».
+const localNetwork = ref<LocalNetworkPermission>('unsupported');
+const askingForLocalNetwork = ref(false);
+const localNetworkBlocked = computed(() => localNetwork.value === 'denied');
 
 // Qué le hemos cambiado a este hub (hub#564). Vacío es una respuesta legítima y frecuente: la
 // mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
@@ -823,6 +870,8 @@ async function refreshHardware(): Promise<void> {
   // Never throws: `notificationPermissionState` answers `unsupported` when it cannot ask, which
   // keeps the card away rather than warning about a state we failed to read.
   notices.value = await notificationPermissionState();
+  // Same contract for the other permission a printer needs (hub#1773).
+  localNetwork.value = await localNetworkPermissionState();
 }
 
 /**
@@ -850,6 +899,35 @@ function onVisibleAgain(): void {
   void notificationPermissionState().then((state) => {
     notices.value = state;
   });
+  void localNetworkPermissionState().then((state) => {
+    localNetwork.value = state;
+  });
+}
+
+/**
+ * Asks to look for printers again, on the user's behalf (hub#1773).
+ *
+ * Twin of {@link turnOnNotices}, and for the same reasons: `force` because nothing asks twice on
+ * its own — the scan's primer is deliberately once per install — and the state is READ BACK from
+ * the system rather than taken from the request's answer, because the user can also have granted
+ * it in the device settings while the sheet was up. If the search is still blocked, the system
+ * will not be asking again, so the only remaining door gets named instead of leaving the tap
+ * silent.
+ */
+async function allowPrinterSearch(): Promise<void> {
+  if (askingForLocalNetwork.value) return;
+  askingForLocalNetwork.value = true;
+  try {
+    await ensureLocalNetworkPermission({ labels: localNetworkPrimerLabelsFrom(t), force: true });
+    localNetwork.value = await localNetworkPermissionState();
+    void toast(
+      localNetwork.value === 'denied'
+        ? t('hardware.localNetwork.blockedInSettings')
+        : t('hardware.localNetwork.turnedOn'),
+    );
+  } finally {
+    askingForLocalNetwork.value = false;
+  }
 }
 
 async function turnOnNotices(): Promise<void> {
