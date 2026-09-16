@@ -206,6 +206,7 @@ import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import SidebarInstallQr from './components/SidebarInstallQr.vue';
 import { user, isAuthed, logout } from './lib/session';
+import { setManagementDistribution } from './lib/management-link';
 import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
@@ -281,6 +282,11 @@ const canOfferPlanUpgrade = ref(true);
 onMounted(async () => {
   const context = await getDeviceContext();
   canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  // hub#1897 — la misma respuesta gobierna la puerta a erplora.com del topbar, que hasta ahora se
+  // pintaba sin mirarla: desde el TPV se llegaba a la pantalla de facturación del SaaS en tres
+  // toques y con la sesión ya abierta. Se resuelve aquí, con el contexto que ya está pedido, para
+  // no preguntarle al shell lo mismo dos veces en el arranque.
+  setManagementDistribution(context?.distribution);
 });
 
 // pm#196 — cruza por la puerta compartida: dentro de la app instalada el navegador del sistema NO

@@ -76,6 +76,55 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     expect(offenders.join('\n')).toBe('');
   });
 
+  // hub#1897 — the OTHER half of the sweep, and the one that let a door back in.
+  //
+  // The list above is literal on purpose, and that literalness is also its blind spot: a control
+  // that opens `/dashboard/` matches none of the three routes, and yet that panel carries «Billing»
+  // and «Marketplace» in its own sidebar — one tap from a payment surface, with the session already
+  // open because the Hub hands the browser a one-time pass (pm#196). The QA measured three taps
+  // from the till to `/dashboard/billing/invoices/` on the published v1.1.25.
+  //
+  // So the rule this guard adds is not about ROUTES but about DOORS: every place that leaves for
+  // the signed-in SaaS through `saasDoor` has to consult who distributed this copy, because that is
+  // who sets the rule (`planUpgradeIsOfferable`, hub#756; `managementIsOfferable`, hub#1897). The
+  // browser and a sideloaded install keep every door — nobody governs them.
+  // 🪤 Se exige la LLAMADA, no el nombre suelto: `managementIsOfferable` escrito en una prosa que
+  // explica la regla satisface un `includes` y deja pasar el fichero. Comprobado mutando —
+  // renombrando la reja de `management-link.ts`, con la aserción floja el mutante SOBREVIVÍA
+  // porque su propio comentario nombra a la hermana.
+  const DISTRIBUTION_GATES = /(?:planUpgradeIsOfferable|managementIsOfferable)\(/;
+
+  /**
+   * The door that is deliberately NOT filtered, and the issue that will decide whether it stays so.
+   *
+   * `ProfilePage` leaves for `/dashboard/profile/` — the person's own account, which hub#479
+   * classified as "cannot take money" and kept. It lands on the same dashboard chrome as the panel
+   * above, so the question it raises is real; it is NOT answered here, because the Play copy would
+   * otherwise be left with no door to erplora.com at all. Tracked in hub#1900.
+   */
+  const UNGATED_BY_DECISION = ['views/ProfilePage.vue'];
+
+  /** The module that DEFINES the door; naming it is not walking through it. */
+  const DOOR_ITSELF = 'lib/saas-door.ts';
+
+  it('every door out to the signed-in SaaS asks who distributed this copy', () => {
+    const offenders: string[] = [];
+
+    for (const path of sourceFiles(SRC)) {
+      const relative = path.slice(SRC.length);
+      if (relative === DOOR_ITSELF || UNGATED_BY_DECISION.includes(relative)) continue;
+
+      const source = readFileSync(path, 'utf8');
+      if (!source.includes('saasDoor(')) continue;
+      if (DISTRIBUTION_GATES.test(source)) continue;
+
+      const line = source.split('\n').findIndex((l) => l.includes('saasDoor(')) + 1;
+      offenders.push(`${relative}:${line} → leaves for the SaaS without a distribution gate`);
+    }
+
+    expect(offenders.join('\n')).toBe('');
+  });
+
   it('keeps the doors that cannot take money — the update channel above all', () => {
     // hub#400: the installed app learns about a new version through `/app/download/<platform>/`,
     // a 302 in the Cloud that becomes the STORE listing once the app is published. Sweeping the

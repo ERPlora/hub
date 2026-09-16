@@ -10,9 +10,10 @@
 // born in `simple` could never make the panel its landing again. The marker travels on a plain
 // navigation because the Hub is another origin — it cannot POST to the SaaS with a CSRF token — and
 // because the Hub deliberately holds no credential that could write there.
-import { computed, type ComputedRef } from 'vue';
+import { computed, type ComputedRef, ref } from 'vue';
 
 import { config } from './config';
+import { type DeviceContext, isTauri } from './device';
 import { openExternal } from './open-external';
 import { toastError } from './toast';
 import { i18n } from '../i18n';
@@ -28,6 +29,55 @@ import { saasDoor } from './saas-door';
  * ignores the reserved `hub.` namespace).
  */
 export const ADMINISTER_PERMISSION = 'hub.administer';
+
+/**
+ * Whether the copy of the app in the user's hands may be offered this door (hub#1897).
+ *
+ * The reasoning that kept it — managing your account is not a storefront, which is what every B2B
+ * SaaS in both stores does — survives for the browser and for Windows. What derogates it on Play is
+ * not an argument but a MEASUREMENT: the QA over the published v1.1.25 timed **three taps** from
+ * the till to the SaaS's invoices screen, the first of them this button, and it lands ALREADY
+ * SIGNED IN because the trip carries a one-time pass (pm#196). The panel is not a page that cannot
+ * sell: it is the one next door to the page that does, with «Billing» in its own sidebar.
+ *
+ * **The cut is the DISTRIBUTION, not the operating system** — the same one `planUpgradeIsOfferable`
+ * makes (hub#756), and for the same reason: the rule is set by whoever hands out the binary. A
+ * sideloaded APK runs on the same Android and Google does not govern it; hiding an owner's own
+ * account there would be taking something away under a rule that does not apply to them.
+ *
+ * With no signal it is OFFERED. A shell older than hub#757 does not send `distribution`, and a
+ * browser never does: refusing by default would lock almost everybody out of their account to guard
+ * against a risk that outside Play does not exist.
+ */
+export function managementIsOfferable(distribution: DeviceContext['distribution']): boolean {
+  return distribution !== 'play';
+}
+
+/**
+ * What the shell answered about this copy — `null` until it has answered at all.
+ *
+ * The distinction matters because the topbar is painted before the answer arrives. Defaulting to
+ * "offered" would show the button on a Play install at every start and take it away a frame later:
+ * the same defect, with a layout jump on top. A BROWSER, on the other hand, is known from the first
+ * frame — no store hands out a Chrome tab — so there it opens with no wait.
+ */
+const shellDistribution = ref<DeviceContext['distribution'] | null>(null);
+
+/**
+ * Publish what the shell said about this copy (`GET device_context`), once, at boot.
+ *
+ * `null` puts it back to "not asked yet"; the app only ever calls this with the resolved answer.
+ */
+export function setManagementDistribution(distribution: DeviceContext['distribution'] | null): void {
+  shellDistribution.value = distribution;
+}
+
+/** Whether this copy carries the door, with the pre-answer rule above applied. */
+function offeredToThisCopy(): boolean {
+  const answered = shellDistribution.value;
+  if (answered === null) return !isTauri();
+  return managementIsOfferable(answered);
+}
 
 /**
  * Whether THIS session may be offered the way out to management.
@@ -48,9 +98,15 @@ export const ADMINISTER_PERMISSION = 'hub.administer';
  * It is filtered here and not only in the runtime because an entry that is shown and then refused is
  * worse than one that was never shown: it promises something it does not deliver (hub#1400). The
  * authority is still the runtime, which revalidates it in `POST /api/auth/handoff`.
+ *
+ * 🏪 **And a third condition** (hub#1897): which copy of the app is asking. Permission and method are
+ * about the PERSON, and the store's objection is not about the person — see
+ * {@link managementIsOfferable}. It is folded in HERE, in the one predicate the chrome reads, so
+ * that both places that render the door (the topbar button and the overflow menu) are covered by
+ * writing the rule once.
  */
 export const canOpenManagement: ComputedRef<boolean> = computed(
-  () => hasPermission(ADMINISTER_PERMISSION) && openedWithCloudLogin.value,
+  () => hasPermission(ADMINISTER_PERMISSION) && openedWithCloudLogin.value && offeredToThisCopy(),
 );
 
 /**

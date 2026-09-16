@@ -14,6 +14,7 @@
 //     from the session the runtime resolved. A waiter has no business — and often no account — at
 //     erplora.com.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 // A mutable stand-in for the boot-time config: `hubId` is resolved from the runtime at boot
 // (`bootHubContext`), so the URL must be built when it is ASKED for, not when this module loads.
@@ -74,7 +75,14 @@ vi.mock('./cloud', () => ({ runtimeBrowserHandoff }));
 const { reportClientError } = vi.hoisted(() => ({ reportClientError: vi.fn() }));
 vi.mock('./error-report', () => ({ reportClientError }));
 
-import { canOpenManagement, managementPath, managementUrl, openManagement } from './management-link';
+import {
+  canOpenManagement,
+  managementIsOfferable,
+  managementPath,
+  managementUrl,
+  openManagement,
+  setManagementDistribution,
+} from './management-link';
 import { user, setHubSession } from './session';
 
 const session = user as unknown as { value: { permissions?: string[] } | null };
@@ -90,6 +98,9 @@ beforeEach(() => {
     'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
   );
   reportClientError.mockClear();
+  // `null` es el estado de arranque: el shell todavía no ha dicho de dónde viene esta copia
+  // (hub#1897). Se restaura en cada test para que ninguno herede la respuesta del anterior.
+  setManagementDistribution(null);
 });
 
 afterEach(() => {
@@ -263,5 +274,77 @@ describe('canOpenManagement', () => {
     setHubSession('runtime-token');
 
     expect(canOpenManagement.value).toBe(false);
+  });
+});
+
+// ── hub#1897: la copia que reparte Google Play no lleva esta puerta ─────────────────────────────
+//
+// El razonamiento de arriba —gestión de cuenta, no escaparate— sigue en pie para el navegador y
+// para Windows. Lo que lo derogó en Play no es un argumento sino una MEDIDA: la QA sobre la app
+// publicada (v1.1.25) cronometró **tres toques** desde el TPV hasta `/dashboard/billing/invoices/`,
+// y el primero de ellos es este botón — que además aterriza YA AUTENTICADA, porque cruza con el
+// pase de un solo uso. El panel al que sale lleva «Facturación» en su menú lateral, así que el
+// destino no es una página que no vende: es la puerta de al lado de la que sí.
+//
+// El corte es el MISMO que el de `planUpgradeIsOfferable` (hub#756), y a propósito: la regla la
+// pone quien reparte el binario, no el sistema operativo. Un APK instalado de lado corre en el
+// mismo Android y Google no lo gobierna; esconderle ahí su cuenta al dueño sería quitarle algo por
+// una regla que no le aplica.
+describe('en la copia que reparte una tienda', () => {
+  it('Google Play NO la recibe: es quien la trata como steering hacia el pago', () => {
+    expect(managementIsOfferable('play')).toBe(false);
+  });
+
+  it('Microsoft SÍ la recibe: su política 10.8.2 lo permite por escrito', () => {
+    expect(managementIsOfferable('msstore')).toBe(true);
+  });
+
+  it('una instalación directa la conserva: ninguna tienda la gobierna', () => {
+    expect(managementIsOfferable('direct')).toBe(true);
+  });
+
+  it('sin señal se OFRECE, que es lo que un shell anterior a hub#757 contesta', () => {
+    // Quitarla ahí dejaría sin su cuenta a todo el que abre el hub en un navegador, que es la
+    // mayoría, y por un riesgo que en el navegador no existe.
+    expect(managementIsOfferable(undefined)).toBe(true);
+  });
+
+  it('cierra la puerta del TPV a una administradora cuando la copia viene de Play', () => {
+    // El defecto exacto de hub#1897: permiso y método de login eran suficientes, y el botón se
+    // pintaba sin mirar de dónde venía la app.
+    session.value = { permissions: ['hub.administer'] };
+    setManagementDistribution('play');
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  it('la deja abierta en la misma sesión cuando la copia no viene de una tienda', () => {
+    session.value = { permissions: ['hub.administer'] };
+    setManagementDistribution('direct');
+
+    expect(canOpenManagement.value).toBe(true);
+  });
+
+  // Mientras el shell no ha contestado no se sabe qué copia es esta, y el topbar ya está pintado:
+  // ofrecerla «por defecto» sería enseñar el botón en Play en cada arranque y quitarlo un frame
+  // después — el mismo defecto, con salto de maquetación de regalo. Un NAVEGADOR sí se sabe desde
+  // el primer frame: ninguna tienda reparte una pestaña de Chrome.
+  it('la app instalada la mantiene cerrada mientras el shell no dice de dónde viene la copia', () => {
+    session.value = { permissions: ['*'] };
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  it('el navegador la abre desde el primer frame, sin esperar a nadie', () => {
+    session.value = { permissions: ['*'] };
+
+    expect(canOpenManagement.value).toBe(true);
+  });
+
+  it('App.vue le da la respuesta del shell al arrancar, no la deja sin cablear', () => {
+    const appSource = readFileSync(new URL('../App.vue', import.meta.url), 'utf8');
+
+    expect(appSource).toContain('setManagementDistribution(context?.distribution)');
   });
 });
