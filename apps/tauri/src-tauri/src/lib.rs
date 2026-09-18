@@ -2735,12 +2735,11 @@ mod tests {
 
     #[test]
     fn a_refused_page_leaves_the_window_where_it_was() {
-        let window = mock_window_at("https://erplora.com/shell/");
+        // Anywhere but the app's start, or "stayed" and "went home" would look the same.
+        let here = "https://erplora.com/account/login/?next=/shell/";
+        let window = mock_window_at(here);
         answer_refusal(&window, NavigationVerdict::Refuse, "https://erplora.com").expect("answer");
-        assert_eq!(
-            window.url().expect("url").as_str(),
-            "https://erplora.com/shell/"
-        );
+        assert_eq!(window.url().expect("url").as_str(), here);
     }
 
     #[test]
