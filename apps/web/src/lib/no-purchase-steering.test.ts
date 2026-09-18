@@ -34,8 +34,9 @@ const SRC = fileURLToPath(new URL('..', import.meta.url));
  *  - `/dashboard/marketplace/modules/` → the module listing, where its subscription is bought.
  *  - `/dashboard/billing/`             → invoices AND the Stripe Connect onboarding banner.
  *
- * `/dashboard/profile/` and `/app/download/` are deliberately absent: neither can take money, so
- * neither is steering. The update channel (hub#400) rides on `/app/download/` and must keep working.
+ * The account page and `/app/download/` are deliberately absent: neither can take money, so neither
+ * is steering — the account page on the condition that it is asked for as the account surface
+ * (hub#1900, below). The update channel (hub#400) rides on `/app/download/` and must keep working.
  */
 const PAYMENT_ROUTES = [
   '/dashboard/marketplace/plans',
@@ -95,31 +96,71 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
   const DISTRIBUTION_GATES = /(?:planUpgradeIsOfferable|managementIsOfferable)\(/;
 
   /**
-   * The door that is deliberately NOT filtered, and the issue that will decide whether it stays so.
+   * The person's own account, asked for WITHOUT the panel around it (hub#1900): the SaaS paints it
+   * with no sidebar, so «Billing» and «Marketplace» are not one tap away.
    *
-   * `ProfilePage` leaves for `/dashboard/profile/` — the person's own account, which hub#479
-   * classified as "cannot take money" and kept. It lands on the same dashboard chrome as the panel
-   * above, so the question it raises is real; it is NOT answered here, because the Play copy would
-   * otherwise be left with no door to erplora.com at all. Tracked in hub#1900.
+   * This is the line Google Play's payments FAQ draws, word for word: an app may send people to
+   * "administrative information – like an account management page […] as long as the webpage does
+   * not eventually lead to an alternate payment method". The bare account page failed the second
+   * half, because it is painted inside the panel. And the door could not simply be taken out of the
+   * Play copy either: the app lets people sign up, so Play also requires an in-app path to DELETE
+   * that account — and deleting it lives on this page. So the door stays in every copy, and what it
+   * asks for is the account alone.
    */
-  const UNGATED_BY_DECISION = ['views/ProfilePage.vue'];
+  const ACCOUNT_SURFACE = '/dashboard/profile/?surface=account';
 
-  /** The module that DEFINES the door; naming it is not walking through it. */
-  const DOOR_ITSELF = 'lib/saas-door.ts';
+  /** An address of the SaaS panel written in code — every page under it carries the panel's menu. */
+  const PANEL_ADDRESS = /(?:[`'"}]|erplora\.com)(\/dashboard\/[^`'"\s]*)/g;
 
-  it('every door out to the signed-in SaaS asks who distributed this copy', () => {
+  /**
+   * The ways out that are NOT filtered by distribution, each with what it opens: the reason it
+   * cannot take money. Being listed is not a pass on its own — the file has to keep reaching that
+   * destination, and any panel address it writes has to be the account surface.
+   */
+  const DOORS_THAT_CANNOT_TAKE_MONEY: Record<string, string> = {
+    // The person's own account (hub#1539, hub#1900).
+    'views/ProfilePage.vue': ACCOUNT_SURFACE,
+    // The installer and the update channel (hub#480, hub#400): `/app/download/`, which turns into
+    // the store listing itself once the app is published.
+    'views/SystemPage.vue': 'appDownloadUrl(',
+    'components/SidebarAppUpdate.vue': 'appUpdateDestination',
+  };
+
+  /** The modules that DEFINE the ways out; naming them is not walking through them. */
+  const DOORS_THEMSELVES = ['lib/saas-door.ts', 'lib/open-external.ts'];
+
+  /**
+   * Every way this app has of opening a page outside the till (hub#1900). The rule used to look at
+   * `saasDoor` alone, so a plain `openExternal` of a panel address — the one a shift session takes
+   * on «Mi perfil» — was never looked at.
+   */
+  const WAY_OUT = /\b(?:saasDoor|openExternal|window\.open)\(/;
+
+  it('every way out of the till asks who distributed this copy, or cannot take money', () => {
     const offenders: string[] = [];
 
     for (const path of sourceFiles(SRC)) {
       const relative = path.slice(SRC.length);
-      if (relative === DOOR_ITSELF || UNGATED_BY_DECISION.includes(relative)) continue;
+      if (DOORS_THEMSELVES.includes(relative)) continue;
 
       const source = readFileSync(path, 'utf8');
-      if (!source.includes('saasDoor(')) continue;
+      if (!WAY_OUT.test(source)) continue;
       if (DISTRIBUTION_GATES.test(source)) continue;
 
-      const line = source.split('\n').findIndex((l) => l.includes('saasDoor(')) + 1;
-      offenders.push(`${relative}:${line} → leaves for the SaaS without a distribution gate`);
+      const line = source.split('\n').findIndex((l) => WAY_OUT.test(l)) + 1;
+      const reaches = DOORS_THAT_CANNOT_TAKE_MONEY[relative];
+      if (reaches === undefined) {
+        offenders.push(`${relative}:${line} → leaves the till without a distribution gate`);
+        continue;
+      }
+      if (!source.includes(reaches)) {
+        offenders.push(`${relative}:${line} → no longer reaches ${reaches}, its reason to be ungated`);
+      }
+      for (const [, address] of source.matchAll(PANEL_ADDRESS)) {
+        if (address !== ACCOUNT_SURFACE) {
+          offenders.push(`${relative} → ${address} is the panel, and this door has no distribution gate`);
+        }
+      }
     }
 
     expect(offenders.join('\n')).toBe('');
