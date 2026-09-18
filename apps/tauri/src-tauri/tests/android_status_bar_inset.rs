@@ -15,6 +15,10 @@
 //! writes, so nothing compiles it until the release job. Dropping the call would therefore be
 //! silent — green PR, green tags, and an APK painting under the clock again — which is exactly the
 //! shape of regression this file exists to stop.
+//!
+//! The same goes for the COLOUR of the reserved strip (hub#1903): it is the window background the
+//! app theme declares, and it has to be the header colour of the hub shell in light and in dark,
+//! or a band of another colour sits between the clock and the header.
 
 use std::path::PathBuf;
 
@@ -180,13 +184,18 @@ fn header_colour(selector: &str) -> String {
     let rule = css_rule(&css, selector);
     let toolbar = css_property(rule, "--ion-toolbar-background")
         .unwrap_or_else(|| panic!("{WEB_THEME} `{selector}` declares no --ion-toolbar-background"));
-    let value = match toolbar.strip_prefix("var(").and_then(|v| v.strip_suffix(')')) {
+    let value = match toolbar
+        .strip_prefix("var(")
+        .and_then(|v| v.strip_suffix(')'))
+    {
         Some(referenced) => css_property(rule, referenced.trim())
             .unwrap_or_else(|| panic!("{WEB_THEME} `{selector}` declares no {referenced}")),
         None => toolbar,
     };
     opaque_rgb(&value).unwrap_or_else(|| {
-        panic!("{WEB_THEME} `{selector}` paints the header with `{value}`, not an opaque hex colour")
+        panic!(
+            "{WEB_THEME} `{selector}` paints the header with `{value}`, not an opaque hex colour"
+        )
     })
 }
 
@@ -266,7 +275,9 @@ fn strip_colour(qualifier: &str) -> String {
             .to_string()
     });
     opaque_rgb(&value).unwrap_or_else(|| {
-        panic!("@color/{colour_name} ({qualifier}) is `{value}`: the strip must be an opaque colour")
+        panic!(
+            "@color/{colour_name} ({qualifier}) is `{value}`: the strip must be an opaque colour"
+        )
     })
 }
 
@@ -313,6 +324,51 @@ fn the_strip_is_painted_by_the_window_and_by_nothing_else() {
                  under the clock stops showing the window background, which is the header colour \
                  (hub#1903)",
             );
+        }
+    }
+}
+
+/// Every resource XML of the app must still be well-formed where a comment is concerned.
+///
+/// XML forbids `--` inside a comment, and the colours above are named after CSS custom properties
+/// that all start with `--`. Quoting one in a resource comment is the natural thing to do and it
+/// breaks `aapt2` (`xml parser error: not well-formed`) — but `:app` is only compiled by the release
+/// job, so the PR would go green and the tag would come out without an APK.
+#[test]
+fn the_android_resources_keep_double_hyphens_out_of_their_comments() {
+    fn xml_files(dir: &std::path::Path, found: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())) {
+            let path = entry.expect("unreadable resource entry").path();
+            if path.is_dir() {
+                xml_files(&path, found);
+            } else if path.extension().is_some_and(|ext| ext == "xml") {
+                found.push(path);
+            }
+        }
+    }
+
+    let mut files = Vec::new();
+    xml_files(&repo_root().join(ANDROID_RES), &mut files);
+    assert!(
+        !files.is_empty(),
+        "no resource XML found under {ANDROID_RES}"
+    );
+
+    for path in files {
+        let xml = std::fs::read_to_string(&path).expect("unreadable resource XML");
+        let mut rest = xml.as_str();
+        while let Some(open) = rest.find("<!--") {
+            let after = &rest[open + 4..];
+            let close = after
+                .find("-->")
+                .unwrap_or_else(|| panic!("{}: unterminated comment", path.display()));
+            assert!(
+                !after[..close].contains("--"),
+                "{}: `--` inside an XML comment is not well-formed and aapt2 refuses the file; \
+                 the release job is the first to compile it (hub#1903)",
+                path.display(),
+            );
+            rest = &after[close + 3..];
         }
     }
 }
