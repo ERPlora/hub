@@ -296,9 +296,15 @@ fn the_main_window_asks_the_verdict_before_it_follows_a_page() {
     let asks = handler
         .find("navigation_verdict(distribution_channel(),")
         .expect("the `on_navigation` handler does not ask `navigation_verdict` for THIS copy (hub#1915)");
-    let refuses = handler[asks..]
-        .find("return false")
+    // ONLY `Allow` is followed: `Home` is a refusal too — the SaaS home page carries the plan prices,
+    // and the window is sent to the app's start instead of loading it.
+    let only_allow = handler[asks..]
+        .find("if verdict != NavigationVerdict::Allow {")
         .map(|at| asks + at)
+        .expect("the handler must refuse every verdict but `Allow` (hub#1915)");
+    let refuses = handler[only_allow..]
+        .find("return false")
+        .map(|at| only_allow + at)
         .expect("the `on_navigation` handler never refuses a page (hub#1915)");
 
     // A refused page must not be remembered as this till's hub, nor become the page the connectivity
