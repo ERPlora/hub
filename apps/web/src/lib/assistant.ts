@@ -660,6 +660,10 @@ async function hostBlueprintApply(params: Record<string, unknown>): Promise<unkn
   const blob = await downloadBlueprint(slug);
   const inspection = await inspectBlueprint(blob);
   const report = await importBlueprint(inspection.upload_id, heroSelection(inspection.manifest));
+  // hub#1905 — the same question the hero card asks: the apps the template brought need the owner's
+  // permission, which a template can never give. Asked on screen, by the shell, not by the model.
+  const { askPermissionsAfterImport } = await import('./import-permissions');
+  askPermissionsAfterImport(report);
 
   // Lo que la plantilla NO deja hecho, leído del hub (hub#1041).
   //
@@ -680,13 +684,28 @@ async function hostBlueprintApply(params: Record<string, unknown>): Promise<unkn
     // La query devuelve UNA fila con el documento entero (`architecture/hub/setup-status.md`),
     // así que se tipa aquí en vez de confiar en el genérico del cliente.
     type SetupRow = {
-      items?: { key: string; state: string; level: string; title: string; route: string }[];
+      items?: {
+        key: string;
+        state: string;
+        level: string;
+        title: string;
+        route: string;
+        missing_capabilities?: string[];
+      }[];
     };
     const rows = (await getClient().query(SETUP_STATUS_QUERY, {})) as SetupRow[] | null;
     const items = rows?.[0]?.items ?? [];
     result.still_blocking = items
       .filter((i) => i.state === 'pending' && (i.level === 'legal' || i.level === 'functional'))
-      .map((i) => ({ key: i.key, level: i.level, title: i.title, route: i.route }));
+      // `missing_capabilities` (hub#1905): the switch the step waits on, so the model says «grant
+      // the certificate permission», not «configure VeriFactu» over settings that are already done.
+      .map((i) => ({
+        key: i.key,
+        level: i.level,
+        title: i.title,
+        route: i.route,
+        missing_capabilities: i.missing_capabilities ?? [],
+      }));
   } catch {
     // Callar sería PEOR que fallar: sin el campo, el modelo lee «no hay nada bloqueando» y vuelve
     // a decir que ya se puede facturar. Se dice que no se sabe.

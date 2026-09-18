@@ -38,6 +38,7 @@ function item(over: Partial<SetupItem> = {}): SetupItem {
     actions: ['template', 'catalog'],
     actionable: true,
     origin: 'user',
+    missingCapabilities: [],
     ...over,
   };
 }

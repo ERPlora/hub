@@ -328,6 +328,9 @@ export default {
     // permission — because a blocker with no owner leaves the user with nowhere to go.
     delegatedHint: 'An administrator has to set this up.',
     inheritedHint: 'It came from the template you used. Worth a look — your room and your prices are your own.',
+    // hub#1905 — the item is pending on a switch in Settings → Permissions, not on its own settings.
+    missingPermissionHint: 'This app needs a permission you have not granted yet. Without it, it cannot do its job.',
+    grantPermission: 'Grant permission',
     completeTitle: 'Your business is ready',
     completeBody: 'Everything on the checklist is done.',
     // The hero card of a business with no apps yet (hub#368). Its whole job is the FIRST choice, so
@@ -1661,6 +1664,16 @@ export default {
     // hub#765: the runtime did not answer before the deadline. Without a timeout the spinner spun
     // forever; now it aborts and says so honestly, so the user can retry instead of walking away.
     timeout: 'The server is taking too long to build the backup. Try again in a moment.',
+  },
+  // hub#1905 — asked at the end of a template import: the apps it brought need the owner's
+  // permission, which a template can never give (hub#473). Same question the store asks for one app.
+  importPermissions: {
+    title: 'Permissions for your apps',
+    intro: 'The template installed these apps, and they need your permission to work — a template cannot give it for you. You can change it any time in Settings → Permissions.',
+    grant: 'Grant permissions',
+    granting: 'Granting…',
+    later: 'Not now',
+    grantError: 'Could not grant the permissions of {apps}. Try again, or turn them on in Settings → Permissions.',
   },
   importPage: {
     title: 'Import configuration',

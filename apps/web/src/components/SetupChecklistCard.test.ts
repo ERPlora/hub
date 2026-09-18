@@ -450,6 +450,69 @@ describe('decision 1 and the titles', () => {
   });
 });
 
+// hub#1905 — a salon imported from a template had «Configure VeriFactu» pending and a «Set up»
+// button to VeriFactu's own settings, already filled in. What was missing was the switch in
+// Settings → Permissions, and the row never said so; the first sale went out with no fiscal record.
+describe('an item pending on a PERMISSION (hub#1905)', () => {
+  const realI18n = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en: enCatalogue },
+  });
+  const setupEn = (enCatalogue as unknown as { setup: Record<string, string> }).setup;
+  const permissionItem = item('verifactu.setup', {
+    title: 'Configure VeriFactu',
+    missing_capabilities: ['certificate'],
+    route: '/settings?tab=permissions',
+  });
+
+  function mountReal(props: CardProps) {
+    return mount(SetupChecklistCard, {
+      props,
+      global: { plugins: [realI18n], renderStubDefaultSlot: true },
+      shallow: true,
+    });
+  }
+
+  it('says that a permission is what is left, in the owner\'s words', () => {
+    const w = mountReal({ status: status([permissionItem]) });
+
+    const note = w.find('[data-testid="setup-note-verifactu.setup"]');
+    expect(note.exists(), 'a row pending on a switch must say it is the switch').toBe(true);
+    expect(note.text()).toBe(setupEn.missingPermissionHint);
+  });
+
+  it('its button names the consequence and goes where the permission is granted', () => {
+    const w = mountReal({ status: status([permissionItem]) });
+
+    const cta = w.find('[data-testid="setup-action-verifactu.setup"]');
+    expect(cta.exists()).toBe(true);
+    expect(cta.html()).toContain('/settings?tab=permissions');
+    expect(cta.text()).toBe(setupEn.grantPermission);
+  });
+
+  it('a row with every permission granted keeps its own words', () => {
+    const w = mountReal({ status: status([item('verifactu.setup', { missing_capabilities: [] })]) });
+
+    expect(w.find('[data-testid="setup-note-verifactu.setup"]').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-action-verifactu.setup"]').text()).toBe(setupEn.configure);
+  });
+
+  it('a wall somebody else has to bring down still says WHO, not which switch', () => {
+    // Not theirs to grant: pointing a waiter at Settings → Permissions sends them to a screen that
+    // refuses them. The delegated hint of hub#435 wins.
+    const w = mountReal({
+      status: status([
+        item('verifactu.setup', { level: 'legal', actionable: false, missing_capabilities: ['certificate'] }),
+      ]),
+    });
+
+    expect(w.find('[data-testid="setup-note-verifactu.setup"]').text()).toBe(setupEn.delegatedHint);
+  });
+});
+
 describe('the strings', () => {
   /** Every leaf key of a message block, in dot notation. */
   function leafKeys(node: unknown, prefix = ''): string[] {

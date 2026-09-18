@@ -308,6 +308,8 @@ export default {
     // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
     delegatedHint: 'Esto lo tiene que configurar un administrador.',
     inheritedHint: 'Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.',
+    missingPermissionHint: 'Esta app necesita un permiso que aún no le has dado. Sin él, no puede hacer su trabajo.',
+    grantPermission: 'Dar permiso',
     completeTitle: 'Tu negocio está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
     // La tarjeta héroe de un negocio que todavía no tiene apps (hub#368). Su único trabajo es la
@@ -1475,6 +1477,14 @@ export default {
     // hub#765: el runtime no respondió antes del plazo. Sin timeout el spinner giraba para siempre;
     // ahora aborta y lo dice, para que el usuario pueda reintentar en vez de irse sin saber.
     timeout: 'El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.',
+  },
+  importPermissions: {
+    title: 'Permisos de tus apps',
+    intro: 'La plantilla ha instalado estas apps y necesitan tu permiso para funcionar: una plantilla no puede dártelo por ti. Puedes cambiarlo cuando quieras en Ajustes → Permisos.',
+    grant: 'Dar permisos',
+    granting: 'Dando permisos…',
+    later: 'Ahora no',
+    grantError: 'No se han podido dar los permisos de {apps}. Vuelve a intentarlo o actívalos en Ajustes → Permisos.',
   },
   importPage: {
     title: 'Importar configuración',

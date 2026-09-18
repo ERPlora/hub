@@ -360,6 +360,7 @@ import {
   IonItemDivider,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
+import { askPermissionsAfterImport } from '../lib/import-permissions';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { hasPermission } from '../lib/session';
 import { ADMINISTER_PERMISSION } from '../lib/management-link';
@@ -755,6 +756,8 @@ async function doRetry(): Promise<void> {
     const outcome = await retryImport(recoveredReport.value.batch_id);
     if (outcome.retried && outcome.report) {
       report.value = outcome.report;
+      // hub#1905 — the apps it installed ask for their permissions, same as a normal import.
+      askPermissionsAfterImport(outcome.report);
       // The retry may have installed modules: same refresh as a normal import.
       await refreshModuleNav();
       window.dispatchEvent(new CustomEvent('erp:modules-changed'));
@@ -881,6 +884,10 @@ async function doImport(): Promise<void> {
       },
       pendingOrigin.value ?? undefined,
     );
+    // hub#1905 — the apps this import brought ask for their permissions, which a template can never
+    // grant by itself. Only an import that runs here: the report RECOVERED on opening the page
+    // (`loadRecoveredReport`) is an earlier import and asks nothing.
+    askPermissionsAfterImport(report.value);
     step.value = 'report';
     // El import pudo instalar módulos: refresca el menú del shell.
     await refreshModuleNav();

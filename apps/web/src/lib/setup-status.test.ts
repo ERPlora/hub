@@ -490,3 +490,45 @@ describe('de dónde viene lo que ya está hecho (hub#536)', () => {
     expect(isInherited(setupStatus.value!.items[0])).toBe(false);
   });
 });
+
+// hub#1905 — which of the module's host capabilities are still denied, so the row can say that the
+// switch in Settings → Permissions is what is left.
+describe('the permissions an item is waiting for (hub#1905)', () => {
+  function one(raw: Record<string, unknown>) {
+    const doc = parseSetupStatus([
+      {
+        items: [
+          {
+            key: 'verifactu.setup',
+            source: 'module',
+            module_id: 'verifactu',
+            state: 'pending',
+            route: '/settings?tab=permissions',
+            ...raw,
+          },
+        ],
+        total: 1,
+        pending: 1,
+        unavailable: 0,
+        blocking_pending: 0,
+      },
+    ]);
+    return doc!.items[0];
+  }
+
+  it('travels as the runtime sent it', () => {
+    expect(one({ missing_capabilities: ['certificate', 'network'] }).missingCapabilities).toEqual([
+      'certificate',
+      'network',
+    ]);
+  });
+
+  it('an older runtime that does not send it means nothing is missing, never a made-up switch', () => {
+    expect(one({}).missingCapabilities).toEqual([]);
+  });
+
+  it('anything that is not an id is dropped', () => {
+    expect(one({ missing_capabilities: ['certificate', 7, null] }).missingCapabilities).toEqual(['certificate']);
+    expect(one({ missing_capabilities: 'certificate' }).missingCapabilities).toEqual([]);
+  });
+});

@@ -179,6 +179,7 @@ import {
   type CatalogBlueprint,
 } from '../lib/runtime';
 import { runtimeErrorSentence } from '../lib/runtime-error-sentence';
+import { askPermissionsAfterImport } from '../lib/import-permissions';
 import { user } from '../lib/session';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 import type { SetupStatus } from '../lib/setup-status';
@@ -376,7 +377,11 @@ async function use(blueprint: CatalogBlueprint): Promise<void> {
     // one-click path is the main producer of partial imports, and the persisted report needs the
     // exact origin for «Retry what's missing» in Settings › Data to be able to act.
     const origin = { slug: blueprint.slug, version: blueprint.latest_version };
-    run.value = { phase: 'finished', outcome: importOutcome(await importBlueprint(uploadId, selection, origin)) };
+    const report = await importBlueprint(uploadId, selection, origin);
+    // hub#1905 — the apps it brought ask for their permissions: a template can never grant them,
+    // and without them VeriFactu does not seal and nothing prints.
+    askPermissionsAfterImport(report);
+    run.value = { phase: 'finished', outcome: importOutcome(report) };
   } catch (err) {
     run.value = { phase: 'finished', outcome: { kind: 'interrupted', reason: messageOf(err) } };
   }

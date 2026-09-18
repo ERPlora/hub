@@ -178,6 +178,10 @@
            cuando cambia el turno; y por eso mismo no navega: salir a /login es lo que perdía la
            venta en curso. Dentro del gate: sin sesión no hay caja que relevar. -->
       <UserSwitchOverlay />
+      <!-- hub#1905 — the permissions the apps of a template still lack. Mounted ONCE, here: the
+           hero card, Settings › Data and the assistant all import templates, and each only raises
+           the signal (`askPermissionsAfterImport`). Inside the gate: only an administrator imports. -->
+      <ImportPermissionsConsent />
     </AuthenticatedChrome>
   </ion-app>
 </template>
@@ -203,6 +207,7 @@ import AuthenticatedChrome from './components/AuthenticatedChrome.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import ElevationDialog from './components/ElevationDialog.vue';
 import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
+import ImportPermissionsConsent from './components/ImportPermissionsConsent.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import SidebarInstallQr from './components/SidebarInstallQr.vue';
 import { user, isAuthed, logout } from './lib/session';
