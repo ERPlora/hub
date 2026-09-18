@@ -215,6 +215,48 @@ pub fn resolve_bundle_version(requested: &str, available: &[Available]) -> Optio
         .map(|(_, version)| version.clone())
 }
 
+/// Which version a TEMPLATE bundle (`purpose: template`) installs for the one it recorded (hub#1904).
+///
+/// A published template starts a **new** business, and a new business starts on what the store
+/// offers **today**: the version in `manifest.modules[].version` is the day the template was
+/// exported, and honouring it while it is still published is how «Peluquería» kept opening salons
+/// on `sales@2.16.1` with `2.16.67` out — a charge button off-screen that was already fixed. The
+/// hub would move it forward on its next boot anyway ([`resolve`], hub#516); until then the owner
+/// runs on stale code.
+///
+/// What the pin still decides is the **contract**, and that is the part that does not move:
+///
+/// - **The newest COMPATIBLE, the pin included** — same *major* (and same *minor* under `0.x`),
+///   exactly as [`resolve_bundle_version`] substitutes a pruned pin. The template's rows were
+///   written against that major; a newer one is the boot auto-update's job, with its migrations.
+/// - **Never backwards, nothing in quarantine**, the same rules as every other resolver here.
+/// - **An unparseable pin resolves only to itself**, published as is: it cannot be placed on a line.
+///
+/// A **backup** (`purpose: backup`) does not come through here: restoring your own hub reinstalls
+/// what it ran, and [`resolve_bundle_version`] keeps that rule (ADR-0303). `None` = nothing
+/// installable in the recorded line, which the caller still has to report.
+pub fn resolve_template_version(requested: &str, available: &[Available]) -> Option<String> {
+    let installable = |candidate: &&Available| candidate.is_active;
+
+    let Some(pinned) = parse(requested) else {
+        return available
+            .iter()
+            .filter(installable)
+            .find(|candidate| candidate.version == requested)
+            .map(|exact| exact.version.clone());
+    };
+
+    available
+        .iter()
+        .filter(installable)
+        .filter_map(|candidate| {
+            parse(&candidate.version).map(|parsed| (parsed, &candidate.version))
+        })
+        .filter(|(parsed, _)| *parsed >= pinned && compatible(pinned, *parsed))
+        .max_by_key(|(parsed, _)| *parsed)
+        .map(|(_, version)| version.clone())
+}
+
 /// `true` si `candidate` puede sustituir a `pinned` sin cambiar el contrato con el que se
 /// escribieron las filas del bundle: mismo *major*, y con *major* `0` también mismo *minor*
 /// (semántica `^`: en `0.x` el minor es el eje que rompe).
@@ -679,5 +721,108 @@ mod tests {
     #[test]
     fn a_module_with_nothing_published_has_no_substitute() {
         assert_eq!(resolve_bundle_version("1.4.1", &[]), None);
+    }
+
+    // ── The version a TEMPLATE recorded (hub#1904) ───────────────────────────────────
+
+    /// The real case: «Peluquería» recorded `sales@2.16.1` while the store served `2.16.67`, and
+    /// the fix for the tablet's charge button only lived in the newer one. A new salon starts on
+    /// what the store offers today, not on the day the template was exported.
+    #[test]
+    fn a_template_pin_that_is_still_published_yields_to_the_newest_compatible() {
+        let resolved = resolve_template_version(
+            "2.16.1",
+            &[v("2.16.67", true), v("2.16.2", true), v("2.16.1", true)],
+        );
+
+        assert_eq!(resolved.as_deref(), Some("2.16.67"));
+    }
+
+    #[test]
+    fn a_template_pin_that_is_already_the_newest_is_kept() {
+        let resolved =
+            resolve_template_version("2.16.67", &[v("2.16.67", true), v("2.16.1", true)]);
+
+        assert_eq!(resolved.as_deref(), Some("2.16.67"));
+    }
+
+    /// Staying current never crosses a major: the template's rows were written against that
+    /// contract. A newer major is the boot auto-update's job, with its migrations, not the import's.
+    #[test]
+    fn a_template_stays_on_its_major_even_when_a_newer_one_exists() {
+        assert_eq!(
+            resolve_template_version(
+                "1.4.1",
+                &[v("2.0.0", true), v("1.4.3", true), v("1.4.1", true)]
+            )
+            .as_deref(),
+            Some("1.4.3"),
+        );
+        assert_eq!(
+            resolve_template_version("1.4.1", &[v("2.0.0", true), v("1.4.1", true)]).as_deref(),
+            Some("1.4.1"),
+            "the recorded one is still the newest of its line",
+        );
+    }
+
+    /// Below 1.0 the minor is the breaking axis (`^` semantics), as for the pruned-pin rescue.
+    #[test]
+    fn a_template_below_one_point_zero_stays_on_its_minor() {
+        assert_eq!(
+            resolve_template_version(
+                "0.1.14",
+                &[v("0.2.0", true), v("0.1.22", true), v("0.1.14", true)]
+            )
+            .as_deref(),
+            Some("0.1.22"),
+        );
+    }
+
+    /// Never backwards: there is no `down` (ADR-0269).
+    #[test]
+    fn a_template_never_goes_back_to_an_older_version() {
+        assert_eq!(
+            resolve_template_version("2.12.8", &[v("2.11.0", true)]),
+            None
+        );
+    }
+
+    /// Quarantine is not skipped for a template: neither the newest nor the recorded one is
+    /// served when it is marked broken.
+    #[test]
+    fn a_template_skips_quarantined_versions() {
+        assert_eq!(
+            resolve_template_version(
+                "2.13.9",
+                &[v("2.13.11", false), v("2.13.10", true), v("2.13.9", true)]
+            )
+            .as_deref(),
+            Some("2.13.10"),
+            "the newest is broken: the next healthy one goes in",
+        );
+        assert_eq!(
+            resolve_template_version("2.13.9", &[v("2.13.9", false)]),
+            None,
+            "nothing healthy in its line: nothing to install",
+        );
+    }
+
+    /// An unparseable pin cannot be placed on a line: only its exact, published self resolves.
+    #[test]
+    fn a_template_with_an_unparseable_pin_resolves_only_to_itself() {
+        assert_eq!(
+            resolve_template_version("2026-07-31", &[v("2.13.10", true), v("2026-07-31", true)])
+                .as_deref(),
+            Some("2026-07-31"),
+        );
+        assert_eq!(
+            resolve_template_version("2026-07-31", &[v("2.13.10", true)]),
+            None
+        );
+    }
+
+    #[test]
+    fn a_template_module_with_nothing_published_resolves_to_nothing() {
+        assert_eq!(resolve_template_version("1.4.1", &[]), None);
     }
 }

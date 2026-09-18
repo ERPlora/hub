@@ -135,8 +135,11 @@
                  403 y un error genérico. Al resto se le dice a quién pedírselo — que es lo que
                  hacen Shopify, Square y Business Central con las acciones de facturación. -->
             <div v-if="assistantQuota && i === messages.length - 1" class="chat-quota-cta">
+              <!-- …and only where this copy may lead to paying at all (hub#1910): on the Google Play
+                   build the checkout is steering, so there it NAMES erplora.com and opens nothing —
+                   the same answer as the plan-limits panel and a paid module's screen (hub#479). -->
               <ion-button
-                v-if="isAdmin"
+                v-if="isAdmin && canOfferPlans"
                 size="small"
                 data-testid="assistant-quota-cta"
                 :disabled="checkoutPending"
@@ -145,6 +148,9 @@
                 <HubIcon slot="start" name="arrow-up-circle-outline" />
                 {{ t('assistant.quotaCta') }}
               </ion-button>
+              <p v-else-if="isAdmin" class="chat-quota-ask" data-testid="assistant-quota-managed-in-account">
+                {{ t('assistant.quotaManagedInAccount') }}
+              </p>
               <p v-else class="chat-quota-ask" data-testid="assistant-quota-ask-admin">
                 {{ t('assistant.quotaAskAdmin') }}
               </p>
@@ -346,6 +352,8 @@ import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
 import { getClient } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
+import { getDeviceContext, isTauri } from '../lib/device';
+import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
 
 const { t, te, locale } = useI18n();
 const router = useRouter();
@@ -494,6 +502,19 @@ function formatResetDate(iso?: string): string {
 async function loadPlan(): Promise<void> {
   const read = await assistantPlan();
   if (read) plan.value = read;
+}
+
+/**
+ * Whether the copy in the user's hands may be offered the checkout (hub#1910). Same cut as the
+ * plan page (`planUpgradeIsOfferable`, hub#756): the DISTRIBUTION decides, not the operating system,
+ * and with no signal it is offered. Inside the installed app it starts closed until the shell has
+ * answered, so a Play copy never shows the button for a frame and takes it away.
+ */
+const canOfferPlans = ref(!isTauri());
+
+async function loadCopyRule(): Promise<void> {
+  const context = await getDeviceContext();
+  canOfferPlans.value = planUpgradeIsOfferable(context?.distribution);
 }
 
 /** Aplica los contadores POST-turno sin perder los planes contratables ya leídos. */
@@ -967,7 +988,10 @@ watch(
     if (open && setupChat.value) void refreshSetupStatus(getClient());
     // Qué plan tiene este hub y cuánto lleva gastado (hub#1183). Una lectura por APERTURA, no por
     // turno: dentro del hilo el contador lo mueve el frame `usage` de cada respuesta.
-    if (open) void loadPlan();
+    if (open) {
+      void loadPlan();
+      void loadCopyRule();
+    }
   },
   { immediate: true }
 );

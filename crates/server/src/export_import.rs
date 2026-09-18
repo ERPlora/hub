@@ -702,12 +702,12 @@ pub(crate) async fn run_import(
                             "phase": phase,
                         }));
                     };
-                    // ADR-0060 (hub#68): `install_bundle_module` pide el PLAN al Cloud y lo
-                    // ejecuta, así que un módulo del blueprint arrastra sus dependencias
-                    // transitivas (p. ej. `invoice` → `taxes`, `sales`) aunque el manifest no las
-                    // liste. Y **no** exige la versión exacta del manifest (hub#751/#752): es la
-                    // foto del hub que exportó, y el marketplace poda las versiones viejas — el
-                    // pin caduca solo y con él la plantilla entera.
+                    // ADR-0060 (hub#68): `install_bundle_module` asks the Cloud for the PLAN and
+                    // runs it, so a blueprint module pulls its transitive dependencies (e.g.
+                    // `invoice` → `taxes`, `sales`) even when the manifest does not list them.
+                    // The manifest version is a snapshot of the exporting hub, not a requirement:
+                    // a backup reinstalls it and only substitutes it once pruned (hub#751/#752),
+                    // while a template installs the newest compatible one (hub#1904).
                     let outcome = install::install_bundle_module(
                         &st.http,
                         &st.config.cloud_base_url,
@@ -716,6 +716,7 @@ pub(crate) async fn run_import(
                         &mut rt,
                         &m.id,
                         &m.version,
+                        manifest.purpose,
                         &on_progress,
                         &st.config.signature_policy(),
                     )

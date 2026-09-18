@@ -267,6 +267,27 @@ describe('ImportPanel · informe: instalación de módulos', () => {
     // El motivo REAL del motor, tal cual: sin él el usuario no puede ni reportar el fallo.
     expect(texto).toContain('módulo sin firma');
   });
+
+  // hub#1904 — a template installs the newest compatible version of EVERY app, so the version note
+  // is the normal case on all the rows of a healthy import. It is information under a green
+  // «installed» row: painted in the failure red it told a new owner that 14 apps went wrong.
+  it('the version note of an installed app is not painted as a failure', async () => {
+    const w = await panelConInforme([
+      { id: 'sales', version: '2.16.67', status: 'installed', requested_version: '2.16.1' },
+    ]);
+    const note = w.get('[data-testid="import-report"] p');
+    expect(note.text()).toContain('importPage.reasonVersionSubstituted');
+    expect(note.classes()).not.toContain('fail-reason');
+  });
+
+  it('the reason of an app that could not be installed keeps the failure tone', async () => {
+    const w = await panelConInforme([
+      { id: 'tables', version: '1.4.0', status: 'failed', error: 'signature required' },
+    ]);
+    const note = w.get('[data-testid="import-report"] p');
+    expect(note.text()).toContain('signature required');
+    expect(note.classes()).toContain('fail-reason');
+  });
 });
 
 // hub#409 — the engine already reports `blocked` (ADR-0060): the module was not installed because

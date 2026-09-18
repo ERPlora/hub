@@ -39,7 +39,11 @@ import { config } from '../lib/config';
 import { setHubSession } from '../lib/session';
 import { resetUserProfile } from '../lib/user-profile';
 
-const PLAIN = `${config.cloudApiUrl.replace(/\/+$/, '')}/dashboard/profile/`;
+// hub#1900 — the door asks for the account ALONE, without the panel around it: painted inside the
+// panel, the account page was one tap from «Billing», which is what Google Play's payments policy
+// forbids linking to. Both routes carry it — the pass and the plain link a shift session opens.
+const ACCOUNT_SURFACE = '/dashboard/profile/?surface=account';
+const PLAIN = `${config.cloudApiUrl.replace(/\/+$/, '')}${ACCOUNT_SURFACE}`;
 
 function stubRuntime(): void {
   vi.stubGlobal(
@@ -109,7 +113,7 @@ describe('«Mi perfil» → the account at erplora.com (hub#1539)', () => {
 
     await pressManageAccount();
 
-    expect(saasDoor).toHaveBeenCalledWith('/dashboard/profile/', PLAIN, 'cloud-account');
+    expect(saasDoor).toHaveBeenCalledWith(ACCOUNT_SURFACE, PLAIN, 'cloud-account');
   });
 
   it('still opens the plain link when the pass cannot be minted', async () => {

@@ -53,6 +53,12 @@ vi.mock('../lib/runtime', async (importOriginal) => ({
 }));
 
 vi.mock('../lib/toast', () => ({ toastSuccess: vi.fn(), toastError: vi.fn() }));
+// Who handed out this copy (hub#1910). `null` is the browser — no store governs it.
+vi.mock('../lib/device', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getDeviceContext: vi.fn(async () => null),
+  isTauri: vi.fn(() => false),
+}));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 // `lib/nav` → `lib/module-loader` → `~icons/…?raw`, which the test environment denies (same
 // reason SetupChecklistCard.test.ts stubs HubIcon). The drawer only reads the module paths.
@@ -69,6 +75,7 @@ import { assistantPlan, startAssistantCheckout } from '../lib/assistant-plan';
 import { streamAssistant, type StreamCallbacks } from '../lib/assistant';
 import { assistantMessages } from '../lib/assistant-history';
 import { toastError } from '../lib/toast';
+import { getDeviceContext, isTauri } from '../lib/device';
 
 const i18n = createI18n({
   legacy: false,
@@ -125,6 +132,8 @@ beforeEach(() => {
   assistantMessages.value = [];
   vi.mocked(streamAssistant).mockImplementation((() => () => {}) as never);
   vi.mocked(startAssistantCheckout).mockResolvedValue('https://checkout.stripe.com/c/pay/cs_x');
+  vi.mocked(getDeviceContext).mockResolvedValue(null);
+  vi.mocked(isTauri).mockReturnValue(false);
 });
 
 describe('hub#1183 — el hub conoce su plan ANTES de agotarlo', () => {
@@ -260,6 +269,60 @@ describe('hub#1259 — el CTA es de quien puede pagarlo', () => {
   });
 });
 
+// hub#1910 — the assistant was the one door to money that never asked who distributed the copy:
+// on the Google Play build an admin who ran out of messages got «See plans», and pressing it sent
+// the webview itself to a card checkout. Google does not let a Play app lead to paying outside Play,
+// so there the drawer does what the plan-limits panel and a paid module's screen already do: it
+// NAMES erplora.com and opens nothing (hub#479, hub#756). The cut is the distribution, not the OS —
+// a sideloaded APK runs on the same Android and Google does not govern it.
+describe('hub#1910 — en la copia de Google Play el asistente no lleva a pagar', () => {
+  const copyFrom = (distribution: 'play' | 'direct') =>
+    vi.mocked(getDeviceContext).mockResolvedValue({
+      id: 'dev-1',
+      clientType: 'tauri',
+      platform: 'android',
+      distribution,
+    } as never);
+
+  it('al admin le dice dónde se amplía el plan, sin botón al checkout', async () => {
+    copyFrom('play');
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', { value: { assign }, writable: true });
+
+    const wrapper = await openWith({ tier: 'free', used: 30, limit: 30, paidTiers: PAID_TIERS });
+    await sendATurnThatRunsOutOfQuota(wrapper);
+
+    expect(wrapper.find('[data-testid="assistant-quota-cta"]').exists()).toBe(false);
+    const where = wrapper.find('[data-testid="assistant-quota-managed-in-account"]');
+    expect(where.exists(), 'sin la frase, en Play el límite sería un callejón sin decir dónde se amplía').toBe(true);
+    expect(where.find('a').exists(), 'se NOMBRA erplora.com, no se enlaza').toBe(false);
+    expect(vi.mocked(startAssistantCheckout)).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('dentro de la app, mientras el shell no ha dicho qué copia es, no ofrece el checkout', async () => {
+    // Offering by default would paint the button on a Play copy and take it away a moment later —
+    // the same defect, with a jump on top. The browser is known from the first frame; the app is not.
+    vi.mocked(isTauri).mockReturnValue(true);
+    vi.mocked(getDeviceContext).mockReturnValue(new Promise(() => {}));
+
+    const wrapper = await openWith({ tier: 'free', used: 30, limit: 30, paidTiers: PAID_TIERS });
+    await sendATurnThatRunsOutOfQuota(wrapper);
+
+    expect(wrapper.find('[data-testid="assistant-quota-cta"]').exists()).toBe(false);
+  });
+
+  it('un APK instalado de lado conserva el botón: Google no lo gobierna', async () => {
+    copyFrom('direct');
+
+    const wrapper = await openWith({ tier: 'free', used: 30, limit: 30, paidTiers: PAID_TIERS });
+    await sendATurnThatRunsOutOfQuota(wrapper);
+
+    expect(wrapper.find('[data-testid="assistant-quota-cta"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="assistant-quota-managed-in-account"]').exists()).toBe(false);
+  });
+});
+
 describe('las cadenas nuevas viajan por i18n, inglés fuente + su es (ADR-0055/0199)', () => {
   it('cada clave existe en en y en es, y no son la misma frase', () => {
     for (const key of [
@@ -270,6 +333,7 @@ describe('las cadenas nuevas viajan por i18n, inglés fuente + su es (ADR-0055/0
       'plansConfirm',
       'planOption',
       'plansUnavailable',
+      'quotaManagedInAccount',
     ] as const) {
       expect(en.assistant[key], `${key} falta en en.ts`).toBeTruthy();
       expect(es.assistant[key], `${key} falta en es.ts`).toBeTruthy();

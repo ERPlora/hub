@@ -34,6 +34,10 @@ on:
       # que un tag que no publica nada salga verde.
       - "scripts/release-gate.sh"
       - "scripts/release-gate.test.sh"
+      # `android_status_bar_inset.rs` compara la franja bajo el reloj de Android con el color de
+      # la cabecera que declara este tema (hub#1903): si cambia la cabecera, la guarda tiene que
+      # correr en ese mismo PR, no en el siguiente que toque el shell.
+      - "apps/web/src/theme/variables.css"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -49,6 +53,10 @@ on:
       # que un tag que no publica nada salga verde.
       - "scripts/release-gate.sh"
       - "scripts/release-gate.test.sh"
+      # `android_status_bar_inset.rs` compara la franja bajo el reloj de Android con el color de
+      # la cabecera que declara este tema (hub#1903): si cambia la cabecera, la guarda tiene que
+      # correr en ese mismo PR, no en el siguiente que toque el shell.
+      - "apps/web/src/theme/variables.css"
   workflow_dispatch:
 
 concurrency:

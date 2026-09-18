@@ -161,6 +161,7 @@ export default {
     quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
     quotaResets: 'Se renuevan el {date}.',
     quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
+    quotaManagedInAccount: 'El plan del asistente se amplía desde tu cuenta de ERPlora, en erplora.com.',
     plansTitle: 'Elige un plan',
     plansConfirm: 'Ir al pago',
     planOption: '{name} — {price} €/mes',
@@ -1560,7 +1561,7 @@ export default {
     reasonBlocked:
       'No se ha instalado: necesita apps que aún no tienes contratadas: {missing}. Contrátalas y vuelve a cargarla — no se ha tocado nada más.',
     mediaFailed: '{n} sin copiar',
-    reasonVersionSubstituted: 'La plantilla pedía la {requested}; esa versión ya no está disponible, así que ha entrado la {installed}.',
+    reasonVersionSubstituted: 'La plantilla traía la {requested}; ha entrado la más reciente compatible, la {installed}.',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del negocio que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso al tuyo.',
     reasonSettingsNotPortable:
