@@ -391,6 +391,12 @@ pub async fn install_from_cloud(
 /// Ese `requested != installed` **no puede ser mudo**: se devuelve para que el informe del import
 /// lo diga (una plantilla que instala otra versión de la que anuncia sería justo la sorpresa que
 /// esto trata de evitar). `None` = se instaló exactamente lo pineado.
+///
+/// That pin-first rule is the **backup** rule: restoring your own hub reinstalls what it ran. A
+/// published **template** (`purpose: template`, hub#1904) starts a new business, so it asks what
+/// the store publishes first and installs the newest version compatible with the recorded one
+/// ([`module_update::resolve_template_version`]) — otherwise a salon opened today runs on the day
+/// the template was exported until its next boot moves it forward.
 pub async fn install_bundle_module(
     http: &reqwest::Client,
     cloud_base_url: &str,
@@ -399,9 +405,39 @@ pub async fn install_bundle_module(
     runtime: &mut erplora_runtime::Runtime,
     module_id: &str,
     manifest_version: &str,
+    purpose: erplora_runtime::export::BundlePurpose,
     on_progress: OnProgress<'_>,
     signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<Installed, InstallError> {
+    if purpose.is_template() {
+        if let Some(current) =
+            template_target(http, cloud_base_url, auth, module_id, manifest_version).await
+        {
+            if current != manifest_version {
+                tracing::info!(
+                    module_id = %module_id,
+                    recorded = %manifest_version,
+                    installing = %current,
+                    "template: installing the newest version compatible with the recorded one (hub#1904)"
+                );
+            }
+            return install_from_cloud(
+                http,
+                cloud_base_url,
+                cache_root,
+                auth,
+                runtime,
+                module_id,
+                &current,
+                on_progress,
+                signature_policy,
+            )
+            .await;
+        }
+        // Nothing to resolve in the recorded line (or the store did not answer): the pin path
+        // below tries it as is and reports the real reason if it cannot be installed either.
+    }
+
     let pinned = install_from_cloud(
         http,
         cloud_base_url,
@@ -450,6 +486,37 @@ pub async fn install_bundle_module(
         signature_policy,
     )
     .await
+}
+
+/// The version a template installs for the one it recorded, or `None` to fall back to the pin.
+///
+/// No pin (`""`/`latest`) already means «the newest» to [`install_from_cloud`], so there is nothing
+/// to resolve. A store that does not answer is not a reason to fail the module here: the pin path
+/// asks again and, if it cannot install either, reports the real error.
+async fn template_target(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+    manifest_version: &str,
+) -> Option<String> {
+    if manifest_version.is_empty() || manifest_version == "latest" {
+        return None;
+    }
+    match published_versions(http, cloud_base_url, auth, module_id).await {
+        Ok(available) => {
+            erplora_runtime::module_update::resolve_template_version(manifest_version, &available)
+        }
+        Err(error) => {
+            tracing::warn!(
+                module_id = %module_id,
+                code = %error.code(),
+                error = %error,
+                "template: could not read versions/; falling back to the recorded version"
+            );
+            None
+        }
+    }
 }
 
 /// Lo que el marketplace publica hoy de un módulo, en la forma que entiende el resolutor del

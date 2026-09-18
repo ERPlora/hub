@@ -1746,10 +1746,10 @@ export default {
     reasonBlocked:
       'Not installed: it needs apps you have not subscribed to yet: {missing}. Subscribe to them and load it again — nothing else was touched.',
     mediaFailed: '{n} not copied',
-    // hub#751/#752 — the template names a version the marketplace no longer publishes, so a newer
-    // compatible one went in. It installed fine; it is said out loud because a template that
-    // quietly installs something other than what it announces is the surprise this avoids.
-    reasonVersionSubstituted: 'The template asked for {requested}; that version is no longer available, so {installed} went in.',
+    // hub#751/#752/#1904 — the bundle names an older version than the one that went in: a
+    // template always installs the newest compatible one, a backup only once its own is gone. It
+    // installed fine; it is said out loud because the import preview listed the recorded version.
+    reasonVersionSubstituted: 'The template came with {requested}; the newest compatible version, {installed}, went in.',
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
