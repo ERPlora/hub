@@ -391,6 +391,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'assistant-mic',
       'assistant-quota-ask-admin',
       'assistant-quota-cta',
+      'assistant-quota-managed-in-account',
       'assistant-quota-warning',
       'assistant-report',
       'assistant-send',

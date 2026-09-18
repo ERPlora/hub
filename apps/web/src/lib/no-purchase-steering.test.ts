@@ -240,7 +240,16 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
       .replace(/(^|[^:'"`\\])\/\/.*$/gm, (m, lead: string) => lead + blank(m.slice(lead.length)));
   }
 
-  /** Why the ways out written in `text` could reach a payment — empty when none can. */
+  /**
+   * Why the ways out written in `text` could reach a payment — empty when none can.
+   *
+   * ⚠️ What it does NOT prove, said so it is not assumed: that a PAID destination sits behind its
+   * gate on the very branch that opens it. Reading source can only require the gate's call in the
+   * same file. Whether the control is really absent on the Play copy is proved by each door's own
+   * mounted test — `ModulePlanPanel.test.ts`, `management-link.test.ts`,
+   * `EmployeeFormPage.user-limit.test.ts`, `login-session-taken-over.hub1801.test.ts`,
+   * `assistant-plan-cta.test.ts` (hub#1910).
+   */
   function stepsTowardsMoney(relative: string, text: string): string[] {
     if (DOORS_THEMSELVES.includes(relative)) return [];
     const source = withoutComments(text);
