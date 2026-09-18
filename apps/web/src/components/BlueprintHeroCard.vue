@@ -131,6 +131,10 @@
         </ion-button>
       </div>
     </div>
+
+    <!-- hub#1905 — the apps the template brought ask for their permissions: a template can never
+         grant them by itself, and without them VeriFactu does not seal and nothing prints. -->
+    <ImportPermissionsConsent :report="importReport" />
   </section>
 </template>
 
@@ -177,8 +181,10 @@ import {
   importBlueprint,
   inspectBlueprint,
   type CatalogBlueprint,
+  type ImportReport,
 } from '../lib/runtime';
 import { runtimeErrorSentence } from '../lib/runtime-error-sentence';
+import ImportPermissionsConsent from './ImportPermissionsConsent.vue';
 import { user } from '../lib/session';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 import type { SetupStatus } from '../lib/setup-status';
@@ -194,6 +200,8 @@ const catalog = ref<CatalogBlueprint[]>([]);
 const requested = ref<boolean>(false);
 const run = ref<HeroRun | null>(null);
 const dismissed = ref<boolean>(false);
+/** The report of the import this card ran — what the permissions question asks about (hub#1905). */
+const importReport = ref<ImportReport | null>(null);
 /**
  * The card has been on screen at least once (hub#1120). Latched, never cleared: it is what stops
  * the offer from being pulled out from under the pointer when `hub.setup.status` refreshes. The
@@ -376,7 +384,9 @@ async function use(blueprint: CatalogBlueprint): Promise<void> {
     // one-click path is the main producer of partial imports, and the persisted report needs the
     // exact origin for «Retry what's missing» in Settings › Data to be able to act.
     const origin = { slug: blueprint.slug, version: blueprint.latest_version };
-    run.value = { phase: 'finished', outcome: importOutcome(await importBlueprint(uploadId, selection, origin)) };
+    const report = await importBlueprint(uploadId, selection, origin);
+    importReport.value = report;
+    run.value = { phase: 'finished', outcome: importOutcome(report) };
   } catch (err) {
     run.value = { phase: 'finished', outcome: { kind: 'interrupted', reason: messageOf(err) } };
   }

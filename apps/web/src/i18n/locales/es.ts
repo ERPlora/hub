@@ -1477,6 +1477,14 @@ export default {
     // ahora aborta y lo dice, para que el usuario pueda reintentar en vez de irse sin saber.
     timeout: 'El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.',
   },
+  importPermissions: {
+    title: 'Permisos de tus apps',
+    intro: 'La plantilla ha instalado estas apps y necesitan tu permiso para funcionar: una plantilla no puede dártelo por ti. Puedes cambiarlo cuando quieras en Ajustes → Permisos.',
+    grant: 'Dar permisos',
+    granting: 'Dando permisos…',
+    later: 'Ahora no',
+    grantError: 'No se han podido dar los permisos de {apps}. Vuelve a intentarlo o actívalos en Ajustes → Permisos.',
+  },
   importPage: {
     title: 'Importar configuración',
     lead: 'Carga una plantilla: instala las apps que falten, aplica sus datos y copia las imágenes.',

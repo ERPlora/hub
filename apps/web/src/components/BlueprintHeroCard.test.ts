@@ -60,6 +60,7 @@ vi.mock('../lib/hub-settings', () => ({ hubSettings: { value: { country_code: 'E
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import BlueprintHeroCard from './BlueprintHeroCard.vue';
+import ImportPermissionsConsent from './ImportPermissionsConsent.vue';
 import type { SetupItem, SetupStatus } from '../lib/setup-status';
 import enCatalogue from '../i18n/locales/en';
 import esCatalogue from '../i18n/locales/es';
@@ -674,5 +675,45 @@ describe('un fallo de la nube se lee (hub#1693)', () => {
     const w = await outcome(mountCard());
 
     expect(w.find('[data-testid="hero-reason"]').text()).toBe('checksum mismatch');
+  });
+});
+
+// hub#1905 — the salon of the issue pressed «Use this» on «Peluquería»: VeriFactu and Printing came
+// in with their permissions off (a template cannot grant them, hub#473) and NOBODY ASKED, so the
+// first sale went out with no fiscal record. The question lives in `ImportPermissionsConsent`
+// (tested there); what this card owes it is the report of the import it just ran.
+describe('the permissions of the apps the template brought (hub#1905)', () => {
+  const consentReport = (w: ReturnType<typeof mountCard>): unknown =>
+    w.getComponent(ImportPermissionsConsent).props('report');
+
+  const salon = {
+    sections: [],
+    installed_modules: [
+      { id: 'verifactu', version: '1.5.40', status: 'installed' },
+      { id: 'printing', version: '0.1.22', status: 'installed' },
+    ],
+  };
+
+  it('are asked about as soon as the one click finishes', async () => {
+    importBlueprint.mockResolvedValue(salon);
+    const w = mountCard();
+    await flushPromises();
+    expect(consentReport(w)).toBeNull();
+
+    await w.get('[data-testid="hero-use"]').trigger('click');
+    await flushPromises();
+
+    expect(consentReport(w)).toEqual(salon);
+  });
+
+  it('an interrupted import asks nothing: there is no report of what came in', async () => {
+    importBlueprint.mockRejectedValue(new Error('connection reset'));
+    const w = mountCard();
+    await flushPromises();
+
+    await w.get('[data-testid="hero-use"]').trigger('click');
+    await flushPromises();
+
+    expect(consentReport(w)).toBeNull();
   });
 });
