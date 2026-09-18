@@ -372,3 +372,24 @@ fn the_android_resources_keep_double_hyphens_out_of_their_comments() {
         }
     }
 }
+
+/// The two colour tests above read the hub shell's theme, so they must run when THAT file changes.
+///
+/// `test-shell.yml` — the only job that runs this file — triggers on `apps/tauri/**`. Without the
+/// theme in its `paths`, a PR that repaints the header would go green without these tests ever
+/// running, and the band under the clock would come back unseen until some unrelated shell PR
+/// turned red for it.
+#[test]
+fn the_colour_tests_run_when_the_header_colour_changes() {
+    let workflow = read(".github/workflows/test-shell.yml");
+    let pull_request = workflow
+        .split_once("\n  pull_request:")
+        .map(|(_, rest)| rest.split("\njobs:").next().unwrap_or(rest))
+        .expect("test-shell.yml no longer triggers on pull_request");
+
+    assert!(
+        pull_request.contains(&format!("- \"{WEB_THEME}\"")),
+        "test-shell.yml does not run on PRs that change {WEB_THEME}: the header colour could move \
+         and leave the strip under the clock behind without a single red check (hub#1903)",
+    );
+}
