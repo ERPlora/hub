@@ -149,6 +149,22 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
   /** Reaching the shell's opener without `openExternal` skips the one place that checks. */
   const SHELL_OPENER = /\bopen_external_url\b|\bOPEN_EXTERNAL_COMMAND\b|plugin:opener|plugin:shell/;
 
+  /**
+   * Paid doors that live in a shared module and are walked through from OTHER files. Their way out
+   * is written once, in the module — so the rule never saw the button that calls it, and a new one
+   * offered without asking passed (second review of hub#1907: a new component with
+   * `@click="openManagement"` and no gate left this file green). Every file that names such a door
+   * has to read the predicate that decides whether this copy is offered it.
+   */
+  const SHARED_PAID_DOORS = [
+    {
+      home: 'lib/management-link.ts',
+      door: /\bopenManagement\b/,
+      offeredBy: /\bcanOpenManagement\b/,
+      what: 'the management panel (hub#1897)',
+    },
+  ];
+
   type WayOut = { kind: 'call' | 'navigation' | 'assignment' | 'anchor'; at: number; target: string };
 
   /** The text between a `(` at `open` and its matching `)` — strings skipped, nesting counted. */
@@ -249,6 +265,11 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
    * mounted test — `ModulePlanPanel.test.ts`, `management-link.test.ts`,
    * `EmployeeFormPage.user-limit.test.ts`, `login-session-taken-over.hub1801.test.ts`,
    * `assistant-plan-cta.test.ts` (hub#1910).
+   *
+   * Nor does it know scopes: a name is followed to the nearest `const` written BEFORE the way out,
+   * wherever that is. A pass-through `function go(url) { openExternal(url) }` placed after an
+   * unrelated `const url = appDownloadUrl(p)` reads as the installer (second review of hub#1907,
+   * mutant S2). Alone, that same wrapper is an offender — "no known destination".
    */
   function stepsTowardsMoney(relative: string, text: string): string[] {
     if (DOORS_THEMSELVES.includes(relative)) return [];
@@ -259,6 +280,14 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     const opener = SHELL_OPENER.exec(source);
     if (opener) {
       offences.push(`${relative}:${lineOf(opener.index)} → calls the shell's opener directly, past openExternal`);
+    }
+
+    for (const shared of SHARED_PAID_DOORS) {
+      if (relative === shared.home) continue;
+      const named = shared.door.exec(source);
+      if (named && !shared.offeredBy.test(source)) {
+        offences.push(`${relative}:${lineOf(named.index)} → walks through ${shared.what} and never reads whether this copy is offered it`);
+      }
     }
 
     for (const way of waysOut(source)) {
@@ -277,6 +306,11 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
       for (const d of reached) {
         if (d.gate && !d.gate.test(source)) {
           offences.push(`${where} → reaches ${d.what} and never asks who distributed this copy`);
+        }
+        // A component's door is pressed from its own template; a module's door is pressed from
+        // anywhere, by buttons this file cannot see unless the door is declared above.
+        if (d.gate && relative.endsWith('.ts') && !SHARED_PAID_DOORS.some((shared) => shared.home === relative)) {
+          offences.push(`${where} → opens ${d.what} from a shared module: declare it in SHARED_PAID_DOORS, with the predicate its callers must read`);
         }
       }
       const raw = RAW_SAAS_ADDRESS.exec(seen.split(ACCOUNT_SURFACE).join(''));
@@ -311,6 +345,18 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     ['the account door back on the bare panel page', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/';\nawait openExternal(await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a'));"],
     ['a checkout nobody gates (hub#1910)', 'components/X.vue', 'const url = await startAssistantCheckout(t);\nif (url) window.location.assign(url);'],
     ['an anchor built in code', 'lib/x.ts', "const a = document.createElement('a');\na.href = 'https://erplora.com/billing/';\na.click();"],
+    // Second review of hub#1907: the two below left the rule green. The way out of a SHARED paid
+    // door is written once, in its module, so the button that calls it was never looked at.
+    [
+      'S1 · a new button on the shared management door that never reads whether it is offered',
+      'components/X.vue',
+      '<ion-button @click="openManagement">Manage</ion-button>\nimport { openManagement } from \'../lib/management-link\';',
+    ],
+    [
+      'a paid door moved into a shared module nobody declared',
+      'lib/x.ts',
+      "export async function openPlan(): Promise<void> {\n  if (!planUpgradeIsOfferable(d)) return;\n  await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'p'));\n}",
+    ],
   ])('catches %s', (_name, relative, source) => {
     expect(stepsTowardsMoney(relative, source)).not.toEqual([]);
   });
@@ -321,6 +367,11 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     ['the account surface', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';\nconst plain = `${base}${CLOUD_ACCOUNT_PATH}`;\nawait openExternal(ok ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a') : plain);"],
     ['the installer', 'views/SystemPage.vue', 'await openExternal(appDownloadUrl(os.platform));'],
     ['a gated plan door', 'App.vue', "x = planUpgradeIsOfferable(d);\nawait openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'p'));"],
+    [
+      'a button on the shared management door that reads whether it is offered',
+      'components/AppTopbar.vue',
+      '<ion-button v-if="canOpenManagement" @click="openManagement">Manage</ion-button>\nimport { canOpenManagement, openManagement } from \'../lib/management-link\';',
+    ],
   ])('lets through %s', (_name, relative, source) => {
     expect(stepsTowardsMoney(relative, source)).toEqual([]);
   });
