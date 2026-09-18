@@ -161,6 +161,7 @@ export default {
     quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
     quotaResets: 'Se renuevan el {date}.',
     quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
+    quotaManagedInAccount: 'El plan del asistente se amplía desde tu cuenta de ERPlora, en erplora.com.',
     plansTitle: 'Elige un plan',
     plansConfirm: 'Ir al pago',
     planOption: '{name} — {price} €/mes',

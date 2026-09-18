@@ -516,7 +516,15 @@ async function removeAvatar(): Promise<void> {
 // one-time pass; this one was left out because the runtime only minted it for whoever administers
 // the hub, and the account page is not administration: it is hers by definition. The runtime tells
 // the two apart now, so the same door serves this trip too.
-const CLOUD_ACCOUNT_PATH = '/dashboard/profile/';
+//
+// And it asks for the account ALONE (hub#1900). Painted inside the panel, the page had «Billing» and
+// «Marketplace» in its sidebar, one tap away — and Google Play only lets an app link to an account
+// page "as long as the webpage does not eventually lead to an alternate payment method". Hiding the
+// door on Play instead was not an option: people can sign up from the app, so Play also demands an
+// in-app way to delete that account, and deleting it lives here. `surface=account` is what the SaaS
+// reads to paint the account without the panel; the runtime drops the query when it decides whether
+// this is the person's own account, so the one-time pass is unaffected.
+const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';
 
 async function manageCloudAccount(): Promise<void> {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
