@@ -307,6 +307,8 @@ export default {
     // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
     delegatedHint: 'Esto lo tiene que configurar un administrador.',
     inheritedHint: 'Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.',
+    missingPermissionHint: 'Esta app necesita un permiso que aún no le has dado. Sin él, no puede hacer su trabajo.',
+    grantPermission: 'Dar permiso',
     completeTitle: 'Tu negocio está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
     // La tarjeta héroe de un negocio que todavía no tiene apps (hub#368). Su único trabajo es la

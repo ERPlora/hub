@@ -103,6 +103,13 @@ export interface SetupItem {
    * somebody imported) — hub#536, ADR-0267. Orthogonal to `state`, exactly like `actionable`.
    */
   origin: string;
+  /**
+   * The module's host capabilities (`certificate`, `printer`…) that are still NOT granted — hub#1905.
+   *
+   * Non-empty means the item is pending on the switch in Settings → Permissions, whatever its own
+   * settings say; the runtime already points `route` there. Empty for everything else.
+   */
+  missingCapabilities: string[];
 }
 
 /** The document: one row with the whole answer, counters included. */
@@ -327,6 +334,10 @@ function toItem(raw: Record<string, unknown>): SetupItem {
     // Absent ⇒ `user`, the conservative read for a shell talking to an older runtime: claiming a
     // template brought something it did not would send the owner to re-check a decision they made.
     origin: str(raw.origin) || ORIGIN_USER,
+    // Absent ⇒ nothing missing: a shell reading an older runtime must not invent a switch to flip.
+    missingCapabilities: Array.isArray(raw.missing_capabilities)
+      ? raw.missing_capabilities.filter((c): c is string => typeof c === 'string')
+      : [],
   };
 }
 

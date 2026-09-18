@@ -97,6 +97,7 @@ function emptyBusiness(): SetupStatus {
     actions: ['template', 'catalog'],
     actionable: true,
     origin: 'user',
+    missingCapabilities: [],
   };
   return { items: [apps], total: 1, pending: 1, unavailable: 0, blockingPending: 0, done: 0 };
 }

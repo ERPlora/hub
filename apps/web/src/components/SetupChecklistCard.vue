@@ -57,7 +57,7 @@
           router-direction="forward"
           :data-testid="`setup-action-${item.key}`"
         >
-          {{ t('setup.configure') }}
+          {{ waitsOnPermission(item) ? t('setup.grantPermission') : t('setup.configure') }}
         </ion-button>
       </li>
     </ul>
@@ -194,9 +194,18 @@ function pillTone(item: SetupItem): string {
  * `unavailable` is **ours** to fix and nothing is expected of anybody in the hub; a wall that is not
  * theirs (hub#435) is somebody else's to type, and saying WHO turns a dead end into an errand.
  */
+/**
+ * Pending on a switch in Settings → Permissions, not on the app's own settings (hub#1905). Only for
+ * whoever can flip it: a wall that is somebody else's keeps saying WHO (hub#435).
+ */
+function waitsOnPermission(item: SetupItem): boolean {
+  return isActionable(item) && item.missingCapabilities.length > 0;
+}
+
 function noteOf(item: SetupItem): string {
   if (item.state === STATE_UNAVAILABLE) return t('setup.unavailableHint');
   if (item.state === STATE_PENDING && !isActionable(item)) return t('setup.delegatedHint');
+  if (waitsOnPermission(item)) return t('setup.missingPermissionHint');
   // Done, but by a template (hub#536): true, and worth a second look — a bar has its own room and
   // its own prices. It is an invitation, never a pending task: the counters do not move.
   if (isInherited(item)) return t('setup.inheritedHint');

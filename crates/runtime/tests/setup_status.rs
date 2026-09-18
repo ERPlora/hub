@@ -1023,6 +1023,9 @@ async fn the_document_and_the_item_carry_exactly_the_contracted_keys() {
                 "icon",
                 "key",
                 "level",
+                // Which host capabilities of the module are still denied (hub#1905): what the
+                // item is waiting for when its own settings are not the problem. Empty elsewhere.
+                "missing_capabilities",
                 "module_id",
                 "order",
                 // Quién puso los datos que hacen pasar el chequeo (hub#536): el dueño, o una
@@ -2052,4 +2055,86 @@ async fn a_module_that_asks_for_nothing_is_unaffected() {
     )
     .await;
     assert_eq!(must(&doc, "pricing.setup")["state"], "done");
+}
+
+// ── hub#1905 · the pending item SAYS it is the permission, and leads to it ───────────────────────
+//
+// hub#1119 made the item honest (pending, not done) but left it mute: a salon imported from a
+// template came out with «Configure VeriFactu» pending, a button to VeriFactu's own settings — which
+// were already filled in — and not a word about the switch in Settings → Permissions that was
+// actually missing. The first sale went out without its fiscal record. The item now carries WHICH
+// capabilities are missing, and its way in is the screen where they are granted.
+
+const PERMISSIONS_ROUTE: &str = "/settings?tab=permissions";
+
+#[tokio::test]
+async fn an_item_pending_on_a_permission_names_it_and_leads_to_permissions() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = sealing_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]),
+    )
+    .await;
+    let item = must(&doc, "verifactu.setup");
+    assert_eq!(item["state"], "pending");
+    assert_eq!(
+        item["missing_capabilities"],
+        json!(["certificate"]),
+        "the item must say what is left, not only that something is"
+    );
+    assert_eq!(
+        item["route"], PERMISSIONS_ROUTE,
+        "its settings are already filled in: the way in is the switch, not the settings screen"
+    );
+}
+
+#[tokio::test]
+async fn once_granted_the_item_forgets_the_permission_and_goes_back_to_its_own_screen() {
+    let mut rt = runtime("hub-setup").await;
+    // Its own check FAILS: once the switch is on, what is left is its own settings.
+    let dir = certificate_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let admin = ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]);
+    let before = status(&rt, &admin).await;
+    assert_eq!(
+        must(&before, "verifactu.setup")["route"],
+        PERMISSIONS_ROUTE,
+        "the permission goes first: without it nothing configured on the module's screen can run"
+    );
+
+    rt.set_module_capability("verifactu", "certificate", true, "hub_user:1")
+        .await
+        .expect("the owner grants it in Ajustes → Permisos");
+
+    let after = status(&rt, &admin).await;
+    let item = must(&after, "verifactu.setup");
+    assert_eq!(item["state"], "pending", "its own settings are still not filled in");
+    assert_eq!(item["missing_capabilities"], json!([]));
+    assert_eq!(item["route"], "/m/verifactu/settings");
+}
+
+#[tokio::test]
+async fn items_that_ask_for_no_permission_carry_an_empty_list() {
+    // «Every item carries every key» (see the contracted keys above): an empty list, never absent,
+    // so a consumer never branches on presence.
+    let mut rt = runtime("hub-setup").await;
+    let dir = setup_module("pricing", false, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
+    for it in items(&doc) {
+        assert_eq!(it["missing_capabilities"], json!([]), "{it}");
+    }
+    assert_eq!(must(&doc, "pricing.setup")["route"], "/m/pricing/settings");
 }

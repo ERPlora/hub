@@ -95,6 +95,7 @@ function appsItem(state: string): SetupItem {
     actions: ['template', 'catalog'],
     actionable: true,
     origin: 'user',
+    missingCapabilities: [],
   };
 }
 

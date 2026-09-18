@@ -327,6 +327,9 @@ export default {
     // permission — because a blocker with no owner leaves the user with nowhere to go.
     delegatedHint: 'An administrator has to set this up.',
     inheritedHint: 'It came from the template you used. Worth a look — your room and your prices are your own.',
+    // hub#1905 — the item is pending on a switch in Settings → Permissions, not on its own settings.
+    missingPermissionHint: 'This app needs a permission you have not granted yet. Without it, it cannot do its job.',
+    grantPermission: 'Grant permission',
     completeTitle: 'Your business is ready',
     completeBody: 'Everything on the checklist is done.',
     // The hero card of a business with no apps yet (hub#368). Its whole job is the FIRST choice, so
