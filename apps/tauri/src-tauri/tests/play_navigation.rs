@@ -177,6 +177,9 @@ fn the_account_page_opens_only_as_the_account_surface() {
             // The mark opens the account pages, not the rest of the panel.
             "https://erplora.com/dashboard/billing/?surface=account",
             "https://erplora.com/dashboard/?surface=account",
+            // The account-deleted page is ONE page, not every `deleted/` of the panel.
+            "https://erplora.com/dashboard/hubs/deleted/",
+            "https://erplora.com/dashboard/profile/deleted/more/",
         ],
         "the account page painted inside the panel",
     );
@@ -265,27 +268,32 @@ fn the_configured_saas_is_policed_as_well() {
 
 // ── …and the window actually asks ────────────────────────────────────────────────────────────────
 
-/// The body of the `on_navigation` handler of the main window, from the real source.
-fn main_window_navigation_handler() -> String {
+/// A top-level function of the shell, from the real source, without its comments: prose is not
+/// code, and a comment that names a call must not satisfy the checks below.
+fn shell_function(name: &str) -> String {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs");
     let source = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
-    let window = source
-        .find("fn open_main_window")
+    source
+        .find(&format!("fn {name}"))
         .map(|at| &source[at..])
         .and_then(|rest| rest.find("\n}").map(|end| &rest[..end]))
-        .expect("src/lib.rs no longer defines `open_main_window`");
-    let handler = window
-        .find(".on_navigation(")
-        .map(|at| &window[at..])
-        .and_then(|rest| rest.find(".build()").map(|end| &rest[..end]))
-        .expect("`open_main_window` no longer registers an `on_navigation` handler");
-    // Prose is not code: a comment that names the verdict must not satisfy the checks below.
-    handler
+        .unwrap_or_else(|| panic!("src/lib.rs no longer defines `{name}`"))
         .lines()
         .map(|line| line.find("//").map_or(line, |at| &line[..at]))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// The body of the `on_navigation` handler of the main window.
+fn main_window_navigation_handler() -> String {
+    let window = shell_function("open_main_window");
+    window
+        .find(".on_navigation(")
+        .map(|at| &window[at..])
+        .and_then(|rest| rest.find(".build()").map(|end| &rest[..end]))
+        .expect("`open_main_window` no longer registers an `on_navigation` handler")
+        .to_string()
 }
 
 #[test]
@@ -307,6 +315,12 @@ fn the_main_window_asks_the_verdict_before_it_follows_a_page() {
         .find("return false")
         .map(|at| only_allow + at)
         .expect("the `on_navigation` handler never refuses a page (hub#1915)");
+    // …and a refusal is ANSWERED. Refusing in silence leaves «Log Out» (which lands on the SaaS home
+    // page) on a stale page, and a refused link looking like a dead button.
+    assert!(
+        handler[only_allow..refuses].contains("refuse_navigation("),
+        "the handler refuses a page without answering it: no notice, no way back to the start (hub#1915)"
+    );
 
     // A refused page must not be remembered as this till's hub, nor become the page the connectivity
     // guard brings the window back to — the guard navigates by program, which no handler sees.
@@ -320,6 +334,20 @@ fn the_main_window_asks_the_verdict_before_it_follows_a_page() {
              remembered or watched (hub#1915)"
         );
     }
+}
+
+#[test]
+fn a_refused_page_is_answered_on_the_window_and_off_the_handler() {
+    // `answer_refusal` is driven on a mock window by the unit tests; this is the link between the
+    // handler and it, which needs a real `AppHandle` and so cannot be driven here.
+    let refuse = shell_function("refuse_navigation");
+    let off_the_handler = refuse
+        .find("async_runtime::spawn(")
+        .expect("`refuse_navigation` answers inside the handler: on Android that is the webview client's own callback (hub#1915)");
+    assert!(
+        refuse[off_the_handler..].contains("answer_refusal(&window, verdict,"),
+        "`refuse_navigation` records the refused page but never answers it on the window (hub#1915)"
+    );
 }
 
 // ── What is not the SaaS keeps today's behaviour ─────────────────────────────────────────────────
