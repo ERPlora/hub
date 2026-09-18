@@ -187,14 +187,6 @@ function pillTone(item: SetupItem): string {
 }
 
 /**
- * Why this row has no button — empty when it does have one.
- *
- * A row without a call to action and without a sentence is the worst of the three: the user reads
- * «pending» and finds nothing to press. The two reasons are different and must not be said alike —
- * `unavailable` is **ours** to fix and nothing is expected of anybody in the hub; a wall that is not
- * theirs (hub#435) is somebody else's to type, and saying WHO turns a dead end into an errand.
- */
-/**
  * Pending on a switch in Settings → Permissions, not on the app's own settings (hub#1905). A wall
  * that is somebody else's still says WHO (hub#435): `noteOf` asks that first, and the button only
  * exists for an actionable row.
@@ -203,6 +195,14 @@ function waitsOnPermission(item: SetupItem): boolean {
   return item.missingCapabilities.length > 0;
 }
 
+/**
+ * Why this row has no button — empty when it does have one.
+ *
+ * A row without a call to action and without a sentence is the worst of the three: the user reads
+ * «pending» and finds nothing to press. The two reasons are different and must not be said alike —
+ * `unavailable` is **ours** to fix and nothing is expected of anybody in the hub; a wall that is not
+ * theirs (hub#435) is somebody else's to type, and saying WHO turns a dead end into an errand.
+ */
 function noteOf(item: SetupItem): string {
   if (item.state === STATE_UNAVAILABLE) return t('setup.unavailableHint');
   if (item.state === STATE_PENDING && !isActionable(item)) return t('setup.delegatedHint');

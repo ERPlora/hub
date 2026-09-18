@@ -413,6 +413,16 @@ pub async fn status(
         // settings say (hub#1119). See [`missing_capabilities`].
         let missing = missing_capabilities(db, registry, hub_id, &manifest.id).await;
         let done = done && missing.is_empty();
+        // The switch is the ADMINISTRATOR's (hub#1905): Ajustes → Permisos lets nobody else flip it,
+        // so while a permission is missing the way in is open to them alone, whoever configures the
+        // module (`printing` hands `manage_settings` to a manager). Same rule as above: a wall still
+        // says WHO, and the rest is only told to whoever can act.
+        let actionable = actionable
+            && (missing.is_empty()
+                || crate::permissions::has(ctx, crate::hub_users::ADMINISTER_PERMISSION));
+        if !actionable && level != LEVEL_LEGAL {
+            continue;
+        }
         // The switch goes first (hub#1905): while it is off, nothing configured on the module's own
         // screen can run, and that screen does not even mention it. So the way in is the screen
         // where it is granted; once it is, the item goes back to its own route.

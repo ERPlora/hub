@@ -158,6 +158,34 @@ describe('when it asks', () => {
     expect(isOpen(w)).toBe(false);
   });
 
+  it('a slower, EARLIER import never overwrites the question of the one that finished after it', async () => {
+    // The retry in Settings › Data and the assistant can finish seconds apart. Reading the first
+    // one's permissions is slow; when it lands, the question on screen is already the second's.
+    let releaseVerifactu: (v: { module_id: string; capabilities: ModuleCapability[] }) => void = () => undefined;
+    getModuleCapabilities.mockImplementation((id: string) =>
+      id === 'verifactu'
+        ? new Promise((resolve) => {
+            releaseVerifactu = resolve;
+          })
+        : Promise.resolve({ module_id: id, capabilities: [cap('printer', 'Printer')] }),
+    );
+    const w = mountConsent();
+    const only = (id: string): ImportReport =>
+      ({ sections: [], installed_modules: [{ id, version: '1.0.0', status: 'installed' }] }) as ImportReport;
+
+    askPermissionsAfterImport(only('verifactu'));
+    await flushPromises();
+    askPermissionsAfterImport(only('printing'));
+    await flushPromises();
+    releaseVerifactu({ module_id: 'verifactu', capabilities: [cap('certificate', 'Business certificate')] });
+    await flushPromises();
+
+    expect(isOpen(w)).toBe(true);
+    expect(w.findAll('[data-testid="import-permissions-app"]').map((g) => g.attributes('data-module'))).toEqual([
+      'printing',
+    ]);
+  });
+
   it('asks again for the next import, not only the first one', async () => {
     const w = await consentAfterImport();
     await w.find('[data-testid="import-permissions-later"]').trigger('click');
@@ -204,6 +232,27 @@ describe('granting', () => {
       'verifactu',
     ]);
     expect(w.emitted('granted')).toBeUndefined();
+  });
+
+  it('cannot be closed while the grant is in flight: its answer would land on a closed question', async () => {
+    // One request per app: every one of them stays in flight until the test refuses it.
+    const inFlight: Array<(e: Error) => void> = [];
+    putModuleCapabilities.mockImplementation(() => new Promise((_, reject) => inFlight.push(reject)));
+    const w = await consentAfterImport();
+
+    await w.find('[data-testid="import-permissions-grant"]').trigger('click');
+    await flushPromises();
+    expect((modal(w).props() as Record<string, unknown>).backdropDismiss).toBe(false);
+    await w.find('[data-testid="import-permissions-later"]').trigger('click');
+    await flushPromises();
+    expect(isOpen(w)).toBe(true);
+
+    for (const refuse of inFlight) refuse(new Error('put-capabilities → 401'));
+    await flushPromises();
+
+    // The refusal is still there to be read, with what failed.
+    expect(isOpen(w)).toBe(true);
+    expect(w.find('[data-testid="import-permissions-error"]').exists()).toBe(true);
   });
 
   it('«Not now» grants nothing and closes', async () => {

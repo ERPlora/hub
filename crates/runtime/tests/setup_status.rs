@@ -1813,7 +1813,12 @@ async fn a_module_item_that_stops_being_a_wall_goes_back_to_being_somebody_else_
         keys(&doc)
     );
     assert_eq!(doc["blocking_pending"], 0);
-    // …and whoever CAN configure it still has it, as a 🔴 and actionable.
+    // …and whoever CAN configure it still has it, as a 🔴 and actionable. The switch is granted
+    // first: while it is off the way in is Ajustes → Permisos, which is the administrator's and not
+    // this configurer's (hub#1905) — what this test is about is the module's OWN settings.
+    rt.set_module_capability("fiscal", "certificate", true, "hub_user:1")
+        .await
+        .expect("the owner grants it in Ajustes → Permisos");
     let doc = status(
         &rt,
         &ctx("hub-setup", &[SESSION, "fiscal.view", "fiscal.configure"]),
@@ -2114,7 +2119,10 @@ async fn once_granted_the_item_forgets_the_permission_and_goes_back_to_its_own_s
 
     let after = status(&rt, &admin).await;
     let item = must(&after, "verifactu.setup");
-    assert_eq!(item["state"], "pending", "its own settings are still not filled in");
+    assert_eq!(
+        item["state"], "pending",
+        "its own settings are still not filled in"
+    );
     assert_eq!(item["missing_capabilities"], json!([]));
     assert_eq!(item["route"], "/m/verifactu/settings");
 }
@@ -2137,4 +2145,108 @@ async fn items_that_ask_for_no_permission_carry_an_empty_list() {
         assert_eq!(it["missing_capabilities"], json!([]), "{it}");
     }
     assert_eq!(must(&doc, "pricing.setup")["route"], "/m/pricing/settings");
+}
+
+// ── hub#1905 (review) · the switch is the ADMINISTRATOR's, whoever configures the module ─────────
+//
+// While a permission is missing, the item's way in is Settings → Permissions, and that screen only
+// lets an administrator flip anything. `printing` hands `printing.manage_settings` to the `manager`
+// role: that manager was told «this app needs a permission you have not granted yet», with a «Grant
+// permission» button to a screen that answers «only an administrator can change permissions». Same
+// rule as hub#435: a wall says WHO, and the rest is only told to whoever can act.
+
+/// A module that asks the host for the printer **and whose own check passes**. Not a legal wall:
+/// nothing about it stops a sale.
+fn printer_module(id: &str) -> PathBuf {
+    module_fixture(
+        json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "capabilities": { "printer": {} },
+            "permissions": [format!("{id}.manage_settings")],
+            "queries": {
+                format!("{id}.settings.get"): {
+                    "permission": format!("{id}.manage_settings"),
+                    "sql": "queries/settings_get.sql"
+                }
+            },
+            "setup": {
+                "query": format!("{id}.settings.get"),
+                "configured_when": [{ "field": "ready", "truthy": true }],
+                "title": format!("Configure {id}"),
+                "route": format!("/m/{id}/settings"),
+                "permission": format!("{id}.manage_settings"),
+                "order": 70
+            }
+        }),
+        &[("queries/settings_get.sql", "SELECT 1 AS ready")],
+    )
+}
+
+#[tokio::test]
+async fn a_wall_pending_on_a_permission_is_not_actionable_for_who_cannot_grant_it() {
+    let mut rt = runtime("hub-setup").await;
+    // Production on purpose: since ADR-0360 the certificate arm — what makes this a wall — is the
+    // production one.
+    pin_fiscal_environment(&rt, "hub-setup", "production").await;
+    set_business_identity(&rt).await;
+    let dir = sealing_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    // Configures the module, does not administer the hub.
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, "verifactu.configure"])).await;
+    let item = must(&doc, "verifactu.setup");
+    assert_eq!(
+        item["level"], "legal",
+        "premise: the wall is why it is still listed"
+    );
+    assert_eq!(item["missing_capabilities"], json!(["certificate"]));
+    assert_eq!(
+        item["actionable"], false,
+        "granting is the administrator's: the row must say WHO, not offer a button that refuses"
+    );
+}
+
+#[tokio::test]
+async fn an_item_pending_on_a_permission_is_only_told_to_who_can_grant_it() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = printer_module("printing");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let manager = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, "printing.manage_settings"]),
+    )
+    .await;
+    assert!(
+        item(&manager, "printing.setup").is_none(),
+        "not a wall and not theirs to grant: {:?}",
+        keys(&manager)
+    );
+
+    let admin = status(
+        &rt,
+        &ctx(
+            "hub-setup",
+            &[SESSION, ADMINISTER, "printing.manage_settings"],
+        ),
+    )
+    .await;
+    let theirs = must(&admin, "printing.setup");
+    assert_eq!(theirs["actionable"], true);
+    assert_eq!(theirs["route"], PERMISSIONS_ROUTE);
+
+    // Once granted, the item is the manager's again: what is left is the module's own screen.
+    rt.set_module_capability("printing", "printer", true, "hub_user:1")
+        .await
+        .expect("the owner grants it in Ajustes → Permisos");
+    let after = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, "printing.manage_settings"]),
+    )
+    .await;
+    assert_eq!(must(&after, "printing.setup")["state"], "done");
 }
