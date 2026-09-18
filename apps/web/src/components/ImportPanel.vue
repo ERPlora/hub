@@ -275,7 +275,10 @@
               <HubIcon slot="start" :name="row.icon" :style="{ color: `var(--ion-color-${row.color})` }" />
               <ion-label class="ion-text-wrap">
                 <h2>{{ row.label }}</h2>
-                <p v-if="row.reason" class="fail-reason">{{ row.reason }}</p>
+                <!-- hub#1904: the failure red only under a row that FAILED. A template installs the
+                     newest compatible version of every app, so its version note sits under every
+                     green «installed» row of a healthy import: there it is plain secondary text. -->
+                <p v-if="row.reason" :class="{ 'fail-reason': row.color === 'danger' }">{{ row.reason }}</p>
               </ion-label>
               <!-- hub#1291: the leading icon above keeps `row.color`'s accent (incl. warning
                    yellow); this note is the readable status LABEL, so its text is remapped via
