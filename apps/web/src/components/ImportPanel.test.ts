@@ -45,13 +45,19 @@ vi.mock('../lib/app-names', async () => {
 // puerta que se prueba con su propio interruptor no prueba nada. Los tests mueven la sesión REAL
 // con `setUser`, la misma que escribe el login.
 vi.mock('../lib/nav', () => ({ refreshModuleNav: vi.fn() }));
+// hub#1905 — the permissions question is `ImportPermissionsConsent`'s (tested there); this panel
+// owes it the signal, with the report of the import that just ran here.
+const askPermissionsAfterImport = vi.fn();
+vi.mock('../lib/import-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/import-permissions')>()),
+  askPermissionsAfterImport: (...a: unknown[]) => askPermissionsAfterImport(...a),
+}));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // HubIcon hornea todos los SVG del shell vía `~icons/…?raw`, que el entorno de test deniega.
 // Aquí probamos el contrato del paso pick, no los iconos: lo stubeamos.
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import ImportPanel from './ImportPanel.vue';
-import ImportPermissionsConsent from './ImportPermissionsConsent.vue';
 import { importBlueprint } from '../lib/runtime';
 import { setUser, type SessionUser } from '../lib/session';
 // Real English catalogue: the blocked row is tested through the sentence the user reads.
@@ -79,6 +85,7 @@ beforeEach(() => {
   downloadBlueprint.mockReset();
   fetchImportReport.mockReset();
   retryImport.mockReset();
+  askPermissionsAfterImport.mockReset();
   appNames.clear();
   signInAsOwner();
 });
@@ -697,9 +704,6 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
 // report: the one of the import that just ran here — never the one recovered from an earlier import
 // when the owner merely opens Settings › Data.
 describe('hub#1905 · al terminar de importar se piden los permisos de sus apps', () => {
-  const consentReport = (w: ReturnType<typeof mountPanel>): unknown =>
-    w.getComponent(ImportPermissionsConsent).props('report');
-
   const salon = {
     sections: [{ section: 'modules/verifactu', status: 'Applied', discarded_rows: 0 }],
     installed_modules: [
@@ -709,18 +713,19 @@ describe('hub#1905 · al terminar de importar se piden los permisos de sus apps'
     origin: { source: 'catalog', slug: 'peluqueria', version: '1.0.0', locale: 'es' },
   };
 
-  it('el modal de permisos recibe el informe del import que acaba de terminar', async () => {
+  it('se pregunta por el informe del import que acaba de terminar', async () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     fetchImportReport.mockResolvedValue(null);
     vi.mocked(importBlueprint).mockResolvedValue(salon as never);
     const w = mountPanel();
     await flushPromises();
-    expect(consentReport(w)).toBeNull();
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
 
     await (w.vm as unknown as { doImport: () => Promise<void> }).doImport();
     await flushPromises();
 
-    expect(consentReport(w)).toEqual(salon);
+    expect(askPermissionsAfterImport).toHaveBeenCalledTimes(1);
+    expect(askPermissionsAfterImport).toHaveBeenCalledWith(salon);
   });
 
   it('y el del reintento, que también puede instalar apps', async () => {
@@ -740,7 +745,8 @@ describe('hub#1905 · al terminar de importar se piden los permisos de sus apps'
     await w.get('[data-testid="import-report-retry"]').trigger('click');
     await flushPromises();
 
-    expect(consentReport(w)).toEqual(salon);
+    expect(askPermissionsAfterImport).toHaveBeenCalledTimes(1);
+    expect(askPermissionsAfterImport).toHaveBeenCalledWith(salon);
   });
 
   it('un informe RECUPERADO de un import anterior no pregunta nada al abrir Datos', async () => {
@@ -759,6 +765,6 @@ describe('hub#1905 · al terminar de importar se piden los permisos de sus apps'
     // The recovered report IS on screen — the question is about the import that is not running.
     expect(w.find('[data-testid="import-report"]').exists()).toBe(true);
 
-    expect(consentReport(w)).toBeNull();
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
   });
 });

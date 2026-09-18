@@ -13,8 +13,8 @@
 //   - one click grants them all; nothing is granted without that click (default-deny stays);
 //   - a refusal is SAID, and only what failed stays on screen to retry;
 //   - «Not now» grants nothing — the checklist keeps saying what is missing (hub#1905, 2nd half).
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
 const getModuleCapabilities = vi.fn();
@@ -40,7 +40,9 @@ vi.mock('../lib/app-names', async () => {
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import ImportPermissionsConsent from './ImportPermissionsConsent.vue';
+import { askPermissionsAfterImport } from '../lib/import-permissions';
 import type { ImportReport, ModuleCapability } from '../lib/runtime';
+import { readFileSync } from 'node:fs';
 import enCatalogue from '../i18n/locales/en';
 import esCatalogue from '../i18n/locales/es';
 
@@ -72,18 +74,28 @@ function salonReport(): ImportReport {
   } as ImportReport;
 }
 
-function mountConsent(report: ImportReport | null) {
+function mountConsent() {
   return mount(ImportPermissionsConsent, {
-    props: { report },
     shallow: true,
     global: { plugins: [i18n], renderStubDefaultSlot: true },
   });
+}
+
+/** Mounted first, THEN an import finishes somewhere in the shell — the order of real life. */
+async function consentAfterImport(report: ImportReport = salonReport()) {
+  const w = mountConsent();
+  askPermissionsAfterImport(report);
+  await flushPromises();
+  return w;
 }
 
 const modal = (w: ReturnType<typeof mountConsent>): VueWrapper =>
   w.getComponent('[data-testid="import-permissions"]') as VueWrapper;
 const isOpen = (w: ReturnType<typeof mountConsent>): unknown =>
   (modal(w).props() as Record<string, unknown>).isOpen;
+
+// The signal is module-wide: a component left mounted by an earlier test would keep answering it.
+enableAutoUnmount(afterEach);
 
 beforeEach(() => {
   getModuleCapabilities.mockReset().mockImplementation(async (id: string) => {
@@ -100,8 +112,7 @@ beforeEach(() => {
 
 describe('when it asks', () => {
   it('at the end of an import, for the permissions still off of the apps it brought', async () => {
-    const w = mountConsent(salonReport());
-    await flushPromises();
+    const w = await consentAfterImport();
 
     expect(isOpen(w)).toBe(true);
     const groups = w.findAll('[data-testid="import-permissions-app"]');
@@ -112,8 +123,7 @@ describe('when it asks', () => {
   });
 
   it('says what stops working without each one, in the words Settings → Permissions uses', async () => {
-    const w = mountConsent(salonReport());
-    await flushPromises();
+    const w = await consentAfterImport();
 
     expect(w.text()).toContain(en.settings.capabilityBreaks.certificate);
     expect(w.text()).toContain(en.settings.capabilityBreaks.printer);
@@ -124,25 +134,37 @@ describe('when it asks', () => {
       module_id: id,
       capabilities: [cap('certificate', 'Business certificate', true)],
     }));
-    const w = mountConsent(salonReport());
-    await flushPromises();
+    const w = await consentAfterImport();
 
     expect(isOpen(w)).toBe(false);
     expect(putModuleCapabilities).not.toHaveBeenCalled();
   });
 
-  it('asks nothing before there is a report (the import has not finished)', async () => {
-    const w = mountConsent(null);
+  it('asks nothing before an import finishes', async () => {
+    const w = mountConsent();
     await flushPromises();
 
     expect(getModuleCapabilities).not.toHaveBeenCalled();
     expect(isOpen(w)).toBe(false);
   });
 
-  it('asks again for the next import, not only the first one', async () => {
-    const w = mountConsent(null);
+  it('an import that finished BEFORE it was mounted is not asked again (a new session starts clean)', async () => {
+    // The chrome is remounted on every sign-in: the last import of the previous session must not
+    // greet the next person with a question they did not cause.
+    askPermissionsAfterImport(salonReport());
+    const w = mountConsent();
     await flushPromises();
-    await w.setProps({ report: salonReport() });
+
+    expect(isOpen(w)).toBe(false);
+  });
+
+  it('asks again for the next import, not only the first one', async () => {
+    const w = await consentAfterImport();
+    await w.find('[data-testid="import-permissions-later"]').trigger('click');
+    await flushPromises();
+    expect(isOpen(w)).toBe(false);
+
+    askPermissionsAfterImport(salonReport());
     await flushPromises();
 
     expect(isOpen(w)).toBe(true);
@@ -151,8 +173,7 @@ describe('when it asks', () => {
 
 describe('granting', () => {
   it('one click grants every permission listed, and nothing is granted before it', async () => {
-    const w = mountConsent(salonReport());
-    await flushPromises();
+    const w = await consentAfterImport();
     expect(putModuleCapabilities).not.toHaveBeenCalled();
 
     await w.find('[data-testid="import-permissions-grant"]').trigger('click');
@@ -170,8 +191,7 @@ describe('granting', () => {
     putModuleCapabilities.mockImplementation(async (id: string) => {
       if (id === 'verifactu') throw new Error('put-capabilities verifactu → 401');
     });
-    const w = mountConsent(salonReport());
-    await flushPromises();
+    const w = await consentAfterImport();
 
     await w.find('[data-testid="import-permissions-grant"]').trigger('click');
     await flushPromises();
@@ -187,14 +207,35 @@ describe('granting', () => {
   });
 
   it('«Not now» grants nothing and closes', async () => {
-    const w = mountConsent(salonReport());
-    await flushPromises();
+    const w = await consentAfterImport();
 
     await w.find('[data-testid="import-permissions-later"]').trigger('click');
     await flushPromises();
 
     expect(isOpen(w)).toBe(false);
     expect(putModuleCapabilities).not.toHaveBeenCalled();
+  });
+});
+
+describe('where it lives', () => {
+  it('is mounted ONCE, in App.vue, inside the authenticated chrome', () => {
+    // Three doors import a template (the hero card, Settings › Data, the assistant): one question,
+    // wherever the import ran. Outside the gate there is nobody who could grant anything.
+    const app = readFileSync('src/App.vue', 'utf8');
+    const at = app.indexOf('<ImportPermissionsConsent');
+    expect(at, 'not mounted in App.vue').toBeGreaterThan(-1);
+    expect(app.indexOf('<ImportPermissionsConsent', at + 1), 'mounted twice').toBe(-1);
+    // App.vue has more than one gated block: the one that ENCLOSES it is what counts.
+    const opened = app.lastIndexOf('<AuthenticatedChrome>', at);
+    expect(opened, 'outside the authenticated chrome').toBeGreaterThan(-1);
+    expect(app.lastIndexOf('</AuthenticatedChrome>', at), 'the gate closed before it').toBeLessThan(opened);
+    expect(app.indexOf('</AuthenticatedChrome>', at)).toBeGreaterThan(at);
+  });
+
+  it('no screen mounts its own copy', () => {
+    for (const screen of ['src/components/BlueprintHeroCard.vue', 'src/components/ImportPanel.vue']) {
+      expect(readFileSync(screen, 'utf8'), screen).not.toContain('<ImportPermissionsConsent');
+    }
   });
 });
 

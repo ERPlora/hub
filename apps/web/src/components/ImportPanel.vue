@@ -330,10 +330,6 @@
         {{ t('importPage.reportDismiss') }}
       </ion-button>
     </template>
-    <!-- hub#1905 — the apps this import brought ask for their permissions, which a template can
-         never grant by itself. Only the import that just ran HERE asks; a report recovered from an
-         earlier import does not. -->
-    <ImportPermissionsConsent :report="justImported" />
   </section>
 </template>
 
@@ -361,7 +357,7 @@ import {
   IonItemDivider,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
-import ImportPermissionsConsent from './ImportPermissionsConsent.vue';
+import { askPermissionsAfterImport } from '../lib/import-permissions';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { hasPermission } from '../lib/session';
 import { ADMINISTER_PERMISSION } from '../lib/management-link';
@@ -757,7 +753,8 @@ async function doRetry(): Promise<void> {
     const outcome = await retryImport(recoveredReport.value.batch_id);
     if (outcome.retried && outcome.report) {
       report.value = outcome.report;
-      justImported.value = outcome.report;
+      // hub#1905 — the apps it installed ask for their permissions, same as a normal import.
+      askPermissionsAfterImport(outcome.report);
       // The retry may have installed modules: same refresh as a normal import.
       await refreshModuleNav();
       window.dispatchEvent(new CustomEvent('erp:modules-changed'));
@@ -867,12 +864,6 @@ function resetToPick(): void {
 
 // ── Paso 3: importar → informe ──
 const report = ref<ImportReport | null>(null);
-/**
- * The report of the import (or retry) that just ran on this screen — what the permissions question
- * is asked about (hub#1905). Not `report`: that one is also filled with a report RECOVERED from an
- * earlier import when the page opens, and opening Settings › Data must not ask anything.
- */
-const justImported = ref<ImportReport | null>(null);
 
 async function doImport(): Promise<void> {
   if (!mayAdminister.value) return; // defensa: el botón ya está disabled
@@ -890,7 +881,10 @@ async function doImport(): Promise<void> {
       },
       pendingOrigin.value ?? undefined,
     );
-    justImported.value = report.value;
+    // hub#1905 — the apps this import brought ask for their permissions, which a template can never
+    // grant by itself. Only an import that runs here: the report RECOVERED on opening the page
+    // (`loadRecoveredReport`) is an earlier import and asks nothing.
+    askPermissionsAfterImport(report.value);
     step.value = 'report';
     // El import pudo instalar módulos: refresca el menú del shell.
     await refreshModuleNav();

@@ -8,9 +8,24 @@
 // import installs several at once and asked nothing, so a salon came out of its template with
 // VeriFactu and Printing switched off and the first sale went out with no fiscal record.
 //
-// Pure on purpose: which apps, which permissions and what failed are decided here, where a test can
-// argue with them; `ImportPermissionsConsent.vue` only paints and clicks.
+// Three doors import a template — the hero card of an empty business, Settings › Data and the
+// assistant (`hub.blueprints.apply`) — and ONE question is asked, by the single
+// `ImportPermissionsConsent` mounted in App.vue. Each door raises `askPermissionsAfterImport`; the
+// question listens. Which apps, which permissions and what failed are decided here, pure, where a
+// test can argue with them; the component only paints and clicks.
+import { computed, shallowRef, type ComputedRef } from 'vue';
+
 import type { ImportReport, ModuleCapability } from './runtime';
+
+const lastImport = shallowRef<ImportReport | null>(null);
+
+/** The report of the template import that just finished, wherever in the shell it ran. */
+export const templateImportReport: ComputedRef<ImportReport | null> = computed(() => lastImport.value);
+
+/** A template import just finished: ask the owner for the permissions its apps still lack. */
+export function askPermissionsAfterImport(report: ImportReport): void {
+  lastImport.value = report;
+}
 
 /** The permissions still off for one app the import brought. */
 export interface PermissionGroup {

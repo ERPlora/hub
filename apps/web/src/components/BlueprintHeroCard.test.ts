@@ -36,6 +36,14 @@ vi.mock('../lib/runtime', async () => {
 const refreshModuleNav = vi.fn();
 vi.mock('../lib/nav', () => ({ refreshModuleNav: (...a: unknown[]) => refreshModuleNav(...a) }));
 
+// hub#1905 — the question itself is `ImportPermissionsConsent`'s (tested there); what this card
+// owes it is the signal, with the report of the import it just ran.
+const askPermissionsAfterImport = vi.fn();
+vi.mock('../lib/import-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/import-permissions')>()),
+  askPermissionsAfterImport: (...a: unknown[]) => askPermissionsAfterImport(...a),
+}));
+
 // hub#488 — human names of the apps. Empty by default, which IS the «no name known» case: the
 // sentence must then fall back to the id rather than go blank.
 const appNames = vi.hoisted(() => new Map<string, string>());
@@ -60,7 +68,6 @@ vi.mock('../lib/hub-settings', () => ({ hubSettings: { value: { country_code: 'E
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import BlueprintHeroCard from './BlueprintHeroCard.vue';
-import ImportPermissionsConsent from './ImportPermissionsConsent.vue';
 import type { SetupItem, SetupStatus } from '../lib/setup-status';
 import enCatalogue from '../i18n/locales/en';
 import esCatalogue from '../i18n/locales/es';
@@ -151,6 +158,7 @@ beforeEach(() => {
   inspectBlueprint.mockReset().mockResolvedValue({ ok: true, upload_id: 'up-1', manifest: MANIFEST });
   importBlueprint.mockReset().mockResolvedValue({ sections: [], installed_modules: [] });
   refreshModuleNav.mockReset();
+  askPermissionsAfterImport.mockReset();
   appNames.clear();
   session.value = { permissions: ['hub.administer'] };
 });
@@ -683,9 +691,6 @@ describe('un fallo de la nube se lee (hub#1693)', () => {
 // first sale went out with no fiscal record. The question lives in `ImportPermissionsConsent`
 // (tested there); what this card owes it is the report of the import it just ran.
 describe('the permissions of the apps the template brought (hub#1905)', () => {
-  const consentReport = (w: ReturnType<typeof mountCard>): unknown =>
-    w.getComponent(ImportPermissionsConsent).props('report');
-
   const salon = {
     sections: [],
     installed_modules: [
@@ -698,12 +703,13 @@ describe('the permissions of the apps the template brought (hub#1905)', () => {
     importBlueprint.mockResolvedValue(salon);
     const w = mountCard();
     await flushPromises();
-    expect(consentReport(w)).toBeNull();
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
 
     await w.get('[data-testid="hero-use"]').trigger('click');
     await flushPromises();
 
-    expect(consentReport(w)).toEqual(salon);
+    expect(askPermissionsAfterImport).toHaveBeenCalledTimes(1);
+    expect(askPermissionsAfterImport).toHaveBeenCalledWith(salon);
   });
 
   it('an interrupted import asks nothing: there is no report of what came in', async () => {
@@ -714,6 +720,6 @@ describe('the permissions of the apps the template brought (hub#1905)', () => {
     await w.get('[data-testid="hero-use"]').trigger('click');
     await flushPromises();
 
-    expect(consentReport(w)).toBeNull();
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
   });
 });

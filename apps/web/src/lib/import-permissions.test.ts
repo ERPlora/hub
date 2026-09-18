@@ -15,7 +15,14 @@
 //   - and granting reports which apps failed, so nothing is claimed that did not happen.
 import { describe, expect, it, vi } from 'vitest';
 
-import { appsToAsk, grantPending, pendingPermissions, type PermissionGroup } from './import-permissions';
+import {
+  appsToAsk,
+  askPermissionsAfterImport,
+  grantPending,
+  pendingPermissions,
+  templateImportReport,
+  type PermissionGroup,
+} from './import-permissions';
 import type { ImportReport, ModuleCapability } from './runtime';
 
 function cap(id: string, over: Partial<ModuleCapability> = {}): ModuleCapability {
@@ -109,5 +116,18 @@ describe('granting', () => {
 
     expect(failed.map((g) => g.moduleId)).toEqual(['verifactu']);
     expect(put).toHaveBeenCalledWith('printing', { printer: true });
+  });
+});
+
+// Three doors import a template — the hero card, Settings › Data and the assistant — and ONE
+// question is asked, by the single `ImportPermissionsConsent` of App.vue. The doors say «this import
+// just finished»; the question listens.
+describe('the signal every door raises when a template import finishes', () => {
+  it('carries the report of the import that just finished', () => {
+    const r = report([['verifactu', 'installed']]);
+
+    askPermissionsAfterImport(r);
+
+    expect(templateImportReport.value).toBe(r);
   });
 });

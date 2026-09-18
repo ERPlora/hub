@@ -70,9 +70,9 @@
 // an import installs several and asked nothing, so a salon came out of «Peluquería» with VeriFactu
 // and Printing switched off: its first sale had no fiscal record and its receipt never printed.
 //
-// Shared by both doors that import a template — the hero card of an empty business and Settings ›
-// Data — so the question is the same wherever the import ran. What to ask and what failed is
-// decided in `lib/import-permissions.ts`; this only paints and clicks.
+// Mounted ONCE, in App.vue: the hero card, Settings › Data and the assistant all import templates,
+// and each raises `askPermissionsAfterImport` — so the question is the same wherever the import ran.
+// What to ask and what failed is decided in `lib/import-permissions.ts`; this only paints and clicks.
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
@@ -91,7 +91,13 @@ import {
 
 import HubIcon from './HubIcon.vue';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
-import { appsToAsk, grantPending, pendingPermissions, type PermissionGroup } from '../lib/import-permissions';
+import {
+  appsToAsk,
+  grantPending,
+  pendingPermissions,
+  templateImportReport,
+  type PermissionGroup,
+} from '../lib/import-permissions';
 import { capabilityBreaksKey } from '../lib/module-capabilities';
 import {
   getClient,
@@ -101,10 +107,6 @@ import {
 } from '../lib/runtime';
 import { refreshSetupStatus } from '../lib/setup-status';
 
-const props = defineProps<{
-  /** The report of the import that just finished. `null` while there is none. */
-  report: ImportReport | null;
-}>();
 const emit = defineEmits<{ granted: [] }>();
 
 const { t } = useI18n();
@@ -124,13 +126,11 @@ const failedMessage = computed<string>(() =>
     : '',
 );
 
-watch(
-  () => props.report,
-  (report) => {
-    void ask(report);
-  },
-  { immediate: true },
-);
+// Only an import that finishes while this is mounted is asked about — never `immediate`: the chrome
+// is remounted on every sign-in, and the last import of the previous session is not this person's.
+watch(templateImportReport, (report) => {
+  void ask(report);
+});
 
 async function ask(report: ImportReport | null): Promise<void> {
   const ids = appsToAsk(report);
@@ -140,7 +140,7 @@ async function ask(report: ImportReport | null): Promise<void> {
     loadAppNames(),
   ]);
   // A newer import finished while this one was being read: that one asks, not this one.
-  if (report !== props.report) return;
+  if (report !== templateImportReport.value) return;
   appNames.value = names;
   groups.value = pending;
   failed.value = [];

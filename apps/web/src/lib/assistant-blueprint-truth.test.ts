@@ -36,6 +36,12 @@ vi.mock('./runtime', async (importOriginal) => ({
   importBlueprint: importMock,
 }));
 vi.mock('./config', () => ({ config: { hubId: 'h1' } }));
+// hub#1905 — the assistant is the third door that imports a template: it raises the same signal.
+const { askPermissionsMock } = vi.hoisted(() => ({ askPermissionsMock: vi.fn() }));
+vi.mock('./import-permissions', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  askPermissionsAfterImport: askPermissionsMock,
+}));
 vi.mock('./cloud', () => ({ getAccessToken: () => 'tok' }));
 
 import { streamAssistant } from './assistant';
@@ -135,5 +141,47 @@ describe('aplicar una plantilla devuelve lo que SIGUE bloqueado', () => {
     // Callar sería peor que fallar: el modelo leería «no hay nada bloqueando».
     expect(result.still_blocking).toBeUndefined();
     expect(result.setup_status_unavailable).toBe(true);
+  });
+});
+
+// hub#1905 — the salon of the issue came out of «Peluquería» with VeriFactu and Printing switched
+// off and nobody asked. Through the assistant it is the same template and the same question: the
+// owner is asked on screen, and the model is told WHICH switch the fiscal step is waiting on.
+describe('aplicar una plantilla por el asistente pide los permisos de sus apps (hub#1905)', () => {
+  const report = { installed_modules: [{ id: 'verifactu', status: 'installed' }] };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    downloadMock.mockResolvedValue(new Blob());
+    inspectMock.mockResolvedValue({ upload_id: 'u1', manifest: {} });
+    importMock.mockResolvedValue(report);
+    queryMock.mockResolvedValue([
+      {
+        items: [
+          {
+            key: 'verifactu.setup',
+            state: 'pending',
+            level: 'legal',
+            title: 'Configure VeriFactu',
+            route: '/settings?tab=permissions',
+            missing_capabilities: ['certificate'],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('la misma pregunta que la tarjeta de plantillas: la señal con el informe del import', async () => {
+    await applyBlueprintAndCaptureToolResult();
+
+    expect(askPermissionsMock).toHaveBeenCalledTimes(1);
+    expect(askPermissionsMock).toHaveBeenCalledWith(report);
+  });
+
+  it('el modelo sabe QUÉ permiso espera el paso fiscal, no solo que está pendiente', async () => {
+    const result = await applyBlueprintAndCaptureToolResult();
+
+    const blocking = result.still_blocking as { key: string; missing_capabilities?: string[] }[];
+    expect(blocking.find((i) => i.key === 'verifactu.setup')?.missing_capabilities).toEqual(['certificate']);
   });
 });
