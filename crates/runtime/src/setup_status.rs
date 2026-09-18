@@ -406,20 +406,27 @@ pub async fn status(
         if !actionable && level != LEVEL_LEGAL {
             continue;
         }
-        let Some(done) = module_item_done(db, registry, def, ctx).await else {
+        let Some(own_done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
         // …and a module the dispatcher is going to refuse is not «configured», whatever its own
         // settings say (hub#1119). See [`missing_capabilities`].
         let missing = missing_capabilities(db, registry, hub_id, &manifest.id).await;
-        let done = done && missing.is_empty();
-        // The switch is the ADMINISTRATOR's (hub#1905): Ajustes → Permisos lets nobody else flip it,
-        // so while a permission is missing the way in is open to them alone, whoever configures the
-        // module (`printing` hands `manage_settings` to a manager). Same rule as above: a wall still
-        // says WHO, and the rest is only told to whoever can act.
-        let actionable = actionable
-            && (missing.is_empty()
-                || crate::permissions::has(ctx, crate::hub_users::ADMINISTER_PERMISSION));
+        let done = own_done && missing.is_empty();
+        // The item has two halves with two owners (hub#1905). The switch is the ADMINISTRATOR's:
+        // Ajustes → Permisos lets nobody else flip it (`printing` hands `manage_settings` to a
+        // manager). The module's own settings are whoever configures it. So a session that cannot
+        // grant is not told about the switch while its own half is still to do — the item stays
+        // theirs, on the module's own screen — and once that half is done, what is left is not
+        // theirs: same rule as above, a wall still says WHO and the rest is only told to whoever
+        // can act.
+        let can_grant = crate::permissions::has(ctx, crate::hub_users::ADMINISTER_PERMISSION);
+        let missing = if own_done || can_grant {
+            missing
+        } else {
+            Vec::new()
+        };
+        let actionable = actionable && (missing.is_empty() || can_grant);
         if !actionable && level != LEVEL_LEGAL {
             continue;
         }
@@ -728,7 +735,8 @@ fn item_json(
         "actionable": actionable,
         // Which of the module's host capabilities are still denied (hub#1905), by id — the reason
         // an item whose own settings are fine is still pending. Always present, empty when nothing
-        // is missing: a consumer never branches on presence.
+        // is missing: a consumer never branches on presence. Also empty for a session that cannot
+        // grant them while the module's own settings are still to do: that half is theirs.
         "missing_capabilities": missing_capabilities,
     })
 }

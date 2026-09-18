@@ -1813,12 +1813,7 @@ async fn a_module_item_that_stops_being_a_wall_goes_back_to_being_somebody_else_
         keys(&doc)
     );
     assert_eq!(doc["blocking_pending"], 0);
-    // …and whoever CAN configure it still has it, as a 🔴 and actionable. The switch is granted
-    // first: while it is off the way in is Ajustes → Permisos, which is the administrator's and not
-    // this configurer's (hub#1905) — what this test is about is the module's OWN settings.
-    rt.set_module_capability("fiscal", "certificate", true, "hub_user:1")
-        .await
-        .expect("the owner grants it in Ajustes → Permisos");
+    // …and whoever CAN configure it still has it, as a 🔴 and actionable.
     let doc = status(
         &rt,
         &ctx("hub-setup", &[SESSION, "fiscal.view", "fiscal.configure"]),
@@ -2155,9 +2150,10 @@ async fn items_that_ask_for_no_permission_carry_an_empty_list() {
 // permission» button to a screen that answers «only an administrator can change permissions». Same
 // rule as hub#435: a wall says WHO, and the rest is only told to whoever can act.
 
-/// A module that asks the host for the printer **and whose own check passes**. Not a legal wall:
-/// nothing about it stops a sale.
-fn printer_module(id: &str) -> PathBuf {
+/// A module that asks the host for the printer. Not a legal wall: nothing about it stops a sale.
+/// `own_settings_filled` is the answer of its OWN check — the half of the item that is whoever
+/// configures the module's, not the administrator's.
+fn printer_module(id: &str, own_settings_filled: bool) -> PathBuf {
     module_fixture(
         json!({
             "id": id,
@@ -2180,7 +2176,14 @@ fn printer_module(id: &str) -> PathBuf {
                 "order": 70
             }
         }),
-        &[("queries/settings_get.sql", "SELECT 1 AS ready")],
+        &[(
+            "queries/settings_get.sql",
+            if own_settings_filled {
+                "SELECT 1 AS ready"
+            } else {
+                "SELECT 0 AS ready"
+            },
+        )],
     )
 }
 
@@ -2212,7 +2215,7 @@ async fn a_wall_pending_on_a_permission_is_not_actionable_for_who_cannot_grant_i
 #[tokio::test]
 async fn an_item_pending_on_a_permission_is_only_told_to_who_can_grant_it() {
     let mut rt = runtime("hub-setup").await;
-    let dir = printer_module("printing");
+    let dir = printer_module("printing", true);
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
@@ -2249,4 +2252,47 @@ async fn an_item_pending_on_a_permission_is_only_told_to_who_can_grant_it() {
     )
     .await;
     assert_eq!(must(&after, "printing.setup")["state"], "done");
+}
+
+#[tokio::test]
+async fn whoever_configures_the_module_keeps_their_own_half_while_the_permission_is_missing() {
+    // The item has two halves with two owners: the switch is the administrator's, the module's OWN
+    // settings are whoever configures it. While those are not filled in either, the item is still
+    // that configurer's task — hiding it because of the half they cannot do loses the half they
+    // can (it also took `fiscal.setup` away from the session hub#370's ⛔ is asserted on).
+    let mut rt = runtime("hub-setup").await;
+    let dir = printer_module("printing", false);
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let manager = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, "printing.manage_settings"]),
+    )
+    .await;
+    let theirs = must(&manager, "printing.setup");
+    assert_eq!(theirs["state"], "pending");
+    assert_eq!(theirs["actionable"], true);
+    assert_eq!(
+        theirs["route"], "/m/printing/settings",
+        "their half is the module's own screen"
+    );
+    assert_eq!(
+        theirs["missing_capabilities"],
+        json!([]),
+        "the switch is not theirs: no «Grant permission» for whoever cannot grant it"
+    );
+
+    // The administrator is still sent to the switch first.
+    let admin = status(
+        &rt,
+        &ctx(
+            "hub-setup",
+            &[SESSION, ADMINISTER, "printing.manage_settings"],
+        ),
+    )
+    .await;
+    let item = must(&admin, "printing.setup");
+    assert_eq!(item["route"], PERMISSIONS_ROUTE);
+    assert_eq!(item["missing_capabilities"], json!(["printer"]));
 }
