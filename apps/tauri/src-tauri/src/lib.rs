@@ -21,6 +21,8 @@ use serde::Serialize;
 /// What the window shows when the network dies under it (hub#1716).
 mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
+mod navigation;
+pub use navigation::{NavigationVerdict, navigation_verdict};
 
 /// Id de dispositivo estable por instalación (`X-Device-Id` del login; sesión única ADR-0154).
 const DEVICE_ID_FILE: &str = "device.id";
@@ -596,12 +598,13 @@ fn trusted_hub_origin(url: &tauri::Url) -> Option<String> {
     Some(url.origin().ascii_serialization())
 }
 
-/// Contrato de captura (ADR-0159): si la navegación lleva el marcador `?shell=1` **y** el destino
-/// es uno de los nuestros ([`trusted_hub_origin`]), devuelve el ORIGEN a persistir como `hub_url`.
+/// Capture contract (ADR-0159): when the navigation carries the `?shell=1` marker **and** the
+/// destination is one of ours ([`trusted_hub_origin`]), returns the ORIGIN to persist as `hub_url`.
 ///
-/// El marcador dice «recuérdame», no «soy de fiar»: lo lleva la URL a la que se navega, y el shell
-/// nunca bloquea una navegación (`on_navigation` devuelve siempre `true`), así que sin el segundo
-/// filtro basta un enlace para dejar el TPV arrancando en la página de otro — para siempre.
+/// The marker says "remember me", not "trust me": it rides on the URL being navigated to, and
+/// `on_navigation` only refuses pages of the SaaS, and only in the Play copy
+/// ([`navigation_verdict`], hub#1915) — so without the second filter one link is enough to leave the
+/// till booting on somebody else's page, for good.
 pub fn shell_capture_origin(url: &tauri::Url) -> Option<String> {
     let has_marker = url.query_pairs().any(|(k, v)| k == "shell" && v == "1");
     if !has_marker {
@@ -1038,11 +1041,20 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 
     let last = std::sync::Mutex::new(persisted);
     let watched = nav_state.clone();
+    let saas_base = saas_base_url();
+    let refusals = app.handle().clone();
     let window = WebviewWindowBuilder::new(app, "main", url)
         .title("ERPlora")
         .inner_size(1280.0, 800.0)
         .min_inner_size(960.0, 600.0)
         .on_navigation(move |nav| {
+            // hub#1915: the Play copy follows only the SaaS pages that cannot take money. First,
+            // so a refused page is neither remembered as the hub nor watched by the guard below.
+            let verdict = navigation_verdict(distribution_channel(), &saas_base, nav);
+            if verdict != NavigationVerdict::Allow {
+                refuse_navigation(&refusals, verdict, &saas_base, nav);
+                return false;
+            }
             if let (Some(dir), Some(origin)) = (cache_dir.as_deref(), shell_capture_origin(nav)) {
                 if let Ok(mut guard) = last.lock() {
                     if guard.as_deref() != Some(origin.as_str()) {
@@ -1059,13 +1071,86 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
             if let Some(target) = connectivity::remote_target(nav) {
                 watched.set_target(target);
             }
-            true // el shell nunca bloquea la navegación; solo observa el marcador
+            true
         })
         .build()?;
 
     // From here on, a load that never lands has an answer (hub#1716).
     spawn_connectivity_guard(window, nav_state);
     Ok(())
+}
+
+/// The notice for a page the Play copy refused (hub#1915): English source plus its `es`
+/// translation (ADR-0055/0199). It names no other place to go on purpose — sending the person to
+/// finish on the website is the very communication Google Play forbids.
+const REFUSAL_NOTICE_EN: &str = "This page is not available in the app.";
+const REFUSAL_NOTICE_ES: &str = "Esta página no está disponible en la aplicación.";
+
+/// The script that shows the refusal notice on the page the window stayed on.
+///
+/// The refused page is the SaaS's, not ours, so there is no i18n runtime to lean on: the language is
+/// picked the way the bundled offline page picks it — Spanish unless the device says otherwise. An
+/// `alert` because it is the one dialog every webview already paints natively (wry's Android client
+/// answers it with an `AlertDialog`). The texts reach the page as JSON string literals, never as
+/// code.
+fn refusal_notice_script() -> String {
+    let es = serde_json::Value::from(REFUSAL_NOTICE_ES);
+    let en = serde_json::Value::from(REFUSAL_NOTICE_EN);
+    format!(
+        "alert(String(navigator.language || \"es\").toLowerCase().indexOf(\"es\") === 0 ? {es} : {en});"
+    )
+}
+
+/// What the window does with a page `on_navigation` refused: the SaaS home page takes it to the
+/// app's own start; any other page leaves it where it was, with the notice.
+fn answer_refusal<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+    verdict: NavigationVerdict,
+    saas_base: &str,
+) -> tauri::Result<()> {
+    match verdict {
+        NavigationVerdict::Allow => Ok(()),
+        NavigationVerdict::Home => {
+            let start = onboarding_url(saas_base)
+                .parse::<tauri::Url>()
+                .map_err(tauri::Error::InvalidUrl)?;
+            window.navigate(start)
+        }
+        NavigationVerdict::Refuse => window.eval(refusal_notice_script()),
+    }
+}
+
+/// Records a refused page and answers it on the main window.
+///
+/// The answer is sent OFF the handler: on Android `on_navigation` runs inside the webview client's
+/// `shouldOverrideUrlLoading`, on the UI thread and under wry's own lock, and it has to return
+/// before the webview can do anything else — including what we are about to ask of it.
+fn refuse_navigation(
+    app: &tauri::AppHandle,
+    verdict: NavigationVerdict,
+    saas_base: &str,
+    target: &tauri::Url,
+) {
+    use tauri::Manager;
+
+    // Origin and path, never the query: it can carry a one-time code.
+    log::warn!(
+        "shell: the {} copy refused {}{} ({verdict:?}, hub#1915)",
+        distribution_channel(),
+        target.origin().ascii_serialization(),
+        target.path()
+    );
+    let app = app.clone();
+    let saas_base = saas_base.to_string();
+    tauri::async_runtime::spawn(async move {
+        let Some(window) = app.get_webview_window("main") else {
+            log::error!("shell: no main window to answer a refused page on");
+            return;
+        };
+        if let Err(e) = answer_refusal(&window, verdict, &saas_base) {
+            log::error!("shell: could not answer a refused page ({verdict:?}): {e}");
+        }
+    });
 }
 
 // ── Camino de hardware: handlers `invoke` → erplora-peripherals ──────────────────────────────────
@@ -2171,8 +2256,9 @@ mod tests {
     // ── hub#335: the marker says "remember me"; it does not say WHO may ask ───────────────────
     //
     // `?shell=1` was the whole capture contract, so ANY https origin that carried it became the
-    // origin this installation boots at, for good. The shell never blocks a navigation
-    // (`on_navigation` always returns `true`), so one link is enough: an open redirect on the SaaS,
+    // origin this installation boots at, for good. The shell blocks no navigation to a foreign
+    // host (`on_navigation` refuses only SaaS pages, in the Play copy — hub#1915), so one link is
+    // enough: an open redirect on the SaaS,
     // an injection into the third-party checkout the same window loads, or simply a link a user
     // taps. From then on the till opens full-screen, chrome-less and titled "ERPlora" on somebody
     // else's page, and the operator types the hub password into it.
@@ -2621,5 +2707,60 @@ mod tests {
         // Una conf ilegible no puede tumbar la pantalla de ajustes: se contesta que no se sabe.
         assert_eq!(tauri_conf_version("{ no es json"), None);
         assert_eq!(tauri_conf_version(r#"{"version":42}"#), None);
+    }
+
+    // ── hub#1915: what the window does with a page the Play copy refuses ────────────────────────
+
+    /// A real window on Tauri's mock runtime, which records `navigate()` and answers `url()` with
+    /// it — so the answer to a refusal is asserted as a MOVE (or its absence), not as a bool.
+    fn mock_window_at(start: &str) -> tauri::WebviewWindow<tauri::test::MockRuntime> {
+        // `mock_context(noop_assets())`, not `generate_context!()`: see `connectivity::tests`.
+        let app = tauri::test::mock_builder()
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::External(url(start)))
+            .build()
+            .expect("mock window")
+    }
+
+    #[test]
+    fn the_saas_home_page_takes_the_window_to_the_app_s_start() {
+        let window = mock_window_at("https://erplora.com/accounts/logout/");
+        answer_refusal(&window, NavigationVerdict::Home, "https://erplora.com").expect("answer");
+        assert_eq!(
+            window.url().expect("url").as_str(),
+            "https://erplora.com/shell/"
+        );
+    }
+
+    #[test]
+    fn a_refused_page_leaves_the_window_where_it_was() {
+        // Anywhere but the app's start, or "stayed" and "went home" would look the same.
+        let here = "https://erplora.com/account/login/?next=/shell/";
+        let window = mock_window_at(here);
+        answer_refusal(&window, NavigationVerdict::Refuse, "https://erplora.com").expect("answer");
+        assert_eq!(window.url().expect("url").as_str(), here);
+    }
+
+    #[test]
+    fn the_refusal_notice_speaks_both_languages_and_names_no_other_place_to_go() {
+        let script = refusal_notice_script();
+        // ADR-0055/0199: the English source and its Spanish translation, picked the way the
+        // bundled offline page picks them (Spanish unless the device says otherwise).
+        assert!(script.contains(REFUSAL_NOTICE_EN), "{script}");
+        assert!(script.contains(REFUSAL_NOTICE_ES), "{script}");
+        assert!(script.contains("navigator.language"), "{script}");
+        assert!(script.starts_with("alert("), "{script}");
+        // Anti-steering cuts both ways: telling the person to finish this on the website is the
+        // very communication Play forbids, so the notice may not name any address.
+        for text in [REFUSAL_NOTICE_EN, REFUSAL_NOTICE_ES] {
+            let lower = text.to_lowercase();
+            for forbidden in ["erplora.com", "http", "www", "browser", "navegador", "web"] {
+                assert!(
+                    !lower.contains(forbidden),
+                    "the notice points elsewhere: {text}"
+                );
+            }
+        }
     }
 }
