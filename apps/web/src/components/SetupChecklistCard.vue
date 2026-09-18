@@ -195,11 +195,12 @@ function pillTone(item: SetupItem): string {
  * theirs (hub#435) is somebody else's to type, and saying WHO turns a dead end into an errand.
  */
 /**
- * Pending on a switch in Settings → Permissions, not on the app's own settings (hub#1905). Only for
- * whoever can flip it: a wall that is somebody else's keeps saying WHO (hub#435).
+ * Pending on a switch in Settings → Permissions, not on the app's own settings (hub#1905). A wall
+ * that is somebody else's still says WHO (hub#435): `noteOf` asks that first, and the button only
+ * exists for an actionable row.
  */
 function waitsOnPermission(item: SetupItem): boolean {
-  return isActionable(item) && item.missingCapabilities.length > 0;
+  return item.missingCapabilities.length > 0;
 }
 
 function noteOf(item: SetupItem): string {
