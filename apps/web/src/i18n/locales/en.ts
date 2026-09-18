@@ -176,6 +176,7 @@ export default {
     // button only gets a 403 and a generic error: worse than not seeing it, and worse than
     // reading who to ask.
     quotaAskAdmin: 'Ask the owner of the business to upgrade the assistant plan.',
+    quotaManagedInAccount: "The assistant's plan is upgraded from your ERPlora account at erplora.com.",
     plansTitle: 'Choose a plan',
     plansConfirm: 'Go to payment',
     planOption: '{name} — {price} €/month',
