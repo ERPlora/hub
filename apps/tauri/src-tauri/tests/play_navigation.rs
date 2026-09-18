@@ -4,7 +4,7 @@
 //! The app boots on the SaaS (`/shell/`) and shows its sign-in, sign-up and account pages in the
 //! webview. Until this guard `on_navigation` returned `true` without looking, so the window could
 //! walk to ANY page of erplora.com — the home page with the plan prices, the public marketplace,
-//! the panel with Billing. One vuelta of the Android QA found six such doors (hub#1900, hub#1910,
+//! the panel with Billing. One round of the Android QA found six such doors (hub#1900, hub#1910,
 //! saas#2083, saas#2084, saas#2085 and the «Log Out» + cookie banner of saas#2088), each one closed
 //! by hand in its template; the next link somebody adds to the web opens the seventh. Paying for
 //! digital goods outside Google Play billing, or being steered there, is a rejection reason.
@@ -16,7 +16,8 @@
 //! What is deliberately NOT policed: pages that are not the SaaS. Hubs are where the app lives, the
 //! loopback is development, the bundled page is ours, and foreign hosts keep today's behaviour —
 //! the payment pages this guard exists for are reached through the SaaS, and the SaaS is what the
-//! list covers.
+//! list covers. And it governs the WINDOW only: the doors that leave for the system browser
+//! (hub#1900, hub#1910 go through `openExternal`) are the web's guard and hub#1918.
 
 use erplora_tauri_lib::{NavigationVerdict, navigation_verdict};
 

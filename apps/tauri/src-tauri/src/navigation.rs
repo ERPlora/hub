@@ -4,7 +4,7 @@
 //! its own window. For as long as `on_navigation` answered `true` without looking, that window could
 //! walk to ANY page of erplora.com: the home page with the plan prices, the public marketplace, the
 //! panel with Billing. In the Google Play copy each of those is a door to paying outside Play
-//! billing — a rejection reason — and one vuelta of the Android QA found six, every one closed by
+//! billing — a rejection reason — and one round of the Android QA found six, every one closed by
 //! hand in its template. The templates cannot be the only barrier: the next link somebody adds to
 //! the web opens the next door.
 //!
@@ -17,6 +17,9 @@
 //! `no-purchase-steering` test of the web app), the loopback is development, the bundled page is
 //! ours, and foreign hosts keep the behaviour they had: the pages this exists for are reached
 //! through the SaaS.
+//!
+//! This governs the WINDOW. What leaves for the system browser (`open_external_url`) and the
+//! panel's in-page htmx navigation never reach `on_navigation`; both are hub#1918.
 
 use tauri::Url;
 
