@@ -46,6 +46,12 @@ export interface SaleTicketFailure {
    * se imprimió», que manda al cajero a buscar un fallo que no existe.
    */
   awaitingHost?: boolean;
+  /**
+   * The paper itself could not be made: the sales module did not compose the ticket (hub#1921).
+   * Nothing reached the printer or the queue, so the way out is reprinting from the ticket screen,
+   * and the till says that in words — `error` carries the code for the log, never for the screen.
+   */
+  notComposed?: boolean;
 }
 
 interface Deps {
@@ -99,7 +105,7 @@ async function printTicket(deps: Deps, saleId: string): Promise<void> {
   try {
     data = await deps.saleDocument(saleId);
   } catch (e) {
-    deps.onFailure?.({ saleId, error: e instanceof Error ? e.message : String(e) });
+    deps.onFailure?.({ saleId, error: e instanceof Error ? e.message : String(e), notComposed: true });
     return;
   }
 

@@ -236,10 +236,13 @@ bootPrintOnSale(getClient(), {
   onFailure: (f) => {
     // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
     // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
+    // A third (hub#1921): the paper was never made — a sentence, not the code, and the way out.
     void toastError(
       f.awaitingHost
         ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
-        : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
+        : f.notComposed
+          ? i18n.global.t('print.ticketNotComposed', { saleId: f.saleId })
+          : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
     );
   },
 });

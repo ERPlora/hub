@@ -115,6 +115,9 @@ describe('the ticket on payment is the paper the ticket screen prints (hub#1921)
     expect(gate.print).not.toHaveBeenCalled();
     expect(onFailure).toHaveBeenCalledTimes(1);
     expect(onFailure.mock.calls[0]![0]).toMatchObject({ saleId: '42', error: 'sale_document_timeout' });
+    // And says WHICH failure it is: the paper was never made (reprint it from the ticket screen), not
+    // a printer that did not deliver — the till shows a sentence for it, never the code.
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ notComposed: true });
   });
 
   it('the drawer opens even when the ticket cannot be composed', async () => {
@@ -189,6 +192,7 @@ describe('the ticket on payment (hub#862)', () => {
 
     expect(onFailure).toHaveBeenCalledTimes(1);
     expect(onFailure.mock.calls[0]![0]).toMatchObject({ saleId: '42' });
+    expect(onFailure.mock.calls[0]![0].notComposed).toBeUndefined();
   });
 
   it('when the door delivers (queue or printer) it keeps quiet', async () => {
