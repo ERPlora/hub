@@ -1327,7 +1327,11 @@ mod testing_always_reaches_the_aeat_hub1934 {
             "a hub without config can only ever send to the TEST AEAT"
         );
         let applied = ops_named(&out, "verifactu._apply_transmission");
-        assert_eq!(applied.len(), 1, "the AEAT verdict must be applied to the record");
+        assert_eq!(
+            applied.len(),
+            1,
+            "the AEAT verdict must be applied to the record"
+        );
         assert_eq!(applied[0].params.get("status"), Some(&json!("accepted")));
     }
 
@@ -1352,7 +1356,11 @@ mod testing_always_reaches_the_aeat_hub1934 {
 
         assert_eq!(ops_named(&out, "verifactu._insert_record").len(), 1);
         let queued = ops_named(&out, "verifactu._enqueue_contingency");
-        assert_eq!(queued.len(), 1, "the record must wait in the contingency queue");
+        assert_eq!(
+            queued.len(),
+            1,
+            "the record must wait in the contingency queue"
+        );
         assert_eq!(queued[0].params.get("record_id"), Some(&json!("id-rec")));
         assert!(
             ops_named(&out, "verifactu._insert_event").iter().any(|o| {
