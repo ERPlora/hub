@@ -29,9 +29,9 @@ pub(crate) async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Resu
         ));
     }
 
-    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
-        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
-    })?;
+    // The config the record was sealed with: a hub that never saved one sends against the
+    // defaults (`testing`), like the sale and the drain do (hub#1934).
+    let config = transmission_config(host, &ctx.hub_id).await?;
     // Gate: sin NINGUNA vía (certificado del core o pasarela fiscal) no se puede transmitir.
     if !can_transmit(host, &ctx.hub_id, &config).await? {
         return Err(VerifactuError::Certificate(
@@ -51,8 +51,10 @@ pub(crate) async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Resu
         &ctx.new_ids[1],
         // Id reservado para el ancla si la AEAT rechaza por encadenamiento y hay que re-anclar.
         &ctx.new_ids[2],
-        // Envío puntual: `verifactu.record.transmit` remite un registro, no drena la cola.
-        Remission::Punctual,
+        // Never punctual (verifactu#111): the record was generated earlier and did not leave with
+        // its sale — that is why somebody is sending it by hand. Filed without the incidence, a
+        // late record is the AEAT's 2004 (and 2007 if it is the first one) of 2026-09-13.
+        Remission::FromContingency,
     )
     .await?;
     let mut out = Output::new();
@@ -559,8 +561,10 @@ pub(crate) async fn enqueue_retry(
 /// incidence (`Cabecera/RemisionVoluntaria/Incidencia`, hub#322).
 ///
 /// It is passed in and not derived from the record on purpose: the caller is the only one that
-/// knows. `process_contingency_queue` is draining the queue; `transmit_record` and the inline
-/// transmission of `create_record` are remitting an invoice as it happens.
+/// knows. Only the inline transmission of `create_record` remits an invoice as it happens;
+/// `process_contingency_queue` and `transmit_record` send records that did not leave with their
+/// sale, and measured against the test AEAT (verifactu#111) a late record without the incidence
+/// is taken with 2004, and with 2007 if it is the first one of its chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Remission {
     /// The record is being remitted as it is generated — the ordinary sale.
@@ -1028,9 +1032,75 @@ pub(crate) fn apply_transmission(
 
 // ── process_contingency_queue (issue verifactu#7) ─────────────────────────────
 
+/// **A record that never left and was never queued** — born without a road, or held back behind
+/// an older record of its chain (verifactu#111). Nothing else leaves a record `pending` with no
+/// queue entry: every failed attempt queues it (hub#1934). Over `verifactu_record r` LEFT JOIN
+/// `verifactu_contingencyqueue q`.
+pub(crate) const DUE_NEVER_QUEUED: &str = "q.id IS NULL AND r.status = 'pending'";
+
+/// **A queue entry whose next attempt is due** — the drain's own eligibility since verifactu#7.
+/// An entry sitting out its backoff is not due: it neither goes early nor holds a new sale back.
+pub(crate) const DUE_FROM_QUEUE: &str = "q.status IN ('pending','retrying') \
+     AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= :now)";
+
+/// **What leaves in this drain, in the order the chain was sealed** (verifactu#111).
+///
+/// Two sources, and before verifactu#111 the drain only read the first: the queue entries that are
+/// due, and the records that never left and were never queued — which is every sale a business
+/// made before it had a road, so those never reached the AEAT at all. Both are sorted by the
+/// chain (`environment`, `issuer_nif`, `sequence_number`) and merged: the queue's own order
+/// (`queued_at`) would send a record retried from last week before the first record of the
+/// chain, and a first record filed after others is the AEAT's 2007.
+async fn due_for_remission(host: &dyn NativeHost, ctx: &Ctx, limit: i64) -> Result<Vec<Json>> {
+    let binds = params(json!({ "hub_id": ctx.hub_id, "now": ctx.now, "limit": limit }));
+    let queued = host
+        .read(
+            &format!(
+                "SELECT q.record_id, r.environment, r.issuer_nif, r.sequence_number \
+                 FROM verifactu_contingencyqueue q \
+                 LEFT JOIN verifactu_record r ON r.id = q.record_id AND r.hub_id = q.hub_id \
+                 WHERE q.hub_id = :hub_id AND q.is_deleted = 0 AND {DUE_FROM_QUEUE} \
+                 ORDER BY r.environment, r.issuer_nif, r.sequence_number, q.queued_at \
+                 LIMIT :limit"
+            ),
+            &binds,
+        )
+        .await?;
+    let never_queued = host
+        .read(
+            &format!(
+                "SELECT r.id AS record_id, r.environment, r.issuer_nif, r.sequence_number \
+                 FROM verifactu_record r \
+                 LEFT JOIN verifactu_contingencyqueue q ON q.record_id = r.id AND q.is_deleted = 0 \
+                 WHERE r.hub_id = :hub_id AND r.is_deleted = 0 AND {DUE_NEVER_QUEUED} \
+                 ORDER BY r.environment, r.issuer_nif, r.sequence_number \
+                 LIMIT :limit"
+            ),
+            &binds,
+        )
+        .await?;
+    let mut due: Vec<Json> = queued.into_iter().chain(never_queued).collect();
+    // Stable: within one position the queue keeps its own order. An orphan entry (its record is
+    // gone) has no position and goes last; the loop below drops it.
+    due.sort_by_key(|row| {
+        (
+            str_field(row, "environment"),
+            str_field(row, "issuer_nif"),
+            int_field(row, "sequence_number", i64::MAX),
+        )
+    });
+    let mut seen = std::collections::HashSet::new();
+    due.retain(|row| {
+        let id = str_field(row, "record_id");
+        !id.is_empty() && seen.insert(id)
+    });
+    Ok(due)
+}
+
 /// Procesa por lotes la cola de contingencia (tarea programada cada 5 min o trigger manual):
-/// lee las entradas elegibles (`pending`/`retrying` con `next_attempt_at <= now`) por prioridad y
-/// antigüedad, y reintenta la transmisión de cada una vía [`transmit_one`]. Éxito → sale de la
+/// lee lo que toca salir ([`due_for_remission`]: las entradas elegibles —`pending`/`retrying` con
+/// `next_attempt_at <= now`— y los registros que nunca salieron ni se encolaron), en el orden de
+/// la cadena, y remite cada uno vía [`transmit_one`] declarando la incidencia. Éxito → sale de la
 /// cola; fallo → backoff. Devuelve un evento resumen `{successful, failed}`.
 pub(crate) async fn process_contingency_queue(
     input: &Json,
@@ -1049,15 +1119,7 @@ pub(crate) async fn process_contingency_queue(
         return Ok(Output::new());
     }
 
-    let eligible = host
-        .read(
-            "SELECT record_id FROM verifactu_contingencyqueue \
-             WHERE hub_id = :hub_id AND is_deleted = 0 AND status IN ('pending','retrying') \
-             AND (next_attempt_at IS NULL OR next_attempt_at <= :now) \
-             ORDER BY priority ASC, queued_at ASC LIMIT :limit",
-            &params(json!({ "hub_id": ctx.hub_id, "now": ctx.now, "limit": limit })),
-        )
-        .await?;
+    let eligible = due_for_remission(host, &ctx, limit).await?;
 
     // 3 ids por registro (evento + cola + ancla de recuperación); reservamos 1 para el resumen.
     let max_records = (ctx.new_ids.len().saturating_sub(1)) / 3;
@@ -1093,7 +1155,7 @@ pub(crate) async fn process_contingency_queue(
         // sitio donde engancha el reintento tras restaurar un backup (hub#287).
         let recovery_id = ctx.new_ids[id_idx + 2].clone();
         id_idx += 3;
-        let (ops, events, success) = transmit_one(
+        let attempt = transmit_one(
             host,
             &ctx,
             &rec,
@@ -1104,7 +1166,28 @@ pub(crate) async fn process_contingency_queue(
             // ESTE es el envío que declara `Incidencia=S`: sale de la cola de contingencia.
             Remission::FromContingency,
         )
-        .await?;
+        .await;
+        // An error of ONE record never leaves this pass (verifactu#111): propagating it threw away
+        // the verdicts of the records already sent in the same pass — at the AEAT and still
+        // `pending` here, so the next pass filed them again (3000 «duplicado»). Such an error only
+        // comes from before the wire (the road or the archive broke), so the record is queued with
+        // its reason, exactly as `create_record` does (hub#1934), and sits out its backoff instead
+        // of holding the head of its chain on every pass.
+        let (ops, events, success) = match attempt {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                refuse_transmission(
+                    host,
+                    &ctx,
+                    &rec,
+                    &event_id,
+                    &queue_id,
+                    &config,
+                    &Refusal::road_unavailable(error.to_string()),
+                )
+                .await?
+            }
+        };
         for e in events {
             out = out.with_event(e);
         }
@@ -2972,22 +3055,58 @@ mod environment_chain_tests {
 
     /// The other half, and the one that keeps the flag meaningful: an ordinary sale is a punctual
     /// remission and declares NO incidence. Stamping every envelope would say nothing at all.
+    ///
+    /// The ordinary sale is `create_record`'s inline send. This test used to take the manual door
+    /// (`transmit_record`) as «ordinary», with a record generated on 08-01 and sent on 08-06 —
+    /// which is precisely the late remission the AEAT takes with 2004 when it carries no incidence
+    /// (measured against the test AEAT, `tests/aeat_live_late_remission.rs`, verifactu#111). The
+    /// manual door is never punctual now; the sale made on the spot still is.
     #[tokio::test]
     async fn an_ordinary_transmission_declares_no_incidence() {
-        let mut host = ChainHost::new(config_row("testing"), vec![queued_testing_record()]);
+        let mut host = ChainHost::new(config_row("testing"), vec![]);
         host.has_core_certificate = true;
-        let input = json!({
-            "payload": { "record_id": "rec-2" },
-            "context": { "hub_id": HUB, "now": "2026-08-06T10:00:00+02:00",
-                         "current_user_id": "u1",
-                         "new_ids": ["id-evt", "id-queue", "id-anchor"] }
-        });
 
-        let _ = transmit_record(&input, &host).await;
+        let mut sale = create_input();
+        // A sale always describes its operation; without it the envelope fails the schema and is
+        // never archived, so there would be nothing to look at.
+        sale["payload"]["description"] = json!("Ticket");
+
+        let _ = create_record(&sale, &host).await;
 
         let sent = host.first_archived();
         assert!(!sent.contains("Incidencia"), "{sent}");
         assert!(!sent.contains("RemisionVoluntaria"), "{sent}");
+    }
+
+    /// The order that holds a sale back is its OWN chain's (verifactu#111): a practice record still
+    /// waiting in `testing`, or a record of another issuer, must not park a production sale — they
+    /// are other chains (guard R4), filed with another agency or on another taxpayer's behalf.
+    #[tokio::test]
+    async fn a_waiting_record_of_another_chain_does_not_hold_back_a_sale() {
+        let mut other_issuer = chain_row("rec-9", 1, "production", HASH_PRODUCTION_1, "");
+        other_issuer["issuer_nif"] = json!("B99999999");
+        other_issuer["status"] = json!("pending");
+        let mut host = ChainHost::new(
+            config_row("production"),
+            vec![queued_testing_record(), other_issuer],
+        );
+        host.has_core_certificate = true;
+        let mut sale = create_input();
+        sale["payload"]["description"] = json!("Ticket");
+
+        let out = create_record(&sale, &host).await.unwrap();
+
+        assert!(
+            !host.archived.lock().unwrap().is_empty(),
+            "the sale goes for the wire at once"
+        );
+        assert!(
+            !out.operations.iter().any(|o| o
+                .params
+                .get("event_type")
+                .is_some_and(|t| t == "transmission_deferred")),
+            "nothing of its own chain is waiting"
+        );
     }
 
     /// **The flag is the ENVELOPE's, and the record knows nothing about it** (the caveat of #322).
@@ -3770,6 +3889,561 @@ mod environment_chain_tests {
             event.params.get("event_type"),
             Some(&json!("chain_error")),
             "a tampered record must still break the chain the verifier walks"
+        );
+    }
+}
+
+#[cfg(test)]
+mod late_remission_verifactu111 {
+    //! **What was born without a road leaves on its own, in order, as a late remission**
+    //! (ERPlora/verifactu#111).
+    //!
+    //! A business sells before it has any way to file — the 24-72 h until its secure connection is
+    //! signed, or until it uploads its certificate. Every sale builds its record, and the record
+    //! stays `pending`. When the road arrives, nothing ever picked those records up: the drain read
+    //! only the contingency queue, and they had never been queued. Forced out by hand they went as
+    //! ordinary remissions, after a newer sale, and the AEAT took them with 2004 and 2007 — both
+    //! reproduced against the real test AEAT in `tests/aeat_live_late_remission.rs`.
+    //!
+    //! These tests run the REAL engine through the REAL dispatcher on a real Postgres with the real
+    //! module installed: what they pin is SQL (which records the drain picks up, and in what order),
+    //! and a fake host answers whatever its author thought the SQL meant. Only the network is fake:
+    //! a cell that keeps every envelope it is handed, in arrival order.
+
+    use crate::records::testing_always_reaches_the_aeat_hub1934::spawn_fake_cell;
+    use base64::Engine as _;
+    use erplora_db::testutil::fresh_db;
+    use erplora_db::Params;
+    use erplora_runtime::native::{NativeHandler, NativeHost};
+    use erplora_runtime::{RequestContext, Result, Runtime};
+    use erplora_wasm_host::Output;
+    use serde_json::{json, Value as Json};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    const NIF: &str = "B12345674";
+
+    /// Whether the hub has a road right now, and the cell it leads to.
+    #[derive(Debug, Default)]
+    struct Road {
+        open: AtomicBool,
+        cell: Mutex<String>,
+        /// The mTLS name the control plane signs the token for: the hub's own.
+        common_name: Mutex<String>,
+        /// How many envelopes the archive still takes before its backend stops answering.
+        /// `usize::MAX` by default: it never breaks.
+        archive_takes: std::sync::atomic::AtomicUsize,
+    }
+
+    /// The real engine, with only the network swapped: the dispatcher still runs the command,
+    /// persists its intentions in one transaction and reads through the real host.
+    #[derive(Debug)]
+    struct EngineOnFakeRoad(Arc<Road>);
+
+    #[async_trait::async_trait]
+    impl NativeHandler for EngineOnFakeRoad {
+        async fn call(
+            &self,
+            function: &str,
+            input: &Json,
+            host: &dyn NativeHost,
+        ) -> Result<Output> {
+            let host = FakeRoadHost {
+                inner: host,
+                road: &self.0,
+            };
+            crate::VerifactuEngine.call(function, input, &host).await
+        }
+    }
+
+    /// Reads go to the real database; the machine identity and the control plane are the fake road.
+    struct FakeRoadHost<'a> {
+        inner: &'a dyn NativeHost,
+        road: &'a Road,
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for FakeRoadHost<'_> {
+        async fn read(&self, sql: &str, params: &Params) -> Result<Vec<Json>> {
+            self.inner.read(sql, params).await
+        }
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            Ok(Some(json!({
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            })))
+        }
+        async fn write_static_file(
+            &self,
+            relative_path: &str,
+            _bytes: &[u8],
+            _content_type: &str,
+        ) -> Result<String> {
+            let left = self.road.archive_takes.load(Ordering::SeqCst);
+            if left == 0 {
+                return Err(erplora_runtime::RuntimeError::Native(
+                    "archive backend down".into(),
+                ));
+            }
+            self.road.archive_takes.store(left - 1, Ordering::SeqCst);
+            Ok(format!("modules/verifactu/{relative_path}"))
+        }
+        async fn machine_identity(
+            &self,
+            hub_id: &str,
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            if !self.road.open.load(Ordering::SeqCst) {
+                return Ok(None);
+            }
+            Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
+                identity: crate::transmission::tests::throwaway_identity(),
+                ca_pem: b"unused-over-plain-http".to_vec(),
+                common_name: format!("hub-{hub_id}.fiscal.erplora.internal"),
+            }))
+        }
+        async fn cloud_call(
+            &self,
+            _request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            let url = self.road.cell.lock().unwrap().clone();
+            let common_name = self.road.common_name.lock().unwrap().clone();
+            Ok(Some(erplora_runtime::cloud_call::CloudResponse {
+                status: 200,
+                body: json!({
+                    "token": "testing-only-bearer",
+                    "expires_in": 300,
+                    "gateway_url": url,
+                    "obligado_nif": NIF,
+                    "presenter_nif": "B27593136",
+                    "presenter_name": "ERPLORA CLOUD SL",
+                    "mtls_common_name": common_name,
+                })
+                .to_string(),
+            }))
+        }
+    }
+
+    /// A hub that never saved its VeriFactu config (the case of every new business), with the
+    /// real chain of modules installed and the fake road CLOSED.
+    struct Bench {
+        rt: Runtime,
+        hub_id: String,
+        road: Arc<Road>,
+        cell: Arc<Mutex<Vec<Json>>>,
+    }
+
+    impl Bench {
+        async fn new(hub_id: &str) -> Option<Self> {
+            if !erplora_runtime::require_modules_workspace() {
+                return None;
+            }
+            let (url, cell) = spawn_fake_cell().await;
+            let road = Arc::new(Road::default());
+            road.archive_takes.store(usize::MAX, Ordering::SeqCst);
+            *road.cell.lock().unwrap() = url;
+            *road.common_name.lock().unwrap() = format!("hub-{hub_id}.fiscal.erplora.internal");
+            let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
+            rt.ensure_system_tables().await.expect("system tables");
+            rt.register_native("verifactu", Arc::new(EngineOnFakeRoad(Arc::clone(&road))));
+            let root = erplora_runtime::e2e_support::modules_root();
+            for module in ["taxes", "inventory", "sales", "invoice", "verifactu"] {
+                rt.install_from_dir(&root.join(module))
+                    .await
+                    .unwrap_or_else(|e| panic!("install {module}: {e}"));
+            }
+            rt.set_module_capability("verifactu", "certificate", true, "hub_user:1")
+                .await
+                .expect("the owner grants the certificate capability");
+            Some(Self {
+                rt,
+                hub_id: hub_id.to_owned(),
+                road,
+                cell,
+            })
+        }
+
+        fn ctx(&self) -> RequestContext {
+            RequestContext::new(
+                &self.hub_id,
+                "u1",
+                [
+                    "verifactu.manage_verifactu".to_string(),
+                    "verifactu.view_verifactu".to_string(),
+                    "verifactu.transmit_verifactu".to_string(),
+                ],
+            )
+        }
+
+        fn open_the_road(&self) {
+            self.road.open.store(true, Ordering::SeqCst);
+        }
+
+        /// One ticket of 29,90 € through `verifactu.records.create` — the door every sale takes.
+        async fn sell(&self, number: u32) {
+            let payload = json!({
+                "record_type": "alta", "issuer_nif": NIF, "issuer_name": "Salon Lucia SL",
+                "invoice_number": format!("TICKET-2026-{number:06}"), "invoice_date": "2026-09-19",
+                "invoice_type": "F2", "description": "Corte y peinado",
+                "base_amount": 2471, "tax_rate": 21.0, "tax_amount": 519, "total_amount": 2990,
+                "tax_breakdown": r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
+                                      "base":2471,"quota":519}]"#,
+            });
+            self.rt
+                .execute_command(
+                    "verifactu.records.create",
+                    payload.as_object().unwrap(),
+                    &self.ctx(),
+                )
+                .await
+                .unwrap_or_else(|e| panic!("sale {number}: {e}"));
+        }
+
+        async fn drain(&self) {
+            self.rt
+                .execute_command("verifactu.contingency.process", &Params::new(), &self.ctx())
+                .await
+                .expect("the drain runs");
+        }
+
+        async fn rows(&self, sql: &str) -> Vec<Json> {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(self.hub_id));
+            self.rt.db().query(sql, &p).await.expect(sql).rows
+        }
+
+        /// `(sequence_number, status)` of the chain, in order.
+        async fn chain(&self) -> Vec<(i64, String)> {
+            self.rows(
+                "SELECT sequence_number, status FROM verifactu_record \
+                 WHERE hub_id = :hub_id ORDER BY sequence_number",
+            )
+            .await
+            .iter()
+            .map(|r| {
+                (
+                    r["sequence_number"].as_i64().unwrap(),
+                    r["status"].as_str().unwrap().to_owned(),
+                )
+            })
+            .collect()
+        }
+
+        async fn record_id(&self, sequence: i64) -> String {
+            self.rows(&format!(
+                "SELECT id FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND sequence_number = {sequence}"
+            ))
+            .await[0]["id"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        }
+
+        /// What reached the cell, in arrival order: the record's sequence number and whether the
+        /// envelope declared `Incidencia=S`.
+        async fn sent(&self) -> Vec<(i64, bool)> {
+            let envelopes = self.cell.lock().unwrap().clone();
+            let mut out = Vec::new();
+            for envelope in envelopes {
+                let id = envelope["transmission_id"].as_str().unwrap().to_owned();
+                let sequence = self
+                    .rows(&format!(
+                        "SELECT sequence_number FROM verifactu_record \
+                         WHERE hub_id = :hub_id AND id = '{id}'"
+                    ))
+                    .await[0]["sequence_number"]
+                    .as_i64()
+                    .unwrap();
+                let xml = base64::engine::general_purpose::STANDARD
+                    .decode(envelope["xml_b64"].as_str().unwrap())
+                    .unwrap();
+                let xml = String::from_utf8(xml).unwrap();
+                out.push((sequence, xml.contains("<sum1:Incidencia>S</sum1:Incidencia>")));
+            }
+            out
+        }
+
+        /// The `details` of the audit rows of one record, parsed.
+        async fn details_of(&self, sequence: i64) -> Vec<Json> {
+            let id = self.record_id(sequence).await;
+            self.rows(&format!(
+                "SELECT details FROM verifactu_event WHERE hub_id = :hub_id AND record_id = '{id}'"
+            ))
+            .await
+            .iter()
+            .filter_map(|r| r["details"].as_str())
+            .filter_map(|d| serde_json::from_str::<Json>(d).ok())
+            .collect()
+        }
+
+        /// Stamps an AEAT verdict on a record, as `_apply_transmission` leaves it.
+        async fn verdict(&self, sequence: i64, status: &str) {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(self.hub_id));
+            p.insert("status".into(), json!(status));
+            p.insert("sequence".into(), json!(sequence));
+            self.rt
+                .db()
+                .execute(
+                    "UPDATE verifactu_record SET status = :status \
+                     WHERE hub_id = :hub_id AND sequence_number = :sequence",
+                    &p,
+                )
+                .await
+                .expect("verdict");
+        }
+
+        /// Puts a record in the contingency queue the way the engine does, with its own next attempt.
+        async fn queue(&self, sequence: i64, status: &str, next_attempt_at: &str) {
+            let record_id = self.record_id(sequence).await;
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(self.hub_id));
+            p.insert("record_id".into(), json!(record_id));
+            p.insert("status".into(), json!(status));
+            p.insert("next_attempt_at".into(), json!(next_attempt_at));
+            self.rt
+                .db()
+                .execute(
+                    "INSERT INTO verifactu_contingencyqueue (id, hub_id, record_id, priority, \
+                     queued_at, attempts, last_attempt_at, last_error, next_attempt_at, status, \
+                     is_deleted, created_by, updated_by, created_at, updated_at) VALUES \
+                     ('q-' || :record_id, :hub_id, :record_id, 2, '2026-09-01T00:00:00+00:00', 1, \
+                     '2026-09-01T00:00:00+00:00', 'the wire failed', :next_attempt_at, :status, \
+                     0, 'u1', 'u1', '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00')",
+                    &p,
+                )
+                .await
+                .expect("queue row");
+        }
+    }
+
+    fn pending(sequences: &[i64]) -> Vec<(i64, String)> {
+        sequences.iter().map(|s| (*s, "pending".to_owned())).collect()
+    }
+
+    fn accepted(sequences: &[i64]) -> Vec<(i64, String)> {
+        sequences.iter().map(|s| (*s, "accepted".to_owned())).collect()
+    }
+
+    /// 🔴 THE bug: three sales with no road, then the road arrives. The drain never looked at
+    /// them. They must leave on their own, in sequence order, each declaring the incidence — and
+    /// one of them already holding a queue entry from an earlier attempt must not jump the line.
+    #[tokio::test]
+    async fn records_born_without_a_road_leave_in_order_as_late_remissions_once_it_opens() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        for n in 1..=3 {
+            hub.sell(n).await;
+        }
+        assert_eq!(hub.chain().await, pending(&[1, 2, 3]));
+        assert!(hub.sent().await.is_empty(), "no road, nothing leaves");
+        // Record 2 met a broken road once: it holds a queue entry that is due now, filed long
+        // before anybody queued 1 or 3. Order is the chain's, never the queue's.
+        hub.queue(2, "retrying", "2026-09-01T00:05:00+00:00").await;
+
+        hub.open_the_road();
+        hub.drain().await;
+
+        assert_eq!(
+            hub.sent().await,
+            vec![(1, true), (2, true), (3, true)],
+            "in sequence order, every one declaring Incidencia=S"
+        );
+        assert_eq!(hub.chain().await, accepted(&[1, 2, 3]));
+
+        hub.drain().await;
+        assert_eq!(hub.sent().await.len(), 3, "what is at the AEAT is not sent twice");
+    }
+
+    /// 🔴 A sale made while older records still wait must not jump ahead of them: it waits its
+    /// turn, and the drain sends the whole chain in order.
+    #[tokio::test]
+    async fn a_sale_made_while_older_records_wait_does_not_jump_ahead_of_them() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.sell(2).await;
+
+        hub.open_the_road();
+        hub.sell(3).await;
+
+        assert!(
+            hub.sent().await.is_empty(),
+            "the new sale must not reach the AEAT before the two that wait"
+        );
+        assert_eq!(hub.chain().await, pending(&[1, 2, 3]));
+        assert!(
+            hub.details_of(3).await.iter().any(|d| {
+                d["message_key"] == "verifactu.transmission_deferred"
+                    && d["why_reason"]["code"] == "earlier_records_pending"
+            }),
+            "the record says WHY it waits: {:?}",
+            hub.details_of(3).await
+        );
+
+        hub.drain().await;
+
+        assert_eq!(hub.sent().await, vec![(1, true), (2, true), (3, true)]);
+        assert_eq!(hub.chain().await, accepted(&[1, 2, 3]));
+    }
+
+    /// 🔴 A record born without a road says so in its audit trail, as a code the Records screen
+    /// turns into a sentence — before this, nothing told the owner why it was pending.
+    #[tokio::test]
+    async fn a_record_born_without_a_road_says_why_it_waits() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000003").await else {
+            return;
+        };
+        hub.sell(1).await;
+
+        let details = hub.details_of(1).await;
+        assert!(
+            details.iter().any(|d| {
+                d["message_key"] == "verifactu.transmission_deferred"
+                    && d["why_reason"]["code"] == "no_transmission_route"
+            }),
+            "{details:?}"
+        );
+    }
+
+    /// What the AEAT already answered stays answered. A record it REFUSED is fixed with a new
+    /// record, never filed again as it is: the drain must not pick it up just because nobody ever
+    /// queued it — it would be refused again every five minutes.
+    #[tokio::test]
+    async fn a_record_the_aeat_refused_is_not_filed_again_by_the_drain() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000006").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.verdict(1, "rejected").await;
+
+        hub.open_the_road();
+        hub.drain().await;
+
+        assert!(hub.sent().await.is_empty());
+        assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
+    }
+
+    /// Only a record that has not reached the AEAT can be ahead of a sale. A stale queue entry of a
+    /// record the AEAT already took (the drain resolves it on its next pass) must not park today's
+    /// sale behind it.
+    #[tokio::test]
+    async fn a_stale_queue_entry_of_an_accepted_record_does_not_hold_back_a_sale() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000007").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.verdict(1, "accepted").await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+
+        hub.open_the_road();
+        hub.sell(2).await;
+
+        assert_eq!(hub.sent().await, vec![(2, false)]);
+    }
+
+    /// The order only holds back a sale for records that are going out NOW. A record sitting out
+    /// its backoff does not go early, and does not keep today's sales from leaving on time.
+    #[tokio::test]
+    async fn a_record_waiting_out_its_backoff_neither_goes_early_nor_holds_back_a_new_sale() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000004").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.queue(1, "retrying", "2999-01-01T00:00:00+00:00").await;
+
+        hub.open_the_road();
+        hub.sell(2).await;
+
+        assert_eq!(
+            hub.sent().await,
+            vec![(2, false)],
+            "the new sale leaves at once, as the ordinary remission it is"
+        );
+        hub.drain().await;
+        assert_eq!(hub.sent().await, vec![(2, false)], "record 1 is still backing off");
+        assert_eq!(
+            hub.chain().await,
+            vec![(1, "pending".to_owned()), (2, "accepted".to_owned())]
+        );
+    }
+
+    /// 🔴 Sending by hand is never punctual: the record was generated earlier, and a late send
+    /// without the incidence is the 2004 of 2026-09-13. It also works for a hub that never saved
+    /// its config — the manual door still demanded the row.
+    #[tokio::test]
+    async fn a_record_sent_by_hand_declares_the_incidence() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000005").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.open_the_road();
+
+        let record_id = hub.record_id(1).await;
+        let payload = json!({ "record_id": record_id });
+        hub.rt
+            .execute_command(
+                "verifactu.records.transmit",
+                payload.as_object().unwrap(),
+                &hub.ctx(),
+            )
+            .await
+            .expect("a hub without a config row can still send by hand");
+
+        assert_eq!(hub.sent().await, vec![(1, true)]);
+        assert_eq!(hub.chain().await, accepted(&[1]));
+    }
+
+    /// 🔴 A drain that breaks half way must keep what the AEAT already answered. The pass used to
+    /// propagate the error of ONE record with `?`, and the verdicts of the records sent before it
+    /// in the same pass went with it: record 1 was at the AEAT and still `pending` here, so the
+    /// next pass filed it again — the AEAT's 3000 «duplicado», which lands as `rejected` over a
+    /// record that is accepted. The record that could not leave is queued with its reason, like a
+    /// sale whose road broke (hub#1934), and it no longer holds the head of the chain for ever.
+    #[tokio::test]
+    async fn a_drain_that_breaks_half_way_keeps_the_verdicts_it_already_has() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000008").await else {
+            return;
+        };
+        for n in 1..=3 {
+            hub.sell(n).await;
+        }
+        hub.open_the_road();
+        // The archive takes ONE more envelope and then stops answering.
+        hub.road.archive_takes.store(1, Ordering::SeqCst);
+
+        hub.drain().await;
+
+        assert_eq!(hub.sent().await, vec![(1, true)]);
+        assert_eq!(
+            hub.chain().await,
+            vec![
+                (1, "accepted".to_owned()),
+                (2, "pending".to_owned()),
+                (3, "pending".to_owned())
+            ],
+            "the verdict of record 1 survives the failure of record 2"
+        );
+        let queued = hub
+            .rows(
+                "SELECT record_id FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND is_deleted = 0",
+            )
+            .await;
+        assert_eq!(queued.len(), 2, "2 and 3 wait in the queue with their reason: {queued:?}");
+
+        hub.road.archive_takes.store(usize::MAX, Ordering::SeqCst);
+        hub.drain().await;
+        assert!(
+            !hub.sent().await[1..].contains(&(1, true)),
+            "record 1 is at the AEAT and is never filed twice"
         );
     }
 }
