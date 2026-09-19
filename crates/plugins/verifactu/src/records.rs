@@ -830,9 +830,18 @@ pub(crate) async fn build_record_output(
     });
     let attempt = match can_transmit(host, &ctx.hub_id, &config).await {
         // NO transmission road at all (neither a core certificate nor an enrolled gateway
-        // identity, hub#1432): nothing can leave, and the record stays `pending`.
-        Ok(false) => None,
-        Ok(true) => Some(
+        // identity, hub#1432): nothing can leave. The record stays `pending` and the drain sends
+        // it — in sequence order, declaring the incidence — once the road opens (verifactu#111).
+        Ok(false) => Attempt::Waits(Wait::NoRoad),
+        // The road is open, but an older record of this same chain is due to leave: overtaking it
+        // is how record nº 1 of 2026-09-13 reached the AEAT after a newer sale. This one waits its
+        // turn, and the drain sends the whole chain in order (verifactu#111).
+        Ok(true) if earlier_record_due(host, ctx, &r.issuer_nif, &environment, sequence_number)
+            .await? =>
+        {
+            Attempt::Waits(Wait::EarlierRecordsPending)
+        }
+        Ok(true) => Attempt::Sent(
             transmit_one(
                 host,
                 ctx,
@@ -849,15 +858,19 @@ pub(crate) async fn build_record_output(
         // The road should be there and broke on the way — the control plane did not mint the
         // token, the brake is on after a failure a moment ago. Before hub#1934 this escaped as an
         // error and the sale lost its record.
-        Err(error) => Some(Err(error)),
+        Err(error) => Attempt::Sent(Err(error)),
     };
     let (ops, events) = match attempt {
-        None => (Vec::new(), Vec::new()),
-        Some(Ok((ops, events, _success))) => (ops, events),
+        // Nothing left, and the audit says why and when it will: the Records screen reads it.
+        Attempt::Waits(wait) => (
+            vec![deferred_event(ctx, &record_id, &ids[3], wait)],
+            Vec::new(),
+        ),
+        Attempt::Sent(Ok((ops, events, _success))) => (ops, events),
         // Whatever stopped the send, the record waits in the contingency queue with its reason
         // visible — the same place a failed wire leaves it — and the drain sends it once the road
         // is back (hub#1934). Never lost with the sale, never a silent loose `pending`.
-        Some(Err(error)) => {
+        Attempt::Sent(Err(error)) => {
             let (ops, events, _success) = refuse_transmission(
                 host,
                 ctx,
@@ -882,6 +895,102 @@ pub(crate) async fn build_record_output(
 
     // El evento `verifactu.record.created` lo emite el `emit` declarado del command.
     Ok(output)
+}
+
+/// What `build_record_output` did with the record it just sealed.
+enum Attempt {
+    /// It went for the wire (or broke on the way to it).
+    Sent(Result<(Vec<Operation>, Vec<Event>, bool)>),
+    /// It stays `pending` for the drain, for this reason.
+    Waits(Wait),
+}
+
+/// **Why a sealed record did not leave with its sale** (verifactu#111) — the two reasons are
+/// codes the module turns into a sentence, never prose the screen has to parse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Wait {
+    /// No road at all yet: no certificate of its own, no enrolled identity for the fiscal cell.
+    /// Same code the diagnostics file for the same fact, so the module owns ONE sentence for it.
+    NoRoad,
+    /// The road is open, and an older record of the same chain is due to leave first.
+    EarlierRecordsPending,
+}
+
+impl Wait {
+    fn code(self) -> &'static str {
+        match self {
+            Wait::NoRoad => "no_transmission_route",
+            Wait::EarlierRecordsPending => "earlier_records_pending",
+        }
+    }
+
+    /// The fallback a hub on an older module paints — the engine's own prose, as every event.
+    fn prose(self) -> &'static str {
+        match self {
+            Wait::NoRoad => "este hub aún no tiene vía de envío (ni certificado propio ni conexión \
+                             con la pasarela fiscal)",
+            Wait::EarlierRecordsPending => "antes tiene que salir un registro anterior de la \
+                                            misma cadena, y a la AEAT se envían en orden",
+        }
+    }
+}
+
+/// The audit row of a record that did not leave with its sale: WHY (a code) and WHEN (on its own,
+/// at the next drain once there is a road, declared as a late remission). It is what the Records
+/// screen shows next to a `pending` record — before verifactu#111 nothing said why it waited.
+fn deferred_event(ctx: &Ctx, record_id: &str, event_id: &str, wait: Wait) -> Operation {
+    op(
+        "verifactu._insert_event",
+        json!({
+            "event_id": event_id,
+            "record_id": record_id,
+            "event_type": "transmission_deferred",
+            "severity": "warning",
+            "message": format!(
+                "Pendiente de envío a la AEAT: {}. Saldrá solo, en orden y declarado como envío \
+                 tardío, en el próximo envío automático en cuanto haya vía",
+                wait.prose()
+            ),
+            "details": details_for("verifactu.transmission_deferred", json!({
+                "why": wait.prose(),
+                "why_reason": { "code": wait.code() },
+            })),
+            "timestamp": ctx.now,
+        }),
+    )
+}
+
+/// **Is an older record of this chain going out NOW?** (verifactu#111) — the question a new sale
+/// asks before it overtakes anybody. «Now» is exactly what the drain collects
+/// ([`DUE_NEVER_QUEUED`] ∪ [`DUE_FROM_QUEUE`]): a record sitting out its backoff does not hold
+/// today's sales back, because holding them would not keep it first anyway.
+async fn earlier_record_due(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    issuer_nif: &str,
+    environment: &str,
+    sequence_number: i64,
+) -> Result<bool> {
+    let rows = host
+        .read(
+            &format!(
+                "SELECT r.id FROM verifactu_record r \
+                 LEFT JOIN verifactu_contingencyqueue q ON q.record_id = r.id AND q.is_deleted = 0 \
+                 WHERE r.hub_id = :hub_id AND r.issuer_nif = :issuer_nif \
+                 AND r.environment = :environment AND r.is_deleted = 0 \
+                 AND r.sequence_number < :sequence_number \
+                 AND (({DUE_NEVER_QUEUED}) OR ({DUE_FROM_QUEUE})) LIMIT 1"
+            ),
+            &params(json!({
+                "hub_id": ctx.hub_id,
+                "issuer_nif": issuer_nif,
+                "environment": environment,
+                "sequence_number": sequence_number,
+                "now": ctx.now,
+            })),
+        )
+        .await?;
+    Ok(!rows.is_empty())
 }
 
 // ── transmit_record (issue verifactu#3) ──────────────────────────────────────
@@ -1089,7 +1198,7 @@ mod audit_message_keys {
 }
 
 #[cfg(test)]
-mod testing_always_reaches_the_aeat_hub1934 {
+pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
     //! **A hub that never saved its VeriFactu config still sends its records** (hub#1934).
     //!
     //! Every sale builds its record and its QR against the DEFAULT environment (`testing`) when
@@ -1119,7 +1228,7 @@ mod testing_always_reaches_the_aeat_hub1934 {
     /// A cell that records every envelope it is handed and answers the AEAT's «Correcto» with a
     /// receipt whose digest is recomputed over the bytes IT decoded — like the real one, so the
     /// canary of hub#1461 holds.
-    async fn spawn_fake_cell() -> (String, Arc<Mutex<Vec<Json>>>) {
+    pub(crate) async fn spawn_fake_cell() -> (String, Arc<Mutex<Vec<Json>>>) {
         use base64::Engine as _;
         let seen: Arc<Mutex<Vec<Json>>> = Arc::new(Mutex::new(Vec::new()));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -158,7 +158,8 @@ async fn a_late_remission_is_clean_only_when_it_declares_the_incidence() {
     let now = chrono::Local::now();
     let serial = format!("LATE-{}", now.format("%Y%m%d-%H%M%S"));
     // Four days late, like record nº 19 of `banco-pre` (born 2026-09-15 without a road).
-    let late = (now - chrono::Duration::days(4)).to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    let late =
+        (now - chrono::Duration::days(4)).to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
 
     // The chain these records hang from: the last record the AEAT already holds for this taxpayer
     // this month — the case of a hub whose newer sale went out first.
@@ -194,7 +195,8 @@ async fn a_late_remission_is_clean_only_when_it_declares_the_incidence() {
     let plain_resp = send_alta(&plain, Some(&anchor_link), false, "late, WITHOUT incidence").await;
 
     // ── the fix: the next record of the same age, filed declaring the incidence ────────────────
-    let declared = build_record(&format!("{serial}-B"), &late, &plain["record_hash"].as_str().unwrap());
+    let plain_hash = plain["record_hash"].as_str().unwrap();
+    let declared = build_record(&format!("{serial}-B"), &late, plain_hash);
     let declared_resp =
         send_alta(&declared, Some(&link_to(&plain)), true, "late, WITH Incidencia=S").await;
 

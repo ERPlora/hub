@@ -38,6 +38,10 @@ tokio = { version = "1", features = ["macros", "rt"] }
 # Identidades mTLS de usar-y-tirar para los tests de la ruta (hub#1432). Solo dev: en producción
 # la cripto vive en el core (`erplora-runtime`), nunca en este crate.
 openssl = { version = "0.10", features = ["vendored"] }
+# Ephemeral Postgres schema per test (ADR-0154): the late-remission tests (verifactu#111) run the
+# real engine through the real dispatcher, because what they pin is SQL — which records the queue
+# picks up, and in what order — and a fake host cannot answer that.
+erplora-db = { path = "../../db", features = ["test-util"] }
 
 # Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
 # queda EXENTO del gate de clippy en silencio; `scripts/tests/clippy-lints.test.sh` lo vigila.
