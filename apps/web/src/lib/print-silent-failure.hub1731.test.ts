@@ -36,8 +36,6 @@ function hubWithNoPrinter() {
     },
     query: vi.fn(async (name: string) => {
       if (name === 'printing.settings.get') return [{ auto_print_on_sale: 1 }];
-      if (name === 'sales.get') return [{ id: '42', total: 2990, series: 'F', number: 7 }];
-      if (name === 'sales.lines') return [{ product_name: 'Corte', quantity: 1_000_000, unit_price: 2990 }];
       return [];
     }),
     peripherals: {
@@ -67,7 +65,10 @@ async function chargeOneSale(body: Record<string, unknown>) {
     iframePrint: vi.fn(),
   });
   const onFailure = vi.fn();
-  bootPrintOnSale(client, { print: gate, onFailure });
+  // The paper itself is the sales module's (hub#1921): a stand-in, since what is under test here is
+  // where the paper goes, not what it says.
+  const saleDocument = async (saleId: string) => ({ receipt_id: saleId, items: [{ name: 'Corte', quantity: 1, total: 29.9 }], total: 29.9 });
+  bootPrintOnSale(client, { print: gate, onFailure, saleDocument });
 
   await emit({ sale_id: '42' });
 
