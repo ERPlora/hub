@@ -693,53 +693,80 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         );
     }
 
-    /// GARANTÍA del seed del demo (hub#36): aplicar `demo.sql` sobre un Runtime SQLite real deja
-    /// un usuario "Demo" cuyo PIN "0000" verifica. Si el hash del PIN o los nombres de columna
-    /// fueran erróneos, este test FALLA — es la red de seguridad que pide hub#36.
+    /// GUARANTEE of the demo seed (hub#36): applying `demo.sql` on a real Runtime leaves a
+    /// "Demo" user whose PIN verifies. If the PIN hash or the column names were wrong, this test
+    /// FAILS — it is the safety net hub#36 asked for.
     ///
-    /// Ya NO siembra dispositivo de confianza (hub#630): el `device_id` lo acuña el navegador, así
-    /// que la fila que había aquí no la podía presentar nadie. Quien abre la puerta ahora es el
-    /// trust-on-first-use del login, y **necesita que el hub no conozca ningún dispositivo** —
-    /// sembrar uno lo desactivaría. Por eso este test comprueba lo contrario que antes: que el seed
-    /// deja la lista VACÍA.
+    /// Regression for ERPlora/hub#1929: the demo asks for SIX digits like every hub provisioned
+    /// today (ADR-0372), and its PIN is always `000000`. The pinpad submits at exactly
+    /// `pin_length` digits (hub#1037), so the seeded PIN and the seeded length have to agree: a
+    /// four-digit PIN behind a six-digit keypad can never be typed, and the other way round the
+    /// keypad fires before the PIN is complete. `000000` is guessable on purpose — the
+    /// `clean_pin` rules are for PINs a person picks; this one is public, shown on the demo page,
+    /// and enters through SQL.
+    ///
+    /// It no longer seeds a trusted device (hub#630): the browser mints the `device_id`, so the
+    /// row that used to be here could not be presented by anyone. The login's trust-on-first-use
+    /// opens the door now, and **it needs the hub to know no device yet** — seeding one would
+    /// disable it. That is why this test checks the opposite of what it used to: that the seed
+    /// leaves the list EMPTY.
     #[tokio::test]
     async fn demo_seed_enables_demo_pin_login_and_trusted_device() {
+        const DEMO_PIN: &str = "000000";
+
         let db = fresh_db().await;
         let runtime = crate::Runtime::new(Box::new(db));
-        // Mismo orden que en el server: tablas de sistema primero, luego seed.
+        // Same order as the server: system tables first, then the seed.
         runtime.ensure_system_tables().await.unwrap();
-        // Por `Runtime::apply_seed`, que es como lo llama el host (`HUB_SEED_SQL`, server/lib.rs) y
-        // quien pone el `hub_id` del despliegue: llamar a `apply` a pelo dejaría sin probar
-        // justamente el punto donde se decide de qué hub es lo que se siembra (hub#489).
+        // Through `Runtime::apply_seed`, which is how the host calls it (`HUB_SEED_SQL`,
+        // server/lib.rs) and who sets the deployment's `hub_id`: calling `apply` directly would
+        // leave untested exactly the point where it is decided which hub the seed belongs to
+        // (hub#489).
         let n = runtime.apply_seed(DEMO_SEED).await.unwrap();
-        assert!(
-            n >= 1,
-            "el seed del demo aplica al menos el usuario, fue {n}"
+        assert!(n >= 1, "the demo seed applies at least the user, was {n}");
+
+        // hub#1929: the keypad the demo shows is six digits long, and the PIN fills it exactly.
+        let pin_length = runtime.pin_length().await.unwrap();
+        assert_eq!(pin_length, 6, "the demo asks for six digits (hub#1929)");
+        assert_eq!(
+            DEMO_PIN.len() as i64,
+            pin_length,
+            "the demo PIN must fill the keypad exactly: the pinpad submits at `pin_length` digits"
         );
 
-        // El PIN "0000" del usuario "Demo" verifica (valida el formato del hash).
-        let user = runtime.verify_pin("Demo", "0000").await.unwrap();
-        let user = user.expect("Demo verifica con PIN 0000");
+        // The "Demo" user's PIN verifies (validates the hash format).
+        let user = runtime.verify_pin("Demo", DEMO_PIN).await.unwrap();
+        let user = user.expect("Demo verifies with PIN 000000");
         assert_eq!(user.name, "Demo");
         assert!(user.is_active);
-        // Rol con permisos completos (admin/owner): el seed lo fija; comprobamos que NO está vacío.
-        assert!(!user.role.is_empty(), "el usuario demo tiene un rol");
-        // PIN incorrecto NO verifica.
-        assert!(runtime.verify_pin("Demo", "1111").await.unwrap().is_none());
+        // Role with full permissions (admin/owner): the seed sets it; we check it is NOT empty.
+        assert!(!user.role.is_empty(), "the demo user has a role");
+        // A wrong PIN does NOT verify — the old four-digit one included (hub#1929).
+        assert!(runtime.verify_pin("Demo", "0000").await.unwrap().is_none());
+        assert!(runtime.verify_pin("Demo", "111111").await.unwrap().is_none());
 
-        // 🔴 El seed NO deja ningún dispositivo de confianza, y eso es el contrato ahora (hub#630):
-        // el trust-on-first-use del login solo adopta al primer visitante si el hub no conoce
-        // ninguno todavía. Una fila sembrada aquí —como la que había, `demo-trusted-device`— dejaba
-        // la demo sin puerta: nadie podía presentar ese id y la adopción no llegaba a actuar.
+        // 🔴 The seed leaves NO trusted device, and that is the contract now (hub#630): the
+        // login's trust-on-first-use only adopts the first visitor if the hub knows none yet. A
+        // row seeded here —like the `demo-trusted-device` there used to be— left the demo without
+        // a door: nobody could present that id and the adoption never got to act.
         assert!(
             runtime.list_devices().await.unwrap().is_empty(),
-            "el seed debe dejar la lista de dispositivos vacía o el first-use no adopta a nadie"
+            "the seed must leave the device list empty or first-use adopts nobody"
         );
 
-        // Re-aplicar el seed es idempotente (no crea un segundo "Demo" ni falla).
+        // Re-applying the seed is idempotent (no second "Demo", no failure) and never overwrites
+        // the hub's own answer: the seed runs at every boot, and a length the admin changed in
+        // Ajustes outranks the one the demo was born with — same `WHERE NOT EXISTS` contract as
+        // the SaaS's `pin_length` seed.
+        runtime.set_pin_length(4).await.unwrap();
         runtime.apply_seed(DEMO_SEED).await.unwrap();
         let res = identity_count_demo(&runtime).await;
-        assert_eq!(res, 1, "el seed no duplica el usuario Demo al re-aplicarse");
+        assert_eq!(res, 1, "the seed does not duplicate the Demo user when re-applied");
+        assert_eq!(
+            runtime.pin_length().await.unwrap(),
+            4,
+            "re-applying the seed must not overwrite the hub's PIN length"
+        );
     }
 
     async fn identity_count_demo(runtime: &crate::Runtime) -> i64 {
