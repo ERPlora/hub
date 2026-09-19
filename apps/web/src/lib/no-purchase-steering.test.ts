@@ -386,7 +386,7 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     const source = withoutComments(text);
     const offences: string[] = [];
     for (const tag of source.matchAll(/<ok-resource-usage\b[^>]*>/g)) {
-      if (/(?:^|\s)(?::|v-bind:)?upgrade(?:\.prop)?=/.test(tag[0])) {
+      if (/(?:^|\s)(?::|\.|v-bind:)?upgrade(?:\.prop)?=/.test(tag[0])) {
         const line = source.slice(0, tag.index).split('\n').length;
         offences.push(`${relative}:${line} → hands ok-resource-usage an upgrade link it paints in the hub's own window`);
       }
@@ -406,6 +406,8 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     ['the SaaS hint as a property', '<ok-resource-usage\n  label="CPU"\n  :upgrade.prop="upgradeHint"\n></ok-resource-usage>'],
     ['a plain binding', '<ok-resource-usage :metric.prop="m" :upgrade="hint"></ok-resource-usage>'],
     ['a long-hand binding', '<ok-resource-usage v-bind:upgrade.prop="hint"></ok-resource-usage>'],
+    // Vue's `.name` is shorthand for `:name.prop` — the same property by another spelling.
+    ['the property shorthand', '<ok-resource-usage :metric.prop="m" .upgrade="hint"></ok-resource-usage>'],
   ])('catches %s', (_name, source) => {
     expect(handsAComponentItsOwnLink('views/X.vue', source)).not.toEqual([]);
   });
