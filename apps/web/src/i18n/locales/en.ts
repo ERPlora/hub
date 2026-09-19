@@ -799,6 +799,10 @@ export default {
     // nothing went to the printer. The way out is the print button on the receipt screen.
     ticketNotComposed:
       'The receipt for sale {saleId} could not be prepared and did NOT print. Print it from the receipt screen.',
+    // hub#1867: the receipt came out, but Hacienda's QR was not ready within the wait (a slow AEAT),
+    // so the customer's copy lacks it. The receipt screen prints the complete one.
+    ticketWithoutFiscal:
+      'The receipt for sale {saleId} came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
     comandaWaitingForPrinter:
       'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
