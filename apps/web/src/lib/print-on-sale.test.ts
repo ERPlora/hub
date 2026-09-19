@@ -80,9 +80,13 @@ const PAPER = {
   paid: 11.9,
 };
 
-/** Where the shell gets that paper from: the sales module's viewer, here a stand-in. */
-function paperSource() {
-  return vi.fn(async (_saleId: string): Promise<Record<string, unknown>> => PAPER);
+/** Where the shell gets that paper from: the sales module's viewer, here a stand-in. `complete` is
+ *  whether the viewer's just-charged wait ended with the fiscal number and QR (hub#1867). */
+function paperSource(complete = true) {
+  return vi.fn(async (_saleId: string): Promise<{ document: Record<string, unknown>; complete: boolean }> => ({
+    document: PAPER,
+    complete,
+  }));
 }
 
 describe('the ticket on payment is the paper the ticket screen prints (hub#1921)', () => {
@@ -277,5 +281,72 @@ describe('the ticket on payment (hub#862)', () => {
 
     expect(openDrawer).not.toHaveBeenCalled();
     expect(gate.print).toHaveBeenCalledTimes(1);
+  });
+});
+
+// hub#1867 — the paper now waits for the invoice number and the AEAT QR, like the till screen does,
+// with the viewer's 10 s ceiling. When a slow AEAT runs that ceiling out, the paper still goes out —
+// a till is never left without it — but the cashier hears that the customer's copy lacks the QR and
+// where the complete one is: the print button on the receipt screen.
+describe('a receipt that went out before its VeriFactu QR (hub#1867)', () => {
+  it('is printed, and the till hears it lacks the QR', async () => {
+    const gate = fakeGate({ via: 'bridge', role: 'receipt' });
+    const onFailure = vi.fn();
+    const onPrintedWithoutFiscal = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: gate.print, onFailure, onPrintedWithoutFiscal, saleDocument: paperSource(false) });
+
+    await emit({ sale_id: '42' });
+
+    expect(gate.calls[0]!.data).toEqual(PAPER);
+    expect(onPrintedWithoutFiscal).toHaveBeenCalledTimes(1);
+    expect(onPrintedWithoutFiscal).toHaveBeenCalledWith('42');
+    expect(onFailure, 'it did print: not a failure').not.toHaveBeenCalled();
+  });
+
+  it('a complete receipt raises no such warning', async () => {
+    const onPrintedWithoutFiscal = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: fakeGate({ via: 'bridge', role: 'receipt' }).print, onPrintedWithoutFiscal, saleDocument: paperSource(true) });
+
+    await emit({ sale_id: '42' });
+
+    expect(onPrintedWithoutFiscal).not.toHaveBeenCalled();
+  });
+
+  it('when the incomplete receipt did not come out either, the till hears only that it did not print', async () => {
+    const onFailure = vi.fn();
+    const onPrintedWithoutFiscal = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, {
+      print: fakeGate({ via: 'none', role: 'receipt', error: 'no printer' }).print,
+      onFailure,
+      onPrintedWithoutFiscal,
+      saleDocument: paperSource(false),
+    });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onPrintedWithoutFiscal, 'one warning, the one that matters').not.toHaveBeenCalled();
+  });
+
+  it('queued with nobody to print it, the till hears only that it is waiting for a printer', async () => {
+    // Nothing came out yet: «it came out without the QR» would be false, and a second toast on top
+    // of «set up a printer» buries the one thing the cashier has to do.
+    const onFailure = vi.fn();
+    const onPrintedWithoutFiscal = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, {
+      print: fakeGate({ via: 'queue', role: 'receipt', awaitingHost: true }).print,
+      onFailure,
+      onPrintedWithoutFiscal,
+      saleDocument: paperSource(false),
+    });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ awaitingHost: true });
+    expect(onPrintedWithoutFiscal).not.toHaveBeenCalled();
   });
 });

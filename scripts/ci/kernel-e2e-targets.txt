@@ -47,6 +47,8 @@ published_migrations_stay_installable
 reads_e2e
 reset_test
 reset_undo_test
+sale_refused_without_route_in_production_hub1935 # el gate fiscal del DISPATCHER (hub#1935):
+                                                 # `sales` + `invoice` son solo el banco
 
 # ── Pendientes de hub#1264 ─────────────────────────────────────────────────────────────────
 # Afirman comportamiento de UN módulo y se van con él cuando su slice aterrice. Cada slice borra

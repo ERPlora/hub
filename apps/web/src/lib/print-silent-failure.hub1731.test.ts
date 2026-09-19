@@ -67,7 +67,10 @@ async function chargeOneSale(body: Record<string, unknown>) {
   const onFailure = vi.fn();
   // The paper itself is the sales module's (hub#1921): a stand-in, since what is under test here is
   // where the paper goes, not what it says.
-  const saleDocument = async (saleId: string) => ({ receipt_id: saleId, items: [{ name: 'Corte', quantity: 1, total: 29.9 }], total: 29.9 });
+  const saleDocument = async (saleId: string) => ({
+    document: { receipt_id: saleId, items: [{ name: 'Corte', quantity: 1, total: 29.9 }], total: 29.9 },
+    complete: true,
+  });
   bootPrintOnSale(client, { print: gate, onFailure, saleDocument });
 
   await emit({ sale_id: '42' });
