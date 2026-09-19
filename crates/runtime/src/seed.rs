@@ -769,6 +769,42 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         );
     }
 
+    /// Regression for ERPlora/hub#1929 (reviewer): a database that ALREADY has the four-digit
+    /// "Demo" — the persistent local `erplora_hub_dev`, or a live demo whose env the SaaS rewrites —
+    /// keeps its `0000` (the user row is `WHERE NOT EXISTS` by name). The seed must not hand that
+    /// hub a six-digit keypad: the pinpad submits at exactly `pin_length` digits, so `0000` could
+    /// never be typed and nobody could log in. PIN and keypad are born together or not at all.
+    #[tokio::test]
+    async fn demo_seed_keeps_a_four_digit_demo_on_its_four_digit_keypad() {
+        // The user statement of `demo.sql` as it was before hub#1929.
+        const OLD_DEMO_USER: &str = "INSERT INTO hub_user \
+            (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at) \
+            SELECT 'demo-user-0000000000000000000000', :hub_id, 'Demo', \
+            'demo-seed-salt:1dc5326634c5a049052910edddc64689c1389d7812621b2f5c6fe6b1bb065628', \
+            'admin', NULL, 1, '2026-01-01T00:00:00+00:00' \
+            WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE hub_id = :hub_id AND name = 'Demo');";
+
+        let db = fresh_db().await;
+        let runtime = crate::Runtime::new(Box::new(db));
+        runtime.ensure_system_tables().await.unwrap();
+        runtime.apply_seed(OLD_DEMO_USER).await.unwrap();
+
+        runtime.apply_seed(DEMO_SEED).await.unwrap();
+
+        assert!(
+            runtime.verify_pin("Demo", "0000").await.unwrap().is_some(),
+            "an existing Demo keeps its PIN"
+        );
+        assert_eq!(
+            runtime.pin_length().await.unwrap(),
+            4,
+            "a Demo whose PIN has four digits must keep a four-digit keypad, or it is locked out"
+        );
+        // And it stays that way on the next boot, when the user row is there either way.
+        runtime.apply_seed(DEMO_SEED).await.unwrap();
+        assert_eq!(runtime.pin_length().await.unwrap(), 4);
+    }
+
     async fn identity_count_demo(runtime: &crate::Runtime) -> i64 {
         let mut p = erplora_db::Params::new();
         p.insert("name".into(), serde_json::json!("Demo"));

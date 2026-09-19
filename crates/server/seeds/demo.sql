@@ -24,6 +24,22 @@
 --   sha256("demo-seed-salt:000000") = e35965261d83711c5304a8a53178f8b9e978177904203918d3f4b331ff2e9a2d
 -- The test `seed::tests::demo_seed_enables_demo_pin_login_and_trusted_device` GUARANTEES it verifies.
 
+-- The demo asks for SIX digits, like every hub provisioned today (ADR-0372), and its PIN fills
+-- them (hub#1929). The pinpad submits at exactly `pin_length` digits (hub#1037): without this row
+-- the demo would fall back to the runtime default of 4 and a six-digit PIN could never be typed.
+-- It lives in the SEED and not in provisioning because the local hub applies this same file.
+-- Same shape as the SaaS's `_pin_length_seed_sql`, and like it it never overwrites: the seed runs
+-- at every boot, and a length the admin changed in Ajustes outranks the one the demo was born with.
+-- ORDER MATTERS: this statement runs BEFORE the user's and only while "Demo" does not exist yet,
+-- so the six-digit keypad and the six-digit PIN are born in the same pass. A database that
+-- already holds the old four-digit "Demo" (a persistent local `erplora_hub_dev`, a live demo)
+-- keeps its `0000` — the user row below never overwrites — and must keep its four-digit keypad
+-- too, or that PIN could never be typed (test `demo_seed_keeps_a_four_digit_demo_on_its_four_digit_keypad`).
+INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by)
+SELECT :hub_id, 'pin_length', '6', '2026-01-01T00:00:00+00:00', 'system:provisioning'
+WHERE NOT EXISTS (SELECT 1 FROM hub_settings WHERE hub_id = :hub_id AND key = 'pin_length')
+  AND NOT EXISTS (SELECT 1 FROM hub_user WHERE hub_id = :hub_id AND name = 'Demo');
+
 -- "Demo" user: role "admin" (the role with the widest permission coverage in the POS modules),
 -- active, no cloud link, PIN "000000".
 INSERT INTO hub_user (id, hub_id, name, pin_hash, role, cloud_user_id, is_active, created_at)
@@ -31,16 +47,6 @@ SELECT 'demo-user-0000000000000000000000', :hub_id, 'Demo',
        'demo-seed-salt:e35965261d83711c5304a8a53178f8b9e978177904203918d3f4b331ff2e9a2d',
        'admin', NULL, 1, '2026-01-01T00:00:00+00:00'
 WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE hub_id = :hub_id AND name = 'Demo');
-
--- The demo asks for SIX digits, like every hub provisioned today (ADR-0372), and its PIN fills
--- them (hub#1929). The pinpad submits at exactly `pin_length` digits (hub#1037): without this row
--- the demo would fall back to the runtime default of 4 and a six-digit PIN could never be typed.
--- It lives in the SEED and not in provisioning because the local hub applies this same file.
--- Same shape as the SaaS's `_pin_length_seed_sql`, and like it it never overwrites: the seed runs
--- at every boot, and a length the admin changed in Ajustes outranks the one the demo was born with.
-INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by)
-SELECT :hub_id, 'pin_length', '6', '2026-01-01T00:00:00+00:00', 'system:provisioning'
-WHERE NOT EXISTS (SELECT 1 FROM hub_settings WHERE hub_id = :hub_id AND key = 'pin_length');
 
 -- 🔴 AQUÍ HABÍA un dispositivo de confianza sembrado, `demo-trusted-device`, para que el login por
 -- PIN funcionase sin login online previo. NO funcionaba, y no podía (hub#630): el `device_id` se lo
