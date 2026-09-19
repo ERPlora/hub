@@ -75,6 +75,29 @@ pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<O
     Ok(config)
 }
 
+/// **The config a TRANSMISSION reads** (hub#1934): the saved row, or — for a hub that never saved
+/// one — the defaults its records are already sealed with.
+///
+/// [`read_config`] keeps answering `None` for «this hub has no VeriFactu config», which is what
+/// the settings screen needs. A transmission cannot stop there: every sale of such a hub already
+/// built its record and its QR against the default environment, and hanging the send on the row
+/// left that QR pointing at a record the AEAT never received. The default is `testing`, so a hub
+/// nobody configured can only ever reach the TEST agency — production still needs the one-way
+/// go-live saved in the row.
+///
+/// The producer facts ride along exactly as [`read_config`] attaches them to a row: without them
+/// no envelope can be built, whichever way the config was obtained.
+pub(crate) async fn transmission_config(host: &dyn NativeHost, hub_id: &str) -> Result<Json> {
+    if let Some(config) = read_config(host, hub_id).await? {
+        return Ok(config);
+    }
+    let mut config = json!({ "environment": "testing" });
+    if let Some(facts) = host.producer_facts().await.unwrap_or_default() {
+        config["producer_facts"] = facts;
+    }
+    Ok(config)
+}
+
 /// ¿Hay un certificado del core con el que transmitir? Gate barato que NO carga los bytes del
 /// `.p12`: basta el marcador `certificate_source` que `read_config` pone con lo que respondió el
 /// core. Sin él, la vía es la celda ([`resolve_route`]), no un fallo.

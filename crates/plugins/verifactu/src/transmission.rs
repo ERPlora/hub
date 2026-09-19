@@ -601,6 +601,17 @@ impl Refusal {
             reason,
         }
     }
+
+    /// The road should be there and broke before anything reached the wire — the control plane
+    /// did not mint the gateway token, or the attempt died on the way (hub#1934). For the operator
+    /// it is the wire failing, not the filing, so it wears [`REASON_TRANSMISSION_FAILED`]: a new
+    /// code would ask every reader of the event for a sentence that says the same thing.
+    pub(crate) fn road_unavailable(reason: String) -> Self {
+        Self {
+            code: REASON_TRANSMISSION_FAILED,
+            reason,
+        }
+    }
 }
 
 /// **The record does not say which AEAT owns it, so nothing is transmitted** (hub#471).
@@ -1028,9 +1039,10 @@ pub(crate) async fn process_contingency_queue(
     let (payload, ctx) = split_input(input)?;
     let limit = int_field(&payload, "limit", 100).clamp(1, 500);
 
-    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
-        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
-    })?;
+    // The same config `create_record` sealed and queued these records with: a hub that never saved
+    // one drains against the defaults (`testing`) instead of refusing — its queue could otherwise
+    // never empty (hub#1934).
+    let config = transmission_config(host, &ctx.hub_id).await?;
     // Gate: sin NINGUNA vía (certificado o pasarela) no hay nada que transmitir; deja la cola
     // como está — los hubs sin cert pero con la pasarela enrolada por fin drenan (hub#1432).
     if !can_transmit(host, &ctx.hub_id, &config).await? {
