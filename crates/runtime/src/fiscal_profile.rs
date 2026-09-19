@@ -255,6 +255,56 @@ pub fn learned_trigger_events(registry: &Registry, country: &str, regime: &str) 
     events
 }
 
+/// **The events that OPEN a fiscal chain in this hub** (hub#1935): the provider's learned triggers,
+/// plus every event an active module listens to with a command that may emit one of them —
+/// followed upstream until nothing new joins.
+///
+/// The provider only ever says «I listen to `invoice.created`». But the transaction that commits
+/// the business to a document is the SALE: `sale.completed` → `invoice.create_from_sale` →
+/// `invoice.created`. A gate keyed on the provider's words alone stops the invoice, and ADR-0203
+/// already wrote down what that costs — the sale closes and the invoice dies in the dead-letter.
+///
+/// Still business-free: the core never names `sale`. What a listener may emit is its declared
+/// `emit` plus, when a handler resolves it, its module's catalogue (`events.emits`, the allowlist
+/// the dispatcher validates handler events against, hub#240). A handler module that declares no
+/// catalogue is unknowable here and does not join the chain.
+pub fn fiscal_chain_events(
+    registry: &Registry,
+    triggers: &[String],
+) -> std::collections::HashSet<String> {
+    let mut chain: std::collections::HashSet<String> = triggers.iter().cloned().collect();
+    loop {
+        let mut grew = false;
+        for module in &registry.installed {
+            for (event, listener) in &module.events.listen {
+                if chain.contains(event) {
+                    continue;
+                }
+                // `get_command` only answers for an ACTIVE module: a deactivated one runs no
+                // listener (ADR-0128), so its subscriptions open nothing.
+                let Some(command) = registry.get_command(&listener.command) else {
+                    continue;
+                };
+                let declared = command.def.emit.iter().map(|e| e.event());
+                let handled = command
+                    .def
+                    .handler
+                    .is_some()
+                    .then_some(module.events.emits.iter().map(String::as_str))
+                    .into_iter()
+                    .flatten();
+                if declared.chain(handled).any(|e| chain.contains(e)) {
+                    chain.insert(event.clone());
+                    grew = true;
+                }
+            }
+        }
+        if !grew {
+            return chain;
+        }
+    }
+}
+
 /// **Were these rows written by a DIFFERENT installation of the software?** (ADR-0273 D8, hub#558).
 ///
 /// `NumeroInstalacion = hub_id` is the ADR-0202 invariant, so the answer is a string comparison and
@@ -446,6 +496,37 @@ pub const ALREADY_EMITTED: &str = "fiscal.already_emitted";
 /// [`NOT_READY`]: what this hub is missing is not configuration but a **signed document**, and the
 /// screen has to be able to say which — one sends the user to the checklist, the other to a form.
 pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
+
+/// **What stops this hub from getting a record to the tax authority** (hub#1935) — `None` when
+/// nothing does. The stable code of the FIRST thing missing otherwise.
+///
+/// One rule with three readers, fed the facts each of them already holds: the dispatcher's gate
+/// (a live hub does not open a fiscal chain it cannot deliver), the core query the TPV reads before
+/// charging (`hub.fiscal.transmission`), and the switch that stops using the own certificate
+/// ([`crate::Runtime::set_business_certificate_use`] asks it about the road it would leave behind).
+///
+/// * **`testing` → nothing is missing.** In pruebas there is nothing to authorize (ADR-0360) and
+///   the road to the AEAT's sandbox always exists (hub#1934).
+/// * **The own certificate is a road on its own** (ADR-0320 §1): no grant, no cell.
+/// * **ERPlora's road needs the grant first** — the cell refuses a `production` envelope without
+///   one (verifactu-gateway, `hub_not_authorized`) — and it is the first thing said, in the order
+///   the go-live says it (hub#817). `has_certificate` never looked at it: that is the hole.
+/// * **…and then the machine identity** that the cell's mTLS ingress demands.
+///
+/// Offline on purpose, like `gateway_identity::is_enrolled`: a cell or an AEAT that is DOWN is a
+/// contingency and the till keeps charging; only a road that does not EXIST stops it.
+pub fn filing_gap(profile: &FiscalProfile, route: &str, enrolled: bool) -> Option<&'static str> {
+    if profile.environment == ENV_TESTING || route == crate::certificate::ROUTE_OWN {
+        return None;
+    }
+    if profile.representation_status != REPRESENTATION_VIGENTE {
+        return Some(NO_REPRESENTATION);
+    }
+    if !enrolled {
+        return Some(crate::certificate::GATEWAY_NOT_ENROLLED);
+    }
+    None
+}
 
 /// The answers the control plane gives about the grant, plus `""` for "never asked".
 ///
@@ -1450,6 +1531,238 @@ mod tests {
             representation_status: REPRESENTATION_VIGENTE.into(),
             representation_at: "2026-08-11T09:00:00Z".into(),
         }
+    }
+
+    // ── Can a hub that files for real get a record out? (hub#1935) ──────────────────────────────
+
+    fn live(representation: &str) -> FiscalProfile {
+        FiscalProfile {
+            environment: ENV_PRODUCTION.into(),
+            representation_status: representation.into(),
+            ..profile_in(FiscalStatus::Active, "hub-es")
+        }
+    }
+
+    /// In `testing` the road always exists (hub#1934, ADR-0360): nothing is ever missing there,
+    /// whatever the route, the grant or the connection.
+    #[test]
+    fn in_testing_nothing_is_missing() {
+        let testing = FiscalProfile {
+            environment: ENV_TESTING.into(),
+            ..live(REPRESENTATION_ABSENT)
+        };
+        assert_eq!(
+            filing_gap(&testing, crate::certificate::ROUTE_DELEGATED, false),
+            None
+        );
+    }
+
+    /// The taxpayer's own certificate is a road on its own: no grant, no cell (ADR-0320 §1).
+    #[test]
+    fn the_own_route_needs_neither_grant_nor_cell() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_ABSENT),
+                crate::certificate::ROUTE_OWN,
+                false
+            ),
+            None
+        );
+    }
+
+    /// ERPlora's road needs the signed grant FIRST — the cell refuses a `production` envelope
+    /// without it — and it is the first thing said, in the go-live's order (hub#817). Every state
+    /// that is not `vigente` is as closed as `absent`.
+    #[test]
+    fn the_delegated_route_without_an_approved_grant_is_missing_the_grant() {
+        for state in [
+            REPRESENTATION_ABSENT,
+            REPRESENTATION_PENDING,
+            REPRESENTATION_REJECTED,
+            REPRESENTATION_REVOKED,
+            "",
+        ] {
+            assert_eq!(
+                filing_gap(&live(state), crate::certificate::ROUTE_DELEGATED, true),
+                Some(NO_REPRESENTATION),
+                "{state:?}"
+            );
+        }
+    }
+
+    /// With the grant approved, the cell still needs this hub's machine identity to be reached.
+    #[test]
+    fn the_delegated_route_without_the_machine_identity_is_missing_the_connection() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_VIGENTE),
+                crate::certificate::ROUTE_DELEGATED,
+                false
+            ),
+            Some(crate::certificate::GATEWAY_NOT_ENROLLED)
+        );
+    }
+
+    #[test]
+    fn the_delegated_route_complete_is_not_missing_anything() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_VIGENTE),
+                crate::certificate::ROUTE_DELEGATED,
+                true
+            ),
+            None
+        );
+    }
+
+    /// `(module id, [(listened event, listener command)], module-level emits, active)`.
+    type ChainModule<'a> = (&'a str, &'a [(&'a str, &'a str)], &'a [&'a str], bool);
+    /// `(command name, declared emit, resolved by a handler)`.
+    type ChainCommand<'a> = (&'a str, &'a [&'a str], bool);
+
+    /// A registry with commands, for the chain closure.
+    fn chain_registry(modules: &[ChainModule], commands: &[ChainCommand]) -> Registry {
+        use crate::registry::{ModuleStatus, RegisteredCommand};
+        let mut reg = Registry::new();
+        for (id, listens, emits, active) in modules {
+            let listen: serde_json::Map<String, serde_json::Value> = listens
+                .iter()
+                .map(|(e, c)| ((*e).to_string(), json!({ "command": c })))
+                .collect();
+            reg.installed.push(
+                serde_json::from_value(json!({
+                    "id": id, "name": id, "version": "1.0.0",
+                    "events": { "listen": listen, "emits": emits }
+                }))
+                .expect("manifest parses"),
+            );
+            reg.status.insert(
+                (*id).to_string(),
+                if *active {
+                    ModuleStatus::Active
+                } else {
+                    ModuleStatus::Inactive
+                },
+            );
+            for (event, command) in listens.iter() {
+                reg.listeners
+                    .entry((*event).to_string())
+                    .or_default()
+                    .push((*command).to_string());
+            }
+        }
+        for (name, emit, handler) in commands {
+            let module_id = name.split('.').next().unwrap_or_default().to_string();
+            let mut def = json!({ "permission": "x", "emit": emit });
+            if *handler {
+                def["handler"] =
+                    json!({ "type": "wasm", "file": "dist/handler.wasm", "function": "f" });
+            }
+            reg.commands.insert(
+                (*name).to_string(),
+                RegisteredCommand {
+                    module_id,
+                    def: serde_json::from_value(def).expect("command parses"),
+                    sql: Vec::new(),
+                    wasm: None,
+                    schema: None,
+                },
+            );
+        }
+        reg
+    }
+
+    fn triggers() -> Vec<String> {
+        vec!["invoice.created".into(), "invoice.rectified".into()]
+    }
+
+    /// The provider's own triggers open the chain: an invoice IS the fiscal document.
+    #[test]
+    fn the_providers_triggers_open_the_chain() {
+        let chain = fiscal_chain_events(&chain_registry(&[], &[]), &triggers());
+        assert!(chain.contains("invoice.created"));
+        assert!(chain.contains("invoice.rectified"));
+    }
+
+    /// 🔴 **The sale.** `invoice` listens to `sale.completed` with a HANDLER, so what it may emit is
+    /// its module-level catalogue (hub#240) — `invoice.created` among it. The sale therefore opens
+    /// the chain, and so does the refund through a DECLARED `emit`.
+    #[test]
+    fn an_event_whose_listener_issues_the_document_opens_the_chain() {
+        let reg = chain_registry(
+            &[(
+                "invoice",
+                &[
+                    ("sale.completed", "invoice.create_from_sale"),
+                    ("sale.refunded", "invoice._rectify_from_refund"),
+                ],
+                &["invoice.created", "invoice.rectified"],
+                true,
+            )],
+            &[
+                ("invoice.create_from_sale", &[], true),
+                (
+                    "invoice._rectify_from_refund",
+                    &["invoice.rectified"],
+                    false,
+                ),
+            ],
+        );
+        let chain = fiscal_chain_events(&reg, &triggers());
+        assert!(chain.contains("sale.completed"), "{chain:?}");
+        assert!(chain.contains("sale.refunded"), "{chain:?}");
+    }
+
+    /// Transitive: whatever feeds the sale opens the chain too.
+    #[test]
+    fn the_chain_is_followed_upstream_more_than_one_hop() {
+        let reg = chain_registry(
+            &[
+                (
+                    "invoice",
+                    &[("sale.completed", "invoice.create_from_sale")],
+                    &["invoice.created"],
+                    true,
+                ),
+                ("sales", &[("order.paid", "sales.close_order")], &[], true),
+            ],
+            &[
+                ("invoice.create_from_sale", &[], true),
+                ("sales.close_order", &["sale.completed"], false),
+            ],
+        );
+        assert!(fiscal_chain_events(&reg, &triggers()).contains("order.paid"));
+    }
+
+    /// Stock going down on a sale is not fiscal, and a listener that cannot issue a document does not
+    /// drag its event into the chain — the gate must not stop what has nothing to file.
+    #[test]
+    fn an_event_whose_listeners_issue_nothing_fiscal_stays_out() {
+        let reg = chain_registry(
+            &[(
+                "inventory",
+                &[("stock.counted", "inventory.recount")],
+                &["stock.changed"],
+                true,
+            )],
+            &[("inventory.recount", &["stock.changed"], true)],
+        );
+        assert!(!fiscal_chain_events(&reg, &triggers()).contains("stock.counted"));
+    }
+
+    /// A deactivated module runs no listener (ADR-0128): its subscriptions open nothing.
+    #[test]
+    fn an_inactive_listener_opens_nothing() {
+        let reg = chain_registry(
+            &[(
+                "invoice",
+                &[("sale.completed", "invoice.create_from_sale")],
+                &["invoice.created"],
+                false,
+            )],
+            &[("invoice.create_from_sale", &[], true)],
+        );
+        assert!(!fiscal_chain_events(&reg, &triggers()).contains("sale.completed"));
     }
 
     /// 🔴 **The case the whole ADR exists for.** The hub went live and the provider went away —

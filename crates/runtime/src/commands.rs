@@ -188,28 +188,41 @@ pub(crate) async fn execute_at(
         // reason (ADR-0360, hub#1087): `enforce_fiscal_precondition` keys its certificate arm on
         // WHICH AEAT this hub files to, and an unread profile must read as the conservative
         // answer (empty → production's demand), never as permission.
-        let (fiscal_mode, fiscal_triggers, fiscal_providers, fiscal_environment) =
-            match crate::fiscal_profile::ensure(db, &ctx.hub_id).await {
-                Ok(p) => (
-                    crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id),
-                    p.fiscal_trigger_events.clone(),
-                    crate::fiscal_profile::providers_of(
-                        registry,
-                        &p.country_code,
-                        &p.fiscal_system,
-                    )
+        let profile = crate::fiscal_profile::ensure(db, &ctx.hub_id).await;
+        // What stops this hub from getting a record to the tax authority (hub#1935), from the same
+        // profile read. The route degrades to DELEGATED on a read error — the answer that asks for
+        // the most — so an unreadable slot fails CLOSED, like `has_cert` above. `has_cert` stands
+        // in for «enrolled»: `filing_gap` only reads it on the delegated route, where no own
+        // certificate is active and `can_transmit` is exactly `is_enrolled`. An unreadable profile
+        // gates nothing here, the same as the mode below: `ensure` failing is the database the
+        // sale itself is about to write to.
+        let filing_gap = match &profile {
+            Ok(p) => crate::fiscal_profile::filing_gap(
+                p,
+                crate::certificate::transmission_route(db, &ctx.hub_id)
+                    .await
+                    .unwrap_or(crate::certificate::ROUTE_DELEGATED),
+                has_cert,
+            ),
+            Err(_) => None,
+        };
+        let (fiscal_mode, fiscal_triggers, fiscal_providers, fiscal_environment) = match profile {
+            Ok(p) => (
+                crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id),
+                p.fiscal_trigger_events.clone(),
+                crate::fiscal_profile::providers_of(registry, &p.country_code, &p.fiscal_system)
                     .iter()
                     .map(|m| m.id.clone())
                     .collect(),
-                    p.environment.clone(),
-                ),
-                Err(_) => (
-                    crate::fiscal_profile::FiscalMode::Unconfigured,
-                    Vec::new(),
-                    Vec::new(),
-                    String::new(),
-                ),
-            };
+                p.environment.clone(),
+            ),
+            Err(_) => (
+                crate::fiscal_profile::FiscalMode::Unconfigured,
+                Vec::new(),
+                Vec::new(),
+                String::new(),
+            ),
+        };
         enriched_ctx = ctx
             .clone()
             .with_business(
@@ -245,6 +258,8 @@ pub(crate) async fn execute_at(
             // mode it feeds. The certificate arm of `enforce_fiscal_precondition` reads it —
             // in `testing` there is nothing to authorize.
             .with_fiscal_environment(fiscal_environment)
+            // What stops it from filing (hub#1935): read by `enforce_fiscal_road`.
+            .with_fiscal_filing_gap(filing_gap)
             // What this hub OWES right now (ADR-0273 D2, hub#550): resolved here, from the core's
             // own tables and the registry, next to the identity and the certificate — never from
             // anything the caller sent. Degrading to `Unconfigured` on a read error keeps this
@@ -542,6 +557,8 @@ pub(crate) async fn execute_at(
         name.starts_with(crate::hub_users::CORE_NAMESPACE),
         &cmd.def.emit,
     )?;
+    // hub#1935: a hub that files for real does not open a fiscal chain it cannot deliver.
+    enforce_fiscal_road(registry, ctx, cmd.def.emit.iter().map(|e| e.event()))?;
 
     // Fiscal environment pin (ADR-0197 §4, hub#376): a demo hub never leaves the sandbox.
     enforce_fiscal_environment_pin(registry, cmd.sql.iter().map(|s| (s.as_str(), payload)))?;
@@ -1408,6 +1425,18 @@ async fn persist_handler_output(
             event.dedup_key(),
         ));
     }
+    // hub#1935: the same gate as the declarative path, on EVERY event this transaction would
+    // enqueue — the declared ones and the ones the handler returned. A sale's `sale.completed`
+    // comes back from its handler; reading only `emit` would never see it. Still before the
+    // transaction: nothing has been written.
+    enforce_fiscal_road(
+        registry,
+        ctx,
+        declared
+            .iter()
+            .map(|e| e.event())
+            .chain(handler_events.iter().map(|(name, _)| name.as_str())),
+    )?;
     for (name, payload) in &handler_events {
         tx_ops.push(outbox::insert_op(
             ctx,
@@ -1999,6 +2028,58 @@ fn enforce_fiscal_capacity(
     }
 }
 
+/// **The fourth branch of the fiscal gate: a hub that files for real does not open a fiscal chain
+/// it cannot deliver** (hub#1935 — amends the consequence ADR-0203 wrote down).
+///
+/// Ioan's rule of 2026-09-19: every ticket has to REACH the tax authority. ADR-0203 put its gate on
+/// the INVOICE and said so in its consequences: a sale without what the invoice needs still
+/// closes, and the invoice dies in the dead-letter. And its certificate arm asks
+/// `has_certificate`, which the machine identity alone satisfies (hub#1489) — so a live hub on
+/// ERPlora's road with no approved grant sold, invoiced and chained records the fiscal cell then
+/// refused, every one of them.
+///
+/// * **What is missing** is [`crate::fiscal_profile::filing_gap`], stamped by the dispatcher from
+///   the core's own tables: empty in `testing` and whenever the road exists. Offline, so an AEAT or
+///   a cell that is DOWN never stops the till — that is a contingency, filed later.
+/// * **What is refused** is a transaction that would enqueue an event that OPENS a fiscal chain
+///   ([`crate::fiscal_profile::fiscal_chain_events`]): the sale, the refund, the invoice itself.
+///   The rest of the till keeps working. `emitted` carries the events a handler returned as well
+///   as the declared ones — a sale's `sale.completed` comes back from its handler, and a gate that
+///   only read `emit` would never see it.
+/// * **What is NOT refused** is the relay delivering a chain that is already open: the invoice of
+///   a sale charged while the road existed is still issued if the road breaks before the relay
+///   runs, and its record waits for the road (verifactu#111) instead of the invoice dying in the
+///   dead-letter. A flow step is not a delivery — it can open a chain of its own, so it is gated.
+fn enforce_fiscal_road<'a>(
+    registry: &Registry,
+    ctx: &RequestContext,
+    emitted: impl IntoIterator<Item = &'a str>,
+) -> Result<()> {
+    let gap = ctx.fiscal_filing_gap();
+    if gap.is_empty() {
+        return Ok(());
+    }
+    let relay_delivery = !ctx.parent_event_id().is_empty() && ctx.automation().is_none();
+    if relay_delivery {
+        return Ok(());
+    }
+    let emitted: Vec<&str> = emitted.into_iter().map(str::trim).collect();
+    if emitted.is_empty() {
+        return Ok(());
+    }
+    let chain = crate::fiscal_profile::fiscal_chain_events(registry, &ctx.fiscal_triggers);
+    if !emitted.iter().any(|e| chain.contains(*e)) {
+        return Ok(());
+    }
+    Err(RuntimeError::Domain {
+        code: gap.to_string(),
+        message: "this hub files for real and has no way to get this fiscal document to the \
+                  tax authority, so nothing was recorded. Fix the connection in the fiscal \
+                  settings and try again"
+            .to_string(),
+    })
+}
+
 // ─── Fiscal environment policy (ADR-0197 §4 · hub#376) ───────────────────────
 
 /// The `system_params`/payload param that names the tax authority environment a fiscal record is
@@ -2309,6 +2390,56 @@ mod tests {
             RuntimeError::Domain { code, .. } => code.clone(),
             other => other.to_string(),
         }
+    }
+
+    // ── hub#1935: a live hub does not open a fiscal chain it cannot deliver ──────────────────
+
+    /// A live hub whose road lacks the grant, with the provider's trigger learnt.
+    fn roadless_ctx() -> RequestContext {
+        fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"])
+            .with_fiscal_filing_gap(Some(crate::fiscal_profile::NO_REPRESENTATION))
+    }
+
+    #[test]
+    fn a_live_hub_without_a_road_refuses_what_opens_the_chain_with_what_is_missing() {
+        let err = enforce_fiscal_road(&Registry::new(), &roadless_ctx(), ["invoice.created"])
+            .expect_err("the chain would open with nobody able to deliver it");
+        assert_eq!(code_of(&err), crate::fiscal_profile::NO_REPRESENTATION);
+    }
+
+    #[test]
+    fn with_the_road_in_place_nothing_is_refused() {
+        let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
+        assert!(enforce_fiscal_road(&Registry::new(), &ctx, ["invoice.created"]).is_ok());
+    }
+
+    #[test]
+    fn what_opens_no_fiscal_chain_is_never_refused_for_the_road() {
+        assert!(enforce_fiscal_road(&Registry::new(), &roadless_ctx(), ["stock.changed"]).is_ok());
+        assert!(enforce_fiscal_road(&Registry::new(), &roadless_ctx(), []).is_ok());
+    }
+
+    /// The relay delivering an event continues a chain that is already open — the invoice of a sale
+    /// already charged. Refusing it would strand that sale in the dead-letter.
+    #[test]
+    fn the_relay_continuing_an_open_chain_is_not_refused() {
+        let ctx = roadless_ctx().caused_by_event("evt-sale-completed");
+        assert!(enforce_fiscal_road(&Registry::new(), &ctx, ["invoice.created"]).is_ok());
+    }
+
+    /// A flow step is caused by an event too, but it can OPEN a chain of its own: it is gated like
+    /// a person at the till.
+    #[test]
+    fn a_flow_step_opening_a_chain_is_refused_like_a_person() {
+        let ctx = roadless_ctx()
+            .caused_by_event("evt-appointment-done")
+            .with_automation(crate::registry::AutomationCtx {
+                flow_id: "f1".into(),
+                run_id: "r1".into(),
+            });
+        let err = enforce_fiscal_road(&Registry::new(), &ctx, ["invoice.created"])
+            .expect_err("an automation opens chains like anybody else");
+        assert_eq!(code_of(&err), crate::fiscal_profile::NO_REPRESENTATION);
     }
 
     /// 🔴 **La venta que abriría una cadena fiscal se RECHAZA cuando no queda nadie que la cierre.**
