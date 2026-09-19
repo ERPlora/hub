@@ -1198,6 +1198,8 @@ mod testing_always_reaches_the_aeat_hub1934 {
         queue: Vec<Json>,
         records: Vec<Json>,
         control_plane: ControlPlane,
+        /// The durable archive of the XML refuses the write (storage down).
+        archive_fails: bool,
     }
 
     #[async_trait::async_trait]
@@ -1237,6 +1239,9 @@ mod testing_always_reaches_the_aeat_hub1934 {
             _bytes: &[u8],
             _content_type: &str,
         ) -> Result<String> {
+            if self.archive_fails {
+                return Err(RuntimeError::Storage("archive unavailable".into()));
+            }
             Ok(format!("modules/verifactu/{relative_path}"))
         }
         async fn machine_identity(
@@ -1310,6 +1315,7 @@ mod testing_always_reaches_the_aeat_hub1934 {
             queue: vec![],
             records: vec![],
             control_plane: ControlPlane::Mints(url),
+            archive_fails: false,
         };
 
         let out = create_record(&sale(hub_id), &host).await.unwrap();
@@ -1337,6 +1343,7 @@ mod testing_always_reaches_the_aeat_hub1934 {
             queue: vec![],
             records: vec![],
             control_plane: ControlPlane::Fails,
+            archive_fails: false,
         };
 
         let out = create_record(&sale(hub_id), &host)
@@ -1371,6 +1378,7 @@ mod testing_always_reaches_the_aeat_hub1934 {
             queue: vec![],
             records: vec![],
             control_plane: ControlPlane::Fails,
+            archive_fails: false,
         };
 
         let out = create_record(&sale(hub_id), &host)
@@ -1408,6 +1416,7 @@ mod testing_always_reaches_the_aeat_hub1934 {
             queue: vec![json!({ "record_id": "rec-queued" })],
             records: vec![record],
             control_plane: ControlPlane::Mints(url),
+            archive_fails: false,
         };
         let input = json!({
             "payload": {},
@@ -1426,5 +1435,35 @@ mod testing_always_reaches_the_aeat_hub1934 {
         let applied = ops_named(&out, "verifactu._apply_transmission");
         assert_eq!(applied.len(), 1);
         assert_eq!(applied[0].params.get("status"), Some(&json!("accepted")));
+    }
+
+    /// 🔴 The road opens but the send dies before the wire (here the XML archive refuses the
+    /// write, which forbids sending by design). It used to be swallowed and the record stayed a
+    /// silent loose `pending`; it waits in the queue with its reason instead.
+    #[tokio::test]
+    async fn a_send_that_dies_before_the_wire_queues_the_record() {
+        let hub_id = "19340000-0000-4000-8000-000000000005";
+        let (url, cell) = spawn_fake_cell().await;
+        let host = EnrolledHub {
+            hub_id: hub_id.to_owned(),
+            config: None,
+            queue: vec![],
+            records: vec![],
+            control_plane: ControlPlane::Mints(url),
+            archive_fails: true,
+        };
+
+        let out = create_record(&sale(hub_id), &host).await.unwrap();
+
+        assert!(
+            cell.lock().unwrap().is_empty(),
+            "nothing is sent without its archived XML"
+        );
+        assert_eq!(ops_named(&out, "verifactu._insert_record").len(), 1);
+        assert_eq!(
+            ops_named(&out, "verifactu._enqueue_contingency").len(),
+            1,
+            "the record must wait in the contingency queue"
+        );
     }
 }
