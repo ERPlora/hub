@@ -18,6 +18,7 @@ type Listener = (payload: unknown) => void;
 function fakeClient(over: {
   devices?: () => Promise<{ role: string | null; ip: string | null; port?: number }[]>;
   settings?: Record<string, unknown>;
+  saleFails?: boolean;
 } = {}) {
   const listeners: Record<string, Listener[]> = {};
   const openDrawer = vi.fn(async () => undefined);
@@ -28,8 +29,13 @@ function fakeClient(over: {
     },
     query: vi.fn(async (name: string) => {
       if (name === 'printing.settings.get') return [over.settings ?? { auto_print_on_sale: 1 }];
-      if (name === 'sales.get') return [{ id: '42', total: 1250, series: 'F', number: 7 }];
-      if (name === 'sales.lines') return [{ product_name: 'Café', quantity: 1_000_000, unit_price: 1250 }];
+      // The raw rows as `sales` serves them (hub#1921): money in minor units, quantity in
+      // millionths, the payment method as a code. Printing THEM is the bug.
+      if (name === 'sales.get') {
+        if (over.saleFails) throw new Error('sales.get failed');
+        return [{ id: '42', sale_number: '20260919-0001', subtotal: 983, tax_amount: 207, total: 1190, payment_method: 'Card', amount_tendered: 1190 }];
+      }
+      if (name === 'sales.lines') return [{ product_name: 'Acondicionador 300 ml', quantity: 1_000_000, line_total: 1190 }];
       return [];
     }),
     peripherals: {
@@ -61,11 +67,83 @@ function fakeGate(result: PrintResult = { via: 'queue', role: 'receipt' }) {
   };
 }
 
+/** The paper the ticket screen's print button prints for the sale (hub#1921), in euros and words. */
+const PAPER = {
+  business_name: 'Salon Lucia SL',
+  vat_number: 'B12345674',
+  receipt_id: '20260919-0001',
+  items: [{ name: 'Acondicionador 300 ml', quantity: 1, total: 11.9 }],
+  subtotal: 9.83,
+  tax_amount: 2.07,
+  total: 11.9,
+  payment_method: 'Tarjeta',
+  paid: 11.9,
+};
+
+/** Where the shell gets that paper from: the sales module's viewer, here a stand-in. */
+function paperSource() {
+  return vi.fn(async (_saleId: string): Promise<Record<string, unknown>> => PAPER);
+}
+
+describe('the ticket on payment is the paper the ticket screen prints (hub#1921)', () => {
+  it('prints the document the sales module composes, never the raw sale row', async () => {
+    const gate = fakeGate();
+    const saleDocument = paperSource();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: gate.print, saleDocument });
+
+    await emit({ sale_id: '42' });
+
+    expect(saleDocument).toHaveBeenCalledWith('42');
+    expect(gate.calls).toHaveLength(1);
+    // «1x … 11.90», «TOTAL 11.90», «Pago: Tarjeta» — not «1000000x … 1190.00» nor «Pago: Card».
+    expect(gate.calls[0]!.data).toEqual(PAPER);
+  });
+
+  it('when the paper cannot be composed nothing is printed and the till hears it, with the code', async () => {
+    const gate = fakeGate();
+    const onFailure = vi.fn();
+    const saleDocument = vi.fn(async () => {
+      throw new Error('sale_document_timeout');
+    });
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: gate.print, onFailure, saleDocument });
+
+    await emit({ sale_id: '42' });
+
+    // Better no paper and a warning (the ticket screen reprints it) than a paper with wrong amounts.
+    expect(gate.print).not.toHaveBeenCalled();
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ saleId: '42', error: 'sale_document_timeout' });
+    // And says WHICH failure it is: the paper was never made (reprint it from the ticket screen), not
+    // a printer that did not deliver — the till shows a sentence for it, never the code.
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ notComposed: true });
+  });
+
+  it('the drawer opens even when the ticket cannot be composed', async () => {
+    // The cash has to go in the drawer whatever happens to the paper: the drawer never waited on
+    // the ticket's content, only on the sale being read — and that read is not the shell's any more.
+    const { client, openDrawer, emit } = fakeClient({
+      devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }],
+      settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
+      saleFails: true,
+    });
+    const saleDocument = vi.fn(async () => {
+      throw new Error('sale_document_unavailable');
+    });
+    bootPrintOnSale(client, { print: fakeGate().print, saleDocument });
+
+    await emit({ sale_id: '42' });
+
+    expect(openDrawer).toHaveBeenCalledWith('network:10.0.0.5:9100');
+  });
+});
+
 describe('the ticket on payment (hub#862)', () => {
   it('with the printer holding NO ROLE the ticket leaves through the door, which queues it', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: gate.print });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -84,7 +162,7 @@ describe('the ticket on payment (hub#862)', () => {
     // print, it warns — the same rule as the kitchen docket (`print-comanda`).
     const gate = fakeGate();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: gate.print });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -97,7 +175,7 @@ describe('the ticket on payment (hub#862)', () => {
     const { client, emit } = fakeClient({
       devices: async () => { throw new Error('hardware_unavailable'); },
     });
-    bootPrintOnSale(client, { print: gate.print });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -108,18 +186,19 @@ describe('the ticket on payment (hub#862)', () => {
     const gate = fakeGate({ via: 'browser', role: 'receipt', error: 'no printer' });
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: gate.print, onFailure });
+    bootPrintOnSale(client, { print: gate.print, onFailure, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
     expect(onFailure).toHaveBeenCalledTimes(1);
     expect(onFailure.mock.calls[0]![0]).toMatchObject({ saleId: '42' });
+    expect(onFailure.mock.calls[0]![0].notComposed).toBeUndefined();
   });
 
   it('when the door delivers (queue or printer) it keeps quiet', async () => {
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: fakeGate({ via: 'bridge', role: 'receipt' }).print, onFailure });
+    bootPrintOnSale(client, { print: fakeGate({ via: 'bridge', role: 'receipt' }).print, onFailure, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -133,7 +212,7 @@ describe('the ticket on payment (hub#862)', () => {
     const gate = fakeGate({ via: 'queue', role: 'receipt', awaitingHost: true });
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: gate.print, onFailure });
+    bootPrintOnSale(client, { print: gate.print, onFailure, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -146,7 +225,7 @@ describe('the ticket on payment (hub#862)', () => {
   it('queued WITH somebody draining it keeps quiet (it comes out late, it is not lost)', async () => {
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: fakeGate({ via: 'queue', role: 'receipt', awaitingHost: false }).print, onFailure });
+    bootPrintOnSale(client, { print: fakeGate({ via: 'queue', role: 'receipt', awaitingHost: false }).print, onFailure, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -157,7 +236,7 @@ describe('the ticket on payment (hub#862)', () => {
     // A warning invented over a well-built hub would show on every ticket and stop being read.
     const onFailure = vi.fn();
     const { client, emit } = fakeClient();
-    bootPrintOnSale(client, { print: fakeGate({ via: 'queue', role: 'receipt' }).print, onFailure });
+    bootPrintOnSale(client, { print: fakeGate({ via: 'queue', role: 'receipt' }).print, onFailure, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -167,7 +246,7 @@ describe('the ticket on payment (hub#862)', () => {
   it('with the setting off it prints nothing', async () => {
     const gate = fakeGate();
     const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 0 } });
-    bootPrintOnSale(client, { print: gate.print });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -180,7 +259,7 @@ describe('the ticket on payment (hub#862)', () => {
       devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }],
       settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
     });
-    bootPrintOnSale(client, { print: gate.print });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 
@@ -192,7 +271,7 @@ describe('the ticket on payment (hub#862)', () => {
     const { client, openDrawer, emit } = fakeClient({
       settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
     });
-    bootPrintOnSale(client, { print: gate.print });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
 
     await emit({ sale_id: '42' });
 

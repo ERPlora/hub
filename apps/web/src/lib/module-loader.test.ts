@@ -29,7 +29,7 @@ vi.mock('../i18n', () => ({ getLocale: () => 'es' }));
 const entitled = vi.fn<(moduleId: string) => boolean>(() => true);
 vi.mock('./entitlement', () => ({ isModuleEntitled: (id: string) => entitled(id) }));
 
-import { invalidateManifestCache, loadMenu } from './module-loader';
+import { invalidateManifestCache, loadMenu, loadModuleElement } from './module-loader';
 
 /** One `/api/navigation` entry, as the runtime serves it. */
 function navItem(moduleId: string) {
@@ -72,6 +72,7 @@ function stubFetch(
 }
 
 const inventoryManifest = { name: 'Inventory', ui: { entry: 'dist/inventory.esm.js' } };
+const salesManifest = { name: 'Sales', ui: { entry: 'dist/sales.esm.js' } };
 
 beforeEach(() => {
   vi.unstubAllGlobals();
@@ -190,5 +191,36 @@ describe('an empty launcher on a hub that expected a menu is an error', () => {
     stubFetch({ ok: true, data: [] });
 
     await expect(loadMenu()).resolves.toEqual([]);
+  });
+});
+
+// ── hub#1921: a shell piece that needs a module's element outside that module's screen ────────
+
+describe('loadModuleElement brings a module element into the shell', () => {
+  it('an element already defined costs nothing: no navigation, no manifest, no bundle', async () => {
+    customElements.define('test-module-element-defined', class extends HTMLElement {});
+    const fetchMock = stubFetch({ ok: true, data: [navItem('sales')], active_modules: 1 }, { sales: salesManifest });
+
+    await loadModuleElement('sales', 'test-module-element-defined');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a module that is not installed resolves without touching its bundle — the caller decides', async () => {
+    const fetchMock = stubFetch({ ok: true, data: [navItem('inventory')], active_modules: 1 }, { inventory: inventoryManifest });
+
+    await expect(loadModuleElement('sales', 'test-module-element-absent')).resolves.toBeUndefined();
+
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/modules/sales/'))).toBe(false);
+  });
+
+  it('an installed module has its bundle loaded — the same url the menu imports', async () => {
+    stubFetch({ ok: true, data: [navItem('sales')], active_modules: 1 }, { sales: salesManifest });
+
+    // There is no bundle behind that url in a test run, so the import itself fails: what is pinned
+    // is that the module's own entry is what gets imported, not whether the file exists here.
+    await expect(loadModuleElement('sales', 'test-module-element-installed')).rejects.toThrow(
+      /modules\/sales\/dist\/sales\.esm\.js/,
+    );
   });
 });

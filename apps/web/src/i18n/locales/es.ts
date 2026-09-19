@@ -712,6 +712,8 @@ export default {
     ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
     ticketWaitingForPrinter:
       'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+    ticketNotComposed:
+      'El tique de la venta {saleId} no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
     comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
     comandaWaitingForPrinter:
       'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',

@@ -4,7 +4,9 @@
 //
 // Flujo: escucha el evento de dominio `sale.completed` (ADR-0010) → lee los ajustes de `printing`
 // → según los flags:
-//   - `auto_print_on_sale` → tique por la PUERTA GLOBAL (`erplora.print`), rol `receipt`.
+//   - `auto_print_on_sale` → tique por la PUERTA GLOBAL (`erplora.print`), rol `receipt`. The paper
+//     is the one the ticket screen's print button prints, composed by the sales module
+//     (`saleDocument`, hub#1921) — never rebuilt here from the raw sale rows.
 //   - `open_drawer_on_sale` → kick del cajón por la impresora con rol `receipt` (hardware directo:
 //     un cajón no se puede encolar, o está aquí o no está).
 //
@@ -25,9 +27,8 @@
 // `printing.print_kitchen` y `printing.routing.*` quedan OBSOLETOS: no los lee nadie.
 import type { BridgeDevice, ErploraClient } from '@erplora/module-sdk';
 import { printerIdForRole, type PrintRequest, type PrintResult } from './print';
-import { buildReceiptDocument, type ReceiptSettings, type SaleLine } from './receipt-document';
 
-interface PrintingSettings extends ReceiptSettings {
+interface PrintingSettings {
   auto_print_on_sale?: number;
   open_drawer_on_sale?: number;
 }
@@ -45,11 +46,22 @@ export interface SaleTicketFailure {
    * se imprimió», que manda al cajero a buscar un fallo que no existe.
    */
   awaitingHost?: boolean;
+  /**
+   * The paper itself could not be made: the sales module did not compose the ticket (hub#1921).
+   * Nothing reached the printer or the queue, so the way out is reprinting from the ticket screen,
+   * and the till says that in words — `error` carries the code for the log, never for the screen.
+   */
+  notComposed?: boolean;
 }
 
 interface Deps {
   /** La puerta global del hub (`erplora.print`). La inyecta el shell, igual que en `print-comanda`. */
   print: (req: PrintRequest) => Promise<PrintResult>;
+  /**
+   * The sale's ticket as the sales module prints it (`sale-document.ts`, hub#1921): the same paper
+   * as the ticket screen's print button. Rejects with an error code when it cannot be composed.
+   */
+  saleDocument: (saleId: string) => Promise<Record<string, unknown>>;
   /**
    * Aviso de que el tique no ha llegado a ningún sitio. Sin él el fallo es MUDO, que es justo lo
    * que se arregla: el cajero cierra la venta creyendo que el papel está saliendo.
@@ -80,67 +92,71 @@ async function onSaleCompleted(client: ErploraClient, deps: Deps, payload: unkno
   const openDrawer = flag(settings.open_drawer_on_sale);
   if (!autoPrint && !openDrawer) return;
 
-  // Datos autoritativos de la venta (el payload del evento es un resumen, no la fuente).
-  const sale = first(
-    await client
-      .query<Record<string, unknown>[] | Record<string, unknown>>('sales.get', { sale_id: saleId })
-      .catch(() => undefined),
-  );
-  if (!sale) return;
-  const lines = await client
-    .query<SaleLine[]>('sales.lines', { sale_id: saleId })
-    .catch(() => [] as SaleLine[]);
+  // The ticket and the drawer are independent: the cash goes in the drawer whatever happens to the
+  // paper, and the drawer does not wait while the paper is being composed.
+  await Promise.all([autoPrint && printTicket(deps, saleId), openDrawer && kickDrawer(client)]);
+}
 
-  if (autoPrint) {
-    // Por la PUERTA: impresora del rol `receipt` si la hay, cola del hub si no (un print host la
-    // drena, ADR-0196 §6). El documento va ESTRUCTURADO (hub#501) — sin `html`, porque el respaldo
-    // del navegador no es una forma de entregar un tique térmico: si la puerta no entrega, se avisa.
-    let result: PrintResult;
-    try {
-      result = await deps.print({
-        role: 'receipt',
-        documentType: 'receipt',
-        // Mismo tique reimpreso = mismo trabajo: la cola (y el equipo que la drena) deduplica.
-        jobId: `sale-${saleId}`,
-        data: buildReceiptDocument(settings, sale, lines),
-        // DESATENDIDA, igual que la comanda: nadie ha pedido imprimir, se ha cobrado. Un diálogo del
-        // navegador aquí sacaría la app en un folio (este camino no manda `html`) y dejaría la caja
-        // esperando un clic. Sin sitio donde imprimir se AVISA, que es lo que sirve al cajero.
-        fallbackToBrowser: false,
-      });
-    } catch (e) {
-      result = { via: 'none', role: 'receipt', error: e instanceof Error ? e.message : String(e) };
-    }
-    // La impresora entrega. La cola entrega **si alguien la drena**: encolar en un hub sin ningún
-    // equipo dado de alta para la estación es lo que hacía MUDO el fallo de hub#1731 —se cobraba,
-    // se decía «aquí tienes» y no salía nada—, porque `via:'queue'` se leía igual que impreso.
-    // `browser` en la app instalada no imprime nada y `none` es «por ningún sitio»: las dos avisan.
-    if (result.via === 'queue') {
-      // `awaitingHost` solo es `true` cuando el runtime CONTESTÓ que no hay nadie. Que no lo
-      // conteste no es un «no» (ver `PrintResult.awaitingHost`).
-      if (result.awaitingHost) {
-        deps.onFailure?.({ saleId, error: result.error ?? 'no printer set up for this station', awaitingHost: true });
-      }
-    } else if (result.via !== 'bridge') {
-      deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });
-    }
+async function printTicket(deps: Deps, saleId: string): Promise<void> {
+  // The paper the ticket screen prints (hub#1921). Built here from the raw `sales.get` rows it
+  // came out with the amounts ×100 and the quantity in millionths; if the sales module cannot
+  // compose it, nothing is printed and the till is told — the ticket screen reprints it.
+  let data: Record<string, unknown>;
+  try {
+    data = await deps.saleDocument(saleId);
+  } catch (e) {
+    deps.onFailure?.({ saleId, error: e instanceof Error ? e.message : String(e), notComposed: true });
+    return;
   }
 
-  if (openDrawer) {
-    // El cajón SÍ necesita hardware aquí y ahora: no hay cola para un kick ESC/POS. Si este equipo
-    // no alcanza la impresora de tiques, no se abre — y no puede arrastrar al tique consigo, que es
-    // lo que pasaba cuando los dos colgaban del mismo `receiptPrinterId`.
-    let devices: BridgeDevice[] = [];
-    try {
-      devices = await client.peripherals.getDevices();
-    } catch {
-      devices = []; // Este equipo no llega al hardware (PWA en el navegador).
-    }
-    // Resolución rol→impresora COMPARTIDA con la puerta global (`printerIdForRole`): una sola
-    // definición de «qué impresora es el rol receipt».
-    const receiptPrinterId = printerIdForRole(devices, 'receipt');
-    if (receiptPrinterId) await client.peripherals.openDrawer(receiptPrinterId).catch(() => undefined);
+  // Por la PUERTA: impresora del rol `receipt` si la hay, cola del hub si no (un print host la
+  // drena, ADR-0196 §6). El documento va ESTRUCTURADO (hub#501) — sin `html`, porque el respaldo
+  // del navegador no es una forma de entregar un tique térmico: si la puerta no entrega, se avisa.
+  let result: PrintResult;
+  try {
+    result = await deps.print({
+      role: 'receipt',
+      documentType: 'receipt',
+      // Mismo tique reimpreso = mismo trabajo: la cola (y el equipo que la drena) deduplica.
+      jobId: `sale-${saleId}`,
+      data,
+      // DESATENDIDA, igual que la comanda: nadie ha pedido imprimir, se ha cobrado. Un diálogo del
+      // navegador aquí sacaría la app en un folio (este camino no manda `html`) y dejaría la caja
+      // esperando un clic. Sin sitio donde imprimir se AVISA, que es lo que sirve al cajero.
+      fallbackToBrowser: false,
+    });
+  } catch (e) {
+    result = { via: 'none', role: 'receipt', error: e instanceof Error ? e.message : String(e) };
   }
+  // La impresora entrega. La cola entrega **si alguien la drena**: encolar en un hub sin ningún
+  // equipo dado de alta para la estación es lo que hacía MUDO el fallo de hub#1731 —se cobraba,
+  // se decía «aquí tienes» y no salía nada—, porque `via:'queue'` se leía igual que impreso.
+  // `browser` en la app instalada no imprime nada y `none` es «por ningún sitio»: las dos avisan.
+  if (result.via === 'queue') {
+    // `awaitingHost` solo es `true` cuando el runtime CONTESTÓ que no hay nadie. Que no lo
+    // conteste no es un «no» (ver `PrintResult.awaitingHost`).
+    if (result.awaitingHost) {
+      deps.onFailure?.({ saleId, error: result.error ?? 'no printer set up for this station', awaitingHost: true });
+    }
+  } else if (result.via !== 'bridge') {
+    deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });
+  }
+}
+
+async function kickDrawer(client: ErploraClient): Promise<void> {
+  // El cajón SÍ necesita hardware aquí y ahora: no hay cola para un kick ESC/POS. Si este equipo
+  // no alcanza la impresora de tiques, no se abre — y no puede arrastrar al tique consigo, que es
+  // lo que pasaba cuando los dos colgaban del mismo `receiptPrinterId`.
+  let devices: BridgeDevice[] = [];
+  try {
+    devices = await client.peripherals.getDevices();
+  } catch {
+    devices = []; // Este equipo no llega al hardware (PWA en el navegador).
+  }
+  // Resolución rol→impresora COMPARTIDA con la puerta global (`printerIdForRole`): una sola
+  // definición de «qué impresora es el rol receipt».
+  const receiptPrinterId = printerIdForRole(devices, 'receipt');
+  if (receiptPrinterId) await client.peripherals.openDrawer(receiptPrinterId).catch(() => undefined);
 }
 
 function saleIdOf(payload: unknown): string | undefined {

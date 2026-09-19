@@ -795,6 +795,10 @@ export default {
     ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
     ticketWaitingForPrinter:
       'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+    // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so
+    // nothing went to the printer. The way out is the print button on the receipt screen.
+    ticketNotComposed:
+      'The receipt for sale {saleId} could not be prepared and did NOT print. Print it from the receipt screen.',
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
     comandaWaitingForPrinter:
       'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',

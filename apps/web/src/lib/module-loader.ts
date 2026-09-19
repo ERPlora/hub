@@ -500,6 +500,19 @@ export async function loadModuleComponent(mod: InstalledManifest, tag: string): 
 }
 
 /**
+ * Makes sure a module's custom element is DEFINED in this page, for a shell piece that needs it
+ * outside that module's screen — the automatic ticket asks `sales` for its paper (hub#1921) on a
+ * device that may never have opened the till. Nothing to do if the tag is already defined; a module
+ * that is not installed (or not entitled) resolves without defining anything, and the caller
+ * decides what that means. Same versioned bundle url as the menu and the slots.
+ */
+export async function loadModuleElement(moduleId: string, tag: string): Promise<void> {
+  if (customElements.get(tag)) return;
+  const mod = (await loadInstalledManifests()).find((m) => m.moduleId === moduleId);
+  if (mod) await loadModuleComponent(mod, tag);
+}
+
+/**
  * Resuelve los componentes que los módulos instalados aportan a un SLOT cross-módulo (ADR-0043,
  * `provides_slots`). Reúne las entradas que matchean `slot` de TODOS los manifests, las ordena por
  * `priority` ascendente, asegura cargado el ESM de cada módulo dueño (CSP-safe, registra su WC) y
