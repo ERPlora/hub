@@ -4149,6 +4149,23 @@ mod late_remission_verifactu111 {
             .collect()
         }
 
+        /// Stamps an AEAT verdict on a record, as `_apply_transmission` leaves it.
+        async fn verdict(&self, sequence: i64, status: &str) {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(self.hub_id));
+            p.insert("status".into(), json!(status));
+            p.insert("sequence".into(), json!(sequence));
+            self.rt
+                .db()
+                .execute(
+                    "UPDATE verifactu_record SET status = :status \
+                     WHERE hub_id = :hub_id AND sequence_number = :sequence",
+                    &p,
+                )
+                .await
+                .expect("verdict");
+        }
+
         /// Puts a record in the contingency queue the way the engine does, with its own next attempt.
         async fn queue(&self, sequence: i64, status: &str, next_attempt_at: &str) {
             let record_id = self.record_id(sequence).await;
@@ -4262,6 +4279,24 @@ mod late_remission_verifactu111 {
             }),
             "{details:?}"
         );
+    }
+
+    /// What the AEAT already answered stays answered. A record it REFUSED is fixed with a new
+    /// record, never filed again as it is: the drain must not pick it up just because nobody ever
+    /// queued it — it would be refused again every five minutes.
+    #[tokio::test]
+    async fn a_record_the_aeat_refused_is_not_filed_again_by_the_drain() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000006").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.verdict(1, "rejected").await;
+
+        hub.open_the_road();
+        hub.drain().await;
+
+        assert!(hub.sent().await.is_empty());
+        assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
     }
 
     /// The order only holds back a sale for records that are going out NOW. A record sitting out
