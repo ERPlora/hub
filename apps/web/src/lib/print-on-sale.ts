@@ -59,14 +59,21 @@ interface Deps {
   print: (req: PrintRequest) => Promise<PrintResult>;
   /**
    * The sale's ticket as the sales module prints it (`sale-document.ts`, hub#1921): the same paper
-   * as the ticket screen's print button. Rejects with an error code when it cannot be composed.
+   * as the ticket screen's print button, once it carries the fiscal number and QR (hub#1867).
+   * Rejects with an error code when it cannot be composed.
    */
-  saleDocument: (saleId: string) => Promise<Record<string, unknown>>;
+  saleDocument: (saleId: string) => Promise<{ document: Record<string, unknown>; complete: boolean }>;
   /**
    * Aviso de que el tique no ha llegado a ningún sitio. Sin él el fallo es MUDO, que es justo lo
    * que se arregla: el cajero cierra la venta creyendo que el papel está saliendo.
    */
   onFailure?: (f: SaleTicketFailure) => void;
+  /**
+   * hub#1867 — the ticket DID come out, but before its fiscal number or VeriFactu QR were ready (the
+   * viewer's wait ran out on a slow AEAT). The customer's copy lacks them; the receipt screen's
+   * print button gives the complete one. Not a failure: the paper is in the customer's hand.
+   */
+  onPrintedWithoutFiscal?: (saleId: string) => void;
 }
 
 /** Arranca el escuchador en el boot del shell. Devuelve la función para cancelar. */
@@ -102,8 +109,9 @@ async function printTicket(deps: Deps, saleId: string): Promise<void> {
   // came out with the amounts ×100 and the quantity in millionths; if the sales module cannot
   // compose it, nothing is printed and the till is told — the ticket screen reprints it.
   let data: Record<string, unknown>;
+  let complete: boolean;
   try {
-    data = await deps.saleDocument(saleId);
+    ({ document: data, complete } = await deps.saleDocument(saleId));
   } catch (e) {
     deps.onFailure?.({ saleId, error: e instanceof Error ? e.message : String(e), notComposed: true });
     return;
@@ -137,10 +145,15 @@ async function printTicket(deps: Deps, saleId: string): Promise<void> {
     // conteste no es un «no» (ver `PrintResult.awaitingHost`).
     if (result.awaitingHost) {
       deps.onFailure?.({ saleId, error: result.error ?? 'no printer set up for this station', awaitingHost: true });
+      return;
     }
   } else if (result.via !== 'bridge') {
     deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });
+    return;
   }
+  // Delivered. If it went out before its fiscal number or QR, the till hears where the complete
+  // copy is (hub#1867) — only now, so a paper that never came out gets one warning, not two.
+  if (!complete) deps.onPrintedWithoutFiscal?.(saleId);
 }
 
 async function kickDrawer(client: ErploraClient): Promise<void> {

@@ -245,6 +245,11 @@ bootPrintOnSale(getClient(), {
           : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
     );
   },
+  // hub#1867: the paper is in the customer's hand but lacks the VeriFactu QR — a warning, not an
+  // error, and long enough to read where the complete copy is.
+  onPrintedWithoutFiscal: (saleId) => {
+    void toast(i18n.global.t('print.ticketWithoutFiscal', { saleId }), 'warning', 6000);
+  },
 });
 
 // HOST DE IMPRESIÓN (ADR-0196 §6, hub#343 + hub#501 + hub#749): este equipo se DA DE ALTA como host
