@@ -1192,6 +1192,10 @@ export default {
     usageRangeLabel3h: 'Últimas 3 horas',
     usageRangeLabel24h: 'Últimas 24 horas',
     usageRangeLabel3d: 'Últimos 3 días',
+    // Una métrica cerca del límite del plan o por encima (hub#1922): la frase la pone el hub.
+    usageNearLimit: 'Al {pct} % del límite de tu plan.',
+    usageOverLimit: 'Al {pct} % del límite de tu plan: el hub puede ir más lento.',
+    planPressure: 'Tu plan se está quedando corto de recursos. Con un plan mayor este hub tiene más margen.',
     databaseShared: 'Base de datos compartida',
     colTime: 'Hora',
     colLevel: 'Nivel',

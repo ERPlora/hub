@@ -43,6 +43,30 @@
             <ion-label>{{ t(RANGE_SHORT_KEYS[r]) }}</ion-label>
           </ion-segment-button>
         </ion-segment>
+        <!-- hub#1922 — the plan is running short. ONE notice, in the person's words, with the door
+             to THIS hub's plan page (`lib/upgrade-plan-link`): the SaaS's own link used to ride on
+             each panel as an `<a href>` to a relative `/pricing/`, which took the hub's window to
+             «this page does not exist» — and on the Play copy it was an invitation to pay. Where
+             the copy may not offer it (hub#756) there is no notice at all: the panels already say
+             how close to the limit each metric is. -->
+        <ok-inline-feedback
+          v-if="offersPlanUpgrade"
+          data-testid="system-plan-pressure"
+          class="system-feedback"
+          tone="warning"
+          icon="trending-up-outline"
+        >
+          {{ t('system.planPressure') }}
+          <ion-button
+            slot="actions"
+            data-testid="system-upgrade-plan"
+            size="small"
+            fill="outline"
+            @click="onUpgradePlan"
+          >
+            {{ t('nav.upgradePlan') }}
+          </ion-button>
+        </ok-inline-feedback>
         <!-- A metric nobody reported is NOT 0% (hub#375/ADR-0237). The panels get `known:false`
              and paint their own «we could not read this» state — never a flat green line at zero.
              The series comes from the SaaS (proxied by the runtime, machine token stays server-side,
@@ -60,7 +84,6 @@
                     :unreadable-label="t('system.health.notMeasured')"
                     :metric.prop="cpuPanel"
                     :thresholds.prop="panelThresholds"
-                    :upgrade.prop="upgradeHint"
                   ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
@@ -76,7 +99,6 @@
                     :unreadable-label="t('system.health.notMeasured')"
                     :metric.prop="memPanel"
                     :thresholds.prop="panelThresholds"
-                    :upgrade.prop="upgradeHint"
                   ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
@@ -107,7 +129,6 @@
                     :unreadable-label="t('system.health.notMeasured')"
                     :metric.prop="connectionsPanel"
                     :thresholds.prop="panelThresholds"
-                    :upgrade.prop="upgradeHint"
                   ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
@@ -472,8 +493,10 @@ import {
   type UsageRange,
   type UsageSeries,
 } from '../lib/system-usage';
-import { isTauri } from '../lib/device';
+import { getDeviceContext, isTauri } from '../lib/device';
 import { openExternal } from '../lib/open-external';
+import { saasDoor } from '../lib/saas-door';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
 import {
   printerLine,
   printerSetupStepKeys,
@@ -725,16 +748,31 @@ function toPanelMetric(metric: SeriesMetric | undefined, local: Reading): PanelM
       current: localCurrent,
       points: [],
       status: 'unknown',
-      message: metric?.message ?? null,
+      message: null,
     };
   }
+  const current = metric.current ?? localCurrent;
+  const status = metric.status ?? 'unknown';
   return {
     known: true,
-    current: metric.current ?? localCurrent,
+    current,
     points: metric.points ?? [],
-    status: metric.status ?? 'unknown',
-    message: metric.message ?? null,
+    status,
+    message: pressureSentence(status, current),
   };
+}
+
+/**
+ * What the panel says about a metric close to (or past) the plan's limit — worded HERE, from the
+ * codes of the series (hub#1922, ADR-0055). The SaaS sends a sentence too, but it is prose of a
+ * machine call: it arrives in English whatever language the person reads.
+ */
+function pressureSentence(status: string, current: number | null): string | null {
+  if (current === null) return null;
+  const pct = Math.round(current);
+  if (status === 'critical') return t('system.usageOverLimit', { pct });
+  if (status === 'warning') return t('system.usageNearLimit', { pct });
+  return null;
 }
 
 const cpuPanel = computed<PanelMetric>(() =>
@@ -756,7 +794,25 @@ const connectionsUnit = computed<string>(() => usageSeries.value?.metrics.db_con
 // old local [70/90/100] gauge zones retired with the gauges — panels must never contradict the
 // alerts the SaaS sends about the same numbers.
 const panelThresholds = computed(() => usageSeries.value?.thresholds ?? { warning: 70, critical: 80 });
-const upgradeHint = computed(() => usageSeries.value?.upgrade ?? { show: false, message: null, url: null });
+
+// hub#756 — whoever hands out the binary sets the rule: the copy Google Play distributes is not
+// offered the plan door. Inside the installed app it starts closed until the shell has answered,
+// so a Play copy never shows it for a frame; a browser sends no `distribution` and is offered it.
+const canOfferPlanUpgrade = ref(!isTauri());
+const offersPlanUpgrade = computed(
+  () => usageSeries.value?.upgrade?.show === true && canOfferPlanUpgrade.value,
+);
+
+// pm#196 — out through the shared door, like the sidebar's «Upgrade plan»: the system browser
+// does not share the webview's cookies, so without the one-time pass the owner would land on a
+// login. When the trip cannot be made it is SAID — a dead button is the defect of hub#475.
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+  } catch {
+    await toastError(t('nav.upgradePlanError'));
+  }
+}
 
 // Tamaño = headline. La BD Postgres es compartida por organización → sin "tamaño local".
 // Cuando no hay sizeLabel (cloud/backend compartido), mostramos el motor como headline
@@ -1079,6 +1135,9 @@ watch(locale, () => {
 });
 
 onMounted(() => {
+  void getDeviceContext().then((context) => {
+    canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  });
   void refreshHardware();
   void loadSystemInfo();
   void loadUsageSeries();

@@ -10,10 +10,17 @@
 //      from `/api/system` are still handed over as `current`: measured is measured.
 //   3. **The thresholds are the SaaS's 70/80.** The old local [70/90/100] gauge zones retire —
 //      two sources of truth about when a hub is «hot» is how panels contradict alert emails.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+//   4. **The plan pressure is the hub's to say, and the Play copy does not say it** (hub#1922). The
+//      SaaS attaches an upgrade link and a sentence per metric, but both are PROSE of a machine
+//      call — English whatever the person reads — and the link is a relative `/pricing/` that the
+//      panel paints as an `<a href>`: it took the hub's own window to «this page does not exist».
+//      The hub reads only the codes (`status`, `current`, `upgrade.show`), words them itself, and
+//      walks to the plan through the one door that asks who distributed this copy (hub#756).
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
+import type { DeviceContext } from '../lib/device';
 import type { UsageSeries } from '../lib/system-usage';
 
 const contractSeries: UsageSeries = {
@@ -75,10 +82,23 @@ vi.mock('../lib/system', () => ({
   })),
 }));
 
+// Which copy of the app is asking (hub#756): a browser by default — no shell, no `distribution`.
+const { getDeviceContextMock, isTauriMock, saasDoorMock } = vi.hoisted(() => ({
+  getDeviceContextMock: vi.fn<() => Promise<DeviceContext | null>>(async () => null),
+  isTauriMock: vi.fn(() => false),
+  saasDoorMock: vi.fn(async (_path: string, url: string, _reason: string) => `${url}&pass=one-shot`),
+}));
+
 vi.mock('../lib/device', async () => {
   const actual = await vi.importActual<typeof import('../lib/device')>('../lib/device');
-  return { ...actual, isTauri: () => false, invokeTauri: vi.fn(async () => ({})) };
+  return {
+    ...actual,
+    isTauri: isTauriMock,
+    invokeTauri: vi.fn(async () => ({})),
+    getDeviceContext: getDeviceContextMock,
+  };
 });
+vi.mock('../lib/saas-door', () => ({ saasDoor: saasDoorMock }));
 
 vi.mock('../lib/runtime', async () => {
   const actual = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
@@ -110,6 +130,8 @@ vi.mock('vue-router', () => ({
 import SystemPage from './SystemPage.vue';
 import en from '../i18n/locales/en';
 import es from '../i18n/locales/es';
+import { openExternal } from '../lib/open-external';
+import { upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
 
 const i18n = createI18n({
   legacy: false,
@@ -132,7 +154,7 @@ interface PanelMetric {
 type PanelElement = HTMLElement & {
   metric?: PanelMetric;
   thresholds?: { warning: number; critical: number };
-  upgrade?: { show: boolean };
+  upgrade?: { show: boolean; message?: string | null; url?: string | null } | null;
 };
 
 async function mountSystem() {
@@ -153,6 +175,11 @@ function panels(wrapper: Awaited<ReturnType<typeof mountSystem>>): PanelElement[
 beforeEach(() => {
   fetchUsageSeriesMock.mockClear();
   fetchUsageSeriesMock.mockResolvedValue(contractSeries);
+  getDeviceContextMock.mockReset();
+  getDeviceContextMock.mockResolvedValue(null);
+  isTauriMock.mockReturnValue(false);
+  saasDoorMock.mockClear();
+  vi.mocked(openExternal).mockClear();
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => {
@@ -230,5 +257,106 @@ describe('the copy, in both languages', () => {
     }
     // «3 days» is the one with words in it: it must actually be translated.
     expect(es.system.usageRange3d).not.toBe(en.system.usageRange3d);
+  });
+});
+
+describe('the plan pressure (hub#1922)', () => {
+  // What the SaaS answered to the QA's Play tablet (v1.1.27): a free hub with memory at 77 % and
+  // connections at 120 %, the sentences in English and the link relative to the SaaS.
+  const underPressure: UsageSeries = {
+    ...contractSeries,
+    metrics: {
+      ...contractSeries.metrics,
+      ram: {
+        ...contractSeries.metrics.ram,
+        current: 77,
+        status: 'warning',
+        message: 'RAM usage is at 77% of your plan limit.',
+      },
+      db_connections: {
+        known: true,
+        unit: '%',
+        current: 120,
+        status: 'critical',
+        points: [[1755100800, 120]],
+        message: 'Database connections usage exceeds 120% of your plan limit — performance may degrade.',
+      },
+    },
+    upgrade: { show: true, message: 'Upgrade from Free to Starter (CPU +100%).', url: '/pricing/' },
+  };
+
+  afterEach(() => {
+    i18n.global.locale.value = 'en';
+  });
+
+  it('never hands the SaaS link to the panels: it took the hub window to a page that does not exist', async () => {
+    fetchUsageSeriesMock.mockResolvedValue(underPressure);
+    const wrapper = await mountSystem();
+
+    for (const panel of panels(wrapper)) {
+      expect(panel.upgrade?.show ?? false).toBe(false);
+    }
+  });
+
+  it('words each notice itself, in the language of the person, from the codes of the series', async () => {
+    i18n.global.locale.value = 'es';
+    fetchUsageSeriesMock.mockResolvedValue(underPressure);
+    const wrapper = await mountSystem();
+
+    const [cpu, ram, connections] = panels(wrapper);
+    expect(ram.metric?.message).toBe(i18n.global.t('system.usageNearLimit', { pct: 77 }));
+    expect(connections.metric?.message).toBe(i18n.global.t('system.usageOverLimit', { pct: 120 }));
+    // A metric with nothing to say says nothing — not an empty band.
+    expect(cpu.metric?.message).toBeNull();
+    // The Spanish is really Spanish, and it carries the figure.
+    expect(es.system.usageNearLimit).not.toBe(en.system.usageNearLimit);
+    expect(es.system.usageOverLimit).not.toBe(en.system.usageOverLimit);
+    expect(ram.metric?.message).toContain('77');
+  });
+
+  it('offers the plan door once, in the person\'s words, where this copy may offer it', async () => {
+    fetchUsageSeriesMock.mockResolvedValue(underPressure);
+    const wrapper = await mountSystem();
+
+    const notice = wrapper.find('[data-testid="system-plan-pressure"]');
+    expect(notice.exists()).toBe(true);
+    expect(notice.text()).toContain(en.system.planPressure);
+    const doors = wrapper.findAll('[data-testid="system-upgrade-plan"]');
+    expect(doors).toHaveLength(1);
+
+    await doors[0].trigger('click');
+    await flushPromises();
+
+    // Out through the shared door (one-time pass, pm#196) to THIS hub's plan page — never the
+    // hub's own window, never the pricing grid.
+    expect(saasDoorMock).toHaveBeenCalledWith(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan');
+    expect(openExternal).toHaveBeenCalledWith(`${upgradePlanUrl()}&pass=one-shot`);
+  });
+
+  it('offers nothing on the copy Google Play distributes: no link, no button, no invitation', async () => {
+    getDeviceContextMock.mockResolvedValue({ distribution: 'play' } as DeviceContext);
+    fetchUsageSeriesMock.mockResolvedValue(underPressure);
+    const wrapper = await mountSystem();
+
+    expect(wrapper.find('[data-testid="system-plan-pressure"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="system-upgrade-plan"]').exists()).toBe(false);
+    for (const panel of panels(wrapper)) {
+      expect(panel.upgrade?.show ?? false).toBe(false);
+    }
+  });
+
+  it('inside the installed app, stays closed until the shell has said which copy this is', async () => {
+    isTauriMock.mockReturnValue(true);
+    getDeviceContextMock.mockReturnValue(new Promise(() => {}));
+    fetchUsageSeriesMock.mockResolvedValue(underPressure);
+    const wrapper = await mountSystem();
+
+    expect(wrapper.find('[data-testid="system-plan-pressure"]').exists()).toBe(false);
+  });
+
+  it('says nothing about the plan while the plan is not under pressure', async () => {
+    const wrapper = await mountSystem();
+
+    expect(wrapper.find('[data-testid="system-plan-pressure"]').exists()).toBe(false);
   });
 });
