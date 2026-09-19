@@ -1,6 +1,7 @@
 # ERPlora Desktop → Microsoft Store (canal Windows principal)
 
-**Decisión (ADR-0136, 2026-07-16):** el canal de distribución Windows es **Microsoft Store
+**Decisión (ADR-0421 — registro as-built de un plan del 2026-07-16 que nunca llegó a asentarse en
+el decision-log con número propio):** el canal de distribución Windows es **Microsoft Store
 con MSIX sin firmar** — la Store re-firma con su certificado tras la certificación, así que
 **no se compra certificado Authenticode** (0€ vs OV ~300–500€/año + token). El argumento
 decisivo: la lógica de negocio vive en los **módulos**, que se actualizan al instante por el

@@ -609,11 +609,10 @@ pub(crate) async fn build_record_output(
 
     // The record joins the chain of the hub's CURRENT config environment (guard R4). Read the
     // config BEFORE the anchor: the environment scopes every chain read below (and the QR host).
-    let config = read_config(host, &ctx.hub_id).await?;
-    let environment = config
-        .as_ref()
-        .map(environment_of)
-        .unwrap_or_else(|| "testing".to_string());
+    // A hub that never saved its config reads the defaults (`testing`): the SAME object seals the
+    // record here and sends it below, so the QR and the send cannot disagree (hub#1934).
+    let config = transmission_config(host, &ctx.hub_id).await?;
+    let environment = environment_of(&config);
     // Chain anchor: last CHAINABLE row for (hub_id, issuer_nif, environment). A `rejected`
     // record is not at the AEAT, so its fingerprint cannot be the next `previous_hash` —
     // chaining there guarantees another rejection and stalls the chain (`is_chainable_status`).
@@ -788,75 +787,216 @@ pub(crate) async fn build_record_output(
     // column was dropped in verifactu v1.5.2 — there is no deferred-transmission mode.
     // `ids[2]` stays reserved (it was the contingency queue id) so the transmit ids below
     // keep their positions.
-    if let Some(cfg) = config.as_ref() {
-        // Inline AEAT transmission on emit. Reuses `transmit_one`, which applies the result to
-        // the record (accepted/rejected + CSV) and, on network failure, enqueues it in the
-        // contingency queue with backoff. With NO transmission road at all (neither a core
-        // certificate nor the fiscal gateway, hub#1432) → left `pending` (manual send later).
-        // Intentions apply AFTER the record INSERT (Output order).
-        if can_transmit(host, &ctx.hub_id, cfg).await? {
-            let record_json = json!({
-                "id": record_id,
-                "record_type": r.record_type,
-                "sequence_number": sequence_number,
-                "issuer_nif": r.issuer_nif,
-                "issuer_name": r.issuer_name,
-                "invoice_number": r.invoice_number,
-                "invoice_date": r.invoice_date,
-                "invoice_type": r.invoice_type,
-                "description": r.description,
-                "tax_rate": r.tax_rate,
-                "tax_breakdown": r.tax_breakdown,
-                "base_amount": r.base_amount,
-                "tax_amount": r.tax_amount,
-                "total_amount": r.total_amount,
-                "record_hash": record_hash,
-                "previous_hash": previous_hash,
-                "is_first_record": if is_first { 1 } else { 0 },
-                "generation_timestamp": generation_timestamp,
-                // Guard R4: `transmit_one` scopes its previous-link lookup by the record's
-                // environment; the freshly built record carries the one resolved above.
-                "environment": environment,
-                "recipient_nif": r.recipient_nif,
-                "recipient_name": r.recipient_name,
-                "substitutes_number": r.substitutes_number,
-                "substitutes_date": r.substitutes_date,
-                "substitutes_nif": r.substitutes_nif,
-                "rectifies_number": r.rectifies_number,
-                "rectifies_date": r.rectifies_date,
-                "rectifies_nif": r.rectifies_nif,
-                "rectification_type": r.rectification_type,
-                "rectified_base_amount": r.rectified_base_amount,
-                "rectified_tax_amount": r.rectified_tax_amount,
-                "rectified_surcharge_amount": r.rectified_surcharge_amount,
-            });
-            if let Ok((ops, events, _success)) = transmit_one(
+    //
+    // Inline AEAT transmission on emit, WITH OR WITHOUT a saved config row (hub#1934): the record
+    // was sealed above against `config`, and the send reads the very same object. Reuses
+    // `transmit_one`, which applies the result to the record (accepted/rejected + CSV) and, on
+    // network failure, enqueues it in the contingency queue with backoff. Intentions apply AFTER
+    // the record INSERT (Output order).
+    let record_json = json!({
+        "id": record_id,
+        "record_type": r.record_type,
+        "sequence_number": sequence_number,
+        "issuer_nif": r.issuer_nif,
+        "issuer_name": r.issuer_name,
+        "invoice_number": r.invoice_number,
+        "invoice_date": r.invoice_date,
+        "invoice_type": r.invoice_type,
+        "description": r.description,
+        "tax_rate": r.tax_rate,
+        "tax_breakdown": r.tax_breakdown,
+        "base_amount": r.base_amount,
+        "tax_amount": r.tax_amount,
+        "total_amount": r.total_amount,
+        "record_hash": record_hash,
+        "previous_hash": previous_hash,
+        "is_first_record": if is_first { 1 } else { 0 },
+        "generation_timestamp": generation_timestamp,
+        // Guard R4: `transmit_one` scopes its previous-link lookup by the record's
+        // environment; the freshly built record carries the one resolved above.
+        "environment": environment,
+        "recipient_nif": r.recipient_nif,
+        "recipient_name": r.recipient_name,
+        "substitutes_number": r.substitutes_number,
+        "substitutes_date": r.substitutes_date,
+        "substitutes_nif": r.substitutes_nif,
+        "rectifies_number": r.rectifies_number,
+        "rectifies_date": r.rectifies_date,
+        "rectifies_nif": r.rectifies_nif,
+        "rectification_type": r.rectification_type,
+        "rectified_base_amount": r.rectified_base_amount,
+        "rectified_tax_amount": r.rectified_tax_amount,
+        "rectified_surcharge_amount": r.rectified_surcharge_amount,
+    });
+    let attempt = match can_transmit(host, &ctx.hub_id, &config).await {
+        // NO transmission road at all (neither a core certificate nor an enrolled gateway
+        // identity, hub#1432): nothing can leave. The record stays `pending` and the drain sends
+        // it — in sequence order, declaring the incidence — once the road opens (verifactu#111).
+        Ok(false) => Attempt::Waits(Wait::NoRoad),
+        // The road is open, but an older record of this same chain is due to leave: overtaking it
+        // is how record nº 1 of 2026-09-13 reached the AEAT after a newer sale. This one waits its
+        // turn, and the drain sends the whole chain in order (verifactu#111).
+        Ok(true) if earlier_record_due(host, ctx, &r.issuer_nif, &environment, sequence_number)
+            .await? =>
+        {
+            Attempt::Waits(Wait::EarlierRecordsPending)
+        }
+        Ok(true) => Attempt::Sent(
+            transmit_one(
                 host,
                 ctx,
                 &record_json,
-                cfg,
+                &config,
                 &ids[3],
                 &ids[4],
                 &ids[5],
                 // Alta recién creada: se remite en el momento, no sale de ninguna cola.
                 Remission::Punctual,
             )
-            .await
-            {
-                for o in ops {
-                    output = output.with_operation(o);
-                }
-                // A sale whose invoice the AEAT refused is the case verifactu#42 exists for: it
-                // happens on the till, in front of nobody, and the audit row is on a screen.
-                for e in events {
-                    output = output.with_event(e);
-                }
-            }
+            .await,
+        ),
+        // The road should be there and broke on the way — the control plane did not mint the
+        // token, the brake is on after a failure a moment ago. Before hub#1934 this escaped as an
+        // error and the sale lost its record.
+        Err(error) => Attempt::Sent(Err(error)),
+    };
+    let (ops, events) = match attempt {
+        // Nothing left, and the audit says why and when it will: the Records screen reads it.
+        Attempt::Waits(wait) => (
+            vec![deferred_event(ctx, &record_id, &ids[3], wait)],
+            Vec::new(),
+        ),
+        Attempt::Sent(Ok((ops, events, _success))) => (ops, events),
+        // Whatever stopped the send, the record waits in the contingency queue with its reason
+        // visible — the same place a failed wire leaves it — and the drain sends it once the road
+        // is back (hub#1934). Never lost with the sale, never a silent loose `pending`.
+        Attempt::Sent(Err(error)) => {
+            let (ops, events, _success) = refuse_transmission(
+                host,
+                ctx,
+                &record_json,
+                &ids[3],
+                &ids[4],
+                &config,
+                &Refusal::road_unavailable(error.to_string()),
+            )
+            .await?;
+            (ops, events)
         }
+    };
+    for o in ops {
+        output = output.with_operation(o);
+    }
+    // A sale whose invoice the AEAT refused is the case verifactu#42 exists for: it happens on the
+    // till, in front of nobody, and the audit row is on a screen.
+    for e in events {
+        output = output.with_event(e);
     }
 
     // El evento `verifactu.record.created` lo emite el `emit` declarado del command.
     Ok(output)
+}
+
+/// What `build_record_output` did with the record it just sealed.
+enum Attempt {
+    /// It went for the wire (or broke on the way to it).
+    Sent(Result<(Vec<Operation>, Vec<Event>, bool)>),
+    /// It stays `pending` for the drain, for this reason.
+    Waits(Wait),
+}
+
+/// **Why a sealed record did not leave with its sale** (verifactu#111) — the two reasons are
+/// codes the module turns into a sentence, never prose the screen has to parse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Wait {
+    /// No road at all yet: no certificate of its own, no enrolled identity for the fiscal cell.
+    /// Same code the diagnostics file for the same fact, so the module owns ONE sentence for it.
+    NoRoad,
+    /// The road is open, and an older record of the same chain is due to leave first.
+    EarlierRecordsPending,
+}
+
+impl Wait {
+    fn code(self) -> &'static str {
+        match self {
+            Wait::NoRoad => "no_transmission_route",
+            Wait::EarlierRecordsPending => "earlier_records_pending",
+        }
+    }
+
+    /// The fallback a hub on an older module paints — the engine's own prose, as every event.
+    fn prose(self) -> &'static str {
+        match self {
+            Wait::NoRoad => "este hub aún no tiene vía de envío (ni certificado propio ni conexión \
+                             con la pasarela fiscal)",
+            Wait::EarlierRecordsPending => "antes tiene que salir un registro anterior de la \
+                                            misma cadena, y a la AEAT se envían en orden",
+        }
+    }
+}
+
+/// The audit row of a record that did not leave with its sale: WHY (a code) and WHEN (on its own,
+/// at the next drain once there is a road, declared as a late remission). It is what the Records
+/// screen shows next to a `pending` record — before verifactu#111 nothing said why it waited.
+fn deferred_event(ctx: &Ctx, record_id: &str, event_id: &str, wait: Wait) -> Operation {
+    op(
+        "verifactu._insert_event",
+        json!({
+            "event_id": event_id,
+            "record_id": record_id,
+            "event_type": "transmission_deferred",
+            "severity": "warning",
+            "message": format!(
+                "Pendiente de envío a la AEAT: {}. Saldrá solo, en orden y declarado como envío \
+                 tardío, en el próximo envío automático en cuanto haya vía",
+                wait.prose()
+            ),
+            "details": details_for("verifactu.transmission_deferred", json!({
+                "why": wait.prose(),
+                "why_reason": { "code": wait.code() },
+            })),
+            "timestamp": ctx.now,
+        }),
+    )
+}
+
+/// **Is an older record of this chain going out NOW?** (verifactu#111) — the question a new sale
+/// asks before it overtakes anybody. «Now» is exactly what the drain collects
+/// ([`DUE_NEVER_QUEUED`] ∪ [`DUE_FROM_QUEUE`]): a record sitting out its backoff does not hold
+/// today's sales back, because holding them would not keep it first anyway.
+///
+/// Only records that have not reached the AEAT count: a stale queue entry of an accepted record
+/// (the drain resolves it on its next pass) is nobody to wait for. That filter is also what keeps
+/// the question cheap at the till — it rides `ix_verifactu_record_hub_status` over the handful of
+/// records on their way, instead of walking the whole chain on every sale.
+async fn earlier_record_due(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    issuer_nif: &str,
+    environment: &str,
+    sequence_number: i64,
+) -> Result<bool> {
+    let rows = host
+        .read(
+            &format!(
+                "SELECT r.id FROM verifactu_record r \
+                 LEFT JOIN verifactu_contingencyqueue q ON q.record_id = r.id AND q.is_deleted = 0 \
+                 WHERE r.hub_id = :hub_id AND r.issuer_nif = :issuer_nif \
+                 AND r.environment = :environment AND r.is_deleted = 0 \
+                 AND r.status IN ('pending', 'error', 'retry') \
+                 AND r.sequence_number < :sequence_number \
+                 AND (({DUE_NEVER_QUEUED}) OR ({DUE_FROM_QUEUE})) LIMIT 1"
+            ),
+            &params(json!({
+                "hub_id": ctx.hub_id,
+                "issuer_nif": issuer_nif,
+                "environment": environment,
+                "sequence_number": sequence_number,
+                "now": ctx.now,
+            })),
+        )
+        .await?;
+    Ok(!rows.is_empty())
 }
 
 // ── transmit_record (issue verifactu#3) ──────────────────────────────────────
@@ -1060,5 +1200,393 @@ mod audit_message_keys {
                 "`{key}` no es un código estable (se esperaba `verifactu.<snake_case>`)"
             );
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
+    //! **A hub that never saved its VeriFactu config still sends its records** (hub#1934).
+    //!
+    //! Every sale builds its record and its QR against the DEFAULT environment (`testing`) when
+    //! the business never saved the config. The transmission, instead, hung off
+    //! `if let Some(cfg)`: with no row nobody even asked whether there was a road, so the QR on
+    //! the ticket pointed at a record the AEAT never received («No encontrada»).
+    //!
+    //! And when the road is there but breaks at the moment of the sale (the control plane does
+    //! not mint the token), the record must not be lost with the sale nor left loose: it goes to
+    //! the contingency queue, which is what sends it once the road is back.
+    //!
+    //! The tests live here, after `audit_message_keys`, because that sweep cuts every line of this
+    //! file after its own marker.
+
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+    const NIF: &str = "B12345674";
+
+    // Every test owns its hub id: the gateway token cache is keyed by hub and process-wide.
+
+    fn common_name(hub_id: &str) -> String {
+        format!("hub-{hub_id}.fiscal.erplora.internal")
+    }
+
+    /// A cell that records every envelope it is handed and answers the AEAT's «Correcto» with a
+    /// receipt whose digest is recomputed over the bytes IT decoded — like the real one, so the
+    /// canary of hub#1461 holds.
+    pub(crate) async fn spawn_fake_cell() -> (String, Arc<Mutex<Vec<Json>>>) {
+        use base64::Engine as _;
+        let seen: Arc<Mutex<Vec<Json>>> = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let recorder = Arc::clone(&seen);
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let mut buffer = Vec::new();
+                let mut chunk = [0u8; 8192];
+                while let Ok(n) = socket.read(&mut chunk).await {
+                    if n == 0 {
+                        break;
+                    }
+                    buffer.extend_from_slice(&chunk[..n]);
+                    if buffer.windows(4).any(|w| w == b"\r\n\r\n") && buffer.ends_with(b"}") {
+                        break;
+                    }
+                }
+                let raw = String::from_utf8_lossy(&buffer).into_owned();
+                let envelope = raw
+                    .split("\r\n\r\n")
+                    .nth(1)
+                    .and_then(|body| serde_json::from_str::<Json>(body).ok())
+                    .unwrap_or(Json::Null);
+                let request_sha256 = envelope["xml_b64"]
+                    .as_str()
+                    .and_then(|b64| base64::engine::general_purpose::STANDARD.decode(b64).ok())
+                    .map(|xml| {
+                        use sha2::Digest as _;
+                        sha2::Sha256::digest(&xml)
+                            .iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default();
+                recorder.lock().unwrap().push(envelope.clone());
+                let receipt = json!({
+                    "schema_version": 1,
+                    "transmission_id": envelope["transmission_id"],
+                    "request_sha256": request_sha256,
+                    "aeat_http_status": 200,
+                    "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(
+                        "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                         <EstadoRegistro>Correcto</EstadoRegistro>\
+                         <CSV>A-HUB1934TEST</CSV></soapenv:Envelope>",
+                    ),
+                    "aeat_response_sha256": "00".repeat(32),
+                    "received_at": "2026-09-19T10:00:00Z",
+                })
+                .to_string();
+                let answer = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\
+                     connection: close\r\n\r\n{receipt}",
+                    receipt.len()
+                );
+                let _ = socket.write_all(answer.as_bytes()).await;
+                let _ = socket.shutdown().await;
+            }
+        });
+        (url, seen)
+    }
+
+    /// What the control plane answers when the hub asks for a token.
+    #[derive(Clone)]
+    enum ControlPlane {
+        /// A testing-only token (no grant) pointing at this cell.
+        Mints(String),
+        /// The control plane is down.
+        Fails,
+    }
+
+    /// The enrolled, certless hub of the delegated road — with or without a saved config row.
+    struct EnrolledHub {
+        hub_id: String,
+        config: Option<Json>,
+        queue: Vec<Json>,
+        records: Vec<Json>,
+        control_plane: ControlPlane,
+        /// The durable archive of the XML refuses the write (storage down).
+        archive_fails: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for EnrolledHub {
+        async fn read(&self, sql: &str, p: &Params) -> Result<Vec<Json>> {
+            if sql.contains("FROM verifactu_config") {
+                return Ok(self.config.iter().cloned().collect());
+            }
+            if sql.contains("FROM verifactu_contingencyqueue") {
+                return Ok(self.queue.clone());
+            }
+            if sql.contains("FROM verifactu_record") && sql.contains("id = :rid") {
+                let rid = p.get("rid").cloned().unwrap_or(Json::Null);
+                return Ok(self
+                    .records
+                    .iter()
+                    .filter(|r| r["id"] == rid)
+                    .cloned()
+                    .collect());
+            }
+            Ok(vec![])
+        }
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            Ok(Some(json!({
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            })))
+        }
+        async fn write_static_file(
+            &self,
+            relative_path: &str,
+            _bytes: &[u8],
+            _content_type: &str,
+        ) -> Result<String> {
+            if self.archive_fails {
+                return Err(RuntimeError::Storage("archive unavailable".into()));
+            }
+            Ok(format!("modules/verifactu/{relative_path}"))
+        }
+        async fn machine_identity(
+            &self,
+            hub_id: &str,
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
+                identity: crate::transmission::tests::throwaway_identity(),
+                ca_pem: b"unused-over-plain-http".to_vec(),
+                common_name: common_name(hub_id),
+            }))
+        }
+        async fn cloud_call(
+            &self,
+            _request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            Ok(Some(match &self.control_plane {
+                ControlPlane::Mints(url) => erplora_runtime::cloud_call::CloudResponse {
+                    status: 200,
+                    body: json!({
+                        "token": "testing-only-bearer",
+                        "expires_in": 300,
+                        "gateway_url": url,
+                        "obligado_nif": NIF,
+                        "presenter_nif": "B27593136",
+                        "presenter_name": "ERPLORA CLOUD SL",
+                        "mtls_common_name": common_name(&self.hub_id),
+                    })
+                    .to_string(),
+                },
+                ControlPlane::Fails => erplora_runtime::cloud_call::CloudResponse {
+                    status: 503,
+                    body: "{}".to_owned(),
+                },
+            }))
+        }
+    }
+
+    fn sale(hub_id: &str) -> Json {
+        json!({
+            "payload": {
+                "record_type": "alta", "issuer_nif": NIF, "issuer_name": "Salon Lucia SL",
+                "invoice_number": "TICKET-2026-000011", "invoice_date": "2026-09-19",
+                "invoice_type": "F2", "description": "Corte y peinado", "base_amount": 2471, "tax_rate": 21.0,
+                "tax_amount": 519, "total_amount": 2990,
+                "tax_breakdown": r#"{"21.00":{"base":2471,"tax":519}}"#
+            },
+            "context": {
+                "hub_id": hub_id, "now": "2026-09-19T10:00:00+02:00", "current_user_id": "u1",
+                "new_ids": ["id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3"]
+            }
+        })
+    }
+
+    fn ops_named<'a>(out: &'a Output, command: &str) -> Vec<&'a Operation> {
+        out.operations
+            .iter()
+            .filter(|o| o.command == command)
+            .collect()
+    }
+
+    /// 🔴 THE bug of hub#1934: no config row, an open road (enrolled machine identity + a
+    /// testing token) — and the record never left. It must go to the cell, and to TESTING.
+    #[tokio::test]
+    async fn a_hub_that_never_saved_its_config_sends_the_record_to_the_testing_aeat() {
+        let hub_id = "19340000-0000-4000-8000-000000000001";
+        let (url, cell) = spawn_fake_cell().await;
+        let host = EnrolledHub {
+            hub_id: hub_id.to_owned(),
+            config: None,
+            queue: vec![],
+            records: vec![],
+            control_plane: ControlPlane::Mints(url),
+            archive_fails: false,
+        };
+
+        let out = create_record(&sale(hub_id), &host).await.unwrap();
+
+        let sent = cell.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "the record must reach the cell exactly once");
+        assert_eq!(
+            sent[0]["environment"], "testing",
+            "a hub without config can only ever send to the TEST AEAT"
+        );
+        let applied = ops_named(&out, "verifactu._apply_transmission");
+        assert_eq!(
+            applied.len(),
+            1,
+            "the AEAT verdict must be applied to the record"
+        );
+        assert_eq!(applied[0].params.get("status"), Some(&json!("accepted")));
+    }
+
+    /// 🔴 The road exists but breaks at the moment of the sale (the control plane does not mint
+    /// the token): the record is created AND queued, with the reason visible — never lost, never
+    /// loose `pending`.
+    #[tokio::test]
+    async fn a_hub_without_config_whose_road_breaks_queues_the_record() {
+        let hub_id = "19340000-0000-4000-8000-000000000002";
+        let host = EnrolledHub {
+            hub_id: hub_id.to_owned(),
+            config: None,
+            queue: vec![],
+            records: vec![],
+            control_plane: ControlPlane::Fails,
+            archive_fails: false,
+        };
+
+        let out = create_record(&sale(hub_id), &host)
+            .await
+            .expect("a broken road must not lose the record of the sale");
+
+        assert_eq!(ops_named(&out, "verifactu._insert_record").len(), 1);
+        let queued = ops_named(&out, "verifactu._enqueue_contingency");
+        assert_eq!(
+            queued.len(),
+            1,
+            "the record must wait in the contingency queue"
+        );
+        assert_eq!(queued[0].params.get("record_id"), Some(&json!("id-rec")));
+        assert!(
+            ops_named(&out, "verifactu._insert_event").iter().any(|o| {
+                // `details` travels serialised, exactly as the audit row stores it.
+                o.params["details"]
+                    .as_str()
+                    .and_then(|d| serde_json::from_str::<Json>(d).ok())
+                    .is_some_and(|d| d["message_key"] == "verifactu.not_transmitted")
+            }),
+            "the reason must be visible in the audit"
+        );
+    }
+
+    /// 🔴 Same broken road on a hub that DID save its config: today the token failure escaped
+    /// `create_record` as an error and the sale's record was not created at all.
+    #[tokio::test]
+    async fn a_configured_hub_whose_road_breaks_queues_the_record_instead_of_failing() {
+        let hub_id = "19340000-0000-4000-8000-000000000003";
+        let host = EnrolledHub {
+            hub_id: hub_id.to_owned(),
+            config: Some(json!({ "hub_id": hub_id, "environment": "testing",
+                                 "issuer_nif": NIF, "issuer_name": "Salon Lucia SL" })),
+            queue: vec![],
+            records: vec![],
+            control_plane: ControlPlane::Fails,
+            archive_fails: false,
+        };
+
+        let out = create_record(&sale(hub_id), &host)
+            .await
+            .expect("a broken road must not lose the record of the sale");
+
+        assert_eq!(ops_named(&out, "verifactu._insert_record").len(), 1);
+        assert_eq!(
+            ops_named(&out, "verifactu._enqueue_contingency").len(),
+            1,
+            "the record must wait in the contingency queue"
+        );
+    }
+
+    /// 🔴 What the queue holds for a hub without config has to LEAVE it: the drain used to stop
+    /// at «VeriFactu sin configurar» and the records of those hubs could never go out.
+    #[tokio::test]
+    async fn the_queue_of_a_hub_that_never_saved_its_config_drains_to_the_testing_aeat() {
+        let hub_id = "19340000-0000-4000-8000-000000000004";
+        let (url, cell) = spawn_fake_cell().await;
+        let record = json!({
+            "id": "rec-queued", "hub_id": hub_id, "issuer_nif": NIF,
+            "issuer_name": "Salon Lucia SL", "environment": "testing", "sequence_number": 1,
+            "record_type": "alta", "invoice_number": "TICKET-2026-000007",
+            "invoice_date": "2026-09-19", "invoice_type": "F2", "description": "Corte y peinado",
+            "base_amount": 2471, "tax_rate": 21.0, "tax_amount": 519, "total_amount": 2990,
+            "tax_breakdown": r#"{"21.00":{"base":2471,"tax":519}}"#,
+            "previous_hash": "", "record_hash": "A".repeat(64), "is_first_record": 1,
+            "generation_timestamp": "2026-09-19T10:00:00+02:00",
+            "status": "pending", "xml_content": "", "is_deleted": 0
+        });
+        let host = EnrolledHub {
+            hub_id: hub_id.to_owned(),
+            config: None,
+            queue: vec![json!({ "record_id": "rec-queued" })],
+            records: vec![record],
+            control_plane: ControlPlane::Mints(url),
+            archive_fails: false,
+        };
+        let input = json!({
+            "payload": {},
+            "context": { "hub_id": hub_id, "now": "2026-09-19T10:05:00+02:00",
+                         "current_user_id": "u1",
+                         "new_ids": ["q-evt", "q-queue", "q-anchor", "q-summary"] }
+        });
+
+        let out = crate::transmission::process_contingency_queue(&input, &host)
+            .await
+            .expect("the queue of a hub without config must drain, not refuse");
+
+        let sent = cell.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "the queued record must reach the cell");
+        assert_eq!(sent[0]["environment"], "testing");
+        let applied = ops_named(&out, "verifactu._apply_transmission");
+        assert_eq!(applied.len(), 1);
+        assert_eq!(applied[0].params.get("status"), Some(&json!("accepted")));
+    }
+
+    /// 🔴 The road opens but the send dies before the wire (here the XML archive refuses the
+    /// write, which forbids sending by design). It used to be swallowed and the record stayed a
+    /// silent loose `pending`; it waits in the queue with its reason instead.
+    #[tokio::test]
+    async fn a_send_that_dies_before_the_wire_queues_the_record() {
+        let hub_id = "19340000-0000-4000-8000-000000000005";
+        let (url, cell) = spawn_fake_cell().await;
+        let host = EnrolledHub {
+            hub_id: hub_id.to_owned(),
+            config: None,
+            queue: vec![],
+            records: vec![],
+            control_plane: ControlPlane::Mints(url),
+            archive_fails: true,
+        };
+
+        let out = create_record(&sale(hub_id), &host).await.unwrap();
+
+        assert!(
+            cell.lock().unwrap().is_empty(),
+            "nothing is sent without its archived XML"
+        );
+        assert_eq!(ops_named(&out, "verifactu._insert_record").len(), 1);
+        assert_eq!(
+            ops_named(&out, "verifactu._enqueue_contingency").len(),
+            1,
+            "the record must wait in the contingency queue"
+        );
     }
 }

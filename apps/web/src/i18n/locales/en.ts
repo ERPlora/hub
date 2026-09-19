@@ -176,6 +176,7 @@ export default {
     // button only gets a 403 and a generic error: worse than not seeing it, and worse than
     // reading who to ask.
     quotaAskAdmin: 'Ask the owner of the business to upgrade the assistant plan.',
+    quotaManagedInAccount: "The assistant's plan is upgraded from your ERPlora account at erplora.com.",
     plansTitle: 'Choose a plan',
     plansConfirm: 'Go to payment',
     planOption: '{name} — {price} €/month',
@@ -327,6 +328,9 @@ export default {
     // permission — because a blocker with no owner leaves the user with nowhere to go.
     delegatedHint: 'An administrator has to set this up.',
     inheritedHint: 'It came from the template you used. Worth a look — your room and your prices are your own.',
+    // hub#1905 — the item is pending on a switch in Settings → Permissions, not on its own settings.
+    missingPermissionHint: 'This app needs a permission you have not granted yet. Without it, it cannot do its job.',
+    grantPermission: 'Grant permission',
     completeTitle: 'Your business is ready',
     completeBody: 'Everything on the checklist is done.',
     // The hero card of a business with no apps yet (hub#368). Its whole job is the FIRST choice, so
@@ -791,6 +795,14 @@ export default {
     ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
     ticketWaitingForPrinter:
       'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+    // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so
+    // nothing went to the printer. The way out is the print button on the receipt screen.
+    ticketNotComposed:
+      'The receipt for sale {saleId} could not be prepared and did NOT print. Print it from the receipt screen.',
+    // hub#1867: the receipt came out, but Hacienda's QR was not ready within the wait (a slow AEAT),
+    // so the customer's copy lacks it. The receipt screen prints the complete one.
+    ticketWithoutFiscal:
+      'The receipt for sale {saleId} came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
     comandaWaitingForPrinter:
       'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
@@ -1354,6 +1366,10 @@ export default {
     usageRangeLabel3h: 'Last 3 hours',
     usageRangeLabel24h: 'Last 24 hours',
     usageRangeLabel3d: 'Last 3 days',
+    // A metric close to / past the plan's limit (hub#1922) — worded by the hub, from the codes.
+    usageNearLimit: 'At {pct}% of your plan\'s limit.',
+    usageOverLimit: 'At {pct}% of your plan\'s limit — the hub may slow down.',
+    planPressure: 'Your plan is running short on resources. A bigger plan gives this hub more room.',
     databaseShared: 'Shared database',
     colTime: 'Time',
     colLevel: 'Level',
@@ -1661,6 +1677,16 @@ export default {
     // forever; now it aborts and says so honestly, so the user can retry instead of walking away.
     timeout: 'The server is taking too long to build the backup. Try again in a moment.',
   },
+  // hub#1905 — asked at the end of a template import: the apps it brought need the owner's
+  // permission, which a template can never give (hub#473). Same question the store asks for one app.
+  importPermissions: {
+    title: 'Permissions for your apps',
+    intro: 'The template installed these apps, and they need your permission to work — a template cannot give it for you. You can change it any time in Settings → Permissions.',
+    grant: 'Grant permissions',
+    granting: 'Granting…',
+    later: 'Not now',
+    grantError: 'Could not grant the permissions of {apps}. Try again, or turn them on in Settings → Permissions.',
+  },
   importPage: {
     title: 'Import configuration',
     lead: 'Load a template: it installs the missing apps, applies their data and copies the images.',
@@ -1746,10 +1772,10 @@ export default {
     reasonBlocked:
       'Not installed: it needs apps you have not subscribed to yet: {missing}. Subscribe to them and load it again — nothing else was touched.',
     mediaFailed: '{n} not copied',
-    // hub#751/#752 — the template names a version the marketplace no longer publishes, so a newer
-    // compatible one went in. It installed fine; it is said out loud because a template that
-    // quietly installs something other than what it announces is the surprise this avoids.
-    reasonVersionSubstituted: 'The template asked for {requested}; that version is no longer available, so {installed} went in.',
+    // hub#751/#752/#1904 — the bundle names an older version than the one that went in: a
+    // template always installs the newest compatible one, a backup only once its own is gone. It
+    // installed fine; it is said out loud because the import preview listed the recorded version.
+    reasonVersionSubstituted: 'The template came with {requested}; the newest compatible version, {installed}, went in.',
     // hub#331 — why the import kept a bundle's accounts out. Users, roles and PINs are the
     // identity of ONE hub: only that hub restoring its own backup gets them back.
     reasonIdentityNotPortable:
@@ -1910,6 +1936,28 @@ export default {
     // whole point — this is the one sentence that turns "it does not work" into a next step.
     unavailable:
       'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
+    // hub#1773 — the sentence that goes in front of Android's local-network dialog, and the row
+    // that says so afterwards. Android's own wording («find, connect to and determine the
+    // relative position of nearby devices») reads like tracking and gets refused; ours says what
+    // it is for. Never mentions the permission by name: what the owner recognises is the printer.
+    localNetwork: {
+      primerHeader: 'Let us look for your printer',
+      primerMessage:
+        'To find your printer we have to look at the devices on your network. Your device will ask you next.',
+      primerLater: 'Not now',
+      primerAllow: 'Look for my printer',
+      // The row on System › your printer, which is where somebody whose printer is never found
+      // would look. Only ever shown when the search really is blocked ON THIS DEVICE.
+      blockedTitle: 'Printer search is blocked',
+      blockedDetail:
+        'This device is not allowed to reach the printers on your network, so a search comes back empty however many printers are switched on.',
+      blockedAction: 'Allow the search',
+      // After asking again and still getting nothing: the system stops showing its dialog once it
+      // has been refused, and from then on the only way through is the device's own settings.
+      blockedInSettings:
+        "Your device didn't ask again. Open its settings, find ERPlora and turn local network access on.",
+      turnedOn: 'Done — this device can look for printers on your network now.',
+    },
   },
   // What the CORE says when it refuses ONE field (hub#1190, ADR-0398 §6).
   //

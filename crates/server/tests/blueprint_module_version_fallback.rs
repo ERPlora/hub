@@ -159,8 +159,19 @@ fn module_zip(id: &str, version: &str) -> (Vec<u8>, String) {
 
 /// A blueprint bundle whose only content is the module list (no data sections): the case under
 /// test is version resolution, not the SQL engine.
+///
+/// No `purpose` in the manifest ⇒ `backup` (the historic default): these are the ADR-0303 cases.
 fn blueprint_zip(modules: Value) -> Vec<u8> {
-    let manifest = json!({
+    bundle_zip(modules, None)
+}
+
+/// A PUBLISHED template (`purpose: template`), which is what the catalog serves (hub#1904).
+fn template_zip(modules: Value) -> Vec<u8> {
+    bundle_zip(modules, Some("template"))
+}
+
+fn bundle_zip(modules: Value, purpose: Option<&str>) -> Vec<u8> {
+    let mut manifest = json!({
         "schema_version": 1,
         "name": "peluqueria",
         "locale": "es",
@@ -169,9 +180,11 @@ fn blueprint_zip(modules: Value) -> Vec<u8> {
         "modules": modules,
         "sections": [],
         "sha256": {},
-    })
-    .to_string();
-    build_zip(&[("manifest.json", manifest.as_bytes())])
+    });
+    if let Some(purpose) = purpose {
+        manifest["purpose"] = json!(purpose);
+    }
+    build_zip(&[("manifest.json", manifest.to_string().as_bytes())])
 }
 
 // ─────────────────────────── hub under test ───────────────────────────
@@ -301,7 +314,8 @@ async fn a_pin_the_marketplace_no_longer_publishes_installs_the_newest_compatibl
     );
 }
 
-/// The fallback is a RECOVERY, not a silent upgrade: a pin that is still published wins.
+/// A BACKUP restores what the hub was running (ADR-0303): the fallback is a RECOVERY, not a
+/// silent upgrade, so a pin that is still published wins. Templates are the other rule (hub#1904).
 #[tokio::test]
 async fn a_pin_that_is_still_published_is_installed_exactly() {
     let (old_zip, old_sha) = module_zip("sales", "2.13.9");
@@ -367,5 +381,91 @@ async fn a_pin_with_no_compatible_version_left_still_fails() {
     assert!(
         mock.downloads.lock().unwrap().is_empty(),
         "no se cruza un major a la brava"
+    );
+}
+
+// ─────────────────────────── templates (hub#1904) ───────────────────────────
+
+/// hub#1904: «Peluquería» recorded `sales@2.16.1` while the store served `2.16.67`, and the salon
+/// started on the old one — with the tablet's charge button off-screen, a bug already fixed. A
+/// published template starts a NEW business: it gets what the store offers today, within the
+/// recorded major, and the stale pin is never even downloaded.
+#[tokio::test]
+async fn a_template_whose_pin_is_still_published_installs_the_newest_compatible_version() {
+    let (old_zip, old_sha) = module_zip("sales", "2.13.9");
+    let (new_zip, new_sha) = module_zip("sales", "2.13.10");
+    let mock = Arc::new(MockCloud {
+        published: HashMap::from([(
+            "sales".to_string(),
+            vec!["2.13.10".to_string(), "2.13.9".to_string()],
+        )]),
+        artifacts: HashMap::from([
+            (("sales".into(), "2.13.10".into()), (new_zip, new_sha)),
+            (("sales".into(), "2.13.9".into()), (old_zip, old_sha)),
+        ]),
+        downloads: Mutex::new(Vec::new()),
+    });
+    let cloud = spawn_mock_cloud(mock.clone()).await;
+    let router = make_app(&cloud, "tpl_live_pin").await;
+
+    let entries = import_blueprint(
+        router,
+        template_zip(json!([{ "id": "sales", "version": "2.13.9", "with_data": false }])),
+    )
+    .await;
+
+    let sales = &entries[0];
+    assert_eq!(sales["status"], "installed", "{sales}");
+    assert_eq!(
+        sales["version"], "2.13.10",
+        "un negocio nuevo arranca con lo que ofrece hoy la tienda: {sales}"
+    );
+    assert_eq!(
+        sales["requested_version"], "2.13.9",
+        "el informe dice qué traía la plantilla: {sales}"
+    );
+    assert_eq!(
+        mock.downloads.lock().unwrap().as_slice(),
+        ["sales@2.13.10"],
+        "la versión vieja no se llega a descargar"
+    );
+}
+
+/// Staying current never crosses the recorded major: the template's rows were written against it.
+#[tokio::test]
+async fn a_template_stays_on_its_major_when_a_newer_major_is_published() {
+    let (v1_zip, v1_sha) = module_zip("verifactu", "1.4.1");
+    let (v2_zip, v2_sha) = module_zip("verifactu", "2.0.0");
+    let mock = Arc::new(MockCloud {
+        published: HashMap::from([(
+            "verifactu".to_string(),
+            vec!["2.0.0".to_string(), "1.4.1".to_string()],
+        )]),
+        artifacts: HashMap::from([
+            (("verifactu".into(), "2.0.0".into()), (v2_zip, v2_sha)),
+            (("verifactu".into(), "1.4.1".into()), (v1_zip, v1_sha)),
+        ]),
+        downloads: Mutex::new(Vec::new()),
+    });
+    let cloud = spawn_mock_cloud(mock.clone()).await;
+    let router = make_app(&cloud, "tpl_major").await;
+
+    let entries = import_blueprint(
+        router,
+        template_zip(json!([{ "id": "verifactu", "version": "1.4.1", "with_data": false }])),
+    )
+    .await;
+
+    assert_eq!(entries[0]["status"], "installed", "{}", entries[0]);
+    assert_eq!(entries[0]["version"], "1.4.1", "{}", entries[0]);
+    assert!(
+        entries[0]["requested_version"].is_null(),
+        "se instaló lo que traía: nada que anotar: {}",
+        entries[0]
+    );
+    assert_eq!(
+        mock.downloads.lock().unwrap().as_slice(),
+        ["verifactu@1.4.1"],
+        "no se cruza un major"
     );
 }

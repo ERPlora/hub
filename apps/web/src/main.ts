@@ -34,6 +34,7 @@ import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
 import {
@@ -43,7 +44,7 @@ import {
 } from './lib/notification-permission';
 import { createPrintService } from './lib/print';
 import { createEnqueuePrintJob } from './lib/print-enqueue';
-import { loadSlotComponents } from './lib/module-loader';
+import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { bootModuleNavLocale } from './lib/nav';
@@ -229,14 +230,25 @@ function askToWarn(force = false) {
 // desaparecía sin cola, sin navegador y sin aviso.
 bootPrintOnSale(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  // The paper is the one the ticket screen prints, composed by the sales module (hub#1921).
+  saleDocument: (saleId) =>
+    saleTicketDocument(saleId, { loadViewer: () => loadModuleElement('sales', SALE_DOCUMENT_TAG) }),
   onFailure: (f) => {
     // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
     // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
+    // A third (hub#1921): the paper was never made — a sentence, not the code, and the way out.
     void toastError(
       f.awaitingHost
         ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
-        : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
+        : f.notComposed
+          ? i18n.global.t('print.ticketNotComposed', { saleId: f.saleId })
+          : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
     );
+  },
+  // hub#1867: the paper is in the customer's hand but lacks the VeriFactu QR — a warning, not an
+  // error, and long enough to read where the complete copy is.
+  onPrintedWithoutFiscal: (saleId) => {
+    void toast(i18n.global.t('print.ticketWithoutFiscal', { saleId }), 'warning', 6000);
   },
 });
 

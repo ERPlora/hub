@@ -43,6 +43,30 @@
             <ion-label>{{ t(RANGE_SHORT_KEYS[r]) }}</ion-label>
           </ion-segment-button>
         </ion-segment>
+        <!-- hub#1922 — the plan is running short. ONE notice, in the person's words, with the door
+             to THIS hub's plan page (`lib/upgrade-plan-link`): the SaaS's own link used to ride on
+             each panel as an `<a href>` to a relative `/pricing/`, which took the hub's window to
+             «this page does not exist» — and on the Play copy it was an invitation to pay. Where
+             the copy may not offer it (hub#756) there is no notice at all: the panels already say
+             how close to the limit each metric is. -->
+        <ok-inline-feedback
+          v-if="offersPlanUpgrade"
+          data-testid="system-plan-pressure"
+          class="system-feedback"
+          tone="warning"
+          icon="trending-up-outline"
+        >
+          {{ t('system.planPressure') }}
+          <ion-button
+            slot="actions"
+            data-testid="system-upgrade-plan"
+            size="small"
+            fill="outline"
+            @click="onUpgradePlan"
+          >
+            {{ t('nav.upgradePlan') }}
+          </ion-button>
+        </ok-inline-feedback>
         <!-- A metric nobody reported is NOT 0% (hub#375/ADR-0237). The panels get `known:false`
              and paint their own «we could not read this» state — never a flat green line at zero.
              The series comes from the SaaS (proxied by the runtime, machine token stays server-side,
@@ -60,7 +84,6 @@
                     :unreadable-label="t('system.health.notMeasured')"
                     :metric.prop="cpuPanel"
                     :thresholds.prop="panelThresholds"
-                    :upgrade.prop="upgradeHint"
                   ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
@@ -76,7 +99,6 @@
                     :unreadable-label="t('system.health.notMeasured')"
                     :metric.prop="memPanel"
                     :thresholds.prop="panelThresholds"
-                    :upgrade.prop="upgradeHint"
                   ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
@@ -107,7 +129,6 @@
                     :unreadable-label="t('system.health.notMeasured')"
                     :metric.prop="connectionsPanel"
                     :thresholds.prop="panelThresholds"
-                    :upgrade.prop="upgradeHint"
                   ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
@@ -179,6 +200,41 @@
                   {{ os.label }}
                 </ion-button>
               </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- ── The printer search is blocked ─────────────────────────────────────────────
+             hub#1773. Android is nearly one-way about the local-network permission: refused, the
+             system stops presenting its dialog, and from then on every search comes back empty
+             however many printers are switched on. The Printing screen does say why when a search
+             runs (hub#338), but the owner who already dismissed that sentence has nowhere left to
+             go — and somebody whose printer is «not found» comes HERE, next to the printer card.
+
+             Only ever rendered on a device that really has the permission and really lacks it: on
+             the desktop app, in a browser and on any Android below 17 the state is `unsupported`
+             and this card does not exist — claiming the search is blocked there would be a false
+             alarm about something that works. -->
+        <ion-card v-if="localNetworkBlocked" class="ion-no-margin">
+          <ion-card-content>
+            <div class="bridge-head">
+              <h3 class="bridge-title">{{ t('hardware.localNetwork.blockedTitle') }}</h3>
+              <ok-status-pill tone="warning" dot>
+                {{ t('hardware.localNetwork.blockedTitle') }}
+              </ok-status-pill>
+            </div>
+            <p class="muted-note">{{ t('hardware.localNetwork.blockedDetail') }}</p>
+            <div class="printer-action">
+              <ion-button
+                size="small"
+                fill="outline"
+                data-testid="system-local-network-allow"
+                :disabled="askingForLocalNetwork"
+                @click="allowPrinterSearch"
+              >
+                <HubIcon slot="start" name="print-outline" />
+                {{ t('hardware.localNetwork.blockedAction') }}
+              </ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -437,8 +493,10 @@ import {
   type UsageRange,
   type UsageSeries,
 } from '../lib/system-usage';
-import { isTauri } from '../lib/device';
+import { getDeviceContext, isTauri } from '../lib/device';
 import { openExternal } from '../lib/open-external';
+import { saasDoor } from '../lib/saas-door';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
 import {
   printerLine,
   printerSetupStepKeys,
@@ -479,6 +537,12 @@ import {
   primerLabelsFrom,
   type NotificationPermission,
 } from '../lib/notification-permission';
+import {
+  ensureLocalNetworkPermission,
+  localNetworkPermissionState,
+  localNetworkPrimerLabelsFrom,
+  type LocalNetworkPermission,
+} from '../lib/local-network-permission';
 import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te, locale } = useI18n();
@@ -563,6 +627,12 @@ const installedModules = ref<InstalledModule[] | null>(null);
 const notices = ref<NotificationPermission>('unsupported');
 const askingForNotices = ref(false);
 const noticesBlocked = computed(() => notices.value === 'denied');
+// Can this device look for a printer at all? (hub#1773) Same reading and the same reason as the
+// notices above: `unsupported` everywhere except an Android 17+ inside the installed app, so the
+// card keys on the state and never on «is this Android».
+const localNetwork = ref<LocalNetworkPermission>('unsupported');
+const askingForLocalNetwork = ref(false);
+const localNetworkBlocked = computed(() => localNetwork.value === 'denied');
 
 // Qué le hemos cambiado a este hub (hub#564). Vacío es una respuesta legítima y frecuente: la
 // mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
@@ -678,16 +748,31 @@ function toPanelMetric(metric: SeriesMetric | undefined, local: Reading): PanelM
       current: localCurrent,
       points: [],
       status: 'unknown',
-      message: metric?.message ?? null,
+      message: null,
     };
   }
+  const current = metric.current ?? localCurrent;
+  const status = metric.status ?? 'unknown';
   return {
     known: true,
-    current: metric.current ?? localCurrent,
+    current,
     points: metric.points ?? [],
-    status: metric.status ?? 'unknown',
-    message: metric.message ?? null,
+    status,
+    message: pressureSentence(status, current),
   };
+}
+
+/**
+ * What the panel says about a metric close to (or past) the plan's limit — worded HERE, from the
+ * codes of the series (hub#1922, ADR-0055). The SaaS sends a sentence too, but it is prose of a
+ * machine call: it arrives in English whatever language the person reads.
+ */
+function pressureSentence(status: string, current: number | null): string | null {
+  if (current === null) return null;
+  const pct = Math.round(current);
+  if (status === 'critical') return t('system.usageOverLimit', { pct });
+  if (status === 'warning') return t('system.usageNearLimit', { pct });
+  return null;
 }
 
 const cpuPanel = computed<PanelMetric>(() =>
@@ -709,7 +794,25 @@ const connectionsUnit = computed<string>(() => usageSeries.value?.metrics.db_con
 // old local [70/90/100] gauge zones retired with the gauges — panels must never contradict the
 // alerts the SaaS sends about the same numbers.
 const panelThresholds = computed(() => usageSeries.value?.thresholds ?? { warning: 70, critical: 80 });
-const upgradeHint = computed(() => usageSeries.value?.upgrade ?? { show: false, message: null, url: null });
+
+// hub#756 — whoever hands out the binary sets the rule: the copy Google Play distributes is not
+// offered the plan door. Inside the installed app it starts closed until the shell has answered,
+// so a Play copy never shows it for a frame; a browser sends no `distribution` and is offered it.
+const canOfferPlanUpgrade = ref(!isTauri());
+const offersPlanUpgrade = computed(
+  () => usageSeries.value?.upgrade?.show === true && canOfferPlanUpgrade.value,
+);
+
+// pm#196 — out through the shared door, like the sidebar's «Upgrade plan»: the system browser
+// does not share the webview's cookies, so without the one-time pass the owner would land on a
+// login. When the trip cannot be made it is SAID — a dead button is the defect of hub#475.
+async function onUpgradePlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+  } catch {
+    await toastError(t('nav.upgradePlanError'));
+  }
+}
 
 // Tamaño = headline. La BD Postgres es compartida por organización → sin "tamaño local".
 // Cuando no hay sizeLabel (cloud/backend compartido), mostramos el motor como headline
@@ -823,6 +926,8 @@ async function refreshHardware(): Promise<void> {
   // Never throws: `notificationPermissionState` answers `unsupported` when it cannot ask, which
   // keeps the card away rather than warning about a state we failed to read.
   notices.value = await notificationPermissionState();
+  // Same contract for the other permission a printer needs (hub#1773).
+  localNetwork.value = await localNetworkPermissionState();
 }
 
 /**
@@ -850,6 +955,35 @@ function onVisibleAgain(): void {
   void notificationPermissionState().then((state) => {
     notices.value = state;
   });
+  void localNetworkPermissionState().then((state) => {
+    localNetwork.value = state;
+  });
+}
+
+/**
+ * Asks to look for printers again, on the user's behalf (hub#1773).
+ *
+ * Twin of {@link turnOnNotices}, and for the same reasons: `force` because nothing asks twice on
+ * its own — the scan's primer is deliberately once per install — and the state is READ BACK from
+ * the system rather than taken from the request's answer, because the user can also have granted
+ * it in the device settings while the sheet was up. If the search is still blocked, the system
+ * will not be asking again, so the only remaining door gets named instead of leaving the tap
+ * silent.
+ */
+async function allowPrinterSearch(): Promise<void> {
+  if (askingForLocalNetwork.value) return;
+  askingForLocalNetwork.value = true;
+  try {
+    await ensureLocalNetworkPermission({ labels: localNetworkPrimerLabelsFrom(t), force: true });
+    localNetwork.value = await localNetworkPermissionState();
+    void toast(
+      localNetwork.value === 'denied'
+        ? t('hardware.localNetwork.blockedInSettings')
+        : t('hardware.localNetwork.turnedOn'),
+    );
+  } finally {
+    askingForLocalNetwork.value = false;
+  }
 }
 
 async function turnOnNotices(): Promise<void> {
@@ -1001,6 +1135,9 @@ watch(locale, () => {
 });
 
 onMounted(() => {
+  void getDeviceContext().then((context) => {
+    canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  });
   void refreshHardware();
   void loadSystemInfo();
   void loadUsageSeries();

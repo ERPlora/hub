@@ -80,6 +80,9 @@ on:
       # El veredicto que obedece ese job (hub#1790): el script y su test, por lo mismo.
       - 'scripts/ci/fleet-canary-verdict.py'
       - 'scripts/tests/fleet-canary-verdict.test.sh'
+      # La guardia previa al envío a Google Play (hub#1718): el control y su test, por lo mismo.
+      - 'scripts/ci/play-reviewer-preflight.py'
+      - 'scripts/tests/play-reviewer-preflight.test.sh'
       # El guardia de los puertos de los service containers (hub#898). La regla que vigila vive
       # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
       # toque ÚNICAMENTE el guardia ejecute sus propios casos.
@@ -124,6 +127,11 @@ on:
       - 'apps/web/src/lib/print.ts'
       - 'crates/peripherals/**'
       - 'crates/runtime/src/print_*.rs'
+      # El SUJETO del guardia de lote aplastado (hub#1878). Su test ya entra por el glob
+      # `scripts/tests/*.test.sh` de arriba, y el workflow que lo lleva por
+      # `.github/workflows/**`; esta ruta es para el script en sí, que vive en `scripts/` y no
+      # dispararía nada por su cuenta.
+      - 'scripts/branch_drift.py'
   workflow_dispatch:
 
 permissions:
@@ -317,6 +325,19 @@ jobs:
           bash ./scripts/tests/canary-on-publish.test.sh
           bash ./scripts/tests/fleet-canary-verdict.test.sh
 
+      # ── La guardia previa al envío a Google Play (hub#1718) ───────────────────────────
+      # El 09/09 se entró con la cuenta de revisión y no había negocio: el revisor veía la
+      # pantalla de alta, y después un hub VACÍO. La app se podía volver a enviar así, porque
+      # nada en el repo hacía la pregunta. Lo que corre aquí son los casos HERMÉTICOS del
+      # control —SaaS y hub falsos en 127.0.0.1, sin red ni credenciales—: que caza el slug que
+      # no es de la cuenta, el hub caído, el hub sin módulos y la falta de configuración, y que
+      # nunca imprime la contraseña. El control DE VERDAD lo corre una persona antes de enviar
+      # (apps/tauri/GOOGLE-PLAY.md); aquí solo se prueba que sabe decir que NO.
+      - name: Contrato de la guardia del revisor de Play (hub#1718)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/play-reviewer-preflight.test.sh
+
       # ── Los puertos de los service containers (hub#898) ───────────────────────────────
       # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y
       # no dejó nada que sostuviera la regla. El saas reestrenó la MISMA incidencia el 2026-09-02
@@ -382,3 +403,31 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/print-chain-doc-truth.test.sh
+
+      # ── Un lote develop → main que entra APLASTADO se caza (hub#1878) ─────────────────
+      # `develop-main-drift.yml` solo se dispara por cron, por push a `main` y a mano, así que
+      # una PR que rompiera el script o le quitara el `fetch` de las refs no encontraría ni un
+      # rojo: se enteraría el cron de la mañana siguiente, o —peor— nadie, porque la señal
+      # muda se lee igual que «no hay nada». Aquí sí corre en cada PR, y cuesta segundos:
+      # los casos montan repos de git de verdad (un lote mergeado, uno aplastado, deriva
+      # normal, un hotfix) y comprueban el veredicto y su código de salida.
+      #
+      # pyyaml ya lo instaló el paso del contrato de `test-hub-modules.yml` de más arriba.
+      - name: "Contrato: el lote aplastado develop → main se caza (hub#1878)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/branch_drift.test.sh
+
+      # ── Nadie se fía del paquete por defecto del SDK de Android (hub#1881) ────────────
+      # El 16/09 TODAS las PRs del hub salieron en rojo —una de solo `.md` incluida— porque el
+      # paso `Setup Android SDK` usaba la acción a pelo y su default es `packages: tools
+      # platform-tools`: Google retiró `tools` del repositorio remoto y `sdkmanager` sale con 1.
+      # Aquí nadie usó nunca `tools`. Dos `with:` son memoria, no guardia: el workflow siguiente
+      # que necesite Android se escribirá copiando uno de estos ficheros, y la copia que pierda
+      # el `with:` está verde en todas partes menos el día del tag — que es justo lo que le pasaba
+      # a `tauri-release.yml`, con el mismo paso a pelo y su rojo esperando en plena release.
+      # Segundos, y lee el YAML de verdad: un comentario que hable del incidente no lo dispara.
+      - name: "Contrato: ningún workflow hereda el paquete `tools` del SDK de Android (hub#1881)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/setup-android-packages.test.sh

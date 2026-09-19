@@ -56,19 +56,24 @@ tenant que sustituira progresivamente al hub actual.
 - Los modulos declaran contrato tecnico en `module.json`. La clasificacion de
   marketplace vive en el SaaS, no en el modulo.
 - Un solo producto (ARQUITECTURA.md §1; [ADR-0154](../architecture/00-overview/decision-log.md)):
-  el **Hub Cloud** — PWA/web shell + **PostgreSQL** per-org, online-only. No hay Hub Local, ni shell
-  Tauri, ni backend SQLite, ni ejes `single`/`cloud`.
+  el **Hub Cloud** — PWA/web shell + **PostgreSQL una BD por hub** (ADR-0201; la `Organization`
+  ya no existe). No hay Hub Local ni backend SQLite ni ejes `single`/`cloud`. El shell Tauri SÍ
+  existe hoy (`apps/tauri`, ADR-0196), pero solo como cliente fino que añade hardware por `invoke`
+  in-process — nunca un runtime/backend local propio.
 - Transporte de datos (modelo decidido [ADR-0050](../architecture/00-overview/decision-log.md)):
   **HTTP (query/command) + WebSocket (solo eventos)** contra el runtime Axum. No hay `invoke`/IPC
   para datos; el SDK no tiene `IpcTransport`. El único `DatabaseAdapter` es **`PgAdapter`**
   (PostgreSQL); los ficheros van al **backend de objetos del Cloud** (sin rama de disco local).
 - **Online-only, SIN sync ni Cloud DB intermedia** (ADR-0154; ADR-0040 «sin sync» sigue en pie):
-  **PostgreSQL por organización** + 1 contenedor por hub, multi-dispositivo / web. No existe motor
+  **PostgreSQL por hub** (ADR-0201) + 1 contenedor por hub, multi-dispositivo / web. No existe motor
   de sincronización ni crate `datasync`. El crate `sync` que sigue vivo es **solo** el cliente
   WebSocket de eventos en vivo, NO un motor de datos. Los backups son responsabilidad del Cloud
   (pgBackRest/PITR), no del Hub.
-- El `bridge/` no se elimina: es el **Bridge standalone (red-only)**, la única app instalable, que la
-  web shell alcanza por localhost HTTP/WS (§2.7).
+- 🪦 El Bridge standalone (`apps/bridge`, red-only por localhost HTTP/WS) **se eliminó** (ADR-0196,
+  hub#340, 2026-08-08). El hardware hoy lo aporta la **app instalable** (`apps/tauri`,
+  `com.erplora.app`) por `invoke` **in-process** sobre `crates/peripherals`, con **tres
+  transportes**: red (TCP 9100), USB por la cola RAW del SO en escritorio (hub#1083) y Bluetooth
+  SPP en Android (ADR-0204, hub#388).
 - AI y embeddings siempre pasan por el proxy del SaaS, no directo desde
   hub.
 

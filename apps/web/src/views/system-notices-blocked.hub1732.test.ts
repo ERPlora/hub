@@ -7,8 +7,10 @@
 // that stops hearing about orders and an owner with no reason to suspect a permission.
 //
 // So System › this device says it, in the same place and the same shape as the printer card right
-// above it, and offers the ask again. The comparison the issue itself draws is the local-network
-// permission on the Printing screen, which does exactly this and does it well.
+// above it, and offers the ask again. (The issue drew the local-network permission as the example
+// to follow — it was not one: the Printing screen said WHY a blocked search came back empty
+// (hub#338), but nothing explained the dialog beforehand and nothing offered a way back. hub#1773
+// put it on this same shape, and its row sits right above this one.)
 //
 // The three things pinned here are the three ways a "state row" goes wrong:
 //

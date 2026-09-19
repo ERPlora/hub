@@ -80,7 +80,8 @@ catálogo privado y las operaciones autorizadas. La falta de red muestra reinten
 
 ### Contextos
 
-- Con y sin el Bridge de hardware conectado.
+- Con y sin la app instalable (hardware por `invoke` in-process, ADR-0196) conectada. 🪦 El Bridge
+  standalone se eliminó (hub#340); hoy el hardware lo aporta `apps/tauri`.
 - Usuario admin y usuario sin permisos suficientes.
 - Español e inglés.
 - Online, offline, respuesta lenta, error recuperable y sesión caducada.

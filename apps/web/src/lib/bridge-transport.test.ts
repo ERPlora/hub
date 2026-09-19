@@ -6,8 +6,9 @@
 //     pública del emparejamiento; 0196 lo retira y la PWA deja de imprimir tiques térmicos.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { tauriMode, invokeSpy } = vi.hoisted(() => ({
+const { tauriMode, invokeSpy, localNetworkSpy } = vi.hoisted(() => ({
   tauriMode: { value: false },
+  localNetworkSpy: vi.fn(async () => 'granted' as const),
   invokeSpy: vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<unknown>>(
     async () => ({ version: 'test' }),
   ),
@@ -17,6 +18,19 @@ vi.mock('./device', () => ({
   isTauri: () => tauriMode.value,
   invokeTauri: invokeSpy,
 }));
+
+// hub#1773 — the local-network permission no longer travels in the batch: it leaves through its
+// own door, which puts a sentence of ours in front of Android's dialog. That door needs a screen
+// to draw the sheet on, so here it is replaced by a spy that answers «granted» — what this file
+// checks is the SCOPE of what gets asked, not the sheet, which has its own suite
+// (`bridge-transport.local-network-primer.hub1773.test.ts`).
+vi.mock('./local-network-permission', async () => {
+  const actual =
+    await vi.importActual<typeof import('./local-network-permission')>(
+      './local-network-permission',
+    );
+  return { ...actual, ensureLocalNetworkPermission: localNetworkSpy };
+});
 
 import {
   ErploraError,
@@ -158,15 +172,20 @@ describe('permisos de runtime antes de tocar el hardware', () => {
     // notifications dialog right after a printer re-scan — an out-of-context request the user
     // rightly denies. Discovery names the two PRINTER permissions (the LAN sweep and the bonded
     // Bluetooth list, ADR-0204/hub#388) and never the notifications one.
-    const peticion = invokeSpy.mock.calls.find(
-      (c) => c[0] === 'plugin:erplora-android|request_permissions',
-    );
-    expect(peticion?.[1]).toEqual({
-      permissions: [
-        'android.permission.ACCESS_LOCAL_NETWORK',
-        'android.permission.BLUETOOTH_CONNECT',
-      ],
-    });
+    //
+    // Since hub#1773 they leave through two doors, not one — the LAN through the primer that
+    // explains it first, the rest straight to the plugin — so the scope is checked on the UNION
+    // of what the operation ends up asking for. The shape changed; the contract did not.
+    expect(localNetworkSpy, 'the local network was never asked for').toHaveBeenCalledTimes(1);
+    const pedidos = invokeSpy.mock.calls
+      .filter((c) => c[0] === 'plugin:erplora-android|request_permissions')
+      .flatMap((c) => ((c[1] as { permissions?: string[] })?.permissions ?? []));
+    expect([...pedidos, 'android.permission.ACCESS_LOCAL_NETWORK'].sort()).toEqual([
+      'android.permission.ACCESS_LOCAL_NETWORK',
+      'android.permission.BLUETOOTH_CONNECT',
+    ]);
+    // The one that must never tag along, whichever door it would have used.
+    expect(pedidos).not.toContain('android.permission.POST_NOTIFICATIONS');
   });
 
   it('pide permisos antes de notificar', async () => {

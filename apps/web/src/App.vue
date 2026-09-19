@@ -178,6 +178,10 @@
            cuando cambia el turno; y por eso mismo no navega: salir a /login es lo que perdía la
            venta en curso. Dentro del gate: sin sesión no hay caja que relevar. -->
       <UserSwitchOverlay />
+      <!-- hub#1905 — the permissions the apps of a template still lack. Mounted ONCE, here: the
+           hero card, Settings › Data and the assistant all import templates, and each only raises
+           the signal (`askPermissionsAfterImport`). Inside the gate: only an administrator imports. -->
+      <ImportPermissionsConsent />
     </AuthenticatedChrome>
   </ion-app>
 </template>
@@ -203,9 +207,11 @@ import AuthenticatedChrome from './components/AuthenticatedChrome.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import ElevationDialog from './components/ElevationDialog.vue';
 import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
+import ImportPermissionsConsent from './components/ImportPermissionsConsent.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import SidebarInstallQr from './components/SidebarInstallQr.vue';
 import { user, isAuthed, logout } from './lib/session';
+import { setManagementDistribution } from './lib/management-link';
 import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
@@ -281,6 +287,11 @@ const canOfferPlanUpgrade = ref(true);
 onMounted(async () => {
   const context = await getDeviceContext();
   canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
+  // hub#1897 — the same answer governs the topbar's door to erplora.com, which until now was painted
+  // without consulting it: from the till one reached the SaaS's billing screen in three taps, with the
+  // session already open. It is resolved here, with the context already requested, so the shell is
+  // not asked the same thing twice at boot.
+  setManagementDistribution(context?.distribution);
 });
 
 // pm#196 — cruza por la puerta compartida: dentro de la app instalada el navegador del sistema NO

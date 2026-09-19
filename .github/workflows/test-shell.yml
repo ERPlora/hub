@@ -34,6 +34,10 @@ on:
       # que un tag que no publica nada salga verde.
       - "scripts/release-gate.sh"
       - "scripts/release-gate.test.sh"
+      # `android_status_bar_inset.rs` compara la franja bajo el reloj de Android con el color de
+      # la cabecera que declara este tema (hub#1903): si cambia la cabecera, la guarda tiene que
+      # correr en ese mismo PR, no en el siguiente que toque el shell.
+      - "apps/web/src/theme/variables.css"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -49,6 +53,10 @@ on:
       # que un tag que no publica nada salga verde.
       - "scripts/release-gate.sh"
       - "scripts/release-gate.test.sh"
+      # `android_status_bar_inset.rs` compara la franja bajo el reloj de Android con el color de
+      # la cabecera que declara este tema (hub#1903): si cambia la cabecera, la guarda tiene que
+      # correr en ese mismo PR, no en el siguiente que toque el shell.
+      - "apps/web/src/theme/variables.css"
   workflow_dispatch:
 
 concurrency:
@@ -165,8 +173,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Only `platform-tools`: the action's default is `tools platform-tools`, and Google
+      # retired the legacy `tools` package on 2026-09-16 — `sdkmanager` exits 1 on it and
+      # takes the job down with it (hub#1881). Nothing here ever used `tools`.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       # Solo la plataforma y las build-tools: el NDK es para compilar Rust a Android y aquí no se
       # compila Rust. Es la diferencia entre un paso de segundos y el job de release.

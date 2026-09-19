@@ -22,7 +22,7 @@ interface Session {
 /** Los tres anchos del contrato de UI del proyecto: escritorio, tablet y móvil. */
 export { VIEWPORTS } from './viewports';
 
-/** Sesión REAL del runtime vía `/api/auth/pin` (usuario Demo / PIN 0000 del seed de dev). */
+/** REAL runtime session via `/api/auth/pin` (Demo user / PIN 000000 from the dev seed, hub#1929). */
 export async function loginByPin(): Promise<Session> {
   const api = await pwRequest.newContext();
   // The device identifies itself, exactly as the browser of a real till does (hub#330: a PIN login
@@ -30,7 +30,7 @@ export async function loginByPin(): Promise<Session> {
   // `HUB_DEVICE_TRUST=off` (see `playwright.config.ts`) because the id a browser mints is random
   // and there is nothing to pre-trust in an ephemeral bank.
   const res = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'e2e-browser-device' },
+    data: { name: 'Demo', pin: '000000', device_id: 'e2e-browser-device' },
   });
   expect(res.ok(), `login PIN falló: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = await res.json();

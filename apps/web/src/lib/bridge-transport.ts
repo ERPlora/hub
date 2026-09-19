@@ -11,6 +11,7 @@
 // Modules consume `erplora.peripherals` without knowing which transport they got (one contract),
 // and since hub#524 the shell's own SCREENS ask at that same door ({@link detectPeripherals}).
 import {
+  ANDROID_LOCAL_NETWORK_PERMISSION,
   IpcBridgeTransport,
   LocalNetworkPermissionDeniedError,
   UnavailableBridgeTransport,
@@ -20,11 +21,72 @@ import {
 } from '@erplora/module-sdk';
 
 import { invokeTauri, isTauri } from './device';
+import { i18n } from '../i18n';
+import {
+  ensureLocalNetworkPermission,
+  localNetworkPrimerLabelsFrom,
+} from './local-network-permission';
 import { hardwareUnavailableMessage, printerDiscoveryMessage } from './printer-discovery';
+
+/** The plugin call that puts a runtime-permission dialog on the screen. */
+const REQUEST_PERMISSIONS = 'plugin:erplora-android|request_permissions';
+
+/**
+ * Puts OUR sentence in front of Android's local-network dialog (hub#1773).
+ *
+ * The transport asks for `ACCESS_LOCAL_NETWORK` itself, right before every operation that needs
+ * the LAN (hub#758's scope) — but it asks COLD, and what Android shows describes the mechanism
+ * («find, connect to and determine the relative position of nearby devices»), never the purpose.
+ * Read cold that is a request to know what is around you, and the normal answer is no; after two
+ * noes the system stops presenting the dialog for the life of the install and the printer is
+ * simply never found again.
+ *
+ * **The interception is here, at the adapter, and not around `discoverPrinters`**, because the
+ * cold ask is inside the SDK's own `ensurePermissions` — patching the method from outside would
+ * put our sheet in front of a dialog that then pops anyway. The adapter is the seam the shell
+ * OWNS: every permission dialog this app shows leaves through it, so explaining one before it
+ * appears is the shell doing its job (ADR-0196 §3, thin client; ADR-0055, the words live here),
+ * and it covers scanning, printing, the test sheet and the drawer with one rule instead of four.
+ *
+ * At most ONE sheet per install: `ensureLocalNetworkPermission` only opens it when the permission
+ * really is refused and the user has not answered yet, so a till that prints all day never sees
+ * it. A «no» resolves normally — the operation behind it carries on and reports what is true
+ * (hub#338 makes a blocked scan a typed refusal, not an empty list).
+ *
+ * Every OTHER permission is forwarded untouched, in the same call: discovery asks for the LAN and
+ * for bonded Bluetooth together (ADR-0204), and the notices have their own primer at their own
+ * moment (hub#1732). Only the one being explained is taken out of the batch.
+ */
+async function askForPermissions(args: Record<string, unknown> | undefined): Promise<unknown> {
+  const requested = Array.isArray(args?.permissions) ? (args.permissions as string[]) : [];
+  if (!requested.includes(ANDROID_LOCAL_NETWORK_PERMISSION)) {
+    return invokeTauri(REQUEST_PERMISSIONS, args) as Promise<unknown>;
+  }
+
+  const state = await ensureLocalNetworkPermission({
+    // Resolved at call time, not at construction: the hub's language can change while the app is
+    // open, and the sheet has to come out in the one that is active now.
+    labels: localNetworkPrimerLabelsFrom((key) => i18n.global.t(key)),
+  });
+  const granted: Record<string, boolean> = {
+    [ANDROID_LOCAL_NETWORK_PERMISSION]: state === 'granted',
+  };
+
+  const rest = requested.filter((p) => p !== ANDROID_LOCAL_NETWORK_PERMISSION);
+  if (rest.length === 0) return granted;
+  const others = (await invokeTauri<Record<string, boolean>>(REQUEST_PERMISSIONS, {
+    ...args,
+    permissions: rest,
+  })) as Record<string, boolean> | null;
+  return { ...granted, ...(others ?? {}) };
+}
 
 /** Adaptador del shell Tauri al contrato `TauriBridge` del SDK (inyectable en tests). */
 const tauriShell: TauriBridge = {
-  invoke: (cmd, args) => invokeTauri(cmd, args) as Promise<unknown>,
+  invoke: (cmd, args) =>
+    cmd === REQUEST_PERMISSIONS
+      ? askForPermissions(args)
+      : (invokeTauri(cmd, args) as Promise<unknown>),
   // El shell aún no emite eventos de hardware hacia la UI (los outcomes van al log del shell);
   // el contrato exige `listen`, así que se entrega una suscripción vacía.
   listen: async () => () => {},

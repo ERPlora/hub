@@ -175,8 +175,8 @@ export default defineConfig({
         // fallo de red, que es lo que un banco sin Cloud tiene que parecer — el mismo truco que
         // usan los tests del server (`cloud_base_url: http://127.0.0.1:1`).
         HUB_CLOUD_API_URL: 'http://127.0.0.1:1',
-        // Seed de dev: usuario Demo (PIN 0000). Sin él no hay a quién autenticar y el login por
-        // PIN de todos los specs falla antes del primer caso.
+        // Dev seed: Demo user (PIN 000000, hub#1929). Without it there is nobody to authenticate and
+        // every spec's PIN login fails before the first case.
         HUB_SEED_SQL_PATH: join(HUB_ROOT, 'crates', 'server', 'seeds', 'demo.sql'),
         HUB_MODULES_DIR: EMPTY_MODULES_DIR,
       },

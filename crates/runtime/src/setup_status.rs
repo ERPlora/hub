@@ -186,6 +186,10 @@ pub const ORIGIN_USER: &str = "user";
 /// A false «pending» is visible; a false «done» hides the task for good.
 pub const ORIGIN_BLUEPRINT: &str = "blueprint";
 
+/// Where a module's host capabilities are granted (hub#1905): Ajustes → Permisos. The way in of an
+/// item that is pending on a switch nobody turned on — see [`missing_capabilities`].
+pub const PERMISSIONS_ROUTE: &str = "/settings?tab=permissions";
+
 /// Slots the core reserves for its own items. The gaps in between are the module slots (see
 /// `architecture/hub/setup-status.md`): sell first, invoice after.
 const ORDER_APPS: i64 = 10;
@@ -361,6 +365,8 @@ pub async fn status(
             // Un ítem del core es SIEMPRE del dueño: una plantilla no lleva identidades ni personas
             // (ADR-0195 §3/§4/§5), así que `business_identity` y `team` no pueden venir heredados.
             ORIGIN_USER,
+            // The core asks the host for nothing: no module capability can be missing here.
+            &[],
         ));
     }
 
@@ -400,12 +406,38 @@ pub async fn status(
         if !actionable && level != LEVEL_LEGAL {
             continue;
         }
-        let Some(done) = module_item_done(db, registry, def, ctx).await else {
+        let Some(own_done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
         // …and a module the dispatcher is going to refuse is not «configured», whatever its own
-        // settings say (hub#1119). See [`capabilities_granted`].
-        let done = done && capabilities_granted(db, registry, hub_id, &manifest.id).await;
+        // settings say (hub#1119). See [`missing_capabilities`].
+        let missing = missing_capabilities(db, registry, hub_id, &manifest.id).await;
+        let done = own_done && missing.is_empty();
+        // The item has two halves with two owners (hub#1905). The switch is the ADMINISTRATOR's:
+        // Ajustes → Permisos lets nobody else flip it (`printing` hands `manage_settings` to a
+        // manager). The module's own settings are whoever configures it. So a session that cannot
+        // grant is not told about the switch while its own half is still to do — the item stays
+        // theirs, on the module's own screen — and once that half is done, what is left is not
+        // theirs: same rule as above, a wall still says WHO and the rest is only told to whoever
+        // can act.
+        let can_grant = crate::permissions::has(ctx, crate::hub_users::ADMINISTER_PERMISSION);
+        let missing = if own_done || can_grant {
+            missing
+        } else {
+            Vec::new()
+        };
+        let actionable = actionable && (missing.is_empty() || can_grant);
+        if !actionable && level != LEVEL_LEGAL {
+            continue;
+        }
+        // The switch goes first (hub#1905): while it is off, nothing configured on the module's own
+        // screen can run, and that screen does not even mention it. So the way in is the screen
+        // where it is granted; once it is, the item goes back to its own route.
+        let route = if missing.is_empty() {
+            def.route.as_str()
+        } else {
+            PERMISSIONS_ROUTE
+        };
         // A module item never reaches the third state: its screen is inside this hub, so there is
         // nothing outside that could make it impossible. Not evaluable ⇒ omitted (above); not
         // configured ⇒ pending.
@@ -430,7 +462,7 @@ pub async fn status(
             } else {
                 &def.icon
             },
-            &def.route,
+            route,
             def.order.unwrap_or(DEFAULT_ORDER),
             // A module item is always reachable by its own screen, and the assistant can drive any
             // module's settings. `template`/`file` are not offered per module yet: no manifest can
@@ -442,6 +474,7 @@ pub async fn status(
             } else {
                 ORIGIN_USER
             },
+            &missing,
         ));
     }
 
@@ -672,6 +705,7 @@ fn item_json(
     actions: &[&str],
     actionable: bool,
     origin: &str,
+    missing_capabilities: &[String],
 ) -> Json {
     json!({
         "key": key,
@@ -699,6 +733,11 @@ fn item_json(
         // says whether they are open to whoever is asking. A `false` only ever reaches a consumer on
         // a wall — everything else the session cannot do was dropped from the list.
         "actionable": actionable,
+        // Which of the module's host capabilities are still denied (hub#1905), by id — the reason
+        // an item whose own settings are fine is still pending. Always present, empty when nothing
+        // is missing: a consumer never branches on presence. Also empty for a session that cannot
+        // grant them while the module's own settings are still to do: that half is theirs.
+        "missing_capabilities": missing_capabilities,
     })
 }
 
@@ -807,7 +846,8 @@ fn done_or_pending(done: bool) -> &'static str {
     }
 }
 
-/// **Has the owner granted every host capability this module declares?** (hub#1119)
+/// **Which host capabilities this module declares that the owner has NOT granted?** (hub#1119,
+/// hub#1905). Empty = the module can run its engine.
 ///
 /// A module's own `setup` query can only answer «are MY settings filled in». It cannot see the gate
 /// in front of its engine: `capabilities::enforce` (ADR-0079) is default-deny and refuses every
@@ -819,19 +859,28 @@ fn done_or_pending(done: bool) -> &'static str {
 /// The switch is a real, named task with a screen behind it (Ajustes → Permisos), so «pending» is
 /// the honest state, not an invented chore. A module that declares no capability is untouched.
 ///
-/// **Best-effort, like every other check here**: if the grants cannot be read we answer `true`
-/// rather than manufacturing a pending item — a false «you are missing X» sends the user to fix
-/// something that is already fine.
-async fn capabilities_granted(
+/// The ids travel in the item (hub#1905) because «pending» alone was mute: a template import left
+/// `verifactu` pending with a button to its own settings — already filled in — and nothing said
+/// that the switch was what was missing.
+///
+/// **Best-effort, like every other check here**: if the grants cannot be read we answer «nothing
+/// missing» rather than manufacturing a pending item — a false «you are missing X» sends the user
+/// to fix something that is already fine.
+async fn missing_capabilities(
     db: &dyn DatabaseAdapter,
     registry: &Registry,
     hub_id: &str,
     module_id: &str,
-) -> bool {
+) -> Vec<String> {
     crate::capabilities::list_for_module(db, registry, hub_id, module_id)
         .await
-        .map(|caps| caps.iter().all(|(_, granted)| *granted))
-        .unwrap_or(true)
+        .map(|caps| {
+            caps.into_iter()
+                .filter(|(_, granted)| !*granted)
+                .map(|(id, _)| id)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Runs the module's own declarative check. `None` = the check could not be made ⇒ omit the item.

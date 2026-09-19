@@ -45,12 +45,20 @@ vi.mock('../lib/app-names', async () => {
 // puerta que se prueba con su propio interruptor no prueba nada. Los tests mueven la sesión REAL
 // con `setUser`, la misma que escribe el login.
 vi.mock('../lib/nav', () => ({ refreshModuleNav: vi.fn() }));
+// hub#1905 — the permissions question is `ImportPermissionsConsent`'s (tested there); this panel
+// owes it the signal, with the report of the import that just ran here.
+const askPermissionsAfterImport = vi.fn();
+vi.mock('../lib/import-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/import-permissions')>()),
+  askPermissionsAfterImport: (...a: unknown[]) => askPermissionsAfterImport(...a),
+}));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // HubIcon hornea todos los SVG del shell vía `~icons/…?raw`, que el entorno de test deniega.
 // Aquí probamos el contrato del paso pick, no los iconos: lo stubeamos.
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import ImportPanel from './ImportPanel.vue';
+import { importBlueprint } from '../lib/runtime';
 import { setUser, type SessionUser } from '../lib/session';
 // Real English catalogue: the blocked row is tested through the sentence the user reads.
 import en from '../i18n/locales/en';
@@ -77,6 +85,7 @@ beforeEach(() => {
   downloadBlueprint.mockReset();
   fetchImportReport.mockReset();
   retryImport.mockReset();
+  askPermissionsAfterImport.mockReset();
   appNames.clear();
   signInAsOwner();
 });
@@ -257,6 +266,27 @@ describe('ImportPanel · informe: instalación de módulos', () => {
     expect(texto).toContain('tables');
     // El motivo REAL del motor, tal cual: sin él el usuario no puede ni reportar el fallo.
     expect(texto).toContain('módulo sin firma');
+  });
+
+  // hub#1904 — a template installs the newest compatible version of EVERY app, so the version note
+  // is the normal case on all the rows of a healthy import. It is information under a green
+  // «installed» row: painted in the failure red it told a new owner that 14 apps went wrong.
+  it('the version note of an installed app is not painted as a failure', async () => {
+    const w = await panelConInforme([
+      { id: 'sales', version: '2.16.67', status: 'installed', requested_version: '2.16.1' },
+    ]);
+    const note = w.get('[data-testid="import-report"] p');
+    expect(note.text()).toContain('importPage.reasonVersionSubstituted');
+    expect(note.classes()).not.toContain('fail-reason');
+  });
+
+  it('the reason of an app that could not be installed keeps the failure tone', async () => {
+    const w = await panelConInforme([
+      { id: 'tables', version: '1.4.0', status: 'failed', error: 'signature required' },
+    ]);
+    const note = w.get('[data-testid="import-report"] p');
+    expect(note.text()).toContain('signature required');
+    expect(note.classes()).toContain('fail-reason');
   });
 });
 
@@ -687,5 +717,75 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
     const shown = w.get('[data-testid="import-retry-error"]').text();
     expect(shown).toContain(en.runtimeErrors.cloud_unreachable);
     expect(shown).not.toContain('cloud_unreachable');
+  });
+});
+
+// hub#1905 — the end of an import asks for the permissions of the apps it brought. The question
+// itself lives in `ImportPermissionsConsent` (tested there); what this panel owes it is the RIGHT
+// report: the one of the import that just ran here — never the one recovered from an earlier import
+// when the owner merely opens Settings › Data.
+describe('hub#1905 · al terminar de importar se piden los permisos de sus apps', () => {
+  const salon = {
+    sections: [{ section: 'modules/verifactu', status: 'Applied', discarded_rows: 0 }],
+    installed_modules: [
+      { id: 'verifactu', version: '1.5.40', status: 'installed' },
+      { id: 'printing', version: '0.1.22', status: 'installed' },
+    ],
+    origin: { source: 'catalog', slug: 'peluqueria', version: '1.0.0', locale: 'es' },
+  };
+
+  it('se pregunta por el informe del import que acaba de terminar', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue(null);
+    vi.mocked(importBlueprint).mockResolvedValue(salon as never);
+    const w = mountPanel();
+    await flushPromises();
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
+
+    await (w.vm as unknown as { doImport: () => Promise<void> }).doImport();
+    await flushPromises();
+
+    expect(askPermissionsAfterImport).toHaveBeenCalledTimes(1);
+    expect(askPermissionsAfterImport).toHaveBeenCalledWith(salon);
+  });
+
+  it('y el del reintento, que también puede instalar apps', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const partial = {
+      sections: [{ section: 'modules/verifactu', status: { Failed: 'módulo no instalado' }, discarded_rows: 0 }],
+      installed_modules: [],
+      origin: salon.origin,
+    };
+    fetchImportReport
+      .mockResolvedValueOnce({ batch_id: 'b1', name: 'peluqueria', created_at: '2026-09-18T10:00:00Z', report: partial })
+      .mockResolvedValueOnce({ batch_id: 'b2', name: 'peluqueria', created_at: '2026-09-18T10:05:00Z', report: salon });
+    retryImport.mockResolvedValue({ retried: true, code: undefined, report: salon });
+    const w = mountPanel();
+    await flushPromises();
+
+    await w.get('[data-testid="import-report-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(askPermissionsAfterImport).toHaveBeenCalledTimes(1);
+    expect(askPermissionsAfterImport).toHaveBeenCalledWith(salon);
+  });
+
+  it('un informe RECUPERADO de un import anterior no pregunta nada al abrir Datos', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue({
+      batch_id: 'b1',
+      name: 'peluqueria',
+      created_at: '2026-09-17T10:00:00Z',
+      report: {
+        ...salon,
+        sections: [{ section: 'modules/tables', status: { Failed: 'módulo no instalado' }, discarded_rows: 0 }],
+      },
+    });
+    const w = mountPanel();
+    await flushPromises();
+    // The recovered report IS on screen — the question is about the import that is not running.
+    expect(w.find('[data-testid="import-report"]').exists()).toBe(true);
+
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
   });
 });

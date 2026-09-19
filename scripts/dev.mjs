@@ -53,9 +53,9 @@ const DEFAULTS = {
   // (`dev`, que se cree las cabeceras X-User-Id/X-Permissions del navegador) hay que pedirlo
   // explícitamente con `HUB_AUTH=dev`. Aquí se deja fijado para que quede a la vista.
   HUB_AUTH: 'session',
-  // Seed de dev: usuario "Demo" (PIN 0000) + dispositivo de confianza, para que el login local por
-  // PIN funcione sin enrolar online (ADR-0065). Sin esto un arranque fresco no tiene usuario con PIN
-  // y la pantalla de login no deja entrar. En prod/ECS el seed llega por HUB_SEED_SQL (terraform).
+  // Dev seed: "Demo" user (PIN 000000) + its six-digit `pin_length` (hub#1929), so the local PIN
+  // login works without enrolling online (ADR-0065). Without it a fresh boot has no PIN user and the
+  // login screen lets nobody in. The production demo gets the SaaS's copy through HUB_SEED_SQL.
   HUB_SEED_SQL_PATH: join(HUB_ROOT, 'crates', 'server', 'seeds', 'demo.sql'),
 };
 

@@ -36,6 +36,14 @@ vi.mock('../lib/runtime', async () => {
 const refreshModuleNav = vi.fn();
 vi.mock('../lib/nav', () => ({ refreshModuleNav: (...a: unknown[]) => refreshModuleNav(...a) }));
 
+// hub#1905 — the question itself is `ImportPermissionsConsent`'s (tested there); what this card
+// owes it is the signal, with the report of the import it just ran.
+const askPermissionsAfterImport = vi.fn();
+vi.mock('../lib/import-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/import-permissions')>()),
+  askPermissionsAfterImport: (...a: unknown[]) => askPermissionsAfterImport(...a),
+}));
+
 // hub#488 — human names of the apps. Empty by default, which IS the «no name known» case: the
 // sentence must then fall back to the id rather than go blank.
 const appNames = vi.hoisted(() => new Map<string, string>());
@@ -95,6 +103,7 @@ function appsItem(state: string): SetupItem {
     actions: ['template', 'catalog'],
     actionable: true,
     origin: 'user',
+    missingCapabilities: [],
   };
 }
 
@@ -149,6 +158,7 @@ beforeEach(() => {
   inspectBlueprint.mockReset().mockResolvedValue({ ok: true, upload_id: 'up-1', manifest: MANIFEST });
   importBlueprint.mockReset().mockResolvedValue({ sections: [], installed_modules: [] });
   refreshModuleNav.mockReset();
+  askPermissionsAfterImport.mockReset();
   appNames.clear();
   session.value = { permissions: ['hub.administer'] };
 });
@@ -673,5 +683,43 @@ describe('un fallo de la nube se lee (hub#1693)', () => {
     const w = await outcome(mountCard());
 
     expect(w.find('[data-testid="hero-reason"]').text()).toBe('checksum mismatch');
+  });
+});
+
+// hub#1905 — the salon of the issue pressed «Use this» on «Peluquería»: VeriFactu and Printing came
+// in with their permissions off (a template cannot grant them, hub#473) and NOBODY ASKED, so the
+// first sale went out with no fiscal record. The question lives in `ImportPermissionsConsent`
+// (tested there); what this card owes it is the report of the import it just ran.
+describe('the permissions of the apps the template brought (hub#1905)', () => {
+  const salon = {
+    sections: [],
+    installed_modules: [
+      { id: 'verifactu', version: '1.5.40', status: 'installed' },
+      { id: 'printing', version: '0.1.22', status: 'installed' },
+    ],
+  };
+
+  it('are asked about as soon as the one click finishes', async () => {
+    importBlueprint.mockResolvedValue(salon);
+    const w = mountCard();
+    await flushPromises();
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
+
+    await w.get('[data-testid="hero-use"]').trigger('click');
+    await flushPromises();
+
+    expect(askPermissionsAfterImport).toHaveBeenCalledTimes(1);
+    expect(askPermissionsAfterImport).toHaveBeenCalledWith(salon);
+  });
+
+  it('an interrupted import asks nothing: there is no report of what came in', async () => {
+    importBlueprint.mockRejectedValue(new Error('connection reset'));
+    const w = mountCard();
+    await flushPromises();
+
+    await w.get('[data-testid="hero-use"]').trigger('click');
+    await flushPromises();
+
+    expect(askPermissionsAfterImport).not.toHaveBeenCalled();
   });
 });

@@ -131,8 +131,9 @@ fn readable(bytes: &[u8]) -> String {
     out.trim_end().to_string()
 }
 
-/// A ticket the way `buildReceiptDocument` composes one from a sale (`receipt-document.ts`): this is
-/// the shape the whole chain now carries, and the shape the paper has to show.
+/// A ticket the way the sales module composes one from a sale (`erp-sales-document` →
+/// `printableDocument()`, which the shell also asks for the automatic ticket since hub#1921): this
+/// is the shape the whole chain now carries, and the shape the paper has to show.
 fn a_real_ticket() -> Value {
     json!({
         "business_name": "ERPlora hub#501",

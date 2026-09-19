@@ -74,8 +74,8 @@ test.beforeAll(async () => {
   test.setTimeout(120_000);
   const cloudPort = await startFixtureCloud();
 
-  // Runtime REAL (binario ya compilado por la suite), hub vacío, seed demo (PIN 0000 + device
-  // de confianza), sirviendo el dist del web en el MISMO origen (ADR-0050, sin Vite ni CORS).
+  // REAL runtime (binary already built by the suite), empty hub, demo seed (PIN 000000, six
+  // digits — hub#1929), serving the web dist on the SAME origin (ADR-0050, no Vite, no CORS).
   runtime = spawn(join(HUB_ROOT, 'target', 'debug', 'erplora-server'), [], {
     env: {
       ...process.env,
@@ -129,7 +129,7 @@ test('la pregunta de configuración viaja ANCLADA: identidad, fecha y hub.setup.
   // Sesión real por PIN (seed demo) — la misma puerta que una cajera.
   const api = await pwRequest.newContext();
   const login = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
   });
   expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
   const session = await login.json();
@@ -215,7 +215,7 @@ test('un turno que dice haber creado algo SIN ejecutar nada sale marcado (hub#10
 
   const api = await pwRequest.newContext();
   const login = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
   });
   expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
   const session = await login.json();
@@ -268,7 +268,7 @@ test('una respuesta con tabla y negrita llega PINTADA, no en crudo (hub#1043)', 
 
   const api = await pwRequest.newContext();
   const login = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
   });
   expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
   const session = await login.json();

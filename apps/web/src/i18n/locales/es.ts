@@ -161,6 +161,7 @@ export default {
     quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
     quotaResets: 'Se renuevan el {date}.',
     quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
+    quotaManagedInAccount: 'El plan del asistente se amplía desde tu cuenta de ERPlora, en erplora.com.',
     plansTitle: 'Elige un plan',
     plansConfirm: 'Ir al pago',
     planOption: '{name} — {price} €/mes',
@@ -307,6 +308,8 @@ export default {
     // permiso —, porque un bloqueo sin dueño deja al usuario sin ningún sitio al que ir.
     delegatedHint: 'Esto lo tiene que configurar un administrador.',
     inheritedHint: 'Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.',
+    missingPermissionHint: 'Esta app necesita un permiso que aún no le has dado. Sin él, no puede hacer su trabajo.',
+    grantPermission: 'Dar permiso',
     completeTitle: 'Tu negocio está listo',
     completeBody: 'No queda nada pendiente en la checklist.',
     // La tarjeta héroe de un negocio que todavía no tiene apps (hub#368). Su único trabajo es la
@@ -709,6 +712,10 @@ export default {
     ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
     ticketWaitingForPrinter:
       'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+    ticketNotComposed:
+      'El tique de la venta {saleId} no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
+    ticketWithoutFiscal:
+      'El tique de la venta {saleId} salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
     comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
     comandaWaitingForPrinter:
       'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
@@ -1189,6 +1196,10 @@ export default {
     usageRangeLabel3h: 'Últimas 3 horas',
     usageRangeLabel24h: 'Últimas 24 horas',
     usageRangeLabel3d: 'Últimos 3 días',
+    // Una métrica cerca del límite del plan o por encima (hub#1922): la frase la pone el hub.
+    usageNearLimit: 'Al {pct} % del límite de tu plan.',
+    usageOverLimit: 'Al {pct} % del límite de tu plan: el hub puede ir más lento.',
+    planPressure: 'Tu plan se está quedando corto de recursos. Con un plan mayor este hub tiene más margen.',
     databaseShared: 'Base de datos compartida',
     colTime: 'Hora',
     colLevel: 'Nivel',
@@ -1475,6 +1486,14 @@ export default {
     // ahora aborta y lo dice, para que el usuario pueda reintentar en vez de irse sin saber.
     timeout: 'El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.',
   },
+  importPermissions: {
+    title: 'Permisos de tus apps',
+    intro: 'La plantilla ha instalado estas apps y necesitan tu permiso para funcionar: una plantilla no puede dártelo por ti. Puedes cambiarlo cuando quieras en Ajustes → Permisos.',
+    grant: 'Dar permisos',
+    granting: 'Dando permisos…',
+    later: 'Ahora no',
+    grantError: 'No se han podido dar los permisos de {apps}. Vuelve a intentarlo o actívalos en Ajustes → Permisos.',
+  },
   importPage: {
     title: 'Importar configuración',
     lead: 'Carga una plantilla: instala las apps que falten, aplica sus datos y copia las imágenes.',
@@ -1550,7 +1569,7 @@ export default {
     reasonBlocked:
       'No se ha instalado: necesita apps que aún no tienes contratadas: {missing}. Contrátalas y vuelve a cargarla — no se ha tocado nada más.',
     mediaFailed: '{n} sin copiar',
-    reasonVersionSubstituted: 'La plantilla pedía la {requested}; esa versión ya no está disponible, así que ha entrado la {installed}.',
+    reasonVersionSubstituted: 'La plantilla traía la {requested}; ha entrado la más reciente compatible, la {installed}.',
     reasonIdentityNotPortable:
       'Los usuarios, roles y PIN son del negocio que los creó. Cuentas descartadas: {n}. Nadie ha obtenido acceso al tuyo.',
     reasonSettingsNotPortable:
@@ -1671,6 +1690,21 @@ export default {
     // la app es lo importante: es la frase que convierte «no funciona» en un paso siguiente.
     unavailable:
       'Desde el navegador, este dispositivo no puede llegar a las impresoras. Instala la app de ERPlora en el dispositivo conectado a la impresora y abre tu negocio desde ahí.',
+    // hub#1773 — traducción de `localNetwork` de `en.ts` (el inglés es la fuente, ADR-0055).
+    localNetwork: {
+      primerHeader: 'Vamos a buscar tu impresora',
+      primerMessage:
+        'Para encontrar tu impresora tenemos que mirar los aparatos de tu red. Tu dispositivo te lo preguntará a continuación.',
+      primerLater: 'Ahora no',
+      primerAllow: 'Buscar mi impresora',
+      blockedTitle: 'La búsqueda de impresoras está bloqueada',
+      blockedDetail:
+        'Este dispositivo no tiene permiso para llegar a las impresoras de tu red, así que la búsqueda vuelve vacía por muchas impresoras que haya encendidas.',
+      blockedAction: 'Permitir la búsqueda',
+      blockedInSettings:
+        'Tu dispositivo no ha vuelto a preguntar. Abre sus ajustes, busca ERPlora y concédele el acceso a la red local.',
+      turnedOn: 'Listo: este dispositivo ya puede buscar impresoras en tu red.',
+    },
   },
   // Lo que dice el CORE cuando rechaza UN campo (hub#1190, ADR-0398 §6). Traducción de
   // `invalidField` de `en.ts` — el inglés es la fuente (ADR-0055).
