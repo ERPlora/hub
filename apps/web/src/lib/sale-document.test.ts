@@ -224,6 +224,30 @@ describe('the automatic ticket waits for the fiscal number and QR, like the till
     expect(ticket.complete).toBe(false);
   });
 
+  it('a paper that already carries the QR is complete, whatever the wait said', async () => {
+    // The viewer's ceiling can fire while its last lookup is landing: the paper then has the QR and
+    // warning the till that it lacks it would be false (review of hub#1867).
+    const tag = nextTag();
+    class LateQrViewer extends HTMLElement {
+      saleId?: string;
+
+      issuing = false;
+
+      issued(): Promise<boolean> {
+        return Promise.resolve(false);
+      }
+
+      printableDocument(): Record<string, unknown> {
+        return { receipt_id: 'TICKET-2026-000009', qr_data: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?x', total: 9.5 };
+      }
+    }
+    customElements.define(tag, LateQrViewer);
+
+    const ticket = await saleTicketDocument('42', { tag, loadViewer: async () => {} });
+
+    expect(ticket.complete).toBe(true);
+  });
+
   it('a viewer that never says it is issued does not hold the paper past the deadline', async () => {
     const tag = nextTag();
     defineIssuingViewer(tag, { neverIssues: true });

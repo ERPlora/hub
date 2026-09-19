@@ -106,7 +106,9 @@ export async function saleTicketDocument(
     const complete = typeof viewer.issued === 'function' ? await issuedBefore(viewer.issued(), deadline) : true;
     for (;;) {
       const doc = viewer.printableDocument();
-      if (doc) return { document: doc, complete };
+      // The viewer's ceiling can fire while its last lookup lands: a paper that does carry the
+      // VeriFactu QR (`qr_data`, the renderer's key) is complete whatever the wait said.
+      if (doc) return { document: doc, complete: complete || Boolean(doc.qr_data) };
       if (Date.now() >= deadline) throw new Error(SALE_DOCUMENT_TIMEOUT);
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }

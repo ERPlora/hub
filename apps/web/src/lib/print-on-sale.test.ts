@@ -330,4 +330,23 @@ describe('a receipt that went out before its VeriFactu QR (hub#1867)', () => {
     expect(onFailure).toHaveBeenCalledTimes(1);
     expect(onPrintedWithoutFiscal, 'one warning, the one that matters').not.toHaveBeenCalled();
   });
+
+  it('queued with nobody to print it, the till hears only that it is waiting for a printer', async () => {
+    // Nothing came out yet: «it came out without the QR» would be false, and a second toast on top
+    // of «set up a printer» buries the one thing the cashier has to do.
+    const onFailure = vi.fn();
+    const onPrintedWithoutFiscal = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, {
+      print: fakeGate({ via: 'queue', role: 'receipt', awaitingHost: true }).print,
+      onFailure,
+      onPrintedWithoutFiscal,
+      saleDocument: paperSource(false),
+    });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ awaitingHost: true });
+    expect(onPrintedWithoutFiscal).not.toHaveBeenCalled();
+  });
 });
