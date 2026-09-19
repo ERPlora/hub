@@ -63,13 +63,14 @@ export async function saleTicketDocument(
   { loadViewer, tag = SALE_DOCUMENT_TAG, timeoutMs = 15000, pollMs = 50 }: SaleDocumentOptions,
 ): Promise<Record<string, unknown>> {
   if (!customElements.get(tag)) await loadViewer();
-  if (!customElements.get(tag)) throw new Error(SALE_DOCUMENT_UNAVAILABLE);
 
+  // Still undefined after loading, the tag makes a bare element with no `printableDocument`: the
+  // same refusal as a viewer too old to print.
+  const viewer = document.createElement(tag) as SaleDocumentViewer;
+  if (typeof viewer.printableDocument !== 'function') throw new Error(SALE_DOCUMENT_UNAVAILABLE);
   const host = document.createElement('div');
   host.hidden = true;
   host.setAttribute('aria-hidden', 'true');
-  const viewer = document.createElement(tag) as SaleDocumentViewer;
-  if (typeof viewer.printableDocument !== 'function') throw new Error(SALE_DOCUMENT_UNAVAILABLE);
   viewer.saleId = saleId;
   host.appendChild(viewer);
   document.body.appendChild(host);
