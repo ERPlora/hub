@@ -964,6 +964,11 @@ fn deferred_event(ctx: &Ctx, record_id: &str, event_id: &str, wait: Wait) -> Ope
 /// asks before it overtakes anybody. «Now» is exactly what the drain collects
 /// ([`DUE_NEVER_QUEUED`] ∪ [`DUE_FROM_QUEUE`]): a record sitting out its backoff does not hold
 /// today's sales back, because holding them would not keep it first anyway.
+///
+/// Only records that have not reached the AEAT count: a stale queue entry of an accepted record
+/// (the drain resolves it on its next pass) is nobody to wait for. That filter is also what keeps
+/// the question cheap at the till — it rides `ix_verifactu_record_hub_status` over the handful of
+/// records on their way, instead of walking the whole chain on every sale.
 async fn earlier_record_due(
     host: &dyn NativeHost,
     ctx: &Ctx,
@@ -978,6 +983,7 @@ async fn earlier_record_due(
                  LEFT JOIN verifactu_contingencyqueue q ON q.record_id = r.id AND q.is_deleted = 0 \
                  WHERE r.hub_id = :hub_id AND r.issuer_nif = :issuer_nif \
                  AND r.environment = :environment AND r.is_deleted = 0 \
+                 AND r.status IN ('pending', 'error', 'retry') \
                  AND r.sequence_number < :sequence_number \
                  AND (({DUE_NEVER_QUEUED}) OR ({DUE_FROM_QUEUE})) LIMIT 1"
             ),

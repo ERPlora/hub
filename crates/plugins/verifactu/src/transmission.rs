@@ -4299,6 +4299,24 @@ mod late_remission_verifactu111 {
         assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
     }
 
+    /// Only a record that has not reached the AEAT can be ahead of a sale. A stale queue entry of a
+    /// record the AEAT already took (the drain resolves it on its next pass) must not park today's
+    /// sale behind it.
+    #[tokio::test]
+    async fn a_stale_queue_entry_of_an_accepted_record_does_not_hold_back_a_sale() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000007").await else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.verdict(1, "accepted").await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+
+        hub.open_the_road();
+        hub.sell(2).await;
+
+        assert_eq!(hub.sent().await, vec![(2, false)]);
+    }
+
     /// The order only holds back a sale for records that are going out NOW. A record sitting out
     /// its backoff does not go early, and does not keep today's sales from leaving on time.
     #[tokio::test]
