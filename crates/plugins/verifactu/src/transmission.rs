@@ -1155,7 +1155,7 @@ pub(crate) async fn process_contingency_queue(
         // sitio donde engancha el reintento tras restaurar un backup (hub#287).
         let recovery_id = ctx.new_ids[id_idx + 2].clone();
         id_idx += 3;
-        let (ops, events, success) = transmit_one(
+        let attempt = transmit_one(
             host,
             &ctx,
             &rec,
@@ -1166,7 +1166,28 @@ pub(crate) async fn process_contingency_queue(
             // ESTE es el envío que declara `Incidencia=S`: sale de la cola de contingencia.
             Remission::FromContingency,
         )
-        .await?;
+        .await;
+        // An error of ONE record never leaves this pass (verifactu#111): propagating it threw away
+        // the verdicts of the records already sent in the same pass — at the AEAT and still
+        // `pending` here, so the next pass filed them again (3000 «duplicado»). Such an error only
+        // comes from before the wire (the road or the archive broke), so the record is queued with
+        // its reason, exactly as `create_record` does (hub#1934), and sits out its backoff instead
+        // of holding the head of its chain on every pass.
+        let (ops, events, success) = match attempt {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                refuse_transmission(
+                    host,
+                    &ctx,
+                    &rec,
+                    &event_id,
+                    &queue_id,
+                    &config,
+                    &Refusal::road_unavailable(error.to_string()),
+                )
+                .await?
+            }
+        };
         for e in events {
             out = out.with_event(e);
         }
@@ -3909,6 +3930,9 @@ mod late_remission_verifactu111 {
         cell: Mutex<String>,
         /// The mTLS name the control plane signs the token for: the hub's own.
         common_name: Mutex<String>,
+        /// How many envelopes the archive still takes before its backend stops answering.
+        /// `usize::MAX` by default: it never breaks.
+        archive_takes: std::sync::atomic::AtomicUsize,
     }
 
     /// The real engine, with only the network swapped: the dispatcher still runs the command,
@@ -3960,6 +3984,13 @@ mod late_remission_verifactu111 {
             _bytes: &[u8],
             _content_type: &str,
         ) -> Result<String> {
+            let left = self.road.archive_takes.load(Ordering::SeqCst);
+            if left == 0 {
+                return Err(erplora_runtime::RuntimeError::Native(
+                    "archive backend down".into(),
+                ));
+            }
+            self.road.archive_takes.store(left - 1, Ordering::SeqCst);
             Ok(format!("modules/verifactu/{relative_path}"))
         }
         async fn machine_identity(
@@ -4013,6 +4044,7 @@ mod late_remission_verifactu111 {
             }
             let (url, cell) = spawn_fake_cell().await;
             let road = Arc::new(Road::default());
+            road.archive_takes.store(usize::MAX, Ordering::SeqCst);
             *road.cell.lock().unwrap() = url;
             *road.common_name.lock().unwrap() = format!("hub-{hub_id}.fiscal.erplora.internal");
             let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
@@ -4367,5 +4399,51 @@ mod late_remission_verifactu111 {
 
         assert_eq!(hub.sent().await, vec![(1, true)]);
         assert_eq!(hub.chain().await, accepted(&[1]));
+    }
+
+    /// 🔴 A drain that breaks half way must keep what the AEAT already answered. The pass used to
+    /// propagate the error of ONE record with `?`, and the verdicts of the records sent before it
+    /// in the same pass went with it: record 1 was at the AEAT and still `pending` here, so the
+    /// next pass filed it again — the AEAT's 3000 «duplicado», which lands as `rejected` over a
+    /// record that is accepted. The record that could not leave is queued with its reason, like a
+    /// sale whose road broke (hub#1934), and it no longer holds the head of the chain for ever.
+    #[tokio::test]
+    async fn a_drain_that_breaks_half_way_keeps_the_verdicts_it_already_has() {
+        let Some(hub) = Bench::new("01110000-0000-4000-8000-000000000008").await else {
+            return;
+        };
+        for n in 1..=3 {
+            hub.sell(n).await;
+        }
+        hub.open_the_road();
+        // The archive takes ONE more envelope and then stops answering.
+        hub.road.archive_takes.store(1, Ordering::SeqCst);
+
+        hub.drain().await;
+
+        assert_eq!(hub.sent().await, vec![(1, true)]);
+        assert_eq!(
+            hub.chain().await,
+            vec![
+                (1, "accepted".to_owned()),
+                (2, "pending".to_owned()),
+                (3, "pending".to_owned())
+            ],
+            "the verdict of record 1 survives the failure of record 2"
+        );
+        let queued = hub
+            .rows(
+                "SELECT record_id FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND is_deleted = 0",
+            )
+            .await;
+        assert_eq!(queued.len(), 2, "2 and 3 wait in the queue with their reason: {queued:?}");
+
+        hub.road.archive_takes.store(usize::MAX, Ordering::SeqCst);
+        hub.drain().await;
+        assert!(
+            !hub.sent().await[1..].contains(&(1, true)),
+            "record 1 is at the AEAT and is never filed twice"
+        );
     }
 }
