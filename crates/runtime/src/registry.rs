@@ -1313,6 +1313,14 @@ pub struct RequestContext {
     /// able to stamp it would hand a TPV the very requirement the ADR exists to enforce. Empty
     /// means UNRESOLVED, and every gate that reads it fails CLOSED (production's answer).
     fiscal_environment: String,
+    /// **What stops this hub from getting a record to the tax authority** (hub#1935) — the stable
+    /// code of [`crate::fiscal_profile::filing_gap`], or `""` when nothing does. Stamped by the
+    /// dispatcher next to [`Self::fiscal_environment`], from the core's own tables.
+    ///
+    /// Private with a `pub(crate)` setter for the same reason: a context built from what a caller
+    /// sent must not be able to say «my road is fine» to the gate that refuses a sale nobody could
+    /// file.
+    fiscal_filing_gap: String,
     /// `hub_user.id` of the manager whose approval let this command past the permission gate.
     /// Filled by the dispatcher **after** spending a grant, so it is a fact about what happened,
     /// not something a caller can assert. This is the seam hub#362 writes next to the cashier's
@@ -1412,6 +1420,7 @@ impl RequestContext {
             fiscal_triggers: Vec::new(),
             fiscal_providers: Vec::new(),
             fiscal_environment: String::new(),
+            fiscal_filing_gap: String::new(),
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
@@ -1454,6 +1463,18 @@ impl RequestContext {
     /// unresolved (read as production — the conservative answer).
     pub fn fiscal_environment(&self) -> &str {
         &self.fiscal_environment
+    }
+
+    /// Stamps what stops this hub from filing (hub#1935). Only the dispatcher calls it — see
+    /// [`RequestContext::fiscal_filing_gap`].
+    pub(crate) fn with_fiscal_filing_gap(mut self, gap: Option<&str>) -> Self {
+        self.fiscal_filing_gap = gap.unwrap_or_default().to_string();
+        self
+    }
+
+    /// The stable code of what stops this hub from filing, or `""` when nothing does.
+    pub fn fiscal_filing_gap(&self) -> &str {
+        &self.fiscal_filing_gap
     }
 
     /// The event that caused this request, or `""` when a person started it directly.

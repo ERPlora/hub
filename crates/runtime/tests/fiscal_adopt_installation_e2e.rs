@@ -69,6 +69,18 @@ async fn hub_restored_elsewhere() -> Runtime {
     set_setting(&rt, "country_code", "ES").await;
     set_setting(&rt, "business_tax_id", "B12345674").await;
     set_setting(&rt, "business_legal_name", "Bar Pepe SL").await;
+    // A live hub needs a road to the AEAT to sell at all (hub#1935): the business's own
+    // certificate. What this file is about is WHOSE chain it continues, not how it files.
+    let mut own = Params::new();
+    own.insert("hub_id".into(), json!(HUB));
+    rt.db()
+        .execute(
+            "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES (:hub_id, 'own', 'v1:ciphertext', 'v1:ciphertext', '2026-08-01T09:00:00Z', 'x')",
+            &own,
+        )
+        .await
+        .unwrap();
     rt.install_from_dir(&fixture("fsale"))
         .await
         .expect("install fsale");

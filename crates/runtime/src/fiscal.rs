@@ -149,22 +149,30 @@ impl Runtime {
                 .await?
                 .filter(|profile| profile.environment == fiscal_profile::ENV_PRODUCTION);
             if let Some(profile) = production {
-                if profile.representation_status != fiscal_profile::REPRESENTATION_VIGENTE {
-                    return Err(RuntimeError::Domain {
-                        code: fiscal_profile::NO_REPRESENTATION.to_string(),
-                        message: "this hub files for real: ERPlora can only file on the \
-                                  taxpayer's behalf once their representation grant is approved"
-                            .to_string(),
-                    });
-                }
-                if !crate::gateway_identity::is_enrolled(db, &self.hub_id).await? {
-                    return Err(RuntimeError::Domain {
-                        code: certificate::GATEWAY_NOT_ENROLLED.to_string(),
-                        message: "this hub files for real and its secure connection to ERPlora \
-                                  is not signed yet: switching the certificate off would leave \
-                                  it with no way to file"
-                            .to_string(),
-                    });
+                // The road this switch would leave behind is ERPlora's, and whether a live hub can
+                // file on it is ONE rule (hub#1935) — the same one the dispatcher refuses a sale
+                // with. Two copies would be how the switch and the till end up disagreeing.
+                let enrolled = crate::gateway_identity::is_enrolled(db, &self.hub_id).await?;
+                match fiscal_profile::filing_gap(&profile, certificate::ROUTE_DELEGATED, enrolled) {
+                    Some(fiscal_profile::NO_REPRESENTATION) => {
+                        return Err(RuntimeError::Domain {
+                            code: fiscal_profile::NO_REPRESENTATION.to_string(),
+                            message: "this hub files for real: ERPlora can only file on the \
+                                      taxpayer's behalf once their representation grant is \
+                                      approved"
+                                .to_string(),
+                        });
+                    }
+                    Some(code) => {
+                        return Err(RuntimeError::Domain {
+                            code: code.to_string(),
+                            message: "this hub files for real and its secure connection to \
+                                      ERPlora is not signed yet: switching the certificate off \
+                                      would leave it with no way to file"
+                                .to_string(),
+                        });
+                    }
+                    None => {}
                 }
             }
         }

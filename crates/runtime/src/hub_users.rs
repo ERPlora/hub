@@ -1219,15 +1219,41 @@ pub async fn core_query(
         //
         // A hub with no profile yet answers the empty string on both grant fields — «never asked»
         // — and never a state it invented, the same tolerance `load` already owes early boot.
+        //
+        // `filing_blocked` (hub#1935) is what the TPV reads BEFORE charging: the stable code of what
+        // stops this hub from getting a record to the tax authority, or `""`. It is the SAME
+        // `fiscal_profile::filing_gap` the dispatcher refuses the sale with, so the notice on the
+        // till and the refusal at the counter cannot disagree. `filing_fix_route` is where it is
+        // fixed — the setup route the regime's provider declares — so `sales` sends the owner there
+        // without ever naming the fiscal module.
         "fiscal.transmission" => {
             let profile = crate::fiscal_profile::load(db, hub_id).await?;
             let grant = |pick: fn(&crate::fiscal_profile::FiscalProfile) -> &str| {
                 profile.as_ref().map(pick).unwrap_or_default().to_string()
             };
+            let route = crate::certificate::transmission_route(db, hub_id).await?;
+            let filing_blocked = match &profile {
+                Some(p) => crate::fiscal_profile::filing_gap(
+                    p,
+                    route,
+                    crate::gateway_identity::is_enrolled(db, hub_id).await?,
+                ),
+                None => None,
+            };
+            let filing_fix_route = profile
+                .as_ref()
+                .and_then(|p| {
+                    crate::fiscal_profile::providers_of(registry, &p.country_code, &p.fiscal_system)
+                        .into_iter()
+                        .find_map(|m| m.setup.as_ref().map(|s| s.route.clone()))
+                })
+                .unwrap_or_default();
             Ok(whole(vec![json!({
-                "transmission_route": crate::certificate::transmission_route(db, hub_id).await?,
+                "transmission_route": route,
                 "representation_status": grant(|p| &p.representation_status),
                 "representation_at": grant(|p| &p.representation_at),
+                "filing_blocked": filing_blocked.unwrap_or_default(),
+                "filing_fix_route": filing_fix_route,
             })]))
         }
         // The PIN approval record (hub#362 writes, hub#512 reads, hub#884 pages). Double
