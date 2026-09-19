@@ -3057,6 +3057,37 @@ mod environment_chain_tests {
         assert!(!sent.contains("RemisionVoluntaria"), "{sent}");
     }
 
+    /// The order that holds a sale back is its OWN chain's (verifactu#111): a practice record still
+    /// waiting in `testing`, or a record of another issuer, must not park a production sale — they
+    /// are other chains (guard R4), filed with another agency or on another taxpayer's behalf.
+    #[tokio::test]
+    async fn a_waiting_record_of_another_chain_does_not_hold_back_a_sale() {
+        let mut other_issuer = chain_row("rec-9", 1, "production", HASH_PRODUCTION_1, "");
+        other_issuer["issuer_nif"] = json!("B99999999");
+        other_issuer["status"] = json!("pending");
+        let mut host = ChainHost::new(
+            config_row("production"),
+            vec![queued_testing_record(), other_issuer],
+        );
+        host.has_core_certificate = true;
+        let mut sale = create_input();
+        sale["payload"]["description"] = json!("Ticket");
+
+        let out = create_record(&sale, &host).await.unwrap();
+
+        assert!(
+            !host.archived.lock().unwrap().is_empty(),
+            "the sale goes for the wire at once"
+        );
+        assert!(
+            !out.operations.iter().any(|o| o
+                .params
+                .get("event_type")
+                .is_some_and(|t| t == "transmission_deferred")),
+            "nothing of its own chain is waiting"
+        );
+    }
+
     /// **The flag is the ENVELOPE's, and the record knows nothing about it** (the caveat of #322).
     ///
     /// The same invoice remitted punctually and remitted out of the queue is the SAME record —
