@@ -376,6 +376,45 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     expect(stepsTowardsMoney(relative, source)).toEqual([]);
   });
 
+  // hub#1922 — a way out neither rule above can see, because it is not written in this app: the
+  // `upgrade` property of `ok-resource-usage` is painted by the component as an `<a href>` of its
+  // own, in the hub's window, to whatever address it is handed. System → Resources handed it the
+  // SaaS's relative `/pricing/`: «this page does not exist» everywhere, and an invitation to pay on
+  // the Play copy. The plan door is `upgradePlanUrl` through `openExternal`, behind its gate — so
+  // no shipped source binds that property at all.
+  function handsAComponentItsOwnLink(relative: string, text: string): string[] {
+    const source = withoutComments(text);
+    const offences: string[] = [];
+    for (const tag of source.matchAll(/<ok-resource-usage\b[^>]*>/g)) {
+      if (/(?:^|\s)(?::|v-bind:)?upgrade(?:\.prop)?=/.test(tag[0])) {
+        const line = source.slice(0, tag.index).split('\n').length;
+        offences.push(`${relative}:${line} → hands ok-resource-usage an upgrade link it paints in the hub's own window`);
+      }
+    }
+    return offences;
+  }
+
+  it('no shipped source hands ok-resource-usage an upgrade link to paint (hub#1922)', () => {
+    const offenders = sourceFiles(SRC).flatMap((path) =>
+      handsAComponentItsOwnLink(path.slice(SRC.length), readFileSync(path, 'utf8')),
+    );
+
+    expect(offenders.join('\n')).toBe('');
+  });
+
+  it.each([
+    ['the SaaS hint as a property', '<ok-resource-usage\n  label="CPU"\n  :upgrade.prop="upgradeHint"\n></ok-resource-usage>'],
+    ['a plain binding', '<ok-resource-usage :metric.prop="m" :upgrade="hint"></ok-resource-usage>'],
+    ['a long-hand binding', '<ok-resource-usage v-bind:upgrade.prop="hint"></ok-resource-usage>'],
+  ])('catches %s', (_name, source) => {
+    expect(handsAComponentItsOwnLink('views/X.vue', source)).not.toEqual([]);
+  });
+
+  it('lets through a panel with no link of its own', () => {
+    const panel = '<ok-resource-usage label="CPU" :metric.prop="cpuPanel" :thresholds.prop="t"></ok-resource-usage>';
+    expect(handsAComponentItsOwnLink('views/X.vue', panel)).toEqual([]);
+  });
+
   it('keeps the doors that cannot take money — the update channel above all', () => {
     // hub#400: the installed app learns about a new version through `/app/download/<platform>/`,
     // a 302 in the Cloud that becomes the STORE listing once the app is published. Sweeping the
