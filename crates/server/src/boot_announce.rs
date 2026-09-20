@@ -89,15 +89,21 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
         .await
     {
-        Ok(_) => {
-            // Los eventos de actividad que llevaba este latido ya están en el Cloud (saas#2129).
-            // El latido de arranque los confirma igual que el tick: es el PRIMERO que sale tras
-            // un reinicio, así que es justo el que entrega lo que el proceso anterior dejó.
-            {
-                let runtime = state.runtime.read().await;
-                daily_usage::confirm_activity(runtime.db(), runtime.hub_id(), &usage.activity)
-                    .await;
-            }
+        Ok(ref answer) => {
+            // The boot beat settles activity exactly like the tick, and it matters more here: it
+            // is the FIRST beat after a restart, so it is the one that delivers whatever the
+            // previous process left behind (saas#2129). It drains in this same pass, too — a hub
+            // that has been down for days comes back with a backlog, and the next chance is
+            // 24 hours away.
+            daily_usage::settle_activity(
+                &state.runtime,
+                &state.http,
+                &state.config.cloud_base_url,
+                &auth,
+                &usage.activity,
+                answer.activity_ack,
+            )
+            .await;
             tracing::info!("arranque: avisado al Cloud de que este hub ya atiende")
         }
         // Best-effort literal: el sondeo del SaaS es exactamente el respaldo de este caso.
@@ -134,12 +140,16 @@ pub fn announce_route_change(state: &AppState) {
         match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
             .await
         {
-            Ok(_) => {
-                {
-                    let runtime = state.runtime.read().await;
-                    daily_usage::confirm_activity(runtime.db(), runtime.hub_id(), &usage.activity)
-                        .await;
-                }
+            Ok(ref answer) => {
+                daily_usage::settle_activity(
+                    &state.runtime,
+                    &state.http,
+                    &state.config.cloud_base_url,
+                    &auth,
+                    &usage.activity,
+                    answer.activity_ack,
+                )
+                .await;
                 tracing::info!(
                     route = ?usage.transmission_route,
                     "fiscal route changed: the SaaS has been told"

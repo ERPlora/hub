@@ -327,3 +327,28 @@ async fn logging_out_a_token_nobody_holds_records_nothing() {
         .unwrap()
         .is_empty());
 }
+
+/// A login is recorded only once the session EXISTS (review of saas#2129).
+///
+/// Recorded before the insert, a failed insert left behind a login that never happened — and the
+/// Cloud would count that hub as used by somebody who never got in. The failure is injected the
+/// only honest way: take the table away and watch `create_session` fail for real.
+#[tokio::test]
+async fn a_login_whose_session_could_not_be_opened_is_not_recorded() {
+    let rt = runtime(HUB).await;
+    rt.db()
+        .execute("DROP TABLE hub_session", &Params::new())
+        .await
+        .expect("la tabla existía");
+
+    let opened = rt.create_session("pin-42", 3600, Some("till-1")).await;
+
+    assert!(opened.is_err(), "sin tabla no hay sesión que abrir");
+    assert!(
+        activity_log::pending(rt.db(), HUB, 10)
+            .await
+            .unwrap()
+            .is_empty(),
+        "un login que no llegó a ocurrir no se registra"
+    );
+}

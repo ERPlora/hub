@@ -311,6 +311,18 @@ pub struct HeartbeatResponse {
     /// `None` again means «nothing was announced», and it is NOT a set of defaults: there are
     /// none for a legal declaration. The engine refuses to build an envelope it cannot fill.
     pub producer: Option<ProducerFacts>,
+    /// **The Cloud has the events; the hub may drop them** (review of saas#2129).
+    ///
+    /// A bare `200` cannot carry this. It is also the answer of a Cloud whose ingest blew up —
+    /// the view swallows that on purpose, because activity may never fail a beat — and of a Cloud
+    /// that predates the field entirely (deploy order, or a PRE running behind). Deleting on
+    /// either would throw the events away believing they were stored, and they cannot be
+    /// reconstructed afterwards.
+    ///
+    /// `false` is therefore the safe default in every direction: no key, an unreadable body, an
+    /// older SaaS. The events simply stay for the next beat, and the Cloud deduplicates the
+    /// re-send by the id the hub minted.
+    pub activity_ack: bool,
     /// Which declaración responsable on the public archive covers the release this hub is
     /// running (hub#1449, ERPlora/saas#1724 — art. 13.3 RRSIF), when the control plane could
     /// compute one.
@@ -343,7 +355,12 @@ impl HeartbeatResponse {
         // whatever this hub already had.
         Self {
             producer: body.get("producer").and_then(ProducerFacts::parse),
-            declaration: body.get("declaration").and_then(DeclarationReference::parse),
+            declaration: body
+                .get("declaration")
+                .and_then(DeclarationReference::parse),
+            // Strictly `true`: anything else — absent, null, `"true"`, a number — is "I cannot
+            // tell", and "I cannot tell" must never delete.
+            activity_ack: body.get("activity_ack") == Some(&Value::Bool(true)),
         }
     }
 }
@@ -419,13 +436,14 @@ pub async fn collect_daily_usage(
         // un atómico y la respalda en `_hub_activity` (hub#670). La rellena el llamador (`serve`)
         // y solo si hay algo nuevo que reportar.
         last_user_activity_at: None,
-        // Los EVENTOS de actividad (saas#2129) sí se leen aquí, como `terminals` o `active_users`:
-        // es una consulta barata a la misma BD y los DOS latidos —el de arranque y el tick— la
-        // necesitan igual. Leer NO consume: solo un 2xx confirma, y el que confirma es el llamador
-        // (`confirm_activity`), porque es el único que sabe si el latido llegó.
+        // The activity EVENTS (saas#2129) ARE read here, like `terminals` and `active_users`: a
+        // cheap query to the same database that BOTH beats — the boot one and the tick — need
+        // alike. Reading does NOT consume: only `activity_ack` confirms, and the caller is the
+        // one who confirms (`settle_activity`), because it is the only one that knows whether the
+        // Cloud actually stored them.
         //
-        // `Err` viaja como lista vacía: un buffer ilegible es «no pude contar», nunca un hub sin
-        // actividad — y desde luego nunca un latido fallido.
+        // `Err` travels as an empty list: an unreadable buffer is "I could not count", never a
+        // hub with no activity — and certainly never a failed beat.
         activity: pending_activity(db, hub_id).await,
         // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
         // único sitio honesto para leerla es aquí.
@@ -480,23 +498,153 @@ async fn pending_activity(db: &dyn DatabaseAdapter, hub_id: &str) -> Vec<Activit
     .collect()
 }
 
-/// Drops the events the Cloud acknowledged. **Only ever called after a 2xx.**
+/// How many extra beats one tick may spend emptying the buffer.
 ///
-/// The exact shape of `ActivityState::mark_reported`: confirming a beat that failed would lose
-/// work that cannot be reconstructed, and re-sending one that succeeded costs nothing because the
-/// Cloud deduplicates on the id the hub minted.
-pub async fn confirm_activity(db: &dyn DatabaseAdapter, hub_id: &str, sent: &[ActivityEvent]) {
-    if sent.is_empty() {
-        return;
+/// **The tick is DAILY, not per minute.** It shares `HUB_ENTITLEMENT_REVALIDATE_SECS`, whose
+/// default is 86 400 and which no deployment overrides. One bite per tick therefore drains ~500
+/// events A DAY, and a busy till produces more than that: the buffer climbs to its ceiling and
+/// from then on the trim discards the OLDEST every day, for ever, with an `eprintln!` as the only
+/// trace — precisely the loss saas#2129 exists to prevent, since this data cannot be rebuilt.
+///
+/// Ten rounds is the buffer's own ceiling (`MAX_BUFFERED_EVENTS / MAX_EVENTS_PER_BEAT`), so a hub
+/// that is merely behind catches up inside one tick. The cap stops an enormous backlog turning a
+/// tick into a storm of beats; whatever does not fit waits for the next one, which is a delay
+/// rather than a loss.
+pub const MAX_DRAIN_ROUNDS: usize = 10;
+
+/// What one tick managed to settle. Returned for logging and for the tests; nobody renders it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ActivitySettlement {
+    /// Events the Cloud acknowledged and the hub dropped.
+    pub confirmed: usize,
+    /// Beats that carried activity, the original one included.
+    pub rounds: usize,
+}
+
+/// Drops what the Cloud acknowledged and **keeps draining in the SAME tick while the bite comes
+/// full** (review of saas#2129).
+///
+/// Two rules, both about not losing what cannot be recovered:
+///
+/// - **Only `activity_ack` deletes**, never a bare 2xx — see [`HeartbeatResponse::activity_ack`].
+/// - **A full bite means there is more behind it.** With a daily tick, stopping here would leave
+///   the surplus to the trim, which drops the oldest. A short bite means the buffer is empty and
+///   nothing further is asked: otherwise every hub in the fleet would send one pointless beat a
+///   day.
+///
+/// The drain beats carry the events and **nothing of the business**: they are the rest of the
+/// batch, not a second heartbeat. Repeating `orders_today` would rewrite the day's count with the
+/// same number once per round.
+///
+/// The runtime lock is taken per database operation and released before each network call: a tick
+/// holding it across ten round trips would block every writer in the hub for as long as the Cloud
+/// takes to answer.
+pub async fn settle_activity(
+    runtime: &crate::state::SharedRuntime,
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &cloud_client::Auth,
+    sent: &[ActivityEvent],
+    acked: bool,
+) -> ActivitySettlement {
+    if sent.is_empty() || !acked {
+        return ActivitySettlement::default();
     }
+
+    let hub_id = {
+        let rt = runtime.read().await;
+        rt.hub_id().to_string()
+    };
+
+    if !confirm_batch(runtime, &hub_id, sent).await {
+        return ActivitySettlement::default();
+    }
+    let mut settled = ActivitySettlement {
+        confirmed: sent.len(),
+        rounds: 1,
+    };
+
+    let mut bite = sent.len();
+    while bite == erplora_runtime::activity_log::MAX_EVENTS_PER_BEAT
+        && settled.rounds < MAX_DRAIN_ROUNDS
+    {
+        // No `trim` here: the ceiling is checked once per tick, in `pending_activity`. Trimming
+        // per round would discard from the old end of a buffer we are in the middle of emptying.
+        let next: Vec<ActivityEvent> = {
+            let rt = runtime.read().await;
+            erplora_runtime::activity_log::pending(
+                rt.db(),
+                &hub_id,
+                erplora_runtime::activity_log::MAX_EVENTS_PER_BEAT,
+            )
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(ActivityEvent::from)
+            .collect()
+        };
+        if next.is_empty() {
+            break;
+        }
+
+        let body = activity_only(next.clone());
+        match send_heartbeat(http, cloud_base_url, auth, &body).await {
+            Ok(answer) if answer.activity_ack => {
+                if !confirm_batch(runtime, &hub_id, &next).await {
+                    break;
+                }
+                settled.confirmed += next.len();
+                settled.rounds += 1;
+                bite = next.len();
+            }
+            // A drain beat that failed, or that came back without the acknowledgement, leaves
+            // everything where it was. The next tick tries again; nothing is lost.
+            _ => break,
+        }
+    }
+
+    settled
+}
+
+/// A beat that is the rest of a batch: the events and the version, nothing else.
+fn activity_only(activity: Vec<ActivityEvent>) -> DailyUsageHeartbeat {
+    DailyUsageHeartbeat {
+        orders_today: None,
+        last_sale_at: None,
+        terminals: None,
+        active_users: None,
+        last_user_activity_at: None,
+        activity,
+        // Required, and honest: it is the binary that is running. Every other field is absent,
+        // which the receiver already reads as "not reported" and therefore writes nowhere.
+        core_version: crate::version::HUB_VERSION.to_string(),
+        pending: PendingObligationFields::default(),
+        cpu_pct: None,
+        memory_used_mb: None,
+        memory_limit_mb: None,
+        memory_peak_mb: None,
+        transmission_route: None,
+    }
+}
+
+/// `true` if the rows really went. A failure to delete is not fatal — the next beat re-sends and
+/// the Cloud deduplicates — but it does stop the drain: carrying on would re-read the same bite.
+async fn confirm_batch(
+    runtime: &crate::state::SharedRuntime,
+    hub_id: &str,
+    sent: &[ActivityEvent],
+) -> bool {
     let ids: Vec<String> = sent.iter().map(|event| event.id.clone()).collect();
-    if let Err(error) = erplora_runtime::activity_log::confirm(db, hub_id, &ids).await {
-        // Not fatal and not silent: the events stay, the next beat re-sends them and the Cloud
-        // drops the duplicates. A buffer that never drains is what the trim above is for.
-        eprintln!(
-            "[activity-log] hub={hub_id} could not confirm {} events: {error}",
-            ids.len()
-        );
+    let rt = runtime.read().await;
+    match erplora_runtime::activity_log::confirm(rt.db(), hub_id, &ids).await {
+        Ok(_) => true,
+        Err(error) => {
+            eprintln!(
+                "[activity-log] hub={hub_id} could not confirm {} events: {error}",
+                ids.len()
+            );
+            false
+        }
     }
 }
 

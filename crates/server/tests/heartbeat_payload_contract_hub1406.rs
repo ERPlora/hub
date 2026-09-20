@@ -175,20 +175,22 @@ fn hub1814_an_empty_census_is_an_honest_zero() {
     hb.active_users = Some(0);
 
     assert!(
-        serde_json::to_string(&hb).unwrap().contains(r#""active_users":0"#),
+        serde_json::to_string(&hb)
+            .unwrap()
+            .contains(r#""active_users":0"#),
         "an explicit zero is «I counted and nobody is here», and it has to travel"
     );
 }
 
-// ── saas#2129 — los eventos de negocio ───────────────────────────────────────────────────────
+// ── saas#2129 — the business activity events ─────────────────────────────────────────────────
 
-/// **Cuatro claves y ninguna más**, bajo los nombres exactos que lee el SaaS.
+/// **Four keys and no more**, under the exact names the SaaS reads.
 ///
-/// Es el contrato entre los dos repos y la guarda de privacidad a la vez: el receptor lee `id`,
-/// `type`, `at` y `actor`, y un quinto campo añadido aquí o bien lo ignoraría —y el dato se
-/// perdería en silencio— o bien metería algo del **CLIENTE FINAL** en el plano de control. Que el
-/// conjunto de claves sea un aserto es lo que convierte eso en un test rojo en vez de en un
-/// hallazgo. Ojo con `type` y `at`: los campos de Rust se llaman `kind` y `occurred_at`.
+/// This is the contract between the two repos and the privacy guard at once: the receiver reads
+/// `id`, `type`, `at` and `actor`, and a fifth field added here would either be ignored there —
+/// losing the data silently — or carry something about the **END CUSTOMER** into the control
+/// plane. Asserting the exact key set is what turns that into a red test instead of a discovery.
+/// Mind `type` and `at`: the Rust fields are called `kind` and `occurred_at`.
 #[test]
 fn saas2129_an_event_travels_with_exactly_the_four_keys_the_saas_reads() {
     let event = ActivityEvent {
@@ -209,23 +211,22 @@ fn saas2129_an_event_travels_with_exactly_the_four_keys_the_saas_reads() {
     assert_eq!(keys, ["actor", "at", "id", "type"], "{wire}");
 }
 
-/// **Sin nada que reportar, el campo NO viaja** — ni siquiera como `[]`.
+/// **With nothing to report the field does NOT travel** — not even as `[]`.
 ///
-/// Distinto a propósito del contrato de `active_users` y `verifactu_pending_depth`, donde un `0`
-/// explícito y una ausencia significan cosas opuestas. Aquí no hay tal distinción: una cola vacía
-/// y una cola que no se pudo leer acaban las dos en «este latido no entrega eventos», y en las dos
-/// el receptor no escribe nada — los eventos siguen en el búfer del hub y el latido siguiente los
-/// reintenta, así que no se pierde nada por callar. Como esto viaja en el latido y la mayoría de
-/// los latidos de la mayoría de los hubs son de un hub parado, mandar `"activity":[]` sería ruido
-/// en casi todos ellos.
+/// Deliberately unlike the contract of `active_users` and `verifactu_pending_depth`, where an
+/// explicit `0` and an absence mean opposite things. Here there is no such distinction: an empty
+/// queue and a queue that could not be read both end in "this beat delivers no events", and in
+/// both the receiver writes nothing — the events stay in the hub's buffer and the next beat
+/// retries, so nothing is lost by staying quiet. And since this rides the beat, and most beats
+/// from most hubs come from an idle hub, sending `"activity":[]` would be noise on nearly all.
 #[test]
 fn saas2129_nothing_to_report_means_the_field_is_absent_not_an_empty_array() {
     let mut hb = base();
     hb.activity = Vec::new();
 
-    // ⚠️ Por CLAVE, no por subcadena: `body.contains("activity")` también casa con
-    // `last_user_activity_at`, que viaja justo al lado, y el aserto pasaría siempre — daba igual
-    // lo que hiciera el campo. Trampa real, vista escribiendo este test.
+    // ⚠️ By KEY, not by substring: `body.contains("activity")` also matches
+    // `last_user_activity_at`, which travels right beside it, so the assertion would pass
+    // whatever the field did. A real trap, hit while writing this test.
     let wire = serde_json::to_value(&hb).unwrap();
     assert!(
         !wire.as_object().unwrap().contains_key("activity"),
@@ -233,8 +234,8 @@ fn saas2129_nothing_to_report_means_the_field_is_absent_not_an_empty_array() {
     );
 }
 
-/// Y el lote viaja ENTERO y en orden. El SaaS deduplica por `id`, así que reenviar no duplica —
-/// pero perder uno por el camino sí es irrecuperable: lo que no se recoja no se reconstruye.
+/// And a batch travels WHOLE and in order. The SaaS deduplicates by `id`, so a re-send costs
+/// nothing — but dropping one on the way is unrecoverable: what is not collected is not rebuilt.
 #[test]
 fn saas2129_a_batch_travels_whole_and_in_order() {
     let mut hb = base();
