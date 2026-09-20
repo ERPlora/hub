@@ -31,6 +31,27 @@
 //! `max_conversations`): la precedencia entre las tres claves de cuota la aplica él, que es quien
 //! conoce sus propios tiers, y aquí no se replica.
 //!
+//! ## Y el CONSUMO viaja en el mismo cuerpo (hub#1953)
+//!
+//! Un cupo, un contador. El cupo se vende —y Meta nos lo cobra— por los mensajes que el negocio
+//! **manda**, que es la cuenta que ya lleva la plataforma (`usage.billable_messages`, el mismo
+//! número que `check_quota` hace cumplir allí antes de gastar dinero, sumado sobre todas las
+//! grafías de la métrica desde saas#1963). El medidor del módulo contaba otra cosa —los mensajes
+//! que la clienta **escribe**—, así que bajo un mismo «30 al mes» había dos números que no se
+//! parecen y el dueño no tenía forma de saber cuál le iba a cortar primero. Aquí se baja el gasto
+//! junto al tope y el módulo pasa de contar a **reflejar**.
+//!
+//! ## Por qué se pregunta ANTES si el módulo lo acepta
+//!
+//! 🔴 La versión del módulo **no se mueve con la del hub**: un `whatsapp_inbox` más viejo sigue
+//! instalando en un hub nuevo (ADR-0286 §3), y el carril del marketplace no promociona solo. El
+//! `_quota.set` publicado hoy declara su schema con `additionalProperties: false`, así que mandarle
+//! [`USAGE_FIELD`] a ciegas no es «un campo que se ignora»: es un `invalid_payload` que tumba el
+//! command entero y deja de escribir **también el tope** — y un tope que no llega es, en este
+//! medidor, un canal facturando por mensaje sin límite. Por eso el campo sólo viaja cuando el
+//! command instalado lo **declara** ([`declares_usage`]), que es una pregunta al registro en
+//! memoria: ni una llamada más, ni un código de error que interpretar.
+//!
 //! ## La regla que no se negocia
 //!
 //! **Si no hay una cuota buena, no se escribe.** Ni `0`, ni un valor «por defecto». Un fallo de
@@ -60,12 +81,29 @@ pub const QUOTA_COMMAND: &str = "whatsapp_inbox._quota.set";
 /// SaaS mantiene para hubs anteriores a ella. Los dos llevan el mismo número.
 pub const PLAN_LIMIT_KEYS: [&str; 2] = ["max_billable_messages", "max_conversations"];
 
+/// El campo del payload de [`QUOTA_COMMAND`] que lleva el consumo del mes (whatsapp_inbox#155).
+///
+/// Es el nombre del contrato entre los dos repos: el módulo lo declara en
+/// `schemas/quota_set.json` y aquí se pregunta por él literalmente. Si una de las dos mitades lo
+/// escribiese distinto, el campo dejaría de viajar **en silencio** — de ahí que sea una constante
+/// y no una cadena suelta, y que [`declares_usage`] tenga su propio test.
+pub const USAGE_FIELD: &str = "monthly_usage";
+
+/// Dónde vive el consumo del mes en el cuerpo de `whatsapp/plan/`: `usage.billable_messages`.
+pub const PLAN_USAGE_KEYS: [&str; 2] = ["usage", "billable_messages"];
+
 /// Qué hizo un tick de sincronización. Explícito a propósito: un resultado que se pueda ignorar es
 /// como un límite acaba fallando en silencio.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuotaSync {
-    /// Se escribió este tope mensual en el medidor.
-    Written(i64),
+    /// Se escribió en el medidor. `monthly_usage` es el consumo que viajó con el tope: `None`
+    /// cuando la plataforma no declaró uno utilizable **o** cuando el módulo instalado todavía no
+    /// declara el campo — en los dos casos el gasto que ya midiera sigue midiendo, porque «no sé»
+    /// nunca es «cero gastado».
+    Written {
+        monthly_limit: i64,
+        monthly_usage: Option<i64>,
+    },
     /// El módulo no está instalado/activo en este hub: no hay nada que medir, y **no se pregunta**.
     ModuleNotActive,
     /// El Cloud contestó, pero no declara un tope utilizable (`tier: null`, sin las claves, o un
@@ -92,8 +130,45 @@ pub fn monthly_limit_from_plan(plan: &Value) -> Option<i64> {
         .filter(|value| *value > 0)
 }
 
+/// Resuelve el consumo del mes a partir del cuerpo de `whatsapp/plan/`. `None` = este cuerpo no
+/// declara uno utilizable, que **no** es lo mismo que decir cero.
+///
+/// 🔴 La regla es la del tope, pero el umbral es **distinto y a propósito**: aquí `0` SÍ es un
+/// dato. En el tope `0` significa «sin límite», así que no se escribe; en el consumo significa
+/// «este mes no has gastado nada» — es lo que ve el dueño el día 1, y tratarlo como «no sé» le
+/// dejaría en pantalla el gasto del mes pasado. Lo que no se escribe es la **ausencia** (un cuerpo
+/// de un SaaS anterior, o ilegible) y el **negativo**, que es un dato corrupto: los dos son «no
+/// sé», y «no sé» regalaría el mes entero.
+///
+/// No se compara con el tope: gastar por encima es legítimo (un tier `is_metered` cobra el exceso,
+/// `overage_price`), así que recortarlo aquí escondería justo la factura que el dueño necesita ver.
+pub fn monthly_usage_from_plan(plan: &Value) -> Option<i64> {
+    PLAN_USAGE_KEYS
+        .iter()
+        .try_fold(plan, |node, key| node.get(*key))
+        .and_then(Value::as_i64)
+        .filter(|value| *value >= 0)
+}
+
+/// ¿Declara el `_quota.set` **instalado** el campo del consumo?
+///
+/// `schema` es el JSON crudo del schema del command tal y como lo publicó el módulo (`None` = el
+/// command no declara ninguno, y un command que no declara contrato no ha declarado este campo).
+///
+/// Se pregunta por las `properties` y no por la versión del módulo porque la versión es una
+/// promesa y el schema es el contrato que el dispatcher va a hacer cumplir dentro de un instante:
+/// es literalmente el mismo documento contra el que [`crate::state::SharedRuntime`] validará el
+/// payload, así que las dos respuestas no pueden divergir.
+pub fn declares_usage(schema: Option<&Value>) -> bool {
+    schema
+        .and_then(|schema| schema.get("properties"))
+        .and_then(Value::as_object)
+        .is_some_and(|properties| properties.contains_key(USAGE_FIELD))
+}
+
 /// UN tick de sincronización: mira si el canal está activo, pregunta al Cloud por el plan y, si
-/// trae un tope bueno, lo escribe por la puerta interna del dispatcher.
+/// trae un tope bueno, lo escribe por la puerta interna del dispatcher — con el consumo al lado
+/// cuando la plataforma lo declara y el módulo instalado sabe recibirlo.
 pub async fn sync_once(
     runtime: &SharedRuntime,
     http: &reqwest::Client,
@@ -102,12 +177,22 @@ pub async fn sync_once(
 ) -> QuotaSync {
     // 1) ¿Está el canal instalado y activo? Mismo gate que `inbound_poll`. Va ANTES de la red a
     //    propósito: la flota que no compró el módulo no puede gastar cupo del cubo compartido.
-    let hub_id = {
+    // También se mira aquí, bajo el MISMO lock, qué declara el `_quota.set` de la versión
+    // instalada: son dos hechos del registro y tomarlos juntos evita un segundo `read()` que
+    // podría ver otro módulo (una instalación entra entre medias) y decidir sobre un schema que
+    // no es el que va a validar.
+    let (hub_id, module_takes_usage) = {
         let rt = runtime.read().await;
         if !rt.registry().is_active(MODULE_ID) {
             return QuotaSync::ModuleNotActive;
         }
-        rt.hub_id().to_string()
+        let takes_usage = declares_usage(
+            rt.registry()
+                .get_command(QUOTA_COMMAND)
+                .and_then(|command| command.schema.as_ref())
+                .map(|schema| schema.raw.as_ref()),
+        );
+        (rt.hub_id().to_string(), takes_usage)
     };
 
     // 2) Preguntar. Si no se puede, NO se escribe: ésta es la rama que impide convertir un
@@ -132,6 +217,28 @@ pub async fn sync_once(
     let mut payload = Params::new();
     payload.insert("monthly_limit".to_string(), Value::from(limit));
 
+    // El consumo, sólo si se sabe Y el módulo instalado lo declara. Una rama explícita por caso: el
+    // que no viaja deja el gasto anterior midiendo, que es lo correcto en los dos — nunca un `0`.
+    let usage = match (monthly_usage_from_plan(&plan), module_takes_usage) {
+        (Some(usage), true) => {
+            payload.insert(USAGE_FIELD.to_string(), Value::from(usage));
+            Some(usage)
+        }
+        (Some(usage), false) => {
+            // La mitad del módulo (whatsapp_inbox#155) todavía no ha llegado a este hub. No es un
+            // fallo —es la flota, y el tope sigue su curso—, pero el dueño sigue viendo dos cupos,
+            // así que queda dicho. En el log, no en el registro de errores: se repetiría cada 24 h
+            // en cada hub con el módulo anterior, y un aviso que sale siempre deja de leerse.
+            tracing::info!(
+                module = MODULE_ID,
+                monthly_usage = usage,
+                "el `_quota.set` instalado todavía no declara el consumo: se refleja sólo el tope"
+            );
+            None
+        }
+        (None, _) => None,
+    };
+
     let result = {
         let rt = runtime.read().await;
         rt.execute_command_internal(QUOTA_COMMAND, &payload, &ctx)
@@ -142,9 +249,13 @@ pub async fn sync_once(
             tracing::info!(
                 module = MODULE_ID,
                 monthly_limit = limit,
+                monthly_usage = usage,
                 "cuota del canal sincronizada"
             );
-            QuotaSync::Written(limit)
+            QuotaSync::Written {
+                monthly_limit: limit,
+                monthly_usage: usage,
+            }
         }
         Err(e) => {
             let code = erplora_runtime::error_registry::error_code_of(&e).to_string();
@@ -258,6 +369,76 @@ mod tests {
             monthly_limit_from_plan(&json!({ "usage": { "billable_messages": 7 } })),
             None,
             "sin tier no hay plan que reflejar"
+        );
+    }
+
+    /// El consumo sale de `usage.billable_messages`, y su umbral NO es el del tope: aquí `0` es un
+    /// dato («este mes no has gastado nada»), porque el medidor guarda gasto, no permiso.
+    #[test]
+    fn el_consumo_sale_del_cuerpo_y_un_cero_si_es_un_dato() {
+        assert_eq!(
+            monthly_usage_from_plan(&json!({ "usage": { "billable_messages": 12 } })),
+            Some(12)
+        );
+        assert_eq!(
+            monthly_usage_from_plan(&json!({ "usage": { "billable_messages": 0 } })),
+            Some(0),
+            "«nada gastado» es el número que ve el dueño el día 1, no una ausencia"
+        );
+        assert_eq!(
+            monthly_usage_from_plan(&json!({ "usage": { "conversations": 9 } })),
+            None,
+            "el alias de la unidad vieja no es esta métrica: el SaaS manda las dos y sólo una es la del cupo"
+        );
+        assert_eq!(
+            monthly_usage_from_plan(&json!({ "tier": { "max_billable_messages": 30 } })),
+            None,
+            "sin `usage` no hay gasto que reflejar"
+        );
+        assert_eq!(
+            monthly_usage_from_plan(&json!({ "usage": { "billable_messages": -3 } })),
+            None,
+            "un negativo es un dato corrupto: se conserva lo que ya medía"
+        );
+        assert_eq!(
+            monthly_usage_from_plan(&json!({ "usage": { "billable_messages": "12" } })),
+            None,
+            "una cifra en texto no es una cifra"
+        );
+    }
+
+    /// 🔴 El predicado que impide la regresión: el campo sólo viaja si el command instalado lo
+    /// DECLARA. Un módulo anterior a whatsapp_inbox#155 lo rechazaría con `additionalProperties:
+    /// false` y se llevaría el tope por delante.
+    #[test]
+    fn el_consumo_solo_viaja_si_el_command_instalado_lo_declara() {
+        let publicado_hoy = json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "monthly_limit": { "type": "integer" } }
+        });
+        let tras_la_issue_hermana = json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "monthly_limit": { "type": "integer" },
+                "monthly_usage": { "type": "integer" }
+            }
+        });
+
+        assert!(!declares_usage(Some(&publicado_hoy)), "el de hoy no lo declara");
+        assert!(declares_usage(Some(&tras_la_issue_hermana)));
+        assert!(
+            !declares_usage(None),
+            "un command sin schema no ha declarado este campo"
+        );
+        assert!(
+            !declares_usage(Some(&json!({ "type": "object" }))),
+            "sin `properties` no hay nada declarado"
+        );
+        assert!(
+            !declares_usage(Some(&json!({ "properties": { "monthly_usage_extra": {} } }))),
+            "el nombre se compara entero: un parecido no es el contrato"
         );
     }
 

@@ -913,8 +913,15 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 )
                 .await
                 {
-                    whatsapp_quota::QuotaSync::Written(limit) => {
-                        tracing::debug!(monthly_limit = limit, "cuota de WhatsApp al día")
+                    whatsapp_quota::QuotaSync::Written {
+                        monthly_limit,
+                        monthly_usage,
+                    } => {
+                        tracing::debug!(
+                            monthly_limit,
+                            monthly_usage,
+                            "cuota de WhatsApp al día"
+                        )
                     }
                     // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
                     // en la flota que no compró el canal): aquí no se repite el ruido.
