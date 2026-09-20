@@ -19,6 +19,36 @@ use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, Produ
 use serde::Serialize;
 use serde_json::{json, Value};
 
+/// One thing somebody of the business DID, on the wire (saas#2129).
+///
+/// FOUR KEYS AND NO MORE, and the Cloud reads exactly these four. Nothing about the END CUSTOMER
+/// travels — not who bought, not what, not how much — and the guard is that there is nowhere to
+/// put it, not a list of forbidden names somebody has to keep up to date.
+///
+/// `id` is minted by the hub and is the dedup key: delivery is at-least-once (the batch is
+/// re-sent until a beat answers 2xx), and that id is what makes storage exactly-once on the other
+/// side. `actor` is the hub's own id for that person — never a name, never an email.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ActivityEvent {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(rename = "at")]
+    pub occurred_at: String,
+    pub actor: String,
+}
+
+impl From<erplora_runtime::activity_log::PendingEvent> for ActivityEvent {
+    fn from(event: erplora_runtime::activity_log::PendingEvent) -> Self {
+        Self {
+            id: event.id,
+            kind: event.kind,
+            occurred_at: event.occurred_at,
+            actor: event.actor,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DailyUsageHeartbeat {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,6 +85,20 @@ pub struct DailyUsageHeartbeat {
     /// entrado**, y el Cloud debe dejar correr el reloj. Ver `crate::activity`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_user_activity_at: Option<String>,
+    /// What the people of the business DID since the last beat (saas#2129) — entering, leaving,
+    /// selling, refunding, opening and closing the till, each with who did it and when.
+    ///
+    /// The sibling of `last_user_activity_at` and a step below it: that one says *somebody came*,
+    /// which is enough to decide whether a free hub is abandoned and not nearly enough to answer
+    /// *are they using it*. A business in its first week — entering, building the catalogue,
+    /// opening the till, not charging yet — reads as dead on the sale count alone.
+    ///
+    /// **Empty is not news of a zero**, same absence contract as `active_users` and the
+    /// `verifactu_*` pair: it is skipped when there is nothing, and the Cloud writes nothing. The
+    /// events are NOT removed from the hub's buffer by being sent — only a 2xx confirms them, so
+    /// a beat that never arrives keeps them for the next one.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub activity: Vec<ActivityEvent>,
     /// The binary this container is running, e.g. `1.0.0` (hub#515) — the **same number** the
     /// `verifactu` engine emits as `SistemaInformatico/Version` in every record, because both read
     /// [`erplora_runtime::CORE_VERSION`] and there is no second source.
@@ -375,6 +419,14 @@ pub async fn collect_daily_usage(
         // un atómico y la respalda en `_hub_activity` (hub#670). La rellena el llamador (`serve`)
         // y solo si hay algo nuevo que reportar.
         last_user_activity_at: None,
+        // Los EVENTOS de actividad (saas#2129) sí se leen aquí, como `terminals` o `active_users`:
+        // es una consulta barata a la misma BD y los DOS latidos —el de arranque y el tick— la
+        // necesitan igual. Leer NO consume: solo un 2xx confirma, y el que confirma es el llamador
+        // (`confirm_activity`), porque es el único que sabe si el latido llegó.
+        //
+        // `Err` viaja como lista vacía: un buffer ilegible es «no pude contar», nunca un hub sin
+        // actividad — y desde luego nunca un latido fallido.
+        activity: pending_activity(db, hub_id).await,
         // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
         // único sitio honesto para leerla es aquí.
         core_version: crate::version::HUB_VERSION.to_string(),
@@ -404,6 +456,50 @@ pub async fn collect_daily_usage(
 
 /// Send a best-effort heartbeat with the existing machine credential, and return what the control
 /// plane announced back (ADR-0202 §2.5 — hub#318).
+/// Reads the next beat's worth of business activity, capping the buffer on the way past.
+///
+/// The trim rides this read rather than the write: a hub that cannot reach the Cloud for months
+/// must not fill its own disk, and checking the ceiling once per beat costs one statement instead
+/// of one per sale.
+async fn pending_activity(db: &dyn DatabaseAdapter, hub_id: &str) -> Vec<ActivityEvent> {
+    let _ = erplora_runtime::activity_log::trim(
+        db,
+        hub_id,
+        erplora_runtime::activity_log::MAX_BUFFERED_EVENTS,
+    )
+    .await;
+    erplora_runtime::activity_log::pending(
+        db,
+        hub_id,
+        erplora_runtime::activity_log::MAX_EVENTS_PER_BEAT,
+    )
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(ActivityEvent::from)
+    .collect()
+}
+
+/// Drops the events the Cloud acknowledged. **Only ever called after a 2xx.**
+///
+/// The exact shape of `ActivityState::mark_reported`: confirming a beat that failed would lose
+/// work that cannot be reconstructed, and re-sending one that succeeded costs nothing because the
+/// Cloud deduplicates on the id the hub minted.
+pub async fn confirm_activity(db: &dyn DatabaseAdapter, hub_id: &str, sent: &[ActivityEvent]) {
+    if sent.is_empty() {
+        return;
+    }
+    let ids: Vec<String> = sent.iter().map(|event| event.id.clone()).collect();
+    if let Err(error) = erplora_runtime::activity_log::confirm(db, hub_id, &ids).await {
+        // Not fatal and not silent: the events stay, the next beat re-sends them and the Cloud
+        // drops the duplicates. A buffer that never drains is what the trim above is for.
+        eprintln!(
+            "[activity-log] hub={hub_id} could not confirm {} events: {error}",
+            ids.len()
+        );
+    }
+}
+
 pub async fn send_heartbeat(
     http: &reqwest::Client,
     cloud_base_url: &str,
@@ -595,6 +691,68 @@ mod tests {
         );
     }
 
+    /// **The four keys and nothing else** (saas#2129). This is the contract between the two
+    /// repos and the privacy guard at the same time: the Cloud reads `id`, `type`, `at` and
+    /// `actor`, so anything else added to this struct would either be ignored there or — the real
+    /// risk — carry something about the END CUSTOMER into the control plane. Asserting the exact
+    /// key set is what makes that a test failure instead of a discovery.
+    #[test]
+    fn an_activity_event_puts_exactly_four_keys_on_the_wire() {
+        let event = ActivityEvent::from(erplora_runtime::activity_log::PendingEvent {
+            id: "e-1".into(),
+            kind: "cash_open".into(),
+            occurred_at: "2026-10-01T09:00:00Z".into(),
+            actor: "pin-42".into(),
+        });
+
+        let wire = serde_json::to_value(&event).unwrap();
+        let mut keys: Vec<&str> = wire
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["actor", "at", "id", "type"]);
+        assert_eq!(
+            wire["type"], "cash_open",
+            "the Cloud reads `type`, not `kind`"
+        );
+        assert_eq!(
+            wire["at"], "2026-10-01T09:00:00Z",
+            "and `at`, not `occurred_at`"
+        );
+        assert_eq!(wire["actor"], "pin-42", "the hub's own id, never a name");
+    }
+
+    /// Silence is not news of a zero — the same absence contract as `active_users` and the
+    /// `verifactu_*` pair. An empty array would be a beat SAYING "nothing happened", which is a
+    /// different claim from not mentioning it, and the Cloud branches on exactly that.
+    #[test]
+    fn a_hub_with_nothing_to_report_does_not_mention_activity_at_all() {
+        let quiet = DailyUsageHeartbeat {
+            orders_today: None,
+            last_sale_at: None,
+            terminals: None,
+            active_users: None,
+            last_user_activity_at: None,
+            activity: Vec::new(),
+            core_version: "1.0.0".into(),
+            pending: PendingObligationFields::default(),
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+            memory_peak_mb: None,
+            transmission_route: None,
+        };
+
+        let wire = serde_json::to_value(&quiet).unwrap();
+        assert!(
+            !wire.as_object().unwrap().contains_key("activity"),
+            "an empty list must be omitted, not sent: {wire}"
+        );
+    }
+
     #[tokio::test]
     async fn sends_expected_json_and_machine_headers() {
         type Captured = Arc<Mutex<Option<oneshot::Sender<(HeaderMap, Value)>>>>;
@@ -628,6 +786,7 @@ mod tests {
             terminals: Some(3),
             active_users: Some(4),
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields(vec![(
                 "verifactu".into(),
@@ -688,6 +847,7 @@ mod tests {
             terminals: Some(0),
             active_users: None,
             last_user_activity_at: None,
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -727,6 +887,7 @@ mod tests {
             terminals: None,
             active_users: None,
             last_user_activity_at: None,
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -787,6 +948,7 @@ mod tests {
             terminals: None,
             active_users: None,
             last_user_activity_at: None,
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -832,6 +994,7 @@ mod tests {
             terminals: None,
             active_users: None,
             last_user_activity_at: None,
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -874,6 +1037,7 @@ mod tests {
             terminals: Some(1),
             active_users: None,
             last_user_activity_at: None,
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -1050,6 +1214,7 @@ mod tests {
                 terminals: None,
                 active_users: None,
                 last_user_activity_at: None,
+                activity: Vec::new(),
                 core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
@@ -1109,6 +1274,7 @@ mod tests {
                 terminals: None,
                 active_users: None,
                 last_user_activity_at: None,
+                activity: Vec::new(),
                 core_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
@@ -1146,6 +1312,7 @@ mod tests {
             terminals: None,
             active_users: None,
             last_user_activity_at: None,
+            activity: Vec::new(),
             core_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,

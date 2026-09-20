@@ -89,7 +89,17 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
         .await
     {
-        Ok(_) => tracing::info!("arranque: avisado al Cloud de que este hub ya atiende"),
+        Ok(_) => {
+            // Los eventos de actividad que llevaba este latido ya están en el Cloud (saas#2129).
+            // El latido de arranque los confirma igual que el tick: es el PRIMERO que sale tras
+            // un reinicio, así que es justo el que entrega lo que el proceso anterior dejó.
+            {
+                let runtime = state.runtime.read().await;
+                daily_usage::confirm_activity(runtime.db(), runtime.hub_id(), &usage.activity)
+                    .await;
+            }
+            tracing::info!("arranque: avisado al Cloud de que este hub ya atiende")
+        }
         // Best-effort literal: el sondeo del SaaS es exactamente el respaldo de este caso.
         Err(error) => {
             tracing::warn!(%error, "arranque: no se pudo avisar al Cloud (queda el sondeo)")
@@ -124,10 +134,17 @@ pub fn announce_route_change(state: &AppState) {
         match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
             .await
         {
-            Ok(_) => tracing::info!(
-                route = ?usage.transmission_route,
-                "fiscal route changed: the SaaS has been told"
-            ),
+            Ok(_) => {
+                {
+                    let runtime = state.runtime.read().await;
+                    daily_usage::confirm_activity(runtime.db(), runtime.hub_id(), &usage.activity)
+                        .await;
+                }
+                tracing::info!(
+                    route = ?usage.transmission_route,
+                    "fiscal route changed: the SaaS has been told"
+                )
+            }
             Err(error) => tracing::warn!(
                 %error,
                 "fiscal route changed but the SaaS could not be told: the daily heartbeat will"

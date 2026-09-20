@@ -78,6 +78,15 @@ impl Runtime {
         if let Err(e) = &r {
             self.report_dispatch_error(e, "command", name, payload);
         }
+        // What the people of the business DO here (saas#2129), recorded at the one funnel every
+        // external command goes through. Only on success — a refund that was refused is not a
+        // refund — and only for the PUBLIC doors (`activity_log::kind_for_command`): the internal
+        // relays one sale fans out into run inside this same call and would count it four times.
+        if r.is_ok() {
+            if let Some(kind) = crate::activity_log::kind_for_command(name) {
+                crate::activity_log::record_best_effort(self.db(), self.hub_id(), kind, ctx).await;
+            }
+        }
         r
     }
 

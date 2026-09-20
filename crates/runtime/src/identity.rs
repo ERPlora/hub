@@ -1564,6 +1564,17 @@ pub async fn create_session_with_credential(
 ) -> Result<String> {
     let token = format!("{}{}", new_id(), new_id()).replace('-', "");
     let expires = (chrono::Utc::now() + chrono::Duration::seconds(ttl_secs)).to_rfc3339();
+    // Somebody of the business signed in (saas#2129). Hooked HERE, at the single funnel every
+    // door goes through (`create_session` delegates, and so do PIN, badge, cloud and courier),
+    // for the same reason `track_user_activity` is one middleware: hanging it off each caller
+    // desynchronises the moment somebody adds the next door.
+    crate::activity_log::record_best_effort_for(
+        db,
+        hub_id,
+        crate::activity_log::Kind::Login,
+        user_id,
+    )
+    .await;
     let mut p = Params::new();
     p.insert("token".into(), json!(token));
     p.insert("hub_id".into(), json!(hub_id));
@@ -1767,11 +1778,31 @@ pub async fn delete_session(db: &dyn DatabaseAdapter, hub_id: &str, token: &str)
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("token".into(), json!(token));
+    // WHO is leaving has to be read BEFORE the row goes: after the delete there is nothing left
+    // to attribute the event to, and an event with no actor is one the Cloud drops.
+    let leaving = db
+        .query(
+            "SELECT user_id FROM hub_session WHERE hub_id = :hub_id AND token = :token",
+            &p,
+        )
+        .await
+        .ok()
+        .and_then(|result| result.rows.into_iter().next())
+        .and_then(|row| row["user_id"].as_str().map(str::to_owned));
     db.execute(
         "DELETE FROM hub_session WHERE hub_id = :hub_id AND token = :token",
         &p,
     )
     .await?;
+    if let Some(user_id) = leaving {
+        crate::activity_log::record_best_effort_for(
+            db,
+            hub_id,
+            crate::activity_log::Kind::Logout,
+            &user_id,
+        )
+        .await;
+    }
     Ok(())
 }
 

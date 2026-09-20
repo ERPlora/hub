@@ -931,6 +931,18 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
                     // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
                     Ok(_) => {
+                        // Lo mismo, un escalón más abajo (saas#2129): los EVENTOS que viajaron en
+                        // este latido ya están en el Cloud, así que se pueden soltar. Un latido
+                        // fallido los deja donde están — este dato no se recupera hacia atrás.
+                        {
+                            let runtime = st.runtime.read().await;
+                            daily_usage::confirm_activity(
+                                runtime.db(),
+                                runtime.hub_id(),
+                                &usage.activity,
+                            )
+                            .await;
+                        }
                         if let Some(ts) = pending_activity {
                             st.activity.mark_reported(ts);
                         }
