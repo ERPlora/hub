@@ -94,15 +94,7 @@ pub(crate) struct GatewayReadiness {
 pub(crate) async fn probe_readiness(
     access: &GatewayAccess,
 ) -> Result<GatewayReadiness, VerifactuError> {
-    let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .identity(access.identity.clone())
-        .add_root_certificate(reqwest::Certificate::from_pem(&access.ca_pem).map_err(|e| {
-            VerifactuError::Transmission(format!("CA de la pasarela ilegible: {e}"))
-        })?)
-        .timeout(READYZ_TIMEOUT)
-        .build()
-        .map_err(|e| VerifactuError::Transmission(format!("cliente mTLS de la pasarela: {e}")))?;
+    let client = gateway_client(access, READYZ_TIMEOUT)?;
 
     let response = client
         .get(readyz_url(&access.url))
@@ -213,7 +205,9 @@ fn refusal_error(status: u16, code: &str, message: &str) -> VerifactuError {
 /// never `::Tls`— and a stable `code` an operator can grep: the prose is for humans, the code is
 /// what a test and an alert assert on (ADR-0055).
 fn receipt_error(code: &str, detail: &str) -> VerifactuError {
-    VerifactuError::Transmission(format!("pasarela fiscal: recibo inválido ({code}): {detail}"))
+    VerifactuError::Transmission(format!(
+        "pasarela fiscal: recibo inválido ({code}): {detail}"
+    ))
 }
 
 /// POSTs the envelope to the cell and hands back the AEAT's raw SOAP body — the SAME string
@@ -249,24 +243,54 @@ pub(crate) async fn transmit_via_gateway(
     }
 }
 
+#[derive(Debug)]
 enum PostOutcome {
     AeatBody(String),
     TokenRefused { code: String, message: String },
+}
+
+/// The ONE place a client for the cell is built, so the two lanes cannot drift apart.
+///
+/// The CA is **always** pinned — on both lanes and whatever the machine trusts otherwise. Dropping
+/// the identity is what the testing lane costs; dropping the peer's verification would let anything
+/// on the path read the XML and forge Hacienda's verdict back, which is not a lane, it is a hole.
+fn gateway_client(
+    access: &GatewayAccess,
+    timeout: Duration,
+) -> Result<reqwest::Client, VerifactuError> {
+    let mut builder = reqwest::Client::builder()
+        .use_rustls_tls()
+        .add_root_certificate(reqwest::Certificate::from_pem(&access.ca_pem).map_err(|e| {
+            VerifactuError::Transmission(format!("CA de la pasarela ilegible: {e}"))
+        })?)
+        .timeout(timeout);
+    if let Some(identity) = access.identity.clone() {
+        builder = builder.identity(identity);
+    }
+    builder
+        .build()
+        .map_err(|e| VerifactuError::Transmission(format!("cliente de la pasarela: {e}")))
 }
 
 async fn post_transmission(
     access: &GatewayAccess,
     envelope: &GatewayEnvelope<'_>,
 ) -> Result<PostOutcome, VerifactuError> {
-    let client = reqwest::Client::builder()
-        .use_rustls_tls()
-        .identity(access.identity.clone())
-        .add_root_certificate(reqwest::Certificate::from_pem(&access.ca_pem).map_err(|e| {
-            VerifactuError::Transmission(format!("CA de la pasarela ilegible: {e}"))
-        })?)
-        .timeout(GATEWAY_TIMEOUT)
-        .build()
-        .map_err(|e| VerifactuError::Transmission(format!("cliente mTLS de la pasarela: {e}")))?;
+    // 🔴 The testing lane addresses `prewww` and nothing else (hub#1936). The cell refuses this
+    // too, but the bytes of a production record must not leave this process on a lane that cannot
+    // carry them: the answer belongs on the RECORD, named, where whoever is looking at it can act
+    // on it — and a record filed at the real AEAT has no undo (ADR-0189). It sits HERE and not in
+    // `transmit_via_gateway` because this is the single door to the wire, and the 401 retry comes
+    // back through it with a freshly resolved access.
+    if access.identity.is_none() && envelope.environment != "testing" {
+        return Err(VerifactuError::Transmission(format!(
+            "pasarela fiscal: anonymous_lane_production: este hub aún no tiene firmada su \
+             conexión segura, así que solo puede transmitir al entorno de pruebas de la AEAT; \
+             el registro pide «{}»",
+            envelope.environment
+        )));
+    }
+    let client = gateway_client(access, GATEWAY_TIMEOUT)?;
 
     let response = client
         .post(transmissions_url(&access.url))
@@ -393,8 +417,11 @@ pub(crate) struct GatewayAccess {
     pub url: String,
     /// The short-lived Bearer. NEVER in a log line — the manual `Debug` below is the guard.
     pub token: String,
-    /// The hub's mTLS client identity (key born on the hub, `gateway_identity.rs`).
-    pub identity: reqwest::Identity,
+    /// The hub's mTLS client identity (key born on the hub, `gateway_identity.rs`). `None` on the
+    /// **testing lane**: a hub whose client certificate nobody has signed yet presents nothing and
+    /// rides the Cloud-signed Bearer alone (hub#1936). The cell refuses `production` on that lane,
+    /// and so does [`post_transmission`] before a byte leaves this process.
+    pub identity: Option<reqwest::Identity>,
     /// PEM of the internal CA that anchors the cell's SERVER certificate.
     pub ca_pem: Vec<u8>,
     /// **Who the control plane SIGNED as the presenter of this burst** — the `Representante` of
@@ -439,6 +466,12 @@ pub(crate) struct GatewayToken {
     pub presenter_nif: String,
     pub presenter_name: String,
     pub mtls_common_name: String,
+    /// PEM of the internal CA that anchors the cell's SERVER certificate (hub#1936). **Public
+    /// material**, and the only way a hub whose own certificate nobody has signed yet can verify
+    /// the cell: the CA reaches an enrolled hub inside the `--fullchain` of its certificate, which
+    /// is precisely what this hub does not have. `None` when the control plane does not publish it
+    /// — an older SaaS, or one whose `VERIFACTU_GATEWAY_CA_PEM` is unset.
+    pub ca_pem: Option<String>,
 }
 
 impl std::fmt::Debug for GatewayToken {
@@ -478,6 +511,9 @@ impl GatewayToken {
             presenter_nif: text("presenter_nif")?,
             presenter_name: text("presenter_name")?,
             mtls_common_name: text("mtls_common_name")?,
+            // Optional on purpose: an enrolled hub already holds the CA and must keep working
+            // against a control plane that has not published it yet.
+            ca_pem: text("ca_pem").ok(),
         })
     }
 
@@ -491,6 +527,7 @@ impl GatewayToken {
             presenter_nif: self.presenter_nif.clone(),
             presenter_name: self.presenter_name.clone(),
             mtls_common_name: self.mtls_common_name.clone(),
+            ca_pem: self.ca_pem.clone(),
         }
     }
 }
@@ -553,7 +590,10 @@ async fn mint_token(
         return Ok(TokenAnswer::GoDirect);
     }
     if !(200..300).contains(&response.status) {
-        return Err(format!("{TOKEN_PATH}: status {} ({hub_id})", response.status));
+        return Err(format!(
+            "{TOKEN_PATH}: status {} ({hub_id})",
+            response.status
+        ));
     }
     GatewayToken::parse(&response.body)
         .map(TokenAnswer::Minted)
@@ -609,11 +649,10 @@ pub(crate) async fn resolve_access(
     host: &dyn NativeHost,
     hub_id: &str,
 ) -> erplora_runtime::errors::Result<Option<GatewayAccess>> {
-    // Local identity FIRST: without it there is nothing to present at the ingress, and the
-    // control-plane quota must not be spent asking for a token nobody can use.
-    let Some(machine) = host.machine_identity(hub_id).await? else {
-        return Ok(None);
-    };
+    // The local identity decides WHICH lane, not WHETHER there is one (hub#1936). Before it, a
+    // hub whose client certificate nobody had signed yet answered `None` here without even asking
+    // the control plane — which is why every one of its tickets stayed «pending» for ever.
+    let machine = host.machine_identity(hub_id).await?;
 
     let token = token(host, hub_id)
         .await
@@ -622,21 +661,40 @@ pub(crate) async fn resolve_access(
         return Ok(None);
     };
 
-    // The control plane and this hub must agree on WHO this machine is: a mismatch means an
-    // identity enrolled for another hub, and the ingress would refuse it anyway — with a far
-    // less actionable message.
-    if token.mtls_common_name != machine.common_name {
-        return Err(RuntimeError::Certificate(format!(
-            "gateway token: el plano de control espera '{}' y este hub es '{}'",
-            token.mtls_common_name, machine.common_name
-        )));
-    }
+    let (identity, ca_pem) = match machine {
+        Some(machine) => {
+            // The control plane and this hub must agree on WHO this machine is: a mismatch means
+            // an identity enrolled for another hub, and the ingress would refuse it anyway — with
+            // a far less actionable message. It is asked only on the lane that presents one.
+            if token.mtls_common_name != machine.common_name {
+                return Err(RuntimeError::Certificate(format!(
+                    "gateway token: el plano de control espera '{}' y este hub es '{}'",
+                    token.mtls_common_name, machine.common_name
+                )));
+            }
+            (Some(machine.identity), machine.ca_pem)
+        }
+        // The testing lane. There is no certificate to present, but the cell is still VERIFIED:
+        // the anchor rides the token, over the public TLS of the control plane and against this
+        // hub's machine credential. Connecting without one would hand the XML — and the AEAT's
+        // verdict coming back — to anything on the path, so no anchor means NO LANE.
+        //
+        // And «no lane» is `Ok(None)`, the same answer this function gave before hub#1936 and not
+        // an `Err`: «there is no road yet» is a state the queue is built for (the record waits and
+        // says so, verifactu#111), while an `Err` is «the road is there and it broke», which would
+        // burn retries and put a failure on a record that never had a road. What the user has to
+        // act on is named one layer up, on the record itself (`config::resolve_route`).
+        None => match token.ca_pem.filter(|pem| !pem.trim().is_empty()) {
+            Some(anchor) => (None, anchor.into_bytes()),
+            None => return Ok(None),
+        },
+    };
 
     Ok(Some(GatewayAccess {
         url: token.gateway_url,
         token: token.token,
-        identity: machine.identity,
-        ca_pem: machine.ca_pem,
+        identity,
+        ca_pem,
         presenter_nif: token.presenter_nif,
         presenter_name: token.presenter_name,
     }))
@@ -815,6 +873,148 @@ mod tests {
         format!("http://{address}")
     }
 
+    /// What a REAL TLS server observed about one connection from [`gateway_client`].
+    struct Handshake {
+        completed: bool,
+        /// CN of the client certificate the server was handed, `None` if it was handed none.
+        client_common_name: Option<String>,
+    }
+
+    /// A self-signed authority, and a leaf for `127.0.0.1` issued by it.
+    fn tls_authority() -> (
+        openssl::x509::X509,
+        openssl::pkey::PKey<openssl::pkey::Private>,
+    ) {
+        let group =
+            openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::X9_62_PRIME256V1).unwrap();
+        let key = openssl::pkey::PKey::from_ec_key(openssl::ec::EcKey::generate(&group).unwrap())
+            .unwrap();
+        let mut name = openssl::x509::X509NameBuilder::new().unwrap();
+        name.append_entry_by_nid(openssl::nid::Nid::COMMONNAME, "ERPlora Fiscal Test CA")
+            .unwrap();
+        let name = name.build();
+        let mut builder = openssl::x509::X509::builder().unwrap();
+        builder.set_version(2).unwrap();
+        builder.set_subject_name(&name).unwrap();
+        builder.set_issuer_name(&name).unwrap();
+        builder.set_pubkey(&key).unwrap();
+        builder
+            .set_not_before(&openssl::asn1::Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        builder
+            .set_not_after(&openssl::asn1::Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
+        builder
+            .append_extension(
+                openssl::x509::extension::BasicConstraints::new()
+                    .critical()
+                    .ca()
+                    .build()
+                    .unwrap(),
+            )
+            .unwrap();
+        builder
+            .sign(&key, openssl::hash::MessageDigest::sha256())
+            .unwrap();
+        (builder.build(), key)
+    }
+
+    fn tls_leaf(
+        ca: &openssl::x509::X509,
+        ca_key: &openssl::pkey::PKey<openssl::pkey::Private>,
+    ) -> (
+        openssl::x509::X509,
+        openssl::pkey::PKey<openssl::pkey::Private>,
+    ) {
+        let group =
+            openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::X9_62_PRIME256V1).unwrap();
+        let key = openssl::pkey::PKey::from_ec_key(openssl::ec::EcKey::generate(&group).unwrap())
+            .unwrap();
+        let mut name = openssl::x509::X509NameBuilder::new().unwrap();
+        name.append_entry_by_nid(openssl::nid::Nid::COMMONNAME, "127.0.0.1")
+            .unwrap();
+        let name = name.build();
+        let mut builder = openssl::x509::X509::builder().unwrap();
+        builder.set_version(2).unwrap();
+        builder.set_subject_name(&name).unwrap();
+        builder.set_issuer_name(ca.subject_name()).unwrap();
+        builder.set_pubkey(&key).unwrap();
+        builder
+            .set_not_before(&openssl::asn1::Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        builder
+            .set_not_after(&openssl::asn1::Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
+        let san = openssl::x509::extension::SubjectAlternativeName::new()
+            .ip("127.0.0.1")
+            .build(&builder.x509v3_context(Some(ca), None))
+            .unwrap();
+        builder.append_extension(san).unwrap();
+        builder
+            .sign(ca_key, openssl::hash::MessageDigest::sha256())
+            .unwrap();
+        (builder.build(), key)
+    }
+
+    /// A **real** TLS listener that answers one request and reports what the handshake produced.
+    ///
+    /// The plain-HTTP `canned_cell` above cannot answer the two questions hub#1936 turns into
+    /// security properties — «is the peer still verified when no certificate is presented?» and
+    /// «is the certificate presented when there IS one?» — because over plain HTTP both are
+    /// invisible. Here they are the handshake itself.
+    fn tls_cell() -> (String, Vec<u8>, std::thread::JoinHandle<Handshake>) {
+        let (ca, ca_key) = tls_authority();
+        let (leaf, leaf_key) = tls_leaf(&ca, &ca_key);
+        let ca_pem = ca.to_pem().unwrap();
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("https://{}", listener.local_addr().unwrap());
+
+        let handle = std::thread::spawn(move || {
+            let mut acceptor =
+                openssl::ssl::SslAcceptor::mozilla_intermediate(openssl::ssl::SslMethod::tls())
+                    .unwrap();
+            acceptor.set_private_key(&leaf_key).unwrap();
+            acceptor.set_certificate(&leaf).unwrap();
+            // Ask for a client certificate without requiring one, and accept whatever arrives:
+            // this server is here to OBSERVE, not to authorise — the cell does the authorising.
+            acceptor.set_verify_callback(openssl::ssl::SslVerifyMode::PEER, |_, _| true);
+            let acceptor = acceptor.build();
+
+            let (stream, _) = listener.accept().unwrap();
+            match acceptor.accept(stream) {
+                Err(_) => Handshake {
+                    completed: false,
+                    client_common_name: None,
+                },
+                Ok(mut stream) => {
+                    let client_common_name = stream.ssl().peer_certificate().and_then(|cert| {
+                        cert.subject_name()
+                            .entries_by_nid(openssl::nid::Nid::COMMONNAME)
+                            .next()
+                            .map(|entry| {
+                                String::from_utf8_lossy(entry.data().as_slice()).into_owned()
+                            })
+                    });
+                    use std::io::{Read as _, Write as _};
+                    let mut buffer = [0u8; 8192];
+                    let _ = stream.read(&mut buffer);
+                    let _ = stream.write_all(
+                        http_json("503 Service Unavailable", r#"{"code":"gateway_not_ready"}"#)
+                            .as_bytes(),
+                    );
+                    let _ = stream.flush();
+                    Handshake {
+                        completed: true,
+                        client_common_name,
+                    }
+                }
+            }
+        });
+
+        (url, ca_pem, handle)
+    }
+
     fn http_json(status: &str, body: &str) -> String {
         format!(
             "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
@@ -890,7 +1090,7 @@ mod tests {
         GatewayAccess {
             url: url.to_owned(),
             token: "bearer-token".to_owned(),
-            identity: reqwest::Identity::from_pem(bundle.as_bytes()).unwrap(),
+            identity: Some(reqwest::Identity::from_pem(bundle.as_bytes()).unwrap()),
             ca_pem,
             presenter_nif: "B27593136".to_owned(),
             presenter_name: "ERPLORA CLOUD SL".to_owned(),
@@ -914,6 +1114,7 @@ mod tests {
             "presenter_nif": "B27593136",
             "presenter_name": "ERPLORA CLOUD SL",
             "mtls_common_name": common_name,
+            "ca_pem": String::from_utf8(test_access("https://unused.example").ca_pem).unwrap(),
         })
         .to_string()
     }
@@ -962,13 +1163,14 @@ mod tests {
         async fn machine_identity(
             &self,
             _hub_id: &str,
-        ) -> erplora_runtime::Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+        ) -> erplora_runtime::Result<Option<erplora_runtime::gateway_identity::MachineIdentity>>
+        {
             if !self.enrolled {
                 return Ok(None);
             }
             let access = test_access("https://unused.example");
             Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
-                identity: access.identity,
+                identity: access.identity.expect("the test access always carries one"),
                 ca_pem: access.ca_pem,
                 common_name: self.common_name.clone(),
             }))
@@ -1179,7 +1381,10 @@ mod tests {
             .expect("a broken body is an error");
 
         let message = error.to_string();
-        assert!(!message.contains("SECRET-BEARER-IN-BROKEN-BODY"), "{message}");
+        assert!(
+            !message.contains("SECRET-BEARER-IN-BROKEN-BODY"),
+            "{message}"
+        );
         assert!(message.contains("ilegible"), "{message}");
     }
 
@@ -1211,7 +1416,10 @@ mod tests {
             .await
             .expect("409 is not a failure");
 
-        assert!(access.is_none(), "the gateway road is simply not this hub's");
+        assert!(
+            access.is_none(),
+            "the gateway road is simply not this hub's"
+        );
     }
 
     /// A non-2xx that is not a 409 is a failure described by its STATUS — never by its body.
@@ -1230,15 +1438,250 @@ mod tests {
     }
 
     /// 🔒 Nothing enrolled = no road, and the control-plane quota is NOT spent finding out.
+    /// 🔴 **hub#1936 — a hub nobody has enrolled still has a road, and it leads to `prewww`.**
+    ///
+    /// Until now this answered `Ok(None)` without even asking the control plane, so every ticket
+    /// of every un-enrolled hub stayed «pending» for ever and its QR read «not found». Signing the
+    /// secure connection is a person's errand that takes days; the rule (19/09) is that in testing
+    /// everything reaches the AEAT with nothing to configure.
     #[tokio::test]
-    async fn without_an_enrolled_identity_the_quota_is_never_touched() {
+    async fn an_unenrolled_hub_gets_the_testing_lane_hub1936() {
         let mut host = LendingHost::minting("https://cell.internal.example");
         host.enrolled = false;
 
-        let access = resolve_access(&host, &a_hub("not-enrolled")).await.unwrap();
+        let access = resolve_access(&host, &a_hub("not-enrolled"))
+            .await
+            .unwrap()
+            .expect("an unenrolled hub has a testing lane");
+
+        assert!(
+            access.identity.is_none(),
+            "there is no client certificate to present"
+        );
+        assert!(
+            !access.ca_pem.is_empty(),
+            "the cell is still verified: the anchor came with the token"
+        );
+        assert_eq!(access.token, "SECRET-BEARER-VALUE");
+    }
+
+    /// 🔴 **The hard condition of hub#1936, on this side of the wire.**
+    ///
+    /// The cell refuses `production` without a client certificate, but the hub must not even open
+    /// the connection: the refusal has to name the cause on the record, and the bytes of a
+    /// production record must never leave this process on a lane that cannot carry them. THIS is
+    /// the test that fails if the testing lane can ever address the real AEAT.
+    #[tokio::test]
+    async fn the_testing_lane_never_carries_a_production_envelope_hub1936() {
+        let mut access = test_access("http://127.0.0.1:1/never-reached");
+        access.identity = None;
+        let xml = "<soapenv:Envelope>produccion</soapenv:Envelope>";
+        let production = GatewayEnvelope {
+            environment: "production",
+            ..envelope(xml)
+        };
+
+        let error = post_transmission(&access, &production)
+            .await
+            .expect_err("a production envelope must not travel on the testing lane");
+
+        let text = error.to_string();
+        assert!(
+            text.contains("anonymous_lane_production"),
+            "the record has to say WHY, by code (ADR-0055): {text}"
+        );
+    }
+
+    /// 🔒 The guard is an ALLOW-list: the lane carries `testing` and nothing else. Written as
+    /// `== "production"` it passed every other test here, and then a word nobody validated
+    /// («Production», «») would leave this process on the lane that must only ever say `testing`.
+    /// The cell maps such a word to `prewww` today; this side must not depend on that.
+    #[tokio::test]
+    async fn the_testing_lane_carries_the_word_testing_and_nothing_else_hub1936() {
+        let mut access = test_access("http://127.0.0.1:1/never-reached");
+        access.identity = None;
+
+        for word in ["", "Production", "PRODUCTION", "prod", "testing "] {
+            let odd = GatewayEnvelope {
+                environment: word,
+                ..envelope("<soapenv:Envelope/>")
+            };
+            let error = post_transmission(&access, &odd)
+                .await
+                .expect_err("only `testing` rides the anonymous lane");
+            assert!(
+                error.to_string().contains("anonymous_lane_production"),
+                "{word:?}: {error}"
+            );
+        }
+    }
+
+    /// The positive control of the test above, and the one that proves the guard is not «refuse
+    /// everything»: the SAME anonymous access carries a `testing` envelope, and what stops it is
+    /// the unreachable address, not the lane.
+    #[tokio::test]
+    async fn the_testing_lane_does_carry_a_testing_envelope_hub1936() {
+        let mut access = test_access("http://127.0.0.1:1/never-reached");
+        access.identity = None;
+
+        let error = post_transmission(&access, &envelope("<soapenv:Envelope/>"))
+            .await
+            .expect_err("nothing is listening on port 1");
+
+        let text = error.to_string();
+        assert!(
+            !text.contains("anonymous_lane_production"),
+            "the lane accepted it; only the transport failed: {text}"
+        );
+        assert!(text.contains("conexión con la pasarela"), "{text}");
+    }
+
+    /// And with a client certificate `production` is untouched — the gates it still has to pass
+    /// are the cell's (the grant, the Seal), not this one.
+    #[tokio::test]
+    async fn mutual_tls_still_carries_production() {
+        let access = test_access("http://127.0.0.1:1/never-reached");
+        let production = GatewayEnvelope {
+            environment: "production",
+            ..envelope("<soapenv:Envelope/>")
+        };
+
+        let error = post_transmission(&access, &production)
+            .await
+            .expect_err("nothing is listening on port 1");
+
+        assert!(
+            !error.to_string().contains("anonymous_lane_production"),
+            "{error}"
+        );
+    }
+
+    /// 🔒 **The testing lane still VERIFIES the cell.** Dropping the client certificate is what
+    /// hub#1936 costs; dropping the peer's verification would be a hole, not a lane — anything on
+    /// the path could read the invoice XML and forge Hacienda's verdict on the way back, and a
+    /// record marked «filed» that was never filed is the one thing VeriFactu cannot recover from.
+    ///
+    /// The assertion is the HANDSHAKE, not the builder: the cell presents a certificate of ITS
+    /// authority and the client is handed somebody ELSE's, so a client that pins nothing completes
+    /// and a client that pins its anchor does not.
+    #[tokio::test]
+    async fn the_testing_lane_still_pins_the_cells_authority_hub1936() {
+        let (url, _real_ca, server) = tls_cell();
+        let mut access = test_access(&url);
+        access.identity = None;
+        // Somebody else's authority — exactly what a proxy in the middle would present.
+        let (stranger, _) = tls_authority();
+        access.ca_pem = stranger.to_pem().unwrap();
+
+        let error = post_transmission(&access, &envelope("<x/>"))
+            .await
+            .expect_err("a cell signed by an unknown authority is not our cell");
+
+        assert!(
+            error.to_string().contains("conexión con la pasarela"),
+            "{error}"
+        );
+        assert!(
+            !server.join().unwrap().completed,
+            "the handshake must die: the client did not accept that authority"
+        );
+    }
+
+    /// The positive control of the test above — and of the lane itself: with the RIGHT anchor and
+    /// no identity, the connection is established. `503 gateway_not_ready` is the canned answer;
+    /// reaching it at all is the proof that an unenrolled hub can now speak to the cell.
+    #[tokio::test]
+    async fn the_testing_lane_connects_with_the_right_anchor_and_no_identity_hub1936() {
+        let (url, ca_pem, server) = tls_cell();
+        let mut access = test_access(&url);
+        access.identity = None;
+        access.ca_pem = ca_pem;
+
+        let error = post_transmission(&access, &envelope("<x/>"))
+            .await
+            .expect_err("the canned cell answers 503");
+
+        assert!(error.to_string().contains("gateway_not_ready"), "{error}");
+        let handshake = server.join().unwrap();
+        assert!(handshake.completed, "the connection was established");
+        assert!(
+            handshake.client_common_name.is_none(),
+            "and no client certificate was presented: that is the lane"
+        );
+    }
+
+    /// 🔒 The OTHER half: an enrolled hub still presents its machine identity. Without this, a
+    /// client builder that quietly stopped attaching it would leave every till on the anonymous
+    /// lane — passing every test above while losing the second factor for everybody.
+    #[tokio::test]
+    async fn an_enrolled_hub_still_presents_its_certificate_hub1936() {
+        let (url, ca_pem, server) = tls_cell();
+        let mut access = test_access(&url);
+        access.ca_pem = ca_pem;
+
+        let _ = post_transmission(&access, &envelope("<x/>")).await;
+
+        let handshake = server.join().unwrap();
+        assert!(handshake.completed);
+        assert_eq!(
+            handshake.client_common_name.as_deref(),
+            Some("canned"),
+            "the identity of `test_access` reached the peer"
+        );
+    }
+
+    /// 🔒 **No anchor, no lane** — and «no lane» is the *no road* this hub already knew, not a
+    /// failure. A control plane that does not publish the CA leaves an unenrolled hub unable to
+    /// VERIFY the cell; connecting anyway would hand the XML and the AEAT's verdict to anything on
+    /// the path. The record then waits and says why (verifactu#111), which is exactly what it did
+    /// before hub#1936 — an `Err` here would instead burn retries on a road that never existed.
+    #[tokio::test]
+    async fn without_a_published_ca_the_testing_lane_stays_shut_hub1936() {
+        let body: serde_json::Value =
+            serde_json::from_str(&token_body(CN, "https://cell.internal.example")).unwrap();
+        let mut body = body.as_object().unwrap().clone();
+        body.remove("ca_pem");
+        let mut host = LendingHost::answering(200, serde_json::Value::Object(body).to_string());
+        host.enrolled = false;
+
+        let access = resolve_access(&host, &a_hub("no-anchor")).await.unwrap();
+
+        assert!(access.is_none(), "no anchor, no lane");
+    }
+
+    /// 🔒 An anchor of whitespace is not an anchor. An operator who sets the environment variable
+    /// to `""` or a stray newline must not open a lane that cannot verify anything.
+    #[tokio::test]
+    async fn a_blank_anchor_is_not_an_anchor_hub1936() {
+        let body: serde_json::Value =
+            serde_json::from_str(&token_body(CN, "https://cell.internal.example")).unwrap();
+        let mut body = body.as_object().unwrap().clone();
+        body.insert("ca_pem".to_owned(), serde_json::json!("   \n  "));
+        let mut host = LendingHost::answering(200, serde_json::Value::Object(body).to_string());
+        host.enrolled = false;
+
+        let access = resolve_access(&host, &a_hub("blank-anchor")).await.unwrap();
 
         assert!(access.is_none());
-        assert_eq!(host.calls(), 0, "no identity, no mint");
+    }
+
+    /// An ENROLLED hub is untouched by all of the above: it already holds the CA that came with
+    /// its own certificate, and a control plane that publishes none must not take its road away.
+    #[tokio::test]
+    async fn an_enrolled_hub_does_not_depend_on_the_published_ca() {
+        let body: serde_json::Value =
+            serde_json::from_str(&token_body(CN, "https://cell.internal.example")).unwrap();
+        let mut body = body.as_object().unwrap().clone();
+        body.remove("ca_pem");
+        let host = LendingHost::answering(200, serde_json::Value::Object(body).to_string());
+
+        let access = resolve_access(&host, &a_hub("enrolled-no-anchor"))
+            .await
+            .unwrap()
+            .expect("an enrolled hub keeps its road");
+
+        assert!(access.identity.is_some());
+        assert!(!access.ca_pem.is_empty());
     }
 
     /// A hub that cannot reach its cloud at all has no road either — and does not panic.
@@ -1267,7 +1710,10 @@ mod tests {
             .expect("a mismatched common name is not usable");
 
         let message = error.to_string();
-        assert!(message.contains("hub-otro.fiscal.erplora.internal"), "{message}");
+        assert!(
+            message.contains("hub-otro.fiscal.erplora.internal"),
+            "{message}"
+        );
         assert!(message.contains(CN), "{message}");
     }
 
@@ -1293,7 +1739,11 @@ mod tests {
         resolve_access(&host, &a_hub("tenant-a")).await.unwrap();
         resolve_access(&host, &a_hub("tenant-b")).await.unwrap();
 
-        assert_eq!(host.calls(), 2, "a bearer minted for one hub is not another's");
+        assert_eq!(
+            host.calls(),
+            2,
+            "a bearer minted for one hub is not another's"
+        );
     }
 
     /// After a failure the next ask BRAKES instead of asking again: a contingency queue draining

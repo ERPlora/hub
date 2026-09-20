@@ -165,7 +165,8 @@ pub(crate) async fn resolve_route(
         Some(access) => Ok(TransmitRoute::Gateway(access)),
         None => Err(VerifactuError::Certificate(
             "no hay vía de transmisión: ni certificado del negocio (súbelo en Ajustes → Negocio) \
-             ni pasarela fiscal disponible (identidad de máquina sin enrolar)"
+             ni pasarela fiscal disponible (este hub no está enrolado y ERPlora todavía no ha \
+             publicado la CA interna que abriría el carril de pruebas)"
                 .into(),
         )
         .into()),
