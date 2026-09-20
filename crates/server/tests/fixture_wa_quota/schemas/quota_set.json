@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "whatsapp_inbox._quota.set",
+  "description": "Mirror of `schemas/quota_set.json` in ERPlora/whatsapp_inbox as PUBLISHED today — the module version the fleet is actually running. `additionalProperties: false` is the point of this fixture: it is what makes a hub that sends a field this module has not declared yet lose the cap as well.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["monthly_limit"],
+  "properties": {
+    "monthly_limit": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Billable messages per calendar month the plan allows. 0 = no cap."
+    }
+  }
+}

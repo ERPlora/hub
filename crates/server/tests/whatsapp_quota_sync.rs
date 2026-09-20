@@ -51,18 +51,33 @@ const MACHINE_TOKEN: &str = "machine-secret";
 /// La ruta real del SaaS (`cloud_client::CloudClient::whatsapp_plan`).
 const CLOUD_PATH: &str = "/api/v1/hub/device/whatsapp/plan/";
 
+/// El módulo tal y como está PUBLICADO hoy: su `_quota.set` sólo declara `monthly_limit`, y su
+/// schema es `additionalProperties: false` como el de verdad.
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_wa_quota")
+}
+
+/// El módulo DESPUÉS de whatsapp_inbox#155: su `_quota.set` declara además `monthly_usage` y la
+/// fila de ajustes tiene dónde guardarlo.
+fn fixture_con_consumo() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_wa_quota_usage")
 }
 
 /// Un hub cuyo registro lleva de verdad `whatsapp_inbox`, instalado por la ÚNICA puerta que
 /// registra algo (`install_from_dir`) — no un mapa de estado tocado a mano.
 async fn hub(installed: bool) -> Arc<RwLock<Runtime>> {
+    hub_con(if installed { Some(fixture()) } else { None }).await
+}
+
+/// El mismo hub, eligiendo QUÉ VERSIÓN del módulo está instalada. Es la diferencia que importa en
+/// esta issue: la versión del módulo no se mueve con la del hub (ADR-0286 §3), así que el tick
+/// tiene que sostener las dos.
+async fn hub_con(fixture: Option<PathBuf>) -> Arc<RwLock<Runtime>> {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
-    if installed {
-        rt.install_from_dir(&fixture()).await.unwrap();
+    if let Some(dir) = fixture {
+        rt.install_from_dir(&dir).await.unwrap();
     }
     Arc::new(RwLock::new(rt))
 }
@@ -136,6 +151,17 @@ where
 /// La respuesta del SaaS tal y como la arma `whatsapp_plan`: el tope YA resuelto por él (con su
 /// precedencia de claves) más el consumo del mes, que es lo que obliga a leerlo en vivo.
 fn plan_body(max_billable_messages: Value) -> Value {
+    plan_body_con_consumo(max_billable_messages, json!(7))
+}
+
+/// El mismo cuerpo, eligiendo el consumo que declara el SaaS. `usage.billable_messages` es el
+/// gasto del mes en curso en la MISMA unidad que el tope, sumado por el SaaS sobre todas las
+/// grafías de la métrica (saas#1963), y es el número que `check_quota` hace cumplir allí.
+fn plan_body_con_consumo(max_billable_messages: Value, billable_messages: Value) -> Value {
+    let mut usage = json!({ "conversations": 7, "month": "2026-08" });
+    if !billable_messages.is_null() {
+        usage["billable_messages"] = billable_messages;
+    }
     json!({
         "tier": {
             "slug": "free",
@@ -146,7 +172,7 @@ fn plan_body(max_billable_messages: Value) -> Value {
             "is_metered": false,
             "overage_price": "0.00",
         },
-        "usage": { "billable_messages": 7, "conversations": 7, "month": "2026-08" },
+        "usage": usage,
         "available_tiers": [],
     })
 }
@@ -174,6 +200,25 @@ async fn stored_limit(runtime: &Arc<RwLock<Runtime>>) -> Option<i64> {
         .and_then(Value::as_i64)
 }
 
+/// El consumo tal y como está guardado en el medidor del módulo (sólo existe en la versión
+/// posterior a whatsapp_inbox#155). `None` = la fila singleton ni siquiera existe.
+async fn stored_usage(runtime: &Arc<RwLock<Runtime>>) -> Option<i64> {
+    let rt = runtime.read().await;
+    let rows = rt
+        .db()
+        .query(
+            "SELECT monthly_usage FROM whatsapp_inbox_settings \
+             WHERE hub_id = :hub_id AND is_deleted = 0",
+            &params([("hub_id", Value::from(HUB))]),
+        )
+        .await
+        .unwrap()
+        .rows;
+    rows.first()
+        .and_then(|r| r.get("monthly_usage"))
+        .and_then(Value::as_i64)
+}
+
 /// ⓵ El caso que la issue pide literalmente: un hub con el módulo instalado y un tier de **30**
 /// acaba con `free_tier_monthly_limit = 30` **sin que nadie abra la pantalla de ajustes** — el
 /// command siembra la fila singleton, porque la ingesta tampoco espera a que nadie la abra.
@@ -189,7 +234,15 @@ async fn un_tier_de_30_deja_el_medidor_en_30_sin_abrir_los_ajustes() {
 
     let outcome = sync(&runtime, &base_url).await;
 
-    assert_eq!(outcome, QuotaSync::Written(30));
+    assert_eq!(
+        outcome,
+        QuotaSync::Written {
+            monthly_limit: 30,
+            // `hub(true)` instala el módulo PUBLICADO, que todavía no declara el consumo: el
+            // tope viaja igual y el gasto no, que es justo la tolerancia de versión de hub#1953.
+            monthly_usage: None,
+        }
+    );
     assert_eq!(stored_limit(&runtime).await, Some(30));
     assert_eq!(seen.calls(), 1, "un tick, una llamada");
 }
@@ -246,7 +299,13 @@ async fn un_cambio_de_plan_se_refleja_en_el_siguiente_tick_sin_pisar_los_ajustes
 
     let outcome = sync(&runtime, &base_url).await;
 
-    assert_eq!(outcome, QuotaSync::Written(200));
+    assert_eq!(
+        outcome,
+        QuotaSync::Written {
+            monthly_limit: 200,
+            monthly_usage: None,
+        }
+    );
     assert_eq!(stored_limit(&runtime).await, Some(200));
     let greeting = {
         let rt = runtime.read().await;
@@ -352,7 +411,14 @@ async fn el_alias_de_compatibilidad_tambien_fija_el_tope() {
     })
     .await;
 
-    assert_eq!(sync(&runtime, &base_url).await, QuotaSync::Written(50));
+    assert_eq!(
+        sync(&runtime, &base_url).await,
+        QuotaSync::Written {
+            monthly_limit: 50,
+            // Este cuerpo no trae `usage` (es el del SaaS anterior al alias): «no sé».
+            monthly_usage: None,
+        }
+    );
     assert_eq!(stored_limit(&runtime).await, Some(50));
 }
 
@@ -392,5 +458,132 @@ async fn el_command_de_la_cuota_no_se_alcanza_por_la_puerta_publica() {
         erplora_runtime::error_registry::error_code_of(&err),
         "internal_command",
         "se afirma sobre el CÓDIGO, no sobre la frase"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Un solo contador: el que lleva la plataforma (hub#1953)
+//
+// El cupo se vende —y Meta nos lo cobra— por los mensajes que el negocio MANDA, y ésa es la
+// cuenta que ya lleva el SaaS. El medidor del módulo contaba los que la clienta ESCRIBE, así que
+// bajo un mismo «30 al mes» había dos números que no se parecen y el dueño no podía saber cuál le
+// iba a cortar. El tick que ya se baja el tope se baja también el gasto.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// ⓽ **Lo que la issue pide.** El mismo tick que fija el tope escribe el consumo que declara la
+/// plataforma, así que el medidor del módulo y la cuenta de erplora.com dicen el mismo número.
+#[tokio::test]
+async fn el_tick_escribe_tambien_el_consumo_que_declara_la_plataforma() {
+    let runtime = hub_con(Some(fixture_con_consumo())).await;
+    let (base_url, seen) = cloud(|_| (StatusCode::OK, plan_body_con_consumo(json!(30), json!(12)))).await;
+
+    sync(&runtime, &base_url).await;
+
+    assert_eq!(stored_limit(&runtime).await, Some(30), "el tope, como siempre");
+    assert_eq!(
+        stored_usage(&runtime).await,
+        Some(12),
+        "el gasto del mes sale de la plataforma, que es quien le paga a Meta"
+    );
+    assert_eq!(seen.calls(), 1, "el consumo viaja en el cuerpo que ya se pedía: ni una llamada más");
+}
+
+/// ⓾ 🔴 **La regresión que hay que impedir.** El módulo publicado HOY declara su `_quota.set` con
+/// `additionalProperties: false` y sin `monthly_usage`; las versiones de módulo no se mueven con
+/// las del hub (ADR-0286 §3: un módulo viejo sigue instalando en un hub nuevo). Un tick que
+/// mandase el campo a ciegas se llevaría un `invalid_payload` y dejaría de escribir **también el
+/// tope** — y en este medidor un tope que no llega es un canal facturando por mensaje sin límite.
+#[tokio::test]
+async fn contra_el_modulo_publicado_hoy_el_tope_sigue_llegando() {
+    let runtime = hub_con(Some(fixture())).await;
+    let (base_url, _seen) = cloud(|_| (StatusCode::OK, plan_body_con_consumo(json!(30), json!(12)))).await;
+
+    let outcome = sync(&runtime, &base_url).await;
+
+    assert_eq!(
+        stored_limit(&runtime).await,
+        Some(30),
+        "el tope no puede perderse por un campo que este módulo todavía no declara"
+    );
+    assert!(
+        !matches!(outcome, QuotaSync::Failed(_)),
+        "un módulo anterior a whatsapp_inbox#155 no es un fallo, es la flota: {outcome:?}"
+    );
+}
+
+/// ⑪ **«No sé» no es «cero gastado».** Un cuerpo sin consumo utilizable no puede poner el medidor
+/// a cero: eso le regalaría al hub el mes entero. El tope sí se escribe —es otro número y se sabe.
+#[tokio::test]
+async fn un_consumo_ausente_o_imposible_no_se_escribe_como_cero() {
+    // (a) Primero un tick bueno deja 12 gastados.
+    let runtime = hub_con(Some(fixture_con_consumo())).await;
+    let (base_url, _seen) = cloud(|n| {
+        let usage = match n {
+            1 => json!(12),
+            2 => Value::Null, // la clave no viene
+            _ => json!(-3),   // un número imposible
+        };
+        (StatusCode::OK, plan_body_con_consumo(json!(30), usage))
+    })
+    .await;
+    sync(&runtime, &base_url).await;
+    assert_eq!(stored_usage(&runtime).await, Some(12));
+
+    // (b) El consumo desaparece del cuerpo: lo que ya medía sigue midiendo.
+    let sin_consumo = sync(&runtime, &base_url).await;
+    assert_eq!(
+        sin_consumo,
+        QuotaSync::Written {
+            monthly_limit: 30,
+            monthly_usage: None,
+        },
+        "el tope sí se sabe: el tick escribe, y sólo se calla sobre el gasto"
+    );
+    assert_eq!(
+        stored_usage(&runtime).await,
+        Some(12),
+        "una ausencia no puede devolverle el mes entero al hub"
+    );
+    assert_eq!(stored_limit(&runtime).await, Some(30), "el tope sí se sabe y sí se escribe");
+
+    // (c) Un negativo es un dato corrupto, no una instrucción.
+    //
+    // 🔴 Se afirma sobre el RESULTADO del tick, no sólo sobre lo guardado, y por una razón que
+    // costó medir: el `minimum: 0` del módulo también rechaza el negativo, pero lo hace tumbando
+    // el command ENTERO (`invalid_payload`), así que el tope tampoco se escribiría. Mirando sólo
+    // la columna, el test pasaba por casualidad —el valor ya estaba puesto del tick anterior— y
+    // dejaba vivo un mutante que borra el filtro de aquí.
+    let negativo = sync(&runtime, &base_url).await;
+    assert_eq!(
+        negativo,
+        QuotaSync::Written {
+            monthly_limit: 30,
+            monthly_usage: None,
+        },
+        "el dato corrupto se descarta AQUÍ; si llega al módulo se lleva el tope por delante"
+    );
+    assert_eq!(stored_usage(&runtime).await, Some(12));
+}
+
+/// ⑫ **Un cero de la plataforma SÍ es un número.** Es la diferencia con el tope, donde `0`
+/// significa «sin límite»: aquí significa «este mes no has gastado nada», y es lo que ve el dueño
+/// el día 1. Confundirlo con «no sé» dejaría el medidor con el gasto del mes pasado.
+#[tokio::test]
+async fn un_consumo_de_cero_es_un_dato_y_se_escribe() {
+    let runtime = hub_con(Some(fixture_con_consumo())).await;
+    let (base_url, _seen) = cloud(|n| {
+        let usage = if n == 1 { json!(29) } else { json!(0) };
+        (StatusCode::OK, plan_body_con_consumo(json!(30), usage))
+    })
+    .await;
+    sync(&runtime, &base_url).await;
+    assert_eq!(stored_usage(&runtime).await, Some(29), "el mes que acaba");
+
+    sync(&runtime, &base_url).await;
+
+    assert_eq!(
+        stored_usage(&runtime).await,
+        Some(0),
+        "el mes nuevo empieza a cero, y ese cero lo dice la plataforma"
     );
 }
