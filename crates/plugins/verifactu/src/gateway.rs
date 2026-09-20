@@ -1492,6 +1492,30 @@ mod tests {
         );
     }
 
+    /// 🔒 The guard is an ALLOW-list: the lane carries `testing` and nothing else. Written as
+    /// `== "production"` it passed every other test here, and then a word nobody validated
+    /// («Production», «») would leave this process on the lane that must only ever say `testing`.
+    /// The cell maps such a word to `prewww` today; this side must not depend on that.
+    #[tokio::test]
+    async fn the_testing_lane_carries_the_word_testing_and_nothing_else_hub1936() {
+        let mut access = test_access("http://127.0.0.1:1/never-reached");
+        access.identity = None;
+
+        for word in ["", "Production", "PRODUCTION", "prod", "testing "] {
+            let odd = GatewayEnvelope {
+                environment: word,
+                ..envelope("<soapenv:Envelope/>")
+            };
+            let error = post_transmission(&access, &odd)
+                .await
+                .expect_err("only `testing` rides the anonymous lane");
+            assert!(
+                error.to_string().contains("anonymous_lane_production"),
+                "{word:?}: {error}"
+            );
+        }
+    }
+
     /// The positive control of the test above, and the one that proves the guard is not «refuse
     /// everything»: the SAME anonymous access carries a `testing` envelope, and what stops it is
     /// the unreachable address, not the lane.
