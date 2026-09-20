@@ -177,9 +177,11 @@ pub async fn pending(
 ) -> Result<Vec<PendingEvent>> {
     let mut params = Params::new();
     params.insert("hub_id".into(), json!(hub_id));
+    // Acotado en los dos extremos: un `0` devolvería un latido que nunca entrega nada, y pedir
+    // más del tope haría una petición lo bastante grande como para expirar en el Cloud.
     params.insert(
         "limit".into(),
-        json!(limit.min(MAX_EVENTS_PER_BEAT).max(1) as i64),
+        json!(limit.clamp(1, MAX_EVENTS_PER_BEAT) as i64),
     );
     // `id` breaks the tie so the order is TOTAL: two events in the same second must not swap
     // places between the read that reports them and the delete that confirms them.
