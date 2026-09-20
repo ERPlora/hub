@@ -226,6 +226,12 @@ pub struct InboundMessage {
     /// [`Self::reply_id`].
     #[serde(default)]
     reply_title: String,
+    /// **WHICH question this message answers**: the `wamid` of the message being replied to, as
+    /// the SaaS lifted it out of Meta's `context` (saas#1919). Empty when the SaaS is older than
+    /// that field, or when nothing is being answered — read it through [`Self::answers`], which
+    /// falls back to the verbatim payload.
+    #[serde(default)]
+    reply_to: String,
     /// The message object from Meta's webhook, verbatim.
     #[serde(default)]
     pub payload: Value,
@@ -269,6 +275,7 @@ impl InboundMessage {
         let (reply_id, reply_title) = self.reply();
         payload.insert("reply_id".into(), json!(reply_id));
         payload.insert("reply_title".into(), json!(reply_title));
+        payload.insert("reply_to".into(), json!(self.answers()));
         payload.insert("received_at".into(), json!(self.received_at));
         payload.insert("message".into(), self.payload.clone());
         payload
@@ -346,6 +353,33 @@ impl InboundMessage {
         (String::new(), String::new())
     }
 
+    /// **WHICH question this message answers** — the `wamid` of the message being replied to, or
+    /// an empty string when it answers nothing (hub#1673).
+    ///
+    /// `reply_id` alone is ambiguous the moment a business asks twice without waiting for an
+    /// answer: two questions may perfectly well offer the same option id — a template's approved
+    /// «Sí» is the same «Sí» every time — and the automation then confirms whichever it guessed.
+    /// Meta already says which one, in `context.id`.
+    ///
+    /// Same two rules as [`Self::reply`]. What the SaaS lifted WINS, because that is where Meta's
+    /// shape is checked and where its next change gets taught first; when it says nothing — a
+    /// SaaS older than saas#1919, or a row parked before it shipped, including the coexistence
+    /// backlog — the same answer is read off the verbatim payload. Empty and never an `Option`:
+    /// a flow comparing `reply_to` against the question it asked should simply not match an
+    /// unprompted message, not have to test for absence first. Anything that is not a non-empty
+    /// string is not a `wamid` — a forward's `context` carries no `id` at all.
+    fn answers(&self) -> String {
+        if !self.reply_to.is_empty() {
+            return self.reply_to.clone();
+        }
+        self.payload
+            .get(ANSWERS_PATH.0)
+            .and_then(|context| context.get(ANSWERS_PATH.1))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
+    }
+
     /// The body of a text message, or an empty string for any other kind. Deliberately not an
     /// `Option`: a flow comparing `text` against something should simply not match a photo.
     fn text(&self) -> String {
@@ -368,6 +402,14 @@ const REPLY_SHAPES: [(&[&str], &str, &str); 3] = [
     (&["interactive", "button_reply"], "id", "title"),
     (&["button"], "payload", "text"),
 ];
+
+/// **Where Meta puts the message an answer answers**: `context.id`, the `wamid` of the message
+/// being replied to. One shape, unlike the tap's three, and no [`dig`]: `Value::get` already
+/// answers `None` for every non-object `context` a payload stored verbatim can hold — a
+/// forward's, a null, a list — so the walk would only be an untested way of saying the same
+/// thing. The SaaS reads the same path (`apps/whatsapp_inbox/api/inbox.py::_reply_to`); this is
+/// the half that keeps working against a SaaS that has not shipped the field yet.
+const ANSWERS_PATH: (&str, &str) = ("context", "id");
 
 /// Walks `path` through nested objects, or `None` the moment the shape is not that.
 ///
@@ -1641,6 +1683,106 @@ mod tests {
             let event = message.event_payload();
             assert_eq!(event["reply_id"], json!(""), "{payload}");
             assert_eq!(event["reply_title"], json!(""), "{payload}");
+        }
+    }
+
+    /// **WHICH question the tap answers reaches the flow as a field with a name** (hub#1673).
+    ///
+    /// `reply_id` alone is ambiguous the moment a business asks twice without waiting: two
+    /// questions may perfectly well offer the same option id — a template's approved «Sí» is the
+    /// same «Sí» every time it is sent — and the automation then confirms whichever it guessed.
+    /// Meta already says which one: an answer carries `context.id`, the `wamid` of the message
+    /// being replied to. Lifted here for the same reason `reply_id` is: a declarative condition
+    /// reads ONE path, not a nesting.
+    #[test]
+    fn which_question_a_tap_answers_is_lifted_like_the_tap_itself_is() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.2",
+            "from": CUSTOMER,
+            "direction": "inbound",
+            "contact": CUSTOMER,
+            "source": "live",
+            "reply_id": "yes",
+            "reply_title": "Sí",
+            "reply_to": "wamid.the-question",
+            "payload": {"type": "interactive", "context": {"id": "wamid.the-question"},
+                "interactive": {"button_reply": {"id": "yes", "title": "Sí"}}},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .expect("the shape the SaaS serves since saas#1919");
+
+        let payload = message.event_payload();
+        assert_eq!(payload["reply_to"], json!("wamid.the-question"));
+        assert_eq!(
+            message.unexpected(),
+            Vec::<String>::new(),
+            "a field this runtime now has a place for must stop being reported as a gap"
+        );
+    }
+
+    /// The same fallback `reply_id` has, for the same reason: a SaaS older than saas#1919, or a
+    /// row parked before it shipped — including the coexistence backlog — still carries Meta's
+    /// word verbatim in `payload`. Reading it there is what keeps a hub working against a cloud
+    /// that has not shipped the field yet.
+    #[test]
+    fn the_question_is_read_off_metas_payload_when_the_saas_is_older_than_the_field() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.2",
+            "from": CUSTOMER,
+            "payload": {"type": "text", "context": {"id": "wamid.the-question"},
+                "text": {"body": "sí"}},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .expect("what a pre-saas#1919 cloud serves: no `reply_to`, payload verbatim");
+
+        assert_eq!(
+            message.event_payload()["reply_to"],
+            json!("wamid.the-question")
+        );
+    }
+
+    /// What the SaaS says WINS over what the hub can work out, exactly as with `reply_id`: the
+    /// SaaS is where Meta's shape is checked and where its next change gets taught first.
+    #[test]
+    fn the_saas_answers_which_question_even_when_the_payload_says_another() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.2",
+            "from": CUSTOMER,
+            "reply_to": "from-the-saas",
+            "payload": {"type": "text", "context": {"id": "from-the-payload"},
+                "text": {"body": "sí"}},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .unwrap();
+
+        assert_eq!(message.event_payload()["reply_to"], json!("from-the-saas"));
+    }
+
+    /// **Empty and never absent**, exactly like `reply_id`: a flow comparing `reply_to` against
+    /// the question it asked must simply not match an unprompted message, not have to test for
+    /// absence first. And a `context` that answers nothing is not an answer: a forward's
+    /// `context` carries no `id`, and anything that is not a non-empty string is not a `wamid`.
+    #[test]
+    fn a_message_that_answers_no_question_reads_as_empty_rather_than_missing() {
+        for payload in [
+            json!({"type": "text", "text": {"body": "hola"}}),
+            json!({"type": "text", "context": {"forwarded": true}, "text": {"body": "hola"}}),
+            json!({"type": "text", "context": {"id": ""}}),
+            json!({"type": "text", "context": {"id": 7}}),
+            json!({"type": "text", "context": {"id": {"nested": "object"}}}),
+            json!({"type": "text", "context": ["not", "an", "object"]}),
+            json!({"type": "text", "context": null}),
+            json!(null),
+        ] {
+            let message: InboundMessage = serde_json::from_value(json!({
+                "wa_message_id": "wamid.1",
+                "from": CUSTOMER,
+                "payload": payload,
+                "received_at": "2026-09-07T10:00:00+00:00",
+            }))
+            .unwrap();
+            let event = message.event_payload();
+            assert_eq!(event["reply_to"], json!(""), "{payload}");
         }
     }
 
