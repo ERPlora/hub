@@ -1060,6 +1060,7 @@ ci_on_remote() {
     return 1
 }
 ci_want="$(printf 'success\t%s' "$CI_WORKSPACE_CHECK")"
+ci_red="$(printf '(failure|timed_out|startup_failure)\t%s' "$CI_WORKSPACE_CHECK")"
 ci_proof_sha=
 ci_probes=0
 for _cand in $(git rev-list --max-count="${HUB_GATE_CI_SCAN:-50}" $ci_scan_refs 2>/dev/null); do
@@ -1071,6 +1072,13 @@ for _cand in $(git rev-list --max-count="${HUB_GATE_CI_SCAN:-50}" $ci_scan_refs 
     # `gh api --paginate` short, and under `pipefail` its EPIPE (141) becomes
     # the pipeline's answer (hub#1534).
     ci_seen="$(ci_checks_for "$_cand")"
+    # One sha carries one run of the check PER EVENT (`push` and `pull_request`
+    # both report on it). If Actions ALSO saw this very tree fail, the green twin
+    # is not a proof: stop looking and fall through to the refusal. A `cancelled`
+    # twin is not evidence — concurrency cancels runs all day.
+    if grep -qxE "$ci_red" <<<"$ci_seen"; then
+        break
+    fi
     if grep -qxF "$ci_want" <<<"$ci_seen"; then
         ci_proof_sha="$_cand"
         break

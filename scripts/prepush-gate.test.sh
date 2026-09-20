@@ -2681,6 +2681,71 @@ errs=""
     && ok "hub#1679: ordinary push — the CI lookup is filtered out locally, GitHub is never asked" \
     || bad "hub#1679: ordinary push — the CI lookup is filtered out locally, GitHub is never asked" "$errs"
 
+# ── 68. A check whose name merely CONTAINS the workspace check is another check ─
+#    The match is the whole line. `cargo test --workspace (shard 2)` green says
+#    nothing about the job `merge-pr.sh` treats as the authority — a substring
+#    match survived every other case of this block (review of hub#1956).
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'success\tcargo test --workspace (shard 2)\nnot-success\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-from-a-lookalike-check"
+[ -z "$errs" ] \
+    && ok "hub#1679: a green check that only CONTAINS the workspace name — refused" \
+    || bad "hub#1679: a green check that only CONTAINS the workspace name — refused" "$errs"
+
+# ── 69. The same commit carries the workspace check RED and GREEN → no proof ───
+#    One sha holds one check run PER EVENT (measured on c0fbc3fc: a `push` run
+#    and a `pull_request` run, both named `cargo test --workspace`). "Any line is
+#    green" would seal a tree that Actions ALSO saw fail: the red run is evidence
+#    about this very content, so it falls through to the refusal — the safe side.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'success\tcargo test --workspace\nfailure\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-a-tree-actions-also-saw-fail"
+[ -z "$errs" ] \
+    && ok "hub#1679: workspace check green AND red on the same commit — refused, nothing attested" \
+    || bad "hub#1679: workspace check green AND red on the same commit — refused, nothing attested" "$errs"
+
+# ── 70. …but a CANCELLED twin is not evidence: concurrency cancels runs all day ─
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'cancelled\tcargo test --workspace\nsuccess\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 0 ]                            || errs="$errs exit=$code(want 0)"
+grep -q "^$sha local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+                                           || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')"
+[ -z "$errs" ] \
+    && ok "hub#1679: a cancelled twin next to the green one — still sealed" \
+    || bad "hub#1679: a cancelled twin next to the green one — still sealed" "$errs"
+
 
 echo
 echo "  $pass passed, $fail failed"
