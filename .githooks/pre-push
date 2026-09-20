@@ -94,6 +94,11 @@
 #   connection has no keepalive; the rule is keepalive margin > max lock wait)
 #   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY (hub#574: how long the
 #   background publish step polls origin for the ref before giving up)
+#   HUB_GATE_CI_CHECKS_CMD · HUB_GATE_CI_SCAN · HUB_GATE_CI_PROBES (hub#1679:
+#   how Actions is asked whether this exact tree is already green, how far back
+#   candidates are looked for, and how many are ever probed — driven without
+#   network. HUB_GATE_CI_CHECKS_CMD is invoked with $1 = sha and prints one
+#   "<conclusion>TAB<check name>" per line, like the default `gh api` call)
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -110,6 +115,14 @@ CONTEXT=local-gate/hub-tests
 # A bypass (SKIP_HUB_WEB=1) publishes NEITHER: absence of seal, never a false one.
 WEB_CONTEXT=local-gate/hub-web
 NO_SUITE_CONTEXT=local-gate/no-suite-needed
+# hub#1679: the seal for a tree Actions ALREADY ran the workspace suite on. It
+# is a separate context on purpose — `local-gate/hub-tests` says "green on the
+# pusher's machine", and that run happened in the cloud. Same rule as the
+# scoped seal: the attestation names what really ran (hub#1207 §4).
+CI_CONTEXT=local-gate/hub-tests-ci
+# The one CI check that answers "did the thing that tests this run?". Same
+# string `merge-pr.sh` treats as the authority (its CI_WORKSPACE_CHECK).
+CI_WORKSPACE_CHECK='cargo test --workspace'
 PG_CONTAINER=erplora-test-pg-5433
 PG_DSN=postgres://postgres:test@localhost:5433/hub_test
 # pgvector, not plain `postgres:18` — `crates/vector/tests/pg_store.rs` does `CREATE EXTENSION
@@ -977,6 +990,104 @@ if [ -f "$green" ]; then
     # no se bloquea nada: el de Rust ya le da checks a la PR; lo que falta es la garantía, y
     # esa se consigue reempujando con el árbol tocado.
     publish_status "$pushed_sha"
+    exit 0
+fi
+
+# ── hub#1679: a tree Actions ALREADY proved green ────────────────────────────
+# Promoting develop → main pushes a commit whose TREE is, byte for byte, the one
+# Actions just ran `cargo test --workspace` on: the promotion carries zero code
+# changes of its own. Today that push still has to pay the suite again (>40 min)
+# AND from a checkout parked on that exact tree — so in practice every release
+# went out with SKIP_HUB_TESTS=1, and v1.1.17 through v1.1.29 carry no seal at
+# all. A control that everyone bypasses has stopped being a control.
+#
+# So, before demanding the checkout (hub#855) or recompiling: is there a commit
+# the remote already knows that carries THIS tree with the workspace check
+# green? If there is, this content was tested — by the run `merge-pr.sh` treats
+# as the AUTHORITY ("the attestation is reported, never accepted in place of the
+# check"), not by somebody's laptop. Reusing it is the same reasoning as the
+# per-tree cache above, with a stronger witness.
+#
+# What this does NOT relax:
+#   · the proof must sit on the IDENTICAL tree, never merely "somewhere in
+#     history" — another tree is other content;
+#   · only `cargo test --workspace` counts. Green checks that never executed the
+#     code is the exact shape hub#640 was written against;
+#   · a red, missing or unreachable check falls straight through to the refusal
+#     below — no seal, no bypass, nothing softened;
+#   · the result is NEVER filed as a local `.green`. That cache is what feeds
+#     `local-gate/hub-tests`, and a later push reusing it would be claiming a run
+#     on this machine that never happened.
+ci_checks_for() {
+    if [ -n "${HUB_GATE_CI_CHECKS_CMD:-}" ]; then
+        ( set -- "$1"; eval "$HUB_GATE_CI_CHECKS_CMD" ) 2>/dev/null
+        return 0
+    fi
+    command -v gh >/dev/null 2>&1 || return 1
+    [ -n "${CI_REPO:-}" ] || CI_REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)"
+    [ -n "${CI_REPO:-}" ] || return 1
+    gh api "repos/$CI_REPO/commits/$1/check-runs" --paginate \
+        -q '.check_runs[] | "\(.conclusion // .status)\t\(.name)"' 2>/dev/null
+}
+
+# The candidates are bounded on purpose: this runs on every push, and the answer
+# is always near the tip. `$pushed_sha`'s ancestry covers a promotion MERGE (its
+# develop parent carries the same tree) and any re-push of a known sha; the
+# remote-tracking heads cover a promotion built with `git commit-tree`, where
+# develop is not an ancestor at all.
+ci_scan_refs="$pushed_sha"
+ci_remote_refs=
+for _ref in refs/remotes/origin/develop refs/remotes/origin/main; do
+    if git rev-parse --verify --quiet "$_ref" >/dev/null 2>&1; then
+        ci_scan_refs="$ci_scan_refs $_ref"
+        ci_remote_refs="$ci_remote_refs $_ref"
+    fi
+done
+
+# Could the remote possibly know this commit? Answered LOCALLY, without a single
+# byte of network. This whole block sits BEFORE the depth dispatch, so it is on
+# the path of EVERY push this machine makes (~19 worktrees share the hook), and
+# an ordinary branch push carries a commit the remote has never seen: probing it
+# would be a guaranteed 404 charged to every push in the fleet. A candidate that
+# is not reachable from a remote-tracking ref was never pushed, so it cannot
+# have checks. Unreachable-but-really-on-the-remote (a stale fetch, a commit on
+# some third branch) just falls through to the refusal below — the safe side.
+ci_on_remote() {
+    local _r
+    for _r in $ci_remote_refs; do
+        git merge-base --is-ancestor "$1" "$_r" 2>/dev/null && return 0
+    done
+    return 1
+}
+ci_want="$(printf 'success\t%s' "$CI_WORKSPACE_CHECK")"
+ci_red="$(printf '(failure|timed_out|startup_failure)\t%s' "$CI_WORKSPACE_CHECK")"
+ci_proof_sha=
+ci_probes=0
+for _cand in $(git rev-list --max-count="${HUB_GATE_CI_SCAN:-50}" $ci_scan_refs 2>/dev/null); do
+    [ "$(git rev-parse "${_cand}^{tree}" 2>/dev/null)" = "$tree" ] || continue
+    ci_on_remote "$_cand" || continue
+    ci_probes=$((ci_probes + 1))
+    [ "$ci_probes" -le "${HUB_GATE_CI_PROBES:-5}" ] || break
+    # Collected first, never piped into `grep -q`: the reader would cut the
+    # `gh api --paginate` short, and under `pipefail` its EPIPE (141) becomes
+    # the pipeline's answer (hub#1534).
+    ci_seen="$(ci_checks_for "$_cand")"
+    # One sha carries one run of the check PER EVENT (`push` and `pull_request`
+    # both report on it). If Actions ALSO saw this very tree fail, the green twin
+    # is not a proof: stop looking and fall through to the refusal. A `cancelled`
+    # twin is not evidence — concurrency cancels runs all day.
+    if grep -qxE "$ci_red" <<<"$ci_seen"; then
+        break
+    fi
+    if grep -qxF "$ci_want" <<<"$ci_seen"; then
+        ci_proof_sha="$_cand"
+        break
+    fi
+done
+if [ -n "$ci_proof_sha" ]; then
+    echo "✅ pre-push: this exact tree is already green in Actions ($CI_WORKSPACE_CHECK on ${ci_proof_sha:0:12}) → nothing to rebuild (hub#1679)." >&2
+    publish_status "$pushed_sha" "$CI_CONTEXT" \
+        "$CI_WORKSPACE_CHECK green in GitHub Actions on the identical tree ${tree:0:12} (commit ${ci_proof_sha:0:12})"
     exit 0
 fi
 
