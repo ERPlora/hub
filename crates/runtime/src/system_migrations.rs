@@ -1995,7 +1995,51 @@ CREATE INDEX IF NOT EXISTS ix_policy_checkpoint ON _policy (hub_id, checkpoint);
         postgres: "ALTER TABLE _hub_certificate \
                      ADD COLUMN IF NOT EXISTS use_for_transmission INTEGER NOT NULL DEFAULT 1;",
     },
-
+    // ── v64 — saas#2129: `_hub_activity_log`, WHAT the people of the business do here ──────────
+    //
+    // `_hub_activity` (v39) holds ONE timestamp: somebody entered. That is enough to decide
+    // whether a free hub is abandoned, and not nearly enough to answer "are they USING it": a
+    // business in its first week — entering, building the catalogue, opening the till, not
+    // charging yet — looks identical to a dead one, because the only business signal the Cloud
+    // had was the sale count. These are EVENTS, each a distinct fact, so they get rows.
+    //
+    // WHY A TABLE AND NOT AN ATOMIC, which is what the sibling signal uses: with
+    // `order: start-first` (ADR-0269) every update kills a task, so a sale between the last beat
+    // and a routine deploy would die in memory. And this data CANNOT be rebuilt afterwards —
+    // what October does not record is gone — which is why the buffer is durable from the first
+    // write rather than from the first successful beat.
+    //
+    // `id` is minted by the HUB (uuid v4) and is the dedup key the Cloud stores: delivery is
+    // at-least-once (a batch is re-sent until a beat answers 2xx), so the id is what turns that
+    // into exactly-once storage on the other side.
+    //
+    // `actor` is the hub's own id for that person (`RequestContext::user_id`) — the PIN-only
+    // cashier never reaches the SaaS at all. NO NAME, NO EMAIL, and nothing whatsoever about the
+    // END CUSTOMER: there is no column for it, so it cannot leak by somebody filling a field in
+    // later.
+    //
+    // Timestamps are RFC3339 UTC TEXT like `_hub_activity`/`_print_queue`: fixed width and always
+    // `Z`, so the ordering that decides what a beat takes is a text comparison with no cast.
+    //
+    // No `deleted_at`: a reported event is DELETED, not soft-deleted. The Cloud is the durable
+    // store from the moment it acknowledges, and a till's disk is not the place to keep a second
+    // copy of a year of telemetry.
+    //
+    // ⚠️ v64: re-check the number against `origin/develop` right before the push (hub#573). Three
+    // branches in flight have renumbered themselves over this catalogue in a single week, and
+    // `apply` only shouts once a hub already carries the higher number — far too late.
+    SystemMigration {
+        version: 64,
+        name: "hub_activity_log",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_activity_log (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, activity_type TEXT NOT NULL, \
+  actor TEXT NOT NULL, occurred_at TEXT NOT NULL, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_hub_activity_log_pending \
+  ON _hub_activity_log (hub_id, occurred_at, id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3950,7 +3994,17 @@ mod kind_contract_tests {
         // additive, so ADR-0269 retires it by leaving it unwritten. When it was written the maximum
         // was v62 on `origin/develop` and across the 98 remote branches that carry the file — none
         // asks for a v63.
-        assert_eq!(MIGRATIONS.len(), 60, "el catálogo cambió de tamaño");
+        // + `hub_activity_log` (v64, saas#2129): `_hub_activity_log`, one row per thing somebody of
+        // the business DID here — entering, leaving, selling, refunding, opening and closing the
+        // till — with the hub's own id for who did it. A TABLE and not another column on
+        // `_hub_activity` because these are events, each a distinct fact; and durable from the
+        // first write because `order: start-first` kills a task on every update and this data
+        // cannot be rebuilt afterwards. `CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT
+        // EXISTS`, so it is additive and re-runnable, and ADR-0269 retires it by leaving it
+        // unwritten. When it was written the maximum was v63 on `origin/develop` and across the 31
+        // remote branches that carry the file — none asks for a v64 (`git grep -l "version: 6[4-9]"`
+        // over every remote ref came back empty).
+        assert_eq!(MIGRATIONS.len(), 61, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

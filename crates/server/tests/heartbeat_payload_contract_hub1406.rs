@@ -13,7 +13,7 @@
 //! still sends them. Dropping them here is therefore safe in both directions — a new hub against an
 //! old SaaS writes two columns fewer, an old hub against the new SaaS is ignored.
 
-use erplora_server::daily_usage::{DailyUsageHeartbeat, PendingObligationFields};
+use erplora_server::daily_usage::{ActivityEvent, DailyUsageHeartbeat, PendingObligationFields};
 
 fn base() -> DailyUsageHeartbeat {
     DailyUsageHeartbeat {
@@ -22,6 +22,12 @@ fn base() -> DailyUsageHeartbeat {
         terminals: Some(2),
         active_users: Some(3),
         last_user_activity_at: Some("2026-09-01T09:00:00Z".to_string()),
+        activity: vec![ActivityEvent {
+            id: "e-1".to_string(),
+            kind: "cash_open".to_string(),
+            occurred_at: "2026-09-01T09:00:00.250Z".to_string(),
+            actor: "pin-42".to_string(),
+        }],
         core_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![(
             "verifactu".to_string(),
@@ -41,7 +47,9 @@ fn hub1406_full_heartbeat_serializes_byte_identically() {
     let expected = concat!(
         r#"{"orders_today":7,"last_sale_at":"2026-09-01T10:00:00Z","terminals":2,"#,
         r#""active_users":3,"#,
-        r#""last_user_activity_at":"2026-09-01T09:00:00Z","core_version":"1.2.3","#,
+        r#""last_user_activity_at":"2026-09-01T09:00:00Z","#,
+        r#""activity":[{"id":"e-1","type":"cash_open","at":"2026-09-01T09:00:00.250Z","actor":"pin-42"}],"#,
+        r#""core_version":"1.2.3","#,
         r#""verifactu_pending_depth":2,"verifactu_oldest_pending_at":"2026-08-30T08:00:00Z","#,
         r#""cpu_pct":1.5,"memory_used_mb":100.0,"memory_limit_mb":512.0,"memory_peak_mb":222.0,"#,
         r#""transmission_route":"delegated"}"#,
@@ -60,6 +68,7 @@ fn hub1406_an_empty_queue_is_a_zero_not_an_absence() {
         terminals: None,
         active_users: None,
         last_user_activity_at: None,
+        activity: Vec::new(),
         core_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![("verifactu".to_string(), 0, None)]),
         cpu_pct: None,
@@ -83,6 +92,7 @@ fn hub1406_an_unreadable_queue_is_absent() {
         terminals: None,
         active_users: None,
         last_user_activity_at: None,
+        activity: Vec::new(),
         core_version: "1.2.3".to_string(),
         pending: PendingObligationFields::default(),
         cpu_pct: None,
@@ -165,7 +175,88 @@ fn hub1814_an_empty_census_is_an_honest_zero() {
     hb.active_users = Some(0);
 
     assert!(
-        serde_json::to_string(&hb).unwrap().contains(r#""active_users":0"#),
+        serde_json::to_string(&hb)
+            .unwrap()
+            .contains(r#""active_users":0"#),
         "an explicit zero is «I counted and nobody is here», and it has to travel"
     );
+}
+
+// ── saas#2129 — the business activity events ─────────────────────────────────────────────────
+
+/// **Four keys and no more**, under the exact names the SaaS reads.
+///
+/// This is the contract between the two repos and the privacy guard at once: the receiver reads
+/// `id`, `type`, `at` and `actor`, and a fifth field added here would either be ignored there —
+/// losing the data silently — or carry something about the **END CUSTOMER** into the control
+/// plane. Asserting the exact key set is what turns that into a red test instead of a discovery.
+/// Mind `type` and `at`: the Rust fields are called `kind` and `occurred_at`.
+#[test]
+fn saas2129_an_event_travels_with_exactly_the_four_keys_the_saas_reads() {
+    let event = ActivityEvent {
+        id: "e-1".to_string(),
+        kind: "cash_open".to_string(),
+        occurred_at: "2026-09-01T09:00:00.250Z".to_string(),
+        actor: "pin-42".to_string(),
+    };
+
+    let wire = serde_json::to_value(&event).unwrap();
+    let mut keys: Vec<&str> = wire
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["actor", "at", "id", "type"], "{wire}");
+}
+
+/// **With nothing to report the field does NOT travel** — not even as `[]`.
+///
+/// Deliberately unlike the contract of `active_users` and `verifactu_pending_depth`, where an
+/// explicit `0` and an absence mean opposite things. Here there is no such distinction: an empty
+/// queue and a queue that could not be read both end in "this beat delivers no events", and in
+/// both the receiver writes nothing — the events stay in the hub's buffer and the next beat
+/// retries, so nothing is lost by staying quiet. And since this rides the beat, and most beats
+/// from most hubs come from an idle hub, sending `"activity":[]` would be noise on nearly all.
+#[test]
+fn saas2129_nothing_to_report_means_the_field_is_absent_not_an_empty_array() {
+    let mut hb = base();
+    hb.activity = Vec::new();
+
+    // ⚠️ By KEY, not by substring: `body.contains("activity")` also matches
+    // `last_user_activity_at`, which travels right beside it, so the assertion would pass
+    // whatever the field did. A real trap, hit while writing this test.
+    let wire = serde_json::to_value(&hb).unwrap();
+    assert!(
+        !wire.as_object().unwrap().contains_key("activity"),
+        "«no tengo nada» es que el campo no esté: {wire}"
+    );
+}
+
+/// And a batch travels WHOLE and in order. The SaaS deduplicates by `id`, so a re-send costs
+/// nothing — but dropping one on the way is unrecoverable: what is not collected is not rebuilt.
+#[test]
+fn saas2129_a_batch_travels_whole_and_in_order() {
+    let mut hb = base();
+    hb.activity = vec![
+        ActivityEvent {
+            id: "e-1".to_string(),
+            kind: "login".to_string(),
+            occurred_at: "2026-09-01T09:00:00.100Z".to_string(),
+            actor: "pin-42".to_string(),
+        },
+        ActivityEvent {
+            id: "e-2".to_string(),
+            kind: "sale".to_string(),
+            occurred_at: "2026-09-01T09:00:00.900Z".to_string(),
+            actor: "pin-42".to_string(),
+        },
+    ];
+
+    let wire = serde_json::to_value(&hb).unwrap();
+    let sent = wire["activity"].as_array().unwrap();
+    assert_eq!(sent.len(), 2, "{wire}");
+    assert_eq!(sent[0]["id"], "e-1", "el más viejo primero");
+    assert_eq!(sent[1]["id"], "e-2");
 }

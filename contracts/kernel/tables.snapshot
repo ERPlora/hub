@@ -184,6 +184,12 @@ _hub_activity.last_activity_at text NOT NULL
 _hub_activity.last_reported_at text NULL
 _hub_activity.updated_at text NOT NULL
 
+_hub_activity_log.activity_type text NOT NULL
+_hub_activity_log.actor text NOT NULL
+_hub_activity_log.hub_id text NOT NULL
+_hub_activity_log.id text NOT NULL
+_hub_activity_log.occurred_at text NOT NULL
+
 _hub_badge_key.created_at text NOT NULL
 _hub_badge_key.hub_id text NOT NULL
 _hub_badge_key.key_hex text NOT NULL

@@ -917,11 +917,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         monthly_limit,
                         monthly_usage,
                     } => {
-                        tracing::debug!(
-                            monthly_limit,
-                            monthly_usage,
-                            "cuota de WhatsApp al día"
-                        )
+                        tracing::debug!(monthly_limit, monthly_usage, "cuota de WhatsApp al día")
                     }
                     // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
                     // en la flota que no compró el canal): aquí no se repite el ruido.
@@ -930,7 +926,28 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 match heartbeat_result {
                     // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
                     // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
-                    Ok(_) => {
+                    Ok(ref answer) => {
+                        // The same, one step further down (saas#2129): the events this beat
+                        // carried are settled, and the buffer keeps draining in THIS tick while
+                        // the bite comes full — the tick is daily, so leaving the surplus for the
+                        // next one is how a busy till loses its oldest events for ever. Only
+                        // `activity_ack` deletes: a bare 2xx is also what a broken ingest answers.
+                        let settled = daily_usage::settle_activity(
+                            &st.runtime,
+                            &st.http,
+                            &st.config.cloud_base_url,
+                            &auth,
+                            &usage.activity,
+                            answer.activity_ack,
+                        )
+                        .await;
+                        if settled.confirmed > 0 {
+                            tracing::debug!(
+                                confirmed = settled.confirmed,
+                                rounds = settled.rounds,
+                                "business activity delivered to the Cloud"
+                            );
+                        }
                         if let Some(ts) = pending_activity {
                             st.activity.mark_reported(ts);
                         }
