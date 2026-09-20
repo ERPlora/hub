@@ -530,7 +530,15 @@ async fn un_consumo_ausente_o_imposible_no_se_escribe_como_cero() {
     assert_eq!(stored_usage(&runtime).await, Some(12));
 
     // (b) El consumo desaparece del cuerpo: lo que ya medía sigue midiendo.
-    sync(&runtime, &base_url).await;
+    let sin_consumo = sync(&runtime, &base_url).await;
+    assert_eq!(
+        sin_consumo,
+        QuotaSync::Written {
+            monthly_limit: 30,
+            monthly_usage: None,
+        },
+        "el tope sí se sabe: el tick escribe, y sólo se calla sobre el gasto"
+    );
     assert_eq!(
         stored_usage(&runtime).await,
         Some(12),
@@ -539,7 +547,21 @@ async fn un_consumo_ausente_o_imposible_no_se_escribe_como_cero() {
     assert_eq!(stored_limit(&runtime).await, Some(30), "el tope sí se sabe y sí se escribe");
 
     // (c) Un negativo es un dato corrupto, no una instrucción.
-    sync(&runtime, &base_url).await;
+    //
+    // 🔴 Se afirma sobre el RESULTADO del tick, no sólo sobre lo guardado, y por una razón que
+    // costó medir: el `minimum: 0` del módulo también rechaza el negativo, pero lo hace tumbando
+    // el command ENTERO (`invalid_payload`), así que el tope tampoco se escribiría. Mirando sólo
+    // la columna, el test pasaba por casualidad —el valor ya estaba puesto del tick anterior— y
+    // dejaba vivo un mutante que borra el filtro de aquí.
+    let negativo = sync(&runtime, &base_url).await;
+    assert_eq!(
+        negativo,
+        QuotaSync::Written {
+            monthly_limit: 30,
+            monthly_usage: None,
+        },
+        "el dato corrupto se descarta AQUÍ; si llega al módulo se lleva el tope por delante"
+    );
     assert_eq!(stored_usage(&runtime).await, Some(12));
 }
 
