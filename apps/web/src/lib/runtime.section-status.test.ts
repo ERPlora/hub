@@ -99,6 +99,15 @@ describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
     expect(sectionDiscardCode('installation_bound_data')).toBe('installation_bound_data');
   });
 
+  // hub#1947 — la plantilla se publicó contra una versión de la app que todavía guardaba esa
+  // tabla, y la que el hub instala hoy ya no la tiene. Sin código, la fila del informe le
+  // enseñaría a la peluquera la cadena cruda `table_gone_in_installed_version`.
+  it('reconoce el código de unas filas de una tabla que la app ya no tiene', () => {
+    expect(sectionDiscardCode('table_gone_in_installed_version')).toBe(
+      'table_gone_in_installed_version',
+    );
+  });
+
   // hub#986 — un bundle de OTRO hub trae las automatizaciones del negocio (los documentos SÍ
   // aterrizan), pero no lo que se les permitía hacer: qué comandos ejecutan, a qué URLs salen. Eso
   // lo aprueba el dueño de ESTE despliegue, así que llegan en pausa y la fila lo dice.

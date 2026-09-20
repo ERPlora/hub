@@ -1049,6 +1049,10 @@ export const SECTION_DISCARD_CODES = [
   'flow_grants_not_portable',
   'flows_paused_without_grants',
   'flows_not_restorable',
+  // hub#1947 — la plantilla se publicó contra una versión anterior de la app y trae filas de una
+  // tabla que la versión instalada ya no guarda (Citas devolvió el horario del negocio a Horarios).
+  // Esas filas no pueden aterrizar en ningún sitio; lo que sí entró es el resto de la sección.
+  'table_gone_in_installed_version',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */

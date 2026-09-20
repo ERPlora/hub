@@ -1801,6 +1801,11 @@ export default {
     // that issued them (a VeriFactu chain, a TicketBai one), so they only ever come back to it.
     reasonInstallationBoundData:
       'Records discarded: {n}. This app keeps an official record chained to the till that issued it, so it only travels back to that same till. Yours starts its own — nothing here has been changed.',
+    // hub#1947 — the template was published against an older version of the app, which kept data
+    // the version installed here no longer has. Naming the APP and not the table is deliberate:
+    // `appointments_schedule` is our word, and what she needs to know is that nothing is broken.
+    reasonTableGoneInInstalledVersion:
+      'Rows discarded: {n}. The template was built for an earlier version of this app, and the one installed here no longer keeps that data. Everything else went in — there is nothing for you to fix.',
     // hub#473 — the file came from ANOTHER hub and brought the permissions its owner had given to
     // its apps. Those are decisions about THIS terminal's printer, certificate and internet access,
     // so a downloaded file never makes them: you grant them here, once, and only if you want to.

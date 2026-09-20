@@ -1047,6 +1047,8 @@ const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   flow_grants_not_portable: () => t('importPage.reasonFlowGrantsNotPortable'),
   flows_paused_without_grants: () => t('importPage.reasonFlowsPausedWithoutGrants'),
   flows_not_restorable: (n) => t('importPage.reasonFlowsNotRestorable', { n }),
+  table_gone_in_installed_version: (n) =>
+    t('importPage.reasonTableGoneInInstalledVersion', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */
