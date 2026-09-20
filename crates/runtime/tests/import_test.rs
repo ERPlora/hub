@@ -1508,3 +1508,101 @@ async fn a_quoted_table_name_is_the_same_table_and_its_rows_land() {
         "las filas tienen que aterrizar igual: {names:?}"
     );
 }
+
+/// Reviewer of hub#1949 — the filter learnt to LEAVE STATEMENTS OUT, and the dangerous way for
+/// that to go wrong is swallowing a real failure. A statement that targets a table that EXISTS and
+/// fails for any other reason (here: a column the table does not have) must still fail the section
+/// out loud — even when the same section also carries a row for a retired table, which on its own
+/// would have made it `PartiallyApplied`.
+#[tokio::test]
+async fn a_real_failure_next_to_a_retired_row_is_still_a_failure() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let mut bundle = exported_bundle().await;
+    let original = String::from_utf8(
+        bundle
+            .files
+            .get("data/inventory.sql")
+            .expect("el bundle trae los datos de inventory")
+            .clone(),
+    )
+    .expect("data/inventory.sql es UTF-8");
+    let retired = "INSERT INTO inventory_retired_shelf (\"hub_id\", \"id\", \"name\") \
+                   SELECT '__HUB_ID__', 'shelf-1', 'Estante' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_retired_shelf WHERE id = 'shelf-1');\n";
+    let broken = "INSERT INTO inventory_product (\"hub_id\", \"id\", \"column_that_never_existed\") \
+                  SELECT '__HUB_ID__', 'broken-1', 'x' \
+                  WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'broken-1');\n";
+    let doctored = format!("{retired}{original}{broken}").into_bytes();
+    bundle
+        .manifest
+        .sha256
+        .insert("data/inventory.sql".into(), sha256_hex(&doctored));
+    bundle.files.insert("data/inventory.sql".into(), doctored);
+
+    let mut b = fresh().await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("el import no se rompe");
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
+    assert!(
+        matches!(&inv.status, SectionStatus::Failed(_)),
+        "a statement that fails on a LIVE table is a failure, never a discard: {:?}",
+        inv.status
+    );
+}
+
+/// Reviewer of hub#1949 — the subset's grammar is case-insensitive on its keywords
+/// (`import_sql::check_statement` uses `is_kw`), while `parse_insert` only reads the exact
+/// `INSERT INTO ` the export writes. So a VALID statement the filter cannot read does exist, and
+/// the fail-open branch is reachable: such a statement must be attempted, never counted as a row
+/// for a retired table.
+#[tokio::test]
+async fn a_valid_statement_the_filter_cannot_read_is_never_counted_as_retired() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let mut bundle = exported_bundle().await;
+    let original = String::from_utf8(
+        bundle
+            .files
+            .get("data/inventory.sql")
+            .expect("el bundle trae los datos de inventory")
+            .clone(),
+    )
+    .expect("data/inventory.sql es UTF-8");
+    let lowercase = original.replace("INSERT INTO inventory_product (", "insert into inventory_product (");
+    assert_ne!(lowercase, original, "the fixture must carry the lowercase form");
+    let lowercase = lowercase.into_bytes();
+    bundle
+        .manifest
+        .sha256
+        .insert("data/inventory.sql".into(), sha256_hex(&lowercase));
+    bundle.files.insert("data/inventory.sql".into(), lowercase);
+
+    let mut b = fresh().await;
+    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
+        .await
+        .expect("el import no se rompe");
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
+    assert_eq!(
+        inv.discarded_rows, 0,
+        "nothing here targets a retired table: {:?}",
+        inv.status
+    );
+    assert!(
+        !matches!(&inv.status, SectionStatus::PartiallyApplied(r) | SectionStatus::Ignored(r)
+                  if r == "table_gone_in_installed_version"),
+        "a live table must never be reported as gone: {:?}",
+        inv.status
+    );
+}
