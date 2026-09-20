@@ -397,6 +397,12 @@ impl InboundMessage {
 /// TEMPLATE — the last one names the id `payload` and the label `text`. The SaaS knows the same
 /// three (`apps/whatsapp_inbox/api/inbox.py`); this is the half that keeps working against a SaaS
 /// that has not shipped them yet.
+const REPLY_SHAPES: [(&[&str], &str, &str); 3] = [
+    (&["interactive", "list_reply"], "id", "title"),
+    (&["interactive", "button_reply"], "id", "title"),
+    (&["button"], "payload", "text"),
+];
+
 /// **Where Meta puts the message an answer answers**: `context.id`, the `wamid` of the message
 /// being replied to. One shape, unlike the tap's three, and no [`dig`]: `Value::get` already
 /// answers `None` for every non-object `context` a payload stored verbatim can hold — a
@@ -404,12 +410,6 @@ impl InboundMessage {
 /// thing. The SaaS reads the same path (`apps/whatsapp_inbox/api/inbox.py::_reply_to`); this is
 /// the half that keeps working against a SaaS that has not shipped the field yet.
 const ANSWERS_PATH: (&str, &str) = ("context", "id");
-
-const REPLY_SHAPES: [(&[&str], &str, &str); 3] = [
-    (&["interactive", "list_reply"], "id", "title"),
-    (&["interactive", "button_reply"], "id", "title"),
-    (&["button"], "payload", "text"),
-];
 
 /// Walks `path` through nested objects, or `None` the moment the shape is not that.
 ///
