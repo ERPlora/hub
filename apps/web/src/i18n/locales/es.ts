@@ -1582,6 +1582,8 @@ export default {
       'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
     reasonInstallationBoundData:
       'Registros descartados: {n}. Esta app lleva un registro oficial encadenado a la caja que lo emitió, así que solo vuelve a esa misma caja. La tuya empieza el suyo — aquí no se ha cambiado nada.',
+    reasonTableGoneInInstalledVersion:
+      'Filas descartadas: {n}. La plantilla se hizo para una versión anterior de esta app, y la que tienes instalada ya no guarda esos datos. Todo lo demás ha entrado — no hay nada que tengas que arreglar.',
     reasonCapabilityGrantsNotPortable:
       'Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal. No se ha permitido nada \u2014 concede lo que necesites en Ajustes \u203a Permisos.',
     reasonCapabilitiesNotGrantable:

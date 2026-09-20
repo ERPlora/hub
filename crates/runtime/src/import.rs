@@ -611,6 +611,19 @@ pub mod ignore_reason {
     /// module has. The import saves through the same door as `POST /flows`, so what the owner could
     /// not type in cannot arrive in a zip either. The rest of the flows still landed.
     pub const FLOWS_NOT_RESTORABLE: &str = "flows_not_restorable";
+    /// The bundle carried rows for a table the module INSTALLED HERE no longer has (hub#1947).
+    ///
+    /// A published bundle is an immutable artefact and the catalogue serves the LATEST version of
+    /// every module, so a template outlives the schema it was exported from: `peluqueria` v1.2.0
+    /// was built on 2026-08-24 against `appointments` 1.1.53 and opens `data/appointments.sql`
+    /// with a row for `appointments_schedule`, a table the module retired in 1.1.79 when it gave
+    /// the business timetable back to `schedules` (`009_drop_own_timetable.sql`).
+    ///
+    /// Those rows cannot land anywhere: the table is gone, and what replaced it came in through
+    /// its own section. The code exists so they stop taking the section with them — one statement
+    /// out of 65 was costing the salon the 28 sample appointments the template promises, and every
+    /// module that ever retires a table would break every bundle exported before it.
+    pub const TABLE_GONE_IN_INSTALLED_VERSION: &str = "table_gone_in_installed_version";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -890,6 +903,24 @@ async fn apply_section(
     } else {
         (sql, 0, None)
     };
+    // hub#1947: and after whatever the bundle's ORIGIN forbids, what its AGE makes impossible. A
+    // template published months ago carries rows for tables the module has retired since, and one
+    // of those statements used to fail the whole section — the `peluqueria` agenda, 28 of the 65
+    // statements of `data/appointments.sql`, died behind a single row for `appointments_schedule`.
+    //
+    // The two reasons can both fire on one section, and the report has room for ONE: the origin
+    // rule wins, because «this is somebody else's identity» is what the owner has to act on, while
+    // a retired table is the product moving on. `discarded_rows` still counts both — the number is
+    // «how much stayed out», not «how much stayed out for this reason».
+    let (sql, discarded, reason) = match drop_rows_for_retired_tables(rt.db(), &sql, &scope).await {
+        Ok((sql, 0)) => (sql, discarded, reason),
+        Ok((sql, retired)) => (
+            sql,
+            discarded + retired,
+            reason.or(Some(ignore_reason::TABLE_GONE_IN_INSTALLED_VERSION)),
+        ),
+        Err(e) => return (SectionStatus::Failed(e), 0),
+    };
     if sql.trim().is_empty() {
         // Nothing survived the filter: the section was identity and nothing else. Reporting that
         // as `Applied` over zero rows would read as «I did what you asked».
@@ -1160,6 +1191,65 @@ fn drop_foreign_numbering(
             kept.push_str(stmt.trim());
             kept.push('\n');
         }
+    }
+    Ok((kept, dropped))
+}
+
+/// Leaves out the statements whose target table the INSTALLED module version no longer has, and
+/// says how many were left out (hub#1947).
+///
+/// It asks the DATABASE CATALOGUE, not the manifest: what decides whether a row can land is the
+/// schema the hub actually runs, and the bundle's own `version` is precisely the thing that is out
+/// of date (`peluqueria` v1.2.0 asks for `appointments` 1.1.53 and the hub installs 1.1.79).
+///
+/// **Fail-OPEN, the opposite of [`drop_foreign_numbering`], and on purpose.** That one keeps data
+/// OUT, so anything it cannot read has to go; this one is the only thing standing between a row
+/// and the hub, so it drops only what it is SURE about. A statement it cannot parse, or a
+/// catalogue it cannot read, leaves the section exactly as it was before this filter existed — it
+/// will be attempted, and fail loudly if the table really is missing.
+///
+/// It does NOT loosen [`crate::import_sql::validate`]: it runs on the statements that validation
+/// already accepted, and only ever removes some. A bundle cannot reach a table it was not allowed
+/// to reach by naming one that does not exist.
+async fn drop_rows_for_retired_tables(
+    db: &dyn erplora_db::DatabaseAdapter,
+    sql: &str,
+    scope: &crate::import_sql::TableScope,
+) -> std::result::Result<(String, u32), String> {
+    let stmts = crate::import_sql::validate(sql, scope)?;
+    let live: std::collections::HashSet<String> = match crate::export::list_tables(db).await {
+        Ok(tables) if !tables.is_empty() => {
+            tables.into_iter().map(|t| t.to_ascii_lowercase()).collect()
+        }
+        // A catalogue that cannot be read, or one that answers «no tables at all» — which cannot be
+        // true of a hub with modules installed, so it means the question did not reach the schema
+        // the hub is working in. Either way nothing can be AFFIRMED to be missing, and reading
+        // silence as «all of them are gone» would empty the section instead of rescuing it.
+        _ => return Ok((sql.to_string(), 0)),
+    };
+    let mut kept = String::with_capacity(sql.len());
+    let mut dropped = 0u32;
+    for stmt in &stmts {
+        // `unquote_ident` because `"inventory_product"` is the SAME table: the subset's tokenizer
+        // unquotes before asking the scope, so a bundle may legitimately be written that way, and
+        // comparing the name WITH its quotes would find nothing in the catalogue and read a live
+        // table as retired. Being wrong about WHICH table this is loses rows in silence.
+        let retired = parse_insert(stmt)
+            .map(|p| !live.contains(&unquote_ident(p.table).to_ascii_lowercase()))
+            .unwrap_or(false);
+        if retired {
+            dropped += 1;
+        } else {
+            kept.push_str(stmt.trim());
+            kept.push('\n');
+        }
+    }
+    // Nothing retired — the overwhelmingly common case — hands back the section BYTE FOR BYTE.
+    // Re-serialising it would put every import through this filter's idea of how the file is
+    // written, to no end; a section this has nothing to say about must be indistinguishable from
+    // one that never came through here.
+    if dropped == 0 {
+        return Ok((sql.to_string(), 0));
     }
     Ok((kept, dropped))
 }
@@ -1783,6 +1873,65 @@ fn derive_id(target_hub_id: &str, source_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A database whose CATALOGUE comes back EMPTY — a `search_path` that does not reach the
+    /// hub's schema answers exactly like this. Only `query` is ever reached from here: the filter
+    /// asks `information_schema` and nothing else.
+    struct NoCatalogueDb;
+
+    #[async_trait::async_trait]
+    impl erplora_db::DatabaseAdapter for NoCatalogueDb {
+        async fn execute(
+            &self,
+            _sql: &str,
+            _params: &erplora_db::Params,
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            panic!("el filtro de tablas retiradas no escribe");
+        }
+        async fn execute_tx(
+            &self,
+            _ops: &[(String, erplora_db::Params)],
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            panic!("el filtro de tablas retiradas no escribe");
+        }
+        async fn execute_tx_gated(
+            &self,
+            _ops: &[(String, erplora_db::Params)],
+            _gates: &[erplora_db::RowGate],
+        ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
+            panic!("el filtro de tablas retiradas no escribe");
+        }
+        async fn query(
+            &self,
+            _sql: &str,
+            _params: &erplora_db::Params,
+        ) -> std::result::Result<erplora_db::QueryResult, erplora_db::DbError> {
+            Ok(erplora_db::QueryResult::new(Vec::new()))
+        }
+        async fn execute_batch(&self, _sql: &str) -> std::result::Result<(), erplora_db::DbError> {
+            panic!("el filtro de tablas retiradas no escribe");
+        }
+    }
+
+    /// Without a usable catalogue, NOTHING is retired (hub#1947).
+    ///
+    /// The filter is the only thing between a row and the hub, so it may only drop what it can
+    /// AFFIRM is missing. A hub with modules installed HAS tables, so an empty answer is the
+    /// question failing to reach the schema, not the truth about it. Reading it as «none of these
+    /// tables exist» would empty every section of every import — the filter written to save 28
+    /// appointments would be losing the whole blueprint instead.
+    #[tokio::test]
+    async fn an_unusable_catalogue_retires_nothing() {
+        let sql = "INSERT INTO inventory_product (\"hub_id\", \"id\") \
+                   SELECT '__HUB_ID__', 'p1' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'p1');";
+        let scope = crate::import_sql::TableScope::Module("inventory".into());
+        let (kept, dropped) = drop_rows_for_retired_tables(&NoCatalogueDb, sql, &scope)
+            .await
+            .expect("una sección válida no se rechaza por no poder leer el catálogo");
+        assert_eq!(dropped, 0, "no se puede afirmar que falte ninguna tabla");
+        assert_eq!(kept, sql, "la sección sigue entera, byte por byte");
+    }
 
     /// El informe hace round-trip serde: es el contrato JSON que la UI del shell pinta.
     #[test]

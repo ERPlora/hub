@@ -381,6 +381,27 @@ describe('what the owner is told happened', () => {
     ).toEqual({ kind: 'ready' });
   });
 
+  // hub#1947 — the `peluqueria` template was published against `appointments` 1.1.53 and carried a
+  // row for a table the module retired in 1.1.79. That one row failed the whole section, so the
+  // salon's first screen was the red «Casi: algo no ha entrado» and an agenda with none of the 28
+  // appointments the card promises. With the rows left out and SAID, the card is `ready` again:
+  // a table the app no longer keeps is the product moving on, not something the owner must fix.
+  it('rows for a table the app RETIRED are not a failure (hub#1947)', () => {
+    expect(
+      importOutcome(
+        report({
+          sections: [
+            {
+              section: 'modules/appointments',
+              status: { PartiallyApplied: 'table_gone_in_installed_version' },
+              discarded_rows: 7,
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ kind: 'ready' });
+  });
+
   // hub#899 — the count used to be all the card got, and the reason written here was that the
   // engine's names are ours, not words the owner ever chose. True about the raw key, and it left
   // her reading «something else did not go in» on the one screen where she is checking whether her
