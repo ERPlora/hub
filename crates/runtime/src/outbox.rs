@@ -2390,6 +2390,30 @@ mod tests {
         .await;
         process_once(&db, &reg).await.unwrap();
 
+        // **The row that makes the empty id dangerous**, and it is not hypothetical: the same
+        // flow path delivered by a transport that names nothing — email, or a proxy older than
+        // the field — records an empty `provider_message_id` next to a perfectly real step.
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::new()));
+        seed_flow_question(
+            &db,
+            "ev-2",
+            "run-1",
+            &grant,
+            "offer-reminder",
+            "ana.perez@example.test",
+        )
+        .await;
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(
+            one_text(
+                &db,
+                "SELECT step_id AS c FROM _event_delivery WHERE event_id='ev-2'"
+            )
+            .await,
+            "offer-reminder",
+            "the unnamed send really did record a step under an empty provider id"
+        );
+
         assert_eq!(
             step_that_sent(&db, "h2", "wamid.the-question")
                 .await
@@ -2407,6 +2431,47 @@ mod tests {
             step_that_sent(&db, "h1", "wamid.never-sent").await.unwrap(),
             "",
             "an id this hub never sent names no step"
+        );
+    }
+
+    /// **A module cannot name a step it does not own** (hub#1951). `flow_step` rides in the
+    /// payload, and a module's payload is a module's to write — so the relay honours the key only
+    /// on the kernel's own row (`module_id` empty AND `run_id` present), which is the one shape a
+    /// module cannot produce. A module writing it into its own `*.reminder.due` records nothing,
+    /// and a tap on its message goes on answering no step rather than someone else's.
+    #[tokio::test]
+    async fn a_module_writing_the_step_key_into_its_own_payload_names_no_step() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::naming("wamid.borrowed")));
+        authorize_notify(&db, &reg, "cliente@x.com").await;
+
+        let mut payload = reminder_payload("cliente@x.com");
+        payload.insert(
+            crate::host_notify::FLOW_STEP_KEY.into(),
+            json!("confirm-appointment"),
+        );
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &payload, &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
+            1,
+            "the message did go out — this is not about refusing the send"
+        );
+        assert_eq!(
+            step_that_sent(&db, "h1", "wamid.borrowed").await.unwrap(),
+            "",
+            "but the step a module wrote itself names nothing"
         );
     }
 
