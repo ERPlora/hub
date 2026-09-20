@@ -152,7 +152,20 @@ impl CloudNotifyTransport {
 
         let status = response.status();
         if status.is_success() {
-            return Ok(SendOutcome::Sent);
+            // The id the provider gave the message — Meta's `wamid` (hub#1951). A 200 is a send
+            // whatever the body says: email has no id worth threading a conversation by, and a
+            // proxy that answers something other than JSON has still delivered. Bounded for the
+            // same reason `detail` is: this ends up in a column, and nothing about a `wamid`
+            // needs three hundred characters.
+            let body: Value = response.json().await.unwrap_or(Value::Null);
+            let message_id: String = body
+                .get("message_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .chars()
+                .take(MAX_DETAIL)
+                .collect();
+            return Ok(SendOutcome::Sent { message_id });
         }
 
         // The reason has to reach whoever reads the dead-letter row: `quota_exceeded`,
@@ -512,7 +525,12 @@ mod tests {
             )
             .await
             .expect("a 200 from the proxy is a send");
-        assert_eq!(sent, SendOutcome::Sent);
+        assert_eq!(
+            sent,
+            SendOutcome::Sent {
+                message_id: "<a@b>".to_string()
+            }
+        );
 
         let calls = cloud.calls();
         assert_eq!(calls.len(), 1);
@@ -527,6 +545,61 @@ mod tests {
         // phishing with ERPlora's own sender (saas#1347).
         assert!(body.get("reply_to").is_none());
         assert!(body.get("from").is_none());
+    }
+
+    /// **hub#1951 — the send brings back the id the provider gave it.**
+    ///
+    /// The proxy already answers `{"message_id": "wamid…"}` and this side threw it away, so the
+    /// hub knew a question had gone out but not WHICH message it was. That id is the only thing
+    /// Meta puts in `context.id` when the customer taps, so without it a tap cannot be matched to
+    /// the question it answers.
+    #[tokio::test]
+    async fn a_send_brings_back_the_id_the_provider_gave_it() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.9"})).await;
+        let sent = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "appointment_reminder",
+                    json!({"text": "¿Confirmas?"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a 200 from the proxy is a send");
+        assert_eq!(
+            sent,
+            SendOutcome::Sent {
+                message_id: "wamid.9".to_string()
+            }
+        );
+    }
+
+    /// **Empty, never an error.** Email has no `wamid` worth threading a conversation by, and a
+    /// SaaS older than the field names nothing: a 200 is a send in both cases. Refusing one here
+    /// would turn "delivered, unidentified" into eight retries and a dead-letter.
+    #[tokio::test]
+    async fn a_send_the_provider_did_not_name_is_still_a_send() {
+        let cloud = fake_cloud(StatusCode::OK, json!({})).await;
+        let sent = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Email,
+                    "cliente@x.com",
+                    "appointment_reminder",
+                    json!({"subject": "Tu cita", "text": "Te esperamos"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a 200 with no id is still a send");
+        assert_eq!(
+            sent,
+            SendOutcome::Sent {
+                message_id: String::new()
+            }
+        );
     }
 
     /// Without a subject in `vars`, the template NAME is the subject — the SaaS rejects an empty

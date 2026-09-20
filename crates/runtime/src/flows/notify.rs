@@ -171,6 +171,11 @@ pub(crate) async fn prepare(
         host_notify::RESOLVED_VIA_KEY.into(),
         json!(host_notify::flow_grant_release(&release_id)),
     );
+    // **Which step is asking** (hub#1951). The relay pairs it with the id the provider gives the
+    // message, so that when the customer taps «Sí» the event can say which of two identical
+    // questions it answers. It goes in the payload next to the release, and is read back only on
+    // the path a module cannot reach (see `outbox::deliver_host_notify`).
+    payload.insert(host_notify::FLOW_STEP_KEY.into(), json!(step.id));
 
     // `module_id` is empty because no module emitted this — the kernel did. That emptiness is half
     // of what tells the relay this row may carry a flow's release, and it is not something a module
@@ -545,6 +550,41 @@ mod tests {
         assert_eq!(queued["module_id"], json!(""));
         assert_eq!(queued["run_id"], json!("run-1"));
         assert_eq!(queued["event_name"], json!(outbox::FLOW_NOTIFY_EVENT));
+    }
+
+    /// **hub#1951 — the row says WHICH step asked.**
+    ///
+    /// `run_id` alone cannot answer it: one run may ask twice, and the run that ANSWERS a tap is a
+    /// different one anyway (the event triggers it). The step is the only name the author wrote
+    /// themselves, it is stable across releases and it is distinct for each question even when
+    /// both use the same approved template and the same «Sí».
+    ///
+    /// It rides in the payload, next to the release, and not in a column: the relay only ever
+    /// reads it on the path a module cannot reach (`module_id` empty **and** `run_id` present —
+    /// see `outbox::deliver_host_notify`), so a module writing `flow_step` into its own
+    /// `*.reminder.due` payload names nothing.
+    #[tokio::test]
+    async fn the_queued_question_names_the_step_that_asked_it() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        let prepared = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap();
+
+        let payload: Json =
+            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            payload["flow_step"],
+            json!("remind"),
+            "the queued question has to carry the step that asked it, or the tap has nothing to \
+             name when it comes back"
+        );
     }
 
     /// The address goes in the QUEUE, which has to dial it — and nowhere else. What the run keeps

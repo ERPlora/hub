@@ -95,6 +95,12 @@ impl Channel {
 /// payload de un módulo no abre nada.
 pub const RESOLVED_VIA_KEY: &str = "resolved_via";
 
+/// **Which STEP of the flow asked**, in the payload of a kernel-released `*.reminder.due`
+/// (hub#1951). The relay reads it only on the path a module cannot reach (`module_id` empty AND
+/// `run_id` present, see `outbox::deliver_host_notify`), so a module writing this key into its own
+/// payload names nothing.
+pub const FLOW_STEP_KEY: &str = "flow_step";
+
 /// Prefijo del valor de [`RESOLVED_VIA_KEY`]: `flow_grant:<id del grant recipient_query>`.
 pub const FLOW_GRANT_PREFIX: &str = "flow_grant:";
 
@@ -332,7 +338,12 @@ pub enum Routing {
 /// retryable by hand**: unlike a revoked release, a quota comes back (top-up, next period).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendOutcome {
-    Sent,
+    /// Handed to the provider, carrying **the id the provider gave the message** — Meta's `wamid`
+    /// (hub#1951). Empty when the channel has no such id worth threading a conversation by, or
+    /// when the proxy did not name one: a send is a send either way.
+    Sent {
+        message_id: String,
+    },
     /// What the proxy said, trimmed — the reason has to reach whoever reads the dead-letter row.
     QuotaExceeded {
         detail: String,
@@ -372,6 +383,9 @@ pub struct MockTransport {
     fail: bool,
     /// If `true`, `send` answers `Ok(SendOutcome::QuotaExceeded)` — the proxy's «no quota left».
     quota_exhausted: bool,
+    /// What the provider calls the message it just accepted (hub#1951). Empty by default: most
+    /// tests do not care, and an empty id is what email and a pre-saas#1919 proxy really answer.
+    message_id: String,
 }
 
 impl MockTransport {
@@ -391,6 +405,14 @@ impl MockTransport {
     pub fn quota_exhausted() -> Self {
         Self {
             quota_exhausted: true,
+            ..Self::default()
+        }
+    }
+
+    /// Variant whose sends come back named, the way the WhatsApp proxy answers (hub#1951).
+    pub fn naming(message_id: &str) -> Self {
+        Self {
+            message_id: message_id.to_string(),
             ..Self::default()
         }
     }
@@ -417,7 +439,9 @@ impl NotifyTransport for MockTransport {
         if let Ok(mut g) = self.sent.lock() {
             g.push((intent.clone(), routing));
         }
-        Ok(SendOutcome::Sent)
+        Ok(SendOutcome::Sent {
+            message_id: self.message_id.clone(),
+        })
     }
 }
 
@@ -608,7 +632,13 @@ mod tests {
         let t = MockTransport::new();
         let intent = NotifyIntent::from_event_payload(&intent_params("sms")).unwrap();
         let out = t.send(&intent, Routing::Tenant).await.unwrap();
-        assert_eq!(out, SendOutcome::Sent);
+        assert_eq!(
+            out,
+            SendOutcome::Sent {
+                message_id: String::new()
+            },
+            "a plain mock names nothing, the way email and a pre-saas#1919 proxy answer"
+        );
         assert_eq!(t.sent().len(), 1);
         assert_eq!(t.sent()[0].1, Routing::Tenant);
     }
