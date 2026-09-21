@@ -276,6 +276,11 @@ impl InboundMessage {
         payload.insert("reply_id".into(), json!(reply_id));
         payload.insert("reply_title".into(), json!(reply_title));
         payload.insert("reply_to".into(), json!(self.answers()));
+        // **Which STEP asked** (hub#1951). Only the hub can answer it — Meta names the message,
+        // not the recipe — so the poller fills it in from the delivery it recorded when the
+        // question went out. Empty and never absent, like every sibling above: what this method
+        // can work out on its own is nothing.
+        payload.insert("reply_to_step".into(), json!(""));
         payload.insert("received_at".into(), json!(self.received_at));
         payload.insert("message".into(), self.payload.clone());
         payload
@@ -390,6 +395,28 @@ impl InboundMessage {
             .unwrap_or_default()
             .to_string()
     }
+}
+
+/// The step of the flow that asked the question a message answers, or `""` when it answers none
+/// (hub#1951).
+///
+/// Reads `reply_to` off the payload that is about to be written — the `wamid` of the question, as
+/// the SaaS lifted it or as the hub read it off Meta's `context` — and asks the runtime which
+/// delivery carried it. An id this hub never sent, one of another hub, or no id at all all answer
+/// `""`: a tap nobody can place names no step rather than the wrong one.
+async fn reply_to_step(
+    db: &dyn erplora_db::DatabaseAdapter,
+    hub_id: &str,
+    payload: &Map<String, Value>,
+) -> Result<String, erplora_runtime::RuntimeError> {
+    let answers = payload
+        .get("reply_to")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if answers.is_empty() {
+        return Ok(String::new());
+    }
+    outbox::step_that_sent(db, hub_id, answers).await
 }
 
 /// **Where Meta puts the option a customer tapped, and under which keys.** Three shapes for one
@@ -636,7 +663,27 @@ impl InboundPoller {
             let rt = runtime.read().await;
             let hub_id = rt.hub_id().to_string();
             for message in &messages {
-                let payload = message.event_payload();
+                let mut payload = message.event_payload();
+                // **The half only this side knows** (hub#1951): Meta says which MESSAGE is being
+                // answered, the hub says which step of which recipe sent it. Looked up before the
+                // write so the event is complete the first time a listener ever sees it.
+                match reply_to_step(rt.db(), &hub_id, &payload).await {
+                    Ok(step) => {
+                        payload.insert("reply_to_step".into(), json!(step));
+                    }
+                    // Not acked, so the SaaS serves it again — the same answer this loop already
+                    // gives a write that fails. Ingesting the tap with no step would ack it and
+                    // leave the automation unable to tell which of two questions it answered,
+                    // which is the silent loss this whole issue is about.
+                    Err(e) => {
+                        tracing::warn!(
+                            wa_message_id = %message.wa_message_id,
+                            "inbound whatsapp: the question this answers could not be looked up, \
+                             it will be redelivered: {e}"
+                        );
+                        continue;
+                    }
+                }
                 match outbox::insert_core_event_once(
                     rt.db(),
                     &message.event_id(),
@@ -1784,6 +1831,181 @@ mod tests {
             let event = message.event_payload();
             assert_eq!(event["reply_to"], json!(""), "{payload}");
         }
+    }
+
+    /// **hub#1951 — `reply_to_step` is empty and never absent**, the rule every sibling of this
+    /// payload follows. A flow comparing it against the step it wrote must simply not match an
+    /// unprompted message, not have to test for absence first. The poller fills it in when the
+    /// hub can say which question was answered; the key is part of the shape regardless.
+    #[test]
+    fn a_message_that_answers_no_question_names_no_step_rather_than_missing_the_key() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.1",
+            "from": CUSTOMER,
+            "payload": {"type": "text", "text": {"body": "hola"}},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .unwrap();
+
+        let event = message.event_payload();
+        assert!(
+            event.contains_key("reply_to_step"),
+            "the key is part of the payload's shape: {event:?}"
+        );
+        assert_eq!(event["reply_to_step"], json!(""));
+    }
+
+    /// A question this hub already sent, as the relay records it when the provider names the
+    /// message (hub#1951): the delivery row is where the `wamid` and the step that asked meet,
+    /// and it is what the poller looks a tap up in.
+    async fn question_already_sent(runtime: &SharedRuntime, wamid: &str, step: &str) {
+        let mut p = Params::new();
+        p.insert("event_id".into(), json!(format!("ev-{wamid}")));
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("wamid".into(), json!(wamid));
+        p.insert("step".into(), json!(step));
+        runtime
+            .read()
+            .await
+            .db()
+            .execute(
+                "INSERT INTO _event_delivery \
+                   (event_id, listener_command, delivered_at, hub_id, provider_message_id, step_id) \
+                 VALUES (:event_id, 'host.notify', '2026-09-07T09:00:00+00:00', :hub_id, :wamid, \
+                         :step)",
+                &p,
+            )
+            .await
+            .unwrap();
+    }
+
+    /// A tap on the «Sí» of an approved template: the same `reply_id` whichever question it
+    /// answers — which is the whole problem — and Meta's `context.id` naming the one it does.
+    fn tap(wa_message_id: &str, answering: &str) -> Value {
+        json!({
+            "wa_message_id": wa_message_id,
+            "from": CUSTOMER,
+            "direction": "inbound",
+            "contact": CUSTOMER,
+            "source": "live",
+            "reply_id": "yes",
+            "reply_title": "Sí",
+            "reply_to": answering,
+            "payload": {
+                "id": wa_message_id,
+                "from": CUSTOMER,
+                "type": "interactive",
+                "context": {"id": answering},
+                "interactive": {"button_reply": {"id": "yes", "title": "Sí"}},
+            },
+            "received_at": "2026-09-07T10:00:00+00:00",
+        })
+    }
+
+    /// **hub#1951 — the scenario the issue describes, end to end.**
+    ///
+    /// A salon asks the same customer two questions without waiting for an answer. Both come from
+    /// the same approved template, so both offer the same «Sí» and `reply_id` tells them apart in
+    /// no way at all. The customer taps one of them. The event has to say WHICH STEP asked — the
+    /// name the author wrote on their own recipe — or the automation confirms an appointment
+    /// nobody confirmed.
+    #[tokio::test]
+    async fn two_questions_with_the_same_yes_are_told_apart_by_the_step_that_asked() {
+        let cloud = fake_cloud(vec![
+            tap("wamid.a", "wamid.q1"),
+            tap("wamid.b", "wamid.q2"),
+            message("wamid.c", "hola, ¿estáis abiertos?"),
+        ])
+        .await;
+        let runtime = hub_with_module(true).await;
+        question_already_sent(&runtime, "wamid.q1", "confirm-appointment").await;
+        question_already_sent(&runtime, "wamid.q2", "offer-reminder").await;
+
+        poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+
+        let events = payloads_by_id(&runtime).await;
+        assert_eq!(
+            events["wa-wamid.a"]["reply_id"], events["wa-wamid.b"]["reply_id"],
+            "the two taps really are indistinguishable by what was tapped"
+        );
+        assert_eq!(
+            events["wa-wamid.a"]["reply_to_step"],
+            json!("confirm-appointment"),
+            "the first tap answers the step that asked for the confirmation"
+        );
+        assert_eq!(
+            events["wa-wamid.b"]["reply_to_step"],
+            json!("offer-reminder"),
+            "and the second answers the other one, same «Sí» and same template"
+        );
+        assert_eq!(
+            events["wa-wamid.c"]["reply_to_step"],
+            json!(""),
+            "an unprompted message names no step"
+        );
+    }
+
+    /// **A tap the hub cannot place is not acked** (hub#1951). Ingesting it with an empty step
+    /// would ack it, and the automation would be left unable to tell which of two identical
+    /// questions the customer answered — with the SaaS, which never serves an acked message
+    /// twice, holding the only copy. So the message comes back instead.
+    ///
+    /// The failure is forced the same blunt way the sibling above forces its own: no
+    /// `_event_delivery` to look the question up in.
+    #[tokio::test]
+    async fn a_tap_whose_question_cannot_be_looked_up_is_neither_written_nor_acked() {
+        let cloud = fake_cloud(vec![tap("wamid.a", "wamid.q1")]).await;
+        let runtime = hub_with_module(true).await;
+        runtime
+            .read()
+            .await
+            .db()
+            .execute_batch("DROP TABLE _event_delivery;")
+            .await
+            .unwrap();
+
+        let report = poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+        assert_eq!(report.fetched, 1);
+        assert_eq!(report.ingested, 0, "half an event is not an event");
+        assert_eq!(report.acked, 0);
+        assert!(
+            outbox_rows(&runtime).await.is_empty(),
+            "nothing was written, so the redelivery is the only thing that can recover it"
+        );
+        assert_eq!(
+            cloud.paths(),
+            vec![GET_INBOX.to_string()],
+            "the ack must not even be attempted"
+        );
+    }
+
+    /// And an ORDINARY message still lands when the lookup is broken: it answers no question, so
+    /// there is nothing to look up. Otherwise a sick `_event_delivery` would stop the whole inbox
+    /// instead of the taps that actually need it.
+    #[tokio::test]
+    async fn a_message_that_answers_nothing_still_lands_when_the_lookup_is_broken() {
+        let cloud = fake_cloud(vec![message("wamid.1", "hola")]).await;
+        let runtime = hub_with_module(true).await;
+        runtime
+            .read()
+            .await
+            .db()
+            .execute_batch("DROP TABLE _event_delivery;")
+            .await
+            .unwrap();
+
+        let report = poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+        assert_eq!(report.ingested, 1);
+        assert_eq!(report.acked, 1);
     }
 
     /// What the SaaS says WINS over what the hub can work out. The SaaS is where the shape is

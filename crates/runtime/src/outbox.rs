@@ -147,10 +147,15 @@ CREATE INDEX IF NOT EXISTS ix_outbox_prune \
 CREATE INDEX IF NOT EXISTS ix_outbox_name ON _event_outbox (hub_id, event_name, created_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
-  hub_id TEXT NOT NULL, \
+  hub_id TEXT NOT NULL, provider_message_id TEXT NOT NULL DEFAULT '', \
+  step_id TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (event_id, listener_command));\
 ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS hub_id TEXT;\
-CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);";
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS provider_message_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS step_id TEXT NOT NULL DEFAULT '';\
+CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);\
+CREATE INDEX IF NOT EXISTS ix_event_delivery_provider \
+  ON _event_delivery (hub_id, provider_message_id) WHERE provider_message_id <> '';";
 
 /// Crea las tablas de sistema del outbox (idempotente), como `migrations::ensure_table`.
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
@@ -314,6 +319,74 @@ pub(crate) fn delivery_op(hub_id: &str, event_id: &str, listener: &str) -> (Stri
     let sql = "INSERT INTO _event_delivery (event_id, listener_command, delivered_at, hub_id) \
         VALUES (:event_id, :listener_command, :delivered_at, :hub_id)";
     (sql.to_string(), p)
+}
+
+/// The delivery marker of a `host.notify` send, carrying **what the provider called the message
+/// and which flow step asked it** (hub#1951).
+///
+/// A sibling of [`delivery_op`] rather than two more parameters on it: the other four callers mark
+/// a listener that ran, which has no provider and no step, and would all have to say so.
+///
+/// Both default to `''` in the schema, so an older row and a send nobody named read the same way —
+/// and [`step_that_sent`] refuses the empty id rather than matching it.
+pub(crate) fn delivery_op_sent(
+    hub_id: &str,
+    event_id: &str,
+    listener: &str,
+    provider_message_id: &str,
+    step_id: &str,
+) -> (String, Params) {
+    let (_, mut p) = delivery_op(hub_id, event_id, listener);
+    p.insert(
+        "provider_message_id".into(),
+        json!(provider_message_id),
+    );
+    p.insert("step_id".into(), json!(step_id));
+    let sql = "INSERT INTO _event_delivery \
+        (event_id, listener_command, delivered_at, hub_id, provider_message_id, step_id) \
+        VALUES (:event_id, :listener_command, :delivered_at, :hub_id, :provider_message_id, \
+                :step_id)";
+    (sql.to_string(), p)
+}
+
+/// **Which flow step asked the question a provider message id belongs to** — hub#1951.
+///
+/// The reverse of what [`delivery_op_sent`] wrote: Meta hands a tap back naming the `wamid` of the
+/// message being answered (`context.id`), and this is the only place the hub can turn that into a
+/// name the person who wrote the recipe would recognise. Nothing else can: the run that asked has
+/// finished by then, and the run that reads the tap is a different one, triggered by the event.
+///
+/// Answers `""` — never an error and never a guess — for the three ways there is no step: an id
+/// this hub never sent, an id belonging to ANOTHER hub, and an empty id. The last one is the
+/// dangerous one and is refused twice, here and in the `WHERE`: every email delivery records an
+/// empty `provider_message_id`, so a message that answers nothing would otherwise match whichever
+/// of them the planner happened to return first and name a step nobody asked about.
+pub async fn step_that_sent(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    provider_message_id: &str,
+) -> Result<String> {
+    if provider_message_id.is_empty() {
+        return Ok(String::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("provider_message_id".into(), json!(provider_message_id));
+    p.insert("listener_command".into(), json!(HOST_NOTIFY_LISTENER));
+    let res = db
+        .query(
+            "SELECT step_id FROM _event_delivery \
+             WHERE hub_id = :hub_id AND provider_message_id = :provider_message_id \
+               AND provider_message_id <> '' AND listener_command = :listener_command",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["step_id"].as_str())
+        .unwrap_or_default()
+        .to_string())
 }
 
 /// Backoff exponencial (segundos), con tope de 1h: 2^attempts acotado.
@@ -787,8 +860,8 @@ async fn deliver_host_notify(
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
     let premium = !registry.premium_whatsapp_modules.is_empty();
     let routing = host_notify::route_channel(intent.channel, premium);
-    match transport.send(&intent, routing).await? {
-        host_notify::SendOutcome::Sent => {}
+    let message_id = match transport.send(&intent, routing).await? {
+        host_notify::SendOutcome::Sent { message_id } => message_id,
         // A spent quota is not a stumble (hub#971): no ladder, dead now — but retryable by hand,
         // because a quota, unlike a revoked release, comes back.
         host_notify::SendOutcome::QuotaExceeded { detail } => {
@@ -799,9 +872,28 @@ async fn deliver_host_notify(
                 RuntimeError::Notify(format!("quota exceeded: {detail}")),
             ));
         }
-    }
-    // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
-    let (sql, p) = delivery_op(hub_id, event_id, HOST_NOTIFY_LISTENER);
+    };
+    // **The step that asked, but only off the KERNEL's own row** (hub#1951). On the module path
+    // the payload is a module's to write, so honouring the key there would let it name a step of
+    // somebody else's flow; `released_by_flow` is `module_id` empty AND `run_id` present, which is
+    // the one shape a module cannot produce.
+    let step_id = if released_by_flow {
+        payload
+            .get(host_notify::FLOW_STEP_KEY)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+    } else {
+        ""
+    };
+    // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark), y con
+    // ella la ÚNICA pareja que existe entre el id del proveedor y quién preguntó.
+    let (sql, p) = delivery_op_sent(
+        hub_id,
+        event_id,
+        HOST_NOTIFY_LISTENER,
+        &message_id,
+        step_id,
+    );
     db.execute(&sql, &p).await?;
     Ok(())
 }
@@ -2161,6 +2253,226 @@ mod tests {
             .first()
             .and_then(|r| r["c"].as_str().map(|s| s.to_string()))
             .unwrap_or_default()
+    }
+
+    /// The twin of [`seed_flow_notify`] for a question that is going to be ANSWERED: same kernel
+    /// row, plus the step that asked it, which is what `flows::notify` writes (hub#1951).
+    async fn seed_flow_question(
+        db: &PgAdapter,
+        id: &str,
+        run_id: &str,
+        grant_id: &str,
+        step_id: &str,
+        to: &str,
+    ) {
+        let mut payload = reminder_payload(to);
+        payload.insert(
+            crate::host_notify::RESOLVED_VIA_KEY.into(),
+            json!(crate::host_notify::flow_grant_release(grant_id)),
+        );
+        payload.insert(crate::host_notify::FLOW_STEP_KEY.into(), json!(step_id));
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("run_id".into(), json!(run_id));
+        p.insert("name".into(), json!(FLOW_NOTIFY_EVENT));
+        p.insert("payload".into(), json!(Json::Object(payload).to_string()));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, run_id, payload, status, \
+              attempts, next_attempt_at, last_error, created_at) \
+             VALUES (:id, 'h1', '', '[]', :name, '', :run_id, :payload, 'pending', 0, :at, '', :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// The two grants the release is read against, as rows — the same shape `grants::replace`
+    /// writes, seeded directly here for the reason `seed_flow_run` is: this file tests the RELAY,
+    /// and building a registry with a recipient query only to satisfy the grant validator would
+    /// put the subject of the test one call further away.
+    async fn seed_live_grants(db: &PgAdapter, flow_id: &str) -> String {
+        let grant_id = format!("grant-{flow_id}");
+        for (id, kind, value) in [
+            (grant_id.clone(), "recipient_query", "appt.customer.get#email"),
+            (format!("{grant_id}-notify"), "notify", "email"),
+        ] {
+            let mut p = Params::new();
+            p.insert("id".into(), json!(id));
+            p.insert("flow_id".into(), json!(flow_id));
+            p.insert("kind".into(), json!(kind));
+            p.insert("value".into(), json!(value));
+            p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+            db.execute(
+                "INSERT INTO _flow_grants \
+                   (id, hub_id, flow_id, kind, value, payload, created_at, granted_by) \
+                 VALUES (:id, 'h1', :flow_id, :kind, :value, '{}', :at, 'hub_user:1')",
+                &p,
+            )
+            .await
+            .unwrap();
+        }
+        grant_id
+    }
+
+    /// **hub#1951 — the delivery row is where the `wamid` and the step MEET.**
+    ///
+    /// At the instant of delivery the hub holds both halves for the first and only time: the id
+    /// the provider just gave the message, and whose question it was. Nothing downstream can
+    /// rebuild that pairing — the run that asked has finished, and the one that will read the tap
+    /// is a different run altogether — so it is written down here or it is lost.
+    #[tokio::test]
+    async fn a_delivered_flow_question_records_the_provider_id_and_the_step_that_asked() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::naming(
+            "wamid.the-question",
+        )));
+
+        seed_flow_run(&db, "run-1", "flow-1").await;
+        let grant = seed_live_grants(&db, "flow-1").await;
+        seed_flow_question(
+            &db,
+            "ev-1",
+            "run-1",
+            &grant,
+            "confirm-appointment",
+            "ana.perez@example.test",
+        )
+        .await;
+
+        process_once(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            one_text(
+                &db,
+                "SELECT provider_message_id AS c FROM _event_delivery WHERE event_id='ev-1'"
+            )
+            .await,
+            "wamid.the-question",
+            "the send has to bring its id back and the delivery has to keep it"
+        );
+        assert_eq!(
+            step_that_sent(&db, "h1", "wamid.the-question")
+                .await
+                .unwrap(),
+            "confirm-appointment",
+            "and the lookup the poller does has to answer with the step that asked"
+        );
+    }
+
+    /// **The three ways the lookup must answer NOTHING**, and the middle one is the dangerous one:
+    /// every email delivery records an empty provider id, so a message that answers nothing would
+    /// match the first of them and name a step nobody asked about.
+    #[tokio::test]
+    async fn a_question_of_another_hub_an_empty_id_and_an_unknown_id_all_name_no_step() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::naming(
+            "wamid.the-question",
+        )));
+
+        seed_flow_run(&db, "run-1", "flow-1").await;
+        let grant = seed_live_grants(&db, "flow-1").await;
+        seed_flow_question(
+            &db,
+            "ev-1",
+            "run-1",
+            &grant,
+            "confirm-appointment",
+            "ana.perez@example.test",
+        )
+        .await;
+        process_once(&db, &reg).await.unwrap();
+
+        // **The row that makes the empty id dangerous**, and it is not hypothetical: the same
+        // flow path delivered by a transport that names nothing — email, or a proxy older than
+        // the field — records an empty `provider_message_id` next to a perfectly real step.
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::new()));
+        seed_flow_question(
+            &db,
+            "ev-2",
+            "run-1",
+            &grant,
+            "offer-reminder",
+            "ana.perez@example.test",
+        )
+        .await;
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(
+            one_text(
+                &db,
+                "SELECT step_id AS c FROM _event_delivery WHERE event_id='ev-2'"
+            )
+            .await,
+            "offer-reminder",
+            "the unnamed send really did record a step under an empty provider id"
+        );
+
+        assert_eq!(
+            step_that_sent(&db, "h2", "wamid.the-question")
+                .await
+                .unwrap(),
+            "",
+            "one hub's question is not another hub's"
+        );
+        assert_eq!(
+            step_that_sent(&db, "h1", "").await.unwrap(),
+            "",
+            "a message that answers nothing names no step, and must not match the empty id every \
+             email delivery writes"
+        );
+        assert_eq!(
+            step_that_sent(&db, "h1", "wamid.never-sent").await.unwrap(),
+            "",
+            "an id this hub never sent names no step"
+        );
+    }
+
+    /// **A module cannot name a step it does not own** (hub#1951). `flow_step` rides in the
+    /// payload, and a module's payload is a module's to write — so the relay honours the key only
+    /// on the kernel's own row (`module_id` empty AND `run_id` present), which is the one shape a
+    /// module cannot produce. A module writing it into its own `*.reminder.due` records nothing,
+    /// and a tap on its message goes on answering no step rather than someone else's.
+    #[tokio::test]
+    async fn a_module_writing_the_step_key_into_its_own_payload_names_no_step() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::naming("wamid.borrowed")));
+        authorize_notify(&db, &reg, "cliente@x.com").await;
+
+        let mut payload = reminder_payload("cliente@x.com");
+        payload.insert(
+            crate::host_notify::FLOW_STEP_KEY.into(),
+            json!("confirm-appointment"),
+        );
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &payload, &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
+            1,
+            "the message did go out — this is not about refusing the send"
+        );
+        assert_eq!(
+            step_that_sent(&db, "h1", "wamid.borrowed").await.unwrap(),
+            "",
+            "but the step a module wrote itself names nothing"
+        );
     }
 
     /// **hub#827 — a revoked authorisation is a definitive NO, not a stumble.**
