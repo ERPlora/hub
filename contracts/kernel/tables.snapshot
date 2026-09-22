@@ -200,6 +200,7 @@ _hub_certificate.cert_version bigint NULL
 _hub_certificate.certificate_type text NOT NULL
 _hub_certificate.hub_id text NOT NULL
 _hub_certificate.kind text NOT NULL
+_hub_certificate.not_after text NOT NULL
 _hub_certificate.password text NOT NULL
 _hub_certificate.pkcs12_b64 text NOT NULL
 _hub_certificate.uploaded_at text NULL
