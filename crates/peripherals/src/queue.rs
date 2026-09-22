@@ -181,39 +181,61 @@ mod tests {
         }
     }
 
-    /// A "black hole" printer: a listener whose tiny backlog is saturated and never accepts.
-    /// Further SYNs are absorbed — neither accepted nor refused — so a bare `connect` against it
-    /// hangs until some deadline fires. Models the hub#596 failure mode (loose cable, stale IP,
-    /// filtered port) without hardware. Keep the value alive: dropping it frees the port again.
+    /// A "black hole" printer: a local address whose SYNs are absorbed — neither accepted nor
+    /// refused — so a bare `connect` against it hangs until some deadline fires. Models the
+    /// hub#596 failure mode (loose cable, stale IP, filtered port) without hardware. Keep the
+    /// value alive: dropping it frees the port again.
+    ///
+    /// No single loopback trick absorbs on every kernel (hub#1972): macOS drops the SYN to a
+    /// bound socket that does not listen but resets a connect to a saturated backlog; Linux
+    /// does the opposite. So `start` builds the first shape and keeps it only if a probe
+    /// connect really hangs, and falls back to the second one otherwise.
     struct BlackHolePrinter {
         target: NetworkTarget,
-        _listener: TcpListener,
-        _backlog_guards: Vec<TcpStream>,
+        _hole: BlackHole,
+    }
+
+    enum BlackHole {
+        /// Bound but not listening: macOS drops the SYN.
+        Unlistened { _socket: tokio::net::TcpSocket },
+        /// A listener whose backlog is full and never accepts: Linux drops further SYNs.
+        SaturatedBacklog { _listener: TcpListener, _guards: Vec<TcpStream> },
     }
 
     impl BlackHolePrinter {
+        const PROBE: Duration = Duration::from_millis(150);
+
         async fn start() -> Self {
             let socket = tokio::net::TcpSocket::new_v4().unwrap();
             socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let addr = socket.local_addr().unwrap();
+            if Self::absorbs(addr).await {
+                return Self::at(addr, BlackHole::Unlistened { _socket: socket });
+            }
+
             let listener = socket.listen(1).unwrap();
-            let addr = listener.local_addr().unwrap();
             let mut guards = Vec::new();
             for _ in 0..4 {
-                match tokio::time::timeout(Duration::from_millis(200), TcpStream::connect(addr))
-                    .await
-                {
+                match tokio::time::timeout(Self::PROBE, TcpStream::connect(addr)).await {
                     Ok(Ok(stream)) => guards.push(stream),
                     // The backlog is full: this connect already hangs, the hole is ready.
                     _ => break,
                 }
             }
+            Self::at(addr, BlackHole::SaturatedBacklog { _listener: listener, _guards: guards })
+        }
+
+        async fn absorbs(addr: std::net::SocketAddr) -> bool {
+            tokio::time::timeout(Self::PROBE, TcpStream::connect(addr)).await.is_err()
+        }
+
+        fn at(addr: std::net::SocketAddr, hole: BlackHole) -> Self {
             Self {
                 target: NetworkTarget {
                     host: addr.ip().to_string(),
                     port: addr.port(),
                 },
-                _listener: listener,
-                _backlog_guards: guards,
+                _hole: hole,
             }
         }
     }
@@ -439,6 +461,18 @@ mod tests {
             .enqueue(job(unreachable_target(), b"nowhere"))
             .expect_err("la cola cerrada no acepta trabajos");
         assert!(matches!(err, PeripheralError::InvalidPayload(_)));
+    }
+
+    /// The black hole really absorbs the connect on this OS (hub#1972): neither accepted nor
+    /// refused. If it resets instead, the deadline tests below go green or red for the wrong
+    /// reason — a fast `ConnectionReset` never exercises `connect_timeout_ms`.
+    #[tokio::test]
+    async fn the_black_hole_printer_absorbs_the_connect() {
+        let hole = BlackHolePrinter::start().await;
+        let addr = hole.target.socket_addr();
+        let probe =
+            tokio::time::timeout(Duration::from_millis(300), TcpStream::connect(&addr)).await;
+        assert!(probe.is_err(), "a black hole must leave the connect hanging, got {probe:?}");
     }
 
     /// **The connect deadline is the queue's own, not the OS one** (hub#596). Against a printer
