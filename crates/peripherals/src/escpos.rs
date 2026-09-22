@@ -389,6 +389,7 @@ enum Label {
     Tendered,
     Change,
     Thanks,
+    Duplicate,
     // The bill taken to the table.
     BillTitle,
     TableOrCustomer,
@@ -486,6 +487,8 @@ impl Locale {
             Label::Tendered => ("Tendered", "Entregado"),
             Label::Change => ("Change", "Cambio"),
             Label::Thanks => ("Thank you for your purchase", "Gracias por su compra"),
+            // RD 1619/2012 art. 14.4: every copy after the original says «duplicado».
+            Label::Duplicate => ("DUPLICATE", "DUPLICADO"),
             Label::BillTitle => ("BILL", "CUENTA"),
             Label::TableOrCustomer => ("Table/Customer: ", "Mesa/Cliente: "),
             // The notice is what keeps this paper from passing for an invoice, so it has a
@@ -577,6 +580,14 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     if is_truthy(data, "phone") {
         b.text(&format!("{}{}\n", t.label(Label::Phone), str_field(data, "phone", "")));
+    }
+
+    // hub#1931 — only one original of an invoice may exist (RD 1619/2012 art. 14): a reprint is a
+    // duplicate and has to say so. Only an explicit `true` prints it, because the word is a legal
+    // statement about the paper, not decoration a truthy string should switch on.
+    if data.get("duplicate").and_then(|v| v.as_bool()) == Some(true) {
+        b.set(Align::Center, true, false, false);
+        b.text(&format!("{}\n", t.label(Label::Duplicate)));
     }
 
     b.text("================================\n");
@@ -1824,6 +1835,65 @@ mod tests {
             &[0x1d, 0x56, 0x01],
             "and the paper is cut, or the next ticket comes out attached to this one"
         );
+    }
+
+    // ── A reprint says «duplicado» (hub#1931, RD 1619/2012 art. 14.4) ───────────────────────────
+
+    fn fiscal_paper(doc: DocumentType, extra: serde_json::Value) -> Vec<(String, bool, bool)> {
+        let mut data = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-42",
+            "items": [{ "name": "Cafe", "quantity": 2, "total": 2.4 }],
+            "total": 2.4,
+        });
+        for (k, v) in extra.as_object().expect("extra fields are an object") {
+            data[k] = v.clone();
+        }
+        let bytes = render_document(doc, &data).expect("a well-formed fiscal document renders");
+        lines_with_modes(&bytes)
+    }
+
+    fn says(lines: &[(String, bool, bool)], word: &str) -> bool {
+        lines.iter().any(|(text, _, _)| text.contains(word))
+    }
+
+    /// Only one original of an invoice may exist, and every other copy has to say «duplicado»
+    /// (art. 14.4). A simplified invoice (the ticket) is an invoice too, so both documents carry it,
+    /// in bold above the ticket data — where whoever gets the paper reads it first.
+    #[test]
+    fn a_duplicate_ticket_or_invoice_says_so_above_its_data() {
+        for doc in [DocumentType::Receipt, DocumentType::Invoice] {
+            let lines = fiscal_paper(doc, json!({ "duplicate": true }));
+            let mark = lines
+                .iter()
+                .position(|(text, _, _)| text.trim() == "DUPLICADO")
+                .unwrap_or_else(|| panic!("{doc:?}: the duplicate carries the mark, got {lines:?}"));
+            assert!(lines[mark].1, "{doc:?}: the mark is printed in bold");
+            let ticket = lines
+                .iter()
+                .position(|(text, _, _)| text.starts_with("Ticket: "))
+                .expect("the ticket number is on the paper");
+            assert!(mark < ticket, "{doc:?}: the mark comes before the ticket data");
+        }
+    }
+
+    /// The original — the first print, the automatic one at checkout — carries no mark, and
+    /// neither does a document that says `duplicate: false` or something that is not a boolean:
+    /// the word is a legal statement, so only an explicit `true` prints it.
+    #[test]
+    fn the_original_carries_no_duplicate_mark() {
+        for extra in [json!({}), json!({ "duplicate": false }), json!({ "duplicate": "yes" })] {
+            let lines = fiscal_paper(DocumentType::Receipt, extra.clone());
+            assert!(!says(&lines, "DUPLICADO"), "{extra}: no mark on the original, got {lines:?}");
+        }
+    }
+
+    /// The mark speaks the language of the paper, like every other label (hub#1159).
+    #[test]
+    fn the_duplicate_mark_speaks_the_language_of_the_paper() {
+        let lines = fiscal_paper(DocumentType::Receipt, json!({ "duplicate": true, "locale": "en" }));
+        assert!(says(&lines, "DUPLICATE"), "an English paper says DUPLICATE, got {lines:?}");
+        assert!(!says(&lines, "DUPLICADO"), "and not the Spanish word");
     }
 
     /// **The bill the waiter takes to the table is a document this printer knows** (hub#748).
