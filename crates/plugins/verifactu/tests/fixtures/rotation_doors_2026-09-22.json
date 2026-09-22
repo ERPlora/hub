@@ -1,0 +1,23 @@
+[
+  {
+    "certificate_kind": "own",
+    "certificate_sha256": "2A45E7404D8B9B18A7DAE6EC69AAE32E2D7BAD138F3AE7177DB0CF24506B4E8B",
+    "csv": "A-86MZ448LPLEBV7",
+    "door": "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+    "step": "a"
+  },
+  {
+    "certificate_kind": "seal",
+    "certificate_sha256": "AD85F4ED838CFEB0EE90537D5F254DBEC12090FBCBDEC8ABA55D78099444B414",
+    "csv": "A-XVFNR9J7H6BQAY",
+    "door": "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+    "step": "b"
+  },
+  {
+    "certificate_kind": "own",
+    "certificate_sha256": "2A45E7404D8B9B18A7DAE6EC69AAE32E2D7BAD138F3AE7177DB0CF24506B4E8B",
+    "csv": "A-L4ZFA8D727WGUK",
+    "door": "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
+    "step": "c"
+  }
+]
