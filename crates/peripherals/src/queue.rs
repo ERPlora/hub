@@ -565,6 +565,7 @@ mod tests {
         }));
         let mut outcomes = spawn_worker(queue.clone());
 
+        let started = std::time::Instant::now();
         queue
             .enqueue(PrintJob {
                 job_id: Some("dead".into()),
@@ -592,6 +593,13 @@ mod tests {
             }
             other => panic!("a black-holed printer cannot complete: {other:?}"),
         }
+        // The failure must have waited out the connect deadline on every attempt: an instant
+        // refusal or reset (hub#1972) would also end as `Failed`, without exercising it.
+        assert!(
+            started.elapsed() >= Duration::from_millis(300),
+            "three attempts must each wait out the 100 ms connect deadline (took {:?})",
+            started.elapsed()
+        );
 
         let second = tokio::time::timeout(Duration::from_secs(2), outcomes.recv())
             .await
