@@ -166,6 +166,9 @@ fn encadenamiento(record: &Json, prev: Option<&Json>) -> String {
 /// La AEAT lo exige para `TipoFactura` F1/F3/R1-R4 (error 1189 si falta); las facturas
 /// **simplificadas** (F2) van **sin** destinatario. Se emite solo si el registro trae
 /// `recipient_nif` (cliente identificado); si no, devuelve vacío.
+///
+/// The recipient is identified by `NIF` only when it is Spanish: an EU VAT number of another
+/// member state goes as `IDOtro` (hub#1965, see [`recipient_identity`]).
 fn destinatarios(record: &Json) -> String {
     let nif = s(record, "recipient_nif");
     if nif.is_empty() {
@@ -182,11 +185,77 @@ fn destinatarios(record: &Json) -> String {
     format!(
         "<sum1:Destinatarios><sum1:IDDestinatario>\
          <sum1:NombreRazon>{name}</sum1:NombreRazon>\
-         <sum1:NIF>{nif}</sum1:NIF>\
+         {identity}\
          </sum1:IDDestinatario></sum1:Destinatarios>",
         name = esc(&name),
-        nif = esc(&nif),
+        identity = recipient_identity(&nif),
     )
+}
+
+/// VAT-number prefixes of the EU member states other than Spain, with the ISO 3166 code
+/// `CodigoPais` expects (`CountryType2`). Only Greece differs: its VAT prefix is `EL`.
+const EU_VAT_PREFIXES: &[(&str, &str)] = &[
+    ("AT", "AT"),
+    ("BE", "BE"),
+    ("BG", "BG"),
+    ("CY", "CY"),
+    ("CZ", "CZ"),
+    ("DE", "DE"),
+    ("DK", "DK"),
+    ("EE", "EE"),
+    ("EL", "GR"),
+    ("FI", "FI"),
+    ("FR", "FR"),
+    ("HR", "HR"),
+    ("HU", "HU"),
+    ("IE", "IE"),
+    ("IT", "IT"),
+    ("LT", "LT"),
+    ("LU", "LU"),
+    ("LV", "LV"),
+    ("MT", "MT"),
+    ("NL", "NL"),
+    ("PL", "PL"),
+    ("PT", "PT"),
+    ("RO", "RO"),
+    ("SE", "SE"),
+    ("SI", "SI"),
+    ("SK", "SK"),
+];
+
+/// The identity element of `IDDestinatario` (`PersonaFisicaJuridicaType`: `NIF` | `IDOtro`).
+///
+/// A Spanish NIF has at most ONE leading letter, so a tax id that starts with an EU member-state
+/// prefix is a NIF-IVA (VIES format): it goes as `IDOtro` with `IDType 02` and the whole number,
+/// prefix included, in `ID`. An `ES` NIF-IVA is a Spanish NIF (the XSD forbids `IDOtro` with
+/// `CodigoPais=ES` for it) and goes as `NIF` without the prefix. Anything else keeps going as
+/// `NIF` exactly as typed: without the customer's country the hub cannot choose between the
+/// non-EU `IDType`s (hub#1965).
+fn recipient_identity(tax_id: &str) -> String {
+    let compact: String = tax_id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_uppercase();
+    if let Some(spanish) = compact.strip_prefix("ES") {
+        if spanish.len() == 9 {
+            return format!("<sum1:NIF>{}</sum1:NIF>", esc(spanish));
+        }
+    }
+    let foreign = compact.get(..2).and_then(|prefix| {
+        EU_VAT_PREFIXES
+            .iter()
+            .find(|(vat, _)| *vat == prefix)
+            .map(|(_, iso)| *iso)
+    });
+    match foreign {
+        Some(country) if compact.len() > 2 => format!(
+            "<sum1:IDOtro><sum1:CodigoPais>{country}</sum1:CodigoPais>\
+             <sum1:IDType>02</sum1:IDType><sum1:ID>{id}</sum1:ID></sum1:IDOtro>",
+            id = esc(&compact),
+        ),
+        _ => format!("<sum1:NIF>{}</sum1:NIF>", esc(tax_id)),
+    }
 }
 
 /// Bloque `FacturasSustituidas` (XSD: tras `TipoFactura`, antes de `DescripcionOperacion`).
@@ -1625,6 +1694,138 @@ mod tls_classification_tests {
     #[test]
     fn an_error_without_a_cause_is_not_a_tls_failure() {
         assert!(!is_tls_failure(&chain(&["algo ha fallado"])));
+    }
+}
+
+/// hub#1965: who the recipient is decides which identity block goes out. A Spanish NIF goes as
+/// `NIF`; an EU VAT number of another member state goes as `IDOtro` (`IDType 02` NIF-IVA), because
+/// the AEAT validates `NIF` against its own census and a `FR…` number is not in it.
+#[cfg(test)]
+mod destinatario_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn recipient_block(tax_id: &str) -> String {
+        destinatarios(&json!({ "recipient_nif": tax_id, "recipient_name": "Client SARL" }))
+    }
+
+    #[test]
+    fn a_spanish_nif_goes_as_nif() {
+        let xml = recipient_block("B87654321");
+        assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
+        assert!(!xml.contains("IDOtro"), "{xml}");
+    }
+
+    #[test]
+    fn a_french_vat_number_goes_as_idotro_nif_iva() {
+        let xml = recipient_block("FR40303265045");
+        assert!(
+            xml.contains(
+                "<sum1:IDOtro><sum1:CodigoPais>FR</sum1:CodigoPais>\
+                 <sum1:IDType>02</sum1:IDType><sum1:ID>FR40303265045</sum1:ID></sum1:IDOtro>"
+            ),
+            "{xml}"
+        );
+        assert!(!xml.contains("<sum1:NIF>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:NombreRazon>Client SARL</sum1:NombreRazon>"),
+            "{xml}"
+        );
+    }
+
+    /// Greece prefixes its VAT numbers with `EL`, but `CodigoPais` is ISO 3166 (`CountryType2`
+    /// has `GR`, not `EL`); the `ID` keeps the prefix the number is written with.
+    #[test]
+    fn a_greek_vat_number_declares_country_gr_and_keeps_its_el_prefix() {
+        let xml = recipient_block("EL094259216");
+        assert!(
+            xml.contains("<sum1:CodigoPais>GR</sum1:CodigoPais>"),
+            "{xml}"
+        );
+        assert!(xml.contains("<sum1:ID>EL094259216</sum1:ID>"), "{xml}");
+    }
+
+    /// People type VAT numbers the way they see them printed: lower case, spaces, dots, dashes.
+    #[test]
+    fn a_vat_number_typed_with_spaces_and_lower_case_is_normalised() {
+        let xml = recipient_block("de 811.569-869");
+        assert!(
+            xml.contains("<sum1:CodigoPais>DE</sum1:CodigoPais>"),
+            "{xml}"
+        );
+        assert!(xml.contains("<sum1:ID>DE811569869</sum1:ID>"), "{xml}");
+    }
+
+    /// `IDOtro` with `CodigoPais=ES` is not allowed for a Spanish taxpayer (XSD note on
+    /// `IDOtroType`): an `ES`-prefixed NIF-IVA is a Spanish NIF and goes as `NIF`, without prefix.
+    #[test]
+    fn a_spanish_vat_number_goes_as_nif_without_the_es_prefix() {
+        let xml = recipient_block("ESB87654321");
+        assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
+        assert!(!xml.contains("IDOtro"), "{xml}");
+    }
+
+    /// A two-letter start that is not an EU member state is not a NIF-IVA: without the customer's
+    /// country the hub cannot pick the `IDType`, so it keeps declaring what it declared before.
+    #[test]
+    fn a_non_eu_prefix_is_not_declared_as_a_nif_iva() {
+        let xml = recipient_block("GB123456789");
+        assert!(!xml.contains("<sum1:IDType>02</sum1:IDType>"), "{xml}");
+    }
+
+    /// Every `CodigoPais` the table can emit is in the official `CountryType2`; a code that is not
+    /// (`EL`) is a 4102 with the chain number already spent.
+    #[test]
+    fn every_country_code_is_in_the_official_country_type() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/schemas/aeat/SuministroInformacion.xsd"
+        );
+        let schema = std::fs::read_to_string(path).expect("vendored XSD");
+        let country_type = schema
+            .split("name=\"CountryType2\"")
+            .nth(1)
+            .and_then(|rest| rest.split("</simpleType>").next())
+            .expect("CountryType2 in the XSD");
+        assert_eq!(
+            EU_VAT_PREFIXES.len(),
+            26,
+            "the 26 member states besides Spain"
+        );
+        for (_, iso) in EU_VAT_PREFIXES {
+            assert!(
+                country_type.contains(&format!("value=\"{iso}\"")),
+                "{iso} is not a CountryType2"
+            );
+        }
+    }
+
+    /// The whole alta with a foreign recipient still passes the XSD gate that runs before every
+    /// transmission.
+    #[test]
+    fn an_alta_to_an_eu_customer_passes_the_xsd_gate() {
+        let record = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F1",
+            "description": "Intra-community sale",
+            "base_amount": 100000.0,
+            "tax_amount": 0.0,
+            "total_amount": 100000.0,
+            "tax_rate": 0.0,
+            "tax_breakdown": r#"[{"tax":"vat","regime":"01","class":"not_subject_location","rate":0.00,"base":100000,"quota":0}]"#,
+            "recipient_nif": "FR40303265045",
+            "recipient_name": "Client SARL",
+            "record_hash": "A".repeat(64),
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        });
+        let xml = build_soap(&record, &test_config_with_producer_facts(), None, "hub-1")
+            .expect("declarable");
+        crate::xsd::validate_registro(&xml).expect("XSD gate");
+        assert!(xml.contains("<sum1:IDType>02</sum1:IDType>"), "{xml}");
     }
 }
 
