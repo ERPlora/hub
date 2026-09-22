@@ -164,6 +164,10 @@ fn load_master_key() -> Result<Option<SecretsKey>> {
 /// «this hub cannot tell», which routes to the holder's door like everything else it cannot vouch
 /// for.
 ///
+/// **…and so does `not_after`** (hub#1940): the instant those bytes stop being accepted by the AEAT,
+/// stored so the rule that decides whether a live hub can file never decrypts the container on a
+/// sale's path. `None` writes the empty string — «not known», which blocks nothing.
+///
 /// **Fail-closed:** without `HUB_SECRETS_KEY` it fails — a new `.p12`/password is NEVER persisted in
 /// the clear, nor is a key generated and stored in the same database (that would protect nothing).
 /// The Hub is Postgres-only/cloud-only since ADR-0154 (there is no Local/Cloud split that could
@@ -176,6 +180,7 @@ pub(crate) async fn set(
     password: &str,
     by: &str,
     certificate_type: Option<CertificateType>,
+    not_after: Option<String>,
 ) -> Result<()> {
     let key = load_master_key()?.ok_or_else(|| {
         RuntimeError::Certificate(format!(
@@ -200,6 +205,7 @@ pub(crate) async fn set(
         "certificate_type".into(),
         json!(certificate_type.map(CertificateType::as_str).unwrap_or("")),
     );
+    p.insert("not_after".into(), json!(not_after.unwrap_or_default()));
     db.execute(
         // `cert_version` is NOT written: it numbered the control plane's central ROTATION of the
         // retired delegated certificate (ADR-0202 §2.5), and nothing rotates a certificate centrally
@@ -210,13 +216,13 @@ pub(crate) async fn set(
         // unused with nobody knowing why.
         "INSERT INTO _hub_certificate \
            (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, certificate_type, \
-            use_for_transmission) \
+            not_after, use_for_transmission) \
          VALUES (:hub_id, :kind, :pkcs12_b64, :password, :uploaded_at, :uploaded_by, \
-                 :certificate_type, 1) \
+                 :certificate_type, :not_after, 1) \
          ON CONFLICT (hub_id, kind) DO UPDATE SET \
            pkcs12_b64 = excluded.pkcs12_b64, password = excluded.password, \
            uploaded_at = excluded.uploaded_at, uploaded_by = excluded.uploaded_by, \
-           certificate_type = excluded.certificate_type, \
+           certificate_type = excluded.certificate_type, not_after = excluded.not_after, \
            use_for_transmission = 1",
         &p,
     )
@@ -241,6 +247,17 @@ pub(crate) fn derive_certificate_type(pkcs12_b64: &str, password: &str) -> Optio
         .decode(pkcs12_b64.trim())
         .ok()?;
     certificate_type_from_der(&der, password).ok().flatten()
+}
+
+/// The `notAfter` of a base64 container as its RFC 3339 instant, with every failure collapsing into
+/// «cannot tell» (hub#1940) — for the same reasons as [`derive_certificate_type`]: an unusable
+/// container has always been storable, and this is not the place to start refusing it.
+pub(crate) fn derive_not_after(pkcs12_b64: &str, password: &str) -> Option<String> {
+    use base64::Engine as _;
+    let der = base64::engine::general_purpose::STANDARD
+        .decode(pkcs12_b64.trim())
+        .ok()?;
+    expiry_instant_from_der(&der, password).ok().flatten()
 }
 
 /// The slots that actually HOLD a certificate, in [`SLOTS`] order (i.e. selection order), each with
@@ -456,6 +473,10 @@ pub const OWN_CERTIFICATE_NOT_UPLOADED: &str = "fiscal.own_certificate_not_uploa
 /// Refusal of switching the own certificate OFF in production while the machine identity the fiscal
 /// cell needs is not enrolled.
 pub const GATEWAY_NOT_ENROLLED: &str = "fiscal.gateway_not_enrolled";
+
+/// Refusal of a live hub whose OWN certificate — the one that signs — is past its `notAfter`
+/// (hub#1940): the AEAT rejects it, so nothing it signs would reach the tax authority.
+pub const OWN_CERTIFICATE_EXPIRED: &str = "fiscal.own_certificate_expired";
 pub const ROUTE_DELEGATED: &str = "delegated";
 
 /// [`ROUTE_OWN`]/[`ROUTE_DELEGATED`] from the slot that signs — **the rule, in one place**.
@@ -478,6 +499,65 @@ pub const fn route_of(active: Option<CertificateKind>) -> &'static str {
         Some(CertificateKind::Own) => ROUTE_OWN,
         None => ROUTE_DELEGATED,
     }
+}
+
+/// **When the certificate that signs expires** (hub#1940), as the RFC 3339 UTC instant of its
+/// `notAfter`; `None` when no certificate signs — or when the one that does cannot say.
+///
+/// It sits on the dispatcher's path ([`crate::fiscal_profile::filing_gap`] asks it on every command
+/// of a live hub on the own road), so it reads the column the upload wrote next to the bytes and
+/// never decrypts them — except for a row written before that column existed (`''`), which is read
+/// from its container until the next upload writes the date, the same story as [`slot_type`].
+///
+/// «Cannot say» — a container that does not decrypt or parse — is `None`, never a guessed date:
+/// an unknown expiry blocks nothing, exactly as it blocked nothing before this existed, and the
+/// TLS handshake still fails loudly on a container that is really broken.
+pub async fn signing_not_after(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<String>> {
+    let Some(kind) = active_kind(db, hub_id).await? else {
+        return Ok(None);
+    };
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("kind".into(), json!(kind.as_str()));
+    let res = db
+        .query(
+            "SELECT not_after FROM _hub_certificate \
+             WHERE hub_id = :hub_id AND kind = :kind AND pkcs12_b64 <> '' LIMIT 1",
+            &p,
+        )
+        .await?;
+    let stored = res
+        .rows
+        .first()
+        .and_then(|row| row.get("not_after"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if !stored.is_empty() {
+        return Ok(Some(stored));
+    }
+    Ok(load_pkcs12(db, hub_id, kind)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|(der, password)| expiry_instant_from_der(&der, &password).ok().flatten()))
+}
+
+/// Whether a `notAfter` instant ([`signing_not_after`]) is already behind `now`. A value that does
+/// not parse as RFC 3339 is not a date, and is never read as «expired».
+pub fn has_expired(not_after: &str, now: chrono::DateTime<chrono::Utc>) -> bool {
+    chrono::DateTime::parse_from_rfc3339(not_after.trim())
+        .map(|expiry| expiry.with_timezone(&chrono::Utc) <= now)
+        .unwrap_or(false)
+}
+
+/// [`signing_not_after`] + [`has_expired`] against the clock: is the certificate that signs for
+/// this hub past its `notAfter` right now? `false` when none signs or its expiry is unknown.
+pub async fn signing_certificate_expired(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    Ok(signing_not_after(db, hub_id)
+        .await?
+        .is_some_and(|not_after| has_expired(&not_after, chrono::Utc::now())))
 }
 
 /// [`route_of`] for a hub: which of the two routes its records take right now.
@@ -1180,6 +1260,35 @@ fn asn1_time_to_rfc3339(s: &str) -> Option<String> {
     shaped.then(|| format!("{date}T{time}Z"))
 }
 
+#[cfg(test)]
+mod expiry_tests {
+    use super::has_expired;
+
+    fn at(rfc3339: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(rfc3339)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+    }
+
+    /// hub#1940: at its `notAfter` the certificate is no longer valid — the instant itself counts.
+    #[test]
+    fn a_certificate_has_expired_from_its_not_after_on() {
+        let not_after = "2026-09-22T10:00:00Z";
+        assert!(!has_expired(not_after, at("2026-09-22T09:59:59Z")));
+        assert!(has_expired(not_after, at("2026-09-22T10:00:00Z")));
+        assert!(has_expired(not_after, at("2027-01-01T00:00:00Z")));
+    }
+
+    /// An expiry nobody could read is not a date: it never blocks a till.
+    #[test]
+    fn an_unknown_expiry_has_not_expired() {
+        let now = at("2030-01-01T00:00:00Z");
+        for unknown in ["", "  ", "2026-09-22", "garbage"] {
+            assert!(!has_expired(unknown, now), "{unknown:?}");
+        }
+    }
+}
+
 #[cfg(all(test, not(target_os = "android")))]
 mod asn1_tests {
     use super::{asn1_time_to_iso, asn1_time_to_rfc3339};
@@ -1329,6 +1438,7 @@ mod tests {
             "secret",
             "hub_user:admin",
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1345,6 +1455,7 @@ mod tests {
             "TkVX",
             "p2",
             "hub_user:admin",
+            None,
             None,
         )
         .await
@@ -1377,6 +1488,7 @@ mod tests {
             "s3cr3t-p12-password",
             "hub_user:admin",
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1407,6 +1519,7 @@ mod tests {
             "mi-contraseña-real",
             "hub_user:admin",
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1435,6 +1548,7 @@ mod tests {
             OWN_B64,
             "no-debe-viajar",
             "hub_user:admin",
+            None,
             None,
         )
         .await
@@ -1493,6 +1607,7 @@ mod tests {
             "password",
             "hub_user:admin",
             None,
+            None,
         )
         .await
         .unwrap_err();
@@ -1521,6 +1636,7 @@ mod tests {
                 "cGtjczEy",
                 "password",
                 "hub_user:admin",
+                None,
                 None,
             )
             .await
@@ -1568,6 +1684,7 @@ mod tests {
             OWN_B64,
             "pw-own",
             "hub_user:admin",
+            None,
             None,
         )
         .await
@@ -1619,6 +1736,7 @@ mod tests {
             OWN_B64,
             "pw-own",
             "hub_user:admin",
+            None,
             None,
         )
         .await
@@ -1741,6 +1859,7 @@ mod tests {
                     "pw",
                     "hub_user:a",
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -1805,6 +1924,7 @@ mod tests {
             password,
             "hub_user:admin",
             derive_certificate_type(b64, password),
+            None,
         )
         .await
     }
@@ -2077,6 +2197,7 @@ mod tests {
             &seal_pw,
             "hub_user:admin",
             derive_certificate_type(&seal_b64, &seal_pw),
+            None,
         )
         .await
         .unwrap();

@@ -1225,18 +1225,33 @@ pub async fn core_query(
         // `fiscal_profile::filing_gap` the dispatcher refuses the sale with, so the notice on the
         // till and the refusal at the counter cannot disagree. `filing_fix_route` is where it is
         // fixed — the setup route the regime's provider declares — so `sales` sends the owner there
-        // without ever naming the fiscal module.
+        // without ever naming the fiscal module. `own_certificate_expires_at` (hub#1940) is when the
+        // own certificate that signs expires, `""` when none does: the till warns days before.
         "fiscal.transmission" => {
             let profile = crate::fiscal_profile::load(db, hub_id).await?;
             let grant = |pick: fn(&crate::fiscal_profile::FiscalProfile) -> &str| {
                 profile.as_ref().map(pick).unwrap_or_default().to_string()
             };
             let route = crate::certificate::transmission_route(db, hub_id).await?;
+            // When the own certificate that signs runs out (hub#1940), so the till can warn BEFORE
+            // it does; `""` on ERPlora's road, where no certificate of the business signs.
+            let own_certificate_expires_at = if route == crate::certificate::ROUTE_OWN {
+                crate::certificate::signing_not_after(db, hub_id)
+                    .await?
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            let own_expired = crate::certificate::has_expired(
+                &own_certificate_expires_at,
+                chrono::Utc::now(),
+            );
             let filing_blocked = match &profile {
                 Some(p) => crate::fiscal_profile::filing_gap(
                     p,
                     route,
                     crate::gateway_identity::is_enrolled(db, hub_id).await?,
+                    own_expired,
                 ),
                 None => None,
             };
@@ -1254,6 +1269,7 @@ pub async fn core_query(
                 "representation_at": grant(|p| &p.representation_at),
                 "filing_blocked": filing_blocked.unwrap_or_default(),
                 "filing_fix_route": filing_fix_route,
+                "own_certificate_expires_at": own_certificate_expires_at,
             })]))
         }
         // The PIN approval record (hub#362 writes, hub#512 reads, hub#884 pages). Double

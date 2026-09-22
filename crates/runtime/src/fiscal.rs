@@ -105,6 +105,7 @@ impl Runtime {
             password,
             by,
             certificate::derive_certificate_type(pkcs12_b64, password),
+            certificate::derive_not_after(pkcs12_b64, password),
         )
         .await
     }
@@ -153,7 +154,14 @@ impl Runtime {
                 // file on it is ONE rule (hub#1935) — the same one the dispatcher refuses a sale
                 // with. Two copies would be how the switch and the till end up disagreeing.
                 let enrolled = crate::gateway_identity::is_enrolled(db, &self.hub_id).await?;
-                match fiscal_profile::filing_gap(&profile, certificate::ROUTE_DELEGATED, enrolled) {
+                // `false`: the road left behind is ERPlora's, where no certificate of the business
+                // signs, so its expiry (hub#1940) cannot be what is missing there.
+                match fiscal_profile::filing_gap(
+                    &profile,
+                    certificate::ROUTE_DELEGATED,
+                    enrolled,
+                    false,
+                ) {
                     Some(fiscal_profile::NO_REPRESENTATION) => {
                         return Err(RuntimeError::Domain {
                             code: fiscal_profile::NO_REPRESENTATION.to_string(),
