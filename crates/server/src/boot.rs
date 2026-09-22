@@ -979,6 +979,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // cuesta nada al plano de control ni llena de revisiones el escritorio del operador.
     gateway_enrolment::spawn_enrolment_service(&state);
 
+    // hub#1939: the hub's copy of the representation grant decides whether a live hub on
+    // ERPlora's road may charge (hub#1935), and only the grant screen used to refresh it — a grant
+    // revoked at ERPlora kept the till charging until somebody opened that screen. Hourly, and only
+    // the hubs whose charging it decides ask (`representation_grant::sync_once`).
+    representation_grant::spawn_sync(&state);
+
     // «Llama a MI nube con MI credencial de máquina» (hub#1459): el primitivo genérico con el
     // que un motor first-party pide algo al plano de control sin sostener jamás el `X-Hub-Token`.
     // El host pone destino y credencial; el motor pone método, ruta y cuerpo — y qué significa la

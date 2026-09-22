@@ -762,6 +762,120 @@ async fn mirror_into_profile(st: &AppState, state: &GrantState) {
     }
 }
 
+// ── The background sync (hub#1939) ──────────────────────────────────────────────────────────────
+
+/// How often a live hub on ERPlora's road asks whether its grant still holds, unless
+/// `HUB_REPRESENTATION_SYNC_SECS` says otherwise.
+///
+/// Hourly, not with the daily heartbeat: a grant revoked at ERPlora closes the till within the
+/// hour instead of the next day, and the question is only ever asked by the hubs whose charging it
+/// decides (see [`sync_once`]), so the fleet-wide cost stays at one small `GET` per such hub.
+pub const DEFAULT_SYNC_SECS: u64 = 3600;
+pub const SYNC_INTERVAL_ENV: &str = "HUB_REPRESENTATION_SYNC_SECS";
+
+/// The tick's period from its env value: a positive number of seconds, or [`DEFAULT_SYNC_SECS`].
+pub fn sync_interval_secs(env_value: Option<&str>) -> u64 {
+    env_value
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|secs| *secs > 0)
+        .unwrap_or(DEFAULT_SYNC_SECS)
+}
+
+/// What one background sync did (hub#1939).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SyncOutcome {
+    /// No machine credential: there is nobody to ask as. The copy stays as it is.
+    NotEnrolled,
+    /// The copy decides nothing for this hub — in `testing`, or filing with its own certificate.
+    NotNeeded,
+    /// The control plane could not be asked, or refused the question. The copy stays as it is:
+    /// "I could not ask" is not "you have not signed", and a network blip must not close a till.
+    Failed,
+    /// The control plane answered and its answer is now the hub's copy.
+    Mirrored { previous: String, current: String },
+}
+
+/// **Keeps the hub's copy of the grant in step with ERPlora, with no screen open** (hub#1939).
+///
+/// The copy (`_hub_fiscal_profile.representation_status`) is what `fiscal_profile::filing_gap`
+/// reads to decide whether a live hub on ERPlora's road may charge (hub#1935). Its only writers
+/// were the grant screen's `GET`/`POST`, so a grant revoked or rejected at ERPlora stayed `vigente`
+/// here until somebody opened that screen — and the till kept charging tickets the fiscal cell
+/// refuses (`hub_not_authorized`). This asks the same question the screen asks, with the same
+/// machine credential, and writes the answer through the same [`mirror_into_profile`].
+///
+/// Only a hub whose charging the copy decides asks: `production` on ERPlora's road. In `testing`
+/// nothing is authorised (ADR-0360) and a business with its own certificate delegates nothing
+/// (ADR-0320 §1). A route that cannot be read is treated as ERPlora's: asking once too often is
+/// harmless, not asking is how a revoked grant keeps charging.
+pub async fn sync_once(st: &AppState) -> SyncOutcome {
+    let Some(machine) = auth::machine_auth(st) else {
+        return SyncOutcome::NotEnrolled;
+    };
+    let previous = {
+        let runtime = st.runtime.read().await;
+        let profile =
+            match erplora_runtime::fiscal_profile::load(runtime.db(), runtime.hub_id()).await {
+                Ok(Some(profile)) => profile,
+                Ok(None) => return SyncOutcome::NotNeeded,
+                Err(error) => {
+                    tracing::warn!(%error, "otorgamiento: no se pudo leer el perfil fiscal");
+                    return SyncOutcome::Failed;
+                }
+            };
+        if profile.environment != erplora_runtime::fiscal_profile::ENV_PRODUCTION {
+            return SyncOutcome::NotNeeded;
+        }
+        let route =
+            erplora_runtime::certificate::transmission_route(runtime.db(), runtime.hub_id()).await;
+        if matches!(route, Ok(route) if route == erplora_runtime::certificate::ROUTE_OWN) {
+            return SyncOutcome::NotNeeded;
+        }
+        profile.representation_status
+    };
+    // The network call goes with the runtime lock released: a slow control plane must not hold
+    // up the tills.
+    match fetch_state(&st.http, &st.config.cloud_base_url, &machine).await {
+        Ok(body) => {
+            let state = grant_state_from_cloud(&body);
+            mirror_into_profile(st, &state).await;
+            if state.0 != previous {
+                tracing::warn!(
+                    previous = %previous,
+                    current = %state.0,
+                    "el estado del otorgamiento cambió en ERPlora; copia del hub actualizada"
+                );
+            }
+            SyncOutcome::Mirrored {
+                previous,
+                current: state.0,
+            }
+        }
+        Err(refusal) => {
+            tracing::warn!(
+                detail = %refusal.detail,
+                "otorgamiento: el plano de control no contestó; se conserva la copia del hub"
+            );
+            SyncOutcome::Failed
+        }
+    }
+}
+
+/// Runs [`sync_once`] on its own tick, the first one at boot. Its own task and period, like the
+/// other background loops: it does network I/O, so it never shares the 1 s relay's lock.
+pub fn spawn_sync(st: &AppState) {
+    let st = st.clone();
+    let secs = sync_interval_secs(std::env::var(SYNC_INTERVAL_ENV).ok().as_deref());
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tick.tick().await;
+            sync_once(&st).await;
+        }
+    });
+}
+
 /// The copy the hub already holds, for when the control plane cannot be reached.
 async fn stored_state(st: &AppState) -> GrantState {
     let runtime = st.runtime.read().await;
