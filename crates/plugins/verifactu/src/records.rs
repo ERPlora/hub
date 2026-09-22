@@ -435,10 +435,10 @@ pub(crate) async fn create_record(input: &Json, host: &dyn NativeHost) -> Result
             invoice_id: payload.get("invoice_id").cloned().unwrap_or(Json::Null),
             recipient_nif: str_field(&payload, "recipient_nif"),
             recipient_name: str_field(&payload, "recipient_name"),
-            // The public door's schema (`record_create.json`) does not declare them: its callers
-            // identify the customer by `recipient_nif` alone, whose prefix decides (hub#1965).
-            recipient_country: String::new(),
-            recipient_id_type: String::new(),
+            // Optional in the public door's schema (hub#1975): empty, the prefix of
+            // `recipient_nif` decides, as since hub#1965.
+            recipient_country: str_field(&payload, "recipient_country"),
+            recipient_id_type: str_field(&payload, "recipient_id_type"),
             // Sustitución (F3): el caller manual puede pasarlos; normalmente vacíos.
             substitutes_number: str_field(&payload, "substitutes_number"),
             substitutes_date: str_field(&payload, "substitutes_date"),
@@ -728,6 +728,13 @@ pub(crate) async fn build_record_output(
                 // anchor/sequence were read above; the SQL COALESCE fallback is only for older
                 // engines that omit the param.
                 "environment": environment,
+                // Destinatarios (hub#1975): who the customer is, persisted with the record. A
+                // deferred send rebuilds the XML from the row alone, and an F1 without its
+                // customer is refused before it leaves (AEAT 1189) with its chain number spent.
+                "recipient_nif": r.recipient_nif,
+                "recipient_name": r.recipient_name,
+                "recipient_country": r.recipient_country,
+                "recipient_id_type": r.recipient_id_type,
                 // F3 → FacturasSustituidas (ADR-0140): snapshot de la F2 sustituida para reconstruir
                 // el XML en contingencia/reintento sin releer la factura. Vacíos si no es sustitución.
                 "substitutes_number": r.substitutes_number,

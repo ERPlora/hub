@@ -4557,4 +4557,99 @@ mod late_remission_verifactu111 {
         let xml = ingest_invoice_to(&bench, "B87654321", None).await;
         assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
     }
+
+    // ── hub#1975 · a deferred full invoice still knows who its customer was ────────────────────
+
+    /// One full invoice (`F1`, 100,00 € + 21 %) to `recipient` through `verifactu.records.create`
+    /// while the hub has NO road, then the road opens and the drain sends it: the envelope is
+    /// rebuilt from the `verifactu_record` row alone. Returns the XML that reached the cell.
+    async fn defer_a_full_invoice_and_drain(bench: &Bench, recipient: Json) -> String {
+        let mut payload = json!({
+            "record_type": "alta", "issuer_nif": NIF, "issuer_name": "Salon Lucia SL",
+            "invoice_number": "FACT-2026-000001", "invoice_date": "2026-09-22",
+            "invoice_type": "F1", "description": "Corte y peinado",
+            "base_amount": 10000, "tax_rate": 21.0, "tax_amount": 2100, "total_amount": 12100,
+            "tax_breakdown": r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
+                                  "base":10000,"quota":2100}]"#,
+        });
+        for (key, value) in recipient.as_object().expect("recipient fields") {
+            payload[key] = value.clone();
+        }
+        bench
+            .rt
+            .execute_command(
+                "verifactu.records.create",
+                payload.as_object().unwrap(),
+                &bench.ctx(),
+            )
+            .await
+            .expect("the invoice is sealed");
+        assert!(
+            bench.cell.lock().unwrap().is_empty(),
+            "no road: nothing leaves at the time of the sale"
+        );
+        assert_eq!(bench.chain().await, pending(&[1]), "the record waits for the road");
+
+        bench.open_the_road();
+        bench.drain().await;
+
+        let sent = bench.cell.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "the drain sends the deferred invoice once");
+        assert_eq!(sent[0]["environment"], "testing", "only the TEST AEAT");
+        assert_ne!(
+            bench.chain().await[0].1,
+            "rejected",
+            "the hub must not reject its own invoice for a customer it forgot"
+        );
+        let xml = base64::engine::general_purpose::STANDARD
+            .decode(sent[0]["xml_b64"].as_str().expect("xml_b64"))
+            .expect("base64");
+        String::from_utf8(xml).expect("utf-8")
+    }
+
+    /// 🔴 hub#1975: an F1 sealed without a road reached the drain with no customer — the row did
+    /// not keep it — and the hub itself rejected it (1189) with its chain number spent.
+    #[tokio::test]
+    async fn a_deferred_full_invoice_reaches_the_aeat_with_its_customer() {
+        let Some(bench) = Bench::new("19750000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        let xml = defer_a_full_invoice_and_drain(
+            &bench,
+            json!({ "recipient_nif": "B87654321", "recipient_name": "Peluqueria Norte SL" }),
+        )
+        .await;
+        assert!(
+            xml.contains(
+                "<sum1:Destinatarios><sum1:IDDestinatario>\
+                 <sum1:NombreRazon>Peluqueria Norte SL</sum1:NombreRazon>\
+                 <sum1:NIF>B87654321</sum1:NIF>"
+            ),
+            "{xml}"
+        );
+    }
+
+    /// The foreign customer's country and document kind (hub#1967) survive the wait too: a
+    /// deferred invoice to a tourist's passport goes out as `IDOtro` US 03, not as a Spanish NIF.
+    #[tokio::test]
+    async fn a_deferred_invoice_to_a_foreigner_keeps_the_country_and_document() {
+        let Some(bench) = Bench::new("19750000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        let xml = defer_a_full_invoice_and_drain(
+            &bench,
+            json!({
+                "recipient_nif": "XA1234567", "recipient_name": "Jane Doe",
+                "recipient_country": "US", "recipient_id_type": "03",
+            }),
+        )
+        .await;
+        assert!(
+            xml.contains(
+                "<sum1:IDOtro><sum1:CodigoPais>US</sum1:CodigoPais>\
+                 <sum1:IDType>03</sum1:IDType><sum1:ID>XA1234567</sum1:ID></sum1:IDOtro>"
+            ),
+            "{xml}"
+        );
+    }
 }
