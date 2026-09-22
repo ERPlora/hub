@@ -2040,6 +2040,24 @@ CREATE TABLE IF NOT EXISTS _hub_activity_log (\
 CREATE INDEX IF NOT EXISTS ix_hub_activity_log_pending \
   ON _hub_activity_log (hub_id, occurred_at, id);",
     },
+    // ── v65 — hub#1940: WHEN the certificate expires, stored next to its bytes ─────────────────
+    // A live hub signing with an expired own certificate charged tickets the AEAT then refused.
+    // The rule that decides whether a hub can file (`fiscal_profile::filing_gap`) runs on every
+    // command, and reading `notAfter` from the container there would decrypt and parse a PKCS#12
+    // per sale. So the upsert that writes the bytes writes their `notAfter` too — the same upsert,
+    // like `certificate_type` (v21), because it describes THOSE bytes.
+    //
+    // RFC 3339 UTC instant, `''` = «not stored»: rows written before this column carry `''` and
+    // `certificate::signing_not_after` reads the container for them until the next upload — the
+    // v21 story, without a blind backfill. Additive and re-runnable, so the auto-rollback can
+    // leave it behind (ADR-0269).
+    SystemMigration {
+        version: 65,
+        name: "hub_certificate_not_after",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _hub_certificate \
+                     ADD COLUMN IF NOT EXISTS not_after TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -4004,7 +4022,12 @@ mod kind_contract_tests {
         // unwritten. When it was written the maximum was v63 on `origin/develop` and across the 31
         // remote branches that carry the file — none asks for a v64 (`git grep -l "version: 6[4-9]"`
         // over every remote ref came back empty).
-        assert_eq!(MIGRATIONS.len(), 61, "el catálogo cambió de tamaño");
+        // + `hub_certificate_not_after` (v65, hub#1940): the `notAfter` of the certificate, written
+        // in the same upsert as its bytes so the rule that decides whether a live hub can file
+        // knows an expired own certificate without decrypting it on every sale. `ADD COLUMN IF NOT
+        // EXISTS … DEFAULT ''`, additive and re-runnable. When it was written the maximum was v64
+        // on `origin/develop` and no remote ref asked for a v65 or above.
+        assert_eq!(MIGRATIONS.len(), 62, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

@@ -218,6 +218,36 @@ mod tests {
         }
     }
 
+    /// A printer that is switched off but keeps its address. The socket is bound, so no other
+    /// socket can take the port, yet it does not listen, so no connect gets through (Linux
+    /// refuses it, macOS drops the SYN) — what a powered-off printer on the LAN does. `switch_on` listens on that same socket, so the
+    /// port never goes back to the OS in between (hub#1961).
+    struct SwitchedOffPrinter {
+        socket: tokio::net::TcpSocket,
+        addr: std::net::SocketAddr,
+        target: NetworkTarget,
+    }
+
+    impl SwitchedOffPrinter {
+        fn new() -> Self {
+            let socket = tokio::net::TcpSocket::new_v4().unwrap();
+            socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let addr = socket.local_addr().unwrap();
+            Self {
+                socket,
+                addr,
+                target: NetworkTarget {
+                    host: addr.ip().to_string(),
+                    port: addr.port(),
+                },
+            }
+        }
+
+        fn switch_on(self) -> TcpListener {
+            self.socket.listen(16).expect("listen on the reserved port")
+        }
+    }
+
     /// Arranca el worker de la cola y devuelve el receptor de outcomes.
     fn spawn_worker(queue: Arc<PrintQueue>) -> UnboundedReceiver<JobOutcome> {
         let (tx, rx) = mpsc::unbounded_channel();
@@ -286,15 +316,40 @@ mod tests {
         );
     }
 
+    /// The switched-off printer is a real off printer AND keeps its address (hub#1961): while
+    /// off, a connect does not get through and no other socket can take the port; once switched on, the
+    /// very same address accepts. Rebinding a dropped port instead let a parallel test grab it
+    /// in between and fail with `AddrInUse`.
+    #[tokio::test]
+    async fn a_switched_off_printer_refuses_connections_and_keeps_its_port() {
+        let printer = SwitchedOffPrinter::new();
+        let addr = printer.addr;
+
+        // Linux refuses the connect outright; macOS drops the SYN. Either way it never connects.
+        let off = tokio::time::timeout(Duration::from_millis(200), TcpStream::connect(addr)).await;
+        assert!(
+            !matches!(off, Ok(Ok(_))),
+            "an off printer must not take the connection, got {off:?}"
+        );
+        let stolen = TcpListener::bind(addr)
+            .await
+            .expect_err("the port stays reserved");
+        assert_eq!(stolen.kind(), std::io::ErrorKind::AddrInUse);
+
+        let listener = printer.switch_on();
+        let (connected, accepted) = tokio::join!(TcpStream::connect(addr), listener.accept());
+        connected.expect("a switched-on printer accepts on the same address");
+        accepted.expect("and the listener sees the connection");
+    }
+
     /// **La impresora apagada un momento no pierde el trabajo.** Es el requisito §2.7 entero: el
     /// primer intento falla con el puerto cerrado y un reintento posterior, ya con la impresora de
     /// vuelta, entrega. Sin esto un tique se pierde cada vez que alguien tropieza con el cable.
     #[tokio::test]
     async fn a_printer_that_comes_back_still_gets_its_job() {
-        // Reserva un puerto y ciérralo: "impresora apagada" en una dirección que luego revive.
-        let probe = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = probe.local_addr().unwrap();
-        drop(probe);
+        // Switched off at an address that comes back later; the port stays ours meanwhile.
+        let printer = SwitchedOffPrinter::new();
+        let target = printer.target.clone();
 
         let captured = Arc::new(tokio::sync::Mutex::new(Vec::new()));
         let accepted = Arc::new(AtomicU32::new(0));
@@ -302,9 +357,9 @@ mod tests {
         let cap = captured.clone();
         let seen = accepted.clone();
         let revive = tokio::spawn(async move {
-            // Vuelve a levantarse mientras la cola hace backoff.
+            // Comes back while the queue is backing off.
             tokio::time::sleep(Duration::from_millis(40)).await;
-            let listener = TcpListener::bind(addr).await.expect("rebind del puerto");
+            let listener = printer.switch_on();
             if let Ok((mut sock, _)) = listener.accept().await {
                 seen.fetch_add(1, Ordering::SeqCst);
                 let mut buf = Vec::new();
@@ -320,10 +375,6 @@ mod tests {
             write_timeout_ms: 1000,
         }));
         let mut outcomes = spawn_worker(queue.clone());
-        let target = NetworkTarget {
-            host: addr.ip().to_string(),
-            port: addr.port(),
-        };
         queue.enqueue(job(target, b"resilient job")).unwrap();
 
         assert!(
