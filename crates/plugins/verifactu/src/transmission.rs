@@ -4588,7 +4588,11 @@ mod late_remission_verifactu111 {
             bench.cell.lock().unwrap().is_empty(),
             "no road: nothing leaves at the time of the sale"
         );
-        assert_eq!(bench.chain().await, pending(&[1]), "the record waits for the road");
+        assert_eq!(
+            bench.chain().await,
+            pending(&[1]),
+            "the record waits for the road"
+        );
 
         bench.open_the_road();
         bench.drain().await;
