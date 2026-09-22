@@ -2048,7 +2048,7 @@ CREATE INDEX IF NOT EXISTS ix_hub_activity_log_pending \
     // like `certificate_type` (v21), because it describes THOSE bytes.
     //
     // RFC 3339 UTC instant, `''` = «not stored»: rows written before this column carry `''` and
-    // `certificate::slot_not_after` reads the container for them until the next upload — the
+    // `certificate::signing_not_after` reads the container for them until the next upload — the
     // v21 story, without a blind backfill. Additive and re-runnable, so the auto-rollback can
     // leave it behind (ADR-0269).
     SystemMigration {
