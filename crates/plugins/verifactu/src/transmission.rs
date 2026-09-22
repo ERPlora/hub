@@ -4446,4 +4446,115 @@ mod late_remission_verifactu111 {
             "record 1 is at the AEAT and is never filed twice"
         );
     }
+
+    // ── hub#1967 · the customer's country travels from the invoice to the XML ─────────────────
+
+    /// One full invoice (`F1`, 100,00 € + 21 %) written straight into the real `invoice_invoice`,
+    /// then ingested as `invoice.created` would. `country` is `None` when the invoice module of
+    /// the hub predates the country columns; the hub runtime updates on its own schedule, so the
+    /// ingest has to read both shapes.
+    async fn ingest_invoice_to(
+        bench: &Bench,
+        tax_id: &str,
+        country: Option<(&str, &str)>,
+    ) -> String {
+        let db = bench.rt.db();
+        let ddl = if country.is_some() {
+            "ALTER TABLE invoice_invoice \
+               ADD COLUMN IF NOT EXISTS customer_country TEXT NOT NULL DEFAULT '', \
+               ADD COLUMN IF NOT EXISTS customer_id_type TEXT NOT NULL DEFAULT ''"
+        } else {
+            "ALTER TABLE invoice_invoice \
+               DROP COLUMN IF EXISTS customer_country, DROP COLUMN IF EXISTS customer_id_type"
+        };
+        db.execute_batch(ddl).await.expect(ddl);
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("tax_id".into(), json!(tax_id));
+        db.execute(
+            "INSERT INTO invoice_invoice (id, hub_id, invoice_type, series, number, issue_date, \
+               issuer_nif, issuer_name, customer_tax_id, customer_name, description, \
+               base_amount, tax_amount, total_amount, tax_breakdown, created_at, updated_at) \
+             VALUES ('inv-1967', :hub_id, 'F1', 'FACT', 'FACT-2026-000001', '2026-09-22', \
+               'B12345674', 'Salon Lucia SL', :tax_id, 'Client Inc', 'Corte y peinado', \
+               10000, 2100, 12100, '{\"21.00\":{\"base\":10000,\"tax\":2100}}', \
+               '2026-09-22T10:00:00Z', '2026-09-22T10:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("the invoice row");
+        if let Some((code, kind)) = country {
+            let mut p = Params::new();
+            p.insert("code".into(), json!(code));
+            p.insert("kind".into(), json!(kind));
+            db.execute(
+                "UPDATE invoice_invoice SET customer_country = :code, customer_id_type = :kind \
+                 WHERE id = 'inv-1967'",
+                &p,
+            )
+            .await
+            .expect("the customer's country");
+        }
+        bench.open_the_road();
+        bench
+            .rt
+            .execute_command(
+                "verifactu.records.ingest_invoice",
+                json!({ "invoice_id": "inv-1967" }).as_object().unwrap(),
+                &bench.ctx(),
+            )
+            .await
+            .expect("the invoice is ingested");
+        let sent = bench.cell.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "the record reaches the cell once");
+        assert_eq!(sent[0]["environment"], "testing", "only the TEST AEAT");
+        let xml = base64::engine::general_purpose::STANDARD
+            .decode(sent[0]["xml_b64"].as_str().expect("xml_b64"))
+            .expect("base64");
+        String::from_utf8(xml).expect("utf-8")
+    }
+
+    /// 🔴 hub#1967: an invoice to a company in the United States reaches the AEAT with the
+    /// customer declared as a foreigner (`IDOtro`, `CodigoPais` US, `IDType 04`), not as a
+    /// Spanish `NIF` the AEAT cannot find in its census.
+    #[tokio::test]
+    async fn an_invoice_to_a_customer_outside_the_eu_reaches_the_aeat_as_idotro() {
+        let Some(bench) = Bench::new("19670000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        let xml = ingest_invoice_to(&bench, "123456789", Some(("US", ""))).await;
+        assert!(
+            xml.contains(
+                "<sum1:IDOtro><sum1:CodigoPais>US</sum1:CodigoPais>\
+                 <sum1:IDType>04</sum1:IDType><sum1:ID>123456789</sum1:ID></sum1:IDOtro>"
+            ),
+            "{xml}"
+        );
+        assert!(!xml.contains("<sum1:NIF>123456789</sum1:NIF>"), "{xml}");
+    }
+
+    /// The document kind the invoice declares (a tourist's passport) is the one that goes out.
+    #[tokio::test]
+    async fn a_passport_on_the_invoice_reaches_the_aeat_as_idtype_03() {
+        let Some(bench) = Bench::new("19670000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        let xml = ingest_invoice_to(&bench, "XA1234567", Some(("US", "03"))).await;
+        assert!(xml.contains("<sum1:IDType>03</sum1:IDType>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:CodigoPais>US</sum1:CodigoPais>"),
+            "{xml}"
+        );
+    }
+
+    /// A hub whose invoice module has no country columns yet still seals and sends its invoices,
+    /// exactly as before hub#1967 — the runtime must not break a sale over a column it reads.
+    #[tokio::test]
+    async fn an_invoice_module_without_the_country_still_seals_and_sends() {
+        let Some(bench) = Bench::new("19670000-0000-4000-8000-000000000003").await else {
+            return;
+        };
+        let xml = ingest_invoice_to(&bench, "B87654321", None).await;
+        assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
+    }
 }

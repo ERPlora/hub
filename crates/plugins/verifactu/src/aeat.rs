@@ -188,7 +188,11 @@ fn destinatarios(record: &Json) -> String {
          {identity}\
          </sum1:IDDestinatario></sum1:Destinatarios>",
         name = esc(&name),
-        identity = recipient_identity(&nif),
+        identity = recipient_identity(
+            &nif,
+            &s(record, "recipient_country"),
+            &s(record, "recipient_id_type"),
+        ),
     )
 }
 
@@ -225,38 +229,115 @@ const EU_VAT_PREFIXES: &[(&str, &str)] = &[
 
 /// The identity element of `IDDestinatario` (`PersonaFisicaJuridicaType`: `NIF` | `IDOtro`).
 ///
-/// A Spanish NIF has at most ONE leading letter, so a tax id that starts with an EU member-state
-/// prefix is a NIF-IVA (VIES format): it goes as `IDOtro` with `IDType 02` and the whole number,
-/// prefix included, in `ID`. An `ES` NIF-IVA is a Spanish NIF (the XSD forbids `IDOtro` with
-/// `CodigoPais=ES` for it) and goes as `NIF` without the prefix. Anything else keeps going as
-/// `NIF` exactly as typed: without the customer's country the hub cannot choose between the
-/// non-EU `IDType`s (hub#1965).
-fn recipient_identity(tax_id: &str) -> String {
+/// `country` (ISO 3166 alpha-2) and `id_type` (the AEAT `IDType`) come from the invoice when the
+/// customer's country is known (hub#1967):
+///
+/// - `ES` is a Spanish NIF: `NIF`, without an `ES` prefix (the XSD forbids `IDOtro` with
+///   `CodigoPais=ES` for it).
+/// - another EU member state is a NIF-IVA (`IDType 02`) checked in VIES, which needs the VAT
+///   prefix: the country supplies it when the number was typed without it. A declared document
+///   kind (a private person's passport, say) is honoured instead, with the number as typed.
+/// - anywhere else is `IDOtro` with the declared kind, `04` (`IDEnPaisResidencia`, the tax id of
+///   the customer's country) by default.
+///
+/// Without a country the prefix decides, as since hub#1965: an EU member-state prefix (plus `XI`,
+/// Northern Ireland) is a NIF-IVA, an `ES` one a Spanish NIF, and anything else keeps going as
+/// `NIF` exactly as typed.
+fn recipient_identity(tax_id: &str, country: &str, id_type: &str) -> String {
     let compact: String = tax_id
         .chars()
         .filter(|c| c.is_ascii_alphanumeric())
         .collect::<String>()
         .to_ascii_uppercase();
-    if let Some(spanish) = compact.strip_prefix("ES") {
-        if spanish.len() == 9 {
-            return format!("<sum1:NIF>{}</sum1:NIF>", esc(spanish));
-        }
-    }
-    let foreign = compact.get(..2).and_then(|prefix| {
-        EU_VAT_PREFIXES
-            .iter()
-            .find(|(vat, _)| *vat == prefix)
-            .map(|(_, iso)| *iso)
-    });
-    match foreign {
-        Some(country) if compact.len() > 2 => format!(
+    let country = country.trim().to_ascii_uppercase();
+    let declared_kind = FOREIGN_ID_TYPES
+        .iter()
+        .copied()
+        .find(|kind| *kind == id_type.trim());
+    let spanish_nif = |number: &str| format!("<sum1:NIF>{}</sum1:NIF>", esc(number));
+    let id_otro = |country: &str, kind: &str, id: &str| {
+        let id: String = id.chars().take(ID_OTRO_MAX_LEN).collect();
+        format!(
             "<sum1:IDOtro><sum1:CodigoPais>{country}</sum1:CodigoPais>\
-             <sum1:IDType>02</sum1:IDType><sum1:ID>{id}</sum1:ID></sum1:IDOtro>",
-            id = esc(&compact),
+             <sum1:IDType>{kind}</sum1:IDType><sum1:ID>{id}</sum1:ID></sum1:IDOtro>",
+            country = esc(country),
+            id = esc(&id),
+        )
+    };
+    let without_es = compact
+        .strip_prefix("ES")
+        .filter(|rest| rest.len() == 9)
+        .unwrap_or(&compact)
+        .to_string();
+
+    if country.is_empty() {
+        if compact.starts_with("ES") && without_es.len() == 9 && without_es != compact {
+            return spanish_nif(&without_es);
+        }
+        return match vat_country(&compact) {
+            Some(iso) if compact.len() > 2 => id_otro(iso, NIF_IVA, &compact),
+            _ => spanish_nif(tax_id),
+        };
+    }
+    if country == "ES" {
+        return spanish_nif(&without_es);
+    }
+    if let Some(kind) = declared_kind.filter(|kind| *kind != NIF_IVA) {
+        return id_otro(&country, kind, &compact);
+    }
+    let vat_prefix = EU_VAT_PREFIXES
+        .iter()
+        .find(|(_, iso)| *iso == country)
+        .map(|(prefix, _)| *prefix)
+        .or(
+            if country == "GB" && compact.starts_with(NORTHERN_IRELAND_VAT_PREFIX) {
+                Some(NORTHERN_IRELAND_VAT_PREFIX)
+            } else {
+                None
+            },
+        );
+    match vat_prefix {
+        Some(prefix) => {
+            let vat = if compact.starts_with(prefix) {
+                compact.clone()
+            } else {
+                format!("{prefix}{compact}")
+            };
+            id_otro(&country, NIF_IVA, &vat)
+        }
+        None => id_otro(
+            &country,
+            declared_kind.unwrap_or(ID_IN_COUNTRY_OF_RESIDENCE),
+            &compact,
         ),
-        _ => format!("<sum1:NIF>{}</sum1:NIF>", esc(tax_id)),
     }
 }
+
+/// The `CodigoPais` of a VAT number written with its prefix, if it is an EU (or Northern Ireland)
+/// NIF-IVA.
+fn vat_country(compact: &str) -> Option<&'static str> {
+    let prefix = compact.get(..2)?;
+    if prefix == NORTHERN_IRELAND_VAT_PREFIX {
+        return Some("GB");
+    }
+    EU_VAT_PREFIXES
+        .iter()
+        .find(|(vat, _)| *vat == prefix)
+        .map(|(_, iso)| *iso)
+}
+
+/// `IDType 02`: NIF-IVA, the VAT number of an EU member state, checked by the AEAT in VIES.
+const NIF_IVA: &str = "02";
+/// `IDType 04`: `IDEnPaisResidencia`, the tax id of the customer's own country.
+const ID_IN_COUNTRY_OF_RESIDENCE: &str = "04";
+/// The `IDType`s of `IDOtro` (`PersonaFisicaJuridicaIDTypeType`): NIF-IVA, passport, id in the
+/// country of residence, residence certificate, other supporting document, not registered.
+const FOREIGN_ID_TYPES: &[&str] = &["02", "03", "04", "05", "06", "07"];
+/// `ID` of `IDOtro` is `TextMax20Type`.
+const ID_OTRO_MAX_LEN: usize = 20;
+/// Northern Ireland keeps EU VAT for goods with `XI` numbers (valid in VIES), but `XI` is not a
+/// `CountryType2`: its `CodigoPais` is `GB`.
+const NORTHERN_IRELAND_VAT_PREFIX: &str = "XI";
 
 /// Bloque `FacturasSustituidas` (XSD: tras `TipoFactura`, antes de `DescripcionOperacion`).
 /// Solo en facturas **F3** (factura completa emitida en SUSTITUCIÓN de una simplificada F2 ya
@@ -1771,6 +1852,139 @@ mod destinatario_tests {
     fn a_non_eu_prefix_is_not_declared_as_a_nif_iva() {
         let xml = recipient_block("GB123456789");
         assert!(!xml.contains("<sum1:IDType>02</sum1:IDType>"), "{xml}");
+    }
+
+    // hub#1967: with the customer's country (and, when it matters, the kind of document) the
+    // hub declares a customer from outside the EU as the foreigner they are.
+
+    fn recipient_block_of(tax_id: &str, country: &str, id_type: &str) -> String {
+        destinatarios(&json!({
+            "recipient_nif": tax_id,
+            "recipient_name": "Client Ltd",
+            "recipient_country": country,
+            "recipient_id_type": id_type,
+        }))
+    }
+
+    fn idotro(country: &str, id_type: &str, id: &str) -> String {
+        format!(
+            "<sum1:IDOtro><sum1:CodigoPais>{country}</sum1:CodigoPais>\
+             <sum1:IDType>{id_type}</sum1:IDType><sum1:ID>{id}</sum1:ID></sum1:IDOtro>"
+        )
+    }
+
+    /// A company outside the EU is identified by the tax id of its own country: `IDType 04`
+    /// (`IDEnPaisResidencia`) is what the number the customer gives is, unless told otherwise.
+    #[test]
+    fn a_customer_outside_the_eu_goes_as_idotro_with_the_id_of_its_country() {
+        let xml = recipient_block_of("123 456 789", "US", "");
+        assert!(xml.contains(&idotro("US", "04", "123456789")), "{xml}");
+        assert!(!xml.contains("<sum1:NIF>"), "{xml}");
+    }
+
+    /// A tourist pays with a passport: the document kind the invoice carries is what goes out.
+    #[test]
+    fn a_passport_goes_as_idtype_03() {
+        let xml = recipient_block_of("XA1234567", "US", "03");
+        assert!(xml.contains(&idotro("US", "03", "XA1234567")), "{xml}");
+    }
+
+    /// The country is written as it is chosen; the XML wants the ISO code in upper case.
+    #[test]
+    fn the_country_is_normalised_to_upper_case() {
+        let xml = recipient_block_of("CHE-116.281.710", "ch", "");
+        assert!(xml.contains(&idotro("CH", "04", "CHE116281710")), "{xml}");
+    }
+
+    /// A British VAT number starts with `GB`, which is not an EU prefix: with the country it is
+    /// the tax id of the United Kingdom, never a Spanish NIF.
+    #[test]
+    fn a_british_vat_number_with_its_country_goes_as_idotro_gb() {
+        let xml = recipient_block_of("GB123456789", "GB", "");
+        assert!(xml.contains(&idotro("GB", "04", "GB123456789")), "{xml}");
+    }
+
+    /// Spain chosen as the country is a Spanish NIF, whatever else the invoice says: the XSD
+    /// forbids `IDOtro` with `CodigoPais=ES` for it.
+    #[test]
+    fn spain_as_the_country_is_a_spanish_nif() {
+        let xml = recipient_block_of("ESB87654321", "ES", "");
+        assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
+        assert!(!xml.contains("IDOtro"), "{xml}");
+    }
+
+    /// A company of another member state gives its VAT number, often without the prefix; the
+    /// AEAT checks a NIF-IVA in VIES, which needs it. The country supplies it.
+    #[test]
+    fn an_eu_company_without_the_prefix_gets_it_from_its_country() {
+        let xml = recipient_block_of("40303265045", "FR", "");
+        assert!(xml.contains(&idotro("FR", "02", "FR40303265045")), "{xml}");
+        let xml = recipient_block_of("094259216", "GR", "");
+        assert!(xml.contains(&idotro("GR", "02", "EL094259216")), "{xml}");
+    }
+
+    /// An EU private person has no VAT number: with a passport (or any document kind the invoice
+    /// declares) the kind is honoured and the number goes as typed, without inventing a prefix.
+    #[test]
+    fn an_eu_customer_with_a_declared_document_keeps_its_kind() {
+        let xml = recipient_block_of("C01X00T47", "DE", "03");
+        assert!(xml.contains(&idotro("DE", "03", "C01X00T47")), "{xml}");
+    }
+
+    /// A document kind the AEAT does not know is not sent (an XSD 4102 with the number spent):
+    /// it falls back to the default of its country.
+    #[test]
+    fn an_unknown_document_kind_falls_back_to_the_default() {
+        let xml = recipient_block_of("123456789", "US", "99");
+        assert!(xml.contains(&idotro("US", "04", "123456789")), "{xml}");
+        let xml = recipient_block_of("NL859048544B01", "NL", "01");
+        assert!(xml.contains(&idotro("NL", "02", "NL859048544B01")), "{xml}");
+    }
+
+    /// Northern Ireland trades goods under EU VAT with an `XI` number, valid in VIES; `XI` is not a
+    /// `CountryType2`, so the country declared is the United Kingdom.
+    #[test]
+    fn a_northern_ireland_vat_number_is_a_nif_iva_of_country_gb() {
+        let xml = recipient_block("XI123456789");
+        assert!(xml.contains(&idotro("GB", "02", "XI123456789")), "{xml}");
+        let xml = recipient_block_of("XI123456789", "GB", "");
+        assert!(xml.contains(&idotro("GB", "02", "XI123456789")), "{xml}");
+    }
+
+    /// `ID` is `TextMax20Type`: a longer document number would be an XSD 4102 after sealing.
+    #[test]
+    fn a_foreign_id_is_capped_at_the_twenty_characters_the_xsd_allows() {
+        let xml = recipient_block_of(&"9".repeat(25), "US", "");
+        assert!(xml.contains(&idotro("US", "04", &"9".repeat(20))), "{xml}");
+    }
+
+    /// The whole alta to a customer from outside the EU passes the XSD gate that runs before
+    /// every transmission.
+    #[test]
+    fn an_alta_to_a_customer_outside_the_eu_passes_the_xsd_gate() {
+        let record = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/2",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F1",
+            "description": "Export sale",
+            "base_amount": 100000.0,
+            "tax_amount": 21000.0,
+            "total_amount": 121000.0,
+            "tax_rate": 21.0,
+            "recipient_nif": "123456789",
+            "recipient_name": "Client Inc",
+            "recipient_country": "US",
+            "recipient_id_type": "",
+            "record_hash": "A".repeat(64),
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        });
+        let xml = build_soap(&record, &test_config_with_producer_facts(), None, "hub-1")
+            .expect("declarable");
+        crate::xsd::validate_registro(&xml).expect("XSD gate");
+        assert!(xml.contains(&idotro("US", "04", "123456789")), "{xml}");
     }
 
     /// Every `CodigoPais` the table can emit is in the official `CountryType2`; a code that is not

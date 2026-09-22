@@ -435,6 +435,10 @@ pub(crate) async fn create_record(input: &Json, host: &dyn NativeHost) -> Result
             invoice_id: payload.get("invoice_id").cloned().unwrap_or(Json::Null),
             recipient_nif: str_field(&payload, "recipient_nif"),
             recipient_name: str_field(&payload, "recipient_name"),
+            // The public door's schema (`record_create.json`) does not declare them: its callers
+            // identify the customer by `recipient_nif` alone, whose prefix decides (hub#1965).
+            recipient_country: String::new(),
+            recipient_id_type: String::new(),
             // Sustitución (F3): el caller manual puede pasarlos; normalmente vacíos.
             substitutes_number: str_field(&payload, "substitutes_number"),
             substitutes_date: str_field(&payload, "substitutes_date"),
@@ -528,6 +532,11 @@ pub(crate) struct RecordInput {
     /// para tiquets simplificados (F2). Se usa al construir el SOAP en la transmisión inline.
     pub(crate) recipient_nif: String,
     pub(crate) recipient_name: String,
+    /// The customer's country (ISO 3166 alpha-2) and the AEAT `IDType` of its document
+    /// (hub#1967): with them a foreign customer goes as `IDOtro` (see `aeat::recipient_identity`).
+    /// Empty when unknown — the tax id's prefix decides, as before.
+    pub(crate) recipient_country: String,
+    pub(crate) recipient_id_type: String,
     /// Factura SUSTITUIDA (F3 → F2, ADR-0140): nº+serie, fecha de expedición y NIF del emisor de la
     /// simplificada que esta factura completa sustituye. Alimentan el bloque XML `FacturasSustituidas`
     /// (XSD IDFacturaARType). Vacíos si el registro no es una sustitución (todo lo que no sea F3).
@@ -817,6 +826,8 @@ pub(crate) async fn build_record_output(
         "environment": environment,
         "recipient_nif": r.recipient_nif,
         "recipient_name": r.recipient_name,
+        "recipient_country": r.recipient_country,
+        "recipient_id_type": r.recipient_id_type,
         "substitutes_number": r.substitutes_number,
         "substitutes_date": r.substitutes_date,
         "substitutes_nif": r.substitutes_nif,
