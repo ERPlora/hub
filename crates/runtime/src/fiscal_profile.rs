@@ -507,7 +507,10 @@ pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
 ///
 /// * **`testing` → nothing is missing.** In pruebas there is nothing to authorize (ADR-0360) and
 ///   the road to the AEAT's sandbox always exists (hub#1934).
-/// * **The own certificate is a road on its own** (ADR-0320 §1): no grant, no cell.
+/// * **The own certificate is a road on its own** (ADR-0320 §1): no grant, no cell — **while it
+///   has not expired** (hub#1940). The AEAT refuses an expired certificate, so past its `notAfter`
+///   ([`crate::certificate::signing_certificate_expired`], the `own_expired` the caller passes) the
+///   road is gone and the code says what fixes it: renewing, or handing filing to ERPlora.
 /// * **ERPlora's road needs the grant first** — the cell refuses a `production` envelope without
 ///   one (verifactu-gateway, `hub_not_authorized`) — and it is the first thing said, in the order
 ///   the go-live says it (hub#817). `has_certificate` never looked at it: that is the hole.
@@ -515,9 +518,17 @@ pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
 ///
 /// Offline on purpose, like `gateway_identity::is_enrolled`: a cell or an AEAT that is DOWN is a
 /// contingency and the till keeps charging; only a road that does not EXIST stops it.
-pub fn filing_gap(profile: &FiscalProfile, route: &str, enrolled: bool) -> Option<&'static str> {
-    if profile.environment == ENV_TESTING || route == crate::certificate::ROUTE_OWN {
+pub fn filing_gap(
+    profile: &FiscalProfile,
+    route: &str,
+    enrolled: bool,
+    own_expired: bool,
+) -> Option<&'static str> {
+    if profile.environment == ENV_TESTING {
         return None;
+    }
+    if route == crate::certificate::ROUTE_OWN {
+        return own_expired.then_some(crate::certificate::OWN_CERTIFICATE_EXPIRED);
     }
     if profile.representation_status != REPRESENTATION_VIGENTE {
         return Some(NO_REPRESENTATION);
@@ -1552,7 +1563,7 @@ mod tests {
             ..live(REPRESENTATION_ABSENT)
         };
         assert_eq!(
-            filing_gap(&testing, crate::certificate::ROUTE_DELEGATED, false),
+            filing_gap(&testing, crate::certificate::ROUTE_DELEGATED, false, false),
             None
         );
     }
@@ -1564,6 +1575,7 @@ mod tests {
             filing_gap(
                 &live(REPRESENTATION_ABSENT),
                 crate::certificate::ROUTE_OWN,
+                false,
                 false
             ),
             None
@@ -1583,7 +1595,12 @@ mod tests {
             "",
         ] {
             assert_eq!(
-                filing_gap(&live(state), crate::certificate::ROUTE_DELEGATED, true),
+                filing_gap(
+                    &live(state),
+                    crate::certificate::ROUTE_DELEGATED,
+                    true,
+                    false
+                ),
                 Some(NO_REPRESENTATION),
                 "{state:?}"
             );
@@ -1597,9 +1614,56 @@ mod tests {
             filing_gap(
                 &live(REPRESENTATION_VIGENTE),
                 crate::certificate::ROUTE_DELEGATED,
+                false,
                 false
             ),
             Some(crate::certificate::GATEWAY_NOT_ENROLLED)
+        );
+    }
+
+    /// 🔴 hub#1940 — the own road stops being a road the moment its certificate expires: the AEAT
+    /// refuses an expired certificate, so a live hub signing with one would charge tickets that
+    /// never reach it. The code is its own, because what fixes it is renewing the certificate (or
+    /// handing filing to ERPlora), not the grant nor the connection.
+    #[test]
+    fn the_own_route_with_an_expired_certificate_is_missing_a_valid_certificate() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_VIGENTE),
+                crate::certificate::ROUTE_OWN,
+                true,
+                true
+            ),
+            Some(crate::certificate::OWN_CERTIFICATE_EXPIRED)
+        );
+    }
+
+    /// The expiry is a fact about the OWN certificate: on ERPlora's road an expired `.p12` that
+    /// is switched off signs nothing, so it cannot be what is missing there.
+    #[test]
+    fn an_expired_own_certificate_does_not_block_erplora_s_road() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_VIGENTE),
+                crate::certificate::ROUTE_DELEGATED,
+                true,
+                true
+            ),
+            None
+        );
+    }
+
+    /// In `testing` nothing is missing (hub#1934) — an expired certificate included: the till of
+    /// a business that is still trying things out never stops.
+    #[test]
+    fn in_testing_an_expired_own_certificate_is_not_missing_anything() {
+        let testing = FiscalProfile {
+            environment: ENV_TESTING.into(),
+            ..live(REPRESENTATION_ABSENT)
+        };
+        assert_eq!(
+            filing_gap(&testing, crate::certificate::ROUTE_OWN, false, true),
+            None
         );
     }
 
@@ -1609,7 +1673,8 @@ mod tests {
             filing_gap(
                 &live(REPRESENTATION_VIGENTE),
                 crate::certificate::ROUTE_DELEGATED,
-                true
+                true,
+                false
             ),
             None
         );

@@ -196,14 +196,22 @@ pub(crate) async fn execute_at(
         // certificate is active and `can_transmit` is exactly `is_enrolled`. An unreadable profile
         // gates nothing here, the same as the mode below: `ensure` failing is the database the
         // sale itself is about to write to.
+        //
+        // The own certificate's expiry (hub#1940) is only read where it can change the answer — a
+        // live hub on the own road — so no other command pays the query. An expiry that cannot be
+        // read is not known, and an unknown expiry blocks nothing, as before the date was stored.
         let filing_gap = match &profile {
-            Ok(p) => crate::fiscal_profile::filing_gap(
-                p,
-                crate::certificate::transmission_route(db, &ctx.hub_id)
+            Ok(p) => {
+                let route = crate::certificate::transmission_route(db, &ctx.hub_id)
                     .await
-                    .unwrap_or(crate::certificate::ROUTE_DELEGATED),
-                has_cert,
-            ),
+                    .unwrap_or(crate::certificate::ROUTE_DELEGATED);
+                let own_expired = p.environment != crate::fiscal_profile::ENV_TESTING
+                    && route == crate::certificate::ROUTE_OWN
+                    && crate::certificate::signing_certificate_expired(db, &ctx.hub_id)
+                        .await
+                        .unwrap_or(false);
+                crate::fiscal_profile::filing_gap(p, route, has_cert, own_expired)
+            }
             Err(_) => None,
         };
         let (fiscal_mode, fiscal_triggers, fiscal_providers, fiscal_environment) = match profile {
