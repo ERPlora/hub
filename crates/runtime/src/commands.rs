@@ -560,10 +560,11 @@ pub(crate) async fn execute_at(
     // sus propias consecuencias que una venta sin identidad SIGUE cerrándose, y lo que muere es el
     // listener de la factura, en dead-letter. Cobrado y sin factura.
     enforce_fiscal_capacity(
+        registry,
         ctx,
         &cmd.module_id,
         name.starts_with(crate::hub_users::CORE_NAMESPACE),
-        &cmd.def.emit,
+        cmd.def.emit.iter().map(|e| e.event()),
     )?;
     // hub#1935: a hub that files for real does not open a fiscal chain it cannot deliver.
     enforce_fiscal_road(registry, ctx, cmd.def.emit.iter().map(|e| e.event()))?;
@@ -1371,7 +1372,20 @@ async fn persist_handler_output(
     // WASM/nativo — que es por donde pasan los listeners del relay del Outbox y las tareas
     // programadas. Un gate que solo cubriera el camino declarativo dejaría fuera justo la mitad por
     // la que viaja la cadena fiscal.
-    enforce_fiscal_capacity(ctx, &cmd.module_id, false, &cmd.def.emit)?;
+    //
+    // hub#1938: on the events the handler RETURNED as well as the declared ones — a sale's
+    // `sale.completed` comes back from its handler, and a restored hub charged it anyway.
+    enforce_fiscal_capacity(
+        registry,
+        ctx,
+        &cmd.module_id,
+        false,
+        cmd.def
+            .emit
+            .iter()
+            .map(|e| e.event())
+            .chain(output.events.iter().map(|ev| ev.name.as_str())),
+    )?;
 
     // Fiscal environment pin (ADR-0197 §4, hub#376) on what the handler RESOLVED to: the native
     // VeriFactu engine emits its own operations, so the pin has to see the params it bound — not
@@ -1972,7 +1986,10 @@ async fn seal_first_record_if_fiscal(
 /// Two hardnesses, deliberately different:
 ///
 /// - **`BLOCKED`** (recoverable) rejects only the **fiscal chain** — the transactions that would
-///   start one. The rest of the till keeps working. Killing the whole hub because a module failed
+///   start one: any event of [`crate::fiscal_profile::fiscal_chain_events`], declared or returned
+///   by a handler (hub#1938 — the sale is a handler, and its `sale.completed` is not the
+///   provider's trigger: a hub restored elsewhere charged it on another installation's chain).
+///   The rest of the till keeps working. Killing the whole hub because a module failed
 ///   to mount is disproportionate and pushes the user to work around us.
 /// - **`CLOSED`** (the owner's decision, irreversible) is **default-deny on writes**, with two
 ///   exceptions the core can classify by itself without naming anybody: commands of the reserved
@@ -1981,11 +1998,12 @@ async fn seal_first_record_if_fiscal(
 ///
 /// **Queries are never gated** — that is where "✅ consult · ✅ export · ✅ accounting" comes from,
 /// free of charge.
-fn enforce_fiscal_capacity(
+fn enforce_fiscal_capacity<'a>(
+    registry: &Registry,
     ctx: &RequestContext,
     module_id: &str,
     is_core_command: bool,
-    emitted: &[crate::manifest::EmitDef],
+    emitted: impl IntoIterator<Item = &'a str>,
 ) -> Result<()> {
     // `None` means UNRESOLVED, never "nothing owed": a path that did not stamp the mode must not
     // read as compliant. Nothing can be decided here, so nothing is allowed through on its word —
@@ -2008,10 +2026,14 @@ fn enforce_fiscal_capacity(
         }
         crate::fiscal_profile::FiscalMode::Blocked(reason) => {
             // Only what would OPEN a fiscal chain is refused. Everything else keeps working.
-            if !emitted
-                .iter()
-                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e.event()))
-            {
+            // The chain starts at the sale, not at the provider's own trigger (hub#1938): the
+            // same set `enforce_fiscal_road` reads.
+            let emitted: Vec<&str> = emitted.into_iter().map(str::trim).collect();
+            if emitted.is_empty() {
+                return Ok(());
+            }
+            let chain = crate::fiscal_profile::fiscal_chain_events(registry, &ctx.fiscal_triggers);
+            if !emitted.iter().any(|e| chain.contains(*e)) {
                 return Ok(());
             }
             Err(RuntimeError::Domain {
@@ -2460,13 +2482,9 @@ mod tests {
             &["invoice.created"],
             &[],
         );
-        let err = enforce_fiscal_capacity(
-            &ctx,
-            "sales",
-            false,
-            &[crate::manifest::EmitDef::from("invoice.created")],
-        )
-        .expect_err("sin proveedor no se abre una cadena fiscal");
+        let err =
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "sales", false, ["invoice.created"])
+                .expect_err("sin proveedor no se abre una cadena fiscal");
         assert_eq!(code_of(&err), "fiscal.provider_missing");
     }
 
@@ -2482,15 +2500,16 @@ mod tests {
         );
         assert!(
             enforce_fiscal_capacity(
+                &Registry::new(),
                 &ctx,
                 "inventory",
                 false,
-                &[crate::manifest::EmitDef::from("inventory.stock.moved")]
+                ["inventory.stock.moved"]
             )
             .is_ok(),
             "mover stock no abre ninguna cadena fiscal"
         );
-        assert!(enforce_fiscal_capacity(&ctx, "inventory", false, &[]).is_ok());
+        assert!(enforce_fiscal_capacity(&Registry::new(), &ctx, "inventory", false, []).is_ok());
     }
 
     /// La otra rama: estos registros los emitió OTRA instalación. Seguir mezclaría dos cadenas.
@@ -2501,13 +2520,9 @@ mod tests {
             &["invoice.created"],
             &["verifactu"],
         );
-        let err = enforce_fiscal_capacity(
-            &ctx,
-            "sales",
-            false,
-            &[crate::manifest::EmitDef::from("invoice.created")],
-        )
-        .expect_err("una cadena ajena no se continúa");
+        let err =
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "sales", false, ["invoice.created"])
+                .expect_err("una cadena ajena no se continúa");
         assert_eq!(code_of(&err), "fiscal.installation_mismatch");
     }
 
@@ -2516,10 +2531,11 @@ mod tests {
     fn an_active_hub_with_its_provider_mounted_is_not_gated() {
         let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
         assert!(enforce_fiscal_capacity(
+            &Registry::new(),
             &ctx,
             "sales",
             false,
-            &[crate::manifest::EmitDef::from("invoice.created")]
+            ["invoice.created"]
         )
         .is_ok());
     }
@@ -2528,7 +2544,7 @@ mod tests {
     #[test]
     fn a_closed_hub_refuses_writes() {
         let ctx = fiscal_ctx(FiscalMode::Closed, &["invoice.created"], &["verifactu"]);
-        let err = enforce_fiscal_capacity(&ctx, "inventory", false, &[])
+        let err = enforce_fiscal_capacity(&Registry::new(), &ctx, "inventory", false, [])
             .expect_err("un hub cerrado no escribe");
         assert_eq!(code_of(&err), "fiscal.hub_closed");
     }
@@ -2540,11 +2556,11 @@ mod tests {
     fn a_closed_hub_still_lets_the_core_and_its_provider_work() {
         let ctx = fiscal_ctx(FiscalMode::Closed, &["invoice.created"], &["verifactu"]);
         assert!(
-            enforce_fiscal_capacity(&ctx, "hub", true, &[]).is_ok(),
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "hub", true, []).is_ok(),
             "el hub se tiene que poder seguir operando"
         );
         assert!(
-            enforce_fiscal_capacity(&ctx, "verifactu", false, &[]).is_ok(),
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "verifactu", false, []).is_ok(),
             "el proveedor tiene que poder drenar lo que aún deba"
         );
     }
@@ -2557,10 +2573,11 @@ mod tests {
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         assert_eq!(ctx.fiscal_mode, None);
         assert!(enforce_fiscal_capacity(
+            &Registry::new(),
             &ctx,
             "sales",
             false,
-            &[crate::manifest::EmitDef::from("invoice.created")]
+            ["invoice.created"]
         )
         .is_ok());
     }

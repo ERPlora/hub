@@ -637,3 +637,69 @@ async fn handing_filing_to_erplora_charges_again_with_the_certificate_expired() 
         .expect("the sale is charged on ERPlora's road");
     assert_eq!(sale_count(&rt).await, 1);
 }
+
+// ── hub#1938: a hub restored into another installation ───────────────────────────────────────
+
+/// What a restore into a different deployment leaves behind: the profile says its records were
+/// filed by ANOTHER installation (`system_id`), and the boot derives BLOCKED from it (ADR-0273 D8).
+async fn restored_into_another_installation(rt: &Runtime) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    rt.db()
+        .execute(
+            "UPDATE _hub_fiscal_profile SET system_id = 'hub-where-these-rows-were-written' \
+             WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        rt.refresh_fiscal_profile().await.unwrap(),
+        fiscal_profile::FiscalMode::Blocked(fiscal_profile::BlockedReason::InstallationMismatch)
+    );
+}
+
+/// 🔴 **hub#1938.** The real sale is a handler: `sale.completed` comes back from it, it is not
+/// declared, and it is not the provider's trigger either (`invoice.created` is). A gate that read
+/// only the declared events and only the provider's words charged the sale and issued its invoice
+/// on another installation's chain — exactly what BLOCKED exists to stop.
+#[tokio::test]
+async fn a_hub_restored_into_another_installation_does_not_charge() {
+    if !erplora_runtime::require_modules_workspace() || !wasm() {
+        eprintln!("SKIP: modules workspace or handler.wasm missing");
+        return;
+    }
+    let rt = live_hub(OWN).await;
+    restored_into_another_installation(&rt).await;
+
+    let code = refused_with(charge(&rt, "hub1938-restored").await);
+    rt.drain_outbox().await.unwrap();
+
+    assert_eq!(code, "fiscal.installation_mismatch");
+    assert_eq!(sale_count(&rt).await, 0, "nothing was charged");
+    assert_eq!(invoice_count(&rt).await, 0, "nothing was invoiced");
+}
+
+/// The way out stays the explicit one: once somebody adopts the installation, the till charges and
+/// the chain carries on to the invoice — a chain of this installation's own.
+#[tokio::test]
+async fn adopting_the_installation_charges_and_invoices_again() {
+    if !erplora_runtime::require_modules_workspace() || !wasm() {
+        eprintln!("SKIP: modules workspace or handler.wasm missing");
+        return;
+    }
+    let rt = live_hub(OWN).await;
+    restored_into_another_installation(&rt).await;
+    refused_with(charge(&rt, "hub1938-before-adopting").await);
+
+    rt.fiscal_adopt_installation("hub_user:1")
+        .await
+        .expect("somebody takes the installation over on purpose");
+
+    charge(&rt, "hub1938-after-adopting")
+        .await
+        .expect("the sale is charged on this installation's own chain");
+    rt.drain_outbox().await.unwrap();
+    assert_eq!(sale_count(&rt).await, 1);
+    assert_eq!(invoice_count(&rt).await, 1);
+}
