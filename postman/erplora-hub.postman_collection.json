@@ -4934,6 +4934,30 @@
           "response": []
         },
         {
+          "name": "GET /p/-/country-names.js",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "p",
+                "-",
+                "country-names.js"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/p/-/country-names.js"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /p/:locator",
           "request": {
             "auth": {
