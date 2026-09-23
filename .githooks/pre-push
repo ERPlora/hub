@@ -620,25 +620,60 @@ fi
 # sin docker— un diff solo-web moría por una base que su comando ni abre (hub#1368; el banco
 # `scripts/prepush-gate.test.sh` promete no tocar Docker y lo tocaba). Los DSN, en cambio, se
 # exportan SIEMPRE: son el contrato con la etapa, la corra quien la corra.
+# The e2e bench is DISPOSABLE (hub#1998): every pass gets databases of its own, born empty, and
+# drops them when it ends. They used to be created only when missing, so they persisted between
+# pushes — and the demo seed never overwrites (`WHERE NOT EXISTS … 'Demo'`), so when hub#1929 moved
+# the Demo PIN to six digits the bench kept the old `0000` Demo and every web push died on 429.
+# Not emptied in place: two worktrees run this stage at once on the same Mac (per-PID ports,
+# hub#1812), and dropping a SHARED database would kill the neighbour's run. The name carries the
+# hook's PID, so a pass killed before cleaning up is pruned by the next one — never a live one.
+E2E_BENCH_DBS=""
 ensure_e2e_databases() {
     local gate_owns_web_cmd=${1:-1}
+    local web_db=hub_e2e_web assistant_db=hub_e2e_assistant
     if [ -n "${HUB_GATE_E2E_DB_CMD:-}" ]; then
         eval "$HUB_GATE_E2E_DB_CMD" || return 1
     elif [ "$gate_owns_web_cmd" = 1 ]; then
+        prune_dead_e2e_databases
+        web_db="hub_e2e_web_$$"
+        assistant_db="hub_e2e_assistant_$$"
         local db
-        for db in hub_e2e_web hub_e2e_assistant; do
-            grep -q 1 <<<"$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null)" && continue
-            if ! docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE $db;" >/dev/null 2>&1; then
+        for db in "$web_db" "$assistant_db"; do
+            if ! docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS $db WITH (FORCE);" >/dev/null 2>&1 \
+                || ! docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE $db;" >/dev/null 2>&1; then
                 echo "❌ pre-push: no pude crear la base '$db' en $PG_CONTAINER (la necesita el e2e de web)." >&2
+                drop_e2e_databases
                 return 1
             fi
-            echo "ℹ️  pre-push: creada la base '$db' del banco de e2e." >&2
+            E2E_BENCH_DBS="$E2E_BENCH_DBS $db"
         done
+        echo "ℹ️  pre-push: banco de e2e recién creado ($web_db, $assistant_db)." >&2
     fi
-    export HUB_E2E_DATABASE_URL="${HUB_E2E_DATABASE_URL:-postgres://postgres:test@localhost:5433/hub_e2e_web}"
-    export E2E_DATABASE_URL="${E2E_DATABASE_URL:-postgres://postgres:test@localhost:5433/hub_e2e_assistant}"
+    export HUB_E2E_DATABASE_URL="${HUB_E2E_DATABASE_URL:-postgres://postgres:test@localhost:5433/$web_db}"
+    export E2E_DATABASE_URL="${E2E_DATABASE_URL:-postgres://postgres:test@localhost:5433/$assistant_db}"
     return 0
+}
+
+# Drops the bench databases THIS pass created. Called whether the stage went green or red.
+drop_e2e_databases() {
+    local db
+    for db in $E2E_BENCH_DBS; do
+        docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS $db WITH (FORCE);" >/dev/null 2>&1 \
+            || echo "⚠️  pre-push: no pude borrar la base '$db' del banco de e2e (la podará el próximo push)." >&2
+    done
+    E2E_BENCH_DBS=""
+}
+
+# Drops the bench databases of passes whose hook process is gone (killed, crashed, Ctrl-C).
+prune_dead_e2e_databases() {
+    local db pid
+    for db in $(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT datname FROM pg_database WHERE datname ~ '^hub_e2e_(web|assistant)_[0-9]+$';" 2>/dev/null); do
+        pid=${db##*_}
+        case "$pid" in ''|*[!0-9]*) continue ;; esac
+        kill -0 "$pid" 2>/dev/null && continue
+        docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS $db WITH (FORCE);" >/dev/null 2>&1 || true
+    done
 }
 
 run_web_stage() {
@@ -713,7 +748,10 @@ run_web_stage() {
     fi
     ensure_e2e_databases "$gate_owns_web_cmd" || return 1
     echo "🧪 pre-push: el diff toca web → pnpm verify + playwright en local…" >&2
-    if ! eval "$web_cmd"; then
+    local web_rc=0
+    eval "$web_cmd" || web_rc=$?
+    drop_e2e_databases
+    if [ "$web_rc" != 0 ]; then
         echo "" >&2
         echo "❌ pre-push: la etapa WEB está ROJA → push ABORTADO." >&2
         echo "   Arréglalo y reintenta. (Sáltatela a sabiendas con 'SKIP_HUB_WEB=1 git push'.)" >&2

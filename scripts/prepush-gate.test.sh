@@ -2746,6 +2746,97 @@ grep -q "^$sha local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
     && ok "hub#1679: a cancelled twin next to the green one — still sealed" \
     || bad "hub#1679: a cancelled twin next to the green one — still sealed" "$errs"
 
+# ── hub#1998: every web pass starts on a FRESH e2e bench ─────────────────────
+# The bench databases used to be created only when missing, so they PERSISTED
+# between pushes. The demo seed never overwrites (`WHERE NOT EXISTS … 'Demo'`), so
+# once hub#1929 moved the Demo PIN to six digits, the bench kept the old `0000`
+# Demo: 401 → 429 too_many_attempts → 18 red specs on every push touching web,
+# unrelated to the diff. The bench must be born empty on every pass.
+#
+# And it cannot be emptied IN PLACE: two worktrees run the web stage at the same
+# time on this Mac (per-PID ports, hub#1812/#1756), so dropping a SHARED database
+# would kill the neighbour's run. Each pass gets databases of its own, drops them
+# when it ends, and prunes the ones a dead pass left behind — never a live one.
+#
+# `docker` is faked with STATE: one file per database under $dbs, its content the
+# rows. The stubbed `pnpm` is the first command of the default web stage, so it
+# records what the bench looks like at the exact moment the specs would start.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+fakebin="${repo}-pgstate"; dbs="$fakebin/dbs"; mkdir -p "$dbs"
+cat > "$fakebin/docker" <<DOCK
+#!/usr/bin/env bash
+dbs="$dbs"
+DOCK
+cat >> "$fakebin/docker" <<'DOCK'
+if [ "$1" = ps ]; then
+    for a in "$@"; do case "$a" in *Names*) echo erplora-test-pg-5433; exit 0 ;; esac; done
+    exit 0
+fi
+[ "$1" = exec ] || exit 0
+sql="${!#}"
+case "$sql" in
+    *max_locks_per_transaction*) echo 1228800 ;;
+    *pg_database*)
+        # Existence probe or listing: answer from the state dir.
+        for f in "$dbs"/*; do [ -e "$f" ] || continue; n=$(basename "$f")
+            case "$sql" in
+                *"datname='$n'"*) echo 1 ;;
+                *"datname='"*) ;;
+                *) echo "$n" ;;
+            esac
+        done ;;
+    *"DROP DATABASE"*)
+        n=$(printf '%s' "$sql" | sed -E 's/.*DROP DATABASE (IF EXISTS )?"?([a-z0-9_]+)"?.*/\2/')
+        rm -f "$dbs/$n" ;;
+    *"CREATE DATABASE"*)
+        n=$(printf '%s' "$sql" | sed -E 's/.*CREATE DATABASE "?([a-z0-9_]+)"?.*/\1/')
+        [ -e "$dbs/$n" ] && { echo "ERROR: database \"$n\" already exists" >&2; exit 1; }
+        : > "$dbs/$n" ;;
+esac
+exit 0
+DOCK
+chmod +x "$fakebin/docker"
+cat > "$fakebin/pnpm" <<PNPM
+#!/usr/bin/env bash
+{ for u in "\$HUB_E2E_DATABASE_URL" "\$E2E_DATABASE_URL"; do
+    n=\${u##*/}
+    if [ ! -e "$dbs/\$n" ]; then echo "\$n=MISSING"
+    elif [ -s "$dbs/\$n" ]; then echo "\$n=STALE:\$(cat "$dbs/\$n")"
+    else echo "\$n=FRESH"; fi
+  done; } > "$repo/BENCH"
+exit 0
+PNPM
+chmod +x "$fakebin/pnpm"
+# The stale bench of the incident: both databases exist, holding the four-digit Demo.
+echo "Demo pin=0000" > "$dbs/hub_e2e_web"
+echo "Demo pin=0000" > "$dbs/hub_e2e_assistant"
+# A pass that died without cleaning up (its PID is gone) and one still running.
+sleep 300 & live_pid=$!
+dead_pid=$( (sh -c 'echo $$') )
+echo "rows" > "$dbs/hub_e2e_web_${dead_pid}"
+echo "rows" > "$dbs/hub_e2e_web_${live_pid}"
+run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    PATH="$fakebin:$PATH" DATABASE_URL= HUB_E2E_DATABASE_URL= E2E_DATABASE_URL= \
+    HUB_GATE_TEST_CMD="true" >/dev/null
+bench=$(tr '\n' ' ' < "$repo/BENCH" 2>/dev/null)
+errs=""
+[ -n "$bench" ] || errs="$errs CONTROL-the-web-stage-never-ran"
+case "$bench" in *STALE*|*MISSING*) errs="$errs bench-not-fresh:[$bench]" ;; esac
+[ "$(printf '%s' "$bench" | grep -o '=FRESH' | wc -l | tr -d ' ')" = 2 ] || errs="$errs want-2-fresh:[$bench]"
+case "$bench" in *"hub_e2e_web="*|*"hub_e2e_assistant="*) errs="$errs uses-the-SHARED-database:[$bench]" ;; esac
+[ -e "$dbs/hub_e2e_web_${live_pid}" ] || errs="$errs dropped-a-LIVE-neighbour"
+[ ! -e "$dbs/hub_e2e_web_${dead_pid}" ] || errs="$errs left-a-dead-pass-leftover"
+for n in $(printf '%s' "$bench" | grep -oE 'hub_e2e_[a-z]+_[0-9]+'); do
+    [ ! -e "$dbs/$n" ] || errs="$errs leaked-its-own:$n"
+done
+kill "$live_pid" 2>/dev/null; wait "$live_pid" 2>/dev/null
+[ -z "$errs" ] \
+    && ok "hub#1998: each web pass runs on fresh bench databases of its own (stale/dead dropped, live neighbour kept)" \
+    || bad "hub#1998: each web pass runs on fresh bench databases of its own (stale/dead dropped, live neighbour kept)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 400)"
+
 
 echo
 echo "  $pass passed, $fail failed"
