@@ -1073,6 +1073,41 @@ mod tests {
         );
     }
 
+    /// hub#1989 — on a retry the chosen option stays chosen; a value the module never offered
+    /// (a tampered POST) leaves the module's default explicitly selected, never no selection.
+    #[test]
+    fn a_retry_keeps_the_chosen_option_and_ignores_one_never_offered() {
+        let mut typed = Typed::new();
+        typed.insert("customer_country".into(), "DE".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            kept.contains("<option value=\"DE\" selected>DE</option>"),
+            "{kept}"
+        );
+        assert!(kept.contains("<option value=\"\">Casa</option>"), "{kept}");
+        typed.insert("customer_country".into(), "ZZ".into());
+        let tampered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            tampered.contains("<option value=\"\" selected>Casa</option>"),
+            "{tampered}"
+        );
+        assert!(!tampered.contains("ZZ"), "{tampered}");
+    }
+
     /// Both languages, and the customer's page is the Spanish one by default — the merchant's
     /// customer never chose a locale anywhere.
     #[test]
