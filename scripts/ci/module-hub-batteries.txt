@@ -126,6 +126,10 @@ inventory/tests/combo_stock.hub.test.py
 # pasada se pone ROJA (`expired-pending-publication`) y la nocturna abre su issue de alerta: se
 # publica, o se borran la entrada y su marca. Mientras está pendiente, la pasada lo anota como
 # `::warning::` en el run y en la PR, no solo en el log.
+#
+# La marca NO sirve de relevo (hub#1995): el heredero de un e2e borrado de
+# `kernel-e2e-targets.txt` tiene que estar ya publicado. Una PR que borra una línea de allí y
+# añade una marca aquí sale en rojo (`pending-publication-lock.sh`, en `actionlint.yml`).
 
 # kitchen × sales: cobrar la cuenta entera saca SUS comandas del KDS y solo las suyas, contra el
 # kernel real — lo único que resuelve las `reads` de `close_from_order` (kitchen#79).
