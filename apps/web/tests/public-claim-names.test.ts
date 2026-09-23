@@ -18,11 +18,11 @@ function renderPage(lang: string, codes: string[]): HTMLSelectElement {
   document.documentElement.lang = lang;
   const home = lang === 'en' ? 'Spain' : 'España';
   document.body.innerHTML =
-    `<select id="country" name="customer_country"><option value="" selected>${home}</option>` +
+    `<select id="f-customer_country" name="customer_country" data-names="region"><option value="" selected>${home}</option>` +
     codes.map((c) => `<option value="${c}">${c}</option>`).join('') +
     '</select>';
   new Function(SCRIPT)();
-  return document.getElementById('country') as HTMLSelectElement;
+  return document.getElementById('f-customer_country') as HTMLSelectElement;
 }
 
 const labels = (select: HTMLSelectElement) => Array.from(select.options).map((o) => o.textContent);
@@ -52,6 +52,18 @@ describe('public claim page — country names (sales#335)', () => {
   it('follows the page language, not a fixed one', () => {
     const select = renderPage('en', ['DE', 'GB', 'US']);
     expect(labels(select)).toEqual(['Spain', 'Germany', 'United Kingdom', 'United States']);
+  });
+
+  it('keeps a label the module already gave, and leaves selects that did not ask alone', () => {
+    document.documentElement.lang = 'es';
+    document.body.innerHTML =
+      '<select id="a" data-names="region"><option value="" selected>Casa</option>' +
+      '<option value="FR">Mi Francia</option><option value="DE">DE</option></select>' +
+      '<select id="b"><option value="US">US</option></select>';
+    new Function(SCRIPT)();
+    const a = document.getElementById('a') as HTMLSelectElement;
+    expect(labels(a)).toEqual(['Casa', new Intl.DisplayNames(['es'], { type: 'region' }).of('DE'), 'Mi Francia']);
+    expect(labels(document.getElementById('b') as HTMLSelectElement)).toEqual(['US']);
   });
 
   it('leaves the page alone when it has no country picker', () => {

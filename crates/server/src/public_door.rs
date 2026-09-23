@@ -28,11 +28,12 @@
 //! by a hydration failure — the trap that already cost `<noscript>` once. Inline `<style>` **is**
 //! allowed by the same policy, so the page can still look like something.
 //!
-//! One exception, and it is optional (sales#335): when the claim lets the customer say which
-//! country they are from, the page loads ONE same-origin file ([`NAMES_SCRIPT_PATH`]) that names the
-//! ISO codes with the browser's `Intl.DisplayNames` — the hub keeps no table of country names.
-//! Nothing inline, no handler attributes, and the form submits the same without it (the codes are
-//! the labels then).
+//! One exception, and it is optional (sales#335): the module that mints a claim may offer the
+//! answers a field accepts (`field_choices`, rendered as `<select>`s). When one of them is a list
+//! of ISO region codes — which codes is the module's knowledge, never the core's (hub#1407) — the
+//! page loads ONE same-origin file ([`NAMES_SCRIPT_PATH`]) that names them with the browser's
+//! `Intl.DisplayNames`. Nothing inline, no handler attributes, and the form submits the same
+//! without it (the codes are the labels then).
 //!
 //! Spanish and English both, chosen from the hub's own `language` setting and overridable with
 //! `?lang=`: the page is read by the merchant's CUSTOMER, who never logged in anywhere and whose
@@ -72,8 +73,37 @@ pub struct MintRequest {
     pub sealed_payload: Value,
     #[serde(default)]
     pub public_fields: Vec<String>,
+    /// sales#335 — the answers the minter offers for some of `public_fields` (see
+    /// [`NewClaim::field_choices`]). A separate key on purpose: a hub that predates it ignores it
+    /// and still mints, so the ticket never loses its QR over a newer module.
+    #[serde(default)]
+    pub public_field_choices: Value,
     #[serde(default)]
     pub expires_at: Option<String>,
+}
+
+/// The most options one field may carry. A claim is a row per printed ticket; a country list is
+/// ~250, so this leaves room without letting a minter park anything in it.
+const MAX_CHOICE_OPTIONS: usize = 400;
+
+/// `public_field_choices`, kept to the fields the visitor may actually fill, or `None` when it is
+/// not an object of `{options: [...]}` within [`MAX_CHOICE_OPTIONS`].
+fn accepted_choices(raw: &Value, fields: &[String]) -> Option<Value> {
+    if raw.is_null() {
+        return Some(json!({}));
+    }
+    let map = raw.as_object()?;
+    let mut kept = serde_json::Map::new();
+    for (field, spec) in map {
+        let options = spec.get("options")?.as_array()?;
+        if options.len() > MAX_CHOICE_OPTIONS {
+            return None;
+        }
+        if fields.contains(field) {
+            kept.insert(field.clone(), spec.clone());
+        }
+    }
+    Some(Value::Object(kept))
 }
 
 /// `POST /api/hub/public-claims` — mint the locator for a ticket.
@@ -116,6 +146,14 @@ pub async fn mint_claim(
             "minting a claim hands out this command; you must be able to run it yourself",
         );
     }
+    let Some(field_choices) = accepted_choices(&req.public_field_choices, &req.public_fields)
+    else {
+        return refusal(
+            StatusCode::BAD_REQUEST,
+            "invalid_choices",
+            "public_field_choices must map fields to {options: [...]} of at most 400 options",
+        );
+    };
     let spec = NewClaim {
         kind: req.kind,
         subject_id: req.subject_id,
@@ -126,6 +164,7 @@ pub async fn mint_claim(
             req.sealed_payload
         },
         public_fields: req.public_fields,
+        field_choices,
         expires_at: req.expires_at,
         created_by: ctx.user_id.clone(),
     };
@@ -174,8 +213,13 @@ pub async fn show(
     match public_claim::redeemable(rt.db(), &hub_id, &locator, &now).await {
         Ok(Ok(claim)) => {
             st.login_throttle.record_success(&key);
-            let fields = claim.public_fields;
-            page(StatusCode::OK, &lang, Body::Form { fields }, &locator)
+            let (fields, choices) = (claim.public_fields, claim.field_choices);
+            page(
+                StatusCode::OK,
+                &lang,
+                Body::Form { fields, choices },
+                &locator,
+            )
         }
         Ok(Err(ClaimRefusal::AlreadyRedeemed(_))) => {
             st.login_throttle.record_success(&key);
@@ -342,6 +386,7 @@ pub async fn redeem(
                 Body::Retry {
                     problem: detail,
                     fields: claim.public_fields.clone(),
+                    choices: claim.field_choices.clone(),
                 },
                 &locator,
             )
@@ -456,13 +501,14 @@ fn refusal(status: StatusCode, code: &str, message: &str) -> Response {
 
 enum Body {
     /// Ask for the tax details — only the ones the claim lets the visitor fill.
-    Form { fields: Vec<String> },
+    Form { fields: Vec<String>, choices: Value },
     /// Already issued (now or before) — show the reference.
     Done { reference: String },
     /// The form again, with what went wrong on top.
     Retry {
         problem: String,
         fields: Vec<String>,
+        choices: Value,
     },
     /// A dead end: unknown locator, expired, or a hub-side failure.
     Message(String),
@@ -503,12 +549,6 @@ fn t(lang: &str, key: &str) -> &'static str {
         "unavailable" => "This business cannot issue invoices right now. Ask at the counter.",
         "locator" => "Receipt code",
         "reference" => "Invoice",
-        "country" => "Country",
-        "homeCountry" => "Spain",
-        "idType" => "Your number is",
-        "idTypeTax" => "A tax or VAT number",
-        "idTypePassport" => "A passport",
-        "idTypeOther" => "Another official document",
         _ => "",
     };
     if lang == "en" {
@@ -531,12 +571,6 @@ fn t(lang: &str, key: &str) -> &'static str {
         "unavailable" => "Este negocio no puede emitir facturas ahora mismo. Pregunta en el mostrador.",
         "locator" => "Código del tique",
         "reference" => "Factura",
-        "country" => "País",
-        "homeCountry" => "España",
-        "idType" => "Tu número es",
-        "idTypeTax" => "Un NIF o número de IVA",
-        "idTypePassport" => "Un pasaporte",
-        "idTypeOther" => "Otro documento oficial",
         _ => en,
     }
 }
@@ -547,8 +581,12 @@ fn t(lang: &str, key: &str) -> &'static str {
 fn page(status: StatusCode, lang: &str, body: Body, locator: &str) -> Response {
     let title = esc(t(lang, "title"));
     let main = match &body {
-        Body::Form { fields } => form_html(lang, locator, None, fields),
-        Body::Retry { problem, fields } => form_html(lang, locator, Some(problem), fields),
+        Body::Form { fields, choices } => form_html(lang, locator, None, fields, choices),
+        Body::Retry {
+            problem,
+            fields,
+            choices,
+        } => form_html(lang, locator, Some(problem), fields, choices),
         Body::Done { reference } => {
             let ref_line = if reference.is_empty() {
                 String::new()
@@ -583,24 +621,17 @@ fn page(status: StatusCode, lang: &str, body: Body, locator: &str) -> Response {
         .into_response()
 }
 
-fn form_html(lang: &str, locator: &str, problem: Option<&str>, fields: &[String]) -> String {
+fn form_html(
+    lang: &str,
+    locator: &str,
+    problem: Option<&str>,
+    fields: &[String],
+    choices: &Value,
+) -> String {
     let warn = problem
         .map(|p| format!("<p class=\"warn\">{}</p>", esc(p)))
         .unwrap_or_default();
-    let offers = |field: &str| fields.iter().any(|f| f == field);
-    let (country, names_script) = if offers("customer_country") {
-        (
-            country_html(lang),
-            format!("<script src=\"{NAMES_SCRIPT_PATH}\" defer></script>"),
-        )
-    } else {
-        (String::new(), String::new())
-    };
-    let id_type = if offers("customer_id_type") {
-        id_type_html(lang)
-    } else {
-        String::new()
-    };
+    let (choice_selects, names_script) = choice_fields_html(lang, fields, choices);
     format!(
         "<h1>{title}</h1><p>{intro}</p>{warn}\
 <p class=\"loc\"><span>{loc_label}</span><code>{locator}</code></p>\
@@ -611,7 +642,7 @@ fn form_html(lang: &str, locator: &str, problem: Option<&str>, fields: &[String]
 <input id=\"name\" name=\"customer_name\" required autocomplete=\"organization\">\
 <label for=\"addr\">{address}</label>\
 <input id=\"addr\" name=\"customer_address\" autocomplete=\"street-address\">\
-{country}{id_type}\
+{choice_selects}\
 <button type=\"submit\">{submit}</button>\
 </form>{names_script}",
         title = esc(t(lang, "title")),
@@ -626,44 +657,74 @@ fn form_html(lang: &str, locator: &str, problem: Option<&str>, fields: &[String]
     )
 }
 
-/// sales#335 — where the customer says which country they are from. Spain goes first as `''`,
-/// exactly what the till sends for Spain: a forced `ES` would declare a typed «FR…» VAT number as
-/// a Spanish NIF, while `''` lets its prefix keep deciding. The rest are the `CodigoPais` the AEAT
-/// accepts, as codes: the customer's browser names them ([`NAMES_SCRIPT`]).
-fn country_html(lang: &str) -> String {
-    let options: String = erplora_runtime::settings::AEAT_COUNTRY_CODES
-        .iter()
-        .filter(|code| !NOT_A_PLACE.contains(code))
-        .map(|code| format!("<option value=\"{code}\">{code}</option>"))
-        .collect();
-    format!(
-        "<label for=\"country\">{label}</label>\
-<select id=\"country\" name=\"customer_country\">\
-<option value=\"\" selected>{home}</option>{options}</select>",
-        label = esc(t(lang, "country")),
-        home = esc(t(lang, "homeCountry")),
-    )
+/// sales#335 — the fields a module offers answers for, as `<select>`s after the fixed inputs.
+///
+/// The core does not know what the answers mean: which countries a tax regime accepts, which
+/// document kinds it has — that is the module's knowledge (hub#1407), sent in the claim as
+/// `field_choices`. Only fields the claim lets the visitor fill are shown (an answer the door drops
+/// would be worse than no question). The first option is the default. `names: "region"` marks a
+/// select of ISO region codes the browser names ([`NAMES_SCRIPT`]); the second value says whether
+/// the page needs that script.
+fn choice_fields_html(lang: &str, fields: &[String], choices: &Value) -> (String, String) {
+    let mut html = String::new();
+    let mut wants_names = false;
+    for field in fields {
+        let Some(spec) = choices.get(field).filter(|c| c.is_object()) else {
+            continue;
+        };
+        let Some(options) = spec.get("options").and_then(Value::as_array) else {
+            continue;
+        };
+        let names = spec.get("names").and_then(Value::as_str) == Some("region");
+        wants_names |= names;
+        let id = format!("f-{}", esc(field));
+        let rendered: String = options
+            .iter()
+            .enumerate()
+            .map(|(i, option)| {
+                let value = option
+                    .as_str()
+                    .or_else(|| option.get("value").and_then(Value::as_str))
+                    .unwrap_or_default();
+                let label = option
+                    .get("label")
+                    .and_then(|l| localized(l, lang))
+                    .unwrap_or(value);
+                let selected = if i == 0 { " selected" } else { "" };
+                format!(
+                    "<option value=\"{}\"{selected}>{}</option>",
+                    esc(value),
+                    esc(label)
+                )
+            })
+            .collect();
+        let label = spec
+            .get("label")
+            .and_then(|l| localized(l, lang))
+            .unwrap_or(field);
+        let data_names = if names { " data-names=\"region\"" } else { "" };
+        html.push_str(&format!(
+            "<label for=\"{id}\">{}</label>\
+<select id=\"{id}\" name=\"{}\"{data_names}>{rendered}</select>",
+            esc(label),
+            esc(field),
+        ));
+    }
+    let script = if wants_names {
+        format!("<script src=\"{NAMES_SCRIPT_PATH}\" defer></script>")
+    } else {
+        String::new()
+    };
+    (html, script)
 }
 
-/// `CountryType2` codes that are not somewhere a customer lives: `QU` (other countries) and the
-/// `X*` codes the AEAT keeps for institutions and special territories.
-const NOT_A_PLACE: &[&str] = &["QU", "XB", "XG", "XN", "XU"];
-
-/// What the number is. `''` — a tax or VAT number — is what `invoice` already turns into `02` in
-/// the EU and `04` elsewhere, and a Spanish NIF at home; the other two are the exceptions a
-/// private customer from abroad actually has.
-fn id_type_html(lang: &str) -> String {
-    format!(
-        "<label for=\"idtype\">{label}</label>\
-<select id=\"idtype\" name=\"customer_id_type\">\
-<option value=\"\" selected>{tax}</option>\
-<option value=\"03\">{passport}</option>\
-<option value=\"06\">{other}</option></select>",
-        label = esc(t(lang, "idType")),
-        tax = esc(t(lang, "idTypeTax")),
-        passport = esc(t(lang, "idTypePassport")),
-        other = esc(t(lang, "idTypeOther")),
-    )
+/// A module-sent `{en, es}` label in the page's language, English when that one is missing.
+fn localized<'a>(label: &'a Value, lang: &str) -> Option<&'a str> {
+    label
+        .get(lang)
+        .and_then(Value::as_str)
+        .or_else(|| label.get("en").and_then(Value::as_str))
+        .filter(|s| !s.is_empty())
 }
 
 /// The one script the page may load, same-origin because `script-src 'self'` drops anything
@@ -715,7 +776,7 @@ mod tests {
     /// on the customer's phone.
     #[test]
     fn the_page_carries_no_script_at_all() {
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &[]);
+        let rendered = form_html("es", "ABCD1234ABCD1234", None, &[], &json!({}));
         assert!(!rendered.contains("<script"));
         assert!(!rendered.contains("onclick"));
         assert!(!rendered.contains("javascript:"));
@@ -724,12 +785,12 @@ mod tests {
     /// The locator comes off a URL a stranger typed; it reaches the page as text, never as markup.
     #[test]
     fn a_locator_cannot_inject_markup_into_the_page() {
-        let rendered = form_html("es", "<img src=x onerror=alert(1)>", None, &[]);
+        let rendered = form_html("es", "<img src=x onerror=alert(1)>", None, &[], &json!({}));
         assert!(!rendered.contains("<img"));
         assert!(rendered.contains("&lt;img"));
     }
 
-    fn foreign_fields() -> Vec<String> {
+    fn claim_fields() -> Vec<String> {
         vec![
             "customer_tax_id".into(),
             "customer_name".into(),
@@ -739,92 +800,146 @@ mod tests {
         ]
     }
 
-    /// sales#335 — a claim that lets the customer say where they are from gets a country picker:
-    /// Spain first and pre-selected as `''` (what the till sends for Spain, so a typed «FR…»
-    /// number keeps being read by its prefix), then every `CodigoPais` the AEAT accepts.
+    /// What a module sends (sales#335): the answers IT knows a field accepts. The core has no
+    /// idea these are countries or document kinds — and must not (hub#1407).
+    fn module_choices() -> Value {
+        json!({
+            "customer_country": {
+                "label": {"en": "Country", "es": "País"},
+                "names": "region",
+                "options": [{"value": "", "label": {"en": "Home", "es": "Casa"}}, "US", "DE"],
+            },
+            "customer_id_type": {
+                "label": {"en": "Your number is", "es": "Tu número es"},
+                "options": [
+                    {"value": "", "label": {"en": "A tax number", "es": "Un NIF"}},
+                    {"value": "03", "label": {"en": "A passport", "es": "Un pasaporte"}},
+                ],
+            },
+        })
+    }
+
+    /// A declared field with choices becomes a `<select>` in the page's language; the first option
+    /// is the default; an option with no label shows its value.
     #[test]
-    fn a_claim_with_the_country_field_asks_for_the_country() {
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &foreign_fields());
-        assert!(
-            rendered.contains("<select id=\"country\" name=\"customer_country\">"),
-            "{rendered}"
+    fn a_field_the_module_offers_choices_for_becomes_a_select() {
+        let es = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
         );
         assert!(
-            rendered.contains("<option value=\"\" selected>España</option>"),
-            "{rendered}"
+            es.contains("<label for=\"f-customer_country\">País</label>"),
+            "{es}"
         );
-        for code in ["US", "DE", "GB", "MA"] {
-            assert!(
-                rendered.contains(&format!("<option value=\"{code}\">{code}</option>")),
-                "{code} missing"
-            );
-        }
-        // Spain travels as '' and never twice; the AEAT's non-places are not somewhere to live.
-        for code in ["ES", "QU", "XB", "XG", "XN", "XU"] {
-            assert!(
-                !rendered.contains(&format!("value=\"{code}\"")),
-                "{code} offered"
-            );
-        }
-        let en = form_html("en", "ABCD1234ABCD1234", None, &foreign_fields());
         assert!(
-            en.contains("<option value=\"\" selected>Spain</option>"),
+            es.contains("<select id=\"f-customer_country\" name=\"customer_country\" data-names=\"region\">"),
+            "{es}"
+        );
+        assert!(
+            es.contains("<option value=\"\" selected>Casa</option>"),
+            "{es}"
+        );
+        assert!(es.contains("<option value=\"US\">US</option>"), "{es}");
+        assert!(
+            es.contains("<select id=\"f-customer_id_type\" name=\"customer_id_type\">"),
+            "{es}"
+        );
+        assert!(
+            es.contains("<option value=\"03\">Un pasaporte</option>"),
+            "{es}"
+        );
+        let en = form_html(
+            "en",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+        );
+        assert!(
+            en.contains(">Country</label>") && en.contains(">A passport</option>"),
             "{en}"
         );
     }
 
-    /// The kind of document: the default (`''`) is the tax or VAT number, which `invoice` already
-    /// turns into 02 in the EU and 04 elsewhere; a passport or another document is the exception.
+    /// A label the module did not translate falls back to English, then to the field's own name —
+    /// never an empty label.
     #[test]
-    fn a_claim_with_the_id_type_field_asks_what_the_number_is() {
-        let rendered = form_html("en", "ABCD1234ABCD1234", None, &foreign_fields());
+    fn an_untranslated_label_falls_back_to_english_then_to_the_name() {
+        let choices = json!({
+            "customer_country": {"label": {"en": "Country"}, "options": ["US"]},
+            "customer_id_type": {"options": [{"value": "03", "label": {"en": "A passport"}}]},
+        });
+        let es = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &choices);
+        assert!(es.contains(">Country</label>"), "{es}");
+        assert!(es.contains(">customer_id_type</label>"), "{es}");
         assert!(
-            rendered.contains("<select id=\"idtype\" name=\"customer_id_type\">"),
-            "{rendered}"
+            es.contains("<option value=\"03\" selected>A passport</option>"),
+            "{es}"
         );
-        assert!(rendered.contains(&format!(
-            "<option value=\"\" selected>{}</option>",
-            t("en", "idTypeTax")
-        )));
-        assert!(rendered.contains(&format!(
-            "<option value=\"03\">{}</option>",
-            t("en", "idTypePassport")
-        )));
-        assert!(rendered.contains(&format!(
-            "<option value=\"06\">{}</option>",
-            t("en", "idTypeOther")
-        )));
     }
 
-    /// A ticket printed before the claim listed the country must not show a picker whose answer
-    /// the door would then drop: the customer would pick «United States» and get a Spanish NIF.
+    /// Choices for a field the claim does not let the visitor fill are not shown: the door would
+    /// drop the answer, so the customer would pick «United States» and get a Spanish NIF. And a
+    /// claim with no choices — every ticket printed before sales#335 — keeps the old form.
     #[test]
-    fn a_claim_without_the_new_fields_keeps_the_old_form() {
+    fn choices_only_show_for_declared_fields() {
         let old: Vec<String> = vec![
             "customer_tax_id".into(),
             "customer_name".into(),
             "customer_address".into(),
         ];
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &old);
-        assert!(!rendered.contains("customer_country"), "{rendered}");
-        assert!(!rendered.contains("customer_id_type"), "{rendered}");
+        let rendered = form_html("es", "ABCD1234ABCD1234", None, &old, &module_choices());
+        assert!(!rendered.contains("<select"), "{rendered}");
         assert!(!rendered.contains("<script"), "{rendered}");
+        let plain = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &json!({}));
+        assert!(!plain.contains("<select"), "{plain}");
     }
 
-    /// The names come from the customer's own browser (`Intl.DisplayNames`), through ONE
-    /// same-origin file — `script-src 'self'` drops anything inline, so nothing inline is allowed.
-    /// Without it the form still works, with ISO codes as labels.
+    /// Labels and values are the module's, but they reach a stranger's page: text, never markup.
     #[test]
-    fn the_country_names_come_from_one_same_origin_script() {
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &foreign_fields());
+    fn choices_cannot_inject_markup_into_the_page() {
+        let choices = json!({
+            "customer_country": {
+                "label": {"es": "<b>x</b>"},
+                "options": ["\"><script>alert(1)</script>", {"value": "a", "label": {"es": "<img src=x>"}}],
+            }
+        });
+        let rendered = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &choices);
+        assert!(!rendered.contains("<script>alert"), "{rendered}");
+        assert!(
+            !rendered.contains("<img") && !rendered.contains("<b>"),
+            "{rendered}"
+        );
+    }
+
+    /// Names for region codes come from the customer's own browser (`Intl.DisplayNames`), through
+    /// ONE same-origin file, loaded only when a select asks for it. Nothing inline.
+    #[test]
+    fn region_names_come_from_one_same_origin_script() {
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+        );
         assert_eq!(rendered.matches("<script").count(), 1, "{rendered}");
         assert!(rendered.contains(&format!(
             "<script src=\"{NAMES_SCRIPT_PATH}\" defer></script>"
         )));
         assert!(NAMES_SCRIPT_PATH.starts_with("/p/") && is_public_path(NAMES_SCRIPT_PATH));
         assert!(!rendered.contains("onclick") && !rendered.contains("onchange"));
-        assert!(!rendered.contains("javascript:"));
         assert!(NAMES_SCRIPT.contains("Intl.DisplayNames"));
+        let mut no_region = module_choices();
+        no_region["customer_country"]
+            .as_object_mut()
+            .unwrap()
+            .remove("names");
+        let rendered = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &no_region);
+        assert!(!rendered.contains("<script"), "{rendered}");
     }
 
     /// Both languages, and the customer's page is the Spanish one by default — the merchant's
@@ -848,12 +963,6 @@ mod tests {
             "unavailable",
             "locator",
             "reference",
-            "country",
-            "homeCountry",
-            "idType",
-            "idTypeTax",
-            "idTypePassport",
-            "idTypeOther",
         ] {
             let en = t("en", key);
             let es = t("es", key);

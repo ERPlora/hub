@@ -1,10 +1,13 @@
-// sales#335 — names the countries of the public invoice form (`/p/<locator>`) in the customer's
-// own language. The server lists ISO codes only: the names come from the browser's
-// `Intl.DisplayNames`, so no country table lives in the hub. Without this file (or without
-// `Intl.DisplayNames`) the form still works, with the codes as labels.
+// sales#335 — names the ISO region codes of the public invoice form (`/p/<locator>`) in the
+// customer's own language. The module that minted the claim decides which codes a field offers
+// (the core has no country list, hub#1407) and marks the select `data-names="region"`; the names
+// come from the browser's `Intl.DisplayNames`. An option the module already labelled keeps its
+// label. Without this file (or without `Intl.DisplayNames`) the form still works, with the codes
+// as labels.
 (function () {
-  var select = document.getElementById('country');
-  if (!select || typeof Intl === 'undefined' || !Intl.DisplayNames) return;
+  if (typeof Intl === 'undefined' || !Intl.DisplayNames) return;
+  var selects = document.querySelectorAll('select[data-names="region"]');
+  if (!selects.length) return;
   var lang = document.documentElement.lang || 'es';
   var names;
   try {
@@ -12,16 +15,21 @@
   } catch (e) {
     return;
   }
-  // The first option is the home country, already named by the server and pre-selected.
-  var rest = [];
-  for (var i = 1; i < select.options.length; i++) {
-    var option = select.options[i];
-    var name = names.of(option.value);
-    if (name) option.textContent = name;
-    rest.push(option);
+  for (var s = 0; s < selects.length; s++) {
+    var select = selects[s];
+    // The first option is the default the module chose: it stays first.
+    var rest = [];
+    for (var i = 1; i < select.options.length; i++) {
+      var option = select.options[i];
+      if (option.value && option.textContent === option.value) {
+        var name = names.of(option.value);
+        if (name) option.textContent = name;
+      }
+      rest.push(option);
+    }
+    rest.sort(function (a, b) {
+      return a.textContent.localeCompare(b.textContent, lang);
+    });
+    for (var j = 0; j < rest.length; j++) select.appendChild(rest[j]);
   }
-  rest.sort(function (a, b) {
-    return a.textContent.localeCompare(b.textContent, lang);
-  });
-  for (var j = 0; j < rest.length; j++) select.appendChild(rest[j]);
 })();

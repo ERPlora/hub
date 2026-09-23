@@ -354,6 +354,46 @@ async fn the_page_never_carries_a_script() {
     assert!(html.contains("<style"), "but it is styled: {html}");
 }
 
+/// What the till sends (sales#335): the answers the MODULE knows these fields accept. The core
+/// only renders them — which countries a regime takes is not its knowledge (hub#1407).
+fn country_choices() -> Value {
+    json!({
+        "customer_country": {
+            "label": {"en": "Country", "es": "País"},
+            "names": "region",
+            "options": [{"value": "", "label": {"en": "Home", "es": "Casa"}}, "US", "DE"],
+        },
+        "customer_id_type": {
+            "label": {"en": "Your number is", "es": "Tu número es"},
+            "options": [
+                {"value": "", "label": {"en": "A tax number", "es": "Un NIF"}},
+                {"value": "03", "label": {"en": "A passport", "es": "Un pasaporte"}},
+            ],
+        },
+    })
+}
+
+/// A claim is a row per printed ticket: a minter cannot park an arbitrarily large list in it.
+#[tokio::test]
+async fn minting_refuses_choices_too_large_for_a_ticket() {
+    let app = make_app().await;
+    let options: Vec<Value> = (0..600).map(|i| json!(format!("V{i}"))).collect();
+    let mut claim = ticket_claim("ticket-huge");
+    claim["public_field_choices"] = json!({"note": {"options": options}});
+    let resp = app.clone().oneshot(mint_request("*", claim)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body_json(resp).await["error"]["code"],
+        json!("invalid_choices")
+    );
+
+    // …and the check detects the positive: a normal list mints.
+    let mut claim = ticket_claim("ticket-normal");
+    claim["public_field_choices"] = json!({"note": {"options": ["a", "b"]}});
+    let resp = app.clone().oneshot(mint_request("*", claim)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
 /// sales#335 — a ticket whose claim lets the customer say where they are from shows the country
 /// and document pickers, loads the one same-origin script that names the countries, and that
 /// script answers a stranger on a hub in the REAL session mode (the diner has no session).
@@ -381,6 +421,7 @@ async fn a_foreign_customer_can_say_their_country_and_document() {
         "customer_country",
         "customer_id_type"
     ]);
+    claim["public_field_choices"] = country_choices();
     let minted = app
         .clone()
         .oneshot(
@@ -409,7 +450,15 @@ async fn a_foreign_customer_can_say_their_country_and_document() {
     let html = body_text(page).await;
     assert!(html.contains("name=\"customer_country\""), "{html}");
     assert!(html.contains("<option value=\"US\">US</option>"), "{html}");
+    assert!(
+        html.contains("<option value=\"\" selected>Casa</option>"),
+        "{html}"
+    );
     assert!(html.contains("name=\"customer_id_type\""), "{html}");
+    assert!(
+        html.contains("<option value=\"03\">Un pasaporte</option>"),
+        "{html}"
+    );
     assert!(
         html.contains("<script src=\"/p/-/country-names.js\" defer></script>"),
         "{html}"
@@ -446,6 +495,7 @@ async fn a_refused_attempt_brings_the_foreign_pickers_back() {
                 "command": "catalog.item.create",
                 "sealed_payload": {},
                 "public_fields": ["name", "customer_country", "customer_id_type"],
+                "public_field_choices": country_choices(),
             }),
         ))
         .await
