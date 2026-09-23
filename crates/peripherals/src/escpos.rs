@@ -1997,6 +1997,18 @@ mod tests {
         let claim = text.find("Pide tu factura").expect("the claim block is printed");
         assert!(fiscal < legend, "the legend goes under the fiscal QR");
         assert!(legend < claim, "and before the second QR, which is not what it names");
+
+        // «bien visible» (Orden HAC/1177/2024 art. 20.1.b): the last emphasis command before the
+        // legend is ESC E 1 (bold on), so it is not printed as one more 8-px caption.
+        let legend_at = bytes
+            .windows(b"VERI*FACTU".len())
+            .position(|w| w == b"VERI*FACTU")
+            .expect("legend bytes");
+        let last_bold = bytes[..legend_at]
+            .windows(3)
+            .rposition(|w| w[0] == 0x1b && w[1] == 0x45)
+            .expect("an ESC E command precedes the legend");
+        assert_eq!(bytes[last_bold + 2], 1, "the legend is printed in bold");
     }
 
     /// No fiscal QR → no legend, whatever the producer sends: the legend names the QR, and alone
