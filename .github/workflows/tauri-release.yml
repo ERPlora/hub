@@ -587,6 +587,22 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
+      # Only for the preflight script below: this job builds nothing.
+      - uses: actions/checkout@v4
+
+      # Each tag SENDS the app to review (`changesNotSentForReview: false` below), so the account
+      # Google reviews with has to work BEFORE anything is uploaded (hub#1888). The control signs
+      # in as the reviewer and demands a living hub with modules (hub#1718: on 09/09 the reviewer
+      # landed on the signup screen, then on an empty hub). No `if:` and no `continue-on-error` on
+      # purpose: missing configuration is red `missing_credentials` naming the variables, never a
+      # silent skip. Contract: `scripts/tests/play-reviewer-preflight-on-publish.test.sh`.
+      - name: Google's reviewer account signs in and lands on a living hub
+        env:
+          PLAY_REVIEWER_EMAIL: ${{ vars.PLAY_REVIEWER_EMAIL }}
+          PLAY_REVIEWER_HUB: ${{ vars.PLAY_REVIEWER_HUB }}
+          PLAY_REVIEWER_PASSWORD: ${{ secrets.PLAY_REVIEWER_PASSWORD }}
+        run: python3 scripts/ci/play-reviewer-preflight.py
+
       - name: Download AAB
         uses: actions/download-artifact@v4
         with:

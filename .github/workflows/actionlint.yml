@@ -331,12 +331,14 @@ jobs:
       # nada en el repo hacía la pregunta. Lo que corre aquí son los casos HERMÉTICOS del
       # control —SaaS y hub falsos en 127.0.0.1, sin red ni credenciales—: que caza el slug que
       # no es de la cuenta, el hub caído, el hub sin módulos y la falta de configuración, y que
-      # nunca imprime la contraseña. El control DE VERDAD lo corre una persona antes de enviar
-      # (apps/tauri/GOOGLE-PLAY.md); aquí solo se prueba que sabe decir que NO.
-      - name: Contrato de la guardia del revisor de Play (hub#1718)
+      # nunca imprime la contraseña. El control DE VERDAD lo corre el job `publish-play` de
+      # tauri-release.yml antes de subir nada (hub#1888); el segundo test exige que ese paso
+      # siga ahí, antes del upload, sin `if:` ni `continue-on-error` y con la contraseña en un secret.
+      - name: Contrato de la guardia del revisor de Play (hub#1718, hub#1888)
         run: |
           set -euo pipefail
           bash ./scripts/tests/play-reviewer-preflight.test.sh
+          bash ./scripts/tests/play-reviewer-preflight-on-publish.test.sh
 
       # ── Los puertos de los service containers (hub#898) ───────────────────────────────
       # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y
