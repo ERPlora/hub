@@ -104,3 +104,24 @@ verifactu/tests/desglose.hub.test.py
 # combos × sales × inventory: que un menú mueva el stock de sus COMPONENTES no lo afirmaba
 # ningún e2e del hub (inventory#73). Cobertura nueva, no mudada (inventory#77, v1.2.44).
 inventory/tests/combo_stock.hub.test.py
+
+# ── Cómo entra una batería NUEVA: `# pending-publication: <repo>#<n>` (kitchen#84) ──────────
+# Una batería nueva no podía aterrizar: el gate del módulo (module-toolkit#163) la rechaza hasta
+# que esta lista en `develop` la declara, y el guard de aquí rechaza la declaración hasta que el
+# `main` del módulo la publica. Las dos PRs en rojo, para siempre. La salida es declararla ANTES,
+# con la marca en su PROPIA línea de comentario justo encima (el gate del módulo compara líneas
+# enteras: un `# …` al final de la línea le escondería la declaración):
+#
+#     # pending-publication: kitchen#84
+#     kitchen/tests/closed_check.hub.test.py
+#
+# La marca excusa UNA cosa: que esa línea aún no esté en el catálogo publicado; mientras tanto el
+# corredor no la ejecuta (su lista sale del catálogo). Orden: mergea la PR del hub con la marca →
+# la del módulo sale verde y se mergea → la siguiente pasada la corre y avisa
+# `stale-pending-publication` para que se borre la marca (nunca en rojo). Una marca sin
+# `<repo>#<n>` o sin la entrada justo debajo se rechaza.
+
+# kitchen × sales: cobrar la cuenta entera saca SUS comandas del KDS y solo las suyas, contra el
+# kernel real — lo único que resuelve las `reads` de `close_from_order` (kitchen#79).
+# pending-publication: kitchen#84
+kitchen/tests/closed_check.hub.test.py

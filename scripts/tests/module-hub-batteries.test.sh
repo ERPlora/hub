@@ -410,4 +410,123 @@ ok
 [ -z "$out" ] || fail "--batteries must print no worklist on the failing path, got: $out"
 ok
 
+# ── 12 · `# pending-publication: <repo>#<n>` breaks the DEADLOCK of a NEW battery (kitchen#84) ──
+# A battery that retires nothing — a brand-new one — could not land at all. The two halves of the
+# pair guard each other: the module's gate (module-toolkit#163) refuses the battery until THIS list
+# on `develop` declares it, and this guard refuses the declaration until the module's `main`
+# publishes it. Both PRs red, forever; `MERGE_PR_FORCE` is not an exit. kitchen#79 had to drop its
+# hub battery for exactly that reason, and kitchen#84 is the battery that was left out.
+#
+# The marker goes on its OWN comment line, right above the entry, because the module's gate
+# compares whole lines: a trailing `# …` would stop it from recognising the declaration.
+#
+# What the marker excuses is ONE direction and nothing else: "declared but not published yet". It
+# names the issue that will publish it, so a pending line is never anonymous; and it never puts
+# the unpublished battery on the runner's worklist, which comes from the catalogue.
+catalogue="$tmp_dir/c12"
+manifest="$tmp_dir/m12.txt"
+rm -rf "$catalogue"
+make_module "$catalogue" kitchen "tests/tickets.hub.test.py"   # the new battery is NOT published yet
+cat > "$manifest" <<'EOF'
+kitchen/tests/tickets.hub.test.py
+# pending-publication: kitchen#84
+kitchen/tests/closed_check.hub.test.py
+EOF
+
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries 2>"$tmp_dir/stderr")
+rc=$?
+err=$(cat "$tmp_dir/stderr")
+[ "$rc" -eq 0 ] || fail "a declared battery marked pending-publication must not fail the pair, got $rc"
+ok
+[ "$out" = "kitchen/tests/tickets.hub.test.py" ] || fail \
+    "an unpublished pending battery must never reach the runner's worklist, got: $(printf '%s' "$out" | tr '\n' ' ')"
+ok
+grep -Fq 'kitchen/tests/closed_check.hub.test.py' <<<"$err" || fail \
+    "the pending battery must be named on stderr so it never goes quiet"
+ok
+grep -Fq 'pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84)' <<<"$err" || fail \
+    "the pending notice must name the battery and the issue that publishes it"
+ok
+if grep -Fq 'stale-pending-publication' <<<"$err"; then
+    fail "an unpublished pending battery is not stale"
+fi
+ok
+
+# Positive control: the SAME fixture without the marker is still the hub#1381 red. If this passed,
+# the case above would prove nothing about the marker.
+cat > "$manifest" <<'EOF'
+kitchen/tests/tickets.hub.test.py
+kitchen/tests/closed_check.hub.test.py
+EOF
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "without the marker an unpublished declared battery must still exit 1, got $rc"
+ok
+
+# The marker excuses only the entry RIGHT BELOW it — not the next one down the file.
+cat > "$manifest" <<'EOF'
+# pending-publication: kitchen#84
+kitchen/tests/tickets.hub.test.py
+kitchen/tests/closed_check.hub.test.py
+EOF
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "a marker must excuse only the entry directly below it, got $rc"
+ok
+
+# The marker's OWN refusals are measured against a PUBLISHED entry, so the marker is the only thing
+# that can put them red — against an unpublished one they would go red through the hub#1381
+# direction and a guard that ignored the marker entirely would pass them.
+catalogue="$tmp_dir/c12b"
+rm -rf "$catalogue"
+make_module "$catalogue" kitchen "tests/tickets.hub.test.py" "tests/closed_check.hub.test.py"
+
+# A marker without an issue is refused: a pending line nobody owns is how it stays pending forever.
+for bad in '' 'soon' 'kitchen 84'; do
+    printf 'kitchen/tests/tickets.hub.test.py\n# pending-publication: %s\nkitchen/tests/closed_check.hub.test.py\n' \
+        "$bad" > "$manifest"
+    run_guard "$catalogue" "$manifest"
+    [ "$rc" -eq 1 ] || fail "a pending-publication marker without <repo>#<n> ('$bad') must exit 1, got $rc"
+    ok
+done
+
+# A marker with no entry right below it (a blank line, a comment or the end of the file) is
+# refused too: it would read as a pending battery that excuses nothing, or — worse — the wrong
+# one after an edit.
+for gap in '' '# a comment'; do
+    printf 'kitchen/tests/tickets.hub.test.py\n# pending-publication: kitchen#84\n%s\nkitchen/tests/closed_check.hub.test.py\n' \
+        "$gap" > "$manifest"
+    run_guard "$catalogue" "$manifest"
+    [ "$rc" -eq 1 ] || fail "a marker separated from its entry by '$gap' must exit 1, got $rc"
+    ok
+done
+cat > "$manifest" <<'EOF2'
+kitchen/tests/tickets.hub.test.py
+kitchen/tests/closed_check.hub.test.py
+# pending-publication: kitchen#84
+EOF2
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "a dangling pending-publication marker at the end of the list must exit 1, got $rc"
+ok
+
+# Once the module publishes it, the battery is a normal declared one: green, on the worklist, and a
+# notice asks for the now-stale marker to go. Never red — that would put the hub's CI red in the
+# push of whoever comes next, the inventory#77 crater this whole pairing exists to avoid.
+make_module "$catalogue" kitchen "tests/closed_check.hub.test.py"
+cat > "$manifest" <<'EOF'
+kitchen/tests/tickets.hub.test.py
+# pending-publication: kitchen#84
+kitchen/tests/closed_check.hub.test.py
+EOF
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries 2>"$tmp_dir/stderr")
+rc=$?
+err=$(cat "$tmp_dir/stderr")
+[ "$rc" -eq 0 ] || fail "a pending battery that got published must pass, got $rc"
+ok
+[ "$out" = "kitchen/tests/closed_check.hub.test.py
+kitchen/tests/tickets.hub.test.py" ] || fail \
+    "a published pending battery must reach the worklist, got: $(printf '%s' "$out" | tr '\n' ' ')"
+ok
+grep -Fq 'stale-pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84)' <<<"$err" || fail \
+    "a published battery still marked pending must get a stale-pending-publication notice"
+ok
+
 printf 'PASS: %d module-hub-batteries guard cases\n' "$passed"
