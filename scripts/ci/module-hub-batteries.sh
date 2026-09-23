@@ -53,22 +53,64 @@ manifest="$script_dir/module-hub-batteries.txt"
 # hub battery" (the name rule AND the `_HUB_BASE_URL` content rule) is written once. The verdict
 # is untouched: a disagreement is still exit 1 with an empty stdout, never a worklist.
 emit=modules
+# The day a `pending-publication` marker's `until` is measured against (hub#1994). UTC, so a run
+# at 01:00 in Madrid and one at 23:00 in California agree on which markers expired.
+today=$(date -u +%Y-%m-%d)
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --catalogue) catalogue="$2"; shift 2 ;;
         --manifest) manifest="$2"; shift 2 ;;
         --batteries) emit=batteries; shift ;;
+        --today) today="${2:-}"; shift 2 ;;
         -h | --help)
-            printf 'usage: %s [--catalogue <dir>] [--manifest <file>] [--batteries]\n' "$0"
+            printf 'usage: %s [--catalogue <dir>] [--manifest <file>] [--batteries] [--today YYYY-MM-DD]\n' "$0"
             exit 0
             ;;
         *)
-            printf 'usage: %s [--catalogue <dir>] [--manifest <file>] [--batteries]\n' "$0" >&2
+            printf 'usage: %s [--catalogue <dir>] [--manifest <file>] [--batteries] [--today YYYY-MM-DD]\n' "$0" >&2
             exit 2
             ;;
     esac
 done
+
+# ── Calendar dates as day numbers ───────────────────────────────────────────────────────────
+# Pure shell arithmetic, because `date -d` (GNU) and `date -j -f` (BSD, macOS) disagree and this
+# guard runs on both. `day_number` prints the days since 1970-01-01 of a REAL calendar date, and
+# fails for anything else — a wrong shape, month 13, February 30th.
+day_number() { # $1=YYYY-MM-DD
+    local y m d dim
+    grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' <<<"$1" || return 1
+    y=$((10#${1%%-*})); m=${1#*-}; m=$((10#${m%%-*})); d=$((10#${1##*-}))
+    [ "$m" -ge 1 ] && [ "$m" -le 12 ] && [ "$d" -ge 1 ] || return 1
+    case "$m" in
+        (2) if [ $((y % 4)) -eq 0 ] && { [ $((y % 100)) -ne 0 ] || [ $((y % 400)) -eq 0 ]; }; then
+                dim=29
+            else
+                dim=28
+            fi ;;
+        (4 | 6 | 9 | 11) dim=30 ;;
+        (*) dim=31 ;;
+    esac
+    [ "$d" -le "$dim" ] || return 1
+    # Howard Hinnant's days_from_civil.
+    [ "$m" -le 2 ] && y=$((y - 1))
+    local era=$((y / 400)) yoe doy doe mp
+    yoe=$((y - era * 400))
+    if [ "$m" -gt 2 ]; then mp=$((m - 3)); else mp=$((m + 9)); fi
+    doy=$(((153 * mp + 2) / 5 + d - 1))
+    doe=$((yoe * 365 + yoe / 4 - yoe / 100 + doy))
+    printf '%s\n' $((era * 146097 + doe - 719468))
+}
+
+# How far ahead a marker may promise publication. Long enough for a module PR to go through
+# review and its gate; short enough that "pending" can never quietly mean "never" (hub#1994).
+max_pending_days=30
+
+if ! today_n=$(day_number "$today"); then
+    printf 'module-hub-batteries: --today must be a calendar date YYYY-MM-DD, got: %s\n' "$today" >&2
+    exit 2
+fi
 
 if [ -z "$catalogue" ]; then
     printf 'module-hub-batteries: no catalogue. Pass --catalogue <dir> or set ERPLORA_MODULES_DIR\n' >&2
@@ -153,7 +195,7 @@ fi
 
 declared=$(printf '%s\n' "$declared_raw" | grep -v '^$' | uniq)
 
-# ── `# pending-publication: <repo>#<n>` — a NEW battery whose module has not published it yet ──
+# ── `# pending-publication: <repo>#<n> until <YYYY-MM-DD>` — a NEW battery not published yet ──
 # Without it a battery that retires no hub e2e could never land: the module's gate
 # (module-toolkit#163) refuses it until this list on `develop` declares it, and the "declared but
 # not published" direction below refuses the declaration until the module's `main` publishes it
@@ -164,9 +206,16 @@ declared=$(printf '%s\n' "$declared_raw" | grep -v '^$' | uniq)
 # publishes it. A marker without `<repo>#<n>`, or with no entry right below it, is refused: a
 # pending line nobody owns, or one that slid onto the wrong entry after an edit, is how the
 # hub#1381 direction would go quiet.
+#
+# And it EXPIRES (hub#1994). While an entry is pending nothing runs it and the pass is green, so a
+# marker whose module never publishes would stay pending for months with no red anywhere — the
+# hub#1381 silence again. `until` is the last day the marker excuses the entry, at most
+# `max_pending_days` ahead of the day it is checked; past it, an entry still unpublished is red.
 pending=""
 pending_notes=""
+expired_notes=""
 marker_issue=""
+marker_until=""
 while IFS= read -r line || [ -n "$line" ]; do
     trimmed=$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
     if [ -n "$marker_issue" ]; then
@@ -180,19 +229,40 @@ while IFS= read -r line || [ -n "$line" ]; do
                 entry=$(printf '%s' "$trimmed" | sed 's/[[:space:]]*#.*$//')
                 pending="$pending$entry
 "
-                pending_notes="$pending_notes$entry ($marker_issue)
+                pending_notes="$pending_notes$entry ($marker_issue, until $marker_until)
 "
+                if [ "$(day_number "$marker_until")" -lt "$today_n" ]; then
+                    expired_notes="$expired_notes$entry ($marker_issue, until $marker_until)
+"
+                fi
                 ;;
         esac
         marker_issue=""
     fi
     case "$trimmed" in
         ('# pending-publication:'*)
-            marker_issue=$(printf '%s' "${trimmed#\# pending-publication:}" | sed 's/^[[:space:]]*//')
+            marker_body=$(printf '%s' "${trimmed#\# pending-publication:}" | sed 's/^[[:space:]]*//')
+            marker_issue=${marker_body%% *}
+            marker_until=""
+            case "$marker_body" in
+                (*' until '*) marker_until=${marker_body##* until } ;;
+            esac
             if ! grep -Eq '^[A-Za-z0-9_./-]+#[0-9]+$' <<<"$marker_issue"; then
                 failures="$failures
   - a \`# pending-publication:\` marker must name the issue that publishes the battery as
-    \`<repo>#<n>\`, got: '$marker_issue'"
+    \`<repo>#<n> until <YYYY-MM-DD>\`, got: '$marker_body'"
+                marker_issue=""
+            elif [ "$marker_body" != "$marker_issue until $marker_until" ] ||
+                ! until_n=$(day_number "$marker_until"); then
+                failures="$failures
+  - a \`# pending-publication:\` marker must carry the last day it excuses the entry, as
+    \`<repo>#<n> until <YYYY-MM-DD>\` — a pending line with no end is a pending-forever
+    (hub#1994), got: '$marker_body'"
+                marker_issue=""
+            elif [ $((until_n - today_n)) -gt "$max_pending_days" ]; then
+                failures="$failures
+  - a \`# pending-publication:\` marker may promise at most $max_pending_days days ahead of today
+    ($today), got: '$marker_body'"
                 marker_issue=""
             fi
             ;;
@@ -203,6 +273,7 @@ if [ -n "$marker_issue" ]; then
   - a \`# pending-publication: $marker_issue\` marker at the end of the list, with no entry below it"
 fi
 pending=$(printf '%s' "$pending" | grep -v '^$' | LC_ALL=C sort -u || true)
+expired_notes=$(printf '%s' "$expired_notes" | grep -v '^$' || true)
 
 # ── A declared module that never materialised is the ENVIRONMENT, not the verdict ───────────
 # `materialize-published-modules.sh --floor 25` already fails on a catalogue that came up short,
@@ -255,6 +326,24 @@ if [ -n "$missing" ]; then
   - DECLARED but NOT in the published module — the battery that a hub e2e was retired against is
     not there, so that behaviour is now asserted nowhere:
 $(printf '%s\n' "$missing" | sed 's/^/      /')"
+fi
+
+# An expired marker on an entry the module STILL has not published: the deadline passed and the
+# battery runs nowhere. Past-date markers on published entries are only the stale notice below.
+expired_unpublished=""
+if [ -n "$expired_notes" ]; then
+    while IFS= read -r note; do
+        grep -Fxq "${note%% (*}" <<<"$missing_all" &&
+            expired_unpublished="$expired_unpublished      expired-pending-publication: $note
+"
+    done <<<"$expired_notes"
+fi
+if [ -n "$expired_unpublished" ]; then
+    failures="$failures
+  - pending-publication markers PAST their \`until\` with the battery still unpublished — nothing
+    has run it, and the promise to publish it is overdue. Publish it, or drop the entry and its
+    marker (moving the date is a reviewable edit, at most $max_pending_days days ahead):
+$(printf '%s' "$expired_unpublished")"
 fi
 
 if [ -n "$undeclared" ]; then

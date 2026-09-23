@@ -393,6 +393,58 @@ if len(battery_step) == 1:
         f"battery step at {battery_idx}, materialiser at {clone_idx}",
     )
 
+    # hub#1994: on a GREEN pass the guard still has something to say — a battery declared
+    # `pending-publication` (not run by anyone yet) or a marker gone stale. On stderr only, that
+    # is read by whoever opens the step log and nobody else. Executed, not grepped: the step's own
+    # shell runs against a stub guard that exits 0 with those two lines, and each has to come
+    # out as a `::warning::` annotation (visible on the run and on the PR) while the step stays
+    # green.
+    import subprocess
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as sandbox:
+        os.makedirs(os.path.join(sandbox, "scripts", "ci"))
+        stub_lines = [
+            "module-hub-batteries: pending-publication: kitchen/tests/a.hub.test.py"
+            " (kitchen#84, until 2026-10-01) — declared, not run until published",
+            "module-hub-batteries: stale-pending-publication: sales/tests/b.hub.test.py"
+            " (sales#9, until 2026-09-01) — published, drop the marker",
+        ]
+        with open(os.path.join(sandbox, BATTERY_GUARD), "w", encoding="utf-8") as fh:
+            fh.write("#!/usr/bin/env bash\necho kitchen\n")
+            for line in stub_lines:
+                fh.write(f"printf '%s\\n' '{line}' >&2\n")
+            fh.write("exit 0\n")
+        runner_temp = os.path.join(sandbox, "runner-temp")
+        os.makedirs(runner_temp)
+        proc = subprocess.run(
+            ["bash", "-c", str(battery_step[0].get("run", ""))],
+            cwd=sandbox,
+            env={**os.environ, "RUNNER_TEMP": runner_temp},
+            capture_output=True,
+            text=True,
+        )
+        check(
+            "the battery step stays green when the guard only reports pending markers",
+            proc.returncode == 0,
+            f"exit {proc.returncode}; stderr: {proc.stderr[-400:]!r}",
+        )
+        annotations = [l for l in proc.stdout.splitlines() if l.startswith("::warning")]
+        for kind, needle in (
+            ("pending-publication", "pending-publication: kitchen/tests/a.hub.test.py (kitchen#84"),
+            ("stale-pending-publication", "stale-pending-publication: sales/tests/b.hub.test.py"),
+        ):
+            check(
+                f"a `{kind}` line from the guard becomes a `::warning::` annotation",
+                any(needle in l for l in annotations),
+                f"annotations were {annotations!r} — on stderr only, nobody sees it (hub#1994)",
+            )
+        check(
+            "only the guard's pending lines are annotated, one each",
+            len(annotations) == len(stub_lines),
+            f"{len(annotations)} annotations: {annotations!r}",
+        )
+
 for shipped in (BATTERY_GUARD, BATTERY_LIST):
     check(
         f"`{shipped}` really exists in this checkout",
