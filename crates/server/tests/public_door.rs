@@ -9,7 +9,8 @@
 //!  - **Once.** A second POST issues nothing and shows the first result.
 //!  - **The seal holds.** A visitor who posts the fields the counter sealed changes nothing.
 //!  - **No oracle.** An unknown locator, a neighbour's locator and a typo are the same answer.
-//!  - **It is HTML, and it has no script** — the hub's CSP would drop one silently.
+//!  - **It is HTML with nothing inline** — the hub's CSP would drop an inline script silently; the
+//!    only script is the optional same-origin one that names countries (sales#335).
 //!
 //! The fixture module is the same `catalog` one the public-API tests use: this issue is about the
 //! door, and using a real installed command (rather than a stub) is what proves the door reaches
@@ -351,6 +352,173 @@ async fn the_page_never_carries_a_script() {
     .await;
     assert!(!html.contains("<script"), "{html}");
     assert!(html.contains("<style"), "but it is styled: {html}");
+}
+
+/// What the till sends (sales#335): the answers the MODULE knows these fields accept. The core
+/// only renders them — which countries a regime takes is not its knowledge (hub#1407).
+fn country_choices() -> Value {
+    json!({
+        "customer_country": {
+            "label": {"en": "Country", "es": "País"},
+            "names": "region",
+            "options": [{"value": "", "label": {"en": "Home", "es": "Casa"}}, "US", "DE"],
+        },
+        "customer_id_type": {
+            "label": {"en": "Your number is", "es": "Tu número es"},
+            "options": [
+                {"value": "", "label": {"en": "A tax number", "es": "Un NIF"}},
+                {"value": "03", "label": {"en": "A passport", "es": "Un pasaporte"}},
+            ],
+        },
+    })
+}
+
+/// A claim is a row per printed ticket: a minter cannot park an arbitrarily large list in it.
+#[tokio::test]
+async fn minting_refuses_choices_too_large_for_a_ticket() {
+    let app = make_app().await;
+    let options: Vec<Value> = (0..600).map(|i| json!(format!("V{i}"))).collect();
+    let mut claim = ticket_claim("ticket-huge");
+    claim["public_field_choices"] = json!({"note": {"options": options}});
+    let resp = app.clone().oneshot(mint_request("*", claim)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body_json(resp).await["error"]["code"],
+        json!("invalid_choices")
+    );
+
+    // …and the check detects the positive: a normal list mints.
+    let mut claim = ticket_claim("ticket-normal");
+    claim["public_field_choices"] = json!({"note": {"options": ["a", "b"]}});
+    let resp = app.clone().oneshot(mint_request("*", claim)).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+/// sales#335 — a ticket whose claim lets the customer say where they are from shows the country
+/// and document pickers, loads the one same-origin script that names the countries, and that
+/// script answers a stranger on a hub in the REAL session mode (the diner has no session).
+#[tokio::test]
+async fn a_foreign_customer_can_say_their_country_and_document() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "hub-public-door-foreign");
+    rt.ensure_system_tables().await.unwrap();
+    rt.install_from_dir(&fixture()).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
+    let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
+    let mut cfg = dev_config();
+    cfg.auth_mode = AuthMode::Session;
+    cfg.hub_id = "hub-public-door-foreign".into();
+    let app = app(AppState::with_config(rt, cfg));
+
+    let mut claim = ticket_claim("ticket-foreign");
+    claim["public_fields"] = json!([
+        "customer_tax_id",
+        "customer_name",
+        "customer_address",
+        "customer_country",
+        "customer_id_type"
+    ]);
+    claim["public_field_choices"] = country_choices();
+    let minted = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/hub/public-claims")
+                .header("content-type", "application/json")
+                .header("x-hub-session", &admin)
+                .body(Body::from(claim.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(minted.status(), StatusCode::OK);
+    let locator = body_json(minted).await["locator"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let page = app
+        .clone()
+        .oneshot(anonymous_get(&format!("/p/{locator}")))
+        .await
+        .unwrap();
+    assert_eq!(page.status(), StatusCode::OK);
+    let html = body_text(page).await;
+    assert!(html.contains("name=\"customer_country\""), "{html}");
+    assert!(html.contains("<option value=\"US\">US</option>"), "{html}");
+    assert!(
+        html.contains("<option value=\"\" selected>Casa</option>"),
+        "{html}"
+    );
+    assert!(html.contains("name=\"customer_id_type\""), "{html}");
+    assert!(
+        html.contains("<option value=\"03\">Un pasaporte</option>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<script src=\"/p/-/country-names.js\" defer></script>"),
+        "{html}"
+    );
+
+    let script = app
+        .clone()
+        .oneshot(anonymous_get("/p/-/country-names.js"))
+        .await
+        .unwrap();
+    assert_eq!(script.status(), StatusCode::OK);
+    assert_eq!(
+        script
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok()),
+        Some("text/javascript; charset=utf-8")
+    );
+    assert!(body_text(script).await.contains("Intl.DisplayNames"));
+}
+
+/// When the command refuses (a mistyped number), the form comes back — and a foreign customer
+/// must still find their country and document pickers on it, or the retry declares them Spanish.
+#[tokio::test]
+async fn a_refused_attempt_brings_the_foreign_pickers_back() {
+    let app = make_app().await;
+    let resp = app
+        .clone()
+        .oneshot(mint_request(
+            "*",
+            json!({
+                "kind": "invoice_request",
+                "subject_id": "ticket-retry",
+                "command": "catalog.item.create",
+                "sealed_payload": {},
+                "public_fields": ["name", "customer_country", "customer_id_type"],
+                "public_field_choices": country_choices(),
+            }),
+        ))
+        .await
+        .unwrap();
+    let locator = body_json(resp).await["locator"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // No `name`: the command's NOT NULL refuses it, which is the door's retry path.
+    let retry = app
+        .clone()
+        .oneshot(anonymous_post(
+            &format!("/p/{locator}"),
+            "customer_country=US",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(retry.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let html = body_text(retry).await;
+    assert!(html.contains("<form method=\"post\""), "{html}");
+    assert!(html.contains("name=\"customer_country\""), "{html}");
+    assert!(html.contains("name=\"customer_id_type\""), "{html}");
 }
 
 /// The customer never chose a locale. Spanish by default, English on request — both real pages.

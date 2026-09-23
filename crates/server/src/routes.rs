@@ -500,6 +500,8 @@ pub fn app(state: AppState) -> Router {
             "/p/:locator",
             get(public_door::show).post(public_door::redeem),
         )
+        // sales#335 — the one script `/p/:locator` may load; must equal `NAMES_SCRIPT_PATH`.
+        .route("/p/-/country-names.js", get(public_door::names_script))
         .route("/api/hub/public-claims", post(public_door::mint_claim))
         .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))

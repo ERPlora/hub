@@ -74,6 +74,11 @@ pub struct NewClaim {
     /// The payload keys the visitor is allowed to fill. Anything else they submit is dropped, not
     /// rejected — a form that 400s on an extra field is a form that breaks on the next browser.
     pub public_fields: Vec<String>,
+    /// What the minter offers as answers for some of `public_fields` (sales#335), keyed by field:
+    /// `{label: {en, es}, names?: "region", options: [value | {value, label: {en, es}}]}`. Opaque
+    /// to the core beyond rendering it — which answers a regime accepts is the module's knowledge
+    /// (hub#1407). `{}` when the minter offers none.
+    pub field_choices: Json,
     /// When it stops being redeemable (RFC-3339). `None` → [`DEFAULT_TTL_DAYS`] from `now`.
     pub expires_at: Option<String>,
     /// `hub_user.id` of whoever minted it, for the audit trail. Empty when the runtime did.
@@ -89,6 +94,7 @@ pub struct Claim {
     pub command: String,
     pub sealed_payload: Json,
     pub public_fields: Vec<String>,
+    pub field_choices: Json,
     pub expires_at: String,
     /// `Some` once somebody has spent it. A spent claim is still readable on purpose: the visitor
     /// who refreshes the page must see their invoice, not a 404.
@@ -242,7 +248,7 @@ pub async fn mint(db: &dyn DatabaseAdapter, hub_id: &str, spec: NewClaim) -> Res
     );
     p.insert(
         "public_fields".into(),
-        json!(json!(spec.public_fields).to_string()),
+        json!(stored_fields(&spec.public_fields, &spec.field_choices).to_string()),
     );
     p.insert("expires_at".into(), json!(expires_at));
     p.insert("created_by".into(), json!(spec.created_by));
@@ -284,15 +290,22 @@ pub async fn find(db: &dyn DatabaseAdapter, hub_id: &str, raw: &str) -> Result<O
     let Some(row) = res.rows.first() else {
         return Ok(None);
     };
+    let stored = parse_json(&str_of(row, "public_fields"));
     Ok(Some(Claim {
         id: str_of(row, "id"),
         kind: str_of(row, "kind"),
         subject_id: str_of(row, "subject_id"),
         command: str_of(row, "command"),
         sealed_payload: parse_json(&str_of(row, "sealed_payload")).unwrap_or_else(|| json!({})),
-        public_fields: parse_json(&str_of(row, "public_fields"))
+        public_fields: fields_of(&stored)
             .and_then(|v| serde_json::from_value(v).ok())
             .unwrap_or_default(),
+        field_choices: stored
+            .as_ref()
+            .and_then(|v| v.get("choices"))
+            .filter(|c| c.is_object())
+            .cloned()
+            .unwrap_or_else(|| json!({})),
         expires_at: str_of(row, "expires_at"),
         redeemed_at: row
             .get("redeemed_at")
@@ -427,6 +440,25 @@ fn str_of(row: &Json, key: &str) -> String {
         .to_string()
 }
 
+/// The `public_fields` column. Without choices it is the plain array of names every hub has always
+/// written; with them (sales#335) it is `{"fields": [...], "choices": {...}}` — same column, no
+/// migration, and a row written before choices existed reads back exactly as it did.
+fn stored_fields(fields: &[String], choices: &Json) -> Json {
+    match choices.as_object() {
+        Some(map) if !map.is_empty() => json!({ "fields": fields, "choices": choices }),
+        _ => json!(fields),
+    }
+}
+
+/// The names half of [`stored_fields`], whichever shape the row has.
+fn fields_of(stored: &Option<Json>) -> Option<Json> {
+    match stored {
+        Some(Json::Array(_)) => stored.clone(),
+        Some(obj @ Json::Object(_)) => obj.get("fields").cloned(),
+        _ => None,
+    }
+}
+
 fn parse_json(raw: &str) -> Option<Json> {
     serde_json::from_str(raw).ok()
 }
@@ -513,6 +545,7 @@ mod tests {
                 "customer_name".into(),
                 "customer_address".into(),
             ],
+            field_choices: json!({}),
             expires_at: None,
             created_by: String::new(),
         }
@@ -563,6 +596,59 @@ mod tests {
 
     /// **Reprinting a lost ticket must yield the same locator**, or the copy the customer already
     /// holds stops working. Minting is idempotent for that reason, deadline included.
+    #[tokio::test]
+    async fn the_choices_the_minter_offers_come_back_with_the_claim() {
+        // sales#335 — the MODULE says which answers a field accepts (a regime's country list is
+        // not the core's to know, hub#1407); the core stores and returns them untouched.
+        let db = claim_db().await;
+        let mut spec = ticket_claim();
+        spec.public_fields.push("customer_country".into());
+        let choices = json!({
+            "customer_country": {
+                "label": {"en": "Country", "es": "País"},
+                "names": "region",
+                "options": [{"value": "", "label": {"en": "Spain", "es": "España"}}, "US", "DE"],
+            }
+        });
+        spec.field_choices = choices.clone();
+        let locator = mint(&db, "h1", spec).await.unwrap();
+        let claim = find(&db, "h1", &locator).await.unwrap().unwrap();
+        assert_eq!(claim.field_choices, choices);
+        assert_eq!(
+            claim.public_fields,
+            vec![
+                "customer_tax_id".to_string(),
+                "customer_name".into(),
+                "customer_address".into(),
+                "customer_country".into(),
+            ],
+            "the names the visitor may fill are unchanged by carrying choices"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_claim_minted_before_choices_existed_reads_as_it_always_did() {
+        let db = claim_db().await;
+        let locator = mint(&db, "h1", ticket_claim()).await.unwrap();
+        let claim = find(&db, "h1", &locator).await.unwrap().unwrap();
+        assert_eq!(claim.public_fields.len(), 3);
+        assert_eq!(claim.field_choices, json!({}));
+        // And the row keeps the exact shape older hubs wrote: a plain JSON array of names.
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!("h1"));
+        let raw = db
+            .query(
+                "SELECT public_fields FROM _public_claim WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            str_of(&raw.rows[0], "public_fields"),
+            r#"["customer_tax_id","customer_name","customer_address"]"#
+        );
+    }
+
     #[tokio::test]
     async fn minting_twice_for_the_same_ticket_returns_the_same_locator() {
         let db = claim_db().await;
@@ -684,6 +770,7 @@ mod tests {
             command: "invoice.substitute".into(),
             sealed_payload: json!({"original_invoice_id": "f2-0001", "items": [{"unit_price": 1500}]}),
             public_fields: vec!["customer_tax_id".into(), "customer_name".into()],
+            field_choices: json!({}),
             expires_at: "2099-01-01T00:00:00Z".into(),
             redeemed_at: None,
             result_ref: String::new(),
@@ -723,6 +810,7 @@ mod tests {
             command: "invoice.substitute".into(),
             sealed_payload: json!({}),
             public_fields: vec!["customer_tax_id".into(), "customer_address".into()],
+            field_choices: json!({}),
             expires_at: "2099-01-01T00:00:00Z".into(),
             redeemed_at: None,
             result_ref: String::new(),
