@@ -153,6 +153,57 @@ fi
 
 declared=$(printf '%s\n' "$declared_raw" | grep -v '^$' | uniq)
 
+# ── `# pending-publication: <repo>#<n>` — a NEW battery whose module has not published it yet ──
+# Without it a battery that retires no hub e2e could never land: the module's gate
+# (module-toolkit#163) refuses it until this list on `develop` declares it, and the "declared but
+# not published" direction below refuses the declaration until the module's `main` publishes it
+# (kitchen#84). The marker lives on its OWN comment line, right above the entry, because the
+# module's gate compares whole lines and a trailing `# …` would hide the declaration from it.
+#
+# It excuses exactly ONE thing — that entry missing from the catalogue — and names the issue that
+# publishes it. A marker without `<repo>#<n>`, or with no entry right below it, is refused: a
+# pending line nobody owns, or one that slid onto the wrong entry after an edit, is how the
+# hub#1381 direction would go quiet.
+pending=""
+pending_notes=""
+marker_issue=""
+while IFS= read -r line || [ -n "$line" ]; do
+    trimmed=$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    if [ -n "$marker_issue" ]; then
+        case "$trimmed" in
+            ('' | '#'*)
+                failures="$failures
+  - a \`# pending-publication: $marker_issue\` marker with no entry right below it:
+      the marker excuses the line directly under it and nothing else"
+                ;;
+            (*)
+                entry=$(printf '%s' "$trimmed" | sed 's/[[:space:]]*#.*$//')
+                pending="$pending$entry
+"
+                pending_notes="$pending_notes$entry ($marker_issue)
+"
+                ;;
+        esac
+        marker_issue=""
+    fi
+    case "$trimmed" in
+        ('# pending-publication:'*)
+            marker_issue=$(printf '%s' "${trimmed#\# pending-publication:}" | sed 's/^[[:space:]]*//')
+            if ! grep -Eq '^[A-Za-z0-9_./-]+#[0-9]+$' <<<"$marker_issue"; then
+                failures="$failures
+  - a \`# pending-publication:\` marker must name the issue that publishes the battery as
+    \`<repo>#<n>\`, got: '$marker_issue'"
+                marker_issue=""
+            fi
+            ;;
+    esac
+done <"$manifest"
+if [ -n "$marker_issue" ]; then
+    failures="$failures
+  - a \`# pending-publication: $marker_issue\` marker at the end of the list, with no entry below it"
+fi
+pending=$(printf '%s' "$pending" | grep -v '^$' | LC_ALL=C sort -u || true)
+
 # ── A declared module that never materialised is the ENVIRONMENT, not the verdict ───────────
 # `materialize-published-modules.sh --floor 25` already fails on a catalogue that came up short,
 # but a single module missing from an otherwise full catalogue would land here as "its battery is
@@ -188,7 +239,13 @@ checkable=$(
         done | LC_ALL=C sort
 )
 
-missing=$(LC_ALL=C comm -23 <(printf '%s\n' "$checkable" | grep -v '^$') \
+missing_all=$(LC_ALL=C comm -23 <(printf '%s\n' "$checkable" | grep -v '^$') \
+    <(printf '%s\n' "$discovered" | grep -v '^$'))
+missing=$(LC_ALL=C comm -23 <(printf '%s\n' "$missing_all" | grep -v '^$') \
+    <(printf '%s\n' "$pending" | grep -v '^$'))
+# Pending AND already published: the marker is stale. A notice, never a red — a red here would
+# land in the push of whoever comes after the module's merge, the inventory#77 crater.
+published_pending=$(LC_ALL=C comm -12 <(printf '%s\n' "$pending" | grep -v '^$') \
     <(printf '%s\n' "$discovered" | grep -v '^$'))
 undeclared=$(LC_ALL=C comm -13 <(printf '%s\n' "$declared" | grep -v '^$') \
     <(printf '%s\n' "$discovered" | grep -v '^$'))
@@ -230,6 +287,18 @@ if [ -n "$failures" ]; then
         printf 'checkable is how 391 lines of `services` coverage ended up running nowhere (hub#1381).\n'
     } >&2
     exit 1
+fi
+
+# One line per pending entry, with a stable prefix a reader (or a test) can match: still waiting
+# for its module, or already published and carrying a marker that should go.
+if [ -n "$pending_notes" ]; then
+    printf '%s' "$pending_notes" | grep -v '^$' | while IFS= read -r note; do
+        if grep -Fxq "${note%% (*}" <<<"$published_pending"; then
+            printf 'module-hub-batteries: stale-pending-publication: %s — published, drop the marker\n' "$note"
+        else
+            printf 'module-hub-batteries: pending-publication: %s — declared, not run until published\n' "$note"
+        fi
+    done >&2
 fi
 
 # The worklist. By default one line per MODULE, not per battery: a module is ONE unit of work —
