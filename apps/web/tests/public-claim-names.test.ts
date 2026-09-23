@@ -71,4 +71,18 @@ describe('public claim page — country names (sales#335)', () => {
     expect(() => new Function(SCRIPT)()).not.toThrow();
     expect(document.body.innerHTML).toBe('<form><input name="customer_tax_id"></form>');
   });
+
+  it('keeps naming the others when one code is not a region the browser can name', () => {
+    // A module may put `names: "region"` on a select whose values are not all ISO regions
+    // (`Intl.DisplayNames.of` throws a RangeError on a malformed code such as `USA`); one bad
+    // value must not leave the rest unnamed and unsorted, nor the page with an uncaught error.
+    document.documentElement.lang = 'es';
+    document.body.innerHTML =
+      '<select id="f-customer_country" data-names="region"><option value="" selected>España</option>' +
+      '<option value="USA">USA</option><option value="US">US</option><option value="DE">DE</option></select>';
+    expect(() => new Function(SCRIPT)()).not.toThrow();
+    const select = document.getElementById('f-customer_country') as HTMLSelectElement;
+    const names = new Intl.DisplayNames(['es'], { type: 'region' });
+    expect(labels(select)).toEqual(['España', names.of('DE'), names.of('US'), 'USA']);
+  });
 });

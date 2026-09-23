@@ -22,7 +22,14 @@
     for (var i = 1; i < select.options.length; i++) {
       var option = select.options[i];
       if (option.value && option.textContent === option.value) {
-        var name = names.of(option.value);
+        // `of` throws on a value that is not a well-formed region code: that option keeps its
+        // value as its label and the others are still named.
+        var name;
+        try {
+          name = names.of(option.value);
+        } catch (e) {
+          name = undefined;
+        }
         if (name) option.textContent = name;
       }
       rest.push(option);
