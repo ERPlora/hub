@@ -86,8 +86,11 @@ make_manifest() { # $1=file, rest=declared `<module-id>/<battery path>` entries
 out=""
 err=""
 rc=0
+# Every run is pinned to one "today" so the `until` of a pending-publication marker (hub#1994) is
+# measured against a fixed clock, never the machine's.
+today=2026-09-23
 run_guard() { # $1=catalogue, $2=manifest
-    out=$("$script" --catalogue "$1" --manifest "$2" 2>"$tmp_dir/stderr")
+    out=$("$script" --catalogue "$1" --manifest "$2" --today "$today" 2>"$tmp_dir/stderr")
     rc=$?
     err=$(cat "$tmp_dir/stderr")
     return 0
@@ -429,11 +432,11 @@ rm -rf "$catalogue"
 make_module "$catalogue" kitchen "tests/tickets.hub.test.py"   # the new battery is NOT published yet
 cat > "$manifest" <<'EOF'
 kitchen/tests/tickets.hub.test.py
-# pending-publication: kitchen#84
+# pending-publication: kitchen#84 until 2026-10-01
 kitchen/tests/closed_check.hub.test.py
 EOF
 
-out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries 2>"$tmp_dir/stderr")
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries --today "$today" 2>"$tmp_dir/stderr")
 rc=$?
 err=$(cat "$tmp_dir/stderr")
 [ "$rc" -eq 0 ] || fail "a declared battery marked pending-publication must not fail the pair, got $rc"
@@ -444,7 +447,7 @@ ok
 grep -Fq 'kitchen/tests/closed_check.hub.test.py' <<<"$err" || fail \
     "the pending battery must be named on stderr so it never goes quiet"
 ok
-grep -Fq 'pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84)' <<<"$err" || fail \
+grep -Fq 'pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84, until 2026-10-01)' <<<"$err" || fail \
     "the pending notice must name the battery and the issue that publishes it"
 ok
 if grep -Fq 'stale-pending-publication' <<<"$err"; then
@@ -464,7 +467,7 @@ ok
 
 # The marker excuses only the entry RIGHT BELOW it — not the next one down the file.
 cat > "$manifest" <<'EOF'
-# pending-publication: kitchen#84
+# pending-publication: kitchen#84 until 2026-10-01
 kitchen/tests/tickets.hub.test.py
 kitchen/tests/closed_check.hub.test.py
 EOF
@@ -492,7 +495,7 @@ done
 # refused too: it would read as a pending battery that excuses nothing, or — worse — the wrong
 # one after an edit.
 for gap in '' '# a comment'; do
-    printf 'kitchen/tests/tickets.hub.test.py\n# pending-publication: kitchen#84\n%s\nkitchen/tests/closed_check.hub.test.py\n' \
+    printf 'kitchen/tests/tickets.hub.test.py\n# pending-publication: kitchen#84 until 2026-10-01\n%s\nkitchen/tests/closed_check.hub.test.py\n' \
         "$gap" > "$manifest"
     run_guard "$catalogue" "$manifest"
     [ "$rc" -eq 1 ] || fail "a marker separated from its entry by '$gap' must exit 1, got $rc"
@@ -501,7 +504,7 @@ done
 cat > "$manifest" <<'EOF2'
 kitchen/tests/tickets.hub.test.py
 kitchen/tests/closed_check.hub.test.py
-# pending-publication: kitchen#84
+# pending-publication: kitchen#84 until 2026-10-01
 EOF2
 run_guard "$catalogue" "$manifest"
 [ "$rc" -eq 1 ] || fail "a dangling pending-publication marker at the end of the list must exit 1, got $rc"
@@ -513,10 +516,10 @@ ok
 make_module "$catalogue" kitchen "tests/closed_check.hub.test.py"
 cat > "$manifest" <<'EOF'
 kitchen/tests/tickets.hub.test.py
-# pending-publication: kitchen#84
+# pending-publication: kitchen#84 until 2026-10-01
 kitchen/tests/closed_check.hub.test.py
 EOF
-out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries 2>"$tmp_dir/stderr")
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries --today "$today" 2>"$tmp_dir/stderr")
 rc=$?
 err=$(cat "$tmp_dir/stderr")
 [ "$rc" -eq 0 ] || fail "a pending battery that got published must pass, got $rc"
@@ -525,8 +528,155 @@ ok
 kitchen/tests/tickets.hub.test.py" ] || fail \
     "a published pending battery must reach the worklist, got: $(printf '%s' "$out" | tr '\n' ' ')"
 ok
-grep -Fq 'stale-pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84)' <<<"$err" || fail \
+grep -Fq 'stale-pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84, until 2026-10-01)' <<<"$err" || fail \
     "a published battery still marked pending must get a stale-pending-publication notice"
+ok
+
+# ── 13 · A pending-publication marker EXPIRES (hub#1994) ─────────────────────────────────────
+# Case 12 lets a NEW battery land before its module publishes it. The price is a direction of the
+# pair that goes quiet: while it is pending, nothing runs it and the pass stays green. Without an
+# end date a marker whose module never publishes stays pending for months with no red and no
+# annotation anywhere — the same silence as hub#1381 (coverage nobody runs, both CIs green).
+#
+# So the marker carries its own deadline, `until <YYYY-MM-DD>`, at most 30 days ahead of the day
+# it is checked. Past it, an entry that is STILL unpublished is red (exit 1): the nightly opens its
+# alert issue, and the fix is a reviewable edit — publish the battery, or drop the entry. A
+# published one past its date is only the stale notice of case 12: it runs, nothing is hidden.
+catalogue="$tmp_dir/c13"
+manifest="$tmp_dir/m13.txt"
+rm -rf "$catalogue"
+make_module "$catalogue" kitchen "tests/tickets.hub.test.py"   # closed_check is NOT published
+write_pending() { # $1=the text after `pending-publication:`
+    printf 'kitchen/tests/tickets.hub.test.py\n# pending-publication: %s\nkitchen/tests/closed_check.hub.test.py\n' \
+        "$1" > "$manifest"
+}
+
+# The deadline itself is still inside the window: `until` names the LAST day the marker excuses.
+write_pending 'kitchen#84 until 2026-09-23'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "a marker on its own until day must still excuse the entry, got $rc"
+ok
+
+# One day past it, an unpublished entry is red — and the verdict names it and the issue.
+write_pending 'kitchen#84 until 2026-09-22'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "an EXPIRED marker on an unpublished battery must exit 1, got $rc"
+ok
+grep -Fq 'expired-pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84, until 2026-09-22)' <<<"$err" || fail \
+    "the expiry verdict must name the battery, the issue and the date it expired"
+ok
+[ -z "$out" ] || fail "an expired marker must print no worklist, got: $out"
+ok
+
+# Expiry compares DATES, not strings of any shape: a month boundary and a year boundary.
+today=2026-10-01
+write_pending 'kitchen#84 until 2026-09-30'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "until 2026-09-30 checked on 2026-10-01 is expired, got $rc"
+ok
+today=2027-01-01
+write_pending 'kitchen#84 until 2026-12-31'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "until 2026-12-31 checked on 2027-01-01 is expired, got $rc"
+ok
+write_pending 'kitchen#84 until 2027-01-31'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "until 2027-01-31 checked on 2027-01-01 (30 days ahead) is valid, got $rc"
+ok
+today=2026-09-23
+
+# A deadline further than 30 days out is refused: `until 2099-01-01` would be "never" in disguise.
+# 2026-10-23 is exactly 30 days after 2026-09-23 and is the last one allowed.
+write_pending 'kitchen#84 until 2026-10-23'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "a marker exactly 30 days ahead must be allowed, got $rc"
+ok
+for far in 2026-10-24 2099-01-01; do
+    write_pending "kitchen#84 until $far"
+    run_guard "$catalogue" "$manifest"
+    [ "$rc" -eq 1 ] || fail "a marker more than 30 days ahead (until $far) must exit 1, got $rc"
+    ok
+done
+
+# A marker with no deadline, or one that is not a real calendar date, is refused: an undated
+# marker is exactly the pending-forever this case exists to end.
+for bad in 'kitchen#84' 'kitchen#84 until' 'kitchen#84 until soon' 'kitchen#84 until 2026-9-30' \
+    'kitchen#84 by 2026-09-30' 'kitchen#84 until 2026-09-30 or later'; do
+    write_pending "$bad"
+    run_guard "$catalogue" "$manifest"
+    [ "$rc" -eq 1 ] || fail "a marker without a valid 'until <YYYY-MM-DD>' ('$bad') must exit 1, got $rc"
+    ok
+done
+# Impossible calendar dates, each checked on a day where — read as the day it would roll over to —
+# it would be in the window and unexpired. Otherwise the expiry or the horizon would put them red
+# and the date validation itself would go untested.
+for pair in '2026-02-20 2026-02-30' '2026-02-20 2026-02-29' '2026-12-20 2026-13-01' \
+    '2026-04-20 2026-04-31' '2026-09-20 2026-09-00'; do
+    today=${pair%% *}
+    write_pending "kitchen#84 until ${pair##* }"
+    run_guard "$catalogue" "$manifest"
+    [ "$rc" -eq 1 ] || fail "'until ${pair##* }' is not a calendar date (checked on $today), must exit 1, got $rc"
+    ok
+done
+# Positive control for the leap-year rule: February 29th exists in 2028 and in 2000.
+for pair in '2028-02-20 2028-02-29' '2000-02-20 2000-02-29'; do
+    today=${pair%% *}
+    write_pending "kitchen#84 until ${pair##* }"
+    run_guard "$catalogue" "$manifest"
+    [ "$rc" -eq 0 ] || fail "'until ${pair##* }' is a real leap day (checked on $today), must pass, got $rc"
+    ok
+done
+# The 30-day window across February of a century year that is NOT a leap year: 2100-02-20 to
+# 2100-03-22 is exactly 30 days (February 2100 has 28), so it is the last day allowed and the next
+# one is refused. A day count that treated 2100 as a leap year would get both wrong.
+today=2100-02-20
+write_pending 'kitchen#84 until 2100-03-22'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "2100-02-20 → 2100-03-22 is exactly 30 days and must pass, got $rc"
+ok
+write_pending 'kitchen#84 until 2100-03-23'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "2100-02-20 → 2100-03-23 is 31 days and must exit 1, got $rc"
+ok
+today=2026-09-23
+
+# Past its date but PUBLISHED: nothing is hidden, the battery runs — the stale notice of case 12,
+# never a red (that red would land in the push of whoever merges next, the inventory#77 crater).
+make_module "$catalogue" kitchen "tests/closed_check.hub.test.py"
+write_pending 'kitchen#84 until 2026-09-01'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "an expired marker on a PUBLISHED battery must not go red, got $rc"
+ok
+grep -Fq 'stale-pending-publication: kitchen/tests/closed_check.hub.test.py (kitchen#84, until 2026-09-01)' <<<"$err" || fail \
+    "an expired marker on a published battery must still get the stale notice"
+ok
+
+# Without `--today`, the guard reads the real clock (UTC). A marker dated today must pass, which
+# proves the default is wired, not that it happens to be some fixed day.
+rm -rf "$catalogue"
+make_module "$catalogue" kitchen "tests/tickets.hub.test.py"
+write_pending "kitchen#84 until $(date -u +%Y-%m-%d)"
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" 2>"$tmp_dir/stderr")
+rc=$?
+err=$(cat "$tmp_dir/stderr")
+[ "$rc" -eq 0 ] || fail "a marker dated today (real clock) must pass without --today, got $rc"
+ok
+
+# A malformed `--today` is the CALLER's error (exit 2), never a verdict on the list.
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --today yesterday 2>"$tmp_dir/stderr")
+rc=$?
+err=$(cat "$tmp_dir/stderr")
+[ "$rc" -eq 2 ] || fail "a malformed --today must exit 2, got $rc"
+ok
+
+# The shipped list obeys the same grammar: every marker in it carries a valid, in-window `until`.
+# Measured against its own catalogue-free shape — the markers are checked before any catalogue
+# comparison, so an empty catalogue with the list's modules is enough to surface a bad marker.
+shipped="$repo_root/scripts/ci/module-hub-batteries.txt"
+while IFS= read -r marker; do
+    grep -Eq '^# pending-publication: [A-Za-z0-9_./-]+#[0-9]+ until [0-9]{4}-[0-9]{2}-[0-9]{2}$' <<<"$marker" || \
+        fail "the shipped list carries a marker without 'until <YYYY-MM-DD>': $marker"
+done < <(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$shipped" | grep '^# pending-publication:' || true)
 ok
 
 printf 'PASS: %d module-hub-batteries guard cases\n' "$passed"
