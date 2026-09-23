@@ -385,6 +385,12 @@ pub async fn redeem(
                 &lang,
                 Body::Retry {
                     problem: detail,
+                    // hub#1989: what they typed comes back — only the fields they may fill.
+                    typed: form
+                        .fields
+                        .into_iter()
+                        .filter(|(key, _)| claim.public_fields.contains(key))
+                        .collect(),
                     fields: claim.public_fields.clone(),
                     choices: claim.field_choices.clone(),
                 },
@@ -507,6 +513,8 @@ enum Body {
     /// The form again, with what went wrong on top.
     Retry {
         problem: String,
+        /// What the visitor sent, already narrowed to the claim's `public_fields` (hub#1989).
+        typed: Typed,
         fields: Vec<String>,
         choices: Value,
     },
@@ -581,12 +589,15 @@ fn t(lang: &str, key: &str) -> &'static str {
 fn page(status: StatusCode, lang: &str, body: Body, locator: &str) -> Response {
     let title = esc(t(lang, "title"));
     let main = match &body {
-        Body::Form { fields, choices } => form_html(lang, locator, None, fields, choices),
+        Body::Form { fields, choices } => {
+            form_html(lang, locator, None, fields, choices, &Typed::new())
+        }
         Body::Retry {
             problem,
+            typed,
             fields,
             choices,
-        } => form_html(lang, locator, Some(problem), fields, choices),
+        } => form_html(lang, locator, Some(problem), fields, choices, typed),
         Body::Done { reference } => {
             let ref_line = if reference.is_empty() {
                 String::new()
@@ -627,21 +638,29 @@ fn form_html(
     problem: Option<&str>,
     fields: &[String],
     choices: &Value,
+    typed: &Typed,
 ) -> String {
     let warn = problem
         .map(|p| format!("<p class=\"warn\">{}</p>", esc(p)))
         .unwrap_or_default();
-    let (choice_selects, names_script) = choice_fields_html(lang, fields, choices);
+    let (choice_selects, names_script) = choice_fields_html(lang, fields, choices, typed);
+    // hub#1989: a refused attempt comes back with what was typed, as an attribute value — escaped.
+    let value = |field: &str| {
+        typed
+            .get(field)
+            .map(|v| format!(" value=\"{}\"", esc(v)))
+            .unwrap_or_default()
+    };
     format!(
         "<h1>{title}</h1><p>{intro}</p>{warn}\
 <p class=\"loc\"><span>{loc_label}</span><code>{locator}</code></p>\
 <form method=\"post\" action=\"{prefix}/{locator}?lang={lang}\">\
 <label for=\"tax\">{tax}</label>\
-<input id=\"tax\" name=\"customer_tax_id\" required autocomplete=\"off\" autocapitalize=\"characters\" spellcheck=\"false\">\
+<input id=\"tax\" name=\"customer_tax_id\"{tax_value} required autocomplete=\"off\" autocapitalize=\"characters\" spellcheck=\"false\">\
 <label for=\"name\">{name}</label>\
-<input id=\"name\" name=\"customer_name\" required autocomplete=\"organization\">\
+<input id=\"name\" name=\"customer_name\"{name_value} required autocomplete=\"organization\">\
 <label for=\"addr\">{address}</label>\
-<input id=\"addr\" name=\"customer_address\" autocomplete=\"street-address\">\
+<input id=\"addr\" name=\"customer_address\"{address_value} autocomplete=\"street-address\">\
 {choice_selects}\
 <button type=\"submit\">{submit}</button>\
 </form>{names_script}",
@@ -654,6 +673,9 @@ fn form_html(
         name = esc(t(lang, "name")),
         address = esc(t(lang, "address")),
         submit = esc(t(lang, "submit")),
+        tax_value = value("customer_tax_id"),
+        name_value = value("customer_name"),
+        address_value = value("customer_address"),
     )
 }
 
@@ -665,7 +687,12 @@ fn form_html(
 /// would be worse than no question). The first option is the default. `names: "region"` marks a
 /// select of ISO region codes the browser names ([`NAMES_SCRIPT`]); the second value says whether
 /// the page needs that script.
-fn choice_fields_html(lang: &str, fields: &[String], choices: &Value) -> (String, String) {
+fn choice_fields_html(
+    lang: &str,
+    fields: &[String],
+    choices: &Value,
+    typed: &Typed,
+) -> (String, String) {
     let mut html = String::new();
     let mut wants_names = false;
     for field in fields {
@@ -678,6 +705,22 @@ fn choice_fields_html(lang: &str, fields: &[String], choices: &Value) -> (String
         let names = spec.get("names").and_then(Value::as_str) == Some("region");
         wants_names |= names;
         let id = format!("f-{}", esc(field));
+        let value_of = |option: &Value| {
+            option
+                .as_str()
+                .or_else(|| option.get("value").and_then(Value::as_str))
+                .unwrap_or_default()
+                .to_string()
+        };
+        // The option the visitor chose stays chosen on a retry (hub#1989) — if it is one of the
+        // offered ones; otherwise the module's default (the first) is.
+        let chosen = typed
+            .get(field)
+            .filter(|v| options.iter().any(|o| value_of(o) == **v))
+            .cloned()
+            .unwrap_or_else(|| options.first().map(value_of).unwrap_or_default());
+        // One `selected` even if a module repeats a value.
+        let first_with = |v: &str| options.iter().position(|o| value_of(o) == v).unwrap_or(0);
         let rendered: String = options
             .iter()
             .enumerate()
@@ -690,7 +733,11 @@ fn choice_fields_html(lang: &str, fields: &[String], choices: &Value) -> (String
                     .get("label")
                     .and_then(|l| localized(l, lang))
                     .unwrap_or(value);
-                let selected = if i == 0 { " selected" } else { "" };
+                let selected = if value == chosen && i == first_with(value) {
+                    " selected"
+                } else {
+                    ""
+                };
                 format!(
                     "<option value=\"{}\"{selected}>{}</option>",
                     esc(value),
@@ -726,6 +773,9 @@ fn localized<'a>(label: &'a Value, lang: &str) -> Option<&'a str> {
         .or_else(|| label.get("en").and_then(Value::as_str))
         .filter(|s| !s.is_empty())
 }
+
+/// What the visitor typed, by field name (hub#1989).
+type Typed = std::collections::BTreeMap<String, String>;
 
 /// The one script the page may load, same-origin because `script-src 'self'` drops anything
 /// inline. It only puts names on the country codes; the form works without it.
@@ -776,7 +826,14 @@ mod tests {
     /// on the customer's phone.
     #[test]
     fn the_page_carries_no_script_at_all() {
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &[], &json!({}));
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &[],
+            &json!({}),
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<script"));
         assert!(!rendered.contains("onclick"));
         assert!(!rendered.contains("javascript:"));
@@ -785,7 +842,14 @@ mod tests {
     /// The locator comes off a URL a stranger typed; it reaches the page as text, never as markup.
     #[test]
     fn a_locator_cannot_inject_markup_into_the_page() {
-        let rendered = form_html("es", "<img src=x onerror=alert(1)>", None, &[], &json!({}));
+        let rendered = form_html(
+            "es",
+            "<img src=x onerror=alert(1)>",
+            None,
+            &[],
+            &json!({}),
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<img"));
         assert!(rendered.contains("&lt;img"));
     }
@@ -829,6 +893,7 @@ mod tests {
             None,
             &claim_fields(),
             &module_choices(),
+            &Typed::new(),
         );
         assert!(
             es.contains("<label for=\"f-customer_country\">País</label>"),
@@ -857,6 +922,7 @@ mod tests {
             None,
             &claim_fields(),
             &module_choices(),
+            &Typed::new(),
         );
         assert!(
             en.contains(">Country</label>") && en.contains(">A passport</option>"),
@@ -872,7 +938,14 @@ mod tests {
             "customer_country": {"label": {"en": "Country"}, "options": ["US"]},
             "customer_id_type": {"options": [{"value": "03", "label": {"en": "A passport"}}]},
         });
-        let es = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &choices);
+        let es = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &Typed::new(),
+        );
         assert!(es.contains(">Country</label>"), "{es}");
         assert!(es.contains(">customer_id_type</label>"), "{es}");
         assert!(
@@ -891,10 +964,24 @@ mod tests {
             "customer_name".into(),
             "customer_address".into(),
         ];
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &old, &module_choices());
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &old,
+            &module_choices(),
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<select"), "{rendered}");
         assert!(!rendered.contains("<script"), "{rendered}");
-        let plain = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &json!({}));
+        let plain = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &json!({}),
+            &Typed::new(),
+        );
         assert!(!plain.contains("<select"), "{plain}");
     }
 
@@ -907,7 +994,14 @@ mod tests {
                 "options": ["\"><script>alert(1)</script>", {"value": "a", "label": {"es": "<img src=x>"}}],
             }
         });
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &choices);
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<script>alert"), "{rendered}");
         assert!(
             !rendered.contains("<img") && !rendered.contains("<b>"),
@@ -925,6 +1019,7 @@ mod tests {
             None,
             &claim_fields(),
             &module_choices(),
+            &Typed::new(),
         );
         assert_eq!(rendered.matches("<script").count(), 1, "{rendered}");
         assert!(rendered.contains(&format!(
@@ -938,7 +1033,14 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("names");
-        let rendered = form_html("es", "ABCD1234ABCD1234", None, &claim_fields(), &no_region);
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &no_region,
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<script"), "{rendered}");
     }
 
@@ -968,6 +1070,97 @@ mod tests {
         assert_eq!(
             accepted_choices(&json!({"customer_country": "US"}), &fields),
             None
+        );
+    }
+
+    /// hub#1989 — on a retry the chosen option stays chosen; a value the module never offered
+    /// (a tampered POST) leaves the module's default explicitly selected, never no selection.
+    #[test]
+    fn a_retry_keeps_the_chosen_option_and_ignores_one_never_offered() {
+        let mut typed = Typed::new();
+        typed.insert("customer_country".into(), "DE".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            kept.contains("<option value=\"DE\" selected>DE</option>"),
+            "{kept}"
+        );
+        assert!(kept.contains("<option value=\"\">Casa</option>"), "{kept}");
+        typed.insert("customer_country".into(), "ZZ".into());
+        let tampered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            tampered.contains("<option value=\"\" selected>Casa</option>"),
+            "{tampered}"
+        );
+        assert!(!tampered.contains("ZZ"), "{tampered}");
+    }
+
+    /// hub#1989 — the three text fields come back on a retry, the address included (the issue
+    /// names it and nothing else asked for it), each one as an attribute value, never as markup.
+    #[test]
+    fn a_retry_keeps_the_address_and_the_rest_as_attribute_text() {
+        let mut typed = Typed::new();
+        typed.insert("customer_tax_id".into(), "B1234567X".into());
+        typed.insert("customer_name".into(), "Bar \"Pepe\" & Co".into());
+        typed.insert("customer_address".into(), "Calle Mayor 1 <b>2º</b>".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            kept.contains("name=\"customer_tax_id\" value=\"B1234567X\""),
+            "{kept}"
+        );
+        assert!(
+            kept.contains("name=\"customer_name\" value=\"Bar &quot;Pepe&quot; &amp; Co\""),
+            "{kept}"
+        );
+        assert!(
+            kept.contains(
+                "name=\"customer_address\" value=\"Calle Mayor 1 &lt;b&gt;2º&lt;/b&gt;\""
+            ),
+            "{kept}"
+        );
+        assert!(!kept.contains("<b>"), "{kept}");
+    }
+
+    /// hub#1989 — a module that repeats a value gets exactly one `selected`, on the first copy.
+    #[test]
+    fn a_repeated_option_value_is_selected_once() {
+        let choices = json!({
+            "customer_country": {"options": ["ES", "DE", "DE"]},
+        });
+        let mut typed = Typed::new();
+        typed.insert("customer_country".into(), "DE".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &typed,
+        );
+        assert_eq!(kept.matches(" selected").count(), 1, "{kept}");
+        assert!(
+            kept.contains("<option value=\"ES\">ES</option><option value=\"DE\" selected>DE</option><option value=\"DE\">DE</option>"),
+            "{kept}"
         );
     }
 
