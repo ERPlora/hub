@@ -71,6 +71,11 @@ on:
       # esperar a los 45 min del job de módulos: una PR que solo toque el corredor se entera aquí.
       - 'scripts/ci/run-module-hub-batteries.sh'
       - 'scripts/tests/run-module-hub-batteries.test.sh'
+      # El cerrojo entre las dos listas (hub#1995): una PR que borra un e2e del kernel no puede
+      # dejar su relevo «pendiente de publicar». Sus SUJETOS son las dos listas de arriba; estas
+      # rutas son para el cerrojo y su test, que no dispararían nada por su cuenta.
+      - 'scripts/ci/pending-publication-lock.sh'
+      - 'scripts/tests/pending-publication-lock.test.sh'
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
@@ -154,6 +159,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # En una PR el checkout es el merge commit: con profundidad 2 su primer padre (`HEAD^1`,
+          # la rama base) está a mano para el cerrojo de «pendiente de publicar» (hub#1995).
+          fetch-depth: 2
 
       # Pinned version + official downloader (a ~3 MB static Go binary; no
       # package manager involved, so it works the same on ci-runner-1 and on
@@ -301,6 +310,22 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/run-module-hub-batteries.test.sh
+
+      # ── Y el cerrojo entre las dos listas (hub#1995) ──────────────────────────────────
+      # La marca `# pending-publication:` (kitchen#84) sirve para baterías NUEVAS. Si la misma PR
+      # que borra un e2e del kernel la pone sobre su heredera, la cobertura no la corre nadie
+      # hasta que la marca caduca (hasta 30 días, hub#1994): el hueco de hub#1381 con plazo. Solo
+      # en PR, porque compara con la base: `HEAD^1` es el primer padre del merge commit.
+      - name: Cerrojo de «pendiente de publicar» (hub#1995)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/pending-publication-lock.test.sh
+
+      - name: Una PR que borra un e2e del kernel no deja su relevo pendiente (hub#1995)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          bash ./scripts/ci/pending-publication-lock.sh --base HEAD^1
 
       # ── El job que publica @erplora/module-sdk (hub#1308) ─────────────────────────────
       # El 403 de cada tag no era un permiso que faltara —el run imprime `Packages: write`—
