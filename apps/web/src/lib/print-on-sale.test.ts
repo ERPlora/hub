@@ -350,3 +350,57 @@ describe('a receipt that went out before its VeriFactu QR (hub#1867)', () => {
     expect(onPrintedWithoutFiscal).not.toHaveBeenCalled();
   });
 });
+
+// ERPlora/sales#283 — the «Print receipt» switch of the charge sheet. The till sends the cashier's
+// choice with the sale (`print_receipt`) and it wins over `auto_print_on_sale` for THAT sale, in
+// both directions (Square/Toast: the setting is the switch's default). Absent — every other
+// producer of sales — the setting decides exactly as before.
+describe('the charge sheet «Print receipt» switch (sales#283)', () => {
+  it('switched OFF with auto-print ON: no receipt', async () => {
+    const gate = fakeGate();
+    const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 1 } });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: false });
+
+    expect(gate.print).not.toHaveBeenCalled();
+  });
+
+  it('switched ON with auto-print OFF: the receipt is printed', async () => {
+    const gate = fakeGate();
+    const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 0 } });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: true });
+
+    expect(gate.print).toHaveBeenCalledTimes(1);
+    expect(gate.calls[0].data).toEqual(PAPER);
+  });
+
+  it('with no choice in the event the setting still decides', async () => {
+    for (const [setting, printed] of [[1, 1], [0, 0]] as const) {
+      const gate = fakeGate();
+      const { client, emit } = fakeClient({ settings: { auto_print_on_sale: setting } });
+      bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+      await emit({ sale_id: '42', print_receipt: 'yes' });
+      await emit({ sale_id: '43' });
+
+      expect(gate.print).toHaveBeenCalledTimes(printed * 2);
+    }
+  });
+
+  it('the switch is about the paper: the drawer opens whatever it says', async () => {
+    const gate = fakeGate();
+    const { client, openDrawer, emit } = fakeClient({
+      devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }],
+      settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
+    });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: false });
+
+    expect(gate.print).not.toHaveBeenCalled();
+    expect(openDrawer).toHaveBeenCalledWith('network:10.0.0.5:9100');
+  });
+});
