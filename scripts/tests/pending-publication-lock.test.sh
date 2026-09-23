@@ -232,6 +232,23 @@ run_lock --head pr-head
 [ "$status" -eq 2 ] || fail "a missing --base must exit 2, got $status (stderr: $err)"
 ok
 
+# ── 12 · A comment that merely MENTIONS the marker is not a marker → green ─────────────────
+# The real list documents the marker in its own header (`#     # pending-publication: kitchen#84
+# until …`). `module-hub-batteries.sh` only honours it at the start of the trimmed line, so a PR
+# that deletes a kernel e2e and adds a line of prose about the marker must stay green.
+new_repo
+commit_head "$kernel_without_redeem" '# Reviewed list of module batteries.
+# A NEW battery enters with `# pending-publication: <repo>#<n> until <date>` above its entry:
+#     # pending-publication: kitchen#84 until 2026-10-23
+#     kitchen/tests/closed_check.hub.test.py
+
+inventory/tests/combo_stock.hub.test.py
+kitchen/tests/tickets.hub.test.py
+services/tests/package_redeem.hub.test.py'
+run_lock --base pr-base --head pr-head
+[ "$status" -eq 0 ] || fail "prose that only mentions the marker is not a marker and must exit 0, got $status (stderr: $err)"
+ok
+
 # ── 11 · The caller really runs the lock on every pull request ─────────────────────────────
 # The lock only protects anything if a workflow that runs ON PULL REQUESTS executes it against
 # the PR's base. `test-hub-modules.yml` does not run on `pull_request` (2026-08-29), so the
