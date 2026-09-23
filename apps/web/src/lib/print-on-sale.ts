@@ -4,7 +4,8 @@
 //
 // Flujo: escucha el evento de dominio `sale.completed` (ADR-0010) → lee los ajustes de `printing`
 // → según los flags:
-//   - `auto_print_on_sale` → tique por la PUERTA GLOBAL (`erplora.print`), rol `receipt`. The paper
+//   - `auto_print_on_sale` (or the sale's own `print_receipt`, the till's switch — it wins, sales#283)
+//     → tique por la PUERTA GLOBAL (`erplora.print`), rol `receipt`. The paper
 //     is the one the ticket screen's print button prints, composed by the sales module
 //     (`saleDocument`, hub#1921) — never rebuilt here from the raw sale rows.
 //   - `open_drawer_on_sale` → kick del cajón por la impresora con rol `receipt` (hardware directo:
@@ -95,7 +96,10 @@ async function onSaleCompleted(client: ErploraClient, deps: Deps, payload: unkno
     return;
   }
   if (!settings) return;
-  const autoPrint = flag(settings.auto_print_on_sale);
+  // ERPlora/sales#283 — the charge sheet's «Print receipt» switch travels with the sale and wins
+  // over the setting for THAT sale, both ways (the setting is only the switch's default). A sale
+  // from anywhere else carries no choice, and then the setting decides as it always did.
+  const autoPrint = receiptChoiceOf(payload) ?? flag(settings.auto_print_on_sale);
   const openDrawer = flag(settings.open_drawer_on_sale);
   if (!autoPrint && !openDrawer) return;
 
@@ -183,6 +187,12 @@ function saleIdOf(payload: unknown): string | undefined {
 
 function first<T>(v: T[] | T | undefined): T | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+/** The cashier's receipt choice for this sale (sales#283). Only a real boolean counts. */
+function receiptChoiceOf(payload: unknown): boolean | undefined {
+  const v = payload && typeof payload === 'object' ? (payload as Record<string, unknown>).print_receipt : undefined;
+  return typeof v === 'boolean' ? v : undefined;
 }
 
 function flag(v: unknown): boolean {
