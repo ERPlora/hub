@@ -521,6 +521,91 @@ async fn a_refused_attempt_brings_the_foreign_pickers_back() {
     assert!(html.contains("name=\"customer_id_type\""), "{html}");
 }
 
+/// hub#1989 — a refused attempt (a mistyped number) must bring the form back with what the
+/// customer typed, so they fix only what is wrong. Only fields the claim lets them fill come back
+/// (a sealed key they posted is not echoed as if it were theirs), the chosen option stays chosen,
+/// and every value reaches the page as text, never as markup.
+#[tokio::test]
+async fn a_refused_attempt_keeps_what_the_customer_typed() {
+    let app = make_app().await;
+    let resp = app
+        .clone()
+        .oneshot(mint_request(
+            "*",
+            json!({
+                "kind": "invoice_request",
+                "subject_id": "ticket-retry-values",
+                "command": "catalog.item.create",
+                // No `name` sealed and none declared: the command's NOT NULL refuses the attempt.
+                "sealed_payload": {},
+                "public_fields": ["customer_tax_id", "customer_name", "customer_country"],
+                "public_field_choices": country_choices(),
+            }),
+        ))
+        .await
+        .unwrap();
+    let locator = body_json(resp).await["locator"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let retry = app
+        .clone()
+        .oneshot(anonymous_post(
+            &format!("/p/{locator}"),
+            "customer_tax_id=B1234567X\
+             &customer_name=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E\
+             &customer_address=Calle+Undeclared+1\
+             &customer_country=US\
+             &original_invoice_id=EVIL-SEALED",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(retry.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let html = body_text(retry).await;
+    assert!(
+        html.contains("value=\"B1234567X\""),
+        "the tax id comes back: {html}"
+    );
+    assert!(
+        html.contains("value=\"&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;\""),
+        "the name comes back, escaped: {html}"
+    );
+    assert!(!html.contains("<script>alert"), "{html}");
+    assert!(
+        html.contains("<option value=\"US\" selected>US</option>"),
+        "the chosen country stays chosen: {html}"
+    );
+    assert!(
+        !html.contains("<option value=\"\" selected>"),
+        "and the default is no longer the selected one: {html}"
+    );
+    assert!(
+        !html.contains("Calle Undeclared 1"),
+        "a field the claim does not let them fill is not echoed: {html}"
+    );
+    assert!(
+        !html.contains("EVIL-SEALED"),
+        "a sealed key is never echoed: {html}"
+    );
+}
+
+/// The first view of the form is still empty: nothing is pre-filled before anybody typed.
+#[tokio::test]
+async fn the_first_view_of_the_form_is_empty() {
+    let app = make_app().await;
+    let locator = mint(&app, "ticket-first-view").await;
+    let html = body_text(
+        app.clone()
+            .oneshot(anonymous_get(&format!("/p/{locator}")))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(!html.contains(" value=\"B"), "{html}");
+    assert!(html.contains("name=\"customer_tax_id\""), "{html}");
+}
+
 /// The customer never chose a locale. Spanish by default, English on request — both real pages.
 #[tokio::test]
 async fn the_page_is_served_in_spanish_and_in_english() {
