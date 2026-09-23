@@ -756,7 +756,7 @@ fn is_foreign_prefixed_tax_id(id: &str) -> bool {
 /// `SuministroInformacion.xsd`) minus `ES` — mirrored here so a foreign form this field accepts
 /// is exactly a foreign form the AEAT would carry, and no more. Sorted for `binary_search`.
 #[rustfmt::skip]
-const AEAT_COUNTRY_CODES: &[&str] = &[
+pub const AEAT_COUNTRY_CODES: &[&str] = &[
     "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR",
     "AS", "AT", "AU", "AW", "AZ", "BA", "BB", "BD", "BE", "BF",
     "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BQ", "BR", "BS",

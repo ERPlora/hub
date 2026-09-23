@@ -500,6 +500,7 @@ pub fn app(state: AppState) -> Router {
             "/p/:locator",
             get(public_door::show).post(public_door::redeem),
         )
+        .route(public_door::NAMES_SCRIPT_PATH, get(public_door::names_script))
         .route("/api/hub/public-claims", post(public_door::mint_claim))
         .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))
