@@ -59,11 +59,11 @@ describe('public claim page — country names (sales#335)', () => {
     document.body.innerHTML =
       '<select id="a" data-names="region"><option value="" selected>Casa</option>' +
       '<option value="FR">Mi Francia</option><option value="DE">DE</option></select>' +
-      '<select id="b"><option value="US">US</option></select>';
+      '<select id="b"><option value="">-</option><option value="US">US</option></select>';
     new Function(SCRIPT)();
     const a = document.getElementById('a') as HTMLSelectElement;
     expect(labels(a)).toEqual(['Casa', new Intl.DisplayNames(['es'], { type: 'region' }).of('DE'), 'Mi Francia']);
-    expect(labels(document.getElementById('b') as HTMLSelectElement)).toEqual(['US']);
+    expect(labels(document.getElementById('b') as HTMLSelectElement)).toEqual(['-', 'US']);
   });
 
   it('leaves the page alone when it has no country picker', () => {
