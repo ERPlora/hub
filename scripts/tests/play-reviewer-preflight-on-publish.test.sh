@@ -18,6 +18,8 @@
 #                                    already answers `missing_credentials` naming the variables,
 #                                    and that red is the point (same rule as `FLEET_API_KEY`).
 #   · password written in the YAML → a secret in the file is a public secret.
+#   · `run: … || true`, `set +e`   → the script says NO and the step stays green: same silent
+#                                    failure as `continue-on-error`, one line lower (rv-1993).
 #   · without `actions/checkout`   → the script does not exist on the runner.
 #
 # Hermetic: reads the workflow, never runs it. Wired in `.github/workflows/actionlint.yml`.
@@ -102,6 +104,16 @@ if [ -n "$step" ] && grep -qE '^[[:space:]]+if:' <<<"$step"; then
         "un \`if:\` convierte la falta de configuración en un salto mudo; el control ya sale rojo \`missing_credentials\`"
 else
     ok "el paso de la guardia no se puede saltar con un \`if:\`"
+fi
+
+# The `run:` must be the bare script on one line: `|| true`, `; exit 0` or a `run: |` block with
+# `set +e` let the script say NO while the step turns green — the same silent failure as
+# `continue-on-error`, one line lower. Only its exit code decides, so nothing may sit around it.
+if [ -n "$step" ] && grep -qE "^[[:space:]]+run:[[:space:]]*python3[[:space:]]+${SCRIPT}[[:space:]]*$" <<<"$step"; then
+    ok "el \`run:\` es solo el script: su código de salida decide"
+else
+    bad "el \`run:\` es solo el script: su código de salida decide" \
+        "con \`|| true\`, \`exit 0\` o \`set +e\` alrededor, el control dice NO y el paso sale verde igual"
 fi
 
 if grep -qE 'PLAY_REVIEWER_PASSWORD:[[:space:]]*\$\{\{[[:space:]]*secrets\.PLAY_REVIEWER_PASSWORD[[:space:]]*\}\}' <<<"$step"; then
