@@ -263,10 +263,15 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
                 .to_string(),
         ));
     }
+    if doc == DocumentType::Invoice {
+        check_full_invoice(data)?;
+    }
     let mut b = EscposBuilder::new();
     match doc {
-        // invoice == receipt (`_print_invoice` delega en `_print_receipt`).
-        DocumentType::Receipt | DocumentType::Invoice => render_receipt(&mut b, data),
+        DocumentType::Receipt => render_receipt(&mut b, data, Fiscal::Ticket),
+        // hub#2005 — the same body as the ticket (lines, totals, QR, duplicate mark) plus what
+        // makes it a FULL invoice; see [`check_full_invoice`] for the fields it reads.
+        DocumentType::Invoice => render_receipt(&mut b, data, Fiscal::FullInvoice),
         // NOT an arm of `render_receipt` with a flag: what the bill must not print is precisely
         // what a receipt exists to print, so sharing the body would put the fiscal furniture one
         // forgotten `if` away from the paper the waiter hands over.
@@ -390,6 +395,12 @@ enum Label {
     Change,
     Thanks,
     Duplicate,
+    // The full invoice (hub#2005).
+    InvoiceTitle,
+    InvoiceNumber,
+    BreakdownRate,
+    BreakdownBase,
+    BreakdownTax,
     // The bill taken to the table.
     BillTitle,
     TableOrCustomer,
@@ -489,6 +500,13 @@ impl Locale {
             Label::Thanks => ("Thank you for your purchase", "Gracias por su compra"),
             // RD 1619/2012 art. 14.4: every copy after the original says «duplicado».
             Label::Duplicate => ("DUPLICATE", "DUPLICADO"),
+            Label::InvoiceTitle => ("INVOICE", "FACTURA"),
+            Label::InvoiceNumber => ("Invoice: ", "Factura: "),
+            // The three columns of the VAT breakdown; «Cuota» is what a Spanish invoice calls the
+            // tax amount of a rate.
+            Label::BreakdownRate => ("Rate", "Tipo"),
+            Label::BreakdownBase => ("Base", "Base"),
+            Label::BreakdownTax => ("Tax", "Cuota"),
             Label::BillTitle => ("BILL", "CUENTA"),
             Label::TableOrCustomer => ("Table/Customer: ", "Mesa/Cliente: "),
             // The notice is what keeps this paper from passing for an invoice, so it has a
@@ -562,8 +580,118 @@ fn modifier_lines(item: &serde_json::Value) -> Vec<String> {
 
 // ─── Renderizadores de documento (porta `printer.py`) ────────────────────────
 
-/// Porta `_print_receipt`.
-fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
+/// Which fiscal paper [`render_receipt`] cuts: the ticket (simplified invoice) or the full invoice.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fiscal {
+    Ticket,
+    FullInvoice,
+}
+
+/// Width of the rate column of the VAT breakdown; the base and the quota take 12 columns each, so
+/// a row fills the 32 of the roll exactly.
+const BREAKDOWN_RATE_WIDTH: usize = LINE_WIDTH - 2 * BREAKDOWN_AMOUNT_WIDTH;
+const BREAKDOWN_AMOUNT_WIDTH: usize = 12;
+
+/// **What a `invoice` must carry to be printed as a FULL invoice on the roll** (hub#2005).
+///
+/// `invoice` used to fall into the ticket's body, which reads neither the customer's tax id nor a
+/// per-rate breakdown: a customer who asked for their invoice took home a ticket, and nothing said
+/// so. Spanish tills (Ágora, Revo, Glop) print the full invoice on the 80 mm roll, and it is valid
+/// as long as it carries every datum RD 1619/2012 art. 6 asks for. So the document either brings
+/// them or is REFUSED here, naming the field — the print host reports the refusal instead of
+/// cutting a mute ticket. The contract (field → paper):
+///
+/// | Field | Required | Paper |
+/// |---|---|---|
+/// | `vat_number` | yes | issuer's tax id, under the business name |
+/// | `receipt_id` | yes | `Factura: <number>` |
+/// | `customer_name` | yes | `Cliente: <name>` |
+/// | `customer_tax_id` | yes | `NIF: <tax id>`, right under the name |
+/// | `customer_address` | no | `Dir: <address>`, under the tax id |
+/// | `tax_breakdown` | yes, non-empty array | one row per rate: `{ rate, base, tax, label? }` |
+///
+/// `rate` is the percentage (`21`, `5.2`), `base` and `tax` are amounts in the document's unit
+/// (the same as `total`), and `label` overrides the row's name (`RE 5.2%` for a surcharge; the
+/// default is `IVA <rate>%`). The rest of the fields are the ticket's.
+fn check_full_invoice(data: &serde_json::Value) -> Result<()> {
+    let refuse = |field: &str, what: &str| {
+        Err(crate::PeripheralError::InvalidPayload(format!(
+            "a full invoice needs `{field}` ({what})"
+        )))
+    };
+    for (field, what) in [
+        ("vat_number", "the issuer's tax id"),
+        ("receipt_id", "the invoice number"),
+        ("customer_name", "the customer's name"),
+        ("customer_tax_id", "the customer's tax id"),
+    ] {
+        if str_field(data, field, "").trim().is_empty() {
+            return refuse(field, what);
+        }
+    }
+    let rows = data.get("tax_breakdown").and_then(|v| v.as_array());
+    let valid = rows.is_some_and(|rows| {
+        !rows.is_empty()
+            && rows.iter().all(|row| {
+                ["rate", "base", "tax"]
+                    .iter()
+                    .all(|k| row.get(k).and_then(|v| v.as_f64()).is_some())
+            })
+    });
+    if !valid {
+        return refuse(
+            "tax_breakdown",
+            "a non-empty array of `{ rate, base, tax }`, one per VAT rate",
+        );
+    }
+    Ok(())
+}
+
+/// A rate as a person writes it: `21`, `5.2` — not `21.00` or `5.20`.
+fn fmt_rate(rate: f64) -> String {
+    let s = format!("{rate:.2}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+/// The VAT breakdown of a full invoice: a header naming the columns and one row per rate, the
+/// amounts right-aligned in fixed columns so the bases and the quotas read as two columns. A
+/// label wider than its column gets a line of its own rather than pushing the amounts out.
+fn render_tax_breakdown(b: &mut EscposBuilder, data: &serde_json::Value, t: Locale) {
+    let Some(rows) = data.get("tax_breakdown").and_then(|v| v.as_array()) else {
+        return;
+    };
+    let row_line = |name: &str, base: &str, tax: &str| {
+        format!(
+            "{name:<rate_w$}{base:>amount_w$}{tax:>amount_w$}\n",
+            rate_w = BREAKDOWN_RATE_WIDTH,
+            amount_w = BREAKDOWN_AMOUNT_WIDTH
+        )
+    };
+    b.set(Align::Left, false, false, false);
+    b.text(&row_line(
+        t.label(Label::BreakdownRate),
+        t.label(Label::BreakdownBase),
+        t.label(Label::BreakdownTax),
+    ));
+    for row in rows {
+        let num = |k: &str| row.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let name = match row.get("label").and_then(|v| v.as_str()).map(str::trim) {
+            Some(label) if !label.is_empty() => label.to_string(),
+            _ => format!("{} {}%", t.label(Label::Tax), fmt_rate(num("rate"))),
+        };
+        let (base, tax) = (format!("{:.2}", num("base")), format!("{:.2}", num("tax")));
+        if name.chars().count() > BREAKDOWN_RATE_WIDTH {
+            b.text(&format!("{name}\n"));
+            b.text(&row_line("", &base, &tax));
+        } else {
+            b.text(&row_line(&name, &base, &tax));
+        }
+    }
+    b.text("--------------------------------\n");
+}
+
+/// Porta `_print_receipt`; with [`Fiscal::FullInvoice`] it is also the full invoice (hub#2005).
+fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal) {
     let t = Locale::from_document(data);
 
     // The fiscal QR (VeriFactu, `qr_data`) OPENS the ticket (sales#339): the AEAT's QR
@@ -615,9 +743,20 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     b.text("================================\n");
 
+    // hub#2005 — the paper says what it is, before its data: the cheapest way to tell a full
+    // invoice from a ticket at a glance.
+    if kind == Fiscal::FullInvoice {
+        b.set(Align::Center, true, true, false);
+        b.text(&format!("{}\n", t.label(Label::InvoiceTitle)));
+    }
+
     b.set(Align::Left, false, false, false);
     let receipt_id = str_field(data, "receipt_id", "");
-    b.text(&format!("{}{receipt_id}\n", t.label(Label::Ticket)));
+    let number_label = match kind {
+        Fiscal::Ticket => Label::Ticket,
+        Fiscal::FullInvoice => Label::InvoiceNumber,
+    };
+    b.text(&format!("{}{receipt_id}\n", t.label(number_label)));
     b.text(&format!("{}{}\n", t.label(Label::Date), now_dmy_hm()));
 
     if is_truthy(data, "cashier") {
@@ -626,6 +765,15 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     if is_truthy(data, "customer_name") {
         b.text(&format!("{}{}\n", t.label(Label::Customer), str_field(data, "customer_name", "")));
+    }
+
+    // hub#2005 — the customer IDENTIFIED, right under their name. Only on the full invoice: the
+    // ticket's paper does not move.
+    if kind == Fiscal::FullInvoice {
+        b.text(&format!("{}{}\n", t.label(Label::VatNumber), str_field(data, "customer_tax_id", "")));
+        if is_truthy(data, "customer_address") {
+            b.text(&format!("{}{}\n", t.label(Label::Address), str_field(data, "customer_address", "")));
+        }
     }
 
     b.text("--------------------------------\n");
@@ -688,6 +836,10 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     }
 
     b.text("--------------------------------\n");
+
+    if kind == Fiscal::FullInvoice {
+        render_tax_breakdown(b, data, t);
+    }
 
     if let Some(subtotal) = data.get("subtotal").and_then(|v| v.as_f64()) {
         b.total_line(t.label(Label::Subtotal), subtotal);
@@ -1863,6 +2015,15 @@ mod tests {
             "items": [{ "name": "Cafe", "quantity": 2, "total": 2.4 }],
             "total": 2.4,
         });
+        // A full invoice is refused without its parties and its breakdown (hub#2005), so the
+        // invoice gets them here: what these tests look at is the mark, not the refusal.
+        if doc == DocumentType::Invoice {
+            for (k, v) in full_invoice().as_object().expect("an object") {
+                if data.get(k).is_none() {
+                    data[k] = v.clone();
+                }
+            }
+        }
         for (k, v) in extra.as_object().expect("extra fields are an object") {
             data[k] = v.clone();
         }
@@ -1888,8 +2049,8 @@ mod tests {
             assert!(lines[mark].1, "{doc:?}: the mark is printed in bold");
             let ticket = lines
                 .iter()
-                .position(|(text, _, _)| text.starts_with("Ticket: "))
-                .expect("the ticket number is on the paper");
+                .position(|(text, _, _)| text.contains("T-42"))
+                .expect("the document number is on the paper");
             assert!(mark < ticket, "{doc:?}: the mark comes before the ticket data");
         }
     }
@@ -1911,6 +2072,179 @@ mod tests {
         let lines = fiscal_paper(DocumentType::Receipt, json!({ "duplicate": true, "locale": "en" }));
         assert!(says(&lines, "DUPLICATE"), "an English paper says DUPLICATE, got {lines:?}");
         assert!(!says(&lines, "DUPLICADO"), "and not the Spanish word");
+    }
+
+    // ── A full invoice on the thermal roll (hub#2005) ──────────────────────────────────────────
+
+    /// What makes an invoice a FULL invoice (RD 1619/2012 art. 6): both parties identified and
+    /// the VAT broken down per rate. Two rates on purpose: a single-rate sale is the case where a
+    /// breakdown and a lone `tax_amount` look the same on paper.
+    fn full_invoice() -> serde_json::Value {
+        json!({
+            "business_name": "Bar Manolo",
+            "vat_number": "B11111111",
+            "receipt_id": "F-2026-000007",
+            "customer_name": "Talleres Paco SL",
+            "customer_tax_id": "B12345678",
+            "customer_address": "Calle Mayor 3, Madrid",
+            "items": [
+                { "name": "Menu", "quantity": 1, "total": 11.0 },
+                { "name": "Vino", "quantity": 1, "total": 12.1 }
+            ],
+            "tax_breakdown": [
+                { "rate": 10, "base": 10.0, "tax": 1.0 },
+                { "rate": 21, "base": 10.0, "tax": 2.1 }
+            ],
+            "subtotal": 20.0,
+            "tax_amount": 3.1,
+            "total": 23.1,
+        })
+    }
+
+    fn invoice_paper(data: &serde_json::Value) -> Vec<(String, bool, bool)> {
+        let bytes = render_document(DocumentType::Invoice, data).expect("a full invoice renders");
+        lines_with_modes(&bytes)
+    }
+
+    fn line_index(lines: &[(String, bool, bool)], pred: impl Fn(&str) -> bool, what: &str) -> usize {
+        lines
+            .iter()
+            .position(|(text, _, _)| pred(text))
+            .unwrap_or_else(|| panic!("{what} is not on the paper: {lines:#?}"))
+    }
+
+    /// The paper says what it is: «FACTURA», bold and double height, above the document data —
+    /// the first thing whoever gets it reads, and what tells it from a ticket at a glance.
+    #[test]
+    fn a_full_invoice_is_titled_factura_above_its_data() {
+        let lines = invoice_paper(&full_invoice());
+        let title = line_index(&lines, |l| l.trim() == "FACTURA", "the title");
+        assert!(lines[title].1 && lines[title].2, "the title is bold and double height: {lines:#?}");
+        let number = line_index(&lines, |l| l.contains("F-2026-000007"), "the invoice number");
+        assert!(title < number, "the title comes before the number");
+        assert!(
+            lines[number].0.starts_with("Factura: "),
+            "the number is the invoice's, not a ticket's: {:?}",
+            lines[number].0
+        );
+        assert!(!says(&lines, "Ticket: "), "an invoice does not call itself a ticket");
+    }
+
+    /// The customer is IDENTIFIED: name, tax id and address, together, under the document data.
+    #[test]
+    fn a_full_invoice_identifies_the_customer_with_their_tax_id() {
+        let lines = invoice_paper(&full_invoice());
+        let name = line_index(&lines, |l| l == "Cliente: Talleres Paco SL", "the customer's name");
+        let tax_id = line_index(&lines, |l| l == "NIF: B12345678", "the customer's tax id");
+        let address = line_index(&lines, |l| l == "Dir: Calle Mayor 3, Madrid", "the address");
+        assert_eq!((tax_id, address), (name + 1, name + 2), "the three lines go together");
+        let issuer = line_index(&lines, |l| l.contains("B11111111"), "the issuer's tax id");
+        assert!(issuer < name, "the issuer heads the paper, the customer comes after");
+    }
+
+    /// The address is printed when it comes and its absence is not a refusal: a customer's tax id
+    /// is what the law cannot do without, and the address is often not on file.
+    #[test]
+    fn a_full_invoice_without_a_customer_address_still_prints() {
+        let mut data = full_invoice();
+        data.as_object_mut().unwrap().remove("customer_address");
+        let lines = invoice_paper(&data);
+        assert!(says(&lines, "NIF: B12345678"));
+        assert!(!says(&lines, "Dir: "), "no empty address line");
+    }
+
+    /// One row per rate with its BASE and its QUOTA, under a header naming the columns — the
+    /// breakdown a full invoice carries (RD 1619/2012 art. 6.1.g/h). The amounts are right-aligned
+    /// in fixed columns so the bases and the quotas read as two columns, not as prose.
+    #[test]
+    fn a_full_invoice_breaks_the_vat_down_per_rate_with_base_and_quota() {
+        let lines = invoice_paper(&full_invoice());
+        let header = line_index(&lines, |l| l.starts_with("Tipo") && l.contains("Base") && l.ends_with("Cuota"), "the header");
+        let ten = line_index(&lines, |l| l.starts_with("IVA 10%"), "the 10% row");
+        let twenty_one = line_index(&lines, |l| l.starts_with("IVA 21%"), "the 21% row");
+        assert!(header < ten && ten < twenty_one, "header, then the rates in the order sent");
+        assert_eq!(lines[ten].0, format!("{:<8}{:>12}{:>12}", "IVA 10%", "10.00", "1.00"));
+        assert_eq!(lines[twenty_one].0, format!("{:<8}{:>12}{:>12}", "IVA 21%", "10.00", "2.10"));
+        for row in [header, ten, twenty_one] {
+            assert_eq!(lines[row].0.chars().count(), LINE_WIDTH, "a row fills the 80 mm line exactly");
+        }
+        let total = line_index(&lines, |l| l.starts_with("TOTAL"), "the total");
+        assert!(twenty_one < total, "the breakdown comes before the total");
+    }
+
+    /// A row may name itself (a surcharge, `RE 5.2%`) and a decimal rate prints as the rate, not
+    /// as `5.20`. A label longer than the rate column gets a line of its own instead of pushing
+    /// the amounts out of their columns.
+    #[test]
+    fn a_breakdown_row_can_name_itself_and_keeps_its_columns() {
+        let mut data = full_invoice();
+        data["tax_breakdown"] = json!([
+            { "rate": 5.2, "base": 10.0, "tax": 0.52 },
+            { "rate": 1.4, "base": 10.0, "tax": 0.14, "label": "Recargo equivalencia 1.4%" }
+        ]);
+        let lines = invoice_paper(&data);
+        assert!(says(&lines, &format!("{:<8}{:>12}{:>12}", "IVA 5.2%", "10.00", "0.52")), "{lines:#?}");
+        let long = line_index(&lines, |l| l == "Recargo equivalencia 1.4%", "the long label");
+        assert_eq!(lines[long + 1].0, format!("{:<8}{:>12}{:>12}", "", "10.00", "0.14"));
+    }
+
+    /// English paper, English labels (hub#1159): the invoice is not a Spanish-only document.
+    #[test]
+    fn a_full_invoice_speaks_the_language_of_the_paper() {
+        let mut data = full_invoice();
+        data["locale"] = json!("en");
+        let lines = invoice_paper(&data);
+        assert!(lines.iter().any(|(l, _, _)| l.trim() == "INVOICE"), "{lines:#?}");
+        assert!(says(&lines, "Invoice: F-2026-000007"));
+        assert!(says(&lines, "Customer: Talleres Paco SL"));
+        assert!(says(&lines, "VAT: B12345678"));
+        assert!(says(&lines, "VAT 21%"));
+        assert!(!says(&lines, "FACTURA") && !says(&lines, "Cuota"), "no Spanish left over");
+    }
+
+    /// **An invoice missing what makes it an invoice is REFUSED, never cut as a mute ticket**
+    /// (hub#2005). Before, `invoice` fell into the ticket's body and a customer who asked for their
+    /// invoice took home paper without their tax id or the breakdown — the silent failure. The
+    /// refusal names the missing field, so the print host's error says what to fix.
+    #[test]
+    fn an_invoice_missing_what_makes_it_an_invoice_is_refused_naming_the_field() {
+        type Breaks = Box<dyn Fn(&mut serde_json::Value)>;
+        let broken: Vec<(&str, Breaks)> = vec![
+            ("vat_number", Box::new(|d| { d.as_object_mut().unwrap().remove("vat_number"); })),
+            ("receipt_id", Box::new(|d| d["receipt_id"] = json!(""))),
+            ("customer_name", Box::new(|d| { d.as_object_mut().unwrap().remove("customer_name"); })),
+            ("customer_tax_id", Box::new(|d| { d.as_object_mut().unwrap().remove("customer_tax_id"); })),
+            ("customer_tax_id", Box::new(|d| d["customer_tax_id"] = json!("  "))),
+            ("tax_breakdown", Box::new(|d| { d.as_object_mut().unwrap().remove("tax_breakdown"); })),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([]))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!({ "21.00": { "base": 10.0, "tax": 2.1 } }))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([{ "rate": 21, "base": 10.0 }]))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([{ "rate": 21, "tax": 2.1 }]))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([{ "base": 10.0, "tax": 2.1 }]))),
+        ];
+        for (field, breaks) in broken {
+            let mut data = full_invoice();
+            breaks(&mut data);
+            match render_document(DocumentType::Invoice, &data) {
+                Err(crate::PeripheralError::InvalidPayload(msg)) => assert!(
+                    msg.contains(field),
+                    "the refusal names `{field}`, got: {msg}"
+                ),
+                other => panic!("an invoice without a valid `{field}` is refused, got {other:?}"),
+            }
+        }
+    }
+
+    /// The ticket does not change: the same fields on a `receipt` print no title, no customer tax
+    /// id and no breakdown, and a receipt without them is still a receipt. Every till of the fleet
+    /// prints this paper, so the invoice's body must not leak into it.
+    #[test]
+    fn a_receipt_does_not_grow_the_invoice_body() {
+        let bytes = render_document(DocumentType::Receipt, &full_invoice()).expect("a receipt renders");
+        let lines = lines_with_modes(&bytes);
+        assert!(says(&lines, "Ticket: F-2026-000007"));
+        assert!(!says(&lines, "FACTURA"), "{lines:#?}");
+        assert!(!says(&lines, "B12345678") && !says(&lines, "Cuota"), "{lines:#?}");
     }
 
     /// **The bill the waiter takes to the table is a document this printer knows** (hub#748).
@@ -2918,6 +3252,12 @@ mod tests {
         let data = json!({
             "business_name": "SALON AURORA SL",
             "tax_id": "12345678Z",
+            // What an invoice cannot be printed without (hub#2005).
+            "vat_number": "B11111111",
+            "receipt_id": "F-1",
+            "customer_name": "Cliente SL",
+            "customer_tax_id": "B12345678",
+            "tax_breakdown": [{ "rate": 21, "base": 9.92, "tax": 2.08 }],
             "ticket_number": "TICKET-2026-000001",
             "title": "Aviso",
             "items": [{ "name": "Corte", "quantity": 1, "total": 12.0 }],
