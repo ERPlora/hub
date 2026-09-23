@@ -1108,6 +1108,62 @@ mod tests {
         assert!(!tampered.contains("ZZ"), "{tampered}");
     }
 
+    /// hub#1989 — the three text fields come back on a retry, the address included (the issue
+    /// names it and nothing else asked for it), each one as an attribute value, never as markup.
+    #[test]
+    fn a_retry_keeps_the_address_and_the_rest_as_attribute_text() {
+        let mut typed = Typed::new();
+        typed.insert("customer_tax_id".into(), "B1234567X".into());
+        typed.insert("customer_name".into(), "Bar \"Pepe\" & Co".into());
+        typed.insert("customer_address".into(), "Calle Mayor 1 <b>2º</b>".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            kept.contains("name=\"customer_tax_id\" value=\"B1234567X\""),
+            "{kept}"
+        );
+        assert!(
+            kept.contains("name=\"customer_name\" value=\"Bar &quot;Pepe&quot; &amp; Co\""),
+            "{kept}"
+        );
+        assert!(
+            kept.contains(
+                "name=\"customer_address\" value=\"Calle Mayor 1 &lt;b&gt;2º&lt;/b&gt;\""
+            ),
+            "{kept}"
+        );
+        assert!(!kept.contains("<b>"), "{kept}");
+    }
+
+    /// hub#1989 — a module that repeats a value gets exactly one `selected`, on the first copy.
+    #[test]
+    fn a_repeated_option_value_is_selected_once() {
+        let choices = json!({
+            "customer_country": {"options": ["ES", "DE", "DE"]},
+        });
+        let mut typed = Typed::new();
+        typed.insert("customer_country".into(), "DE".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &typed,
+        );
+        assert_eq!(kept.matches(" selected").count(), 1, "{kept}");
+        assert!(
+            kept.contains("<option value=\"ES\">ES</option><option value=\"DE\" selected>DE</option><option value=\"DE\">DE</option>"),
+            "{kept}"
+        );
+    }
+
     /// Both languages, and the customer's page is the Spanish one by default — the merchant's
     /// customer never chose a locale anywhere.
     #[test]
