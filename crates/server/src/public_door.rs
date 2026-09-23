@@ -942,6 +942,35 @@ mod tests {
         assert!(!rendered.contains("<script"), "{rendered}");
     }
 
+    /// A claim is a row per printed ticket: only choices for fields the visitor may fill are
+    /// kept (the page would never show the rest), each list is capped, and a malformed map is a
+    /// refusal rather than something stored half-read.
+    #[test]
+    fn minted_choices_keep_only_declared_fields_within_the_cap() {
+        let fields = vec!["customer_country".to_string()];
+        let raw = json!({
+            "customer_country": {"options": ["US"]},
+            "sealed_thing": {"options": ["x"]},
+        });
+        assert_eq!(
+            accepted_choices(&raw, &fields),
+            Some(json!({"customer_country": {"options": ["US"]}}))
+        );
+        assert_eq!(accepted_choices(&Value::Null, &fields), Some(json!({})));
+        let too_many: Vec<Value> = (0..=MAX_CHOICE_OPTIONS)
+            .map(|i| json!(i.to_string()))
+            .collect();
+        assert_eq!(
+            accepted_choices(&json!({"customer_country": {"options": too_many}}), &fields),
+            None
+        );
+        assert_eq!(accepted_choices(&json!(["US"]), &fields), None);
+        assert_eq!(
+            accepted_choices(&json!({"customer_country": "US"}), &fields),
+            None
+        );
+    }
+
     /// Both languages, and the customer's page is the Spanish one by default — the merchant's
     /// customer never chose a locale anywhere.
     #[test]
