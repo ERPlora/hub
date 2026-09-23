@@ -703,10 +703,18 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
         }
     }
 
-    // QR opcional del ticket (p.ej. VeriFactu / enlace a factura): campo `qr_data` del payload.
+    // Optional ticket QR (e.g. VeriFactu / link to the invoice): `qr_data` in the payload.
     if is_truthy(data, "qr_data") {
         b.set(Align::Center, false, false, false);
         b.qr(str_field(data, "qr_data", ""));
+        // sales#327 — the legal legend of the fiscal QR («VERI*FACTU», RD 1619/2012 art. 6.5.b),
+        // right under it and in bold so it reads as clearly as the rest of the data (Orden
+        // HAC/1177/2024 art. 20.1.b). Only with the QR: alone it would name nothing.
+        if is_truthy(data, "qr_legend") {
+            b.set(Align::Center, true, false, false);
+            b.text(&format!("{}\n", str_field(data, "qr_legend", "")));
+            b.set(Align::Center, false, false, false);
+        }
     }
 
     // **El SEGUNDO QR: «pide tu factura»** (hub#963). No sustituye al de arriba y por eso son dos
@@ -1960,6 +1968,72 @@ mod tests {
         assert!(
             text.contains("ABCD1234ABCD1234\n"),
             "and the locator in PLAIN TEXT below it: the camera is not always an option"
+        );
+    }
+
+    /// **«VERI*FACTU» under the fiscal QR** (sales#327). RD 1619/2012 art. 6.5.b (7.5 for the
+    /// simplified invoice a ticket is) wants the legend beside the QR of every invoice from a
+    /// system that remits all its records, and Orden HAC/1177/2024 art. 20.1.b wants it as
+    /// visible as the rest of the data. The producer sends it as `qr_legend`; the renderer prints
+    /// it right under the fiscal QR — before the second QR, so it cannot be read as its caption.
+    #[test]
+    fn the_verifactu_legend_is_printed_right_under_the_fiscal_qr() {
+        let doc = json!({
+            "receipt_id": "T-44",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "qr_legend": "VERI*FACTU",
+            "claim_note": "Pide tu factura",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &doc).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+
+        let fiscal = text.find("ValidarQR").expect("the fiscal QR is printed");
+        let legend = text
+            .find("VERI*FACTU\n")
+            .expect("the legend is printed, on its own line");
+        let claim = text.find("Pide tu factura").expect("the claim block is printed");
+        assert!(fiscal < legend, "the legend goes under the fiscal QR");
+        assert!(legend < claim, "and before the second QR, which is not what it names");
+
+        // «bien visible» (Orden HAC/1177/2024 art. 20.1.b): the last emphasis command before the
+        // legend is ESC E 1 (bold on), so it is not printed as one more 8-px caption.
+        let legend_at = bytes
+            .windows(b"VERI*FACTU".len())
+            .position(|w| w == b"VERI*FACTU")
+            .expect("legend bytes");
+        let last_bold = bytes[..legend_at]
+            .windows(3)
+            .rposition(|w| w[0] == 0x1b && w[1] == 0x45)
+            .expect("an ESC E command precedes the legend");
+        assert_eq!(bytes[last_bold + 2], 1, "the legend is printed in bold");
+    }
+
+    /// No fiscal QR → no legend, whatever the producer sends: the legend names the QR, and alone
+    /// it would claim a verification the paper does not offer. The bill never carries it.
+    #[test]
+    fn the_verifactu_legend_needs_the_fiscal_qr() {
+        let no_qr = json!({
+            "receipt_id": "T-45",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_legend": "VERI*FACTU",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &no_qr).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("VERI*FACTU"));
+
+        let bill = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "qr_legend": "VERI*FACTU",
+        });
+        let bytes = render_document(DocumentType::parse("prebill").unwrap(), &bill).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&bytes).contains("VERI*FACTU"),
+            "a bill is not an invoice and cannot say it is verifiable"
         );
     }
 
