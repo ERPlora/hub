@@ -493,7 +493,7 @@ pub(crate) async fn run_list(
             .search
             .iter()
             .filter(|c| is_ident(c))
-            .map(|c| format!("CAST(sub.{c} AS TEXT) LIKE '%' || CAST(:search AS TEXT) || '%'"))
+            .map(|c| contains_ci(&format!("sub.{c}"), ":search"))
             .collect();
         if !likes.is_empty() {
             conds.push(format!("({})", likes.join(" OR ")));
@@ -537,9 +537,7 @@ pub(crate) async fn run_list(
             }
             FilterOp::Like => {
                 if has(&p, &format!("f_{col}")) {
-                    conds.push(format!(
-                        "CAST(sub.{col} AS TEXT) LIKE '%' || CAST(:f_{col} AS TEXT) || '%'"
-                    ));
+                    conds.push(contains_ci(&format!("sub.{col}"), &format!(":f_{col}")));
                 }
             }
             FilterOp::Range => {
@@ -817,6 +815,28 @@ fn coalesce_first_arg_spans(bytes: &[u8], code: &[(usize, usize)]) -> Vec<(usize
 /// ¿Es un identificador SQL seguro (`[A-Za-z_][A-Za-z0-9_]*`)? Solo estos se interpolan en el
 /// SQL (columnas de `sort`/`filters` vienen del manifest de confianza; esto es defensa en
 /// profundidad frente a un manifest malformado).
+/// The accented letters a Spanish-speaking (and Portuguese/French/Catalan) till types, upper and
+/// lower case, and the bare letter each one folds to — position by position, as `translate`
+/// wants them. Upper case is listed too so the fold holds on a database whose `LC_CTYPE` is `C`,
+/// where `lower()` only knows ASCII.
+const FOLD_FROM: &str = "áàâäãåéèêëíìîïóòôöõúùûüñçÁÀÂÄÃÅÉÈÊËÍÌÎÏÓÒÔÖÕÚÙÛÜÑÇ";
+const FOLD_TO: &str = "aaaaaaeeeeiiiiooooouuuuncaaaaaaeeeeiiiiooooouuuunc";
+
+/// Case- and accent-insensitive «contains» (hub#2096): `column` holds `bind` somewhere, both
+/// sides lower-cased and stripped of accents, so «garcia» finds «García» — what every search box
+/// in the market does. `translate` and `lower` are built-ins, not the `unaccent` extension: a
+/// hub's database is not guaranteed to have it, and a list that fails to prepare is worse than
+/// one that does not fold. Both sides are cast to TEXT for the same reason as `eq` (a `<select>`
+/// sends strings, Postgres refuses `integer = text`).
+fn contains_ci(column: &str, bind: &str) -> String {
+    let fold = |e: String| format!("translate(lower({e}), '{FOLD_FROM}', '{FOLD_TO}')");
+    format!(
+        "{} LIKE '%' || {} || '%'",
+        fold(format!("CAST({column} AS TEXT)")),
+        fold(format!("CAST({bind} AS TEXT)"))
+    )
+}
+
 fn is_ident(s: &str) -> bool {
     let mut chars = s.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
