@@ -32,6 +32,8 @@ fn main() {
             "erplora_test_print",
             "erplora_open_drawer",
             "erplora_set_device_role",
+            // Alta por IP tecleada cuando el escaneo no la ve (hub#1924).
+            "erplora_add_network_printer",
             "erplora_set_device_name",
             "erplora_remove_device",
             // Notificación del SO: el aviso cuando NADIE mira la pantalla (comanda a cocina).

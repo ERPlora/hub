@@ -239,7 +239,7 @@ impl DeviceRegistry {
                  registry (an OS print queue registers through its printer_id)"
             )));
         }
-        self.upsert(device_key(mac.as_deref(), ip, port), mac, ip, port, name, kind)
+        self.upsert(device_key(mac.as_deref(), ip, port), mac, ip, port, name, kind, false)
     }
 
     /// Alta/actualización de una **cola de impresión del SO** (`usb:{queue}`, hub#1083),
@@ -268,10 +268,24 @@ impl DeviceRegistry {
             }
             Err(exc) => return Err(exc),
         }
-        self.upsert(printer_id.to_string(), None, "", 0, name, KIND_USB)
+        self.upsert(printer_id.to_string(), None, "", 0, name, KIND_USB, false)
     }
 
-    /// El alta en sí, una vez resuelta la identidad. Preserva `first_seen` y `role`.
+    /// Alta de una impresora de red cuya dirección ha TECLEADO el dueño (hub#1924): la misma
+    /// entrada que dejaría el escaneo, marcada [`Device::manual`] para que el siguiente
+    /// descubrimiento la siga listando aunque no la vea.
+    pub fn register_manual(&self, ip: &str, port: u16, name: &str) -> Result<Device> {
+        if ip.trim().is_empty() {
+            return Err(crate::PeripheralError::InvalidPrinterId(format!(
+                "`{name}` has no address to register"
+            )));
+        }
+        self.upsert(device_key(None, ip, port), None, ip, port, name, "network", true)
+    }
+
+    /// El alta en sí, una vez resuelta la identidad. Preserva `first_seen`, `role` y la marca
+    /// [`Device::manual`]: un escaneo que ve una impresora tecleada no la degrada a escaneada.
+    #[allow(clippy::too_many_arguments)]
     fn upsert(
         &self,
         key: String,
@@ -280,6 +294,7 @@ impl DeviceRegistry {
         port: u16,
         name: &str,
         kind: &str,
+        manual: bool,
     ) -> Result<Device> {
         let now = now_iso();
 
@@ -292,6 +307,7 @@ impl DeviceRegistry {
                     existing.name = name.to_string();
                     existing.kind = kind.to_string();
                     existing.last_seen = now;
+                    existing.manual |= manual;
                     // Una MAC que aparece más tarde (p. ej. el ARP responde en el 2º escaneo)
                     // enriquece la entrada, pero nunca la borra si ya se conocía.
                     if mac.is_some() {
@@ -311,6 +327,7 @@ impl DeviceRegistry {
                         first_seen: now.clone(),
                         last_seen: now,
                         status: "online".to_string(),
+                        manual,
                     };
                     map.insert(key.clone(), device.clone());
                     device
@@ -761,6 +778,7 @@ mod tests {
             first_seen: "2026-08-13T00:00:00".into(),
             last_seen: "2026-08-13T00:00:00".into(),
             status: "online".into(),
+            manual: false,
         }
     }
 
@@ -1088,5 +1106,36 @@ mod tests {
 
         assert_eq!(device.key, "AA:BB:CC:DD:EE:F4", "la clave se rellena desde la MAC");
         assert_eq!(device.role.as_deref(), Some("kitchen"), "el rol asignado no se pierde");
+    }
+
+    // ── hub#1924: a printer typed by address is remembered as such ───────────────────────────────
+
+    #[test]
+    fn a_rescan_that_finds_a_typed_printer_keeps_it_manual_and_keeps_its_role() {
+        let (registry, path) = temp_registry("manual-survives-rescan");
+        registry.register_manual("10.9.9.9", 9100, "Network Printer (10.9.9.9)").expect("manual");
+        registry.set_role("network:10.9.9.9:9100", "receipt").expect("role");
+
+        registry
+            .register(None, "10.9.9.9", 9100, "Network Printer (10.9.9.9)", "network")
+            .expect("rescan");
+
+        let device = registry.get("network:10.9.9.9:9100").expect("device");
+        assert!(device.manual, "a scan that also sees it must not demote a typed printer");
+        assert_eq!(device.role.as_deref(), Some("receipt"));
+        let reloaded = DeviceRegistry::load(path);
+        assert!(
+            reloaded.get("network:10.9.9.9:9100").expect("persisted").manual,
+            "the mark has to survive a restart of the app"
+        );
+    }
+
+    #[test]
+    fn a_scanned_printer_is_not_manual() {
+        let (registry, _) = temp_registry("scanned-not-manual");
+        let device = registry
+            .register(None, "10.1.1.1", 9100, "Network Printer (10.1.1.1)", "network")
+            .expect("scanned");
+        assert!(!device.manual);
     }
 }

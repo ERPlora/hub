@@ -25,6 +25,7 @@
     "allow-erplora-test-print",
     "allow-erplora-open-drawer",
     "allow-erplora-set-device-role",
+    "allow-erplora-add-network-printer",
     "allow-erplora-set-device-name",
     "allow-erplora-remove-device",
     "allow-erplora-notify",
