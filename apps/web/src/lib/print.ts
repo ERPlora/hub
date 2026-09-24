@@ -83,6 +83,15 @@ export interface PrintRequest {
    * formato por defecto salía con el ancho de un tiquet.
    */
   format?: PrintFormat;
+  /**
+   * The hub's print queue and nowhere else (hub#2029): no printer of this device, no dialog.
+   *
+   * For a document EVERY open shell is told to print at once — a kitchen ticket no till fired (API,
+   * flow, online ordering). Each shell printing it on its own printer put one ticket per till at the
+   * pass; asking the queue for the same `jobId` from all of them leaves one job, printed once by the
+   * device that drains the station. If the queue does not take it, the answer says so.
+   */
+  queueOnly?: boolean;
 }
 
 export interface PrintResult {
@@ -180,6 +189,18 @@ function mintJobId(documentType: string): string {
 }
 
 /**
+ * Can this device hand a job to that printer? A network printer needs an address; a bonded Bluetooth
+ * one (ADR-0204) has none and is reached by its MAC. ONE definition, shared by the global door
+ * (`printerIdForRole`) and by the print host's alta (`printerRolesOfDevices`): since hub#2029 a
+ * kitchen ticket can reach the printer's device ONLY through the queue, so a printer the door can
+ * print to but the alta does not claim is a station nobody drains.
+ */
+export function isReachablePrinter(device: PrintDevice | undefined): boolean {
+  if (!device) return false;
+  return Boolean(device.ip || (device.type === 'bluetooth' && device.mac));
+}
+
+/**
  * Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`.
  *
  * A bonded Bluetooth printer (ADR-0204, Android only) registers with NO ip — its identity is the
@@ -187,9 +208,7 @@ function mintJobId(documentType: string): string {
  * `network::0`: a job sent to nowhere, failing at some socket far from here.
  */
 export function printerIdForRole(devices: PrintDevice[], role: string): string | undefined {
-  const d = (devices || []).find(
-    (x) => x?.role === role && (x?.ip || (x?.type === 'bluetooth' && x?.mac)),
-  );
+  const d = (devices || []).find((x) => x?.role === role && isReachablePrinter(x));
   if (!d) return undefined;
   if (d.type === 'bluetooth') return `bluetooth:${d.mac}`;
   return `network:${d.ip}:${d.port ?? 9100}`;
@@ -338,6 +357,8 @@ export function createPrintService(
       if (req.html) iframePrint(req.html, req.format); else browserPrint();
       return { via: 'browser', role, error };
     };
+
+    if (req.queueOnly) return toQueue();
 
     // A4 inside the installed app: the system print dialog, before any thermal route (hub#2006).
     // An invoice on a till roll is the wrong paper; the dialog is where the user picks the laser

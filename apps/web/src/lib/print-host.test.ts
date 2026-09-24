@@ -205,6 +205,22 @@ describe('print host — booting it in the shell', () => {
     ).toEqual(['receipt', 'kitchen']);
   });
 
+  // hub#2029 made the queue the ONLY road for a kitchen ticket no till fired, and for one fired at
+  // a till with no kitchen printer: the device that owns the kitchen printer prints it by draining.
+  // A bonded Bluetooth printer (ADR-0204, Android) has no `ip` — its identity is the MAC — and the
+  // global door already prints to it (`printerIdForRole`). If the alta left it out, an Android
+  // tablet with the kitchen printer over Bluetooth would hear every ticket as somebody else's and
+  // drain none: the pass would go quiet after the update.
+  it('a Bluetooth printer with a role is a role this device can drain (hub#2029)', () => {
+    expect(
+      printerRolesOfDevices([
+        { role: 'kitchen', ip: null, type: 'bluetooth', mac: '00:11:22:33:44:55' },
+        // No MAC and no ip: nowhere to send a job, so not a role.
+        { role: 'bar', ip: null, type: 'bluetooth' },
+      ]),
+    ).toEqual(['kitchen']);
+  });
+
   // **The drain must not connect before the alta.** It does not retry a configuration refusal —
   // rightly, or a phone would hammer the hub for ever — so a socket opened one tick too early
   // spends its single attempt on `print.host_not_registered` and this device never drains again

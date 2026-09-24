@@ -24,6 +24,7 @@ _event_delivery.step_id text NOT NULL
 
 _event_outbox.attempts bigint NOT NULL
 _event_outbox.claim_expires_at text NULL
+_event_outbox.client_instance text NOT NULL
 _event_outbox.created_at text NOT NULL
 _event_outbox.delivered_at text NULL
 _event_outbox.depth bigint NOT NULL

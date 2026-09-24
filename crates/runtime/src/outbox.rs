@@ -128,7 +128,8 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
   module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
   discarded_at TEXT, discarded_by TEXT, discard_reason TEXT NOT NULL DEFAULT '', \
-  run_id TEXT NOT NULL DEFAULT '', parent_event_id TEXT NOT NULL DEFAULT '');\
+  run_id TEXT NOT NULL DEFAULT '', parent_event_id TEXT NOT NULL DEFAULT '', \
+  client_instance TEXT NOT NULL DEFAULT '');\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
@@ -137,6 +138,7 @@ ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discard_reason TEXT NOT NULL 
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS run_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS parent_event_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS failure_kind TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS client_instance TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_due ON _event_outbox (status, next_attempt_at);\
 CREATE INDEX IF NOT EXISTS ix_outbox_run ON _event_outbox (hub_id, run_id) WHERE run_id <> '';\
 CREATE INDEX IF NOT EXISTS ix_outbox_parent ON _event_outbox (hub_id, parent_event_id) \
@@ -181,6 +183,10 @@ pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
 /// payload. Un evento emitido dentro de un run queda sellado con ese run, y todo evento en cascada
 /// nombra al evento cuya entrega lo provocó. Sin eso la cadena venta → run → command → evento hijo
 /// solo se podía adivinar por marca de tiempo, que con dos ventas por segundo no es una respuesta.
+///
+/// `client_instance` is the shell tab that sent the request (hub#1980), kept so the listener that
+/// runs one hop later still says it on the live frame (hub#2029, [`listener_ctx`]): a till fires the
+/// order, `kitchen` makes the ticket in a listener, and only the till that fired it should print it.
 ///
 /// `dedup_key` (hub#1076) is the manifest-declared field NAME (`emit[].dedup_key`, e.g.
 /// `"wa_message_id"`), not a value — this function is what resolves it against `payload`. When it
@@ -240,6 +246,10 @@ pub(crate) fn insert_op(
             .unwrap_or_default()),
     );
     p.insert("parent_event_id".into(), json!(ctx.parent_event_id()));
+    p.insert(
+        "client_instance".into(),
+        json!(ctx.client_instance.as_deref().unwrap_or_default()),
+    );
     p.insert("now".into(), json!(now));
     let conflict_clause = if dedup_id.is_some() {
         " ON CONFLICT (id) DO NOTHING"
@@ -248,8 +258,8 @@ pub(crate) fn insert_op(
     };
     let sql = format!(
         "INSERT INTO _event_outbox \
-        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, run_id, parent_event_id, status, attempts, next_attempt_at, last_error, created_at) \
-        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, :run_id, :parent_event_id, 'pending', 0, :now, '', :now){conflict_clause}"
+        (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, run_id, parent_event_id, client_instance, status, attempts, next_attempt_at, last_error, created_at) \
+        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, :run_id, :parent_event_id, :client_instance, 'pending', 0, :now, '', :now){conflict_clause}"
     );
     (sql, p)
 }
@@ -483,7 +493,7 @@ async fn claim_next_due(db: &dyn DatabaseAdapter, now: &str) -> Result<Option<Js
                    AND (claim_expires_at IS NULL OR claim_expires_at <= :now) \
                  ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) \
                RETURNING id, hub_id, user_id, permissions, event_name, module_id, payload, depth, \
-                         attempts, run_id";
+                         attempts, run_id, client_instance";
     let res = db.query(sql, &p).await?;
     Ok(res.rows.into_iter().next())
 }
@@ -1033,14 +1043,21 @@ async fn deliver_host_print(
 fn listener_ctx(row: &Json) -> RequestContext {
     let hub_id = row["hub_id"].as_str().unwrap_or_default().to_string();
     let user_id = row["user_id"].as_str().unwrap_or_default().to_string();
-    RequestContext::new(hub_id, user_id, [permissions::WILDCARD.to_string()])
+    let ctx = RequestContext::new(hub_id, user_id, [permissions::WILDCARD.to_string()])
         // Whatever this listener emits is a consequence of THIS event, and says so (hub#666).
         .caused_by_event(row["id"].as_str().unwrap_or_default())
         // There is no human at the relay, so there is nobody to type a manager's PIN: the
         // step-up dialog (hub#361) must never be offered here. It cannot be today — the
         // wildcard opens the gate before elevation is ever considered — and saying so in the
         // context means it stays true if the authority is ever narrowed.
-        .as_machine()
+        .as_machine();
+    // The shell tab whose request started the chain (hub#2029). A till fires the ORDER; the kitchen
+    // ticket is made here, one hop later, and without the tab it reached the live channel as
+    // nobody's — so every till printed it. It names and grants nothing, like at the door.
+    match row["client_instance"].as_str() {
+        Some(instance) if !instance.is_empty() => ctx.with_client_instance(instance),
+        _ => ctx,
+    }
 }
 
 fn parse_payload(row: &Json) -> Params {
