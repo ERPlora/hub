@@ -104,6 +104,7 @@ pub(crate) mod test_support {
                 schema: None,
                 expose_api: false,
                 internal: false,
+                on_unique: Default::default(),
             },
             sql: vec![sql.to_string()],
             wasm: None,
