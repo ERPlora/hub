@@ -1010,3 +1010,65 @@ async fn a_cascade_made_by_the_other_task_arrives_here_as_it_was_recorded() {
 
     let _ = std::fs::remove_dir_all(&t.temp);
 }
+
+/// A version this task could not load is written off only while the module stays installed: once
+/// the other task uninstalls it, the slate is clean, and installing that same version again later
+/// is followed here like any other install.
+#[tokio::test]
+async fn an_uninstall_clears_what_this_task_had_given_up_on() {
+    let mock = MockCloud::with(&[("parts", "1.0.0", package("parts", "1.0.0"))]);
+    let t = two_tasks("slate", mock.clone()).await;
+    let reconciler = ModuleReconciler::new();
+    {
+        let rt = t.outgoing.runtime.read().await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        rt.db()
+            .execute(
+                "UPDATE hub_module SET version = '2.0.0' WHERE hub_id = :hub_id AND module_id = 'parts'",
+                &p,
+            )
+            .await
+            .unwrap();
+    }
+    assert_eq!(reconciler.reconcile_once(&t.staying).await.failed.len(), 1);
+
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .uninstall("parts")
+        .await
+        .unwrap();
+    assert_eq!(
+        reconciler.reconcile_once(&t.staying).await.removed,
+        vec!["parts".to_string()]
+    );
+
+    // 2.0.0 becomes available to this task (its own cache) and the other task installs it again.
+    let cached = t.staying.config.module_cache.join("parts").join("2.0.0");
+    std::fs::create_dir_all(cached.join("migrations/postgres")).unwrap();
+    std::fs::write(cached.join("module.json"), manifest("parts", "2.0.0")).unwrap();
+    std::fs::write(
+        cached.join("migrations/postgres/001_init.sql"),
+        INIT_SQL.replace("{id}", "parts"),
+    )
+    .unwrap();
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .install_from_dir(&cached)
+        .await
+        .unwrap();
+
+    let report = reconciler.reconcile_once(&t.staying).await;
+
+    assert_eq!(
+        report.reloaded,
+        vec![("parts".to_string(), "2.0.0".to_string())],
+        "{report:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
