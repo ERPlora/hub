@@ -506,6 +506,21 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
+    // hub#1875: from here on, what ANOTHER task of this hub installs or updates is followed too. In a
+    // rolling deploy the outgoing task keeps serving while it drains, and a module updated there
+    // moved `hub_module` without this task ever looking again: the list said one version, the
+    // database another, and the runtime served the old code until the button was pressed again.
+    // Started after the boot restore above on purpose — that block already brought the registry to
+    // `hub_module`, so the first tick waits a full interval instead of racing it.
+    module_reconcile::spawn(
+        state.clone(),
+        std::time::Duration::from_secs(module_reconcile::interval_secs(
+            std::env::var(module_reconcile::INTERVAL_ENV)
+                .ok()
+                .as_deref(),
+        )),
+    );
+
     // Backfill del índice vectorial (§9.6): la ingesta normal corre en el hook de INSTALL, que ya
     // pasó para todo hub existente — sin esto, su índice quedaría vacío para siempre y el router
     // (§9.2b) nunca se activaría. Solo embebe la DIFERENCIA (módulos activos aún no indexados):

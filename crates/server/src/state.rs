@@ -497,7 +497,10 @@ impl HubConfig {
         if self.dev_mode {
             // Explicit escape hatch: dev accepts unsigned modules. The ring is still built in case
             // a dev flow wants to exercise verification (nothing is forced here).
-            return (cloud_client::SignaturePolicy::DevTrust, SignatureMode::DevTrust);
+            return (
+                cloud_client::SignaturePolicy::DevTrust,
+                SignatureMode::DevTrust,
+            );
         }
         if ring.is_empty() {
             if !bad.is_empty() {
@@ -714,11 +717,8 @@ mod staging_tests {
     #[test]
     fn una_clave_ilegible_entre_varias_no_tumba_el_anillo() {
         let good = "a".repeat(64);
-        let policy = config_with_keys(
-            false,
-            vec![format!("rota=zz, marketplace={good}")],
-        )
-        .signature_policy();
+        let policy = config_with_keys(false, vec![format!("rota=zz, marketplace={good}")])
+            .signature_policy();
 
         assert!(policy.requires_signature(), "{policy:?}");
     }
@@ -827,7 +827,10 @@ mod staging_tests {
     /// hide a half-pasted ring behind an INFO.
     #[test]
     fn a_partly_unreadable_ring_still_verifies_but_keeps_its_warning() {
-        let config = config_with_keys(false, vec![format!("rota=zz, marketplace={}", "a".repeat(64))]);
+        let config = config_with_keys(
+            false,
+            vec![format!("rota=zz, marketplace={}", "a".repeat(64))],
+        );
 
         let log = captured_boot_log(|| config.announce_signature_policy());
 
@@ -863,7 +866,14 @@ mod staging_tests {
     #[test]
     fn announcing_never_changes_the_policy_that_is_enforced() {
         for (keys, dev, mode) in [
-            (ring_of_one(), false, SignatureMode::Verifying { keys: 1, ignored: 0 }),
+            (
+                ring_of_one(),
+                false,
+                SignatureMode::Verifying {
+                    keys: 1,
+                    ignored: 0,
+                },
+            ),
             (Vec::new(), false, SignatureMode::NotVerifying),
             (
                 vec!["marketplace=no-es-una-clave".to_string()],

@@ -212,12 +212,7 @@ struct Hub {
 
 /// A hub with the `agenda` module installed, one flow whose only step is the agent turn, and the
 /// grants the story needs: read the diary, write a booking.
-async fn hub(
-    cloud_base_url: String,
-    tag: &str,
-    step: Value,
-    grants: &[GrantSpec],
-) -> Hub {
+async fn hub(cloud_base_url: String, tag: &str, step: Value, grants: &[GrantSpec]) -> Hub {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();

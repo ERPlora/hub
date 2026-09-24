@@ -760,7 +760,7 @@ pub async fn restore_from_local_packages(
 }
 
 /// Repone UN módulo de su copia local. `Ok(false)` = este hub no tiene copia guardada.
-async fn restore_one(
+pub(crate) async fn restore_one(
     cache_root: &std::path::Path,
     runtime: &mut erplora_runtime::Runtime,
     module_id: &str,
@@ -1477,7 +1477,7 @@ fn install_recursive<'a>(
 /// versión anterior vuelve si el intento falla—; la diferencia es el contrato: `update_from_dir`
 /// **se niega** si el módulo no está instalado, de modo que una actualización nunca puede acabar
 /// instalando algo que este hub no tenía.
-async fn register(
+pub(crate) async fn register(
     runtime: &mut erplora_runtime::Runtime,
     dir: &std::path::Path,
     module_id: &str,

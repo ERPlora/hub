@@ -32,7 +32,8 @@ const URI: &str = "/api/business/certificate";
 type Beats = Arc<Mutex<Vec<Value>>>;
 
 fn config(cloud_base_url: String, tag: &str) -> HubConfig {
-    let temp = std::env::temp_dir().join(format!("erplora-cert-switch-{tag}-{}", std::process::id()));
+    let temp =
+        std::env::temp_dir().join(format!("erplora-cert-switch-{tag}-{}", std::process::id()));
     HubConfig {
         demo: false,
         hub_id: HUB.into(),
@@ -89,9 +90,15 @@ async fn fixture(tag: &str, with_certificate: bool) -> Fixture {
             .await
             .unwrap();
     }
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
-    let employee_id = rt.create_user("Caja", "2222", "employee", None).await.unwrap();
+    let employee_id = rt
+        .create_user("Caja", "2222", "employee", None)
+        .await
+        .unwrap();
     let employee = rt.create_session(&employee_id, 3600, None).await.unwrap();
     Fixture {
         router: app(AppState::with_config(rt, config(cloud, tag))),
@@ -101,7 +108,12 @@ async fn fixture(tag: &str, with_certificate: bool) -> Fixture {
     }
 }
 
-async fn send(router: &Router, method: &str, session: &str, body: Option<Value>) -> (StatusCode, Value) {
+async fn send(
+    router: &Router,
+    method: &str,
+    session: &str,
+    body: Option<Value>,
+) -> (StatusCode, Value) {
     let mut request = Request::builder()
         .method(method)
         .uri(URI)
@@ -113,10 +125,17 @@ async fn send(router: &Router, method: &str, session: &str, body: Option<Value>)
         }
         None => Body::empty(),
     };
-    let response = router.clone().oneshot(request.body(body).unwrap()).await.unwrap();
+    let response = router
+        .clone()
+        .oneshot(request.body(body).unwrap())
+        .await
+        .unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// Waits (bounded) for a heartbeat carrying `route`. The heartbeat is fired in the background, so
@@ -140,15 +159,31 @@ async fn heartbeat_with_route(beats: &Beats, route: &str) -> bool {
 async fn an_admin_switches_the_certificate_off_and_it_stays_uploaded() {
     let f = fixture("off", true).await;
 
-    let (status, body) = send(&f.router, "PATCH", &f.admin, Some(json!({ "use_for_transmission": false }))).await;
+    let (status, body) = send(
+        &f.router,
+        "PATCH",
+        &f.admin,
+        Some(json!({ "use_for_transmission": false })),
+    )
+    .await;
 
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["ok"], json!(true), "{body}");
     assert_eq!(body["data"]["present"], json!(true), "{body}");
     assert_eq!(body["data"]["use_for_transmission"], json!(false), "{body}");
-    assert_eq!(body["data"]["transmission_route"], json!("delegated"), "{body}");
+    assert_eq!(
+        body["data"]["transmission_route"],
+        json!("delegated"),
+        "{body}"
+    );
 
-    let (status, body) = send(&f.router, "PATCH", &f.admin, Some(json!({ "use_for_transmission": true }))).await;
+    let (status, body) = send(
+        &f.router,
+        "PATCH",
+        &f.admin,
+        Some(json!({ "use_for_transmission": true })),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["data"]["transmission_route"], json!("own"), "{body}");
 }
@@ -157,7 +192,13 @@ async fn an_admin_switches_the_certificate_off_and_it_stays_uploaded() {
 async fn the_saas_hears_the_new_route_right_after_the_switch() {
     let f = fixture("beat-patch", true).await;
 
-    let (status, body) = send(&f.router, "PATCH", &f.admin, Some(json!({ "use_for_transmission": false }))).await;
+    let (status, body) = send(
+        &f.router,
+        "PATCH",
+        &f.admin,
+        Some(json!({ "use_for_transmission": false })),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{body}");
 
     assert!(
@@ -189,7 +230,11 @@ async fn the_body_must_say_on_or_off() {
         let (status, body) = send(&f.router, "PATCH", &f.admin, Some(bad.clone())).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{bad} → {body}");
         assert_eq!(body["error"]["code"], json!("invalid_field"), "{body}");
-        assert_eq!(body["error"]["field"], json!("use_for_transmission"), "{body}");
+        assert_eq!(
+            body["error"]["field"],
+            json!("use_for_transmission"),
+            "{body}"
+        );
     }
 }
 
@@ -197,7 +242,13 @@ async fn the_body_must_say_on_or_off() {
 async fn only_an_admin_switches_it() {
     let f = fixture("employee", true).await;
 
-    let (status, body) = send(&f.router, "PATCH", &f.employee, Some(json!({ "use_for_transmission": false }))).await;
+    let (status, body) = send(
+        &f.router,
+        "PATCH",
+        &f.employee,
+        Some(json!({ "use_for_transmission": false })),
+    )
+    .await;
 
     assert!(
         status == StatusCode::FORBIDDEN || status == StatusCode::UNAUTHORIZED,
@@ -211,8 +262,18 @@ async fn only_an_admin_switches_it() {
 async fn switching_on_with_nothing_uploaded_answers_the_domain_code() {
     let f = fixture("absent", false).await;
 
-    let (status, body) = send(&f.router, "PATCH", &f.admin, Some(json!({ "use_for_transmission": true }))).await;
+    let (status, body) = send(
+        &f.router,
+        "PATCH",
+        &f.admin,
+        Some(json!({ "use_for_transmission": true })),
+    )
+    .await;
 
     assert_eq!(status, StatusCode::CONFLICT, "{body}");
-    assert_eq!(body["error"]["code"], json!("fiscal.own_certificate_not_uploaded"), "{body}");
+    assert_eq!(
+        body["error"]["code"],
+        json!("fiscal.own_certificate_not_uploaded"),
+        "{body}"
+    );
 }

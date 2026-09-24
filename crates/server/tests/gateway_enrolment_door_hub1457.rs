@@ -18,7 +18,10 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-enrol");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let cashier_id = rt
         .create_user("Cashier", "2222", "employee", None)
         .await

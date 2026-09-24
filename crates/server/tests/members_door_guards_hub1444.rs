@@ -46,30 +46,39 @@ async fn fixture(hub_id: &str, second_admin: bool) -> Fixture {
     rt.ensure_system_tables().await.unwrap();
 
     let admin = rt
-        .create_hub_user(&NewHubUser {
-            name: "Ana Soto".into(),
-            email: "ana@example.com".into(),
-            role: "admin".into(),
-            ..NewHubUser::default()
-        }, 0)
+        .create_hub_user(
+            &NewHubUser {
+                name: "Ana Soto".into(),
+                email: "ana@example.com".into(),
+                role: "admin".into(),
+                ..NewHubUser::default()
+            },
+            0,
+        )
         .await
         .unwrap();
-    rt.create_hub_user(&NewHubUser {
-        name: "Luis Prat".into(),
-        email: "luis@example.com".into(),
-        role: "employee".into(),
-        ..NewHubUser::default()
-    }, 0)
+    rt.create_hub_user(
+        &NewHubUser {
+            name: "Luis Prat".into(),
+            email: "luis@example.com".into(),
+            role: "employee".into(),
+            ..NewHubUser::default()
+        },
+        0,
+    )
     .await
     .unwrap();
     let second = if second_admin {
         Some(
-            rt.create_hub_user(&NewHubUser {
-                name: "Bea Roig".into(),
-                email: "bea@example.com".into(),
-                role: "admin".into(),
-                ..NewHubUser::default()
-            }, 0)
+            rt.create_hub_user(
+                &NewHubUser {
+                    name: "Bea Roig".into(),
+                    email: "bea@example.com".into(),
+                    role: "admin".into(),
+                    ..NewHubUser::default()
+                },
+                0,
+            )
             .await
             .unwrap(),
         )
@@ -120,7 +129,9 @@ async fn add_member(fx: &Fixture, email: &str, role: &str) -> (StatusCode, Value
         .uri("/api/members")
         .header("content-type", "application/json")
         .header("x-hub-session", &fx.admin_session)
-        .body(Body::from(json!({ "email": email, "role": role }).to_string()))
+        .body(Body::from(
+            json!({ "email": email, "role": role }).to_string(),
+        ))
         .unwrap();
     let response = fx.router.clone().oneshot(request).await.unwrap();
     let status = response.status();

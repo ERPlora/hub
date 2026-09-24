@@ -311,6 +311,8 @@ function params(): { moduleId: string; navId: string } {
 let onScreen = true;
 /** La ruta que esta copia tiene pintada. Al volver a pantalla, dice si hay que ponerse al día. */
 let mountedPath = '';
+/** This copy let go of its module when it left the screen (hub#1797): coming back mounts it again. */
+let released = false;
 
 let mountGeneration = 0;
 /**
@@ -529,14 +531,17 @@ watch(isOnline, (back) => {
 });
 
 /**
- * Fuera de pantalla, pero VIVA. Se suelta aquí todo lo que se soltaba en `onBeforeUnmount` y que
- * por lo de arriba no llegaba a soltarse nunca (hub#1099): tras 8 navegaciones quedaban 8 listeners
- * de `focus` —un solo foco de ventana disparaba 8 consultas de entitlement al Cloud—, 8
- * MutationObserver vigilando outlets escondidos y 8 suscripciones al `resume_on` del guard.
+ * Off screen. Everything `onBeforeUnmount` used to release — and by the above never got to — is
+ * released here (hub#1099): after 8 navigations there were 8 `focus` listeners, 8 MutationObservers
+ * over hidden outlets and 8 subscriptions to the guard's `resume_on`.
  *
- * Lo que NO se toca es el Web Component del módulo: sigue montado en su outlet. Destruirlo al
- * cambiar de pantalla es otra decisión —afecta a lo que el cajero tiene a medias— y no es de esta
- * issue; lo que esta issue exige es que la vista escondida deje de TRABAJAR, y eso ya está.
+ * And the module's Web Component goes too (hub#1797). A hidden screen that stays CONNECTED keeps
+ * hearing `popstate`, which is how modules serve a deep link (flows#57, sales#279): measured on
+ * till → Home → agenda → «Charge», Ionic reused the VISIBLE page for the new till while the old
+ * till, hidden, served `?appointment_id=` first and erased it from the address — the till on
+ * screen opened an empty check. Ionic does not hand the hidden copy back on that path, and on the
+ * way back (`history.back`) it built a new till anyway, so keeping it alive bought nothing. Only
+ * the screen on show runs a module; a mount still in flight is cancelled so it cannot land here.
  */
 onIonViewDidLeave(() => {
   onScreen = false;
@@ -544,14 +549,21 @@ onIonViewDidLeave(() => {
   stopChrome?.();
   stopChrome = null;
   clearProtectsSubscription();
+  mountGeneration += 1;
+  outlet.value?.replaceChildren();
+  protectsOutlet.value?.replaceChildren();
+  released = true;
 });
 
-/** De vuelta en pantalla: se recupera lo soltado y se pone al día si la ruta se movió sin ella. */
+/** Back on screen: take back what was released and mount the screen the route names. */
 onIonViewWillEnter(() => {
   onScreen = true;
   window.addEventListener('focus', recheckEntitlement);
   if (!stopChrome && outlet.value) stopChrome = installChrome(outlet.value, chromeControls);
-  if (mountedPath && mountedPath !== route.fullPath) void mount().then(revealActiveTab);
+  if (released || (mountedPath && mountedPath !== route.fullPath)) {
+    released = false;
+    void mount().then(revealActiveTab);
+  }
 });
 
 onBeforeUnmount(() => {
