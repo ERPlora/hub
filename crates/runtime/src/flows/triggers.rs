@@ -474,6 +474,65 @@ mod tests {
             .unwrap_or(-1)
     }
 
+    /// **hub#2061** — the WhatsApp recipes listen to the same event twice: once for a written
+    /// message and once for the tap on an option. Keyed by `kind:event`, the second trigger
+    /// overwrote the first, so a customer who WROTE was never answered.
+    #[tokio::test]
+    async fn every_trigger_on_the_same_event_starts_the_flow() {
+        let db = db().await;
+        let flow = flow_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "triggers": [
+                    { "kind": "event", "event": "hub.whatsapp.message_received",
+                      "filter": { "event.text": { "neq": "" } } },
+                    { "kind": "event", "event": "hub.whatsapp.message_received",
+                      "filter": { "event.text": { "eq": "" }, "event.reply_id": { "neq": "" } } }
+                ],
+                "steps": [{ "id": "wait", "kind": "delay", "seconds": 1 }]
+            }),
+        )
+        .await;
+
+        let written = payload(&[
+            ("text", json!("quiero cita mañana")),
+            ("reply_id", json!("")),
+        ]);
+        on_event(
+            &db,
+            HUB,
+            "evt-text",
+            "hub.whatsapp.message_received",
+            &written,
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            run_count(&db, &flow).await,
+            1,
+            "a written message starts it"
+        );
+
+        let tapped = payload(&[("text", json!("")), ("reply_id", json!("slot-1"))]);
+        on_event(
+            &db,
+            HUB,
+            "evt-tap",
+            "hub.whatsapp.message_received",
+            &tapped,
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            run_count(&db, &flow).await,
+            2,
+            "and so does a tap on an option"
+        );
+    }
+
     #[tokio::test]
     async fn a_matching_event_inserts_exactly_one_run_however_many_times_it_is_delivered() {
         let db = db().await;

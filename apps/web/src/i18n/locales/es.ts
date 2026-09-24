@@ -687,6 +687,7 @@ export default {
     reset_media: 'Ficheros e imágenes',
     reset_fiscal: 'Configuración fiscal',
     reset_roles: 'Roles activos',
+    reset_print_queue: 'Cola de impresión',
     permissionsTitle: 'Permisos de las apps',
     permissionsDesc: 'Concede o revoca los permisos que cada app pide (acceso a internet, certificado, impresora, notificaciones, administrar automatizaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',
@@ -805,6 +806,7 @@ export default {
     stateInstalled: 'Instalado',
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
+    stateNeedsNewerHub: 'Necesita ERPlora {version}',
     stateInstalling: 'Instalando…',
     // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
     // «hay actualización» sin decir cuál es una insistencia, no una información.
@@ -818,6 +820,7 @@ export default {
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
     actionUpdate: 'Actualizar',
+    actionSeeHubUpdates: 'Ver tu versión de ERPlora y sus actualizaciones',
     actionOpen: 'Abrir',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',

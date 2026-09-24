@@ -105,6 +105,12 @@ verifactu/tests/desglose.hub.test.py
 # ningún e2e del hub (inventory#73). Cobertura nueva, no mudada (inventory#77, v1.2.44).
 inventory/tests/combo_stock.hub.test.py
 
+# staff: un usuario del Hub cuelga de UNA sola ficha viva — el rechazo `staff.user_already_linked`,
+# el id que devuelve el alta y la guarda de rol tras pasar alta/edición a handler WASM, contra el
+# kernel real (staff#55). Cobertura nueva, no mudada.
+# pending-publication: staff#62 until 2026-10-23
+staff/tests/user_link.hub.test.py
+
 # ── Cómo entra una batería NUEVA: `# pending-publication: <repo>#<n> until <fecha>` (kitchen#84) ─
 # Una batería nueva no podía aterrizar: el gate del módulo (module-toolkit#163) la rechaza hasta
 # que esta lista en `develop` la declara, y el guard de aquí rechaza la declaración hasta que el
