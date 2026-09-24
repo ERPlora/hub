@@ -592,7 +592,6 @@ onIonViewDidLeave(() => {
 });
 onIonViewWillEnter(() => {
   if (!leftScreen) return;
-  leftScreen = false;
   void loadSystemHealth();
 });
 </script>
