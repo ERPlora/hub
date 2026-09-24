@@ -1395,6 +1395,9 @@ export default {
         "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
       notMeasured: "We couldn't read this",
     },
+    // hub#1886 — the button on the two blocked cards (notices, printer search) that opens THIS
+    // app's page in the device settings: once Android stops asking, that page is the only way back.
+    openDeviceSettings: 'Open settings',
     // hub#1732 — the notices, and the permission that lets them exist at all.
     //
     // The sheet that goes in FRONT of Android's dialog. Android's own says «Allow ERPlora to send

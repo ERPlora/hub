@@ -1225,6 +1225,8 @@ export default {
         'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
       notMeasured: 'No hemos podido leerlo',
     },
+    // hub#1886 — ver el comentario gemelo en `en.ts`.
+    openDeviceSettings: 'Abrir los ajustes',
     notices: {
       primerHeader: 'Deja que te avisemos de las comandas',
       primerMessage:
