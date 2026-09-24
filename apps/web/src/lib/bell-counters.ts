@@ -16,13 +16,13 @@
  * when the cause is dealt with), a poll and not a socket, and a failed fetch keeps the last known
  * value instead of flashing zero.
  */
-import { ref } from 'vue';
+import { ref, watch, type WatchStopHandle } from 'vue';
 import type { BellManifestDef, ModuleManifest } from '@erplora/module-types';
 
 import { normalizeRows } from './dashboard-widgets';
 import { loadInstalledManifests } from './module-loader';
 import { getClient } from './runtime';
-import { hasPermission, isAuthed } from './session';
+import { hasPermission, isAuthed, user } from './session';
 import { setNotificationCount } from './shell';
 
 /** Poll cadence: the same as stalled printing — a customer is waiting on the other end. */
@@ -46,6 +46,12 @@ export const bellCounters = ref<BellCounter[]>([]);
 /** Last count seen per counter, so a failed query keeps its value instead of reading as zero. */
 let lastCounts = new Map<string, number>();
 
+/**
+ * Bumped by every refresh. A pass that was overtaken (the cashier changed while its queries were in
+ * flight) drops its result: it was filtered with the previous person's permissions.
+ */
+let generation = 0;
+
 function countOf(result: unknown): number {
   const raw = normalizeRows(result)[0]?.count;
   const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
@@ -64,6 +70,7 @@ function publish(counters: BellCounter[]): void {
  * Run every `bell` counter the session may see and feed the bell. **Never throws.**
  */
 export async function refreshBellCounters(): Promise<void> {
+  const pass = ++generation;
   if (!isAuthed.value) {
     lastCounts = new Map();
     publish([]);
@@ -75,6 +82,7 @@ export async function refreshBellCounters(): Promise<void> {
   } catch {
     return; // no manifests is not "nothing waiting"
   }
+  if (pass !== generation) return;
   const client = getClient();
   const next = new Map<string, number>();
   const counters: BellCounter[] = [];
@@ -95,6 +103,7 @@ export async function refreshBellCounters(): Promise<void> {
       } catch {
         count = lastCounts.get(key) ?? 0;
       }
+      if (pass !== generation) return;
       next.set(key, count);
       if (count === 0) continue;
 
@@ -114,6 +123,7 @@ export async function refreshBellCounters(): Promise<void> {
 
 let watching = false;
 let timer: ReturnType<typeof setInterval> | null = null;
+let stopUserWatch: WatchStopHandle | null = null;
 
 function onVisible(): void {
   if (document.visibilityState === 'visible') void refreshBellCounters();
@@ -131,6 +141,12 @@ export function bootBellCountersWatch(): void {
     if (document.visibilityState === 'visible') void refreshBellCounters();
   }, POLL_MS);
   document.addEventListener('visibilitychange', onVisible);
+  // A PIN hand-over swaps the user without a logout (`user-switch.ts`): repaint for the one who
+  // arrived now, not at the next poll.
+  stopUserWatch = watch(
+    () => user.value?.id,
+    () => void refreshBellCounters(),
+  );
 }
 
 /** Stop polling and clear this source (e.g. on logout). */
@@ -138,7 +154,10 @@ export function stopBellCountersWatch(): void {
   if (timer) clearInterval(timer);
   timer = null;
   document.removeEventListener('visibilitychange', onVisible);
+  stopUserWatch?.();
+  stopUserWatch = null;
   watching = false;
+  generation++;
   lastCounts = new Map();
   publish([]);
 }

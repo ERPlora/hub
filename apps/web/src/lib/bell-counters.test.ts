@@ -4,10 +4,13 @@
 // two sources wired by hand (dead letters, printing) and nothing a module could feed.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { nextTick, ref } from 'vue';
+
 import type { InstalledManifest } from './module-loader';
 import { notificationCount, notificationCountOf, setNotificationCount } from './shell';
 
 const isAuthed = { value: true };
+const user = ref<{ id: string } | null>({ id: 'owner' });
 const allowed = new Set<string>(['appointments.view']);
 let installed: InstalledManifest[] = [];
 const query = vi.fn<(name: string, params?: Record<string, unknown>) => Promise<unknown>>();
@@ -16,13 +19,23 @@ vi.mock('./session', () => ({
   get isAuthed() {
     return isAuthed;
   },
+  get user() {
+    return user;
+  },
   hasPermission: (p: string) => allowed.has(p),
 }));
 vi.mock('./runtime', () => ({ getClient: () => ({ query }) }));
 vi.mock('./module-loader', () => ({ loadInstalledManifests: async () => installed }));
 
 // Imported after the mocks so the module under test picks them up.
-const { refreshBellCounters, bellCounters, stopBellCountersWatch } = await import('./bell-counters');
+const { refreshBellCounters, bellCounters, bootBellCountersWatch, stopBellCountersWatch } = await import(
+  './bell-counters'
+);
+
+const settle = async (): Promise<void> => {
+  await nextTick();
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
 
 function appointments(bell: Record<string, unknown>, locale?: InstalledManifest['locale']): InstalledManifest {
   return {
@@ -45,6 +58,7 @@ const TO_CONFIRM = {
 describe('module counters on the bell (hub#1678)', () => {
   beforeEach(() => {
     isAuthed.value = true;
+    user.value = { id: 'owner' };
     allowed.clear();
     allowed.add('appointments.view');
     query.mockReset();
@@ -179,5 +193,39 @@ describe('module counters on the bell (hub#1678)', () => {
 
     expect(bellCounters.value).toEqual([]);
     expect(notificationCount.value).toBe(0);
+  });
+
+  // A shift hand-over by PIN is not a logout (user-switch.ts): the next cashier must not see, for
+  // up to a poll, the counters of the person who left — least of all one she has no permission for.
+  it('repaints at once when another cashier takes over the till', async () => {
+    installed = [appointments({ 'appointments.to_confirm': TO_CONFIRM })];
+    query.mockResolvedValue([{ count: 2 }]);
+    bootBellCountersWatch();
+    await settle();
+    expect(notificationCountOf('modules')).toBe(2);
+
+    allowed.clear();
+    user.value = { id: 'cashier' };
+    await settle();
+
+    expect(bellCounters.value).toEqual([]);
+    expect(notificationCountOf('modules')).toBe(0);
+  });
+
+  it('a slow answer asked for the previous cashier does not repaint the bell after the hand-over', async () => {
+    installed = [appointments({ 'appointments.to_confirm': TO_CONFIRM })];
+    let answer: (v: unknown) => void = () => {};
+    query.mockReturnValueOnce(new Promise((r) => (answer = r)));
+    const slow = refreshBellCounters();
+    await settle();
+    expect(query).toHaveBeenCalledTimes(1);
+
+    allowed.clear();
+    await refreshBellCounters();
+    answer([{ count: 5 }]);
+    await slow;
+
+    expect(bellCounters.value).toEqual([]);
+    expect(notificationCountOf('modules')).toBe(0);
   });
 });
