@@ -583,6 +583,11 @@ mod tests {
         .await
     }
 
+    /// The outbox row a prepared step queues; panics when it queued nothing.
+    fn queue_row(prepared: &Prepared) -> &Params {
+        &prepared.queue_op.as_ref().expect("the step queued a message").1
+    }
+
     #[tokio::test]
     async fn the_queued_message_carries_the_address_and_names_the_grant_that_released_it() {
         let db = db().await;
@@ -597,7 +602,7 @@ mod tests {
         .await
         .unwrap();
 
-        let queued = &prepared.queue_op.as_ref().unwrap().1;
+        let queued = &queue_row(&prepared);
         let payload: Json = serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["to"],
@@ -650,7 +655,7 @@ mod tests {
         .unwrap();
 
         let payload: Json =
-            serde_json::from_str(prepared.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(queue_row(&prepared)["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["flow_step"],
             json!("remind"),
@@ -858,7 +863,7 @@ mod tests {
 
         let prepared = prepare_step(&db, &asking, &authority).await.unwrap();
 
-        let queued = &prepared.queue_op.as_ref().unwrap().1;
+        let queued = &queue_row(&prepared);
         let payload: Json = serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
         assert_eq!(payload["to"], json!("+34600111222"));
         assert_eq!(
@@ -887,7 +892,7 @@ mod tests {
         .await
         .unwrap();
         let plain_payload: Json =
-            serde_json::from_str(plain.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(queue_row(&plain)["payload"].as_str().unwrap()).unwrap();
         assert!(
             plain_payload.get("interactive").is_none(),
             "a plain message carries no `interactive`: {plain_payload}"
@@ -961,7 +966,7 @@ mod tests {
             .await
             .expect("a list that IS there is queued");
         let payload: Json =
-            serde_json::from_str(prepared.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(queue_row(&prepared)["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["interactive"]["action"]["sections"][0]["rows"][0]["id"],
             json!("s1")
@@ -1256,7 +1261,7 @@ mod tests {
         .await
         .expect("a section that IS there is queued");
         let payload: Json =
-            serde_json::from_str(prepared.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(queue_row(&prepared)["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["interactive"]["action"]["sections"][0]["title"],
             json!("Huecos")
