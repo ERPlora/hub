@@ -819,7 +819,7 @@ export default {
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
     actionUpdate: 'Actualizar',
-    actionSeeHubUpdates: 'Ver la versión y las actualizaciones del hub',
+    actionSeeHubUpdates: 'Ver tu versión de ERPlora y sus actualizaciones',
     actionOpen: 'Abrir',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',
