@@ -372,6 +372,10 @@ export default {
         title: 'Los datos de tu negocio',
         description: 'Razón social y NIF: sin ellos no puedes emitir una factura.',
       },
+      printer: {
+        title: 'Configura la impresora',
+        description: 'Da de alta el dispositivo que imprime los tiques de tus clientes, para que la primera venta salga en papel.',
+      },
       team: {
         title: 'Tu equipo',
         description: 'Añade a las personas que usarán el TPV, cada una con su forma de entrar.',

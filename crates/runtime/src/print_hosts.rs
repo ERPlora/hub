@@ -459,6 +459,29 @@ pub async fn live_hosts_for(db: &dyn DatabaseAdapter, hub_id: &str, role: &str) 
         .unwrap_or(0))
 }
 
+/// **Has any device ever been set up to print `role` here?** Live or not (hub#1948).
+///
+/// The question of the onboarding checklist, which is not [`live_hosts_for`]'s: registering a till
+/// as the receipt printer is a one-off task, and a till switched off overnight is the coverage
+/// alarm's business, not a first step that went back to undone.
+pub async fn is_registered_for(db: &dyn DatabaseAdapter, hub_id: &str, role: &str) -> Result<bool> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("role".into(), json!(role.trim()));
+    let res = db
+        .query(
+            "SELECT COUNT(*) AS hosts FROM _print_host WHERE hub_id = :hub_id AND role = :role",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|row| row["hosts"].as_i64())
+        .unwrap_or(0)
+        > 0)
+}
+
 /// The name of every host that is live as of `cutoff`, per station.
 ///
 /// A second read of `_print_host` and not a column of the aggregate above, because collapsing
