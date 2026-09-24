@@ -707,3 +707,80 @@ async fn manifest_fallback_also_reports_dragged_in_dependencies_hub1130() {
         "the manifest fallback must report the dependency it installed too"
     );
 }
+
+/// A `module.zip` whose manifest declares it needs a core newer than any this hub will ever run.
+fn module_zip_needing_a_newer_hub(id: &str) -> Vec<u8> {
+    let manifest = json!({
+        "id": id, "name": id, "version": "1.0.0", "depends_on": [],
+        "compatibility": { "min_erplora_version": "999.0.0" },
+    });
+    build_zip(&[(
+        "module.json",
+        serde_json::to_string(&manifest).unwrap().as_bytes(),
+    )])
+}
+
+/// hub#1620 — installing an app that needs a newer hub keeps the runtime's STABLE fact
+/// (`core_version_too_old`) and both numbers, by BOTH install roads (the Cloud's plan and the
+/// manifest fallback). It used to be flattened into `install_runtime_failed` with the engine's
+/// English sentence behind a «runtime: » prefix, which is what the owner read in the toast.
+#[tokio::test]
+async fn an_app_that_needs_a_newer_hub_keeps_its_code_and_both_versions() {
+    for (tag, with_plan) in [("floor-plan", true), ("floor-fallback", false)] {
+        let zip = module_zip_needing_a_newer_hub("whatsapp_inbox");
+        let sha = sha256_hex(&zip);
+        let mut catalog = HashMap::new();
+        catalog.insert("whatsapp_inbox".to_string(), (zip, sha.clone()));
+        let plan = with_plan.then(|| {
+            json!({
+                "requested": "whatsapp_inbox",
+                "plan": [node("whatsapp_inbox", &sha, "requested")],
+                "already_satisfied": [],
+                "blocked": false,
+                "blocked_on": [],
+            })
+        });
+        let mock = Arc::new(MockCloud {
+            catalog,
+            plan,
+            calls: Mutex::new(Vec::new()),
+            plan_bodies: Mutex::new(Vec::new()),
+        });
+        let base_url = spawn_mock_cloud(mock).await;
+
+        let mut rt = Runtime::new(Box::new(fresh_db().await));
+        let err = install_from_cloud(
+            &reqwest::Client::new(),
+            &base_url,
+            &cache_dir(tag),
+            &Auth::HubToken {
+                hub_id: "hub-test".into(),
+                token: "tok".into(),
+            },
+            &mut rt,
+            "whatsapp_inbox",
+            "latest",
+            &|_, _| {},
+            &dev_policy(),
+        )
+        .await
+        .expect_err("a module that needs a newer hub is refused");
+
+        assert_eq!(err.code(), "core_version_too_old", "{tag}: {err:?}");
+        let InstallError::CoreVersionTooOld {
+            module,
+            required,
+            core,
+        } = &err
+        else {
+            panic!("{tag}: the refusal must carry its numbers, got {err:?}");
+        };
+        assert_eq!(module, "whatsapp_inbox", "{tag}");
+        assert_eq!(required, "999.0.0", "{tag}");
+        assert!(
+            !core.is_empty() && core != required,
+            "{tag}: `core` is the version this hub runs: {core:?}"
+        );
+        assert!(!rt.registry().is_installed("whatsapp_inbox"), "{tag}");
+    }
+}

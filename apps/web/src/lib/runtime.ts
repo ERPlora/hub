@@ -467,13 +467,37 @@ export class InstallFailedError extends Error {
    * nothing», which is the only way to know whether there is a sentence worth replacing ours with.
    */
   readonly detail: string | null;
+  /**
+   * The facts the translated sentence names, or `null` when the code needs none (hub#1620): «this
+   * app needs ERPlora {required} and your hub runs {core}» travels as data, never parsed out of
+   * the engine's English line.
+   */
+  readonly params: Record<string, string> | null;
 
-  constructor(message: string, code: string, detail: string | null = null) {
+  constructor(
+    message: string,
+    code: string,
+    detail: string | null = null,
+    params: Record<string, string> | null = null,
+  ) {
     super(message);
     this.name = 'InstallFailedError';
     this.code = code;
     this.detail = detail;
+    this.params = params;
   }
+}
+
+/**
+ * The versions a `core_version_too_old` refusal carries (hub#1620), or `null` when the body does
+ * not bring both — a half sentence («needs ERPlora  · yours is 1.1.15») is worse than none.
+ */
+function coreVersionParams(body: Record<string, unknown> | null): Record<string, string> | null {
+  const required = body?.required;
+  const core = body?.core;
+  return typeof required === 'string' && typeof core === 'string' && required && core
+    ? { required, core }
+    : null;
 }
 
 /**
@@ -520,7 +544,7 @@ export async function requestInstall(moduleId: string, version: string): Promise
           : [];
         throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code, detail);
+      throw new InstallFailedError(message, code, detail, coreVersionParams(body));
     }
     return (await res.json()) as InstallRequestResult;
   } finally {
@@ -723,7 +747,7 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
           : [];
         throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code, detail);
+      throw new InstallFailedError(message, code, detail, coreVersionParams(body));
     }
     return (await res.json()) as ModuleUpdateResult;
   } finally {
