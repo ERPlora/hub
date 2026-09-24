@@ -111,7 +111,9 @@ async fn a_hub_that_went_live_through_the_module_select_is_adopted_as_live() {
     rt.set_settings(&identity, "u1").await.expect("fiscal identity");
     module_config_saying(rt.db(), ENV_PRODUCTION).await;
 
-    assert!(rt.adopt_module_fiscal_environment().await.unwrap());
+    // Through the boot's own step: the host resolves the profile at every start, and that is
+    // where the adoption runs.
+    rt.refresh_fiscal_profile().await.unwrap();
 
     let after = profile(rt.db()).await;
     assert_eq!(after.environment, ENV_PRODUCTION);
@@ -185,4 +187,24 @@ async fn a_hub_without_the_module_table_adopts_nothing() {
 
     assert!(!rt.adopt_module_fiscal_environment().await.unwrap());
     assert_eq!(profile(rt.db()).await.environment, ENV_TESTING);
+}
+
+/// 🔴 **The fiscal hard line, end to end through the real seam** (real host → real engine): the
+/// module's row says `production`, the core never went live, and the endpoint the engine would
+/// POST to is the AEAT's TEST agency. If this ever answers a production host, a settings select is
+/// once again sending real invoices around the go-live.
+#[tokio::test]
+async fn a_module_row_saying_production_never_points_the_engine_at_the_real_aeat() {
+    let rt = hub().await;
+    module_config_saying(rt.db(), ENV_PRODUCTION).await;
+
+    let endpoint = erplora_verifactu::transmission_endpoint_for(&host(rt.db()), HUB)
+        .await
+        .unwrap();
+    assert!(
+        endpoint.starts_with("https://prewww1.aeat.es/")
+            || endpoint.starts_with("https://prewww10.aeat.es/"),
+        "the core is in testing: {endpoint}"
+    );
+    assert!(!endpoint.contains("agenciatributaria.gob.es"), "{endpoint}");
 }
