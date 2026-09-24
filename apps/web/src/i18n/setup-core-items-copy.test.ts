@@ -42,4 +42,16 @@ describe('setup checklist · copy of the core items (hub#1948)', () => {
   it('asks the Spanish owner to set up the printer in plain words', () => {
     expect(items(es).printer?.title).toBe('Configura la impresora');
   });
+
+  // The step lands on Settings → Receipts (`/settings#tickets`), whose row leads on to the Printers
+  // app. A row that only said «Receipt template» would leave the owner who came to add a printer
+  // looking for it on a screen that never names it.
+  it.each([
+    ['en', en, /printer/i],
+    ['es', es, /impresora/i],
+  ] as const)('%s: the row the printer step lands on names the printer', (_code, locale, word) => {
+    const settings = (locale as unknown as { settings: Record<string, string> }).settings;
+    expect(settings.receiptTemplate).toMatch(word);
+    expect(settings.receiptTemplateMissing).toMatch(word);
+  });
 });
