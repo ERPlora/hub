@@ -124,9 +124,34 @@ describe('Apps · what an installed app card offers', () => {
     expect(iface).toContain('hidden?: (row: Row) => boolean;');
   });
 
+  // 0.1.84 is the first OutfitKit whose row actions honour `hidden`. The floor is asserted by
+  // semver, not by equality: CI runs `pnpm add @erplora/outfitkit@latest` before verifying
+  // (hub#1793), which rewrites the range on every release, and an equality pin turned every PR red
+  // the day 0.1.85 shipped (hub#2048).
   it('requires the OutfitKit that knows how to hide a row action', () => {
     const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
-    expect(pkg.dependencies['@erplora/outfitkit']).toBe('^0.1.84');
+    const range = pkg.dependencies['@erplora/outfitkit'];
+    expect(rangeFloorIsAtLeast(range, '0.1.84'), `@erplora/outfitkit is "${range}"`).toBe(true);
+  });
+
+  it.each([
+    ['^0.1.83', false],
+    ['^0.1.84', true],
+    ['^0.1.85', true],
+    ['~0.1.84', true],
+    ['>=0.1.84', true],
+    ['0.1.84', true],
+    ['^0.2.0', true],
+    ['^1.0.0', true],
+    // Numeric, not lexical: 0.1.9 sorts after 0.1.84 as text but is an older release.
+    ['^0.1.9', false],
+    ['^0.0.99', false],
+    // A range whose lowest version cannot be read guarantees no floor at all.
+    ['*', false],
+    ['latest', false],
+    [undefined, false],
+  ])('reads the OutfitKit floor of %s as at least 0.1.84: %s', (range, expected) => {
+    expect(rangeFloorIsAtLeast(range, '0.1.84')).toBe(expected);
   });
 
   it('always asks before flipping the switch, and the question names the future state', () => {
@@ -286,3 +311,19 @@ describe('Apps · what an installed app card offers', () => {
     expect(fn).toContain('apps.uninstallBlocked');
   });
 });
+
+/**
+ * Whether the lowest version an npm range admits is at least `floor`. Only the plain forms
+ * `package.json` uses (`^x.y.z`, `~x.y.z`, `>=x.y.z`, `x.y.z`) have a readable lowest version;
+ * anything else guarantees no floor, so it answers false.
+ */
+function rangeFloorIsAtLeast(range: string | undefined, floor: string): boolean {
+  const lowest = /^(?:\^|~|>=)?(\d+)\.(\d+)\.(\d+)$/.exec(range?.trim() ?? '');
+  if (!lowest) return false;
+  const want = floor.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const have = Number(lowest[i + 1]);
+    if (have !== want[i]) return have > want[i];
+  }
+  return true;
+}
