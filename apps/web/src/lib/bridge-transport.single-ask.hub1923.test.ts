@@ -90,6 +90,14 @@ describe('one search, one question (hub#1923)', () => {
     expect([...asks[0]].sort()).toEqual([BT, LAN].sort());
   });
 
+  it('and when the owner allows it, it is still that one dialog — nothing behind it', async () => {
+    systemSaysYes = true;
+
+    await makeBridgeTransport().discoverPrinters();
+
+    expect(asks, 'a second dialog followed the one the owner accepted').toHaveLength(1);
+  });
+
   it('a «not now» to our sheet keeps Android out of it for Bluetooth too', async () => {
     confirmSpy.mockImplementation(async () => false);
 
