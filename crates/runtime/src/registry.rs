@@ -1867,6 +1867,7 @@ mod tests {
             ai: None,
             expose_api,
             internal,
+            on_unique: Default::default(),
         }
     }
 
