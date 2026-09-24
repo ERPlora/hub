@@ -290,6 +290,59 @@ fn recipient_of(spec: &NotifyStep, rows: &[Json]) -> Result<String> {
     Ok(to)
 }
 
+/// The first text this message promises — a `vars` entry, or the `header`/`body`/`footer` of an
+/// `interactive` — that the run filled with **nothing**.
+///
+/// Same frontier as [`missing_options`]: only NOTHING counts. A path that resolves to nothing, or a
+/// text made of nothing but `{{…}}` placeholders that ALL resolve to nothing. An empty string the
+/// run did publish is somebody's decision, and words around an empty placeholder still say
+/// something — every automation tool of the market sends a missing merge field as blank (Zapier,
+/// Make, Shopify Flow, Klaviyo without a default), and refusing it would stop recipes that work.
+fn missing_text(spec: &NotifyStep, scope: &Json) -> Option<MissingOptions> {
+    let missing = |place: String, mapped_from: String| MissingOptions { place, mapped_from };
+    for (key, written) in &spec.vars {
+        if let Some(from) = nothing_from(written, scope) {
+            return Some(missing(format!("vars.{key}"), from));
+        }
+    }
+    let interactive = spec.interactive.as_ref()?;
+    for part in ["header", "body", "footer"] {
+        match interactive.get(part) {
+            Some(whole @ Json::String(_)) => {
+                if let Some(from) = nothing_from(whole, scope) {
+                    return Some(missing(format!("interactive.{part}"), from));
+                }
+            }
+            Some(Json::Object(block)) => {
+                if let Some(from) = block.get("text").and_then(|t| nothing_from(t, scope)) {
+                    return Some(missing(format!("interactive.{part}.text"), from));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// What a written text was mapped from, when the run had none of it; `None` when it is there or
+/// is the author's own words.
+fn nothing_from(written: &Json, scope: &Json) -> Option<String> {
+    let absent = |path: &str| def::resolve_path(path, scope).is_none_or(|v| v.is_null());
+    let Json::String(s) = written else {
+        return None;
+    };
+    if def::is_path(s) {
+        return absent(s).then(|| s.clone());
+    }
+    if !s.contains("{{") || !def::render(s, &Json::Null).trim().is_empty() {
+        return None;
+    }
+    let mut paths = Vec::new();
+    def::template_paths(written, &mut paths);
+    let first = paths.first()?.clone();
+    paths.iter().all(|p| absent(p)).then_some(first)
+}
+
 /// A place in a message where the options live, mapped from the run and filled with **nothing**.
 #[derive(Debug)]
 struct MissingOptions {
@@ -406,59 +459,6 @@ fn missing_options(written: &Json, filled: &Json) -> Option<MissingOptions> {
         }
     }
     None
-}
-
-/// The first text this message promises — a `vars` entry, or the `header`/`body`/`footer` of an
-/// `interactive` — that the run filled with **nothing**.
-///
-/// Same frontier as [`missing_options`]: only NOTHING counts. A path that resolves to nothing, or a
-/// text made of nothing but `{{…}}` placeholders that ALL resolve to nothing. An empty string the
-/// run did publish is somebody's decision, and words around an empty placeholder still say
-/// something — every automation tool of the market sends a missing merge field as blank (Zapier,
-/// Make, Shopify Flow, Klaviyo without a default), and refusing it would stop recipes that work.
-fn missing_text(spec: &NotifyStep, scope: &Json) -> Option<MissingOptions> {
-    let missing = |place: String, mapped_from: String| MissingOptions { place, mapped_from };
-    for (key, written) in &spec.vars {
-        if let Some(from) = nothing_from(written, scope) {
-            return Some(missing(format!("vars.{key}"), from));
-        }
-    }
-    let interactive = spec.interactive.as_ref()?;
-    for part in ["header", "body", "footer"] {
-        match interactive.get(part) {
-            Some(whole @ Json::String(_)) => {
-                if let Some(from) = nothing_from(whole, scope) {
-                    return Some(missing(format!("interactive.{part}"), from));
-                }
-            }
-            Some(Json::Object(block)) => {
-                if let Some(from) = block.get("text").and_then(|t| nothing_from(t, scope)) {
-                    return Some(missing(format!("interactive.{part}.text"), from));
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// What a written text was mapped from, when the run had none of it; `None` when it is there or
-/// is the author's own words.
-fn nothing_from(written: &Json, scope: &Json) -> Option<String> {
-    let absent = |path: &str| def::resolve_path(path, scope).is_none_or(|v| v.is_null());
-    let Json::String(s) = written else {
-        return None;
-    };
-    if def::is_path(s) {
-        return absent(s).then(|| s.clone());
-    }
-    if !s.contains("{{") || !def::render(s, &Json::Null).trim().is_empty() {
-        return None;
-    }
-    let mut paths = Vec::new();
-    def::template_paths(written, &mut paths);
-    let first = paths.first()?.clone();
-    paths.iter().all(|p| absent(p)).then_some(first)
 }
 
 /// How a resolved value reads on the wire — same rule as the mapping language, so a template and a
