@@ -58,6 +58,15 @@ pub enum InstallError {
     },
     #[error("runtime: {0}")]
     Runtime(String),
+    /// The module declares it needs a newer core than this hub runs (hub#1620). Its own variant,
+    /// not a [`InstallError::Runtime`] string: the shell translates it with both numbers instead
+    /// of painting the engine's English sentence.
+    #[error("the module `{module}` requires ERPlora {required} and this hub runs {core}")]
+    CoreVersionTooOld {
+        module: String,
+        required: String,
+        core: String,
+    },
     /// Se pidió **actualizar** un módulo que este hub no tiene instalado (hub#516). Actualizar no
     /// es una puerta trasera para instalar: un id mal escrito debe decirlo, no instalar algo nuevo.
     #[error("el módulo `{0}` no está instalado en este hub: no hay nada que actualizar")]
@@ -80,6 +89,26 @@ pub enum InstallError {
 }
 
 impl InstallError {
+    /// The one door every runtime refusal of the install pipeline takes (hub#1620).
+    ///
+    /// «This app needs a newer hub» is lifted out with its numbers because it is the one refusal
+    /// the owner can act on — update the hub — and the shell has to be able to say so in their
+    /// language. Everything else keeps travelling as `install_runtime_failed`.
+    pub fn from_runtime(e: erplora_runtime::RuntimeError) -> Self {
+        match e {
+            erplora_runtime::RuntimeError::CoreVersionTooOld {
+                module,
+                required,
+                core,
+            } => InstallError::CoreVersionTooOld {
+                module,
+                required,
+                core,
+            },
+            other => InstallError::Runtime(other.to_string()),
+        }
+    }
+
     /// Código de error **estable** (canal de errores de dominio, hub#139): la UI programa y
     /// traduce contra él, nunca contra el mensaje. Un fallo de instalación deja de ser mudo.
     pub fn code(&self) -> &'static str {
@@ -91,6 +120,7 @@ impl InstallError {
             InstallError::MissingSha256 { .. } => "install_missing_sha256",
             InstallError::Blocked { .. } => "install_blocked",
             InstallError::Runtime(_) => "install_runtime_failed",
+            InstallError::CoreVersionTooOld { .. } => "core_version_too_old",
             InstallError::NotInstalled(_) => "update_not_installed",
             InstallError::CloudDenied => "install_cloud_denied",
             InstallError::NotInCatalog { .. } => "install_not_in_catalog",
@@ -768,7 +798,7 @@ pub(crate) async fn restore_one(
 ) -> Result<bool, InstallError> {
     let stored = erplora_runtime::module_package::load(runtime.db(), runtime.hub_id(), module_id)
         .await
-        .map_err(|e| InstallError::Runtime(e.to_string()))?;
+        .map_err(InstallError::from_runtime)?;
     let Some(stored) = stored else {
         return Ok(false);
     };
@@ -1254,7 +1284,7 @@ async fn execute_plan(
         // falls back to manifest resolution. Registering would only die in `MissingDependency`.
         let missing: Vec<String> = runtime
             .missing_dependencies(&dir)
-            .map_err(|e| InstallError::Runtime(e.to_string()))?
+            .map_err(InstallError::from_runtime)?
             .into_iter()
             .filter(|dep| !planned.contains(dep.as_str()))
             .collect();
@@ -1410,7 +1440,7 @@ fn install_recursive<'a>(
         //     aquí se satisface ese contrato descargándolas del Cloud en orden de profundidad.
         let missing = runtime
             .missing_dependencies(&dir)
-            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+            .map_err(InstallError::from_runtime)?;
         installing.insert(module_id.clone());
         for dep in missing {
             // Ya en la cadena en curso (ciclo) o ya instalada por otra rama (dep en diamante): saltar.
@@ -1489,5 +1519,5 @@ pub(crate) async fn register(
     } else {
         runtime.install_from_dir(dir).await
     };
-    result.map_err(|e| InstallError::Runtime(e.to_string()))
+    result.map_err(InstallError::from_runtime)
 }
