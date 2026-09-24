@@ -166,6 +166,7 @@ export default {
     plansConfirm: 'Ir al pago',
     planOption: '{name} — {price} €/mes',
     plansUnavailable: 'Ahora mismo no hay planes a los que ampliar.',
+    checkoutOpenFailed: 'No se pudo abrir la página de pago en el navegador. Inténtalo de nuevo y, si sigue fallando, actualiza la app de ERPlora.',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
