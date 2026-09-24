@@ -22,6 +22,7 @@ import {
   MODULE_SCOPE_REQUIRED,
   RELEASE_REVOKED,
 } from './index.ts';
+import type { ModuleFlowTemplate } from './index.ts';
 
 const SESSION = 's3ss10n-of-a-human-admin';
 const EDITOR = 'flows_editor';
@@ -689,4 +690,33 @@ test('hub#1677: a family that would not survive a URL is refused before it is pa
     );
   }
   assert.deepEqual(calls, [], 'and nothing was sent');
+});
+
+test('hub#2069: a recipe grant carries the sentence that explains it, per language, verbatim', async () => {
+  // The runtime serves it since flows#114 (`FlowTemplateGrant.reason`): the module writes it in its
+  // `<family>.grants.json` and the permission screen paints it next to the pin. The public type has
+  // to announce it, or the next gallery only learns it exists by reading the hub.
+  const template: ModuleFlowTemplate = {
+    module: 'appointments',
+    family: 'appointment-from-whatsapp',
+    documents: { en: { name: 'Book from WhatsApp' } },
+    grants: [
+      { kind: 'command', value: 'appointments.appointments.create' },
+      {
+        kind: 'command',
+        value: 'appointments.appointments.cancel',
+        payload: { channel: 'customer' },
+        reason: { en: 'Cancel as the customer', es: 'Anular como la clienta' },
+      },
+    ],
+    requires: {},
+    installed: null,
+  };
+  const { client } = scoped({ ok: true, data: [template] });
+
+  const [served] = await client.flows.templates();
+
+  const reason: Record<string, string> | undefined = served.grants[1].reason;
+  assert.deepEqual(reason, { en: 'Cancel as the customer', es: 'Anular como la clienta' });
+  assert.equal(served.grants[0].reason, undefined, 'optional: a grant without one stays without one');
 });
