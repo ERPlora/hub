@@ -10,8 +10,8 @@
 //
 // La cabecera de esa hoja lleva la etiqueta de sala, la ronda y —desde hub#1410— **quién disparó
 // la ronda**: cocina tiene que saber a quién llamar cuando un plato sale mal o va tarde, sin
-// buscar a nadie por la sala. El id viaja opaco en la comanda y el nombre lo resuelve `waiterName`
-// contra `hub.users.list`, igual que la tarjeta del KDS (kitchen#63, ADR-0192).
+// buscar a nadie por la sala. The id travels opaque in the order and `waiterName` resolves the name
+// against `hub.users.list`, then the staff app's team (hub#2033), like the KDS card (kitchen#63/#82).
 //
 // Dos reglas que no son negociables, las dos por lo mismo (un bar lleno):
 //  - **Nunca bloquea.** La comanda ya está en la BD y el KDS es la fuente de verdad; el papel es
@@ -296,7 +296,41 @@ async function waiterName(client: ErploraClient, header: Record<string, unknown>
     .query<{ id?: unknown; name?: unknown }[]>('hub.users.list')
     .catch(() => [] as { id?: unknown; name?: unknown }[]);
   const user = (Array.isArray(users) ? users : []).find((u) => u && str(u.id) === waiterId);
-  return str(user?.name).trim();
+  const userName = str(user?.name).trim();
+  if (userName) return userName;
+  return teamMemberName(client, waiterId);
+}
+
+/** One row of `staff.members.list` — the business's TEAM (hub#2033, same shape as kitchen#82). */
+interface TeamMember {
+  id?: unknown;
+  full_name?: unknown;
+  first_name?: unknown;
+  last_name?: unknown;
+}
+
+/**
+ * The name of a TEAM record with no hub user, or `''` (hub#2033).
+ *
+ * Since sales#318/#320 the till can say a round is served by a staff record that never logs in:
+ * `waiter_id` is then that record's id and `hub.users.list` cannot name it. The KDS card reads the
+ * staff app for it (kitchen#82); the paper reads the same place so both say the same name.
+ *
+ * The staff app is OPTIONAL (ADR-0127, no dependency): not installed, no permission to read it or
+ * any failure → `''`, and the ticket prints exactly as before. Terminated and inactive records are
+ * NOT filtered: who fired a round is a historical fact. Only asked when the user lookup missed.
+ */
+async function teamMemberName(client: ErploraClient, waiterId: string): Promise<string> {
+  let team: TeamMember[] | undefined;
+  try {
+    team = await client.queryAllOptional<TeamMember>('staff.members.list');
+  } catch {
+    return '';
+  }
+  const member = (Array.isArray(team) ? team : []).find((m) => m && str(m.id) === waiterId);
+  if (!member) return '';
+  const full = str(member.full_name).trim();
+  return full || `${str(member.first_name)} ${str(member.last_name)}`.trim();
 }
 
 /**
