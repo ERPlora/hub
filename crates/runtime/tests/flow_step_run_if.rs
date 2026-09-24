@@ -133,7 +133,10 @@ async fn when_the_assistant_fails_the_customer_gets_the_fallback_and_nothing_els
 
     assert_eq!(
         notes(&rt).await,
-        vec!["one moment".to_string(), "we will call you back".to_string()],
+        vec![
+            "one moment".to_string(),
+            "we will call you back".to_string()
+        ],
         "she was told something after «one moment», and it was not an empty confirmation"
     );
     let run = run_of(&rt, &flow_id).await;
@@ -149,7 +152,9 @@ async fn when_the_assistant_fails_the_customer_gets_the_fallback_and_nothing_els
         "the assistant step still FAILED in the history: the owner reads why"
     );
     assert!(
-        steps.iter().any(|s| s.step_id == "apology" && s.status == "done"),
+        steps
+            .iter()
+            .any(|s| s.step_id == "apology" && s.status == "done"),
         "…and the history shows the customer was told: {steps:?}"
     );
 }
@@ -274,16 +279,20 @@ fn a_condition_refuses_a_guard_of_its_own() {
 /// discovered at 3 AM.
 #[test]
 fn a_malformed_guard_is_refused_at_save_time() {
-    let err = parse(json!([{ "id": "s", "kind": "command", "command": "crm.note.add",
-                             "run_if": { "input.x": { "near": 1 } } }]))
+    let err = parse(
+        json!([{ "id": "s", "kind": "command", "command": "crm.note.add",
+                             "run_if": { "input.x": { "near": 1 } } }]),
+    )
     .expect_err("an unknown operator in a guard must be refused");
     assert!(
         err.starts_with("flow.unknown_operator:"),
         "the same code a `condition` gets for the same mistake: {err}"
     );
 
-    let err = parse(json!([{ "id": "s", "kind": "command", "command": "crm.note.add",
-                             "run_if": "input.x" }]))
+    let err = parse(
+        json!([{ "id": "s", "kind": "command", "command": "crm.note.add",
+                             "run_if": "input.x" }]),
+    )
     .expect_err("a guard is an object of clauses");
     assert!(err.contains("flow.invalid_definition"), "{err}");
 }
