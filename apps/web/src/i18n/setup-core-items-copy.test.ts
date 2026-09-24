@@ -21,7 +21,7 @@ function coreItemKeys(): string[] {
 }
 
 type Copy = { title?: string; description?: string };
-const items = (locale: typeof en): Record<string, Copy> =>
+const items = (locale: unknown): Record<string, Copy> =>
   (locale as unknown as { setup: { items: Record<string, Copy> } }).setup.items;
 
 describe('setup checklist · copy of the core items (hub#1948)', () => {
