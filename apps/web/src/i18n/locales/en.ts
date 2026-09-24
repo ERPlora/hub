@@ -924,7 +924,7 @@ export default {
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
     actionUpdate: 'Update',
-    actionSeeHubUpdates: 'See hub version and updates',
+    actionSeeHubUpdates: 'See your ERPlora version and updates',
     // Icon-only like every action (Ioan 2026-07-16 on ADR-0133): okdt puts this in `aria-label`
     // and `title`, never on the face of the button.
     actionOpen: 'Open',
