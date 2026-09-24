@@ -309,7 +309,12 @@ function params(): { moduleId: string; navId: string } {
  * queda en blanco: solo `ionViewDidLeave` puede apagarlo.
  */
 let onScreen = true;
-/** La ruta que esta copia tiene pintada. Al volver a pantalla, dice si hay que ponerse al día. */
+/**
+ * The screen this copy has painted — its PATH, not `fullPath`. On the way back on screen it says
+ * whether the view has to catch up. A change after `?` or `#` is not another screen: the module
+ * serves it itself on every `popstate` (flows#57, sales#279). Rebuilding for it put a second copy of
+ * the Web Component next to the one already serving the deep link, and they raced (hub#1797).
+ */
 let mountedPath = '';
 
 let mountGeneration = 0;
@@ -327,7 +332,7 @@ function clearProtectsSubscription(): void {
 
 async function mount(): Promise<void> {
   const generation = ++mountGeneration;
-  mountedPath = route.fullPath;
+  mountedPath = route.path;
   const { moduleId, navId } = params();
   status.value = 'loading';
   // Cada montaje empieza SIN guard: o se vuelve a evaluar abajo, o no aplica (p. ej. pestaña Plan).
@@ -551,7 +556,7 @@ onIonViewWillEnter(() => {
   onScreen = true;
   window.addEventListener('focus', recheckEntitlement);
   if (!stopChrome && outlet.value) stopChrome = installChrome(outlet.value, chromeControls);
-  if (mountedPath && mountedPath !== route.fullPath) void mount().then(revealActiveTab);
+  if (mountedPath && mountedPath !== route.path) void mount().then(revealActiveTab);
 });
 
 onBeforeUnmount(() => {
