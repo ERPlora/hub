@@ -65,6 +65,10 @@ pub struct Report {
     /// `(module_id, version, reason)` that could not be loaded. The module keeps serving what it
     /// had: a failed install puts the previous version back (hub#516).
     pub failed: Vec<(String, String, String)>,
+    /// Modules registered here that `hub_module` no longer has: another task uninstalled them.
+    pub removed: Vec<String>,
+    /// `(module_id, status)` whose recorded status (same version) was applied here.
+    pub status_changed: Vec<(String, ModuleStatus)>,
 }
 
 /// The reconciliation, with its memory of what it could not load.
@@ -161,7 +165,61 @@ impl ModuleReconciler {
             self.gave_up().insert(module_id.clone(), version.clone());
             report.failed.push((module_id, version, reason));
         }
+
+        self.follow_uninstalls_and_status(state, &hub_id, &mut report)
+            .await;
         report
+    }
+
+    /// hub#2039: what the other task uninstalled or switched on/off without changing the version.
+    /// Memory only — the other task decided and wrote; this one follows. Checked under a read lock
+    /// first so the normal case (nothing to follow) never blocks the till, and again under the
+    /// write lock before touching anything.
+    async fn follow_uninstalls_and_status(
+        &self,
+        state: &AppState,
+        hub_id: &str,
+        report: &mut Report,
+    ) {
+        {
+            let rt = state.runtime.read().await;
+            match presence_and_status_drift(&rt, hub_id).await {
+                Ok((gone, restatus)) if gone.is_empty() && restatus.is_empty() => return,
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!(error = %e, "module reconciliation: cannot read hub_module (hub#2039)");
+                    return;
+                }
+            }
+        }
+        let mut rt = state.runtime.write().await;
+        let (gone, restatus) = match presence_and_status_drift(&rt, hub_id).await {
+            Ok(drift) => drift,
+            Err(e) => {
+                tracing::warn!(error = %e, "module reconciliation: cannot read hub_module (hub#2039)");
+                return;
+            }
+        };
+        for module_id in gone {
+            if rt.forget_uninstalled_elsewhere(&module_id) {
+                self.gave_up().remove(&module_id);
+                tracing::info!(module_id = %module_id, "module uninstalled by another task of this hub: dropped here too (hub#2039)");
+                state.broadcast(json!({ "type": "module.uninstalled", "module_id": module_id }));
+                report.removed.push(module_id);
+            }
+        }
+        for (module_id, status) in restatus {
+            if rt.adopt_recorded_status(&module_id, status) {
+                tracing::info!(module_id = %module_id, status = ?status, "module status set by another task of this hub: applied here too (hub#2039)");
+                let kind = if status == ModuleStatus::Active {
+                    "module.activated"
+                } else {
+                    "module.deactivated"
+                };
+                state.broadcast(json!({ "type": kind, "module_id": module_id }));
+                report.status_changed.push((module_id, status));
+            }
+        }
     }
 
     /// The memo of failures. A poisoned lock only means a pass panicked mid-update of a plain map:
@@ -190,6 +248,34 @@ async fn drifted_modules(
             !registry.is_installed(id) || registry.module_version(id) != *version
         })
         .collect())
+}
+
+/// Modules registered here that `hub_module` no longer has (uninstalled elsewhere), and modules
+/// whose recorded status is not the one they have here.
+async fn presence_and_status_drift(
+    rt: &erplora_runtime::Runtime,
+    hub_id: &str,
+) -> erplora_runtime::errors::Result<(Vec<String>, Vec<(String, ModuleStatus)>)> {
+    let persisted = erplora_runtime::installer::installed_status_versioned(rt.db(), hub_id).await?;
+    let recorded: HashMap<&str, ModuleStatus> = persisted
+        .iter()
+        .map(|(id, _, status)| (id.as_str(), *status))
+        .collect();
+    let registry = rt.registry();
+    let mut gone = Vec::new();
+    let mut restatus = Vec::new();
+    for module in &registry.installed {
+        match recorded.get(module.id.as_str()) {
+            None => gone.push(module.id.clone()),
+            // Also when the version differs and could not be loaded: the switch is the admin's
+            // decision about the module, not about one version of it.
+            Some(status) if registry.status.get(&module.id) != Some(status) => {
+                restatus.push((module.id.clone(), *status));
+            }
+            Some(_) => {}
+        }
+    }
+    Ok((gone, restatus))
 }
 
 /// Registers `module_id@version`, from the cheapest source that has exactly that version.

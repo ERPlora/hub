@@ -41,7 +41,7 @@ use erplora_db::{
 };
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
-use erplora_runtime::reset::undo_import;
+use erplora_runtime::reset::{list_import_batches, undo_import};
 use erplora_runtime::Runtime;
 
 /// A throwaway module directory, unique per call so tests running in parallel never share one.
@@ -1197,4 +1197,97 @@ async fn the_export_count_of_a_half_adopted_week_is_the_whole_week() {
         0,
         "a week nobody adopted does not travel, so the screen must not count it either"
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hub#1556 — undoing after the business edited the imported week must not be SILENT.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Imports the template into a fresh `h2` and returns the destination hub and its batch id.
+async fn imported_template() -> (Runtime, String) {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&origen, "h1").await;
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export the template");
+    let mut destino = hub_con("h2", &[&wp]).await;
+    let report = import_sections(
+        &mut destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+    let batch = report.batch_id.clone().expect("the import opens a batch");
+    (destino, batch)
+}
+
+/// 🔴 The Data tab asks «undo this import?» off the batch list. When the business adjusted one day
+/// after importing, undoing leaves it with ONLY that day (the seeded week cannot come back on top
+/// of its own row, hub#1551). The list has to say so BEFORE the business confirms, so the dialog
+/// can warn — today the confirmation is identical to the harmless case.
+#[tokio::test]
+async fn the_batch_list_flags_a_table_the_business_edited_after_importing() {
+    let (destino, batch) = imported_template().await;
+
+    let untouched = list_import_batches(&destino, "h2").await.expect("list");
+    let row = untouched.iter().find(|b| b.id == batch).expect("the batch");
+    assert!(
+        row.edited_after_import.is_empty(),
+        "nothing edited yet: undoing gives the seeded week back, no warning — {row:?}"
+    );
+
+    owner_rewrites_day(&destino, "h2", 0, "10:00", "19:00").await;
+
+    let edited = list_import_batches(&destino, "h2").await.expect("list");
+    let row = edited.iter().find(|b| b.id == batch).expect("the batch");
+    assert_eq!(
+        row.edited_after_import,
+        vec!["weekplan_hours".to_string()],
+        "the Hours screen touched the imported week: undo will not bring the rest back — {row:?}"
+    );
+}
+
+/// 🔴 …and the undo report itself is not mute either: it names the table whose previous content
+/// stayed out, so the screen can tell the business what it is left with.
+#[tokio::test]
+async fn the_undo_report_names_what_did_not_come_back() {
+    let (destino, batch) = imported_template().await;
+    owner_rewrites_day(&destino, "h2", 0, "10:00", "19:00").await;
+
+    let report = undo_import(&destino, "h2", &batch).await.expect("undo");
+    assert_eq!(
+        report.not_restored,
+        vec!["weekplan_hours".to_string()],
+        "the seeded week stayed retired and the report has to say it — {report:?}"
+    );
+    let week = semana(&destino, "h2").await;
+    assert_eq!(
+        week.len(),
+        1,
+        "precondition: only the owner's Monday is left — {week:?}"
+    );
+}
+
+/// Control: an undo that DOES give the seeded week back reports nothing missing.
+#[tokio::test]
+async fn an_undo_that_restores_everything_reports_nothing_missing() {
+    let (destino, batch) = imported_template().await;
+
+    let report = undo_import(&destino, "h2", &batch).await.expect("undo");
+    assert!(
+        report.not_restored.is_empty(),
+        "the seeded week came back whole — {report:?}"
+    );
+    assert_eq!(semana(&destino, "h2").await.len(), 7);
 }

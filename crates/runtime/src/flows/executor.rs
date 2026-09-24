@@ -305,6 +305,20 @@ async fn advance_run(
             "now": def::clock(),
         });
 
+        // **Not this step's turn** (hub#2066). A `run_if` that does not match skips THIS step and
+        // the run carries on — the opposite of a `condition`, which ends it. Nothing runs, so no
+        // step row is written: the history lists what the hub DID, and a skipped message was never
+        // sent. What later steps read is `steps.<id>.skipped`, never a null they cannot tell apart
+        // from a step that does not exist.
+        if let Some(guard) = &step.run_if {
+            if !guard.matches(&scope) {
+                set_step_output(&mut vars, &step.id, json!({ "skipped": true }));
+                index += 1;
+                persist_vars(db, hub_id, &run_id, index, &vars).await?;
+                continue;
+            }
+        }
+
         match run_step(
             db,
             registry,
@@ -859,7 +873,7 @@ async fn run_step(
             .await
             {
                 Ok(notify::Prepared {
-                    queue_op,
+                    queue_op: Some(queue_op),
                     recorded_input,
                     output,
                 }) => {
@@ -881,6 +895,31 @@ async fn run_step(
                     db.execute_tx(&ops).await?;
                     complete_step(db, hub_id, run_id, index, &output, &now).await?;
                     Ok(Outcome::Continue { output })
+                }
+                // **Nothing to offer** (hub#1651): the list the message promised is there and has
+                // no rows. Meta refuses a list without rows, so queuing it would end in the proxy's
+                // refusal hours later; the run stops here instead — like a `condition` that did not
+                // match, a halt and not a failure: «no free slots today» is a state of the business,
+                // not a broken flow. The step keeps what it would have asked and why it did not.
+                Ok(notify::Prepared {
+                    queue_op: None,
+                    recorded_input,
+                    output,
+                }) => {
+                    write_step(
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_STOPPED,
+                        &recorded_input,
+                        &output,
+                        "",
+                        &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Stopped)
                 }
                 Err(e) => {
                     // Denied, nobody to write to, or a column that is not an address: NOTHING was

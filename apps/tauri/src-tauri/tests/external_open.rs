@@ -43,6 +43,34 @@ fn opens_a_hub_of_ours_whatever_its_aura() {
     }
 }
 
+/// The assistant's paid upgrade is its own Stripe subscription (ADR-0033), and the SaaS answers
+/// its checkout with Stripe's hosted page — there is no erplora.com page in between. Without this
+/// the assistant's «See plans» could only fail inside the installed app, so it navigated the till
+/// window itself and left the owner stranded on a payment page with no way back (hub#1914).
+#[test]
+fn opens_stripe_hosted_checkout_for_the_assistant_upgrade() {
+    const STRIPE: &str = "https://checkout.stripe.com/c/pay/cs_live_a1B2c3#fidkdWxOYHwnPyd1blpxYHZxWjA0";
+    assert_eq!(external_browser_url(STRIPE).as_deref(), Some(STRIPE));
+}
+
+#[test]
+fn stripe_is_admitted_by_its_exact_checkout_host_only() {
+    for raw in [
+        // Other Stripe hosts are not a checkout the till starts.
+        "https://dashboard.stripe.com/",
+        "https://stripe.com/",
+        // Look-alikes of the checkout host.
+        "https://checkout.stripe.com.evil.example/c/pay/cs_x",
+        "https://evilcheckout.stripe.com/c/pay/cs_x",
+        // Downgradeable trip.
+        "http://checkout.stripe.com/c/pay/cs_x",
+        // Credentials in front of the real host.
+        "https://support%40evil.example@checkout.stripe.com/c/pay/cs_x",
+    ] {
+        assert_eq!(external_browser_url(raw), None, "{raw} must be refused");
+    }
+}
+
 #[test]
 fn opens_the_development_loopback() {
     // `VITE_CLOUD_API_URL=http://127.0.0.1:8001` is how the shell is developed against a local

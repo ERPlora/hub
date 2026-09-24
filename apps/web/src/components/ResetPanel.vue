@@ -79,6 +79,16 @@
       {{ t('settings.resetSubmit') }}
     </ion-button>
 
+    <!-- hub#1556: after an undo, the data that kept ONLY the business's own changes (what the
+         import replaced did not come back) is said, not left for the business to discover. -->
+    <ion-note
+      v-if="report?.not_restored?.length"
+      class="reset-intro"
+      data-testid="reset-undo-not-restored"
+    >
+      {{ t('settings.resetUndoNotRestored', { areas: tableModules(report.not_restored) }) }}
+    </ion-note>
+
     <!-- Informe final: qué se borró de verdad, por sección. -->
     <ion-list v-if="report" class="reset-report" data-testid="reset-report">
       <ion-item v-for="r in report.sections" :key="r.section">
@@ -179,9 +189,16 @@ onMounted(async () => {
 async function undo(batchId: string): Promise<void> {
   const batch = batches.value.find((b) => b.id === batchId);
   if (!batch) return;
+  // hub#1556: if the business edited what this import brought (one day of the hours, say), what
+  // the import replaced cannot come back on top of its changes — undoing leaves ONLY its own rows
+  // there. That is said here, before confirming, not discovered afterwards.
+  const edited = batch.edited_after_import ?? [];
+  const message = edited.length
+    ? `${t('settings.resetUndoBody', { n: batch.rows })}\n${t('settings.resetUndoEdited', { areas: tableModules(edited) })}`
+    : t('settings.resetUndoBody', { n: batch.rows });
   const alert = await alertController.create({
     header: t('settings.resetUndoTitle', { name: batch.name }),
-    message: t('settings.resetUndoBody', { n: batch.rows }),
+    message,
     buttons: [
       { text: t('settings.resetCancel'), role: 'cancel' },
       { text: t('settings.resetUndo'), role: 'confirm', cssClass: 'alert-button-danger' },
@@ -209,6 +226,22 @@ function label(section: string): string {
     return moduleNames.value.get(id) ?? id;
   }
   return t(`settings.reset_${section}`);
+}
+
+/**
+ * Human names of the modules that own some tables (hub#1556). A module's tables are prefixed with
+ * its id (`schedules_business_hours` → `schedules`); the longest matching installed id wins, and a
+ * table no installed module claims falls back to its own name — readable, never blank.
+ */
+function tableModules(tables: string[]): string {
+  const names = tables.map((table) => {
+    let best = '';
+    for (const id of moduleNames.value.keys()) {
+      if ((table === id || table.startsWith(`${id}_`)) && id.length > best.length) best = id;
+    }
+    return best ? (moduleNames.value.get(best) ?? best) : table;
+  });
+  return [...new Set(names)].join(', ');
 }
 
 function toggle(section: string): void {

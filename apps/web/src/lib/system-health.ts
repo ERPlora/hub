@@ -184,6 +184,50 @@ export function printerLine(
   };
 }
 
+/** The module that owns the WhatsApp channel; without it, this hub has no WhatsApp to speak of. */
+export const WHATSAPP_MODULE_ID = 'whatsapp_inbox';
+/** Where «Connect again» lives — the module's settings screen (hub#1626). */
+export const WHATSAPP_ROUTE = '/m/whatsapp_inbox/settings';
+
+/** The minimum we need of a connected number (`WhatsAppNumber` of `whatsapp-connect.ts` fits). */
+export interface WhatsAppNumberRef {
+  phone_number_id: string;
+  needs_reconnect?: boolean;
+}
+
+/** Is the WhatsApp module installed and running? Same «say nothing on a maybe» as the printer. */
+export function isWhatsAppInstalled(modules: readonly InstalledModuleRef[] | null | undefined): boolean {
+  return (modules ?? []).some((m) => m.id === WHATSAPP_MODULE_ID && m.status === 'active');
+}
+
+/**
+ * The sentence about a WhatsApp channel that stopped on its own (hub#1629), or `null`.
+ *
+ * Unlike the printer, WhatsApp only ever speaks up to raise its hand. The only verdict anybody
+ * gives is `needs_reconnect === true` (saas#1887): the permission expired, Meta revoked it, the
+ * owner unlinked the number. Everything else is silence, and on purpose:
+ *
+ * * `null`/`undefined` numbers — the call failed. «I could not check» is not «it is down».
+ * * a number with no `needs_reconnect` — a SaaS from before the field. Not asked is not broken, and
+ *   not fine either: a green «WhatsApp connected» on a key nobody sent is the lie of hub#375.
+ * * no numbers at all — never connected. That is setup, not an outage, and not this strip's news.
+ */
+export function whatsappLine(
+  numbers: readonly WhatsAppNumberRef[] | null | undefined,
+  modules: readonly InstalledModuleRef[] | null | undefined,
+): HealthLine | null {
+  if (!isWhatsAppInstalled(modules)) return null;
+  if (!(numbers ?? []).some((n) => n.needs_reconnect === true)) return null;
+  return {
+    key: 'whatsapp',
+    state: STATE_ATTENTION,
+    tone: 'warning',
+    titleKey: 'system.health.whatsappDown',
+    detailKey: 'system.health.whatsappDownDetail',
+    action: { labelKey: 'system.health.whatsappAction', route: WHATSAPP_ROUTE },
+  };
+}
+
 /**
  * The steps to get a printer answering, in the order the user takes them, for the surface they are
  * standing on (hub#480).

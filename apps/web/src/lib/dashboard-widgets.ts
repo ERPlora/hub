@@ -114,7 +114,7 @@ function roundRobin(groups: string[][], limit: number): string[] {
  * como `{rows,total,limit,offset}` (motor de listas) o como array de filas (queries get/stats);
  * un escalar/objeto suelto se envuelve en una fila única. Robusto ante `null`/`undefined`.
  */
-function normalizeRows(result: unknown): Row[] {
+export function normalizeRows(result: unknown): Row[] {
   if (result == null) return [];
   if (Array.isArray(result)) return result as Row[];
   if (typeof result === 'object') {

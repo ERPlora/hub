@@ -13,8 +13,8 @@
 // Se monta el SFC de verdad (no se lee su fuente): lo que hay que probar es que el aviso APARECE
 // y que el control DESAPARECE según el rol, y una aserción sobre el texto del fichero no distingue
 // «pintado» de «escrito en el template pero nunca renderizado».
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { alertController, IonTextarea } from '@ionic/vue';
 
@@ -53,6 +53,11 @@ vi.mock('../lib/runtime', async (importOriginal) => ({
 }));
 
 vi.mock('../lib/toast', () => ({ toastSuccess: vi.fn(), toastError: vi.fn() }));
+// The one door out of the till (hub#475). Mocked so the tests see WHERE the checkout was sent.
+vi.mock('../lib/open-external', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  openExternal: vi.fn(async () => {}),
+}));
 // Who handed out this copy (hub#1910). `null` is the browser — no store governs it.
 vi.mock('../lib/device', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -76,6 +81,7 @@ import { streamAssistant, type StreamCallbacks } from '../lib/assistant';
 import { assistantMessages } from '../lib/assistant-history';
 import { toastError } from '../lib/toast';
 import { getDeviceContext, isTauri } from '../lib/device';
+import { openExternal, OpenExternalError } from '../lib/open-external';
 
 const i18n = createI18n({
   legacy: false,
@@ -84,6 +90,9 @@ const i18n = createI18n({
   fallbackWarn: false,
   messages: { en, es },
 });
+
+// A drawer left mounted keeps its window listeners and would answer another test's `focus` (hub#1914).
+enableAutoUnmount(afterEach);
 
 const PAID_TIERS = [
   { slug: 'basic', name: 'Basic', priceMonthly: '11.99' },
@@ -192,8 +201,6 @@ describe('hub#1183 — el CTA ofrece los tiers que da el SaaS, no `basic` a cieg
       present: vi.fn(async () => {}),
       onDidDismiss: vi.fn(async () => ({ role: 'confirm', data: { values: 'pro' } })),
     } as never);
-    const assign = vi.fn();
-    Object.defineProperty(window, 'location', { value: { assign }, writable: true });
 
     const wrapper = await openWith({ tier: 'free', used: 30, limit: 30, paidTiers: PAID_TIERS });
     await sendATurnThatRunsOutOfQuota(wrapper);
@@ -204,7 +211,7 @@ describe('hub#1183 — el CTA ofrece los tiers que da el SaaS, no `basic` a cieg
     const inputs = (created.mock.calls[0][0] as { inputs?: { value?: string }[] }).inputs ?? [];
     expect(inputs.map((i) => i.value)).toEqual(['basic', 'pro']);
     expect(vi.mocked(startAssistantCheckout)).toHaveBeenCalledWith('pro');
-    expect(assign).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_x');
+    expect(vi.mocked(openExternal)).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_x');
   });
 
   it('sin planes que ofrecer no manda a ninguna parte: lo dice', async () => {
@@ -323,6 +330,73 @@ describe('hub#1910 — en la copia de Google Play el asistente no lleva a pagar'
   });
 });
 
+// hub#1914 — every other door to money (the hub's plan, a module's plan) leaves through
+// `openExternal` and keeps the till where it was; the assistant navigated the till window itself
+// onto the checkout. In the installed app that window has no Back button and no tabs, so after
+// paying the owner was left on erplora.com's «upgrade complete» page with no way back to the till.
+describe('hub#1914 — «See plans» pays outside the till, like every other checkout', () => {
+  let assign: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    assign = vi.fn();
+    Object.defineProperty(window, 'location', { value: { assign }, writable: true });
+  });
+
+  async function pressSeePlans() {
+    const wrapper = await openWith({
+      tier: 'free',
+      used: 30,
+      limit: 30,
+      paidTiers: [PAID_TIERS[0]],
+    });
+    await sendATurnThatRunsOutOfQuota(wrapper);
+    await wrapper.find('[data-testid="assistant-quota-cta"]').trigger('click');
+    await flushPromises();
+    return wrapper;
+  }
+
+  it('opens the checkout through the one door out and never navigates the till window', async () => {
+    await pressSeePlans();
+
+    expect(vi.mocked(openExternal)).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_x');
+    expect(assign, 'navigating the till window is the defect: no way back in the installed app').not.toHaveBeenCalled();
+  });
+
+  it('says so when the trip out cannot be made, instead of a dead button', async () => {
+    vi.mocked(openExternal).mockRejectedValueOnce(
+      new OpenExternalError('https://checkout.stripe.com/c/pay/cs_x'),
+    );
+
+    await pressSeePlans();
+
+    expect(vi.mocked(toastError)).toHaveBeenCalledWith(en.assistant.checkoutOpenFailed);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('reads the plan again when the owner comes back to the till after paying', async () => {
+    await pressSeePlans();
+    vi.mocked(assistantPlan).mockClear();
+    vi.mocked(assistantPlan).mockResolvedValue({ tier: 'basic', used: 0, limit: 300, paidTiers: [] } as never);
+
+    window.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    expect(vi.mocked(assistantPlan), 'without the re-read the drawer keeps saying the quota ran out').toHaveBeenCalled();
+  });
+
+  // The control of the control: the re-read belongs to a trip that was made. A drawer that re-read
+  // on every focus would call the SaaS each time the cashier switches windows for nothing.
+  it('does not re-read the plan on focus when nobody went to pay', async () => {
+    await openWith({ tier: 'free', used: 4, limit: 30, paidTiers: PAID_TIERS });
+    vi.mocked(assistantPlan).mockClear();
+
+    window.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    expect(vi.mocked(assistantPlan)).not.toHaveBeenCalled();
+  });
+});
+
 describe('las cadenas nuevas viajan por i18n, inglés fuente + su es (ADR-0055/0199)', () => {
   it('cada clave existe en en y en es, y no son la misma frase', () => {
     for (const key of [
@@ -334,6 +408,7 @@ describe('las cadenas nuevas viajan por i18n, inglés fuente + su es (ADR-0055/0
       'planOption',
       'plansUnavailable',
       'quotaManagedInAccount',
+      'checkoutOpenFailed',
     ] as const) {
       expect(en.assistant[key], `${key} falta en en.ts`).toBeTruthy();
       expect(es.assistant[key], `${key} falta en es.ts`).toBeTruthy();

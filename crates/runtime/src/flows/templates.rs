@@ -138,8 +138,9 @@ fn wanted_grants(tpl: &ModuleFlowTemplate) -> Result<Vec<GrantSpec>> {
         .collect()
 }
 
-/// Turns `<module>/<family>` on: builds it or finds it, gives it exactly the sidecar's permissions,
-/// and leaves it running. Idempotent — the second tap lands on the same flow.
+/// Turns `<module>/<family>` on. The first time it builds it with exactly the sidecar's permissions
+/// and leaves it running; afterwards it only switches the existing flow on, keeping what the owner
+/// changed (hub#1684). Idempotent — the second tap lands on the same flow.
 pub async fn activate(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -159,39 +160,82 @@ pub async fn activate(
         .unwrap_or(family)
         .to_string();
 
-    // ── create or reuse, PAUSED ───────────────────────────────────────────────────────────────
     let reference = template_ref(module, family);
-    let paused = NewFlow {
-        name,
-        enabled: false,
-        definition,
-    };
-    let (flow, created) =
-        match store::find_by_template_ref(db, hub_id, &reference).await? {
-            // The recipe may have been republished since it was installed, so the document is
-            // refreshed from the registry rather than left as it was: activating is «give me the
-            // automation this module ships today».
-            Some(existing) => (
-                store::update(db, hub_id, &existing.id, registry, &paused, by).await?,
-                false,
-            ),
-            None => (
-                store::create_from_template(db, hub_id, registry, &paused, by, Some(&reference))
-                    .await?,
-                true,
-            ),
+    let Some(existing) = store::find_by_template_ref(db, hub_id, &reference).await? else {
+        // ── build it PAUSED → exactly the sidecar's permissions → running ─────────────────────
+        let paused = NewFlow {
+            name,
+            enabled: false,
+            definition,
         };
+        let flow = store::create_from_template(db, hub_id, registry, &paused, by, Some(&reference))
+            .await?;
+        let flow = grant_then_enable(db, hub_id, registry, &flow.id, paused, &wanted, by).await?;
+        return Ok(Activation {
+            flow,
+            created: true,
+        });
+    };
 
-    // ── exactly the sidecar's permissions (all-or-nothing, and it validates the pins) ─────────
-    grants::replace(db, hub_id, &flow.id, registry, &wanted, by).await?;
-
-    // ── and only now, running ─────────────────────────────────────────────────────────────────
+    // ── reuse: turning it back on is a SWITCH, not «restore the factory recipe» (hub#1684) ────
+    // Its OWN document and its OWN permissions, the mirror of `deactivate`: after activating, the
+    // owner may have edited the recipe, retired a permission or narrowed its limits in
+    // Automations (ADR-0470 §4), and a tap on the module's screen must not undo that silently.
+    // Getting the factory recipe back is an explicit gesture: delete it and activate again.
+    let own = own_document(&existing);
+    let paused = NewFlow {
+        name: existing.name.clone(),
+        enabled: false,
+        definition: own,
+    };
+    // The one exception keeps the order's recovery promise: a recipe with NO permission at all —
+    // an activation that fell between «paused» and «grants», or an owner who retired every one —
+    // can do nothing, and «activate» means «leave it working», so it gets the module's.
+    if grants::list(db, hub_id, &existing.id).await?.is_empty() {
+        let flow = store::update(db, hub_id, &existing.id, registry, &paused, by).await?;
+        let flow = grant_then_enable(db, hub_id, registry, &flow.id, paused, &wanted, by).await?;
+        return Ok(Activation {
+            flow,
+            created: false,
+        });
+    }
     let running = NewFlow {
         enabled: true,
         ..paused
     };
-    let flow = store::update(db, hub_id, &flow.id, registry, &running, by).await?;
-    Ok(Activation { flow, created })
+    let flow = store::update(db, hub_id, &existing.id, registry, &running, by).await?;
+    Ok(Activation {
+        flow,
+        created: false,
+    })
+}
+
+/// The flow's own document, as `store::update` wants it back.
+fn own_document(flow: &Flow) -> serde_json::Value {
+    if flow.definition.is_null() {
+        json!({})
+    } else {
+        flow.definition.clone()
+    }
+}
+
+/// The tail of the guaranteed order: the flow is already PAUSED as `paused`; give it exactly
+/// `wanted` (all-or-nothing, pins validated) and only then turn it on.
+async fn grant_then_enable(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    registry: &Registry,
+    flow_id: &str,
+    paused: NewFlow,
+    wanted: &[GrantSpec],
+    by: &str,
+) -> Result<Flow> {
+    grants::replace(db, hub_id, flow_id, registry, wanted, by).await?;
+    let running = NewFlow {
+        enabled: true,
+        ..paused
+    };
+    store::update(db, hub_id, flow_id, registry, &running, by).await
 }
 
 /// Turns it off: a **pause**, never a delete.
@@ -220,11 +264,7 @@ pub async fn deactivate(
     let paused = NewFlow {
         name: flow.name.clone(),
         enabled: false,
-        definition: if flow.definition.is_null() {
-            json!({})
-        } else {
-            flow.definition.clone()
-        },
+        definition: own_document(&flow),
     };
     store::update(db, hub_id, &flow.id, registry, &paused, by).await
 }

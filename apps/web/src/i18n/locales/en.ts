@@ -141,6 +141,12 @@ export default {
     action: 'Download',
     cancel: 'Not now',
     failed: 'We could not open your browser. Go to erplora.com to get the new version.',
+    android: {
+      confirmBody:
+        'The ERPlora listing opens on Google Play. Google Play installs version {version}: there is no file to download or open.',
+      action: 'Open Google Play',
+      failed: 'We could not open Google Play. Search for ERPlora there to get the new version.',
+    },
   },
   assistant: {
     confirmTitle: 'The assistant wants to run an action',
@@ -181,6 +187,7 @@ export default {
     plansConfirm: 'Go to payment',
     planOption: '{name} — {price} €/month',
     plansUnavailable: 'There are no plans to upgrade to right now.',
+    checkoutOpenFailed: 'The payment page could not be opened in your browser. Try again, and if it keeps failing, update the ERPlora app.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
@@ -727,6 +734,8 @@ export default {
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
     resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
+    resetUndoEdited: 'You changed {areas} after importing. Undoing keeps only your changes there: what this blueprint replaced will not come back.',
+    resetUndoNotRestored: 'In {areas} only your own changes were kept: what the blueprint had replaced did not come back. Check that screen.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} row | {n} rows',
@@ -854,6 +863,15 @@ export default {
       cloud_unreachable: CLOUD_UNREACHABLE,
       unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
+      // hub#1624: the codes erplora.com sends next to its prose (saas#1902). `meta_unreachable` is the
+      // only one where trying again helps, so it is the only one that says so.
+      meta_unreachable: 'WhatsApp is not answering right now. Try again in a few minutes.',
+      meta_api_error: 'WhatsApp refused the connection because of a problem on our side. Contact support.',
+      no_access_token: 'Facebook did not give the permission to connect. Open the connection again and accept the permissions.',
+      missing_code: 'The Facebook window closed before finishing. Open the connection again and complete every step.',
+      hub_not_found: 'erplora.com does not recognise this hub. Contact support.',
+      number_not_found: 'That number is no longer connected.',
+      internal_error: 'erplora.com could not finish the connection. Contact support if it keeps happening.',
       default: 'Something went wrong while connecting. Try again in a minute.',
     },
   },
@@ -1393,6 +1411,11 @@ export default {
       printerUnknown: "We couldn't check the printer",
       printerUnknownDetail:
         "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
+      // hub#1629 — WhatsApp that stopped on its own (expired permission, revoked by Meta, unlinked).
+      whatsappDown: 'WhatsApp stopped working',
+      whatsappDownDetail:
+        "Customer messages aren't coming in and your replies aren't going out until you connect it again.",
+      whatsappAction: 'Connect WhatsApp again',
       notMeasured: "We couldn't read this",
     },
     // hub#1886 — the button on the two blocked cards (notices, printer search) that opens THIS
@@ -1402,26 +1425,27 @@ export default {
     //
     // The sheet that goes in FRONT of Android's dialog. Android's own says «Allow ERPlora to send
     // you notifications?» and nothing about what for; asked cold it reads as opportunistic and
-    // gets refused, and two refusals close the dialog for the life of the install. So this names
-    // the one thing the till actually notifies about — an order arriving — and never says
-    // «permission», «POST_NOTIFICATIONS» or «Android».
+    // gets refused, and two refusals close the dialog for the life of the install. So this says
+    // what the notices are for — and never «permission», «POST_NOTIFICATIONS» or «Android». In
+    // words that fit EVERY business: the sheet appears on a salon's front desk as much as on a
+    // restaurant's till, and «orders in the kitchen» got it refused there (hub#1927).
     notices: {
-      primerHeader: 'Let us warn you about new orders',
+      primerHeader: 'Let us keep you posted',
       primerMessage:
-        'When an order comes into the kitchen we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
+        'When something needs your attention, we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
       primerLater: 'Not now',
       primerAllow: 'Turn on notices',
       // The row on System › your printer, which is where somebody who never got warned would
       // look. Only ever shown when the notices really are off ON THIS DEVICE.
       blockedTitle: 'Notices are off',
       blockedDetail:
-        "This device won't warn you when an order comes in. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
+        "This device won't warn you when something needs your attention. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
       blockedAction: 'Turn on notices',
       // After asking again and still getting nothing: the system stops showing its dialog once
       // it has been refused, and from then on the only way through is the device's own settings.
       blockedInSettings:
         "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
-      turnedOn: 'Done — this device will warn you about new orders.',
+      turnedOn: 'Done — this device will warn you when something needs your attention.',
     },
   },
   planLimits: {
@@ -2025,6 +2049,12 @@ export default {
       duplicate: 'This hub already has that value.',
     },
   },
+  // hub#1620 — the same codes when the runtime ALSO sent the facts the line names (`core_version_too_old`
+  // → `required`, `core`). Only `moduleFailureMessage` reads these, and only when every fact arrived.
+  runtimeErrorFacts: {
+    core_version_too_old:
+      'This app needs a newer hub (ERPlora {required}). Yours runs {core}: update the hub and try again.',
+  },
   // What the runtime answers a screen when a cloud-facing door fails: a short stable code, not a
   // sentence (hub#1689 made it a code precisely so it COULD be translated). Every back-office
   // screen turns it into one of these lines through `lib/runtime-error-sentence.ts`; a code with
@@ -2042,6 +2072,10 @@ export default {
     install_not_in_catalog: 'That app is not available in your catalogue.',
     install_cloud_rejected:
       'erplora.com could not attend to this installation right now. Try again in a few minutes.',
+    // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
+    // not run whole); the owner can act on it by updating the hub. The line that names both versions
+    // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.
+    core_version_too_old: 'This app needs a newer hub: update the hub and try again.',
     cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
     cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
     hub_not_enrolled: 'This hub is not connected to erplora.com yet.',

@@ -90,23 +90,27 @@
           <!-- The sentence and its way out travel together: a status the owner cannot act on is
                half a message. Grouped so `space-between` keeps them side by side on the left. -->
           <div class="dash-health-status">
-            <ok-status-pill
-              v-if="printerHealth"
-              class="dash-health-pill"
-              :tone="printerHealth.tone"
-              dot
-              :label="t(printerHealth.titleKey)"
-            />
-            <ion-button
-              v-if="printerHealth?.action"
-              fill="clear"
-              size="small"
-              :router-link="printerHealth.action.route"
-              router-direction="forward"
-              class="dash-health-link"
-            >
-              {{ t(printerHealth.action.labelKey) }}
-            </ion-button>
+            <!-- One pill per thing the hub has something to say about — the printer, and WhatsApp
+                 when it stopped on its own (hub#1629) — each with its own way out. -->
+            <template v-for="line in healthLines" :key="line.key">
+              <ok-status-pill
+                class="dash-health-pill"
+                :tone="line.tone"
+                dot
+                :label="t(line.titleKey)"
+                :title="t(line.detailKey)"
+              />
+              <ion-button
+                v-if="line.action"
+                fill="clear"
+                size="small"
+                :router-link="line.action.route"
+                router-direction="forward"
+                class="dash-health-link"
+              >
+                {{ t(line.action.labelKey) }}
+              </ion-button>
+            </template>
           </div>
           <ion-button
             fill="clear"
@@ -198,7 +202,14 @@ import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { moduleNav, moduleNavState } from '../lib/nav';
 import { refreshSetupStatus, setupStatus } from '../lib/setup-status';
 import { openAssistantForSetup } from '../lib/shell';
-import { printerLine, probeFromCoverage, type HealthLine } from '../lib/system-health';
+import {
+  isWhatsAppInstalled,
+  printerLine,
+  probeFromCoverage,
+  whatsappLine,
+  type HealthLine,
+} from '../lib/system-health';
+import { fetchWhatsAppNumbers, type WhatsAppNumber } from '../lib/whatsapp-connect';
 import { fetchPrintHosts, type PrintRoleCoverage } from '../lib/print-coverage';
 import { GREETING_KEY, panelHeading } from '../lib/dashboard-heading';
 import { hubSettings } from '../lib/hub-settings';
@@ -409,6 +420,19 @@ const printerHealth = computed<HealthLine | null>(() =>
   printerLine(probeFromCoverage(printerCoverage.value), installedModules.value),
 );
 
+// hub#1629 — a WhatsApp channel that stopped on its own (expired permission, revoked by Meta,
+// unlinked from the phone) was only said in the module's settings, which nobody opens daily.
+// `null` = not read (no module, or the call failed): «we do not know», never «it is down».
+const whatsappNumbers = ref<WhatsAppNumber[] | null>(null);
+const whatsappHealth = computed<HealthLine | null>(() =>
+  whatsappLine(whatsappNumbers.value, installedModules.value),
+);
+
+/** Every sentence the hub has to say about itself right now, in the order they are painted. */
+const healthLines = computed<HealthLine[]>(() =>
+  [printerHealth.value, whatsappHealth.value].filter((line): line is HealthLine => line !== null),
+);
+
 async function loadSystemHealth(): Promise<void> {
   // Both fail on their own: printing installed but uncovered is a different sentence from «we do
   // not even know whether this hub prints», and neither may borrow the other's answer.
@@ -425,6 +449,17 @@ async function loadSystemHealth(): Promise<void> {
     installedModules.value = await listInstalledModules();
   } catch {
     installedModules.value = null; // we do not know what is installed → the badge stays quiet
+  }
+  // Only a hub running the WhatsApp module is asked about its numbers; the read goes through the
+  // SaaS, so a hub without it does not pay a round trip for a sentence it will never show.
+  if (!isWhatsAppInstalled(installedModules.value)) {
+    whatsappNumbers.value = null;
+    return;
+  }
+  try {
+    whatsappNumbers.value = await fetchWhatsAppNumbers();
+  } catch {
+    whatsappNumbers.value = null; // we could not ask — NOT «WhatsApp is down»
   }
 }
 
@@ -583,6 +618,8 @@ function onModulesChanged(): void {
    y el enlace pueden quedar pegados → un poco más de gap y touch-friendly. */
 .dash-health {
   display: flex;
+  /* Two lines (printer + WhatsApp, hub#1629) plus /system do not fit a phone row: wrap them. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
@@ -592,6 +629,7 @@ function onModulesChanged(): void {
 }
 .dash-health-status {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
 }

@@ -46,7 +46,12 @@ vi.mock('../lib/nav', () => ({ moduleNav: ref([]), moduleNavState: ref('ready') 
 vi.mock('../lib/setup-status', () => ({ refreshSetupStatus: vi.fn(), setupStatus: ref(null) }));
 vi.mock('../lib/shell', () => ({ openAssistantForSetup: vi.fn() }));
 vi.mock('../lib/bridge-transport', () => ({ detectPeripherals: async () => null }));
-vi.mock('../lib/system-health', () => ({ printerLine: () => null, probeFromCoverage: () => null }));
+vi.mock('../lib/system-health', () => ({
+  printerLine: () => null,
+  probeFromCoverage: () => null,
+  whatsappLine: () => null,
+  isWhatsAppInstalled: () => false,
+}));
 vi.mock('../lib/dashboard-heading', () => ({
   GREETING_KEY: { morning: 'dashboard.morning' },
   panelHeading: () => ({ kind: 'business', name: 'Bar Manolo SL' }),

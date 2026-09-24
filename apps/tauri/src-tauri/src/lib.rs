@@ -235,6 +235,13 @@ const HUB_DOMAIN_SUFFIX: &str = ".erplora.com";
 /// deliberately NOT a hub: only [`external_browser_url`] accepts it.
 const ERPLORA_DOMAIN: &str = "erplora.com";
 
+/// Stripe's hosted checkout, matched by EXACT host. The assistant's paid upgrade is its own Stripe
+/// subscription (ADR-0033) and the SaaS answers it with this page directly — there is no
+/// erplora.com page in between to send the browser to. Without it the assistant's «See plans» could
+/// only fail inside the installed app (hub#1914). No other Stripe host, and no suffix match: the
+/// dashboard or a look-alike is not a checkout the till starts.
+const STRIPE_CHECKOUT_HOST: &str = "checkout.stripe.com";
+
 /// Is this host a hub of ours — `<label>[.<label>…].erplora.com`?
 ///
 /// The apex has no leading dot to strip, which is exactly why it is excluded: `erplora.com` also
@@ -383,7 +390,8 @@ pub fn external_browser_url(raw: &str) -> Option<String> {
     let host = url.host_str()?;
     let allowed = match url.scheme() {
         // Everything we serve: the SaaS at the apex plus every hub, auras by wildcard.
-        "https" => host == ERPLORA_DOMAIN || is_hub_domain(host),
+        // Plus Stripe's hosted checkout, where the assistant's upgrade is paid (hub#1914).
+        "https" => host == ERPLORA_DOMAIN || host == STRIPE_CHECKOUT_HOST || is_hub_domain(host),
         // Development against a local SaaS (`VITE_CLOUD_API_URL=http://127.0.0.1:8001`). Nothing
         // outside this machine can serve loopback, so nobody else can steer it.
         "http" => is_loopback_host(host),

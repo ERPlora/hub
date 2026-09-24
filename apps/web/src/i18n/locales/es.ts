@@ -135,6 +135,12 @@ export default {
     action: 'Descargar',
     cancel: 'Ahora no',
     failed: 'No hemos podido abrir tu navegador. Entra en erplora.com para conseguir la nueva versión.',
+    android: {
+      confirmBody:
+        'Se abre la ficha de ERPlora en Google Play. La versión {version} la instala Google Play: no hay ningún archivo que descargar ni que abrir.',
+      action: 'Abrir Google Play',
+      failed: 'No hemos podido abrir Google Play. Búscalo allí como ERPlora para conseguir la nueva versión.',
+    },
   },
   assistant: {
     confirmTitle: 'El asistente quiere ejecutar una acción',
@@ -166,6 +172,7 @@ export default {
     plansConfirm: 'Ir al pago',
     planOption: '{name} — {price} €/mes',
     plansUnavailable: 'Ahora mismo no hay planes a los que ampliar.',
+    checkoutOpenFailed: 'No se pudo abrir la página de pago en el navegador. Inténtalo de nuevo y, si sigue fallando, actualiza la app de ERPlora.',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
@@ -663,6 +670,8 @@ export default {
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
     resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
+    resetUndoEdited: 'Cambiaste {areas} después de importar. Al deshacer solo se quedan tus cambios ahí: lo que este blueprint sustituyó no vuelve.',
+    resetUndoNotRestored: 'En {areas} solo se han quedado tus cambios: lo que el blueprint había sustituido no ha vuelto. Revisa esa pantalla.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} fila | {n} filas',
@@ -756,6 +765,13 @@ export default {
       cloud_unreachable: CLOUD_UNREACHABLE,
       unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
+      meta_unreachable: 'WhatsApp no responde ahora mismo. Vuelve a intentarlo en unos minutos.',
+      meta_api_error: 'WhatsApp ha rechazado la conexión por un problema de nuestra parte. Contacta con soporte.',
+      no_access_token: 'Facebook no ha dado el permiso para conectar. Abre de nuevo la conexión y acepta los permisos.',
+      missing_code: 'La ventana de Facebook se cerró antes de terminar. Abre de nuevo la conexión y completa todos los pasos.',
+      hub_not_found: 'erplora.com no reconoce este hub. Contacta con soporte.',
+      number_not_found: 'Ese número ya no está conectado.',
+      internal_error: 'erplora.com no ha podido terminar la conexión. Contacta con soporte si sigue pasando.',
       default: 'Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.',
     },
   },
@@ -1223,23 +1239,28 @@ export default {
       printerUnknown: 'No hemos podido comprobar la impresora',
       printerUnknownDetail:
         'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
+      // hub#1629 — WhatsApp que se cae solo (permiso caducado, revocado por Meta, desvinculado).
+      whatsappDown: 'WhatsApp ha dejado de funcionar',
+      whatsappDownDetail:
+        'No entran los mensajes de los clientes ni salen tus respuestas hasta que lo vuelvas a conectar.',
+      whatsappAction: 'Volver a conectar WhatsApp',
       notMeasured: 'No hemos podido leerlo',
     },
     // hub#1886 — ver el comentario gemelo en `en.ts`.
     openDeviceSettings: 'Abrir los ajustes',
     notices: {
-      primerHeader: 'Deja que te avisemos de las comandas',
+      primerHeader: 'Deja que te avisemos',
       primerMessage:
-        'Cuando entre una comanda en cocina podemos avisarte, aunque nadie esté mirando esta pantalla. Tu dispositivo te lo preguntará a continuación.',
+        'Cuando algo necesite tu atención podemos avisarte, aunque nadie esté mirando esta pantalla. Tu dispositivo te lo preguntará a continuación.',
       primerLater: 'Ahora no',
       primerAllow: 'Activar los avisos',
       blockedTitle: 'Los avisos están desactivados',
       blockedDetail:
-        'Este dispositivo no te avisará cuando entre una comanda. Actívalos y lo dirá en voz alta, aunque nadie esté mirando la pantalla.',
+        'Este dispositivo no te avisará cuando algo necesite tu atención. Actívalos y lo dirá en voz alta, aunque nadie esté mirando la pantalla.',
       blockedAction: 'Activar los avisos',
       blockedInSettings:
         'Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.',
-      turnedOn: 'Listo: este dispositivo te avisará de las comandas nuevas.',
+      turnedOn: 'Listo: este dispositivo te avisará cuando algo necesite tu atención.',
     },
   },
   planLimits: {
@@ -1757,6 +1778,10 @@ export default {
       duplicate: 'Este hub ya tiene ese valor.',
     },
   },
+  runtimeErrorFacts: {
+    core_version_too_old:
+      'Esta app necesita un hub más nuevo (ERPlora {required}). El tuyo tiene la {core}: actualiza el hub e inténtalo de nuevo.',
+  },
   // Traducción de `runtimeErrors` en `en.ts`: lo que el runtime contesta cuando falla una puerta
   // que habla con la nube. Un código sin frase aquí no se pinta nunca; el llamador cae a `default`.
   runtimeErrors: {
@@ -1767,6 +1792,7 @@ export default {
     install_not_in_catalog: 'Esa app no está disponible en tu catálogo.',
     install_cloud_rejected:
       'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
+    core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
     hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',

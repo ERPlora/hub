@@ -952,6 +952,8 @@ mod tests {
             // shape as a recipient nobody could be found for, and pinned here rather than left to
             // the `not_found` suffix rule, so renaming it cannot silently turn it into a `400`.
             (notify::ERR_OPTIONS_NOT_FOUND, StatusCode::NOT_FOUND),
+            // …and the text it promised, on the same terms (hub#1660).
+            (notify::ERR_TEXT_NOT_FOUND, StatusCode::NOT_FOUND),
             // Refused by an authority.
             (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
             (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),

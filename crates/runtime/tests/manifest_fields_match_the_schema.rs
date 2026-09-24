@@ -67,6 +67,7 @@ const BLOCKS: &[(&str, &str)] = &[
     ("/properties/navigation/items", "navigation[]"),
     ("/properties/protects/items", "protects[]"),
     ("/$defs/widget", "widgets.*"),
+    ("/properties/bell/additionalProperties", "bell.*"),
     ("/properties/setup", "setup"),
     ("/properties/settings", "settings"),
     ("/properties/agent", "agent"),

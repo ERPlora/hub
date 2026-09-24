@@ -820,6 +820,13 @@ pub struct StepDef {
     /// does not match is the flow working, not an error, and offering a policy for a failure that
     /// cannot happen is a guard nobody executes.
     pub on_error: ErrorPolicy,
+    /// **Whether this step applies at all** (hub#2066). When it does not match, THIS step does not
+    /// run and the run carries on with the next one — unlike a `condition`, which ends the run.
+    /// The spine stays linear: nothing branches or jumps, a step just may not be its turn. It is
+    /// the step-level `if:` of GitHub Actions and the «run after: has failed» of Power Automate,
+    /// and it exists so a document can say «tell her we will call back, ONLY if the assistant
+    /// failed» (whatsapp_inbox#122) without the guard also ending the run before the confirmation.
+    pub run_if: Option<Condition>,
 }
 
 impl StepDef {
@@ -1505,8 +1512,9 @@ fn stringify(v: &Json) -> String {
     }
 }
 
-/// Every `{{path}}` inside a value, for the save-time checks.
-fn template_paths(expr: &Json, out: &mut Vec<String>) {
+/// Every `{{path}}` inside a value, for the save-time checks — and for `notify`, which asks
+/// whether the run had any of what a text was built from (hub#1660).
+pub(crate) fn template_paths(expr: &Json, out: &mut Vec<String>) {
     match expr {
         Json::String(s) => {
             if is_path(s) {
@@ -1668,6 +1676,25 @@ impl FlowDefinition {
                     ));
                 }
             }
+            // A `run_if` is a comparison on EVERY kind, `http` included (hub#2066): the call may
+            // carry a credential, but whether to make it is decided in the open, and a guard
+            // comparing against a secret is how it gets guessed byte by byte.
+            if let Some(guard) = &step.run_if {
+                let mut paths = Vec::new();
+                for expr in guard.expressions() {
+                    template_paths(&expr, &mut paths);
+                }
+                if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
+                    return Err(invalid(
+                        ERR_SECRET_NOT_AVAILABLE,
+                        format!(
+                            "step `{}`: `{path}` — the `run_if` of a step cannot read a flow \
+                             secret (ADR-0283 §4)",
+                            step.id
+                        ),
+                    ));
+                }
+            }
         }
         // A trigger runs before any step and its scope is the EVENT, so there is nothing a secret
         // could mean there.
@@ -1809,9 +1836,9 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     })?;
 
     let allowed: &[&str] = match kind {
-        StepKind::Command => &["id", "kind", "command", "params", "on_error"],
+        StepKind::Command => &["id", "kind", "command", "params", "on_error", "run_if"],
         StepKind::Query => &[
-            "id", "kind", "query", "params", "result", "limit", "options", "on_error",
+            "id", "kind", "query", "params", "result", "limit", "options", "on_error", "run_if",
         ],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &[
@@ -1825,9 +1852,10 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "cancel_on",
             "reschedule_on",
             "on_error",
+            "run_if",
         ],
         StepKind::Http => &[
-            "id", "kind", "method", "url", "headers", "body", "timeout", "on_error",
+            "id", "kind", "method", "url", "headers", "body", "timeout", "on_error", "run_if",
         ],
         StepKind::Ai => &[
             "id",
@@ -1840,6 +1868,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "on_reject",
             "on_error",
             "output",
+            "run_if",
         ],
         StepKind::Notify => &[
             "id",
@@ -1850,6 +1879,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "vars",
             "interactive",
             "on_error",
+            "run_if",
         ],
         StepKind::Approval => &[
             "id",
@@ -1860,6 +1890,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "expires_in",
             "on_expire",
             "on_reject",
+            "run_if",
         ],
     };
     for key in map.keys() {
@@ -1896,6 +1927,20 @@ fn parse_step(value: &Json) -> Result<StepDef> {
                     "step `{id}`: `on_error` is one of {}",
                     joined(ErrorPolicy::ALL.iter().map(|p| p.as_str()))
                 ),
+            ))
+        }
+    };
+
+    // **Whether this step applies at all** (hub#2066): the same `{path: {op: value}}` a `condition`
+    // speaks, parsed the same way so a bad operator is refused here and not at 3 AM. The allow-list
+    // above leaves it off `condition`, whose `when` already IS the guard.
+    let run_if = match map.get("run_if") {
+        None | Some(Json::Null) => None,
+        Some(value @ Json::Object(_)) => Some(Condition::parse(value)?),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `run_if` is an object of `{{path: {{op: value}}}}`"),
             ))
         }
     };
@@ -2023,6 +2068,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         kind,
         spec,
         on_error,
+        run_if,
     })
 }
 

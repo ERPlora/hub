@@ -354,6 +354,7 @@ import { getClient } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import { getDeviceContext, isTauri } from '../lib/device';
 import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
+import { openExternal } from '../lib/open-external';
 
 const { t, te, locale } = useI18n();
 const router = useRouter();
@@ -546,6 +547,11 @@ function tierLabel(tier: AssistantTierOption): string {
  *
  * Si no llega url NO se navega: mejor no moverse que llevar a una página vacía justo cuando el
  * dueño está intentando pagar.
+ *
+ * The checkout leaves through the one door out of the till (`openExternal`, hub#475), like every
+ * other checkout: navigating this window onto it left the owner of the installed app on
+ * erplora.com's «upgrade complete» page with no Back button and no way back (hub#1914). The till
+ * stays behind, and coming back to it re-reads the plan so the purchase shows.
  */
 async function openPlans(): Promise<void> {
   if (checkoutPending.value) return;
@@ -560,11 +566,37 @@ async function openPlans(): Promise<void> {
   checkoutPending.value = true;
   try {
     const url = await startAssistantCheckout(chosen);
-    if (url) window.location.assign(url);
-    else toastError(t('assistant.error'));
+    if (!url) {
+      toastError(t('assistant.error'));
+      return;
+    }
+    try {
+      await openExternal(url);
+      watchForCheckoutReturn();
+    } catch {
+      toastError(t('assistant.checkoutOpenFailed'));
+    }
   } finally {
     checkoutPending.value = false;
   }
+}
+
+/** Re-reads the plan when the owner comes back from the checkout (hub#1914), the same
+ *  recheck-on-focus `ModulePlanPanel` uses. Only armed once a checkout was actually opened: every
+ *  focus of the till is not a reason to call the SaaS. It stays armed while the drawer lives, since
+ *  the payment can land after the first return (the SaaS learns it from Stripe's webhook). */
+let checkoutReturnWatched = false;
+
+function onCheckoutReturn(): void {
+  if (document.visibilityState !== 'visible') return;
+  void loadPlan();
+}
+
+function watchForCheckoutReturn(): void {
+  if (checkoutReturnWatched) return;
+  checkoutReturnWatched = true;
+  window.addEventListener('focus', onCheckoutReturn);
+  document.addEventListener('visibilitychange', onCheckoutReturn);
 }
 
 /** La hoja de selección: el MISMO `alertController` con radios que ya usa la tarjeta de
@@ -998,6 +1030,8 @@ watch(
 
 onBeforeUnmount(() => {
   abort?.();
+  window.removeEventListener('focus', onCheckoutReturn);
+  document.removeEventListener('visibilitychange', onCheckoutReturn);
   // Never leave the mic light on: an unmount mid-recording releases the stream.
   recording.value?.cancel();
   recording.value = null;
