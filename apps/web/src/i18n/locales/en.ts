@@ -141,6 +141,12 @@ export default {
     action: 'Download',
     cancel: 'Not now',
     failed: 'We could not open your browser. Go to erplora.com to get the new version.',
+    android: {
+      confirmBody:
+        'The ERPlora listing opens on Google Play. Google Play installs version {version}: there is no file to download or open.',
+      action: 'Open Google Play',
+      failed: 'We could not open Google Play. Search for ERPlora there to get the new version.',
+    },
   },
   assistant: {
     confirmTitle: 'The assistant wants to run an action',

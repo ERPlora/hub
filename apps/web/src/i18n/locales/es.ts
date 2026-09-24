@@ -135,6 +135,12 @@ export default {
     action: 'Descargar',
     cancel: 'Ahora no',
     failed: 'No hemos podido abrir tu navegador. Entra en erplora.com para conseguir la nueva versión.',
+    android: {
+      confirmBody:
+        'Se abre la ficha de ERPlora en Google Play. La versión {version} la instala Google Play: no hay ningún archivo que descargar ni que abrir.',
+      action: 'Abrir Google Play',
+      failed: 'No hemos podido abrir Google Play. Búscalo allí como ERPlora para conseguir la nueva versión.',
+    },
   },
   assistant: {
     confirmTitle: 'El asistente quiere ejecutar una acción',
