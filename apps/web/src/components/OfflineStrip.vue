@@ -6,10 +6,12 @@
     class="offline-strip"
     tone="warning"
     icon="cloud-offline-outline"
-    :heading="t('offline.title')"
+    :heading="offlineCause === 'hub' ? t('offline.hubTitle') : t('offline.title')"
     data-testid="offline-strip"
   >
-    <p class="offline-strip-body">{{ t('offline.body') }}</p>
+    <p class="offline-strip-body">
+      {{ offlineCause === 'hub' ? t('offline.hubBody') : t('offline.body') }}
+    </p>
   </ok-inline-feedback>
 </template>
 
@@ -38,9 +40,16 @@
 //
 // The announcement is not repeated here: `ok-inline-feedback` already wraps its content in a
 // `role="status"` live region, and a second one on the host makes screen readers say it twice.
+//
+// **Two causes, two sentences** (hub#2085). The flag is `true` on a till plugged into a router with
+// no uplink, so the band now also rises when the HUB stops answering (`lib/offline.ts` asks it).
+// There the words «no internet connection» would be a lie — the device may well have internet and
+// the fault may be ours — so that case names what is known, ERPlora is not answering, and the two
+// places the fault can be. When the browser itself says there is no network, that sentence wins:
+// it is the one the person can act on.
 import { useI18n } from 'vue-i18n';
 
-import { isOffline } from '../lib/offline';
+import { isOffline, offlineCause } from '../lib/offline';
 
 const { t } = useI18n();
 </script>

@@ -28,6 +28,7 @@ import {
   bootHubContext,
   ensureMediaCookie,
   setOnRuntimeSessionExpired,
+  RUNTIME_URL,
 } from './lib/runtime';
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
@@ -47,6 +48,7 @@ import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
+import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
 import { bootActionFeedback, toast, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
@@ -151,6 +153,12 @@ bootModuleNavLocale();
 
 // Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
 bootPwa();
+
+// hub#2085 — pregunta al hub si está ahí, una petición ligera cada 30 s con la pestaña visible.
+// `navigator.onLine` es `true` en una caja enchufada a un router sin salida a Internet (la forma
+// más habitual de quedarse sin red en un local), así que la banda de «Sin conexión» (hub#1743)
+// no se levantaba justo en el corte para el que existe. Ver lib/offline.ts.
+startHubWatch({ probe: makeHubProbe(RUNTIME_URL) });
 
 // Pide la cookie con la que el NAVEGADOR pide las fotos (hub#791). `setHubSession` ya la pide en
 // cada login, pero el caso más frecuente no es un login: es la caja que YA tiene sesión y se
