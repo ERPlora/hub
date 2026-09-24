@@ -1777,8 +1777,17 @@ export interface ModuleFlowTemplate {
    * turns «may cancel appointments» into «may cancel appointments AS THE CUSTOMER». Paint it and
    * hand it back on `PUT …/flows/<id>/grants` unchanged — a pin dropped between this list and the
    * permission screen is a wide permission granted by an owner who believed they narrowed it.
+   *
+   * `reason` is the sentence that explains the permission, `lang -> text` (hub#2069, flows#114):
+   * the module writes it in its `<family>.grants.json` and the hub serves it verbatim. Optional —
+   * absent means the module gave none, and the screen falls back to the bare command name.
    */
-  grants: Array<{ kind: string; value: string; payload?: Record<string, unknown> }>;
+  grants: Array<{
+    kind: string;
+    value: string;
+    payload?: Record<string, unknown>;
+    reason?: Record<string, string>;
+  }>;
   /** Per-template version floor (`module -> SemVer`). Unmet -> do not offer it. */
   requires: Record<string, string>;
   /**
