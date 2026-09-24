@@ -16,6 +16,7 @@ _elevation_audit.permission text NOT NULL
 
 _event_delivery.delivered_at text NOT NULL
 _event_delivery.event_id text NOT NULL
+_event_delivery.flow_id text NOT NULL
 _event_delivery.hub_id text NOT NULL
 _event_delivery.listener_command text NOT NULL
 _event_delivery.provider_message_id text NOT NULL

@@ -1028,13 +1028,16 @@ pub async fn check_notify_grants(
 /// names is still alive and still belongs to that run's flow, and the channel is still allowed.
 /// Any of those gone and the send is refused — the row is not marked delivered, it retries and it
 /// ends in the dead-letter, visibly, instead of quietly going out.
+///
+/// Answers the flow the release belongs to, read from the run (hub#1962): the relay records it
+/// next to the step, so a tap can say which automation asked and not only which step.
 pub async fn check_notify_release(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     run_id: &str,
     resolved_via: &str,
     channel: Channel,
-) -> Result<()> {
+) -> Result<String> {
     let refuse = |why: String| {
         Err(RuntimeError::Notify(format!(
             "el destinatario lo autorizó un flujo (`{resolved_via}`) y esa autorización ya no vale: \
@@ -1092,7 +1095,7 @@ pub async fn check_notify_release(
             channel.as_str()
         ));
     }
-    Ok(())
+    Ok(flow_id)
 }
 
 /// Replaces the whole grant list of a flow (the `PUT …/grants` contract): what disappears is
