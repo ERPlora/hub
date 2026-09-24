@@ -305,6 +305,20 @@ async fn advance_run(
             "now": def::clock(),
         });
 
+        // **Not this step's turn** (hub#2066). A `run_if` that does not match skips THIS step and
+        // the run carries on — the opposite of a `condition`, which ends it. Nothing runs, so no
+        // step row is written: the history lists what the hub DID, and a skipped message was never
+        // sent. What later steps read is `steps.<id>.skipped`, never a null they cannot tell apart
+        // from a step that does not exist.
+        if let Some(guard) = &step.run_if {
+            if !guard.matches(&scope) {
+                set_step_output(&mut vars, &step.id, json!({ "skipped": true }));
+                index += 1;
+                persist_vars(db, hub_id, &run_id, index, &vars).await?;
+                continue;
+            }
+        }
+
         match run_step(
             db,
             registry,

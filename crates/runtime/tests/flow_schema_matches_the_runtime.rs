@@ -730,3 +730,35 @@ fn the_failure_policy_is_the_same_closed_vocabulary_on_both_sides() {
     .is_err());
     assert!(step("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_err());
 }
+
+/// **Whether a step applies at all** (hub#2066), on both sides. `run_if` is the step-level guard:
+/// when it does not match, the step is skipped and the run carries on. The editor and the toolkit
+/// judge documents against the schema, so a schema that did not declare it would have them
+/// flagging the one key the WhatsApp recipes need to answer a customer whose assistant failed.
+#[test]
+fn the_step_guard_is_declared_on_both_sides() {
+    let schema = schema();
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/run_if/$ref"),
+        Some(&serde_json::json!("#/$defs/condition")),
+        "the schema must declare `run_if` as the same condition language `when` speaks"
+    );
+
+    // …and the runtime refuses it exactly where the schema's description says it does: on a
+    // `condition`, whose `when` already IS the guard.
+    let parse = |kind: &str, extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "s", "kind": kind, "run_if": { "input.x": { "eq": 1 } }
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(parse("command", serde_json::json!({ "command": "crm.note.add" })).is_ok());
+    assert!(parse("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_ok());
+    assert!(parse("condition", serde_json::json!({ "when": {} })).is_err());
+}
