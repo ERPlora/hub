@@ -281,7 +281,10 @@ async fn the_catalogue_carries_the_exact_name_permission_and_payload_shape() {
     assert_eq!(sale["permission"], json!("sales.create_sale"));
     assert_eq!(sale["expose_api"], json!(true));
     assert_eq!(sale["payload"]["required"], json!(["total"]));
-    assert_eq!(sale["payload"]["properties"]["total"]["type"], json!("string"));
+    assert_eq!(
+        sale["payload"]["properties"]["total"]["type"],
+        json!("string")
+    );
 
     // A list query: what it can be searched, sorted and filtered by is the shape of ITS payload,
     // and it is the half a caller cannot guess from the name.

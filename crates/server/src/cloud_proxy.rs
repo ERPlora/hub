@@ -272,7 +272,10 @@ pub(crate) fn cloud_envelope_passthrough(status: StatusCode, body: axum::body::B
     // crosses: what the module reads is «erplora.com could not attend to this», not `unknown
     // error`.
     if status.is_server_error() {
-        tracing::warn!(status = status.as_u16(), "erplora.com answered a server error");
+        tracing::warn!(
+            status = status.as_u16(),
+            "erplora.com answered a server error"
+        );
         return envelope_error(
             CLOUD_FAILED,
             CLOUD_REJECTED,
@@ -362,7 +365,10 @@ pub(crate) async fn proxy_cloud_send_enveloped(
 /// Spanish screen (hub#1214).
 pub(crate) fn cloud_json_passthrough(status: StatusCode, body: axum::body::Bytes) -> Response {
     if status.is_server_error() {
-        tracing::warn!(status = status.as_u16(), "erplora.com answered a server error");
+        tracing::warn!(
+            status = status.as_u16(),
+            "erplora.com answered a server error"
+        );
         return (
             CLOUD_FAILED,
             [(axum::http::header::CACHE_CONTROL, "no-store")],
@@ -491,7 +497,10 @@ pub(crate) async fn proxy_entitlement(State(st): State<AppState>, headers: Heade
         // read `revalidation`, which is the ONE thing it needs here: «this hub works until
         // {date}». Same shape as the branch below, which is the other way this call fails.
         Ok((status, _retry_after, _body)) if status.is_server_error() => {
-            tracing::warn!(status = status.as_u16(), "erplora.com answered a server error");
+            tracing::warn!(
+                status = status.as_u16(),
+                "erplora.com answered a server error"
+            );
             (
                 CLOUD_FAILED,
                 Json(json!({
@@ -945,9 +954,5 @@ pub(crate) async fn fetch_blueprint(
 /// el resto de proxies y el mismo status, [`CLOUD_FAILED`] — un `5xx` aquí se lo comería el borde
 /// y el motivo no llegaría a la pantalla (hub#1763).
 pub(crate) fn cloud_failed(reason: String) -> Response {
-    (
-        CLOUD_FAILED,
-        Json(json!({ "ok": false, "error": reason })),
-    )
-        .into_response()
+    (CLOUD_FAILED, Json(json!({ "ok": false, "error": reason }))).into_response()
 }

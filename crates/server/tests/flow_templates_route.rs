@@ -398,7 +398,9 @@ async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
     );
     // hub#1649: y la puerta DICE por qué. Una galería que solo enumera lo que hay deja «el módulo
     // no trae ninguna» y «la trae y el hub la ha descartado» exactamente iguales en pantalla.
-    let discarded = body["discarded"].as_array().expect("una lista de descartes");
+    let discarded = body["discarded"]
+        .as_array()
+        .expect("una lista de descartes");
     assert_eq!(discarded.len(), 1, "el descarte se cuenta: {discarded:?}");
     assert_eq!(discarded[0]["module"], "whatsapp_inbox");
     assert_eq!(discarded[0]["family"], "appointment-from-whatsapp");

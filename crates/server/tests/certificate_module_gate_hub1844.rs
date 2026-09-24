@@ -142,7 +142,10 @@ async fn call(
     let response = router.clone().oneshot(request).await.unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 fn error_code(body: &Value) -> String {
@@ -159,14 +162,8 @@ async fn a_module_without_the_grant_is_refused_on_every_certificate_door() {
     let fx = fixture(false, "denied").await;
 
     for (method, body) in doors() {
-        let (status, response) = call(
-            &fx.router,
-            method,
-            &fx.admin,
-            Some(VERIFACTU),
-            body.clone(),
-        )
-        .await;
+        let (status, response) =
+            call(&fx.router, method, &fx.admin, Some(VERIFACTU), body.clone()).await;
         assert_ne!(
             status,
             StatusCode::OK,

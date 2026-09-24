@@ -1592,5 +1592,4 @@ mod tests {
             signer_numero: String::new(),
         }
     }
-
 }
