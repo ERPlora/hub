@@ -445,4 +445,72 @@ describe('ResetPanel · deshacer una importación', () => {
     expect(note.exists()).toBe(true);
     expect(note.text()).toContain('Only your changes were kept in Opening hours');
   });
+
+  // hub#2055: the undo report comes back per TABLE (`schedules_business_hours`), not per reset
+  // section. Without a table→module lookup the list painted the raw i18n key
+  // `settings.reset_schedules_business_hours` instead of a name the business understands.
+  it('names each undone table by the app it belongs to, never by an internal key', async () => {
+    undoImport.mockResolvedValue({
+      sections: [{ section: 'schedules_business_hours', rows_deleted: 7 }],
+    });
+    listInstalledModules.mockResolvedValue([{ id: 'schedules', name: 'Opening hours', version: '1.0.0' }]);
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const report = w.find('[data-testid="reset-report"]');
+    expect(report.text()).toContain('Opening hours — 7 rows deleted');
+    expect(report.text()).not.toContain('settings.reset_');
+    expect(report.text()).not.toContain('schedules_business_hours');
+  });
+
+  it('adds up the tables of the same app into a single line', async () => {
+    undoImport.mockResolvedValue({
+      sections: [
+        { section: 'inventory_product', rows_deleted: 300 },
+        { section: 'inventory_category', rows_deleted: 12 },
+        { section: 'customers_customer', rows_deleted: 5 },
+      ],
+    });
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const lines = w.findAll('[data-testid="reset-report-line"]').map((l) => l.text());
+    expect(lines).toEqual(['Inventory — 312 rows deleted', 'Customers — 5 rows deleted']);
+  });
+
+  it('a table no installed app claims falls back to its own name, not to a raw i18n key', async () => {
+    undoImport.mockResolvedValue({ sections: [{ section: 'orphan_table', rows_deleted: 2 }] });
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const report = w.find('[data-testid="reset-report"]');
+    expect(report.text()).toContain('orphan_table — 2 rows deleted');
+    expect(report.text()).not.toContain('settings.reset_');
+  });
+
+  it('a full reset report still names core sections by their translated name', async () => {
+    resetHub.mockResolvedValue({
+      sections: [
+        { section: 'hub_settings', rows_deleted: 1 },
+        { section: 'modules/inventory', rows_deleted: 124 },
+      ],
+    });
+    const w = mountPanel();
+    await flush(w);
+    await w.vm.toggle('modules/inventory');
+    await w.vm.submit();
+    await flush(w);
+
+    const lines = w.findAll('[data-testid="reset-report-line"]').map((l) => l.text());
+    expect(lines).toEqual(['Hub settings — 1 rows deleted', 'Inventory — 124 rows deleted']);
+  });
 })
