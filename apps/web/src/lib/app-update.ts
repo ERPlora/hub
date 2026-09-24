@@ -210,11 +210,16 @@ export async function checkAppUpdate(): Promise<AppUpdate> {
  * notice away from them is exactly the orphaned fleet this module was written to prevent.
  */
 export async function updateDestination(): Promise<string | null> {
+  return (await updateTarget())?.url ?? null;
+}
+
+/** {@link updateDestination} together with the platform it was resolved for. */
+async function updateTarget(): Promise<{ platform: DownloadPlatform; url: string } | null> {
   if (!isTauri()) return null;
   const context = await getDeviceContext();
   if (context?.distribution === 'play' || context?.distribution === 'msstore') return null;
   const platform = downloadPlatform(context?.platform);
-  return platform ? appDownloadUrl(platform) : null;
+  return platform ? { platform, url: appDownloadUrl(platform) } : null;
 }
 
 // ── What the chrome reads ──────────────────────────────────────────────────────────────────────
@@ -224,6 +229,15 @@ export const appUpdate = ref<AppUpdate>(UNKNOWN_UPDATE);
 
 /** Where this device would get it, resolved once — `null` while unknown or unreachable. */
 export const appUpdateDestination = ref<string | null>(null);
+
+/**
+ * The platform {@link appUpdateDestination} was resolved for — `null` whenever the destination is.
+ *
+ * The confirmation reads it (hub#1898): on Android the Cloud's page hands over to Google Play, so
+ * there is no file to download and nothing to open afterwards, and the desktop sentence would leave
+ * the owner waiting for a download that never arrives.
+ */
+export const appUpdatePlatform = ref<DownloadPlatform | null>(null);
 
 /**
  * Whether THIS session is the one this task belongs to.
@@ -267,7 +281,9 @@ function rememberAnnounced(version: string): void {
 export async function refreshAppUpdate(): Promise<void> {
   const update = await checkAppUpdate();
   appUpdate.value = update;
-  appUpdateDestination.value = update.state === 'attention' ? await updateDestination() : null;
+  const target = update.state === 'attention' ? await updateTarget() : null;
+  appUpdateDestination.value = target?.url ?? null;
+  appUpdatePlatform.value = target?.platform ?? null;
 
   const version = update.latest;
   if (
