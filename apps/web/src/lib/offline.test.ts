@@ -261,6 +261,38 @@ describe('hub#2085 — a hub that does not answer is an outage, whatever the bro
     await vi.advanceTimersByTimeAsync(120_000);
     expect(probe).toHaveBeenCalledTimes(2);
   });
+  it('🔴 after an outage ends, one miss is one miss again, not a new outage', async () => {
+    // The two-misses rule is about EVERY outage, not only the first: with the count never reset,
+    // every hub restart after the first cut would flash the band the rule exists to keep down.
+    const probe = unreachable();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(true);
+
+    probe.mockResolvedValue(undefined);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(false);
+
+    probe.mockRejectedValue(new TypeError('Failed to fetch'));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(probe).toHaveBeenCalledTimes(4);
+    expect(isOffline.value, 'a single miss after a recovery raised the band').toBe(false);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(true);
+  });
+
+  it('🔴 the browser saying «online» again makes it ask at once: the flag is not a promise', async () => {
+    const probe = answering();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    goOffline();
+    goOnline();
+    await flush();
+    expect(probe, 'the flag came back and nobody asked the hub').toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('hub#2085 — what «the hub answered» means for the probe', () => {
