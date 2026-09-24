@@ -40,6 +40,12 @@ impl Runtime {
         fiscal_profile::go_live(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// **One-off, at boot (hub#2079):** a hub that went live through the VeriFactu select is
+    /// written down as live in the core. See [`fiscal_profile::adopt_module_environment`].
+    pub async fn adopt_module_fiscal_environment(&self) -> Result<bool> {
+        fiscal_profile::adopt_module_environment(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// **Apaga el go-live**, y solo mientras no haya salido ni un registro hacia la Hacienda real
     /// (ADR-0273 D3). Lo irreversible es el primer ENVÍO, no el clic: quien activa por error y se
     /// da cuenta antes de facturar puede volver.
