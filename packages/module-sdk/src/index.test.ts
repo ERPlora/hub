@@ -23,6 +23,12 @@ import {
   parseQuantity,
   formatQuantity,
   onGrid,
+  UnavailableBridgeTransport,
+  HARDWARE_UNAVAILABLE,
+  ANDROID_LOCAL_NETWORK_PERMISSION,
+  INVALID_PRINTER_ADDRESS,
+  PRINTER_UNREACHABLE,
+  PRINTER_ADD_FAILED,
 } from './index.ts';
 
 // The barrel re-exports the quantity contract (ADR-0147) from `./quantity.ts`. Asserting the
@@ -1955,5 +1961,70 @@ test('hub#1094: a refusal that names no field leaves `fields` undefined, not an 
   await assert.rejects(
     () => t.command('kitchen.settings.update', {}),
     (e: unknown) => e instanceof ErploraError && e.fields === undefined,
+  );
+});
+
+// ── hub#1924: a printer the scan cannot see, added by typing its address ─────────────────────────
+
+function fakeAddShell(answer: (args: Record<string, unknown>) => unknown) {
+  const calls: { cmd: string; args: Record<string, unknown> }[] = [];
+  const tauri = {
+    invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
+      calls.push({ cmd, args });
+      if (cmd === 'erplora_add_network_printer') return answer(args);
+      return {};
+    },
+    listen: async () => () => {},
+  };
+  return { transport: new IpcBridgeTransport(tauri), calls };
+}
+
+test('addNetworkPrinter: asks for the LAN first, then adds host+port and returns the printer', async () => {
+  const { transport, calls } = fakeAddShell(() => A_PRINTER);
+
+  const printer = await transport.addNetworkPrinter!('192.168.1.50', 9100);
+
+  assert.deepEqual(printer, A_PRINTER);
+  assert.deepEqual(
+    calls.map((c) => c.cmd),
+    ['plugin:erplora-android|request_permissions', 'erplora_add_network_printer'],
+  );
+  assert.deepEqual(calls[0].args, { permissions: [ANDROID_LOCAL_NETWORK_PERMISSION] });
+  assert.deepEqual(calls[1].args, { host: '192.168.1.50', port: 9100 });
+});
+
+test('addNetworkPrinter: with no port it uses 9100, the raw ESC/POS port', async () => {
+  const { transport, calls } = fakeAddShell(() => A_PRINTER);
+  await transport.addNetworkPrinter!('192.168.1.50');
+  assert.equal(calls[1].args.port, 9100);
+});
+
+test('addNetworkPrinter: the shell refusal keeps its CODE, so the page can tell typo from silence', async () => {
+  for (const code of [PRINTER_UNREACHABLE, INVALID_PRINTER_ADDRESS]) {
+    const { transport } = fakeAddShell(() => {
+      throw { code, message: 'detail for the log' };
+    });
+    await assert.rejects(
+      () => transport.addNetworkPrinter!('192.168.1.50', 9100),
+      (e: unknown) => e instanceof ErploraError && e.code === code,
+    );
+  }
+});
+
+test('addNetworkPrinter: an app that does not know the command still rejects with a code', async () => {
+  // An installed app older than the hub answers a bare string ("command … not found").
+  const { transport } = fakeAddShell(() => {
+    throw 'Command erplora_add_network_printer not found';
+  });
+  await assert.rejects(
+    () => transport.addNetworkPrinter!('192.168.1.50', 9100),
+    (e: unknown) => e instanceof ErploraError && e.code === PRINTER_ADD_FAILED,
+  );
+});
+
+test('addNetworkPrinter: in a plain browser there is no hardware to add a printer to', async () => {
+  await assert.rejects(
+    () => new UnavailableBridgeTransport().addNetworkPrinter!('192.168.1.50', 9100),
+    (e: unknown) => e instanceof ErploraError && e.code === HARDWARE_UNAVAILABLE,
   );
 });

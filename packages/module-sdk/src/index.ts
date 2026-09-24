@@ -3285,6 +3285,23 @@ export interface BridgeTransport {
    */
   setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]>;
   /**
+   * Adds a network printer by the address the owner TYPED (hub#1924) — the way in when the scan
+   * cannot see it: another subnet, an isolated guest Wi-Fi, mDNS blocked by the router.
+   *
+   * The app connects to `host:port` first and saves ONLY a printer that answers; from then on it
+   * is listed by every `discoverPrinters()` and takes a role like any other. Resolves with that
+   * printer. Rejects with an {@link ErploraError} whose `code` is {@link INVALID_PRINTER_ADDRESS},
+   * {@link PRINTER_UNREACHABLE} or {@link PRINTER_ADD_FAILED} (or `hardware_unavailable` outside
+   * the app).
+   *
+   * **Optional** because a module can run on a hub whose SDK predates it: check that it exists
+   * before offering the form.
+   *
+   * @param host  A dotted IPv4 address, as the printer's self-test sheet prints it.
+   * @param port  The raw print port; 9100 when omitted.
+   */
+  addNetworkPrinter?(host: string, port?: number): Promise<BridgePrinter>;
+  /**
    * Muestra una notificación del SISTEMA — la del SO, no un toast dentro de la app.
    *
    * Para eso existe: avisar cuando **nadie está mirando la pantalla**. El caso que la motiva es la
@@ -3308,6 +3325,17 @@ export interface BridgeTransport {
  * impresora en este dispositivo y lo que toca es instalar la app.
  */
 export const HARDWARE_UNAVAILABLE = 'hardware_unavailable';
+
+/**
+ * The three `code`s {@link BridgeTransport.addNetworkPrinter} rejects with (hub#1924). A screen
+ * compares against these, never against the message. The first two send the owner to opposite
+ * places — fix what they typed, or go look at the printer — which is why they are kept apart.
+ */
+export const INVALID_PRINTER_ADDRESS = 'invalid_printer_address';
+/** Nothing answered on that address and port: the printer was NOT added. */
+export const PRINTER_UNREACHABLE = 'printer_unreachable';
+/** Anything else — e.g. an installed app older than this hub, that does not know the command. */
+export const PRINTER_ADD_FAILED = 'printer_add_failed';
 
 /**
  * El entorno NO tiene acceso al hardware — hoy, un navegador a secas (ADR-0196 §3).
@@ -3367,6 +3395,10 @@ export class UnavailableBridgeTransport implements BridgeTransport {
   }
 
   setDeviceRole(): Promise<BridgeDevice[]> {
+    return this.refuse();
+  }
+
+  addNetworkPrinter(): Promise<BridgePrinter> {
     return this.refuse();
   }
 
@@ -3507,6 +3539,25 @@ export class IpcBridgeTransport implements BridgeTransport {
     return this.tauri.invoke('erplora_set_device_role', { mac: keyOrMac, role }) as Promise<
       BridgeDevice[]
     >;
+  }
+
+  /**
+   * The refusal keeps the shell's `code` (hub#1924): `{code, message}` from an app that knows the
+   * command, a bare string from one that does not — the latter becomes {@link PRINTER_ADD_FAILED}
+   * so the page still has a code to branch on.
+   */
+  async addNetworkPrinter(host: string, port = 9100): Promise<BridgePrinter> {
+    // The connect crosses the LAN, which Android gates at runtime like printing does (hub#337).
+    await this.ensurePermissions([ANDROID_LOCAL_NETWORK_PERMISSION]);
+    try {
+      return (await this.tauri.invoke('erplora_add_network_printer', { host, port })) as BridgePrinter;
+    } catch (e) {
+      const refusal = e as { code?: unknown; message?: unknown } | null;
+      if (refusal && typeof refusal === 'object' && typeof refusal.code === 'string') {
+        throw new ErploraError(refusal.code, String(refusal.message ?? refusal.code));
+      }
+      throw new ErploraError(PRINTER_ADD_FAILED, e instanceof Error ? e.message : String(e));
+    }
   }
 
   /** Notificación del SO por el shell (que ES el bridge en Tauri). Best-effort: no propaga fallos. */
