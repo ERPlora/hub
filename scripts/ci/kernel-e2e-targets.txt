@@ -34,6 +34,8 @@ import_no_duplica_lo_sembrado
 import_report_persist_test
 import_retry_test
 import_test
+kitchen_order_client_instance                    # el RELAY del outbox lleva la pestaña al
+                                                 # listener (hub#2029): `sales`+`kitchen` son el banco
 lifecycle_cascade_e2e
 module_manifest_contract
 module_not_installed_e2e
