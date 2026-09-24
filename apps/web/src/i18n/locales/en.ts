@@ -187,6 +187,7 @@ export default {
     plansConfirm: 'Go to payment',
     planOption: '{name} — {price} €/month',
     plansUnavailable: 'There are no plans to upgrade to right now.',
+    checkoutOpenFailed: 'The payment page could not be opened in your browser. Try again, and if it keeps failing, update the ERPlora app.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
