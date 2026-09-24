@@ -515,7 +515,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     {
         let st = state.clone();
         let secs = module_reconcile::interval_secs(
-            std::env::var(module_reconcile::INTERVAL_ENV).ok().as_deref(),
+            std::env::var(module_reconcile::INTERVAL_ENV)
+                .ok()
+                .as_deref(),
         );
         tokio::spawn(async move {
             let reconciler = module_reconcile::ModuleReconciler::new();

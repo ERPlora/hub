@@ -118,8 +118,7 @@ impl ModuleReconciler {
                 }
                 Err(reason) => {
                     tracing::warn!(module_id = %module_id, version = %version, error = %reason, "module reconciliation failed; the module keeps serving what it had (hub#1875)");
-                    self.gave_up()
-                        .insert(module_id.clone(), version.clone());
+                    self.gave_up().insert(module_id.clone(), version.clone());
                     report.failed.push((module_id, version, reason));
                 }
             }
@@ -130,13 +129,13 @@ impl ModuleReconciler {
     /// The memo of failures. A poisoned lock only means a pass panicked mid-update of a plain map:
     /// its content is still a valid map, so it is used as is.
     fn gave_up(&self) -> std::sync::MutexGuard<'_, HashMap<String, String>> {
-        self.gave_up.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.gave_up
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     fn already_gave_up(&self, module_id: &str, version: &str) -> bool {
-        self.gave_up()
-            .get(module_id)
-            .is_some_and(|v| v == version)
+        self.gave_up().get(module_id).is_some_and(|v| v == version)
     }
 }
 

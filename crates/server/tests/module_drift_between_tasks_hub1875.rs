@@ -102,7 +102,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
-const INIT_SQL: &str = "CREATE TABLE IF NOT EXISTS {id}_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);";
+const INIT_SQL: &str =
+    "CREATE TABLE IF NOT EXISTS {id}_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);";
 
 fn manifest(id: &str, version: &str) -> String {
     serde_json::to_string(&json!({
@@ -294,11 +295,17 @@ async fn two_tasks(tag: &str, mock: Shared) -> TwoTasks {
         .await
         .unwrap();
     let session = rt_out.create_session(&admin, 3600, None).await.unwrap();
-    rt_out.install_from_dir(&seed).await.expect("outgoing: seed parts@1.0.0");
+    rt_out
+        .install_from_dir(&seed)
+        .await
+        .expect("outgoing: seed parts@1.0.0");
 
     let mut rt_stay = Runtime::with_hub_id(Box::new(db_stay), HUB);
     rt_stay.ensure_system_tables().await.unwrap();
-    rt_stay.install_from_dir(&seed).await.expect("staying: seed parts@1.0.0");
+    rt_stay
+        .install_from_dir(&seed)
+        .await
+        .expect("staying: seed parts@1.0.0");
 
     let outgoing = AppState::with_config(
         rt_out,
@@ -381,7 +388,14 @@ async fn an_update_made_by_the_other_task_is_what_this_task_lists_and_serves() {
     ]);
     let t = two_tasks("update", mock.clone()).await;
 
-    let updated = call(&t.outgoing, &t.session, "POST", "/api/modules/parts/update", "{}").await;
+    let updated = call(
+        &t.outgoing,
+        &t.session,
+        "POST",
+        "/api/modules/parts/update",
+        "{}",
+    )
+    .await;
     assert_eq!(updated["data"]["version"], json!("2.0.0"), "{updated}");
     assert_eq!(recorded(&t.staying, "parts").await.0, "2.0.0");
     let downloads_before = mock.downloads();
@@ -398,10 +412,22 @@ async fn an_update_made_by_the_other_task_is_what_this_task_lists_and_serves() {
         json!("2.0.0"),
         "the module list must show the version the hub runs"
     );
-    let versions = call(&t.staying, &t.session, "GET", "/api/modules/parts/versions", "").await;
+    let versions = call(
+        &t.staying,
+        &t.session,
+        "GET",
+        "/api/modules/parts/versions",
+        "",
+    )
+    .await;
     assert_eq!(versions["data"]["installed"], json!("2.0.0"), "{versions}");
     assert_eq!(
-        t.staying.runtime.read().await.registry().module_version("parts"),
+        t.staying
+            .runtime
+            .read()
+            .await
+            .registry()
+            .module_version("parts"),
         "2.0.0",
         "and the runtime serves the new code, not only a new label"
     );
@@ -449,7 +475,8 @@ async fn a_module_installed_by_the_other_task_appears_here_at_the_recorded_versi
         "the recorded version, not the newest one the marketplace offers"
     );
     assert!(
-        mock.downloads().contains(&"download:extras@1.0.0".to_string()),
+        mock.downloads()
+            .contains(&"download:extras@1.0.0".to_string()),
         "{:?}",
         mock.downloads()
     );
@@ -468,9 +495,25 @@ async fn a_module_the_other_task_left_switched_off_stays_off_here() {
         ("parts", "2.0.0", package("parts", "2.0.0")),
     ]);
     let t = two_tasks("inactive", mock.clone()).await;
-    call(&t.outgoing, &t.session, "POST", "/api/modules/parts/update", "{}").await;
-    t.outgoing.runtime.write().await.deactivate("parts").await.unwrap();
-    assert_eq!(recorded(&t.staying, "parts").await, ("2.0.0".into(), "inactive".into()));
+    call(
+        &t.outgoing,
+        &t.session,
+        "POST",
+        "/api/modules/parts/update",
+        "{}",
+    )
+    .await;
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .deactivate("parts")
+        .await
+        .unwrap();
+    assert_eq!(
+        recorded(&t.staying, "parts").await,
+        ("2.0.0".into(), "inactive".into())
+    );
 
     let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
 
@@ -516,14 +559,22 @@ async fn a_version_that_cannot_be_loaded_keeps_the_old_one_and_is_not_retried_ev
     assert_eq!(first.failed[0].0, "parts");
     assert_eq!(first.failed[0].1, "9.9.9");
     assert_eq!(
-        t.staying.runtime.read().await.registry().module_version("parts"),
+        t.staying
+            .runtime
+            .read()
+            .await
+            .registry()
+            .module_version("parts"),
         "1.0.0",
         "a failed reload leaves the module serving, never missing"
     );
     let calls_after_first = mock.call_count();
 
     let second = reconciler.reconcile_once(&t.staying).await;
-    assert!(second.reloaded.is_empty() && second.failed.is_empty(), "{second:?}");
+    assert!(
+        second.reloaded.is_empty() && second.failed.is_empty(),
+        "{second:?}"
+    );
     assert_eq!(
         mock.call_count(),
         calls_after_first,
@@ -542,7 +593,10 @@ async fn when_memory_and_database_agree_nothing_is_touched() {
 
     let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
 
-    assert!(report.reloaded.is_empty() && report.failed.is_empty(), "{report:?}");
+    assert!(
+        report.reloaded.is_empty() && report.failed.is_empty(),
+        "{report:?}"
+    );
     assert_eq!(mock.call_count(), 0, "{:?}", mock.calls.lock().unwrap());
 
     let _ = std::fs::remove_dir_all(&t.temp);
@@ -618,7 +672,9 @@ async fn a_module_that_fell_in_cascade_is_reloaded_still_fallen() {
     let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
 
     assert!(
-        report.reloaded.contains(&("addon".to_string(), "1.0.0".to_string())),
+        report
+            .reloaded
+            .contains(&("addon".to_string(), "1.0.0".to_string())),
         "{report:?}"
     );
     assert_eq!(
