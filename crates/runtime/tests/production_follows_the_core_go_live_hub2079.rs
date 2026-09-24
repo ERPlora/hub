@@ -82,7 +82,11 @@ async fn the_native_host_answers_the_core_profile_environment() {
     module_config_saying(rt.db(), ENV_PRODUCTION).await;
 
     assert_eq!(
-        host(rt.db()).fiscal_environment(HUB).await.unwrap().as_deref(),
+        host(rt.db())
+            .fiscal_environment(HUB)
+            .await
+            .unwrap()
+            .as_deref(),
         Some(ENV_TESTING),
         "the module's row said production; the core never went live"
     );
@@ -94,7 +98,11 @@ async fn the_native_host_answers_the_core_profile_environment() {
     )
     .await;
     assert_eq!(
-        host(rt.db()).fiscal_environment(HUB).await.unwrap().as_deref(),
+        host(rt.db())
+            .fiscal_environment(HUB)
+            .await
+            .unwrap()
+            .as_deref(),
         Some(ENV_PRODUCTION)
     );
 }
@@ -108,7 +116,9 @@ async fn a_hub_that_went_live_through_the_module_select_is_adopted_as_live() {
     let mut identity = serde_json::Map::new();
     identity.insert("business_legal_name".into(), json!("Bar Manolo SL"));
     identity.insert("business_tax_id".into(), json!("B12345674"));
-    rt.set_settings(&identity, "u1").await.expect("fiscal identity");
+    rt.set_settings(&identity, "u1")
+        .await
+        .expect("fiscal identity");
     module_config_saying(rt.db(), ENV_PRODUCTION).await;
 
     // Through the boot's own step: the host resolves the profile at every start, and that is
@@ -118,8 +128,14 @@ async fn a_hub_that_went_live_through_the_module_select_is_adopted_as_live() {
     let after = profile(rt.db()).await;
     assert_eq!(after.environment, ENV_PRODUCTION);
     assert_eq!(after.status, FiscalStatus::Active);
-    assert!(!after.activated_at.is_empty(), "the go-live instant is stamped");
-    assert_eq!(after.taxpayer_id, "B12345674", "the identity is frozen as in go_live");
+    assert!(
+        !after.activated_at.is_empty(),
+        "the go-live instant is stamped"
+    );
+    assert_eq!(
+        after.taxpayer_id, "B12345674",
+        "the identity is frozen as in go_live"
+    );
 }
 
 /// Exactly once: after the owner stands down (nothing filed yet), the next boot does not push the
