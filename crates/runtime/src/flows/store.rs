@@ -1307,6 +1307,34 @@ mod tests {
         );
     }
 
+    /// Tenancy: the boot of one hub repairs its own flows, never another hub's rows.
+    #[tokio::test]
+    async fn the_boot_repair_of_one_hub_does_not_touch_another_hubs_flow() {
+        let db = db().await;
+        let flow = create(
+            &db,
+            HUB,
+            &registry(),
+            &NewFlow {
+                name: "WhatsApp".into(),
+                enabled: true,
+                definition: twin_triggers(),
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        collapse_as_before_the_fix(&db, &flow.id).await;
+
+        reseed_lost_triggers(&db, "another-hub").await.unwrap();
+
+        assert_eq!(
+            live_triggers(&db, &flow.id).await.len(),
+            1,
+            "another hub's boot must not re-seed this hub's flow"
+        );
+    }
+
     /// The repair only touches flows that LOST a trigger: re-seeding every flow on every boot would
     /// re-enable a one-shot `at` trigger that already fired.
     #[tokio::test]
