@@ -53,6 +53,10 @@ pub const CLOCK_ISO: &str = "iso";
 /// silently treated as a literal string — a step that thinks it is sending a secret and sends the
 /// text `secret.API_KEY` is worse than one that will not save.
 const ROOT_SECRET: &str = "secret";
+/// Every root above — what [`is_path`] reads as a reference into the run. Published in the kernel
+/// contract (`[flow_path_roots]`, module-toolkit#234) because `erplora validate` has to tell a
+/// reference from a literal exactly as this does.
+pub const PATH_ROOTS: [&str; 5] = [ROOT_INPUT, ROOT_STEPS, ROOT_EVENT, ROOT_SECRET, ROOT_NOW];
 
 /// The methods an `http` step may use. Frozen and small: the point of the step is to call a
 /// business API, and `CONNECT`/`TRACE` are how an allow-listed URL becomes a tunnel.
@@ -1370,12 +1374,7 @@ fn as_text(v: &Json) -> Option<String> {
 /// Is `s` a bare path into the run (`input.…`, `steps.…`, `event.…`, `secret.…`, `now.…`)?
 pub fn is_path(s: &str) -> bool {
     matches!(s.split('.').next(), Some(root)
-        if (root == ROOT_INPUT
-            || root == ROOT_STEPS
-            || root == ROOT_EVENT
-            || root == ROOT_SECRET
-            || root == ROOT_NOW)
-            && s.len() > root.len() + 1)
+        if PATH_ROOTS.contains(&root) && s.len() > root.len() + 1)
 }
 
 /// The run clock as the mapping language addresses it, ready to be merged into a scope.

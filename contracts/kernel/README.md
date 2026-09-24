@@ -16,7 +16,7 @@ No es un invento nuestro: es lo que hacen Kotlin (`apiCheck` / binary-compatibil
 | Fichero | Qué congela | Lo genera |
 |---|---|---|
 | `routes.snapshot` | Cada ruta HTTP/WS de `app()`: método · ruta · clase de auth | `cargo test -p erplora-server --test kernel_contract_routes` |
-| `engine.snapshot` | Motor declarativo: params inyectados, `hub.*`, capabilities, orígenes del dispatcher, `kind`s de migración **y los verbos que sacan una migración de `expand`**, guardas de fila | `cargo test -p erplora-runtime --test kernel_contract_engine` |
+| `engine.snapshot` | Motor declarativo: params inyectados, `hub.*`, capabilities, orígenes del dispatcher, `kind`s de migración **y los verbos que sacan una migración de `expand`**, guardas de fila, `emit[]`, y lo que un permiso de flujo puede fijar (`[flow_pin_*]`, `[flow_path_roots]`; module-toolkit#234) | `cargo test -p erplora-runtime --test kernel_contract_engine` |
 | `guest.snapshot` | Contrato del guest WASM: campos de `Input`/`Output` y topes de `WasmLimits` | `cargo test -p erplora-runtime --test kernel_contract_guest` |
 | `tables.snapshot` | Tablas de sistema (`hub_*`, `_*`) con sus columnas, **reflejadas** de un hub recién arrancado | `cargo test -p erplora-runtime --test kernel_contract_tables` (necesita Postgres, `DATABASE_URL`) |
 | `sdk.d.ts` | API pública de `@erplora/module-sdk`, tal cual la emite `tsc` | `pnpm -F @erplora/module-sdk contract:check` (va en `pnpm verify`) |
