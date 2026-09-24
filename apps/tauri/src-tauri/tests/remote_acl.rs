@@ -217,7 +217,12 @@ fn the_hub_origin_can_drive_the_hardware() {
         .map(|(_, permission)| permission)
         .collect();
 
-    for needed in ["allow-erplora-print", "allow-erplora-open-drawer"] {
+    // `add-network-printer` (hub#1924): without it a printer the scan cannot see has no way in.
+    for needed in [
+        "allow-erplora-print",
+        "allow-erplora-open-drawer",
+        "allow-erplora-add-network-printer",
+    ] {
         assert!(
             granted.iter().any(|permission| permission == needed),
             "the hub PWA does not get `{needed}` → the till cannot work"

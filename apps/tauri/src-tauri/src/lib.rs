@@ -1301,6 +1301,25 @@ impl Serialize for HardwareError {
     }
 }
 
+/// Refusal of `erplora_add_network_printer` (hub#1924): the stable `code` the page branches on
+/// next to the message for the log. `HardwareError` travels as a bare string, and the two answers
+/// this command can give send the owner to opposite places — fix the typed address, or go check
+/// the printer — so the page must be able to tell them apart without parsing prose (ADR-0055).
+#[derive(Debug, Serialize)]
+struct AddPrinterError {
+    code: &'static str,
+    message: String,
+}
+
+impl From<erplora_peripherals::PeripheralError> for AddPrinterError {
+    fn from(e: erplora_peripherals::PeripheralError) -> Self {
+        Self {
+            code: e.code(),
+            message: e.to_string(),
+        }
+    }
+}
+
 /// `erplora_bridge_status` — el `IpcBridgeTransport.detect()` lo invoca para saber si el canal de
 /// hardware existe (en el shell siempre existe: el shell ES el bridge). Devuelve la versión.
 #[tauri::command]
@@ -1525,10 +1544,33 @@ async fn erplora_discover_printers(
     // only monitors `network`, so a queue never enters the health probe or the ARP recovery sweep.
     register_discovered_queues(&state.registry, &usb);
 
+    // Printers the owner typed by address (hub#1924) stay listed even when the sweep cannot see
+    // them — that is why they were typed.
+    let outcome = discovery::with_manual_printers(outcome, &state.registry);
+
     Ok(merge_usb_printers(
         merge_bluetooth_printers(outcome, bonded),
         usb,
     ))
+}
+
+/// `erplora_add_network_printer` — adds a network printer by the address the owner TYPED
+/// (hub#1924): the way in when the scan cannot see it (another subnet, an isolated Wi-Fi, mDNS
+/// blocked by the router). It connects first and only a printer that answers is saved; the next
+/// discovery keeps listing it. Returns the printer as the scan would have.
+#[tauri::command]
+async fn erplora_add_network_printer(
+    state: tauri::State<'_, PeripheralsState>,
+    host: String,
+    port: u16,
+) -> Result<erplora_peripherals::protocol::PrinterInfo, AddPrinterError> {
+    Ok(discovery::add_network_printer(
+        &state.registry,
+        &host,
+        port,
+        discovery::MANUAL_PRINTER_PROBE_TIMEOUT,
+    )
+    .await?)
 }
 
 /// `erplora_get_devices` — contenido del registro persistente de dispositivos (con sus roles).
@@ -2007,6 +2049,7 @@ pub fn run() {
             erplora_test_print,
             erplora_open_drawer,
             erplora_set_device_role,
+            erplora_add_network_printer,
             erplora_set_device_name,
             erplora_remove_device,
             erplora_notify,
@@ -2027,6 +2070,27 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#1924: adding a printer by typing its address ─────────────────────────────────────────
+    //
+    // The screen has to tell a typo from a printer that did not answer, in the user's language. A
+    // bare string (what `HardwareError` sends) cannot be branched on without parsing prose, so this
+    // command's refusal carries the stable code next to the message.
+
+    #[test]
+    fn a_refused_manual_printer_reaches_the_page_as_a_code_and_a_message() {
+        let unreachable = AddPrinterError::from(erplora_peripherals::PeripheralError::Unreachable(
+            "10.0.0.9:9100: connection refused".into(),
+        ));
+        let wire = serde_json::to_value(&unreachable).expect("serializes");
+        assert_eq!(wire["code"], "printer_unreachable");
+        assert!(wire["message"].as_str().is_some_and(|m| m.contains("10.0.0.9")));
+
+        let typo = AddPrinterError::from(erplora_peripherals::PeripheralError::InvalidPrinterId(
+            "not an IPv4 address".into(),
+        ));
+        assert_eq!(serde_json::to_value(&typo).expect("serializes")["code"], "invalid_printer_address");
+    }
 
     fn url(s: &str) -> tauri::Url {
         s.parse().expect("url de test válida")
