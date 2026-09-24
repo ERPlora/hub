@@ -383,6 +383,23 @@ impl Runtime {
         }
     }
 
+    /// Drops from THIS task's registry a module another task of the hub already uninstalled
+    /// (hub#2039). Memory only, on purpose: the other task went through every guard of
+    /// [`Self::uninstall`] and did all the writing — the `hub_module` row, the roles, the scheduled
+    /// tasks and the stored package are gone. Doing it again here would be a second decision.
+    /// Returns `false` if the module was not registered.
+    pub fn forget_uninstalled_elsewhere(&mut self, module_id: &str) -> bool {
+        self.registry.remove_module(module_id)
+    }
+
+    /// Applies to THIS task's registry the status another task recorded for a module (hub#2039).
+    /// Memory only, and without cascading: the other task already ran the cascade (ADR-0128) and
+    /// recorded every module it touched, so each row arrives here as it was decided. Returns
+    /// `false` if the module is not registered.
+    pub fn adopt_recorded_status(&mut self, module_id: &str, status: ModuleStatus) -> bool {
+        self.registry.set_status(module_id, status)
+    }
+
     /// [`Self::deactivate`] SIN el retention gate: repone un estado inactivo YA persistido
     /// (arranque/rehidratación), que no es una decisión nueva del admin. Gatearlo aquí solo podría
     /// tumbar el arranque o resucitar un módulo que el admin había apagado (hub#314).
