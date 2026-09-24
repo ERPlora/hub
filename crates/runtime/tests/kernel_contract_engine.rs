@@ -17,12 +17,17 @@
 //! - `[command_origins]`, `[migration_kinds]`, `[row_gates]` — read from the runtime's own source,
 //!   because the items are `pub(crate)` and opening them for a test would widen the very surface
 //!   this contract is closing.
+//! - `[flow_pin_kinds]`, `[flow_pin_roots]`, `[flow_path_roots]` — `GrantKind::can_pin`,
+//!   `grants::PIN_ROOTS` and `def::PATH_ROOTS` (module-toolkit#234), the lists `erplora validate`
+//!   checks a template's pinned permissions against.
 //!
 //! Update: `UPDATE_KERNEL_CONTRACT=1 cargo test -p erplora-runtime --test kernel_contract_engine`.
 
 use std::collections::BTreeSet;
 
 use erplora_db::Params;
+use erplora_runtime::flows::grants::{self, GrantKind};
+use erplora_runtime::flows::def;
 use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::migration_guard::Kind;
 use erplora_runtime::RequestContext;
@@ -214,7 +219,66 @@ fn generate() -> String {
     assert_eq!(keyed.event(), "sale.completed");
     assert_eq!(keyed.dedup_key(), Some("wa_message_id"));
 
+    // What a flow's permissions may FIX (hub#1623/#1662), which `erplora validate` mirrors so a
+    // template cannot publish a pin the hub refuses at install — nor be refused one the hub
+    // accepts (module-toolkit#234). Three lists, each from the code that enforces it.
+    //
+    // The grant kinds that can carry a pin: a REAL call to `can_pin` over every kind.
+    out.push_str("\n[flow_pin_kinds]\n");
+    for kind in GrantKind::ALL.iter().filter(|k| k.can_pin()) {
+        out.push_str(&format!("{}\n", kind.as_str()));
+    }
+    // The roots a pinned value may reference.
+    out.push_str("\n[flow_pin_roots]\n");
+    for root in grants::PIN_ROOTS {
+        out.push_str(&format!("{root}\n"));
+    }
+    // Every root the mapping language reads as a reference into the run. Its own list, NOT derived
+    // from the one above: a dotted value whose root is here and not in `[flow_pin_roots]` is
+    // refused, one whose root is in neither is a literal — the toolkit needs both halves.
+    out.push_str("\n[flow_path_roots]\n");
+    for root in def::PATH_ROOTS {
+        assert!(
+            def::is_path(&format!("{root}.x")),
+            "`{root}` is listed as a path root and `is_path` does not read `{root}.x` as a path"
+        );
+        out.push_str(&format!("{root}\n"));
+    }
+    assert!(
+        !def::is_path("appointments.list"),
+        "a dotted literal outside the path roots must stay a literal"
+    );
+
     out
+}
+
+/// `PATH_ROOTS` is what the snapshot publishes, and `is_path` is what the runtime obeys: a root
+/// the function accepts but the list omits would ship a contract narrower than the kernel. Probed
+/// with every word a root could plausibly be, since the function has no list of its own to read.
+#[test]
+fn is_path_accepts_exactly_the_published_path_roots_mt234() {
+    let candidates = [
+        "input", "steps", "event", "secret", "now", "env", "vars", "flow", "run", "trigger",
+        "payload", "context", "ctx", "hub", "user", "self", "output", "result", "data", "state",
+        "config", "params", "clock", "time", "date", "today",
+    ];
+    let accepted: BTreeSet<&str> = candidates
+        .into_iter()
+        .filter(|root| def::is_path(&format!("{root}.x")))
+        .collect();
+    let published: BTreeSet<&str> = def::PATH_ROOTS.into_iter().collect();
+    assert_eq!(accepted, published);
+}
+
+/// A pin may only reference something a path can name at all.
+#[test]
+fn every_pin_root_is_a_path_root_mt234() {
+    for root in grants::PIN_ROOTS {
+        assert!(
+            def::PATH_ROOTS.contains(&root),
+            "pin root `{root}` is not a path root"
+        );
+    }
 }
 
 fn migration_kinds() -> Vec<String> {

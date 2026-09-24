@@ -195,7 +195,7 @@ impl GrantKind {
 /// the secret one guess at a time. `event.…` is absent because the run scope does not carry it, so
 /// such a pin could only ever deny: a permission that authorises nothing, which is exactly what
 /// this file refuses to store.
-const PIN_ROOTS: [&str; 2] = ["input", "steps"];
+pub const PIN_ROOTS: [&str; 2] = ["input", "steps"];
 
 /// The live grants of one flow, read once. Everything the gate and the context need comes from
 /// this snapshot, so a step asks the database once and then answers consistently for that step.
