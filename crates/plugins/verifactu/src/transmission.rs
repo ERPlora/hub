@@ -4979,7 +4979,11 @@ mod late_remission_verifactu111 {
 
         assert!(envelopes(&bench).is_empty(), "nothing leaves");
         assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
-        assert_eq!(schema_refusals(&bench).await, 1, "and it is not refused again");
+        assert_eq!(
+            schema_refusals(&bench).await,
+            1,
+            "and it is not refused again"
+        );
     }
 
     /// A hub whose `verifactu` module predates the customer columns (migration 017) — the runtime
@@ -5007,6 +5011,10 @@ mod late_remission_verifactu111 {
         let sent = envelopes(&bench);
         assert_eq!(sent.len(), 1, "{sent:?}");
         assert_eq!(sent[0].0, "testing", "only the TEST AEAT");
-        assert!(sent[0].1.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{}", sent[0].1);
+        assert!(
+            sent[0].1.contains("<sum1:NIF>B87654321</sum1:NIF>"),
+            "{}",
+            sent[0].1
+        );
     }
 }
