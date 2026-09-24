@@ -811,20 +811,39 @@ async fn a_read_fills_the_tappable_list_and_it_reaches_the_transport_whole() {
         "and the rest of the message is rendered as it always was"
     );
 
-    // The control, so the assertion above is about the read and not about anything a message now
-    // grows on its own: with the notes gone, the same flow sends the same message with no rows.
+    // **No free slots** (hub#1651). With the notes gone the read publishes an empty list, and a
+    // list without rows is one Meta refuses: it used to be queued anyway, the customer received
+    // nothing and the refusal landed hours later in the proxy. Now the run stops at the message —
+    // a halt, not a failure: the run did nothing wrong — and the step says why.
     rt.db_for_test()
         .execute("DELETE FROM crm_note", &Params::new())
         .await
         .unwrap();
-    run_flow(&rt, &flow_id).await;
-    rt.drain_outbox().await.unwrap();
-    let sent = transport.sent();
-    assert_eq!(sent.len(), 2);
+    let run_id = run_flow(&rt, &flow_id).await;
+    let (run, steps) = rt.get_flow_run(&run_id).await.unwrap();
     assert_eq!(
-        sent[1].0.interactive["action"]["sections"][0]["rows"],
-        json!([]),
-        "an empty read is an empty list, and the run does not fail over it"
+        run.status,
+        store::STATUS_DONE,
+        "an empty read is not an error: {}",
+        run.last_error
+    );
+    let ask = steps
+        .iter()
+        .find(|s| s.step_id == "ask")
+        .expect("the message step is in the history");
+    assert_eq!(ask.status, "stopped", "{ask:?}");
+    assert_eq!(ask.output["reason"], json!("flow.nothing_to_offer"));
+    assert_eq!(ask.output["queued"], json!(false));
+    rt.drain_outbox().await.unwrap();
+    assert_eq!(
+        transport.sent().len(),
+        1,
+        "the first run's message and nothing more: a list with nothing to tap never leaves"
+    );
+    assert_eq!(
+        queued_notifications(&rt).await.len(),
+        1,
+        "and the second run queued nothing to be refused later"
     );
 }
 

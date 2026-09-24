@@ -49,14 +49,17 @@ pub const ERR_RECIPIENT_AMBIGUOUS: &str = "flow.recipient_ambiguous";
 pub const ERR_RECIPIENT_INVALID: &str = "flow.recipient_invalid";
 /// The message promises options to tap and the run never published them (hub#1646).
 pub const ERR_OPTIONS_NOT_FOUND: &str = "flow.options_not_found";
+/// Not an error: the options ARE there and there are none — a read that found no free slots. The
+/// step stops without queuing anything and says so in its outcome (hub#1651).
+pub const REASON_NOTHING_TO_OFFER: &str = "flow.nothing_to_offer";
 
-/// A `notify` step turned into one queued message: the row to insert, and the two halves of what
-/// gets written down.
+/// A `notify` step turned into one queued message — or into none, when it had nothing to offer —
+/// and the two halves of what gets written down.
 #[derive(Debug)]
 pub(crate) struct Prepared {
     /// The `_event_outbox` INSERT. It rides in the STEP's transaction, so the message and the
     /// run's advance commit together: a crash never queues a reminder twice.
-    pub queue_op: (String, Params),
+    pub queue_op: Option<(String, Params)>,
     /// What `_flow_run_steps.input` records — the shape of the decision, never the address.
     pub recorded_input: Json,
     /// What later steps read as `steps.<id>`, and what the history shows as the outcome.
@@ -154,6 +157,39 @@ pub(crate) async fn prepare(
             Some(filled)
         }
     };
+    // **And then it is looked at once more, for the opposite hole** (hub#1651): the options ARE
+    // there and there are none — a read that found no free slots. Meta refuses a list without rows
+    // (every section needs one), so what goes out is only what can be tapped.
+    let (interactive, nothing_to_offer) = match interactive {
+        None => (None, None),
+        Some(filled) => match offered(filled) {
+            Ok(offer) => (Some(offer), None),
+            Err((written, place)) => (Some(written), Some(place)),
+        },
+    };
+
+    if let Some(place) = nothing_to_offer {
+        let mut recorded_input = json!({
+            "channel": spec.channel.as_str(),
+            "to": { "query": spec.query, "params": Json::Object(params), "field": spec.field },
+            "template": template,
+            "vars": Json::Object(vars),
+            "recipient": REDACTED,
+        });
+        if let Some(interactive) = interactive {
+            recorded_input["interactive"] = interactive;
+        }
+        return Ok(Prepared {
+            queue_op: None,
+            recorded_input,
+            output: json!({
+                "queued": false,
+                "channel": spec.channel.as_str(),
+                "reason": REASON_NOTHING_TO_OFFER,
+                "place": place,
+            }),
+        });
+    }
 
     // The intent the transport already knows how to send (ADR-0012), plus the release. `to` is in
     // the QUEUE row because the transport needs an address to dial; it is not in the run history.
@@ -218,7 +254,7 @@ pub(crate) async fn prepare(
             // like the step never had a recipient.
             "recipient_redacted": true,
         }),
-        queue_op,
+        queue_op: Some(queue_op),
     })
 }
 
@@ -321,8 +357,9 @@ impl MissingOptions {
 /// deliberately somebody else's question:
 ///
 /// - **An EMPTY list is not a missing one.** A read that legitimately found no free slots
-///   publishes `[]`, and the document that wants to say «no quedan huecos» branches on
-///   `steps.<id>.count` — that is the recipe's decision (hub#1641), not this door's.
+///   publishes `[]`: the run did nothing wrong, so it is not refused here. It is not sent either —
+///   [`offered`] stops the step with nothing to offer (hub#1651) — and the document that wants to
+///   say «no quedan huecos» still branches on `steps.<id>.count` before it (hub#1641).
 /// - **How many rows Meta holds, how long a title may be, whether two ids repeat**: the SaaS proxy
 ///   (`whatsapp_inbox/services/interactive.py`) is the one place that knows Meta's rules, and a
 ///   second copy of them here would be a table that ages on its own.
@@ -376,6 +413,41 @@ fn missing_options(written: &Json, filled: &Json) -> Option<MissingOptions> {
         }
     }
     None
+}
+
+/// The message as it can be tapped, or — when nothing is left to tap — the message as written and
+/// the place that came back empty.
+///
+/// A section whose rows are an empty list is left out: Meta refuses the WHOLE list for one section
+/// without rows, and «tomorrow is full» must not cost the customer the day after. Only rows that
+/// ARE a list count as empty; any other shape is the proxy's question, like the rest of Meta's
+/// limits (see [`missing_options`]).
+fn offered(mut filled: Json) -> std::result::Result<Json, (Json, String)> {
+    let is_empty_list = |v: Option<&Json>| v.and_then(Json::as_array).is_some_and(Vec::is_empty);
+    let Some(action) = filled.get_mut("action") else {
+        return Ok(filled);
+    };
+    if is_empty_list(action.get("buttons")) {
+        return Err((filled, "action.buttons".to_string()));
+    }
+    let Some(sections) = action.get("sections").and_then(Json::as_array) else {
+        return Ok(filled);
+    };
+    let kept: Vec<Json> = sections
+        .iter()
+        .filter(|section| !is_empty_list(section.get("rows")))
+        .cloned()
+        .collect();
+    if kept.is_empty() {
+        let place = if sections.len() == 1 {
+            "action.sections[0].rows"
+        } else {
+            "action.sections"
+        };
+        return Err((filled, place.to_string()));
+    }
+    action["sections"] = Json::Array(kept);
+    Ok(filled)
 }
 
 /// How a resolved value reads on the wire — same rule as the mapping language, so a template and a
@@ -525,7 +597,7 @@ mod tests {
         .await
         .unwrap();
 
-        let queued = &prepared.queue_op.1;
+        let queued = &prepared.queue_op.as_ref().unwrap().1;
         let payload: Json = serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["to"],
@@ -578,7 +650,7 @@ mod tests {
         .unwrap();
 
         let payload: Json =
-            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(prepared.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["flow_step"],
             json!("remind"),
@@ -786,7 +858,7 @@ mod tests {
 
         let prepared = prepare_step(&db, &asking, &authority).await.unwrap();
 
-        let queued = &prepared.queue_op.1;
+        let queued = &prepared.queue_op.as_ref().unwrap().1;
         let payload: Json = serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
         assert_eq!(payload["to"], json!("+34600111222"));
         assert_eq!(
@@ -815,7 +887,7 @@ mod tests {
         .await
         .unwrap();
         let plain_payload: Json =
-            serde_json::from_str(plain.queue_op.1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(plain.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
         assert!(
             plain_payload.get("interactive").is_none(),
             "a plain message carries no `interactive`: {plain_payload}"
@@ -889,7 +961,7 @@ mod tests {
             .await
             .expect("a list that IS there is queued");
         let payload: Json =
-            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(prepared.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["interactive"]["action"]["sections"][0]["rows"][0]["id"],
             json!("s1")
@@ -956,13 +1028,17 @@ mod tests {
         );
     }
 
-    /// **The refusal is about a promise the run could not keep, not about how many rows there
-    /// are.** A read that legitimately found nothing publishes an EMPTY list, and a document that
-    /// wants to say «no quedan huecos» branches on `steps.<id>.count` — that decision is the
-    /// recipe's (hub#1641), and refusing it here would break it. Meta's own limits stay in the one
-    /// place that knows them, the SaaS proxy: two validators that drift apart is worse than one.
+    /// **A list with no rows is not sent, and the step says there was nothing to offer**
+    /// (hub#1651).
+    ///
+    /// A read that legitimately found no free slots publishes an EMPTY list. That is not a missing
+    /// one — the run did nothing wrong, so it is not an error (hub#1646 is the `null` case) — but it
+    /// is not a message either: Meta refuses a list without rows, and queuing it meant the refusal
+    /// landed hours later in the proxy while the customer received nothing. So nothing is queued,
+    /// and the outcome names the reason and the place, where the run history shows it. How many rows
+    /// Meta HOLDS stays the proxy's question: two validators that drift apart is worse than one.
     #[tokio::test]
-    async fn an_empty_list_is_not_a_missing_one_and_meta_limits_stay_at_the_proxy() {
+    async fn a_list_with_no_rows_queues_nothing_and_says_there_was_nothing_to_offer() {
         let db = db().await;
         customer(&db, "c-1", "marta@example.com", "+34600111222").await;
         let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
@@ -971,9 +1047,23 @@ mod tests {
             "input": { "customer_id": "c-1", "name": "Marta" },
             "steps": { "libres": { "options": [] } }
         });
-        prepare_in(&db, &asking("steps.libres.options"), &authority, &empty)
+        let halted = prepare_in(&db, &asking("steps.libres.options"), &authority, &empty)
             .await
-            .expect("an empty read is an empty list, and the run does not fail over it");
+            .expect("an empty read is not an error: the run did nothing wrong");
+        assert!(
+            halted.queue_op.is_none(),
+            "a list with nothing to tap is never queued: {:?}",
+            halted.queue_op
+        );
+        assert_eq!(halted.output["queued"], json!(false));
+        assert_eq!(halted.output["reason"], json!(REASON_NOTHING_TO_OFFER));
+        assert_eq!(halted.output["place"], json!("action.sections[0].rows"));
+        // What it would have asked stays readable, like any other step.
+        assert_eq!(
+            halted.recorded_input["interactive"]["action"]["button"],
+            json!("Ver huecos")
+        );
+        assert_eq!(halted.recorded_input["recipient"], json!(REDACTED));
 
         // Eleven rows is a Meta limit, and this door does not know Meta's limits on purpose.
         let many: Vec<Json> = (0..11)
@@ -986,6 +1076,115 @@ mod tests {
         prepare_in(&db, &asking("steps.libres.options"), &authority, &over)
             .await
             .expect("how many rows Meta holds is the proxy's question, not this one's");
+    }
+
+    /// **Buttons that came back as an empty list are the same nothing to offer** (hub#1651).
+    #[tokio::test]
+    async fn buttons_that_came_back_empty_queue_nothing_either() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+        let step = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": "¿Confirmas?" },
+                    "action": { "buttons": "steps.pick.options" }
+                }
+            }]
+        }))
+        .unwrap()
+        .steps
+        .remove(0);
+        let with = |buttons: Json| {
+            json!({
+                "input": { "customer_id": "c-1", "name": "Marta" },
+                "steps": { "pick": { "options": buttons } }
+            })
+        };
+
+        let halted = prepare_in(&db, &step, &authority, &with(json!([])))
+            .await
+            .unwrap();
+        assert!(halted.queue_op.is_none());
+        assert_eq!(halted.output["reason"], json!(REASON_NOTHING_TO_OFFER));
+        assert_eq!(halted.output["place"], json!("action.buttons"));
+
+        // The control: one button is something to offer.
+        let one = json!([{ "type": "reply", "reply": { "id": "yes", "title": "Sí" } }]);
+        let queued = prepare_in(&db, &step, &authority, &with(one))
+            .await
+            .unwrap();
+        assert!(queued.queue_op.is_some(), "one button is a message");
+    }
+
+    /// **One empty section among full ones is dropped, not the whole message** (hub#1651).
+    ///
+    /// «Mañana» and «Pasado» filled by two reads, and tomorrow is full: Meta refuses the WHOLE list
+    /// for the one section without rows, so sending it as written would lose the day that does
+    /// have slots. The customer is offered what there is; only when no section has a row is there
+    /// nothing to send.
+    #[tokio::test]
+    async fn an_empty_section_is_left_out_and_the_rest_of_the_list_is_sent() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+        let step = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "interactive": {
+                    "type": "list",
+                    "body": { "text": "¿Qué hueco te viene bien?" },
+                    "action": { "button": "Ver huecos", "sections": [
+                        { "title": "Mañana", "rows": "steps.tomorrow.options" },
+                        { "title": "Pasado", "rows": "steps.after.options" }
+                    ] }
+                }
+            }]
+        }))
+        .unwrap()
+        .steps
+        .remove(0);
+        let slot = json!([{ "id": "s-1", "title": "10:30" }]);
+        let with = |tomorrow: &Json, after: &Json| {
+            json!({
+                "input": { "customer_id": "c-1", "name": "Marta" },
+                "steps": { "tomorrow": { "options": tomorrow }, "after": { "options": after } }
+            })
+        };
+
+        let prepared = prepare_in(&db, &step, &authority, &with(&json!([]), &slot))
+            .await
+            .unwrap();
+        let payload: Json = serde_json::from_str(
+            prepared.queue_op.as_ref().expect("the day with slots is sent").1["payload"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            payload["interactive"]["action"]["sections"],
+            json!([{ "title": "Pasado", "rows": slot }]),
+            "only the section with rows travels"
+        );
+        assert_eq!(
+            prepared.recorded_input["interactive"]["action"]["sections"],
+            json!([{ "title": "Pasado", "rows": slot }]),
+            "and the history shows what was actually offered"
+        );
+
+        let halted = prepare_in(&db, &step, &authority, &with(&json!([]), &json!([])))
+            .await
+            .unwrap();
+        assert!(halted.queue_op.is_none(), "no section with rows: nothing to send");
+        assert_eq!(halted.output["place"], json!("action.sections"));
     }
 
     /// **A whole SECTION nobody published is the same hole as its rows** (hub#1646).
@@ -1045,7 +1244,8 @@ mod tests {
         // is there with an EMPTY list of rows is still not a missing one (hub#1641).
         let published = json!({
             "input": { "customer_id": "c-1", "name": "Marta" },
-            "steps": { "libres": { "section": { "title": "Huecos", "rows": [] } } }
+            "steps": { "libres": { "section": { "title": "Huecos",
+                                                "rows": [{ "id": "s-1", "title": "10:30" }] } } }
         });
         let prepared = prepare_in(
             &db,
@@ -1054,12 +1254,29 @@ mod tests {
             &published,
         )
         .await
-        .expect("a section that IS there is queued, empty rows and all");
+        .expect("a section that IS there is queued");
         let payload: Json =
-            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+            serde_json::from_str(prepared.queue_op.as_ref().unwrap().1["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
             payload["interactive"]["action"]["sections"][0]["title"],
             json!("Huecos")
         );
+
+        // A section that is there with NO rows is not a missing one — it is nothing to offer
+        // (hub#1651): no error, and nothing queued.
+        let empty = json!({
+            "input": { "customer_id": "c-1", "name": "Marta" },
+            "steps": { "libres": { "section": { "title": "Huecos", "rows": [] } } }
+        });
+        let halted = prepare_in(
+            &db,
+            &mapped_whole(json!(["steps.libres.section"])),
+            &authority,
+            &empty,
+        )
+        .await
+        .expect("an empty section is not an error");
+        assert!(halted.queue_op.is_none());
+        assert_eq!(halted.output["reason"], json!(REASON_NOTHING_TO_OFFER));
     }
 }
