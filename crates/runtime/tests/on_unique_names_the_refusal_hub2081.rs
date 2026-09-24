@@ -89,7 +89,10 @@ async fn the_index_refusal_answers_with_the_declared_code_hub2081() {
     let rt = runtime_with(&scratch).await;
 
     create(&rt, "Ana").await.expect("the first write goes in");
-    match create(&rt, "Ana").await.expect_err("the index refuses the second one") {
+    match create(&rt, "Ana")
+        .await
+        .expect_err("the index refuses the second one")
+    {
         RuntimeError::Domain { code, .. } => assert_eq!(code, CODE),
         other => panic!("expected the declared code `{CODE}`, got {other:?}"),
     }
