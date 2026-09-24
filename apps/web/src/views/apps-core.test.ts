@@ -154,8 +154,28 @@ describe('Apps · what an installed app card offers', () => {
     expect(catalogActions).toContain("id: 'install'");
     expect(catalogActions).toContain("id: 'update'");
     // Each one lives exactly where its own operation applies — never both on the same row.
-    expect(catalogActions).toContain("catalogActionFor(row.state as CatalogRowState) !== 'install'");
-    expect(catalogActions).toContain("catalogActionFor(row.state as CatalogRowState) !== 'update'");
+    expect(catalogActions).toContain('catalogVisibleAction(');
+  });
+
+  // hub#2019 — same recipe as hub#2015 in «My apps»: the action that does not apply is left out, not
+  // greyed out. Grey is kept only for the one that applies but cannot be pressed now (it is running).
+  it('hides «Install» and «Update» where they do not apply instead of greying them out', () => {
+    const start = source.indexOf('const catalogActions');
+    const catalogActions = source.slice(start, source.indexOf('// --- Handlers ---', start));
+    const action = (id: string) => {
+      const from = catalogActions.indexOf(`id: '${id}'`);
+      expect(from, `action ${id} must exist`).toBeGreaterThan(-1);
+      return catalogActions.slice(from, catalogActions.indexOf('},', from));
+    };
+    for (const id of ['install', 'update']) {
+      expect(action(id)).toContain(`hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== '${id}'`);
+      expect(action(id)).toContain("disabled: (row) => row.state === 'installing'");
+      expect(action(id)).toContain("loading: (row) => row.state === 'installing'");
+      expect(action(id)).not.toContain('catalogActionFor(');
+    }
+    // The row says WHICH operation is running, so the spinner stays on that button and not the other.
+    const rows = source.slice(source.indexOf('const filteredModules'), source.indexOf('const installedDisplay'));
+    expect(rows).toContain("busyAction: updatingIds.value.has(m.id) ? 'update' : prog !== null ? 'install' : null");
   });
 
   it('routes the catalog press by the ROW state, not by the Cloud flag', () => {

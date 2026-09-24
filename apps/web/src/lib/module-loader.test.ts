@@ -100,6 +100,68 @@ describe('loadMenu builds the launcher', () => {
   });
 });
 
+// ── hub#2021: switching an app back on left «Open» missing for ~7 s ─────────────────────────────
+//
+// Every `module.activated` empties the manifest cache (`refreshModuleNavAfterInstall`), and
+// `loadMenu` then read `module.json` + `icons.json` ONE MODULE AFTER ANOTHER: ~330 ms × 21 apps on a
+// real hub before the new menu — and with it the «Open» button — could land. The reads are
+// independent, so they go out together and the menu costs about one round-trip, not one per app.
+describe('loadMenu reads every module at once, not one after another', () => {
+  const ids = Array.from({ length: 21 }, (_, i) => `m${String(i).padStart(2, '0')}`);
+
+  /** A fetch whose `module.json` answers are held until the test releases them. */
+  function stubHeldManifests() {
+    const held = new Map<string, () => void>();
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith('/api/navigation')) {
+        return Promise.resolve({
+          ok: true, status: 200, json: async () => ({ ok: true, data: ids.map(navItem), active_modules: ids.length }),
+        } as unknown as Response);
+      }
+      const match = /^\/modules\/([^/]+)\/module\.json$/.exec(url);
+      if (match) {
+        const id = match[1];
+        return new Promise<Response>((resolve) => {
+          held.set(id, () => resolve({
+            ok: true, status: 200, json: async () => ({ name: id, ui: { entry: `dist/${id}.esm.js` } }),
+          } as unknown as Response));
+        });
+      }
+      return Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as unknown as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return held;
+  }
+
+  const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); };
+
+  it('has every module.json in flight before the first one answers', async () => {
+    const held = stubHeldManifests();
+
+    const pending = loadMenu();
+    await flush();
+
+    expect([...held.keys()].sort()).toEqual(ids);
+    for (const release of held.values()) release();
+    await pending;
+  });
+
+  it('keeps the navigation order even when the answers arrive in reverse', async () => {
+    const held = stubHeldManifests();
+    // Each answer lands later the earlier its module is listed: the last app answers first.
+    const release = setInterval(() => {
+      for (const [id, answer] of held) setTimeout(answer, (ids.length - ids.indexOf(id)) * 2);
+      held.clear();
+    }, 1);
+
+    try {
+      expect((await loadMenu()).map((e) => e.moduleId)).toEqual(ids);
+    } finally {
+      clearInterval(release);
+    }
+  });
+});
+
 // ── The bug: a failure that came out as «you have no apps» ────────────────────────────────────
 
 describe('a failed navigation is a FAILURE, not an empty hub', () => {
