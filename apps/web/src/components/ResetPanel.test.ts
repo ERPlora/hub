@@ -61,6 +61,8 @@ const i18n = createI18n({
         resetUndo: 'Undo',
         resetUndoTitle: 'Undo {name}',
         resetUndoBody: '{n} rows brought in by this blueprint will be deleted.',
+        resetUndoEdited: 'You changed {areas} after importing: only your changes stay there.',
+        resetUndoNotRestored: 'Only your changes were kept in {areas}.',
         resetConfirm: 'Delete permanently',
         reset_hub_settings: 'Hub settings',
         reset_hub_users: 'Employees',
@@ -392,5 +394,55 @@ describe('ResetPanel · deshacer una importación', () => {
     const opts = alertCreate.mock.calls[0][0] as { inputs?: unknown[] };
     expect(opts.inputs ?? []).toHaveLength(0);
     expect(undoImport).toHaveBeenCalled();
+  });
+
+  // hub#1556: the business adjusted ONE day of the imported week and then undid the import. The
+  // seeded week cannot come back on top of its own row, so it is left with only that day — and
+  // nothing said so. The runtime now flags the tables it edited; the dialog has to warn.
+  it('warns in the confirmation when the business edited the imported data afterwards', async () => {
+    fetchImportBatches.mockResolvedValue([
+      {
+        id: 'batch-1',
+        name: 'peluqueria_es',
+        rows: 7,
+        created_at: '2026-07-31T10:14:00Z',
+        edited_after_import: ['schedules_business_hours'],
+      },
+    ]);
+    listInstalledModules.mockResolvedValue([{ id: 'schedules', name: 'Opening hours', version: '1.0.0' }]);
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    const opts = alertCreate.mock.calls[0][0] as { message?: string };
+    expect(opts.message).toContain('You changed Opening hours after importing');
+  });
+
+  it('does not warn when nothing imported was edited', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    const opts = alertCreate.mock.calls[0][0] as { message?: string };
+    expect(opts.message).not.toContain('You changed');
+  });
+
+  it('says after undoing which data kept only the business changes', async () => {
+    undoImport.mockResolvedValue({
+      sections: [{ section: 'schedules_business_hours', rows_deleted: 7 }],
+      not_restored: ['schedules_business_hours'],
+    });
+    listInstalledModules.mockResolvedValue([{ id: 'schedules', name: 'Opening hours', version: '1.0.0' }]);
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const note = w.find('[data-testid="reset-undo-not-restored"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain('Only your changes were kept in Opening hours');
   });
 })

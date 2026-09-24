@@ -1635,6 +1635,11 @@ export interface ResetSectionOutcome {
 /** Informe final del reset (`POST /api/hub/reset`). */
 export interface ResetReport {
   sections: ResetSectionOutcome[];
+  /**
+   * Undo only (hub#1556): tables where what the import replaced did NOT come back, because the
+   * business had written its own rows there afterwards. Absent/empty when nothing was lost.
+   */
+  not_restored?: string[];
 }
 
 /**
@@ -1680,6 +1685,11 @@ export interface ImportBatch {
   /** Filas que ESE lote insertó realmente. */
   rows: number;
   created_at: string;
+  /**
+   * Tables the business edited after this import (hub#1556): undoing it now keeps only its own
+   * rows there. The undo confirmation warns off this.
+   */
+  edited_after_import?: string[];
 }
 
 /** Importaciones del hub, de la más reciente a la más antigua (`GET /api/hub/import/batches`). */

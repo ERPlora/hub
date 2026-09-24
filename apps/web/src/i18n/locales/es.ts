@@ -670,6 +670,8 @@ export default {
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
     resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
+    resetUndoEdited: 'Cambiaste {areas} después de importar. Al deshacer solo se quedan tus cambios ahí: lo que este blueprint sustituyó no vuelve.',
+    resetUndoNotRestored: 'En {areas} solo se han quedado tus cambios: lo que el blueprint había sustituido no ha vuelto. Revisa esa pantalla.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} fila | {n} filas',

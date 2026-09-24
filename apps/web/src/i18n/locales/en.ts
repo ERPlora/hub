@@ -734,6 +734,8 @@ export default {
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
     resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
+    resetUndoEdited: 'You changed {areas} after importing. Undoing keeps only your changes there: what this blueprint replaced will not come back.',
+    resetUndoNotRestored: 'In {areas} only your own changes were kept: what the blueprint had replaced did not come back. Check that screen.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} row | {n} rows',

@@ -352,7 +352,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
   },
   'components/ResetPanel.vue': {
     prefix: 'reset-',
-    contract: ['reset-export-first', 'reset-report', 'reset-submit'],
+    contract: ['reset-export-first', 'reset-report', 'reset-submit', 'reset-undo-not-restored'],
     computed: [
       'reset-batch-',
       'reset-section-',
