@@ -1019,7 +1019,10 @@ async fn turning_it_back_on_keeps_what_the_owner_wrote_in_the_editor() {
     let body = toggle(&fx).await;
     assert_eq!(body["id"], flow_id.as_str());
     assert_eq!(body["enabled"], true);
-    assert_eq!(body["name"], "Citas de la tarde", "el nombre que puso el dueño");
+    assert_eq!(
+        body["name"], "Citas de la tarde",
+        "el nombre que puso el dueño"
+    );
     assert_eq!(
         body["definition"]["steps"].as_array().map(Vec::len),
         Some(2),

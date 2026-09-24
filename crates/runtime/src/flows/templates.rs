@@ -168,9 +168,8 @@ pub async fn activate(
             enabled: false,
             definition,
         };
-        let flow =
-            store::create_from_template(db, hub_id, registry, &paused, by, Some(&reference))
-                .await?;
+        let flow = store::create_from_template(db, hub_id, registry, &paused, by, Some(&reference))
+            .await?;
         let flow = grant_then_enable(db, hub_id, registry, &flow.id, paused, &wanted, by).await?;
         return Ok(Activation {
             flow,
