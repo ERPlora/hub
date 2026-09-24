@@ -1393,6 +1393,11 @@ export default {
       printerUnknown: "We couldn't check the printer",
       printerUnknownDetail:
         "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
+      // hub#1629 — WhatsApp that stopped on its own (expired permission, revoked by Meta, unlinked).
+      whatsappDown: 'WhatsApp stopped working',
+      whatsappDownDetail:
+        "Customer messages aren't coming in and your replies aren't going out until you connect it again.",
+      whatsappAction: 'Connect WhatsApp again',
       notMeasured: "We couldn't read this",
     },
     // hub#1732 — the notices, and the permission that lets them exist at all.
