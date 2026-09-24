@@ -90,7 +90,7 @@ export function takeShellCourierCode(): string | null {
  * only moment early enough to stop the auth gate from deciding without the session (hub#858).
  *
  * A hash without a `courier` key is left completely alone: the shell puts real state there
- * (`/settings#permisos`), and eating it would break every sub-tab deep link.
+ * (`/settings#permissions`), and eating it would break every sub-tab deep link.
  */
 export function takeCourierCode(
   locationLike: Pick<Location, 'hash' | 'pathname' | 'search'> = window.location,

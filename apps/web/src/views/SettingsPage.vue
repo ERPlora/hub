@@ -602,8 +602,8 @@ const { t, te } = useI18n();
 
 type Tab = SettingsTab;
 
-// Deep-link a una pestaña por HASH (/settings#permisos) — la ruta base no cambia, así Ionic
-// no trata el cambio de pestaña como página secundaria (no se desmonta el tabbar ni hay botón back).
+// Deep link to a tab by HASH (/settings#permissions) — the base route does not change, so Ionic
+// does not treat a tab switch as a secondary page (the tabbar is not unmounted, no back button).
 // ¿Estamos DENTRO de la app instalada? Es lo único que decide si este dispositivo puede hablar con
 // el hardware: los periféricos viven en `crates/peripherals`, dentro de la app, no en la web. Se lee
 // una vez — no puede cambiar mientras la pantalla está abierta (mismo criterio que `SystemPage`).

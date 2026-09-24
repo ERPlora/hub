@@ -21,9 +21,9 @@ export const routes: RouteRecordRaw[] = [
   // (mismo flujo de finalización); no lleva `meta.auth` (aún no hay sesión) y el gate de registro
   // de máquina lo deja pasar igual que a `/login`.
   { path: '/auth/google/callback', name: 'google-callback', component: () => import('../views/LoginPage.vue') },
-  // La pestaña activa del tabbar secundario va en el HASH (#permisos) en vez de en el path:
-  // así la ruta base NO cambia → Ionic no trata el cambio de pestaña como navegación a una
-  // página secundaria (no se desmonta el tabbar ni aparece el botón back). Deep-link: /settings#permisos.
+  // The active tab of the secondary tabbar lives in the HASH (#permissions), not in the path:
+  // the base route does NOT change → Ionic does not treat a tab switch as navigating to a
+  // secondary page (the tabbar is not unmounted and no back button appears). Deep link: /settings#permissions.
   { path: '/dashboard', name: 'dashboard', component: () => import('../views/DashboardPage.vue'), meta: { auth: true } },
   { path: '/employees/new', name: 'employee-new', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
   { path: '/employees/:id', name: 'employee-edit', component: () => import('../views/EmployeeFormPage.vue'), meta: { auth: true } },
@@ -37,8 +37,8 @@ export const routes: RouteRecordRaw[] = [
   // Compat: la tienda se llamaba "Marketplace"; los enlaces/bookmarks viejos siguen funcionando.
   { path: '/marketplace', redirect: '/apps' },
   { path: '/system', name: 'system', component: () => import('../views/SystemPage.vue'), meta: { auth: true } },
-  // Export/Import del hub (ADR-0113): viven JUNTOS en la pestaña Datos de Ajustes
-  // (/settings#datos, decisión del humano 2026-07-12 — antes eran las páginas /export y /import).
+  // Hub export/import (ADR-0113): they live TOGETHER in the Data tab of Ajustes
+  // (/settings#data, decided 2026-07-12 — they used to be the /export and /import pages).
   // El gate admin REAL es del runtime (require_admin_session, como PUT /api/settings).
   { path: '/settings', name: 'settings', component: () => import('../views/SettingsPage.vue'), meta: { auth: true } },
   // Documentación de la API pública (ADR-0057 §4): vista Vue interna que renderiza Swagger sobre el
