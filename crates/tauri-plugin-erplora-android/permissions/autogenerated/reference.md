@@ -1,12 +1,13 @@
 ## Default Permission
 
-Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y salir de la app con el botón Atrás.
+Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás y abrir la ficha de la app en los ajustes del sistema.
 
 #### This default permission set includes the following:
 
 - `allow-check-permissions`
 - `allow-request-permissions`
 - `allow-leave-app`
+- `allow-open-app-settings`
 
 ## Permission Table
 
@@ -65,6 +66,32 @@ Enables the leave_app command without any pre-configured scope.
 <td>
 
 Denies the leave_app command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`erplora-android:allow-open-app-settings`
+
+</td>
+<td>
+
+Enables the open_app_settings command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`erplora-android:deny-open-app-settings`
+
+</td>
+<td>
+
+Denies the open_app_settings command without any pre-configured scope.
 
 </td>
 </tr>

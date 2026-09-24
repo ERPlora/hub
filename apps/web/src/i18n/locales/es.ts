@@ -1246,6 +1246,8 @@ export default {
       whatsappAction: 'Volver a conectar WhatsApp',
       notMeasured: 'No hemos podido leerlo',
     },
+    // hub#1886 — ver el comentario gemelo en `en.ts`.
+    openDeviceSettings: 'Abrir los ajustes',
     notices: {
       primerHeader: 'Deja que te avisemos',
       primerMessage:
