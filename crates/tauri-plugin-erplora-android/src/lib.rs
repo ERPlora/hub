@@ -164,6 +164,11 @@ struct PrintHtmlArgs {
     html: String,
 }
 
+/// What `printHtml` answers with. Kotlin's `invoke.resolve()` with no data reaches Rust as JSON
+/// `null`, so the answer is read and ignored whatever its shape — reading it as [`Empty`] turned a
+/// print screen that DID open into a failure (seen on the emulator, hub#2008).
+type PrintHtmlAnswer = serde::de::IgnoredAny;
+
 /// How long reader mode may stay open on one call (hub#988). Kotlin clamps it: an argument nobody
 /// typed by hand must never be the reason a till has no reader.
 #[derive(Debug, Serialize)]
@@ -398,7 +403,7 @@ impl<R: Runtime> ErploraAndroid<R> {
         {
             return self
                 .0
-                .run_mobile_plugin::<Empty>(
+                .run_mobile_plugin::<PrintHtmlAnswer>(
                     PRINT_HTML_COMMAND,
                     PrintHtmlArgs {
                         html: html.to_string(),
@@ -943,6 +948,19 @@ mod tests {
                 code.contains(&literal),
                 "{literal} is not in ErploraAndroidPlugin.kt — the invoice would reach Kotlin as \
                  `command not found` or with no document, on a real device only"
+            );
+        }
+    }
+
+    #[test]
+    fn an_answer_with_no_data_is_a_print_screen_that_opened() {
+        // `invoke.resolve()` with no data arrives as `null` (and a `JSObject()` as `{}`): both
+        // mean the print screen opened. Reading either as an error sent the invoice to the till
+        // roll right behind the dialog the user was looking at.
+        for answer in [serde_json::Value::Null, serde_json::json!({})] {
+            assert!(
+                serde_json::from_value::<PrintHtmlAnswer>(answer.clone()).is_ok(),
+                "{answer} must read as success"
             );
         }
     }
