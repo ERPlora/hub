@@ -242,7 +242,8 @@ const CORE_ITEMS: &[CoreItem] = &[
         title: "Your business details",
         description: "Legal name and tax id: without them the hub cannot issue an invoice.",
         icon: "business-outline",
-        route: "/settings",
+        // The `business` tab, not bare `/settings` (that opens General, where the tax id is not; hub#1954).
+        route: "/settings#business",
         required: true,
         actions: &["manual", "assistant"],
         permission: crate::hub_users::ADMINISTER_PERMISSION,
@@ -1183,6 +1184,19 @@ mod tests {
                 "`{key}` is on the ⛔ list but is not an item the core emits"
             );
         }
+    }
+
+    #[test]
+    fn the_business_identity_item_lands_on_the_settings_tab_that_holds_the_tax_id() {
+        // hub#1954: plain `/settings` opens the General tab, where neither the legal name nor the
+        // tax id live — the one button that unblocks invoicing left the owner halfway. The shell
+        // deep-links Settings tabs by hash (`apps/web/src/lib/settings-tabs.ts`), and the fields
+        // this item asks for are on the `business` tab.
+        let identity = CORE_ITEMS
+            .iter()
+            .find(|c| c.key == ITEM_BUSINESS_IDENTITY)
+            .expect("the core emits the business identity item");
+        assert_eq!(identity.route, "/settings#business");
     }
 
     #[test]
