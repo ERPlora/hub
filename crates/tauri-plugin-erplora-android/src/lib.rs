@@ -177,6 +177,7 @@ type PrintHtmlAnswer = serde::de::IgnoredAny;
 
 /// `openAppSettings` resolves with no data (`invoke.resolve()` → `null`): read it as anything
 /// (hub#2024).
+#[cfg(target_os = "android")]
 type OpenAppSettingsAnswer = serde::de::IgnoredAny;
 
 /// How long reader mode may stay open on one call (hub#988). Kotlin clamps it: an argument nobody
