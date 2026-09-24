@@ -618,6 +618,8 @@ function onModulesChanged(): void {
    y el enlace pueden quedar pegados → un poco más de gap y touch-friendly. */
 .dash-health {
   display: flex;
+  /* Two lines (printer + WhatsApp, hub#1629) plus /system do not fit a phone row: wrap them. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
@@ -627,6 +629,7 @@ function onModulesChanged(): void {
 }
 .dash-health-status {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
 }

@@ -53,3 +53,20 @@ describe('the panel says when WhatsApp stopped on its own (hub#1629)', () => {
     expect(dashboard).not.toMatch(/printerHealth\?\.action/);
   });
 });
+
+// Reviewer (hub#2062): with two lines the strip holds two pills, two actions and the /system link.
+// Without wrapping, on a 375 px phone that row measured 711 px inside 343 px and «Connect WhatsApp
+// again» landed off-screen — the one button this feature exists for. Wrapping keeps every action
+// on screen at every width.
+describe('the strip keeps every way out on screen on a phone (hub#1629)', () => {
+  function rule(selector: string): string {
+    const start = dashboard.indexOf(`\n${selector} {`);
+    expect(start, `${selector} rule not found`).toBeGreaterThan(-1);
+    return dashboard.slice(start, dashboard.indexOf('}', start));
+  }
+
+  it('lets the health row and its sentences wrap instead of running off the edge', () => {
+    expect(rule('.dash-health')).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule('.dash-health-status')).toMatch(/flex-wrap:\s*wrap/);
+  });
+});
