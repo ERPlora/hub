@@ -523,6 +523,12 @@ pub(crate) async fn command(
         Some(token) => ctx.with_elevation_token(token),
         None => ctx,
     };
+    // hub#1980: which shell tab is charging. It names, it never grants — read here, on the shell's
+    // door, so the live frames of what this command emits say which till caused them.
+    let ctx = match auth::client_instance(&headers) {
+        Some(instance) => ctx.with_client_instance(instance),
+        None => ctx,
+    };
     // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
     let owner = rt
         .registry()

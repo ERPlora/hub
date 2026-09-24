@@ -26,7 +26,14 @@
 // (`kitchen_station` + destino por estación) en vez de con `printing.routing` (categoría → texto
 // libre `receipt|kitchen|bar`, sin relación con las estaciones reales).
 // `printing.print_kitchen` y `printing.routing.*` quedan OBSOLETOS: no los lee nadie.
-import type { BridgeDevice, ErploraClient } from '@erplora/module-sdk';
+//
+// SOLO LA CAJA QUE COBRÓ (hub#1980). Todos los shells abiertos oyen todos los `sale.completed` (el
+// hub emite un solo canal), así que con dos cajas y una impresora cada una el tique salía en las
+// dos, y el cajón se abría en las dos. El hub sella el frame con la pestaña que mandó el cobro
+// (`clientInstance`, de su `X-Client-Instance`); aquí solo se actúa sobre las ventas propias. Una
+// venta que no cobró ningún shell (API, flujo) no la imprime ninguna caja.
+import type { BridgeDevice, ErploraClient, EventMeta } from '@erplora/module-sdk';
+import { CLIENT_INSTANCE } from './client-instance';
 import { printerIdForRole, type PrintRequest, type PrintResult } from './print';
 
 interface PrintingSettings {
@@ -79,7 +86,9 @@ interface Deps {
 
 /** Arranca el escuchador en el boot del shell. Devuelve la función para cancelar. */
 export function bootPrintOnSale(client: ErploraClient, deps: Deps): () => void {
-  return client.on('sale.completed', (payload) => {
+  return client.onEvent('sale.completed', (payload, meta: EventMeta) => {
+    // hub#1980: the till next door's sale is not ours — no paper, no drawer, no warning.
+    if (meta.clientInstance !== CLIENT_INSTANCE) return;
     void onSaleCompleted(client, deps, payload).catch((e) => console.warn('[print-on-sale]', e));
   });
 }

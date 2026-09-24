@@ -15,8 +15,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createEnqueuePrintJob } from './print-enqueue';
 import { createPrintService } from './print';
 import { bootPrintOnSale } from './print-on-sale';
+import { CLIENT_INSTANCE } from './client-instance';
 
-type Listener = (payload: unknown) => void;
+type Listener = (payload: unknown, meta?: { clientInstance?: string }) => void;
 
 /** The runtime, answering `POST /api/print/jobs` with one canned body. */
 function runtimeAnswering(body: Record<string, unknown>) {
@@ -34,6 +35,10 @@ function hubWithNoPrinter() {
       (listeners[event] ??= []).push(cb);
       return () => {};
     },
+    onEvent: (event: string, cb: Listener) => {
+      (listeners[event] ??= []).push(cb);
+      return () => {};
+    },
     query: vi.fn(async (name: string) => {
       if (name === 'printing.settings.get') return [{ auto_print_on_sale: 1 }];
       return [];
@@ -48,8 +53,9 @@ function hubWithNoPrinter() {
   };
   return {
     client: client as never,
+    // Charged at THIS till (hub#1980): only the till that charged prints.
     emit: async (payload: unknown) => {
-      for (const cb of listeners['sale.completed'] ?? []) cb(payload);
+      for (const cb of listeners['sale.completed'] ?? []) cb(payload, { clientInstance: CLIENT_INSTANCE });
       await new Promise((r) => setTimeout(r, 0));
     },
   };

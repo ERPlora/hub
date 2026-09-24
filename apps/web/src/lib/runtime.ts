@@ -30,6 +30,7 @@ import { setRuntimeClientKind } from './device';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 import { sessionEndReason } from './session-end-reason';
+import { CLIENT_INSTANCE } from './client-instance';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -149,6 +150,9 @@ export function runtimeHeaders(): Record<string, string> {
   // JWT del usuario: fallback hub-scoped (marketplace/install) cuando el hub no está enrolado.
   const token = getAccessToken();
   if (token) h['Authorization'] = `Bearer ${token}`;
+  // hub#1980: which shell tab is calling. The hub repeats it on the live frames this call produces,
+  // so only the till that charged a sale prints its ticket. It names, it grants nothing.
+  h['X-Client-Instance'] = CLIENT_INSTANCE;
   return h;
 }
 

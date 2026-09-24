@@ -667,10 +667,12 @@ pub(crate) async fn execute_at(
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
     // durable a listeners la hace el relay desde el outbox. El emisor viaja con el evento
     // (hub#529): es lo único que el canal puede creerse para filtrar por módulo.
+    // hub#1980: and the shell tab that sent the request, so only the till that charged prints.
     for event in &cmd.def.emit {
-        events::notify_sink(
+        events::notify_sink_from(
             registry,
             crate::registry::EventSource::Module(&cmd.module_id),
+            ctx.client_instance.as_deref(),
             event.event(),
             &bound,
         );
@@ -1500,11 +1502,12 @@ async fn persist_handler_output(
     // eventos del handler salen con el módulo del command (hub#529) — que es también el único
     // namespace en el que hub#240 les deja llamarse.
     let source = crate::registry::EventSource::Module(&cmd.module_id);
+    let instance = ctx.client_instance.as_deref();
     for event in &declared {
-        events::notify_sink(registry, source, event.event(), &declared_payload);
+        events::notify_sink_from(registry, source, instance, event.event(), &declared_payload);
     }
     for (name, payload) in &handler_events {
-        events::notify_sink(registry, source, name, payload);
+        events::notify_sink_from(registry, source, instance, name, payload);
     }
 
     let mut response = json!({

@@ -13,7 +13,25 @@ use crate::registry::{EventSource, Registry};
 /// by module and the caller is the only one who knows: here the dispatcher holds `cmd.module_id`,
 /// and the core says so explicitly ([`EventSource::Core`]).
 pub fn notify_sink(registry: &Registry, source: EventSource<'_>, event: &str, payload: &Params) {
+    notify_sink_from(registry, source, None, event, payload);
+}
+
+/// [`notify_sink`] for an event a REQUEST caused: `client_instance` is the shell tab that sent it
+/// ([`crate::RequestContext::client_instance`], hub#1980), so the live frame can say which till
+/// charged the sale and only that till prints it.
+pub fn notify_sink_from(
+    registry: &Registry,
+    source: EventSource<'_>,
+    client_instance: Option<&str>,
+    event: &str,
+    payload: &Params,
+) {
     if let Some(sink) = &registry.event_sink {
-        sink.emit(source, event, &serde_json::Value::Object(payload.clone()));
+        sink.emit_from(
+            source,
+            client_instance,
+            event,
+            &serde_json::Value::Object(payload.clone()),
+        );
     }
 }

@@ -47,6 +47,8 @@ published_migrations_stay_installable
 reads_e2e
 reset_test
 reset_undo_test
+sale_event_client_instance                       # el DISPATCHER pasa la pestaña al sink en el
+                                                 # sitio WASM (hub#1980): `sales` es el banco
 sale_refused_without_route_in_production_hub1935 # el gate fiscal del DISPATCHER (hub#1935):
                                                  # `sales` + `invoice` son solo el banco
 

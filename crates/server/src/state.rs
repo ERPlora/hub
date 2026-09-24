@@ -30,12 +30,33 @@ pub type WsEvent = Json;
 /// [`AppState::broadcast`] publishes).
 pub const FRAME_MODULE: &str = "module";
 
+/// The field a frame carries the **shell tab that caused it** in (hub#1980): the caller's
+/// `X-Client-Instance`, stamped by the sink from the request context — like [`FRAME_MODULE`], out
+/// of the payload's reach. Absent = no shell sent it (API, flow, scheduler, listener).
+///
+/// Every till hears every `sale.completed`; this is how the one that charged knows the sale is its
+/// own and prints it, and the one next to it knows it is not.
+pub const FRAME_CLIENT_INSTANCE: &str = "client_instance";
+
 /// Turns an emitted event into the frame this channel carries. **One builder**, used by the sink
 /// and by anything that needs the same shape, so the wire format is defined in exactly one place.
 pub fn event_frame(source: EventSource<'_>, event: &str, payload: &Json) -> WsEvent {
+    event_frame_from(source, None, event, payload)
+}
+
+/// [`event_frame`] for an event a shell's request caused (hub#1980, [`FRAME_CLIENT_INSTANCE`]).
+pub fn event_frame_from(
+    source: EventSource<'_>,
+    client_instance: Option<&str>,
+    event: &str,
+    payload: &Json,
+) -> WsEvent {
     let mut frame = json!({ "name": event, "payload": payload });
     if let Some(module_id) = source.module_id() {
         frame[FRAME_MODULE] = json!(module_id);
+    }
+    if let Some(instance) = client_instance {
+        frame[FRAME_CLIENT_INSTANCE] = json!(instance);
     }
     frame
 }
@@ -50,6 +71,18 @@ impl EventSink for BroadcastSink {
     fn emit(&self, source: EventSource<'_>, event: &str, payload: &Json) {
         // Si no hay suscriptores, `send` falla; lo ignoramos a propósito.
         let _ = self.tx.send(event_frame(source, event, payload));
+    }
+
+    fn emit_from(
+        &self,
+        source: EventSource<'_>,
+        client_instance: Option<&str>,
+        event: &str,
+        payload: &Json,
+    ) {
+        let _ = self
+            .tx
+            .send(event_frame_from(source, client_instance, event, payload));
     }
 }
 

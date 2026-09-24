@@ -27,10 +27,27 @@ export {
   // importa el módulo directamente y por sí solo pasaba en verde.
 } from './quantity.ts';
 
+/**
+ * What the hub says about a live event beyond its payload (hub#1980).
+ *
+ * `clientInstance` is the shell tab whose request produced the event — the `X-Client-Instance` it
+ * sent, stamped on the frame by the hub, never by the emitting module. Absent when no shell caused
+ * it (an API integration, a flow, a scheduled task). Every till hears every `sale.completed`; this
+ * is how the till that charged tells its own sale from the one next to it.
+ */
+export interface EventMeta {
+  clientInstance?: string;
+}
+
 export interface ErploraTransport {
   query(name: string, params?: Record<string, unknown>): Promise<unknown>;
   command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
   subscribe(event: string, cb: (payload: unknown) => void): () => void;
+  /**
+   * `subscribe` with the frame's [`EventMeta`] (hub#1980). Optional so a transport without frames
+   * keeps working: the client then delivers an empty meta.
+   */
+  subscribeWithMeta?(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void;
   /**
    * Descarga autenticada de un fichero de `media/`. Es opcional para que transportes sin HTTP
    * (y shells anteriores) sigan siendo compatibles; el cliente degrada a `null`.
@@ -978,7 +995,7 @@ export class HttpWsTransport implements ErploraTransport {
 
   private ws?: WebSocket;
   private es?: EventSource;
-  private readonly listeners = new Map<string, Set<(p: unknown) => void>>();
+  private readonly listeners = new Map<string, Set<(p: unknown, meta: EventMeta) => void>>();
   private pushStarted = false;
 
   constructor(opts: HttpWsOptions = {}) {
@@ -1206,6 +1223,10 @@ export class HttpWsTransport implements ErploraTransport {
   }
 
   subscribe(event: string, cb: (payload: unknown) => void): () => void {
+    return this.subscribeWithMeta(event, (payload) => cb(payload));
+  }
+
+  subscribeWithMeta(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void {
     let set = this.listeners.get(event);
     if (!set) {
       set = new Set();
@@ -1221,7 +1242,7 @@ export class HttpWsTransport implements ErploraTransport {
 
   /** Reparte un frame del wire (texto JSON) a los suscriptores. Común a WS y SSE. */
   private handleFrame(raw: unknown): void {
-    let msg: { event?: string; name?: string; type?: string; payload?: unknown };
+    let msg: { event?: string; name?: string; type?: string; payload?: unknown; client_instance?: unknown };
     try {
       msg = JSON.parse(typeof raw === 'string' ? raw : '');
     } catch {
@@ -1244,7 +1265,10 @@ export class HttpWsTransport implements ErploraTransport {
       return;
     }
     const set = this.listeners.get(name);
-    if (set) for (const cb of set) cb(msg.payload ?? msg);
+    if (!set) return;
+    // hub#1980: the tab that caused it, as the hub stamped it next to `module`. Only a string counts.
+    const meta: EventMeta = typeof msg.client_instance === 'string' ? { clientInstance: msg.client_instance } : {};
+    for (const cb of set) cb(msg.payload ?? msg, meta);
   }
 
   /** Abre el canal push (lazy) la primera vez que alguien se suscribe, según `push`. */
@@ -2921,6 +2945,14 @@ export class ErploraClient {
   /** Suscribe a un evento de dominio; devuelve una función para cancelar. */
   on(event: string, cb: (payload: unknown) => void): () => void {
     return this.transport.subscribe(event, cb);
+  }
+  /**
+   * [`on`] with the hub's [`EventMeta`] (hub#1980): which shell tab caused the event. A transport
+   * without frames delivers an empty meta — «no tab known», never a guessed one.
+   */
+  onEvent(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void {
+    if (this.transport.subscribeWithMeta) return this.transport.subscribeWithMeta(event, cb);
+    return this.transport.subscribe(event, (payload) => cb(payload, {}));
   }
   /**
    * SOLO para mostrar/ocultar UI. La seguridad real la revalida Rust en cada call:
