@@ -399,17 +399,17 @@ async fn a_real_hub_still_gets_the_wall_and_the_refusal() {
 #[tokio::test]
 async fn a_hub_with_no_modules_at_all_still_gets_its_core_checklist() {
     // The module-only design of ADR-0063 says NOTHING here, and this is the first screen a new
-    // customer sees. The three core items are declared in Rust precisely so they do not depend on
+    // customer sees. The four core items are declared in Rust precisely so they do not depend on
     // anybody having installed anything.
     let rt = runtime("hub-setup").await;
     let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
 
     assert_eq!(
         keys(&doc),
-        vec!["apps", "business_identity", "team"],
+        vec!["apps", "business_identity", "printer", "team"],
         "the core items are fixed and come back in the order the business needs them"
     );
-    for key in ["apps", "business_identity", "team"] {
+    for key in ["apps", "business_identity", "printer", "team"] {
         assert_eq!(must(&doc, key)["state"], "pending", "{key} is not done yet");
         assert_eq!(must(&doc, key)["source"], "core");
         assert!(
@@ -417,11 +417,11 @@ async fn a_hub_with_no_modules_at_all_still_gets_its_core_checklist() {
             "a core item belongs to no module"
         );
     }
-    assert_eq!(doc["total"], 3);
-    assert_eq!(doc["pending"], 3);
+    assert_eq!(doc["total"], 4);
+    assert_eq!(doc["pending"], 4);
     assert_eq!(
         doc["blocking_pending"], 1,
-        "of the three, only the business identity has a gate behind it (ADR-0203)"
+        "of the four, only the business identity has a gate behind it (ADR-0203)"
     );
 }
 
@@ -461,8 +461,15 @@ async fn the_core_items_flip_to_done_when_the_hub_is_actually_set_up() {
         .await
         .unwrap();
 
+    assert_eq!(must(&status(&rt, &ctx).await, "team")["state"], "done");
+
+    // 7 · Your printer — some device registered to print the customer's receipt (hub#1948).
+    rt.register_print_host("till-1", "receipt", "Counter till", "u1")
+        .await
+        .unwrap();
+
     let doc = status(&rt, &ctx).await;
-    assert_eq!(must(&doc, "team")["state"], "done");
+    assert_eq!(must(&doc, "printer")["state"], "done");
     assert_eq!(doc["pending"], 0, "everything the core asks for is done");
 }
 
@@ -551,7 +558,7 @@ async fn an_installed_module_setup_block_joins_the_core_items() {
     assert_eq!(pricing["title"], "Configure pricing");
     assert_eq!(pricing["route"], "/m/pricing/settings");
     assert_eq!(pricing["icon"], "settings-outline");
-    assert_eq!(doc["total"], 4, "three core items + the module one");
+    assert_eq!(doc["total"], 5, "four core items + the module one");
 }
 
 #[tokio::test]
@@ -603,7 +610,10 @@ async fn a_module_without_a_setup_block_contributes_nothing_but_still_counts_as_
     std::fs::remove_dir_all(&dir).ok();
 
     let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
-    assert_eq!(keys(&doc), vec!["apps", "business_identity", "team"]);
+    assert_eq!(
+        keys(&doc),
+        vec!["apps", "business_identity", "printer", "team"]
+    );
     assert_eq!(must(&doc, "apps")["state"], "done");
 }
 
@@ -857,7 +867,7 @@ async fn a_module_whose_setup_query_fails_is_omitted_instead_of_reported_as_pend
         keys(&doc)
     );
     assert_eq!(
-        doc["total"], 3,
+        doc["total"], 4,
         "and it does not leave a hole in the counters either"
     );
 }
@@ -965,6 +975,7 @@ async fn the_list_comes_back_already_ordered_by_the_core() {
             "apps",                 // 10 · core
             "pricing.setup",        // 20 · module
             "business_identity",    // 40 · core
+            "printer",              // 70 · core
             "team",                 // 80 · core
             "cash_register.setup",  // 90 · module
             "unknown_module.setup", // undeclared → last
@@ -1520,10 +1531,10 @@ async fn an_unavailable_item_stays_on_the_list_instead_of_being_omitted() {
     let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
     assert_eq!(
         keys(&doc),
-        vec!["apps", "business_identity", "team"],
+        vec!["apps", "business_identity", "printer", "team"],
         "the item is still there, and still first"
     );
-    assert_eq!(doc["total"], 3);
+    assert_eq!(doc["total"], 4);
 }
 
 #[tokio::test]
@@ -1535,7 +1546,10 @@ async fn an_unavailable_item_is_not_work_the_user_still_has_to_do() {
     catalogue_offered(&rt, 0).await;
 
     let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
-    assert_eq!(doc["pending"], 2, "the identity and the team, not the apps");
+    assert_eq!(
+        doc["pending"], 3,
+        "the identity, the printer and the team, not the apps"
+    );
     assert_eq!(doc["unavailable"], 1);
     let done = items(&doc).iter().filter(|i| i["state"] == "done").count();
     assert_eq!(
@@ -1725,22 +1739,25 @@ async fn a_wall_already_down_is_not_kept_on_a_list_it_never_belonged_to() {
 }
 
 #[tokio::test]
-async fn whoever_administers_the_hub_gets_the_three_core_items_and_can_act_on_every_one() {
+async fn whoever_administers_the_hub_gets_the_four_core_items_and_can_act_on_every_one() {
     // The other side of the same filter: nothing is taken away from the person the items are for.
     let rt = runtime("hub-setup").await;
 
     let doc = status(&rt, &ctx("hub-setup", ADMIN_SESSION)).await;
 
-    assert_eq!(keys(&doc), vec!["apps", "business_identity", "team"]);
-    for key in ["apps", "business_identity", "team"] {
+    assert_eq!(
+        keys(&doc),
+        vec!["apps", "business_identity", "printer", "team"]
+    );
+    for key in ["apps", "business_identity", "printer", "team"] {
         assert_eq!(
             must(&doc, key)["actionable"],
             true,
             "{key} is this session's to do"
         );
     }
-    assert_eq!(doc["total"], 3);
-    assert_eq!(doc["pending"], 3);
+    assert_eq!(doc["total"], 4);
+    assert_eq!(doc["pending"], 4);
 }
 
 #[tokio::test]
@@ -1967,8 +1984,8 @@ async fn los_items_del_core_son_siempre_del_dueno() {
 
     let doc = status(&rt, &ctx("hub-core", ADMIN_SESSION)).await;
 
-    for key in ["apps", "business_identity", "team"] {
-        assert_eq!(must(&doc, key)["origin"], "user", "ítem del core: {key}");
+    for key in ["apps", "business_identity", "printer", "team"] {
+        assert_eq!(must(&doc, key)["origin"], "user", "core item: {key}");
     }
 }
 

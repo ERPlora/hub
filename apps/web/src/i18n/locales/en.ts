@@ -412,6 +412,10 @@ export default {
         title: 'Your business details',
         description: 'Legal name and tax id: without them you cannot issue an invoice.',
       },
+      printer: {
+        title: 'Set up your printer',
+        description: "Register the device that prints your customers' receipts, so the first sale comes out on paper.",
+      },
       team: {
         title: 'Your team',
         description: 'Add the people who will use the till, each with their own way in.',
@@ -702,9 +706,9 @@ export default {
     taxRegimeDesc: 'Invoicing regime',
     regimeGeneral: 'General regime',
     regimeEquivalence: 'Equivalence surcharge',
-    receiptTemplate: 'Receipt template',
-    receiptTemplateDesc: 'Printed and digital receipt settings',
-    receiptTemplateMissing: 'Install the Printing app to set up your receipt',
+    receiptTemplate: 'Printers and receipt',
+    receiptTemplateDesc: 'Add your printer and set up the printed and digital receipt',
+    receiptTemplateMissing: 'Install the Printing app to add your printer and set up your receipt',
     tabHub: 'General',
     tabBusiness: 'Business',
     tabTickets: 'Receipts',

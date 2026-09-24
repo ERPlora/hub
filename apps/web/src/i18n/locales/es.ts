@@ -372,6 +372,10 @@ export default {
         title: 'Los datos de tu negocio',
         description: 'Razón social y NIF: sin ellos no puedes emitir una factura.',
       },
+      printer: {
+        title: 'Configura la impresora',
+        description: 'Da de alta el dispositivo que imprime los tiques de tus clientes, para que la primera venta salga en papel.',
+      },
       team: {
         title: 'Tu equipo',
         description: 'Añade a las personas que usarán el TPV, cada una con su forma de entrar.',
@@ -638,9 +642,9 @@ export default {
     taxRegimeDesc: 'Régimen de facturación',
     regimeGeneral: 'Régimen general',
     regimeEquivalence: 'Recargo de equivalencia',
-    receiptTemplate: 'Plantilla de tique',
-    receiptTemplateDesc: 'Configuración del recibo impreso y digital',
-    receiptTemplateMissing: 'Instala la app Impresión para configurar tu tique',
+    receiptTemplate: 'Impresoras y tique',
+    receiptTemplateDesc: 'Da de alta tu impresora y configura el tique impreso y digital',
+    receiptTemplateMissing: 'Instala la app Impresión para dar de alta tu impresora y configurar el tique',
     tabHub: 'General',
     tabBusiness: 'Negocio',
     tabTickets: 'Tiques',
