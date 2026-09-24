@@ -208,3 +208,22 @@ async fn a_module_row_saying_production_never_points_the_engine_at_the_real_aeat
     );
     assert!(!endpoint.contains("agenciatributaria.gob.es"), "{endpoint}");
 }
+
+/// A hub the core already took live keeps the go-live it froze: the adoption does not re-stamp its
+/// activation instant nor re-read its taxpayer (hub#554 — the identity froze at the real go-live).
+#[tokio::test]
+async fn a_hub_already_live_in_the_core_is_not_frozen_again() {
+    let rt = hub().await;
+    exec(
+        rt.db(),
+        "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
+         activated_at = '2026-01-01T00:00:00Z', taxpayer_id = 'B11111111' WHERE hub_id = :hub_id",
+    )
+    .await;
+    module_config_saying(rt.db(), ENV_PRODUCTION).await;
+
+    assert!(!rt.adopt_module_fiscal_environment().await.unwrap());
+    let after = profile(rt.db()).await;
+    assert_eq!(after.activated_at, "2026-01-01T00:00:00Z");
+    assert_eq!(after.taxpayer_id, "B11111111");
+}
