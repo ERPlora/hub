@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canOpenModule,
   dependentsOf,
+  hidesUpdateAction,
   moduleRoutePath,
   toggleIntent,
 } from './installed-app-actions';
@@ -95,5 +96,25 @@ describe('dependentsOf — what uninstalling this app would break', () => {
     // somebody else, and the confirmation dialog is the last place we want an infinite loop.
     const cyclic = [mod({ id: 'a', depends_on: ['b'] }), mod({ id: 'b', depends_on: ['a'] })];
     expect(dependentsOf('a', cyclic).map((m) => m.id)).toEqual(['b']);
+  });
+});
+
+// hub#2015 — a card showed «Update» greyed out whenever the app had no new version, which is almost
+// always, and a person read the grey button as «something is blocked». The action is not greyed any
+// more: it is simply not there. It still has to be there WHILE it runs — that is where the spinner
+// lives — even if the row has already lost its pending version.
+describe('hidesUpdateAction', () => {
+  it('hides «Update» when there is no new version and nothing is running', () => {
+    expect(hidesUpdateAction({ update: null, updating: false })).toBe(true);
+    expect(hidesUpdateAction({})).toBe(true);
+  });
+
+  it('shows «Update» when a new version is waiting', () => {
+    expect(hidesUpdateAction({ update: { latest: '1.2.0' }, updating: false })).toBe(false);
+  });
+
+  it('keeps «Update» on screen while it runs, so the spinner has somewhere to spin', () => {
+    expect(hidesUpdateAction({ update: { latest: '1.2.0' }, updating: true })).toBe(false);
+    expect(hidesUpdateAction({ update: null, updating: true })).toBe(false);
   });
 });

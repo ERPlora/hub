@@ -179,7 +179,7 @@ import {
 } from '../lib/runtime';
 import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { reloadForModuleUpdate } from '../lib/module-loader';
-import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
+import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
   alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled,
   modulesWithUnknownPublication, publicationOf,
@@ -247,6 +247,8 @@ interface DataTableAction {
   disabled?: (row: Row) => boolean;
   /** ADITIVO (OutfitKit ≥0.1.14): spinner en lugar del icono mientras la fila está en curso. */
   loading?: (row: Row) => boolean;
+  /** ADDITIVE (OutfitKit ≥0.1.84): the action is not painted for that row (list, card or «⋮»). */
+  hidden?: (row: Row) => boolean;
 }
 
 // --- Estado ---
@@ -597,8 +599,9 @@ const mineActions = computed<DataTableAction[]>(() => {
         icon: 'open-outline',
         color: 'primary',
         // A module that paints nothing, or one that is switched off, has no screen to open — and a
-        // button that lands on an empty page is worse than no button. `canOpenModule` decides.
-        disabled: (row) => !canOpenModule(row as unknown as InstalledModule, nav),
+        // button that lands on an empty page is worse than no button. `canOpenModule` decides, and
+        // the button is left out rather than greyed out (hub#2015).
+        hidden: (row) => !canOpenModule(row as unknown as InstalledModule, nav),
       },
       {
         // El botón «Actualizar» de ADR-0269 §3.5: **por módulo**, para ADELANTAR. Que el sistema
@@ -606,8 +609,10 @@ const mineActions = computed<DataTableAction[]>(() => {
         id: 'update',
         label: t('apps.actionUpdate'),
         icon: 'arrow-up-circle-outline',
-        // Sin versión nueva no hay nada que pulsar; con una en curso, spinner en vez del icono.
-        disabled: (row) => !row.update || row.updating === true,
+        // No new version, no button (hub#2015). While one runs it stays, with the spinner instead
+        // of the icon, and a second press cannot start it again.
+        hidden: (row) => hidesUpdateAction(row),
+        disabled: (row) => row.updating === true,
         loading: (row) => row.updating === true,
       },
       { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
@@ -1190,9 +1195,9 @@ const catalogTable = ref<HTMLElement | null>(null);
 function handleMineAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
   const m = row as unknown as InstalledModule;
-  // Abrir la app (hub#773). `canOpenModule` ya deshabilitó el botón cuando no hay pantalla, pero se
-  // vuelve a preguntar aquí: el evento puede llegar de un teclado sobre un estado recién cambiado, y
-  // navegar a `/m/<id>` de un módulo apagado deja al usuario en una pantalla vacía sin explicación.
+  // Open the app (hub#773). `canOpenModule` already left the button out when there is no screen,
+  // but it is asked again here: the event can come from a keyboard over a state that just changed,
+  // and navigating to `/m/<id>` of a switched-off module leaves the person on an empty screen.
   if (actionId === 'open') {
     if (canOpenModule(m, moduleNav.value)) void router.push(moduleRoutePath(m.id));
     return;

@@ -32,6 +32,17 @@ export function canOpenModule(
   return nav.some((entry) => entry.path === path);
 }
 
+/**
+ * Should the card leave «Update» out? (hub#2015)
+ *
+ * Out when there is no new version and nothing is running — a greyed-out button reads as «something
+ * is blocked». In while an update runs, even once the row no longer carries the pending version:
+ * that button is where the spinner lives.
+ */
+export function hidesUpdateAction(row: { update?: unknown; updating?: unknown }): boolean {
+  return !row.update && row.updating !== true;
+}
+
 /** What pressing the switch would DO — the future state, which is what the label must say. */
 export function toggleIntent(status: InstalledModule['status']): 'activate' | 'deactivate' {
   // `inactive_auto` (ADR-0128) is «off because something I depend on went off». The press still
