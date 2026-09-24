@@ -1204,9 +1204,10 @@ mod tests {
                 prepare_in(&db, &saying(json!({ "text": mapped })), &authority, &published)
                     .await
                     .expect("a text that IS there is queued");
-            let payload: Json =
-                serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
-            assert_eq!(payload["vars"]["text"], json!("Te espero el martes a las 10:00."));
+            assert_eq!(
+                prepared.recorded_input["vars"]["text"],
+                json!("Te espero el martes a las 10:00.")
+            );
         }
     }
 
@@ -1351,10 +1352,8 @@ mod tests {
         )
         .await
         .expect("a body that IS there is queued");
-        let payload: Json =
-            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
         assert_eq!(
-            payload["interactive"]["body"]["text"],
+            prepared.recorded_input["interactive"]["body"]["text"],
             json!("Mañana quedan huecos por la tarde")
         );
     }
