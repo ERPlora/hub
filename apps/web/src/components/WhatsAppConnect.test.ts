@@ -323,3 +323,70 @@ describe('when Meta drops the permission (hub#1626)', () => {
     expect(wrapper.find('[data-testid="whatsapp-status-badge"]').attributes('color')).toBe('success');
   });
 });
+
+describe('every refusal the SaaS names gets its own sentence (hub#1624)', () => {
+  // saas#1902 made `connect` and `disconnect` answer `{error, code}`. A code with no sentence in the
+  // catalogue falls back on «Something went wrong… try again in a minute» — which is the one piece
+  // of advice that is wrong for most of them (the permission was not given, the hub is unknown) and
+  // the only one that is right for `meta_unreachable`, where it has to say so plainly.
+  const CONNECT_REFUSALS: Array<[string, number]> = [
+    ['meta_unreachable', 502],
+    ['meta_api_error', 502],
+    ['no_access_token', 502],
+    ['missing_code', 400],
+    ['internal_error', 500],
+  ];
+  const errorsEs = es.whatsappConnect.errors as Record<string, string>;
+  const errorsEn = en.whatsappConnect.errors as Record<string, string>;
+
+  it.each(CONNECT_REFUSALS)('a failed connection with `%s` reads its own sentence, not the generic one', async (code, status) => {
+    vi.mocked(openEmbeddedSignup).mockResolvedValue({ code: 'c', event: 'FINISH', waba_id: 'w', phone_number_id: 'p', business_id: 'b' });
+    vi.mocked(connectWhatsApp).mockRejectedValue(new WhatsAppConnectError(code, status));
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    await wrapper.find('[data-testid="whatsapp-connect-button"]').trigger('click');
+    await flushPromises();
+
+    expect(errorsEs[code]).toBeTypeOf('string');
+    expect(wrapper.text()).toContain(errorsEs[code]);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.errors.default);
+    expect(wrapper.text()).not.toContain(code);
+  });
+
+  it('says the hub is not recognised, not that the person lacks the role, when erplora.com does not know it', async () => {
+    // A 401 `hub_not_found` is about the hub's credential; the refusal by role is a 403.
+    vi.mocked(fetchWhatsAppConfig).mockRejectedValue(new WhatsAppConnectError('hub_not_found', 401));
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(errorsEs.hub_not_found).toBeTypeOf('string');
+    expect(wrapper.text()).toContain(errorsEs.hub_not_found);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.errors.forbidden);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.errors.default);
+  });
+
+  it('treats disconnecting a number that is already gone as done, not as a failure', async () => {
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValueOnce([NUMBER]).mockResolvedValueOnce([]);
+    vi.mocked(disconnectWhatsApp).mockRejectedValue(new WhatsAppConnectError('number_not_found', 404));
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    await wrapper.find('[data-testid="whatsapp-disconnect-button"]').trigger('click');
+    await flushPromises();
+
+    expect(errorsEs.number_not_found).toBeTypeOf('string');
+    expect(wrapper.text()).toContain(errorsEs.number_not_found);
+    expect(wrapper.find('.whatsapp-connect__status--error').exists()).toBe(false);
+    // The list is read again, so the stale number goes away and the way to connect comes back.
+    expect(wrapper.text()).not.toContain('+34 612 345 678');
+    expect(wrapper.find('[data-testid="whatsapp-connect-button"]').exists()).toBe(true);
+  });
+
+  it('has every sentence translated: no Spanish entry is a copy of its English one', () => {
+    for (const code of Object.keys(errorsEn)) {
+      expect(errorsEs[code], code).toBeTypeOf('string');
+      expect(errorsEs[code], code).not.toBe(errorsEn[code]);
+    }
+  });
+});
