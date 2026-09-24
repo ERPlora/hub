@@ -281,6 +281,10 @@ impl InboundMessage {
         // question went out. Empty and never absent, like every sibling above: what this method
         // can work out on its own is nothing.
         payload.insert("reply_to_step".into(), json!(""));
+        // **And which automation** (hub#1962): a step id is unique only inside its flow, so the
+        // same recipe installed twice asks with the same one. Filled in by the poller alongside
+        // the step, and empty and never absent for the same reason.
+        payload.insert("reply_to_flow".into(), json!(""));
         payload.insert("received_at".into(), json!(self.received_at));
         payload.insert("message".into(), self.payload.clone());
         payload
@@ -397,26 +401,26 @@ impl InboundMessage {
     }
 }
 
-/// The step of the flow that asked the question a message answers, or `""` when it answers none
-/// (hub#1951).
+/// The flow, and the step of it, that asked the question a message answers — both `""` when it
+/// answers none (hub#1951, hub#1962).
 ///
 /// Reads `reply_to` off the payload that is about to be written — the `wamid` of the question, as
 /// the SaaS lifted it or as the hub read it off Meta's `context` — and asks the runtime which
 /// delivery carried it. An id this hub never sent, one of another hub, or no id at all all answer
 /// `""`: a tap nobody can place names no step rather than the wrong one.
-async fn reply_to_step(
+async fn who_asked(
     db: &dyn erplora_db::DatabaseAdapter,
     hub_id: &str,
     payload: &Map<String, Value>,
-) -> Result<String, erplora_runtime::RuntimeError> {
+) -> Result<outbox::AskedBy, erplora_runtime::RuntimeError> {
     let answers = payload
         .get("reply_to")
         .and_then(Value::as_str)
         .unwrap_or_default();
     if answers.is_empty() {
-        return Ok(String::new());
+        return Ok(outbox::AskedBy::default());
     }
-    outbox::step_that_sent(db, hub_id, answers).await
+    outbox::who_asked(db, hub_id, answers).await
 }
 
 /// **Where Meta puts the option a customer tapped, and under which keys.** Three shapes for one
@@ -667,9 +671,10 @@ impl InboundPoller {
                 // **The half only this side knows** (hub#1951): Meta says which MESSAGE is being
                 // answered, the hub says which step of which recipe sent it. Looked up before the
                 // write so the event is complete the first time a listener ever sees it.
-                match reply_to_step(rt.db(), &hub_id, &payload).await {
-                    Ok(step) => {
-                        payload.insert("reply_to_step".into(), json!(step));
+                match who_asked(rt.db(), &hub_id, &payload).await {
+                    Ok(asked) => {
+                        payload.insert("reply_to_step".into(), json!(asked.step_id));
+                        payload.insert("reply_to_flow".into(), json!(asked.flow_id));
                     }
                     // Not acked, so the SaaS serves it again — the same answer this loop already
                     // gives a write that fails. Ingesting the tap with no step would ack it and
@@ -1855,14 +1860,40 @@ mod tests {
         assert_eq!(event["reply_to_step"], json!(""));
     }
 
+    /// **hub#1962 — `reply_to_flow` follows the same rule**: the automation that asked, empty and
+    /// never absent, so a filter written against it simply does not match an unprompted message.
+    #[test]
+    fn a_message_that_answers_no_question_names_no_flow_rather_than_missing_the_key() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.1",
+            "from": CUSTOMER,
+            "payload": {"type": "text", "text": {"body": "hola"}},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .unwrap();
+
+        let event = message.event_payload();
+        assert!(
+            event.contains_key("reply_to_flow"),
+            "the key is part of the payload's shape: {event:?}"
+        );
+        assert_eq!(event["reply_to_flow"], json!(""));
+    }
+
     /// A question this hub already sent, as the relay records it when the provider names the
     /// message (hub#1951): the delivery row is where the `wamid` and the step that asked meet,
     /// and it is what the poller looks a tap up in.
     async fn question_already_sent(runtime: &SharedRuntime, wamid: &str, step: &str) {
+        question_sent_by(runtime, wamid, "", step).await;
+    }
+
+    /// The same, naming the automation that sent it too (hub#1962).
+    async fn question_sent_by(runtime: &SharedRuntime, wamid: &str, flow: &str, step: &str) {
         let mut p = Params::new();
         p.insert("event_id".into(), json!(format!("ev-{wamid}")));
         p.insert("hub_id".into(), json!(HUB));
         p.insert("wamid".into(), json!(wamid));
+        p.insert("flow".into(), json!(flow));
         p.insert("step".into(), json!(step));
         runtime
             .read()
@@ -1870,9 +1901,10 @@ mod tests {
             .db()
             .execute(
                 "INSERT INTO _event_delivery \
-                   (event_id, listener_command, delivered_at, hub_id, provider_message_id, step_id) \
+                   (event_id, listener_command, delivered_at, hub_id, provider_message_id, \
+                    flow_id, step_id) \
                  VALUES (:event_id, 'host.notify', '2026-09-07T09:00:00+00:00', :hub_id, :wamid, \
-                         :step)",
+                         :flow, :step)",
                 &p,
             )
             .await
@@ -1945,6 +1977,51 @@ mod tests {
             events["wa-wamid.c"]["reply_to_step"],
             json!(""),
             "an unprompted message names no step"
+        );
+    }
+
+    /// **hub#1962 — the same recipe installed twice, end to end.**
+    ///
+    /// Two automations built from one gallery template ask the same customer with the same step
+    /// id, because a step id is unique only inside its flow. The step no longer tells them apart,
+    /// so the event has to name the automation that sent the message the customer tapped — or both
+    /// read the «Sí» as theirs and one confirms what was never confirmed.
+    #[tokio::test]
+    async fn two_automations_asking_with_the_same_step_are_told_apart_by_the_flow_that_asked() {
+        let cloud = fake_cloud(vec![
+            tap("wamid.a", "wamid.q1"),
+            tap("wamid.b", "wamid.q2"),
+            message("wamid.c", "hola"),
+        ])
+        .await;
+        let runtime = hub_with_module(true).await;
+        question_sent_by(&runtime, "wamid.q1", "flow-haircut", "confirm-appointment").await;
+        question_sent_by(&runtime, "wamid.q2", "flow-colour", "confirm-appointment").await;
+
+        poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+
+        let events = payloads_by_id(&runtime).await;
+        assert_eq!(
+            events["wa-wamid.a"]["reply_to_step"], events["wa-wamid.b"]["reply_to_step"],
+            "the two taps really answer the same step of the same recipe"
+        );
+        assert_eq!(
+            events["wa-wamid.a"]["reply_to_flow"],
+            json!("flow-haircut"),
+            "the first tap belongs to the automation that sent the first question"
+        );
+        assert_eq!(
+            events["wa-wamid.b"]["reply_to_flow"],
+            json!("flow-colour"),
+            "and the second to its sibling"
+        );
+        assert_eq!(
+            events["wa-wamid.c"]["reply_to_flow"],
+            json!(""),
+            "an unprompted message names no automation"
         );
     }
 

@@ -148,11 +148,12 @@ CREATE INDEX IF NOT EXISTS ix_outbox_name ON _event_outbox (hub_id, event_name, 
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
   hub_id TEXT NOT NULL, provider_message_id TEXT NOT NULL DEFAULT '', \
-  step_id TEXT NOT NULL DEFAULT '', \
+  step_id TEXT NOT NULL DEFAULT '', flow_id TEXT NOT NULL DEFAULT '', \
   PRIMARY KEY (event_id, listener_command));\
 ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS hub_id TEXT;\
 ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS provider_message_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS step_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS flow_id TEXT NOT NULL DEFAULT '';\
 CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);\
 CREATE INDEX IF NOT EXISTS ix_event_delivery_provider \
   ON _event_delivery (hub_id, provider_message_id) WHERE provider_message_id <> '';";
@@ -322,18 +323,20 @@ pub(crate) fn delivery_op(hub_id: &str, event_id: &str, listener: &str) -> (Stri
 }
 
 /// The delivery marker of a `host.notify` send, carrying **what the provider called the message
-/// and which flow step asked it** (hub#1951).
+/// and which flow, and which step of it, asked it** (hub#1951, hub#1962).
 ///
-/// A sibling of [`delivery_op`] rather than two more parameters on it: the other four callers mark
-/// a listener that ran, which has no provider and no step, and would all have to say so.
+/// A sibling of [`delivery_op`] rather than three more parameters on it: the other four callers
+/// mark a listener that ran, which has no provider, no flow and no step, and would all have to say
+/// so.
 ///
-/// Both default to `''` in the schema, so an older row and a send nobody named read the same way —
-/// and [`step_that_sent`] refuses the empty id rather than matching it.
+/// All three default to `''` in the schema, so an older row and a send nobody named read the same way —
+/// and [`who_asked`] refuses the empty id rather than matching it.
 pub(crate) fn delivery_op_sent(
     hub_id: &str,
     event_id: &str,
     listener: &str,
     provider_message_id: &str,
+    flow_id: &str,
     step_id: &str,
 ) -> (String, Params) {
     let (_, mut p) = delivery_op(hub_id, event_id, listener);
@@ -341,15 +344,26 @@ pub(crate) fn delivery_op_sent(
         "provider_message_id".into(),
         json!(provider_message_id),
     );
+    p.insert("flow_id".into(), json!(flow_id));
     p.insert("step_id".into(), json!(step_id));
     let sql = "INSERT INTO _event_delivery \
-        (event_id, listener_command, delivered_at, hub_id, provider_message_id, step_id) \
+        (event_id, listener_command, delivered_at, hub_id, provider_message_id, flow_id, \
+         step_id) \
         VALUES (:event_id, :listener_command, :delivered_at, :hub_id, :provider_message_id, \
-                :step_id)";
+                :flow_id, :step_id)";
     (sql.to_string(), p)
 }
 
-/// **Which flow step asked the question a provider message id belongs to** — hub#1951.
+/// **Who asked the question a provider message id belongs to**: the automation and its step.
+/// Both are `""` when nobody the hub can name did (hub#1951, hub#1962).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AskedBy {
+    pub flow_id: String,
+    pub step_id: String,
+}
+
+/// **Which flow, and which step of it, asked the question a provider message id belongs to** —
+/// hub#1951 (the step) and hub#1962 (the flow).
 ///
 /// The reverse of what [`delivery_op_sent`] wrote: Meta hands a tap back naming the `wamid` of the
 /// message being answered (`context.id`), and this is the only place the hub can turn that into a
@@ -361,13 +375,13 @@ pub(crate) fn delivery_op_sent(
 /// dangerous one and is refused twice, here and in the `WHERE`: every email delivery records an
 /// empty `provider_message_id`, so a message that answers nothing would otherwise match whichever
 /// of them the planner happened to return first and name a step nobody asked about.
-pub async fn step_that_sent(
+pub async fn who_asked(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     provider_message_id: &str,
-) -> Result<String> {
+) -> Result<AskedBy> {
     if provider_message_id.is_empty() {
-        return Ok(String::new());
+        return Ok(AskedBy::default());
     }
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -375,18 +389,20 @@ pub async fn step_that_sent(
     p.insert("listener_command".into(), json!(HOST_NOTIFY_LISTENER));
     let res = db
         .query(
-            "SELECT step_id FROM _event_delivery \
+            "SELECT flow_id, step_id FROM _event_delivery \
              WHERE hub_id = :hub_id AND provider_message_id = :provider_message_id \
                AND provider_message_id <> '' AND listener_command = :listener_command",
             &p,
         )
         .await?;
-    Ok(res
-        .rows
-        .first()
-        .and_then(|r| r["step_id"].as_str())
-        .unwrap_or_default()
-        .to_string())
+    let Some(row) = res.rows.first() else {
+        return Ok(AskedBy::default());
+    };
+    let text = |column: &str| row[column].as_str().unwrap_or_default().to_string();
+    Ok(AskedBy {
+        flow_id: text("flow_id"),
+        step_id: text("step_id"),
+    })
 }
 
 /// Backoff exponencial (segundos), con tope de 1h: 2^attempts acotado.
@@ -791,6 +807,9 @@ async fn deliver_host_notify(
     }
     let intent = NotifyIntent::from_event_payload(payload)?;
     let released_by_flow = module_id.trim().is_empty() && !run_id.trim().is_empty();
+    // The flow that asked (hub#1962), set only on the kernel's path and only from the RUN — the
+    // release check reads it there, never from the payload, so a module cannot name one.
+    let mut asking_flow = String::new();
 
     if released_by_flow {
         // Puerta 4 — la autorización del flujo, **releída ahora**: revocar cualquiera de los dos
@@ -803,7 +822,7 @@ async fn deliver_host_notify(
         // Not `?`: a release that is gone is the one refusal the relay must not retry (hub#827).
         // The owner took the permission away — the eighth attempt would know exactly what the first
         // one did, and would have spent eight more minutes holding a customer's address in a queue.
-        if let Err(e) = crate::flows::grants::check_notify_release(
+        match crate::flows::grants::check_notify_release(
             db,
             hub_id,
             run_id,
@@ -812,7 +831,8 @@ async fn deliver_host_notify(
         )
         .await
         {
-            return Err(NotifyFailure::permanent(FAILURE_RELEASE_REVOKED, e));
+            Ok(flow_id) => asking_flow = flow_id,
+            Err(e) => return Err(NotifyFailure::permanent(FAILURE_RELEASE_REVOKED, e)),
         }
         host_notify::check_recipient_syntax(intent.channel, &intent.to)?;
     } else {
@@ -892,6 +912,7 @@ async fn deliver_host_notify(
         event_id,
         HOST_NOTIFY_LISTENER,
         &message_id,
+        &asking_flow,
         step_id,
     );
     db.execute(&sql, &p).await?;
@@ -2356,9 +2377,10 @@ mod tests {
             "the send has to bring its id back and the delivery has to keep it"
         );
         assert_eq!(
-            step_that_sent(&db, "h1", "wamid.the-question")
+            who_asked(&db, "h1", "wamid.the-question")
                 .await
-                .unwrap(),
+                .unwrap()
+                .step_id,
             "confirm-appointment",
             "and the lookup the poller does has to answer with the step that asked"
         );
@@ -2415,20 +2437,27 @@ mod tests {
         );
 
         assert_eq!(
-            step_that_sent(&db, "h2", "wamid.the-question")
+            who_asked(&db, "h2", "wamid.the-question")
                 .await
-                .unwrap(),
+                .unwrap()
+                .step_id,
             "",
             "one hub's question is not another hub's"
         );
         assert_eq!(
-            step_that_sent(&db, "h1", "").await.unwrap(),
+            who_asked(&db, "h1", "")
+                .await
+                .unwrap()
+                .step_id,
             "",
             "a message that answers nothing names no step, and must not match the empty id every \
              email delivery writes"
         );
         assert_eq!(
-            step_that_sent(&db, "h1", "wamid.never-sent").await.unwrap(),
+            who_asked(&db, "h1", "wamid.never-sent")
+                .await
+                .unwrap()
+                .step_id,
             "",
             "an id this hub never sent names no step"
         );
@@ -2469,9 +2498,80 @@ mod tests {
             "the message did go out — this is not about refusing the send"
         );
         assert_eq!(
-            step_that_sent(&db, "h1", "wamid.borrowed").await.unwrap(),
-            "",
-            "but the step a module wrote itself names nothing"
+            who_asked(&db, "h1", "wamid.borrowed").await.unwrap(),
+            AskedBy::default(),
+            "but the step a module wrote itself names nothing — and no flow either (hub#1962)"
+        );
+    }
+
+    /// **hub#1962 — the step says WHICH question, the flow says WHOSE.**
+    ///
+    /// A step id is unique inside its flow (`def.rs` refuses the duplicate) and nowhere else: the
+    /// same gallery recipe installed twice, or one flow exported and imported, asks with the very
+    /// same `confirm-appointment` from two automations. The tap has to name the automation that
+    /// sent the message too, or both believe the «Sí» was theirs and one confirms what the
+    /// customer never confirmed.
+    ///
+    /// The flow is read from the RUN the kernel row carries, not from the payload — the same
+    /// source the release check trusts — and one hub's question still names nothing in another.
+    #[tokio::test]
+    async fn two_flows_asking_with_the_same_step_id_are_told_apart_by_the_flow_that_asked() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::naming(
+            "wamid.from-the-first",
+        )));
+        seed_flow_run(&db, "run-1", "flow-haircut").await;
+        let first = seed_live_grants(&db, "flow-haircut").await;
+        seed_flow_question(
+            &db,
+            "ev-1",
+            "run-1",
+            &first,
+            "confirm-appointment",
+            "ana.perez@example.test",
+        )
+        .await;
+        process_once(&db, &reg).await.unwrap();
+
+        reg.notify_transport = Some(std::sync::Arc::new(MockTransport::naming(
+            "wamid.from-the-second",
+        )));
+        seed_flow_run(&db, "run-2", "flow-colour").await;
+        let second = seed_live_grants(&db, "flow-colour").await;
+        seed_flow_question(
+            &db,
+            "ev-2",
+            "run-2",
+            &second,
+            "confirm-appointment",
+            "ana.perez@example.test",
+        )
+        .await;
+        process_once(&db, &reg).await.unwrap();
+
+        let a = who_asked(&db, "h1", "wamid.from-the-first").await.unwrap();
+        let b = who_asked(&db, "h1", "wamid.from-the-second").await.unwrap();
+        assert_eq!(
+            (a.step_id.as_str(), b.step_id.as_str()),
+            ("confirm-appointment", "confirm-appointment"),
+            "the two questions really are the same step of the same recipe"
+        );
+        assert_eq!(
+            a.flow_id, "flow-haircut",
+            "the first tap belongs to the automation that sent the first message"
+        );
+        assert_eq!(
+            b.flow_id, "flow-colour",
+            "and the second to its sibling, not to whichever was installed first"
+        );
+        assert_eq!(
+            who_asked(&db, "h2", "wamid.from-the-first").await.unwrap(),
+            AskedBy::default(),
+            "one hub's question names no flow of it in another hub"
         );
     }
 
