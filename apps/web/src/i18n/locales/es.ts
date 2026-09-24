@@ -687,6 +687,7 @@ export default {
     reset_media: 'Ficheros e imágenes',
     reset_fiscal: 'Configuración fiscal',
     reset_roles: 'Roles activos',
+    reset_print_queue: 'Cola de impresión',
     permissionsTitle: 'Permisos de las apps',
     permissionsDesc: 'Concede o revoca los permisos que cada app pide (acceso a internet, certificado, impresora, notificaciones, administrar automatizaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',

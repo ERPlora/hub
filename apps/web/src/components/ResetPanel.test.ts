@@ -293,6 +293,28 @@ describe('ResetPanel', () => {
     }
   });
 
+  // hub#2055 (found in review): the runtime plans SIX core sections (`reset.rs`), and every one
+  // of them is painted with `t('settings.reset_<section>')`. `print_queue` (hub#502) had no string
+  // in either locale, so a hub with pending receipts saw an internal name where the owner expects
+  // «Print queue». The list is the runtime's, not the locales': a new core section without its
+  // strings has to fail HERE, before it reaches a screen.
+  it('every core section the runtime plans has its string in English AND Spanish', async () => {
+    const CORE_SECTIONS = ['hub_settings', 'hub_users', 'media', 'fiscal', 'roles', 'print_queue'];
+    const [en, es] = await Promise.all([
+      import('../i18n/locales/en'),
+      import('../i18n/locales/es'),
+    ]);
+    for (const [lang, mod] of [['en', en], ['es', es]] as const) {
+      const messages = mod.default as unknown as Record<string, Record<string, string>>;
+      for (const section of CORE_SECTIONS) {
+        expect(
+          messages.settings?.[`reset_${section}`],
+          `missing settings.reset_${section} in ${lang}`,
+        ).toBeTruthy();
+      }
+    }
+  });
+
   it('ofrece exportar antes de borrar (red de seguridad de un clic)', async () => {
     const w = mountPanel();
     await flush(w);
