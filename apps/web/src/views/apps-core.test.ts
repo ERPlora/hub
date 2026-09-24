@@ -101,7 +101,32 @@ describe('Apps · what an installed app card offers', () => {
     // Only when there is a screen to open: `canOpenModule` is the one that decides, and it is
     // covered by its own tests. Here we only check the card asks it.
     expect(mineActions).toContain('canOpenModule(');
-    expect(source).toContain("import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions'");
+    expect(source).toContain("import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions'");
+  });
+
+  // hub#2015 — a greyed-out button next to a live one reads as «something is broken». What a card
+  // cannot do is not painted at all (OutfitKit ≥0.1.84 `DataTableAction.hidden`), like the app lists
+  // of Shopify or the app stores: no screen, no «Open»; no new version, no «Update».
+  it('hides «Open» and «Update» where they do not apply instead of greying them out', () => {
+    const action = (id: string) => {
+      const from = mineActions.indexOf(`id: '${id}'`);
+      expect(from, `action ${id} must exist`).toBeGreaterThan(-1);
+      return mineActions.slice(from, mineActions.indexOf('},', from));
+    };
+    expect(action('open')).toContain('hidden: (row) => !canOpenModule(');
+    expect(action('open')).not.toContain('disabled:');
+    expect(action('update')).toContain('hidden: (row) => hidesUpdateAction(row)');
+    // While it runs it stays visible with its spinner, and a second press must not start it again.
+    expect(action('update')).toContain('loading: (row) => row.updating === true');
+    expect(action('update')).toContain('disabled: (row) => row.updating === true');
+    // The local mirror of OutfitKit's type has to carry the field, or `hidden` does not typecheck.
+    const iface = source.slice(source.indexOf('interface DataTableAction'), source.indexOf('// --- Estado ---'));
+    expect(iface).toContain('hidden?: (row: Row) => boolean;');
+  });
+
+  it('requires the OutfitKit that knows how to hide a row action', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+    expect(pkg.dependencies['@erplora/outfitkit']).toBe('^0.1.84');
   });
 
   it('always asks before flipping the switch, and the question names the future state', () => {
