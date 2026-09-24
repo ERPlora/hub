@@ -91,9 +91,9 @@
 
     <!-- Informe final: qué se borró de verdad, por sección. -->
     <ion-list v-if="report" class="reset-report" data-testid="reset-report">
-      <ion-item v-for="r in report.sections" :key="r.section">
+      <ion-item v-for="r in reportLines" :key="r.name" data-testid="reset-report-line">
         <ion-label>
-          {{ label(r.section) }} — {{ t('settings.resetDeleted', { n: r.rows_deleted }) }}
+          {{ r.name }} — {{ t('settings.resetDeleted', { n: r.rows_deleted }) }}
         </ion-label>
       </ion-item>
     </ion-list>
@@ -141,7 +141,7 @@ import { hubSettings } from '../lib/hub-settings';
 
 defineEmits<{ (e: 'go-export'): void }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 const loading = ref(true);
 const sections = ref<ResetSectionPlan[]>([]);
@@ -160,6 +160,20 @@ const moduleNames = ref<Map<string, string>>(new Map());
 const visibleSections = computed(() =>
   sections.value.filter((s) => s.rows > 0 || s.blocked_by),
 );
+
+/**
+ * The final report, one line per name the business reads (hub#2055). Undoing an import reports
+ * per TABLE, so several tables of one app (`inventory_product`, `inventory_category`) collapse into
+ * a single «Inventory» line with their rows added up.
+ */
+const reportLines = computed(() => {
+  const lines = new Map<string, number>();
+  for (const r of report.value?.sections ?? []) {
+    const name = label(r.section);
+    lines.set(name, (lines.get(name) ?? 0) + r.rows_deleted);
+  }
+  return [...lines].map(([name, rows_deleted]) => ({ name, rows_deleted }));
+});
 
 /** Solo lo que de verdad se puede borrar: lo bloqueado nunca entra en la selección efectiva. */
 const selectable = computed(() =>
@@ -215,17 +229,19 @@ async function undo(batchId: string): Promise<void> {
 }
 
 /**
- * Nombre legible de una sección. Una sección de módulo (`modules/inventory`) prefiere el NOMBRE
- * humano del módulo (hub#765): el slug es un identificador de desarrollador y no le dice nada al
- * dueño que está decidiendo qué borrar. Si el módulo no está en la lista de instalados (datos
- * huérfanos tras desinstalar), cae al slug — algo legible, nunca en blanco.
+ * Readable name of a section. A module section (`modules/inventory`) prefers the module's human
+ * NAME (hub#765): the slug is a developer identifier that tells the owner nothing. If the module is
+ * not installed (orphan data after uninstalling), it falls back to the slug — readable, never blank.
+ * A core section has its own translation; anything else is a TABLE (the undo report, hub#2055) and
+ * is named by the app that owns it, like the undo warnings — never by a raw i18n key.
  */
 function label(section: string): string {
   if (section.startsWith('modules/')) {
     const id = section.slice('modules/'.length);
     return moduleNames.value.get(id) ?? id;
   }
-  return t(`settings.reset_${section}`);
+  const key = `settings.reset_${section}`;
+  return te(key) ? t(key) : tableModules([section]);
 }
 
 /**
