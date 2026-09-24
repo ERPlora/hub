@@ -61,6 +61,21 @@ export function catalogActionFor(state: CatalogRowState): 'install' | 'update' |
   return null;
 }
 
+/** The operation a busy row is running: the install progress or an update in flight. */
+export type CatalogBusyAction = 'install' | 'update' | null;
+
+/**
+ * Which action a catalog row PAINTS, or `null` for none (hub#2019).
+ *
+ * The one that does not apply is left out rather than greyed out: a dead button next to a live one
+ * reads as «something is blocked». While the row is busy the running operation stays painted — with
+ * its spinner, and disabled — so the person sees what is happening on the button they pressed.
+ */
+export function catalogVisibleAction(state: CatalogRowState, busy: CatalogBusyAction): 'install' | 'update' | null {
+  if (state === 'installing') return busy;
+  return catalogActionFor(state);
+}
+
 // --- Publication status of a module in the marketplace (ADR-0380, hub#1134) ------------------
 
 /**

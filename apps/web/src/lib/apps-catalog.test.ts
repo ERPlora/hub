@@ -5,7 +5,7 @@
 // (Bug reportado en el demo 2026-07-12: un módulo recién instalado seguía como "Disponible".)
 import { describe, expect, it } from 'vitest';
 
-import { alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled } from './apps-catalog';
+import { alsoInstalledNames, catalogActionFor, catalogRowState, catalogVisibleAction, isModuleInstalled } from './apps-catalog';
 
 describe('isModuleInstalled', () => {
   it('el Cloud manda cuando dice instalado', () => {
@@ -71,6 +71,32 @@ describe('catalogActionFor', () => {
     expect(catalogActionFor('installed')).toBe(null);
     expect(catalogActionFor('unavailable')).toBe(null);
     expect(catalogActionFor('installing')).toBe(null);
+  });
+});
+
+// hub#2019 — the catalog painted BOTH buttons on every row and greyed out the one that did not
+// apply, so a row always carried a dead button that reads as «something is blocked». Only the action
+// that applies is painted; while it runs, that same one stays (with its spinner), not the other.
+describe('catalogVisibleAction', () => {
+  it('shows the action the row offers', () => {
+    expect(catalogVisibleAction('available', null)).toBe('install');
+    expect(catalogVisibleAction('updatable', null)).toBe('update');
+  });
+
+  it('shows nothing where there is nothing to do', () => {
+    expect(catalogVisibleAction('installed', null)).toBe(null);
+    expect(catalogVisibleAction('unavailable', null)).toBe(null);
+  });
+
+  it('keeps the RUNNING operation visible while the row is busy, and only that one', () => {
+    expect(catalogVisibleAction('installing', 'install')).toBe('install');
+    expect(catalogVisibleAction('installing', 'update')).toBe('update');
+    expect(catalogVisibleAction('installing', null)).toBe(null);
+  });
+
+  it('ignores a stale busy operation once the row is no longer busy', () => {
+    expect(catalogVisibleAction('installed', 'install')).toBe(null);
+    expect(catalogVisibleAction('available', 'update')).toBe('install');
   });
 });
 
