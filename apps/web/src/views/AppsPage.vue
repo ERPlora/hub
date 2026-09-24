@@ -181,9 +181,9 @@ import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
-  alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled,
+  alsoInstalledNames, catalogActionFor, catalogRowState, catalogVisibleAction, isModuleInstalled,
   modulesWithUnknownPublication, publicationOf,
-  type CatalogRowState, type PublicationStatus,
+  type CatalogBusyAction, type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
@@ -490,6 +490,8 @@ const filteredModules = computed<Row[]>(() => {
     return {
       ...m,
       state,
+      // Which operation is running, so its button keeps the spinner and the other one stays out.
+      busyAction: updatingIds.value.has(m.id) ? 'update' : prog !== null ? 'install' : null,
       stateLabel:
         state === 'installing'
           ? t('apps.stateInstalling')
@@ -636,22 +638,25 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
 // único que se lee (aria-label + tooltip), así que a un teclado y a un lector de pantalla se les
 // estaba diciendo el verbo equivocado de la operación que iban a lanzar.
 //
-// Cada una vive exactamente donde su operación aplica; `catalogActionFor` decide, y es la misma
-// función que los tests fijan. Nunca están las dos vivas en la misma fila.
+// Each one is painted only where its operation applies — the other is left out, not greyed out
+// (hub#2019, same as «My apps» in hub#2015). `catalogVisibleAction` decides, and while a row is busy it
+// keeps the running one, disabled and with its spinner. Never both on the same row.
 const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !config.demo
   ? [
       {
         id: 'install',
         label: t('apps.actionInstall'),
         icon: 'download-outline',
-        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'install',
+        hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'install',
+        disabled: (row) => row.state === 'installing',
         loading: (row) => row.state === 'installing',
       },
       {
         id: 'update',
         label: t('apps.actionUpdate'),
         icon: 'arrow-up-circle-outline',
-        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'update',
+        hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'update',
+        disabled: (row) => row.state === 'installing',
         loading: (row) => row.state === 'installing',
       },
     ]
