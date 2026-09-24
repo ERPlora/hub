@@ -23,6 +23,13 @@ pub const LINE_WIDTH: usize = 32;
 /// drift apart again.
 pub const PRODUCT_NAME: &str = "ERPlora";
 
+/// Module size, in dots, of a QR on the paper (fiscal and «pide tu factura»).
+const QR_MODULE_DOTS: u8 = 4;
+
+/// The promotional QR (hub#2009) at 3 dots — 75 % of the fiscal one, the nearest whole dot to the
+/// 70 % `<ok-receipt>` draws on screen.
+const PROMO_QR_MODULE_DOTS: u8 = 3;
+
 /// Tipos de documento soportados (espejo del `if document_type == …` de `PrinterManager`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -178,6 +185,12 @@ impl EscposBuilder {
     /// fn 180 (almacenar datos) → fn 181 (imprimir). Datos vacíos o > límite del comando
     /// (~7 KB) → no-op.
     pub fn qr(&mut self, data: &str) -> &mut Self {
+        self.qr_sized(data, QR_MODULE_DOTS)
+    }
+
+    /// [`Self::qr`] with its module size in dots (fn 167): a secondary code prints smaller so the
+    /// one the paper is for stays the one the eye goes to.
+    pub fn qr_sized(&mut self, data: &str, module_dots: u8) -> &mut Self {
         let bytes = data.as_bytes();
         if bytes.is_empty() || bytes.len() > 7080 {
             return self;
@@ -186,7 +199,7 @@ impl EscposBuilder {
         // GS ( k 4 0 49 65 50 0 — fn 165: seleccionar modelo 2.
         self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 4, 0, 49, 65, 50, 0]);
         // GS ( k 3 0 49 67 n — fn 167: tamaño de módulo (puntos).
-        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 67, 4]);
+        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 67, module_dots]);
         // GS ( k 3 0 49 69 n — fn 169: nivel de corrección M (49).
         self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 69, 49]);
         // GS ( k pL pH 49 80 48 d1..dk — fn 180: almacenar los datos (len = k + 3).
@@ -910,6 +923,18 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
 
     b.set(Align::Center, false, false, false);
     b.text(&format!("\n{}\n\n", t.label(Label::Thanks)));
+
+    // **The business's promotional QR** (hub#2009): reviews, social media — the link it set in
+    // the POS settings. It closes the paper, like `<ok-receipt>` and the browser paper (sales#345),
+    // and prints smaller than the fiscal QR. Without the URL nothing prints: a note alone names
+    // nothing. Only on the ticket — the full invoice is formal, like the A4.
+    if kind == Fiscal::Ticket && is_truthy(data, "promo_qr") {
+        if is_truthy(data, "promo_note") {
+            b.text(&format!("{}\n", str_field(data, "promo_note", "")));
+        }
+        b.qr_sized(str_field(data, "promo_qr", ""), PROMO_QR_MODULE_DOTS);
+        b.text("\n");
+    }
 
     b.cut();
 }
@@ -3290,6 +3315,114 @@ mod tests {
                  from the tree by hub#340"
             );
         }
+    }
+
+    const PROMO_URL: &str = "https://g.page/r/bar-manolo/review";
+
+    fn ticket_with_promo() -> serde_json::Value {
+        json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-44",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "claim_note": "Pide tu factura",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+            "claim_locator": "ABCD1234ABCD1234",
+            "receipt_footer": "Vuelva pronto",
+            "promo_qr": PROMO_URL,
+            "promo_note": "Escanea y dejanos una resena",
+        })
+    }
+
+    fn position(bytes: &[u8], needle: &str) -> usize {
+        bytes
+            .windows(needle.len())
+            .position(|w| w == needle.as_bytes())
+            .unwrap_or_else(|| panic!("`{needle}` is not on the paper"))
+    }
+
+    /// The module size (`GS ( k … 49 67 n`, fn 167) of every QR on the paper, in printing order.
+    fn qr_module_sizes(bytes: &[u8]) -> Vec<u8> {
+        bytes
+            .windows(8)
+            .filter(|w| w[..7] == [0x1d, 0x28, 0x6b, 3, 0, 49, 67])
+            .map(|w| w[7])
+            .collect()
+    }
+
+    /// **The business's promotional QR reaches the thermal paper** (hub#2009, sale of sales#345).
+    /// The screen (`<ok-receipt>`) and the browser paper already carry it; the roll printed nothing
+    /// and the business believed its ticket did.
+    #[test]
+    fn a_ticket_prints_the_promotional_qr_with_its_note() {
+        let bytes =
+            render_document(DocumentType::parse("receipt").unwrap(), &ticket_with_promo()).unwrap();
+        assert_eq!(qr_symbols(&bytes), 3, "fiscal + «pide tu factura» + promotional");
+        position(&bytes, PROMO_URL);
+        assert!(
+            position(&bytes, "Escanea y dejanos una resena") < position(&bytes, PROMO_URL),
+            "the note goes ABOVE its QR, or nobody knows what the code is for"
+        );
+    }
+
+    /// Where it goes: it CLOSES the paper, after the fiscal QR, after «pide tu factura» and after
+    /// the footer and the thanks — the same order as the screen and the browser paper.
+    #[test]
+    fn the_promotional_qr_closes_the_ticket() {
+        let bytes =
+            render_document(DocumentType::parse("receipt").unwrap(), &ticket_with_promo()).unwrap();
+        let note = position(&bytes, "Escanea y dejanos una resena");
+        assert!(note > position(&bytes, "ValidarQR"), "after the fiscal QR");
+        assert!(note > position(&bytes, "/p/ABCD1234ABCD1234"), "after «pide tu factura»");
+        assert!(note > position(&bytes, "Vuelva pronto"), "after the footer");
+        assert!(note > position(&bytes, "Gracias por su compra"), "after the thanks");
+        let cut = bytes
+            .windows(2)
+            .rposition(|w| w == [0x1d, 0x56])
+            .expect("the ticket is cut");
+        assert!(position(&bytes, PROMO_URL) < cut, "and before the cut");
+    }
+
+    /// Smaller than the fiscal QR, like `<ok-receipt>` draws it: the fiscal proof is the code
+    /// the paper is for, the promotion is an extra.
+    #[test]
+    fn the_promotional_qr_is_smaller_than_the_fiscal_one() {
+        let bytes =
+            render_document(DocumentType::parse("receipt").unwrap(), &ticket_with_promo()).unwrap();
+        let sizes = qr_module_sizes(&bytes);
+        assert_eq!(sizes.len(), 3, "{sizes:?}");
+        assert!(sizes[2] < sizes[0], "promotional {sizes:?} not smaller than the fiscal");
+        assert!(sizes[2] > 0, "a zero module size prints nothing");
+    }
+
+    /// No URL, no promotion: a note alone names nothing, and a ticket of a business that did not
+    /// configure it prints byte for byte what it printed before.
+    #[test]
+    fn a_promotional_note_without_its_qr_prints_nothing() {
+        let mut with_note = ticket_with_promo();
+        with_note.as_object_mut().unwrap().remove("promo_qr");
+        let mut without = with_note.clone();
+        without.as_object_mut().unwrap().remove("promo_note");
+        let receipt = DocumentType::parse("receipt").unwrap();
+        assert_eq!(
+            render_document(receipt, &with_note).unwrap(),
+            render_document(receipt, &without).unwrap()
+        );
+    }
+
+    /// The full invoice is formal: no promotion on it, like the A4 (sales#345). A producer that
+    /// builds the invoice from its ticket (sales `saleToInvoicePrintDocument`) must not smuggle
+    /// the review link onto an invoice.
+    #[test]
+    fn a_full_invoice_carries_no_promotional_qr() {
+        let mut doc = full_invoice();
+        doc["promo_qr"] = json!(PROMO_URL);
+        doc["promo_note"] = json!("Escanea y dejanos una resena");
+        let bytes = render_document(DocumentType::parse("invoice").unwrap(), &doc).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!text.contains(PROMO_URL), "no promotional QR on an invoice");
+        assert!(!text.contains("Escanea"), "nor its note");
     }
 }
 
