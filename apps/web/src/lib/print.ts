@@ -83,6 +83,15 @@ export interface PrintRequest {
    * formato por defecto salía con el ancho de un tiquet.
    */
   format?: PrintFormat;
+  /**
+   * The hub's print queue and nowhere else (hub#2029): no printer of this device, no dialog.
+   *
+   * For a document EVERY open shell is told to print at once — a kitchen ticket no till fired (API,
+   * flow, online ordering). Each shell printing it on its own printer put one ticket per till at the
+   * pass; asking the queue for the same `jobId` from all of them leaves one job, printed once by the
+   * device that drains the station. If the queue does not take it, the answer says so.
+   */
+  queueOnly?: boolean;
 }
 
 export interface PrintResult {
@@ -338,6 +347,8 @@ export function createPrintService(
       if (req.html) iframePrint(req.html, req.format); else browserPrint();
       return { via: 'browser', role, error };
     };
+
+    if (req.queueOnly) return toQueue();
 
     // A4 inside the installed app: the system print dialog, before any thermal route (hub#2006).
     // An invoice on a till roll is the wrong paper; the dialog is where the user picks the laser

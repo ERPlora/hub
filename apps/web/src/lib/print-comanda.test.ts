@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildComandaGroups, onKitchenOrderCreated } from './print-comanda';
+import { bootPrintComanda, buildComandaGroups, comandaRoute, onKitchenOrderCreated } from './print-comanda';
+import { CLIENT_INSTANCE } from './client-instance';
 import type { PrintRequest, PrintResult } from './print';
 
 // La comanda sale al DISPARAR el pedido (ADR-0144), no al cobrar. Cada estación dice por dónde
@@ -407,5 +408,100 @@ describe('la ronda `rush` manda el aviso `!! URGENTE !!` al pie (hub#1411)', () 
     const print = okPrint();
     await onKitchenOrderCreated(clientWithPriority('vip'), { order_id: 'k-1' }, { print });
     expect(print.mock.calls[0]![0].data).not.toHaveProperty('priority');
+  });
+});
+
+// hub#2029 — two tills that both reach the kitchen printer. Every open shell hears every
+// `kitchen.order.created` (one broadcast per hub), so the ticket came out once per open till and
+// the pass cooked the dish twice. The hub stamps the frame with the shell tab that fired the order
+// (`clientInstance`, hub#1980, carried across the relay by hub#2029): that till prints the ticket,
+// the others only get the system notice. An order no till fired (API, flow, online ordering) goes to
+// the hub's print queue, which keeps ONE job per `kitchen-<order>-<role>` — so it comes out once too.
+describe('the kitchen ticket comes out once, at the printer it belongs to (hub#2029)', () => {
+  const TILL_NEXT_DOOR = 'till-next-door-7c1e';
+
+  function tillHearing() {
+    const listeners: ((payload: unknown, meta: { clientInstance?: string }) => void)[] = [];
+    const client = fakeClient({
+      on: () => {
+        throw new Error('the kitchen ticket must listen with onEvent: `on` cannot tell which till fired');
+      },
+      onEvent: (event: string, cb: (typeof listeners)[number]) => {
+        if (event === 'kitchen.order.created') listeners.push(cb);
+        return () => {};
+      },
+    });
+    const emit = async (payload: unknown, meta: { clientInstance?: string }) => {
+      for (const cb of listeners) cb(payload, meta);
+      // The listener fires async work: let it finish its queries and its print.
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    return { client, emit };
+  }
+
+  function deps() {
+    return {
+      print: vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' })),
+      notify: vi.fn<(t: string, b: string) => Promise<void>>(async () => {}),
+      onFailure: vi.fn(),
+    };
+  }
+
+  it('an order fired at the till next door prints nothing here', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(d.print).not.toHaveBeenCalled();
+    // Somebody else's ticket is not a failure: no warning either.
+    expect(d.onFailure).not.toHaveBeenCalled();
+  });
+
+  it('…but the system notice still reaches this device: a KDS tablet with no printer lives on it', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(d.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('the till that fired the order prints its ticket, by its usual route', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, { clientInstance: CLIENT_INSTANCE });
+
+    expect(d.print).toHaveBeenCalledTimes(1);
+    const req = d.print.mock.calls[0]![0];
+    expect(req.jobId).toBe('kitchen-k-1-kitchen');
+    // Its own printer if it has one: nothing forces it through the queue.
+    expect(req.queueOnly).toBeFalsy();
+  });
+
+  it('an order no till fired goes ONLY to the hub queue, where it is one job for every till', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, {});
+
+    expect(d.print).toHaveBeenCalledTimes(1);
+    const req = d.print.mock.calls[0]![0];
+    expect(req.queueOnly).toBe(true);
+    // The queue's key: the same order and station from every till is the same row.
+    expect(req.jobId).toBe('kitchen-k-1-kitchen');
+  });
+});
+
+describe('comandaRoute — who prints a kitchen ticket (hub#2029)', () => {
+  it('this tab fired it → here; another tab → elsewhere; no tab → queue', () => {
+    expect(comandaRoute({ clientInstance: CLIENT_INSTANCE })).toBe('here');
+    expect(comandaRoute({ clientInstance: 'till-next-door-7c1e' })).toBe('elsewhere');
+    expect(comandaRoute({})).toBe('queue');
   });
 });

@@ -570,3 +570,57 @@ describe('la cola dice si hay alguien que la drene (hub#1731)', () => {
     expect(r.awaitingHost).toBeFalsy();
   });
 });
+
+// hub#2029 — a kitchen ticket no till fired (API, flow, online ordering) is heard by EVERY open
+// till. Each one printing it on its own printer is what put two tickets at the pass. `queueOnly`
+// sends it to the hub's queue and nowhere else: every till asks for the same `jobId`, the queue keeps
+// one row, and the device that drains the station prints it once.
+describe('queueOnly: the hub queue and nowhere else (hub#2029)', () => {
+  it('with a printer for the role right here, it still goes to the queue and not to the printer', async () => {
+    const client = fakeClient();
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const print = createPrintService(client, { enqueue });
+
+    const r = await print({
+      role: 'kitchen',
+      documentType: 'kitchen_order',
+      jobId: 'kitchen-k-1-kitchen',
+      data: { items: [] },
+      fallbackToBrowser: false,
+      queueOnly: true,
+    });
+
+    expect(r.via).toBe('queue');
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ jobId: 'kitchen-k-1-kitchen', role: 'kitchen' }));
+    expect((client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print).not.toHaveBeenCalled();
+  });
+
+  it('when the queue refuses it, it says so instead of printing here', async () => {
+    const client = fakeClient();
+    const enqueue = vi.fn(async () => ({ queued: false }));
+    const print = createPrintService(client, { enqueue });
+
+    const r = await print({
+      role: 'kitchen',
+      documentType: 'kitchen_order',
+      jobId: 'kitchen-k-1-kitchen',
+      data: { items: [] },
+      fallbackToBrowser: false,
+      queueOnly: true,
+    });
+
+    expect(r.via).toBe('none');
+    expect((client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print).not.toHaveBeenCalled();
+  });
+
+  it('without queueOnly the printer of the role right here still wins (control)', async () => {
+    const client = fakeClient();
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const print = createPrintService(client, { enqueue });
+
+    const r = await print({ role: 'kitchen', documentType: 'kitchen_order', jobId: 'kitchen-k-1-kitchen', data: { items: [] } });
+
+    expect(r.via).toBe('bridge');
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+});
