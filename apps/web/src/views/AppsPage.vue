@@ -190,7 +190,7 @@ import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
-  defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
+  defaultVersion, pendingUpdate, shouldPickVersion, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo,
 } from '../lib/module-updates';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
@@ -501,6 +501,7 @@ const filteredModules = computed<Row[]>(() => {
       available: m.available,
       busy: prog !== null || updatingIds.value.has(m.id),
       needsNewerHub: hubTooOldFor(m.minErploraVersion, hubVersion.value),
+      updateNeedsNewerHub: updateNeedsNewerHub(update, hubVersion.value),
     });
     return {
       ...m,
@@ -517,7 +518,9 @@ const filteredModules = computed<Row[]>(() => {
               : state === 'unavailable'
                 ? t('apps.stateUnavailable')
                 : state === 'needs_newer_hub'
-                  ? t('apps.stateNeedsNewerHub', { version: m.minErploraVersion ?? '' })
+                  ? update
+                    ? t('apps.stateUpdateNeedsNewerHub', { version: update.latest, floor: update.latest_min_erplora_version ?? '' })
+                    : t('apps.stateNeedsNewerHub', { version: m.minErploraVersion ?? '' })
                   : t('apps.stateAvailable'),
       progress: prog,
     };
@@ -559,13 +562,18 @@ const catalogEmptyMessage = computed(() =>
 // Instalados desde el runtime, como filas de la tabla. Se les cuelga la actualización pendiente
 // (hub#516) para que la celda de versión y el predicado de la acción la vean sin recalcularla.
 const installedRows = computed<Row[]>(() =>
-  installedModules.value.map((m) => ({
-    ...m,
-    update: pendingUpdate(m.id, moduleUpdates.value),
-    updating: updatingIds.value.has(m.id),
-    // ADR-0380 (hub#1134): si el marketplace lo sigue ofreciendo. `null` = no se pudo preguntar.
-    publicationStatus: publicationOf(m.id, catalogIds.value, publicationStatuses.value),
-  })) as unknown as Row[],
+  installedModules.value.map((m) => {
+    const update = pendingUpdate(m.id, moduleUpdates.value);
+    return {
+      ...m,
+      update,
+      // hub#2082: the pending version needs a newer ERPlora — no «Update», the row says why instead.
+      updateNeedsNewerHub: updateNeedsNewerHub(update, hubVersion.value),
+      updating: updatingIds.value.has(m.id),
+      // ADR-0380 (hub#1134): si el marketplace lo sigue ofreciendo. `null` = no se pudo preguntar.
+      publicationStatus: publicationOf(m.id, catalogIds.value, publicationStatuses.value),
+    };
+  }) as unknown as Row[],
 );
 
 // --- Columnas + acciones ---
@@ -584,7 +592,16 @@ const mineColumns = computed<DataTableColumn[]>(() => [
     header: t('apps.colVersion'),
     // DE → A cuando hay actualización (`1.1.1 → 1.1.2`), y solo lo que corre cuando no la hay
     // (ADR-0269 §3.5). «Inventario 1.1.2» no dice nada; «1.1.1 → 1.1.2» sí.
-    format: (r) => updateLabel(String(r.version ?? ''), (r.update as ModuleUpdateInfo | null) ?? null),
+    format: (r) => {
+      const update = (r.update as ModuleUpdateInfo | null) ?? null;
+      // hub#2082: an update this hub is too old for is not «1.0.0 → 2.0.0»: it names what it needs.
+      if (update && r.updateNeedsNewerHub === true) {
+        return `${String(r.version ?? '')} · ${t('apps.stateUpdateNeedsNewerHub', {
+          version: update.latest, floor: update.latest_min_erplora_version ?? '',
+        })}`;
+      }
+      return updateLabel(String(r.version ?? ''), update);
+    },
   },
   {
     key: 'status', header: t('apps.colStatus'), filterable: true, filterType: 'select',
@@ -633,6 +650,14 @@ const mineActions = computed<DataTableAction[]>(() => {
         hidden: (row) => hidesUpdateAction(row),
         disabled: (row) => row.updating === true,
         loading: (row) => row.updating === true,
+      },
+      {
+        // hub#2082: in place of «Update» when the new version needs a newer ERPlora. The hub updates
+        // itself (ADR-0269), so this leads to where its version and what changed are shown.
+        id: 'see_hub_updates',
+        label: t('apps.actionSeeHubUpdates'),
+        icon: 'information-circle-outline',
+        hidden: (row) => row.updateNeedsNewerHub !== true || row.updating === true,
       },
       { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
       { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
@@ -1236,6 +1261,7 @@ function handleMineAction(e: Event): void {
   if (actionId === 'toggle') void toggleModule(m);
   else if (actionId === 'uninstall') void removeModule(m);
   else if (actionId === 'update') void updateInstalledModule(m.id, m.name);
+  else if (actionId === 'see_hub_updates') void router.push('/system#updates');
 }
 function handleCatalogAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;

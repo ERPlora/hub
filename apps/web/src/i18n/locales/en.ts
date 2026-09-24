@@ -911,6 +911,8 @@ export default {
     stateAvailable: 'Available',
     stateUnavailable: 'Unavailable',
     stateNeedsNewerHub: 'Needs ERPlora {version}',
+    // hub#2082: installed, and its next version needs a newer ERPlora than this one runs.
+    stateUpdateNeedsNewerHub: 'Version {version} needs ERPlora {floor}',
     stateInstalling: 'Installing…',
     // hub#516: installed, but a newer version is published. Names the version — «there is an
     // update» without saying which one is a nag, not information.

@@ -806,6 +806,7 @@ export default {
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
     stateNeedsNewerHub: 'Necesita ERPlora {version}',
+    stateUpdateNeedsNewerHub: 'La versión {version} necesita ERPlora {floor}',
     stateInstalling: 'Instalando…',
     // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
     // «hay actualización» sin decir cuál es una insistencia, no una información.

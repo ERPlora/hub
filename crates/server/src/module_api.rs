@@ -399,7 +399,7 @@ pub(crate) async fn list_module_updates(
 
     let mut out = Vec::with_capacity(installed.len());
     for (module_id, version, pinned) in installed {
-        let target = install::resolve_target(
+        let (target, floor) = install::resolve_offer(
             &st.http,
             &st.config.cloud_base_url,
             &auth,
@@ -414,6 +414,9 @@ pub(crate) async fn list_module_updates(
             "latest": target.version(),
             "update_available": target.is_update(),
             "pinned": pinned,
+            // hub#2082: the ERPlora the offered version needs (`null` = none declared), so the
+            // Apps page says «needs ERPlora X» instead of an «Update» the runtime would refuse.
+            "latest_min_erplora_version": floor,
         }));
     }
     Json(json!({ "ok": true, "data": out })).into_response()
