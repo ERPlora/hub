@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the check_permissions command without any pre-configured scope."
         },
         {
+          "description": "Enables the open_app_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-app-settings",
+          "markdownDescription": "Enables the open_app_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_app_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-app-settings",
+          "markdownDescription": "Denies the open_app_settings command without any pre-configured scope."
+        },
+        {
           "description": "Enables the request_permissions command without any pre-configured scope.",
           "type": "string",
           "const": "allow-request-permissions",
@@ -319,10 +331,10 @@
           "markdownDescription": "Denies the request_permissions command without any pre-configured scope."
         },
         {
-          "description": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`",
+          "description": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y abrir la ficha de la app en los ajustes del sistema.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-open-app-settings`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`"
+          "markdownDescription": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y abrir la ficha de la app en los ajustes del sistema.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-open-app-settings`"
         }
       ]
     }

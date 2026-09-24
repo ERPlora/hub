@@ -175,6 +175,10 @@ struct PrintHtmlArgs {
 /// print screen that DID open into a failure (seen on the emulator, hub#2008).
 type PrintHtmlAnswer = serde::de::IgnoredAny;
 
+/// `openAppSettings` resolves with no data (`invoke.resolve()` → `null`): read it as anything
+/// (hub#2024).
+type OpenAppSettingsAnswer = serde::de::IgnoredAny;
+
 /// How long reader mode may stay open on one call (hub#988). Kotlin clamps it: an argument nobody
 /// typed by hand must never be the reason a till has no reader.
 #[derive(Debug, Serialize)]
@@ -247,6 +251,21 @@ pub struct ErploraAndroid<R: Runtime>(tauri::plugin::PluginHandle<R>);
 pub struct ErploraAndroid<R: Runtime>(std::marker::PhantomData<fn() -> R>);
 
 impl<R: Runtime> ErploraAndroid<R> {
+    /// hub#1886 — opens this app's page in the device settings, the only place left to turn a
+    /// permission on once Android stops showing its dialog. On desktop there is no such page.
+    pub fn open_app_settings(&self) -> Result<(), Error> {
+        #[cfg(target_os = "android")]
+        {
+            return self
+                .0
+                .run_mobile_plugin::<OpenAppSettingsAnswer>("openAppSettings", Empty {})
+                .map(|_| ())
+                .map_err(|e| Error::PluginInvoke(e.to_string()));
+        }
+        #[cfg(not(target_os = "android"))]
+        Ok(())
+    }
+
     /// Permisos concedidos ahora mismo. En escritorio, siempre vacío: no hay nada que conceder.
     pub fn check_permissions(&self) -> Result<PermissionStatus, Error> {
         #[cfg(target_os = "android")]
@@ -441,6 +460,13 @@ impl<R: Runtime, T: Manager<R>> ErploraAndroidExt<R> for T {
     }
 }
 
+/// hub#1886 — takes the owner to this app's page in the device settings. The shell only offers it
+/// on a device that really has a permission refused, so on desktop it is never called: a no-op.
+#[tauri::command]
+async fn open_app_settings<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Error> {
+    app.erplora_android().open_app_settings()
+}
+
 #[tauri::command]
 async fn check_permissions<R: Runtime>(app: tauri::AppHandle<R>) -> Result<PermissionStatus, Error> {
     app.erplora_android().check_permissions()
@@ -456,7 +482,7 @@ async fn request_permissions<R: Runtime>(
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("erplora-android")
-        .invoke_handler(tauri::generate_handler![check_permissions, request_permissions])
+        .invoke_handler(tauri::generate_handler![check_permissions, request_permissions, open_app_settings])
         .setup(|app, _api| {
             #[cfg(target_os = "android")]
             let handle = _api.register_android_plugin(PLUGIN_IDENTIFIER, "ErploraAndroidPlugin")?;
@@ -474,6 +500,62 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub#1886 — once Android stops showing a permission dialog, the only way back is the app's
+    /// page in the device settings, and the shell offers a button that takes the owner there.
+    /// Four places have to agree or the tap dies in silence on a real device only: the build
+    /// (which generates the permission), the invoke handler, the default permission set the hub
+    /// capability grants, and the Kotlin command that opens the page.
+    const PLUGIN_KT_SOURCE: &str =
+        include_str!("../android/src/main/java/com/erplora/android/ErploraAndroidPlugin.kt");
+    const BUILD_RS_SOURCE: &str = include_str!("../build.rs");
+    const LIB_RS_SOURCE: &str = include_str!("lib.rs");
+    const DEFAULT_PERMISSIONS_TOML: &str = include_str!("../permissions/default.toml");
+
+    #[test]
+    fn open_app_settings_is_declared_wired_granted_and_implemented_hub1886() {
+        assert!(
+            BUILD_RS_SOURCE.contains("\"open_app_settings\""),
+            "build.rs does not declare open_app_settings: no permission is generated"
+        );
+        // Only the code above the tests: this very assertion spells the command too.
+        let production = LIB_RS_SOURCE.split("#[cfg(test)]").next().unwrap_or_default();
+        let handler = production
+            .split("generate_handler![")
+            .nth(1)
+            .and_then(|rest| rest.split(']').next())
+            .expect("no invoke handler");
+        assert!(
+            handler.split(',').any(|c| c.trim() == "open_app_settings"),
+            "open_app_settings is not wired to the invoke handler"
+        );
+        assert!(
+            DEFAULT_PERMISSIONS_TOML.contains("\"allow-open-app-settings\""),
+            "erplora-android:default does not grant allow-open-app-settings: the hub's capability \
+             would refuse it"
+        );
+        let signature = "fun openAppSettings(invoke: Invoke)";
+        let before = PLUGIN_KT_SOURCE.split(signature).next().unwrap_or_default();
+        assert!(before.trim_end().ends_with("@Command"), "Kotlin openAppSettings is not a @Command");
+        let body = PLUGIN_KT_SOURCE
+            .split(signature)
+            .nth(1)
+            .and_then(|rest| rest.split("\n    }").next())
+            .expect("no Kotlin openAppSettings command");
+        assert!(
+            body.contains("Settings.ACTION_APPLICATION_DETAILS_SETTINGS"),
+            "openAppSettings does not open the app's own page in the device settings"
+        );
+        assert!(
+            body.contains("Uri.fromParts(\"package\", activity.packageName, null)"),
+            "openAppSettings does not point the settings at THIS app"
+        );
+        assert!(body.contains("invoke.resolve()"), "openAppSettings never answers: the web would wait forever");
+        assert!(
+            body.contains("invoke.reject("),
+            "openAppSettings swallows a device with no settings page: the web must hear it to fall back"
+        );
+    }
 
     #[test]
     fn el_estado_serializa_como_un_mapa_permiso_a_booleano() {

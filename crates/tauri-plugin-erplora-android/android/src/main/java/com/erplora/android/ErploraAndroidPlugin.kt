@@ -1,8 +1,12 @@
 package com.erplora.android
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -47,6 +51,28 @@ import java.io.File
     ]
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
+
+    /**
+     * `open_app_settings` (hub#1886) — opens ERPlora's own page in the device settings.
+     *
+     * Refused twice, Android stops showing a permission dialog for the life of the install, and
+     * from then on that page is the only place to turn it back on. Sending the owner to look for it
+     * among ten differently organised settings apps is what this replaces. A device with no such
+     * page (a locked-down kiosk build) REJECTS, so the shell can fall back to saying where to go.
+     */
+    @Command
+    fun openAppSettings(invoke: Invoke) {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", activity.packageName, null),
+        )
+        try {
+            activity.startActivity(intent)
+            invoke.resolve()
+        } catch (e: ActivityNotFoundException) {
+            invoke.reject("app_settings_unavailable")
+        }
+    }
 
     /**
      * `check_permissions` — qué hay concedido AHORA, sin molestar al usuario.

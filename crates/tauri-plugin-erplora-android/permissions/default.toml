@@ -1,7 +1,8 @@
 # Concedidos por defecto: preguntar y pedir permisos NUNCA es peligroso —lo peligroso es no poder
-# pedirlos y que el hardware quede muerto sin que nadie sepa por qué.
+# pedirlos y que el hardware quede muerto sin que nadie sepa por qué. `allow-open-app-settings`
+# (hub#1886) solo abre la ficha de la app en los ajustes del sistema: quien decide sigue siendo la persona.
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Consultar y solicitar los permisos de runtime que el TPV necesita en Android."
-permissions = ["allow-check-permissions", "allow-request-permissions"]
+description = "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y abrir la ficha de la app en los ajustes del sistema."
+permissions = ["allow-check-permissions", "allow-request-permissions", "allow-open-app-settings"]
