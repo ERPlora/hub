@@ -59,9 +59,12 @@ export function moduleFailureMessage(error: unknown, fallback: string, i18n: Tra
   const key = runtimeErrorKey(error, i18n);
   if (key) {
     // hub#1620: some sentences name facts the runtime sent as data (`core_version_too_old` → the
-    // version the app needs and the one this hub runs).
+    // version the app needs and the one this hub runs). That line lives apart, in
+    // `runtimeErrorFacts`, so the shared one still reads whole when a door sends the bare code.
     const params = paramsOf(error);
-    return params ? i18n.t(key, params) : i18n.t(key);
+    const withFacts = key.replace(/^runtimeErrors\./, 'runtimeErrorFacts.');
+    if (params && withFacts !== key && i18n.te(withFacts)) return i18n.t(withFacts, params);
+    return i18n.t(key);
   }
 
   const sentence = serverSentence(error);

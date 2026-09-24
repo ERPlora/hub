@@ -2022,6 +2022,12 @@ export default {
       duplicate: 'This hub already has that value.',
     },
   },
+  // hub#1620 — the same codes when the runtime ALSO sent the facts the line names (`core_version_too_old`
+  // → `required`, `core`). Only `moduleFailureMessage` reads these, and only when every fact arrived.
+  runtimeErrorFacts: {
+    core_version_too_old:
+      'This app needs a newer hub (ERPlora {required}). Yours runs {core}: update the hub and try again.',
+  },
   // What the runtime answers a screen when a cloud-facing door fails: a short stable code, not a
   // sentence (hub#1689 made it a code precisely so it COULD be translated). Every back-office
   // screen turns it into one of these lines through `lib/runtime-error-sentence.ts`; a code with
@@ -2040,9 +2046,9 @@ export default {
     install_cloud_rejected:
       'erplora.com could not attend to this installation right now. Try again in a few minutes.',
     // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
-    // not run whole); the owner can act on it by updating the hub.
-    core_version_too_old:
-      'This app needs a newer hub (ERPlora {required}). Yours runs {core}: update the hub and try again.',
+    // not run whole); the owner can act on it by updating the hub. The line that names both versions
+    // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.
+    core_version_too_old: 'This app needs a newer hub: update the hub and try again.',
     cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
     cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
     hub_not_enrolled: 'This hub is not connected to erplora.com yet.',
