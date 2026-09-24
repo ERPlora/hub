@@ -751,6 +751,7 @@ export default {
     reset_media: 'Files and images',
     reset_fiscal: 'Tax configuration',
     reset_roles: 'Active roles',
+    reset_print_queue: 'Print queue',
     permissionsTitle: 'App permissions',
     permissionsDesc: 'Grant or revoke the permissions each app asks for (internet access, certificate, printer, notifications, manage automations). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',
