@@ -164,6 +164,10 @@ export default {
     quotaTitle: 'Has usado todos tus mensajes del asistente',
     quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
     quotaCta: 'Ver planes',
+    includedInPlan: 'Incluido en tu plan {plan}.',
+    includedInHubPlan: 'Incluido en tu plan.',
+    upgradeHubPlan: 'Subir de plan',
+    planOpenFailed: 'No se pudo abrir la página de tu plan en el navegador. Inténtalo de nuevo.',
     quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
     quotaResets: 'Se renuevan el {date}.',
     quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
@@ -1679,6 +1683,7 @@ export default {
     yourPlan: 'Tu plan',
     managePlan: 'Gestionar plan',
     managePlanError: 'No se pudo abrir la gestión del plan. Inténtalo de nuevo.',
+    upgradeHubPlan: 'Sube de plan para tener más',
     purchaseDetected: 'Confirmado. Tu plan se ha actualizado.',
     // Lo que este hub lleva GASTADO de lo que incluye su plan (whatsapp_inbox#131). El nombre de
     // la métrica lo pone el módulo (`lib/module-quota.ts`): aquí nunca se escribe «conversaciones».
@@ -1703,6 +1708,8 @@ export default {
       none: 'Aún no tienes un plan para este módulo.',
       free: 'Estás en {plan}, el plan con el que entra todo el mundo.',
       expiredOnFree: 'Tu suscripción ha caducado. Sigues en {plan}.',
+      includedInPlan: 'Incluido en tu plan {plan}.',
+      includedInHubPlan: 'Incluido en tu plan.',
       canceled: 'Tu suscripción está cancelada.',
       past_due: 'Hay un pago pendiente en tu suscripción.',
     },

@@ -127,3 +127,43 @@ describe('hub#1183 — el plan trae con qué avisar y con qué elegir', () => {
     expect((await assistantPlan())?.paidTiers).toEqual([]);
   });
 });
+
+// hub#1686 (ADR-0474, ERPlora/saas#1952): the hub plan gives the assistant level. The SaaS says so
+// with `source: "plan"` and names the hub plan in `plan_name`; both keys are additive, and without
+// them (older SaaS) the drawer keeps selling the assistant tier as today.
+describe('assistantPlan — where the level comes from (hub#1686)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  it('carries `source: "plan"` and the hub plan name', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ tier: 'basic', source: 'plan', plan_name: 'Standard' }),
+    });
+
+    const plan = await assistantPlan();
+
+    expect(plan?.source).toBe('plan');
+    expect(plan?.planName).toBe('Standard');
+  });
+
+  it('leaves both unknown when an older SaaS does not send them', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ tier: 'free' }) });
+
+    const plan = await assistantPlan();
+
+    expect(plan?.source).toBeNull();
+    expect(plan?.planName).toBeNull();
+  });
+
+  it('does not take an unknown source for «plan»', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ tier: 'free', source: 'gift', plan_name: '' }) });
+
+    const plan = await assistantPlan();
+
+    expect(plan?.source).toBeNull();
+    expect(plan?.planName).toBeNull();
+  });
+});

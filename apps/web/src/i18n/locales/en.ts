@@ -174,6 +174,10 @@ export default {
     quotaTitle: 'You have used all your assistant messages',
     quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
     quotaCta: 'See plans',
+    includedInPlan: 'Included in your {plan} plan.',
+    includedInHubPlan: 'Included in your plan.',
+    upgradeHubPlan: 'Upgrade your plan',
+    planOpenFailed: 'Your plan page could not be opened in your browser. Try again.',
     // hub#1183 — knowing the limit only once it is spent is knowing it at the worst possible
     // moment. From 80% on, the drawer says what is left and when it comes back.
     quotaRemaining: 'Plan {tier} — {remaining} of {limit} messages left this month.',
@@ -1926,6 +1930,7 @@ export default {
     yourPlan: 'Your plan',
     managePlan: 'Manage plan',
     managePlanError: 'Could not open plan management. Try again.',
+    upgradeHubPlan: 'Upgrade your plan for more',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
     // What the hub has already SPENT of what its plan includes (whatsapp_inbox#131). The tier
     // cards say what a plan includes; without these the one number that warns a channel is about
@@ -1956,6 +1961,8 @@ export default {
       // Expiring does not leave you outside when the module ships a free tier: it drops you back
       // onto it. Saying "subscribe again to keep using it" there is simply not true.
       expiredOnFree: 'Your subscription has expired. You are still on {plan}.',
+      includedInPlan: 'Included in your {plan} plan.',
+      includedInHubPlan: 'Included in your plan.',
       canceled: 'Your subscription is canceled.',
       past_due: 'There is a pending payment on your subscription.',
     },
