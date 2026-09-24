@@ -1230,6 +1230,11 @@ export default {
       printerUnknown: 'No hemos podido comprobar la impresora',
       printerUnknownDetail:
         'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
+      // hub#1629 — WhatsApp que se cae solo (permiso caducado, revocado por Meta, desvinculado).
+      whatsappDown: 'WhatsApp ha dejado de funcionar',
+      whatsappDownDetail:
+        'No entran los mensajes de los clientes ni salen tus respuestas hasta que lo vuelvas a conectar.',
+      whatsappAction: 'Volver a conectar WhatsApp',
       notMeasured: 'No hemos podido leerlo',
     },
     notices: {
