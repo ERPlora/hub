@@ -859,7 +859,7 @@ async fn run_step(
             .await
             {
                 Ok(notify::Prepared {
-                    queue_op,
+                    queue_op: Some(queue_op),
                     recorded_input,
                     output,
                 }) => {
@@ -881,6 +881,31 @@ async fn run_step(
                     db.execute_tx(&ops).await?;
                     complete_step(db, hub_id, run_id, index, &output, &now).await?;
                     Ok(Outcome::Continue { output })
+                }
+                // **Nothing to offer** (hub#1651): the list the message promised is there and has
+                // no rows. Meta refuses a list without rows, so queuing it would end in the proxy's
+                // refusal hours later; the run stops here instead — like a `condition` that did not
+                // match, a halt and not a failure: «no free slots today» is a state of the business,
+                // not a broken flow. The step keeps what it would have asked and why it did not.
+                Ok(notify::Prepared {
+                    queue_op: None,
+                    recorded_input,
+                    output,
+                }) => {
+                    write_step(
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_STOPPED,
+                        &recorded_input,
+                        &output,
+                        "",
+                        &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Stopped)
                 }
                 Err(e) => {
                     // Denied, nobody to write to, or a column that is not an address: NOTHING was
