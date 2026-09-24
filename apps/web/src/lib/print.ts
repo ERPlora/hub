@@ -24,10 +24,10 @@
 // imprime nada. Allí acabar en el navegador es un FALLO (`via:'none'`) y se devuelve como tal — dar
 // por bueno un `via:'browser'` es lo que dejó a la QA creyendo que el papel había salido.
 //
-// A4 in the installed desktop app (hub#2006): a document with `format:'a4'` and its `html` goes
+// A4 in the installed app (desktop hub#2006, Android hub#2008): a document with `format:'a4'` and its `html` goes
 // FIRST to the shell's native print dialog (`print_document`) — the system's own, with its printer
 // list and «Save as PDF». It answers `via:'browser'` because it is the same thing the browser does
-// with an A4. Where the shell cannot (older build, Android: hub#2008) the door takes its usual route.
+// with an A4. Where the shell cannot (older build) the door takes its usual route.
 import { isTauri } from './device';
 import { printDocumentNatively } from './native-print';
 
@@ -90,7 +90,7 @@ export interface PrintResult {
    * Por dónde salió: el Bridge, la cola del hub, el navegador, o por ningún sitio.
    *
    * `browser` means «handed to a print dialog»: the browser's, or — for an A4 inside the installed
-   * desktop app — the system's own, opened by the shell (hub#2006).
+   * app — the system's own, opened by the shell (desktop hub#2006, Android hub#2008).
    */
   via: 'bridge' | 'queue' | 'browser' | 'none';
   role: string;
