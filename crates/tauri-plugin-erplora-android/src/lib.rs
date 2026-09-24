@@ -137,6 +137,12 @@ impl BluetoothPrintArgs {
     }
 }
 
+/// What `bluetoothPrint` answers with once the bytes are on the printer: nothing. Kotlin's
+/// `invoke.resolve()` with no data reaches Rust as JSON `null`, so it is read and ignored whatever
+/// its shape — reading it as [`Empty`] reported a ticket already on paper as `failed` (hub#2024,
+/// the same trap as `printHtml` in hub#2008).
+type BluetoothPrintAnswer = serde::de::IgnoredAny;
+
 /// A bonded printer as Kotlin announces it: `id` is `bluetooth:{MAC}` (the printer_id contract of
 /// ADR-0204), `mac` the raw identity the registry keys on.
 #[derive(Debug, Clone, Deserialize)]
@@ -301,7 +307,10 @@ impl<R: Runtime> ErploraAndroid<R> {
         {
             return self
                 .0
-                .run_mobile_plugin::<Empty>("bluetoothPrint", BluetoothPrintArgs::new(mac, payload))
+                .run_mobile_plugin::<BluetoothPrintAnswer>(
+                    "bluetoothPrint",
+                    BluetoothPrintArgs::new(mac, payload),
+                )
                 .map(|_| ())
                 .map_err(|e| Error::PluginInvoke(e.to_string()));
         }
@@ -981,5 +990,107 @@ mod tests {
         // anyway: a resolved call would read as a dialog that opened (hub#475).
         let desktop = ErploraAndroid::<tauri::Wry>(std::marker::PhantomData);
         assert!(desktop.print_html("<p>F-1</p>").is_err());
+    }
+
+    // ── Kotlin answers with no data (hub#2024) ──────────────────────────────────────────────
+    //
+    // `invoke.resolve()` with no data reaches Rust as JSON `null`. Read as a struct, that `null`
+    // is a deserialize error, so a call that DID its job came back as a failure: the ticket was
+    // on paper and the print host reported it `failed`.
+
+    #[test]
+    fn a_bluetooth_answer_with_no_data_is_a_ticket_on_paper() {
+        for answer in [serde_json::Value::Null, serde_json::json!({})] {
+            assert!(
+                serde_json::from_value::<BluetoothPrintAnswer>(answer.clone()).is_ok(),
+                "{answer} must read as a printed ticket"
+            );
+        }
+    }
+
+    /// The Rust source outside this test module.
+    fn production_rust() -> &'static str {
+        const LIB_RS: &str = include_str!("lib.rs");
+        LIB_RS
+            .split("#[cfg(test)]\nmod tests")
+            .next()
+            .expect("lib.rs has code before its tests")
+    }
+
+    /// Commands whose Kotlin side resolves with a bare `invoke.resolve()` somewhere.
+    fn kotlin_commands_resolving_with_no_data(kotlin: &str) -> Vec<String> {
+        let code = without_kotlin_comments(kotlin);
+        let mut names = Vec::new();
+        let mut rest = code.as_str();
+        while let Some(at) = rest.find("(invoke: Invoke)") {
+            let name = rest[..at]
+                .rsplit(|c: char| !c.is_alphanumeric() && c != '_')
+                .next()
+                .unwrap_or_default()
+                .to_string();
+            rest = &rest[at + "(invoke: Invoke)".len()..];
+            let body_end = rest.find("(invoke: Invoke)").unwrap_or(rest.len());
+            if rest[..body_end].contains("invoke.resolve()") {
+                names.push(name);
+            }
+        }
+        names
+    }
+
+    /// The type each `run_mobile_plugin::<T>(command, …)` reads its answer as, by command name.
+    fn rust_answer_types(rust: &str) -> Vec<(String, String)> {
+        const CALL: &str = "run_mobile_plugin::<";
+        let mut found = Vec::new();
+        let mut rest = rust;
+        while let Some(at) = rest.find(CALL) {
+            rest = &rest[at + CALL.len()..];
+            let Some(close) = rest.find(">(") else { break };
+            let ty = rest[..close].trim().to_string();
+            let arg = rest[close + 2..].trim_start();
+            let command = if let Some(quoted) = arg.strip_prefix('"') {
+                quoted.split('"').next().unwrap_or_default().to_string()
+            } else {
+                let ident: String = arg
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                let decl = format!("const {ident}: &str = \"");
+                rust.split(&decl)
+                    .nth(1)
+                    .and_then(|v| v.split('"').next())
+                    .unwrap_or_default()
+                    .to_string()
+            };
+            found.push((command, ty));
+        }
+        found
+    }
+
+    #[test]
+    fn every_command_kotlin_resolves_with_no_data_is_read_whatever_its_shape() {
+        let rust = production_rust();
+        let empty_answers = kotlin_commands_resolving_with_no_data(ERPLORA_ANDROID_PLUGIN_KT);
+        // Positive control: the scan sees the two commands known to answer with nothing.
+        for known in ["bluetoothPrint", "printHtml"] {
+            assert!(
+                empty_answers.iter().any(|n| n == known),
+                "{known} not found by the scan: {empty_answers:?}"
+            );
+        }
+        let answers = rust_answer_types(rust);
+        for command in &empty_answers {
+            let ty = answers
+                .iter()
+                .find(|(c, _)| c == command)
+                .map(|(_, t)| t.as_str())
+                .unwrap_or_else(|| panic!("no run_mobile_plugin::<T> call for {command}"));
+            let reads_anything = ty == "serde::de::IgnoredAny"
+                || rust.contains(&format!("type {ty} = serde::de::IgnoredAny;"));
+            assert!(
+                reads_anything,
+                "{command} answers `null` from Kotlin but Rust reads it as {ty}: a call that did \
+                 its job would come back as a failure (hub#2024)"
+            );
+        }
     }
 }
