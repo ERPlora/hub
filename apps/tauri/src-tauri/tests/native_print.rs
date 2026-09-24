@@ -10,8 +10,9 @@
 //! 1. **The document runs no code.** It is html from a remote page, shown in a window of the app:
 //!    its response carries a CSP with `default-src 'none'` and no script source at all.
 //! 2. **The print window has no IPC.** No capability names it, so nothing inside it can `invoke`.
-//! 3. **Only the desktop has the dialog.** Android answers `native_print_unsupported` and the print
-//!    door keeps its usual route (hub#2008).
+//! 3. **Desktop and Android have the dialog.** Android's comes from its own print service
+//!    (`PrintManager`, hub#2008); any other platform answers `native_print_unsupported` and the
+//!    print door keeps its usual route.
 
 use erplora_tauri_lib::{
     native_print_supported, print_document_id, print_document_url, print_window_label,
@@ -26,11 +27,16 @@ fn the_desktop_has_a_system_print_dialog() {
 }
 
 #[test]
-fn a_phone_has_no_native_print_yet() {
-    // wry has no `print` on Android; the door keeps its route there (hub#2008).
-    for os in ["android", "ios"] {
-        assert!(!native_print_supported(os), "{os} must refuse, not pretend");
-    }
+fn android_has_the_system_print_service() {
+    // wry has no `print` on Android, so the shell hands the document to Android's own
+    // `PrintManager` through its plugin: printer list and «Save as PDF» (hub#2008).
+    assert!(native_print_supported("android"));
+}
+
+#[test]
+fn ios_has_no_native_print_yet() {
+    // No shell half on iOS: it must refuse, and the door keeps its route there.
+    assert!(!native_print_supported("ios"), "ios must refuse, not pretend");
 }
 
 #[test]

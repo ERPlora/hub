@@ -25,7 +25,7 @@ mod navigation;
 pub use navigation::{NavigationVerdict, navigation_verdict};
 mod native_print;
 pub use native_print::{
-    native_print_supported, print_document_id, print_document_url, print_window_label,
+    check_print_document, native_print_supported, print_document_id, print_document_url, print_window_label,
     print_window_may_navigate, PrintDocuments, MAX_PRINT_DOCUMENT_BYTES, PRINT_DOCUMENT_CSP,
     PRINT_SCHEME,
 };
@@ -83,7 +83,7 @@ pub enum ShellError {
     /// The page sent no document to print, or one too big to hold (hub#2006).
     #[error("print_document_refused")]
     PrintDocumentRefused,
-    /// This platform has no system print dialog for a webview (Android, hub#2008). The print door
+    /// This platform has no system print dialog for a webview (iOS). The print door
     /// takes its usual route instead.
     #[error("native_print_unsupported")]
     NativePrintUnsupported,
@@ -867,10 +867,11 @@ fn save_download(
 
 /// `print_document` — the system print dialog for an A4 document the page holds (hub#2006).
 ///
-/// The page keeps the html, the shell keeps the dialog: a window of its own shows the document and
-/// the OS prints it, with its printer list and «Save as PDF» ([`native_print`]). Where there is no
-/// dialog (Android, hub#2008) it answers `native_print_unsupported` and the print door takes its
-/// usual route — a refusal, never a pretended page.
+/// The page keeps the html, the shell keeps the dialog: on the desktop a window of its own shows
+/// the document and the OS prints it, with its printer list and «Save as PDF» ([`native_print`]);
+/// on Android the plugin renders it in a WebView of its own and opens the system print service
+/// (`PrintManager`, hub#2008). Where there is no dialog it answers `native_print_unsupported` and
+/// the print door takes its usual route — a refusal, never a pretended page.
 ///
 /// ⚠️ `(async)` is load-bearing: creating a window from a synchronous command deadlocks on Windows.
 #[tauri::command(async)]
@@ -882,7 +883,15 @@ fn print_document(app: tauri::AppHandle, html: String) -> Result<(), ShellError>
     {
         native_print::open_print_window(&app, html)
     }
-    #[cfg(not(desktop))]
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_erplora_android::ErploraAndroidExt;
+        check_print_document(&html)?;
+        app.erplora_android()
+            .print_html(&html)
+            .map_err(|e| ShellError::NativePrintFailed(e.to_string()))
+    }
+    #[cfg(not(any(desktop, target_os = "android")))]
     {
         let _ = (&app, &html);
         Err(ShellError::NativePrintUnsupported)

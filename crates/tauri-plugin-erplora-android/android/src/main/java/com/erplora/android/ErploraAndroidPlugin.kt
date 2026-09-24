@@ -153,6 +153,29 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
+     * `print_html` — the system print screen with an A4 document, printer or «Save as PDF»
+     * (hub#2008). The rendering and the `PrintManager` call are [HtmlPrinter]'s.
+     *
+     * Resolves once the print screen has been asked for — the same moment the desktop answers,
+     * because what the user does in it (print, save, cancel) is the system's. Anything that stops
+     * it from opening REJECTS: a resolve there would read as a document handed over (hub#475).
+     */
+    @Command
+    fun printHtml(invoke: Invoke) {
+        val html = invoke.getArgs().getString("html", null)
+        if (html.isNullOrBlank()) {
+            invoke.reject("print_html needs the html of the document")
+            return
+        }
+        HtmlPrinter.print(
+            activity,
+            html,
+            onOpened = { invoke.resolve() },
+            onFailed = { e -> invoke.reject(e.message ?: e.toString(), e) },
+        )
+    }
+
+    /**
      * `bluetooth_bonded_printers` — the bonded devices that look like printers (ADR-0204).
      *
      * The BONDED list, never a scan: pairing belongs to Android's own settings (its UI, its PIN
