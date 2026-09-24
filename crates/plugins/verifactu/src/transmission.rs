@@ -1043,6 +1043,64 @@ pub(crate) const DUE_NEVER_QUEUED: &str = "q.id IS NULL AND r.status = 'pending'
 pub(crate) const DUE_FROM_QUEUE: &str = "q.status IN ('pending','retrying') \
      AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= :now)";
 
+/// **A full invoice the hub itself rejected because it forgot its customer** (hub#1978).
+///
+/// Before hub#1975 the row did not keep the customer, so a full invoice sealed without a road
+/// reached the drain with no `Destinatarios` and the hub's own schema check rejected it
+/// (`aeat_response_code = 'XSD'`) — chain number spent, never seen by the AEAT. Only that case:
+/// an `alta` of a type that requires the customer, linked to the invoice it came from, whose row
+/// has no customer and whose rejected envelope carries no `Destinatarios`. The last condition is
+/// what makes it happen once — the envelope a revived record leaves with does carry them.
+///
+/// The customer column is read through `to_jsonb(r)`: a hub whose `verifactu` module predates
+/// migration 017 has no such column, and the drain must keep running there.
+/// The mark [`due_for_remission`] leaves on a row picked by [`DUE_FORGOTTEN_CUSTOMER`].
+const FORGOTTEN_CUSTOMER: &str = "forgotten_customer";
+
+pub(crate) const DUE_FORGOTTEN_CUSTOMER: &str = "r.status = 'rejected' \
+     AND r.aeat_response_code = 'XSD' AND r.record_type = 'alta' \
+     AND r.invoice_type IN ('F1','F3','R1','R2','R3','R4') \
+     AND COALESCE(r.invoice_id, '') <> '' \
+     AND COALESCE(to_jsonb(r) ->> 'recipient_nif', '') = '' \
+     AND COALESCE(r.xml_content, '') NOT LIKE '%Destinatarios>%'";
+
+/// Gives a record picked by [`DUE_FORGOTTEN_CUSTOMER`] its customer back, from the invoice it
+/// was sealed from, and drops the envelope the hub rejected so the send rebuilds it. `None` when
+/// there is no customer to give back — the invoice is gone, names none, or cannot be read —: the
+/// record then stays rejected as it was, since without `Destinatarios` the AEAT refuses it (1189).
+///
+/// The invoice is read the way `ingest_invoice` reads it (ADR-0058's bounded read by id), with the
+/// country and document kind of hub#1967 through `to_jsonb(i)` for the same reason.
+async fn with_its_customer_back(host: &dyn NativeHost, ctx: &Ctx, record: Json) -> Option<Json> {
+    let invoice = host
+        .read(
+            "SELECT i.customer_tax_id, i.customer_name, \
+             COALESCE(to_jsonb(i) ->> 'customer_country', '') AS customer_country, \
+             COALESCE(to_jsonb(i) ->> 'customer_id_type', '') AS customer_id_type \
+             FROM invoice_invoice i \
+             WHERE i.id = :invoice_id AND i.hub_id = :hub_id AND i.is_deleted = 0 LIMIT 1",
+            &params(json!({
+                "invoice_id": str_field(&record, "invoice_id"),
+                "hub_id": ctx.hub_id,
+            })),
+        )
+        .await
+        .ok()?
+        .into_iter()
+        .next()?;
+    let tax_id = str_field(&invoice, "customer_tax_id");
+    if tax_id.trim().is_empty() {
+        return None;
+    }
+    let mut record = record;
+    record["recipient_nif"] = json!(tax_id);
+    record["recipient_name"] = json!(str_field(&invoice, "customer_name"));
+    record["recipient_country"] = json!(str_field(&invoice, "customer_country"));
+    record["recipient_id_type"] = json!(str_field(&invoice, "customer_id_type"));
+    record["xml_content"] = json!("");
+    Some(record)
+}
+
 /// **What leaves in this drain, in the order the chain was sealed** (verifactu#111).
 ///
 /// Two sources, and before verifactu#111 the drain only read the first: the queue entries that are
@@ -1079,7 +1137,27 @@ async fn due_for_remission(host: &dyn NativeHost, ctx: &Ctx, limit: i64) -> Resu
             &binds,
         )
         .await?;
-    let mut due: Vec<Json> = queued.into_iter().chain(never_queued).collect();
+    let forgotten = host
+        .read(
+            &format!(
+                "SELECT r.id AS record_id, r.environment, r.issuer_nif, r.sequence_number \
+                 FROM verifactu_record r \
+                 WHERE r.hub_id = :hub_id AND r.is_deleted = 0 AND {DUE_FORGOTTEN_CUSTOMER} \
+                 ORDER BY r.environment, r.issuer_nif, r.sequence_number \
+                 LIMIT :limit"
+            ),
+            &binds,
+        )
+        .await?;
+    let forgotten_ids: std::collections::HashSet<String> = forgotten
+        .iter()
+        .map(|row| str_field(row, "record_id"))
+        .collect();
+    let mut due: Vec<Json> = queued
+        .into_iter()
+        .chain(never_queued)
+        .chain(forgotten)
+        .collect();
     // Stable: within one position the queue keeps its own order. An orphan entry (its record is
     // gone) has no position and goes last; the loop below drops it.
     due.sort_by_key(|row| {
@@ -1094,6 +1172,12 @@ async fn due_for_remission(host: &dyn NativeHost, ctx: &Ctx, limit: i64) -> Resu
         let id = str_field(row, "record_id");
         !id.is_empty() && seen.insert(id)
     });
+    // Marked here, after the merge, so the mark survives whichever source the record came from.
+    for row in &mut due {
+        if forgotten_ids.contains(&str_field(row, "record_id")) {
+            row[FORGOTTEN_CUSTOMER] = json!(true);
+        }
+    }
     Ok(due)
 }
 
@@ -1140,6 +1224,14 @@ pub(crate) async fn process_contingency_queue(
         let rec = match rec {
             Some(r) => r,
             None => continue, // registro borrado: ignorar la entrada huérfana
+        };
+        let rec = if q.get(FORGOTTEN_CUSTOMER).is_some() {
+            match with_its_customer_back(host, &ctx, rec).await {
+                Some(revived) => revived,
+                None => continue,
+            }
+        } else {
+            rec
         };
         if str_field(&rec, "status") == "accepted" {
             // Ya aceptado: limpiar la entrada de cola obsoleta.
@@ -4654,6 +4746,275 @@ mod late_remission_verifactu111 {
                  <sum1:IDType>03</sum1:IDType><sum1:ID>XA1234567</sum1:ID></sum1:IDOtro>"
             ),
             "{xml}"
+        );
+    }
+
+    // ── hub#1978 · the invoices the hub rejected for a customer it forgot come back ────────────
+
+    /// One full invoice (`F1`) to `tax_id` written into the real `invoice_invoice` and ingested
+    /// while the hub has NO road, left exactly as a hub before hub#1975 left it: the row sealed
+    /// without its customer, then the road opened and the drain rejected it LOCALLY
+    /// (`verifactu.xsd_invalid`, «una F1 exige Destinatarios»), with nothing reaching the AEAT.
+    /// Returns the record's id.
+    async fn an_invoice_rejected_for_a_forgotten_customer(
+        bench: &Bench,
+        invoice_id: &str,
+        tax_id: &str,
+    ) -> String {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("invoice_id".into(), json!(invoice_id));
+        p.insert("tax_id".into(), json!(tax_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "INSERT INTO invoice_invoice (id, hub_id, invoice_type, series, number, issue_date, \
+                   issuer_nif, issuer_name, customer_tax_id, customer_name, description, \
+                   base_amount, tax_amount, total_amount, tax_breakdown, created_at, updated_at) \
+                 VALUES (:invoice_id, :hub_id, 'F1', 'FACT', 'FACT-2026-000001', '2026-09-22', \
+                   'B12345674', 'Salon Lucia SL', :tax_id, 'Peluqueria Norte SL', 'Corte y peinado', \
+                   10000, 2100, 12100, '{\"21.00\":{\"base\":10000,\"tax\":2100}}', \
+                   '2026-09-22T10:00:00Z', '2026-09-22T10:00:00Z')",
+                &p,
+            )
+            .await
+            .expect("the invoice row");
+        bench
+            .rt
+            .execute_command(
+                "verifactu.records.ingest_invoice",
+                json!({ "invoice_id": invoice_id }).as_object().unwrap(),
+                &bench.ctx(),
+            )
+            .await
+            .expect("the invoice is sealed");
+        assert_eq!(bench.chain().await, pending(&[1]), "no road: it waits");
+        // What a hub before hub#1975 kept: no customer on the row.
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE verifactu_record SET recipient_nif = '', recipient_name = '', \
+                   recipient_country = '', recipient_id_type = '' WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("the customer is forgotten");
+        bench.open_the_road();
+        bench.drain().await;
+        assert_eq!(
+            bench.chain().await,
+            vec![(1, "rejected".to_owned())],
+            "the legacy state: the hub rejected its own invoice"
+        );
+        assert!(
+            bench.cell.lock().unwrap().is_empty(),
+            "and nothing reached the AEAT"
+        );
+        assert!(
+            bench
+                .details_of(1)
+                .await
+                .iter()
+                .any(|d| d["message_key"] == "verifactu.xsd_invalid"),
+            "rejected by the hub's own schema check"
+        );
+        bench.record_id(1).await
+    }
+
+    /// The XMLs that reached the cell, decoded, each with the environment it was sent to.
+    fn envelopes(bench: &Bench) -> Vec<(String, String)> {
+        bench
+            .cell
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let xml = base64::engine::general_purpose::STANDARD
+                    .decode(e["xml_b64"].as_str().expect("xml_b64"))
+                    .expect("base64");
+                (
+                    e["environment"].as_str().unwrap_or_default().to_owned(),
+                    String::from_utf8(xml).expect("utf-8"),
+                )
+            })
+            .collect()
+    }
+
+    /// 🔴 hub#1978: the invoice the hub rejected before hub#1975 takes its customer back from the
+    /// invoice it was sealed from and leaves on the next drain — once, to the TEST AEAT only,
+    /// declaring the incidence and with its `Destinatarios`.
+    #[tokio::test]
+    async fn an_invoice_the_hub_rejected_for_a_forgotten_customer_reaches_the_aeat() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-1", "B87654321").await;
+
+        bench.drain().await;
+
+        let sent = envelopes(&bench);
+        assert_eq!(sent.len(), 1, "the rejected invoice leaves once: {sent:?}");
+        let (environment, xml) = &sent[0];
+        assert_eq!(environment, "testing", "only the TEST AEAT");
+        assert!(
+            xml.contains(
+                "<sum1:Destinatarios><sum1:IDDestinatario>\
+                 <sum1:NombreRazon>Peluqueria Norte SL</sum1:NombreRazon>\
+                 <sum1:NIF>B87654321</sum1:NIF>"
+            ),
+            "{xml}"
+        );
+        assert!(
+            xml.contains("<sum1:Incidencia>S</sum1:Incidencia>"),
+            "a late remission declares the incidence: {xml}"
+        );
+        assert_ne!(bench.chain().await[0].1, "rejected", "it is no longer dead");
+
+        bench.drain().await;
+        assert_eq!(envelopes(&bench).len(), 1, "and it is never filed twice");
+    }
+
+    /// Only the hub's OWN schema rejection is undone: an invoice the AEAT itself refused was seen
+    /// by it, and filing it again is not a late remission but a correction — it stays as it is.
+    #[tokio::test]
+    async fn an_invoice_the_aeat_itself_rejected_is_left_alone() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        let record_id =
+            an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-2", "B87654321").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("id".into(), json!(record_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE verifactu_record SET aeat_response_code = '1189' \
+                 WHERE hub_id = :hub_id AND id = :id",
+                &p,
+            )
+            .await
+            .expect("the AEAT's own verdict");
+
+        bench.drain().await;
+
+        assert!(envelopes(&bench).is_empty(), "nothing leaves");
+        assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
+    }
+
+    /// An invoice with no customer to take back cannot be declared either: it stays rejected
+    /// instead of leaving without the `Destinatarios` the AEAT would refuse (1189).
+    #[tokio::test]
+    async fn an_invoice_whose_invoice_names_no_customer_stays_rejected() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000003").await else {
+            return;
+        };
+        an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-3", "B87654321").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE invoice_invoice SET customer_tax_id = '' WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("an invoice with no customer");
+
+        bench.drain().await;
+
+        assert!(envelopes(&bench).is_empty(), "nothing leaves");
+        assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
+        assert_eq!(
+            schema_refusals(&bench).await,
+            1,
+            "and it is not rebuilt to be refused again"
+        );
+    }
+
+    /// How many times the hub's own schema check refused record 1.
+    async fn schema_refusals(bench: &Bench) -> usize {
+        bench
+            .details_of(1)
+            .await
+            .iter()
+            .filter(|d| d["message_key"] == "verifactu.xsd_invalid")
+            .count()
+    }
+
+    /// A rejected envelope that already carried `Destinatarios` was refused for something else —
+    /// which is also where a revived invoice lands if its new envelope is refused too. It is not
+    /// the forgotten-customer case, and it is not rebuilt on every drain to be refused again.
+    #[tokio::test]
+    async fn an_envelope_refused_with_its_customer_is_not_revived() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000004").await else {
+            return;
+        };
+        let record_id =
+            an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-4", "B87654321").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("id".into(), json!(record_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE verifactu_record SET xml_content = replace(xml_content, \
+                   '</sum1:RegistroAlta>', \
+                   '<sum1:Destinatarios><sum1:IDDestinatario><sum1:NombreRazon>X</sum1:NombreRazon>\
+                   <sum1:NIF>B87654321</sum1:NIF></sum1:IDDestinatario></sum1:Destinatarios>\
+                   </sum1:RegistroAlta>') \
+                 WHERE hub_id = :hub_id AND id = :id",
+                &p,
+            )
+            .await
+            .expect("an envelope refused with its customer on board");
+
+        bench.drain().await;
+        bench.drain().await;
+
+        assert!(envelopes(&bench).is_empty(), "nothing leaves");
+        assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
+        assert_eq!(
+            schema_refusals(&bench).await,
+            1,
+            "and it is not refused again"
+        );
+    }
+
+    /// A hub whose `verifactu` module predates the customer columns (migration 017) — the runtime
+    /// and the module update on their own schedules — keeps draining, and still gives the
+    /// rejected invoice its customer back from the invoice.
+    #[tokio::test]
+    async fn a_module_without_the_customer_columns_still_drains_and_revives() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000005").await else {
+            return;
+        };
+        an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-5", "B87654321").await;
+        bench
+            .rt
+            .db()
+            .execute_batch(
+                "ALTER TABLE verifactu_record DROP COLUMN recipient_nif, \
+                   DROP COLUMN recipient_name, DROP COLUMN recipient_country, \
+                   DROP COLUMN recipient_id_type",
+            )
+            .await
+            .expect("a module before 017");
+
+        bench.drain().await;
+
+        let sent = envelopes(&bench);
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(sent[0].0, "testing", "only the TEST AEAT");
+        assert!(
+            sent[0].1.contains("<sum1:NIF>B87654321</sum1:NIF>"),
+            "{}",
+            sent[0].1
         );
     }
 }
