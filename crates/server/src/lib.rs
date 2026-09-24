@@ -75,6 +75,7 @@ pub mod logging;
 mod log_capture;
 pub mod login_throttle;
 pub mod media;
+pub mod module_reconcile;
 pub mod members;
 pub mod module_storage;
 pub mod notify_transport;
