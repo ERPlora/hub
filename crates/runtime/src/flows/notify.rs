@@ -47,6 +47,9 @@ pub const ERR_RECIPIENT_NOT_FOUND: &str = "flow.recipient_not_found";
 pub const ERR_RECIPIENT_AMBIGUOUS: &str = "flow.recipient_ambiguous";
 /// The value is there and cannot be a recipient for this channel.
 pub const ERR_RECIPIENT_INVALID: &str = "flow.recipient_invalid";
+/// The message promises a text — a `vars` entry, the body of an `interactive` — mapped from the
+/// run, and the run never had it (hub#1660).
+pub const ERR_TEXT_NOT_FOUND: &str = "flow.text_not_found";
 /// The message promises options to tap and the run never published them (hub#1646).
 pub const ERR_OPTIONS_NOT_FOUND: &str = "flow.options_not_found";
 
@@ -131,6 +134,16 @@ pub(crate) async fn prepare(
 
     let vars = def::resolve_map(&spec.vars, scope);
     let template = as_text(&def::resolve(&json!(spec.template), scope));
+    // **The copy gets the same look as the options below** (hub#1660). The WhatsApp recipes answer
+    // with `{{steps.book_appointment.text}}`: the words come from an earlier step, and when it
+    // never published them the template fills in as `""` and the customer used to get a message
+    // with nothing in it — refused by the proxy hours later, where nobody is looking.
+    if let Some(missing) = missing_text(spec, scope) {
+        return Err(RuntimeError::Domain {
+            code: ERR_TEXT_NOT_FOUND.to_string(),
+            message: missing.text_refusal(spec.channel.as_str()),
+        });
+    }
     // The tappable options (hub#1633), mapped like the rest of the copy: `resolve` recurses, so a
     // `{{steps.slots.first}}` inside a list row fills the same way `vars.text` does.
     let interactive = match spec.interactive.as_ref() {
@@ -306,6 +319,23 @@ impl MissingOptions {
         )
     }
 
+    /// The same sentence for the words of the message (hub#1660).
+    fn text_refusal(&self, channel: &str) -> String {
+        let source = match self.publisher() {
+            Some(step) => format!(
+                "`{}` resolved to nothing, so step `{step}` never published it",
+                self.mapped_from
+            ),
+            None => format!("`{}` resolved to nothing", self.mapped_from),
+        };
+        format!(
+            "`{channel}`: the text this message says at `{}` is not there — {source}. Queuing it \
+             would put an empty message on a customer's phone, and the refusal would arrive later \
+             in a background tick instead of on this run",
+            self.place
+        )
+    }
+
     /// The step a `steps.<id>.<field>` path was waiting on.
     fn publisher(&self) -> Option<&str> {
         self.mapped_from
@@ -376,6 +406,59 @@ fn missing_options(written: &Json, filled: &Json) -> Option<MissingOptions> {
         }
     }
     None
+}
+
+/// The first text this message promises — a `vars` entry, or the `header`/`body`/`footer` of an
+/// `interactive` — that the run filled with **nothing**.
+///
+/// Same frontier as [`missing_options`]: only NOTHING counts. A path that resolves to nothing, or a
+/// text made of nothing but `{{…}}` placeholders that ALL resolve to nothing. An empty string the
+/// run did publish is somebody's decision, and words around an empty placeholder still say
+/// something — every automation tool of the market sends a missing merge field as blank (Zapier,
+/// Make, Shopify Flow, Klaviyo without a default), and refusing it would stop recipes that work.
+fn missing_text(spec: &NotifyStep, scope: &Json) -> Option<MissingOptions> {
+    let missing = |place: String, mapped_from: String| MissingOptions { place, mapped_from };
+    for (key, written) in &spec.vars {
+        if let Some(from) = nothing_from(written, scope) {
+            return Some(missing(format!("vars.{key}"), from));
+        }
+    }
+    let interactive = spec.interactive.as_ref()?;
+    for part in ["header", "body", "footer"] {
+        match interactive.get(part) {
+            Some(whole @ Json::String(_)) => {
+                if let Some(from) = nothing_from(whole, scope) {
+                    return Some(missing(format!("interactive.{part}"), from));
+                }
+            }
+            Some(Json::Object(block)) => {
+                if let Some(from) = block.get("text").and_then(|t| nothing_from(t, scope)) {
+                    return Some(missing(format!("interactive.{part}.text"), from));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// What a written text was mapped from, when the run had none of it; `None` when it is there or
+/// is the author's own words.
+fn nothing_from(written: &Json, scope: &Json) -> Option<String> {
+    let absent = |path: &str| def::resolve_path(path, scope).is_none_or(|v| v.is_null());
+    let Json::String(s) = written else {
+        return None;
+    };
+    if def::is_path(s) {
+        return absent(s).then(|| s.clone());
+    }
+    if !s.contains("{{") || !def::render(s, &Json::Null).trim().is_empty() {
+        return None;
+    }
+    let mut paths = Vec::new();
+    def::template_paths(written, &mut paths);
+    let first = paths.first()?.clone();
+    paths.iter().all(|p| absent(p)).then_some(first)
 }
 
 /// How a resolved value reads on the wire — same rule as the mapping language, so a template and a
@@ -1060,6 +1143,219 @@ mod tests {
         assert_eq!(
             payload["interactive"]["action"]["sections"][0]["title"],
             json!("Huecos")
+        );
+    }
+
+    /// A plain `notify` (no `interactive`) whose copy is mapped from the run.
+    fn saying(vars: Json) -> StepDef {
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "confirm", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "template": "",
+                "vars": vars
+            }]
+        }))
+        .unwrap()
+        .steps
+        .remove(0)
+    }
+
+    fn refused_for_text(err: &RuntimeError) -> &str {
+        match err {
+            RuntimeError::Domain { code, message } if code == ERR_TEXT_NOT_FOUND => message,
+            other => panic!("a promised text that is not there is refused as such: {other}"),
+        }
+    }
+
+    /// **The copy the message promises and the run does not have stops the step** (hub#1660).
+    ///
+    /// The WhatsApp recipes answer the customer with `{"text": "{{steps.book_appointment.text}}"}`:
+    /// the words are written by an earlier step. When that step never published them — it failed
+    /// under `on_error: "continue"`, or the document names one that does not exist — the template
+    /// filled in as `""` and the message used to be queued anyway, with nothing to say, and the
+    /// refusal arrived hours later at the proxy. Same hole as the options (hub#1646), on the text.
+    #[tokio::test]
+    async fn a_text_nobody_published_stops_the_step_instead_of_queuing_an_empty_message() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        // Both ways a document maps a text: a `{{…}}` template and a bare path.
+        for mapped in ["{{steps.book.text}}", "steps.book.text"] {
+            let err = prepare_in(&db, &saying(json!({ "text": mapped })), &authority, &scope())
+                .await
+                .unwrap_err();
+            let message = refused_for_text(&err);
+            assert!(message.contains("`book`"), "names the step that owed it: {message}");
+            assert!(message.contains("vars.text"), "…and where the hole is: {message}");
+        }
+
+        // **The control**: the same documents with the step that writes the text are queued, with
+        // that text on the wire.
+        let published = json!({
+            "input": { "customer_id": "c-1", "name": "Marta" },
+            "steps": { "book": { "text": "Te espero el martes a las 10:00." } }
+        });
+        for mapped in ["{{steps.book.text}}", "steps.book.text"] {
+            let prepared =
+                prepare_in(&db, &saying(json!({ "text": mapped })), &authority, &published)
+                    .await
+                    .expect("a text that IS there is queued");
+            let payload: Json =
+                serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+            assert_eq!(payload["vars"]["text"], json!("Te espero el martes a las 10:00."));
+        }
+    }
+
+    /// Every `vars` entry is a promise, not only `text`: a template variable filled with nothing
+    /// is refused by Meta the same way (hub#821), and several placeholders that ALL resolve to
+    /// nothing are still nothing.
+    #[tokio::test]
+    async fn any_var_left_with_nothing_is_the_same_hole() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        let err = prepare_in(
+            &db,
+            &saying(json!({ "text": "Hola", "when": " {{steps.slot.day}} {{steps.slot.time}} " })),
+            &authority,
+            &scope(),
+        )
+        .await
+        .unwrap_err();
+        let message = refused_for_text(&err);
+        assert!(message.contains("vars.when"), "{message}");
+        assert!(message.contains("`slot`"), "{message}");
+    }
+
+    /// **Only «nothing» counts** — the frontier hub#1646 already drew for the options.
+    ///
+    /// - An empty string the run DID publish is the author's (or the step's) decision.
+    /// - A text with words of its own and a placeholder that came back empty still says
+    ///   something: that is what every automation tool of the market does with a missing merge
+    ///   field (Zapier, Make, Shopify Flow, Klaviyo without a default), and refusing it would stop
+    ///   recipes that work today.
+    /// - A literal the author typed is never looked at.
+    #[tokio::test]
+    async fn an_empty_text_the_run_published_and_words_around_a_hole_are_still_sent() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        let published_empty = json!({
+            "input": { "customer_id": "c-1", "name": "Marta" },
+            "steps": { "book": { "text": "", "note": null } }
+        });
+        for vars in [
+            json!({ "text": "Hola", "note": "{{steps.book.text}}" }),
+            json!({ "text": "Hola", "note": "steps.book.text" }),
+            json!({ "text": "Hola {{steps.book.missing}}, te esperamos" }),
+            json!({ "text": "Hola", "note": "" }),
+            // Only placeholders, one of them there: the run HAD part of it.
+            json!({ "text": "Hola", "note": "{{steps.book.text}} {{steps.book.missing}}" }),
+        ] {
+            prepare_in(&db, &saying(vars.clone()), &authority, &published_empty)
+                .await
+                .unwrap_or_else(|e| panic!("{vars} is not a promise the run broke: {e}"));
+        }
+
+        // A step that published an explicit `null` published NOTHING: the key being there does
+        // not make it a text.
+        let err = prepare_in(
+            &db,
+            &saying(json!({ "text": "{{steps.book.note}}" })),
+            &authority,
+            &published_empty,
+        )
+        .await
+        .unwrap_err();
+        refused_for_text(&err);
+    }
+
+    /// The copy of a message that ALSO offers options: the options are there (so hub#1646's door
+    /// lets it through) and the text above them is not — exactly the probe in the issue.
+    #[tokio::test]
+    async fn the_body_of_a_list_nobody_published_stops_the_step_even_with_its_rows_there() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        let with = |place: &str, text: &str| {
+            let mut interactive = json!({
+                "type": "list",
+                "body": { "text": "¿Qué hueco te viene bien?" },
+                "action": { "button": "Ver huecos",
+                            "sections": [{ "title": "Huecos", "rows": "steps.libres.options" }] }
+            });
+            interactive[place] = json!({ "text": text });
+            FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "ask", "kind": "notify", "channel": "whatsapp",
+                    "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                            "field": "phone" },
+                    "interactive": interactive
+                }]
+            }))
+            .unwrap()
+            .steps
+            .remove(0)
+        };
+        let options_only = json!({
+            "input": { "customer_id": "c-1", "name": "Marta" },
+            "steps": { "libres": { "options": [{ "id": "s1", "title": "10:00" }] } }
+        });
+
+        for place in ["body", "header", "footer"] {
+            let err = prepare_in(
+                &db,
+                &with(place, "steps.libres.summary"),
+                &authority,
+                &options_only,
+            )
+            .await
+            .unwrap_err();
+            let message = refused_for_text(&err);
+            assert!(
+                message.contains(&format!("interactive.{place}.text")),
+                "{place}: {message}"
+            );
+            assert!(message.contains("`libres`"), "{place}: {message}");
+        }
+
+        // A whole body mapped from a step that never published it is the same hole, one level up.
+        let mut whole = with("body", "x");
+        if let StepSpec::Notify(spec) = &mut whole.spec {
+            spec.interactive.as_mut().unwrap()["body"] = json!("steps.libres.body");
+        }
+        let err = prepare_in(&db, &whole, &authority, &options_only)
+            .await
+            .unwrap_err();
+        assert!(refused_for_text(&err).contains("interactive.body"));
+
+        // **The control**: with the summary published the same message is queued.
+        let both_there = json!({
+            "input": { "customer_id": "c-1", "name": "Marta" },
+            "steps": { "libres": { "options": [{ "id": "s1", "title": "10:00" }],
+                                   "summary": "Mañana quedan huecos por la tarde" } }
+        });
+        let prepared = prepare_in(
+            &db,
+            &with("body", "steps.libres.summary"),
+            &authority,
+            &both_there,
+        )
+        .await
+        .expect("a body that IS there is queued");
+        let payload: Json =
+            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            payload["interactive"]["body"]["text"],
+            json!("Mañana quedan huecos por la tarde")
         );
     }
 }
