@@ -1,7 +1,9 @@
 # Concedidos por defecto: preguntar y pedir permisos NUNCA es peligroso —lo peligroso es no poder
-# pedirlos y que el hardware quede muerto sin que nadie sepa por qué.
+# pedirlos y que el hardware quede muerto sin que nadie sepa por qué. `allow-leave-app` (hub#1906)
+# manda la app al fondo, lo mismo que el Atrás del sistema en la pantalla raíz: no hay nada que
+# proteger detrás.
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Consultar y solicitar los permisos de runtime que el TPV necesita en Android."
-permissions = ["allow-check-permissions", "allow-request-permissions"]
+description = "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y salir de la app con el botón Atrás."
+permissions = ["allow-check-permissions", "allow-request-permissions", "allow-leave-app"]

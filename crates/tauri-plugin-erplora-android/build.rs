@@ -1,6 +1,7 @@
 // Declara los comandos del plugin para que `tauri-plugin` autogenere sus permisos ACL
 // (`allow-check-permissions`, `allow-request-permissions`) y compile el módulo Android.
-const COMMANDS: &[&str] = &["check_permissions", "request_permissions"];
+// `leave_app` (hub#1906): the way out when the shell holds the Back button and nothing is left.
+const COMMANDS: &[&str] = &["check_permissions", "request_permissions", "leave_app"];
 
 fn main() {
     tauri_plugin::Builder::new(COMMANDS)

@@ -54,6 +54,20 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
      * `@PermissionCallback` no es opcional ni heredado: es también el callback que cierra el
      * `request_permissions` de abajo cuando el usuario responde.
      */
+    /**
+     * `leave_app` (hub#1906) — the app goes to the background, which is what the system Back does
+     * on a root screen since Android 12 (the task moves back; nothing is finished or killed).
+     *
+     * Needed because the shell now HOLDS the Back button through Tauri's `onBackButtonPress`: with a
+     * listener registered, Tauri no longer leaves on its own when the WebView has no history, and
+     * its own `exit` command has no permission a capability could grant.
+     */
+    @Command
+    fun leaveApp(invoke: Invoke) {
+        invoke.resolve()
+        activity.moveTaskToBack(true)
+    }
+
     @Command
     @PermissionCallback
     override fun checkPermissions(invoke: Invoke) {

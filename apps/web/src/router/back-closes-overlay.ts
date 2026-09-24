@@ -1,19 +1,23 @@
-import type { Router } from 'vue-router';
+import { invokeTauri } from '../lib/device';
 
 /**
  * hub#1906 — the system Back button closes what is open on top BEFORE it leaves the screen.
  *
- * On the installed Android app, Back is a plain `history.back()` of the WebView (Tauri's activity
- * does `goBack()` while it can). Nobody in the shell listened, so the router slid the screen away
- * and took the payment sheet, the modal or the side menu with it. Android's rule — and what every
- * POS on it does (Square, Loyverse) — is the opposite: Back dismisses the topmost layer first, and
- * only an empty screen navigates. The browser's Back gets the same treatment, as it does in most
- * web apps with sheets.
+ * On the installed Android app, Tauri's activity turns the system Back into `webView.goBack()` —
+ * but only while nobody listens to its `back-button` event (`AppPlugin.kt`). With nobody
+ * listening, the router slid the screen away and took the payment sheet, the modal or the side
+ * menu with it. Android's rule — and what every POS on it does (Square, Loyverse) — is the
+ * opposite: Back dismisses the topmost layer first, and only an empty screen goes back.
  *
- * The layers, topmost first:
+ * So the shell TAKES the button (`installSystemBackButton`) and never cancels a navigation: a
+ * guard that aborts the popstate leaves @ionic/vue-router with a stale "this was a Back" and the
+ * next push animates to the wrong view (rv-2042). The browser's own Back arrow stays a plain
+ * navigation, as in most Ionic apps.
+ *
+ * The layers, topmost first (`closeTopmostLayer`):
  *   1. a presented Ionic overlay in the document (modal, alert, popover, action sheet, loading) —
  *      dismissed with role `backdrop` like Ionic's own hardware back; one that cannot be dismissed
- *      (`backdropDismiss: false`) HOLDS the back instead of letting the page slide away under it;
+ *      (`backdropDismiss: false`) HOLDS the press;
  *   2. an open `ion-menu`;
  *   3. the mounted module, through the `erplora:back` contract below.
  *
@@ -30,6 +34,9 @@ export type BackOutcome = 'closed' | 'held' | 'none';
 
 /** Ionic's own overlay list (`getOverlays` in @ionic/core) minus the toast, which never blocks. */
 const IONIC_OVERLAYS = 'ion-alert,ion-action-sheet,ion-loading,ion-modal,ion-picker-legacy,ion-popover';
+
+/** Our Android plugin's way out, used when there is nothing to close and no history left. */
+const LEAVE_APP = 'plugin:erplora-android|leave_app';
 
 type IonicOverlay = HTMLElement & {
   overlayIndex?: number;
@@ -73,22 +80,37 @@ export async function closeTopmostLayer(doc: Document = document, win: Window = 
   return ask.defaultPrevented ? 'closed' : 'none';
 }
 
+type PluginListener = { unregister: () => Promise<void> };
+type TauriApp = { onBackButtonPress?: (handler: (payload: { canGoBack: boolean }) => void) => Promise<PluginListener> };
+
 /**
- * Wires the rule into `router`. MUST run right after `createRouter()` and before the first
- * navigation: the history listener registered here has to fire BEFORE the router's own popstate
- * listener (registered on its first navigation), so the guard knows the navigation is a Back.
+ * Takes the Android Back button (Tauri's `onBackButtonPress`, exposed by `withGlobalTauri`). With a
+ * listener registered Tauri no longer moves the WebView itself, so the shell does what the system
+ * would have done once nothing is left to close: `history.back()` (a real popstate, which the
+ * router and Ionic see as the pop it is) or, with no history left, leave the app.
+ *
+ * Resolves `false` where there is no such button — a browser, or the desktop app, where the
+ * listener is refused. The listener is dropped on `pagehide`: Tauri keeps listeners across page
+ * loads, and a dead one would swallow the button on whatever page the app loads next.
  */
-export function installBackClosesOverlay(router: Router, closeTop: () => Promise<BackOutcome> = () => closeTopmostLayer()): void {
-  let backPending = false;
-  router.options.history.listen((_to, _from, info) => {
-    backPending = info.direction === 'back';
-  });
-  router.beforeEach(async () => {
-    const isBack = backPending;
-    backPending = false;
-    if (!isBack) return true;
-    // `false` aborts the popstate navigation and vue-router restores the history entry, so the
-    // next Back behaves exactly like this one.
-    return (await closeTop()) === 'none';
-  });
+export async function installSystemBackButton(
+  opts: { win?: Window; closeTop?: () => Promise<BackOutcome>; leaveApp?: () => Promise<unknown> } = {},
+): Promise<boolean> {
+  const win = opts.win ?? window;
+  const closeTop = opts.closeTop ?? (() => closeTopmostLayer());
+  const leaveApp = opts.leaveApp ?? (() => invokeTauri(LEAVE_APP));
+  const app = (win as unknown as { __TAURI__?: { app?: TauriApp } }).__TAURI__?.app;
+  if (typeof app?.onBackButtonPress !== 'function') return false;
+  let listener: PluginListener;
+  try {
+    listener = await app.onBackButtonPress(async ({ canGoBack }) => {
+      if ((await closeTop()) !== 'none') return;
+      if (canGoBack) win.history.back();
+      else await leaveApp();
+    });
+  } catch {
+    return false;
+  }
+  win.addEventListener('pagehide', () => void listener.unregister().catch(() => undefined), { once: true });
+  return true;
 }
