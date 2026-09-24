@@ -131,7 +131,11 @@ fn build_catalog(reg: &Registry, only: Option<&str>) -> Vec<Value> {
                 "list": q.def.list.as_ref().map(list_shape).unwrap_or(Value::Null),
             }));
         }
-        for (name, c) in reg.commands.iter().filter(|(_, c)| c.module_id == module.id) {
+        for (name, c) in reg
+            .commands
+            .iter()
+            .filter(|(_, c)| c.module_id == module.id)
+        {
             // Internal (hub#131 the `_` convention, hub#145 the explicit flag): only the runtime
             // itself invokes it, so publishing its name and payload would undo what those closed.
             if c.def.is_internal(name) {

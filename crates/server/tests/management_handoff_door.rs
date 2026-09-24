@@ -90,7 +90,10 @@ async fn fixture(role: &str, cloud_base_url: String) -> (axum::Router, Runtime, 
     let test_db = TestDb::new().await;
     let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
-    let ana = rt.create_user("Ana", "4729", role, Some("77")).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", role, Some("77"))
+        .await
+        .unwrap();
 
     let temp = std::env::temp_dir().join(format!("erplora-handoff-{}", std::process::id()));
     let cfg = HubConfig {
@@ -484,7 +487,10 @@ async fn a_cloud_that_cannot_be_reached_says_so_instead_of_failing_silently() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763
-    assert_eq!(body_json(response).await["code"], json!("handoff_unavailable"));
+    assert_eq!(
+        body_json(response).await["code"],
+        json!("handoff_unavailable")
+    );
 }
 
 // ── The own-account door: your own account is not somebody else's task (hub#1539) ──────────────

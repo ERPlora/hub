@@ -54,7 +54,9 @@ async fn sign_in_with_pin(router: axum::Router) -> Value {
                 .method("POST")
                 .uri("/api/auth/pin")
                 .header("content-type", "application/json")
-                .body(Body::from(json!({ "name": "Ana", "pin": "4729" }).to_string()))
+                .body(Body::from(
+                    json!({ "name": "Ana", "pin": "4729" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await

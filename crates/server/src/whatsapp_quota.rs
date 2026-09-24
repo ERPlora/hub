@@ -426,7 +426,10 @@ mod tests {
             }
         });
 
-        assert!(!declares_usage(Some(&publicado_hoy)), "el de hoy no lo declara");
+        assert!(
+            !declares_usage(Some(&publicado_hoy)),
+            "el de hoy no lo declara"
+        );
         assert!(declares_usage(Some(&tras_la_issue_hermana)));
         assert!(
             !declares_usage(None),
@@ -437,7 +440,9 @@ mod tests {
             "sin `properties` no hay nada declarado"
         );
         assert!(
-            !declares_usage(Some(&json!({ "properties": { "monthly_usage_extra": {} } }))),
+            !declares_usage(Some(
+                &json!({ "properties": { "monthly_usage_extra": {} } })
+            )),
             "el nombre se compara entero: un parecido no es el contrato"
         );
     }

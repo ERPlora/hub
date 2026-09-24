@@ -352,11 +352,17 @@ impl InboundMessage {
             let Some(reply) = dig(&self.payload, path) else {
                 continue;
             };
-            let Some(id) = reply.get(id_key).and_then(Value::as_str).filter(|s| !s.is_empty())
+            let Some(id) = reply
+                .get(id_key)
+                .and_then(Value::as_str)
+                .filter(|s| !s.is_empty())
             else {
                 continue;
             };
-            let title = reply.get(title_key).and_then(Value::as_str).unwrap_or_default();
+            let title = reply
+                .get(title_key)
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             return (id.to_string(), title.to_string());
         }
         (String::new(), String::new())
@@ -745,7 +751,10 @@ impl InboundPoller {
     /// Nothing is thrown away here. The messages are ingested either way; what the line says is
     /// that part of the answer needs a runtime release before anything can act on it.
     fn report_contract_drift(&self, messages: &[InboundMessage]) -> usize {
-        let gaps: Vec<String> = messages.iter().flat_map(InboundMessage::unexpected).collect();
+        let gaps: Vec<String> = messages
+            .iter()
+            .flat_map(InboundMessage::unexpected)
+            .collect();
         if gaps.is_empty() {
             return 0;
         }
@@ -757,7 +766,9 @@ impl InboundPoller {
             Err(poisoned) => poisoned.into_inner().observe(gaps),
         };
         if fresh.is_empty() {
-            tracing::debug!("inbound whatsapp: the SaaS answer still carries fields this runtime does not know");
+            tracing::debug!(
+                "inbound whatsapp: the SaaS answer still carries fields this runtime does not know"
+            );
         } else {
             tracing::warn!(
                 unknown = %fresh.join(", "),
@@ -1042,8 +1053,7 @@ mod tests {
             Query(params): Query<HashMap<String, String>>,
             headers: HeaderMap,
         ) -> (StatusCode, Json<Value>) {
-            let mut query: Vec<String> =
-                params.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            let mut query: Vec<String> = params.iter().map(|(k, v)| format!("{k}={v}")).collect();
             query.sort();
             let path = if query.is_empty() {
                 "GET inbox".to_string()
@@ -1095,8 +1105,10 @@ mod tests {
                 .unwrap()
                 .iter()
                 .filter(|m| {
-                    let served_direction =
-                        m["direction"].as_str().unwrap_or(DEFAULT_DIRECTION).to_string();
+                    let served_direction = m["direction"]
+                        .as_str()
+                        .unwrap_or(DEFAULT_DIRECTION)
+                        .to_string();
                     let served_source = m["source"].as_str().unwrap_or(DEFAULT_SOURCE).to_string();
                     (direction == "all" || direction == served_direction)
                         && (source == "all" || source == served_source)
@@ -2202,7 +2214,11 @@ mod tests {
             vec!["source=history-0".to_string()],
             "one line for the field that drifted, carrying the first value seen"
         );
-        assert_eq!(drift.tracked(), 1, "one gap remembered, however many values it took");
+        assert_eq!(
+            drift.tracked(),
+            1,
+            "one gap remembered, however many values it took"
+        );
 
         assert_eq!(
             drift.observe(vec!["field:reactions".into()]),
@@ -2397,7 +2413,7 @@ mod tests {
         assert_eq!(
             cloud.paths(),
             vec![
-                GET_INBOX.to_string(), // refused
+                GET_INBOX.to_string(),  // refused
                 GET_INBOX.to_string(),  // the probe…
                 "POST ack".to_string(), // …which acked what it wrote
                 GET_INBOX.to_string(),  // and the next tick polls again, unsuppressed

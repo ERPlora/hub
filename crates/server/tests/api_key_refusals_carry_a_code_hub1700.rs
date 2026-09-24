@@ -122,7 +122,9 @@ async fn revoking_a_key_that_is_gone_says_so() {
     );
     // And the prose still travels, in the shape hub#1697's clients read (`error.message`).
     assert!(
-        body["error"]["message"].as_str().is_some_and(|m| !m.is_empty()),
+        body["error"]["message"]
+            .as_str()
+            .is_some_and(|m| !m.is_empty()),
         "a refusal keeps a message for the log: {body}"
     );
 }

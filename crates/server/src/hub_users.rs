@@ -353,7 +353,11 @@ pub(crate) async fn guard_members_door_by_email(
         // Nadie en el censo lleva ese email: el alta va a CREAR la fila, así que no hay a quién
         // proteger — pero el rango sí se mira igual (hub#356: nadie reparte un rol por encima del
         // suyo), que es la única de las reglas que no habla de una fila existente.
-        return match input.role.as_deref().and_then(|r| grant_decision(&actor.role, r)) {
+        return match input
+            .role
+            .as_deref()
+            .and_then(|r| grant_decision(&actor.role, r))
+        {
             Some(Guard::Forbidden { code, message }) => Some(forbidden(code, message)),
             _ => None,
         };
@@ -974,7 +978,10 @@ mod tests {
             Some("ana".to_string())
         );
         assert_eq!(census_id_by_access_email(&census, "   "), None);
-        assert_eq!(census_id_by_access_email(&census, "nadie@example.com"), None);
+        assert_eq!(
+            census_id_by_access_email(&census, "nadie@example.com"),
+            None
+        );
     }
 
     /// And from that row the decision is [`guard_decision`] itself — the SAME function Personal
