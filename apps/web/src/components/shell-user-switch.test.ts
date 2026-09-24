@@ -57,6 +57,9 @@ vi.mock('../lib/user-profile', () => ({
 vi.mock('../lib/setup-status', () => ({ refreshSetupStatus: vi.fn(async () => {}) }));
 vi.mock('../lib/app-update', () => ({ bootAppUpdateWatch: vi.fn() }));
 vi.mock('../lib/dead-letter', () => ({ bootDeadLetterWatch: vi.fn() }));
+// Its chain reaches `lib/icons` (virtual `~icons/…?raw` ids this environment denies); the bell has its
+// own tests (`lib/bell-counters.test.ts`).
+vi.mock('../lib/bell-counters', () => ({ bootBellCountersWatch: vi.fn() }));
 vi.mock('../lib/idle-logout', () => ({ installIdleLogout: vi.fn() }));
 vi.mock('../lib/toast', () => ({ toast: vi.fn(), toastError: vi.fn() }));
 vi.mock('../lib/open-external', () => ({ openExternal: vi.fn(async () => {}) }));
