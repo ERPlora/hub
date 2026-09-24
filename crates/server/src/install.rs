@@ -1521,3 +1521,37 @@ pub(crate) async fn register(
     };
     result.map_err(InstallError::from_runtime)
 }
+
+#[cfg(test)]
+mod register_tests {
+    use super::*;
+
+    /// hub#1620 — `register` is also reached WITHOUT the `missing_dependencies` read that catches
+    /// the floor first on a fresh install: restoring the local copy (`restore_one`) and the
+    /// reconciler go straight here. It has to keep the same stable fact, not flatten it into
+    /// `install_runtime_failed`.
+    #[tokio::test]
+    async fn register_keeps_the_newer_hub_refusal_as_its_own_code() {
+        let dir = std::env::temp_dir().join(format!(
+            "erplora-hub1620-register-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::fs::write(
+            dir.join("module.json"),
+            r#"{"id":"whatsapp_inbox","name":"whatsapp_inbox","version":"1.0.0",
+                "compatibility":{"min_erplora_version":"999.0.0"}}"#,
+        )
+        .expect("manifest");
+
+        let mut rt =
+            erplora_runtime::Runtime::new(Box::new(erplora_db::testutil::fresh_db().await));
+        let err = register(&mut rt, &dir, "whatsapp_inbox", None)
+            .await
+            .expect_err("a module that needs a newer hub is refused");
+
+        assert_eq!(err.code(), "core_version_too_old", "{err:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
