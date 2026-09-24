@@ -873,3 +873,191 @@ async fn a_module_is_told_about_its_own_discards_and_nobody_elses() {
         "y no se entera del descarte ajeno"
     );
 }
+
+fn put(uri: &str, session: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("PUT")
+        .uri(uri)
+        .header("x-hub-session", session)
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// Enciende la receta de WhatsApp por la puerta de un toque y devuelve el id del flujo.
+async fn activated(fx: &Fixture) -> String {
+    let response = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert!(response.status().is_success(), "{}", response.status());
+    body_json(response).await["data"]["id"]
+        .as_str()
+        .expect("el flujo montado")
+        .to_string()
+}
+
+/// El interruptor de la pantalla del módulo: apagar y volver a encender.
+async fn toggle(fx: &Fixture) -> Value {
+    let off = send(
+        &fx.router,
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(off.status(), StatusCode::OK);
+    let on = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(on.status(), StatusCode::OK, "reutiliza: `200`");
+    body_json(on).await["data"].clone()
+}
+
+fn grant_values(grants: &[Value]) -> Vec<String> {
+    let mut values: Vec<String> = grants
+        .iter()
+        .map(|g| g["value"].as_str().unwrap_or_default().to_string())
+        .collect();
+    values.sort();
+    values
+}
+
+#[tokio::test]
+async fn turning_it_back_on_keeps_the_permissions_the_owner_retired() {
+    // hub#1684: en Automatizaciones el dueño RETIRA un permiso (ADR-0470 §4, «cada grant con
+    // Límites y Retirar»). Volver a encender desde la pantalla del módulo tiene que ENCENDER, no
+    // devolverle en silencio lo que él quitó — igual que apagar respeta lo suyo.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+
+    let narrowed = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}/grants"),
+            &fx.admin,
+            json!({ "grants": [
+                { "kind": "command", "value": CANCEL, "payload": { "channel": "customer" } },
+            ]}),
+        ),
+    )
+    .await;
+    assert_eq!(narrowed.status(), StatusCode::OK);
+
+    // Un segundo «Activar» a secas…
+    let again = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(again.status(), StatusCode::OK);
+    assert_eq!(
+        grant_values(&grants_of(&fx, &flow_id).await),
+        vec![CANCEL.to_string()],
+        "un segundo «Activar» no devuelve el permiso que el dueño retiró"
+    );
+
+    // …y «Desactivar» + «Activar».
+    let body = toggle(&fx).await;
+    assert_eq!(body["enabled"], true, "y sí queda encendida");
+    let grants = grants_of(&fx, &flow_id).await;
+    assert_eq!(
+        grant_values(&grants),
+        vec![CANCEL.to_string()],
+        "apagar y encender no devuelve el permiso que el dueño retiró"
+    );
+    assert_eq!(
+        grants[0]["payload"]["channel"], "customer",
+        "y el que dejó conserva su límite"
+    );
+}
+
+#[tokio::test]
+async fn turning_it_back_on_keeps_what_the_owner_wrote_in_the_editor() {
+    // hub#1684: el dueño cambia la receta en el editor (nombre, texto, pasos). Encenderla otra vez
+    // desde el módulo no es «restaurar la de fábrica»: eso es borrarla y volver a activarla.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+
+    let edited = json!({
+        "schema_version": 1,
+        "name": "Citas de la tarde",
+        "triggers": [{ "kind": "manual" }],
+        "steps": [
+            { "id": "s1", "kind": "command", "command": CREATE },
+            { "id": "s2", "kind": "command", "command": CREATE }
+        ]
+    });
+    let response = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": edited }),
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = toggle(&fx).await;
+    assert_eq!(body["id"], flow_id.as_str());
+    assert_eq!(body["enabled"], true);
+    assert_eq!(body["name"], "Citas de la tarde", "el nombre que puso el dueño");
+    assert_eq!(
+        body["definition"]["steps"].as_array().map(Vec::len),
+        Some(2),
+        "los pasos que escribió el dueño, no los de fábrica"
+    );
+    assert_eq!(grants_of(&fx, &flow_id).await.len(), 2, "y sus permisos");
+}
+
+#[tokio::test]
+async fn a_recipe_left_without_any_permission_gets_the_modules_back_when_turned_on() {
+    // La otra mitad de la regla, y la que sostiene la recuperación del orden validar → crear en
+    // pausa → grants → encender: una receta que se quedó SIN NINGÚN permiso (una activación que
+    // cayó a mitad, o el dueño que los retiró todos) no puede hacer nada. «Activar» ahí significa
+    // «déjala funcionando», así que recibe los del módulo — si no, el toque encendería una
+    // automatización que falla en cada paso con `flow.grant_denied`.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+
+    let emptied = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}/grants"),
+            &fx.admin,
+            json!({ "grants": [] }),
+        ),
+    )
+    .await;
+    assert_eq!(emptied.status(), StatusCode::OK);
+
+    let body = toggle(&fx).await;
+    assert_eq!(body["enabled"], true);
+    assert_eq!(
+        grant_values(&grants_of(&fx, &flow_id).await),
+        {
+            let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
+            v.sort();
+            v
+        },
+        "sin ningún permiso, recibe exactamente los del módulo"
+    );
+}
