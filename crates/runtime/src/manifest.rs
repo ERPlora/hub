@@ -1660,6 +1660,7 @@ const ROOT_FIELDS: &[&str] = &[
     "commands",
     "events",
     "widgets",
+    "bell",
     "setup",
     "settings",
     "network",
@@ -1719,6 +1720,9 @@ const PROTECTS_FIELDS: &[&str] = &[
     "component",
     "resume_on",
 ];
+/// hub#1678: one counter a module puts on the shell's notification bell. Read by the SHELL, like
+/// `widgets`; the runtime only judges the shape.
+const BELL_FIELDS: &[&str] = &["label", "icon", "query", "params", "nav", "permission"];
 const WIDGET_FIELDS: &[&str] = &[
     "title",
     "icon",
@@ -1775,6 +1779,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "navigation[]" => NAV_FIELDS,
         "protects[]" => PROTECTS_FIELDS,
         "widgets.*" => WIDGET_FIELDS,
+        "bell.*" => BELL_FIELDS,
         "setup" => SETUP_FIELDS,
         "settings" => SETTINGS_FIELDS,
         "agent" => AGENT_FIELDS,
@@ -1931,6 +1936,7 @@ impl Manifest {
             ("commands", "commands.*"),
             ("queries", "queries.*"),
             ("widgets", "widgets.*"),
+            ("bell", "bell.*"),
             ("records", "records.*"),
             ("errors", "errors.*"),
         ] {

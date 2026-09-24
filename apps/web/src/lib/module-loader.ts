@@ -384,6 +384,8 @@ export function reloadForModuleUpdate(delayMs = MODULE_UPDATE_RELOAD_DELAY_MS): 
  */
 export interface ModuleLocaleFile {
   widgets?: Record<string, { title?: string; label?: string }>;
+  /** The label of each `bell` counter (hub#1678), by full id (`appointments.to_confirm`). */
+  bell?: Record<string, { label?: string }>;
   /** Nombre del módulo traducido (el runtime ya lo resuelve para la nav; aquí sirve al diálogo de
    *  aprobación, que no pasa por `GET /api/navigation`). */
   name?: string;
