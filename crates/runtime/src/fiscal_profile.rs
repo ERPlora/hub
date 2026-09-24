@@ -662,8 +662,8 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
     if crate::certificate::signing_certificate_expired(db, hub_id).await? {
         return Err(RuntimeError::Domain {
             code: crate::certificate::OWN_CERTIFICATE_EXPIRED.to_string(),
-            message: "the hub's own certificate has expired and the AEAT does not accept it: \
-                      upload a renewed certificate, or let ERPlora file for you, and try again"
+            message: "the hub's own certificate has expired and the tax authority does not accept \
+                      it: upload a renewed certificate, or let ERPlora file for you, and try again"
                 .to_string(),
         });
     }
