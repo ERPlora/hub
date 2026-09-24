@@ -861,6 +861,15 @@ export default {
       cloud_unreachable: CLOUD_UNREACHABLE,
       unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
+      // hub#1624: the codes erplora.com sends next to its prose (saas#1902). `meta_unreachable` is the
+      // only one where trying again helps, so it is the only one that says so.
+      meta_unreachable: 'WhatsApp is not answering right now. Try again in a few minutes.',
+      meta_api_error: 'WhatsApp refused the connection because of a problem on our side. Contact support.',
+      no_access_token: 'Facebook did not give the permission to connect. Open the connection again and accept the permissions.',
+      missing_code: 'The Facebook window closed before finishing. Open the connection again and complete every step.',
+      hub_not_found: 'erplora.com does not recognise this hub. Contact support.',
+      number_not_found: 'That number is no longer connected.',
+      internal_error: 'erplora.com could not finish the connection. Contact support if it keeps happening.',
       default: 'Something went wrong while connecting. Try again in a minute.',
     },
   },

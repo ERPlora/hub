@@ -117,6 +117,13 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
     await disconnectWhatsApp(number.phone_number_id);
     await refresh();
   } catch (error) {
+    // The number is already gone on erplora.com (hub#1624): what the owner asked for is done, so it
+    // reads as a fact, and the list is read again so the stale number stops being painted.
+    if (error instanceof WhatsAppConnectError && error.code === 'number_not_found') {
+      await refresh();
+      say(sentence(error), false);
+      return;
+    }
     say(sentence(error), true);
   } finally {
     busy.value = false;
