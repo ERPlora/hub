@@ -2459,6 +2459,39 @@ pub struct FlowTemplateGrant {
     /// fuera se ve, y `erplora validate` ya lo caza antes de publicar.
     #[serde(default, skip_serializing_if = "Params::is_empty")]
     pub payload: Params,
+    /// La frase que explica el permiso al dueño, por idioma (`{ en, es }`, flows#114). Sin ella la
+    /// galería solo puede pintar el nombre interno (`staff.schedules.list_for_member`).
+    ///
+    /// Es PROSA, no parte de lo que el permiso concede: por eso no viaja a `_flow_grants`
+    /// ([`crate::flows::templates`] copia `kind`/`value`/`payload` y nada más) y por eso, al
+    /// revés que `payload`, una frase mal escrita se IGNORA en vez de tumbar la familia —
+    /// perder una receta por una errata de texto sería peor que pintar el nombre del permiso.
+    /// `erplora validate` ya la rechaza antes de publicar.
+    #[serde(
+        default,
+        deserialize_with = "readable_reason",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub reason: Option<HashMap<String, String>>,
+}
+
+/// `reason` de un grant: las lenguas con una frase de verdad, o nada (flows#114).
+fn readable_reason<'de, D>(de: D) -> std::result::Result<Option<HashMap<String, String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = <serde_json::Value as serde::Deserialize>::deserialize(de)?;
+    let Some(map) = raw.as_object() else {
+        return Ok(None);
+    };
+    let kept: HashMap<String, String> = map
+        .iter()
+        .filter_map(|(lang, text)| {
+            let text = text.as_str()?.trim();
+            (!text.is_empty()).then(|| (lang.clone(), text.to_string()))
+        })
+        .collect();
+    Ok((!kept.is_empty()).then_some(kept))
 }
 
 /// `<family>.grants.json` — las claves `_*` del fichero son documentación y se ignoran.
@@ -2513,6 +2546,48 @@ pub struct NavLocale {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// flows#114 — la frase de un permiso es para leerla, no para decidir nada: una `reason` mal
+    /// formada se ignora (la galería pinta el nombre del permiso) en vez de tumbar la receta
+    /// entera. `erplora validate` ya la rechaza antes de publicar; esto es la red del hub.
+    #[test]
+    fn a_grant_reason_is_kept_when_readable_and_dropped_when_not() {
+        let read = |raw: &str| serde_json::from_str::<FlowTemplateGrant>(raw).expect(raw);
+        let ok = read(
+            r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":"Buscar"}}"#,
+        );
+        assert_eq!(
+            ok.reason,
+            Some(HashMap::from([
+                ("en".to_string(), "Look up".to_string()),
+                ("es".to_string(), "Buscar".to_string()),
+            ]))
+        );
+        for bad in [
+            r#""Look up""#,
+            r#"["Look up"]"#,
+            r#"null"#,
+            r#"{}"#,
+            r#"{"en":7}"#,
+            r#"{"en":"  "}"#,
+        ] {
+            let grant = read(&format!(
+                r#"{{"kind":"query","value":"customers.list","reason":{bad}}}"#
+            ));
+            assert_eq!(grant.reason, None, "{bad}");
+            assert_eq!(grant.value, "customers.list", "{bad}");
+        }
+        // Una lengua ilegible no se lleva por delante la legible.
+        let partial =
+            read(r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":7}}"#);
+        assert_eq!(
+            partial.reason,
+            Some(HashMap::from([("en".to_string(), "Look up".to_string())]))
+        );
+        let none = read(r#"{"kind":"query","value":"customers.list"}"#);
+        assert_eq!(none.reason, None);
+        assert!(serde_json::to_value(&none).unwrap().get("reason").is_none());
+    }
 
     /// Un `risk` fuera del vocabulario NO puede impedir que el módulo se instale (hub#1042).
     ///

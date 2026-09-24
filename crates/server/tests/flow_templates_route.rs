@@ -91,7 +91,7 @@ fn module_dir(root: &Path, id: &str, extra: Value, with_templates: bool) -> Path
         // de `whatsapp_inbox`: anular una cita **como clienta**, nunca de parte del salón.
         std::fs::write(
             dir.join("flows/appointment-from-whatsapp.grants.json"),
-            r#"{"grants":[{"kind":"command","value":"appointments.appointments.create"},{"kind":"command","value":"appointments.appointments.cancel","payload":{"channel":"customer"}}]}"#,
+            r#"{"grants":[{"kind":"command","value":"appointments.appointments.create"},{"kind":"command","value":"appointments.appointments.cancel","payload":{"channel":"customer"},"reason":{"en":"Cancel as the customer","es":"Anular como la clienta"}}]}"#,
         )
         .unwrap();
         std::fs::write(
@@ -275,6 +275,40 @@ async fn the_limit_the_module_put_on_a_permission_reaches_the_gallery() {
         wide.get("payload").is_none(),
         "un grant que no fija nada no estrena una clave que nadie escribió"
     );
+}
+
+#[tokio::test]
+async fn the_sentence_the_module_wrote_for_a_permission_reaches_the_gallery() {
+    // flows#114 — sin la frase, la galería solo puede pintar el nombre interno del permiso
+    // (`staff.schedules.list_for_member`) y el dueño autoriza identificadores. La frase la escribe
+    // el módulo en su `<family>.grants.json` como `reason: { en, es }` y esta ruta la sirve tal cual.
+    let fx = fixture(true).await;
+
+    let response = send(
+        &fx.router,
+        request(TEMPLATES, Some(&fx.admin), Some(EDITOR)),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    let grants = body["data"][0]["grants"]
+        .as_array()
+        .expect("los permisos que la plantilla pedirá");
+    let explained = grants
+        .iter()
+        .find(|g| g["value"] == "appointments.appointments.cancel")
+        .expect("el permiso explicado se ofrece");
+    assert_eq!(
+        explained["reason"],
+        json!({ "en": "Cancel as the customer", "es": "Anular como la clienta" })
+    );
+    // El que el módulo no explicó viaja sin `reason`, no con uno vacío.
+    let bare = grants
+        .iter()
+        .find(|g| g["value"] == "appointments.appointments.create")
+        .expect("el permiso sin frase se ofrece igual");
+    assert!(bare.get("reason").is_none(), "{bare}");
 }
 
 #[tokio::test]
