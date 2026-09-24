@@ -1505,8 +1505,9 @@ fn stringify(v: &Json) -> String {
     }
 }
 
-/// Every `{{path}}` inside a value, for the save-time checks.
-fn template_paths(expr: &Json, out: &mut Vec<String>) {
+/// Every `{{path}}` inside a value, for the save-time checks — and for `notify`, which asks
+/// whether the run had any of what a text was built from (hub#1660).
+pub(crate) fn template_paths(expr: &Json, out: &mut Vec<String>) {
     match expr {
         Json::String(s) => {
             if is_path(s) {

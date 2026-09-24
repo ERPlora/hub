@@ -944,3 +944,81 @@ async fn a_list_the_failed_step_never_published_stops_the_message_instead_of_sen
         json!("martes 10:30")
     );
 }
+
+/// **The step that writes the answer failed, the run carried on, and the empty answer did NOT go
+/// out** (hub#1660) — the WhatsApp recipes' own shape: `confirm_to_customer` says
+/// `{{steps.book_appointment.text}}`, and every word of it comes from the step before.
+///
+/// Same deterministic failure as the list above (a read the flow was never granted), same
+/// leftover: a step that failed under `continue` publishes `{status, error}` and no `text`. Before
+/// this, the template filled in as `""` and the message was queued with nothing to say; the
+/// customer got nothing useful and the proxy's refusal landed hours later in a background tick.
+#[tokio::test]
+async fn an_answer_the_failed_step_never_wrote_stops_the_message_instead_of_sending_it_empty() {
+    let (rt, transport) = runtime().await;
+
+    let answering = json!({
+        "schema_version": 1,
+        "steps": [
+            { "id": "book", "kind": "query", "query": "crm.note.list", "limit": 1,
+              "result": "first", "on_error": "continue" },
+            { "id": "confirm_to_customer", "kind": "notify", "channel": "whatsapp",
+              "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                      "field": "phone" },
+              "template": "",
+              "vars": { "text": "{{steps.book.text}}" } }
+        ]
+    });
+
+    let flow_id = create_flow(&rt, answering.clone()).await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    let run_id = run_flow(&rt, &flow_id).await;
+
+    let (run, steps) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_FAILED);
+    assert!(
+        run.last_error.contains("flow.text_not_found"),
+        "the run says the answer was missing, not the transport hours later: {}",
+        run.last_error
+    );
+    assert!(
+        run.last_error.contains("`book`"),
+        "…and names the step that owed it: {}",
+        run.last_error
+    );
+    assert_eq!(steps.len(), 2, "the read failed and the run went on to the message");
+
+    rt.drain_outbox().await.unwrap();
+    assert!(transport.sent().is_empty(), "no empty message reached the transport");
+    assert!(
+        queued_notifications(&rt).await.is_empty(),
+        "and none was queued either: the refusal is before the outbox, not in it"
+    );
+
+    // **The control.** Same document, same read, now granted: the answer is written and it goes
+    // out with its words. Without this half the assertions above would hold just as well if
+    // `notify` had stopped working altogether.
+    let mut p = Params::new();
+    p.insert("id".into(), json!("n-1"));
+    p.insert("hub".into(), json!(HUB));
+    rt.db_for_test()
+        .execute(
+            "INSERT INTO crm_note (id, hub_id, created_by, customer_id, text) \
+             VALUES (:id, :hub, 'seed', 'c-1', 'Te espero el martes a las 10:30')",
+            &p,
+        )
+        .await
+        .unwrap();
+    let allowed = create_flow(&rt, answering).await;
+    let mut grants = both_grants();
+    grants.push(GrantSpec::pair(GrantKind::Query, "crm.note.list"));
+    set_grants(&rt, &allowed, &grants).await;
+    let run_id = run_flow(&rt, &allowed).await;
+    let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_DONE, "{}", run.last_error);
+
+    rt.drain_outbox().await.unwrap();
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "the answer did go out");
+    assert_eq!(sent[0].0.vars["text"], json!("Te espero el martes a las 10:30"));
+}
