@@ -189,6 +189,18 @@ function mintJobId(documentType: string): string {
 }
 
 /**
+ * Can this device hand a job to that printer? A network printer needs an address; a bonded Bluetooth
+ * one (ADR-0204) has none and is reached by its MAC. ONE definition, shared by the global door
+ * (`printerIdForRole`) and by the print host's alta (`printerRolesOfDevices`): since hub#2029 a
+ * kitchen ticket can reach the printer's device ONLY through the queue, so a printer the door can
+ * print to but the alta does not claim is a station nobody drains.
+ */
+export function isReachablePrinter(device: PrintDevice | undefined): boolean {
+  if (!device) return false;
+  return Boolean(device.ip || (device.type === 'bluetooth' && device.mac));
+}
+
+/**
  * Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`.
  *
  * A bonded Bluetooth printer (ADR-0204, Android only) registers with NO ip — its identity is the
@@ -196,9 +208,7 @@ function mintJobId(documentType: string): string {
  * `network::0`: a job sent to nowhere, failing at some socket far from here.
  */
 export function printerIdForRole(devices: PrintDevice[], role: string): string | undefined {
-  const d = (devices || []).find(
-    (x) => x?.role === role && (x?.ip || (x?.type === 'bluetooth' && x?.mac)),
-  );
+  const d = (devices || []).find((x) => x?.role === role && isReachablePrinter(x));
   if (!d) return undefined;
   if (d.type === 'bluetooth') return `bluetooth:${d.mac}`;
   return `network:${d.ip}:${d.port ?? 9100}`;

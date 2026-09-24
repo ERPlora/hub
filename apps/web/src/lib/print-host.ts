@@ -20,7 +20,7 @@
 // `failed` frame, the hub puts the ticket back for the next host and keeps the reason in
 // `_print_queue.last_error`. A swallowed error here would be a lost ticket nobody could see.
 import { createPrintDrain, type DrainDiagnostic, type DrainSocket, type DrainJob } from './print-drain';
-import { printerIdForRole, type PrintDevice } from './print';
+import { isReachablePrinter, printerIdForRole, type PrintDevice } from './print';
 import { createPrintHostRegistration } from './print-host-registration';
 import { getHubSession } from './session';
 import { resolveDeviceId } from './device';
@@ -152,8 +152,9 @@ export function printerRolesOfDevices(devices: PrintDevice[]): string[] {
   const roles = new Set<string>();
   for (const device of devices ?? []) {
     const role = device?.role?.trim();
-    // `ip` is what makes it reachable: a registry entry without one cannot take a job.
-    if (role && device?.ip) roles.add(role);
+    // Reachable = the global door could print to it (an address, or a bonded Bluetooth MAC):
+    // a registry entry this device cannot hand a job to is not a role it can drain.
+    if (role && isReachablePrinter(device)) roles.add(role);
   }
   return [...roles];
 }
