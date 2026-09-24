@@ -355,6 +355,88 @@ describe('quién mandó la ronda sale EN EL PAPEL (hub#1410 · recorte de kitche
   });
 });
 
+describe('a team member with no app login is named on the paper too (hub#2033 · kitchen#82)', () => {
+  // Since sales#318/#320 the till can say a round is served by a staff record with no hub user:
+  // `waiter_id` is then that record's id, which `hub.users.list` never lists. The KDS card names
+  // it from the staff app (kitchen#82); the paper has to say the same thing as the screen.
+  function clientWithTeam(team: unknown, users: unknown = [{ id: 'u-9', name: 'Marta' }]) {
+    const query = vi.fn(async (name: string) => {
+      if (name === 'kitchen.orders.items') return [CROQUETAS];
+      if (name === 'kitchen.orders.get') {
+        return [{ id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018', waiter_id: 'sm-7' }];
+      }
+      if (name === 'hub.users.list') return users;
+      return [];
+    });
+    const queryAllOptional = vi.fn(async (name: string) => {
+      if (name !== 'staff.members.list') return undefined;
+      if (team instanceof Error) throw team;
+      return team;
+    });
+    return { client: { query, queryAllOptional } as never, query, queryAllOptional };
+  }
+
+  const okPrint = () =>
+    vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+
+  it('names the staff record by its full name', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([
+      { id: 'sm-1', full_name: 'Luis Gil' },
+      { id: 'sm-7', full_name: 'Carmen Ruiz', user_id: null },
+    ]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen Ruiz');
+  });
+
+  it('falls back to first + last name when the record has no full name', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([{ id: 'sm-7', first_name: 'Carmen', last_name: 'Ruiz' }]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen Ruiz');
+  });
+
+  it('still names a terminated or inactive member: who fired the round is a historical fact', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([{ id: 'sm-7', full_name: 'Carmen Ruiz', status: 'terminated', is_active: false }]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen Ruiz');
+  });
+
+  it('a hub user is resolved first and the staff app is not asked', async () => {
+    const print = okPrint();
+    const { client, queryAllOptional } = clientWithTeam([{ id: 'sm-7', full_name: 'Carmen Ruiz' }], [
+      { id: 'sm-7', name: 'Carmen (user)' },
+    ]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen (user)');
+    expect(queryAllOptional).not.toHaveBeenCalled();
+  });
+
+  it('without the staff app installed the paper prints as before — no name, no id', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam(undefined);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+
+  it('if reading the team fails (no permission), the ticket still prints without a name', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam(new Error('permission_denied'));
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+
+  it('an id the team does not list either never reaches the paper', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([{ id: 'sm-1', full_name: 'Luis Gil' }]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+});
+
 describe('la ronda `rush` manda el aviso `!! URGENTE !!` al pie (hub#1411)', () => {
   // El renderizador ESC/POS ya sabía pintar el aviso al pie del papel — pero solo reacciona a la
   // forma EXACTA `priority: "HIGH"` (`escpos.rs`, contrato de dispositivo que no se toca: lo lee
