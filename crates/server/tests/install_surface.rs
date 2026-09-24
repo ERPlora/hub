@@ -359,7 +359,10 @@ async fn con_anillo_desplegado_una_firma_invalida_no_instala() {
     let rng = ring::rand::SystemRandom::new();
     let (marketplace, _) = cloud_client::Signer::generate(&rng);
     let (impostor, _) = cloud_client::Signer::generate(&rng);
-    let trusted = vec![format!("marketplace={}", hex::encode(marketplace.public_key()))];
+    let trusted = vec![format!(
+        "marketplace={}",
+        hex::encode(marketplace.public_key())
+    )];
     let zip = module_zip("notes");
 
     // (1) firma auténtica del marketplace, pero sobre OTROS bytes que los que se descargan.

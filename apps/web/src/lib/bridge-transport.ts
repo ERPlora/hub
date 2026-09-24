@@ -21,6 +21,7 @@ import {
 } from '@erplora/module-sdk';
 
 import { invokeTauri, isTauri } from './device';
+import { checkDevicePermissions } from './device-permission';
 import { i18n } from '../i18n';
 import {
   ensureLocalNetworkPermission,
@@ -53,32 +54,76 @@ const REQUEST_PERMISSIONS = 'plugin:erplora-android|request_permissions';
  * it. A «no» resolves normally — the operation behind it carries on and reports what is true
  * (hub#338 makes a blocked scan a typed refusal, not an empty list).
  *
- * Every OTHER permission is forwarded untouched, in the same call: discovery asks for the LAN and
- * for bonded Bluetooth together (ADR-0204), and the notices have their own primer at their own
- * moment (hub#1732). Only the one being explained is taken out of the batch.
+ * **One sheet, one system dialog, one answer** (hub#1923). Discovery asks for the LAN and for
+ * bonded Bluetooth together (ADR-0204); on Android 17 both are «nearby devices» and the system
+ * words them identically. So the batch travels WHOLE behind the sheet, in a single
+ * `request_permissions` — Android shows one dialog for it — and the rest of the batch follows the
+ * LAN's fate: a «no», to our sheet or to Android's, is not answered with a second, cold ask for
+ * Bluetooth. Where this Android has no LAN permission (API < 37) the rest is asked as before.
+ * The notices have their own primer at their own moment (hub#1732).
  */
+async function askWithLocalNetworkPrimer(
+  args: Record<string, unknown> | undefined,
+  requested: string[],
+): Promise<Record<string, boolean>> {
+  let before: Record<string, boolean> = {};
+  // Set from inside the request seam, so it is a holder: TS does not see closure writes.
+  const asked = { done: false, answer: {} as Record<string, boolean> };
+  const lanState = await ensureLocalNetworkPermission({
+    // Resolved at call time, not at construction: the hub's language can change while the app is
+    // open, and the sheet has to come out in the one that is active now.
+    labels: localNetworkPrimerLabelsFrom((key) => i18n.global.t(key)),
+    check: async () => {
+      before = (await checkDevicePermissions()) ?? {};
+      return before;
+    },
+    // The user said yes to our sentence: ONE ask for everything the operation needs.
+    request: async () => {
+      asked.done = true;
+      const answer = await invokeTauri<Record<string, boolean>>(REQUEST_PERMISSIONS, {
+        ...args,
+        permissions: requested,
+      });
+      asked.answer = answer ?? {};
+      return answer;
+    },
+  });
+  // Android has been asked for the whole batch already: never a second dialog behind it.
+  if (asked.done) return { ...before, ...asked.answer };
+
+  const current = { ...before, [ANDROID_LOCAL_NETWORK_PERMISSION]: lanState === 'granted' };
+  if (lanState === 'denied') {
+    // Ours or Android's, the answer was no: the rest of the batch does not get a cold dialog.
+    return current;
+  }
+  const missing = requested.filter(
+    (p) => p !== ANDROID_LOCAL_NETWORK_PERMISSION && before[p] !== true,
+  );
+  if (missing.length === 0) return current;
+  const others = await invokeTauri<Record<string, boolean>>(REQUEST_PERMISSIONS, {
+    ...args,
+    permissions: missing,
+  });
+  return { ...current, ...(others ?? {}) };
+}
+
+/**
+ * The asks that carry the LAN go out ONE AT A TIME (hub#1923). The Printing screen scans on open
+ * and the owner taps «Find my printer» a moment later; run side by side, both read «not asked
+ * yet» before the first answer was written and a second sheet stacked under the first. In a
+ * queue, the one behind finds the answer already given and asks nothing.
+ */
+let localNetworkAsks: Promise<unknown> = Promise.resolve();
+
 async function askForPermissions(args: Record<string, unknown> | undefined): Promise<unknown> {
   const requested = Array.isArray(args?.permissions) ? (args.permissions as string[]) : [];
   if (!requested.includes(ANDROID_LOCAL_NETWORK_PERMISSION)) {
     return invokeTauri(REQUEST_PERMISSIONS, args) as Promise<unknown>;
   }
-
-  const state = await ensureLocalNetworkPermission({
-    // Resolved at call time, not at construction: the hub's language can change while the app is
-    // open, and the sheet has to come out in the one that is active now.
-    labels: localNetworkPrimerLabelsFrom((key) => i18n.global.t(key)),
-  });
-  const granted: Record<string, boolean> = {
-    [ANDROID_LOCAL_NETWORK_PERMISSION]: state === 'granted',
-  };
-
-  const rest = requested.filter((p) => p !== ANDROID_LOCAL_NETWORK_PERMISSION);
-  if (rest.length === 0) return granted;
-  const others = (await invokeTauri<Record<string, boolean>>(REQUEST_PERMISSIONS, {
-    ...args,
-    permissions: rest,
-  })) as Record<string, boolean> | null;
-  return { ...granted, ...(others ?? {}) };
+  const turn = localNetworkAsks.then(() => askWithLocalNetworkPrimer(args, requested));
+  // The queue survives a failed ask: the next one still gets its turn.
+  localNetworkAsks = turn.catch(() => undefined);
+  return turn;
 }
 
 /** Adaptador del shell Tauri al contrato `TauriBridge` del SDK (inyectable en tests). */

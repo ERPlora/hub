@@ -350,7 +350,11 @@ async fn activating_a_factory_template_leaves_it_running() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -382,7 +386,11 @@ async fn a_module_cannot_activate_a_template_that_is_not_its_own() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(INTRUDER)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(INTRUDER),
+        ),
     )
     .await;
 
@@ -423,7 +431,11 @@ async fn the_limit_the_module_put_on_a_permission_survives_the_activation() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(response.status(), StatusCode::CREATED);
@@ -433,7 +445,11 @@ async fn the_limit_the_module_put_on_a_permission_survives_the_activation() {
         .to_string();
 
     let grants = grants_of(&fx, &flow_id).await;
-    assert_eq!(grants.len(), 2, "exactamente los dos del sidecar, ni uno más");
+    assert_eq!(
+        grants.len(),
+        2,
+        "exactamente los dos del sidecar, ni uno más"
+    );
     let cancel = grants
         .iter()
         .find(|g| g["value"] == CANCEL)
@@ -450,15 +466,26 @@ async fn activating_twice_neither_duplicates_the_flow_nor_its_permissions() {
 
     let first = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(first.status(), StatusCode::CREATED);
-    let first_id = body_json(first).await["data"]["id"].as_str().unwrap().to_string();
+    let first_id = body_json(first).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let second = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(
@@ -466,7 +493,10 @@ async fn activating_twice_neither_duplicates_the_flow_nor_its_permissions() {
         StatusCode::OK,
         "la segunda vez REUTILIZA: `200`, no `201`"
     );
-    let second_id = body_json(second).await["data"]["id"].as_str().unwrap().to_string();
+    let second_id = body_json(second).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     assert_eq!(first_id, second_id, "el mismo flujo, no uno nuevo");
     assert_eq!(flows(&fx).await.len(), 1, "y sigue habiendo UNO en el hub");
@@ -482,14 +512,25 @@ async fn deactivating_pauses_it_and_keeps_the_permissions() {
     let fx = fixture().await;
     let activated = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
-    let flow_id = body_json(activated).await["data"]["id"].as_str().unwrap().to_string();
+    let flow_id = body_json(activated).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let response = send(
         &fx.router,
-        post(&deactivate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -503,12 +544,19 @@ async fn deactivating_pauses_it_and_keeps_the_permissions() {
 
     let again = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(again.status(), StatusCode::OK);
     let body = body_json(again).await;
-    assert_eq!(body["data"]["id"], flow_id, "vuelve a encender el MISMO flujo");
+    assert_eq!(
+        body["data"]["id"], flow_id,
+        "vuelve a encender el MISMO flujo"
+    );
     assert_eq!(body["data"]["enabled"], true);
 }
 
@@ -518,7 +566,11 @@ async fn deactivating_a_family_that_was_never_activated_is_a_not_found() {
 
     let response = send(
         &fx.router,
-        post(&deactivate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -535,7 +587,11 @@ async fn a_template_this_hub_discarded_refuses_with_the_reason_it_discarded_it()
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -545,10 +601,7 @@ async fn a_template_this_hub_discarded_refuses_with_the_reason_it_discarded_it()
         "template_floor_module_too_old",
         "el código del descarte, el mismo que ya sirve el listado"
     );
-    assert!(
-        flows(&fx).await.is_empty(),
-        "y no se montó nada a medias"
-    );
+    assert!(flows(&fx).await.is_empty(), "y no se montó nada a medias");
 }
 
 #[tokio::test]
@@ -557,7 +610,11 @@ async fn a_family_no_module_ships_is_a_not_found() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, "there-is-no-such-family"), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, "there-is-no-such-family"),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -576,7 +633,10 @@ async fn without_a_human_admin_session_the_door_is_shut() {
         (None, StatusCode::UNAUTHORIZED),
         (Some(fx.employee.clone()), StatusCode::FORBIDDEN),
     ] {
-        for uri in [activate_uri(WHATSAPP, FAMILY), deactivate_uri(WHATSAPP, FAMILY)] {
+        for uri in [
+            activate_uri(WHATSAPP, FAMILY),
+            deactivate_uri(WHATSAPP, FAMILY),
+        ] {
             let response = send(&fx.router, post(&uri, session.as_deref(), Some(WHATSAPP))).await;
             assert_eq!(
                 response.status(),
@@ -608,10 +668,17 @@ async fn the_listing_says_which_templates_are_already_running() {
 
     let activated = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
-    let flow_id = body_json(activated).await["data"]["id"].as_str().unwrap().to_string();
+    let flow_id = body_json(activated).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let after = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
     let body = body_json(after).await;
@@ -620,7 +687,11 @@ async fn the_listing_says_which_templates_are_already_running() {
 
     send(
         &fx.router,
-        post(&deactivate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     let paused = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
@@ -670,7 +741,11 @@ async fn a_recipe_whose_permissions_are_refused_is_never_left_running() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert!(
@@ -708,7 +783,10 @@ async fn a_recipe_whose_permissions_are_refused_is_never_left_running() {
         ),
     )
     .await;
-    assert!(ok.status().is_success(), "control: una receta sana sí se enciende");
+    assert!(
+        ok.status().is_success(),
+        "control: una receta sana sí se enciende"
+    );
     assert_eq!(body_json(ok).await["data"]["enabled"], json!(true));
 }
 

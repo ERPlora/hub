@@ -1,0 +1,7 @@
+{
+  "id": "e2e_till",
+  "name": "E2E Till",
+  "version": "1.0.0",
+  "ui": { "entry": "dist/e2e_till.esm.js" },
+  "navigation": [{ "id": "pos", "label": "Till", "icon": "cart-outline", "component": "erp-e2e-till" }]
+}

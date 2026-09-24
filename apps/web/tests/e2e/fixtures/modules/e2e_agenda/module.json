@@ -1,0 +1,7 @@
+{
+  "id": "e2e_agenda",
+  "name": "E2E Agenda",
+  "version": "1.0.0",
+  "ui": { "entry": "dist/e2e_agenda.esm.js" },
+  "navigation": [{ "id": "list", "label": "Agenda", "icon": "calendar-outline", "component": "erp-e2e-agenda" }]
+}

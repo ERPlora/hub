@@ -85,7 +85,11 @@ async fn admin_token(router: &axum::Router) -> String {
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "login admin debe devolver 200");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "login admin debe devolver 200"
+    );
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let v: Value = serde_json::from_slice(&bytes).unwrap();
     v["token"].as_str().expect("token").to_string()
@@ -297,7 +301,10 @@ async fn bringing_a_deactivated_user_back_is_refused_when_the_plan_is_full() {
         StatusCode::OK
     );
     let bruno = json_body(create_local_user(&router, &token, "Bruno", "5183").await).await;
-    let bruno_id = bruno["data"]["id"].as_str().expect("id de Bruno").to_string();
+    let bruno_id = bruno["data"]["id"]
+        .as_str()
+        .expect("id de Bruno")
+        .to_string();
     assert_eq!(
         set_active(&router, &token, &bruno_id, false).await.status(),
         StatusCode::OK,
@@ -342,7 +349,10 @@ async fn editing_somebody_already_inside_does_not_need_a_free_seat() {
         StatusCode::OK
     );
     let bruno = json_body(create_local_user(&router, &token, "Bruno", "5183").await).await;
-    let bruno_id = bruno["data"]["id"].as_str().expect("id de Bruno").to_string();
+    let bruno_id = bruno["data"]["id"]
+        .as_str()
+        .expect("id de Bruno")
+        .to_string();
 
     let resp = router
         .clone()

@@ -63,7 +63,8 @@ fn hub1754_boot_announces_the_signature_policy_unconditionally() {
     let line = announcement[0];
     let indent = line.len() - line.trim_start().len();
     assert_eq!(
-        indent, 4,
+        indent,
+        4,
         "{}: the announcement is nested {indent} spaces deep, so it is inside some branch — a hub \
          that takes the other branch goes back to booting mute: {line}",
         path.display()

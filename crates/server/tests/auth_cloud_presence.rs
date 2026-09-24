@@ -789,7 +789,9 @@ async fn editing_a_revoked_user_without_deciding_about_the_door_keeps_the_revoca
             &erplora_runtime::hub_users::UpdateHubUser {
                 name: Some("Marta Ruiz".into()),
                 ..Default::default()
-            }, 0,)
+            },
+            0,
+        )
         .await
         .unwrap();
         id
