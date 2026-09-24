@@ -52,7 +52,11 @@ async fn ids_for(rt: &Runtime, key: &str, value: &str) -> Vec<String> {
 async fn search_ignores_case() {
     let rt = hub().await;
     for q in ["García", "garcía", "GARCÍA", "marta"] {
-        assert_eq!(ids_for(&rt, "search", q).await, vec!["marta"], "search={q:?}");
+        assert_eq!(
+            ids_for(&rt, "search", q).await,
+            vec!["marta"],
+            "search={q:?}"
+        );
     }
 }
 
