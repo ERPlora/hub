@@ -256,6 +256,49 @@ test('subscribe abre el WS lazy y enruta eventos por nombre', () => {
   assert.equal(seen.length, 1, 'tras unsub no se reciben más');
 });
 
+// hub#1980 — every till hears every `sale.completed`; the frame says which shell tab caused it
+// (`client_instance`, stamped by the hub from the charging request's `X-Client-Instance`) and
+// `onEvent` hands that to the listener, so only the till that charged prints the ticket.
+test('onEvent delivers the payload AND the tab that caused it (hub#1980)', () => {
+  const t = new HttpWsTransport({ baseUrl: 'http://h', WebSocketImpl: FakeWs as unknown as typeof WebSocket });
+  const client = new ErploraClient(t);
+  const seen: unknown[] = [];
+  const unsub = client.onEvent('sale.completed', (payload, meta) => seen.push([payload, meta.clientInstance]));
+
+  FakeWs.last!.onmessage!({
+    data: JSON.stringify({ name: 'sale.completed', module: 'sales', client_instance: 'till-a', payload: { sale_id: '1' } }),
+  });
+  // Nobody's till (an API sale, a flow): the listener hears it, with no instance.
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', payload: { sale_id: '2' } }) });
+  // A non-string instance is not an instance.
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', client_instance: 7, payload: { sale_id: '3' } }) });
+  assert.deepEqual(seen, [
+    [{ sale_id: '1' }, 'till-a'],
+    [{ sale_id: '2' }, undefined],
+    [{ sale_id: '3' }, undefined],
+  ]);
+
+  unsub();
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', client_instance: 'till-a', payload: {} }) });
+  assert.equal(seen.length, 3, 'unsubscribed');
+});
+
+test('onEvent over a transport that only knows `subscribe` still delivers, with no instance (hub#1980)', () => {
+  let cb: ((p: unknown) => void) | undefined;
+  const client = new ErploraClient({
+    query: async () => [],
+    command: async () => ({}),
+    subscribe: (_event, fn) => {
+      cb = fn;
+      return () => {};
+    },
+  });
+  const seen: unknown[] = [];
+  client.onEvent('sale.completed', (payload, meta) => seen.push([payload, meta.clientInstance]));
+  cb!({ sale_id: '9' });
+  assert.deepEqual(seen, [[{ sale_id: '9' }, undefined]]);
+});
+
 // ── HttpWsTransport: push por SSE (hub#19) ──────────────────────────────────
 
 class FakeEventSource {
