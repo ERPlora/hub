@@ -2547,7 +2547,9 @@ mod tests {
     #[test]
     fn a_grant_reason_is_kept_when_readable_and_dropped_when_not() {
         let read = |raw: &str| serde_json::from_str::<FlowTemplateGrant>(raw).expect(raw);
-        let ok = read(r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":"Buscar"}}"#);
+        let ok = read(
+            r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":"Buscar"}}"#,
+        );
         assert_eq!(
             ok.reason,
             Some(HashMap::from([
@@ -2570,7 +2572,8 @@ mod tests {
             assert_eq!(grant.value, "customers.list", "{bad}");
         }
         // Una lengua ilegible no se lleva por delante la legible.
-        let partial = read(r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":7}}"#);
+        let partial =
+            read(r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":7}}"#);
         assert_eq!(
             partial.reason,
             Some(HashMap::from([("en".to_string(), "Look up".to_string())]))
