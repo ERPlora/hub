@@ -30,10 +30,20 @@ pub const PRINT_DOCUMENT_CSP: &str =
 
 /// Does this platform have a system print dialog for a webview? `os` is `std::env::consts::OS`.
 ///
-/// wry implements `print` on macOS, Windows and Linux. On Android it does not, and the print door
-/// keeps its usual route there (hub#2008).
+/// wry implements `print` on macOS, Windows and Linux. On Android it does not, so the shell hands
+/// the document to Android's own print service through its plugin instead (hub#2008). Anywhere
+/// else the print door keeps its usual route.
 pub fn native_print_supported(os: &str) -> bool {
-    matches!(os, "macos" | "windows" | "linux")
+    matches!(os, "macos" | "windows" | "linux" | "android")
+}
+
+/// Is `html` a document the shell will hand to a print dialog? Refuses an empty or oversized one:
+/// nothing to print, or a runaway page.
+pub fn check_print_document(html: &str) -> Result<(), ShellError> {
+    if html.trim().is_empty() || html.len() > MAX_PRINT_DOCUMENT_BYTES {
+        return Err(ShellError::PrintDocumentRefused);
+    }
+    Ok(())
 }
 
 /// The address of document `id` in the print window. WebView2 and the Android WebView only load a
@@ -78,9 +88,7 @@ pub struct PrintDocuments {
 impl PrintDocuments {
     /// Takes a document and answers its id. Refuses an empty or oversized one: nothing to print.
     pub fn insert(&self, html: String) -> Result<u64, ShellError> {
-        if html.trim().is_empty() || html.len() > MAX_PRINT_DOCUMENT_BYTES {
-            return Err(ShellError::PrintDocumentRefused);
-        }
+        check_print_document(&html)?;
         let id = self.next.fetch_add(1, Ordering::Relaxed) + 1;
         self.lock().insert(id, html);
         Ok(id)
