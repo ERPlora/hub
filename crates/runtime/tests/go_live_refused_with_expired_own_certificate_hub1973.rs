@@ -7,7 +7,8 @@
 //!
 //! What this file pins, through the runtime's real doors (the upload and the go-live):
 //!  - `READY` on the own road with an expired certificate → the go-live answers the SAME code the
-//!    till answers, and nothing is frozen: the profile stays in `testing` and `READY`, with no activation instant;
+//!    till answers, and nothing is frozen: the profile stays in `testing` and `READY`, with no
+//!    activation instant;
 //!  - the positive control: the same hub with a certificate still valid goes live;
 //!  - renewing the certificate (uploading a valid one) opens the go-live again;
 //!  - an expiry the hub cannot read blocks nothing, as in hub#1940;
@@ -74,7 +75,10 @@ fn pkcs12_expiring_in(valid_for_secs: i64) -> (String, String) {
         .unwrap()
         .to_der()
         .unwrap();
-    (base64::engine::general_purpose::STANDARD.encode(&der), password)
+    (
+        base64::engine::general_purpose::STANDARD.encode(&der),
+        password,
+    )
 }
 
 const A_YEAR: i64 = 365 * 86_400;
@@ -134,7 +138,10 @@ async fn the_go_live_refuses_an_expired_own_certificate_and_freezes_nothing() {
 
     assert_eq!(domain_code(err), OWN_CERTIFICATE_EXPIRED);
     let after = profile(rt.db()).await;
-    assert_eq!(after.environment, ENV_TESTING, "nothing may reach the real AEAT");
+    assert_eq!(
+        after.environment, ENV_TESTING,
+        "nothing may reach the real AEAT"
+    );
     assert_eq!(after.status, FiscalStatus::Ready);
     assert_eq!(after.activated_at, "", "the go-live froze nothing");
 }
@@ -146,7 +153,10 @@ async fn a_valid_own_certificate_goes_live() {
     upload(&rt, A_YEAR).await;
     ready(rt.db()).await;
 
-    let live = rt.fiscal_go_live().await.expect("a valid own certificate goes live");
+    let live = rt
+        .fiscal_go_live()
+        .await
+        .expect("a valid own certificate goes live");
 
     assert_eq!(live.status, FiscalStatus::Active);
     assert_eq!(live.environment, ENV_PRODUCTION);
@@ -164,7 +174,10 @@ async fn renewing_the_certificate_opens_the_go_live_again() {
     upload(&rt, A_YEAR).await;
     ready(rt.db()).await;
 
-    let live = rt.fiscal_go_live().await.expect("the renewed certificate goes live");
+    let live = rt
+        .fiscal_go_live()
+        .await
+        .expect("the renewed certificate goes live");
     assert_eq!(live.environment, ENV_PRODUCTION);
 }
 
@@ -201,7 +214,10 @@ async fn on_erploras_road_the_own_certificate_expiry_is_not_asked() {
     ready(rt.db()).await;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(HUB));
-    p.insert("vigente".into(), json!(fiscal_profile::REPRESENTATION_VIGENTE));
+    p.insert(
+        "vigente".into(),
+        json!(fiscal_profile::REPRESENTATION_VIGENTE),
+    );
     rt.db()
         .execute(
             "UPDATE _hub_fiscal_profile SET representation_status = :vigente \
