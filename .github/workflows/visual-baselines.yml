@@ -128,6 +128,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # hub#2011 — draw the baselines with the OutfitKit `test-web.yml` compares against, which is
+      # the one the image ships (`docker/Dockerfile` resolves `@latest`, hub#1793). With the
+      # lockfile's version the regenerated photos were already stale for every PR.
+      # Contract: scripts/tests/visual-baselines-workflow.test.sh.
+      - name: OutfitKit as the image resolves it (docker/Dockerfile)
+        run: pnpm --filter @erplora/web add @erplora/outfitkit@latest
+
       - name: Toolchain (rust-toolchain.toml)
         run: |
           set -euo pipefail

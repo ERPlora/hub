@@ -177,5 +177,30 @@ else
     ok "actionlint.yml runs this contract (real step) and fires when only this test changes (paths)"
 fi
 
+# ── 7. The baselines are drawn with the OutfitKit the image SHIPS (hub#2011) ─────────────────
+#
+# `test-web.yml` compares against the OutfitKit `docker/Dockerfile` resolves (`@latest`, hub#1793),
+# but this workflow only ran `pnpm install --frozen-lockfile` — so it redrew the baselines with the
+# LOCKFILE's OutfitKit (0.1.72) while the comparison ran against 0.1.81: regenerating by the book
+# produced photos that every PR would still fail. Same command as the image, taken from the
+# Dockerfile (not retyped here), between the install and the Playwright run.
+dockerfile="$repo_root/docker/Dockerfile"
+image_resolution=$(awk 'match($0, /pnpm --filter @erplora\/web add @erplora\/outfitkit@[^[:space:]"]+/) { print substr($0, RSTART, RLENGTH); exit }' "$dockerfile")
+install_at=$(awk '/^[[:space:]]*run: pnpm install --frozen-lockfile/ {print NR; exit}' "$workflow")
+resolve_at=$(awk -v cmd="$image_resolution" 'index($0, cmd) && !/^[[:space:]]*#/ {print NR; exit}' "$workflow")
+playwright_at=$(awk '/^[[:space:]]*run: .*playwright test -c tests\/playwright\.config\.ts/ {print NR; exit}' "$workflow")
+if [ -z "$image_resolution" ]; then
+    bad "la imagen resuelve OutfitKit con un comando reconocible (hub#2011)" \
+        "no encuentro \`pnpm --filter @erplora/web add @erplora/outfitkit@…\` en docker/Dockerfile"
+elif [ -z "$resolve_at" ]; then
+    bad "las baselines se pintan con la OutfitKit que publica la imagen (hub#2011)" \
+        "falta \`$image_resolution\`: se regeneran con la OutfitKit del lockfile y test-web.yml compara con otra"
+elif [ -z "$install_at" ] || [ -z "$playwright_at" ] || [ "$resolve_at" -le "$install_at" ] || [ "$resolve_at" -ge "$playwright_at" ]; then
+    bad "OutfitKit se resuelve ENTRE el install y Playwright (hub#2011)" \
+        "orden encontrado — install: ${install_at:-?}, resolución: $resolve_at, playwright: ${playwright_at:-?}"
+else
+    ok "las baselines se pintan con la OutfitKit que publica la imagen (hub#2011)"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
