@@ -12,7 +12,7 @@
 // The fixtures (`fixtures/modules/*`) follow the module deep-link contract to the letter: the
 // agenda pushes the till's address and fires `popstate` (as `appointments` does), the till serves
 // the link at boot and on every `popstate` and consumes it (as `sales` does).
-import { cpSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { expect, request as pwRequest, test, type Page } from '../bench-boot';
@@ -61,7 +61,10 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   // The rest of the suite asserts on a freshly created hub: leave it as it was found.
-  for (const id of MODULE_IDS) await moduleCall(`/api/modules/${id}/uninstall`);
+  for (const id of MODULE_IDS) {
+    await moduleCall(`/api/modules/${id}/uninstall`);
+    rmSync(join(MODULES_DIR, id), { recursive: true, force: true });
+  }
 });
 
 /** The runtime serves module assets in production; in this bench Vite does not, so the spec does. */
