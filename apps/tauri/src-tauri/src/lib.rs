@@ -23,6 +23,14 @@ mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
 mod navigation;
 pub use navigation::{NavigationVerdict, navigation_verdict};
+mod native_print;
+pub use native_print::{
+    native_print_supported, print_document_id, print_document_url, print_window_label,
+    print_window_may_navigate, PrintDocuments, MAX_PRINT_DOCUMENT_BYTES, PRINT_DOCUMENT_CSP,
+    PRINT_SCHEME,
+};
+#[cfg(desktop)]
+pub use native_print::open_print_window;
 
 /// Id de dispositivo estable por instalación (`X-Device-Id` del login; sesión única ADR-0154).
 const DEVICE_ID_FILE: &str = "device.id";
@@ -72,6 +80,16 @@ pub enum ShellError {
     /// locked out by a card that demonstrably worked the day it was set up.
     #[error("nfc_random_uid")]
     NfcRandomUid,
+    /// The page sent no document to print, or one too big to hold (hub#2006).
+    #[error("print_document_refused")]
+    PrintDocumentRefused,
+    /// This platform has no system print dialog for a webview (Android, hub#2008). The print door
+    /// takes its usual route instead.
+    #[error("native_print_unsupported")]
+    NativePrintUnsupported,
+    /// The print window could not be opened.
+    #[error("native_print_failed: {0}")]
+    NativePrintFailed(String),
 }
 
 impl Serialize for ShellError {
@@ -844,6 +862,30 @@ fn save_download(
                 Err(ShellError::DownloadsUnreachable)
             }
         }
+    }
+}
+
+/// `print_document` — the system print dialog for an A4 document the page holds (hub#2006).
+///
+/// The page keeps the html, the shell keeps the dialog: a window of its own shows the document and
+/// the OS prints it, with its printer list and «Save as PDF» ([`native_print`]). Where there is no
+/// dialog (Android, hub#2008) it answers `native_print_unsupported` and the print door takes its
+/// usual route — a refusal, never a pretended page.
+///
+/// ⚠️ `(async)` is load-bearing: creating a window from a synchronous command deadlocks on Windows.
+#[tauri::command(async)]
+fn print_document(app: tauri::AppHandle, html: String) -> Result<(), ShellError> {
+    if !native_print_supported(std::env::consts::OS) {
+        return Err(ShellError::NativePrintUnsupported);
+    }
+    #[cfg(desktop)]
+    {
+        native_print::open_print_window(&app, html)
+    }
+    #[cfg(not(desktop))]
+    {
+        let _ = (&app, &html);
+        Err(ShellError::NativePrintUnsupported)
     }
 }
 
@@ -1864,6 +1906,14 @@ pub fn run() {
     ));
 
     builder
+        // The A4 document of `print_document` (hub#2006), served from memory to its print window
+        // with a CSP that runs no code. Any other path is a 404.
+        .register_uri_scheme_protocol(PRINT_SCHEME, |ctx, request| {
+            use tauri::Manager;
+            ctx.app_handle()
+                .state::<PrintDocuments>()
+                .respond(request.uri().path())
+        })
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_erplora_android::init())
         // The user's own browser (hub#475). Registered for its RUST api only: no `opener:*`
@@ -1923,6 +1973,7 @@ pub fn run() {
                 .map(|d| d.join(DEVICES_FILE))
                 .unwrap_or_else(|| PathBuf::from(DEVICES_FILE));
             app.manage(build_peripherals_state(devices_path));
+            app.manage(PrintDocuments::default());
             // Ventana única: onboarding del SaaS o el hub capturado (modo app).
             if let Err(e) = open_main_window(app, cache_dir) {
                 eprintln!("no se pudo crear la ventana principal: {e}");
@@ -1934,6 +1985,8 @@ pub fn run() {
             forget_hub,
             open_external_url,
             save_download,
+            // The system print dialog for an A4 document (hub#2006).
+            print_document,
             // The way out when the network dies under the window (hub#1716).
             shell_retry,
             // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
