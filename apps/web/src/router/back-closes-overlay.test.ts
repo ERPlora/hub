@@ -184,6 +184,18 @@ describe('hub#1906 — installSystemBackButton (the Android button)', () => {
     expect(t.historyBack).not.toHaveBeenCalled();
   });
 
+  it('an app build without `leave_app` hands the button back to Tauri instead of leaving it dead', async () => {
+    // The web ships with the hub, the APK with the store: an older app may lack the command. Once
+    // the listener is gone Tauri's own Back runs again (goBack, or the system Back at the root).
+    const t = setup('none');
+    t.leaveApp.mockRejectedValueOnce(new Error('command leave_app not found'));
+    await installSystemBackButton({ win: t.win, closeTop: t.closeTop, leaveApp: t.leaveApp });
+
+    await expect(t.state.handler!({ canGoBack: false })).resolves.toBeUndefined();
+
+    expect(t.state.unregister).toHaveBeenCalledTimes(1);
+  });
+
   it('unregisters the listener when the page goes away', async () => {
     const t = setup('none');
     await installSystemBackButton({ win: t.win, closeTop: t.closeTop, leaveApp: t.leaveApp });

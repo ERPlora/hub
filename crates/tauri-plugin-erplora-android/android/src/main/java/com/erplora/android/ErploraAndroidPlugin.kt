@@ -49,12 +49,6 @@ import java.io.File
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
 
     /**
-     * `check_permissions` — qué hay concedido AHORA, sin molestar al usuario.
-     *
-     * `@PermissionCallback` no es opcional ni heredado: es también el callback que cierra el
-     * `request_permissions` de abajo cuando el usuario responde.
-     */
-    /**
      * `leave_app` (hub#1906) — the app goes to the background, which is what the system Back does
      * on a root screen since Android 12 (the task moves back; nothing is finished or killed).
      *
@@ -68,6 +62,12 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         activity.moveTaskToBack(true)
     }
 
+    /**
+     * `check_permissions` — qué hay concedido AHORA, sin molestar al usuario.
+     *
+     * `@PermissionCallback` no es opcional ni heredado: es también el callback que cierra el
+     * `request_permissions` de abajo cuando el usuario responde.
+     */
     @Command
     @PermissionCallback
     override fun checkPermissions(invoke: Invoke) {

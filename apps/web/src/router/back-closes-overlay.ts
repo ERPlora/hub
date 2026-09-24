@@ -106,7 +106,9 @@ export async function installSystemBackButton(
     listener = await app.onBackButtonPress(async ({ canGoBack }) => {
       if ((await closeTop()) !== 'none') return;
       if (canGoBack) win.history.back();
-      else await leaveApp();
+      // An app build older than `leave_app` refuses it: give the button back to Tauri, whose own
+      // Back leaves from the root, instead of a button that no longer does anything.
+      else await leaveApp().catch(() => listener.unregister());
     });
   } catch {
     return false;
