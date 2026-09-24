@@ -3424,6 +3424,21 @@ mod tests {
         assert!(!text.contains(PROMO_URL), "no promotional QR on an invoice");
         assert!(!text.contains("Escanea"), "nor its note");
     }
+
+    /// The module size of every QR on the paper is a contract, not a relation (rv-2012): the fiscal
+    /// QR and «pide tu factura» keep the 4 dots (0.5 mm at 203 dpi) they printed at before hub#2009,
+    /// and the promotional one prints at 3. «Smaller than the fiscal» alone lets the fiscal one drift
+    /// to 5 or the promotional one to 2 (0.25 mm, which a phone no longer reads) without a test going red.
+    #[test]
+    fn every_qr_prints_at_its_contracted_module_size() {
+        let receipt = DocumentType::parse("receipt").unwrap();
+        let with_promo = render_document(receipt, &ticket_with_promo()).unwrap();
+        assert_eq!(qr_module_sizes(&with_promo), vec![4, 4, 3], "fiscal, claim, promotional");
+        let mut without = ticket_with_promo();
+        without.as_object_mut().unwrap().remove("promo_qr");
+        let bytes = render_document(receipt, &without).unwrap();
+        assert_eq!(qr_module_sizes(&bytes), vec![4, 4], "byte for byte what it printed before");
+    }
 }
 
 /// **Typographic punctuation → what a cp437 printer can actually produce.**
