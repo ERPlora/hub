@@ -597,6 +597,10 @@ async fn when_memory_and_database_agree_nothing_is_touched() {
         report.reloaded.is_empty() && report.failed.is_empty(),
         "{report:?}"
     );
+    assert!(
+        report.removed.is_empty() && report.status_changed.is_empty(),
+        "{report:?}"
+    );
     assert_eq!(mock.call_count(), 0, "{:?}", mock.calls.lock().unwrap());
 
     let _ = std::fs::remove_dir_all(&t.temp);
@@ -813,6 +817,196 @@ async fn the_loop_serve_starts_catches_up_without_anyone_calling_it() {
     }
     reconciling.abort();
     assert_eq!(listed_version, json!("2.0.0"));
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
+
+// ── hub#2039: what the other task uninstalls or switches on/off ──────────────────────────
+
+/// `addon@1.0.0`, which needs `parts`, extracted on disk.
+fn addon_dir(temp: &std::path::Path) -> std::path::PathBuf {
+    let dir = temp.join("seed").join("addon").join("1.0.0");
+    std::fs::create_dir_all(dir.join("migrations/postgres")).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        serde_json::to_string(&json!({
+            "id": "addon", "name": "addon", "version": "1.0.0", "depends_on": ["parts"],
+            "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("migrations/postgres/001_init.sql"),
+        INIT_SQL.replace("{id}", "addon"),
+    )
+    .unwrap();
+    dir
+}
+
+async fn has_row(state: &AppState, id: &str) -> bool {
+    let rt = state.runtime.read().await;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    p.insert("module_id".into(), json!(id));
+    !rt.db()
+        .query(
+            "SELECT 1 FROM hub_module WHERE hub_id = :hub_id AND module_id = :module_id",
+            &p,
+        )
+        .await
+        .unwrap()
+        .rows
+        .is_empty()
+}
+
+/// Uninstalled through the other task: here it stops being listed AND stops existing for the
+/// dispatcher — and nothing is written back, the other task already did all the writing.
+#[tokio::test]
+async fn a_module_uninstalled_by_the_other_task_is_gone_here_too() {
+    let mock = MockCloud::with(&[("parts", "1.0.0", package("parts", "1.0.0"))]);
+    let t = two_tasks("uninstall", mock.clone()).await;
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .uninstall("parts")
+        .await
+        .unwrap();
+    assert!(listed(&t.staying, &t.session, "parts").await.is_some());
+
+    let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
+
+    assert_eq!(report.removed, vec!["parts".to_string()], "{report:?}");
+    assert!(listed(&t.staying, &t.session, "parts").await.is_none());
+    assert!(
+        !t.staying
+            .runtime
+            .read()
+            .await
+            .registry()
+            .is_installed("parts"),
+        "its queries and commands must stop existing here, not only its row in the list"
+    );
+    assert!(!has_row(&t.staying, "parts").await, "nothing written back");
+    assert_eq!(mock.call_count(), 0, "{:?}", mock.calls.lock().unwrap());
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
+
+/// Switched off through the other task, same version: here it is off too, and the database keeps
+/// saying «off» (following is reading, not deciding again).
+#[tokio::test]
+async fn a_module_switched_off_by_the_other_task_is_off_here_too() {
+    let mock = MockCloud::with(&[("parts", "1.0.0", package("parts", "1.0.0"))]);
+    let t = two_tasks("switch-off", mock.clone()).await;
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .deactivate("parts")
+        .await
+        .unwrap();
+    assert_eq!(
+        listed(&t.staying, &t.session, "parts").await.unwrap()["status"],
+        json!("active")
+    );
+
+    let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
+
+    assert!(
+        report.reloaded.is_empty(),
+        "same version: nothing to reload {report:?}"
+    );
+    assert_eq!(report.status_changed.len(), 1, "{report:?}");
+    assert_eq!(
+        listed(&t.staying, &t.session, "parts").await.unwrap()["status"],
+        json!("inactive")
+    );
+    assert!(!t.staying.runtime.read().await.registry().is_active("parts"));
+    assert_eq!(recorded(&t.staying, "parts").await.1, "inactive");
+    assert_eq!(mock.call_count(), 0, "{:?}", mock.calls.lock().unwrap());
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
+
+/// And back on: switching it on through the other task turns it on here too.
+#[tokio::test]
+async fn a_module_switched_back_on_by_the_other_task_is_on_here_too() {
+    let mock = MockCloud::with(&[("parts", "1.0.0", package("parts", "1.0.0"))]);
+    let t = two_tasks("switch-on", mock.clone()).await;
+    let reconciler = ModuleReconciler::new();
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .deactivate("parts")
+        .await
+        .unwrap();
+    reconciler.reconcile_once(&t.staying).await;
+    assert!(!t.staying.runtime.read().await.registry().is_active("parts"));
+
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .activate("parts")
+        .await
+        .unwrap();
+    let report = reconciler.reconcile_once(&t.staying).await;
+
+    assert_eq!(report.status_changed.len(), 1, "{report:?}");
+    assert_eq!(
+        listed(&t.staying, &t.session, "parts").await.unwrap()["status"],
+        json!("active")
+    );
+    assert!(t.staying.runtime.read().await.registry().is_active("parts"));
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
+
+/// Switching off a dependency through the other task takes its dependents down IN CASCADE there;
+/// here each one ends as the database recorded it — the root `inactive`, the dependent
+/// `inactive_auto` — so that switching the root back on revives the dependent (ADR-0128).
+#[tokio::test]
+async fn a_cascade_made_by_the_other_task_arrives_here_as_it_was_recorded() {
+    let mock = MockCloud::with(&[("parts", "1.0.0", package("parts", "1.0.0"))]);
+    let t = two_tasks("cascade-off", mock.clone()).await;
+    let addon = addon_dir(&t.temp);
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .install_from_dir(&addon)
+        .await
+        .unwrap();
+    t.staying
+        .runtime
+        .write()
+        .await
+        .install_from_dir(&addon)
+        .await
+        .unwrap();
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .deactivate("parts")
+        .await
+        .unwrap();
+
+    let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
+
+    assert_eq!(report.status_changed.len(), 2, "{report:?}");
+    assert_eq!(
+        listed(&t.staying, &t.session, "parts").await.unwrap()["status"],
+        json!("inactive")
+    );
+    assert_eq!(
+        listed(&t.staying, &t.session, "addon").await.unwrap()["status"],
+        json!("inactive_auto")
+    );
+    assert_eq!(recorded(&t.staying, "addon").await.1, "inactive_auto");
 
     let _ = std::fs::remove_dir_all(&t.temp);
 }
