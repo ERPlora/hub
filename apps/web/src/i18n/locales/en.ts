@@ -1411,26 +1411,27 @@ export default {
     //
     // The sheet that goes in FRONT of Android's dialog. Android's own says «Allow ERPlora to send
     // you notifications?» and nothing about what for; asked cold it reads as opportunistic and
-    // gets refused, and two refusals close the dialog for the life of the install. So this names
-    // the one thing the till actually notifies about — an order arriving — and never says
-    // «permission», «POST_NOTIFICATIONS» or «Android».
+    // gets refused, and two refusals close the dialog for the life of the install. So this says
+    // what the notices are for — and never «permission», «POST_NOTIFICATIONS» or «Android». In
+    // words that fit EVERY business: the sheet appears on a salon's front desk as much as on a
+    // restaurant's till, and «orders in the kitchen» got it refused there (hub#1927).
     notices: {
-      primerHeader: 'Let us warn you about new orders',
+      primerHeader: 'Let us keep you posted',
       primerMessage:
-        'When an order comes into the kitchen we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
+        'When something needs your attention, we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
       primerLater: 'Not now',
       primerAllow: 'Turn on notices',
       // The row on System › your printer, which is where somebody who never got warned would
       // look. Only ever shown when the notices really are off ON THIS DEVICE.
       blockedTitle: 'Notices are off',
       blockedDetail:
-        "This device won't warn you when an order comes in. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
+        "This device won't warn you when something needs your attention. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
       blockedAction: 'Turn on notices',
       // After asking again and still getting nothing: the system stops showing its dialog once
       // it has been refused, and from then on the only way through is the device's own settings.
       blockedInSettings:
         "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
-      turnedOn: 'Done — this device will warn you about new orders.',
+      turnedOn: 'Done — this device will warn you when something needs your attention.',
     },
   },
   planLimits: {
