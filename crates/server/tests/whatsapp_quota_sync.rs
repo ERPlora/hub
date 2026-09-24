@@ -475,17 +475,26 @@ async fn el_command_de_la_cuota_no_se_alcanza_por_la_puerta_publica() {
 #[tokio::test]
 async fn el_tick_escribe_tambien_el_consumo_que_declara_la_plataforma() {
     let runtime = hub_con(Some(fixture_con_consumo())).await;
-    let (base_url, seen) = cloud(|_| (StatusCode::OK, plan_body_con_consumo(json!(30), json!(12)))).await;
+    let (base_url, seen) =
+        cloud(|_| (StatusCode::OK, plan_body_con_consumo(json!(30), json!(12)))).await;
 
     sync(&runtime, &base_url).await;
 
-    assert_eq!(stored_limit(&runtime).await, Some(30), "el tope, como siempre");
+    assert_eq!(
+        stored_limit(&runtime).await,
+        Some(30),
+        "el tope, como siempre"
+    );
     assert_eq!(
         stored_usage(&runtime).await,
         Some(12),
         "el gasto del mes sale de la plataforma, que es quien le paga a Meta"
     );
-    assert_eq!(seen.calls(), 1, "el consumo viaja en el cuerpo que ya se pedía: ni una llamada más");
+    assert_eq!(
+        seen.calls(),
+        1,
+        "el consumo viaja en el cuerpo que ya se pedía: ni una llamada más"
+    );
 }
 
 /// ⓾ 🔴 **La regresión que hay que impedir.** El módulo publicado HOY declara su `_quota.set` con
@@ -496,7 +505,8 @@ async fn el_tick_escribe_tambien_el_consumo_que_declara_la_plataforma() {
 #[tokio::test]
 async fn contra_el_modulo_publicado_hoy_el_tope_sigue_llegando() {
     let runtime = hub_con(Some(fixture())).await;
-    let (base_url, _seen) = cloud(|_| (StatusCode::OK, plan_body_con_consumo(json!(30), json!(12)))).await;
+    let (base_url, _seen) =
+        cloud(|_| (StatusCode::OK, plan_body_con_consumo(json!(30), json!(12)))).await;
 
     let outcome = sync(&runtime, &base_url).await;
 
@@ -544,7 +554,11 @@ async fn un_consumo_ausente_o_imposible_no_se_escribe_como_cero() {
         Some(12),
         "una ausencia no puede devolverle el mes entero al hub"
     );
-    assert_eq!(stored_limit(&runtime).await, Some(30), "el tope sí se sabe y sí se escribe");
+    assert_eq!(
+        stored_limit(&runtime).await,
+        Some(30),
+        "el tope sí se sabe y sí se escribe"
+    );
 
     // (c) Un negativo es un dato corrupto, no una instrucción.
     //

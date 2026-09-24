@@ -53,8 +53,8 @@ async fn fixture() -> Fixture {
     // The same module as the runtime battery: it declares `p1701/discount_limit` over
     // `p1701.order.set_discount`. Reused and not copied — a second fixture with the same rules is
     // one more place where the contract can drift apart without anyone noticing.
-    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../runtime/tests/fixture_1701");
+    let dir =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_1701");
     rt.install_from_dir(&dir).await.unwrap();
 
     let admin_id = rt.create_user("Ioan", "1111", "admin", None).await.unwrap();
@@ -143,12 +143,7 @@ async fn the_owner_lists_where_a_rule_may_go_hub1701() {
     let f = fixture().await;
     let response = send(
         &f.router,
-        request(
-            "GET",
-            "/api/hub/policies/checkpoints",
-            Some(&f.admin),
-            None,
-        ),
+        request("GET", "/api/hub/policies/checkpoints", Some(&f.admin), None),
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -232,10 +227,7 @@ async fn a_rule_round_trips_through_the_door_hub1701() {
 #[tokio::test]
 async fn only_a_human_who_administers_the_hub_gets_in_hub1701() {
     let f = fixture().await;
-    for (label, session) in [
-        ("sin sesión", None),
-        ("cajero", Some(f.employee.as_str())),
-    ] {
+    for (label, session) in [("sin sesión", None), ("cajero", Some(f.employee.as_str()))] {
         let response = send(
             &f.router,
             request("GET", "/api/hub/policies", session, None),

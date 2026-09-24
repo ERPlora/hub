@@ -685,3 +685,134 @@ async fn a_module_that_fell_in_cascade_is_reloaded_still_fallen() {
 
     let _ = std::fs::remove_dir_all(&t.temp);
 }
+
+// ── 8. `hub_module` has no topological order ─────────────────────────────────────────────
+
+/// The other task installs a module AND the dependency it pulls in. `hub_module` keeps no
+/// topological order (the boot restore loops for the same reason), so the dependent may come first
+/// in a pass: failing it then is a matter of turn, not a version nobody can provide — it has to be
+/// loaded once its dependency is, and not written off until `hub_module` changes.
+#[tokio::test]
+async fn a_dependent_read_before_its_dependency_is_loaded_in_the_same_pass() {
+    let addon_manifest = serde_json::to_string(&json!({
+        "id": "addon", "name": "addon", "version": "1.0.0", "depends_on": ["extras"],
+        "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+    }))
+    .unwrap();
+    let addon_sql = INIT_SQL.replace("{id}", "addon");
+    let addon_zip = build_zip(&[
+        ("module.json", addon_manifest.as_bytes()),
+        ("migrations/postgres/001_init.sql", addon_sql.as_bytes()),
+    ]);
+    // Neither is in the marketplace: the copies the other task stored are the only source, as
+    // after any install through the route (the marketplace path pulls dependencies by itself).
+    let mock = MockCloud::with(&[("parts", "1.0.0", package("parts", "1.0.0"))]);
+    let t = two_tasks("topo", mock.clone()).await;
+    let extras = package_dir(&t.temp, "extras", "1.0.0");
+    let addon = t.temp.join("seed").join("addon").join("1.0.0");
+    std::fs::create_dir_all(addon.join("migrations/postgres")).unwrap();
+    std::fs::write(addon.join("module.json"), &addon_manifest).unwrap();
+    std::fs::write(addon.join("migrations/postgres/001_init.sql"), &addon_sql).unwrap();
+    {
+        let mut rt = t.outgoing.runtime.write().await;
+        rt.install_from_dir(&extras).await.unwrap();
+        rt.install_from_dir(&addon).await.unwrap();
+        for (id, zip) in [("extras", package("extras", "1.0.0")), ("addon", addon_zip)] {
+            erplora_runtime::module_package::save(
+                rt.db(),
+                HUB,
+                id,
+                "1.0.0",
+                &sha256_hex(&zip),
+                None,
+                &zip,
+            )
+            .await
+            .unwrap();
+        }
+        // The dependency's row rewritten after the dependent's: a plain scan now reads the dependent
+        // first — how a real table ends up out of order after enough writes.
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        rt.db()
+            .execute(
+                "WITH gone AS (DELETE FROM hub_module WHERE hub_id = :hub_id AND module_id = 'extras' RETURNING *) \
+                 INSERT INTO hub_module SELECT * FROM gone",
+                &p,
+            )
+            .await
+            .unwrap();
+        let order = rt
+            .db()
+            .query(
+                "SELECT module_id FROM hub_module WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .unwrap();
+        let order: Vec<&str> = order
+            .rows
+            .iter()
+            .filter_map(|r| r["module_id"].as_str())
+            .collect();
+        assert!(
+            order.iter().position(|m| *m == "addon") < order.iter().position(|m| *m == "extras"),
+            "the scan must read the dependent first for this test to mean anything: {order:?}"
+        );
+    }
+
+    let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
+
+    assert!(report.failed.is_empty(), "{report:?}");
+    assert!(
+        report
+            .reloaded
+            .contains(&("addon".to_string(), "1.0.0".to_string())),
+        "{report:?}"
+    );
+    assert_eq!(
+        listed(&t.staying, &t.session, "addon").await.unwrap()["version"],
+        json!("1.0.0")
+    );
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
+
+// ── 9. The loop `serve()` starts ─────────────────────────────────────────────────────────
+
+/// What `serve()` launches after the boot restore: nobody calls `reconcile_once` by hand in
+/// production, so the loop itself has to bring the staying task to the other task's update.
+#[tokio::test]
+async fn the_loop_serve_starts_catches_up_without_anyone_calling_it() {
+    let mock = MockCloud::with(&[
+        ("parts", "1.0.0", package("parts", "1.0.0")),
+        ("parts", "2.0.0", package("parts", "2.0.0")),
+    ]);
+    let t = two_tasks("loop", mock.clone()).await;
+    let reconciling = erplora_server::module_reconcile::spawn(
+        t.staying.clone(),
+        std::time::Duration::from_millis(100),
+    );
+
+    call(
+        &t.outgoing,
+        &t.session,
+        "POST",
+        "/api/modules/parts/update",
+        "{}",
+    )
+    .await;
+
+    let mut listed_version = Value::Null;
+    for _ in 0..100 {
+        listed_version = listed(&t.staying, &t.session, "parts").await.unwrap()["version"].clone();
+        if listed_version == json!("2.0.0") {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    reconciling.abort();
+    assert_eq!(listed_version, json!("2.0.0"));
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}

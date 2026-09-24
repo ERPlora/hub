@@ -202,7 +202,11 @@ async fn an_unreadable_range_bound_names_itself_instead_of_being_redacted() {
     .await;
 
     assert_eq!(body["ok"], json!(false), "{body}");
-    assert_eq!(body["error"]["code"], json!("invalid_filter_bound"), "{body}");
+    assert_eq!(
+        body["error"]["code"],
+        json!("invalid_filter_bound"),
+        "{body}"
+    );
     let message = body["error"]["message"].as_str().unwrap_or_default();
     assert!(
         message.contains("f_weight_from") && message.contains("heavy"),

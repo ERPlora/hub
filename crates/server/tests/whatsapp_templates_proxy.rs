@@ -218,7 +218,10 @@ async fn the_templates_and_the_verdict_meta_gave_them_reach_the_tab() {
     // what THIS test is about is the credential on the wire.
     assert_eq!(body["data"]["templates"][0]["name"], "table_ready");
     // The reason Meta rejected it travels as it came: the tab is what turns it into a sentence.
-    assert_eq!(body["data"]["templates"][0]["rejected_reason"], "INVALID_FORMAT");
+    assert_eq!(
+        body["data"]["templates"][0]["rejected_reason"],
+        "INVALID_FORMAT"
+    );
     assert_eq!(body["data"]["stale"], false);
     let s = seen.lock().unwrap();
     assert_eq!(s.path, "list");
@@ -431,7 +434,10 @@ async fn the_list_reaches_the_module_in_the_envelope_the_sdk_reads() {
     // The SaaS's payload travels WHOLE inside `data`: the verdict Meta gave each template and the
     // `stale` flag are what the tab draws, and neither is reinterpreted on the way.
     assert_eq!(body["data"]["templates"][0]["name"], "table_ready");
-    assert_eq!(body["data"]["templates"][0]["rejected_reason"], "INVALID_FORMAT");
+    assert_eq!(
+        body["data"]["templates"][0]["rejected_reason"],
+        "INVALID_FORMAT"
+    );
     assert_eq!(body["data"]["stale"], false);
 }
 
@@ -595,6 +601,9 @@ async fn a_success_the_hub_cannot_read_reaches_the_module_as_a_code_not_as_an_em
 
     assert_eq!(response.status(), StatusCode::FAILED_DEPENDENCY); // hub#1763
     let body = body_json(response).await;
-    assert_eq!(body["ok"], false, "an answer the hub could not read is not a success: {body}");
+    assert_eq!(
+        body["ok"], false,
+        "an answer the hub could not read is not a success: {body}"
+    );
     assert_eq!(body["error"]["code"], "cloud_unreadable");
 }

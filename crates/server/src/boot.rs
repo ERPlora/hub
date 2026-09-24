@@ -512,24 +512,14 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // database another, and the runtime served the old code until the button was pressed again.
     // Started after the boot restore above on purpose — that block already brought the registry to
     // `hub_module`, so the first tick waits a full interval instead of racing it.
-    {
-        let st = state.clone();
-        let secs = module_reconcile::interval_secs(
+    module_reconcile::spawn(
+        state.clone(),
+        std::time::Duration::from_secs(module_reconcile::interval_secs(
             std::env::var(module_reconcile::INTERVAL_ENV)
                 .ok()
                 .as_deref(),
-        );
-        tokio::spawn(async move {
-            let reconciler = module_reconcile::ModuleReconciler::new();
-            let period = std::time::Duration::from_secs(secs);
-            let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-            loop {
-                tick.tick().await;
-                reconciler.reconcile_once(&st).await;
-            }
-        });
-    }
+        )),
+    );
 
     // Backfill del índice vectorial (§9.6): la ingesta normal corre en el hook de INSTALL, que ya
     // pasó para todo hub existente — sin esto, su índice quedaría vacío para siempre y el router

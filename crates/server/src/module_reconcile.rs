@@ -39,6 +39,24 @@ pub fn interval_secs(raw: Option<&str>) -> u64 {
         .unwrap_or(DEFAULT_INTERVAL_SECS)
 }
 
+/// Starts the reconciliation `serve()` runs for as long as the task lives. The first pass comes one
+/// `period` after now, not at once: the boot restore has just brought the registry to `hub_module`.
+pub fn spawn(state: AppState, period: std::time::Duration) -> tokio::task::JoinHandle<()> {
+    tracing::info!(
+        every_secs = period.as_secs_f64(),
+        "module reconciliation started: this task follows what another task of the hub installs or updates (hub#1875)"
+    );
+    tokio::spawn(async move {
+        let reconciler = ModuleReconciler::new();
+        let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tick.tick().await;
+            reconciler.reconcile_once(&state).await;
+        }
+    })
+}
+
 /// What one pass did.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Report {
@@ -78,50 +96,70 @@ impl ModuleReconciler {
             }
         };
 
-        for (module_id, version, _) in drifted {
-            if self.already_gave_up(&module_id, &version) {
-                continue;
-            }
-            let mut rt = state.runtime.write().await;
-            // Checked again under the write lock: an install of THIS task may have been holding it
-            // and have just written the same version, or the row may have moved again meanwhile.
-            let current = match drifted_modules(&rt, &hub_id).await {
-                Ok(drifted) => drifted.into_iter().find(|(id, _, _)| *id == module_id),
-                Err(e) => {
-                    tracing::warn!(error = %e, "module reconciliation: cannot read hub_module (hub#1875)");
-                    return report;
+        // `hub_module` keeps no topological order, and registering needs the `depends_on` already
+        // registered: a dependent read before its dependency fails for its turn, not for good. So
+        // passes repeat while the previous one loaded something — the boot restore does the same
+        // (`install::restore_from_local_packages`) — and only what still fails is written off.
+        let mut pending: Vec<String> = drifted
+            .into_iter()
+            .filter(|(id, version, _)| !self.already_gave_up(id, version))
+            .map(|(id, _, _)| id)
+            .collect();
+        let mut failed: Vec<(String, String, String)> = Vec::new();
+        while !pending.is_empty() {
+            let mut progressed = false;
+            failed.clear();
+            for module_id in std::mem::take(&mut pending) {
+                let mut rt = state.runtime.write().await;
+                // Checked again under the write lock: an install of THIS task may have been holding
+                // it and have just written the same version, or the row may have moved meanwhile.
+                let current = match drifted_modules(&rt, &hub_id).await {
+                    Ok(drifted) => drifted.into_iter().find(|(id, _, _)| *id == module_id),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "module reconciliation: cannot read hub_module (hub#1875)");
+                        return report;
+                    }
+                };
+                let Some((_, version, status)) = current else {
+                    continue;
+                };
+                if self.already_gave_up(&module_id, &version) {
+                    continue;
                 }
-            };
-            let Some((_, version, status)) = current else {
-                continue;
-            };
-            if self.already_gave_up(&module_id, &version) {
-                continue;
-            }
 
-            let loaded = match load(state, &mut rt, &module_id, &version).await {
-                Ok(()) => rt
-                    .restore_persisted_status(&module_id, status)
-                    .await
-                    .map_err(|e| e.to_string()),
-                Err(e) => Err(e),
-            };
-            drop(rt);
-            match loaded {
-                Ok(()) => {
-                    self.gave_up().remove(&module_id);
-                    tracing::info!(module_id = %module_id, version = %version, "module reloaded at the version this hub records (hub#1875)");
-                    // The event the shell already listens to for refreshing the nav and the
-                    // entitlement: for whoever is connected to THIS task, the module changed now.
-                    state.broadcast(json!({ "type": "module.installed", "module_id": module_id }));
-                    report.reloaded.push((module_id, version));
-                }
-                Err(reason) => {
-                    tracing::warn!(module_id = %module_id, version = %version, error = %reason, "module reconciliation failed; the module keeps serving what it had (hub#1875)");
-                    self.gave_up().insert(module_id.clone(), version.clone());
-                    report.failed.push((module_id, version, reason));
+                let loaded = match load(state, &mut rt, &module_id, &version).await {
+                    Ok(()) => rt
+                        .restore_persisted_status(&module_id, status)
+                        .await
+                        .map_err(|e| e.to_string()),
+                    Err(e) => Err(e),
+                };
+                drop(rt);
+                match loaded {
+                    Ok(()) => {
+                        progressed = true;
+                        self.gave_up().remove(&module_id);
+                        tracing::info!(module_id = %module_id, version = %version, "module reloaded at the version this hub records (hub#1875)");
+                        // The event the shell already listens to for refreshing the nav and the
+                        // entitlement: for whoever is connected to THIS task, the module changed now.
+                        state.broadcast(
+                            json!({ "type": "module.installed", "module_id": module_id }),
+                        );
+                        report.reloaded.push((module_id, version));
+                    }
+                    Err(reason) => failed.push((module_id, version, reason)),
                 }
             }
+            if !progressed {
+                break;
+            }
+            pending = failed.iter().map(|(id, _, _)| id.clone()).collect();
+        }
+
+        for (module_id, version, reason) in failed {
+            tracing::warn!(module_id = %module_id, version = %version, error = %reason, "module reconciliation failed; the module keeps serving what it had (hub#1875)");
+            self.gave_up().insert(module_id.clone(), version.clone());
+            report.failed.push((module_id, version, reason));
         }
         report
     }

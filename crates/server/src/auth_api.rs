@@ -739,7 +739,10 @@ pub(crate) async fn auth_handoff(
             Ok(None) => return refuse(StatusCode::UNAUTHORIZED, "handoff_session_required"),
             Err(e) => {
                 eprintln!("[handoff] could not resolve the session: {e}");
-                return refuse(StatusCode::INTERNAL_SERVER_ERROR, "handoff_session_unreadable");
+                return refuse(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "handoff_session_unreadable",
+                );
             }
         }
     };
@@ -780,27 +783,26 @@ pub(crate) async fn auth_handoff(
         hub_id: auth::hub_id(&headers, &st.hub_id()),
         access,
     };
-    let prepared = cloud_client::CloudClient::new(&st.config.cloud_base_url).browser_handoff_issue(&auth);
+    let prepared =
+        cloud_client::CloudClient::new(&st.config.cloud_base_url).browser_handoff_issue(&auth);
     let mut request = st.http.post(&prepared.url).json(&json!({}));
     for (name, value) in prepared.headers {
         request = request.header(name, value);
     }
     let code = match request.send().await {
-        Ok(response) if response.status().is_success() => {
-            match response.json::<Value>().await {
-                Ok(body) => match body.get("code").and_then(Value::as_str) {
-                    Some(code) if !code.is_empty() => code.to_string(),
-                    _ => {
-                        eprintln!("[handoff] the SaaS answered without a one-time code");
-                        return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
-                    }
-                },
-                Err(e) => {
-                    eprintln!("[handoff] unreadable answer from the SaaS: {e}");
+        Ok(response) if response.status().is_success() => match response.json::<Value>().await {
+            Ok(body) => match body.get("code").and_then(Value::as_str) {
+                Some(code) if !code.is_empty() => code.to_string(),
+                _ => {
+                    eprintln!("[handoff] the SaaS answered without a one-time code");
                     return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
                 }
+            },
+            Err(e) => {
+                eprintln!("[handoff] unreadable answer from the SaaS: {e}");
+                return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
             }
-        }
+        },
         Ok(response) => {
             eprintln!("[handoff] the SaaS refused the pass: {}", response.status());
             return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
