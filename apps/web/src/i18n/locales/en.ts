@@ -911,6 +911,7 @@ export default {
     stateInstalled: 'Installed',
     stateAvailable: 'Available',
     stateUnavailable: 'Unavailable',
+    stateNeedsNewerHub: 'Needs ERPlora {version}',
     stateInstalling: 'Installing…',
     // hub#516: installed, but a newer version is published. Names the version — «there is an
     // update» without saying which one is a nag, not information.
@@ -924,6 +925,7 @@ export default {
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
     actionUpdate: 'Update',
+    actionSeeHubUpdates: 'See your ERPlora version and updates',
     // Icon-only like every action (Ioan 2026-07-16 on ADR-0133): okdt puts this in `aria-label`
     // and `title`, never on the face of the button.
     actionOpen: 'Open',

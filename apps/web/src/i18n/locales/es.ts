@@ -806,6 +806,7 @@ export default {
     stateInstalled: 'Instalado',
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
+    stateNeedsNewerHub: 'Necesita ERPlora {version}',
     stateInstalling: 'Instalando…',
     // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
     // «hay actualización» sin decir cuál es una insistencia, no una información.
@@ -819,6 +820,7 @@ export default {
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
     actionUpdate: 'Actualizar',
+    actionSeeHubUpdates: 'Ver tu versión de ERPlora y sus actualizaciones',
     actionOpen: 'Abrir',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',

@@ -178,10 +178,11 @@ import {
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { moduleNav, refreshModuleNav } from '../lib/nav';
+import { fetchSystemInfo } from '../lib/system';
 import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
-  alsoInstalledNames, catalogActionFor, catalogRowState, catalogVisibleAction, isModuleInstalled,
+  alsoInstalledNames, catalogActionFor, catalogRowState, catalogVisibleAction, hubTooOldFor, isModuleInstalled,
   modulesWithUnknownPublication, publicationOf,
   type CatalogBusyAction, type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
@@ -209,6 +210,8 @@ interface Mod {
   version?: string;
   /** Ids de los permisos que declara el manifest, según el catálogo Cloud (pm#132). */
   capabilities: string[];
+  /** Minimum ERPlora version the announced `version` needs, or `null` (saas#2239, hub#2054). */
+  minErploraVersion: string | null;
 }
 
 type AppsTab = 'mine' | 'all' | 'paid';
@@ -384,6 +387,7 @@ function stateCell(row: Row): Node {
   if (row.state === 'updatable') return badgeCell(String(row.stateLabel ?? ''), 'primary');
   if (row.state === 'installed') return badgeCell(t('apps.stateInstalled'), 'success');
   if (row.state === 'unavailable') return badgeCell(t('apps.stateUnavailable'), 'warning');
+  if (row.state === 'needs_newer_hub') return badgeCell(String(row.stateLabel ?? ''), 'warning');
   return badgeCell(t('apps.stateAvailable'), 'medium');
 }
 
@@ -392,6 +396,16 @@ function stateCell(row: Row): Node {
 // (`mark_installed` es best-effort), así que lo cruzamos con la lista local para no mostrar
 // "Disponible" (ni el botón Instalar activo) en un módulo ya instalado. (Bug demo 2026-07-12.)
 const installedIds = computed<Set<string>>(() => new Set(installedModules.value.map((m) => m.id)));
+
+// The version this hub runs (`/api/system`, e.g. `v1.4.0`), to compare with each app's floor before
+// anyone presses «Install» (hub#2054). `null` until it answers — or when it cannot — and then no card
+// is blocked: the runtime still refuses a too-new app at install time (hub#1620).
+const hubVersion = ref<string | null>(null);
+async function loadHubVersion(): Promise<void> {
+  const info = await fetchSystemInfo();
+  if (!info) console.warn('[apps] could not read the hub version: the catalog cannot warn about app floors');
+  hubVersion.value = info?.hubVersion ?? null;
+}
 
 // Los ids que el CATÁLOGO trae hoy. Estar ahí ya es la respuesta: la lista del marketplace sólo
 // sirve `publication_status='listed'` (lo filtra el SaaS en su acción `list`), así que un módulo
@@ -486,6 +500,7 @@ const filteredModules = computed<Row[]>(() => {
       hasUpdate: update !== null,
       available: m.available,
       busy: prog !== null || updatingIds.value.has(m.id),
+      needsNewerHub: hubTooOldFor(m.minErploraVersion, hubVersion.value),
     });
     return {
       ...m,
@@ -501,7 +516,9 @@ const filteredModules = computed<Row[]>(() => {
               ? t('apps.stateInstalled')
               : state === 'unavailable'
                 ? t('apps.stateUnavailable')
-                : t('apps.stateAvailable'),
+                : state === 'needs_newer_hub'
+                  ? t('apps.stateNeedsNewerHub', { version: m.minErploraVersion ?? '' })
+                  : t('apps.stateAvailable'),
       progress: prog,
     };
   });
@@ -658,6 +675,14 @@ const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !confi
         hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'update',
         disabled: (row) => row.state === 'installing',
         loading: (row) => row.state === 'installing',
+      },
+      {
+        // hub#2054: in place of «Install» on an app this hub is too old for. The hub updates itself
+        // (ADR-0269), so this leads to where its version and what changed are shown.
+        id: 'see_hub_updates',
+        label: t('apps.actionSeeHubUpdates'),
+        icon: 'information-circle-outline',
+        hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'see_hub_updates',
       },
     ]
   : []);
@@ -1166,6 +1191,7 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     cat: m.category,
     version: m.version,
     capabilities: m.capabilities,
+    minErploraVersion: m.minErploraVersion,
   };
 }
 
@@ -1220,6 +1246,7 @@ function handleCatalogAction(e: Event): void {
   const offered = catalogActionFor(row.state as CatalogRowState);
   if (actionId === 'update' && offered === 'update') void updateInstalledModule(mod.id, mod.name);
   else if (actionId === 'install' && offered === 'install') void installModule(mod);
+  else if (actionId === 'see_hub_updates' && offered === 'see_hub_updates') void router.push('/system#updates');
 }
 
 // Cablea una tabla (labels del locale activo + listener de rowAction). La vista inicial = tarjetas la fija el
@@ -1275,6 +1302,7 @@ onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
   void loadCatalog();
   void loadInstalled();
+  void loadHubVersion();
   // Qué módulos publican pantalla, para el botón «Abrir» (hub#773). El shell ya la carga al entrar,
   // pero esta pantalla no puede depender de eso: entrar por `/apps` directamente (deep-link, F5)
   // dejaría todos los «Abrir» en gris hasta que algo más la refrescase.
