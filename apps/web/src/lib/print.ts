@@ -23,7 +23,13 @@
 // ⚠️ El escalón 3 NO existe dentro de la app instalada (hub#862): en su WebView `window.print()` no
 // imprime nada. Allí acabar en el navegador es un FALLO (`via:'none'`) y se devuelve como tal — dar
 // por bueno un `via:'browser'` es lo que dejó a la QA creyendo que el papel había salido.
+//
+// A4 in the installed desktop app (hub#2006): a document with `format:'a4'` and its `html` goes
+// FIRST to the shell's native print dialog (`print_document`) — the system's own, with its printer
+// list and «Save as PDF». It answers `via:'browser'` because it is the same thing the browser does
+// with an A4. Where the shell cannot (older build, Android: hub#2008) the door takes its usual route.
 import { isTauri } from './device';
+import { printDocumentNatively } from './native-print';
 
 /** Dispositivo tal y como lo registra el Bridge. */
 export interface PrintDevice {
@@ -80,7 +86,12 @@ export interface PrintRequest {
 }
 
 export interface PrintResult {
-  /** Por dónde salió: el Bridge, la cola del hub, el navegador, o por ningún sitio. */
+  /**
+   * Por dónde salió: el Bridge, la cola del hub, el navegador, o por ningún sitio.
+   *
+   * `browser` means «handed to a print dialog»: the browser's, or — for an A4 inside the installed
+   * desktop app — the system's own, opened by the shell (hub#2006).
+   */
   via: 'bridge' | 'queue' | 'browser' | 'none';
   role: string;
   printerId?: string;
@@ -249,6 +260,11 @@ export function createPrintService(
      * papel que no existe — es lo que hizo invisible el fallo durante toda la QA de hub#862.
      */
     installedApp?: () => boolean;
+    /**
+     * Opens the system print dialog of the installed app with an A4 `html` (hub#2006). By default
+     * the shell command `print_document`. Rejects when the shell has no dialog to open.
+     */
+    nativePrint?: (html: string) => Promise<void>;
   } = {},
 ): (req: PrintRequest) => Promise<PrintResult> {
   const browserPrint = opts.browserPrint ?? (() => globalThis.print?.());
@@ -256,12 +272,15 @@ export function createPrintService(
     opts.iframePrint ?? ((html: string, format?: PrintFormat) => printHtmlInIframe(html, document, format));
   const enqueue = opts.enqueue;
   const installedApp = opts.installedApp ?? isTauri;
+  const nativePrint = opts.nativePrint ?? printDocumentNatively;
 
   return async function print(req: PrintRequest): Promise<PrintResult> {
     const role = req.role || 'receipt';
     const allowBrowser = req.fallbackToBrowser !== false;
     const documentType = req.documentType || 'receipt';
     const data = req.data ?? {};
+    // Why the system print dialog could not open (hub#2006), kept for the `via:'none'` answer.
+    let nativeError: string | undefined;
 
     // Encola en el hub y devuelve vía 'queue'. Solo para tiques térmicos (receipt/kitchen…): el
     // A4 (facturas/albaranes) no tiene cola, va al navegador. Si el runtime rechaza el encolado,
@@ -309,7 +328,7 @@ export function createPrintService(
         return {
           via: 'none',
           role,
-          error: [error, 'la app instalada no imprime por el navegador: asigna un rol a la impresora']
+          error: [nativeError, error, 'la app instalada no imprime por el navegador: asigna un rol a la impresora']
             .filter(Boolean)
             .join(' · '),
         };
@@ -320,6 +339,18 @@ export function createPrintService(
       return { via: 'browser', role, error };
     };
 
+    // A4 inside the installed app: the system print dialog, before any thermal route (hub#2006).
+    // An invoice on a till roll is the wrong paper; the dialog is where the user picks the laser
+    // printer or «Save as PDF». Only when someone is in front of it (`fallbackToBrowser` not false),
+    // and only with the document's own html — there is nothing else to show in the dialog.
+    if (req.format === 'a4' && req.html && allowBrowser && installedApp()) {
+      try {
+        await nativePrint(req.html);
+        return { via: 'browser', role };
+      } catch (e) {
+        nativeError = e instanceof Error ? e.message : String(e);
+      }
+    }
     let devices: PrintDevice[];
     try {
       devices = await client.peripherals.getDevices();

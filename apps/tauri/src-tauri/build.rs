@@ -18,6 +18,9 @@ fn main() {
             // The other half of the same trip: bytes the page already holds, written where the
             // user will find them, with the path returned so the app can SAY so (hub#480).
             "save_download",
+            // The system print dialog for an A4 document the page holds (hub#2006): a laser printer
+            // or «Save as PDF», which the webview's own `window.print()` cannot reach.
+            "print_document",
             // The way out when the network dies under the window (hub#1716): the retry control of
             // the bundled offline page. Granted to that page ONLY (`capabilities/degraded.json`).
             "shell_retry",

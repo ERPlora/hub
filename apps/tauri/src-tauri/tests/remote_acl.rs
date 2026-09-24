@@ -388,6 +388,22 @@ fn the_hub_origin_can_save_a_file_where_the_user_will_find_it() {
 }
 
 #[test]
+fn the_hub_origin_can_open_the_system_print_dialog() {
+    // hub#2006: an A4 invoice reaches a laser printer or «Save as PDF» through `print_document`.
+    // Without this grant the ACL refuses the command and the door falls back to the till roll —
+    // on the installed app only, where no dev run would show it.
+    let granted: Vec<String> = permissions_granted_to("https://panaderia.a.erplora.com/m/sales")
+        .into_iter()
+        .map(|(_, permission)| permission)
+        .collect();
+
+    assert!(
+        granted.iter().any(|p| p == "allow-print-document"),
+        "no capability lets the till PWA open the print dialog; granted: {granted:?}"
+    );
+}
+
+#[test]
 fn no_capability_hands_a_page_the_raw_opener_plugin() {
     // The app links `tauri-plugin-opener` so the till can send the user to the SaaS checkout in
     // their own browser (hub#475). The plugin's OWN commands are not what the page gets: they take
