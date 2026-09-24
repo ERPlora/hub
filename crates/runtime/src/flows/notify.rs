@@ -1258,6 +1258,8 @@ mod tests {
             json!({ "text": "Hola", "note": "" }),
             // Only placeholders, one of them there: the run HAD part of it.
             json!({ "text": "Hola", "note": "{{steps.book.text}} {{steps.book.missing}}" }),
+            // …in either order: the first placeholder being absent does not make the text absent.
+            json!({ "text": "Hola", "note": "{{steps.book.missing}} {{steps.book.text}}" }),
         ] {
             prepare_in(&db, &saying(vars.clone()), &authority, &published_empty)
                 .await
