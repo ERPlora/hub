@@ -81,6 +81,12 @@ export interface CloudMarketplaceModule {
    * preguntar nada (pm#132). Declaración, nunca concesión.
    */
   capabilities: string[];
+  /**
+   * The minimum ERPlora version the announced `version` needs, or `null` when it declares none
+   * (saas#2239: the floor of THAT version for this hub's lane, not one per app). Additive: a SaaS
+   * older than the field omits it and nothing is blocked (hub#2054).
+   */
+  minErploraVersion: string | null;
 }
 
 // --- Token store (JWT del usuario activo) -----------------------------------
@@ -831,6 +837,10 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
     available: Boolean(raw.can_install ?? raw.is_active ?? true) && raw.is_coming_soon !== true,
     version: raw.version ? String(raw.version) : undefined,
     capabilities: capabilityIds(raw.capabilities),
+    minErploraVersion:
+      typeof raw.min_erplora_version === 'string' && raw.min_erplora_version.trim()
+        ? raw.min_erplora_version.trim()
+        : null,
   };
 }
 
