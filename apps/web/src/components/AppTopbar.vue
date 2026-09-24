@@ -448,10 +448,11 @@ function goToDeadLetters(): void {
 /** Lo que aporta cada fuente, para pintar SU fila y no el total (hub#987). */
 const deadLetterCount = computed(() => notificationCountOf('deadLetters'));
 
-// Y de impresión parada: a la pantalla donde se ve la cobertura por estación y se registra el host
-// (hub#987). Es la misma que ya pintaba el aviso donde nadie lo veía.
+// And for stopped printing: to the Tickets tab, where the per-station coverage is shown and the
+// print host is registered (hub#987). It used to push `#receipts`, a tab that does not exist, and
+// landed on General (hub#2016) — `settings-tab-links.hub2016.test.ts` keeps every such link honest.
 function goToPrinting(): void {
-  void router.push({ path: '/settings', hash: '#receipts' });
+  void router.push({ path: '/settings', hash: '#tickets' });
 }
 </script>
 
