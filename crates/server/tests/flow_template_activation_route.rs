@@ -927,6 +927,19 @@ async fn toggle(fx: &Fixture) -> Value {
     body_json(on).await["data"].clone()
 }
 
+/// Una receta que el dueño reescribió en el editor: otro nombre y dos pasos.
+fn owner_recipe() -> Value {
+    json!({
+        "schema_version": 1,
+        "name": "Citas de la tarde",
+        "triggers": [{ "kind": "manual" }],
+        "steps": [
+            { "id": "s1", "kind": "command", "command": CREATE },
+            { "id": "s2", "kind": "command", "command": CREATE }
+        ]
+    })
+}
+
 fn grant_values(grants: &[Value]) -> Vec<String> {
     let mut values: Vec<String> = grants
         .iter()
@@ -996,15 +1009,7 @@ async fn turning_it_back_on_keeps_what_the_owner_wrote_in_the_editor() {
     let fx = fixture().await;
     let flow_id = activated(&fx).await;
 
-    let edited = json!({
-        "schema_version": 1,
-        "name": "Citas de la tarde",
-        "triggers": [{ "kind": "manual" }],
-        "steps": [
-            { "id": "s1", "kind": "command", "command": CREATE },
-            { "id": "s2", "kind": "command", "command": CREATE }
-        ]
-    });
+    let edited = owner_recipe();
     let response = send(
         &fx.router,
         put(
@@ -1040,6 +1045,16 @@ async fn a_recipe_left_without_any_permission_gets_the_modules_back_when_turned_
     // automatización que falla en cada paso con `flow.grant_denied`.
     let fx = fixture().await;
     let flow_id = activated(&fx).await;
+    let renamed = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(renamed.status(), StatusCode::OK);
 
     let emptied = send(
         &fx.router,
@@ -1055,6 +1070,10 @@ async fn a_recipe_left_without_any_permission_gets_the_modules_back_when_turned_
     let body = toggle(&fx).await;
     assert_eq!(body["enabled"], true);
     assert_eq!(
+        body["name"], "Citas de la tarde",
+        "recibe los permisos del módulo, no su receta: lo que escribió el dueño se queda"
+    );
+    assert_eq!(
         grant_values(&grants_of(&fx, &flow_id).await),
         {
             let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
@@ -1062,5 +1081,68 @@ async fn a_recipe_left_without_any_permission_gets_the_modules_back_when_turned_
             v
         },
         "sin ningún permiso, recibe exactamente los del módulo"
+    );
+}
+
+#[tokio::test]
+async fn deleting_it_and_activating_again_brings_back_the_factory_recipe() {
+    // hub#1684: como «Activar» ya no restaura, el camino explícito para volver a la de fábrica es
+    // borrarla en Automatizaciones y activarla otra vez. Si ese camino no existiera, el dueño
+    // que se equivocó editando no tendría forma de recuperar la receta del módulo.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let edited = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(edited.status(), StatusCode::OK);
+
+    let deleted = send(
+        &fx.router,
+        Request::builder()
+            .method("DELETE")
+            .uri(format!("/api/hub/flows/{flow_id}"))
+            .header("x-hub-session", fx.admin.as_str())
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(deleted.status().is_success(), "{}", deleted.status());
+
+    let again = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(again.status(), StatusCode::CREATED, "monta una nueva");
+    let body = body_json(again).await["data"].clone();
+    assert_ne!(body["id"], flow_id.as_str());
+    assert_ne!(
+        body["name"], "Citas de la tarde",
+        "con el nombre de fábrica"
+    );
+    assert_ne!(
+        body["definition"]["steps"].as_array().map(Vec::len),
+        Some(2),
+        "y los pasos de fábrica"
+    );
+    let id = body["id"].as_str().expect("el flujo nuevo").to_string();
+    assert_eq!(
+        grant_values(&grants_of(&fx, &id).await),
+        {
+            let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
+            v.sort();
+            v
+        },
+        "y exactamente los permisos del módulo"
     );
 }
