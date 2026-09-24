@@ -547,3 +547,85 @@ async fn when_memory_and_database_agree_nothing_is_touched() {
 
     let _ = std::fs::remove_dir_all(&t.temp);
 }
+
+// ── 6. A package that is not what it says ────────────────────────────────────────────────
+
+/// The marketplace answers the recorded version with a package whose manifest carries ANOTHER one
+/// (a mislabelled publication). That is not «reloaded at the recorded version», and saying so would
+/// hide that this task now runs something nobody asked for.
+#[tokio::test]
+async fn a_package_that_carries_another_version_is_reported_as_a_failure() {
+    let mislabelled = package("extras", "1.2.0");
+    let mock = MockCloud::with(&[
+        ("parts", "1.0.0", package("parts", "1.0.0")),
+        ("extras", "1.0.0", mislabelled),
+    ]);
+    let t = two_tasks("mislabelled", mock.clone()).await;
+    let extras = package_dir(&t.temp, "extras", "1.0.0");
+    t.outgoing
+        .runtime
+        .write()
+        .await
+        .install_from_dir(&extras)
+        .await
+        .unwrap();
+
+    let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
+
+    assert!(report.reloaded.is_empty(), "{report:?}");
+    assert_eq!(report.failed.len(), 1, "{report:?}");
+    assert_eq!(
+        (report.failed[0].0.as_str(), report.failed[0].1.as_str()),
+        ("extras", "1.0.0"),
+        "{report:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
+
+// ── 7. What fell in cascade stays fallen ─────────────────────────────────────────────────
+
+/// A module that went off IN CASCADE because its dependency was switched off (ADR-0128) is
+/// reloaded as what it is — `inactive_auto` — and not as active on top of a dependency that is off.
+#[tokio::test]
+async fn a_module_that_fell_in_cascade_is_reloaded_still_fallen() {
+    let addon_manifest = serde_json::to_string(&json!({
+        "id": "addon", "name": "addon", "version": "1.0.0", "depends_on": ["parts"],
+        "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+    }))
+    .unwrap();
+    let addon_sql = INIT_SQL.replace("{id}", "addon");
+    let addon_zip = build_zip(&[
+        ("module.json", addon_manifest.as_bytes()),
+        ("migrations/postgres/001_init.sql", addon_sql.as_bytes()),
+    ]);
+    let mock = MockCloud::with(&[
+        ("parts", "1.0.0", package("parts", "1.0.0")),
+        ("addon", "1.0.0", addon_zip),
+    ]);
+    let t = two_tasks("cascade", mock.clone()).await;
+    let addon = t.temp.join("seed").join("addon").join("1.0.0");
+    std::fs::create_dir_all(addon.join("migrations/postgres")).unwrap();
+    std::fs::write(addon.join("module.json"), &addon_manifest).unwrap();
+    std::fs::write(addon.join("migrations/postgres/001_init.sql"), &addon_sql).unwrap();
+    {
+        let mut rt = t.outgoing.runtime.write().await;
+        rt.install_from_dir(&addon).await.unwrap();
+        rt.deactivate("parts").await.unwrap();
+    }
+    assert_eq!(recorded(&t.staying, "addon").await.1, "inactive_auto");
+
+    let report = ModuleReconciler::new().reconcile_once(&t.staying).await;
+
+    assert!(
+        report.reloaded.contains(&("addon".to_string(), "1.0.0".to_string())),
+        "{report:?}"
+    );
+    assert_eq!(
+        listed(&t.staying, &t.session, "addon").await.unwrap()["status"],
+        json!("inactive_auto")
+    );
+    assert_eq!(recorded(&t.staying, "addon").await.1, "inactive_auto");
+
+    let _ = std::fs::remove_dir_all(&t.temp);
+}
