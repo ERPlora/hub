@@ -654,6 +654,20 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
                 .to_string(),
         });
     }
+    // An own certificate past its `notAfter` is no road at all (hub#1973): the AEAT refuses it, and
+    // the till would refuse the FIRST sale with this same code (hub#1940). Said here, before anything
+    // is frozen, so the owner renews or hands filing to ERPlora while the hub is still in `testing`.
+    // An expiry the hub cannot read blocks nothing, exactly as on the sale's path.
+    if route == crate::certificate::ROUTE_OWN
+        && crate::certificate::signing_certificate_expired(db, hub_id).await?
+    {
+        return Err(RuntimeError::Domain {
+            code: crate::certificate::OWN_CERTIFICATE_EXPIRED.to_string(),
+            message: "the hub's own certificate has expired and the AEAT does not accept it: \
+                      upload a renewed certificate, or let ERPlora file for you, and try again"
+                .to_string(),
+        });
+    }
     let taxpayer_id = crate::settings::get_all(db, hub_id)
         .await
         .unwrap_or(json!({}))
