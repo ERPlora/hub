@@ -16,7 +16,10 @@
 // translates), with the translator injected so no caller has to repeat the `te`/`t` dance.
 
 /** The slice of `vue-i18n` this needs: ask whether a key exists, then read it. */
-export type Translator = { t: (key: string) => string; te: (key: string) => boolean };
+export type Translator = {
+  t: (key: string, params?: Record<string, string>) => string;
+  te: (key: string) => boolean;
+};
 
 /** What a stable code looks like: `cloud_unreachable`, `install_cloud_unavailable`, `a.b-c`. */
 const CODE_SHAPE = /^[a-z][a-z0-9_.-]*$/;

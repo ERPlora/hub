@@ -19,6 +19,13 @@
 import { ModuleActionError } from './runtime';
 import { runtimeErrorKey, type Translator } from './runtime-error-sentence';
 
+/** The facts a translated sentence interpolates, when the error carries them (hub#1620). */
+function paramsOf(error: unknown): Record<string, string> | null {
+  if (!error || typeof error !== 'object') return null;
+  const params = (error as { params?: unknown }).params;
+  return params && typeof params === 'object' ? (params as Record<string, string>) : null;
+}
+
 /** The sentence the runtime sent, or `null` when it did not speak. */
 function serverSentence(error: unknown): string | null {
   if (!error || typeof error !== 'object') return null;
@@ -50,7 +57,12 @@ function serverSentence(error: unknown): string | null {
  */
 export function moduleFailureMessage(error: unknown, fallback: string, i18n: Translator): string {
   const key = runtimeErrorKey(error, i18n);
-  if (key) return i18n.t(key);
+  if (key) {
+    // hub#1620: some sentences name facts the runtime sent as data (`core_version_too_old` → the
+    // version the app needs and the one this hub runs).
+    const params = paramsOf(error);
+    return params ? i18n.t(key, params) : i18n.t(key);
+  }
 
   const sentence = serverSentence(error);
   return sentence && sentence.trim() ? sentence : fallback;

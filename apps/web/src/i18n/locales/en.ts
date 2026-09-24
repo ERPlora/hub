@@ -2039,6 +2039,10 @@ export default {
     install_not_in_catalog: 'That app is not available in your catalogue.',
     install_cloud_rejected:
       'erplora.com could not attend to this installation right now. Try again in a few minutes.',
+    // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
+    // not run whole); the owner can act on it by updating the hub.
+    core_version_too_old:
+      'This app needs a newer hub (ERPlora {required}). Yours runs {core}: update the hub and try again.',
     cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
     cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
     hub_not_enrolled: 'This hub is not connected to erplora.com yet.',
