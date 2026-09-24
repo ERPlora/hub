@@ -181,6 +181,7 @@ import {
   IonSegment, IonSegmentButton, IonLabel,
   IonButton, IonSpinner,
   IonList, IonItem, IonToolbar,
+  onIonViewDidLeave, onIonViewWillEnter,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -579,6 +580,20 @@ function onModulesChanged(): void {
   // several more: without re-reading it, the card would keep asking for what the user just did.
   void refreshSetupStatus(client);
 }
+
+// hub#2064 — `ion-router-outlet` keeps this page cached while the owner goes to fix what the strip
+// warns about (reconnect WhatsApp in its settings, set up the printer), so coming back does not
+// mount it again and `onMounted` never re-reads. Re-read on every return, like ModuleView does.
+// Only after a real leave: Ionic also fires WillEnter on the first entry, right after the mount
+// that has just read it, and that would be every call twice.
+let leftScreen = false;
+onIonViewDidLeave(() => {
+  leftScreen = true;
+});
+onIonViewWillEnter(() => {
+  if (!leftScreen) return;
+  void loadSystemHealth();
+});
 </script>
 
 <style scoped>
