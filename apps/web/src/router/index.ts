@@ -9,6 +9,7 @@ import { reportClientError } from '../lib/error-report';
 import { toastError } from '../lib/toast';
 import { i18n } from '../i18n';
 import { showViewLoadFailure } from './view-load-failure-notice';
+import { installSystemBackButton } from './back-closes-overlay';
 import { browserRecoveryStorage, clearViewLoadRecovery, recoverFromViewLoadError } from './view-load-recovery';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
@@ -93,6 +94,10 @@ export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 });
+
+// hub#1906 — Android's Back button closes the sheet/modal/menu on top before it leaves the screen.
+// It takes the button itself and never cancels a navigation: see `installSystemBackButton`.
+void installSystemBackButton();
 
 /**
  * Auth-gate: rutas con `meta.auth` requieren sesión; si no, a `/login`. (Vue-router nativo.)

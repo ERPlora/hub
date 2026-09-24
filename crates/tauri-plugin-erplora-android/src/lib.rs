@@ -175,6 +175,9 @@ struct PrintHtmlArgs {
 /// print screen that DID open into a failure (seen on the emulator, hub#2008).
 type PrintHtmlAnswer = serde::de::IgnoredAny;
 
+/// `leaveApp` resolves with no data (`invoke.resolve()` → `null`): read it as anything (hub#2024).
+type LeaveAppAnswer = serde::de::IgnoredAny;
+
 /// How long reader mode may stay open on one call (hub#988). Kotlin clamps it: an argument nobody
 /// typed by hand must never be the reason a till has no reader.
 #[derive(Debug, Serialize)]
@@ -247,6 +250,20 @@ pub struct ErploraAndroid<R: Runtime>(tauri::plugin::PluginHandle<R>);
 pub struct ErploraAndroid<R: Runtime>(std::marker::PhantomData<fn() -> R>);
 
 impl<R: Runtime> ErploraAndroid<R> {
+    /// hub#1906 — sends the app to the background, as the system Back does on a root screen.
+    pub fn leave_app(&self) -> Result<(), Error> {
+        #[cfg(target_os = "android")]
+        {
+            return self
+                .0
+                .run_mobile_plugin::<LeaveAppAnswer>("leaveApp", Empty {})
+                .map(|_| ())
+                .map_err(|e| Error::PluginInvoke(e.to_string()));
+        }
+        #[cfg(not(target_os = "android"))]
+        Ok(())
+    }
+
     /// Permisos concedidos ahora mismo. En escritorio, siempre vacío: no hay nada que conceder.
     pub fn check_permissions(&self) -> Result<PermissionStatus, Error> {
         #[cfg(target_os = "android")]
@@ -441,6 +458,14 @@ impl<R: Runtime, T: Manager<R>> ErploraAndroidExt<R> for T {
     }
 }
 
+/// hub#1906 — leaves the app the way the system Back does on a root screen (the task goes to
+/// the background; nothing is killed). The shell calls it when it holds the Back button and there
+/// is nothing left to close nor to go back to. On desktop there is no such button: a no-op.
+#[tauri::command]
+async fn leave_app<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Error> {
+    app.erplora_android().leave_app()
+}
+
 #[tauri::command]
 async fn check_permissions<R: Runtime>(app: tauri::AppHandle<R>) -> Result<PermissionStatus, Error> {
     app.erplora_android().check_permissions()
@@ -456,7 +481,7 @@ async fn request_permissions<R: Runtime>(
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("erplora-android")
-        .invoke_handler(tauri::generate_handler![check_permissions, request_permissions])
+        .invoke_handler(tauri::generate_handler![check_permissions, request_permissions, leave_app])
         .setup(|app, _api| {
             #[cfg(target_os = "android")]
             let handle = _api.register_android_plugin(PLUGIN_IDENTIFIER, "ErploraAndroidPlugin")?;
@@ -474,6 +499,38 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub#1906 — once the shell takes the Android Back button (Tauri's `onBackButtonPress`),
+    /// Tauri no longer leaves the app on its own when the WebView has no history left: the shell
+    /// has to ask for it, and Tauri's own `exit` has no ACL permission to grant. `leave_app` is that
+    /// door. Four places have to agree or the press dies in silence: the build (which generates the
+    /// permission), the invoke handler, the default permission set the hub capability grants, and
+    /// the Kotlin command that actually leaves.
+    const PLUGIN_KT: &str = include_str!("../android/src/main/java/com/erplora/android/ErploraAndroidPlugin.kt");
+    const BUILD_RS: &str = include_str!("../build.rs");
+    const LIB_RS: &str = include_str!("lib.rs");
+    const DEFAULT_PERMISSIONS: &str = include_str!("../permissions/default.toml");
+
+    #[test]
+    fn leave_app_is_declared_wired_granted_and_implemented_hub1906() {
+        assert!(BUILD_RS.contains("\"leave_app\""), "build.rs does not declare leave_app: no permission is generated");
+        // Only the code above the tests: this very assertion spells the handler too.
+        let production = LIB_RS.split("#[cfg(test)]").next().unwrap_or_default();
+        assert!(
+            production.contains("generate_handler![check_permissions, request_permissions, leave_app]"),
+            "leave_app is not wired to the invoke handler"
+        );
+        assert!(
+            DEFAULT_PERMISSIONS.contains("\"allow-leave-app\""),
+            "erplora-android:default does not grant allow-leave-app: the hub's capability would refuse it"
+        );
+        let kotlin = PLUGIN_KT.split("fun leaveApp(invoke: Invoke)").nth(1).expect("no Kotlin leaveApp command");
+        let before = PLUGIN_KT.split("fun leaveApp(invoke: Invoke)").next().unwrap_or_default();
+        assert!(before.trim_end().ends_with("@Command"), "Kotlin leaveApp is not a @Command");
+        let body = kotlin.split("\n    }").next().unwrap_or_default();
+        assert!(body.contains("moveTaskToBack(true)"), "leaveApp does not leave the way the system Back does");
+        assert!(body.contains("invoke.resolve()"), "leaveApp never answers: the web would wait forever");
+    }
 
     #[test]
     fn el_estado_serializa_como_un_mapa_permiso_a_booleano() {

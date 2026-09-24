@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the check_permissions command without any pre-configured scope."
         },
         {
+          "description": "Enables the leave_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-leave-app",
+          "markdownDescription": "Enables the leave_app command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the leave_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-leave-app",
+          "markdownDescription": "Denies the leave_app command without any pre-configured scope."
+        },
+        {
           "description": "Enables the request_permissions command without any pre-configured scope.",
           "type": "string",
           "const": "allow-request-permissions",
@@ -319,10 +331,10 @@
           "markdownDescription": "Denies the request_permissions command without any pre-configured scope."
         },
         {
-          "description": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`",
+          "description": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y salir de la app con el botón Atrás.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-leave-app`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`"
+          "markdownDescription": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, y salir de la app con el botón Atrás.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-leave-app`"
         }
       ]
     }
