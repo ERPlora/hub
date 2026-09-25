@@ -253,6 +253,18 @@ impl InboundMessage {
         format!("{EVENT_ID_PREFIX}{}", self.wa_message_id)
     }
 
+    /// Outbox primary key of a **completed copy** of a backlog message (hub#2102): the `wamid`
+    /// plus a digest of Meta's object. The platform rewrites a history row in place once Meta
+    /// sends what the first webhook only announced (saas#1913), so the same `wamid` legitimately
+    /// comes back with a different message. The digest makes each distinct version one event and
+    /// keeps a redelivered version a duplicate, exactly like [`Self::event_id`] does for the first.
+    pub fn revision_event_id(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(self.payload.to_string().as_bytes());
+        let short: String = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
+        format!("{}~{short}", self.event_id())
+    }
+
     /// Payload of the core event.
     ///
     /// `from` and `text` are lifted out of Meta's nested shape because that is what a declarative
@@ -429,6 +441,54 @@ async fn who_asked(
     outbox::who_asked(db, hub_id, answers).await
 }
 
+/// **A backlog message the hub already holds, served again with a different message** (hub#2102).
+///
+/// Meta announces a recent photo, voice note or document of the coexistence backlog as an empty
+/// placeholder and sends the real message in a second webhook; the SaaS then completes its row in
+/// place and serves the same `wamid` again (saas#1913). Deduplicating by `wamid` alone acked that
+/// completion and threw it away, so the inbox kept the placeholder forever. The first event was
+/// already delivered — and a listener never sees the same event twice — so the completed copy
+/// becomes an event of its OWN, under [`InboundMessage::revision_event_id`]. It carries
+/// `source = "history"`, which is what keeps every automation from firing on it.
+///
+/// Returns whether a new event was written. A copy identical to what the hub already holds is a
+/// plain redelivery (a lost ack) and writes nothing. Only ever called for `history`: a LIVE message
+/// already raised may have started an automation, and raising it again would start it twice.
+async fn record_history_completion(
+    db: &dyn erplora_db::DatabaseAdapter,
+    hub_id: &str,
+    message: &InboundMessage,
+    payload: &Map<String, Value>,
+) -> Result<bool, erplora_runtime::RuntimeError> {
+    let mut params = erplora_db::Params::new();
+    params.insert("id".into(), json!(message.event_id()));
+    params.insert("hub_id".into(), json!(hub_id));
+    let known = db
+        .query(
+            "SELECT payload FROM _event_outbox WHERE id = :id AND hub_id = :hub_id",
+            &params,
+        )
+        .await?;
+    let unchanged = known.rows.first().is_some_and(|row| {
+        let stored = match &row["payload"] {
+            Value::String(text) => serde_json::from_str(text).unwrap_or(Value::Null),
+            other => other.clone(),
+        };
+        stored.get("message") == Some(&message.payload)
+    });
+    if unchanged {
+        return Ok(false);
+    }
+    outbox::insert_core_event_once(
+        db,
+        &message.revision_event_id(),
+        hub_id,
+        EVENT_NAME,
+        payload,
+    )
+    .await
+}
+
 /// **Where Meta puts the option a customer tapped, and under which keys.** Three shapes for one
 /// idea: a list row, a reply button of an interactive message, and a quick-reply button of a
 /// TEMPLATE — the last one names the id `payload` and the label `text`. The SaaS knows the same
@@ -474,7 +534,8 @@ pub struct PollReport {
     /// Messages the SaaS served (including ones already ingested on an earlier tick). The SaaS
     /// caps a page at 100; a bigger backlog drains over the following ticks.
     pub fetched: usize,
-    /// Messages that became a NEW core event on this tick.
+    /// Messages that became a NEW core event on this tick — including a backlog message the
+    /// platform completed after the hub already held its placeholder (hub#2102).
     pub ingested: usize,
     /// Messages the SaaS confirmed it will not serve again.
     pub acked: usize,
@@ -704,12 +765,28 @@ impl InboundPoller {
                 )
                 .await
                 {
-                    Ok(fresh) => {
-                        if fresh {
-                            ingested += 1;
-                        }
+                    Ok(true) => {
+                        ingested += 1;
                         acknowledge.push(message.wa_message_id.clone());
                     }
+                    Ok(false) if message.source() == "history" => {
+                        match record_history_completion(rt.db(), &hub_id, message, &payload).await {
+                            Ok(fresh) => {
+                                if fresh {
+                                    ingested += 1;
+                                }
+                                acknowledge.push(message.wa_message_id.clone());
+                            }
+                            // Not acked: the SaaS serves the completed copy again, and dropping
+                            // it here is the very loss hub#2102 is about.
+                            Err(e) => tracing::warn!(
+                                wa_message_id = %message.wa_message_id,
+                                "inbound whatsapp: the completed history message could not be \
+                                 written, it will be redelivered: {e}"
+                            ),
+                        }
+                    }
+                    Ok(false) => acknowledge.push(message.wa_message_id.clone()),
                     // One bad row must not strand the rest of the page: this message simply is
                     // not acked, so the SaaS serves it again on the next tick.
                     Err(e) => tracing::warn!(
@@ -988,6 +1065,19 @@ mod tests {
 
         fn answer_the_inbox_with(&self, status: StatusCode) {
             *self.inbox.inbox_status.lock().unwrap() = status;
+        }
+
+        /// What the SaaS does when Meta's second history webhook completes a row it already
+        /// delivered (saas#1913): the row is rewritten IN PLACE with the full message and marked
+        /// undelivered again, so the next poll serves the same `wamid` with the new payload.
+        fn complete_in_place(&self, message: Value) {
+            let wamid = message["wa_message_id"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            let mut pending = self.inbox.pending.lock().unwrap();
+            pending.retain(|m| m["wa_message_id"].as_str() != Some(wamid.as_str()));
+            pending.push(message);
         }
     }
 
@@ -1561,6 +1651,159 @@ mod tests {
         let payloads = payloads_by_id(&runtime).await;
         assert_eq!(payloads["wa-wamid.old"]["source"], json!("history"));
         assert_eq!(payloads["wa-wamid.1"]["source"], json!("live"));
+    }
+
+    /// A photo out of the coexistence backlog as Meta announces it FIRST: a placeholder with
+    /// nothing to download yet (saas#1913).
+    fn history_placeholder(wa_message_id: &str) -> Value {
+        let mut message = from_history(message(wa_message_id, ""));
+        message["payload"] = json!({
+            "id": wa_message_id,
+            "from": CUSTOMER,
+            "timestamp": "1785153600",
+            "type": "media_placeholder",
+        });
+        message
+    }
+
+    /// The same backlog message once the platform completed it: the image and the id of its
+    /// asset, which is what the module needs to download it.
+    fn history_photo(wa_message_id: &str) -> Value {
+        let mut message = history_placeholder(wa_message_id);
+        message["payload"]["type"] = json!("image");
+        message["payload"]["image"] = json!({"id": "media-77", "mime_type": "image/jpeg"});
+        message["received_at"] = json!("2026-08-09T10:05:00+00:00");
+        message
+    }
+
+    /// **hub#2102.** Meta announces a recent backlog photo as an empty placeholder and sends the
+    /// real message later; the SaaS completes its row in place and serves the same `wamid` again.
+    /// Deduplicating by `wamid` alone acked that second delivery and threw it away, so the inbox
+    /// kept the empty placeholder forever. The completed copy has to reach the module as an
+    /// event of its own — the placeholder's was already delivered and will not be delivered twice.
+    #[tokio::test]
+    async fn a_history_message_the_platform_completes_later_reaches_the_hub_with_its_attachment() {
+        let cloud = fake_cloud(vec![history_placeholder("wamid.photo")]).await;
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok"));
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        cloud.complete_in_place(history_photo("wamid.photo"));
+        let report = poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        assert_eq!(report.ingested, 1, "the completed copy is new to this hub");
+        assert_eq!(report.acked, 1);
+        assert!(
+            cloud.pending_ids().is_empty(),
+            "and the SaaS stops serving it"
+        );
+
+        let rows = outbox_rows(&runtime).await;
+        assert_eq!(
+            rows.len(),
+            2,
+            "the placeholder's event plus the completed one"
+        );
+        let completed: Vec<Value> = rows
+            .iter()
+            .filter(|row| row["id"] != json!("wa-wamid.photo"))
+            .map(|row| serde_json::from_str(row["payload"].as_str().unwrap()).unwrap())
+            .collect();
+        assert_eq!(completed.len(), 1);
+        assert_eq!(
+            rows[1]["event_name"],
+            json!(EVENT_NAME),
+            "the same door into the module"
+        );
+        assert_eq!(rows[1]["hub_id"], json!(HUB));
+        let payload = &completed[0];
+        assert_eq!(payload["wa_message_id"], json!("wamid.photo"));
+        assert_eq!(
+            payload["source"],
+            json!("history"),
+            "what keeps every automation from firing on a backlog message"
+        );
+        assert_eq!(payload["message"]["type"], json!("image"));
+        assert_eq!(payload["message"]["image"]["id"], json!("media-77"));
+    }
+
+    /// The completed copy is subject to the same redelivery contract as anything else: an ack
+    /// that never lands serves it again, and it must still be ONE update, not one per tick.
+    #[tokio::test]
+    async fn a_completed_history_message_redelivered_is_still_one_update() {
+        let cloud = fake_cloud(vec![history_placeholder("wamid.photo")]).await;
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok"));
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        cloud.complete_in_place(history_photo("wamid.photo"));
+        cloud.fail_the_ack_with(StatusCode::INTERNAL_SERVER_ERROR);
+        for _ in 0..3 {
+            let _ = poller.poll_once(&runtime, &entitled()).await;
+        }
+
+        assert_eq!(cloud.pending_ids(), vec!["wamid.photo".to_string()]);
+        assert_eq!(outbox_rows(&runtime).await.len(), 2);
+    }
+
+    /// Each distinct version the platform serves is its own update: a second completion (a
+    /// caption Meta sent later, say) must not be mistaken for a redelivery of the first.
+    #[tokio::test]
+    async fn every_distinct_completion_of_a_history_message_reaches_the_hub() {
+        let cloud = fake_cloud(vec![history_placeholder("wamid.photo")]).await;
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok"));
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        cloud.complete_in_place(history_photo("wamid.photo"));
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+        let mut captioned = history_photo("wamid.photo");
+        captioned["payload"]["image"]["caption"] = json!("the colour I want");
+        cloud.complete_in_place(captioned);
+        let report = poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        assert_eq!(report.ingested, 1);
+        let captions: Vec<Value> = payloads_by_id(&runtime)
+            .await
+            .into_values()
+            .map(|payload| payload["message"]["image"]["caption"].clone())
+            .collect();
+        assert_eq!(captions.len(), 3);
+        assert!(captions.contains(&json!("the colour I want")));
+    }
+
+    /// A backlog message redelivered UNCHANGED (its ack was lost) is a duplicate like any other:
+    /// only a different payload is an update.
+    #[tokio::test]
+    async fn an_unchanged_history_message_delivered_twice_is_still_one_event() {
+        let cloud = fake_cloud(vec![history_placeholder("wamid.photo")]).await;
+        cloud.fail_the_ack_with(StatusCode::INTERNAL_SERVER_ERROR);
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok"));
+
+        for _ in 0..2 {
+            let _ = poller.poll_once(&runtime, &entitled()).await;
+        }
+
+        assert_eq!(outbox_rows(&runtime).await.len(), 1);
+    }
+
+    /// Only the backlog is completed after the fact. A LIVE message the hub already processed is
+    /// never raised again, whatever comes back under its `wamid`: its event may already have
+    /// started an automation, and a second one would start it twice.
+    #[tokio::test]
+    async fn a_live_message_served_again_with_another_payload_is_not_raised_twice() {
+        let cloud = fake_cloud(vec![message("wamid.1", "hola")]).await;
+        let runtime = hub_with_module(true).await;
+        let poller = poller(&cloud.base_url, Some("machine-tok"));
+        poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        cloud.complete_in_place(message("wamid.1", "hola, otra vez"));
+        let report = poller.poll_once(&runtime, &entitled()).await.unwrap();
+
+        assert_eq!(report.ingested, 0);
+        assert_eq!(report.acked, 1, "acked, so it is not served forever");
+        assert_eq!(outbox_rows(&runtime).await.len(), 1);
     }
 
     /// A SaaS that predates the three columns says nothing about direction, contact or source.
