@@ -116,13 +116,18 @@
               mode="md"
               fill="outline"
               label-placement="floating"
+              type="password"
               inputmode="numeric"
+              autocomplete="new-password"
               :label="t('employeeForm.pin')"
               :helper-text="form.local ? t('employeeForm.localPinHelp', { n: hubPinLength }) : t('employeeForm.accountPinHelp', { n: hubPinLength })"
               :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`, { n: hubPinLength }) : ''"
               :class="{ 'ion-invalid ion-touched': Boolean(pinIssue) }"
               :maxlength="hubPinLength"
-            />
+            >
+              <!-- hub#2074: the PIN is a secret — masked like in My profile, the eye reveals it. -->
+              <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+            </ion-input>
             <ion-button
               type="submit"
               data-testid="employees-submit"
@@ -192,6 +197,7 @@ import {
   IonButton,
   IonFooter,
   IonInput,
+  IonInputPasswordToggle,
   IonLabel,
   IonSegment,
   IonSegmentButton,
