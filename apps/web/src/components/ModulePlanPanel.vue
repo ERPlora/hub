@@ -73,7 +73,7 @@
            plan es el del hub o el del módulo. Se oculta donde el revisor de Play lo leería como
            steering, con el mismo gate que el menú (hub#756). -->
       <ion-button
-        v-if="canOfferPlanManagement"
+        v-if="canOfferPlanManagement && !includedByPlan"
         slot="actions"
         size="small"
         data-testid="module-manage-plan"
@@ -81,6 +81,19 @@
       >
         <HubIcon name="open-outline" slot="start" />
         {{ t('modulePlan.managePlan') }}
+      </ion-button>
+      <!-- When the hub plan gives the level (hub#1686, ADR-0474) there is no module plan to manage:
+           the one way to more is a bigger HUB plan, on the same account page as the side menu, and
+           behind the same Play gate (hub#756). Not offered on the top level: there is nothing above. -->
+      <ion-button
+        v-if="canOfferPlanManagement && includedByPlan && hasHigherTier"
+        slot="actions"
+        size="small"
+        data-testid="module-upgrade-hub-plan"
+        @click="onUpgradeHubPlan"
+      >
+        <HubIcon name="open-outline" slot="start" />
+        {{ t('modulePlan.upgradeHubPlan') }}
       </ion-button>
       <!-- Re-consulta manual: "ya lo he contratado" (además del recheck-on-focus). Se queda
            SIEMPRE, también donde el enlace no se ofrece: quien contrató en el navegador necesita
@@ -188,7 +201,7 @@ import { formatDate } from '../lib/format-datetime';
 import { getDeviceContext } from '../lib/device';
 import { openExternal } from '../lib/open-external';
 import { saasDoor } from '../lib/saas-door';
-import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
 import { loadModuleLocale } from '../lib/module-loader';
 import { modulePlanPath, modulePlanUrl } from '../lib/module-plan-link';
 import { moduleBase } from '../lib/module-url';
@@ -254,6 +267,20 @@ const currentTier = computed<BillingTierDef | null>(() => {
   return freeTier.value;
 });
 
+/**
+ * Does the hub PLAN give this level (hub#1686, ADR-0474)? Only when the Cloud says so literally
+ * (`source: "plan"`, ERPlora/saas#1952). Anything else — no answer from an older SaaS, a
+ * third-party module, a bought level — keeps the per-module tab as it was.
+ */
+const includedByPlan = computed(() => sub.value?.source === 'plan');
+
+/** Is there a level above yours in this manifest? The upgrade is pointless on the top one. */
+const hasHigherTier = computed(() => {
+  const current = currentTier.value;
+  if (!current) return false;
+  return tiers.value.findIndex((tier) => tier.slug === current.slug) < tiers.value.length - 1;
+});
+
 /** Is the plan you are on the one that costs nothing? */
 const onFreeTier = computed(() => currentTier.value != null && !currentTier.value.price);
 
@@ -278,7 +305,10 @@ function isCurrentTier(tier: BillingTierDef): boolean {
 type DisplayStatus = ModuleSubscriptionStatus | 'free';
 const displayStatus = computed<DisplayStatus>(() => {
   const s = sub.value?.status ?? 'none';
-  if ((s === 'none' || s === 'trialing') && onFreeTier.value) return 'free';
+  // A level the hub plan gives (hub#1686) has no subscription behind it either, and it can be a
+  // level the manifest prices (Standard → Basic): in force all the same, so it reads as the free
+  // tier does — in and working.
+  if ((s === 'none' || s === 'trialing') && (onFreeTier.value || includedByPlan.value)) return 'free';
   return s;
 });
 
@@ -323,6 +353,12 @@ const statusLabel = computed(() =>
   t(`modulePlan.status.${displayStatus.value === 'free' ? 'active' : displayStatus.value}`),
 );
 const statusHint = computed(() => {
+  if (includedByPlan.value) {
+    const planName = sub.value?.planName;
+    return planName
+      ? t('modulePlan.hint.includedInPlan', { plan: planName })
+      : t('modulePlan.hint.includedInHubPlan');
+  }
   // Expiring does not leave you outside when the module ships a free tier: it drops you back onto
   // it, and the sentence says so.
   const key =
@@ -362,12 +398,15 @@ function tierLabel(tier: BillingTierDef): string {
 
 /** El importe. El periodo viaja aparte para que la tarjeta pueda componerlo a su manera. */
 function priceLabel(tier: BillingTierDef): string {
+  // A level that comes with the hub plan is not sold separately (ADR-0474): no price to paint.
+  if (includedByPlan.value) return '';
   if (!tier.price) return t('modulePlan.free');
   return fmtMoney(tier.price);
 }
 
 /** «/mes», «/año» — vacío para un pago único y para el gratuito, que no repiten. */
 function periodLabel(tier: BillingTierDef): string {
+  if (includedByPlan.value) return '';
   if (!tier.price || tier.interval === 'one_time') return '';
   return tier.interval === 'year' ? t('modulePlan.perYear') : t('modulePlan.perMonth');
 }
@@ -519,6 +558,15 @@ async function onManagePlan(): Promise<void> {
   try {
     const path = modulePlanPath(props.moduleId);
     await openExternal(await saasDoor(path, modulePlanUrl(props.moduleId), 'module-plan'));
+  } catch {
+    notify(t('modulePlan.managePlanError'), 'danger');
+  }
+}
+
+/** Opens the hub plan page in the customer's account — the same door as the side menu. */
+async function onUpgradeHubPlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
   } catch {
     notify(t('modulePlan.managePlanError'), 'danger');
   }

@@ -387,6 +387,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'assistant-close',
       'assistant-drawer',
       'assistant-empty',
+      'assistant-included-in-plan',
       'assistant-input',
       'assistant-mic',
       'assistant-quota-ask-admin',
@@ -398,6 +399,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'assistant-stop',
       'assistant-suggest-missing',
       'assistant-thread',
+      'assistant-upgrade-hub-plan',
       'assistant-voice-error',
     ],
     computed: [

@@ -27,7 +27,15 @@ export interface AssistantPlan {
   /** Los planes que se pueden contratar HOY. Lista vacía = no hay nada que ofrecer; nunca
    *  `undefined`, para que la pantalla no tenga que distinguir «no llegó» de «no hay». */
   paidTiers: AssistantTierOption[];
+  /** Where the level comes from (ERPlora/saas#1952, hub#1686): `plan` = the hub plan gives it and
+   *  the way to more is a bigger hub plan, not an assistant checkout. `null` = the SaaS did not say
+   *  (older than saas#1952) or said something unknown; only a literal `plan` changes the drawer. */
+  source: 'plan' | 'purchase' | 'free' | null;
+  /** Display name of the hub plan («Standard»), or `null`. */
+  planName: string | null;
 }
+
+const LEVEL_SOURCES = ['plan', 'purchase', 'free'] as const;
 
 /** El plan y el consumo del mes. `null` si no se puede leer — nunca un plan inventado: el consumo
  *  es un número con el que el dueño decide si paga, y enseñarlo mal es peor que no enseñarlo. */
@@ -39,6 +47,8 @@ export async function assistantPlan(): Promise<AssistantPlan | null> {
       tier?: string;
       usage?: { messages_used?: number; messages_limit?: number; resets_at?: string };
       available_paid_tiers?: { slug?: string; name?: string; price_monthly?: string }[];
+      source?: string;
+      plan_name?: string;
     };
     return {
       tier: body.tier,
@@ -53,6 +63,10 @@ export async function assistantPlan(): Promise<AssistantPlan | null> {
       paidTiers: (body.available_paid_tiers ?? [])
         .filter((t): t is { slug: string; name?: string; price_monthly?: string } => !!t?.slug)
         .map((t) => ({ slug: t.slug, name: t.name || t.slug, priceMonthly: t.price_monthly })),
+      source: (LEVEL_SOURCES as readonly unknown[]).includes(body.source)
+        ? (body.source as AssistantPlan['source'])
+        : null,
+      planName: typeof body.plan_name === 'string' && body.plan_name ? body.plan_name : null,
     };
   } catch {
     return null;

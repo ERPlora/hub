@@ -916,7 +916,20 @@ export interface CloudModuleSubscription {
    * ADDITIVE: a SaaS older than saas#1921 does not send the key and it stays `null` here.
    */
   tier: string | null;
+  /**
+   * Where that level COMES FROM (ERPlora/saas#1952, hub#1686): `plan` = the hub plan gives it and it
+   * is not sold separately (ERPlora's own modules, ADR-0474); `purchase`/`trial`/`free` = the
+   * per-module path third-party modules keep. `null` = the SaaS did not say (older than saas#1952)
+   * or said something this hub does not know — and only a literal `plan` changes the screen.
+   */
+  source: ModuleLevelSource | null;
+  /** Display name of the hub plan («Standard»), or `null` when it does not arrive. */
+  planName: string | null;
 }
+
+/** Where a module level comes from (ERPlora/saas#1952). */
+export type ModuleLevelSource = 'plan' | 'purchase' | 'trial' | 'free';
+const LEVEL_SOURCES = ['plan', 'purchase', 'trial', 'free'] as const;
 
 const SUB_STATUS = ['active', 'trialing', 'expired', 'none', 'canceled', 'past_due'] as const;
 function normSubStatus(s: unknown): ModuleSubscriptionStatus {
@@ -930,6 +943,8 @@ export async function cloudModuleSubscription(moduleSlug: string): Promise<Cloud
     trial_end?: string | null;
     period_end?: string | null;
     tier?: string | null;
+    source?: string | null;
+    plan_name?: string | null;
   }>(`/api/v1/hub/device/module-subscription/?module=${encodeURIComponent(moduleSlug)}`);
   return {
     status: normSubStatus(data.status),
@@ -938,6 +953,10 @@ export async function cloudModuleSubscription(moduleSlug: string): Promise<Cloud
     // Empty string = says nothing, same as absent: normalised to `null` so the reader has ONE form
     // of "I don't know", not two.
     tier: typeof data.tier === 'string' && data.tier ? data.tier : null,
+    source: (LEVEL_SOURCES as readonly unknown[]).includes(data.source)
+      ? (data.source as ModuleLevelSource)
+      : null,
+    planName: typeof data.plan_name === 'string' && data.plan_name ? data.plan_name : null,
   };
 }
 
