@@ -446,4 +446,11 @@ async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
         "el motivo nombra al vecino que falta: {:?}",
         discarded[0]["detail"]
     );
+    // hub#2123: and it names the neighbour as DATA, so a module never parses `detail` (ADR-0055).
+    // `installed: null` and not absent: «not installed» is an answer, not «unknown».
+    assert_eq!(
+        discarded[0]["requires"],
+        json!({ "module": "appointments", "floor": "1.1.69", "installed": null }),
+        "the floor discard carries its neighbour: {discarded:?}"
+    );
 }

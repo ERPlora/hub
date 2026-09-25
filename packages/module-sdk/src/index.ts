@@ -1030,7 +1030,7 @@ export class HttpWsTransport implements ErploraTransport {
    * thing on the client that can call it is {@link FlowsApi}, whose method list is pinned by a test.
    */
   coreRequest(req: CoreRequest, extraHeaders: Record<string, string> = {}): Promise<unknown> {
-    return this.send(req.method, req.path, req.body, extraHeaders);
+    return this.send(req.method, req.path, req.body, extraHeaders, req.envelope === true);
   }
 
   /**
@@ -1112,6 +1112,7 @@ export class HttpWsTransport implements ErploraTransport {
     path: string,
     body: unknown,
     extraHeaders: Record<string, string> = {},
+    envelope = false,
   ): Promise<unknown> {
     // hub#782: the proxy's `5xx text/html` page (the hub container died — OOM exit 137 / hub#759;
     // any deploy window) used to reach `res.json()` and blow up as a raw `SyntaxError`, which is
@@ -1170,7 +1171,8 @@ export class HttpWsTransport implements ErploraTransport {
         `request to ${path} returned an invalid JSON body`,
       );
     }
-    return unwrap(env);
+    const data = unwrap(env);
+    return envelope ? env : data;
   }
 
   /**
@@ -1483,6 +1485,11 @@ export interface CoreRequest {
   method: CoreMethod;
   path: string;
   body?: unknown;
+  /**
+   * Hand back the whole `ok` envelope instead of its `data` (hub#2123): for a route whose answer
+   * carries a sibling of `data` — `discarded` on `GET /flows/templates`. A refusal throws the same.
+   */
+  envelope?: boolean;
 }
 
 /** A transport that can reach the core's REST surface (as opposed to the dispatcher). */
@@ -1759,6 +1766,33 @@ export class FlowsApi {
   }
 
   /**
+   * `GET /api/hub/flows/templates`, read for its other half (hub#2123): **the automations of this
+   * module that the hub is NOT offering, and why**.
+   *
+   * The hub computes it since hub#1649 and answers it next to `data`, but {@link templates} returns
+   * `data` alone, so no module could tell «I ship none» from «the hub left mine out». Read the
+   * `code`; `detail` is prose for a person and is never compared (ADR-0055). On the floor codes
+   * (`template_floor_*`) `requires` names the neighbour as data — which module, the floor, and the
+   * version installed here (`null` = not installed) — so the card can say «Needs Staff, which is
+   * paused» in the user's language.
+   *
+   * Same request and scope as {@link templates}: only this module's own. A separate method so the
+   * array `templates()` returns keeps its shape. A hub older than this method leaves it
+   * **absent**: `typeof flows.templateDiscards` is the probe.
+   */
+  async templateDiscards(): Promise<FlowTemplateDiscard[]> {
+    const path = `${FLOWS_BASE_PATH}/templates`;
+    const env = (await this.send({ method: 'GET', path, envelope: true })) as {
+      discarded?: unknown;
+    };
+    // «Nothing was left out» is a claim; an answer that does not carry the list cannot make it.
+    if (!Array.isArray(env?.discarded)) {
+      throw new ErploraError(SERVER_UNAVAILABLE, `unexpected response from ${path}: no discarded list`);
+    }
+    return env.discarded as FlowTemplateDiscard[];
+  }
+
+  /**
    * `POST /api/hub/flows/templates/{thisModule}/{family}/activate` — **the one tap** (hub#1677,
    * ADR-0470).
    *
@@ -1800,6 +1834,25 @@ export class FlowsApi {
       path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/deactivate`,
     }) as Promise<Flow>;
   }
+}
+
+/**
+ * A factory automation of this module that the hub is NOT offering, and why (hub#1649, hub#2123).
+ */
+export interface FlowTemplateDiscard {
+  /** The module that ships it — always the caller itself. */
+  module: string;
+  /** The family left out, or the file name when it did not even name one. */
+  family: string;
+  /** Stable reason code (`template_floor_module_paused`, `template_owner_paused`…). Read this. */
+  code: string;
+  /** A sentence for a person. Never compared (ADR-0055). */
+  detail: string;
+  /**
+   * Only on the floor codes (`template_floor_*`): the neighbour the floor names. `installed` is the
+   * version this hub has, or `null` when it is not installed.
+   */
+  requires?: { module: string; floor: string; installed: string | null };
 }
 
 /**

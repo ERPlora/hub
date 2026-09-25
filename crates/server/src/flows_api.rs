@@ -683,12 +683,18 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
         .into_iter()
         .filter(|(module_id, _)| mine(module_id))
         .map(|(module_id, discard)| {
-            json!({
+            let mut row = json!({
                 "module": module_id,
                 "family": discard.family,
                 "code": discard.code,
                 "detail": discard.detail,
-            })
+            });
+            // hub#2123: the neighbour a floor names, as data. Only the floor codes carry it; on
+            // the rest the key is absent, not `null` (a `null` would read as «no neighbour needed»).
+            if let Some(requires) = &discard.requires {
+                row["requires"] = json!(requires);
+            }
+            row
         })
         .collect();
     Json(json!({ "ok": true, "data": data, "discarded": discarded })).into_response()
