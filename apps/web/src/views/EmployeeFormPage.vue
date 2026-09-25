@@ -101,12 +101,17 @@
               label-placement="floating"
               mode="md"
               fill="outline"
+              type="password"
               inputmode="numeric"
+              autocomplete="new-password"
               :maxlength="hubPinLength"
               :helper-text="pinHelp"
               :error-text="pinError"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
-            />
+            >
+              <!-- hub#2074: the PIN is a secret — masked like in My profile, the eye reveals it. -->
+              <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+            </ion-input>
             <!-- **Placa** (hub#658): un campo que el LECTOR rellena y que sigue siendo tecleable —
                  un iButton lleva el número grabado y no todo el mundo tiene el lector a mano. El
                  lector no necesita que este campo tenga el foco: la ráfaga la caza el listener
@@ -210,6 +215,7 @@ import {
   IonCard,
   IonCardContent,
   IonInput,
+  IonInputPasswordToggle,
   IonSelect,
   IonSelectOption,
   IonSpinner,
