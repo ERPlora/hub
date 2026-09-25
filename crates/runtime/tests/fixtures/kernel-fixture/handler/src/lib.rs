@@ -12,6 +12,9 @@
 //!    `RuntimeError::Domain { code }`, which is what the browser can translate. The `Err` arm is
 //!    reserved for a broken guest contract.
 //!
+//! 5. `context.principal` (`human` | `machine`, hub#2113) is echoed back in `Output.result`, so the
+//!    suite proves the WASM path tells a guest WHO is calling (hub#2117).
+//!
 //! `escape_to` exists so the suite can prove the HOST refuses an operation naming a command the
 //! module does not own — the guest is allowed to ask; the kernel is what says no.
 
@@ -77,7 +80,10 @@ pub fn handle_pure(input: Value) -> Output {
         "kfx.items.bulked",
         json!({ "count": names.len() }),
     ));
-    out.with_result(json!({ "count": names.len() }))
+    out.with_result(json!({
+        "count": names.len(),
+        "principal": input["context"]["principal"],
+    }))
 }
 
 #[cfg(feature = "guest")]
@@ -105,6 +111,14 @@ mod tests {
         assert_eq!(out.operations[0].params["id"], json!("id-1"));
         assert_eq!(out.events.len(), 1);
         assert!(out.error.is_none());
+    }
+
+    #[test]
+    fn echoes_who_is_calling_from_the_host_context() {
+        let mut value = input(json!(["a"]));
+        value["context"]["principal"] = json!("machine");
+        let out = handle_pure(value);
+        assert_eq!(out.result.unwrap()["principal"], json!("machine"));
     }
 
     #[test]

@@ -4,7 +4,7 @@
   "features": [
     "guest"
   ],
-  "sources_sha256": "61b06739edcc546d13e3f61d68ca9a11d74576cfe59ff0c1e3c6f13797dbfd16",
-  "wasm_sha256": "428949532515cb3b0e6d07588630a36ebcf526de371bc8dc04400beed797892f",
-  "bytes": 131533
+  "sources_sha256": "b665eac73b058fc7ccf7e9d110555e0e8197a1ca05e084052bee82a8751414e4",
+  "wasm_sha256": "0682c2e142e7d643ffbeed8007bf555462282f3d626f213d04e47818ac698f3c",
+  "bytes": 133931
 }

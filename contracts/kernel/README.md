@@ -107,7 +107,7 @@ API está ahí, y solo ejecutarla dice que funciona.
 | `kernel_conformance_events.rs` | `emit` → `_event_outbox` → listener; el evento de un handler por el mismo camino; un command que falla no emite; nombre fuera de `events.emits` **rechazado nombrándolo** |
 | `kernel_conformance_slots_navigation.rs` | `navigation` (permiso, `chrome`), `provides_slots` y los `locales/` del módulo (`en` canónico, `es` traducido) |
 | `kernel_conformance_errors.rs` | El catálogo `errors` (ADR-0398/0412): servido ordenado, `deprecated` marcado, `expect_rows.error` fuera del catálogo rechazado **al instalar**, y un código fuera del catálogo devuelto por un handler es contrato roto (`Wasm`), nunca un `Domain` que la UI intente traducir |
-| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad**; el guest no alcanza ni un command inexistente ni el de un módulo VECINO (un gemelo del fixture bajo otro id) |
+| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad**; el guest no alcanza ni un command inexistente ni el de un módulo VECINO (un gemelo del fixture bajo otro id); el guest recibe `context.principal` (`human`/`machine`) y lo devuelve, así el camino WASM queda tan cubierto como el nativo (hub#2117) |
 | `kernel_conformance_update.rs` | Update en caliente (hub#516): los datos sobreviven, solo corre la migración nueva, y un update que falla deja **corriendo la versión anterior** |
 
 Todas usan el **módulo fixture del propio kernel** —`crates/runtime/tests/fixtures/kernel-fixture/`,

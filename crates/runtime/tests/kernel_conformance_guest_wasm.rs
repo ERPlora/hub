@@ -72,6 +72,41 @@ async fn guest_operations_become_rows_through_the_host_hub1238() {
     );
 }
 
+/// Runs `kfx.items.bulk` as `ctx` and returns `context.principal` as the compiled guest saw it —
+/// the guest echoes it back in `Output.result`.
+async fn principal_seen_by_the_guest(ctx: &RequestContext) -> serde_json::Value {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    install_fixture(&mut rt).await;
+
+    let mut payload = Params::new();
+    payload.insert("names".into(), json!(["a"]));
+    let out = rt
+        .execute_command("kfx.items.bulk", &payload, ctx)
+        .await
+        .expect("the guest runs");
+    out["result"]["principal"].clone()
+}
+
+/// hub#2117: the WASM path tells the guest WHO is calling, end to end through a real `.wasm`.
+/// Twin of `handler_context_params_e2e.rs` (native): without it, a WASM path rewritten without the
+/// shared `handler_context` builder could drop `principal` and no test would notice.
+#[tokio::test]
+async fn the_guest_is_told_a_person_is_calling_hub2117() {
+    assert_eq!(principal_seen_by_the_guest(&admin()).await, json!("human"));
+}
+
+/// hub#2117: an automation is told `machine`, whatever its `current_user_id` looks like.
+#[tokio::test]
+async fn the_guest_is_told_an_automation_is_calling_hub2117() {
+    let machine =
+        RequestContext::new("h1", "robot-of-the-future:7", ["*".to_string()]).as_machine();
+    assert_eq!(
+        principal_seen_by_the_guest(&machine).await,
+        json!("machine")
+    );
+}
+
 /// A guest's `Output.error` reaches the caller as a `Domain` error carrying the CODE, never prose.
 #[tokio::test]
 async fn guest_domain_error_travels_as_a_code_hub1238() {
