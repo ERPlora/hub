@@ -770,8 +770,7 @@ impl InboundPoller {
                         acknowledge.push(message.wa_message_id.clone());
                     }
                     Ok(false) if message.source() == "history" => {
-                        match record_history_completion(rt.db(), &hub_id, message, &payload).await
-                        {
+                        match record_history_completion(rt.db(), &hub_id, message, &payload).await {
                             Ok(fresh) => {
                                 if fresh {
                                     ingested += 1;
@@ -1072,7 +1071,10 @@ mod tests {
         /// delivered (saas#1913): the row is rewritten IN PLACE with the full message and marked
         /// undelivered again, so the next poll serves the same `wamid` with the new payload.
         fn complete_in_place(&self, message: Value) {
-            let wamid = message["wa_message_id"].as_str().unwrap_or_default().to_string();
+            let wamid = message["wa_message_id"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
             let mut pending = self.inbox.pending.lock().unwrap();
             pending.retain(|m| m["wa_message_id"].as_str() != Some(wamid.as_str()));
             pending.push(message);
@@ -1691,17 +1693,28 @@ mod tests {
 
         assert_eq!(report.ingested, 1, "the completed copy is new to this hub");
         assert_eq!(report.acked, 1);
-        assert!(cloud.pending_ids().is_empty(), "and the SaaS stops serving it");
+        assert!(
+            cloud.pending_ids().is_empty(),
+            "and the SaaS stops serving it"
+        );
 
         let rows = outbox_rows(&runtime).await;
-        assert_eq!(rows.len(), 2, "the placeholder's event plus the completed one");
+        assert_eq!(
+            rows.len(),
+            2,
+            "the placeholder's event plus the completed one"
+        );
         let completed: Vec<Value> = rows
             .iter()
             .filter(|row| row["id"] != json!("wa-wamid.photo"))
             .map(|row| serde_json::from_str(row["payload"].as_str().unwrap()).unwrap())
             .collect();
         assert_eq!(completed.len(), 1);
-        assert_eq!(rows[1]["event_name"], json!(EVENT_NAME), "the same door into the module");
+        assert_eq!(
+            rows[1]["event_name"],
+            json!(EVENT_NAME),
+            "the same door into the module"
+        );
         assert_eq!(rows[1]["hub_id"], json!(HUB));
         let payload = &completed[0];
         assert_eq!(payload["wa_message_id"], json!("wamid.photo"));
