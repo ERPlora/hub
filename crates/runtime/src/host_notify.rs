@@ -119,6 +119,27 @@ pub const HEADER_MEDIA_VARS: &[(&str, &str)] = &[
     ("header_document", "document"),
 ];
 
+/// **The variable part of a WhatsApp template's link button** (hub#2110): `vars.button_url_<n>`
+/// is the text Meta appends to the `{{1}}` of the URL button at position `<n>` (0-based, as Meta
+/// counts the template's buttons). `flows::def` refuses at save time what the transport would
+/// refuse before the network; `schemas/flow.schema.json` declares the same key under
+/// `vars.patternProperties` with exactly [`BUTTON_URL_VAR_PATTERN`].
+pub const BUTTON_URL_VAR_PREFIX: &str = "button_url_";
+
+/// The key [`button_url_index`] accepts, as the schema's `patternProperties` writes it. Meta allows
+/// at most ten buttons on a template, so the position is one digit.
+pub const BUTTON_URL_VAR_PATTERN: &str = "^button_url_[0-9]$";
+
+/// The button position a `vars` key names, or `None` when the key is not a well-formed
+/// `button_url_<n>`. A key that starts with [`BUTTON_URL_VAR_PREFIX`] and still answers `None` is a
+/// typo the callers refuse, never a body variable.
+pub fn button_url_index(key: &str) -> Option<u8> {
+    match key.strip_prefix(BUTTON_URL_VAR_PREFIX)?.as_bytes() {
+        [digit] if digit.is_ascii_digit() => Some(digit - b'0'),
+        _ => None,
+    }
+}
+
 /// La intención de notificación que un command emite en el payload del evento `*.reminder.due`.
 /// El módulo de negocio solo construye esto; el host resuelve el transporte y el secreto.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -470,6 +491,26 @@ mod tests {
     use super::*;
     use erplora_db::Params;
     use serde_json::json;
+
+    /// **A link button's position** (hub#2110): one digit after the prefix, nothing else — Meta
+    /// counts at most ten buttons, and a near miss must not pass for a body variable.
+    #[test]
+    fn button_url_index_reads_one_digit_after_the_prefix() {
+        assert_eq!(button_url_index("button_url_0"), Some(0));
+        assert_eq!(button_url_index("button_url_9"), Some(9));
+        for bad in [
+            "button_url_",
+            "button_url_10",
+            "button_url_x",
+            "button_url_-1",
+            "button_url_ 1",
+            "Button_url_1",
+            "url_1",
+            "who",
+        ] {
+            assert_eq!(button_url_index(bad), None, "{bad}");
+        }
+    }
 
     fn intent_params(channel: &str) -> Params {
         let mut p = Params::new();

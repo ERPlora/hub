@@ -19,7 +19,9 @@ use erplora_runtime::flows::def::{
     MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_OPTION_ROWS, MAX_QUERY_ROWS, MAX_WAIT_HOOKS,
     SCHEMA_VERSION,
 };
-use erplora_runtime::host_notify::{Channel, HEADER_MEDIA_VARS};
+use erplora_runtime::host_notify::{
+    button_url_index, Channel, BUTTON_URL_VAR_PATTERN, HEADER_MEDIA_VARS,
+};
 
 fn schema() -> serde_json::Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -635,6 +637,23 @@ fn the_header_media_vars_are_the_same_on_both_sides() {
         .map(|(key, _)| key.to_string())
         .collect();
     assert_eq!(declared, runtime);
+}
+
+/// **A template's link button** (hub#2110) is declared as a PATTERN, the one the runtime reads:
+/// the editor looks for it to know whether THIS hub sends a button's variable end, and a key the
+/// runtime turns into Meta's `button` component that the schema did not name would be a field the
+/// editor can never offer.
+#[test]
+fn the_url_button_vars_are_the_same_on_both_sides() {
+    let declared = keys_at(&schema(), "/$defs/step/properties/vars/patternProperties");
+    assert_eq!(
+        declared,
+        BTreeSet::from([BUTTON_URL_VAR_PATTERN.to_string()])
+    );
+    // The pattern and the parser agree on the edges a regex engine would read differently.
+    assert_eq!(button_url_index("button_url_0"), Some(0));
+    assert_eq!(button_url_index("button_url_9"), Some(9));
+    assert_eq!(button_url_index("button_url_10"), None);
 }
 
 /// Every key the runtime parses for an `ai` step must be declared, or the editor would flag as

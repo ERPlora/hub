@@ -2776,6 +2776,44 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     }
 
+    // **A template's link button** (hub#2110): `vars.button_url_<n>` is the end the transport
+    // appends to the URL button at position `<n>`. Like the header, it only travels with a
+    // whatsapp template; a near miss of the key would otherwise go out as a body variable Meta
+    // refuses, so it is refused here, where it was typed.
+    let mut buttons: Vec<&str> = vars
+        .keys()
+        .map(String::as_str)
+        .filter(|key| key.starts_with(crate::host_notify::BUTTON_URL_VAR_PREFIX))
+        .collect();
+    buttons.sort_unstable();
+    if let Some(first) = buttons.first() {
+        let problem = if let Some(bad) = buttons
+            .iter()
+            .find(|key| crate::host_notify::button_url_index(key).is_none())
+        {
+            Some(format!(
+                "`vars.{bad}` is not a link button: the key is `button_url_<n>`, with `<n>` the \
+                 button's position in the template (0-9)"
+            ))
+        } else if channel != Channel::Whatsapp {
+            Some(format!(
+                "`vars.{first}` is a whatsapp template's link button — an email has none"
+            ))
+        } else if template_name.is_empty() {
+            Some(format!(
+                "`vars.{first}` needs the `template` it belongs to: a free text has no buttons"
+            ))
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: {problem}"),
+            ));
+        }
+    }
+
     Ok(NotifyStep {
         interactive,
         channel,
@@ -3363,6 +3401,57 @@ mod tests {
                 format!("{err}").contains("header_"),
                 "{err} for {channel} {vars}"
             );
+        }
+    }
+
+    /// **A template's link button with a variable end** (hub#2110): `vars.button_url_<n>`, mapped
+    /// against the run like the rest of the copy, parses without anybody writing Meta's
+    /// `components` block by hand.
+    #[test]
+    fn a_whatsapp_template_step_can_carry_its_url_button_values() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "confirm", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "template": "appointment_confirmed",
+                "vars": {
+                    "button_url_0": "{{input.appointment_code}}",
+                    "button_url_1": "{{input.payment_code}}",
+                    "header_image": "{{input.picture_url}}"
+                }
+            }]
+        }))
+        .expect("a template with link buttons is an ordinary whatsapp step");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.vars["button_url_0"], json!("{{input.appointment_code}}"));
+    }
+
+    /// Where a link button's end cannot travel it is refused at save time, not dropped (or turned
+    /// into a body variable Meta rejects) at send time: an email and a free WhatsApp text have no
+    /// buttons, and the position is one digit.
+    #[test]
+    fn url_button_values_are_refused_where_they_could_not_be_sent() {
+        let cases = [
+            ("email", "promo", json!({ "button_url_0": "A1", "text": "hola" }), "button_url_0"),
+            ("whatsapp", "", json!({ "button_url_0": "A1", "text": "hola" }), "button_url_0"),
+            ("whatsapp", "promo", json!({ "button_url_10": "A1" }), "button_url_10"),
+            ("whatsapp", "promo", json!({ "button_url_x": "A1" }), "button_url_x"),
+            ("whatsapp", "promo", json!({ "button_url_": "A1" }), "button_url_"),
+        ];
+        for (channel, template, vars, key) in cases {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": template, "vars": vars.clone()
+                }]
+            }))
+            .expect_err("a link button's end only travels with a whatsapp template");
+            assert!(format!("{err}").contains(key), "{err} for {channel} {vars}");
         }
     }
 
