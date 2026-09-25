@@ -1079,4 +1079,22 @@ mod tests {
         .expect_err("only a template has a header");
         assert!(format!("{err}").contains("header_image"), "{err}");
     }
+
+    /// A tappable message wins over the template (hub#1633) and returns before the components are
+    /// built, so a header riding next to `interactive` would vanish without a word. A flow cannot
+    /// pair them (`flows::def` refuses it), but a module emitting the intent can — and it is told.
+    #[test]
+    fn whatsapp_interactive_refuses_header_media() {
+        let err = whatsapp_body(&NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"header_image": "https://a/x.jpg"}),
+            )
+        })
+        .expect_err("a tappable message has no template header");
+        assert!(format!("{err}").contains("header_image"), "{err}");
+    }
 }
