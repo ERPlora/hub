@@ -229,6 +229,10 @@ pub fn app(state: AppState) -> Router {
         .route("/modules/:id/*path", get(serve_module_asset))
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
+        // hub#2105: the SaaS hands the running hub its new entitlement after a plan change, so
+        // the change lands now instead of on the daily tick or a restart. The RS256 signature is
+        // the authentication (no session, no key); see `entitlement::push_refresh`.
+        .route("/api/entitlement/refresh", post(entitlement::push_refresh))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
         // «Connect WhatsApp» from the hub (hub#1600, ADR-0452): owner/admin session here, the
         // hub's machine credential towards the SaaS, which keeps the Meta token.
