@@ -30,6 +30,7 @@
 // with an A4. Where the shell cannot (older build) the door takes its usual route.
 import { isTauri } from './device';
 import { printDocumentNatively } from './native-print';
+import { hubCurrencyDecimals } from './money';
 
 /** Dispositivo tal y como lo registra el Bridge. */
 export interface PrintDevice {
@@ -284,6 +285,12 @@ export function createPrintService(
      * the shell command `print_document`. Rejects when the shell has no dialog to open.
      */
     nativePrint?: (html: string) => Promise<void>;
+    /**
+     * The hub currency's scale (JPY 0, EUR 2, KWD 3), by default {@link hubCurrencyDecimals}.
+     * Stamped as `decimals` on what goes STRAIGHT to the printer (hub#2129): the renderer prints
+     * every amount with that many digits, and two without it.
+     */
+    currencyDecimals?: () => number;
   } = {},
 ): (req: PrintRequest) => Promise<PrintResult> {
   const browserPrint = opts.browserPrint ?? (() => globalThis.print?.());
@@ -292,6 +299,7 @@ export function createPrintService(
   const enqueue = opts.enqueue;
   const installedApp = opts.installedApp ?? isTauri;
   const nativePrint = opts.nativePrint ?? printDocumentNatively;
+  const currencyDecimals = opts.currencyDecimals ?? hubCurrencyDecimals;
 
   return async function print(req: PrintRequest): Promise<PrintResult> {
     const role = req.role || 'receipt';
@@ -396,7 +404,10 @@ export function createPrintService(
     }
 
     try {
-      await client.peripherals.print(printerId, documentType, data, req.jobId);
+      // hub#2129 — the scale of the amounts, stamped here because this road never passes through
+      // the hub's queue, which stamps its own. A producer that stated it keeps it.
+      const paper = data.decimals == null ? { ...data, decimals: currencyDecimals() } : data;
+      await client.peripherals.print(printerId, documentType, paper, req.jobId);
       return { via: 'bridge', role, printerId };
     } catch (e) {
       // La impresora existe pero falló (sin papel, apagada…). A la cola antes que al navegador: si
