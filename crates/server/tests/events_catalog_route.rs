@@ -76,12 +76,23 @@ fn module_dir(root: &Path, id: &str, extra: Value) -> PathBuf {
     dir
 }
 
+/// The sale's payload values, and the only way the catalogue tests look for them. The total has
+/// four digits before the point because an RFC 3339 timestamp only ever has two there (the
+/// seconds): with "42.50", a sighting at `…:42.50…` read as a leak (hub#1976).
+const SALE_TOTAL: &str = "4250.99";
+const SALE_EMAIL: &str = "marta@example.com";
+
+/// Whether the serialised catalogue carries anything from the sale's payload.
+fn leaks_the_sale(text: &str) -> bool {
+    text.contains(SALE_EMAIL) || text.contains(SALE_TOTAL)
+}
+
 fn a_sale() -> Params {
     let mut p = Params::new();
-    p.insert("total".into(), json!("42.50"));
+    p.insert("total".into(), json!(SALE_TOTAL));
     p.insert(
         "customer".into(),
-        json!({ "id": "c-1", "name": "Marta", "email": "marta@example.com" }),
+        json!({ "id": "c-1", "name": "Marta", "email": SALE_EMAIL }),
     );
     p
 }
@@ -270,11 +281,40 @@ async fn the_catalogue_is_the_union_of_declared_and_seen_events() {
     // Names only: what an event carries stays behind `…/shape`, with its redaction.
     let text = body.to_string();
     assert!(
-        !text.contains("marta@example.com") && !text.contains("42.50"),
+        !leaks_the_sale(&text),
         "the catalogue leaked a payload: {body}"
     );
 
     std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// hub#1976: the CI run of hub#1970 went red because a sighting landed at `…:42.507…` and the
+/// old check found "42.50" inside the timestamp. The check must still catch a real leak.
+#[test]
+fn the_leak_check_tells_a_timestamp_from_the_sale_total() {
+    let collided = json!({ "ok": true, "data": [{
+        "declared_by": [],
+        "last_seen_at": "2026-09-22T19:31:42.507507367+00:00",
+        "name": "legacy.migrated",
+    }]});
+    assert!(
+        !leaks_the_sale(&collided.to_string()),
+        "a timestamp is not the sale's total: {collided}"
+    );
+
+    let leaked = json!({ "ok": true, "data": [{
+        "name": "inventory.sale_completed",
+        "payload": { "total": SALE_TOTAL, "customer": { "email": SALE_EMAIL } },
+    }]});
+    assert!(
+        leaks_the_sale(&leaked.to_string()),
+        "a real leak is caught: {leaked}"
+    );
+    let total_only = json!({ "data": [{ "name": "x", "sample": { "total": SALE_TOTAL } }] });
+    assert!(
+        leaks_the_sale(&total_only.to_string()),
+        "the total alone is caught: {total_only}"
+    );
 }
 
 /// **Same two gates as `…/shape`** (ADR-0312), and neither replaces the other: the human door
