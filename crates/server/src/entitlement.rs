@@ -31,6 +31,7 @@
 
 use std::sync::{Arc, RwLock};
 
+use axum::response::IntoResponse;
 use cloud_client::EntitlementClaims;
 use serde_json::Value;
 
@@ -60,6 +61,13 @@ pub struct RevalidationState {
 /// Celda compartida del estado (job de background ↔ handlers), como `MachineToken`.
 pub type SharedRevalidation = Arc<RwLock<RevalidationState>>;
 
+/// Why a pushed entitlement token was NOT applied (hub#2105).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushRefusal {
+    WrongHub,
+    Stale,
+}
+
 /// Crea la celda compartida vacía (estado inicial fail-open).
 pub fn new_shared() -> SharedRevalidation {
     Arc::new(RwLock::new(RevalidationState::default()))
@@ -84,6 +92,33 @@ impl RevalidationState {
         self.last_refresh_ok_at = Some(now);
         self.last_check_at = Some(now);
         self.consecutive_failures = 0;
+    }
+
+    /// Applies a token the SaaS PUSHED to this hub (hub#2105) as if the daily tick had just
+    /// fetched it, so a plan change lands at once instead of a day later or after a restart.
+    ///
+    /// The caller has already verified the signature. What is left is the two checks a valid
+    /// signature does not cover: the token names THIS hub, and it is not older than the one in
+    /// force — otherwise a captured token from before an upgrade could roll the plan back. The
+    /// same `iat` again is accepted (idempotent: a SaaS retry must not read as a failure).
+    pub fn apply_pushed(
+        &mut self,
+        claims: EntitlementClaims,
+        hub_id: &str,
+        now: i64,
+    ) -> Result<(), PushRefusal> {
+        if claims.hub_id != hub_id {
+            return Err(PushRefusal::WrongHub);
+        }
+        if self
+            .last_claims
+            .as_ref()
+            .is_some_and(|current| claims.iat < current.iat)
+        {
+            return Err(PushRefusal::Stale);
+        }
+        self.apply_success(claims, now);
+        Ok(())
     }
 
     /// Registra un refresh FALLIDO (red/HTTP/firma): incrementa el contador de fallos.
@@ -231,6 +266,125 @@ pub async fn fetch_verified_claims(
 
     // 3) Verificación offline-style: firma RS256 + ventana de gracia.
     cloud_client::verify_entitlement(&ent.token, &pk.public_key, now).map_err(|e| e.to_string())
+}
+
+/// `POST /api/entitlement/refresh` — the SaaS hands this hub its new entitlement (hub#2105).
+///
+/// The body is `{"token": "<RS256 JWT>"}`, the very token `GET /api/v1/hub/device/entitlement/`
+/// returns. It is verified with the same key and the same [`cloud_client::verify_entitlement`]
+/// as the daily tick, then applied like a successful tick ([`RevalidationState::apply_pushed`]),
+/// and the shell's 60 s cache of `GET /api/entitlement` is expired so the new plan shows now.
+///
+/// There is no session and no key: the signature IS the authentication, which is why the door
+/// is open to the SaaS and to nobody else in practice. `200 {"ok": true}` is the only answer the
+/// SaaS reads as "delivered"; anything else and it falls back to redeploying the hub. Nothing
+/// here touches a session: a lower `max_devices` evicts the extra device at its next sign-in
+/// (`mint_session`), never in the middle of a sale.
+///
+/// An RSA verification is not free and the door is open, so a caller that keeps sending tokens
+/// that do not apply is locked out ([`crate::login_throttle`], keyed by the address the proxy
+/// saw) BEFORE the hub verifies anything else it sends.
+pub(crate) async fn push_refresh(
+    axum::extract::State(st): axum::extract::State<crate::AppState>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> axum::response::Response {
+    use axum::http::StatusCode;
+
+    let key = push_throttle_key(&headers);
+    if st.login_throttle.locked_for(&key).is_some() {
+        return push_refused(StatusCode::TOO_MANY_REQUESTS, "entitlement_push_throttled");
+    }
+    let token = serde_json::from_slice::<Value>(&body)
+        .ok()
+        .and_then(|v| v.get("token").and_then(Value::as_str).map(str::to_owned))
+        .filter(|t| !t.is_empty());
+    let Some(token) = token else {
+        return push_refused(StatusCode::BAD_REQUEST, "entitlement_token_missing");
+    };
+    // The key the boot resolved for user JWTs is the same pair the SaaS signs entitlements
+    // with. A hub that could not fetch it at boot asks now; if the Cloud does not answer, the
+    // push was not applied and the SaaS falls back to redeploying — never counted against it.
+    let public_key = match &st.config.jwt_public_key {
+        Some(pem) => pem.clone(),
+        None => match crate::boot::fetch_jwt_public_key(&st.config.cloud_base_url).await {
+            Some(pem) => pem,
+            None => {
+                tracing::warn!("entitlement push: no public key to verify it with");
+                return push_refused(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "entitlement_key_unavailable",
+                );
+            }
+        },
+    };
+    let now = now_unix();
+    let claims = match cloud_client::verify_entitlement(&token, &public_key, now) {
+        Ok(claims) => claims,
+        Err(error) => {
+            tracing::warn!(%error, "entitlement push refused: token does not verify");
+            st.login_throttle.record_failure(&key);
+            return push_refused(StatusCode::UNAUTHORIZED, "entitlement_token_invalid");
+        }
+    };
+    let applied = match st.entitlement.write() {
+        Ok(mut guard) => guard.apply_pushed(claims, &st.hub_id(), now),
+        Err(_) => {
+            return push_refused(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "entitlement_state_unavailable",
+            )
+        }
+    };
+    match applied {
+        Ok(()) => {
+            st.login_throttle.record_success(&key);
+            if let Ok(mut cache) = st.entitlement_proxy.write() {
+                cache.invalidate();
+            }
+            tracing::info!("entitlement pushed by the Cloud applied");
+            (
+                StatusCode::OK,
+                axum::Json(serde_json::json!({ "ok": true })),
+            )
+                .into_response()
+        }
+        Err(refusal) => {
+            st.login_throttle.record_failure(&key);
+            tracing::warn!(?refusal, "entitlement push refused");
+            match refusal {
+                PushRefusal::WrongHub => {
+                    push_refused(StatusCode::FORBIDDEN, "entitlement_wrong_hub")
+                }
+                PushRefusal::Stale => push_refused(StatusCode::CONFLICT, "entitlement_stale"),
+            }
+        }
+    }
+}
+
+/// What the push guard counts against: the LAST `X-Forwarded-For` hop — the one the proxy in
+/// front of the hub appended, not one the caller wrote (same reasoning as the public door,
+/// `public_door::throttle_key`). With no proxy header every caller shares one counter.
+fn push_throttle_key(headers: &axum::http::HeaderMap) -> String {
+    let client = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.rsplit(',').next())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .unwrap_or("direct");
+    format!("entitlement-push:ip:{client}")
+}
+
+fn push_refused(status: axum::http::StatusCode, code: &str) -> axum::response::Response {
+    (
+        status,
+        axum::Json(serde_json::json!({
+            "ok": false,
+            "error": { "code": code, "message": code },
+        })),
+    )
+        .into_response()
 }
 
 /// Ejecuta un GET de una `PreparedRequest` del `CloudClient` y devuelve el body si es 2xx.
@@ -834,6 +988,87 @@ mod tests {
         c.max_database_size_gb = 5;
         st2.apply_success(c, 1_500);
         assert_eq!(st2.max_database_size_gb(), 5);
+    }
+
+    /// hub#2105: a token the SaaS pushes lands exactly like a successful tick — new claims,
+    /// counter back to zero — so a plan upgrade applies without waiting a day or a restart.
+    #[test]
+    fn a_pushed_token_applies_like_a_successful_refresh() {
+        let mut st = RevalidationState::default();
+        st.apply_success(claims(&["pos"], 5_000), 1_500);
+        st.apply_failure(1_600);
+
+        let mut upgraded = claims(&["pos", "inventory"], 9_000);
+        upgraded.iat = 2_000;
+        upgraded.max_devices = 3;
+        assert_eq!(st.apply_pushed(upgraded.clone(), "h1", 2_100), Ok(()));
+
+        assert_eq!(st.last_claims, Some(upgraded));
+        assert_eq!(st.last_refresh_ok_at, Some(2_100));
+        assert_eq!(st.consecutive_failures, 0);
+        assert_eq!(st.max_devices(), 3);
+    }
+
+    /// The first token a freshly booted hub hears about may be the pushed one.
+    #[test]
+    fn a_pushed_token_applies_on_a_hub_with_no_previous_refresh() {
+        let mut st = RevalidationState::default();
+        assert_eq!(
+            st.apply_pushed(claims(&["pos"], 9_000), "h1", 1_100),
+            Ok(())
+        );
+        assert_eq!(st.last_refresh_ok_at, Some(1_100));
+    }
+
+    /// A token signed for ANOTHER hub is a valid signature on the wrong door: never applied.
+    #[test]
+    fn a_pushed_token_for_another_hub_is_refused_and_changes_nothing() {
+        let mut st = RevalidationState::default();
+        st.apply_success(claims(&["pos"], 5_000), 1_500);
+
+        let mut foreign = claims(&["pos", "inventory"], 9_000);
+        foreign.hub_id = "h2".into();
+        foreign.iat = 2_000;
+        assert_eq!(
+            st.apply_pushed(foreign, "h1", 2_100),
+            Err(PushRefusal::WrongHub)
+        );
+        assert_eq!(st.last_claims, Some(claims(&["pos"], 5_000)));
+        assert_eq!(st.last_refresh_ok_at, Some(1_500));
+    }
+
+    /// Anti-replay: an older token (say, the free plan captured before the upgrade) cannot roll
+    /// the hub back. The same token again is harmless and idempotent.
+    #[test]
+    fn a_pushed_token_older_than_the_current_one_is_refused() {
+        let mut st = RevalidationState::default();
+        let mut current = claims(&["pos", "inventory"], 9_000);
+        current.iat = 5_000;
+        st.apply_success(current.clone(), 5_100);
+
+        let mut older = claims(&["pos"], 9_000);
+        older.iat = 4_999;
+        assert_eq!(st.apply_pushed(older, "h1", 5_200), Err(PushRefusal::Stale));
+        assert_eq!(st.last_claims, Some(current.clone()));
+        assert_eq!(st.last_refresh_ok_at, Some(5_100));
+
+        assert_eq!(st.apply_pushed(current, "h1", 5_300), Ok(()));
+    }
+
+    /// The push guard counts the hop the proxy appended, never one the caller wrote: reading the
+    /// first entry would hand an attacker a fresh counter on every request.
+    #[test]
+    fn the_push_guard_counts_the_hop_the_caller_could_not_forge() {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert("x-forwarded-for", "1.2.3.4, 198.51.100.7".parse().unwrap());
+        assert_eq!(
+            push_throttle_key(&headers),
+            "entitlement-push:ip:198.51.100.7"
+        );
+        assert_eq!(
+            push_throttle_key(&axum::http::HeaderMap::new()),
+            "entitlement-push:ip:direct"
+        );
     }
 
     #[test]

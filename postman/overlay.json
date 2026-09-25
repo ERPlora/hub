@@ -256,5 +256,12 @@
     "body": {
       "use_for_transmission": false
     }
+  },
+  "POST /api/entitlement/refresh": {
+    "name": "Hand the hub its new entitlement (called by the SaaS)",
+    "description": "What the SaaS calls after a plan change (hub#2105, saas#1959): the body carries the RS256 token of `GET /api/v1/hub/device/entitlement/` and the hub applies it at once, without a restart or closing sessions. No session or key: the signature is the authentication. `200 {\"ok\": true}` only when applied; `401 entitlement_token_invalid`, `403 entitlement_wrong_hub`, `409 entitlement_stale`, `429 entitlement_push_throttled` otherwise.",
+    "body": {
+      "token": "{{entitlement_token}}"
+    }
   }
 }
