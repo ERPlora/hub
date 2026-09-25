@@ -10,8 +10,8 @@
 # Usage:  scripts/package-guest-sdk.sh <out-dir>
 # Prints the path of the unpacked crate (`<out-dir>/erplora-guest-sdk-<version>`) on stdout.
 #
-# It does NOT publish anything: where the crate goes (crates.io or a public mirror) is its own
-# decision, and `publish = false` stays until then.
+# It does NOT publish anything: the `publish-guest-sdk` job of build-hub.yml uploads the same
+# crate to crates.io on every `v*` tag (hub#2119).
 set -euo pipefail
 
 if [ "$#" -ne 1 ] || [ -z "$1" ]; then

@@ -3,23 +3,25 @@ name = "erplora-guest-sdk"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-# Se consume por GIT TAG, nunca por un registro (hub#1236):
+description = "Host-guest contract (Input/Operation/Event/Output) and exact money helpers for ERPlora Hub module handlers compiled to WASM (Tier 2)."
+homepage = "https://erplora.com"
+keywords = ["erplora", "wasm", "plugin", "sdk", "extism"]
+categories = ["wasm", "api-bindings"]
+# Published to crates.io on every `v*` tag by the `publish-guest-sdk` job of build-hub.yml
+# (hub#2119), with the tag's version. A module handler — ERPlora's own or a third party's —
+# declares it by version:
 #
-#   erplora-guest-sdk = { git = "https://github.com/ERPlora/hub", tag = "vX.Y.Z" }
+#   erplora-guest-sdk = "X.Y.Z"
 #
-# Hasta hub#1236 el handler de cada módulo lo alcanzaba por
-# `path = "../../../../hub/crates/guest-sdk"`: una ruta que solo existe en el portátil de quien
-# tiene los dos repos hermanos clonados, y que en un runner no existe — por eso el wasm del
-# handler no se podía compilar en CI (`handler WASM SIN VERIFICAR`, ADR-0287 D5).
+# ERPlora/hub is private, so the `{ git = …, tag = … }` route (hub#1236) never reached a vendor,
+# and the `path = "../../../../hub/crates/guest-sdk"` of the in-house handlers only exists on a
+# machine with both repos cloned side by side. `scripts/package-guest-sdk.sh` emits the same
+# normalised crate crates.io receives, and `scripts/tests/guest-sdk-standalone.test.sh` proves a
+# handler builds against it with no ERPlora repo next to it (hub#2115).
 #
-# Third parties cannot reach that tag (ERPlora/hub is private) nor copy this directory (it
-# inherits from the workspace): `scripts/package-guest-sdk.sh` emits the self-contained crate
-# they build against, guarded by `scripts/tests/guest-sdk-standalone.test.sh` (hub#2115).
-# Where it gets published is hub#2119.
-#
-# 🔴 `publish = false` a propósito: el tag es la vía, y `cargo publish` mandaría al registro
-# PÚBLICO de crates.io el SDK de un repo privado. En crates.io una versión no se retira.
-publish = false
+# 🔴 crates.io ONLY: a version there can be yanked but never deleted, so the list pins the one
+# registry this crate may go to. `scripts/tests/publish-sdks.test.sh` guards it.
+publish = ["crates-io"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

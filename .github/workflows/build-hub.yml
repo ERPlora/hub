@@ -122,6 +122,11 @@ jobs:
       - name: Contrato del job publish-module-sdk (hub#1308)
         run: bash ./scripts/tests/publish-module-sdk-workflow.test.sh
 
+      # The Rust half of the same release (hub#2119): the `publish-guest-sdk` job still publishes
+      # to crates.io only from a tag, with the tag's version, naming a missing token. ~1 s.
+      - name: Contrato del job publish-guest-sdk (hub#2119)
+        run: bash ./scripts/tests/publish-guest-sdk-workflow.test.sh
+
       # El tercero del mismo tipo: el cableado del job que prueba lo que este build publica
       # (ERPlora/saas#1895). ~1 s, y aquí es donde importa — este workflow ES el camino a
       # produccion, así que un `fleet-canary` roto se ve en la release, no dos días después.
@@ -590,16 +595,150 @@ jobs:
             LABEL=area:ci-cd BODY="$body" \
             ./scripts/ci/alert-issue.sh
 
-      # `erplora-guest-sdk` no se publica en ningún registro: se consume por GIT TAG
-      # (`crates/guest-sdk/Cargo.toml` lleva `publish = false`). El tag ya existe —es el que ha
-      # disparado este workflow—, así que no hay nada que hacer salvo dejar escrita la línea que
-      # un módulo tiene que poner en su `handler/Cargo.toml`.
-      - name: Cómo se consume erplora-guest-sdk
+  # ============================================================================
+  # `erplora-guest-sdk` → crates.io, on every `v*` tag (hub#2119)
+  # ============================================================================
+  #
+  # WHAT IT FIXES. A third-party developer writing a module handler in Rust (Tier 2 WASM) had no
+  # way to get the SDK: ERPlora/hub is private, so the `{ git = …, tag = … }` route of hub#1236 only
+  # served ERPlora itself. crates.io is where the market's WASM plugin SDKs live (extism-pdk,
+  # spin-sdk, shopify_function); with this job a vendor declares `erplora-guest-sdk = "X.Y.Z"`.
+  #
+  # Credential: `CARGO_REGISTRY_TOKEN`, an API token of the crates.io account that owns the crate
+  # (scope `publish-update`, plus `publish-new` for the very first upload). Without it the job
+  # fails NAMING the missing secret and opens the alert issue — it never goes green silently.
+  #
+  # `needs: build-and-push` on purpose, same as `publish-module-sdk`: `scripts/image-tags.sh`
+  # rejects a tag that is not semver, already published or going backwards, and a crates.io
+  # version can be yanked but never deleted. A prerelease (`X.Y.Z-rc.N`) is safe to upload: cargo
+  # never resolves a prerelease unless the dependent asks for it explicitly.
+  publish-guest-sdk:
+    name: Publicar erplora-guest-sdk (crates.io)
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write     # open/refresh the alert issue when publishing fails
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Same guard as test-hub.yml: `rustup` ships with GitHub's image, but on `ci-runner-1` it is
+      # just one more file something can delete.
+      - name: Toolchain (rust-toolchain.toml)
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup missing on this runner — installing it (touches neither PATH nor toolchains)"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show
+
+      # The SAME script and the SAME number as the image and the npm SDK: the tag's.
+      - name: Estampar la versión del tag
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: ./scripts/stamp-version.sh --version "${GITHUB_REF_NAME#v}"
+
+      # `--allow-dirty`: the stamp above rewrites Cargo.toml/Cargo.lock in the checkout, and that
+      # stamped tree is exactly what has to be uploaded.
+      # The `--dry-run` goes first and needs no token: it packages the crate and COMPILES it
+      # against crates.io, so a broken package is caught before anything irreversible happens,
+      # and its verdict is in the log even when the credential is missing.
+      # A re-run of a tag that already uploaded answers «already exists»: that version IS on
+      # crates.io, so it is reported and the step stays green.
+      - name: Publicar en crates.io
+        id: publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
-          echo "erplora-guest-sdk se consume por git tag (sin registro, publish = false):"
-          echo "  erplora-guest-sdk = { git = \"https://github.com/ERPlora/hub\", tag = \"${GITHUB_REF_NAME}\" }"
+          # No `-e` on purpose: the failure of `cargo publish` has to be READ and classified.
+          # Every error path ends in an explicit `exit`.
+          set -uo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          if ! cargo publish --dry-run --allow-dirty --package erplora-guest-sdk; then
+            echo "blocked_by=pack" >> "$GITHUB_OUTPUT"
+            echo "::error title=erplora-guest-sdk no se puede ni empaquetar::cargo publish --dry-run ha fallado, así que no se intenta la subida. El defecto está en crates/guest-sdk (su Cargo.toml o su código) y se arregla en este repositorio."
+            exit 1
+          fi
+
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "blocked_by=credential" >> "$GITHUB_OUTPUT"
+            echo "::error title=Falta el secreto CARGO_REGISTRY_TOKEN::El paquete está listo (el --dry-run ha pasado) pero el repositorio no tiene el secreto CARGO_REGISTRY_TOKEN: un token de la API de crates.io de la cuenta dueña del crate. Créalo en Settings → Secrets → Actions de ERPlora/hub y relanza este job."
+            exit 1
+          fi
+
+          log="${RUNNER_TEMP}/cargo-publish.log"
+          cargo publish --allow-dirty --no-verify --package erplora-guest-sdk > "$log" 2>&1
+          status=$?
+          cat "$log"
+
+          if [ "$status" -eq 0 ]; then
+            echo "blocked_by=" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "Publicado erplora-guest-sdk@${version} en https://crates.io/crates/erplora-guest-sdk"
+            echo "Consumir en handler/Cargo.toml:"
+            echo "  erplora-guest-sdk = \"${version}\""
+            exit 0
+          fi
+
+          if grep -qiE 'already exists|already uploaded' "$log"; then
+            echo "blocked_by=" >> "$GITHUB_OUTPUT"
+            echo "::notice title=erplora-guest-sdk ya estaba publicado::erplora-guest-sdk@${version} ya está en crates.io (re-ejecución del tag); no hay nada que subir."
+            exit 0
+          fi
+
+          echo "blocked_by=other" >> "$GITHUB_OUTPUT"
+          echo "::error title=cargo publish ha fallado contra crates.io::El motivo exacto está en el log de este paso, unas líneas más arriba."
+          exit "$status"
+
+      # A red tag run notifies nobody (hub#652). Stable prefix + `MATCH=prefix`: the `: <version>`
+      # suffix changes on every tag and must not open a second issue.
+      - name: Abrir/refrescar la incidencia de publicación del crate
+        if: failure() && steps.publish.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.publish.outputs.version }}
+          BLOCKED_BY: ${{ steps.publish.outputs.blocked_by }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          case "$BLOCKED_BY" in
+            credential)
+              cause="**Falta el secreto \`CARGO_REGISTRY_TOKEN\`.** El paquete está bien (\`cargo publish --dry-run\` ha pasado); lo que no hay es la credencial de crates.io.
+
+          Se arregla fuera del código: la persona dueña de la cuenta de crates.io crea un token de API (scopes \`publish-new\` y \`publish-update\`, limitado al crate \`erplora-guest-sdk\` en cuanto exista), lo guarda como secreto \`CARGO_REGISTRY_TOKEN\` de ERPlora/hub y relanza el job de este run." ;;
+            pack)
+              cause="**El crate no se puede ni empaquetar** — \`cargo publish --dry-run\` ha fallado. El defecto está en \`crates/guest-sdk\` y se arregla en este repositorio." ;;
+            *)
+              cause="**crates.io ha rechazado la subida.** El log del paso «Publicar en crates.io» lleva la respuesta entera." ;;
+          esac
+
+          body="La imagen del hub de este tag SÍ se publicó (job «Build & Push erplora/hub»); lo que falló es solo el SDK de Rust.
+
+          - versión: \`${VERSION}\`
+          - run: ${RUN_URL}
+
+          Causa: ${cause}
+
+          Mientras esto siga rojo, \`erplora-guest-sdk@${VERSION}\` no existe en crates.io y un desarrollador de fuera no puede declararlo en el handler de su módulo.
+
+          Esta incidencia se reutiliza (un comentario por tag fallido) mientras el bloqueo siga en pie; ciérrala cuando un tag publique el crate."
+
+          TITLE="El SDK erplora-guest-sdk no se pudo publicar en crates.io: ${VERSION}" \
+            MATCH=prefix MATCH_VALUE="El SDK erplora-guest-sdk no se pudo publicar en crates.io" \
+            LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
 
 # ==============================================================================
 # Pendiente (requiere credenciales/acceso reales que hoy solo tiene Ioan, no una decisión de diseño):
