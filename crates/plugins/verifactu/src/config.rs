@@ -71,8 +71,26 @@ pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<O
         if let Some(facts) = host.producer_facts().await.unwrap_or_default() {
             obj.insert("producer_facts".into(), facts);
         }
+        // WHICH AEAT hears this hub is the core's answer (hub#2079), attached like the facts above:
+        // it overrides the row's column and never creates a row. The column was the switch the
+        // settings select wrote, and that switch skipped every check of the go-live.
+        if let Some(environment) = core_environment(host, hub_id).await? {
+            obj.insert("environment".into(), json!(environment));
+        }
     }
     Ok(config)
+}
+
+/// The core profile's environment (hub#2079), or `None` when the host cannot tell. An empty answer
+/// is «cannot tell» too: it must not read as an environment.
+///
+/// A failed read PROPAGATES instead of falling back to the row: the row is the very switch that
+/// bypassed the go-live, so «the core did not answer» cannot quietly mean «trust the module».
+async fn core_environment(host: &dyn NativeHost, hub_id: &str) -> Result<Option<String>> {
+    Ok(host
+        .fiscal_environment(hub_id)
+        .await?
+        .filter(|environment| !environment.trim().is_empty()))
 }
 
 /// **The config a TRANSMISSION reads** (hub#1934): the saved row, or — for a hub that never saved
@@ -91,7 +109,10 @@ pub(crate) async fn transmission_config(host: &dyn NativeHost, hub_id: &str) -> 
     if let Some(config) = read_config(host, hub_id).await? {
         return Ok(config);
     }
-    let mut config = json!({ "environment": "testing" });
+    let environment = core_environment(host, hub_id)
+        .await?
+        .unwrap_or_else(|| "testing".to_string());
+    let mut config = json!({ "environment": environment });
     if let Some(facts) = host.producer_facts().await.unwrap_or_default() {
         config["producer_facts"] = facts;
     }
@@ -795,3 +816,99 @@ mod cert_source_tests {
     }
 }
 
+
+/// **The core decides WHICH AEAT hears this hub, the module's column does not** (hub#2079).
+///
+/// `verifactu_config.environment` used to be the switch: the settings screen wrote `production`
+/// into it and every record, QR and endpoint followed — without ever passing through the core's
+/// go-live (`fiscal_profile::go_live`: the signed grant, the demo pin, the expired certificate).
+/// The engine now takes the environment from the core's profile, so the only way to production is
+/// the go-live, and the module's column is at most a mirror.
+#[cfg(test)]
+mod core_environment_tests {
+    use super::*;
+
+    /// A hub whose module row says one thing and whose core profile says another.
+    struct SplitHost {
+        row_environment: &'static str,
+        core_environment: Option<&'static str>,
+    }
+
+    #[async_trait::async_trait]
+    impl NativeHost for SplitHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            if sql.contains("verifactu_config") {
+                Ok(vec![json!({ "hub_id": "h1", "environment": self.row_environment })])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn fiscal_environment(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(self.core_environment.map(str::to_string))
+        }
+    }
+
+    /// The symptom of hub#2079: «Producción» saved in the module while the core never went live.
+    /// The record, its QR and its endpoint must stay on the AEAT's TEST side.
+    #[tokio::test]
+    async fn a_module_row_saying_production_does_not_reach_the_real_aeat_while_the_core_is_in_testing()
+    {
+        let host = SplitHost {
+            row_environment: "production",
+            core_environment: Some("testing"),
+        };
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert_eq!(environment_of(&cfg), "testing");
+        let endpoint = transmission_endpoint_for(&host, "h1").await.unwrap();
+        assert!(
+            endpoint.starts_with("https://prewww1.aeat.es/")
+                || endpoint.starts_with("https://prewww10.aeat.es/"),
+            "a hub the core keeps in testing must never be pointed at the real AEAT: {endpoint}"
+        );
+        assert!(!endpoint.contains("agenciatributaria.gob.es"), "{endpoint}");
+    }
+
+    /// The other half: once the core went live, the engine files for real even if the module's
+    /// mirror was never rewritten.
+    #[tokio::test]
+    async fn the_core_going_live_moves_the_engine_to_production_whatever_the_module_row_says() {
+        let host = SplitHost {
+            row_environment: "testing",
+            core_environment: Some("production"),
+        };
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert_eq!(environment_of(&cfg), "production");
+    }
+
+    /// A hub that never saved a VeriFactu config transmits with the core's environment too.
+    #[tokio::test]
+    async fn a_hub_without_a_saved_config_transmits_in_the_core_environment() {
+        struct NoRowHost;
+        #[async_trait::async_trait]
+        impl NativeHost for NoRowHost {
+            async fn read(&self, _sql: &str, _p: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn fiscal_environment(&self, _hub_id: &str) -> Result<Option<String>> {
+                Ok(Some("production".to_string()))
+            }
+        }
+        let cfg = transmission_config(&NoRowHost, "h1").await.unwrap();
+        assert_eq!(environment_of(&cfg), "production");
+        // «No config saved» still answers `None` to the settings screen: the core's environment
+        // is attached to a row, it does not create one.
+        assert!(read_config(&NoRowHost, "h1").await.unwrap().is_none());
+    }
+
+    /// A host that cannot answer (no profile, an embedded runtime) leaves the row's value: the
+    /// override needs an answer from the core, it never invents one.
+    #[tokio::test]
+    async fn a_host_without_a_core_answer_keeps_the_row_environment() {
+        let host = SplitHost {
+            row_environment: "testing",
+            core_environment: None,
+        };
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        assert_eq!(environment_of(&cfg), "testing");
+    }
+}

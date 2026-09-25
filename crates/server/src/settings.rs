@@ -379,6 +379,85 @@ pub async fn patch_business_certificate(
     }
 }
 
+/// What the go-live door answers (hub#2079): where this hub files and whether it may still move.
+///
+/// `filed_for_real` is «a record already left for the real AEAT» (`first_record_at` sealed): the
+/// screen hides the way back then, because the core refuses it (ADR-0273 D3).
+fn go_live_state(profile: &erplora_runtime::fiscal_profile::FiscalProfile) -> Value {
+    json!({
+        "environment": profile.environment,
+        "status": profile.status.as_str(),
+        "can_go_live": profile.can_go_live,
+        "activated_at": profile.activated_at,
+        "filed_for_real": !profile.first_record_at.is_empty(),
+    })
+}
+
+/// GET /api/fiscal/go-live — where this hub files today (`testing` | `production`), from the core
+/// profile (hub#2079). Auth = any user session; a module naming itself needs `certificate`.
+pub async fn get_go_live(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return crate::auth_rejected(e);
+    }
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
+    }
+    match erplora_runtime::fiscal_profile::ensure(rt.db(), &st.hub_id()).await {
+        Ok(profile) => enveloped(go_live_state(&profile)),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/fiscal/go-live — **the** way to production (hub#2079): `fiscal_profile::go_live`, with
+/// every check it makes (the signed grant, the demo pin, readiness, the expired certificate). A
+/// refusal carries the go-live's own code so the screen can say what is missing.
+///
+/// Auth = admin session, and — like the certificate doors (hub#1844) — a module that names itself
+/// needs `certificate` granted: sending the business to the real tax authority is at least as
+/// grave as signing with its key.
+pub async fn post_go_live(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return crate::auth_rejected(e);
+    }
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
+    }
+    match rt.fiscal_go_live().await {
+        Ok(profile) => enveloped(go_live_state(&profile)),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// DELETE /api/fiscal/go-live — back to `testing` while nothing has left for the real AEAT
+/// (`fiscal_profile::stand_down`, ADR-0273 D3). Same gates as the way in.
+pub async fn delete_go_live(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return crate::auth_rejected(e);
+    }
+    if let Err(response) = certificate_capability(&headers, &rt).await {
+        return response;
+    }
+    match rt.fiscal_stand_down().await {
+        Ok(profile) => enveloped(go_live_state(&profile)),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// GET /api/business/gateway-identity — estado de la identidad de MÁQUINA para la pasarela
 /// fiscal (hub#1432): nombres y fechas, nunca material de clave. Auth = sesión de usuario.
 pub async fn get_gateway_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {

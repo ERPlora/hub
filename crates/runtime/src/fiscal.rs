@@ -29,7 +29,12 @@ impl Runtime {
     /// D2/D4, hub#550). The host calls it at boot **after re-hydrating the registry** — that is the
     /// first instant both halves of the answer exist: what the hub owes, and who is mounted to
     /// comply. Idempotent, so every restart and every redeploy runs it.
+    ///
+    /// It first writes down, ONCE, a go-live that happened through the VeriFactu select before
+    /// hub#2079 ([`fiscal_profile::adopt_module_environment`]): from then on the engine files where
+    /// the profile says, so the profile has to know.
     pub async fn refresh_fiscal_profile(&self) -> Result<fiscal_profile::FiscalMode> {
+        fiscal_profile::adopt_module_environment(self.db.as_ref(), &self.hub_id).await?;
         fiscal_profile::refresh(self.db.as_ref(), &self.registry, &self.hub_id).await
     }
 
@@ -38,6 +43,12 @@ impl Runtime {
     /// misma condición que enseña la checklist— y que el hub pueda hacerlo (una demo no).
     pub async fn fiscal_go_live(&self) -> Result<fiscal_profile::FiscalProfile> {
         fiscal_profile::go_live(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// **One-off, at boot (hub#2079):** a hub that went live through the VeriFactu select is
+    /// written down as live in the core. See [`fiscal_profile::adopt_module_environment`].
+    pub async fn adopt_module_fiscal_environment(&self) -> Result<bool> {
+        fiscal_profile::adopt_module_environment(self.db.as_ref(), &self.hub_id).await
     }
 
     /// **Apaga el go-live**, y solo mientras no haya salido ni un registro hacia la Hacienda real

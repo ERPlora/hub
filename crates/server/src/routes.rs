@@ -123,6 +123,14 @@ pub fn app(state: AppState) -> Router {
             "/api/fiscal/representation-grant/model",
             post(representation_grant::post_representation_grant_model),
         )
+        // La salida a producción (hub#2079): la ÚNICA puerta a `production`, la del core, con todas
+        // sus comprobaciones. La pantalla de VeriFactu la usa en vez de escribir su propia columna.
+        .route(
+            "/api/fiscal/go-live",
+            get(settings::get_go_live)
+                .post(settings::post_go_live)
+                .delete(settings::delete_go_live),
+        )
         .route(
             "/api/business/fiscal-identity",
             post(settings::publish_fiscal_identity),

@@ -1256,6 +1256,87 @@
     {
       "item": [
         {
+          "name": "GET /api/fiscal/go-live",
+          "request": {
+            "description": "auth: capability+session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "go-live"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/go-live"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/fiscal/go-live",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "go-live"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/go-live"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/fiscal/go-live",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "go-live"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/go-live"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /api/fiscal/representation-grant",
           "request": {
             "description": "auth: session",

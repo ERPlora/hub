@@ -667,6 +667,13 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
                 .to_string(),
         });
     }
+    freeze_live(db, hub_id).await
+}
+
+/// The write half of the go-live: `ACTIVE`, `production`, the instant, and the taxpayer frozen from
+/// the business identity. Shared by [`go_live`] (after its checks) and by
+/// [`adopt_module_environment`] (a hub that is ALREADY live), so both freeze the same four facts.
+async fn freeze_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalProfile> {
     let taxpayer_id = crate::settings::get_all(db, hub_id)
         .await
         .unwrap_or(json!({}))
@@ -691,6 +698,68 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
     )
     .await?;
     reload(db, hub_id).await
+}
+
+/// `_hub_meta` marker of [`adopt_module_environment`]: once written, the adoption never runs again.
+const MODULE_ENVIRONMENT_ADOPTED: &str = "fiscal_environment_adopted";
+
+/// **One-off transition of hub#2079: a hub that went live through the VeriFactu select is live.**
+///
+/// Until hub#2079 the module's settings screen wrote `production` into its own
+/// `verifactu_config.environment` and the engine filed from there, so a hub could be sending real
+/// records to the AEAT while this profile still said `testing`. The engine now asks the CORE which
+/// AEAT to use ([`crate::native::NativeHost::fiscal_environment`]); left alone, such a hub would
+/// send its next real invoices to the test agency — invoices the AEAT never sees (ADR-0189).
+///
+/// So, ONCE per hub (the `_hub_meta` marker), a profile still in `testing` whose module row says
+/// `production` takes the go-live's write half ([`freeze_live`]) without its checks: this is not a
+/// go-live, it is writing down one that already happened. Never for a demo (`can_go_live = 0`,
+/// hub#552) nor for a ceased hub (hub#557). Once only, because afterwards the row is a mirror: a
+/// stand-down must not be undone by the next boot reading a stale mirror.
+///
+/// The core names the module's table here and only here, the way `reset` and `export` already do:
+/// it is the data of the transition, not a dependency — a hub without the table adopts nothing.
+///
+/// Returns whether the profile was promoted.
+pub async fn adopt_module_environment(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    if crate::hub_meta::get(db, MODULE_ENVIRONMENT_ADOPTED)
+        .await?
+        .is_some()
+    {
+        return Ok(false);
+    }
+    let profile = ensure(db, hub_id).await?;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("production".into(), json!(ENV_PRODUCTION));
+    let went_live_in_the_module = db
+        .query(
+            "SELECT to_regclass('verifactu_config') IS NOT NULL AS present",
+            &Params::new(),
+        )
+        .await?
+        .rows
+        .first()
+        .and_then(|row| row["present"].as_bool())
+        .unwrap_or(false)
+        && !db
+            .query(
+                "SELECT 1 AS live FROM verifactu_config \
+                 WHERE hub_id = :hub_id AND is_deleted = 0 AND environment = :production",
+                &p,
+            )
+            .await?
+            .rows
+            .is_empty();
+    let adopt = went_live_in_the_module
+        && profile.environment == ENV_TESTING
+        && profile.can_go_live
+        && profile.status != FiscalStatus::Closed;
+    if adopt {
+        freeze_live(db, hub_id).await?;
+    }
+    crate::hub_meta::set(db, MODULE_ENVIRONMENT_ADOPTED, &now_rfc3339()).await?;
+    Ok(adopt)
 }
 
 /// **Stands the hub back down to the sandbox** — allowed *while nothing has left for the real tax

@@ -101,6 +101,21 @@ pub trait NativeHost: Send + Sync {
         Ok(None)
     }
 
+    /// **Which AEAT this hub files to** — `_hub_fiscal_profile.environment` (`testing` |
+    /// `production`), the core's answer (ADR-0273 D3, hub#2079).
+    ///
+    /// The go-live IS `testing → production`, and only [`crate::fiscal_profile::go_live`] writes
+    /// `production`: it is where the signed grant, the demo pin and the expired certificate are
+    /// checked. A fiscal engine that took its environment from its own config column instead let a
+    /// settings select send real invoices to the tax authority without any of those checks. Same
+    /// rule as the certificate questions: the core answers, the module does not re-derive it.
+    ///
+    /// Default: `Ok(None)` — «cannot tell» (a host without a profile). The engine keeps what it
+    /// had; it never invents an environment.
+    async fn fiscal_environment(&self, _hub_id: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
+
     /// Igual que [`certificate_identity`](Self::certificate_identity) pero sobre un `.p12` **provisto
     /// en memoria** (DER + contraseña) — validar/usar un certificado recién subido. La cripto PKCS#12
     /// (OpenSSL) vive SOLO en el core; el módulo no la implementa. Default = la cripto del core.
@@ -288,6 +303,12 @@ impl NativeHost for DbHost<'_> {
         hub_id: &str,
     ) -> Result<Option<crate::certificate::CertificateHolder>> {
         crate::certificate::active_holder(self.db, hub_id).await
+    }
+
+    async fn fiscal_environment(&self, hub_id: &str) -> Result<Option<String>> {
+        Ok(crate::fiscal_profile::load(self.db, hub_id)
+            .await?
+            .map(|profile| profile.environment))
     }
 
     async fn producer_facts(&self) -> Result<Option<Json>> {
