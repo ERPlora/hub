@@ -5931,4 +5931,84 @@ mod late_remission_verifactu111 {
         assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
         hub.only_testing_was_reached();
     }
+
+    // ── hub#2132: the drain launched by hand re-chains like the scheduled one ─────────────────
+
+    /// 🔴 THE bug: a manager (manage + transmit, not configure) sends the pending tickets by hand
+    /// and one of them needs re-chaining. Writing the recovered anchor asked for the configure
+    /// permission, so the dispatcher refused it and the whole drain stopped with a permission
+    /// error — while the scheduled drain, running as the system, did the same recovery fine.
+    /// Filing the anchor is part of sending, like `_rechain_record`: the same permission.
+    #[tokio::test]
+    async fn a_drain_launched_by_hand_rechains_and_the_ticket_reaches_the_aeat() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-0000000021d2",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        hub.save_the_config().await;
+        hub.sell(1).await;
+        let id = hub.record_id(1).await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+        hub.open_the_road();
+
+        hub.rt
+            .execute_command("verifactu.contingency.process", &Params::new(), &hub.ctx())
+            .await
+            .expect("the manager's drain runs");
+
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            3,
+            "the refusal, the consult and the re-chained resend"
+        );
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    /// The positive control of the one above: the doors that write an anchor ON DEMAND (the
+    /// recovery screen) keep asking for the configure permission. Only the anchor the send itself
+    /// needs travels with the send's permission.
+    #[tokio::test]
+    async fn a_manager_still_cannot_recover_the_chain_from_the_recovery_screen() {
+        let Some(hub) = Bench::answering(
+            "01110000-0000-4000-8000-0000000021d3",
+            CONSULT_WITH_AN_ANCHOR,
+        )
+        .await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.open_the_road();
+
+        let mut input = Params::new();
+        input.insert("issuer_nif".into(), json!(NIF));
+        let refused = hub
+            .rt
+            .execute_command("verifactu.recovery.from_aeat", &input, &hub.ctx())
+            .await;
+
+        assert!(
+            matches!(refused, Err(erplora_runtime::RuntimeError::PermissionDenied(_))),
+            "{refused:?}"
+        );
+        assert!(hub.cell.lock().unwrap().is_empty(), "nothing was asked");
+    }
 }
