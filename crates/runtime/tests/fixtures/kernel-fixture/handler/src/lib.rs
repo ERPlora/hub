@@ -60,6 +60,17 @@ pub fn handle_pure(input: Value) -> Output {
         .unwrap_or("kfx._insert_item")
         .to_string();
 
+    // The param the id travels under. Normally `id` (what `kfx._insert_item` binds); the suite
+    // overrides it with `new_id` — the name `system_params` also injects — to prove the host keeps
+    // a batch id handed over under that name (hub#1357).
+    let id_key = input["payload"]["id_key"]
+        .as_str()
+        .unwrap_or("id")
+        .to_string();
+    // An id NOT taken from the batch. Only the suite sets it, to prove the host never lets a
+    // guest-invented id reach a row (hub#1357).
+    let invented_id = input["payload"]["invented_id"].as_str();
+
     let mut out = Output::new();
     for (i, name) in names.iter().enumerate() {
         let Some(id) = new_ids.get(i) else {
@@ -72,7 +83,7 @@ pub fn handle_pure(input: Value) -> Output {
             return refused;
         };
         let mut params = Map::new();
-        params.insert("id".to_string(), json!(id));
+        params.insert(id_key.clone(), json!(invented_id.unwrap_or(id)));
         params.insert("name".to_string(), json!(name));
         out = out.with_operation(Operation::sql(&target, params));
     }
@@ -111,6 +122,15 @@ mod tests {
         assert_eq!(out.operations[0].params["id"], json!("id-1"));
         assert_eq!(out.events.len(), 1);
         assert!(out.error.is_none());
+    }
+
+    #[test]
+    fn hands_the_batch_id_over_under_the_requested_key() {
+        let mut value = input(json!(["a"]));
+        value["payload"]["id_key"] = json!("new_id");
+        let out = handle_pure(value);
+        assert_eq!(out.operations[0].params["new_id"], json!("id-1"));
+        assert!(out.operations[0].params.get("id").is_none());
     }
 
     #[test]
