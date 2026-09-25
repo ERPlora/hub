@@ -101,14 +101,34 @@ async function settled(page: Page): Promise<void> {
   await expect(page.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)')).toHaveCount(1);
 }
 
-/** In-app navigation the way the launcher and «My apps» do it: through the shell's router. */
+interface ShellRouter {
+  push: (p: string) => Promise<unknown>;
+  currentRoute: { value: { fullPath: string } };
+}
+
+/** In-app navigation the way the launcher and «My apps» do it: through the shell's router.
+ *
+ *  The navigation starts in the page but its promise stays there (hub#2100): awaited across
+ *  `page.evaluate`, Chromium's inspector holds it weakly and CI saw it «garbage collected» while
+ *  the navigation itself landed. What that promise stood for — the router committed the route — is
+ *  read from outside, and then Ionic has to settle. */
 async function go(page: Page, path: string): Promise<void> {
-  await page.evaluate(async (to) => {
+  await page.evaluate((to) => {
     const app = (document.querySelector('#app') as unknown as {
-      __vue_app__: { config: { globalProperties: { $router: { push: (p: string) => Promise<unknown> } } } };
+      __vue_app__: { config: { globalProperties: { $router: ShellRouter } } };
     }).__vue_app__;
-    await app.config.globalProperties.$router.push(to);
+    void app.config.globalProperties.$router.push(to);
   }, path);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (document.querySelector('#app') as unknown as {
+            __vue_app__: { config: { globalProperties: { $router: ShellRouter } } };
+          }).__vue_app__.config.globalProperties.$router.currentRoute.value.fullPath,
+      ),
+    )
+    .toBe(path);
   await settled(page);
 }
 
