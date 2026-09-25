@@ -109,11 +109,13 @@ pub fn flow_grant_release(grant_id: &str) -> String {
     format!("{FLOW_GRANT_PREFIX}{grant_id}")
 }
 
-/// **The media header of a WhatsApp template** (hub#2101): the `vars` key that carries its link,
-/// and the Meta parameter type it becomes. A template has at most one header, so at most one of
-/// these may be set; `flows::def` refuses the rest at save time and the transport before the
-/// network. `schemas/flow.schema.json` declares the same keys under `vars.properties`.
-pub const HEADER_MEDIA_VARS: &[(&str, &str)] = &[
+/// **The header of a WhatsApp template**: the `vars` key that fills it, and the Meta parameter type
+/// it becomes — the value of a text header's `{{1}}` (hub#2111) or the link of a media header
+/// (hub#2101). A template has at most one header, so at most one of these may be set;
+/// `flows::def` refuses the rest at save time and the transport before the network.
+/// `schemas/flow.schema.json` declares the same keys under `vars.properties`.
+pub const HEADER_VARS: &[(&str, &str)] = &[
+    ("header_text", "text"),
     ("header_image", "image"),
     ("header_video", "video"),
     ("header_document", "document"),

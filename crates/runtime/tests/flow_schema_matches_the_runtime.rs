@@ -20,7 +20,7 @@ use erplora_runtime::flows::def::{
     SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::{
-    button_url_index, Channel, BUTTON_URL_VAR_PATTERN, HEADER_MEDIA_VARS,
+    button_url_index, Channel, BUTTON_URL_VAR_PATTERN, HEADER_VARS,
 };
 
 fn schema() -> serde_json::Value {
@@ -632,11 +632,14 @@ fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides()
 #[test]
 fn the_header_media_vars_are_the_same_on_both_sides() {
     let declared = keys_at(&schema(), "/$defs/step/properties/vars/properties");
-    let runtime: BTreeSet<String> = HEADER_MEDIA_VARS
+    let runtime: BTreeSet<String> = HEADER_VARS
         .iter()
         .map(|(key, _)| key.to_string())
         .collect();
     assert_eq!(declared, runtime);
+    // The text header (hub#2111) is one of them: the editor asks for its value only when the hub
+    // declares it.
+    assert!(declared.contains("header_text"), "{declared:?}");
 }
 
 /// **A template's link button** (hub#2110) is declared as a PATTERN, the one the runtime reads:

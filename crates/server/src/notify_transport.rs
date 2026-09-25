@@ -46,7 +46,7 @@ use cloud_client::{Auth, CloudClient, PreparedRequest};
 use erplora_runtime::errors::{Result, RuntimeError};
 use erplora_runtime::host_notify::{
     button_url_index, Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
-    BUTTON_URL_VAR_PREFIX, HEADER_MEDIA_VARS,
+    BUTTON_URL_VAR_PREFIX, HEADER_VARS,
 };
 use serde_json::{json, Value};
 
@@ -271,14 +271,14 @@ fn email_body(intent: &NotifyIntent) -> Result<Value> {
 /// `template` is Meta's OBJECT (`{name, language, components}`), which the SaaS forwards verbatim
 /// — not the bare template name the Rust client's doc-comment used to promise (hub#663).
 fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
-    let header = header_media(intent)?;
+    let header = template_header(intent)?;
     if let (Some((key, _)), true) = (
         &header,
         intent.template.trim().is_empty() || !intent.interactive.is_null(),
     ) {
         return Err(RuntimeError::Notify(format!(
             "whatsapp notification with `vars.{key}` outside a template: only an approved template \
-             has a header, and dropping the media would send a message nobody wrote"
+             has a header, and dropping it would send a message nobody wrote"
         )));
     }
     let url_buttons = url_buttons(intent)?;
@@ -350,8 +350,9 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
 /// `vars.components` wins verbatim: a template with POSITIONAL variables has no other way to be
 /// filled, and the proxy passes the block to Meta untouched. Otherwise the remaining `vars` become
 /// NAMED body parameters, sorted so the same intent always produces the same payload (Meta matches
-/// them by name, so the order is only ours to keep stable — and testable). A media header
-/// ([`header_media`]) goes first, as Meta's own `header` component (hub#2101), and the link
+/// them by name, so the order is only ours to keep stable — and testable). The header
+/// ([`template_header`]: text hub#2111, media hub#2101) goes first, as Meta's own `header`
+/// component, and the link
 /// buttons' variable ends ([`url_buttons`]) last (hub#2110).
 fn template_components(
     intent: &NotifyIntent,
@@ -373,7 +374,7 @@ fn template_components(
         .into_iter()
         .flatten()
         .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
-        .filter(|(key, _)| !HEADER_MEDIA_VARS.iter().any(|(header, _)| header == key))
+        .filter(|(key, _)| !HEADER_VARS.iter().any(|(header, _)| header == key))
         .filter(|(key, _)| !key.starts_with(BUTTON_URL_VAR_PREFIX))
         .collect();
     named.sort_by(|a, b| a.0.cmp(b.0));
@@ -435,13 +436,15 @@ fn url_buttons(intent: &NotifyIntent) -> Result<Vec<(u8, Value)>> {
     Ok(buttons)
 }
 
-/// The media header the intent asks for, as `(var key, Meta's header parameter)` (hub#2101).
+/// The header the intent asks for, as `(var key, Meta's header parameter)`: the value of a text
+/// header's `{{1}}` (hub#2111) or the link of a media header (hub#2101).
 ///
 /// Refused before the network when it cannot be what Meta expects: two of them (a template has
-/// one header), or a value that is not an http(s) link Meta can fetch — both would come back as an
-/// opaque 400 once the call was paid for, or as a promotion without its picture.
-fn header_media(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)>> {
-    let present: Vec<(&'static str, &'static str, &Value)> = HEADER_MEDIA_VARS
+/// one header), a text value that is empty or not a scalar (a title with a hole), or a media value
+/// that is not an http(s) link Meta can fetch — all would come back as an opaque 400 once the call
+/// was paid for, or as a promotion without its picture.
+fn template_header(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)>> {
+    let present: Vec<(&'static str, &'static str, &Value)> = HEADER_VARS
         .iter()
         .filter_map(|(key, kind)| intent.vars.get(*key).map(|value| (*key, *kind, value)))
         .collect();
@@ -452,11 +455,25 @@ fn header_media(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)>> 
             let keys: Vec<String> = many.iter().map(|(k, _, _)| format!("`vars.{k}`")).collect();
             return Err(RuntimeError::Notify(format!(
                 "whatsapp notification with {}: a template has ONE header, so keep only the \
-                 media its approved header asks for",
+                 one its approved header asks for",
                 keys.join(" and ")
             )));
         }
     };
+    if kind == "text" {
+        let text = match value {
+            Value::String(text) => text.trim().to_string(),
+            Value::Number(number) => number.to_string(),
+            _ => String::new(),
+        };
+        if text.is_empty() {
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{key}` is empty or not text: it fills the \
+                 variable of the template's title, and Meta refuses a title with a hole"
+            )));
+        }
+        return Ok(Some((key, json!({ "type": "text", "text": text }))));
+    }
     let link = value
         .as_str()
         .map(str::trim)
@@ -1160,6 +1177,114 @@ mod tests {
         })
         .expect_err("a tappable message has no template header");
         assert!(format!("{err}").contains("header_image"), "{err}");
+    }
+
+    /// **A template whose text header has a variable** (hub#2111): «Your appointment on {{1}}».
+    /// Meta refuses the send unless the `header` component fills that `{{1}}`, and before this the
+    /// only way to write it was `vars.components` by hand. `vars.header_text` is the value; it is
+    /// never a body variable, and the rest of the vars stay the named body parameters.
+    #[test]
+    fn whatsapp_template_with_a_header_text_sends_it_as_the_header_parameter() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "appointment_reminder",
+            json!({"header_text": " 3 October ", "who": "Ana", "button_url_0": "A1"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [{"type": "text", "text": "3 October"}] },
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]},
+                { "type": "button", "sub_type": "url", "index": "0", "parameters": [
+                    {"type": "text", "text": "A1"}
+                ]}
+            ])
+        );
+    }
+
+    /// A number mapped from the run (a table, a day) is still the header's text, and a template
+    /// whose body has no variables still needs its header.
+    #[test]
+    fn whatsapp_template_header_text_takes_a_number_and_needs_no_body_variables() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "table_ready",
+            json!({"header_text": 12, "language": "es"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([{ "type": "header", "parameters": [{"type": "text", "text": "12"}] }])
+        );
+    }
+
+    /// An empty header value is a title with a hole Meta refuses after the call was paid for; an
+    /// object or a list is not a title at all.
+    #[test]
+    fn whatsapp_refuses_a_header_text_without_a_value() {
+        for bad in [
+            json!(""),
+            json!("   "),
+            json!(null),
+            json!({"a": 1}),
+            json!(["x"]),
+        ] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "appointment_reminder",
+                json!({ "header_text": bad.clone() }),
+            ))
+            .expect_err("the header's variable needs a value");
+            assert!(format!("{err}").contains("header_text"), "{err} for {bad}");
+        }
+    }
+
+    /// A template has ONE header: a text value next to a media link is a flow that does not know
+    /// which header its template has.
+    #[test]
+    fn whatsapp_refuses_a_header_text_next_to_header_media() {
+        let err = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "promo",
+            json!({"header_text": "Hi", "header_image": "https://a/x.jpg"}),
+        ))
+        .expect_err("a template has one header");
+        let text = format!("{err}");
+        assert!(
+            text.contains("header_text") && text.contains("header_image"),
+            "{text}"
+        );
+    }
+
+    /// Outside a template (free text or a tappable message) there is no header to fill.
+    #[test]
+    fn whatsapp_refuses_a_header_text_outside_a_template() {
+        let free = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "",
+            json!({"text": "hola", "header_text": "Hi"}),
+        ))
+        .expect_err("only a template has a header");
+        assert!(format!("{free}").contains("header_text"), "{free}");
+        let tappable = whatsapp_body(&NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"header_text": "Hi"}),
+            )
+        })
+        .expect_err("a tappable message has no template header");
+        assert!(format!("{tappable}").contains("header_text"), "{tappable}");
     }
 
     /// **A template's link button with a variable end** (hub#2110): «See your appointment»
