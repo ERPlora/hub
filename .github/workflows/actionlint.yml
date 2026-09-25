@@ -79,6 +79,8 @@ on:
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
+      # Same for the crates.io job of erplora-guest-sdk (hub#2119).
+      - 'scripts/tests/publish-guest-sdk-workflow.test.sh'
       # El contrato del job que crea el canario al publicar (saas#1895), por lo mismo: vive fuera
       # de `.github/`, así que sin esta ruta una PR que solo lo tocara no lo ejecutaría.
       - 'scripts/tests/canary-on-publish.test.sh'
@@ -338,6 +340,14 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/publish-module-sdk-workflow.test.sh
+
+      # ── The job that publishes erplora-guest-sdk to crates.io (hub#2119) ──────────────
+      # A crates.io version cannot be deleted: the tag-only guard, the stamped version and the
+      # named missing token are what this pins. Seconds; also a step of `build-hub.yml`.
+      - name: Contrato del job publish-guest-sdk (hub#2119)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/publish-guest-sdk-workflow.test.sh
 
       # ── El canario que publica cada release (ERPlora/saas#1895) ───────────────────────
       # El job `fleet-canary` es lo único que contesta «¿arranca lo que acabamos de publicar?»,
