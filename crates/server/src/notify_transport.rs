@@ -45,7 +45,8 @@ use async_trait::async_trait;
 use cloud_client::{Auth, CloudClient, PreparedRequest};
 use erplora_runtime::errors::{Result, RuntimeError};
 use erplora_runtime::host_notify::{
-    Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome, HEADER_MEDIA_VARS,
+    button_url_index, Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
+    BUTTON_URL_VAR_PREFIX, HEADER_MEDIA_VARS,
 };
 use serde_json::{json, Value};
 
@@ -280,6 +281,18 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
              has a header, and dropping the media would send a message nobody wrote"
         )));
     }
+    let url_buttons = url_buttons(intent)?;
+    if let (Some((first, _)), true) = (
+        url_buttons.first(),
+        intent.template.trim().is_empty() || !intent.interactive.is_null(),
+    ) {
+        return Err(RuntimeError::Notify(format!(
+            "whatsapp notification with `vars.{BUTTON_URL_VAR_PREFIX}{}` outside a template: only \
+             an approved template has link buttons, and dropping their end would send a link \
+             nobody wrote",
+            first
+        )));
+    }
     let mut body = json!({ "to": intent.to.trim() });
     // Optional: one of THIS hub's numbers. A foreign one is a 404 at the proxy, by design.
     if let Some(phone_number_id) = var_str(intent, "phone_number_id") {
@@ -325,7 +338,7 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
     if let Some(language) = var_str(intent, "language") {
         template["language"] = json!(language);
     }
-    if let Some(components) = template_components(intent, header) {
+    if let Some(components) = template_components(intent, header, url_buttons) {
         template["components"] = components;
     }
     body["template"] = template;
@@ -338,8 +351,13 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
 /// filled, and the proxy passes the block to Meta untouched. Otherwise the remaining `vars` become
 /// NAMED body parameters, sorted so the same intent always produces the same payload (Meta matches
 /// them by name, so the order is only ours to keep stable — and testable). A media header
-/// ([`header_media`]) goes first, as Meta's own `header` component (hub#2101).
-fn template_components(intent: &NotifyIntent, header: Option<(&str, Value)>) -> Option<Value> {
+/// ([`header_media`]) goes first, as Meta's own `header` component (hub#2101), and the link
+/// buttons' variable ends ([`url_buttons`]) last, in position order (hub#2110).
+fn template_components(
+    intent: &NotifyIntent,
+    header: Option<(&str, Value)>,
+    url_buttons: Vec<(u8, Value)>,
+) -> Option<Value> {
     if let Some(explicit) = intent.vars.get("components").filter(|v| v.is_array()) {
         return Some(explicit.clone());
     }
@@ -356,6 +374,7 @@ fn template_components(intent: &NotifyIntent, header: Option<(&str, Value)>) -> 
         .flatten()
         .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
         .filter(|(key, _)| !HEADER_MEDIA_VARS.iter().any(|(header, _)| header == key))
+        .filter(|(key, _)| !key.starts_with(BUTTON_URL_VAR_PREFIX))
         .collect();
     named.sort_by(|a, b| a.0.cmp(b.0));
     if !named.is_empty() {
@@ -367,8 +386,53 @@ fn template_components(intent: &NotifyIntent, header: Option<(&str, Value)>) -> 
             .collect();
         components.push(json!({ "type": "body", "parameters": parameters }));
     }
+    components.extend(url_buttons.into_iter().map(|(_, button)| button));
 
     (!components.is_empty()).then(|| Value::Array(components))
+}
+
+/// Meta's `button` components for the template's link buttons, with their position, in position
+/// order (hub#2110).
+///
+/// `vars.button_url_<n>` is the text Meta appends to the `{{1}}` of the URL button at position
+/// `<n>`. Refused before the network when Meta could only answer an opaque 400 after the call was
+/// paid for: a key whose position is not one digit (it would otherwise travel as a body variable),
+/// or an end that is empty or not a scalar (a link to the bare prefix, or to `{"a":1}`).
+fn url_buttons(intent: &NotifyIntent) -> Result<Vec<(u8, Value)>> {
+    let mut buttons: Vec<(u8, Value)> = Vec::new();
+    for (key, value) in intent.vars.as_object().into_iter().flatten() {
+        if !key.starts_with(BUTTON_URL_VAR_PREFIX) {
+            continue;
+        }
+        let index = button_url_index(key).ok_or_else(|| {
+            RuntimeError::Notify(format!(
+                "whatsapp notification with `vars.{key}`: a link button is `button_url_<n>`, with \
+                 `<n>` the button's position in the template (0-9)"
+            ))
+        })?;
+        let text = match value {
+            Value::String(text) => text.trim().to_string(),
+            Value::Number(number) => number.to_string(),
+            _ => String::new(),
+        };
+        if text.is_empty() {
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{key}` is empty or not text: it is the end of \
+                 the button's link, and without it the customer would tap a link to nowhere"
+            )));
+        }
+        buttons.push((
+            index,
+            json!({
+                "type": "button",
+                "sub_type": "url",
+                "index": index.to_string(),
+                "parameters": [{ "type": "text", "text": text }]
+            }),
+        ));
+    }
+    buttons.sort_by_key(|(index, _)| *index);
+    Ok(buttons)
 }
 
 /// The media header the intent asks for, as `(var key, Meta's header parameter)` (hub#2101).
@@ -1096,5 +1160,118 @@ mod tests {
         })
         .expect_err("a tappable message has no template header");
         assert!(format!("{err}").contains("header_image"), "{err}");
+    }
+
+    /// **A template's link button with a variable end** (hub#2110): «See your appointment»
+    /// pointing at `https://…/c/{{1}}`. Meta refuses the send unless the `button` component
+    /// carries that end, and before this the only way to write it was `vars.components` by hand.
+    /// `vars.button_url_<n>` is the end of the button at position `<n>`; the buttons follow the
+    /// header and the body, in position order, whatever order the flow wrote them in.
+    #[test]
+    fn whatsapp_template_with_url_buttons_sends_their_variable_part() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "appointment_confirmed",
+            json!({
+                "button_url_1": "pay/A1B2",
+                "who": "Ana",
+                "header_image": "https://cdn.example.com/salon.jpg",
+                "button_url_0": 4521,
+            }),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [
+                    {"type": "image", "image": {"link": "https://cdn.example.com/salon.jpg"}}
+                ]},
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]},
+                { "type": "button", "sub_type": "url", "index": "0", "parameters": [
+                    {"type": "text", "text": "4521"}
+                ]},
+                { "type": "button", "sub_type": "url", "index": "1", "parameters": [
+                    {"type": "text", "text": "pay/A1B2"}
+                ]}
+            ])
+        );
+    }
+
+    /// A template whose only variable is the button's end still sends it.
+    #[test]
+    fn whatsapp_template_url_button_needs_no_body_variables() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "order_ready",
+            json!({ "button_url_0": " R-77 ", "language": "es" }),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([{ "type": "button", "sub_type": "url", "index": "0", "parameters": [
+                {"type": "text", "text": "R-77"}
+            ]}])
+        );
+    }
+
+    /// An empty end is a link to the bare prefix — the customer taps «Pay» and lands nowhere — and
+    /// Meta answers an opaque 400 after the call was paid for. Refused before the network.
+    #[test]
+    fn whatsapp_refuses_a_url_button_without_a_value() {
+        for bad in [json!(""), json!("   "), json!(null), json!({}), json!([]), json!(true)] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "order_ready",
+                json!({ "button_url_0": bad.clone() }),
+            ))
+            .expect_err("the button's end is text Meta appends to the link");
+            assert!(format!("{err}").contains("button_url_0"), "{err} for {bad}");
+        }
+    }
+
+    /// A near miss of the key is a typo, not a body variable named `button_url_x` that Meta would
+    /// refuse with a message nobody can read.
+    #[test]
+    fn whatsapp_refuses_a_malformed_url_button_key() {
+        for key in ["button_url_", "button_url_10", "button_url_x"] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "order_ready",
+                json!({ key: "A1" }),
+            ))
+            .expect_err("the position is one digit");
+            assert!(format!("{err}").contains(key), "{err} for {key}");
+        }
+    }
+
+    /// Only a template has buttons: next to free text or a tappable message the end would vanish
+    /// without a word.
+    #[test]
+    fn whatsapp_refuses_a_url_button_outside_a_template() {
+        let free_text = intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "",
+            json!({"text": "hola", "button_url_0": "A1"}),
+        );
+        let tappable = NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"button_url_0": "A1"}),
+            )
+        };
+        for intent in [free_text, tappable] {
+            let err = whatsapp_body(&intent).expect_err("only a template has link buttons");
+            assert!(format!("{err}").contains("button_url_0"), "{err}");
+        }
     }
 }

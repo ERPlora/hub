@@ -736,6 +736,47 @@ async fn a_flow_offers_the_customer_options_to_tap_and_they_reach_the_transport_
     );
 }
 
+/// **A template's link button with a variable end, end to end** (hub#2110): «See your
+/// appointment» pointing at `https://…/c/{{1}}`. The step names the end in `vars.button_url_0`,
+/// mapped against the run like the rest of the copy; what a unit test of the parser cannot prove
+/// is that it survives the queue row and the relay and reaches the transport RENDERED, under the
+/// key the transport turns into Meta's `button` component.
+#[tokio::test]
+async fn a_template_with_a_link_button_reaches_the_transport_with_its_end_rendered() {
+    let (rt, transport) = runtime().await;
+    let flow_id = create_flow(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "confirm",
+                "kind": "notify",
+                "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "template": "appointment_confirmed",
+                "vars": { "when": "{{input.when}}", "button_url_0": "c/{{input.customer_id}}" }
+            }]
+        }),
+    )
+    .await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    run_flow(&rt, &flow_id).await;
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "one run, one message");
+    let intent = &sent[0].0;
+    assert_eq!(intent.to, PHONE);
+    assert_eq!(intent.template, "appointment_confirmed");
+    assert_eq!(
+        intent.vars["button_url_0"],
+        json!("c/c-1"),
+        "the button's end is rendered against the run like any other copy"
+    );
+    assert_eq!(intent.vars["when"], json!("martes"));
+}
+
 /// **The whole point of hub#1641, end to end**: the list is ALREADY in the database, so nothing
 /// asks a language model to read it out loud. A `query` step publishes it whole, and the tappable
 /// message names it with ONE bare path — `steps.<id>.options` — which is exactly the mapping the
