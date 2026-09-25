@@ -116,6 +116,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     'reject',
     'remove',
     'replaceGrants',
+    'restoreTemplate',
     'run',
     'runs',
     'schema',
@@ -149,6 +150,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
   await flows.templateDiscards().catch(() => undefined);
   await flows.activateTemplate('appointment-from-whatsapp');
   await flows.deactivateTemplate('appointment-from-whatsapp');
+  await flows.restoreTemplate('appointment-from-whatsapp');
 
   assert.deepEqual(
     calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
@@ -179,6 +181,8 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
       // the client's own and is never an argument: see the test below.
       'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/activate',
       'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/deactivate',
+      // hub#2059 — the explicit «restore the factory one», MY OWN recipe only, like activate.
+      'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/restore',
     ],
   );
   for (const call of calls) {

@@ -2058,6 +2058,29 @@ CREATE INDEX IF NOT EXISTS ix_hub_activity_log_pending \
         postgres: "ALTER TABLE _hub_certificate \
                      ADD COLUMN IF NOT EXISTS not_after TEXT NOT NULL DEFAULT '';",
     },
+    // ── v66 — hub#2059: the fingerprint of the factory recipe a flow was built from ────────────
+    // «Activate» twice lands on the SAME flow (hub#1684) — the second tap only switches it on and
+    // never touches its document again, on purpose: an owner who edited the recipe must not have
+    // those edits silently overwritten. That leaves no way to tell «the module improved its recipe
+    // since» from «this is still the one it shipped», so the gallery could never flag a flow whose
+    // factory version had moved on. `template_digest` is what a listing compares against the
+    // digest the registry computes NOW for that `<module>/<family>` (`templates::recipe_digest`).
+    //
+    // `NULL` on purpose for every flow built before this column existed: there is no recipe version
+    // to compare against, and the listing has to answer «unknown», not «up to date» — the second
+    // would tell exactly the businesses this issue is about that nothing changed. No backfill: the
+    // digest of the recipe a hub built from, years ago, at whatever version the module was then, is
+    // not recoverable from what is stored today.
+    //
+    // `ALTER … ADD COLUMN IF NOT EXISTS`, additive and re-runnable, and it is what ADR-0269 retires
+    // by leaving it unwritten. When it was written the maximum was v65 on `origin/develop` and no
+    // remote ref asked for a v66.
+    SystemMigration {
+        version: 66,
+        name: "flow_template_digest",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_digest TEXT;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -4027,7 +4050,13 @@ mod kind_contract_tests {
         // knows an expired own certificate without decrypting it on every sale. `ADD COLUMN IF NOT
         // EXISTS … DEFAULT ''`, additive and re-runnable. When it was written the maximum was v64
         // on `origin/develop` and no remote ref asked for a v65 or above.
-        assert_eq!(MIGRATIONS.len(), 62, "el catálogo cambió de tamaño");
+        // + `flow_template_digest` (v66, hub#2059): the `template_digest` column of `_flow` — the
+        // fingerprint of the factory recipe a flow was built from, so the gallery can tell «the
+        // module improved its recipe since» from «still the one it shipped». `NULL` on every flow
+        // built before this column existed, with no backfill: an old digest is not recoverable.
+        // `ADD COLUMN IF NOT EXISTS`, additive and re-runnable. When it was written the maximum was
+        // v65 on `origin/develop` and no remote ref asked for a v66.
+        assert_eq!(MIGRATIONS.len(), 63, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO
