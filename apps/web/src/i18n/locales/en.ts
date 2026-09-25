@@ -315,6 +315,10 @@ export default {
   offline: {
     title: 'No internet connection',
     body: 'Anything that needs the internet — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
+    // hub#2085 — the browser says it has a network, but ERPlora does not answer. Names what is
+    // known and both places the fault can be; never claims «no internet», which may be false here.
+    hubTitle: 'ERPlora is not responding',
+    hubBody: 'Your device seems to be online, but ERPlora is not answering: it may be your internet connection or a problem on our side. Anything that needs it — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
   },
   setup: {
     title: 'Finish setting up your business',
@@ -915,6 +919,7 @@ export default {
     stateInstalled: 'Installed',
     stateAvailable: 'Available',
     stateUnavailable: 'Unavailable',
+    stateNeedsNewerHub: 'Needs ERPlora {version}',
     stateInstalling: 'Installing…',
     // hub#516: installed, but a newer version is published. Names the version — «there is an
     // update» without saying which one is a nag, not information.
@@ -928,6 +933,7 @@ export default {
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
     actionUpdate: 'Update',
+    actionSeeHubUpdates: 'See your ERPlora version and updates',
     // Icon-only like every action (Ioan 2026-07-16 on ADR-0133): okdt puts this in `aria-label`
     // and `title`, never on the face of the button.
     actionOpen: 'Open',

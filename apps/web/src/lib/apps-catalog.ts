@@ -18,7 +18,46 @@ export function isModuleInstalled(
 }
 
 /** What a catalog row is, as far as the screen and the buttons are concerned. */
-export type CatalogRowState = 'installing' | 'updatable' | 'installed' | 'available' | 'unavailable';
+export type CatalogRowState =
+  | 'installing'
+  | 'updatable'
+  | 'installed'
+  | 'available'
+  | 'needs_newer_hub'
+  | 'unavailable';
+
+/**
+ * Reads a version as a comparable triple — a mirror of the runtime's `version_triple`
+ * (`crates/runtime/src/core_version.rs`), so the card and the install refusal agree on every number.
+ * A pre-release/build suffix is dropped (`1.2.3-rc1` floors at `1.2.3`), missing components read as
+ * zero, and anything else (four parts, a letter) is not a version anybody released.
+ */
+function versionTriple(value: string): [number, number, number] | null {
+  const core = value.trim().split(/[-+]/)[0] ?? '';
+  const parts = core.split('.');
+  if (parts.length > 3 || !parts.every((part) => /^\d+$/.test(part))) return null;
+  const [major, minor = 0, patch = 0] = parts.map(Number);
+  return [major, minor, patch];
+}
+
+/**
+ * Whether this hub is below the floor the catalog announces for an app (hub#2054).
+ *
+ * `hubVersion` is what `/api/system` reports (`v1.4.0`: the `v` is a reading aid and is stripped).
+ * Only a floor and a hub version that can BOTH be read can say «too old»: no floor, a hub version the
+ * screen could not get, or a shape nobody released read as «not too old» — the runtime still refuses
+ * at install time, and a guessed «needs a newer hub» would lock the owner out of a good app.
+ */
+export function hubTooOldFor(minErploraVersion: string | null, hubVersion: string | null | undefined): boolean {
+  if (!minErploraVersion || !hubVersion) return false;
+  const floor = versionTriple(minErploraVersion);
+  const hub = versionTriple(hubVersion.trim().replace(/^v/, ''));
+  if (!floor || !hub) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (hub[i] !== floor[i]) return hub[i] < floor[i];
+  }
+  return false;
+}
 
 /**
  * The state of one catalog row — the single place install-or-update is decided (hub#795).
@@ -39,13 +78,17 @@ export function catalogRowState(row: {
   hasUpdate: boolean;
   available: boolean;
   busy: boolean;
+  /** The version the catalog announces needs a newer hub than this one ({@link hubTooOldFor}). */
+  needsNewerHub?: boolean;
 }): CatalogRowState {
   if (row.busy) return 'installing';
   const installed = isModuleInstalled(row.cloudInstalled, row.id, row.localInstalledIds);
   // An update is only an update over something this hub HAS. A newer version in the marketplace of a
   // module nobody installed here is just the version you would get if you installed it.
   if (installed) return row.hasUpdate ? 'updatable' : 'installed';
-  return row.available ? 'available' : 'unavailable';
+  if (!row.available) return 'unavailable';
+  // hub#2054: said BEFORE the press. Offering «Install» here only led to the runtime's refusal.
+  return row.needsNewerHub ? 'needs_newer_hub' : 'available';
 }
 
 /**
@@ -55,11 +98,17 @@ export function catalogRowState(row: {
  * `label` IS the accessible name and the tooltip. A single «Install» button serving both operations
  * told a keyboard and a screen reader the wrong verb — which is the whole of hub#795.
  */
-export function catalogActionFor(state: CatalogRowState): 'install' | 'update' | null {
+export function catalogActionFor(state: CatalogRowState): CatalogAction | null {
   if (state === 'available') return 'install';
   if (state === 'updatable') return 'update';
+  // The hub updates itself (ADR-0269): there is no button to press here, only where to see the
+  // version it runs and what changed — which is what the owner needs to know next.
+  if (state === 'needs_newer_hub') return 'see_hub_updates';
   return null;
 }
+
+/** The actions a catalog row can offer. */
+export type CatalogAction = 'install' | 'update' | 'see_hub_updates';
 
 /** The operation a busy row is running: the install progress or an update in flight. */
 export type CatalogBusyAction = 'install' | 'update' | null;
@@ -71,7 +120,7 @@ export type CatalogBusyAction = 'install' | 'update' | null;
  * reads as «something is blocked». While the row is busy the running operation stays painted — with
  * its spinner, and disabled — so the person sees what is happening on the button they pressed.
  */
-export function catalogVisibleAction(state: CatalogRowState, busy: CatalogBusyAction): 'install' | 'update' | null {
+export function catalogVisibleAction(state: CatalogRowState, busy: CatalogBusyAction): CatalogAction | null {
   if (state === 'installing') return busy;
   return catalogActionFor(state);
 }

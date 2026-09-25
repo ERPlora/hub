@@ -671,6 +671,26 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
         }
     }
     for (name, command) in &manifest.commands {
+        // hub#2081: `on_unique` names codes the dispatcher will RAISE, so each one passes the
+        // same door as `expect_rows.error` — own namespace, and in the catalog when there is one.
+        for (index, code) in &command.on_unique {
+            if !crate::errors::valid_domain_code(&manifest.id, code) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` maps the index `{index}` in `on_unique` to the invalid domain code `{code}`; expected `{}.<snake_case>`",
+                    manifest.id, manifest.id
+                )));
+            }
+            if manifest
+                .errors
+                .as_ref()
+                .is_some_and(|catalog| !catalog.contains_key(code))
+            {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` raises `{code}` in `on_unique`, which the `errors` catalog does not declare (ADR-0398)",
+                    manifest.id
+                )));
+            }
+        }
         if command.min_affected_rows.is_some() && command.expect_rows.is_some() {
             return Err(RuntimeError::Other(format!(
                 "manifest `{}`: command `{name}` cannot combine `min_affected_rows` and `expect_rows`",

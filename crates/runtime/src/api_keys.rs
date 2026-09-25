@@ -755,6 +755,7 @@ mod tests {
             ai: None,
             expose_api: expose,
             internal: false,
+            on_unique: Default::default(),
         }
     }
 

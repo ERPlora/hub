@@ -294,6 +294,8 @@ export default {
   offline: {
     title: 'Sin conexión a Internet',
     body: 'Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
+    hubTitle: 'ERPlora no responde',
+    hubBody: 'Tu dispositivo parece tener conexión, pero ERPlora no contesta: puede ser tu Internet o un problema por nuestra parte. Lo que lo necesita —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
   },
   setup: {
     title: 'Termina de configurar tu negocio',
@@ -810,6 +812,7 @@ export default {
     stateInstalled: 'Instalado',
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
+    stateNeedsNewerHub: 'Necesita ERPlora {version}',
     stateInstalling: 'Instalando…',
     // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
     // «hay actualización» sin decir cuál es una insistencia, no una información.
@@ -823,6 +826,7 @@ export default {
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
     actionUpdate: 'Actualizar',
+    actionSeeHubUpdates: 'Ver tu versión de ERPlora y sus actualizaciones',
     actionOpen: 'Abrir',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',

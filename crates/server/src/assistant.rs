@@ -2193,6 +2193,7 @@ mod tests {
                 }),
                 expose_api: false,
                 internal,
+                on_unique: Default::default(),
             }
         }
 
