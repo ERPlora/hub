@@ -112,6 +112,16 @@ async fn fixture(granted: bool) -> Fixture {
 /// (`requires.json` pide `appointments >= 1.1.69`). Con `false`, el suelo NO se cumple y la
 /// plantilla no debe ofrecerse, que es la otra mitad del contrato de la carpeta.
 async fn fixture_with(granted: bool, appointments_installed: bool) -> Fixture {
+    fixture_full(granted, appointments_installed, false).await
+}
+
+/// `whatsapp_paused` = the module that ships the template is paused (hub#2123: a discard that is
+/// not about a floor).
+async fn fixture_full(
+    granted: bool,
+    appointments_installed: bool,
+    whatsapp_paused: bool,
+) -> Fixture {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -153,6 +163,9 @@ async fn fixture_with(granted: bool, appointments_installed: bool) -> Fixture {
     rt.install_from_dir(&module_dir(&modules, WHATSAPP, json!({}), true))
         .await
         .unwrap();
+    if whatsapp_paused {
+        rt.deactivate(WHATSAPP).await.unwrap();
+    }
     if granted {
         rt.set_module_capability(EDITOR, "manage_flows", true, "hub_user:admin")
             .await
@@ -452,5 +465,26 @@ async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
         discarded[0]["requires"],
         json!({ "module": "appointments", "floor": "1.1.69", "installed": null }),
         "the floor discard carries its neighbour: {discarded:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_discard_that_is_not_about_a_floor_names_no_neighbour() {
+    // hub#2123: `requires` is ABSENT, not `null`, on the codes that are not a floor — a module
+    // reading it must never see «this one needs a neighbour» where there is none.
+    let fx = fixture_full(true, true, true).await;
+
+    let response = send(&fx.router, request(TEMPLATES, Some(&fx.admin), None)).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    let discarded = body["discarded"]
+        .as_array()
+        .expect("una lista de descartes");
+    assert_eq!(discarded.len(), 1, "{discarded:?}");
+    assert_eq!(discarded[0]["code"], "template_owner_paused");
+    assert!(
+        discarded[0].get("requires").is_none(),
+        "no neighbour on a non-floor discard: {discarded:?}"
     );
 }
