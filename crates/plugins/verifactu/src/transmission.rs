@@ -6006,7 +6006,10 @@ mod late_remission_verifactu111 {
             .await;
 
         assert!(
-            matches!(refused, Err(erplora_runtime::RuntimeError::PermissionDenied(_))),
+            matches!(
+                refused,
+                Err(erplora_runtime::RuntimeError::PermissionDenied(_))
+            ),
             "{refused:?}"
         );
         assert!(hub.cell.lock().unwrap().is_empty(), "nothing was asked");
