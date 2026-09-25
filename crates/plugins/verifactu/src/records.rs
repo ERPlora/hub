@@ -1266,13 +1266,27 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
     pub(crate) async fn spawn_fake_cell_answering(
         aeat_response: &'static str,
     ) -> (String, Arc<Mutex<Vec<Json>>>) {
+        spawn_fake_cell_answering_in_sequence(&[aeat_response]).await
+    }
+
+    /// The same cell, relaying `answers[n]` to the n-th envelope and the last one to every
+    /// envelope after it — so a chain recovery (refusal → consult → resend) can be played through
+    /// the one door both legs take (hub#2127).
+    pub(crate) async fn spawn_fake_cell_answering_in_sequence(
+        answers: &[&'static str],
+    ) -> (String, Arc<Mutex<Vec<Json>>>) {
         use base64::Engine as _;
+        assert!(!answers.is_empty(), "the cell needs something to answer");
+        let answers = answers.to_vec();
         let seen: Arc<Mutex<Vec<Json>>> = Arc::new(Mutex::new(Vec::new()));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let recorder = Arc::clone(&seen);
         tokio::spawn(async move {
+            let mut served = 0usize;
             while let Ok((mut socket, _)) = listener.accept().await {
+                let aeat_response = answers[served.min(answers.len() - 1)];
+                served += 1;
                 let mut buffer = Vec::new();
                 let mut chunk = [0u8; 8192];
                 while let Ok(n) = socket.read(&mut chunk).await {
