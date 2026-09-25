@@ -182,9 +182,9 @@ import { fetchSystemInfo } from '../lib/system';
 import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
-  alsoInstalledNames, catalogActionFor, catalogRowState, catalogVisibleAction, hubTooOldFor, isModuleInstalled,
+  alsoInstalledNames, catalogActionFor, catalogPrice, catalogRowState, catalogVisibleAction, hubTooOldFor, isModuleInstalled,
   modulesWithUnknownPublication, publicationOf,
-  type CatalogBusyAction, type CatalogRowState, type PublicationStatus,
+  type CatalogBusyAction, type CatalogPrice, type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
@@ -1193,18 +1193,28 @@ async function removeModule(m: InstalledModule): Promise<void> {
   }
 }
 
+/** Words for a card's price line; the unit never goes out without its amount (hub#2072). */
+function priceText(p: CatalogPrice): string {
+  switch (p.kind) {
+    case 'label':
+      return p.label;
+    case 'free':
+      return t('apps.priceFree');
+    case 'included_in_plan':
+      return t('apps.priceIncludedInPlan');
+    case 'monthly':
+      return t('apps.priceMonthly', { price: p.amount });
+    case 'yearly':
+      return t('apps.priceYearly', { price: p.amount });
+    case 'one_time':
+      return t('apps.priceOneTime', { price: p.amount });
+    case 'on_request':
+      return t('apps.priceOnRequest');
+  }
+}
+
 function toViewModule(m: CloudMarketplaceModule): Mod {
-  const amount = m.priceAmount ?? '';
-  const price = m.isFree
-    ? t('apps.priceFree')
-    : m.priceLabel
-      || (m.priceInterval === 'month'
-        ? t('apps.priceMonthly', { price: amount })
-        : m.priceInterval === 'year'
-          ? t('apps.priceYearly', { price: amount })
-          : amount
-            ? t('apps.priceOneTime', { price: amount })
-            : t('apps.priceOnRequest'));
+  const price = priceText(catalogPrice(m));
   return {
     id: m.id,
     name: m.name,
