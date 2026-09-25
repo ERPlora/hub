@@ -2172,6 +2172,37 @@
           "response": []
         },
         {
+          "name": "POST /api/hub/flows/templates/:module/:family/restore",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "templates",
+                "{{module}}",
+                "{{family}}",
+                "restore"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/templates/{{module}}/{{family}}/restore"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /api/hub/flows/:id",
           "request": {
             "description": "auth: admin+capability",

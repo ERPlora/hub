@@ -1834,6 +1834,32 @@ export class FlowsApi {
       path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/deactivate`,
     }) as Promise<Flow>;
   }
+
+  /**
+   * `POST /api/hub/flows/templates/{thisModule}/{family}/restore` — the explicit **«restore the
+   * factory recipe»** gesture (hub#2059).
+   *
+   * Same flow (id and run history kept), rebuilt from the module's CURRENT document and given
+   * exactly the permissions it declares today — pins included. The owner's own edits to the flow
+   * are lost; that is the whole point of the button, never a side effect of something softer.
+   * Paused stays paused, running stays running: this is not {@link activateTemplate}.
+   *
+   * A family that was never activated answers `flow.not_found` — there is no factory recipe here
+   * to restore. A module may only restore its OWN recipes through this method, exactly like
+   * {@link activateTemplate}; the gallery that holds `manage_flows` may restore any module's, but
+   * that is a different door, not this one.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * {@link activateTemplate}: `typeof flows.restoreTemplate` is the probe.
+   */
+  async restoreTemplate(family: string): Promise<Flow> {
+    const own = checkedSegment('module id', this.moduleId, ID_PATTERN);
+    const target = checkedSegment('template family', family, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/restore`,
+    }) as Promise<Flow>;
+  }
 }
 
 /**
@@ -1902,7 +1928,21 @@ export interface ModuleFlowTemplate {
    * families of the same module apart: with two appointment recipes and one of them on, both read
    * as «you already have this one».
    */
-  installed?: { flow_id: string; enabled: boolean } | null;
+  installed?: {
+    flow_id: string;
+    enabled: boolean;
+    /**
+     * Whether the installed flow was built from an OLDER version of the recipe this module ships
+     * today (hub#2059).
+     *
+     * `true` — the module now ships a different recipe than the one this flow was built from:
+     * offer «Restore the factory one» ({@link FlowsApi.restoreTemplate}), never overwrite it on its
+     * own. `false` — the flow already matches what the module ships. `null` — this hub cannot tell
+     * (the flow was built before the hub started remembering the recipe's version). Absent — a hub
+     * older than hub#2059, which never computed this at all.
+     */
+    outdated?: boolean | null;
+  } | null;
 }
 
 /**

@@ -151,19 +151,46 @@ impl Runtime {
         .await
     }
 
-    /// `template_ref → (flow id, enabled)` for every flow this hub built from a factory recipe.
+    /// **The explicit «restore the factory recipe»** (hub#2059) — mirrors
+    /// [`Self::activate_flow_template`] in every way but ONE: it overwrites the document and the
+    /// grants of an ALREADY activated flow with what the module ships today, instead of leaving
+    /// them alone. See [`flows::templates::restore`] for the guaranteed order.
+    pub async fn restore_flow_template(
+        &self,
+        module: &str,
+        family: &str,
+        by: &str,
+    ) -> Result<flows::Flow> {
+        let language = self.hub_language().await;
+        flows::templates::restore(
+            self.db.as_ref(),
+            &self.hub_id,
+            &self.registry,
+            module,
+            family,
+            &language,
+            by,
+        )
+        .await
+    }
+
+    /// `template_ref → (flow id, enabled, stored digest)` for every flow this hub built from a
+    /// factory recipe. The digest is `None` for a flow built before hub#2059 — «this hub cannot
+    /// tell» — never a value that would compare equal or different by accident.
     ///
     /// One read for the whole listing rather than one per template: the gallery asks for all of
     /// them at once, and a query per card is how a screen that opens in 40 ms starts taking a
     /// second on a hub with thirty recipes installed.
-    pub async fn installed_flow_templates(&self) -> Result<HashMap<String, (String, bool)>> {
+    pub async fn installed_flow_templates(
+        &self,
+    ) -> Result<HashMap<String, (String, bool, Option<String>)>> {
         Ok(flows::store::list(self.db.as_ref(), &self.hub_id)
             .await?
             .into_iter()
             .filter_map(|f| {
-                f.template_ref
-                    .clone()
-                    .map(|reference| (reference, (f.id.clone(), f.enabled)))
+                f.template_ref.clone().map(|reference| {
+                    (reference, (f.id.clone(), f.enabled, f.template_digest.clone()))
+                })
             })
             .collect())
     }

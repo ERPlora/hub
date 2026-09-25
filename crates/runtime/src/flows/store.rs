@@ -49,6 +49,14 @@ pub struct Flow {
     /// it to say «active» — the heuristic it replaces (guessing by trigger event + command, wi#79)
     /// could not tell two families of the same module apart.
     pub template_ref: Option<String>,
+    /// The fingerprint ([`crate::flows::templates::recipe_digest`]) of the factory recipe this flow
+    /// was built from, or `None` for a flow a person wrote — same shape as `template_ref`, and
+    /// `None` for the same two reasons (hub#2059).
+    ///
+    /// `#[serde(skip)]`: it is bookkeeping for the OUTDATED check `GET …/flows/templates` runs
+    /// listing-side, not a fact about the flow a screen renders, so it never reaches `GET …/flows`.
+    #[serde(skip)]
+    pub template_digest: Option<String>,
 }
 
 /// What a `POST`/`PUT` carries. The definition is validated before anything touches the database.
@@ -172,17 +180,20 @@ pub async fn create(
     new: &NewFlow,
     by: &str,
 ) -> Result<Flow> {
-    create_from_template(db, hub_id, registry, new, by, None).await
+    create_from_template(db, hub_id, registry, new, by, None, None).await
 }
 
-/// The same creation, remembering **which factory recipe it came from** (hub#1677, ADR-0470).
+/// The same creation, remembering **which factory recipe it came from, and which version of it**
+/// (hub#1677/#2059, ADR-0470).
 ///
-/// [`create`] delegates here with `None`, which is every flow a person writes in the editor: one
-/// implementation, so the recipe path cannot drift away from the hand-written one on the checks
+/// [`create`] delegates here with `None, None`, which is every flow a person writes in the editor:
+/// one implementation, so the recipe path cannot drift away from the hand-written one on the checks
 /// that matter (the document parses, the commands and queries it names exist).
 ///
 /// `template_ref` is `<module>/<family>` and is what [`find_by_template_ref`] looks a flow up by,
-/// which is what makes «activate» idempotent instead of a second copy per tap.
+/// which is what makes «activate» idempotent instead of a second copy per tap. `template_digest` is
+/// [`crate::flows::templates::recipe_digest`] of the recipe at the moment it was built, which is
+/// what lets a LATER listing say «the module has improved it since».
 pub async fn create_from_template(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -190,6 +201,7 @@ pub async fn create_from_template(
     new: &NewFlow,
     by: &str,
     template_ref: Option<&str>,
+    template_digest: Option<&str>,
 ) -> Result<Flow> {
     // Parse BEFORE writing: a stored document that does not parse is a flow that fails at 3 AM
     // instead of at the screen where it was written.
@@ -208,11 +220,13 @@ pub async fn create_from_template(
     p.insert("now".into(), json!(now));
     p.insert("by".into(), json!(by));
     p.insert("template_ref".into(), json!(template_ref));
+    p.insert("template_digest".into(), json!(template_digest));
     db.execute(
         "INSERT INTO _flow (id, hub_id, name, enabled, schema_version, definition, \
-                            created_at, created_by, updated_at, updated_by, template_ref) \
+                            created_at, created_by, updated_at, updated_by, template_ref, \
+                            template_digest) \
          VALUES (:id, :hub_id, :name, :enabled, :schema_version, :definition, \
-                 :now, :by, :now, :by, :template_ref)",
+                 :now, :by, :now, :by, :template_ref, :template_digest)",
         &p,
     )
     .await?;
@@ -236,7 +250,7 @@ pub async fn find_by_template_ref(
     let res = db
         .query(
             "SELECT id, name, enabled, schema_version, definition, created_at, created_by, \
-                    updated_at, updated_by, template_ref \
+                    updated_at, updated_by, template_ref, template_digest \
              FROM _flow \
              WHERE hub_id = :hub_id AND template_ref = :template_ref AND deleted_at IS NULL \
              ORDER BY created_at, id",
@@ -278,6 +292,33 @@ pub async fn update(
     get(db, hub_id, id).await
 }
 
+/// Stamps the fingerprint of the factory recipe a flow was just brought back to (hub#2059,
+/// `templates::restore`). Separate from [`update`] on purpose: the digest is not part of what a
+/// person edits through `PUT …/flows/{id}`, so folding it into that statement would give every
+/// hand-written save a chance to silently overwrite it.
+pub async fn set_template_digest(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    id: &str,
+    digest: &str,
+    by: &str,
+) -> Result<()> {
+    get(db, hub_id, id).await?; // 404 before mutating, and scoped to this hub.
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("digest".into(), json!(digest));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("by".into(), json!(by));
+    db.execute(
+        "UPDATE _flow SET template_digest = :digest, updated_at = :now, updated_by = :by \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<Flow> {
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
@@ -285,7 +326,7 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<Flo
     let res = db
         .query(
             "SELECT id, name, enabled, schema_version, definition, created_at, created_by, \
-                    updated_at, updated_by, template_ref \
+                    updated_at, updated_by, template_ref, template_digest \
              FROM _flow WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
@@ -299,7 +340,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Flow>> {
     let res = db
         .query(
             "SELECT id, name, enabled, schema_version, definition, created_at, created_by, \
-                    updated_at, updated_by, template_ref \
+                    updated_at, updated_by, template_ref, template_digest \
              FROM _flow WHERE hub_id = :hub_id AND deleted_at IS NULL ORDER BY created_at, id",
             &p,
         )
@@ -397,6 +438,13 @@ fn flow_row(row: &Json) -> Flow {
         // `NULL` and `''` both mean «no recipe»: the column is nullable, and an adapter that hands
         // back an empty string for a NULL must not invent a family whose name is the empty string.
         template_ref: row["template_ref"]
+            .as_str()
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
+        // Same NULL-or-'' rule as `template_ref`, and the same reason: a flow built before hub#2059
+        // (or hand-written, which never has one) must read as «unknown», never as a digest that
+        // happens to be the empty string.
+        template_digest: row["template_digest"]
             .as_str()
             .filter(|s| !s.is_empty())
             .map(str::to_string),
@@ -2253,5 +2301,56 @@ mod tests {
         .expect_err("a stored document that does not parse fails at 3 AM instead of at the screen");
         assert!(format!("{err}").contains("schema_version"), "{err}");
         assert!(list(&db, HUB).await.unwrap().is_empty());
+    }
+
+    /// hub#2059: the fingerprint of the factory recipe a flow was built from travels with it, so
+    /// the listing can tell «the module now ships a different one».
+    #[tokio::test]
+    async fn a_flow_built_from_a_recipe_remembers_which_version_of_it() {
+        let db = db().await;
+        let new = NewFlow {
+            name: "Recipe".into(),
+            enabled: false,
+            definition: definition("0 9 * * *"),
+        };
+        let flow = create_from_template(&db, HUB, &registry(), &new, "t", Some("m/f"), Some("d1"))
+            .await
+            .unwrap();
+        assert_eq!(flow.template_digest.as_deref(), Some("d1"));
+        let hand = create(&db, HUB, &registry(), &new, "t").await.unwrap();
+        assert_eq!(hand.template_digest, None, "a hand-written flow came from no recipe");
+    }
+
+    /// Tenancy (hub#2059): writing the fingerprint goes through `hub_id` like every other write
+    /// here — another hub naming this flow's id neither moves it nor learns it exists.
+    #[tokio::test]
+    async fn the_recipe_version_is_only_rewritten_on_this_hubs_flow() {
+        let db = db().await;
+        let new = NewFlow {
+            name: "Recipe".into(),
+            enabled: false,
+            definition: definition("0 9 * * *"),
+        };
+        let mine = create_from_template(&db, HUB, &registry(), &new, "t", Some("m/f"), Some("d1"))
+            .await
+            .unwrap();
+
+        let err = set_template_digest(&db, "hub-other", &mine.id, "d2", "t")
+            .await
+            .expect_err("another hub cannot reach this flow");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_FLOW_NOT_FOUND),
+            "{err}"
+        );
+        assert_eq!(
+            get(&db, HUB, &mine.id).await.unwrap().template_digest.as_deref(),
+            Some("d1")
+        );
+
+        set_template_digest(&db, HUB, &mine.id, "d2", "t").await.unwrap();
+        assert_eq!(
+            get(&db, HUB, &mine.id).await.unwrap().template_digest.as_deref(),
+            Some("d2")
+        );
     }
 }

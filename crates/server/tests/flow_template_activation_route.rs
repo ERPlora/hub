@@ -52,8 +52,10 @@ const CANCEL: &str = "appointments.appointments.cancel";
 
 struct Fixture {
     router: axum::Router,
+    state: AppState,
     admin: String,
     employee: String,
+    modules: PathBuf,
 }
 
 async fn body_json(response: axum::response::Response) -> Value {
@@ -121,20 +123,38 @@ fn whatsapp_dir(root: &Path, floor: &str) -> PathBuf {
 /// El mismo módulo con el sidecar de permisos que se le pase, que es lo que permite construir el
 /// caso en el que `grants::replace` FALLA a mitad de la activación.
 fn whatsapp_dir_with_grants(root: &Path, floor: &str, grants: Value) -> PathBuf {
-    let dir = root.join(WHATSAPP);
+    whatsapp_release(
+        &root.join(WHATSAPP),
+        "2.1.50",
+        floor,
+        grants,
+        [
+            ("en", "Book from WhatsApp"),
+            ("es", "Reservar por WhatsApp"),
+        ],
+    )
+}
+
+/// One release of the module that publishes the recipe: its version, and the words its recipe
+/// ships with. Two releases whose `names` differ are «the module improved its recipe» (hub#2059).
+fn whatsapp_release(
+    dir: &Path,
+    version: &str,
+    floor: &str,
+    grants: Value,
+    names: [(&str, &str); 2],
+) -> PathBuf {
+    let dir = dir.to_path_buf();
     std::fs::create_dir_all(dir.join("flows")).unwrap();
     std::fs::write(
         dir.join("module.json"),
         serde_json::to_string_pretty(&json!({
-            "id": WHATSAPP, "name": "WhatsApp Inbox", "version": "2.1.50"
+            "id": WHATSAPP, "name": "WhatsApp Inbox", "version": version
         }))
         .unwrap(),
     )
     .unwrap();
-    for (lang, name) in [
-        ("en", "Book from WhatsApp"),
-        ("es", "Reservar por WhatsApp"),
-    ] {
+    for (lang, name) in names {
         let doc = json!({
             "schema_version": 1,
             "name": name,
@@ -281,10 +301,13 @@ async fn fixture_with_grants(floor: &str, grants: Option<Value>) -> Fixture {
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
+    let state = AppState::with_config(rt, cfg);
     Fixture {
-        router: app(AppState::with_config(rt, cfg)),
+        router: app(state.clone()),
+        state,
         admin,
         employee,
+        modules,
     }
 }
 
@@ -1145,4 +1168,354 @@ async fn deleting_it_and_activating_again_brings_back_the_factory_recipe() {
         },
         "y exactamente los permisos del módulo"
     );
+}
+
+// ── hub#2059: the module improved its recipe — say so, and restore it only when asked ────────
+
+fn restore_uri(module: &str, family: &str) -> String {
+    format!("{TEMPLATES}/{module}/{family}/restore")
+}
+
+/// The sidecar every release in this file ships: one wide permission and one PINNED one.
+fn factory_grants() -> Value {
+    json!({ "grants": [
+        { "kind": "command", "value": CREATE },
+        { "kind": "command", "value": CANCEL, "payload": { "channel": "customer" } },
+    ]})
+}
+
+const IMPROVED: &str = "Book from WhatsApp, with a reminder";
+
+/// The module publishes a new release through the update door (hub#516). `names` are the words its
+/// recipe ships with: the same ones as today is «a release that did not touch the recipe».
+async fn publish_release(fx: &Fixture, version: &str, names: [(&str, &str); 2]) {
+    let dir = whatsapp_release(
+        &fx.modules.join(format!("{WHATSAPP}-{version}")),
+        version,
+        "1.1.69",
+        factory_grants(),
+        names,
+    );
+    fx.state
+        .runtime
+        .write()
+        .await
+        .update_from_dir(&dir)
+        .await
+        .expect("the module updates");
+}
+
+async fn publish_improved_recipe(fx: &Fixture) {
+    publish_release(
+        fx,
+        "2.1.51",
+        // The same words in both languages on purpose: which one a hub serves is `hub_language`'s
+        // business, and these tests are about the version of the recipe, not its language.
+        [("en", IMPROVED), ("es", IMPROVED)],
+    )
+    .await;
+}
+
+/// `installed` of the WhatsApp recipe, as the module's own screen reads it.
+async fn installed_of(fx: &Fixture) -> Value {
+    let response = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["data"][0]["installed"].clone()
+}
+
+fn both_factory_grants() -> Vec<String> {
+    let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
+    v.sort();
+    v
+}
+
+#[tokio::test]
+async fn a_recipe_the_module_improved_is_flagged_and_nothing_is_overwritten() {
+    // The symptom of hub#2059: the module ships a better recipe and the business that already had
+    // it on keeps the old one with nobody telling it. Since hub#1684 «Activate» no longer replaces
+    // it — so the listing is the only place that can say «there is a newer one».
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(false),
+        "just built from the recipe the module ships: not outdated"
+    );
+
+    publish_improved_recipe(&fx).await;
+
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(true),
+        "the module now ships a different recipe than the one this hub built"
+    );
+    let flow = flows(&fx)
+        .await
+        .into_iter()
+        .find(|f| f["id"] == flow_id.as_str())
+        .expect("the flow is still there");
+    assert_ne!(
+        flow["name"], IMPROVED,
+        "and nothing was overwritten on its own: the owner decides"
+    );
+}
+
+#[tokio::test]
+async fn a_release_that_leaves_the_recipe_as_it_was_does_not_flag_it() {
+    // The other half, and what stops «flag it on every update»: a new version of the module that
+    // did not touch this recipe must not invite the owner to throw away their changes for nothing.
+    let fx = fixture().await;
+    activated(&fx).await;
+
+    publish_release(
+        &fx,
+        "2.1.51",
+        [
+            ("en", "Book from WhatsApp"),
+            ("es", "Reservar por WhatsApp"),
+        ],
+    )
+    .await;
+
+    assert_eq!(installed_of(&fx).await["outdated"], json!(false));
+}
+
+#[tokio::test]
+async fn the_owners_own_edits_do_not_make_it_outdated() {
+    // «Outdated» compares what the MODULE ships with what the hub built from, never with what the
+    // owner wrote on top: editing the recipe in Automations is not «the module has a new one».
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let edited = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(edited.status(), StatusCode::OK);
+
+    assert_eq!(installed_of(&fx).await["outdated"], json!(false));
+}
+
+#[tokio::test]
+async fn restoring_brings_the_improved_recipe_and_exactly_the_modules_permissions() {
+    // The explicit gesture the issue asks for: «Restore the factory one», knowing the owner's own
+    // changes are lost. Same automation (same id, its history keeps an owner), the module's CURRENT
+    // document and exactly its permissions — pins included.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let edited = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(edited.status(), StatusCode::OK);
+    let narrowed = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}/grants"),
+            &fx.admin,
+            json!({ "grants": [{ "kind": "command", "value": CREATE }] }),
+        ),
+    )
+    .await;
+    assert_eq!(narrowed.status(), StatusCode::OK);
+    publish_improved_recipe(&fx).await;
+
+    let restored = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.admin), None),
+    )
+    .await;
+
+    assert_eq!(restored.status(), StatusCode::OK);
+    let body = body_json(restored).await["data"].clone();
+    assert_eq!(
+        body["id"],
+        flow_id.as_str(),
+        "the same automation, not a new one"
+    );
+    assert_eq!(body["name"], IMPROVED, "with the module's improved recipe");
+    assert_eq!(
+        body["definition"]["name"], IMPROVED,
+        "the document is the new one, not only the name"
+    );
+    assert_eq!(
+        body["definition"]["steps"].as_array().map(Vec::len),
+        Some(1),
+        "and the owner's extra step is gone: that is what «restore» means"
+    );
+    assert_eq!(body["enabled"], true, "it was running, it keeps running");
+    let grants = grants_of(&fx, &flow_id).await;
+    assert_eq!(grant_values(&grants), both_factory_grants());
+    let pinned = grants
+        .iter()
+        .find(|g| g["value"] == CANCEL)
+        .expect("the pinned permission");
+    assert_eq!(pinned["payload"]["channel"], "customer", "with its pin");
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(false),
+        "and the card stops announcing a newer version"
+    );
+}
+
+#[tokio::test]
+async fn restoring_a_paused_recipe_leaves_it_paused() {
+    // Restoring replaces WHAT it does, not WHETHER it runs: the owner paused it, and a button that
+    // says «restore the factory one» must not switch on an automation that writes to customers.
+    let fx = fixture().await;
+    activated(&fx).await;
+    let off = send(
+        &fx.router,
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(off.status(), StatusCode::OK);
+    publish_improved_recipe(&fx).await;
+
+    let restored = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.admin), None),
+    )
+    .await;
+
+    assert_eq!(restored.status(), StatusCode::OK);
+    let body = body_json(restored).await["data"].clone();
+    assert_eq!(body["enabled"], false);
+    assert_eq!(body["name"], IMPROVED);
+}
+
+#[tokio::test]
+async fn restoring_a_recipe_that_was_never_activated_is_a_not_found() {
+    // Nothing to restore: turning it on is `activate`'s job, and a restore that built it would be
+    // a second door that switches automations on.
+    let fx = fixture().await;
+
+    let response = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.admin), None),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(body_json(response).await["error"]["code"], "flow.not_found");
+    assert!(flows(&fx).await.is_empty(), "and nothing was built");
+}
+
+#[tokio::test]
+async fn the_gallery_may_restore_any_recipe_and_a_stranger_may_not() {
+    // Automations (the module holding `manage_flows`) is where the owner sees «there is a newer
+    // version», and it already edits any flow and its permissions — restoring is not more power.
+    // A module without it may only point at its OWN recipes, like activate (ADR-0470 §1).
+    let fx = fixture().await;
+    activated(&fx).await;
+    publish_improved_recipe(&fx).await;
+
+    let stranger = send(
+        &fx.router,
+        post(
+            &restore_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(INTRUDER),
+        ),
+    )
+    .await;
+    assert_eq!(stranger.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(stranger).await["error"]["code"],
+        "flow.template_not_yours"
+    );
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(true),
+        "and the refusal wrote nothing"
+    );
+
+    let own = send(
+        &fx.router,
+        post(
+            &restore_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(own.status(), StatusCode::OK, "its own module may");
+
+    publish_release(
+        &fx,
+        "2.1.52",
+        [
+            ("en", "Book from WhatsApp 3"),
+            ("es", "Book from WhatsApp 3"),
+        ],
+    )
+    .await;
+    let gallery = send(
+        &fx.router,
+        post(
+            &restore_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(EDITOR),
+        ),
+    )
+    .await;
+    assert_eq!(gallery.status(), StatusCode::OK, "and so may Automations");
+    assert_eq!(
+        body_json(gallery).await["data"]["name"],
+        "Book from WhatsApp 3"
+    );
+}
+
+#[tokio::test]
+async fn restoring_needs_a_human_admin_session() {
+    let fx = fixture().await;
+    activated(&fx).await;
+
+    let anonymous = send(&fx.router, post(&restore_uri(WHATSAPP, FAMILY), None, None)).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    let cashier = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.employee), None),
+    )
+    .await;
+    assert_eq!(cashier.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn a_recipe_built_before_the_hub_remembered_its_version_is_unknown_not_up_to_date() {
+    // Every recipe activated before hub#2059 has no record of which version it was built from.
+    // Answering `false` there would tell exactly the businesses this issue is about «you are up to
+    // date»; answering `true` would push them to throw away their edits for nothing. `null` =
+    // «this hub cannot tell», and the screen still offers the explicit restore.
+    let fx = fixture().await;
+    activated(&fx).await;
+    {
+        let rt = fx.state.runtime.read().await;
+        let mut p = erplora_db::Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        rt.db()
+            .execute(
+                "UPDATE _flow SET template_digest = NULL WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("forget the version, as a recipe built before hub#2059");
+    }
+
+    let installed = installed_of(&fx).await;
+    assert!(installed["flow_id"].is_string(), "it is still installed");
+    assert_eq!(installed["outdated"], Value::Null);
 }

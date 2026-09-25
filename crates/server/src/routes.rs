@@ -440,6 +440,13 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/flows/templates/:module/:family/deactivate",
             post(flows_api::deactivate_template),
         )
+        // …y el gesto explícito de traer de vuelta la de fábrica cuando el módulo la ha mejorado
+        // (hub#2059): misma puerta, y además la galería de Automatizaciones (`manage_flows`) puede
+        // restaurar cualquiera, no solo la suya — es donde el dueño ve «hay una versión nueva».
+        .route(
+            "/api/hub/flows/templates/:module/:family/restore",
+            post(flows_api::restore_template),
+        )
         // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
         // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
         .route("/api/hub/flows/secrets", get(flows_api::list_secrets))
