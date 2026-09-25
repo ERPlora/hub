@@ -18,6 +18,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ErploraError, HttpWsTransport, platformFailureMessage } from './index.ts';
+import type { PlatformFailure } from './index.ts';
 
 /** The runtime's answer, verbatim in shape: envelope, stable code, app as a field. */
 function runtimeAnswering(error: Record<string, unknown>): typeof fetch {
@@ -194,6 +195,9 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
 /** The line `error_payload` sends when it redacts — pinned here, and against the Rust below. */
 const RUNTIME_REDACTED_LINE = 'the request could not be completed — the hub recorded the details';
 
+/** What the envelope carries: `message` travels on the wire but is not part of the public PlatformFailure. */
+const onWire = (f: PlatformFailure & { message?: string }): PlatformFailure => f;
+
 test('hub#1337: an authored `other` reaches the reader — the runtime already decided it may', () => {
   const failure = { code: 'other', message: 'usuario no encontrado' };
 
@@ -221,7 +225,7 @@ test('hub#1337: the till reads the authored sentence, not the generic one', asyn
 test('hub#1337: a REDACTED `other` still speaks the language of whoever is reading', () => {
   // `carries_driver_text` fired, so the sentence on the wire is the runtime's fixed ENGLISH line
   // written for the log. Leaving it alone would put it on a Spanish till — hub#1102 all over again.
-  const es = platformFailureMessage({ code: 'other', message: RUNTIME_REDACTED_LINE }, 'es');
+  const es = platformFailureMessage(onWire({ code: 'other', message: RUNTIME_REDACTED_LINE }), 'es');
 
   assert.ok(es);
   assert.doesNotMatch(es!, /could not be completed/, 'the log line never reaches a counter');
@@ -231,12 +235,12 @@ test('hub#1337: a REDACTED `other` still speaks the language of whoever is readi
 test('hub#1337: an `other` with nothing to say keeps the plumbing sentence', () => {
   // An older runtime, or a caller that only carries the code: «unknown error» says less.
   assert.ok(platformFailureMessage({ code: 'other' }, 'es'));
-  assert.ok(platformFailureMessage({ code: 'other', message: '   ' }, 'es'));
+  assert.ok(platformFailureMessage(onWire({ code: 'other', message: '   ' }), 'es'));
 });
 
 test('hub#1337: `error` stays plumbing — the hubs that answer it are the ones that never redacted', () => {
   const es = platformFailureMessage(
-    { code: 'error', message: 'sqlx: error returned from database' },
+    onWire({ code: 'error', message: 'sqlx: error returned from database' }),
     'es',
   );
 

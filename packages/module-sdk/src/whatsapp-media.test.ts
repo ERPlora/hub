@@ -37,7 +37,7 @@ interface Call {
 
 /** What the runtime answers: bytes on `200`, the envelope on a refusal (`whatsapp_media.rs`). */
 type Answer =
-  | { kind: 'bytes'; type: string; bytes: Uint8Array }
+  | { kind: 'bytes'; type: string; bytes: Uint8Array<ArrayBuffer> }
   | { kind: 'json'; status: number; body: unknown }
   | { kind: 'page'; status: number }
   | { kind: 'throw' };

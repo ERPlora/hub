@@ -18,25 +18,14 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { TSC_OPTIONS } from './tsc-options.mjs'
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const snapshot = resolve(packageDir, '../../contracts/kernel/sdk.d.ts')
 const update = process.env.UPDATE_KERNEL_CONTRACT === '1'
 
-// Fixed compiler options, written here and not in a `tsconfig.json`: the snapshot has to be
-// byte-identical wherever it runs, and a config file is something another tool could tune.
-const OPTIONS = [
-  '--declaration',
-  '--emitDeclarationOnly',
-  '--removeComments',
-  '--allowImportingTsExtensions',
-  '--target', 'ES2022',
-  '--module', 'ESNext',
-  '--moduleResolution', 'Bundler',
-  '--strict',
-  '--skipLibCheck',
-  '--lib', 'ES2022,DOM,DOM.Iterable',
-]
+// This command's own flags (declaration emit) on top of the shared base (`tsc-options.mjs`).
+const OPTIONS = ['--declaration', '--emitDeclarationOnly', '--removeComments', ...TSC_OPTIONS]
 
 const outDir = mkdtempSync(join(tmpdir(), 'erplora-sdk-dts-'))
 let generated
