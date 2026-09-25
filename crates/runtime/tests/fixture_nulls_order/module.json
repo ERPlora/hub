@@ -1,0 +1,43 @@
+{
+  "id": "nullsorder",
+  "name": "Nulls Order Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "nullsorder.write",
+    "nullsorder.read"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "nullsorder.threads.list": {
+      "permission": "nullsorder.read",
+      "sql": "queries/threads_list.sql",
+      "list": {
+        "sort": [
+          "last_message_at",
+          "label"
+        ],
+        "default_sort": "last_message_at",
+        "default_dir": "desc",
+        "page_size": 2
+      }
+    }
+  },
+  "commands": {
+    "nullsorder.threads.create": {
+      "permission": "nullsorder.write",
+      "transaction": true,
+      "sql": [
+        "commands/threads_create.sql"
+      ]
+    }
+  }
+}
