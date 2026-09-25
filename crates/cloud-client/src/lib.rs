@@ -953,6 +953,24 @@ impl CloudClient {
         )
     }
 
+    /// **One WhatsApp attachment, as bytes** (hub#2114, saas#2285) —
+    /// `GET /api/v1/hub/device/whatsapp/media/<media_id>/` with the **machine** credential.
+    ///
+    /// Meta hands the business an asset id for every photo, voice note, video or document a
+    /// customer sends; only the SaaS, which holds the Meta token (ADR-0012), can swap it for the
+    /// file. `200` streams the bytes with Meta's `Content-Type`; every refusal is
+    /// `{"error": <code>, "detail"}` decided before the first byte. The id is percent-encoded for
+    /// the same reason as [`Self::whatsapp_template_delete`]: it sits inside a Cloud path.
+    pub fn whatsapp_media(&self, auth: &Auth, media_id: &str) -> PreparedRequest {
+        self.get(
+            &format!(
+                "/api/v1/hub/device/whatsapp/media/{}/",
+                encode_path_segment(media_id)
+            ),
+            auth,
+        )
+    }
+
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -2347,6 +2365,36 @@ mod tests {
         assert!(
             !hostile.url.contains("/../") && !hostile.url.contains("/disconnect/"),
             "a name with a path separator escaped the delete route: {}",
+            hostile.url
+        );
+    }
+
+    /// hub#2114 — the door the WhatsApp inbox downloads a customer's photo, voice note or document
+    /// through (saas#2285). Machine credential, like its template neighbours: the SaaS holds the
+    /// Meta token and the browser never holds this one. The id sits INSIDE a Cloud path, so it is
+    /// percent-encoded: whatever the caller hands in cannot steer the call at another endpoint.
+    #[test]
+    fn whatsapp_media_is_a_machine_authenticated_get_that_names_the_media() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_media(&auth, "1234567890");
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/media/1234567890/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+        let hostile = c.whatsapp_media(&auth, "../templates/x");
+        assert!(
+            !hostile.url.contains("/../") && !hostile.url.contains("/templates/"),
+            "a media id with a path separator escaped the media route: {}",
             hostile.url
         );
     }

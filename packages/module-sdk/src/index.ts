@@ -1059,6 +1059,54 @@ export class HttpWsTransport implements ErploraTransport {
     }
   }
 
+  /**
+   * **Bytes from the hub's own REST surface** (hub#2114) — the `GET` twin of {@link coreRequest}
+   * for the one kind of door that answers a FILE instead of an envelope: a WhatsApp attachment the
+   * runtime streams from the SaaS. Same seal as `coreRequest`: module code cannot reach it — only
+   * {@link WhatsappMediaApi} calls it, with a path it built from a fixed prefix.
+   *
+   * A `2xx` is the file, handed back as a `Blob` so the module makes a local object URL and no
+   * credential ever lands in the DOM. A refusal is still the runtime's envelope and is read like
+   * every other one (`unwrap`), so the module gets the SaaS's own `code` (`media_not_found`,
+   * `media_unavailable`…). Anything that is neither — the proxy's HTML page, a dead network — is
+   * {@link SERVER_UNAVAILABLE}, with none of its text.
+   */
+  async coreBlobRequest(path: string, extraHeaders: Record<string, string> = {}): Promise<Blob> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: 'GET',
+        headers: { ...this.headers(), ...extraHeaders },
+        // Never follow a 30x: `fetch` could carry the hub session to another origin.
+        redirect: 'error',
+      });
+    } catch {
+      // A fixed phrase: the browser's own message is nothing the cashier can act on.
+      throw new ErploraError(SERVER_UNAVAILABLE, `request to ${path} failed`);
+    }
+    if (res.status >= 200 && res.status < 300) return await res.blob();
+    const ct = res.headers?.get?.('content-type');
+    if (!ct || !ct.toLowerCase().includes('application/json')) {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `unexpected response from ${path}: HTTP ${res.status}`,
+      );
+    }
+    let env: Envelope;
+    try {
+      env = (await res.json()) as Envelope;
+    } catch {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `request to ${path} returned an invalid JSON body`,
+      );
+    }
+    // A refusal throws here with its own code; an `ok` envelope on a non-2xx status is nothing
+    // the runtime writes, so it is not taken for a file.
+    if (!env.ok) unwrap(env);
+    throw new ErploraError(SERVER_UNAVAILABLE, `unexpected response from ${path}: HTTP ${res.status}`);
+  }
+
   private async send(
     method: string,
     path: string,
@@ -2293,6 +2341,50 @@ export class WhatsappTemplatesApi {
   }
 }
 
+/** Where a WhatsApp attachment is downloaded from. Every path {@link WhatsappMediaApi} can build
+ *  starts here — `crates/server/src/whatsapp_media.rs` (hub#2114). */
+export const WHATSAPP_MEDIA_BASE_PATH = '/api/hub/whatsapp/media';
+
+/**
+ * A Meta media id, exactly as the runtime and the SaaS define it (`whatsapp_media.rs::
+ * media_id_is_safe`, saas#2289): digits, 1 to 32. It is pasted into a path, and `fetch` normalises
+ * `..` out of a URL, so anything else is refused before a request exists.
+ */
+const MEDIA_ID_PATTERN = /^\d{1,32}$/;
+
+/** A transport that can fetch bytes from the core's REST surface (hub#2114). */
+export interface CoreBlobTransport {
+  coreBlobRequest(path: string, headers?: Record<string, string>): Promise<Blob>;
+}
+
+/**
+ * **A WhatsApp attachment** (hub#2114) — the photo, voice note, video or document a customer sent.
+ *
+ * Meta hands the business an asset id (`payload.image.id`, `payload.audio.id`…), never the file;
+ * the SaaS swaps it for the bytes and the runtime streams them with the hub's machine credential,
+ * which never reaches the browser (ADR-0003). One method and no more: the path is one fixed prefix
+ * plus an id checked against {@link MEDIA_ID_PATTERN}, and the method list is pinned by
+ * `whatsapp-media.test.ts`.
+ */
+export class WhatsappMediaApi {
+  constructor(private readonly fetchBlob: (path: string) => Promise<Blob>) {}
+
+  /**
+   * `GET /api/hub/whatsapp/media/{mediaId}` — the file, as a `Blob` whose `type` is Meta's MIME
+   * (`image/jpeg`, `audio/ogg; codecs=opus`…). Make an object URL of it and revoke it when the
+   * bubble goes away.
+   *
+   * A refusal arrives as an {@link ErploraError} with the code to act on: `media_not_found` (Meta
+   * no longer keeps it — do not retry), `media_unavailable` (Meta did not answer — offer «Retry»),
+   * `meta_permission_denied` (reconnect WhatsApp), `no_whatsapp_number`, `capability_denied`
+   * (`notify` on `whatsapp` not granted), `permission_denied` (this person cannot read the inbox).
+   */
+  async get(mediaId: string): Promise<Blob> {
+    const id = checkedSegment('WhatsApp media id', mediaId, MEDIA_ID_PATTERN);
+    return this.fetchBlob(`${WHATSAPP_MEDIA_BASE_PATH}/${id}`);
+  }
+}
+
 /** Where the business certificate lives. Every path {@link CertificateApi} can build is this one. */
 export const CERTIFICATE_BASE_PATH = '/api/business/certificate';
 
@@ -2482,6 +2574,7 @@ export class ErploraClient {
   private eventsApi?: EventsApi;
   private printApi?: PrintApi;
   private whatsappTemplatesApi?: WhatsappTemplatesApi;
+  private whatsappMediaApi?: WhatsappMediaApi;
   private certificateApi?: CertificateApi;
 
   constructor(
@@ -2616,6 +2709,7 @@ export class ErploraClient {
     scoped.eventsApi = undefined;
     scoped.printApi = undefined;
     scoped.whatsappTemplatesApi = undefined;
+    scoped.whatsappMediaApi = undefined;
     scoped.certificateApi = undefined;
     return scoped;
   }
@@ -2734,6 +2828,37 @@ export class ErploraClient {
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
       transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
+  /**
+   * **A WhatsApp attachment** (hub#2114) — `get(mediaId)` → the `Blob` of the photo, voice note,
+   * video or document a customer sent.
+   *
+   * Module-scoped and gated twice by the runtime: a person with a session who may read the inbox
+   * (`whatsapp_inbox.view_conversation`), plus **`notify`** on the `whatsapp` channel declared in the
+   * module's `module.json` and granted by the owner — the criterion of {@link whatsappTemplates}.
+   *
+   * Reading this getter on a scoped client NEVER throws: the inbox reads it on every render of a
+   * thread, and a throw there would take the whole conversation down instead of one attachment. A
+   * transport that cannot fetch bytes (a shell older than this surface) makes `get` reject with
+   * {@link SERVER_UNAVAILABLE} instead.
+   */
+  get whatsappMedia(): WhatsappMediaApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'WhatsApp attachments are module-scoped: use `erplora.forModule("<your module id>").whatsappMedia`',
+      );
+    }
+    const transport = this.transport as Partial<CoreBlobTransport>;
+    return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
+      typeof transport.coreBlobRequest === 'function'
+        ? transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId })
+        : Promise.reject(
+            new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
+          ),
     ));
   }
 

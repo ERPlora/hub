@@ -3143,6 +3143,35 @@
           "response": []
         },
         {
+          "name": "GET /api/hub/whatsapp/media/:media_id",
+          "request": {
+            "description": "auth: capability+session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "media",
+                "{{media_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/media/{{media_id}}"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /api/hub/whatsapp/numbers",
           "request": {
             "description": "auth: admin",

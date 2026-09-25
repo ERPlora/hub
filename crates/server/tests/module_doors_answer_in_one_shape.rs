@@ -87,6 +87,14 @@ const ANSWERS_OUTSIDE_THE_ENVELOPE_ON_PURPOSE: &[(&str, &str, &str)] = &[
         "bytes, not JSON: the SDK reads it with `fetchMediaBlob`, which hands the module a `Blob` \
          and never looks for `ok`",
     ),
+    (
+        "GET",
+        "/api/hub/whatsapp/media/:media_id",
+        "bytes, not JSON: a WhatsApp attachment streamed from the SaaS (hub#2114). The SDK reads \
+         a `2xx` as a `Blob` (`coreBlobRequest`) and only a refusal through `unwrap`; that the \
+         refusals travel in the envelope with the SaaS's own code is pinned by \
+         `whatsapp_media_proxy.rs`",
+    ),
 ];
 
 /// `(method, path)` of every route in the committed kernel contract, with its auth class.
