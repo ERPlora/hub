@@ -67,8 +67,14 @@ describe('catalogPrice (hub#2072)', () => {
     expect(catalogPrice(m)).toEqual({ kind: 'one_time', amount: '49' });
   });
 
-  it('a free module is free, whatever its tiers say', () => {
-    const m = normalizeMarketplaceModule({ module_id: 'inventory', module_type: 'free', is_free: true, tiers: [] });
+  it('a free module is free, whatever its tiers say — even tiers that all cost nothing', () => {
+    // A free module can declare a zero-priced tier too; that never makes it «included in the plan».
+    const m = normalizeMarketplaceModule({
+      module_id: 'inventory',
+      module_type: 'free',
+      is_free: true,
+      tiers: [{ slug: 'free', price: '0.00', interval: 'month' }],
+    });
     expect(m.includedInPlan).toBe(false);
     expect(catalogPrice(m)).toEqual({ kind: 'free' });
   });
