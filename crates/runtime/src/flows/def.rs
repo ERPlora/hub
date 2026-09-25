@@ -2738,11 +2738,11 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     }
 
-    // **A template's media header** (hub#2101): `vars.header_<kind>` is the link the transport
-    // turns into Meta's `header` parameter. It only travels with ONE whatsapp template — an email
+    // **A template's header**: `vars.header_<kind>` is the text value (hub#2111) or the media link
+    // (hub#2101) the transport turns into Meta's `header` parameter. It only travels with ONE whatsapp template — an email
     // and a free text have no header, and dropping the picture at send time would ship a message
     // nobody wrote, eight retries after the owner stopped looking.
-    let headers: Vec<&str> = crate::host_notify::HEADER_MEDIA_VARS
+    let headers: Vec<&str> = crate::host_notify::HEADER_VARS
         .iter()
         .map(|(key, _)| *key)
         .filter(|key| vars.contains_key(*key))
@@ -2758,7 +2758,7 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
             ))
         } else if headers.len() > 1 {
             Some(format!(
-                "{} — a template has ONE header, keep the media its approved header asks for",
+                "{} — a template has ONE header, keep the one its approved header asks for",
                 headers
                     .iter()
                     .map(|k| format!("`vars.{k}`"))
@@ -3364,6 +3364,64 @@ mod tests {
             panic!("a notify step parses as one");
         };
         assert_eq!(step.vars["header_image"], json!("{{input.picture_url}}"));
+    }
+
+    /// **A template's text header with a variable** (hub#2111): the value of «Your appointment on
+    /// {{1}}» rides in `vars.header_text`, mapped against the run like the rest of the copy.
+    #[test]
+    fn a_whatsapp_template_step_can_carry_its_header_text() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "remind", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "template": "appointment_reminder",
+                "vars": { "header_text": "{{input.day}}", "who": "{{input.name}}" }
+            }]
+        }))
+        .expect("a template with a text header is an ordinary whatsapp step");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.vars["header_text"], json!("{{input.day}}"));
+    }
+
+    /// The text header is refused where it could not be sent, like the media one: an email and a
+    /// free text have no header, and next to a media link it would be a second header.
+    #[test]
+    fn header_text_is_refused_where_it_could_not_be_sent() {
+        let cases = [
+            (
+                "email",
+                "promo",
+                json!({ "header_text": "Hi", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "",
+                json!({ "header_text": "Hi", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "promo",
+                json!({ "header_text": "Hi", "header_image": "https://a/x.jpg" }),
+            ),
+        ];
+        for (channel, template, vars) in cases {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": template, "vars": vars.clone()
+                }]
+            }))
+            .expect_err("a header only travels with one whatsapp template");
+            assert!(
+                format!("{err}").contains("header_text"),
+                "{err} for {channel} {vars}"
+            );
+        }
     }
 
     /// Where a header cannot travel it is refused at save time, not dropped at send time: an
