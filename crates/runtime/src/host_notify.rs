@@ -109,6 +109,16 @@ pub fn flow_grant_release(grant_id: &str) -> String {
     format!("{FLOW_GRANT_PREFIX}{grant_id}")
 }
 
+/// **The media header of a WhatsApp template** (hub#2101): the `vars` key that carries its link,
+/// and the Meta parameter type it becomes. A template has at most one header, so at most one of
+/// these may be set; `flows::def` refuses the rest at save time and the transport before the
+/// network. `schemas/flow.schema.json` declares the same keys under `vars.properties`.
+pub const HEADER_MEDIA_VARS: &[(&str, &str)] = &[
+    ("header_image", "image"),
+    ("header_video", "video"),
+    ("header_document", "document"),
+];
+
 /// La intención de notificación que un command emite en el payload del evento `*.reminder.due`.
 /// El módulo de negocio solo construye esto; el host resuelve el transporte y el secreto.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

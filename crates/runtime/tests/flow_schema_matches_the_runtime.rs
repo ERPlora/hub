@@ -19,7 +19,7 @@ use erplora_runtime::flows::def::{
     MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_OPTION_ROWS, MAX_QUERY_ROWS, MAX_WAIT_HOOKS,
     SCHEMA_VERSION,
 };
-use erplora_runtime::host_notify::Channel;
+use erplora_runtime::host_notify::{Channel, HEADER_MEDIA_VARS};
 
 fn schema() -> serde_json::Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -621,6 +621,20 @@ fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides()
     }))
     .is_ok());
     assert!(step(serde_json::json!("{{input.phone}}")).is_err());
+}
+
+/// **A template's media header** (hub#2101) is declared by NAME on both sides: the editor reads
+/// `vars.properties` to know whether THIS hub sends a header, instead of guessing from a version —
+/// and a key the runtime turns into Meta's `header` parameter that the schema did not name would
+/// be a picture the editor can never offer.
+#[test]
+fn the_header_media_vars_are_the_same_on_both_sides() {
+    let declared = keys_at(&schema(), "/$defs/step/properties/vars/properties");
+    let runtime: BTreeSet<String> = HEADER_MEDIA_VARS
+        .iter()
+        .map(|(key, _)| key.to_string())
+        .collect();
+    assert_eq!(declared, runtime);
 }
 
 /// Every key the runtime parses for an `ai` step must be declared, or the editor would flag as

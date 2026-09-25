@@ -45,7 +45,7 @@ use async_trait::async_trait;
 use cloud_client::{Auth, CloudClient, PreparedRequest};
 use erplora_runtime::errors::{Result, RuntimeError};
 use erplora_runtime::host_notify::{
-    Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
+    Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome, HEADER_MEDIA_VARS,
 };
 use serde_json::{json, Value};
 
@@ -270,6 +270,16 @@ fn email_body(intent: &NotifyIntent) -> Result<Value> {
 /// `template` is Meta's OBJECT (`{name, language, components}`), which the SaaS forwards verbatim
 /// — not the bare template name the Rust client's doc-comment used to promise (hub#663).
 fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
+    let header = header_media(intent)?;
+    if let (Some((key, _)), true) = (
+        &header,
+        intent.template.trim().is_empty() || !intent.interactive.is_null(),
+    ) {
+        return Err(RuntimeError::Notify(format!(
+            "whatsapp notification with `vars.{key}` outside a template: only an approved template \
+             has a header, and dropping the media would send a message nobody wrote"
+        )));
+    }
     let mut body = json!({ "to": intent.to.trim() });
     // Optional: one of THIS hub's numbers. A foreign one is a 404 at the proxy, by design.
     if let Some(phone_number_id) = var_str(intent, "phone_number_id") {
@@ -315,7 +325,7 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
     if let Some(language) = var_str(intent, "language") {
         template["language"] = json!(language);
     }
-    if let Some(components) = template_components(intent) {
+    if let Some(components) = template_components(intent, header) {
         template["components"] = components;
     }
     body["template"] = template;
@@ -327,30 +337,73 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
 /// `vars.components` wins verbatim: a template with POSITIONAL variables has no other way to be
 /// filled, and the proxy passes the block to Meta untouched. Otherwise the remaining `vars` become
 /// NAMED body parameters, sorted so the same intent always produces the same payload (Meta matches
-/// them by name, so the order is only ours to keep stable — and testable).
-fn template_components(intent: &NotifyIntent) -> Option<Value> {
+/// them by name, so the order is only ours to keep stable — and testable). A media header
+/// ([`header_media`]) goes first, as Meta's own `header` component (hub#2101).
+fn template_components(intent: &NotifyIntent, header: Option<(&str, Value)>) -> Option<Value> {
     if let Some(explicit) = intent.vars.get("components").filter(|v| v.is_array()) {
         return Some(explicit.clone());
     }
 
+    let mut components = Vec::new();
+    if let Some((_, parameter)) = header {
+        components.push(json!({ "type": "header", "parameters": [parameter] }));
+    }
+
     let mut named: Vec<(&String, &Value)> = intent
         .vars
-        .as_object()?
-        .iter()
-        .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
-        .collect();
-    if named.is_empty() {
-        return None;
-    }
-    named.sort_by(|a, b| a.0.cmp(b.0));
-
-    let parameters: Vec<Value> = named
+        .as_object()
         .into_iter()
-        .map(
-            |(key, value)| json!({ "type": "text", "parameter_name": key, "text": as_text(value) }),
-        )
+        .flatten()
+        .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
+        .filter(|(key, _)| !HEADER_MEDIA_VARS.iter().any(|(header, _)| header == key))
         .collect();
-    Some(json!([{ "type": "body", "parameters": parameters }]))
+    named.sort_by(|a, b| a.0.cmp(b.0));
+    if !named.is_empty() {
+        let parameters: Vec<Value> = named
+            .into_iter()
+            .map(|(key, value)| {
+                json!({ "type": "text", "parameter_name": key, "text": as_text(value) })
+            })
+            .collect();
+        components.push(json!({ "type": "body", "parameters": parameters }));
+    }
+
+    (!components.is_empty()).then(|| Value::Array(components))
+}
+
+/// The media header the intent asks for, as `(var key, Meta's header parameter)` (hub#2101).
+///
+/// Refused before the network when it cannot be what Meta expects: two of them (a template has
+/// one header), or a value that is not an http(s) link Meta can fetch — both would come back as an
+/// opaque 400 once the call was paid for, or as a promotion without its picture.
+fn header_media(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)>> {
+    let present: Vec<(&'static str, &'static str, &Value)> = HEADER_MEDIA_VARS
+        .iter()
+        .filter_map(|(key, kind)| intent.vars.get(*key).map(|value| (*key, *kind, value)))
+        .collect();
+    let (key, kind, value) = match present.as_slice() {
+        [] => return Ok(None),
+        [one] => *one,
+        many => {
+            let keys: Vec<String> = many.iter().map(|(k, _, _)| format!("`vars.{k}`")).collect();
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification with {}: a template has ONE header, so keep only the \
+                 media its approved header asks for",
+                keys.join(" and ")
+            )));
+        }
+    };
+    let link = value
+        .as_str()
+        .map(str::trim)
+        .filter(|link| link.starts_with("https://") || link.starts_with("http://"))
+        .ok_or_else(|| {
+            RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{key}` is not an http(s) link: Meta downloads \
+                 the header media itself, so it has to be a public address it can fetch"
+            ))
+        })?;
+    Ok(Some((key, json!({ "type": kind, kind: { "link": link } }))))
 }
 
 /// A template variable as the text Meta will print. A string goes through unquoted; anything else
@@ -924,5 +977,124 @@ mod tests {
         })
         .expect_err("an email has nothing to tap");
         assert!(format!("{err}").contains("interactive"), "{err}");
+    }
+
+    /// **A template with media in its header** (hub#2101). Meta refuses the send unless the header
+    /// parameter travels with it, and before this the only way to write one was `vars.components`
+    /// by hand — the one thing the flow editor cannot offer an owner. `vars.header_<kind>` is the
+    /// link; the remaining vars stay the named body parameters they always were.
+    #[test]
+    fn whatsapp_template_with_a_header_image_sends_it_as_the_header_parameter() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "autumn_promo",
+            json!({"header_image": " https://cdn.example.com/salon.jpg ", "who": "Ana"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [
+                    {"type": "image", "image": {"link": "https://cdn.example.com/salon.jpg"}}
+                ]},
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]}
+            ])
+        );
+    }
+
+    /// Video and document are the same parameter under another type; a template whose body has
+    /// no variables still needs its header.
+    #[test]
+    fn whatsapp_template_header_video_and_document_need_no_body_variables() {
+        for (key, kind) in [("header_video", "video"), ("header_document", "document")] {
+            let body = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "menu_of_the_day",
+                json!({ key: "https://cdn.example.com/file", "language": "es" }),
+            ))
+            .unwrap();
+            assert_eq!(
+                body["template"]["components"],
+                json!([{ "type": "header", "parameters": [
+                    { "type": kind, kind: {"link": "https://cdn.example.com/file"} }
+                ]}]),
+                "{key}"
+            );
+        }
+    }
+
+    /// A template has ONE header. Two media keys is a flow that does not know which one it meant,
+    /// and picking one by precedence would send a message nobody approved.
+    #[test]
+    fn whatsapp_refuses_two_header_media_before_the_network() {
+        let err = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "promo",
+            json!({"header_image": "https://a/x.jpg", "header_video": "https://a/x.mp4"}),
+        ))
+        .expect_err("a template has one header");
+        let text = format!("{err}");
+        assert!(
+            text.contains("header_image") && text.contains("header_video"),
+            "{text}"
+        );
+    }
+
+    /// Meta fetches the media itself: anything that is not an http(s) link comes back as an
+    /// opaque 400 after the call was paid for — or, blank, as a message without its picture.
+    #[test]
+    fn whatsapp_refuses_a_header_that_is_not_a_link() {
+        for bad in [
+            json!("salon.jpg"),
+            json!(""),
+            json!(7),
+            json!("ftp://a/x.jpg"),
+        ] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({ "header_image": bad.clone() }),
+            ))
+            .expect_err("the header is a link Meta can fetch");
+            assert!(format!("{err}").contains("header_image"), "{err} for {bad}");
+        }
+    }
+
+    /// Free text has no header: dropping the picture silently would send a message the owner did
+    /// not write.
+    #[test]
+    fn whatsapp_free_text_refuses_header_media() {
+        let err = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "",
+            json!({"text": "hola", "header_image": "https://a/x.jpg"}),
+        ))
+        .expect_err("only a template has a header");
+        assert!(format!("{err}").contains("header_image"), "{err}");
+    }
+
+    /// A tappable message wins over the template (hub#1633) and returns before the components are
+    /// built, so a header riding next to `interactive` would vanish without a word. A flow cannot
+    /// pair them (`flows::def` refuses it), but a module emitting the intent can — and it is told.
+    #[test]
+    fn whatsapp_interactive_refuses_header_media() {
+        let err = whatsapp_body(&NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"header_image": "https://a/x.jpg"}),
+            )
+        })
+        .expect_err("a tappable message has no template header");
+        assert!(format!("{err}").contains("header_image"), "{err}");
     }
 }
