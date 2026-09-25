@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "verify": "node --test scripts/tests/no-dead-packages.test.mjs && pnpm -F @erplora/web verify && pnpm -F @erplora/module-sdk test && pnpm -F @erplora/module-sdk contract:check",
+    "verify": "node --test scripts/tests/no-dead-packages.test.mjs && pnpm -F @erplora/web verify && pnpm -F @erplora/module-sdk test && pnpm -F @erplora/module-sdk typecheck && pnpm -F @erplora/module-sdk contract:check",
     "dev": "node scripts/dev.mjs",
     "dev:web": "pnpm -F @erplora/web dev",
     "dev:runtime": "cargo run -p erplora-server"

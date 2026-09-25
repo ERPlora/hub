@@ -2024,7 +2024,7 @@ test('addNetworkPrinter: an app that does not know the command still rejects wit
 
 test('addNetworkPrinter: in a plain browser there is no hardware to add a printer to', async () => {
   await assert.rejects(
-    () => new UnavailableBridgeTransport().addNetworkPrinter!('192.168.1.50', 9100),
+    () => new UnavailableBridgeTransport().addNetworkPrinter!(),
     (e: unknown) => e instanceof ErploraError && e.code === HARDWARE_UNAVAILABLE,
   );
 });
