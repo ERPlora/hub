@@ -5,6 +5,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createBootScreen } from './boot-screen';
+import { MODULE_LOCALE_KEY, i18n } from '../i18n';
+import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
 const SPINNER =
   '<div class="boot-progress" role="status" aria-busy="true"><div class="boot-progress-spinner"></div></div>';
@@ -12,6 +15,8 @@ const SPINNER =
 let el: HTMLElement;
 
 beforeEach(() => {
+  localStorage.clear();
+  i18n.global.locale.value = 'es';
   document.body.innerHTML = `<div id="app">${SPINNER}</div>`;
   el = document.getElementById('app')!;
 });
@@ -54,5 +59,56 @@ describe('boot screen (hub#2143)', () => {
 
     expect(el.querySelectorAll('[data-testid="boot-unreachable"]')).toHaveLength(1);
     expect(el.querySelector('.boot-progress')).toBeNull();
+  });
+
+  // With no answer from the hub there is no hub language either, and the shell boots in its default
+  // (Spanish) until the context says otherwise. The best fact left is the language this device
+  // showed last time — published on every change under `erplora.locale`.
+  it('speaks the language this device used last', async () => {
+    localStorage.setItem(MODULE_LOCALE_KEY, 'en');
+    const screen = createBootScreen(el);
+
+    screen.showUnreachable(() => undefined);
+    await Promise.resolve();
+
+    const retry = el.querySelector('[data-testid="boot-unreachable-retry"]')!;
+    expect(retry.textContent?.trim()).toBe(en.boot.unreachable.retry);
+  });
+
+  it('with no language on record, uses the default one', async () => {
+    const screen = createBootScreen(el);
+
+    screen.showUnreachable(() => undefined);
+    await Promise.resolve();
+
+    const retry = el.querySelector('[data-testid="boot-unreachable-retry"]')!;
+    expect(retry.textContent?.trim()).toBe(es.boot.unreachable.retry);
+  });
+
+  it('leaves the shell language as it found it once the notice goes', () => {
+    localStorage.setItem(MODULE_LOCALE_KEY, 'en');
+    const screen = createBootScreen(el);
+
+    screen.showUnreachable(() => undefined);
+    screen.showProgress();
+
+    // The hub's own language is reconciled by `bootHubLanguage` once the context answers; the
+    // notice must not have decided it on the way.
+    expect(i18n.global.locale.value).toBe('es');
+  });
+
+  it('ignores a language on record that has no translation', async () => {
+    localStorage.setItem(MODULE_LOCALE_KEY, 'xx');
+    const screen = createBootScreen(el);
+
+    screen.showUnreachable(() => undefined);
+    await Promise.resolve();
+
+    expect(el.querySelector('[data-testid="boot-unreachable-retry"]')!.textContent?.trim()).toBe(
+      es.boot.unreachable.retry,
+    );
+    // Not even borrowed: like `setLocale`, a language with no file is never put in place (vue-i18n
+    // would only mask it with its fallback, and warn about it).
+    expect(i18n.global.locale.value).toBe('es');
   });
 });
