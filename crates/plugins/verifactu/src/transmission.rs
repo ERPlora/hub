@@ -344,7 +344,7 @@ pub(crate) async fn transmit_one(
             // un hub por la celda que restaura un backup se re-ancla como cualquier otro. Se le
             // pasa la vía YA RESUELTA: consultar por una puerta y re-transmitir por otra anclaría
             // la cadena desde una puerta que no la emitió (guarda R4).
-            let note = if verdict.should_retransmit()
+            if verdict.should_retransmit()
                 && aeat::is_chaining_rejection(&resp.codigo_error, &resp.descripcion_error)
                 && !recovery_id.is_empty()
             {
@@ -367,15 +367,33 @@ pub(crate) async fn transmit_one(
                     // con la misma regla que cualquier otro envío (hub#2127).
                     Ok(Some(result)) => return Ok(result),
                     // La AEAT no dio ancla utilizable → se registra el rechazo original.
-                    Ok(None) => None,
-                    // La recuperación falló (consulta caída, sin certificado…). El rechazo
-                    // original se registra igual, con el motivo del fallo anotado: nunca se
-                    // traga en silencio.
-                    Err(e) => Some(format!("recuperación automática fallida: {e}")),
+                    Ok(None) => {}
+                    // The recovery could not complete (the consult or the resend never got an
+                    // answer, the road broke…). That is not the AEAT's last word on this record:
+                    // it is retried like any send the wire broke (hub#2134), with the refusal it
+                    // was recovering from in its reason, and the next pass runs the whole
+                    // recovery again — the frozen envelope draws the same refusal.
+                    Err(e) => {
+                        let reason = format!(
+                            "{} {} — automatic chain recovery failed: {e}",
+                            resp.codigo_error,
+                            resp.descripcion_error.trim()
+                        );
+                        return wire_failure(
+                            host,
+                            ctx,
+                            record,
+                            config,
+                            &destination,
+                            (&xml, &xml_storage_path),
+                            (event_id, queue_id, &record_id),
+                            reason.trim(),
+                            None,
+                        )
+                        .await;
+                    }
                 }
-            } else {
-                None
-            };
+            }
 
             let outcome = response_ops(
                 record,
@@ -386,7 +404,7 @@ pub(crate) async fn transmit_one(
                 event_id,
                 &ctx.now,
                 &record_id,
-                note.as_deref(),
+                None,
             );
             refusal_leaves_the_queue(host, ctx, &verdict, &record_id, queue_id, outcome).await
         }
@@ -421,8 +439,8 @@ pub(crate) async fn transmit_one(
 
 /// The send reached no verdict — the wire broke, or the AEAT answered a Fault the next send can
 /// clear: the record is filed as `error` and queued with its backoff, the reason in the event and
-/// in the queue entry (WASM-TODO §5). Shared by the first send and by the re-chained resend
-/// (hub#2127), so both retry the same way.
+/// in the queue entry (WASM-TODO §5). Shared by the first send, by the re-chained resend
+/// (hub#2127) and by a chain recovery the wire broke (hub#2134), so all of them retry the same way.
 #[allow(clippy::too_many_arguments)]
 async fn wire_failure(
     host: &dyn NativeHost,
@@ -5665,6 +5683,102 @@ mod late_remission_verifactu111 {
             .await[0]["sequence_number"],
             3,
             "after the anchor (2), which is after the record's old place (1)"
+        );
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2134: the wire breaks in the middle of the chain recovery ──────────────────────────
+
+    /// 🔴 THE bug: the AEAT refuses the record for its chain and the wire breaks before the
+    /// recovery completes (the consult never gets its answer). That is a cut of the wire, not the
+    /// AEAT's last word: the record must stay in the queue with its backoff and its reason, like
+    /// any send the wire broke — not leave it as `failed` with nobody to retry it. And once the
+    /// wire is back, the next drain runs the whole recovery again and the record reaches the AEAT
+    /// on the anchor it holds.
+    #[tokio::test]
+    async fn a_chain_recovery_the_wire_breaks_is_retried_until_it_completes() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002134",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                crate::records::testing_always_reaches_the_aeat_hub1934::CELL_HANGS_UP,
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub.hub_id));
+        hub.rt
+            .db()
+            .execute(
+                "INSERT INTO verifactu_config (id, hub_id, enabled, environment, issuer_nif, \
+                 issuer_name, created_at) VALUES ('cfg-' || :hub_id, :hub_id, 1, 'testing', \
+                 'B12345674', 'Salon Lucia SL', '2026-09-01T00:00:00+00:00')",
+                &p,
+            )
+            .await
+            .expect("config row");
+        hub.sell(1).await;
+        let id = hub.record_id(1).await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+        hub.open_the_road();
+
+        hub.scheduled_drain().await;
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            2,
+            "the refusal and the cut consult"
+        );
+        let record = hub.record(&id).await;
+        assert_ne!(record["status"], "accepted", "{record}");
+        let (status, attempts, last_error) = hub.queue_entry(&id).await;
+        assert_eq!(status, "retrying", "a cut wire is retried: {last_error}");
+        assert_eq!(attempts, 2, "the cut recovery counts as an attempt");
+        assert!(
+            last_error.contains("2007"),
+            "the reason says what was being recovered: {last_error}"
+        );
+        let due = hub
+            .rows(&format!(
+                "SELECT next_attempt_at FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+            ))
+            .await;
+        assert!(
+            !due[0]["next_attempt_at"].is_null(),
+            "it waits out a backoff: {due:?}"
+        );
+
+        // The backoff runs out; the wire is back.
+        hub.rt
+            .db()
+            .execute(
+                "UPDATE verifactu_contingencyqueue \
+                 SET next_attempt_at = '2026-09-01T00:05:00+00:00' WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("backoff over");
+        hub.scheduled_drain().await;
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            5,
+            "the whole recovery again: refusal, consult, re-chained resend"
+        );
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
         );
         assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
         hub.only_testing_was_reached();
