@@ -440,8 +440,14 @@ fn set_aside_instead_of_dropping(statement: &str) -> Result<String, GuardError> 
             .next()
             .unwrap_or(column)
             .trim_end_matches(';');
+        if guard.is_empty() {
+            return Ok(format!(
+                "{prose}{head} RENAME COLUMN {column} TO _deprecated_{column}"
+            ));
+        }
         return Ok(format!(
-            "{prose}{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}"
+            "{prose}{}",
+            guarded_column_rename(table_of_alter(head), column)
         ));
     }
 
@@ -467,6 +473,51 @@ fn set_aside_instead_of_dropping(statement: &str) -> Result<String, GuardError> 
     }
 
     Ok(statement.to_string())
+}
+
+/// `DROP COLUMN IF EXISTS c` set aside WITHOUT losing its `IF EXISTS` (hub#2108).
+///
+/// Postgres has `ALTER TABLE IF EXISTS` and `DROP COLUMN IF EXISTS`, but **no**
+/// `RENAME COLUMN IF EXISTS`: emitting it was a `syntax error at or near "EXISTS"` that left the
+/// module un-updatable on every hub. Dropping the guard is not the answer either — the author wrote
+/// `IF EXISTS` because the column may legitimately be missing, and a plain rename would then fail
+/// the update just the same. So the rename runs only when the column is there, checked in the
+/// catalog of the schema the migration runs in. The `DO` body is ours, not the module's: the
+/// guard's refusal of procedural bodies (hub#1149) is about SQL it cannot read, and this one is
+/// built here from two identifiers.
+fn guarded_column_rename(table: &str, column: &str) -> String {
+    format!(
+        "DO $erplora_set_aside$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns \
+         WHERE table_schema = current_schema() AND table_name = {} AND column_name = {}) \
+         THEN ALTER TABLE {table} RENAME COLUMN {column} TO _deprecated_{column}; END IF; \
+         END $erplora_set_aside$",
+        catalog_literal(table),
+        catalog_literal(column),
+    )
+}
+
+/// The table named by `ALTER TABLE [IF EXISTS] [ONLY] <table>`.
+fn table_of_alter(head: &str) -> &str {
+    let mut rest = head.trim();
+    for keyword in ["ALTER TABLE ", "IF EXISTS ", "ONLY "] {
+        if rest.len() >= keyword.len() && rest[..keyword.len()].eq_ignore_ascii_case(keyword) {
+            rest = rest[keyword.len()..].trim_start();
+        }
+    }
+    rest
+}
+
+/// An identifier as the catalog stores it, as a string literal: unquoted names fold to lower case,
+/// quoted ones keep theirs.
+fn catalog_literal(identifier: &str) -> String {
+    let name = match identifier
+        .strip_prefix('"')
+        .and_then(|inner| inner.strip_suffix('"'))
+    {
+        Some(quoted) => quoted.replace("\"\"", "\""),
+        None => identifier.to_lowercase(),
+    };
+    format!("'{}'", name.replace('\'', "''"))
 }
 
 /// El verbo que destruye FILAS, si la sentencia lleva alguno (hub#1145).
@@ -561,8 +612,10 @@ fn declares_contract_version(sql: &str) -> bool {
     })
 }
 
-/// Devuelve (`"IF EXISTS "` si lo llevaba, resto). Se conserva: un `contract` que se reintenta —
-/// porque el arranque anterior murió a medias— no puede reventar por apartar algo ya apartado.
+/// Returns (`"IF EXISTS "` if it had one, rest). It is kept: a `contract` that is retried —because
+/// the previous boot died halfway— cannot blow up setting aside something already set aside. For a
+/// table it travels as `ALTER TABLE IF EXISTS`; for a column Postgres has no such clause, so it
+/// becomes a catalog check ([`guarded_column_rename`], hub#2108).
 fn strip_if_exists(rest: &str) -> (&'static str, &str) {
     let upper = rest.to_uppercase();
     if let Some(stripped) = upper.strip_prefix("IF EXISTS ") {
@@ -1062,18 +1115,27 @@ mod tests {
         );
     }
 
-    /// Y no se aparta dos veces: al segundo arranque la columna ya se llama `_deprecated_*`.
+    /// `DROP COLUMN IF EXISTS` keeps its meaning — "nothing to do if it is not there" — without
+    /// emitting `RENAME COLUMN IF EXISTS`, which Postgres does not have (hub#2108). The old
+    /// assertion here (`contains("IF EXISTS") || contains("RENAME")`) passed with that broken SQL;
+    /// the execution proof lives in `tests/contract_migration_drop_column_if_exists.rs`.
     #[test]
-    fn setting_something_aside_twice_is_not_an_error() {
+    fn drop_column_if_exists_becomes_a_guarded_rename_postgres_accepts() {
         let Plan::Rewritten(rewritten) =
             contract("ALTER TABLE sales_sale DROP COLUMN IF EXISTS tax_rate").unwrap()
         else {
             panic!("un contract se reescribe");
         };
 
-        assert!(
-            rewritten[0].contains("IF EXISTS") || rewritten[0].contains("RENAME"),
-            "un contract repetido no puede reventar el arranque: {rewritten:?}"
+        assert_eq!(
+            rewritten,
+            vec![
+                "DO $erplora_set_aside$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns \
+                 WHERE table_schema = current_schema() AND table_name = 'sales_sale' \
+                 AND column_name = 'tax_rate') THEN ALTER TABLE sales_sale RENAME COLUMN tax_rate \
+                 TO _deprecated_tax_rate; END IF; END $erplora_set_aside$"
+                    .to_string()
+            ]
         );
     }
 
