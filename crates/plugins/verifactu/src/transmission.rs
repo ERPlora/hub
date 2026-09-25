@@ -358,11 +358,13 @@ pub(crate) async fn transmit_one(
                     &resp,
                     recovery_id,
                     event_id,
+                    queue_id,
                     remission,
                 )
                 .await
                 {
-                    // Re-anclado y reintentado: ese es el resultado que vale.
+                    // Re-anclado y reintentado: ese es el resultado que vale — y sale de la cola
+                    // con la misma regla que cualquier otro envío (hub#2127).
                     Ok(Some(result)) => return Ok(result),
                     // La AEAT no dio ancla utilizable → se registra el rechazo original.
                     Ok(None) => None,
@@ -401,60 +403,94 @@ pub(crate) async fn transmit_one(
             // correcto: el registro se encola en contingencia con backoff y el error se ve.
             //
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
-            let reason = err.to_string();
-            let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, &reason).await?;
-            let environment = &destination.environment;
-            let backoff_minutes = retry.backoff_minutes;
-            let ops = vec![
-                apply_transmission(
-                    &record_id,
-                    "error",
-                    "",
-                    &reason,
-                    "",
-                    &xml,
-                    &xml_storage_path,
-                    &record_id,
-                    1,
-                ),
-                op(
-                    "verifactu._insert_event",
-                    json!({
-                        "event_id": event_id,
-                        "record_id": record_id.clone(),
-                        "event_type": "transmission_failure",
-                        "severity": "error",
-                        "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
-                        "details": details_for("verifactu.transmission_retry", json!({
-                            "environment": environment,
-                            "backoff_minutes": backoff_minutes,
-                            "error": reason.clone(),
-                            "attempts": retry.attempts,
-                        })),
-                        "timestamp": ctx.now,
-                    }),
-                ),
-                retry.operation,
-            ];
-            Ok((
-                ops,
-                // For the owner this is the same problem as a refusal — the invoice is not at the
-                // AEAT. `reason` is what tells an operator that the wire failed, not the filing.
-                vec![Event::new(
-                    EVENT_RECORD_REJECTED,
-                    failure_payload(
-                        record,
-                        REASON_TRANSMISSION_FAILED,
-                        "error",
-                        "",
-                        &reason,
-                        environment,
-                    ),
-                )],
-                false,
-            ))
+            wire_failure(
+                host,
+                ctx,
+                record,
+                config,
+                &destination,
+                (&xml, &xml_storage_path),
+                (event_id, queue_id, &record_id),
+                &err.to_string(),
+                None,
+            )
+            .await
         }
     }
+}
+
+/// The send reached no verdict — the wire broke, or the AEAT answered a Fault the next send can
+/// clear: the record is filed as `error` and queued with its backoff, the reason in the event and
+/// in the queue entry (WASM-TODO §5). Shared by the first send and by the re-chained resend
+/// (hub#2127), so both retry the same way.
+#[allow(clippy::too_many_arguments)]
+async fn wire_failure(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    record: &Json,
+    config: &Json,
+    destination: &Destination,
+    (xml, xml_storage_path): (&str, &str),
+    (event_id, queue_id, transmission_id): (&str, &str, &str),
+    reason: &str,
+    note: Option<&str>,
+) -> Result<(Vec<Operation>, Vec<Event>, bool)> {
+    let record_id = str_field(record, "id");
+    let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, reason).await?;
+    let environment = &destination.environment;
+    let backoff_minutes = retry.backoff_minutes;
+    let mut details = json!({
+        "environment": environment,
+        "backoff_minutes": backoff_minutes,
+        "error": reason,
+        "attempts": retry.attempts,
+    });
+    if let (Some(note), Some(map)) = (note, details.as_object_mut()) {
+        map.insert("note".into(), json!(note));
+    }
+    let ops = vec![
+        apply_transmission(
+            &record_id,
+            "error",
+            "",
+            reason,
+            "",
+            xml,
+            xml_storage_path,
+            transmission_id,
+            1,
+        ),
+        op(
+            "verifactu._insert_event",
+            json!({
+                "event_id": event_id,
+                "record_id": record_id,
+                "event_type": "transmission_failure",
+                "severity": "error",
+                "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
+                "details": details_for("verifactu.transmission_retry", details),
+                "timestamp": ctx.now,
+            }),
+        ),
+        retry.operation,
+    ];
+    Ok((
+        ops,
+        // For the owner this is the same problem as a refusal — the invoice is not at the
+        // AEAT. `reason` is what tells an operator that the wire failed, not the filing.
+        vec![Event::new(
+            EVENT_RECORD_REJECTED,
+            failure_payload(
+                record,
+                REASON_TRANSMISSION_FAILED,
+                "error",
+                "",
+                reason,
+                environment,
+            ),
+        )],
+        false,
+    ))
 }
 
 /// Contingency entry for a record that could NOT be remitted: attempt count + the 5/10/20/40/60
@@ -886,6 +922,10 @@ pub(crate) fn anchor_as_prev(anchor: &aeat::ConsultRecord) -> Json {
 ///
 /// Un solo reintento, a propósito: si el segundo envío también se rechaza, el problema no era el
 /// eslabón y reintentar en bucle solo quemaría números de cadena.
+///
+/// Its outcome follows the rule of every other send (hub#2127): a refusal — a verdict or a Fault
+/// the AEAT will repeat — leaves the queue as `failed`, and a Fault the next send can clear keeps
+/// the retry with its backoff and its reason.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn auto_rechain_and_retry(
     host: &dyn NativeHost,
@@ -903,6 +943,7 @@ pub(crate) async fn auto_rechain_and_retry(
     rejection: &aeat::AeatResponse,
     recovery_id: &str,
     event_id: &str,
+    queue_id: &str,
     // El re-anclado hereda el origen del envío que lo disparó (hub#322): un registro que salió
     // de la cola sigue saliendo de la cola cuando se reintenta sobre el ancla que dio la AEAT.
     remission: Remission,
@@ -953,6 +994,23 @@ pub(crate) async fn auto_rechain_and_retry(
 
     let (rechained, rechain_op) = rechain_record(record, anchor, anchor_seq + 1);
     let record_id = str_field(record, "id");
+    // The refusal that triggered the recovery is filed FIRST (hub#2127): `_rechain_record` only
+    // rewrites a record already refused — the guard that keeps an accepted or in-flight record
+    // from being re-chained — and without this row the record reached it still `pending`, so the
+    // UPDATE matched nothing and the row kept its old link while the AEAT took the new one. The
+    // envelope and its path are left to the resend below, which overwrites both.
+    let refused = aeat::classify(rejection);
+    let refusal_op = apply_transmission(
+        &record_id,
+        refused.status,
+        &refused.code,
+        &refused.message,
+        "",
+        "",
+        "",
+        &record_id,
+        0,
+    );
     let xml = aeat::build_soap(
         &rechained,
         config,
@@ -997,8 +1055,6 @@ pub(crate) async fn auto_rechain_and_retry(
             .await?
         }
     };
-    let resp = aeat::parse_response(&body);
-
     let note = format!(
         "re-anclado automáticamente tras {} ({}) y reintentado sobre la huella {}…",
         if rejection.codigo_error.is_empty() {
@@ -1009,7 +1065,31 @@ pub(crate) async fn auto_rechain_and_retry(
         rejection.descripcion_error.trim(),
         short(&chain::normalize_hash(&anchor.record_hash)),
     );
-    let (mut ops, events, success) = response_ops(
+    // The resend's answer is read like the first send's (hub#2124): a Fault the AEAT will repeat
+    // is its refusal, any other Fault is a wire failure to retry, and only the rest is a verdict.
+    let resp = match permanent_fault(&body) {
+        Some(refusal) => refusal,
+        None => match fault_reason(&body) {
+            Some(reason) => {
+                let (mut ops, events, success) = wire_failure(
+                    host,
+                    ctx,
+                    record,
+                    config,
+                    destination,
+                    (&xml, &xml_storage_path),
+                    (event_id, queue_id, &delivery_id),
+                    &reason,
+                    Some(&note),
+                )
+                .await?;
+                ops.splice(0..0, [refusal_op, anchor_op, rechain_op]);
+                return Ok(Some((ops, events, success)));
+            }
+            None => aeat::parse_response(&body),
+        },
+    };
+    let outcome = response_ops(
         record,
         &resp,
         destination,
@@ -1020,9 +1100,18 @@ pub(crate) async fn auto_rechain_and_retry(
         &delivery_id,
         Some(&note),
     );
-    // El ancla y el re-encadenado se aplican ANTES del resultado del reintento (orden del Output).
-    ops.insert(0, rechain_op);
-    ops.insert(0, anchor_op);
+    let (mut ops, events, success) = refusal_leaves_the_queue(
+        host,
+        ctx,
+        &aeat::classify(&resp),
+        &record_id,
+        queue_id,
+        outcome,
+    )
+    .await?;
+    // El rechazo original, el ancla y el re-encadenado se aplican ANTES del resultado del
+    // reintento (orden del Output).
+    ops.splice(0..0, [refusal_op, anchor_op, rechain_op]);
     Ok(Some((ops, events, success)))
 }
 
@@ -2479,8 +2568,12 @@ pub(crate) mod tests {
             "el registro tiene que quedar re-encadenado: {:?}",
             ops.iter().map(|o| &o.command).collect::<Vec<_>>()
         );
+        // The LAST apply is the resend's verdict: the first one files the refusal that triggered
+        // the recovery, so that `_rechain_record` (which only rewrites a refused record) applies
+        // (hub#2127).
         let applied = ops
             .iter()
+            .rev()
             .find(|o| o.command == "verifactu._apply_transmission")
             .expect("el veredicto llega al registro");
         assert_eq!(
@@ -4098,7 +4191,7 @@ mod late_remission_verifactu111 {
     //! a cell that keeps every envelope it is handed, in arrival order.
 
     use crate::records::testing_always_reaches_the_aeat_hub1934::{
-        spawn_fake_cell, spawn_fake_cell_answering,
+        spawn_fake_cell, spawn_fake_cell_answering, spawn_fake_cell_answering_in_sequence,
     };
     use base64::Engine as _;
     use erplora_db::testutil::fresh_db;
@@ -4240,6 +4333,14 @@ mod late_remission_verifactu111 {
                 return None;
             }
             Self::on_cell(hub_id, spawn_fake_cell_answering(aeat_response).await).await
+        }
+
+        /// A bench whose AEAT answers the n-th envelope with `answers[n]` (hub#2127).
+        async fn answering_in_sequence(hub_id: &str, answers: &[&'static str]) -> Option<Self> {
+            if !erplora_runtime::require_modules_workspace() {
+                return None;
+            }
+            Self::on_cell(hub_id, spawn_fake_cell_answering_in_sequence(answers).await).await
         }
 
         async fn on_cell(
@@ -5324,6 +5425,248 @@ mod late_remission_verifactu111 {
 
         assert_eq!(hub.chain().await, vec![(1, "error".to_owned())]);
         assert_eq!(hub.queue_status(1).await.as_deref(), Some("retrying"));
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2127: the resend after re-chaining follows the rule of hub#2124 ────────────────────
+
+    /// The refusal a restored backup draws: the chain says «first record» when the AEAT already
+    /// holds later ones. It is what triggers the automatic re-chain.
+    const REFUSED_FOR_ITS_CHAIN: &str = "<soapenv:Envelope><EstadoEnvio>Incorrecto</EstadoEnvio>\
+        <EstadoRegistro>Incorrecto</EstadoRegistro><CodigoErrorRegistro>2007</CodigoErrorRegistro>\
+        <DescripcionErrorRegistro>No debe informarse como primer registro, existen facturas \
+        emitidas con el obligado emisión y el sistema informático actual.\
+        </DescripcionErrorRegistro></soapenv:Envelope>";
+    /// The consult answer: the AEAT's last link for this obligado, the anchor of the re-chain.
+    const CONSULT_WITH_AN_ANCHOR: &str = "<env:Envelope><env:Body>\
+        <tikLRRC:RespuestaConsultaFactuSistemaFacturacion>\
+        <tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>\
+        <tikLRRC:IDFactura><tik:IDEmisorFactura>B12345674</tik:IDEmisorFactura>\
+        <tik:NumSerieFactura>PREVIA-9</tik:NumSerieFactura>\
+        <tik:FechaExpedicionFactura>02-09-2026</tik:FechaExpedicionFactura></tikLRRC:IDFactura>\
+        <tikLRRC:DatosRegistroFacturacion>\
+        <tikLRRC:FechaHoraHusoGenRegistro>2026-09-02T10:00:00Z</tikLRRC:FechaHoraHusoGenRegistro>\
+        <tikLRRC:Huella>3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696\
+        </tikLRRC:Huella></tikLRRC:DatosRegistroFacturacion>\
+        <tikLRRC:EstadoRegistro><tikLRRC:EstadoRegistro>Correcto</tikLRRC:EstadoRegistro>\
+        </tikLRRC:EstadoRegistro>\
+        </tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>\
+        </tikLRRC:RespuestaConsultaFactuSistemaFacturacion></env:Body></env:Envelope>";
+
+    impl Bench {
+        /// A sale born without a road and queued by an earlier attempt, then the road opens and
+        /// the drain takes it: refused for its chain → consult → the re-chained resend. Returns
+        /// the record's id (its sequence number moves when it is re-chained).
+        async fn restored_backup_resend(&self) -> String {
+            // The consult names the obligado by its registered name, which only a saved config
+            // holds (`diagnostics::obligado_name`).
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(self.hub_id));
+            self.rt
+                .db()
+                .execute(
+                    "INSERT INTO verifactu_config (id, hub_id, enabled, environment, issuer_nif, \
+                     issuer_name, created_at) VALUES ('cfg-' || :hub_id, :hub_id, 1, 'testing', \
+                     'B12345674', 'Salon Lucia SL', '2026-09-01T00:00:00+00:00')",
+                    &p,
+                )
+                .await
+                .expect("config row");
+            self.sell(1).await;
+            let id = self.record_id(1).await;
+            self.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+            self.open_the_road();
+            self.scheduled_drain().await;
+            let sent = self.cell.lock().unwrap().len();
+            assert_eq!(
+                sent,
+                3,
+                "the refusal, the consult and the re-chained resend: {:?}",
+                self.rows(&format!(
+                    "SELECT message, details FROM verifactu_event \
+                     WHERE hub_id = :hub_id AND record_id = '{id}'"
+                ))
+                .await
+            );
+            id
+        }
+
+        /// The drain as the scheduler runs it every five minutes (`scheduler::system_ctx`): the
+        /// re-chain writes the anchor, which is above what a cashier's context may reach.
+        async fn scheduled_drain(&self) {
+            let system = RequestContext::new(&self.hub_id, "", ["*".to_string()]).as_machine();
+            self.rt
+                .execute_command("verifactu.contingency.process", &Params::new(), &system)
+                .await
+                .expect("the scheduled drain runs");
+        }
+
+        async fn record(&self, id: &str) -> Json {
+            self.rows(&format!(
+                "SELECT status, aeat_response_code, previous_hash FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND id = '{id}'"
+            ))
+            .await
+            .remove(0)
+        }
+
+        async fn queue_status_of(&self, id: &str) -> Option<String> {
+            self.rows(&format!(
+                "SELECT status FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+            ))
+            .await
+            .first()
+            .and_then(|r| r["status"].as_str().map(ToOwned::to_owned))
+        }
+
+        /// `(status, attempts, last_error)` of one record's queue entry.
+        async fn queue_entry(&self, id: &str) -> (String, i64, String) {
+            let row = self
+                .rows(&format!(
+                    "SELECT status, attempts, last_error FROM verifactu_contingencyqueue \
+                     WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+                ))
+                .await
+                .remove(0);
+            (
+                row["status"].as_str().unwrap_or_default().to_owned(),
+                row["attempts"].as_i64().unwrap_or_default(),
+                row["last_error"].as_str().unwrap_or_default().to_owned(),
+            )
+        }
+    }
+
+    /// 🔴 THE bug: the AEAT refuses the re-chained resend too. The record is refused, and the
+    /// queue entry it came from leaves as `failed` — before, it stayed due and the drain re-ran
+    /// the whole recovery on every pass.
+    #[tokio::test]
+    async fn a_resend_refused_after_rechaining_leaves_the_queue_as_failed() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002127",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                VERDICT_REFUSED,
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "rejected", "{record}");
+        assert_eq!(record["aeat_response_code"], "1100", "{record}");
+        assert_eq!(hub.queue_entry(&id).await.0, "failed");
+
+        hub.scheduled_drain().await;
+        assert_eq!(hub.cell.lock().unwrap().len(), 3, "never filed again");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 A Fault the AEAT will repeat, answered to the re-chained resend, is its refusal: the
+    /// record is refused with the AEAT's code and leaves the queue — not an empty verdict filed
+    /// as an `error` that nobody retries and nobody can read.
+    #[tokio::test]
+    async fn a_resend_the_aeat_faults_for_good_after_rechaining_is_refused_with_its_code() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002128",
+            &[REFUSED_FOR_ITS_CHAIN, CONSULT_WITH_AN_ANCHOR, FAULT_4104],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "rejected", "{record}");
+        assert_eq!(record["aeat_response_code"], "4104", "{record}");
+        assert_eq!(hub.queue_entry(&id).await.0, "failed");
+
+        hub.scheduled_drain().await;
+        assert_eq!(hub.cell.lock().unwrap().len(), 3, "never filed again");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 A Fault the next send can clear, answered to the re-chained resend, keeps the retry of
+    /// any other send: the entry counts the attempt, waits out its backoff and says why. The
+    /// re-chain stays — the anchor is what the AEAT holds — so the retry resends the re-chained
+    /// envelope, not the one the AEAT refused for its chain.
+    #[tokio::test]
+    async fn a_resend_the_next_send_can_clear_after_rechaining_is_retried_with_its_reason() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002129",
+            &[REFUSED_FOR_ITS_CHAIN, CONSULT_WITH_AN_ANCHOR, FAULT_4112],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "error", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "the re-chain is kept: {record}"
+        );
+        let (status, attempts, last_error) = hub.queue_entry(&id).await;
+        assert_eq!(status, "retrying");
+        assert_eq!(attempts, 2, "the resend counts as an attempt");
+        assert!(last_error.contains("4112"), "{last_error}");
+
+        hub.scheduled_drain().await;
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            3,
+            "it waits out its backoff"
+        );
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 The re-chain is PERSISTED when the resend is accepted: the record the AEAT holds now
+    /// hangs from the anchor, so the local row must say so — its previous hash and its place after
+    /// the anchor. `_rechain_record` only rewrites a record already refused, and the engine never
+    /// filed the first refusal before re-chaining, so the row kept its old link while the AEAT
+    /// held the new one, and the next sale chained onto a hash the AEAT never saw.
+    #[tokio::test]
+    async fn an_accepted_resend_after_rechaining_keeps_the_new_link() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-00000000212a",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        assert_eq!(
+            hub.rows(&format!(
+                "SELECT sequence_number FROM verifactu_record WHERE hub_id = :hub_id AND id = '{id}'"
+            ))
+            .await[0]["sequence_number"],
+            3,
+            "after the anchor (2), which is after the record's old place (1)"
+        );
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
         hub.only_testing_was_reached();
     }
 }
