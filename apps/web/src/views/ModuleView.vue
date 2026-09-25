@@ -418,6 +418,11 @@ async function mount(): Promise<void> {
           // sin bundle → el fallback genérico del template se queda
         }
         if (generation !== mountGeneration) return;
+        // hub#2095 — the outlet only renders under `status === 'ready'`: flip it and let Vue paint
+        // it BEFORE appending, or `protectsOutlet` is still `null` and the screen stays empty.
+        status.value = 'ready';
+        await nextTick();
+        if (generation !== mountGeneration) return;
         if (protectsOutlet.value) {
           protectsOutlet.value.replaceChildren();
           const el = document.createElement(guard.def.component) as HTMLElement & { client?: unknown };
