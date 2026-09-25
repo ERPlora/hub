@@ -733,7 +733,8 @@ mod tests {
         // hub#1159: the queue now stamps the hub's language on enqueue, so the device can print
         // the paper in it. The assertion is NOT relaxed to "contains what the producer sent" —
         // that would let a future change smuggle a second field in unnoticed. It stays exact:
-        // everything the producer sent, arriving whole, PLUS the one stamp and nothing else.
+        // everything the producer sent, arriving whole, PLUS the stamps and nothing else — the
+        // language (hub#1159) and the scale of the hub's currency (hub#2129, `decimals`).
         let document = &job.frame["document"];
         assert_eq!(
             document["receipt_id"],
@@ -746,10 +747,15 @@ mod tests {
             "the queue stamps the hub's language once, for every producer (hub#1159)"
         );
         assert_eq!(
+            document["decimals"],
+            json!(2),
+            "the queue stamps the hub's currency scale once, for every producer (hub#2129)"
+        );
+        assert_eq!(
             document.as_object().map(|d| d.len()),
-            Some(2),
-            "the stamp is the ONLY thing the queue adds — anything else reaching the host is \
-             something the producer never sent: {document:?}"
+            Some(3),
+            "the two stamps are the ONLY things the queue adds — anything else reaching the host \
+             is something the producer never sent: {document:?}"
         );
         assert_eq!(
             job.frame["documentType"], "receipt",
