@@ -534,6 +534,36 @@ pub fn decimals_of(currency: &str) -> u32 {
         .unwrap_or(erplora_guest_sdk::currency::DEFAULT_DECIMALS)
 }
 
+/// The hub's currency scale out of its settings map (`get_all`), ADR-0123 §7: what the hub
+/// declared by hand (`currency_decimals`, for a currency the registry does not know) → the
+/// ISO-4217 registry for `currency` → the explicit default. The ONE resolution the screen
+/// (`/api/hub/context`) and the paper ([`currency_decimals_of`]) share, so they cannot disagree.
+pub fn currency_decimals_in(settings: &Value) -> u32 {
+    settings
+        .get("currency_decimals")
+        .and_then(|v| v.as_u64())
+        .filter(|n| *n <= 4)
+        .map(|n| n as u32)
+        .unwrap_or_else(|| {
+            decimals_of(
+                settings
+                    .get("currency")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("EUR"),
+            )
+        })
+}
+
+/// **The hub's currency scale** (hub#2129): EUR 2, JPY 0, KWD 3 — see [`currency_decimals_in`].
+///
+/// [`crate::print_queue::enqueue`] stamps it on every document so the thermal paper prints its
+/// amounts with the digits the screen shows. Tolerant like the rest of this module: settings that
+/// cannot be read degrade to the euro's scale rather than leaving a till without its ticket.
+pub async fn currency_decimals_of(db: &dyn DatabaseAdapter, hub_id: &str) -> u32 {
+    let settings = get_all(db, hub_id).await.unwrap_or_else(|_| json!({}));
+    currency_decimals_in(&settings)
+}
+
 /// `language`: locale soportado (`es`|`en`). Se normaliza a minúsculas al persistir.
 fn validate_language(v: &Value) -> std::result::Result<String, String> {
     let s = v

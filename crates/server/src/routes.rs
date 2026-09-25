@@ -829,13 +829,8 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         //
         // Precedencia: lo que el hub declare a mano (`currency_decimals`, para monedas que el
         // registro no conoce) → el registro ISO-4217 → el default explícito.
-        let currency_decimals = settings
-            .get("currency_decimals")
-            .and_then(|v| v.as_i64())
-            .map(|n| n as u32)
-            .unwrap_or_else(|| {
-                erplora_runtime::settings::decimals_of(currency.as_str().unwrap_or("EUR"))
-            });
+        // The paper resolves it with the same function (hub#2129), so the two cannot disagree.
+        let currency_decimals = erplora_runtime::settings::currency_decimals_in(&settings);
         let language = settings
             .get("language")
             .cloned()
