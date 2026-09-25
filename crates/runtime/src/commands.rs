@@ -1415,7 +1415,8 @@ async fn persist_handler_output(
         if let Some(schema) = target.and_then(|t| t.schema.as_ref()) {
             schema.coerce_declared_number_shapes(&mut op_params);
         }
-        let bound = crate::system_params(&op_params, ctx);
+        let mut bound = crate::system_params(&op_params, ctx);
+        keep_batch_new_id(&mut bound, &op.params, new_ids);
         let first = tx_ops.len();
         let count = sqls.len();
         for sql in sqls {
@@ -1604,6 +1605,21 @@ async fn persist_handler_output(
         response["result"] = result.clone();
     }
     Ok(response)
+}
+
+/// Restores the `new_id` a handler operation took from the host's batch (hub#1357).
+///
+/// `system_params` mints a fresh `:new_id` for every statement, which is right for a caller's
+/// payload but wrong here: a guest whose SQL binds `:new_id` (`customers.create`) hands the batch
+/// id over under that very name, and overwriting it wrote the row with one id while
+/// [`consumed_new_ids`] reported the batch one. Only a batch id is kept — the host stays the sole
+/// authority of ids (§5.3), so anything else keeps the id `system_params` minted, exactly as
+/// before: published guests that forward the payload (whose `new_id` is host-minted but not part
+/// of the batch) keep working.
+fn keep_batch_new_id(bound: &mut Params, op_params: &Params, new_ids: &[Json]) {
+    if let Some(id) = op_params.get("new_id").filter(|id| new_ids.contains(id)) {
+        bound.insert("new_id".into(), id.clone());
+    }
 }
 
 /// The batch ids the handler's operations actually CONSUMED, in batch order (hub#776).
