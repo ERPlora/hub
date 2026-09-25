@@ -13,20 +13,16 @@
       :message="t('boot.unreachable.body')"
       data-testid="boot-unreachable"
     >
-      <ion-button
-        slot="action"
-        data-testid="boot-unreachable-retry"
-        @click="emit('retry')"
-      >
-        {{ t("boot.unreachable.retry") }}
+      <ion-button slot="action" data-testid="boot-unreachable-retry" @click="emit('retry')">
+        {{ t('boot.unreachable.retry') }}
       </ion-button>
     </ok-empty-state>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
-import { IonButton } from "@ionic/vue";
+import { useI18n } from 'vue-i18n';
+import { IonButton } from '@ionic/vue';
 
 const emit = defineEmits<{ retry: [] }>();
 const { t, locale } = useI18n();

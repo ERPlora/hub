@@ -11,9 +11,10 @@
     "prebuild": "node sync-modules.mjs",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
+    "format:check": "prettier --check src",
     "test": "vitest run",
     "test:e2e": "playwright test -c tests/playwright.config.ts",
-    "verify": "pnpm run typecheck && pnpm run test",
+    "verify": "pnpm run typecheck && pnpm run format:check && pnpm run test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.11",
     "happy-dom": "^20.10.6",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.6.0",
     "unplugin-icons": "^23.0.1",

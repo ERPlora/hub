@@ -97,6 +97,7 @@ on:
       # The guard `pnpm verify` runs first (hub#1244): without it in `paths`, a PR that
       # only touched `no-dead-packages.test.mjs` triggered no check at all (hub#1247).
       - "scripts/tests/no-dead-packages.test.mjs"
+      - "scripts/tests/web-format.test.sh"
       - ".github/workflows/test-web.yml"
   # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Fuera del 29/08 al 03/09 (pm#197): la suite
   # corría en el gate pre-push local. Medido en la tanda R2 del 02/09: ese gate es UN lock para
@@ -116,6 +117,7 @@ on:
       - "pnpm-workspace.yaml"
       - "scripts/tests/test-web-workflow.test.sh"
       - "scripts/tests/no-dead-packages.test.mjs"
+      - "scripts/tests/web-format.test.sh"
       - ".github/workflows/test-web.yml"
   schedule:
     - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
@@ -190,6 +192,12 @@ jobs:
       # entera. Son ~2 s de bash y es lo único que puede notar un cable que se cae.
       - name: Contrato de test-web.yml (scripts/tests/test-web-workflow.test.sh)
         run: bash ./scripts/tests/test-web-workflow.test.sh
+
+      # hub#2156 — the shell's formatting guard: config + legacy baseline + a positive control
+      # (a new double-quoted file must turn `format:check` red). `pnpm verify` above already ran
+      # the check itself; this pins the wiring so it cannot silently fall off.
+      - name: Contrato del formato del shell (scripts/tests/web-format.test.sh)
+        run: bash ./scripts/tests/web-format.test.sh
 
   e2e:
     name: playwright (test:e2e, runtime real)
