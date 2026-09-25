@@ -593,8 +593,10 @@ pub(crate) async fn run_list(
     } else {
         format!(" WHERE {}", conds.join(" AND "))
     };
+    // Rows without a value go last in BOTH directions (hub#2099): Postgres sorts NULL as the
+    // largest value, so a bare `DESC` put every row without a date at the top of a newest-first list.
     let order_clause = match &sort_col {
-        Some(c) => format!(" ORDER BY sub.{c} {dir}"),
+        Some(c) => format!(" ORDER BY sub.{c} {dir} NULLS LAST"),
         None => String::new(),
     };
 
