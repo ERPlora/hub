@@ -816,6 +816,7 @@ pub(crate) async fn restore_one(
         file_size_bytes: 0,
         sha256: Some(stored.sha256.clone()),
         signature: signature.clone(),
+        min_erplora_version: None,
     };
     let store = ModuleStore::new(cache_root);
     let dir = acquire(
@@ -858,15 +859,42 @@ pub async fn resolve_target(
     installed: &str,
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
+    resolve_offer(http, cloud_base_url, auth, module_id, installed, pinned)
+        .await
+        .0
+}
+
+/// [`resolve_target`] plus the ERPlora floor of the version it offers (hub#2082).
+///
+/// The floor is `Some` only for an UPDATE and only when that very version declares one: it is read
+/// off the same `versions/` answer the resolver chose from, so a newer version the resolver skipped
+/// (quarantine) never lends its floor to the one offered. The pin short-circuits exactly as in
+/// [`resolve_target`] — nothing is offered, nothing is asked.
+pub async fn resolve_offer(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+    installed: &str,
+    pinned: Option<&str>,
+) -> (erplora_runtime::module_update::Target, Option<String>) {
     use erplora_runtime::module_update::{resolve, Target};
 
     if let Some(pin) = pinned {
-        return Target::StayPut(pin.to_string());
+        return (Target::StayPut(pin.to_string()), None);
     }
 
-    let available = available_versions(http, cloud_base_url, auth, module_id).await;
-
-    resolve(installed, None, &available)
+    let published = versions_as_published(http, cloud_base_url, auth, module_id).await;
+    let target = resolve(installed, None, &as_available(&published));
+    let floor = if target.is_update() {
+        published
+            .into_iter()
+            .find(|v| v.version == target.version())
+            .and_then(|v| v.min_erplora_version)
+    } else {
+        None
+    };
+    (target, floor)
 }
 
 /// Lo que el marketplace publica hoy para un módulo (`versions/`), tal cual.
@@ -880,8 +908,28 @@ pub async fn available_versions(
     auth: &Auth,
     module_id: &str,
 ) -> Vec<erplora_runtime::module_update::Available> {
-    use erplora_runtime::module_update::Available;
+    as_available(&versions_as_published(http, cloud_base_url, auth, module_id).await)
+}
 
+/// What the resolver needs from each published version.
+fn as_available(published: &[ModuleVersion]) -> Vec<erplora_runtime::module_update::Available> {
+    published
+        .iter()
+        .map(|v| erplora_runtime::module_update::Available {
+            version: v.version.clone(),
+            is_active: v.is_active,
+        })
+        .collect()
+}
+
+/// The marketplace's `versions/` answer as published, or empty when it could not be read — the
+/// same «I don't know» [`available_versions`] documents.
+async fn versions_as_published(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+) -> Vec<ModuleVersion> {
     let request = CloudClient::new(cloud_base_url).versions(auth, module_id);
     let mut call = http.get(&request.url);
     for (name, value) in &request.headers {
@@ -891,13 +939,7 @@ pub async fn available_versions(
         Ok(response) => response
             .json::<Vec<ModuleVersion>>()
             .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|v| Available {
-                version: v.version,
-                is_active: v.is_active,
-            })
-            .collect(),
+            .unwrap_or_default(),
         Err(error) => {
             tracing::warn!(
                 module_id = %module_id,
@@ -1267,6 +1309,7 @@ async fn execute_plan(
             file_size_bytes: 0,
             sha256: Some(sha.to_string()),
             signature: signature.clone(),
+            min_erplora_version: None,
         };
         let dir = acquire_from_file(
             &store,

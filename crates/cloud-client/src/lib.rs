@@ -1007,6 +1007,11 @@ pub struct ModuleVersion {
     /// instalación (DEFAULT deny) — por eso el catálogo se re-firma ANTES de repartir el anillo.
     #[serde(default)]
     pub signature: Option<ModuleSignature>,
+    /// The `compatibility.min_erplora_version` THIS version's manifest declares (hub#2082), as the
+    /// marketplace's `versions/` reports it. `None` = it declares none, or a marketplace older than
+    /// the field: the screen then warns about nothing and the runtime still refuses at install.
+    #[serde(default)]
+    pub min_erplora_version: Option<String>,
 }
 
 impl ModuleVersion {

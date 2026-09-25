@@ -39,8 +39,10 @@ export function canOpenModule(
  * is blocked». In while an update runs, even once the row no longer carries the pending version:
  * that button is where the spinner lives.
  */
-export function hidesUpdateAction(row: { update?: unknown; updating?: unknown }): boolean {
-  return !row.update && row.updating !== true;
+export function hidesUpdateAction(row: { update?: unknown; updating?: unknown; updateNeedsNewerHub?: unknown }): boolean {
+  if (row.updating === true) return false;
+  // hub#2082: a version this hub is too old for is not an update it can take — the row says so.
+  return !row.update || row.updateNeedsNewerHub === true;
 }
 
 /** What pressing the switch would DO — the future state, which is what the label must say. */

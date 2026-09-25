@@ -80,12 +80,18 @@ export function catalogRowState(row: {
   busy: boolean;
   /** The version the catalog announces needs a newer hub than this one ({@link hubTooOldFor}). */
   needsNewerHub?: boolean;
+  /** The pending UPDATE needs a newer hub than this one (hub#2082, `updateNeedsNewerHub`). */
+  updateNeedsNewerHub?: boolean;
 }): CatalogRowState {
   if (row.busy) return 'installing';
   const installed = isModuleInstalled(row.cloudInstalled, row.id, row.localInstalledIds);
   // An update is only an update over something this hub HAS. A newer version in the marketplace of a
   // module nobody installed here is just the version you would get if you installed it.
-  if (installed) return row.hasUpdate ? 'updatable' : 'installed';
+  if (installed) {
+    if (!row.hasUpdate) return 'installed';
+    // hub#2082: an «Update» the runtime would refuse is said before the press, like «Install».
+    return row.updateNeedsNewerHub ? 'needs_newer_hub' : 'updatable';
+  }
   if (!row.available) return 'unavailable';
   // hub#2054: said BEFORE the press. Offering «Install» here only led to the runtime's refusal.
   return row.needsNewerHub ? 'needs_newer_hub' : 'available';
