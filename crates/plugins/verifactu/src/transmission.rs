@@ -5477,8 +5477,9 @@ mod late_remission_verifactu111 {
             self.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
             self.open_the_road();
             self.scheduled_drain().await;
+            let sent = self.cell.lock().unwrap().len();
             assert_eq!(
-                self.cell.lock().unwrap().len(),
+                sent,
                 3,
                 "the refusal, the consult and the re-chained resend: {:?}",
                 self.rows(&format!(
