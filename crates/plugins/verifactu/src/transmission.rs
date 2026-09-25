@@ -320,7 +320,6 @@ pub(crate) async fn transmit_one(
 
     match transport {
         Ok(resp) => {
-
             // ── Recuperación automática: SOLO si la AEAT rechazó de verdad ─────────────────
             // El caso que se quería cubrir es **restaurar un backup**: la cadena local retrocede
             // y el envío sale con `PrimerRegistro=S` cuando la AEAT ya tiene registros de ese
@@ -345,7 +344,7 @@ pub(crate) async fn transmit_one(
             // un hub por la celda que restaura un backup se re-ancla como cualquier otro. Se le
             // pasa la vía YA RESUELTA: consultar por una puerta y re-transmitir por otra anclaría
             // la cadena desde una puerta que no la emitió (guarda R4).
-            if verdict.should_retransmit()
+            let note = if verdict.should_retransmit()
                 && aeat::is_chaining_rejection(&resp.codigo_error, &resp.descripcion_error)
                 && !recovery_id.is_empty()
             {
@@ -366,27 +365,15 @@ pub(crate) async fn transmit_one(
                     // Re-anclado y reintentado: ese es el resultado que vale.
                     Ok(Some(result)) => return Ok(result),
                     // La AEAT no dio ancla utilizable → se registra el rechazo original.
-                    Ok(None) => {}
+                    Ok(None) => None,
                     // La recuperación falló (consulta caída, sin certificado…). El rechazo
                     // original se registra igual, con el motivo del fallo anotado: nunca se
                     // traga en silencio.
-                    Err(e) => {
-                        let outcome = response_ops(
-                            record,
-                            &resp,
-                            &destination,
-                            &xml,
-                            &xml_storage_path,
-                            event_id,
-                            &ctx.now,
-                            &record_id,
-                            Some(&format!("recuperación automática fallida: {e}")),
-                        );
-                        return refusal_leaves_the_queue(host, ctx, &verdict, &record_id, queue_id, outcome)
-                            .await;
-                    }
+                    Err(e) => Some(format!("recuperación automática fallida: {e}")),
                 }
-            }
+            } else {
+                None
+            };
 
             let outcome = response_ops(
                 record,
@@ -397,7 +384,7 @@ pub(crate) async fn transmit_one(
                 event_id,
                 &ctx.now,
                 &record_id,
-                None,
+                note.as_deref(),
             );
             refusal_leaves_the_queue(host, ctx, &verdict, &record_id, queue_id, outcome).await
         }
@@ -525,7 +512,7 @@ pub(crate) fn fault_reason(body: &str) -> Option<String> {
 /// measured on 2026-09-02 with `B00000000`). NOT here: `4112` (the presenter may not present for
 /// this obligado) — the presenter is stamped on every send (`aeat::set_representative`), so the
 /// next one can go through once the representation exists. Anything not listed keeps the retry.
-const PERMANENT_FAULT_CODES: [&str; 3] = ["4102", "4104", "4116"];
+const PERMANENT_FAULT_CODES: &[&str] = &["4102", "4104", "4116"];
 
 /// A Fault in [`PERMANENT_FAULT_CODES`] as the refusal it is: `Incorrecto` with the AEAT's code
 /// and its `faultstring`, so it is filed like any other refused record. `None` for anything else.
@@ -1396,8 +1383,8 @@ pub(crate) async fn process_contingency_queue(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        archive_transmission_xml, derive_tax_rate, fault_reason, permanent_fault, NativeHost, Params,
-        Result,
+        archive_transmission_xml, derive_tax_rate, fault_reason, permanent_fault, NativeHost,
+        Params, Result,
     };
     use serde_json::Value as Json;
     use std::sync::Mutex;
@@ -5210,7 +5197,11 @@ mod late_remission_verifactu111 {
             hub.sell(1).await;
 
             assert_eq!(hub.sent().await.len(), 1, "{code}");
-            assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())], "{code}");
+            assert_eq!(
+                hub.chain().await,
+                vec![(1, "rejected".to_owned())],
+                "{code}"
+            );
             assert_eq!(hub.column(1, "aeat_response_code").await, code);
             assert_eq!(hub.queue_status(1).await, None, "{code}: nothing to retry");
             assert!(
@@ -5231,8 +5222,7 @@ mod late_remission_verifactu111 {
     /// kept as the trace of what was tried, never due again.
     #[tokio::test]
     async fn a_queued_record_the_aeat_faults_for_good_leaves_the_queue_as_failed() {
-        let Some(hub) =
-            Bench::answering("01110000-0000-4000-8000-000000002130", FAULT_4104).await
+        let Some(hub) = Bench::answering("01110000-0000-4000-8000-000000002130", FAULT_4104).await
         else {
             return;
         };
@@ -5273,12 +5263,59 @@ mod late_remission_verifactu111 {
         hub.only_testing_was_reached();
     }
 
+    /// 🔒 Tenancy: the entry the refusal retires is THIS hub's. Another hub's row that names the
+    /// same record id is never read, so it is never rewritten (`_enqueue_contingency` upserts on
+    /// `record_id` alone).
+    #[tokio::test]
+    async fn a_refusal_never_touches_another_hubs_queue_row() {
+        let Some(hub) = Bench::answering("01110000-0000-4000-8000-000000002133", FAULT_4104).await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        let record_id = hub.record_id(1).await;
+        let mut p = Params::new();
+        p.insert("record_id".into(), json!(record_id));
+        hub.rt
+            .db()
+            .execute(
+                "INSERT INTO verifactu_contingencyqueue (id, hub_id, record_id, priority, \
+                 queued_at, attempts, last_attempt_at, last_error, next_attempt_at, status, \
+                 is_deleted, created_by, updated_by, created_at, updated_at) VALUES \
+                 ('q-other', '01110000-0000-4000-8000-0000000021ff', :record_id, 2, \
+                 '2026-09-01T00:00:00+00:00', 1, '2026-09-01T00:00:00+00:00', 'theirs', \
+                 '2999-01-01T00:00:00+00:00', 'retrying', 0, 'u1', 'u1', \
+                 '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00')",
+                &p,
+            )
+            .await
+            .expect("the other hub's row");
+
+        hub.open_the_road();
+        let payload = json!({ "record_id": record_id });
+        hub.rt
+            .execute_command(
+                "verifactu.records.transmit",
+                payload.as_object().unwrap(),
+                &hub.ctx(),
+            )
+            .await
+            .expect("sent by hand");
+
+        assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
+        let theirs = hub
+            .rows("SELECT status, attempts FROM verifactu_contingencyqueue WHERE id = 'q-other'")
+            .await;
+        assert_eq!(theirs[0]["status"], "retrying", "{theirs:?}");
+        assert_eq!(theirs[0]["attempts"], 1, "{theirs:?}");
+        hub.only_testing_was_reached();
+    }
+
     /// The positive control: a Fault the next send can clear (the presenter, stamped on every
     /// send, may not present for this obligado YET) keeps the retry it has today.
     #[tokio::test]
     async fn a_fault_the_next_send_can_clear_keeps_being_retried() {
-        let Some(hub) =
-            Bench::answering("01110000-0000-4000-8000-000000002132", FAULT_4112).await
+        let Some(hub) = Bench::answering("01110000-0000-4000-8000-000000002132", FAULT_4112).await
         else {
             return;
         };
