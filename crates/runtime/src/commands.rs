@@ -150,6 +150,84 @@ pub(crate) async fn execute_at(
     origin: Origin,
     grants: Option<&Grants>,
 ) -> Result<Json> {
+    execute_unnamed(
+        db, registry, name, payload, ctx, depth, extra_ops, origin, grants,
+    )
+    .await
+    .map_err(|err| name_unique_violation(registry, name, err))
+}
+
+/// hub#2081: a unique violation of an index the command DECLARES in `on_unique` becomes the
+/// module's domain code; every other error passes through untouched.
+///
+/// One wrapper around the whole dispatch rather than a branch per path, because the violation
+/// reaches the database from three places (declarative SQL, a WASM handler's operations, a native
+/// plugin's) and a mapping that only one of them honoured would be the same unexplained `db`
+/// on the other two.
+fn name_unique_violation(registry: &Registry, name: &str, err: RuntimeError) -> RuntimeError {
+    let RuntimeError::Db(erplora_db::DbError::Sqlx(sqlx_err)) = &err else {
+        return err;
+    };
+    let Some(db_err) = sqlx_err.as_database_error() else {
+        return err;
+    };
+    if db_err.code().as_deref() != Some(UNIQUE_VIOLATION) {
+        return err;
+    }
+    let Some(cmd) = registry.get_command(name) else {
+        return err;
+    };
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    match unique_violation_code(
+        &cmd.def.on_unique,
+        &cmd.module_id,
+        &installed,
+        db_err.constraint(),
+        db_err.table(),
+    ) {
+        Some(code) => RuntimeError::Domain {
+            code: code.to_string(),
+            // Generated fallback, like `expect_rows`: states the refusal without internals. The
+            // module's `locales/<lang>.json` translates the code; this is only the last resort.
+            message: format!("the operation `{name}` conflicts with a record that already exists"),
+        },
+        None => err,
+    }
+}
+
+/// SQLSTATE `unique_violation`.
+const UNIQUE_VIOLATION: &str = "23505";
+
+/// The code `on_unique` declares for a violation of `constraint` on `table`, if any (hub#2081).
+///
+/// Kept away from the database so each refusal to map is testable on its own. The index must be
+/// one the command names, AND the table must belong to the command's module (longest installed
+/// prefix, the same rule as export/reset): a manifest cannot rename the refusal of another
+/// module's index — or a core table's — into a code of its own.
+fn unique_violation_code<'a>(
+    on_unique: &'a std::collections::BTreeMap<String, String>,
+    module_id: &str,
+    installed: &[String],
+    constraint: Option<&str>,
+    table: Option<&str>,
+) -> Option<&'a str> {
+    let code = on_unique.get(constraint?)?;
+    let owner = crate::export::table_owner(table?, installed)?;
+    (owner == module_id).then_some(code.as_str())
+}
+
+#[allow(clippy::too_many_arguments)] // the body of `execute_at`, same signature
+async fn execute_unnamed(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    payload: &Params,
+    ctx: &RequestContext,
+    depth: u32,
+    extra_ops: &[(String, Params)],
+    origin: Origin,
+    grants: Option<&Grants>,
+) -> Result<Json> {
     if depth > MAX_EVENT_DEPTH {
         return Err(RuntimeError::EventLoop);
     }
@@ -2182,6 +2260,86 @@ fn enforce_fiscal_environment_pin<'a>(
 
 #[cfg(test)]
 mod tests {
+
+    // ── hub#2081: which unique violations `on_unique` may rename ──────────────────────────────
+
+    fn on_unique_staff() -> std::collections::BTreeMap<String, String> {
+        [(
+            "uq_staff_member_hub_user".to_string(),
+            "staff.user_already_linked".to_string(),
+        )]
+        .into_iter()
+        .collect()
+    }
+
+    fn installed(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| id.to_string()).collect()
+    }
+
+    #[test]
+    fn a_declared_index_on_an_own_table_is_renamed_hub2081() {
+        let map = on_unique_staff();
+        assert_eq!(
+            unique_violation_code(
+                &map,
+                "staff",
+                &installed(&["staff", "sales"]),
+                Some("uq_staff_member_hub_user"),
+                Some("staff_member"),
+            ),
+            Some("staff.user_already_linked")
+        );
+    }
+
+    #[test]
+    fn an_undeclared_index_is_not_renamed_hub2081() {
+        let map = on_unique_staff();
+        assert_eq!(
+            unique_violation_code(
+                &map,
+                "staff",
+                &installed(&["staff"]),
+                Some("staff_member_pkey"),
+                Some("staff_member"),
+            ),
+            None
+        );
+    }
+
+    /// 🔴 A manifest cannot rename another module's refusal: the same index NAME on a table owned
+    /// by someone else (or by the core) stays the database's error.
+    #[test]
+    fn a_declared_name_on_a_foreign_or_core_table_is_not_renamed_hub2081() {
+        let map = on_unique_staff();
+        for table in ["sales_order", "hub_users", "staffing_shift"] {
+            assert_eq!(
+                unique_violation_code(
+                    &map,
+                    "staff",
+                    &installed(&["staff", "sales", "staffing"]),
+                    Some("uq_staff_member_hub_user"),
+                    Some(table),
+                ),
+                None,
+                "`{table}` is not `staff`'s"
+            );
+        }
+    }
+
+    #[test]
+    fn a_violation_without_constraint_or_table_is_not_renamed_hub2081() {
+        let map = on_unique_staff();
+        let ids = installed(&["staff"]);
+        assert_eq!(
+            unique_violation_code(&map, "staff", &ids, None, Some("staff_member")),
+            None
+        );
+        assert_eq!(
+            unique_violation_code(&map, "staff", &ids, Some("uq_staff_member_hub_user"), None),
+            None
+        );
+    }
+
     use super::*;
     use crate::manifest::CommandDef;
     use crate::registry::ModuleStatus;
@@ -2201,6 +2359,7 @@ mod tests {
             schema: None,
             expose_api: false,
             internal: false,
+            on_unique: Default::default(),
         }
     }
 

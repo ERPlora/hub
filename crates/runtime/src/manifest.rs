@@ -1544,6 +1544,21 @@ pub struct CommandDef {
     /// módulos que prefieren blindarlo explícitamente sin ese prefijo. Ver [`CommandDef::is_internal`].
     #[serde(default)]
     pub internal: bool,
+    /// **What a refusal of one of the module's unique indexes MEANS** (hub#2081): index name →
+    /// domain code of the module's catalogue (`{"uq_staff_member_hub_user":
+    /// "staff.user_already_linked"}`).
+    ///
+    /// A module guards "is this already taken?" with a read and backs it with a unique index,
+    /// because two requests can pass the read at the same time. The index stops the second write,
+    /// and without this the loser of that race got `db` — "the request could not be completed" —
+    /// instead of the reason the module gives when there is no race. The dispatcher maps a
+    /// `23505` on a DECLARED index of a table the module OWNS to [`RuntimeError::Domain`] with the
+    /// declared code; anything else stays a database error. The installer checks each code the
+    /// same way it checks `expect_rows.error` (own namespace, listed in `errors` when present).
+    ///
+    /// [`RuntimeError::Domain`]: crate::errors::RuntimeError::Domain
+    #[serde(default)]
+    pub on_unique: BTreeMap<String, String>,
 }
 
 impl CommandDef {
@@ -1696,6 +1711,7 @@ const COMMAND_FIELDS: &[&str] = &[
     "ai",
     "expose_api",
     "internal",
+    "on_unique",
 ];
 
 const QUERY_FIELDS: &[&str] = &["permission", "sql", "schema", "list", "ai", "expose_api"];
