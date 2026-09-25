@@ -88,14 +88,56 @@ pub enum Align {
 
 /// Constructor de un buffer ESC/POS. Cada método empuja bytes al buffer interno.
 /// Porta `_RawNetworkPrinter.{set,text,cut,barcode}` (codificación cp437).
-#[derive(Default)]
 pub struct EscposBuilder {
     buf: Vec<u8>,
+    /// Decimals every amount is printed with: the scale of the document's currency (hub#2129).
+    decimals: usize,
+}
+
+impl Default for EscposBuilder {
+    fn default() -> Self {
+        Self {
+            buf: Vec::new(),
+            decimals: DEFAULT_MONEY_DECIMALS,
+        }
+    }
+}
+
+/// The scale a document without `decimals` is printed in: the euro's, which is what every paper
+/// printed before hub#2129.
+const DEFAULT_MONEY_DECIMALS: usize = 2;
+
+/// The widest scale ISO 4217 defines (CLF, UYW). A document asking for more is not trusted.
+const MAX_MONEY_DECIMALS: u64 = 4;
+
+/// The currency scale a document declares in `decimals` (hub#2129): JPY 0, EUR 2, KWD 3.
+///
+/// The amounts reach the paper as major-unit floats that the producer (`sales`) already divided by
+/// that scale, so the paper only needs to know how many digits to show. Anything that is not a
+/// whole number in `0..=4` falls back to two decimals — the paper of every document that predates
+/// the field — rather than printing a ticket with nine.
+fn money_decimals(data: &serde_json::Value) -> usize {
+    data.get("decimals")
+        .and_then(|v| v.as_u64())
+        .filter(|d| *d <= MAX_MONEY_DECIMALS)
+        .map_or(DEFAULT_MONEY_DECIMALS, |d| d as usize)
 }
 
 impl EscposBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Prints every amount with `decimals` digits (the currency's scale, hub#2129).
+    pub fn with_money_decimals(mut self, decimals: usize) -> Self {
+        self.decimals = decimals;
+        self
+    }
+
+    /// An amount as the paper shows it, in the currency's scale: `1500` in yen, `12.50` in euros,
+    /// `1.234` in dinars.
+    pub fn money(&self, amount: f64) -> String {
+        format!("{amount:.prec$}", prec = self.decimals)
     }
 
     /// Estado de impresión: alineación + negrita + doble alto/ancho (`ESC a`, `ESC E`, `GS !`).
@@ -223,7 +265,7 @@ impl EscposBuilder {
 
     /// Línea de total alineada a la derecha: `Etiqueta        12.50`. Porta `_print_total_line`.
     pub fn total_line(&mut self, label: &str, amount: f64) -> &mut Self {
-        let amount_str = format!("{amount:.2}");
+        let amount_str = self.money(amount);
         let padding = (LINE_WIDTH as isize - label.len() as isize - amount_str.len() as isize).max(1)
             as usize;
         self.text(&format!("{label}{}{amount_str}\n", " ".repeat(padding)));
@@ -279,7 +321,7 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
     if doc == DocumentType::Invoice {
         check_full_invoice(data)?;
     }
-    let mut b = EscposBuilder::new();
+    let mut b = EscposBuilder::new().with_money_decimals(money_decimals(data));
     match doc {
         DocumentType::Receipt => render_receipt(&mut b, data, Fiscal::Ticket),
         // hub#2005 — the same body as the ticket (lines, totals, QR, duplicate mark) plus what
@@ -692,7 +734,7 @@ fn render_tax_breakdown(b: &mut EscposBuilder, data: &serde_json::Value, t: Loca
             Some(label) if !label.is_empty() => label.to_string(),
             _ => format!("{} {}%", t.label(Label::Tax), fmt_rate(num("rate"))),
         };
-        let (base, tax) = (format!("{:.2}", num("base")), format!("{:.2}", num("tax")));
+        let (base, tax) = (b.money(num("base")), b.money(num("tax")));
         if name.chars().count() > BREAKDOWN_RATE_WIDTH {
             b.text(&format!("{name}\n"));
             b.text(&row_line("", &base, &tax));
@@ -799,7 +841,7 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
 
             b.set(Align::Left, false, false, false);
             let line = format!("{}x {name}", fmt_qty(item.get("quantity"), qty));
-            let total_str = format!("{total:.2}");
+            let total_str = b.money(total);
             let padding = (LINE_WIDTH as isize - line.len() as isize - total_str.len() as isize)
                 .max(1) as usize;
             b.text(&format!("{line}{}{total_str}\n", " ".repeat(padding)));
@@ -1263,7 +1305,8 @@ fn render_barcode_label(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     if let Some(price) = data.get("price").and_then(|v| v.as_f64()) {
         b.set(Align::Center, true, true, false);
-        b.text(&format!("{price:.2}\n"));
+        let price = b.money(price);
+        b.text(&format!("{price}\n"));
     }
 
     b.cut();
@@ -3438,6 +3481,125 @@ mod tests {
         without.as_object_mut().unwrap().remove("promo_qr");
         let bytes = render_document(receipt, &without).unwrap();
         assert_eq!(qr_module_sizes(&bytes), vec![4, 4], "byte for byte what it printed before");
+    }
+
+    // ── The paper prints money in the currency's own scale (hub#2129) ──────────────────────────
+
+    /// The paper's text lines, whatever the document type.
+    fn money_paper(doc: DocumentType, data: &serde_json::Value) -> Vec<String> {
+        let bytes = render_document(doc, data).expect("a valid document");
+        lines_with_modes(&bytes).into_iter().map(|(text, _, _)| text).collect()
+    }
+
+    /// The line that starts with `label`, trimmed — the amount is what is right of it.
+    fn line_of<'a>(lines: &'a [String], label: &str) -> &'a str {
+        lines
+            .iter()
+            .map(|l| l.trim())
+            .find(|l| l.starts_with(label))
+            .unwrap_or_else(|| panic!("no line starting with {label:?} in {lines:#?}"))
+    }
+
+    fn yen_ticket() -> serde_json::Value {
+        json!({
+            "business_name": "Sushi Tanaka",
+            "decimals": 0,
+            "items": [{ "name": "Nigiri", "quantity": 2, "total": 1500.0 }],
+            "subtotal": 1364.0,
+            "tax_amount": 136.0,
+            "discount": 100.0,
+            "total": 1400.0,
+            "payment_method": "Efectivo",
+            "paid": 2000.0,
+            "change": 600.0,
+        })
+    }
+
+    /// **A yen shop's ticket has no cents** (hub#2129): `sales` sends the amounts already divided
+    /// by the currency's scale and says which scale it is; the paper used to add «.00» to every
+    /// one of them while the screen and the HTML ticket showed «1500».
+    #[test]
+    fn a_yen_ticket_prints_every_amount_without_decimals() {
+        let lines = money_paper(DocumentType::Receipt, &yen_ticket());
+        assert!(!lines.iter().any(|l| l.contains(".00")), "{lines:#?}");
+        assert!(line_of(&lines, "2x Nigiri").ends_with(" 1500"), "{lines:#?}");
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1400"), "{lines:#?}");
+        assert!(line_of(&lines, "Subtotal").ends_with(" 1364"), "{lines:#?}");
+        assert!(line_of(&lines, "Descuento").ends_with(" -100"), "{lines:#?}");
+        assert!(line_of(&lines, "Entregado").ends_with(" 2000"), "{lines:#?}");
+        assert!(line_of(&lines, "Cambio").ends_with(" 600"), "{lines:#?}");
+    }
+
+    /// The bill the waiter takes to the table, same scale.
+    #[test]
+    fn a_yen_bill_prints_every_amount_without_decimals() {
+        let lines = money_paper(DocumentType::Prebill, &yen_ticket());
+        assert!(!lines.iter().any(|l| l.contains(".00")), "{lines:#?}");
+        assert!(line_of(&lines, "2x Nigiri").ends_with(" 1500"), "{lines:#?}");
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1400"), "{lines:#?}");
+    }
+
+    /// **A dinar has three decimals, and the third one is money** (hub#2129): `1.234` KWD used to
+    /// print as `1.23`, a fil lost on every amount — the VAT breakdown included.
+    #[test]
+    fn a_dinar_invoice_keeps_its_third_decimal_on_every_amount() {
+        let mut data = full_invoice();
+        data["decimals"] = json!(3);
+        data["items"] = json!([{ "name": "Menu", "quantity": 1, "total": 1.234 }]);
+        data["tax_breakdown"] = json!([{ "rate": 10, "base": 1.122, "tax": 0.112 }]);
+        data["subtotal"] = json!(1.122);
+        data["tax_amount"] = json!(0.112);
+        data["total"] = json!(1.234);
+        let lines = money_paper(DocumentType::Invoice, &data);
+        assert!(line_of(&lines, "1x Menu").ends_with(" 1.234"), "{lines:#?}");
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1.234"), "{lines:#?}");
+        let row = line_of(&lines, "IVA 10%");
+        assert!(row.contains(" 1.122") && row.ends_with(" 0.112"), "{lines:#?}");
+    }
+
+    /// The cash report and the shelf label are money too: a yen till closes in yen.
+    #[test]
+    fn a_yen_cash_report_and_shelf_label_print_without_decimals() {
+        let report = money_paper(
+            DocumentType::CashSessionReport,
+            &json!({
+                "decimals": 0,
+                "opening_balance": 10000.0,
+                "closing_balance": 25000.0,
+                "transactions": [{ "label": "Venta", "amount": 15000.0 }],
+            }),
+        );
+        assert!(!report.iter().any(|l| l.contains(".00")), "{report:#?}");
+        assert!(line_of(&report, "Venta").ends_with(" 15000"), "{report:#?}");
+        let label = money_paper(
+            DocumentType::BarcodeLabel,
+            &json!({ "decimals": 0, "product_name": "Te verde", "price": 480.0 }),
+        );
+        assert!(label.iter().any(|l| l.trim() == "480"), "{label:#?}");
+    }
+
+    /// **A document without `decimals` prints exactly as before** — two decimals. Every module
+    /// in the fleet that predates hub#2129 sends none, and a euro ticket must not change a byte.
+    /// A scale that is not a whole number between 0 and 4 (the widest ISO 4217 scale) is not
+    /// trusted either: two decimals, never a ticket with nine.
+    #[test]
+    fn a_document_without_a_valid_scale_prints_two_decimals() {
+        let mut data = yen_ticket();
+        data.as_object_mut().unwrap().remove("decimals");
+        let without = render_document(DocumentType::Receipt, &data).expect("valid");
+        let lines = money_paper(DocumentType::Receipt, &data);
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1400.00"), "{lines:#?}");
+        for bad in [json!(5), json!(-1), json!("0"), json!(2.5), json!(null)] {
+            data["decimals"] = bad.clone();
+            let bytes = render_document(DocumentType::Receipt, &data).expect("valid");
+            assert_eq!(bytes, without, "decimals = {bad} must print as if absent");
+        }
+        data["decimals"] = json!(2);
+        assert_eq!(
+            render_document(DocumentType::Receipt, &data).expect("valid"),
+            without,
+            "an explicit 2 is today's paper"
+        );
     }
 }
 
