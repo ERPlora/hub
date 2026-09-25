@@ -67,6 +67,7 @@ impl NativeHandler for RecordingHandler {
             "caller_lang".into(),
             input["payload"]["caller_lang"].clone(),
         );
+        params.insert("principal".into(), input["context"]["principal"].clone());
         Ok(Output::new().with_operation(Operation::sql("ctxp._insert", params)))
     }
 }
@@ -227,4 +228,41 @@ async fn queries_bind_the_same_timezone_and_caller_lang() {
         ":timezone in a query"
     );
     assert_eq!(row["caller_lang"], json!("es"), ":caller_lang in a query");
+}
+
+// ── hub#2113: context.principal ───────────────────────────────────────────────────────────
+
+/// Runs `ctxp.record` as `ctx` and returns `context.principal` as the handler saw it.
+async fn observed_principal(rt: &Runtime, ctx: &RequestContext) -> Json {
+    rt.execute_command("ctxp.record", &Params::new(), ctx)
+        .await
+        .expect("ctxp.record runs");
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("h1"));
+    let rows = rt
+        .db_for_test()
+        .query("SELECT principal FROM ctxp_observation", &p)
+        .await
+        .expect("read the observation back")
+        .rows;
+    assert_eq!(rows.len(), 1, "the handler materialised exactly one row");
+    rows[0]["principal"].clone()
+}
+
+/// A person at the till: the handler is TOLD `human`, it does not have to infer it from the
+/// shape of `current_user_id`.
+#[tokio::test]
+async fn handler_is_told_a_person_is_calling() {
+    let rt = runtime().await;
+    assert_eq!(observed_principal(&rt, &admin()).await, json!("human"));
+}
+
+/// An automation (flow, API key, outbox relay, scheduler — every surface that marks its context
+/// `as_machine`) is told `machine`, whatever its `current_user_id` looks like. The id here is
+/// deliberately one no module's prefix list knows: the fact must come from the kernel.
+#[tokio::test]
+async fn handler_is_told_an_automation_is_calling_whatever_its_id_looks_like() {
+    let rt = runtime().await;
+    let machine = RequestContext::new("h1", "robot-of-the-future:7", ["*".to_string()]).as_machine();
+    assert_eq!(observed_principal(&rt, &machine).await, json!("machine"));
 }

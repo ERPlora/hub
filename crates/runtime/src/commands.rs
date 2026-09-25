@@ -1135,22 +1135,15 @@ async fn execute_wasm(
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
     let reads = preload_reads(db, registry, cmd, ctx, payload).await?;
+    let mut context = handler_context(ctx, &new_ids);
+    // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra el
+    // catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
+    context.insert("country_code".into(), json!(ctx.country_code));
+    context.insert("region_code".into(), json!(ctx.region_code));
+    context.insert("reads".into(), reads);
     let input = json!({
         "payload": Json::Object(bound_payload),
-        "context": {
-            "hub_id": ctx.hub_id,
-            "current_user_id": ctx.user_id,
-            "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids.clone(),
-            // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra
-            // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
-            "country_code": ctx.country_code,
-            "region_code": ctx.region_code,
-            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022): nombre IANA ya resuelto — «mañana a las
-            // 09:00» son las 09:00 de la TIENDA. Viaja también como `:timezone` en el payload.
-            "timezone": ctx.timezone_name(),
-            "reads": reads,
-        },
+        "context": Json::Object(context),
     });
 
     // hub#926: el código compilado se pide a la caché del registro, que lo compila la PRIMERA vez
@@ -1168,6 +1161,25 @@ async fn execute_wasm(
         db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
     )
     .await
+}
+
+/// The `context` every handler receives, WASM or native — ONE builder so the two paths cannot
+/// drift apart (the WASM path adds its fiscal identity and `reads` on top).
+///
+///  - `principal` (hub#2113): `human` or `machine` — WHO is calling, a kernel fact. A module must
+///    never infer it from the shape of `current_user_id`: that guess fails open the day the hub
+///    grows a new kind of automated caller.
+///  - `timezone` (hub#731, hub#1022): the business clock, IANA name already resolved — «tomorrow
+///    at 09:00» is 09:00 at the SHOP. It also rides the payload as `:timezone`.
+fn handler_context(ctx: &RequestContext, new_ids: &[Json]) -> serde_json::Map<String, Json> {
+    let mut context = serde_json::Map::new();
+    context.insert("hub_id".into(), json!(ctx.hub_id));
+    context.insert("current_user_id".into(), json!(ctx.user_id));
+    context.insert("principal".into(), json!(ctx.principal.as_str()));
+    context.insert("now".into(), json!(crate::registry::now_rfc3339()));
+    context.insert("new_ids".into(), Json::Array(new_ids.to_vec()));
+    context.insert("timezone".into(), json!(ctx.timezone_name()));
+    context
 }
 
 /// Margen (ms) que el host espera POR ENCIMA del timeout interno del guest antes de rendirse.
@@ -1280,15 +1292,7 @@ async fn execute_native(
         .collect();
     let input = json!({
         "payload": Json::Object(bound_payload),
-        "context": {
-            "hub_id": ctx.hub_id,
-            "current_user_id": ctx.user_id,
-            "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids.clone(),
-            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022), mismo contrato que el camino WASM: el
-            // handler nativo agenda con el mismo IANA resuelto que un guest.
-            "timezone": ctx.timezone_name(),
-        },
+        "context": Json::Object(handler_context(ctx, &new_ids)),
     });
 
     let static_folder = registry
@@ -2344,6 +2348,18 @@ mod tests {
     use crate::manifest::CommandDef;
     use crate::registry::ModuleStatus;
     use serde_json::Map;
+
+    /// hub#2113: the ONE context builder both handler paths (WASM and native) share tells the
+    /// handler who is calling. Pinned at the builder because the WASM path has no echoing guest:
+    /// the native e2e (`handler_context_params_e2e.rs`) proves the wiring, this proves the WASM
+    /// path gets the very same field.
+    #[test]
+    fn handler_context_tells_the_handler_who_is_calling() {
+        let person = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let machine = RequestContext::new("h1", "robot:1", ["*".to_string()]).as_machine();
+        assert_eq!(handler_context(&person, &[])["principal"], json!("human"));
+        assert_eq!(handler_context(&machine, &[])["principal"], json!("machine"));
+    }
 
     fn cmd_def() -> CommandDef {
         CommandDef {

@@ -4,5 +4,6 @@ CREATE TABLE IF NOT EXISTS ctxp_observation (
     ctx_timezone TEXT NOT NULL DEFAULT '',
     param_timezone TEXT NOT NULL DEFAULT '',
     caller_lang TEXT NOT NULL DEFAULT '',
+    principal TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (hub_id, id)
 );

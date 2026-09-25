@@ -1419,6 +1419,18 @@ pub enum Principal {
     Machine,
 }
 
+impl Principal {
+    /// The name handlers receive in `context.principal` (hub#2113): the kernel TELLS a module
+    /// whether a person or an automation is calling, so no module has to guess it from the shape
+    /// of `current_user_id` — a guess that fails open the day a new machine caller appears.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Principal::Human => "human",
+            Principal::Machine => "machine",
+        }
+    }
+}
+
 impl RequestContext {
     pub fn new(
         hub_id: impl Into<String>,
@@ -1966,6 +1978,14 @@ mod tests {
             Principal::default(),
             "`new` and the derive must not drift apart"
         );
+    }
+
+    /// hub#2113: the wire names handlers read in `context.principal`. They are a contract with
+    /// every module (appointments reads them), so they are pinned here, not only through an e2e.
+    #[test]
+    fn principal_wire_names_are_human_and_machine() {
+        assert_eq!(Principal::Human.as_str(), "human");
+        assert_eq!(Principal::Machine.as_str(), "machine");
     }
 
     // ── Setup item i18n (ADR-0055, hub#762) ──────────────────────────────────────────────────
