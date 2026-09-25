@@ -105,6 +105,7 @@ pub mod version;
 pub mod whatsapp_connect;
 pub mod whatsapp_quota;
 pub mod whatsapp_templates;
+pub mod whatsapp_media;
 
 pub use state::{
     AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, SignatureMode, WsEvent,

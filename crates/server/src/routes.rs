@@ -264,6 +264,13 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/whatsapp/templates/:name",
             axum::routing::delete(whatsapp_templates::whatsapp_template_delete),
         )
+        // A customer's photo, voice note, video or document (hub#2114, saas#2285): Meta hands an
+        // asset id, the SaaS swaps it for the bytes, the runtime streams them with its machine
+        // credential. Read-only; gated on reading the inbox plus `notify:whatsapp` for a module.
+        .route(
+            "/api/hub/whatsapp/media/:media_id",
+            get(whatsapp_media::whatsapp_media),
+        )
         // Qué dice el marketplace de UN módulo (hub#1134). El catálogo de arriba sólo trae lo que
         // se sigue OFRECIENDO, así que no puede contestar por un módulo que este hub corre y el
         // marketplace ha retirado — que es justo el que «Mis apps» tiene que poder marcar.
