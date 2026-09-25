@@ -967,6 +967,9 @@ pub(crate) async fn auto_rechain_and_retry(
     remission: Remission,
 ) -> Result<Option<(Vec<Operation>, Vec<Event>, bool)>> {
     let issuer_nif = str_field(record, "issuer_nif");
+    // Who asks is the record's obligado (hub#2131): a business that never saved the settings
+    // screen has no registered name in its config, and the consult cannot leave without one.
+    let config = &diagnostics::with_obligado_name_of(config, record);
     // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
     // tax agency for the anchor would re-chain this record onto a link from the other chain,
     // which is precisely the crossing that guard R4 exists to prevent.
@@ -5476,8 +5479,12 @@ mod late_remission_verifactu111 {
         /// the drain takes it: refused for its chain → consult → the re-chained resend. Returns
         /// the record's id (its sequence number moves when it is re-chained).
         async fn restored_backup_resend(&self) -> String {
-            // The consult names the obligado by its registered name, which only a saved config
-            // holds (`diagnostics::obligado_name`).
+            self.save_the_config().await;
+            self.restored_backup_resend_as_it_is().await
+        }
+
+        /// The business saves the VeriFactu settings screen once.
+        async fn save_the_config(&self) {
             let mut p = Params::new();
             p.insert("hub_id".into(), json!(self.hub_id));
             self.rt
@@ -5490,6 +5497,11 @@ mod late_remission_verifactu111 {
                 )
                 .await
                 .expect("config row");
+        }
+
+        /// [`Self::restored_backup_resend`] on the hub as it stands — with or without a saved
+        /// config.
+        async fn restored_backup_resend_as_it_is(&self) -> String {
             self.sell(1).await;
             let id = self.record_id(1).await;
             self.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
@@ -5685,6 +5697,142 @@ mod late_remission_verifactu111 {
             "after the anchor (2), which is after the record's old place (1)"
         );
         assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2131: a business that never saved the VeriFactu settings re-chains too ──────────
+
+    /// The XML of the `n`-th envelope the cell received.
+    fn xml_sent(hub: &Bench, n: usize) -> String {
+        use base64::Engine as _;
+        let envelope = hub.cell.lock().unwrap()[n].clone();
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(envelope["xml_b64"].as_str().unwrap_or_default())
+            .unwrap_or_default();
+        String::from_utf8(bytes).unwrap_or_default()
+    }
+
+    /// 🔴 THE bug: every new business bills on the defaults and never saves the settings screen,
+    /// so there is no saved registered name. The consult that recovers the anchor asked for it
+    /// there, found nothing and never left the hub — the record was refused for good and never
+    /// reached the AEAT. The name the record itself was sealed with is the obligado's, the same
+    /// one its alta carries.
+    #[tokio::test]
+    async fn a_business_without_saved_settings_recovers_its_chain_and_the_record_arrives() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-00000000213c",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        assert!(
+            hub.rows("SELECT id FROM verifactu_config WHERE hub_id = :hub_id")
+                .await
+                .is_empty(),
+            "the bench is a hub that never saved its config"
+        );
+        let id = hub.restored_backup_resend_as_it_is().await;
+
+        let consult = xml_sent(&hub, 1);
+        assert!(
+            consult.contains("ConsultaFactuSistemaFacturacion")
+                && consult.contains(">Salon Lucia SL<"),
+            "the consult names the obligado by the record's name: {consult}"
+        );
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        let anchor = hub
+            .rows(
+                "SELECT issuer_name FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND record_hash = \
+                 '3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696'",
+            )
+            .await;
+        assert_eq!(anchor.len(), 1, "one anchor: {anchor:?}");
+        assert_eq!(anchor[0]["issuer_name"], "Salon Lucia SL", "{anchor:?}");
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 The same business asks by hand from the recovery screen («Recover from AEAT»): the
+    /// engine demanded a saved config before asking anything, so the button failed the same way.
+    /// It asks with the defaults its records are sealed with and names the obligado as its
+    /// records do.
+    #[tokio::test]
+    async fn a_business_without_saved_settings_recovers_its_chain_by_hand() {
+        let Some(hub) = Bench::answering(
+            "01110000-0000-4000-8000-00000000213b",
+            CONSULT_WITH_AN_ANCHOR,
+        )
+        .await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        // Another hub's record, same NIF, a later number and another name: never this hub's.
+        for sql in [
+            "CREATE TABLE other_hub_record AS SELECT * FROM verifactu_record WHERE hub_id = :hub_id",
+            "UPDATE other_hub_record SET id = 'other-hub-record', hub_id = 'other-hub', \
+             issuer_name = 'Otro Negocio SL', sequence_number = 99",
+            "INSERT INTO verifactu_record SELECT * FROM other_hub_record",
+        ] {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub.hub_id));
+            hub.rt.db().execute(sql, &p).await.expect(sql);
+        }
+        hub.open_the_road();
+
+        let mut input = Params::new();
+        input.insert("issuer_nif".into(), json!(NIF));
+        hub.rt
+            .execute_command(
+                "verifactu.recovery.from_aeat",
+                &input,
+                // The owner, from the recovery screen: every VeriFactu permission.
+                &RequestContext::new(
+                    &hub.hub_id,
+                    "u1",
+                    [
+                        "verifactu.configure_verifactu",
+                        "verifactu.manage_verifactu",
+                        "verifactu.view_verifactu",
+                        "verifactu.transmit_verifactu",
+                    ]
+                    .map(String::from),
+                ),
+            )
+            .await
+            .expect("the recovery runs without a saved config");
+
+        let consult = xml_sent(&hub, 0);
+        assert!(
+            consult.contains("ConsultaFactuSistemaFacturacion")
+                && consult.contains(">Salon Lucia SL<"),
+            "the consult names the obligado by its records' name: {consult}"
+        );
+        let anchor = hub
+            .rows(
+                "SELECT issuer_name, environment FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND record_hash = \
+                 '3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696'",
+            )
+            .await;
+        assert_eq!(anchor.len(), 1, "one anchor: {anchor:?}");
+        assert_eq!(anchor[0]["issuer_name"], "Salon Lucia SL", "{anchor:?}");
+        assert_eq!(anchor[0]["environment"], "testing", "{anchor:?}");
         hub.only_testing_was_reached();
     }
 

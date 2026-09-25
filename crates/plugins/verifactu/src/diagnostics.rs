@@ -673,6 +673,22 @@ pub(crate) fn obligado_name(config: &Json) -> String {
     str_field(config, "issuer_name")
 }
 
+/// `config` answering [`obligado_name`] for `record` (hub#2131): the saved registered name when
+/// there is one, and otherwise the name the record was sealed with — the obligado its own alta
+/// declares. A hub that never saved its VeriFactu settings transmits on the defaults
+/// (`config::transmission_config`), which carry no name, and a consult on its behalf would not
+/// even be built.
+pub(crate) fn with_obligado_name_of(config: &Json, record: &Json) -> Json {
+    let mut config = config.clone();
+    if obligado_name(&config).trim().is_empty() {
+        let sealed = str_field(record, "issuer_name");
+        if let Some(fields) = config.as_object_mut() {
+            fields.insert("issuer_name".into(), Json::String(sealed));
+        }
+    }
+    config
+}
+
 /// Consulta a la AEAT los registros del emisor en el periodo actual y los parsea, **por la vía
 /// que este hub tenga** (ADR-0320, hub#1436). Red real — sin vía ni red devuelve error, nunca
 /// silencioso.

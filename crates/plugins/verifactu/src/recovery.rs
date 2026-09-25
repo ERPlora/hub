@@ -7,16 +7,7 @@ use crate::*;
 /// No toca la cadena local — solo trae lo que la AEAT tiene confirmado.
 pub(crate) async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
-    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
-        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
-    })?;
-    let issuer_nif = resolve_nif(&payload, Some(&config));
-    if issuer_nif.is_empty() {
-        return Err(VerifactuError::Payload(
-            "falta issuer_nif del obligado (config VeriFactu → identidad fiscal)".into(),
-        )
-        .into());
-    }
+    let (config, issuer_nif) = consult_config(host, &ctx.hub_id, &payload).await?;
     let records = run_consult(
         host,
         &ctx.hub_id,
@@ -46,6 +37,42 @@ pub(crate) async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> R
     Ok(out)
 }
 
+/// The config a consult made BY HAND reads, and the obligado it asks for (hub#2131).
+///
+/// The same defaults a transmission reads ([`transmission_config`]): a business that never saved
+/// its VeriFactu settings bills on them, and asking the AEAT about its records cannot demand a
+/// row its sales never needed. The registered name, when no row holds it, is the one this NIF's
+/// records were sealed with — the obligado their own altas declare.
+async fn consult_config(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    payload: &Json,
+) -> Result<(Json, String)> {
+    let config = transmission_config(host, hub_id).await?;
+    let issuer_nif = resolve_nif(payload, Some(&config));
+    if issuer_nif.is_empty() {
+        return Err(VerifactuError::Payload(
+            "falta issuer_nif del obligado (config VeriFactu → identidad fiscal)".into(),
+        )
+        .into());
+    }
+    if !obligado_name(&config).trim().is_empty() {
+        return Ok((config, issuer_nif));
+    }
+    let sealed = host
+        .read(
+            "SELECT issuer_name FROM verifactu_record \
+             WHERE hub_id = :hub_id AND issuer_nif = :issuer_nif AND is_deleted = 0 \
+             AND issuer_name <> '' ORDER BY sequence_number DESC LIMIT 1",
+            &params(json!({ "hub_id": hub_id, "issuer_nif": issuer_nif })),
+        )
+        .await?
+        .into_iter()
+        .next()
+        .unwrap_or_default();
+    Ok((with_obligado_name_of(&config, &sealed), issuer_nif))
+}
+
 // ── recuperación de cadena (WASM-TODO §9) ─────────────────────────────────────
 
 /// Recupera la cadena consultando a la AEAT: vuelca el snapshot e inserta un **ancla de
@@ -53,16 +80,7 @@ pub(crate) async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> R
 /// `create_record` encadene desde ahí. Operación sensible (admin) — emite `chain_recovered`.
 pub(crate) async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
-    let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
-        RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
-    })?;
-    let issuer_nif = resolve_nif(&payload, Some(&config));
-    if issuer_nif.is_empty() {
-        return Err(VerifactuError::Payload(
-            "falta issuer_nif del obligado (config VeriFactu → identidad fiscal)".into(),
-        )
-        .into());
-    }
+    let (config, issuer_nif) = consult_config(host, &ctx.hub_id, &payload).await?;
     let records = run_consult(
         host,
         &ctx.hub_id,
