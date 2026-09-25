@@ -20,8 +20,11 @@ import { join } from 'node:path';
 
 const E2E_DIR = fileURLToPath(new URL('./e2e', import.meta.url));
 
-/** `await`/`return` of a router navigation: the promise an evaluate would carry back over CDP. */
-const AWAITED_ROUTER_NAVIGATION = /\b(?:await|return)\s+[\w.$]*\brouter\s*\.\s*(?:push|replace|go|back|forward)\s*\(/i;
+/** `await`/`return`/arrow-implicit-return of a router navigation: the promise an evaluate would
+ *  carry back over CDP. The arrow form (`page.evaluate((to) => router.push(to))`) is the natural
+ *  rewrite of «just do not await it», and it hands back the very same promise. */
+const AWAITED_ROUTER_NAVIGATION =
+  /(?:\b(?:await|return)\s+|=>\s*)[\w.$]*\brouter\s*\.\s*(?:push|replace|go|back|forward)\s*\(/i;
 
 function specs(): string[] {
   return readdirSync(E2E_DIR)
@@ -33,6 +36,9 @@ describe('e2e specs drive the router without carrying its promise over CDP (hub#
   it('the check catches the shape that flaked', () => {
     expect(AWAITED_ROUTER_NAVIGATION.test('await app.config.globalProperties.$router.push(to);')).toBe(true);
     expect(AWAITED_ROUTER_NAVIGATION.test('return router.replace(path)')).toBe(true);
+    // An arrow's implicit return hands the very same promise back over CDP (rv-2104).
+    expect(AWAITED_ROUTER_NAVIGATION.test('page.evaluate((to) => app.config.globalProperties.$router.push(to), path);')).toBe(true);
+    expect(AWAITED_ROUTER_NAVIGATION.test('page.evaluate((to) => router.push(to))')).toBe(true);
     expect(AWAITED_ROUTER_NAVIGATION.test('void app.config.globalProperties.$router.push(to);')).toBe(false);
   });
 
