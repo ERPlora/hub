@@ -403,25 +403,56 @@ async fn a_booted_hub_learns_of_the_revocation_on_its_own() {
         web_dir: None,
         csp: erplora_server::default_csp(&cloud),
     };
+    // hub#2036: `serve()` reports on this channel if it ever returns, so a boot that fails is a
+    // red with its reason instead of a silent wait.
+    let (ended_tx, ended_rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
-        if let Err(error) = rt.block_on(erplora_server::serve(cfg)) {
-            eprintln!("serve() ended: {error}");
-        }
+        let outcome = match rt.block_on(erplora_server::serve(cfg)) {
+            Ok(()) => "serve() returned".to_string(),
+            Err(error) => format!("serve() ended: {error}"),
+        };
+        ended_tx.send(outcome).ok();
     });
 
+    // hub#2036: the clock for the sync starts when the hub is READY, not when the thread starts.
+    // A loaded CI runner can take longer than any fixed budget to migrate and boot; the signal is
+    // the listener accepting connections, and `serve` binds it only after `spawn_sync` ran. The
+    // boot ceiling only exists so a hung boot cannot hang the suite.
+    let boot_deadline = std::time::Instant::now() + std::time::Duration::from_secs(300);
+    loop {
+        if let Ok(outcome) = ended_rx.try_recv() {
+            panic!("the hub never became ready: {outcome}");
+        }
+        if tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .is_ok()
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < boot_deadline,
+            "the hub did not start listening within the boot ceiling"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    // Ready: the first sync tick fires at boot, so the revocation lands within seconds or never.
     let reader = erplora_db::PgAdapter::connect(&dsn).await.unwrap();
-    let mut status = String::new();
-    for _ in 0..150 {
+    let sync_deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    let mut status;
+    loop {
         status = fiscal_profile::load(&reader, HUB)
             .await
             .unwrap()
             .map(|p| p.representation_status)
             .unwrap_or_default();
-        if status == fiscal_profile::REPRESENTATION_REVOKED {
+        if status == fiscal_profile::REPRESENTATION_REVOKED
+            || std::time::Instant::now() >= sync_deadline
+        {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
