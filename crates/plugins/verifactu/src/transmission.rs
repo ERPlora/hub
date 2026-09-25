@@ -5543,7 +5543,11 @@ mod late_remission_verifactu111 {
     async fn a_resend_refused_after_rechaining_leaves_the_queue_as_failed() {
         let Some(hub) = Bench::answering_in_sequence(
             "01110000-0000-4000-8000-000000002127",
-            &[REFUSED_FOR_ITS_CHAIN, CONSULT_WITH_AN_ANCHOR, VERDICT_REFUSED],
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                VERDICT_REFUSED,
+            ],
         )
         .await
         else {
@@ -5615,7 +5619,11 @@ mod late_remission_verifactu111 {
         assert!(last_error.contains("4112"), "{last_error}");
 
         hub.scheduled_drain().await;
-        assert_eq!(hub.cell.lock().unwrap().len(), 3, "it waits out its backoff");
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            3,
+            "it waits out its backoff"
+        );
         hub.only_testing_was_reached();
     }
 
