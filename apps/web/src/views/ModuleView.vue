@@ -175,7 +175,7 @@ import { clientInjectionKey, getClient } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
-import { isOfflineError, isOnline } from '../lib/offline';
+import { isOfflineError, isOnline, reportNetworkFailure } from '../lib/offline';
 import { toastInfo } from '../lib/toast';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
@@ -477,6 +477,9 @@ async function mount(): Promise<void> {
     // contestó 500 no son la misma frase, y hasta aquí el `catch` tiraba el error y las decía
     // iguales.
     status.value = isOfflineError(error) ? 'offline' : 'error';
+    // hub#2085 — un fallo que no llegó a nadie es la prueba que la sonda del hub tarda hasta 30 s
+    // en obtener: que pregunte ya, y la banda del shell sube a la vez que esta pantalla.
+    if (status.value === 'offline') reportNetworkFailure();
   }
 }
 

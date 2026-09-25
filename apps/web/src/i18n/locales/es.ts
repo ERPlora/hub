@@ -290,6 +290,8 @@ export default {
   offline: {
     title: 'Sin conexión a Internet',
     body: 'Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
+    hubTitle: 'ERPlora no responde',
+    hubBody: 'Tu dispositivo parece tener conexión, pero ERPlora no contesta: puede ser tu Internet o un problema por nuestra parte. Lo que lo necesita —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
   },
   setup: {
     title: 'Termina de configurar tu negocio',

@@ -311,6 +311,10 @@ export default {
   offline: {
     title: 'No internet connection',
     body: 'Anything that needs the internet — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
+    // hub#2085 — the browser says it has a network, but ERPlora does not answer. Names what is
+    // known and both places the fault can be; never claims «no internet», which may be false here.
+    hubTitle: 'ERPlora is not responding',
+    hubBody: 'Your device seems to be online, but ERPlora is not answering: it may be your internet connection or a problem on our side. Anything that needs it — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
   },
   setup: {
     title: 'Finish setting up your business',

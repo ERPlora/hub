@@ -251,6 +251,8 @@ export default defineConfig({
         secure: false,
         rewrite: (p) => p.replace(/^\/cloud/, ''),
       },
+      // hub#2085 — the shell's probe asks /healthz; in dev it has to reach the runtime too.
+      '/healthz': { target: RUNTIME_TARGET, changeOrigin: true },
       '/api': { target: RUNTIME_TARGET, changeOrigin: true },
       '/ws': { target: RUNTIME_TARGET, changeOrigin: true, ws: true },
     },
