@@ -1253,6 +1253,19 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
     /// receipt whose digest is recomputed over the bytes IT decoded — like the real one, so the
     /// canary of hub#1461 holds.
     pub(crate) async fn spawn_fake_cell() -> (String, Arc<Mutex<Vec<Json>>>) {
+        spawn_fake_cell_answering(
+            "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+             <EstadoRegistro>Correcto</EstadoRegistro>\
+             <CSV>A-HUB1934TEST</CSV></soapenv:Envelope>",
+        )
+        .await
+    }
+
+    /// The same cell, relaying `aeat_response` as the AEAT's answer to every envelope — a SOAP
+    /// Fault as much as a verdict (hub#2124).
+    pub(crate) async fn spawn_fake_cell_answering(
+        aeat_response: &'static str,
+    ) -> (String, Arc<Mutex<Vec<Json>>>) {
         use base64::Engine as _;
         let seen: Arc<Mutex<Vec<Json>>> = Arc::new(Mutex::new(Vec::new()));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1294,11 +1307,7 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
                     "transmission_id": envelope["transmission_id"],
                     "request_sha256": request_sha256,
                     "aeat_http_status": 200,
-                    "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(
-                        "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
-                         <EstadoRegistro>Correcto</EstadoRegistro>\
-                         <CSV>A-HUB1934TEST</CSV></soapenv:Envelope>",
-                    ),
+                    "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(aeat_response),
                     "aeat_response_sha256": "00".repeat(32),
                     "received_at": "2026-09-19T10:00:00Z",
                 })
