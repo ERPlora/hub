@@ -1530,14 +1530,24 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
  * Se llama una vez en el boot (main.ts). Si el runtime no responde, deja el fallback
  * (VITE_HUB_ID) que ya trae `config`. No lanza: el boot del shell no debe romperse aquí.
  */
+/**
+ * How long the boot waits for `/api/hub/context` before «the hub is not answering» is the verdict
+ * (hub#2143). Without it a request that never finishes kept the boot spinner turning for ever; the
+ * browser's own timeout is over a minute. Same bound as the hub probe (`HUB_PROBE_TIMEOUT_MS`).
+ */
+export const BOOT_CONTEXT_TIMEOUT_MS = 10_000;
+
 export async function bootHubContext(): Promise<HubContext | null> {
   // Cloud callers wait for this answer (hub#1164): a login that raced ahead would hit the
   // build-time URL and be blocked by the hub's own CSP.
   markCloudApiUrlPending();
   let cloudBaseUrl: string | null = null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BOOT_CONTEXT_TIMEOUT_MS);
   try {
     const res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
     });
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
@@ -1575,6 +1585,7 @@ export async function bootHubContext(): Promise<HubContext | null> {
   } catch {
     return null;
   } finally {
+    clearTimeout(timer);
     // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
     resolveCloudApiUrl(cloudBaseUrl);
   }

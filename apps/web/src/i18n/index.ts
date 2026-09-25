@@ -102,10 +102,30 @@ function publishLocale(locale: Locale): void {
   }
 }
 
+// hub#2143: what the device showed last, read BEFORE the line below overwrites it with the boot
+// default. See `lastDeviceLocale`.
+const deviceLocaleBeforeBoot: Locale | null = (() => {
+  try {
+    return localStorage.getItem(MODULE_LOCALE_KEY);
+  } catch {
+    return null;
+  }
+})();
+
 // At boot: the bridge has to exist BEFORE the first module mounts. A WC that connects on the
 // first render reads the key at that instant, and if it is not there it stays on its fallback
 // until something changes it — which may never happen.
 publishLocale(i18n.global.locale.value);
+
+/**
+ * The language this device showed last time, when it has a translation (hub#2143). Only for what
+ * is painted before the hub answers — the «cannot connect» notice —: with no context there is no
+ * hub language, and the boot default would greet an English-speaking business in Spanish. Once
+ * the hub answers, `bootHubLanguage` decides as always.
+ */
+export function lastDeviceLocale(): Locale | null {
+  return deviceLocaleBeforeBoot && messages[deviceLocaleBeforeBoot] ? deviceLocaleBeforeBoot : null;
+}
 
 /** Changes the shell language on the fly. The personal preference is persisted in `/api/profile`. */
 export function setLocale(locale: Locale): void {

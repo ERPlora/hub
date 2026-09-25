@@ -53,6 +53,8 @@ import { bootModuleNavLocale } from './lib/nav';
 import { bootActionFeedback, toast, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { bootCourier, takeShellCourierCode } from './lib/courier';
+import { bootUntilReachable } from './lib/boot';
+import { createBootScreen } from './lib/boot-screen';
 
 // Pick up the bearer-like one-time code before registering workers, reporting errors or making any
 // boot request.  It remains only in memory until the Hub context is ready for the exchange.
@@ -356,10 +358,18 @@ setOnHubGone(() => {
   void router.replace('/login');
 });
 
-// Resuelve el hub_id desde el runtime (`GET /api/hub/context`) ANTES de montar, para que
-// X-Hub-Id esté disponible en la primera llamada. No bloquea si el runtime no responde
-// (deja el fallback VITE_HUB_ID). Decisión del humano (2): hub_id inyectado, sin picker.
-void bootHubContext().finally(async () => {
+// Resolves the hub context (`GET /api/hub/context`: hub_id, PIN users, settings) BEFORE mounting, so
+// X-Hub-Id is there on the first call. hub#2143: a hub that does not answer — the bounded wait in
+// `bootHubContext` ran out, or it answered an error — stops the boot on a «cannot connect» notice
+// with a retry, instead of spinning for ever or mounting a shell with nothing behind it. See
+// lib/boot.ts.
+const mountPoint = document.getElementById('app');
+const bootScreen = mountPoint ? createBootScreen(mountPoint) : null;
+void bootUntilReachable({
+  loadContext: bootHubContext,
+  showUnreachable: (retry) => bootScreen?.showUnreachable(retry),
+  showProgress: () => bootScreen?.showProgress(),
+}).then(async () => {
   // ADR-0159: if the SaaS sent a one-time shell courier, consume it before router mount so the
   // first protected route sees an authenticated local session.  The fragment is scrubbed before
   // this network call; failure falls through to the ordinary login page without logging the code.
