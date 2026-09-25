@@ -2358,7 +2358,10 @@ mod tests {
         let person = RequestContext::new("h1", "u1", ["*".to_string()]);
         let machine = RequestContext::new("h1", "robot:1", ["*".to_string()]).as_machine();
         assert_eq!(handler_context(&person, &[])["principal"], json!("human"));
-        assert_eq!(handler_context(&machine, &[])["principal"], json!("machine"));
+        assert_eq!(
+            handler_context(&machine, &[])["principal"],
+            json!("machine")
+        );
     }
 
     fn cmd_def() -> CommandDef {

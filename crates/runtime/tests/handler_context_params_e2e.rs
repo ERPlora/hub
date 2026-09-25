@@ -263,6 +263,7 @@ async fn handler_is_told_a_person_is_calling() {
 #[tokio::test]
 async fn handler_is_told_an_automation_is_calling_whatever_its_id_looks_like() {
     let rt = runtime().await;
-    let machine = RequestContext::new("h1", "robot-of-the-future:7", ["*".to_string()]).as_machine();
+    let machine =
+        RequestContext::new("h1", "robot-of-the-future:7", ["*".to_string()]).as_machine();
     assert_eq!(observed_principal(&rt, &machine).await, json!("machine"));
 }
