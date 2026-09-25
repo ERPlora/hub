@@ -1269,9 +1269,13 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
         spawn_fake_cell_answering_in_sequence(&[aeat_response]).await
     }
 
+    /// An answer the cell never gives: it takes the envelope and hangs up without a word — the
+    /// cut of the wire in the middle of a chain recovery (hub#2134).
+    pub(crate) const CELL_HANGS_UP: &str = "\u{0}the cell hangs up";
+
     /// The same cell, relaying `answers[n]` to the n-th envelope and the last one to every
     /// envelope after it — so a chain recovery (refusal → consult → resend) can be played through
-    /// the one door both legs take (hub#2127).
+    /// the one door both legs take (hub#2127). [`CELL_HANGS_UP`] as an answer cuts the wire.
     pub(crate) async fn spawn_fake_cell_answering_in_sequence(
         answers: &[&'static str],
     ) -> (String, Arc<Mutex<Vec<Json>>>) {
@@ -1316,6 +1320,10 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
                     })
                     .unwrap_or_default();
                 recorder.lock().unwrap().push(envelope.clone());
+                if aeat_response == CELL_HANGS_UP {
+                    let _ = socket.shutdown().await;
+                    continue;
+                }
                 let receipt = json!({
                     "schema_version": 1,
                     "transmission_id": envelope["transmission_id"],
