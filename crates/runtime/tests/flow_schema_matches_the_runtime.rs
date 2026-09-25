@@ -632,10 +632,7 @@ fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides()
 #[test]
 fn the_header_media_vars_are_the_same_on_both_sides() {
     let declared = keys_at(&schema(), "/$defs/step/properties/vars/properties");
-    let runtime: BTreeSet<String> = HEADER_VARS
-        .iter()
-        .map(|(key, _)| key.to_string())
-        .collect();
+    let runtime: BTreeSet<String> = HEADER_VARS.iter().map(|(key, _)| key.to_string()).collect();
     assert_eq!(declared, runtime);
     // The text header (hub#2111) is one of them: the editor asks for its value only when the hub
     // declares it.
