@@ -1337,7 +1337,8 @@ pub struct QueryDef {
 /// para componer el SQL paginado. ARQUITECTURA.md §4, §8.2.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ListSpec {
-    /// Columnas sobre las que aplica el buscador global (LIKE).
+    /// Columns the global search box looks into: a «contains» that ignores case and accents
+    /// (hub#2096, see `queries::contains_ci`).
     #[serde(default)]
     pub search: Vec<String>,
     /// Whitelist de columnas ordenables (anti-inyección: solo estas se interpolan en ORDER BY).
