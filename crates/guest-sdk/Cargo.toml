@@ -12,6 +12,11 @@ license.workspace = true
 # tiene los dos repos hermanos clonados, y que en un runner no existe — por eso el wasm del
 # handler no se podía compilar en CI (`handler WASM SIN VERIFICAR`, ADR-0287 D5).
 #
+# Third parties cannot reach that tag (ERPlora/hub is private) nor copy this directory (it
+# inherits from the workspace): `scripts/package-guest-sdk.sh` emits the self-contained crate
+# they build against, guarded by `scripts/tests/guest-sdk-standalone.test.sh` (hub#2115).
+# Where it gets published is hub#2119.
+#
 # 🔴 `publish = false` a propósito: el tag es la vía, y `cargo publish` mandaría al registro
 # PÚBLICO de crates.io el SDK de un repo privado. En crates.io una versión no se retira.
 publish = false
