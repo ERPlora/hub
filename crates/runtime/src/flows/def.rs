@@ -2742,8 +2742,9 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
     // turns into Meta's `header` parameter. It only travels with ONE whatsapp template — an email
     // and a free text have no header, and dropping the picture at send time would ship a message
     // nobody wrote, eight retries after the owner stopped looking.
-    let headers: Vec<&str> = ["header_image", "header_video", "header_document"]
-        .into_iter()
+    let headers: Vec<&str> = crate::host_notify::HEADER_MEDIA_VARS
+        .iter()
+        .map(|(key, _)| *key)
         .filter(|key| vars.contains_key(*key))
         .collect();
     if let Some(first) = headers.first() {

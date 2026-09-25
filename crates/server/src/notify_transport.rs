@@ -45,7 +45,7 @@ use async_trait::async_trait;
 use cloud_client::{Auth, CloudClient, PreparedRequest};
 use erplora_runtime::errors::{Result, RuntimeError};
 use erplora_runtime::host_notify::{
-    Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
+    Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome, HEADER_MEDIA_VARS,
 };
 use serde_json::{json, Value};
 
@@ -66,17 +66,6 @@ const RESERVED_VARS: &[&str] = &[
     "language",
     "phone_number_id",
     "components",
-    "header_image",
-    "header_video",
-    "header_document",
-];
-
-/// `vars.<key>` that carries the link of a template's media header, and the Meta parameter type it
-/// becomes (hub#2101). A template has at most one header, so at most one of these may be set.
-const HEADER_MEDIA_VARS: &[(&str, &str)] = &[
-    ("header_image", "image"),
-    ("header_video", "video"),
-    ("header_document", "document"),
 ];
 
 /// How much of the proxy's answer is worth carrying into the error (and thus into the
@@ -366,6 +355,7 @@ fn template_components(intent: &NotifyIntent, header: Option<(&str, Value)>) -> 
         .into_iter()
         .flatten()
         .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
+        .filter(|(key, _)| !HEADER_MEDIA_VARS.iter().any(|(header, _)| header == key))
         .collect();
     named.sort_by(|a, b| a.0.cmp(b.0));
     if !named.is_empty() {
