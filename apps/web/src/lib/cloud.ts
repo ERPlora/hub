@@ -69,6 +69,12 @@ export interface CloudMarketplaceModule {
   priceAmount: string | null;
   priceInterval: 'month' | 'year' | null;
   isFree: boolean;
+  /**
+   * A paid module whose every tier costs nothing: an ERPlora premium module that comes only with the
+   * hub plan (ADR-0474), so the catalog has no amount to show for it (hub#2072). Never true without
+   * tiers — a missing price is not the same as «included».
+   */
+  includedInPlan: boolean;
   moduleType: 'free' | 'one_time' | 'subscription' | string;
   category: string;
   installed: boolean;
@@ -807,6 +813,11 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
           ? raw.subscription_price_monthly ?? raw.monthly_price
           : raw.price),
       );
+  const tiers = Array.isArray(raw.tiers) ? (raw.tiers as Record<string, unknown>[]) : [];
+  const includedInPlan = !isFree
+    && priceAmount === null
+    && tiers.length > 0
+    && tiers.every((tier) => positiveDecimal(tier?.price) === null);
   const interval =
     raw.subscription_interval === 'year'
       ? 'year'
@@ -824,6 +835,7 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
     priceAmount,
     priceInterval: interval,
     isFree,
+    includedInPlan,
     moduleType,
     category: String(
       raw.category

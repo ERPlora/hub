@@ -834,6 +834,7 @@ export default {
     priceYearly: '{price} €/año',
     priceOneTime: '{price} €',
     priceOnRequest: 'Consultar',
+    priceIncludedInPlan: 'Incluida en tu plan',
     alreadyInstalled: '{name} ya está instalado.',
     installing: 'Instalando {name}…',
     installSuccess: '{name} instalado correctamente.',

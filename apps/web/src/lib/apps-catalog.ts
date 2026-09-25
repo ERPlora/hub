@@ -212,3 +212,34 @@ export function alsoInstalledNames(
   const nameById = new Map(catalog.map((m) => [m.id, m.name]));
   return alsoInstalled.map((id) => nameById.get(id) ?? id);
 }
+
+/** What the price line of a catalog card says, before it is put into words. */
+export type CatalogPrice =
+  | { kind: 'label'; label: string }
+  | { kind: 'free' }
+  | { kind: 'included_in_plan' }
+  | { kind: 'monthly'; amount: string }
+  | { kind: 'yearly'; amount: string }
+  | { kind: 'one_time'; amount: string }
+  | { kind: 'on_request' };
+
+/**
+ * The price line of a catalog card (hub#2072). A unit is only ever printed next to its amount: a paid
+ * module with no amount is either included in the hub plan (all its tiers cost nothing, ADR-0474) or
+ * priced on request — never «€/month» on its own.
+ */
+export function catalogPrice(m: {
+  isFree: boolean;
+  priceLabel: string;
+  priceAmount: string | null;
+  priceInterval: 'month' | 'year' | null;
+  includedInPlan: boolean;
+}): CatalogPrice {
+  if (m.isFree) return { kind: 'free' };
+  if (m.priceLabel) return { kind: 'label', label: m.priceLabel };
+  if (m.includedInPlan) return { kind: 'included_in_plan' };
+  if (!m.priceAmount) return { kind: 'on_request' };
+  if (m.priceInterval === 'month') return { kind: 'monthly', amount: m.priceAmount };
+  if (m.priceInterval === 'year') return { kind: 'yearly', amount: m.priceAmount };
+  return { kind: 'one_time', amount: m.priceAmount };
+}
