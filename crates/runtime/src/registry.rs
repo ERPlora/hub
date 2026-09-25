@@ -4,9 +4,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::manifest::{
-    CommandDef, FlowTemplateDiscard, FlowTemplateScan, Manifest, ModuleFlowTemplate, ModuleLocale,
-    Nav, QueryDef, FLOOR_MODULE_MISSING, FLOOR_MODULE_PAUSED, FLOOR_MODULE_TOO_OLD,
-    FLOOR_UNREADABLE, OWNER_PAUSED,
+    CommandDef, FloorRequirement, FlowTemplateDiscard, FlowTemplateScan, Manifest,
+    ModuleFlowTemplate, ModuleLocale, Nav, QueryDef, FLOOR_MODULE_MISSING, FLOOR_MODULE_PAUSED,
+    FLOOR_MODULE_TOO_OLD, FLOOR_UNREADABLE, OWNER_PAUSED,
 };
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
@@ -695,14 +695,24 @@ impl Registry {
         let mut needed: Vec<(&String, &String)> = tpl.requires.iter().collect();
         needed.sort();
         for (module_id, floor) in needed {
+            // hub#2123: the neighbour travels as data too, so a module can name it without
+            // parsing `detail`. `installed` is `None` only when the module is not installed.
+            let installed = self
+                .is_installed(module_id)
+                .then(|| self.module_version(module_id));
             let discard = |code: &str, detail: String| {
                 Some(FlowTemplateDiscard {
                     family: tpl.family.clone(),
                     code: code.to_string(),
                     detail,
+                    requires: Some(FloorRequirement {
+                        module: module_id.clone(),
+                        floor: floor.clone(),
+                        installed: installed.clone(),
+                    }),
                 })
             };
-            if !self.is_installed(module_id) {
+            if installed.is_none() {
                 return discard(
                     FLOOR_MODULE_MISSING,
                     format!("necesita `{module_id}` >= {floor} y no está instalado"),
@@ -772,6 +782,7 @@ impl Registry {
                             family: tpl.family.clone(),
                             code: OWNER_PAUSED.to_string(),
                             detail: format!("`{module_id}` está pausado"),
+                            requires: None,
                         },
                     )
                 }));

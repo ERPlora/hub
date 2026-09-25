@@ -2377,6 +2377,7 @@ impl FlowTemplateScan {
             family: family.to_string(),
             code: code.to_string(),
             detail,
+            requires: None,
         });
     }
 }
@@ -2395,6 +2396,23 @@ pub struct FlowTemplateDiscard {
     pub code: String,
     /// Qué fichero y qué le pasa, en una frase sobre la que se puede actuar.
     pub detail: String,
+    /// The neighbour a version floor names, as data (hub#2123). Only on the floor codes
+    /// (`template_floor_*`): `detail` is prose and is never parsed (ADR-0055), so without this a
+    /// module could not say WHICH module to install, resume or update. Absent on every other code.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires: Option<FloorRequirement>,
+}
+
+/// Which module a template's version floor names, what it asks for and what this hub has
+/// (hub#2123).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct FloorRequirement {
+    /// The neighbour module id (`staff`), never the module that ships the template.
+    pub module: String,
+    /// The floor the template declares in `<family>.requires.json`, verbatim.
+    pub floor: String,
+    /// The version installed in this hub, or `None` when the module is not installed.
+    pub installed: Option<String>,
 }
 
 /// `<family>.<lang>.flow.json` sin idioma: el nombre no separa familia e idioma.

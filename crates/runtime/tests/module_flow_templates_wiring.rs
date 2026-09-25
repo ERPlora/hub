@@ -362,3 +362,93 @@ async fn a_floor_that_is_not_met_says_which_neighbour_and_why() {
         discards[0].1.detail
     );
 }
+
+#[tokio::test]
+async fn a_floor_discard_names_the_neighbour_as_data_not_prose() {
+    // hub#2123. The neighbour a floor names used to travel only inside `detail`, a Spanish sentence
+    // (ADR-0055: prose is never read). A module's card that wants to say «Needs Staff, which is
+    // paused» had to parse it. `requires` carries the same three facts as data: which module, the
+    // floor the recipe asks for, and the version installed here (`None` when it is not installed).
+    use erplora_runtime::manifest::FloorRequirement;
+    let needs = |installed: Option<&str>| {
+        Some(FloorRequirement {
+            module: "appointments".to_string(),
+            floor: "1.1.69".to_string(),
+            installed: installed.map(str::to_string),
+        })
+    };
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-data");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&fixture_requiring(
+            "whatsapp_inbox",
+            "appointments",
+            "1.1.69",
+        ))
+        .await
+        .unwrap();
+    let missing = runtime.registry().flow_template_discards();
+    assert_eq!(missing[0].1.code, "template_floor_module_missing");
+    assert_eq!(
+        missing[0].1.requires,
+        needs(None),
+        "missing: no installed version"
+    );
+
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.68"))
+        .await
+        .unwrap();
+    let too_old = runtime.registry().flow_template_discards();
+    assert_eq!(too_old[0].1.code, "template_floor_module_too_old");
+    assert_eq!(too_old[0].1.requires, needs(Some("1.1.68")));
+
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.69"))
+        .await
+        .unwrap();
+    runtime.deactivate("appointments").await.unwrap();
+    let paused = runtime.registry().flow_template_discards();
+    assert_eq!(paused[0].1.code, "template_floor_module_paused");
+    assert_eq!(paused[0].1.requires, needs(Some("1.1.69")));
+
+    // A discard that is not about a floor names no neighbour: the owner itself is paused.
+    runtime.activate("appointments").await.unwrap();
+    runtime.deactivate("whatsapp_inbox").await.unwrap();
+    let owner = runtime.registry().flow_template_discards();
+    assert_eq!(owner[0].1.code, "template_owner_paused");
+    assert_eq!(owner[0].1.requires, None, "not a floor: no `requires`");
+}
+
+#[tokio::test]
+async fn an_unreadable_floor_still_names_the_neighbour() {
+    // hub#2123. Fail-closed discard, same data: the card can still say which module to look at.
+    use erplora_runtime::manifest::FloorRequirement;
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-data-unreadable");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.69"))
+        .await
+        .unwrap();
+    runtime
+        .install_from_dir(&fixture_requiring(
+            "whatsapp_inbox",
+            "appointments",
+            "latest",
+        ))
+        .await
+        .unwrap();
+
+    let discards = runtime.registry().flow_template_discards();
+    assert_eq!(discards[0].1.code, "template_floor_unreadable");
+    assert_eq!(
+        discards[0].1.requires,
+        Some(FloorRequirement {
+            module: "appointments".to_string(),
+            floor: "latest".to_string(),
+            installed: Some("1.1.69".to_string()),
+        })
+    );
+}
