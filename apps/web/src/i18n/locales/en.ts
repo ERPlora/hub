@@ -312,6 +312,14 @@ export default {
   // hub#1743 — the shell-wide band for «there is no network right now». Says the CONSEQUENCE, not
   // the state: «offline» on its own reads as a setting somebody turned on. Nothing here names a
   // module or a screen, because the outage is not about any of them.
+  // hub#2143 — painted before the shell mounts, when the hub did not answer its boot context.
+  boot: {
+    unreachable: {
+      title: 'We cannot connect to your business',
+      body: 'ERPlora is not answering. Check that this device is connected to the internet and try again. If it keeps happening, the problem may be on our side.',
+      retry: 'Try again',
+    },
+  },
   offline: {
     title: 'No internet connection',
     body: 'Anything that needs the internet — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',

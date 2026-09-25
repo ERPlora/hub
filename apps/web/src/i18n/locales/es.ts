@@ -291,6 +291,13 @@ export default {
   // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
   // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
   // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  boot: {
+    unreachable: {
+      title: 'No podemos conectar con tu negocio',
+      body: 'ERPlora no responde. Comprueba que este dispositivo tiene conexión a Internet y vuelve a intentarlo. Si sigue pasando, el problema puede ser nuestro.',
+      retry: 'Reintentar',
+    },
+  },
   offline: {
     title: 'Sin conexión a Internet',
     body: 'Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
