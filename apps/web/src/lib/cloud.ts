@@ -405,7 +405,14 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    const data = (await res.json().catch(() => ({}))) as {
+    const parsed: unknown = await res.json().catch(() => undefined);
+    // A 2xx without a JSON object is a broken answer (a proxy page, an empty body), never a
+    // success: returning `{}` as the door result let the courier store "undefined" tokens (hub#2149).
+    const isObject = typeof parsed === 'object' && parsed !== null;
+    if (res.ok && !isObject) {
+      throw new RuntimeError(`runtime ${path} → ${res.status} without a JSON body`, 'runtime_bad_response');
+    }
+    const data = (isObject ? parsed : {}) as {
       ok?: boolean;
       // Two shapes share this door: the hand-built ones in this file (`too_many_attempts`,
       // `device_untrusted`…) put `error` as plain prose with `code` alongside it at the top; a
