@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createBootScreen } from './boot-screen';
-import { MODULE_LOCALE_KEY, i18n } from '../i18n';
+import { i18n } from '../i18n';
 import en from '../i18n/locales/en';
 import es from '../i18n/locales/es';
 
@@ -63,52 +63,60 @@ describe('boot screen (hub#2143)', () => {
 
   // With no answer from the hub there is no hub language either, and the shell boots in its default
   // (Spanish) until the context says otherwise. The best fact left is the language this device
-  // showed last time — published on every change under `erplora.locale`.
+  // showed last time — published on every change under `erplora.locale`. The i18n module
+  // republishes its boot default under that key AS IT LOADS, so what counts is the value the
+  // device had BEFORE the bundle ran: each case seeds storage and only then loads the modules.
+  async function bootWith(stored: string | null) {
+    localStorage.clear();
+    if (stored !== null) localStorage.setItem('erplora.locale', stored);
+    vi.resetModules();
+    const i18nMod = await import('../i18n');
+    const { createBootScreen: create } = await import('./boot-screen');
+    return { i18n: i18nMod.i18n, screen: create(el) };
+  }
+  const retryText = () => el.querySelector('[data-testid="boot-unreachable-retry"]')!.textContent?.trim();
+
   it('speaks the language this device used last', async () => {
-    localStorage.setItem(MODULE_LOCALE_KEY, 'en');
-    const screen = createBootScreen(el);
+    const { screen } = await bootWith('en');
 
     screen.showUnreachable(() => undefined);
     await Promise.resolve();
 
-    const retry = el.querySelector('[data-testid="boot-unreachable-retry"]')!;
-    expect(retry.textContent?.trim()).toBe(en.boot.unreachable.retry);
+    expect(retryText()).toBe(en.boot.unreachable.retry);
+    // The document still says `es` (the shell's boot default): the notice carries its own `lang` so
+    // a screen reader does not read English with Spanish rules.
+    expect(el.querySelector('.boot-unreachable')!.getAttribute('lang')).toBe('en');
   });
 
   it('with no language on record, uses the default one', async () => {
-    const screen = createBootScreen(el);
+    const { screen } = await bootWith(null);
 
     screen.showUnreachable(() => undefined);
     await Promise.resolve();
 
-    const retry = el.querySelector('[data-testid="boot-unreachable-retry"]')!;
-    expect(retry.textContent?.trim()).toBe(es.boot.unreachable.retry);
+    expect(retryText()).toBe(es.boot.unreachable.retry);
   });
 
-  it('leaves the shell language as it found it once the notice goes', () => {
-    localStorage.setItem(MODULE_LOCALE_KEY, 'en');
-    const screen = createBootScreen(el);
+  it('leaves the shell language as it found it once the notice goes', async () => {
+    const { screen, i18n: fresh } = await bootWith('en');
 
     screen.showUnreachable(() => undefined);
     screen.showProgress();
 
     // The hub's own language is reconciled by `bootHubLanguage` once the context answers; the
     // notice must not have decided it on the way.
-    expect(i18n.global.locale.value).toBe('es');
+    expect(fresh.global.locale.value).toBe('es');
   });
 
   it('ignores a language on record that has no translation', async () => {
-    localStorage.setItem(MODULE_LOCALE_KEY, 'xx');
-    const screen = createBootScreen(el);
+    const { screen, i18n: fresh } = await bootWith('xx');
 
     screen.showUnreachable(() => undefined);
     await Promise.resolve();
 
-    expect(el.querySelector('[data-testid="boot-unreachable-retry"]')!.textContent?.trim()).toBe(
-      es.boot.unreachable.retry,
-    );
+    expect(retryText()).toBe(es.boot.unreachable.retry);
     // Not even borrowed: like `setLocale`, a language with no file is never put in place (vue-i18n
     // would only mask it with its fallback, and warn about it).
-    expect(i18n.global.locale.value).toBe('es');
+    expect(fresh.global.locale.value).toBe('es');
   });
 });

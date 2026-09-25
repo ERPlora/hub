@@ -8,32 +8,19 @@
 import { createApp, type App as VueApp } from 'vue';
 
 import BootUnreachable from '../components/BootUnreachable.vue';
-import { MODULE_LOCALE_KEY, i18n } from '../i18n';
+import { i18n, lastDeviceLocale } from '../i18n';
 
 export interface BootScreen {
   showUnreachable(retry: () => void): void;
   showProgress(): void;
 }
 
-/**
- * The language this device showed last (`erplora.locale`, rewritten on every change), when it has a
- * translation. With no answer from the hub there is no hub language, and the shell's boot default
- * (Spanish) would greet an English-speaking business in a language it never chose.
- */
-function lastDeviceLocale(): string | null {
-  try {
-    const stored = localStorage.getItem(MODULE_LOCALE_KEY);
-    return stored && i18n.global.availableLocales.includes(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
 export function createBootScreen(el: HTMLElement): BootScreen {
   const progressMarkup = el.innerHTML;
   let notice: VueApp | null = null;
-  // The shell's locale before the notice borrowed one; given back when the notice goes, because the
-  // hub's own language is `bootHubLanguage`'s call once the context answers, not the notice's.
+  // With no answer there is no hub language: the notice speaks the one this device showed last
+  // (`lastDeviceLocale`). The shell's locale is given back when the notice goes, because the hub's
+  // own language is `bootHubLanguage`'s call once the context answers, not the notice's.
   let shellLocale: string | null = null;
 
   const unmountNotice = (): void => {

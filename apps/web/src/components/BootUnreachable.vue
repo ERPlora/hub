@@ -6,7 +6,7 @@
   check, and one action — try again — as POS apps do at launch (Square, Toast, Lightspeed).
 -->
 <template>
-  <div class="boot-unreachable">
+  <div class="boot-unreachable" :lang="locale">
     <ok-empty-state
       icon="cloud-offline-outline"
       :heading="t('boot.unreachable.title')"
@@ -25,7 +25,7 @@ import { useI18n } from 'vue-i18n';
 import { IonButton } from '@ionic/vue';
 
 const emit = defineEmits<{ retry: [] }>();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 </script>
 
 <style scoped>
