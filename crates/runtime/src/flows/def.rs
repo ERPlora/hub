@@ -3391,8 +3391,16 @@ mod tests {
     #[test]
     fn header_text_is_refused_where_it_could_not_be_sent() {
         let cases = [
-            ("email", "promo", json!({ "header_text": "Hi", "text": "hola" })),
-            ("whatsapp", "", json!({ "header_text": "Hi", "text": "hola" })),
+            (
+                "email",
+                "promo",
+                json!({ "header_text": "Hi", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "",
+                json!({ "header_text": "Hi", "text": "hola" }),
+            ),
             (
                 "whatsapp",
                 "promo",
