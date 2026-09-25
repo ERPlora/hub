@@ -2738,6 +2738,43 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     }
 
+    // **A template's media header** (hub#2101): `vars.header_<kind>` is the link the transport
+    // turns into Meta's `header` parameter. It only travels with ONE whatsapp template — an email
+    // and a free text have no header, and dropping the picture at send time would ship a message
+    // nobody wrote, eight retries after the owner stopped looking.
+    let headers: Vec<&str> = ["header_image", "header_video", "header_document"]
+        .into_iter()
+        .filter(|key| vars.contains_key(*key))
+        .collect();
+    if let Some(first) = headers.first() {
+        let problem = if channel != Channel::Whatsapp {
+            Some(format!(
+                "`vars.{first}` is a whatsapp template's header — an email has none"
+            ))
+        } else if template_name.is_empty() {
+            Some(format!(
+                "`vars.{first}` needs the `template` it belongs to: a free text has no header"
+            ))
+        } else if headers.len() > 1 {
+            Some(format!(
+                "{} — a template has ONE header, keep the media its approved header asks for",
+                headers
+                    .iter()
+                    .map(|k| format!("`vars.{k}`"))
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            ))
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: {problem}"),
+            ));
+        }
+    }
+
     Ok(NotifyStep {
         interactive,
         channel,
@@ -3265,6 +3302,65 @@ mod tests {
             assert!(
                 format!("{err}").contains("to") || format!("{err}").contains("query"),
                 "{err}"
+            );
+        }
+    }
+
+    /// **A template's media header** (hub#2101): the link rides in `vars.header_<kind>`, mapped
+    /// against the run like the rest of the copy, and parses without anybody writing Meta's
+    /// `components` block by hand.
+    #[test]
+    fn a_whatsapp_template_step_can_carry_its_header_media() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "promo", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "template": "autumn_promo",
+                "vars": { "header_image": "{{input.picture_url}}", "who": "{{input.name}}" }
+            }]
+        }))
+        .expect("a template with an image header is an ordinary whatsapp step");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.vars["header_image"], json!("{{input.picture_url}}"));
+    }
+
+    /// Where a header cannot travel it is refused at save time, not dropped at send time: an
+    /// email and a free WhatsApp text have no header, and a template has only one.
+    #[test]
+    fn header_media_is_refused_where_it_could_not_be_sent() {
+        let cases = [
+            (
+                "email",
+                "promo",
+                json!({ "header_image": "https://a/x.jpg", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "",
+                json!({ "header_video": "https://a/x.mp4", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "promo",
+                json!({ "header_image": "https://a/x.jpg", "header_document": "https://a/x.pdf" }),
+            ),
+        ];
+        for (channel, template, vars) in cases {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": template, "vars": vars.clone()
+                }]
+            }))
+            .expect_err("a header only travels with one whatsapp template");
+            assert!(
+                format!("{err}").contains("header_"),
+                "{err} for {channel} {vars}"
             );
         }
     }
