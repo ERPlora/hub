@@ -352,7 +352,7 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
 /// NAMED body parameters, sorted so the same intent always produces the same payload (Meta matches
 /// them by name, so the order is only ours to keep stable — and testable). A media header
 /// ([`header_media`]) goes first, as Meta's own `header` component (hub#2101), and the link
-/// buttons' variable ends ([`url_buttons`]) last, in position order (hub#2110).
+/// buttons' variable ends ([`url_buttons`]) last (hub#2110).
 fn template_components(
     intent: &NotifyIntent,
     header: Option<(&str, Value)>,
@@ -391,8 +391,9 @@ fn template_components(
     (!components.is_empty()).then(|| Value::Array(components))
 }
 
-/// Meta's `button` components for the template's link buttons, with their position, in position
-/// order (hub#2110).
+/// Meta's `button` components for the template's link buttons, with their position (hub#2110).
+/// Meta matches each one by its `index`, so the array order is only the `vars` key order — stable,
+/// which keeps the payload testable.
 ///
 /// `vars.button_url_<n>` is the text Meta appends to the `{{1}}` of the URL button at position
 /// `<n>`. Refused before the network when Meta could only answer an opaque 400 after the call was
@@ -431,7 +432,6 @@ fn url_buttons(intent: &NotifyIntent) -> Result<Vec<(u8, Value)>> {
             }),
         ));
     }
-    buttons.sort_by_key(|(index, _)| *index);
     Ok(buttons)
 }
 
@@ -1166,7 +1166,7 @@ mod tests {
     /// pointing at `https://…/c/{{1}}`. Meta refuses the send unless the `button` component
     /// carries that end, and before this the only way to write it was `vars.components` by hand.
     /// `vars.button_url_<n>` is the end of the button at position `<n>`; the buttons follow the
-    /// header and the body, in position order, whatever order the flow wrote them in.
+    /// header and the body.
     #[test]
     fn whatsapp_template_with_url_buttons_sends_their_variable_part() {
         let body = whatsapp_body(&intent(
@@ -1222,7 +1222,14 @@ mod tests {
     /// Meta answers an opaque 400 after the call was paid for. Refused before the network.
     #[test]
     fn whatsapp_refuses_a_url_button_without_a_value() {
-        for bad in [json!(""), json!("   "), json!(null), json!({}), json!([]), json!(true)] {
+        for bad in [
+            json!(""),
+            json!("   "),
+            json!(null),
+            json!({}),
+            json!([]),
+            json!(true),
+        ] {
             let err = whatsapp_body(&intent(
                 Channel::Whatsapp,
                 "+34600999888",
