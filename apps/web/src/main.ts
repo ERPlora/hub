@@ -40,6 +40,7 @@ import { bootPrintOnSale } from './lib/print-on-sale';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import { bootAppointmentNotices } from './lib/appointment-notice';
 import {
   ensureNotificationPermission,
   primerLabelsFrom,
@@ -282,11 +283,12 @@ bootPrintOnSale(getClient(), {
 // that gets TOLD an order came in, and somebody is standing at it setting it up. Asked at the
 // first order instead, the dialog appears on a tablet propped on a shelf with nobody in front of
 // it. `ensureNotificationPermission` asks at most once and never throws.
-// The ask itself is now IN CONTEXT (hub#2046): a salon has no kitchen, and the kitchen order
-// below is the only notice the shell sends, so asking on every hub regardless of what it runs
-// asked a salon for a permission that would never fire. `warnIfThereIsSomethingToTell` refreshes
-// what is installed and only asks when an active module the shell sends notices for is there —
-// the kitchen notice itself keeps being the fallback trigger below.
+// The ask itself is now IN CONTEXT (hub#2046): a shop with neither a kitchen nor appointments
+// (hub#2168 added the second source) has nothing that would ever use the permission, so asking on
+// every hub regardless of what it runs asked one for a permission that would never fire.
+// `warnIfThereIsSomethingToTell` refreshes what is installed and only asks when an active module
+// the shell sends notices for is there — the kitchen order and appointment notices below keep
+// being the fallback trigger.
 void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
   onRegistered: () =>
     void warnIfThereIsSomethingToTell({
@@ -323,6 +325,20 @@ bootPrintComanda(getClient(), {
   // letting it through would pop Android's bare dialog in the middle of a service. Android drops
   // the notice either way; what the user gets instead is the row on System › your printer, which
   // says the notices are off and offers to ask again.
+  notify: async (title, body) => {
+    if (!shouldSendNotice(await askToWarn())) return;
+    await getClient().peripherals.notify(title, body);
+  },
+});
+
+// The salon's twin of the kitchen notice above (hub#2168): a booking or a cancellation that did
+// not come from a till (WhatsApp, the web, a flow, the customer) gets a system notice too.
+//
+// Same permission gate as the kitchen notice — `askToWarn` asks for it at most once, and a
+// refusal stops here instead of falling through to `peripherals.notify()`, which would pop
+// Android's bare dialog with no sentence of ours in front of it.
+bootAppointmentNotices(getClient(), {
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
   notify: async (title, body) => {
     if (!shouldSendNotice(await askToWarn())) return;
     await getClient().peripherals.notify(title, body);

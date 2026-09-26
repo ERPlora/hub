@@ -133,9 +133,10 @@ export type EnsureNotificationPermissionDeps = Omit<
  * Puts the explanation and then Android's dialog in front of the user — at most once — and
  * resolves with the state the system actually ended up in.
  *
- * **Never propagates.** It is called from the print-host alta and from the kitchen-order notice,
- * and neither can fail because a permission could not be asked for: the order still has to print.
- * Everything that goes wrong is logged and answered with the honest state.
+ * **Never propagates.** It is called from the print-host alta and from the kitchen-order and
+ * appointment notices (hub#2168), and none of them can fail because a permission could not be
+ * asked for: the order or the booking still has to go through. Everything that goes wrong is
+ * logged and answered with the honest state.
  */
 export function ensureNotificationPermission(
   deps: EnsureNotificationPermissionDeps,
@@ -163,12 +164,13 @@ export function notificationPermissionState(
 /**
  * The modules the shell sends system notices for, today.
  *
- * The only notice the shell fires is the kitchen order (`print-comanda.ts`) — so a hub without an
- * active module from this list has nothing that would ever use the permission, and asking there
- * asks for nothing (hub#2046). Adding another source is a deliberate change to this list, not a
- * side effect of adding a module.
+ * The shell fires a notice for the kitchen order (`print-comanda.ts`) and, since hub#2168, for a
+ * booking or a cancellation that did not come from a till (`appointment-notice.ts`) — so a hub
+ * without an active module from this list has nothing that would ever use the permission, and
+ * asking there asks for nothing (hub#2046). Adding another source is a deliberate change to this
+ * list, not a side effect of adding a module.
  */
-export const NOTICE_SOURCE_MODULES: readonly string[] = ['kitchen'] as const;
+export const NOTICE_SOURCE_MODULES: readonly string[] = ['kitchen', 'appointments'] as const;
 
 /**
  * Does this hub have anything installed that the shell would ever send a system notice for?

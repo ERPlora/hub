@@ -840,6 +840,18 @@ export default {
     // named in the warning, or the sentence reads «the order for ()».
     comandaDefaultLabel: 'the floor',
   },
+  // The system notices for a booking or a cancellation that did NOT come from a till (hub#2168):
+  // a salon's twin of the kitchen order's notice above. `createdFor`/`cancelledFor` name the
+  // customer when the event brought one; the plain `created`/`cancelled` cover the rest so the
+  // title never leaves a hole. `when` is the day and hour, already resolved in the business's own
+  // timezone by the appointments module (appointments#151) — this file only places it in a sentence.
+  appointmentNotice: {
+    created: 'New booking',
+    createdFor: 'New booking · {customer}',
+    cancelled: 'Booking cancelled',
+    cancelledFor: 'Booking cancelled · {customer}',
+    when: '{date} at {time}',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.

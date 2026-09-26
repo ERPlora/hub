@@ -254,11 +254,13 @@ describe('and it notices when the notices come back from the device settings', (
 });
 
 describe('on a hub with nothing to warn about (hub#2046)', () => {
-  it('a salon with the notices refused is not told they are off — nothing would have sent one', async () => {
+  // hub#2168 moved the salon out of this block: appointments now send notices (a booking or a
+  // cancellation that did not come from a till), so a shop with no notice source is the case here.
+  it('a shop with the notices refused is not told they are off — nothing would have sent one', async () => {
     permissionStatus.value = { [NOTIFICATIONS]: false };
     vi.mocked(listInstalledModules).mockResolvedValueOnce([
-      { id: 'appointments', status: 'active' },
       { id: 'sales', status: 'active' },
+      { id: 'customers', status: 'active' },
     ] as Awaited<ReturnType<typeof listInstalledModules>>);
 
     const wrapper = await mountSystem();
@@ -280,5 +282,17 @@ describe('on a hub with nothing to warn about (hub#2046)', () => {
     ] as Awaited<ReturnType<typeof listInstalledModules>>);
 
     expect((await mountSystem()).text()).not.toContain(en.system.notices.blockedTitle);
+  });
+});
+
+describe('on a salon (hub#2168)', () => {
+  it('with the notices refused, it IS told they are off — bookings and cancellations would not reach it', async () => {
+    permissionStatus.value = { [NOTIFICATIONS]: false };
+    vi.mocked(listInstalledModules).mockResolvedValueOnce([
+      { id: 'appointments', status: 'active' },
+      { id: 'sales', status: 'active' },
+    ] as Awaited<ReturnType<typeof listInstalledModules>>);
+
+    expect((await mountSystem()).text()).toContain(en.system.notices.blockedTitle);
   });
 });

@@ -18,16 +18,21 @@ describe('which hubs have something to warn about', () => {
     expect(hasNoticeSource(new Set(['sales', 'kitchen']))).toBe(true);
   });
 
-  it('a salon — appointments, sales, customers — does not', () => {
-    expect(hasNoticeSource(new Set(['sales', 'appointments', 'customers', 'whatsapp_inbox']))).toBe(false);
+  // hub#2168: a salon now does (bookings and cancellations that did not come from a till).
+  it('a salon with appointments active does', () => {
+    expect(hasNoticeSource(new Set(['sales', 'appointments', 'customers', 'whatsapp_inbox']))).toBe(true);
+  });
+
+  it('a shop — sales, customers, inventory — does not', () => {
+    expect(hasNoticeSource(new Set(['sales', 'customers', 'inventory', 'whatsapp_inbox']))).toBe(false);
   });
 
   it('not knowing what is installed is not a reason to ask', () => {
     expect(hasNoticeSource(undefined)).toBe(false);
   });
 
-  it('the kitchen is the only source today (a new one is a deliberate change here)', () => {
-    expect([...NOTICE_SOURCE_MODULES]).toEqual(['kitchen']);
+  it('the kitchen and appointments are the sources today (a new one is a deliberate change here)', () => {
+    expect([...NOTICE_SOURCE_MODULES]).toEqual(['kitchen', 'appointments']);
   });
 });
 
@@ -51,11 +56,11 @@ describe('the ask at the print-host alta', () => {
     expect(order).toEqual(['refresh', 'ask']);
   });
 
-  it('does not ask on a salon', async () => {
+  it('does not ask on a shop with nothing to warn about', async () => {
     const ask = vi.fn(async () => {});
     await warnIfThereIsSomethingToTell({
       refresh: async () => {},
-      activeModules: () => new Set(['appointments', 'sales']),
+      activeModules: () => new Set(['customers', 'sales']),
       ask,
     });
     expect(ask).not.toHaveBeenCalled();

@@ -646,8 +646,9 @@ const installedModules = ref<InstalledModule[] | null>(null);
 // state and never on «is this Android».
 const notices = ref<NotificationPermission>('unsupported');
 const askingForNotices = ref(false);
-// hub#2046: a hub with no ACTIVE notice-source module (today only `kitchen`) has nothing that
-// would ever use this permission, so the card stays hidden even with the notices refused.
+// hub#2046: a hub with no ACTIVE notice-source module (today `kitchen` and, since hub#2168,
+// `appointments`) has nothing that would ever use this permission, so the card stays hidden even
+// with the notices refused.
 const noticesBlocked = computed(
   () =>
     notices.value === 'denied' &&
