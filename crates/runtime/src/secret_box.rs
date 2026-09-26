@@ -92,6 +92,8 @@ impl SecretsKey {
 /// en lectura de filas legacy). `Err` si está definida pero no es una clave válida (base64 de
 /// exactamente 32 bytes): un typo del operador debe fallar claro, no silenciarse como "sin clave".
 pub fn master_key_from_env() -> Result<Option<SecretsKey>, SecretBoxError> {
+    #[cfg(test)]
+    test_support::assert_env_lock_held();
     key_from_env_var(MASTER_KEY_ENV)
 }
 
@@ -198,16 +200,58 @@ pub fn decrypt_or_legacy(key: Option<&SecretsKey>, value: &str) -> Result<String
 /// entorno global `HUB_SECRETS_KEY` entre tests que corren en paralelo (`cargo test` multi-hilo).
 #[cfg(test)]
 pub(crate) mod test_support {
+    use std::cell::Cell;
     use std::sync::{Mutex, MutexGuard, OnceLock};
 
-    /// Un solo `Mutex` para TODOS los tests (de este módulo y de `certificate.rs`) que tocan
-    /// `HUB_SECRETS_KEY`: la env var es estado global del proceso, así que dos tests mutándola en
-    /// paralelo se pisarían de forma no determinista sin esto.
-    pub(crate) fn env_lock() -> MutexGuard<'static, ()> {
+    thread_local! {
+        /// hub#2184: marks that the CURRENT THREAD holds `env_lock()`. `master_key_from_env`
+        /// checks this marker (via [`assert_env_lock_held`]) to turn an unlocked read of
+        /// `HUB_SECRETS_KEY` into a loud, deterministic panic instead of an intermittent race
+        /// with whichever other test happens to be setting/unsetting the env var at the same
+        /// time. Thread-local (not the mutex itself) because the guard is only proof that ONE
+        /// thread — the one calling `env_lock()` — is currently allowed to read.
+        static LOCK_HELD: Cell<bool> = const { Cell::new(false) };
+    }
+
+    /// RAII guard returned by [`env_lock`]. Holds the real `Mutex` guard AND marks
+    /// [`LOCK_HELD`] for the current thread; `Drop` clears the marker first, then (implicitly,
+    /// via field drop order) releases the mutex — the marker is never left set after the lock
+    /// itself is gone.
+    pub(crate) struct EnvLockGuard {
+        _guard: MutexGuard<'static, ()>,
+    }
+
+    impl Drop for EnvLockGuard {
+        fn drop(&mut self) {
+            LOCK_HELD.with(|held| held.set(false));
+        }
+    }
+
+    /// A single `Mutex` for ALL tests (in this module and in `certificate.rs`) that touch
+    /// `HUB_SECRETS_KEY`: the env var is process-global state, so two tests mutating it in
+    /// parallel would stomp on each other non-deterministically without this. Also marks
+    /// [`LOCK_HELD`] so that `master_key_from_env` can detect a read attempted without holding
+    /// this guard (hub#2184).
+    pub(crate) fn env_lock() -> EnvLockGuard {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
+        let guard = LOCK
+            .get_or_init(|| Mutex::new(()))
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(|e| e.into_inner());
+        LOCK_HELD.with(|held| held.set(true));
+        EnvLockGuard { _guard: guard }
+    }
+
+    /// Panics with a message containing "env_lock" if the current thread does not hold the guard
+    /// returned by [`env_lock`]. Called from `master_key_from_env` under `#[cfg(test)]` so a test
+    /// that forgets `let _lock = env_lock();` fails loudly and deterministically instead of
+    /// racing whichever other test is setting/unsetting `HUB_SECRETS_KEY` (hub#2184).
+    pub(crate) fn assert_env_lock_held() {
+        let held = LOCK_HELD.with(Cell::get);
+        assert!(
+            held,
+            "HUB_SECRETS_KEY read without env_lock(): take crate::secret_box::test_support::env_lock() in this test (hub#2184)"
+        );
     }
 
     /// Base64-estándar de 32 bytes rellenos con `fill` — valor válido para `HUB_SECRETS_KEY` en
@@ -261,6 +305,38 @@ pub(crate) mod test_support {
 mod tests {
     use super::test_support::{env_lock, EnvVarGuard};
     use super::*;
+
+    /// hub#2184: a unit test that reads `HUB_SECRETS_KEY` without `env_lock()` races every test
+    /// that sets/unsets it — the fiscal certificate test saw the key in two different states
+    /// between two calls. In unit tests the read now fails loudly instead of intermittently.
+    #[test]
+    #[should_panic(expected = "env_lock")]
+    fn issue_2184_reading_the_master_key_without_env_lock_panics_in_tests() {
+        let _ = master_key_from_env();
+    }
+
+    #[test]
+    fn issue_2184_reading_the_master_key_under_env_lock_is_allowed() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
+        assert!(master_key_from_env()
+            .expect("unset is not an error")
+            .is_none());
+    }
+
+    #[test]
+    fn issue_2184_the_lock_marker_is_released_with_the_guard() {
+        {
+            let _lock = env_lock();
+        }
+        let read = std::panic::catch_unwind(|| {
+            let _ = master_key_from_env();
+        });
+        assert!(
+            read.is_err(),
+            "a dropped env_lock must not keep allowing reads"
+        );
+    }
 
     #[test]
     fn roundtrip_returns_original_plaintext() {
