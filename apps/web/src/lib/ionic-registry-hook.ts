@@ -6,9 +6,11 @@
 //
 //   · `fill` must paint a box (hub#1060 → `./ionic-fill`);
 //   · the buttons of the selection dialogs must speak the user's language (hub#1736 →
-//     `./ionic-select-text`).
+//     `./ionic-select-text`);
+//   · a single-choice select must close on pick (hub#2223 → `./ionic-select-interface`, which
+//     wraps `open()` and so does not depend on the ordering the other two do).
 //
-// Both need the SAME hook, and for the same three reasons (the long version is in `./ionic-fill`):
+// The first two need the SAME hook, and for the same three reasons (the long version is in `./ionic-fill`):
 // a document stylesheet cannot cross a shadow boundary, a MutationObserver fires after the element
 // is already connected, and patching a prototype AFTER `customElements.define` is a silent no-op —
 // the HTML spec captures a custom element's lifecycle callbacks inside `define`. Wrapping `define`
