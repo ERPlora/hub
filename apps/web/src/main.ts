@@ -46,6 +46,7 @@ import {
 import { createPrintService } from './lib/print';
 import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
+import { preloadTeleportedStyles } from './lib/teleported-styles';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
@@ -186,6 +187,14 @@ bootActionFeedback();
 // el ion-menu fijo del split-pane (App.vue, when="lg") tapa el borde y el gesto no puede empezar —
 // o sea que afecta justo al tablet en vertical (768/834), el formato de sala. ADR-0143.
 const app = createApp(App).use(IonicVue, { mode: 'ios', swipeBackEnabled: false }).use(router).use(i18n);
+
+// hub#2162 — hydrates one hidden probe per mode of the non-shadow Ionic tags in the document, so
+// Stencil attaches their stylesheet there. Without this, an overlay a module opens inline (inside
+// its own shadow root) loses its styles the moment Ionic teleports it to `ion-app` on present.
+// It runs AFTER `use(IonicVue)` on purpose: that call is Ionic's `initialize()` (Stencil's
+// `setMode`); before it the probes hydrate without a mode and register no sheet at all.
+// Best-effort and non-blocking: it never throws and boot does not wait on it.
+void preloadTeleportedStyles();
 
 // Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
 // promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
