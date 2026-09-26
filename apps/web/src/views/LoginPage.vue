@@ -133,7 +133,7 @@
                 <!-- Checkbox "confiar en este dispositivo" + popover informativo. Solo donde el PIN
                      se va a pedir: en un dispositivo `personal` la pregunta ya está contestada —lo
                      marcó un administrador— y ofrecerla haría creer que la casilla cambia algo. -->
-                <div v-if="pinAvailable" class="trust-row">
+                <div v-if="asksPinOnceTrusted" class="trust-row">
                   <ion-checkbox
                     data-testid="login-trust"
                     :checked="trust"
@@ -168,7 +168,7 @@
 
                 <!-- Dispositivo `personal` (hub#358): la sesión dura y no se pide PIN. Se dice, en
                      vez de callarlo, porque es lo que hay que saber si el dispositivo se pierde. -->
-                <ion-text v-else color="medium" class="setup-hint">
+                <ion-text v-else-if="deviceMode === 'personal'" color="medium" class="setup-hint">
                   <p>{{ t('login.personalDeviceNote') }}</p>
                 </ion-text>
 
@@ -432,7 +432,7 @@ import {
   pinUsers,
 } from '../lib/runtime';
 import { deviceMode, deviceTrusted, loadDeviceMode, offersPinLogin } from '../lib/device-mode';
-import { pinPolicy } from '../lib/pin-policy';
+import { asksForPin, pinPolicy } from '../lib/pin-policy';
 import { isDark, toggleTheme } from '../lib/theme';
 import { hubLogo, DEFAULT_HUB_LOGO } from '../lib/branding';
 import { SESSION_EVICTED_DEVICE_LIMIT } from '../lib/session-end-reason';
@@ -512,6 +512,13 @@ const trustedUsers = ref<TrustedUser[]>(readTrustedUsers());
 // escribirlas exige sesión admin.
 const pinAvailable = computed(() =>
   offersPinLogin(deviceMode.value, deviceTrusted.value, pinPolicy.value),
+);
+// hub#2189: a `shared` device whose dial still asks will get the pinpad once an online login
+// trusts it (hub#514) — even if it is not trusted YET, as on a fresh browser. That is where the
+// «trust this device» box belongs; the «personal» note is said only where the hub answered
+// `personal`, never as the fallback of «no pinpad right now».
+const asksPinOnceTrusted = computed(
+  () => deviceMode.value === 'shared' && asksForPin(pinPolicy.value),
 );
 const step = ref<Step>(pinAvailable.value ? 'pin' : 'email');
 const showTabs = computed(() => pinAvailable.value && step.value !== 'setup' && step.value !== 'twoFactor');
