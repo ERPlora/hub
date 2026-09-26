@@ -1375,6 +1375,7 @@ async fn reload(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalProfile>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::secret_box::test_support::{env_lock, EnvVarGuard};
     use erplora_db::testutil::fresh_db;
 
     /// Boots a hub the way `Runtime::ensure_system_tables` does, optionally with a country set.
@@ -2484,6 +2485,8 @@ mod tests {
     /// ERPlora usaría, porque su ruta es `direct`.
     #[tokio::test]
     async fn an_own_certificate_needs_no_grant_to_go_live() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready_with_own_certificate(&db, "hub-es").await;
 
@@ -2527,6 +2530,8 @@ mod tests {
     /// Y con el otorgamiento vigente, la puerta se abre.
     #[tokio::test]
     async fn a_signed_grant_opens_the_go_live() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
 
@@ -2647,6 +2652,8 @@ mod tests {
     /// `testing → production`. Un solo camino y un solo sitio donde guardarlo.
     #[tokio::test]
     async fn going_live_moves_the_environment_and_freezes_the_taxpayer_id() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
 
@@ -2712,6 +2719,8 @@ mod tests {
     /// cuenta ANTES de facturar puede volver: el daño no lo hace el toggle, lo hace el registro.
     #[tokio::test]
     async fn the_toggle_still_goes_back_while_nothing_has_been_filed() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
@@ -2727,6 +2736,8 @@ mod tests {
     /// ve — el huérfano generado-y-jamás-remitido que prohíbe la FAQ §5.
     #[tokio::test]
     async fn once_something_has_been_filed_the_toggle_is_dead_for_ever() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
@@ -2745,6 +2756,8 @@ mod tests {
     /// `first_record_at` es **write-once**: solo cuenta el primero, y no se mueve después.
     #[tokio::test]
     async fn the_first_record_stamp_is_write_once() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
@@ -2777,6 +2790,8 @@ mod tests {
     /// Encender un interruptor que ya está encendido no es un error.
     #[tokio::test]
     async fn going_live_is_idempotent() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
         let first = go_live(&db, "hub-es").await.unwrap();
@@ -2793,6 +2808,8 @@ mod tests {
     /// record is not a trace, it is a state somebody will later have to guess the origin of.
     #[tokio::test]
     async fn ceasing_activity_closes_the_hub_and_records_when_and_who() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         let reg = hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
@@ -2815,6 +2832,8 @@ mod tests {
     /// instead of asking for a certificate the hub already has.
     #[tokio::test]
     async fn a_closed_hub_never_goes_back_to_issuing() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
@@ -2853,6 +2872,8 @@ mod tests {
     /// a way of closing a hub and leaving no record of who did it.
     #[tokio::test]
     async fn closing_with_nobody_to_attribute_it_to_is_refused() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
@@ -2930,6 +2951,8 @@ mod tests {
     /// the core may decide by itself (ADR-0249).
     #[tokio::test]
     async fn a_profile_from_another_installation_is_flagged_at_boot() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
 
@@ -2950,6 +2973,8 @@ mod tests {
     /// record already filed is neither re-sent nor deleted (ADR-0189).
     #[tokio::test]
     async fn booting_never_adopts_a_foreign_installation_by_itself() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
 
@@ -2970,6 +2995,8 @@ mod tests {
     /// mixed here.
     #[tokio::test]
     async fn adopting_takes_over_the_installation_and_records_where_it_came_from() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
 
@@ -3011,6 +3038,8 @@ mod tests {
     /// record is not a trace.
     #[tokio::test]
     async fn adopting_with_nobody_to_attribute_it_to_is_refused() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
 
@@ -3031,6 +3060,8 @@ mod tests {
     /// afterwards would file the following sales where the tax authority never sees them.
     #[tokio::test]
     async fn adopting_does_not_unseal_the_go_live() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let db = fresh_db().await;
         hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
         stamp_first_record(&db, "hub-es").await.unwrap();
