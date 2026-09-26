@@ -46,6 +46,12 @@ sales/tests/orders.hub.test.py
 sales/tests/void.hub.test.py
 sales/tests/void_chain.hub.test.py
 
+# sales: el descuento de una cuenta abierta se autoriza al APLICARLO — la puerta normal rechaza
+# lo que pasa del tope con `sales.discount_over_limit` y la del encargado lo guarda, contra el
+# kernel real (sales#284). Cobertura nueva, no mudada.
+# pending-publication: sales#284 until 2026-10-23
+sales/tests/order_discount_cap.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
