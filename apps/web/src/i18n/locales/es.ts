@@ -871,6 +871,9 @@ export default {
     // has_dependents` de hub#1101, que ya nombra lo que rompería un desinstalar.
     installSuccessWithDependencies: '{name} instalado correctamente. También se instaló: {names}.',
     installError: 'No se pudo iniciar la instalación de {name}.',
+    // hub#2244: the sticky install error's two ways out.
+    installRetry: 'Reintentar',
+    noticeClose: 'Cerrar',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
     // hub#516 — el botón de actualizar. `updateError` dice lo único que importa: el módulo NO se
