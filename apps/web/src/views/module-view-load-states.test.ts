@@ -52,6 +52,11 @@ vi.mock('../lib/module-loader', () => ({
 vi.mock('../lib/runtime', () => ({
   clientInjectionKey: Symbol('runtime-client'),
   getClient: () => ({ forModule: () => ({}), on: () => () => {} }),
+  // The empty case below is an app that IS installed and paints nothing (switched off): an app the
+  // runtime does not list is the other sentence, «not installed» (hub#2190).
+  listInstalledModules: async () => [
+    { id: routeParams.moduleId, name: 'Sales', version: '1.0.0', status: 'inactive' },
+  ],
 }));
 vi.mock('../lib/protects', () => ({ resolveProtectsGuard: vi.fn(async () => null) }));
 vi.mock('../lib/entitlement', () => ({

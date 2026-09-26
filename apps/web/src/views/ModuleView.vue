@@ -66,6 +66,20 @@
       :message="t('moduleView.emptyHint')"
       data-testid="module-empty"
     />
+    <!-- hub#2190 — the app is not on this hub at all (the runtime's installed list does not name
+         it). Saying «installed» here contradicted Apps; the way out is the catalogue, where an app
+         you do not have gets installed. -->
+    <ok-empty-state
+      v-else-if="status === 'not-installed'"
+      icon="apps-outline"
+      :heading="t('moduleView.notInstalledTitle')"
+      :message="t('moduleView.notInstalledHint')"
+      data-testid="module-not-installed"
+    >
+      <ion-button slot="action" router-link="/apps#all" data-testid="module-not-installed-catalog">
+        {{ t('moduleView.notInstalledAction') }}
+      </ion-button>
+    </ok-empty-state>
     <!-- hub#2205 — the address names a screen this app does not have. The SAME answer a wrong
          address at the root gets (NotFoundPage), with the address left in the bar as evidence and
          the app's tabbar still under it, so the right screen is one tap away. -->
@@ -176,7 +190,7 @@ import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { shellTabHeading } from '../lib/module-settings';
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
-import { clientInjectionKey, getClient } from '../lib/runtime';
+import { clientInjectionKey, getClient, listInstalledModules } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
@@ -215,7 +229,7 @@ const SKELETON_ROWS = 6;
  * así que el módulo no tiene nada que ver. Son cuatro frases distintas y la pantalla no puede
  * decir una por otra.
  */
-const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline' | 'not-found'>('loading');
+const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline' | 'not-found' | 'not-installed'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
@@ -408,7 +422,16 @@ async function mount(): Promise<void> {
       // is not entitled, so it contributes no tab. «Nothing to show» is the wrong sentence for it
       // (the module IS active; the entitlement is what stops it): `ready` lets the `blocked-card`
       // above say why, the same card a module blocked for non-payment gets.
-      status.value = isBlocked.value ? 'ready' : 'empty';
+      if (isBlocked.value) {
+        status.value = 'ready';
+        return;
+      }
+      // hub#2190 — the menu answers «no tab» both for an installed app that is switched off and for
+      // an app this hub never had; only the runtime's installed list tells them apart. If that
+      // question fails, the catch below says so instead of guessing either sentence.
+      const installed = await listInstalledModules();
+      if (generation !== mountGeneration) return;
+      status.value = installed.some((m) => m.id === moduleId) ? 'empty' : 'not-installed';
       return;
     }
     moduleName.value = entry.moduleName;
