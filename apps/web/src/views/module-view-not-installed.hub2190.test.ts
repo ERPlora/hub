@@ -139,10 +139,7 @@ describe('an app the hub does not have is not called installed (hub#2190)', () =
 
   it('keeps «installed but nothing to open» for an app that IS installed and switched off', async () => {
     installed.answer = () =>
-      Promise.resolve([
-        SALES,
-        { id: 'online_booking', name: 'Online booking', version: '1.0.0', status: 'inactive' },
-      ]);
+      Promise.resolve([SALES, { id: 'online_booking', name: 'Online booking', version: '1.0.0', status: 'inactive' }]);
     const wrapper = mountModuleView();
     await settle();
 
