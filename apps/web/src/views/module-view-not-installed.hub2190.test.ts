@@ -147,6 +147,27 @@ describe('an app the hub does not have is not called installed (hub#2190)', () =
     expect(wrapper.find('[data-testid="module-not-installed"]').exists()).toBe(false);
   });
 
+  // The issue's second report: the header of those screens read the bare id («cart_checkout»,
+  // «payments») in lower case. An app the hub does not have has no name to show, so the header says
+  // what the page says — the same way the root 404 titles itself (NotFoundPage).
+  it('🔴 does not title the page with the technical id of an app the hub does not have', async () => {
+    const wrapper = mountModuleView('es');
+    await settle();
+
+    const title = wrapper.findComponent({ name: 'AppPage' }).attributes('title');
+    expect(title).toBe(esCatalogue.moduleView.notInstalledTitle);
+    expect(title).not.toBe(routeParams.moduleId);
+  });
+
+  it('titles an installed app that paints nothing with its translated name, not its id', async () => {
+    installed.answer = () =>
+      Promise.resolve([SALES, { id: 'online_booking', name: 'Reservas online', version: '1.0.0', status: 'inactive' }]);
+    const wrapper = mountModuleView('es');
+    await settle();
+
+    expect(wrapper.findComponent({ name: 'AppPage' }).attributes('title')).toBe('Reservas online');
+  });
+
   it('does not claim either sentence when it could not ask the runtime what is installed', async () => {
     installed.answer = () => Promise.reject(new Error('modules → 500'));
     const wrapper = mountModuleView();

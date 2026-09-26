@@ -431,7 +431,12 @@ async function mount(): Promise<void> {
       // question fails, the catch below says so instead of guessing either sentence.
       const installed = await listInstalledModules();
       if (generation !== mountGeneration) return;
-      status.value = installed.some((m) => m.id === moduleId) ? 'empty' : 'not-installed';
+      const mine = installed.find((m) => m.id === moduleId);
+      // Without tabs the heading above falls back to the bare id («cart_checkout»): an installed
+      // app has its translated name in the same list, and one the hub lacks has no name to show,
+      // so the header says what the page says, like the root 404 (NotFoundPage).
+      moduleName.value = mine ? mine.name || moduleName.value : t('moduleView.notInstalledTitle');
+      status.value = mine ? 'empty' : 'not-installed';
       return;
     }
     moduleName.value = entry.moduleName;
