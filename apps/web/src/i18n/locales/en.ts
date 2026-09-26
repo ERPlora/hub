@@ -1507,8 +1507,9 @@ export default {
     coresOf: '{used} of {limit} vCPU',
     cores: '{used} cores',
     dbNoQuota: 'No plan quota',
-    activeSessions: '{n} active sessions',
-    activeUsers: '{n} active people',
+    // Plural via vue-i18n (`singular | plural`, picked by the `n` option): «1 active sessions» (hub#2202).
+    activeSessions: '{n} active session | {n} active sessions',
+    activeUsers: '{n} active person | {n} active people',
     liveNote: 'Live — refreshes every few seconds while this page is open.',
     loadErrorTitle: 'Resource metrics are unavailable',
     loadErrorBody: "The Hub couldn't report its resource usage right now. You can try again.",
