@@ -172,6 +172,18 @@ pub async fn enqueue_job(
                     "type": crate::print_ws::EVENT_JOB_QUEUED,
                     "role": job.role.trim(),
                 }));
+                // The third channel of hub#1731 (hub#1781): the till and the home panel already
+                // show a ticket nobody is draining; this line is what whoever watches the fleet
+                // sees. One per real ticket — a retried `jobId` is the same incident — and none
+                // while a device drains the station. The code is what alerts match on.
+                if report.live_hosts == 0 {
+                    tracing::warn!(
+                        event = "print.job_unattended",
+                        job_id = job.job_id.trim(),
+                        role = report.role.as_str(),
+                        "print job queued with no device draining its station"
+                    );
+                }
             }
             Json(json!({
                 "ok": true,
