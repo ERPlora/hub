@@ -298,8 +298,6 @@ src/views/dashboard-health-refresh.test.ts
 src/views/dashboard-locale.test.ts
 src/views/dashboard-my-apps.test.ts
 src/views/dashboard-setup-checklist.test.ts
-src/views/dashboard-widget-board.test.ts
-src/views/DashboardPage.vue
 src/views/EmployeeFormPage.invalid-field.test.ts
 src/views/EmployeeFormPage.user-limit.test.ts
 src/views/EmployeeFormPage.vue
