@@ -43,6 +43,14 @@ export interface ElevationCatalogueEntry {
        * dropped and the plain `label` is used instead — never a half-rendered sentence.
        */
       approval_label?: string;
+      /**
+       * Whole-sentence variants of `approval_label` for a command whose figures may be zero
+       * (hub#2186), e.g. a ticket discount with a percentage, a fixed amount or both. Tried in
+       * order; a number hole at ZERO counts as absent, so the first sentence whose holes are all
+       * filled with non-zero figures wins. When none can be filled, `approval_label` and then
+       * `label` apply as before. A separate key so that a shell from before hub#2186 ignores it.
+       */
+      approval_labels?: readonly string[];
     }
   >;
 }
@@ -73,7 +81,8 @@ const APPROVAL_HOLE = /\{\s*([a-z0-9_]+)\s*(?:,\s*([a-z]+)\s*)?\}/gi;
  * `Infinity`, an object, a boolean — refuses rather than guess); a bare hole accepts a non-blank
  * string or a finite number. An unknown format name always refuses.
  */
-function formatHole(value: unknown, format: string | undefined): string | null {
+function formatHole(value: unknown, format: string | undefined, zeroIsAbsent: boolean): string | null {
+  if (zeroIsAbsent && value === 0) return null;
   if (format === 'money') {
     return typeof value === 'number' && Number.isFinite(value) ? formatMoney(value) : null;
   }
@@ -99,15 +108,16 @@ function formatHole(value: unknown, format: string | undefined): string | null {
  * Fills `template`'s holes from `payload`, or returns `''` when it cannot be filled completely —
  * a missing field, an unresolvable value, or a leftover `{`/`}` (an unmatched or malformed hole)
  * all fall back the same way. Fields are read as OWN top-level keys only, never inherited ones.
+ * With `zeroIsAbsent` (the `approval_labels` variants, hub#2186) a number at zero cannot fill a hole.
  */
-function renderApprovalTemplate(template: string, payload: Record<string, unknown>): string {
+function renderApprovalTemplate(template: string, payload: Record<string, unknown>, zeroIsAbsent = false): string {
   let resolved = true;
   const rendered = template.replace(APPROVAL_HOLE, (whole, field: string, format: string | undefined) => {
     if (!Object.prototype.hasOwnProperty.call(payload, field)) {
       resolved = false;
       return whole;
     }
-    const filled = formatHole(payload[field], format);
+    const filled = formatHole(payload[field], format, zeroIsAbsent);
     if (filled === null) {
       resolved = false;
       return whole;
@@ -132,12 +142,29 @@ export function describeElevation(
   const entry = catalogue.find((c) => c.moduleId === moduleId);
   if (!entry) return { action: '', moduleName: '' };
   const commandEntry = entry.commands[ask.command];
-  const template = commandEntry?.approval_label;
-  const rendered = template && ask.payload ? renderApprovalTemplate(template, ask.payload) : '';
+  const rendered = ask.payload && commandEntry ? renderApproval(commandEntry, ask.payload) : '';
   return {
     action: rendered || commandEntry?.label?.trim() || '',
     moduleName: entry.moduleName.trim(),
   };
+}
+
+/**
+ * The first `approval_labels` variant that fills with non-zero figures, else `approval_label` as
+ * written, else `''`. The locale is module-supplied JSON: a non-list or a non-text entry is skipped.
+ */
+function renderApproval(
+  commandEntry: { approval_label?: unknown; approval_labels?: unknown },
+  payload: Record<string, unknown>,
+): string {
+  const variants = Array.isArray(commandEntry.approval_labels) ? commandEntry.approval_labels : [];
+  for (const variant of variants) {
+    if (typeof variant !== 'string') continue;
+    const rendered = renderApprovalTemplate(variant, payload, true);
+    if (rendered) return rendered;
+  }
+  const template = commandEntry.approval_label;
+  return typeof template === 'string' && template ? renderApprovalTemplate(template, payload) : '';
 }
 
 /** El catálogo vigente. Vacío = todavía no se sabe, y la escalera degrada al mensaje genérico. */
