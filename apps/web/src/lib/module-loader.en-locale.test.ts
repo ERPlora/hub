@@ -73,13 +73,8 @@ describe('module locale on an English hub (hub#2179)', () => {
     const installed = await loadInstalledManifests();
 
     expect(urls.some((u) => u.endsWith('/locales/en.json'))).toBe(true);
-    expect(installed[0]?.locale?.commands?.['sales.open_price']?.label).toBe(
-      'Sell an item at an open price',
-    );
-    const described = describeElevation(
-      { command: 'sales.open_price' },
-      catalogueFromManifests(installed),
-    );
+    expect(installed[0]?.locale?.commands?.['sales.open_price']?.label).toBe('Sell an item at an open price');
+    const described = describeElevation({ command: 'sales.open_price' }, catalogueFromManifests(installed));
     expect(described.action).toBe('Sell an item at an open price');
   });
 
@@ -90,10 +85,7 @@ describe('module locale on an English hub (hub#2179)', () => {
 
     expect(installed).toHaveLength(1);
     expect(installed[0]?.locale).toBeUndefined();
-    const described = describeElevation(
-      { command: 'sales.open_price' },
-      catalogueFromManifests(installed),
-    );
+    const described = describeElevation({ command: 'sales.open_price' }, catalogueFromManifests(installed));
     expect(described).toEqual({ action: '', moduleName: 'Sales / POS' });
   });
 });
