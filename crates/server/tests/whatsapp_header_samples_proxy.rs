@@ -245,7 +245,8 @@ fn upload(body: Vec<u8>, session: Option<&str>, module: Option<&str>) -> Request
             "content-type",
             format!("multipart/form-data; boundary={BOUNDARY}"),
         )
-        .header("content-length", body.len().to_string());
+        .header("content-length", body.len().to_string())
+        .header("accept-language", "es-ES");
     if let Some(s) = session {
         req = req.header("x-hub-session", s);
     }
@@ -296,6 +297,8 @@ async fn the_sample_reaches_the_saas_byte_for_byte_and_the_handle_comes_back() {
         Some(sent.len().to_string().as_str())
     );
     assert!(call.header("transfer-encoding").is_none());
+    // The SaaS words its `detail` in the owner's language, like on every other relayed door.
+    assert_eq!(call.header("accept-language"), Some("es-ES"));
     assert_eq!(call.header("x-hub-token"), Some("machine-secret"));
     assert_eq!(call.header("x-hub-id"), Some(HUB));
     assert!(call.header("authorization").is_none());

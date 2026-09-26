@@ -2492,14 +2492,12 @@ export class WhatsappTemplatesApi {
    * {@link ErploraError} with its code — `unsupported_header_sample`, `header_sample_too_large`,
    * `missing_file`, `no_whatsapp_number`, `whatsapp_not_configured`, `meta_*`.
    *
-   * A `Blob` with no name goes up as `sample`: a multipart part without a filename is not a file
-   * to the SaaS.
+   * A `File` keeps its name; a bare `Blob` goes up as `blob` (what `FormData` names it), still a
+   * file part — a multipart part without a filename is not a file to the SaaS.
    */
   async uploadHeaderSample(file: Blob): Promise<WhatsappTemplateHeaderSample> {
     const form = new FormData();
-    const named = (file as Partial<File>).name;
-    const name = typeof named === 'string' && named ? named : 'sample';
-    form.append('file', file, name);
+    form.append('file', file);
     return this.send({
       method: 'POST',
       path: WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH,
