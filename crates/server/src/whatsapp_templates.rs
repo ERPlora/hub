@@ -59,7 +59,10 @@ use erplora_runtime::manifest::CapabilityKind;
 /// door keeps that second half: a module the owner granted `notify` to send e-mail receipts must
 /// not be able to delete the business's approved WhatsApp templates, a channel it never asked for
 /// and cannot even send on. Same function, same `capability_denied` code (`notify:whatsapp`).
-async fn require_owner_and_notify(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) async fn require_owner_and_notify(
+    st: &AppState,
+    headers: &HeaderMap,
+) -> Result<(), Response> {
     whatsapp_connect::require_owner(st, headers).await?;
     let rt = st.runtime.read().await;
     let module =
