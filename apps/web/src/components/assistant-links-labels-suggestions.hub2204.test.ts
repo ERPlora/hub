@@ -102,9 +102,21 @@ describe('hub#2204 · 1 — a Markdown link is read as a link', () => {
 
   it('clicking the link takes the owner to that screen', async () => {
     const wrapper = await drawerWithAnswer('→ Go to: [Invoicing settings](/m/invoice/settings)');
-    await wrapper.find('[data-testid="assistant-message-1"] .chat-md .md-link').trigger('click');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    wrapper.find('[data-testid="assistant-message-1"] .chat-md .md-link').element.dispatchEvent(click);
 
     expect(push).toHaveBeenCalledWith('/m/invoice/settings');
+    // The router moves; the browser must not also follow the href and reload the whole hub.
+    expect(click.defaultPrevented).toBe(true);
+  });
+
+  // The whole target has to be a screen: a web address that merely CARRIES a screen path in its
+  // query is still an outside address, and a click on it would leave the hub.
+  it('a web address carrying a screen path is still outside the hub, never a link', async () => {
+    const wrapper = await drawerWithAnswer('Open [Settings](https://evil.example/?next=/settings) now.');
+
+    expect(wrapper.find('[data-testid="assistant-message-1"] .chat-md .md-link').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="assistant-message-1"] .chat-md a').exists()).toBe(false);
   });
 
   it('a bare path in the prose is named like the screen, not printed', async () => {

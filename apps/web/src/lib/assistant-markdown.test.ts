@@ -186,4 +186,18 @@ describe('parseMarkdown — links (hub#2204)', () => {
 
     expect(block.items[0]).toEqual([{ kind: 'link', text: 'Empleados', href: '/employees' }]);
   });
+
+  it('emphasis marks inside a link label are not read', () => {
+    const [block] = parseMarkdown('Abre [**Caja**](/m/cash_register).');
+    if (block.type !== 'paragraph') throw new Error('párrafo');
+
+    expect(block.spans).toContainEqual({ kind: 'link', text: 'Caja', href: '/m/cash_register' });
+  });
+
+  it('a screen path followed by more path is not a screen of the hub', () => {
+    const [block] = parseMarkdown('Ve a /m/invoice/settings/advanced o a /settings/extra.');
+    if (block.type !== 'paragraph') throw new Error('párrafo');
+
+    expect(block.spans.some((s) => s.kind === 'link')).toBe(false);
+  });
 });
