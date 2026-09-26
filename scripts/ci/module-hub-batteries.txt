@@ -52,6 +52,12 @@ sales/tests/void_chain.hub.test.py
 # Landed pending publication (sales#284); the module has published it: now a normal entry.
 sales/tests/order_discount_cap.hub.test.py
 
+# sales × services: a salon sells a haircut at the till — the service comes back from the till's
+# own reads with its family counted, goes on a check and is charged as a service line, against
+# the real kernel with `services` installed next to `sales` (sales#278). New coverage, not moved.
+# pending-publication: sales#278 until 2026-10-24
+sales/tests/service_sale.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
