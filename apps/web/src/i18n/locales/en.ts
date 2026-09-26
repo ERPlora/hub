@@ -1781,6 +1781,7 @@ export default {
     colTemplate: 'Template',
     colDescription: 'Description',
     colLanguage: 'Language',
+    colCountry: 'Country',
     colVersion: 'Version',
     colDownloads: 'Downloads',
     colSize: 'Size',

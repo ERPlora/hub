@@ -25,7 +25,6 @@ src/components/AssistantDrawer.vue
 src/components/AuthenticatedChrome.test.ts
 src/components/BlueprintHeroCard.test.ts
 src/components/BlueprintHeroCard.vue
-src/components/DataPanel.vue
 src/components/DeviceModeCard.test.ts
 src/components/DeviceModeCard.vue
 src/components/DevicesCard.test.ts
@@ -33,12 +32,9 @@ src/components/DevicesCard.vue
 src/components/ElevationDialog.test.ts
 src/components/ElevationDialog.vue
 src/components/ExportPanel.test.ts
-src/components/ExportPanel.vue
 src/components/FilePreviewModal.test.ts
 src/components/FilePreviewModal.vue
 src/components/GrantFilePicker.vue
-src/components/ImportPanel.test.ts
-src/components/ImportPanel.vue
 src/components/ImportPermissionsConsent.test.ts
 src/components/ImportPermissionsConsent.vue
 src/components/module-lifecycle-refreshes-nav.test.ts
