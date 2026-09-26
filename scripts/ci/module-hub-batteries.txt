@@ -165,3 +165,9 @@ customers/tests/merge.hub.test.py
 # nueva, no mudada.
 # Landed pending publication (appointments#196); the module has published it: now a normal entry.
 appointments/tests/history_trail.hub.test.py
+
+# pricing: un código de lista repetido se rechaza con `pricing.duplicate_code` dentro del hub y el
+# mismo código en OTRO hub se acepta (unicidad por `(hub_id, code)`), contra el kernel real
+# (pricing#46). Cobertura nueva, no mudada.
+# pending-publication: pricing#46 until 2026-10-26
+pricing/tests/duplicate_list_code.hub.test.py
