@@ -32,7 +32,15 @@ vi.mock('../lib/device', async () => {
 
 vi.mock('../lib/runtime', async () => {
   const actual = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
-  return { ...actual, listInstalledModules: vi.fn(async () => [{ id: 'printing', status: 'active' }]) };
+  // hub#2046: the notices card exists only on a hub the shell sends notices for (today, one with a
+  // kitchen), so the hub under test has one — otherwise the button this file pins is never there.
+  return {
+    ...actual,
+    listInstalledModules: vi.fn(async () => [
+      { id: 'printing', status: 'active' },
+      { id: 'kitchen', status: 'active' },
+    ]),
+  };
 });
 
 vi.mock('../lib/system', () => ({ fetchSystemInfo: vi.fn(async () => null) }));
