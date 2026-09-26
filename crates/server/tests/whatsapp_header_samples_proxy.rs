@@ -419,6 +419,9 @@ async fn a_body_that_is_not_a_form_is_refused_before_the_saas_is_called() {
         Some("application/json"),
         Some("image/jpeg"),
         Some("multipart/form-data"),
+        // A form without its boundary: the SaaS could not find the `file` field in it.
+        Some("multipart/form-data; charset=utf-8"),
+        Some("multipart/form-data; boundary="),
         None,
     ] {
         let mut req = Request::builder()
