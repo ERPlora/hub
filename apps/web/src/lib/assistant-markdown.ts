@@ -16,7 +16,22 @@
 // tablas—, no CommonMark entero. Lo que no se reconoce se queda como texto, que es la degradación
 // correcta: peor formateado nunca es peor que ilegible.
 
-export type Inline = { kind: 'text' | 'bold' | 'italic' | 'code'; text: string };
+export type Inline =
+  | { kind: 'text' | 'bold' | 'italic' | 'code'; text: string }
+  /**
+   * A link (hub#2204). `text` is what is read; `href` travels beside it and the drawer decides
+   * whether it becomes clickable (only a screen of this hub does). `text` is EMPTY for a bare
+   * screen path written in the prose: the drawer names it the way the shell names that screen.
+   */
+  | { kind: 'link'; text: string; href: string };
+
+/**
+ * A screen of the shell as the assistant writes it (`/m/<module>[/<tab>]`, `/settings#…`, …).
+ * Not preceded by a word, a dot, a slash or a colon, so the path of a web address
+ * (`https://erplora.com/apps`) is never taken for one; not followed by more path either.
+ */
+export const SCREEN_PATH =
+  /(?<![\w./:-])\/(?:m\/[\w-]+(?:\/[\w-]+)?|settings|apps|dashboard|system|billing|employees)(?:#[\w-]+)?(?![\w/-])/;
 export type Block =
   | { type: 'paragraph'; spans: Inline[] }
   | { type: 'heading'; level: number; spans: Inline[] }
@@ -31,32 +46,35 @@ export type Block =
  * parseando después del cierre, así que un `precio * cantidad` dentro de comillas no abre
  * cursiva. La garantía es esa, no la posición en esta lista.
  */
-const INLINE = [
-  { kind: 'code' as const, re: /`([^`]+)`/ },
-  { kind: 'bold' as const, re: /\*\*([^*]+)\*\*/ },
+const INLINE: { re: RegExp; build: (m: RegExpExecArray) => Inline }[] = [
+  { re: /`([^`]+)`/, build: (m) => ({ kind: 'code', text: m[1] }) },
+  // `[label](target)`: the label is read, the brackets and the target never (hub#2204). Emphasis
+  // marks inside the label are dropped — a link is one span, not a nest of them.
+  {
+    re: /\[([^\]\n]+)\]\(([^()\s]+)\)/,
+    build: (m) => ({ kind: 'link', text: m[1].replace(/[*`]/g, ''), href: m[2] }),
+  },
+  { re: SCREEN_PATH, build: (m) => ({ kind: 'link', text: '', href: m[0] }) },
+  { re: /\*\*([^*]+)\*\*/, build: (m) => ({ kind: 'bold', text: m[1] }) },
   // Un asterisco suelto («El total * 2») NO abre cursiva: se exige contenido sin espacios a los
   // lados, que es lo que separa el énfasis de la multiplicación.
-  { kind: 'italic' as const, re: /\*(\S[^*]*\S|\S)\*/ },
+  { re: /\*(\S[^*]*\S|\S)\*/, build: (m) => ({ kind: 'italic', text: m[1] }) },
 ];
 
 /** Parte una línea en spans. Nunca lanza: una respuesta mal formateada se lee, una excepción no. */
 export function parseInline(text: string): Inline[] {
-  let earliest: { kind: Inline['kind']; index: number; length: number; inner: string } | null = null;
-  for (const { kind, re } of INLINE) {
+  let earliest: { span: Inline; index: number; length: number } | null = null;
+  for (const { re, build } of INLINE) {
     const m = re.exec(text);
     if (m && (earliest === null || m.index < earliest.index)) {
-      earliest = { kind, index: m.index, length: m[0].length, inner: m[1] };
+      earliest = { span: build(m), index: m.index, length: m[0].length };
     }
   }
   if (!earliest) return text ? [{ kind: 'text', text }] : [];
 
   const before = text.slice(0, earliest.index);
   const after = text.slice(earliest.index + earliest.length);
-  return [
-    ...(before ? [{ kind: 'text' as const, text: before }] : []),
-    { kind: earliest.kind, text: earliest.inner },
-    ...parseInline(after),
-  ];
+  return [...(before ? [{ kind: 'text' as const, text: before }] : []), earliest.span, ...parseInline(after)];
 }
 
 /** Las celdas de una fila `| a | b |`, sin los bordes. */

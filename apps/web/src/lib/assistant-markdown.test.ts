@@ -12,9 +12,12 @@ import { describe, expect, it } from 'vitest';
 
 import { parseMarkdown } from './assistant-markdown';
 
-/** El texto plano de un bloque, para afirmar sin recorrer spans a mano. */
-function textOf(spans: { text: string }[]): string {
-  return spans.map((s) => s.text).join('');
+/**
+ * El texto plano de un bloque, para afirmar sin recorrer spans a mano. A bare screen path is a
+ * link with no label of its own (hub#2204) — the drawer names it — so it reads as its target here.
+ */
+function textOf(spans: { text: string; href?: string }[]): string {
+  return spans.map((s) => s.text || s.href || '').join('');
 }
 
 describe('parseMarkdown — énfasis y código', () => {
@@ -60,6 +63,8 @@ describe('parseMarkdown — la tabla, que era lo ilegible', () => {
     expect(block.rows[0].map(textOf)).toEqual(['staff', 'Personal', '/m/staff/staff']);
     // El contenido de las celdas también se formatea: `staff` iba en comillas.
     expect(block.rows[0][0][0].kind).toBe('code');
+    // …and a screen path in a cell is a link the drawer names (hub#2204), not a path to read.
+    expect(block.rows[0][2][0]).toEqual({ kind: 'link', text: '', href: '/m/staff/staff' });
   });
 
   it('una línea suelta con barras NO es una tabla', () => {
@@ -131,5 +136,54 @@ describe('parseMarkdown — no rompe lo que ya funcionaba', () => {
     const code = block.spans.find((s) => s.kind === 'code');
     expect(code?.text).toBe('precio * cantidad * iva');
     expect(block.spans.some((s) => s.kind === 'italic')).toBe(false);
+  });
+});
+
+// hub#2204 — the owner read «→ Ve a: [Ajustes de facturación](/m/invoice/settings)» with the
+// brackets, the parentheses and the path on screen. A link is a span of its own: the label is
+// what is read, the target travels beside it and the drawer decides whether it is clickable.
+describe('parseMarkdown — links (hub#2204)', () => {
+  it('a Markdown link shows its label, never the brackets or the path', () => {
+    const [block] = parseMarkdown('→ Ve a: [Ajustes de facturación](/m/invoice/settings)');
+    if (block.type !== 'paragraph') throw new Error('párrafo');
+
+    expect(textOf(block.spans)).toBe('→ Ve a: Ajustes de facturación');
+    expect(block.spans).toContainEqual({ kind: 'link', text: 'Ajustes de facturación', href: '/m/invoice/settings' });
+  });
+
+  it('a bare screen path becomes a link with no label of its own — the drawer names it', () => {
+    const [block] = parseMarkdown('Ve a /m/invoice/settings y activa la serie.');
+    if (block.type !== 'paragraph') throw new Error('párrafo');
+
+    expect(block.spans).toContainEqual({ kind: 'link', text: '', href: '/m/invoice/settings' });
+    expect(
+      block.spans
+        .filter((s) => s.kind === 'text')
+        .map((s) => s.text)
+        .join(''),
+    ).not.toContain('/m/');
+  });
+
+  it('the path of a web address is not mistaken for a screen of the hub', () => {
+    const [block] = parseMarkdown('Consulta https://erplora.com/apps para más.');
+    if (block.type !== 'paragraph') throw new Error('párrafo');
+
+    expect(block.spans.some((s) => s.kind === 'link')).toBe(false);
+    expect(textOf(block.spans)).toBe('Consulta https://erplora.com/apps para más.');
+  });
+
+  it('inside a link label the emphasis is not parsed twice and the link keeps its target', () => {
+    const [block] = parseMarkdown('**Paso 1:** abre [Caja](/m/cash_register) ahora');
+    if (block.type !== 'paragraph') throw new Error('párrafo');
+
+    expect(block.spans[0]).toEqual({ kind: 'bold', text: 'Paso 1:' });
+    expect(block.spans).toContainEqual({ kind: 'link', text: 'Caja', href: '/m/cash_register' });
+  });
+
+  it('a list item keeps its link too', () => {
+    const [block] = parseMarkdown('- [Empleados](/employees)');
+    if (block.type !== 'list') throw new Error('lista');
+
+    expect(block.items[0]).toEqual([{ kind: 'link', text: 'Empleados', href: '/employees' }]);
   });
 });
