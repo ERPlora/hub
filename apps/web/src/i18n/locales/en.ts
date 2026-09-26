@@ -836,6 +836,12 @@ export default {
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
     comandaWaitingForPrinter:
       'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
+    // The system notice when a kitchen order comes in (hub#2171): `comandaNoticeFor` names the
+    // floor label («Table 4», «Bar») when the order has one; the body is the order number and the
+    // line count, pluralised by `n`.
+    comandaNotice: 'New kitchen order',
+    comandaNoticeFor: 'New kitchen order · {label}',
+    comandaNoticeLines: '{n} line | {n} lines',
     // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
     // named in the warning, or the sentence reads «the order for ()».
     comandaDefaultLabel: 'the floor',

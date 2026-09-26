@@ -323,6 +323,8 @@ bootPrintComanda(getClient(), {
   // letting it through would pop Android's bare dialog in the middle of a service. Android drops
   // the notice either way; what the user gets instead is the row on System › your printer, which
   // says the notices are off and offers to ask again.
+  // The notice's words come from the catalogue, in the app's language (hub#2171).
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
   notify: async (title, body) => {
     if (!shouldSendNotice(await askToWarn())) return;
     await getClient().peripherals.notify(title, body);

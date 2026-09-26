@@ -746,6 +746,10 @@ export default {
     comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
     comandaWaitingForPrinter:
       'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
+    // hub#2171 — the system notice when a kitchen order comes in.
+    comandaNotice: 'Nueva comanda',
+    comandaNoticeFor: 'Nueva comanda · {label}',
+    comandaNoticeLines: '{n} línea | {n} líneas',
     comandaDefaultLabel: 'sala',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:

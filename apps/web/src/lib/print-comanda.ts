@@ -93,18 +93,26 @@ export interface ComandaPrintFailure {
   awaitingHost?: boolean;
 }
 
-interface Deps {
+/** The notice and its words travel together: a notice without the catalogue would speak one language. */
+type NoticeDeps =
+  | {
+      /**
+       * SYSTEM notification when the order comes in. Optional: without it everything works as before.
+       *
+       * The paper is a copy and the KDS is the source of truth — but a screen nobody looks at warns
+       * nobody. In a hot kitchen the tablet is propped up, on another view or locked, and the OS
+       * notification is the only thing that gets through.
+       */
+      notify: (title: string, body: string) => Promise<void>;
+      /** The caller owns i18n (ADR-0055, hub#2171): this file only picks the key and its params. */
+      t: (key: string, params?: Record<string, unknown>) => string;
+    }
+  | { notify?: undefined; t?: undefined };
+
+type Deps = NoticeDeps & {
   print: (req: PrintRequest) => Promise<PrintResult>;
   onFailure?: (f: ComandaPrintFailure) => void;
-  /**
-   * Notificación del SISTEMA al entrar la comanda. Opcional: sin ella todo sigue igual.
-   *
-   * El papel es una copia y el KDS es la fuente de verdad — pero una pantalla que nadie mira no
-   * avisa de nada. En cocina caliente la tablet está apoyada, en otra vista o bloqueada, y la
-   * notificación del SO es lo único que atraviesa eso.
-   */
-  notify?: (title: string, body: string) => Promise<void>;
-}
+};
 
 /**
  * Agrupa las líneas en hojas de papel. Agrupa por **rol de impresora**, no por estación: dos
@@ -202,12 +210,14 @@ export async function onKitchenOrderCreated(
   //    impresora sin papel), y cocina debe enterarse ya.
   // Best-effort: si falla, la comanda sigue su curso — igual que con el papel.
   if (deps.notify) {
-    const titulo = label ? `Nueva comanda · ${label}` : 'Nueva comanda';
+    // The label and the order number are the business's own data and travel as they are; only
+    // the words around them come from the catalogue (hub#2171).
+    const title = label ? deps.t('print.comandaNoticeFor', { label }) : deps.t('print.comandaNotice');
     const total = (items ?? []).length;
-    const cuerpo = [orderNumber, total ? `${total} línea${total === 1 ? '' : 's'}` : '']
+    const body = [orderNumber, total ? deps.t('print.comandaNoticeLines', { n: total }) : '']
       .filter(Boolean)
       .join(' · ');
-    await deps.notify(titulo, cuerpo).catch(() => {});
+    await deps.notify(title, body).catch(() => {});
   }
 
   if (!groups.length) return; // todo era de pantalla, o la comanda venía vacía
