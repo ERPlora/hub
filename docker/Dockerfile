@@ -33,6 +33,9 @@ ENV CI=1
 RUN corepack enable
 # Copiamos manifests primero para cachear `pnpm install` mientras no cambien.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# `patchedDependencies` of package.json (hub#2242: @ionic/vue's outlet): pnpm applies them at install
+# time and fails without the file, so it travels with the manifests.
+COPY patches ./patches
 COPY apps/web/package.json ./apps/web/
 COPY packages ./packages
 # `hub/modules` es el dir reservado para módulos INSTALADOS en runtime: está vacío en git (0

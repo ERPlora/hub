@@ -1,0 +1,41 @@
+diff --git a/dist/index.js b/dist/index.js
+index 56807374194f8231aa978440339a317e9f8d6eac..bf2abae45f59810136276be24596ce3f496dc593 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1502,7 +1502,35 @@ const IonRouterOutlet = /*@__PURE__*/ defineComponent({
+             });
+             return result;
+         };
+-        const handlePageTransition = async () => {
++        /**
++         * ERPlora hub#2242 — one page transition at a time, each reading the route when it STARTS.
++         * `transition()` marks the entering page `ion-page-invisible` before it waits for the
++         * outlet's lock, so a navigation that arrived while another one was still queued saw the
++         * page it wanted as "already visible" and the one on screen as invisible, returned early
++         * below, and the queued slide then left the previous page on screen under the new address.
++         * Queued here, the late navigation runs after the slide ends and sees the real screen.
++         * Idle, it still starts synchronously, exactly as before.
++         */
++        let pageTransitionTail;
++        const handlePageTransition = () => {
++            const current = pageTransitionTail
++                ? pageTransitionTail.then(runPageTransition)
++                : runPageTransition();
++            // A failed transition must not stall the ones behind it, nor go quiet: it is reported
++            // as an uncaught error (the window `error` event), as it surfaced before this queue.
++            const tail = current.then(() => undefined, (err) => {
++                if (typeof reportError === "function")
++                    reportError(err);
++                else
++                    void Promise.reject(err);
++            }).then(() => {
++                if (pageTransitionTail === tail)
++                    pageTransitionTail = undefined;
++            });
++            pageTransitionTail = tail;
++            return current;
++        };
++        const runPageTransition = async () => {
+             const routeInfo = ionRouter.getCurrentRouteInfo();
+             const { routerDirection, routerAction, routerAnimation, prevRouteLastPathname, delta, } = routeInfo;
+             const enteringViewItem = viewStacks.findViewItemByRouteInfo(routeInfo, id);
