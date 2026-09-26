@@ -7,9 +7,11 @@
 
   Cinco cosas que no son de estilo:
 
-    - **Reconocer el dispositivo ES la tarea.** Un id opaco no decide nada, así que cada fila lleva
-      el nombre con el que entró, si hay alguien dentro AHORA y cuánto le queda a esa sesión. Y el
-      id también: dos cajas pueden llamarse igual.
+    - **Recognising the device IS the task.** An opaque id decides nothing, so each row carries
+      the name it was given, whether somebody is on it RIGHT NOW and how long that session has
+      left. The id itself is never painted (hub#2203): it is 128 random bits nobody can read, it
+      ended up in every screenshot, and two rows that look alike are told apart by the name the
+      business gives them and by their dates — the way Google, Apple or Shopify list devices.
     - **De qué NO fiarse, y de qué sí.** El id y la etiqueta los elige el propio dispositivo
       (ADR-0257: el navegador se acuña su id; la etiqueta es el nombre de la persona que viajó en el
       login, reescrito en cada entrada). Sirven para reconocerlo a ojo y para nada más. Lo único de
@@ -65,7 +67,6 @@
               <p v-if="device.label.trim()" class="activity">
                 {{ t('devices.lastSignedInBy', { who: device.label.trim() }) }}
               </p>
-              <p class="id">{{ device.deviceId }}</p>
             </ion-label>
             <ion-button
               v-if="isAdmin"
@@ -357,11 +358,6 @@ defineExpose({ load, ask, revoke, startNaming, rename, devices });
 }
 .activity {
   font-size: 0.8125rem;
-}
-.id {
-  font-size: 0.75rem;
-  color: var(--ion-color-medium);
-  word-break: break-all;
 }
 .note {
   font-size: 0.8125rem;
