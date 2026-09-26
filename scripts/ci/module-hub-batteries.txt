@@ -82,7 +82,6 @@ services/tests/package_redeem.hub.test.py
 #   `schedules` y nadie más, así que el e2e ya no podía sembrarlas con los commands de Citas.
 appointments/tests/availability.hub.test.py
 appointments/tests/create_overlap.hub.test.py
-appointments/tests/history_trail.hub.test.py
 
 # ── Baterías ATERRIZADAS cuyo e2e del hub SIGUE EN PIE ──────────────────────────────────────
 # La mitad aditiva ya está (las PRs de módulo son `+N/-0`), pero su línea sigue en la sección
@@ -147,3 +146,9 @@ kitchen/tests/closed_check.hub.test.py
 # ve ni la toca, contra el kernel real (kitchen#76). Cobertura nueva, no mudada.
 # pending-publication: kitchen#95 until 2026-10-25
 kitchen/tests/rush_after_fire.hub.test.py
+
+# appointments: mover y anular una cita dejan su línea de historial (quién lo pidió y por qué) y
+# un movimiento rechazado no deja ninguna, contra el kernel real (appointments#196). Cobertura
+# nueva, no mudada.
+# pending-publication: appointments#196 until 2026-10-26
+appointments/tests/history_trail.hub.test.py
