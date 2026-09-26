@@ -65,6 +65,18 @@
             </ion-button>
           </ok-inline-feedback>
 
+          <!-- hub#2152 — entering from the ERPlora panel failed; say so instead of a silent login. -->
+          <ok-inline-feedback
+            v-if="courierFailedNotice && !sessionEndedNotice"
+            data-testid="login-courier-failed"
+            tone="warning"
+            icon="alert-circle-outline"
+            :heading="t('login.courierFailed')"
+            class="mb-5"
+          >
+            {{ t('login.courierFailedBody') }}
+          </ok-inline-feedback>
+
           <!-- Tarjeta principal -->
           <ion-card class="ion-no-margin login-card">
             <ion-card-content>
@@ -428,6 +440,7 @@ import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/
 import { saasDoor } from '../lib/saas-door';
 import { openExternal } from '../lib/open-external';
 import { getDeviceContext } from '../lib/device';
+import { takeCourierFailure } from '../lib/courier';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -568,6 +581,9 @@ const router = useRouter();
 const sessionEndedNotice = computed(
   () => router.currentRoute.value.query.reason === SESSION_EVICTED_DEVICE_LIMIT,
 );
+// hub#2152 — the panel's pass could not be redeemed at boot. One-shot: read once when this screen
+// is created, so coming back to the login later does not repeat it.
+const courierFailedNotice = ref(takeCourierFailure());
 // hub#756 — la regla la pone quien reparte el binario: en una copia de Play no se ofrece la puerta.
 // Sin señal se ofrece (el navegador no manda `distribution`, y negar dejaría a casi todos fuera).
 const canOfferPlanUpgrade = ref(true);

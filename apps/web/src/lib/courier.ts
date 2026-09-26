@@ -1,5 +1,6 @@
-import { runtimeCourierSession, setTokens } from './cloud';
+import { RuntimeError, runtimeCourierSession, setTokens } from './cloud';
 import { getDeviceContext } from './device';
+import { reportClientError } from './error-report';
 import { setHubSession, setUser } from './session';
 
 const COURIER_KEY = 'courier';
@@ -137,4 +138,58 @@ async function exchangeCourier(code: string): Promise<boolean> {
     permissions: result.permissions,
   });
   return true;
+}
+
+/** One-shot flag: a courier exchange failed during this boot (hub#2152). Read through
+ *  `takeCourierFailure`, which resets it — see that export for why it exists. */
+let courierFailed = false;
+
+/**
+ * Reduce a failed exchange to a stable identifier, never its prose and never the pass.
+ *
+ * ADR-0159: the runtime's free text is not trusted to be free of the one-time credential (it has
+ * appeared inside error prose before, e.g. "pass … expired"), so only the machine-readable code or
+ * error name ever leaves this module. `RuntimeError.code` is the contract most failures carry; a
+ * `DOMException` `AbortError` (the runtime deadline, hub#2145) has no such code but its `name` is
+ * just as stable. Some environments do not make `DOMException` an `instanceof Error`, so the name
+ * is also read structurally as a fallback.
+ */
+function courierFailureReason(error: unknown): string {
+  if (error instanceof RuntimeError && error.code) return error.code;
+  if (error instanceof Error) return error.name;
+  const name = (error as { name?: unknown } | null)?.name;
+  return typeof name === 'string' && name ? name : 'unknown';
+}
+
+/**
+ * Redeem the shell's one-time courier before the router mounts. This is `main.ts`'s single entry
+ * point for it and it NEVER throws (hub#2152).
+ *
+ * Before this, `main.ts` called `bootCourier` behind an empty `catch`: a broken answer, a refusal,
+ * or a hub that stopped responding all looked the same from there on — silence. Login has to stay
+ * reachable no matter what the exchange does, so failure is reported through the ordinary
+ * client-error channel with the runtime's CODE (never its message, never the pass — ADR-0159) and
+ * left as a one-shot flag (`takeCourierFailure`) for the login screen to explain.
+ */
+export async function redeemShellCourier(code: string | null): Promise<boolean> {
+  try {
+    return await bootCourier(code);
+  } catch (error) {
+    courierFailed = true;
+    reportClientError({
+      message: `courier exchange failed: ${courierFailureReason(error)}`,
+      component: 'courier',
+    });
+    return false;
+  }
+}
+
+/**
+ * One-shot read of the courier failure flag (hub#2152): the login screen reads it once when it is
+ * created and resets it here, so coming back to the login later does not repeat the notice.
+ */
+export function takeCourierFailure(): boolean {
+  const failed = courierFailed;
+  courierFailed = false;
+  return failed;
 }

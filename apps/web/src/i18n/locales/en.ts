@@ -1617,6 +1617,10 @@ export default {
     // theirs) and what to do about it. Both gestures are offered, in the order that is free first.
     sessionTakenOverBody:
       'Your plan covers one device at a time, so signing in on another one signed this device out. Sign in again to use it here, or add devices to your plan.',
+    // hub#2152 — the pass from the ERPlora panel could not be redeemed; the login still works.
+    courierFailed: "Couldn't sign you in from the ERPlora panel",
+    courierFailedBody:
+      'Sign in here to continue.',
     setupChoosePin: 'Choose a {n}-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',
