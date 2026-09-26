@@ -123,6 +123,23 @@ describe('hub#2204 · 1 — a Markdown link is read as a link', () => {
     expect(wrapper.find('[data-testid="assistant-message-1"] .chat-md .md-link').exists()).toBe(false);
     expect(painted(wrapper.find('[data-testid="assistant-message-1"] .chat-md').html())).toContain('the docs');
   });
+
+  it('a screen the audit could not find in this hub is plain text, never a link', async () => {
+    assistantMessages.value = [
+      { role: 'user', content: 'Where do I set up the loyalty card?' },
+      {
+        role: 'assistant',
+        content: 'Go to [Loyalty](/m/loyalty/settings).',
+        grounding: { claimedWithoutEffect: false, unsourcedIds: [], unknownRoutes: ['/m/loyalty/settings'] },
+      },
+    ];
+    const wrapper = mount(AssistantDrawer, { global: { plugins: [i18n] } });
+    (assistantOpen as unknown as { value: boolean }).value = true;
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="assistant-message-1"] .chat-md .md-link').exists()).toBe(false);
+    expect(painted(wrapper.find('[data-testid="assistant-message-1"] .chat-md').html())).toContain('Loyalty');
+  });
 });
 
 describe('hub#2204 · 2 — the «Go to» buttons name the app and the screen', () => {
