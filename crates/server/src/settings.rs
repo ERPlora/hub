@@ -736,8 +736,9 @@ fn fiscal_identity_payload(settings: &Value) -> Option<Map<String, Value>> {
     );
     body.insert("billing_country".into(), Value::String(get("country_code")));
     // hub#2217 — whether the owner ticked «use these details for my ERPlora invoice too». Always
-    // sent, `false` included: the control plane reads an ABSENT flag as a hub that predates the
-    // box and keeps updating the `BillingProfile` as it always did (saas#2370).
+    // sent, `false` included, so the choice never depends on a default: a control plane that
+    // predates saas#2370 ignores the flag and updates the `BillingProfile` as it always did, and
+    // since saas#2370 only an explicit `true` lets it touch that profile (absent reads as `false`).
     let use_for_billing = settings
         .get(BILLING_IDENTITY_SETTING)
         .and_then(Value::as_bool)

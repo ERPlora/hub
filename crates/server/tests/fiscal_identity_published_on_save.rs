@@ -414,9 +414,9 @@ async fn ticking_the_box_and_saving_publishes_the_identity_for_billing() {
     assert_eq!(published[0].1["use_for_billing"], json!(true));
 }
 
-/// 🔴 The box unticked (its default) still publishes the taxpayer — and says so EXPLICITLY. An
-/// absent flag is read by the control plane as «the old hub, update the profile as always»
-/// (saas#2370), so `false` has to travel, not be left out.
+/// 🔴 The box unticked (its default) still publishes the taxpayer — and says so EXPLICITLY:
+/// `false` travels instead of being left out, so the choice never rests on the control plane's
+/// default for an absent flag (saas#2370 reads it as `false`; an older control plane ignores it).
 #[tokio::test]
 async fn an_unticked_box_publishes_the_identity_not_for_billing() {
     let (cloud, published) = spawn_cloud(StatusCode::OK).await;
