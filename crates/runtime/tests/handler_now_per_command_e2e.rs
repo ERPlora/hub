@@ -133,7 +133,10 @@ async fn the_declared_event_carries_the_operations_now() {
     let rt = runtime().await;
     touch(&rt, "a1").await;
 
-    let stamped = trail_rows(&rt).await.first().expect("the history row exists")["stamped_at"]
+    let stamped = trail_rows(&rt)
+        .await
+        .first()
+        .expect("the history row exists")["stamped_at"]
         .clone();
     let events = rt
         .db_for_test()
@@ -144,7 +147,11 @@ async fn the_declared_event_carries_the_operations_now() {
         .await
         .expect("read _event_outbox")
         .rows;
-    assert_eq!(events.len(), 1, "the declared event is enqueued: {events:?}");
+    assert_eq!(
+        events.len(),
+        1,
+        "the declared event is enqueued: {events:?}"
+    );
     let payload: Json = match &events[0]["payload"] {
         Json::String(text) => serde_json::from_str(text).expect("payload is JSON"),
         other => other.clone(),
