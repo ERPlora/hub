@@ -1,6 +1,6 @@
 // How the assistant panel NAMES a screen of the shell (hub#2204).
 //
-// The answer mentions screens by path (`/m/cash_register/settings`, `/settings#pin`, …) and the
+// The answer mentions screens by path (`/m/cash_register/settings`, `/settings#permissions`, …) and the
 // drawer turns them into «Go to …» buttons and links. They read «Cash_register › settings»: the
 // module id with a capital letter and the raw tab id — identifiers the owner meets nowhere else.
 // The sidebar, the launcher and the module tab bar name the app and the screen from

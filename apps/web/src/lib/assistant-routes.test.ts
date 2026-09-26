@@ -64,7 +64,7 @@ describe('routeLabel — a screen is named as the shell names it (hub#2204)', ()
   it('the shell screens by their menu name, with or without a section anchor', () => {
     expect(routeLabel('/dashboard', { modules, t })).toBe('Inicio');
     expect(routeLabel('/employees', { modules, t })).toBe('Empleados');
-    expect(routeLabel('/settings#pin', { modules, t })).toBe('Ajustes');
+    expect(routeLabel('/settings#permissions', { modules, t })).toBe('Ajustes');
     expect(routeLabel('/billing', { modules, t })).toBe('Mi plan');
   });
 });
