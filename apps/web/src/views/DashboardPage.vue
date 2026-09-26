@@ -364,11 +364,13 @@ async function loadWidgets(): Promise<void> {
       hasPermission: () => null,
       labels: { empty: t('dashboard.widgetEmpty'), error: t('dashboard.widgetError') },
     });
-    widgets = collected.widgets;
-    presets = collected.presets;
+    // A partial answer degrades HERE, inside the try, as the old spreads did: a missing list read
+    // later from the board's watcher throws where nothing catches it.
+    widgets = collected.widgets ?? [];
+    presets = collected.presets ?? [];
     // Lo que ADR-0054 §4 marca como activo para este hub. Los `default:false` NO entran aquí: se
     // activan a mano desde el ⋮ (hub#1100).
-    active = collected.defaultActive;
+    active = collected.defaultActive ?? [];
   } catch {
     /* degrada: sin widgets de módulo */
   }

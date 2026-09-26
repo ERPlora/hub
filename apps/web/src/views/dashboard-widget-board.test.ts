@@ -433,6 +433,20 @@ describe('hub#2199 — the «set up your business» tile belongs to an empty bus
     expect(whatTheBoardShows(boardOf(wrapper))).toEqual(['core.blueprint']);
   });
 
+  it('🔴 a collection that omits `defaultActive` still dresses the board, starting empty', async () => {
+    // What the view did before hub#2199 too: a partial answer degrades inside `loadWidgets`, it
+    // never throws later from the board's watcher (the gate caught that as an unhandled rejection).
+    collectDashboardWidgets.mockResolvedValue({
+      widgets: MODULE_WIDGETS.widgets,
+      presets: [],
+    });
+    setupStatusRef.value = statusWithApps('done');
+    const { wrapper } = mountDashboard();
+    await flushPromises();
+    expect(ids(boardOf(wrapper))).toEqual(['sales.today']);
+    expect(whatTheBoardShows(boardOf(wrapper))).toEqual([]);
+  });
+
   it('🔴 leaves the board when the template is applied while the panel is on screen', async () => {
     collectDashboardWidgets.mockResolvedValue(NO_MODULES);
     setupStatusRef.value = statusWithApps('pending');
