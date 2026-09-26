@@ -49,6 +49,15 @@ describe('the receipt that did NOT come out is still an error', () => {
   });
 });
 
+describe('the receipt out without its VeriFactu QR (hub#1867)', () => {
+  it('is a warning, not an error: the paper is already in the customer’s hand', () => {
+    const n = saleTicketWithoutFiscalNotice();
+    expect(n.messageKey).toBe('print.ticketWithoutFiscal');
+    expect(n.color).toBe('warning');
+    expect(n.duration).toBeGreaterThanOrEqual(6000);
+  });
+});
+
 describe('no warning about the sale’s receipt shows its internal id', () => {
   const locale = i18n.global.locale;
   const before = locale.value;
@@ -105,6 +114,10 @@ describe('the shell paints the receipt warnings through these notices', () => {
     expect(call).not.toContain('toastError');
     expect(call).not.toContain("'print.ticket");
     expect(call).not.toContain('saleId }');
+    // The tone and the time are the notice's: a literal colour here (or the default 2.6 s) would
+    // paint the waiting receipt red again while every test above stays green.
+    expect(call.match(/, n\.color, n\.duration\)/g)).toHaveLength(2);
+    expect(call).not.toMatch(/'(danger|warning|primary|success|medium)'/);
   });
 
   it('and the region asserted really is only that call', () => {
