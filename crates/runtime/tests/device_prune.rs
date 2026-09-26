@@ -251,3 +251,58 @@ async fn a_row_with_no_last_use_on_record_is_judged_by_the_day_it_was_trusted() 
     assert!(listed(&rt, "trusted-today").await.is_some());
     assert!(listed(&rt, "trusted-long-ago").await.is_none());
 }
+
+#[tokio::test]
+async fn a_device_somebody_signed_out_of_last_week_stays() {
+    // Signing out DELETES the session row (`delete_session`), and so do a user's deactivation and
+    // the device-limit sweep: a till used ten days ago and closed with «Sign out» has no session left
+    // to vouch for it. Its `last_seen_at` is the only trace of that use, and it has to be enough.
+    let hub_id = "hub-2215-f";
+    let (rt, admin) = hub(hub_id).await;
+    rt.trust_device("signed-out-till", "Ana").await.unwrap();
+    let token = rt
+        .create_session(&admin, 3600, Some("signed-out-till"))
+        .await
+        .unwrap();
+    rt.delete_session(&token).await.unwrap();
+    age_device(&rt, hub_id, "signed-out-till", 60, 10).await;
+    assert_eq!(
+        session_rows(&rt, hub_id, "signed-out-till").await,
+        0,
+        "precondition: signing out left no session behind"
+    );
+
+    assert!(!listed(&rt, "signed-out-till").await.unwrap().stale);
+
+    let pruned = rt.prune_stale_devices("").await.unwrap();
+
+    assert_eq!(pruned.removed, 0, "a till used ten days ago is not unused");
+    assert!(listed(&rt, "signed-out-till").await.is_some());
+}
+
+#[tokio::test]
+async fn the_business_next_door_using_the_same_tablet_does_not_keep_mine() {
+    // One tablet can be trusted by two businesses (hub#489). Its live session in the business next
+    // door says nothing about its use HERE: the rule reads this hub's sessions only.
+    let test_db = TestDb::new().await;
+    let mine = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-2215-g-mine");
+    let theirs = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-2215-g-theirs");
+    mine.ensure_system_tables().await.unwrap();
+    theirs.ensure_system_tables().await.unwrap();
+    for rt in [&mine, &theirs] {
+        let admin = rt
+            .create_user("Admin", "1111", "admin", None)
+            .await
+            .unwrap();
+        rt.trust_device("shared-tablet", "Ana").await.unwrap();
+        rt.create_session(&admin, 3600, Some("shared-tablet"))
+            .await
+            .unwrap();
+    }
+    age_device(&mine, "hub-2215-g-mine", "shared-tablet", 60, 40).await;
+    age_sessions(&mine, "hub-2215-g-mine", "shared-tablet", 40, 39).await;
+
+    assert!(listed(&mine, "shared-tablet").await.unwrap().stale);
+    assert_eq!(mine.prune_stale_devices("").await.unwrap().removed, 1);
+    assert!(listed(&theirs, "shared-tablet").await.is_some());
+}
