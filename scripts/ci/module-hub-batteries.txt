@@ -141,3 +141,8 @@ staff/tests/user_link.hub.test.py
 # kernel real — lo único que resuelve las `reads` de `close_from_order` (kitchen#79).
 # Entró pendiente de publicar (kitchen#84) y kitchen#85 la publicó: ya es una entrada normal.
 kitchen/tests/closed_check.hub.test.py
+
+# kitchen: una ronda ya enviada pasa a urgente y vuelve por la puerta de SU hub, y otro hub ni la
+# ve ni la toca, contra el kernel real (kitchen#76). Cobertura nueva, no mudada.
+# pending-publication: kitchen#95 until 2026-10-25
+kitchen/tests/rush_after_fire.hub.test.py
