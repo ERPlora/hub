@@ -35,6 +35,7 @@ export default {
     loading: 'Loading documentation…',
     errorTitle: 'Could not load the documentation',
     errorBody: 'The API spec could not be fetched. Sign in and try again.',
+    retry: 'Retry',
   },
   topbar: {
     back: 'Back',
@@ -297,6 +298,14 @@ export default {
     renameError: 'It could not be renamed. This folder may be read-only.',
     deleteFolderTitle: 'Delete folder',
     deleteFolderBody: 'You are about to delete “{name}” and everything inside it. This cannot be undone.',
+    // hub#2197 — the move toast names the folder the file went to; `{folder}` is its last segment.
+    moveSuccess: 'Moved to “{folder}”.',
+    moveError: 'It could not be moved. The destination folder may be read-only.',
+    // The rest of the labels `ok-file-manager` renders; without them it shows its built-in Spanish.
+    move: 'Move to…',
+    renameFolder: 'Rename folder',
+    deleteFolder: 'Delete folder',
+    noLimit: 'No limit',
     close: 'Close',
     previewZoomIn: 'Zoom in',
     previewZoomOut: 'Zoom out',
