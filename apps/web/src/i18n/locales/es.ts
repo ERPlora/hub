@@ -1411,6 +1411,10 @@ export default {
     // qué hacer. Se ofrecen los dos gestos, y primero el que no cuesta nada.
     sessionTakenOverBody:
       'Tu plan cubre un dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí, o amplía los dispositivos de tu plan.',
+    // hub#2152 — the pass from the ERPlora panel could not be redeemed; the login still works.
+    courierFailed: 'No se pudo entrar desde el panel de ERPlora',
+    courierFailedBody:
+      'Inicia sesión aquí para continuar.',
     setupChoosePin: 'Elige un PIN de {n} dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',

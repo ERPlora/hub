@@ -57,7 +57,7 @@ import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
 import { bootActionFeedback, toast, toastError } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
-import { bootCourier, takeShellCourierCode } from './lib/courier';
+import { redeemShellCourier, takeShellCourierCode } from './lib/courier';
 import { bootUntilReachable } from './lib/boot';
 import { createBootScreen } from './lib/boot-screen';
 
@@ -409,12 +409,10 @@ void bootUntilReachable({
   showProgress: () => bootScreen?.showProgress(),
 }).then(async () => {
   // ADR-0159: if the SaaS sent a one-time shell courier, consume it before router mount so the
-  // first protected route sees an authenticated local session.  The fragment is scrubbed before
-  // this network call; failure falls through to the ordinary login page without logging the code.
-  try {
-    await bootCourier(shellCourierCode);
-  } catch {
-    // Login remains available and the one-time credential has already been removed from the URL.
-  }
+  // first protected route sees an authenticated local session. The fragment is scrubbed before
+  // this network call. `redeemShellCourier` never throws: a failure is reported through the
+  // client-error channel (the runtime's code, never the pass) and falls through to the ordinary
+  // login page, which explains it (hub#2152).
+  await redeemShellCourier(shellCourierCode);
   router.isReady().then(() => app.mount('#app'));
 });
