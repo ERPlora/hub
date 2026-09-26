@@ -22,23 +22,33 @@ export const TELEPORTED_STYLE_MODES = ['ios', 'md'] as const;
  * them wherever they render (ion-modal, ion-button, ion-item, ion-content, ...) — and structural
  * tags with side effects on connect (ion-app, ion-router*, ion-refresher, ion-infinite-scroll,
  * ion-item-sliding, ion-reorder-group, ion-radio-group).
+ *
+ * THE ORDER IS PART OF THE CONTRACT. Stencil inserts each new scoped sheet BEFORE the previous
+ * ones in `<head>`, so the sheet registered last has the lowest priority, and Ionic's own sheets
+ * collide at equal specificity (`.card-content-ios h2` vs `.sc-ion-label-ios-s h2`). A page
+ * connects a container before the fields inside it, and the shell's visual baselines (hub#1250)
+ * pin that cascade: containers first, then the fields they hold. With the leaves first, the row
+ * titles of the «Hub» settings tab grew from 16px to 17px (measured, rv-2170).
  */
 export const TELEPORTED_STYLE_TAGS: readonly string[] = [
+  // Overlays a module opens inline (roots of their own).
   'ion-alert',
   'ion-action-sheet',
   'ion-loading',
   'ion-picker-legacy',
-  'ion-input',
-  'ion-input-otp',
-  'ion-textarea',
-  'ion-searchbar',
-  'ion-label',
-  'ion-buttons',
-  'ion-list',
-  'ion-item-group',
+  // Containers, outermost first.
   'ion-header',
   'ion-footer',
   'ion-card-content',
+  'ion-list',
+  'ion-item-group',
+  // Fields and leaves the containers hold.
+  'ion-buttons',
+  'ion-searchbar',
+  'ion-label',
+  'ion-input',
+  'ion-input-otp',
+  'ion-textarea',
 ];
 
 export interface PreloadOptions {

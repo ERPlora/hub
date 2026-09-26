@@ -120,3 +120,34 @@ describe('preloadTeleportedStyles (hub#2162)', () => {
     expect(main.search(/\bvoid preloadTeleportedStyles\(\)/)).toBeGreaterThan(ionicInit);
   });
 });
+
+describe('preload order (hub#2162 · visual baseline hub#1250)', () => {
+  it('connects the probes in list order, so Stencil registers their sheets in that order', async () => {
+    const outer = freshTag();
+    const inner = freshTag();
+    defineStandIn(customElements, outer);
+    defineStandIn(customElements, inner);
+
+    await preloadTeleportedStyles({ doc: document, registry: customElements, tags: [outer, inner] });
+
+    expect(seen.map((s) => s.tag)).toEqual([outer, outer, inner, inner]);
+  });
+
+  it('lists every container before the fields it holds, the way the DOM connects a page', () => {
+    // Stencil inserts each new scoped sheet BEFORE the previous ones in <head>, so the sheet
+    // registered last has the lowest priority. Ionic's own sheets collide at equal specificity
+    // (`.card-content-ios h2` vs `.sc-ion-label-ios-s h2`): a page connects the container first and
+    // its fields after, and the visual baselines (hub#1250) pin that cascade. Measured with the
+    // leaves first: the «Hub» tab of Settings grew its row titles from 16px to 17px.
+    const at = (tag: string): number => TELEPORTED_STYLE_TAGS.indexOf(tag);
+    const containers = ['ion-header', 'ion-footer', 'ion-card-content', 'ion-list', 'ion-item-group'];
+    const leaves = ['ion-buttons', 'ion-searchbar', 'ion-label', 'ion-input', 'ion-input-otp', 'ion-textarea'];
+    for (const container of containers) {
+      for (const leaf of leaves) {
+        expect(at(container), `${container} must precede ${leaf}`).toBeLessThan(at(leaf));
+      }
+    }
+    expect(at('ion-card-content')).toBeLessThan(at('ion-list'));
+    expect(at('ion-list')).toBeLessThan(at('ion-item-group'));
+  });
+});
