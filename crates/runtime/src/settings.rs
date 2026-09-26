@@ -42,6 +42,9 @@ struct Setting {
 }
 
 /// Registro de claves conocidas. **Añadir una clave = añadir una entrada aquí** (sin migración).
+/// The setting behind «use these details for my ERPlora invoice too» (hub#2217).
+pub const BILLING_IDENTITY_SETTING: &str = "business_identity_for_erplora_billing";
+
 const KNOWN: &[Setting] = &[
     Setting {
         key: "currency",
@@ -130,6 +133,17 @@ const KNOWN: &[Setting] = &[
         default: || json!(""),
         validate: validate_tax_id,
         parse_stored: |s| json!(s),
+    },
+    // «Use these details for my ERPlora invoice too» (ADR-0201 d. 5, hub#2217): whether the
+    // identity above is ALSO who ERPlora invoices. The identity always goes up (the representation
+    // grant names the taxpayer); only this box lets the control plane touch the `BillingProfile`
+    // that pays the hub (saas#2370). Off by default: the accounting firm that pays its clients'
+    // hubs must not see its profile overwritten because a client saved a tax id.
+    Setting {
+        key: BILLING_IDENTITY_SETTING,
+        default: || json!(false),
+        validate: validate_bool,
+        parse_stored: |s| json!(s == "true"),
     },
     Setting {
         key: "business_legal_name",

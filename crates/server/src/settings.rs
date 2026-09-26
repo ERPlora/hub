@@ -20,6 +20,7 @@ use serde_json::{json, Map, Value};
 
 use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, ProducerFactsCache};
+use erplora_runtime::settings::BILLING_IDENTITY_SETTING;
 
 use crate::auth;
 use crate::gateway_enrolment;
@@ -734,17 +735,27 @@ fn fiscal_identity_payload(settings: &Value) -> Option<Map<String, Value>> {
         Value::String(get("business_address")),
     );
     body.insert("billing_country".into(), Value::String(get("country_code")));
+    // hub#2217 — whether the owner ticked «use these details for my ERPlora invoice too». Always
+    // sent, `false` included: the control plane reads an ABSENT flag as a hub that predates the
+    // box and keeps updating the `BillingProfile` as it always did (saas#2370).
+    let use_for_billing = settings
+        .get(BILLING_IDENTITY_SETTING)
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    body.insert("use_for_billing".into(), Value::Bool(use_for_billing));
     Some(body)
 }
 
-/// Claves de `hub_settings` que dicen QUIÉN es el obligado tributario. Un guardado que toca
-/// cualquiera de ellas republica la identidad; cualquier otro deja al SaaS en paz — si publicara en
-/// cada guardado, apagar la doc de la API mandaría una identidad fiscal.
-const FISCAL_IDENTITY_KEYS: [&str; 4] = [
+/// `hub_settings` keys that say WHO the taxpayer is — plus the box that says whether ERPlora
+/// invoices that same identity (hub#2217). A save touching any of them republishes the identity;
+/// any other leaves the control plane alone — publishing on every save would send a fiscal
+/// identity whenever somebody switched off the API docs.
+const FISCAL_IDENTITY_KEYS: [&str; 5] = [
     "business_tax_id",
     "business_legal_name",
     "business_address",
     "country_code",
+    BILLING_IDENTITY_SETTING,
 ];
 
 fn touches_fiscal_identity(updates: &Map<String, Value>) -> bool {
@@ -834,10 +845,11 @@ impl PublishFailure {
     }
 }
 
-/// **El único camino** por el que la identidad fiscal del negocio sube al SaaS, que crea/actualiza
-/// el `BillingProfile` que paga este hub (ADR-0201 decisión 5) y **espeja el NIF del obligado**
-/// para el otorgamiento del Anexo I (saas#1741). Lo comparten sus dos puertas: la casilla explícita
-/// ([`publish_fiscal_identity`]) y el guardado de Ajustes → Negocio ([`put_settings`], hub#1306).
+/// **The only path** by which the business's fiscal identity reaches the SaaS. The SaaS always
+/// **mirrors the taxpayer's tax id** for the Annex I grant (saas#1741), and creates/updates the
+/// `BillingProfile` that pays this hub (ADR-0201 decision 5) only when `use_for_billing` says the
+/// owner ticked the box (hub#2217, saas#2370). Two doors share it: the Settings → Business save
+/// ([`put_settings`], hub#1306) and the legacy explicit door ([`publish_fiscal_identity`]).
 ///
 /// La llamada la hace el runtime porque el `cloud_api_token` es secreto del hub y nunca cruza al
 /// navegador (ADR-0003).
@@ -868,15 +880,15 @@ pub(crate) async fn push_fiscal_identity(
     }
 }
 
-/// POST /api/business/fiscal-identity — publica la identidad fiscal del negocio en el SaaS.
+/// POST /api/business/fiscal-identity — republishes the STORED fiscal identity to the SaaS.
 ///
-/// Es la casilla *"usar estos datos también para mi factura de ERPlora"* de Ajustes → Negocio: el
-/// dato se escribió UNA vez aquí y la copia SUBE. Sin marcarla, el perfil se rellena aparte en el
-/// SaaS (el caso de la gestoría que paga los hubs de sus clientes). **No es la única puerta**: el
-/// propio guardado del NIF publica desde hub#1306, porque el SaaS necesita al obligado para el
-/// otorgamiento del Anexo I, no solo para su factura.
+/// It used to sit behind the *«use these details for my ERPlora invoice too»* toggle, which fired
+/// it on press with the stored values instead of the typed ones. Since hub#2217 that choice is a
+/// setting saved with the Business form, and the save publishes (hub#1306). The door stays for
+/// existing callers and sends the stored box like any other publication, never a hard-coded
+/// «for billing».
 ///
-/// Auth = sesión admin, porque la identidad fiscal es del dueño del negocio.
+/// Auth = admin session, because the fiscal identity belongs to the business owner.
 pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,

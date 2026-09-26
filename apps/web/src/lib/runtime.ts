@@ -900,22 +900,6 @@ export async function putModuleCapabilities(
 }
 
 
-/**
- * Comparte la identidad fiscal del negocio con el SaaS (`POST /api/business/fiscal-identity`) —
- * la casilla «usar estos datos también para mi factura de ERPlora» (ADR-0201 decisión 5).
- *
- * El body lo construye el RUNTIME leyendo `hub_settings`: el dato ya está escrito, aquí solo se
- * autoriza que suba una copia. Y la llamada al SaaS la hace el runtime porque el token de máquina
- * del hub nunca cruza a este navegador (ADR-0003). Solo admin (Rust revalida). Lanza si falla.
- */
-export async function publishFiscalIdentity(): Promise<void> {
-  const res = await runtimeFetch(`${RUNTIME_URL}/api/business/fiscal-identity`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...runtimeHeaders() },
-  });
-  if (!res.ok) throw new Error(`publish-fiscal-identity → ${res.status}`);
-}
-
 // ── Export/Import del hub (blueprints, ADR-0113 — architecture/hub/export-import.md) ──────────
 // Motor CORE de backup/restore: exportar empaqueta configuración (+datos opcionales) en un
 // `*.blueprint.zip`; importar lo restaura en orden «migrate» (instalar módulos → SQL → media →
@@ -1507,6 +1491,7 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     business_street_number: hubSettings.value?.business_street_number ?? '',
     business_postal_code: hubSettings.value?.business_postal_code ?? '',
     business_city: hubSettings.value?.business_city ?? '',
+    business_identity_for_erplora_billing: hubSettings.value?.business_identity_for_erplora_billing ?? false,
     // La paleta global tampoco viaja en el context: la trae el GET completo (que además
     // la refleja en el shell vía theme.ts). Aquí solo se preserva la cache.
     theme_palette: hubSettings.value?.theme_palette ?? 'erplora',
