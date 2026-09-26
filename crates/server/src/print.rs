@@ -176,7 +176,7 @@ pub async fn enqueue_job(
                 // show a ticket nobody is draining; this line is what whoever watches the fleet
                 // sees. One per real ticket — a retried `jobId` is the same incident — and none
                 // while a device drains the station. The code is what alerts match on.
-                if report.live_hosts == 0 {
+                if report.awaiting_host() {
                     tracing::warn!(
                         event = "print.job_unattended",
                         job_id = job.job_id.trim(),

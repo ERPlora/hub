@@ -210,3 +210,26 @@ async fn a_duplicate_of_an_unattended_ticket_does_not_warn_twice() {
 
     assert_eq!(unattended_lines("unattended-3").len(), 1);
 }
+
+/// The line names the STATION the ticket landed on, not the word the producer sent: the alert
+/// that reads `role` has to match the same key the hosts register under, and ` Kitchen ` is not
+/// a station anybody drains.
+#[tokio::test]
+async fn the_warning_names_the_resolved_station_not_the_producers_spelling() {
+    let (router, session) = fixture().await;
+
+    let body = enqueue(&router, &session, "unattended-4", " Kitchen ").await;
+    assert_eq!(
+        body["role"],
+        json!("kitchen"),
+        "precondition: the answer resolves it"
+    );
+
+    let lines = unattended_lines("unattended-4");
+    assert_eq!(lines.len(), 1, "exactly one line: {lines:?}");
+    assert!(
+        lines[0].contains("role=\"kitchen\""),
+        "the canonical station key, never the producer's spelling: {}",
+        lines[0]
+    );
+}
