@@ -1939,11 +1939,6 @@ export default {
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'This app is not available for this hub.',
-    // hub#1723 — an address that names a screen this app does not have. It is swapped for the one
-    // it does have (an old bookmark keeps working), and the swap is now said out loud, naming what
-    // ended up on screen: «that does not exist» on its own leaves the person wondering what they
-    // are looking at instead.
-    unknownTabToast: 'This app has no screen at that address — showing «{tab}».',
   },
   moduleSettings: {
     tab: 'Settings',
