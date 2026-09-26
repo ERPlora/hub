@@ -29,6 +29,9 @@
 // programmatic `open()` with no event makes Ionic fall back to the alert by itself (with its own
 // warning), so nothing ends up worse than before.
 //
+// The same wrapper also tells the popover WHERE to open (hub#2237, `anchoredTo` below): inside a
+// module's shadow roots Ionic would otherwise pin the list to the top of the module, not the field.
+//
 // What counts as the author's choice: any `interface` attribute (`alert` included), and any value
 // written from JS other than Ionic's default. The one case that cannot be told apart is a module
 // writing `.interface = 'alert'` from JS — letter for letter the default — and no module does.
@@ -84,8 +87,34 @@ function patchConstructor(ctor: CustomElementConstructor): void {
       // The dialog must open no matter what: an alert that needs OK beats a select that is dead.
       console.error('[ionic-select-interface] choosing the interface failed; opening as is', error);
     }
-    return original.call(this, ev);
+    return original.call(this, anchoredTo(this, ev));
   };
+}
+
+type AnchorDetail = { ionShadowTarget?: EventTarget };
+
+/**
+ * hub#2237 — the click, naming the select as the element its list opens against.
+ *
+ * With a stacked/floating label (or `md` with `fill`) Ionic hands the click to the popover untouched
+ * (`size: 'cover'`), and the popover anchors to `ev.detail?.ionShadowTarget || ev.target`. It reads
+ * that after the click has left the module's shadow roots, when `target` is already the module HOST:
+ * the list lands on top of the module, 150-300 px from the field. Ionic's other branch names the
+ * anchor the same way, with a copy of the event — `Object.assign` skips the getters of an `Event`, so
+ * what the popover also reads (`target`, and the point for `reference: 'event'`) is carried over by
+ * hand. An anchor the event already names is kept.
+ */
+function anchoredTo(el: SelectControl, ev?: Event): Event | undefined {
+  if (!ev) return ev;
+  const { detail, clientX, clientY } = ev as Event & { detail?: unknown; clientX?: number; clientY?: number };
+  if ((detail as AnchorDetail | undefined)?.ionShadowTarget) return ev;
+  const extra = detail !== null && typeof detail === 'object' ? detail : {};
+  return Object.assign({}, ev, {
+    target: ev.target,
+    clientX,
+    clientY,
+    detail: { ...extra, ionShadowTarget: el },
+  });
 }
 
 /**

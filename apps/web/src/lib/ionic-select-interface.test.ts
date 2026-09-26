@@ -95,6 +95,45 @@ function patchedTag(): string {
   return tag;
 }
 
+/** What Ionic's popover reads from the event it is given to decide where to open. */
+type AnchorEvent = Event & { detail?: { ionShadowTarget?: EventTarget } };
+
+/** The element Ionic's popover positions itself against (`popover/utils.js`, reference `trigger`). */
+const anchorOf = (ev: AnchorEvent): EventTarget | null | undefined => ev.detail?.ionShadowTarget || ev.target;
+
+/** Like `patchedTag`, but the probe's `open(ev)` returns the event Ionic would receive. */
+function patchedAnchorTag(): string {
+  const tag = uniq('ion-select');
+  bootIonicSelectInterface([tag]);
+  customElements.define(
+    tag,
+    class extends HTMLElement {
+      interface = 'alert';
+      multiple = false;
+      open(ev?: Event): Event | undefined {
+        return ev;
+      }
+    },
+  );
+  return tag;
+}
+
+/** Mounts `html` two shadow roots deep — a module page holding a module form, like verifactu's. */
+function mountInNestedShadowRoots(
+  html: string,
+  selector: string,
+): HTMLElement & { open(ev?: Event): Event | undefined } {
+  const page = document.createElement('div');
+  document.body.append(page);
+  const form = document.createElement('div');
+  page.attachShadow({ mode: 'open' }).append(form);
+  const root = form.attachShadow({ mode: 'open' });
+  root.innerHTML = html;
+  const el = root.querySelector(selector);
+  if (!el) throw new Error(`probe not found: ${selector}`);
+  return el as HTMLElement & { open(ev?: Event): Event | undefined };
+}
+
 describe('a single-choice select closes the moment an option is picked (hub#2223)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -176,12 +215,12 @@ describe('a single-choice select closes the moment an option is picked (hub#2223
   it("keeps the element working: Ionic's own `open` still runs and its result comes back", async () => {
     const tag = uniq('ion-select');
     bootIonicSelectInterface([tag]);
-    const calls: Array<[string | undefined, Event | undefined]> = [];
+    const calls: Array<[string | undefined, AnchorEvent | undefined]> = [];
     class Probed extends HTMLElement {
       interface = 'alert';
       multiple = false;
       async open(ev?: Event): Promise<string> {
-        calls.push([this.interface, ev]);
+        calls.push([this.interface, ev as AnchorEvent | undefined]);
         return 'presented';
       }
     }
@@ -189,8 +228,14 @@ describe('a single-choice select closes the moment an option is picked (hub#2223
     const el = document.createElement(tag) as unknown as Probed;
     document.body.append(el);
     const click = new MouseEvent('click');
+    el.dispatchEvent(click);
     await expect(el.open(click)).resolves.toBe('presented');
-    expect(calls).toEqual([['popover', click]]); // the click is what the popover anchors to
+    expect(calls).toHaveLength(1);
+    const [opened, ev] = calls[0];
+    expect(opened).toBe('popover');
+    // The click still reaches Ionic — what the popover anchors to, now pinned to the select itself.
+    expect(ev?.target).toBe(click.target);
+    expect(ev?.detail?.ionShadowTarget).toBe(el);
   });
 
   it('is idempotent: booting twice does not double-patch or throw', () => {
@@ -204,6 +249,73 @@ describe('a single-choice select closes the moment an option is picked (hub#2223
     document.body.append(el); // re-connecting must not stack a second default either
     el.interface = 'modal';
     expect(el.open()).toBe('modal');
+  });
+
+  describe('the list opens under the field, not at the top of the module (hub#2237)', () => {
+    // With a stacked/floating label (what our selects use) Ionic hands the click to the popover as
+    // is, and the popover anchors to `ev.detail?.ionShadowTarget || ev.target`. By the time it reads
+    // it, the click has left the module's shadow roots and `target` points at the module HOST: the
+    // list covers the top of the module, 150-300 px away from the field.
+    /** Opens like Ionic does — from the element's own click listener — and returns what Ionic got. */
+    function clickToOpen(el: HTMLElement & { open(ev?: Event): unknown }): AnchorEvent {
+      let received: AnchorEvent | undefined;
+      el.addEventListener('click', (e) => {
+        received = el.open(e) as AnchorEvent;
+      });
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+      if (!received) throw new Error('the click did not open the select');
+      return received;
+    }
+
+    it('a select two shadow roots deep anchors its list to itself', () => {
+      const tag = patchedAnchorTag();
+      const el = mountInNestedShadowRoots(`<${tag}></${tag}>`, tag);
+      const ev = clickToOpen(el);
+      expect(ev.detail?.ionShadowTarget).toBe(el);
+      expect(anchorOf(ev)).toBe(el);
+    });
+
+    it('keeps the rest of what the popover reads: the target, and the point for `reference: event`', () => {
+      const tag = patchedAnchorTag();
+      const el = mountInNestedShadowRoots(`<${tag}></${tag}>`, tag);
+      let target: EventTarget | null = null;
+      el.addEventListener('click', (e) => {
+        target = e.target;
+      });
+      let received: (AnchorEvent & { clientX?: number; clientY?: number }) | undefined;
+      el.addEventListener('click', (e) => {
+        received = el.open(e) as typeof received;
+      });
+      // In a browser the point lives in getters of MouseEvent.prototype, which a copy of the event
+      // skips; happy-dom keeps it as own properties, so the click is built the browser's way.
+      class BrowserClick extends Event {
+        get clientX(): number {
+          return 12;
+        }
+        get clientY(): number {
+          return 34;
+        }
+      }
+      const click = new BrowserClick('click');
+      expect(Object.assign({}, click).clientX, 'a copy must not carry the point by itself').toBeUndefined();
+      el.dispatchEvent(click);
+      expect(received?.target).toBe(target);
+      expect([received?.clientX, received?.clientY]).toEqual([12, 34]);
+    });
+
+    it('an anchor the event already names is respected', () => {
+      const tag = patchedAnchorTag();
+      const el = mountInNestedShadowRoots(`<${tag}></${tag}>`, tag);
+      const inner = document.createElement('span');
+      const custom = { target: el, detail: { ionShadowTarget: inner } } as unknown as Event;
+      expect(anchorOf(el.open(custom) as AnchorEvent)).toBe(inner);
+    });
+
+    it('a programmatic open without a click stays without one — Ionic then falls back by itself', () => {
+      const tag = patchedAnchorTag();
+      const el = mountInNestedShadowRoots(`<${tag}></${tag}>`, tag);
+      expect(el.open()).toBeUndefined();
+    });
   });
 
   it('booting LATE still works — `open` is a method, not a lifecycle callback frozen by define', () => {
@@ -222,13 +334,13 @@ describe('a single-choice select closes the moment an option is picked (hub#2223
 
 describe('the premise still holds', () => {
   /** Source of one `@ionic/core` component, read from the installed dependency itself. */
-  async function ionicSource(component: string): Promise<string> {
+  async function ionicSource(component: string, file = component): Promise<string> {
     const { createRequire } = await import('node:module');
     const { readFileSync } = await import('node:fs');
     const { dirname, join } = await import('node:path');
     const require = createRequire(import.meta.url);
     const core = dirname(require.resolve('@ionic/core/package.json'));
-    return readFileSync(join(core, 'dist/collection/components', component, `${component}.js`), 'utf8');
+    return readFileSync(join(core, 'dist/collection/components', component, `${file}.js`), 'utf8');
   }
 
   it('`ion-select` is what the shell watches', () => {
@@ -294,6 +406,32 @@ describe('the premise still holds', () => {
     explicit.setAttribute('interface', 'action-sheet');
     document.body.append(explicit);
     expect(await openedInterface(explicit)).toBe('action-sheet');
+
+    // hub#2237 — a stacked select two shadow roots deep, the way verifactu's forms render it: the
+    // event Ionic's own `open()` hands to `createOverlay` names the select as the popover's anchor.
+    const deep = mountInNestedShadowRoots(
+      '<ion-select label="Type" label-placement="stacked"></ion-select>',
+      'ion-select',
+    ) as unknown as RealSelect;
+    let handed: AnchorEvent | undefined;
+    deep.createOverlay = (ev) => {
+      handed = ev as AnchorEvent;
+      return { addEventListener: () => {}, onDidDismiss: () => new Promise(() => {}), present: async () => {} };
+    };
+    await deep.open(new MouseEvent('click'));
+    expect(handed?.detail?.ionShadowTarget).toBe(deep);
+  });
+
+  it('with a stacked or floating label Ionic still hands the click to the popover untouched', async () => {
+    // The reason hub#2237 exists: only the OTHER branch of `openPopover` names an anchor. The day
+    // Ionic names one for `cover` too, the shell's anchor is redundant.
+    const select = await ionicSource('select');
+    expect(select).toMatch(
+      /if \(hasFloatingOrStackedLabel \|\| \(mode === 'md' && fill !== undefined\)\) \{\s*size = 'cover';/,
+    );
+    const utils = await ionicSource('popover', 'utils');
+    expect(utils).toContain('_a.ionShadowTarget) ||');
+    expect(utils).toContain('customEv.target));');
   });
 
   it('the shell boots the hook: main.ts imports it next to its twins, before @ionic/vue', async () => {
