@@ -82,6 +82,7 @@ services/tests/package_redeem.hub.test.py
 #   `schedules` y nadie más, así que el e2e ya no podía sembrarlas con los commands de Citas.
 appointments/tests/availability.hub.test.py
 appointments/tests/create_overlap.hub.test.py
+appointments/tests/history_trail.hub.test.py
 
 # ── Baterías ATERRIZADAS cuyo e2e del hub SIGUE EN PIE ──────────────────────────────────────
 # La mitad aditiva ya está (las PRs de módulo son `+N/-0`), pero su línea sigue en la sección
