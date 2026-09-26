@@ -748,6 +748,14 @@ export default {
       'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
     comandaDefaultLabel: 'sala',
   },
+  // hub#2168 — system notices for a booking or cancellation that did NOT come from a till.
+  appointmentNotice: {
+    created: 'Nueva cita',
+    createdFor: 'Nueva cita · {customer}',
+    cancelled: 'Cita cancelada',
+    cancelledFor: 'Cita cancelada · {customer}',
+    when: '{date} a las {time}',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
