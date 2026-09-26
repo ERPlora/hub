@@ -116,6 +116,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     'reject',
     'remove',
     'replaceGrants',
+    'restoreModuleTemplate',
     'restoreTemplate',
     'run',
     'runs',
@@ -151,6 +152,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
   await flows.activateTemplate('appointment-from-whatsapp');
   await flows.deactivateTemplate('appointment-from-whatsapp');
   await flows.restoreTemplate('appointment-from-whatsapp');
+  await flows.restoreModuleTemplate('whatsapp_inbox', 'appointment-from-whatsapp');
 
   assert.deepEqual(
     calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
@@ -183,6 +185,9 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
       'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/deactivate',
       // hub#2059 — the explicit «restore the factory one», MY OWN recipe only, like activate.
       'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/restore',
+      // flows#136 — the gallery's door: restoring ANOTHER module's recipe. The path names that
+      // module; the header below still names the caller, so the hub judges `manage_flows` on it.
+      'POST /api/hub/flows/templates/whatsapp_inbox/appointment-from-whatsapp/restore',
     ],
   );
   for (const call of calls) {
@@ -695,6 +700,15 @@ test('hub#1677: a family that would not survive a URL is refused before it is pa
     );
     await assert.rejects(
       () => client.flows.deactivateTemplate(bad),
+      (e: unknown) => e instanceof ErploraError && e.code === INVALID_ARGUMENT,
+    );
+    await assert.rejects(
+      () => client.flows.restoreModuleTemplate('whatsapp_inbox', bad),
+      (e: unknown) => e instanceof ErploraError && e.code === INVALID_ARGUMENT,
+    );
+    // flows#136 — the module is an argument on this door, so it is checked like the family.
+    await assert.rejects(
+      () => client.flows.restoreModuleTemplate(bad, 'appointment-from-whatsapp'),
       (e: unknown) => e instanceof ErploraError && e.code === INVALID_ARGUMENT,
     );
   }

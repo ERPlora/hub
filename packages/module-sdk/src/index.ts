@@ -1847,7 +1847,7 @@ export class FlowsApi {
    * A family that was never activated answers `flow.not_found` — there is no factory recipe here
    * to restore. A module may only restore its OWN recipes through this method, exactly like
    * {@link activateTemplate}; the gallery that holds `manage_flows` may restore any module's, but
-   * that is a different door, not this one.
+   * that is a different door, not this one: {@link restoreModuleTemplate}.
    *
    * A hub older than this route leaves the method **absent** rather than broken, like
    * {@link activateTemplate}: `typeof flows.restoreTemplate` is the probe.
@@ -1858,6 +1858,34 @@ export class FlowsApi {
     return this.send({
       method: 'POST',
       path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/restore`,
+    }) as Promise<Flow>;
+  }
+
+  /**
+   * `POST /api/hub/flows/templates/{module}/{family}/restore` — the Automations gallery's door
+   * (flows#136), for the `flows` module to restore a recipe that belongs to ANOTHER module, not
+   * its own.
+   *
+   * Unlike {@link restoreTemplate}, `module` is an argument here, so it is checked exactly like
+   * `family`. The path names the target module; the `X-Erplora-Module` header still names the
+   * calling module (`send` sets it, nothing to do here), and the hub judges that caller, not the
+   * path, in `refuse_unless_own_or_editor` (hub#2059, `crates/server/src/flows_api.rs`): it lets
+   * the call through only when the caller holds `manage_flows`, or the caller names itself — every
+   * other caller gets `403 flow.template_not_yours`.
+   *
+   * Same effect as {@link restoreTemplate} otherwise: same flow id and run history, its document
+   * and grants rebuilt from the target module's CURRENT recipe, enabled state unchanged. A family
+   * that was never activated answers `flow.not_found`, same as the other door.
+   *
+   * A hub older than this method leaves it **absent** rather than broken, like
+   * {@link restoreTemplate}: `typeof flows.restoreModuleTemplate` is the probe.
+   */
+  async restoreModuleTemplate(module: string, family: string): Promise<Flow> {
+    const targetModule = checkedSegment('module id', module, ID_PATTERN);
+    const targetFamily = checkedSegment('template family', family, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/templates/${targetModule}/${targetFamily}/restore`,
     }) as Promise<Flow>;
   }
 }
