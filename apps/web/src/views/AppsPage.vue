@@ -126,7 +126,7 @@
       :duration="toastDuration"
       :buttons="toastButtons"
       position="bottom"
-      :position-anchor="TOAST_ANCHOR"
+      :position-anchor="pageShown ? TOAST_ANCHOR : undefined"
       @did-dismiss="onToastDismissed"
     />
     <!-- Tabs en footer -->
@@ -162,7 +162,7 @@ import {
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
   IonToast,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
-  IonList, IonItem, alertController,
+  IonList, IonItem, alertController, onIonViewWillEnter, onIonViewWillLeave,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -295,6 +295,16 @@ const toastButtons = ref<ToastButton[]>([]);
 // hub#2244 — every notice of this page sits ABOVE the Apps tab bar (the footer below), not at the
 // window edge under it: on a desktop the error rose over the tabs, bottom edge 10 px from the frame.
 const TOAST_ANCHOR = 'apps-footer';
+// …but only while Apps is on screen. Ionic keeps a page it left in the DOM, hidden, and places a
+// notice anchored to a hidden footer from a zero-size box: above the TOP edge of the window. The
+// result of an install still running when the person left shows at the bottom of where they are.
+const pageShown = ref(true);
+onIonViewWillEnter(() => {
+  pageShown.value = true;
+});
+onIonViewWillLeave(() => {
+  pageShown.value = false;
+});
 // hub#2244 — `didDismiss` of a notice the page REPLACED arrives after its successor is already open
 // (Ionic finishes the leave animation first). Counted here so that late event does not close the
 // new notice: it closed the install error ~0.3 s after it rose.

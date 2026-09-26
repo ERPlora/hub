@@ -29,6 +29,15 @@ vi.mock('../lib/icons', () => ({
   moduleIconRegistry: () => ({}),
 }));
 vi.mock('../components/HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
+// The Ionic page lifecycle, captured so a test can walk away from Apps and back (hub#2249 review).
+const { lifecycle } = vi.hoisted(() => ({
+  lifecycle: { willEnter: [] as Array<() => void>, willLeave: [] as Array<() => void> },
+}));
+vi.mock('@ionic/vue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@ionic/vue')>()),
+  onIonViewWillEnter: (fn: () => void) => lifecycle.willEnter.push(fn),
+  onIonViewWillLeave: (fn: () => void) => lifecycle.willLeave.push(fn),
+}));
 
 function catalogueEntry(id: string, name: string) {
   return {
@@ -161,6 +170,8 @@ beforeEach(() => {
   CATALOG = [catalogueEntry('flows', 'Automations')];
   moduleNav.value = [];
   requestInstallMock.mockReset();
+  lifecycle.willEnter.length = 0;
+  lifecycle.willLeave.length = 0;
 });
 
 describe('a failed install stays readable and can be retried (hub#2244)', () => {
@@ -253,6 +264,39 @@ describe('a failed install stays readable and can be retried (hub#2244)', () => 
     await settle();
     await pressInstall(w, 'flows');
 
+    expect(toast(w).positionAnchor).toBe('apps-footer');
+  });
+
+  it('a failure that lands after the person left Apps is not anchored to the hidden footer', async () => {
+    // Ionic keeps a page it navigated away from in the DOM, hidden: a notice anchored to its footer
+    // is placed from a zero-size box and rises ABOVE the top edge of the window (measured at
+    // top -61 px on a 1080 px bench). The error of an install still running when the person left
+    // has to show where they are now, at the bottom of the window.
+    let fail: (e: unknown) => void = () => {};
+    requestInstallMock.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
+    const w = mountApps('en');
+    await settle();
+    await pressInstall(w, 'flows');
+    expect(toast(w).positionAnchor).toBe('apps-footer');
+
+    lifecycle.willLeave.forEach((fn) => fn());
+    fail(runtimeFailure('The marketplace did not answer'));
+    await settle();
+    expect(toast(w).message).toBe('The marketplace did not answer');
+    // Unset (the stub reports Ionic Vue's empty-prop sentinel, not `undefined`): no anchor at all.
+    expect(typeof toast(w).positionAnchor).not.toBe('string');
+
+    // Back on Apps, its notices sit above the tab bar again.
+    lifecycle.willEnter.forEach((fn) => fn());
+    requestInstallMock.mockRejectedValue(runtimeFailure('boom'));
+    await toast(w).buttons[0].handler?.();
+    await settle();
+    expect(toast(w).message).toBe('boom');
     expect(toast(w).positionAnchor).toBe('apps-footer');
   });
 
