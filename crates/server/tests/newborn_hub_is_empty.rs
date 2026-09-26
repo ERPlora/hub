@@ -116,12 +116,12 @@ fn free_port() -> u16 {
 }
 
 /// Arranca el hub por su punto de entrada REAL y espera a que conteste. Devuelve la base HTTP.
-async fn boot_hub(hub_id: &str, schema: &str, cloud: &str, tag: &str) -> String {
+async fn boot_hub(hub_id: &str, database_url: String, cloud: &str, tag: &str) -> String {
     let base_dir =
         std::env::temp_dir().join(format!("erplora_newborn_{}_{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base_dir);
     let cfg = ServeConfig {
-        database_url: dsn_for(schema),
+        database_url,
         bind: format!("127.0.0.1:{}", free_port()),
         modules_dir: None,
         hub: HubConfig {
@@ -146,23 +146,38 @@ async fn boot_hub(hub_id: &str, schema: &str, cloud: &str, tag: &str) -> String 
     // En su propio hilo con su propio runtime: el futuro de `serve()` no es `Send` (su error es un
     // `Box<dyn Error>`), así que no se puede `tokio::spawn`. Arrancarlo aparte, además, es más fiel:
     // es lo que hace el binario.
+    // hub#2155: `serve()` reports on this channel if it ever returns, so a boot that fails is a
+    // red with its reason instead of a silent wait for the whole ceiling.
+    let (ended_tx, ended_rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
-        if let Err(e) = rt.block_on(erplora_server::serve(cfg)) {
-            eprintln!("serve() terminó: {e}");
-        }
+        let outcome = match rt.block_on(erplora_server::serve(cfg)) {
+            Ok(()) => "serve() returned".to_string(),
+            Err(e) => format!("serve() ended: {e}"),
+        };
+        ended_tx.send(outcome).ok();
     });
-    wait_until_answering(&url).await;
+    wait_until_answering(&url, &ended_rx).await;
     url
 }
 
-/// El arranque real hace red y migraciones; se espera a que `/healthz` conteste antes de mirar nada.
-async fn wait_until_answering(base: &str) {
+/// How long a boot may take before the test calls it hung (hub#2155). It only guards against a
+/// hang: a loaded CI runner has taken over 15 s just to boot (hub#2036), so any budget near that
+/// paints a PR red for a slow machine. A boot that FAILS does not wait for it — see below.
+const BOOT_CEILING: Duration = Duration::from_secs(300);
+
+/// The real boot does network and migrations; wait until `/healthz` answers before looking at
+/// anything. If `serve()` returns first, go red at once with its reason.
+async fn wait_until_answering(base: &str, ended: &std::sync::mpsc::Receiver<String>) {
     let client = reqwest::Client::new();
-    for _ in 0..200 {
+    let deadline = std::time::Instant::now() + BOOT_CEILING;
+    while std::time::Instant::now() < deadline {
+        if let Ok(outcome) = ended.try_recv() {
+            panic!("the hub never became ready: {outcome}");
+        }
         if let Ok(r) = client.get(format!("{base}/healthz")).send().await {
             if r.status().is_success() {
                 return;
@@ -170,7 +185,7 @@ async fn wait_until_answering(base: &str) {
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
-    panic!("el hub no llegó a contestar en {base}");
+    panic!("the hub did not answer at {base} within the boot ceiling");
 }
 
 async fn readyz(base: &str) -> Value {
@@ -225,7 +240,7 @@ async fn a_newborn_hub_installs_nothing_even_if_the_deploy_declares_a_blueprint(
     let (cloud, spy) = spawn_spy_cloud().await;
     let hub_id = "hub-newborn";
 
-    let hub = boot_hub(hub_id, db.schema(), &cloud, "newborn").await;
+    let hub = boot_hub(hub_id, dsn_for(db.schema()), &cloud, "newborn").await;
     // El import de arranque iba en su propia task: hay que darle margen para que se note.
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -283,12 +298,43 @@ async fn a_hub_that_already_had_modules_keeps_them() {
             .unwrap();
     }
 
-    boot_hub(hub_id, db.schema(), &cloud, "history").await;
+    boot_hub(hub_id, dsn_for(db.schema()), &cloud, "history").await;
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     assert_eq!(
         installed_module_ids(db.schema(), hub_id).await,
         vec!["sales".to_string()],
         "arrancar no puede quitarle a un hub lo que ya tenía instalado"
+    );
+}
+
+// ─────────────────────────────── the harness itself (hub#2155) ───────────────────────────────
+
+/// hub#2155: the boot ceiling only guards against a HUNG boot. A loaded CI runner has already
+/// taken over 15 s just to boot a hub (hub#2036), so a ceiling in that range paints a PR red for
+/// a slow machine, not for a broken hub.
+#[test]
+fn the_boot_ceiling_only_catches_a_hung_boot_not_a_slow_runner() {
+    assert!(
+        BOOT_CEILING >= Duration::from_secs(120),
+        "boot ceiling is {BOOT_CEILING:?}: a loaded runner can exceed it without anything broken"
+    );
+}
+
+/// hub#2155: with a long ceiling, a boot that FAILS must not burn it in silence — the test goes
+/// red at once, carrying why `serve()` returned. An empty DSN is the cheapest real boot failure:
+/// `serve()` refuses it before touching Postgres.
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(expected = "the hub never became ready")]
+async fn a_boot_that_fails_goes_red_at_once_with_its_cause() {
+    let (cloud, _spy) = spawn_spy_cloud().await;
+    let booted = tokio::time::timeout(
+        Duration::from_secs(10),
+        boot_hub("hub-broken-boot", String::new(), &cloud, "broken"),
+    )
+    .await;
+    assert!(
+        booted.is_ok(),
+        "a failed boot waited out the whole ceiling instead of reporting its cause"
     );
 }
