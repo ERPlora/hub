@@ -11,6 +11,20 @@ import { test, expect } from '../bench-boot';
 import { loginByPin, withSession } from './shell-visual-helpers';
 import { VIEWPORTS } from './viewports';
 
+/** The settings this test writes. Every spec of the run shares ONE bench hub, so they go back. */
+const WRITTEN = ['business_tax_id', 'business_legal_name', 'business_identity_for_erplora_billing'] as const;
+
+let restoreBench: (() => Promise<void>) | null = null;
+
+// The bench hub is shared by every spec of the run, and what this test saves is exactly what
+// clears «You cannot invoice yet» (the business identity, ADR-0203). Left behind, it would repaint
+// the specs that run after it — `SettingsVisual` lost that strip from its capture (run
+// 36265115394). So the identity the hub had goes back whatever this test's outcome.
+test.afterEach(async () => {
+  await restoreBench?.();
+  restoreBench = null;
+});
+
 // ONE test on purpose: the bench shares a single runtime between tests, so a second test would
 // find the box already ticked by the first. The flow runs once; the reload is checked at each width.
 test('Settings › Business: tick the ERPlora-invoice box, save once, still ticked after a reload (hub#2217)', async ({
@@ -21,6 +35,19 @@ test('Settings › Business: tick the ERPlora-invoice box, save once, still tick
   // The bench database outlives a run (`hub_e2e_web`, fixed hub id): start from an unticked box
   // instead of assuming a hub nobody has saved before.
   const api = await pwRequest.newContext();
+  const settingsUrl = `${process.env.HUB_RUNTIME_URL}/api/settings`;
+  const headers = { 'x-hub-session': session.token };
+  const before = await api.get(settingsUrl, { headers });
+  expect(before.ok(), `could not read the settings: ${before.status()}`).toBeTruthy();
+  const stored = (await before.json()) as Record<string, unknown>;
+  const original = Object.fromEntries(WRITTEN.map((key) => [key, stored[key]]));
+  expect(original.business_tax_id, 'GET /api/settings answers the flat settings object').toBeDefined();
+  restoreBench = async () => {
+    const back = await pwRequest.newContext();
+    const res = await back.put(settingsUrl, { headers, data: original });
+    expect(res.ok(), `could not give the bench its identity back: ${res.status()} ${await res.text()}`).toBeTruthy();
+    await back.dispose();
+  };
   const reset = await api.put(`${process.env.HUB_RUNTIME_URL}/api/settings`, {
     headers: { 'x-hub-session': session.token },
     data: { business_identity_for_erplora_billing: false },
