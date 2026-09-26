@@ -117,7 +117,13 @@ async function settle(): Promise<void> {
 const mounted: VueWrapper[] = [];
 
 function mountStaff(): VueWrapper {
-  const i18n = createI18n({ legacy: false, locale: 'en', missingWarn: false, fallbackWarn: false, messages: { en: enCatalogue } });
+  const i18n = createI18n({
+    legacy: false,
+    locale: 'en',
+    missingWarn: false,
+    fallbackWarn: false,
+    messages: { en: enCatalogue },
+  });
   const wrapper = mount(ModuleView, { global: { plugins: [i18n] }, attachTo: document.body });
   mounted.push(wrapper);
   return wrapper;
