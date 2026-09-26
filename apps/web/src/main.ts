@@ -29,6 +29,8 @@ import {
   ensureMediaCookie,
   setOnRuntimeSessionExpired,
   RUNTIME_URL,
+  activeModuleIds,
+  refreshActiveModuleIds,
 } from './lib/runtime';
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
@@ -42,6 +44,7 @@ import {
   ensureNotificationPermission,
   primerLabelsFrom,
   shouldSendNotice,
+  warnIfThereIsSomethingToTell,
 } from './lib/notification-permission';
 import { createPrintService } from './lib/print';
 import { createEnqueuePrintJob } from './lib/print-enqueue';
@@ -279,8 +282,18 @@ bootPrintOnSale(getClient(), {
 // that gets TOLD an order came in, and somebody is standing at it setting it up. Asked at the
 // first order instead, the dialog appears on a tablet propped on a shelf with nobody in front of
 // it. `ensureNotificationPermission` asks at most once and never throws.
+// The ask itself is now IN CONTEXT (hub#2046): a salon has no kitchen, and the kitchen order
+// below is the only notice the shell sends, so asking on every hub regardless of what it runs
+// asked a salon for a permission that would never fire. `warnIfThereIsSomethingToTell` refreshes
+// what is installed and only asks when an active module the shell sends notices for is there —
+// the kitchen notice itself keeps being the fallback trigger below.
 void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
-  onRegistered: () => void askToWarn(),
+  onRegistered: () =>
+    void warnIfThereIsSomethingToTell({
+      refresh: refreshActiveModuleIds,
+      activeModules: activeModuleIds,
+      ask: () => askToWarn(),
+    }),
 });
 
 // Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque

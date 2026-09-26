@@ -52,7 +52,15 @@ vi.mock('../lib/notification-permission', async () => {
 
 vi.mock('../lib/runtime', async () => {
   const actual = await vi.importActual<typeof import('../lib/runtime')>('../lib/runtime');
-  return { ...actual, listInstalledModules: vi.fn(async () => [{ id: 'printing', status: 'active' }]) };
+  // hub#2046: the row is about the notices the shell SENDS, and today those are the kitchen's —
+  // so the hub under test has a kitchen. The salon case (no kitchen) is its own block below.
+  return {
+    ...actual,
+    listInstalledModules: vi.fn(async () => [
+      { id: 'printing', status: 'active' },
+      { id: 'kitchen', status: 'active' },
+    ]),
+  };
 });
 
 vi.mock('../lib/system', () => ({ fetchSystemInfo: vi.fn(async () => null) }));
@@ -77,6 +85,7 @@ vi.mock('vue-router', () => ({
 
 import SystemPage from './SystemPage.vue';
 import { toast } from '../lib/toast';
+import { listInstalledModules } from '../lib/runtime';
 import en from '../i18n/locales/en';
 import es from '../i18n/locales/es';
 
@@ -241,5 +250,35 @@ describe('and it notices when the notices come back from the device settings', (
 
     expect(removed.mock.calls.some(([type]) => type === 'visibilitychange')).toBe(true);
     removed.mockRestore();
+  });
+});
+
+describe('on a hub with nothing to warn about (hub#2046)', () => {
+  it('a salon with the notices refused is not told they are off — nothing would have sent one', async () => {
+    permissionStatus.value = { [NOTIFICATIONS]: false };
+    vi.mocked(listInstalledModules).mockResolvedValueOnce([
+      { id: 'appointments', status: 'active' },
+      { id: 'sales', status: 'active' },
+    ] as Awaited<ReturnType<typeof listInstalledModules>>);
+
+    const wrapper = await mountSystem();
+
+    expect(wrapper.text()).not.toContain(en.system.notices.blockedTitle);
+  });
+
+  it('nor when the installed list could not be read', async () => {
+    permissionStatus.value = { [NOTIFICATIONS]: false };
+    vi.mocked(listInstalledModules).mockRejectedValueOnce(new Error('offline'));
+
+    expect((await mountSystem()).text()).not.toContain(en.system.notices.blockedTitle);
+  });
+
+  it('a kitchen that is installed but switched off does not count', async () => {
+    permissionStatus.value = { [NOTIFICATIONS]: false };
+    vi.mocked(listInstalledModules).mockResolvedValueOnce([
+      { id: 'kitchen', status: 'inactive' },
+    ] as Awaited<ReturnType<typeof listInstalledModules>>);
+
+    expect((await mountSystem()).text()).not.toContain(en.system.notices.blockedTitle);
   });
 });
