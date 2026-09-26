@@ -166,7 +166,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSkeletonText,
-  onIonViewDidLeave, onIonViewWillEnter
+  onIonViewDidLeave, onIonViewWillEnter, onIonViewWillLeave
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -317,6 +317,13 @@ let onScreen = true;
 let mountedPath = '';
 /** This copy let go of its module when it left the screen (hub#1797): coming back mounts it again. */
 let released = false;
+/**
+ * Whether the last word Ionic said to this copy was «you are leaving» (hub#2241). Ionic Vue calls
+ * `onIonViewWillEnter` BEFORE awaiting the outlet's commit, and commits run one at a time: on a
+ * quick A → B → A the way back's WillEnter reaches A before the way out's DidLeave. A DidLeave that
+ * finds this `false` is that late way out — the copy is the one on show, and it must not let go.
+ */
+let leaving = false;
 
 let mountGeneration = 0;
 /**
@@ -557,7 +564,14 @@ watch(isOnline, (back) => {
  * way back (`history.back`) it built a new till anyway, so keeping it alive bought nothing. Only
  * the screen on show runs a module; a mount still in flight is cancelled so it cannot land here.
  */
+onIonViewWillLeave(() => {
+  leaving = true;
+});
+
 onIonViewDidLeave(() => {
+  // hub#2241 — a way back was announced after this way out began: this copy is on show again.
+  // Acting on it cancelled the mount in flight and left the screen on its skeleton for good.
+  if (!leaving) return;
   onScreen = false;
   window.removeEventListener('focus', recheckEntitlement);
   stopChrome?.();
@@ -571,6 +585,7 @@ onIonViewDidLeave(() => {
 
 /** Back on screen: take back what was released and mount the screen the route names. */
 onIonViewWillEnter(() => {
+  leaving = false;
   onScreen = true;
   window.addEventListener('focus', recheckEntitlement);
   if (!stopChrome && outlet.value) stopChrome = installChrome(outlet.value, chromeControls);
