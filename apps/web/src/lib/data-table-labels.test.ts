@@ -8,4 +8,11 @@ describe('ok-data-table shell labels', () => {
     expect(DT_LABELS_EN.rowsPerPage).toBe('Rows per page');
     expect(Object.keys(DT_LABELS_EN)).toEqual(Object.keys(DT_LABELS_ES));
   });
+
+  // ok-data-table titles open('edit') with labels.editRecord; without it the header falls back
+  // to the component's own language guess instead of the shell locale (pm#450).
+  it('titles the edit panel in the shell locale', () => {
+    expect(dataTableLabels('en')).toMatchObject({ editRecord: 'Edit' });
+    expect(dataTableLabels('es')).toMatchObject({ editRecord: 'Editar' });
+  });
 });
