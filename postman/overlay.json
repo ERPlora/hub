@@ -203,6 +203,10 @@
       "name": "<device name>"
     }
   },
+  "POST /api/devices/prune": {
+    "name": "Remove devices unused for 30 days",
+    "description": "Forgets every device of this business nobody has used for 30 days (the rows marked `stale` in GET /api/devices), except the one named by X-Device-Id. Admin session."
+  },
   "GET /api/devices": {
     "name": "Devices that have logged into this hub"
   },

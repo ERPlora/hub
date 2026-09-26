@@ -620,6 +620,15 @@ export default {
     adminOnly: 'Only an administrator can remove a device.',
     loadError: 'The devices could not be loaded. Check the connection and try again.',
     revokeError: 'This device could not be removed. Check the connection and try again.',
+    // hub#2215 — clearing, in one gesture, the devices nobody uses any more.
+    pruneStale:
+      'Remove the device not used in 30 days | Remove the {n} devices not used in 30 days',
+    pruneConfirm:
+      'Remove 1 device nobody has used in 30 days? | Remove {n} devices nobody has used in 30 days?',
+    pruneConsequence:
+      'They stop appearing here, and to use one again somebody has to sign in on it with their account. Devices used in the last 30 days and the one you are using stay.',
+    pruneAction: 'Remove',
+    pruneError: 'The unused devices could not be removed. Check the connection and try again.',
   },
   // hub#359 — the dial the OWNER turns, on top of the device mode above. Every option says what it
   // does to the business, never what it is called: "never" means nothing to a shopkeeper, "whoever

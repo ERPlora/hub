@@ -22,7 +22,13 @@ vi.mock('./runtime', () => ({
 }));
 vi.mock('./device', () => ({ resolveDeviceId: vi.fn(async () => 'dev_self') }));
 
-import { DevicesError, listDevices, renameDevice, revokeDevice } from './devices';
+import {
+  DevicesError,
+  listDevices,
+  pruneStaleDevices,
+  renameDevice,
+  revokeDevice,
+} from './devices';
 
 const fetchMock = vi.fn();
 
@@ -52,6 +58,8 @@ function device(overrides: Record<string, unknown> = {}): Record<string, unknown
     open_sessions: 1,
     last_sign_in: '2026-08-07T10:00:00+00:00',
     signed_in_until: '2026-09-06T10:00:00+00:00',
+    last_used_at: '2026-08-07T10:00:00+00:00',
+    stale: false,
     current: false,
     ...overrides,
   };
@@ -89,6 +97,8 @@ describe('listDevices', () => {
       openSessions: 1,
       lastSignIn: '2026-08-07T10:00:00+00:00',
       signedInUntil: '2026-09-06T10:00:00+00:00',
+      lastUsedAt: '2026-08-07T10:00:00+00:00',
+      stale: false,
       current: true,
     });
   });
@@ -290,5 +300,51 @@ describe('DevicesError lleva el código estable de la puerta (hub#1697)', () => 
     const error = (await refuse({ ok: false, error: 'nope' })) as { code?: string };
 
     expect(error.code).toBeUndefined();
+  });
+});
+
+describe('hub#2215 — old rows', () => {
+  it('reads when a device was really last used and whether nobody has used it for 30 days', async () => {
+    answering(200, {
+      ok: true,
+      data: {
+        devices: [
+          device({
+            open_sessions: 0,
+            last_sign_in: '',
+            last_used_at: '2026-07-01T09:00:00+00:00',
+            stale: true,
+          }),
+          device({ device_id: 'dev_new', last_used_at: 'x', stale: 'yes' }),
+        ],
+      },
+    });
+
+    const [old, recent] = await listDevices();
+
+    expect(old.lastUsedAt).toBe('2026-07-01T09:00:00+00:00');
+    expect(old.stale).toBe(true);
+    // Only a real `true` makes a row removable: anything else keeps the device.
+    expect(recent.stale).toBe(false);
+  });
+
+  it('clears the unused devices through its own door and says how many went', async () => {
+    answering(200, { ok: true, data: { removed: 3 } });
+
+    const removed = await pruneStaleDevices();
+
+    expect(removed).toBe(3);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://runtime.test/api/devices/prune');
+    expect(init.method).toBe('POST');
+    // The device asking is named, so the hub keeps it whatever its dates say.
+    expect(init.headers['X-Device-Id']).toBe('dev_self');
+    expect(init.headers['X-Hub-Session']).toBe('admin-token');
+  });
+
+  it('a refused clean-up reaches the screen instead of looking like one that happened', async () => {
+    answering(403, { ok: false, error: { code: 'forbidden', message: 'admin only' } });
+
+    await expect(pruneStaleDevices()).rejects.toMatchObject({ code: 'forbidden' });
   });
 });

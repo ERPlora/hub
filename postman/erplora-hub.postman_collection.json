@@ -1034,6 +1034,33 @@
           "response": []
         },
         {
+          "name": "Remove devices unused for 30 days",
+          "request": {
+            "description": "Forgets every device of this business nobody has used for 30 days (the rows marked `stale` in GET /api/devices), except the one named by X-Device-Id. Admin session.\n\n(auth: admin)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "devices",
+                "prune"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/devices/prune"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Rename a device",
           "request": {
             "body": {
