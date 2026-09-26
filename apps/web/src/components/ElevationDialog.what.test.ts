@@ -89,6 +89,38 @@ describe('what the manager is approving', () => {
     expect(wrapper.get('[data-testid="elevation-what"]').text()).toContain('Anular una venta');
   });
 
+  it('says the figure being approved when the module ships an approval template (hub#2180)', async () => {
+    vi.mocked(loadInstalledManifests).mockResolvedValue([
+      {
+        moduleId: 'sales',
+        manifest: { name: 'Sales & POS' },
+        entryUrl: '',
+        locale: {
+          name: 'Sales / POS',
+          commands: {
+            'sales.order.set_line_discount_over_limit': {
+              label: 'Apply a line discount above the limit',
+              approval_label: 'Apply a {discount_percent, percent} line discount',
+            },
+          },
+        },
+      },
+    ] as never);
+    const wrapper = await mountDialog();
+    pendingElevation.value = {
+      command: 'sales.order.set_line_discount_over_limit',
+      permission: 'sales.discount.over_limit',
+      payload: { order_id: 'o-hidden', line_id: 'l-hidden', discount_percent: 90 },
+      approve: vi.fn(),
+      approveWithBadge: vi.fn(),
+    } as never;
+    await flushPromises();
+
+    const shown = wrapper.get('[data-testid="elevation-what"]').text();
+    expect(shown).toMatch(/Apply a 90\s?% line discount/);
+    expect(wrapper.html()).not.toContain('hidden');
+  });
+
   it('falls back to the app name, and never to the command or the permission', async () => {
     vi.mocked(loadInstalledManifests).mockResolvedValue([
       { moduleId: 'sales', manifest: { name: 'Sales & POS' }, entryUrl: '', locale: { name: 'Ventas / TPV' } },
