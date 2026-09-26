@@ -178,6 +178,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'login-pin-to-email',
       'login-pinpad',
       'login-session-ended',
+      'login-courier-failed',
       'login-setup-error',
       'login-setup-pinpad',
       'login-setup-step',

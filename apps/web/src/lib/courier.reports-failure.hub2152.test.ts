@@ -89,9 +89,7 @@ describe('the boot reports a pass it could not redeem (hub#2152)', () => {
       () =>
         new Promise((_resolve, reject) => {
           const signal = (vi.mocked(fetch).mock.calls.at(-1)?.[1] as RequestInit | undefined)?.signal;
-          signal?.addEventListener('abort', () =>
-            reject(new DOMException('The operation was aborted.', 'AbortError')),
-          );
+          signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
         }),
     );
 

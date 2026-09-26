@@ -11,7 +11,6 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
 import { createI18n } from 'vue-i18n';
 
-
 vi.mock('../lib/runtime', async () => {
   const { ref } = await import('vue');
   return {
