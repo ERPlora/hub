@@ -141,9 +141,7 @@ describe('a single-choice select closes the moment an option is picked (hub#2223
 
   it('an explicit `interface` attribute wins — the shell sets a DEFAULT, it does not override', () => {
     const tag = patchedTag();
-    expect(mountInShadowRoot(`<${tag} interface="action-sheet"></${tag}>`, tag).open()).toBe(
-      'action-sheet',
-    );
+    expect(mountInShadowRoot(`<${tag} interface="action-sheet"></${tag}>`, tag).open()).toBe('action-sheet');
     expect(mountInShadowRoot(`<${tag} interface="modal"></${tag}>`, tag).open()).toBe('modal');
   });
 
@@ -230,10 +228,7 @@ describe('the premise still holds', () => {
     const { dirname, join } = await import('node:path');
     const require = createRequire(import.meta.url);
     const core = dirname(require.resolve('@ionic/core/package.json'));
-    return readFileSync(
-      join(core, 'dist/collection/components', component, `${component}.js`),
-      'utf8',
-    );
+    return readFileSync(join(core, 'dist/collection/components', component, `${component}.js`), 'utf8');
   }
 
   it('`ion-select` is what the shell watches', () => {
@@ -245,7 +240,9 @@ describe('the premise still holds', () => {
     // the alert close on pick, this hook has no reason to exist.
     const select = await ionicSource('select');
     expect(select).toContain("this.interface = 'alert'");
-    expect(select).toMatch(/text: this\.okText,\s*handler: \(selectedValues\) => \{\s*this\.setValue\(selectedValues\);/);
+    expect(select).toMatch(
+      /text: this\.okText,\s*handler: \(selectedValues\) => \{\s*this\.setValue\(selectedValues\);/,
+    );
   });
 
   it('the popover the shell picks really closes on the click of an option', async () => {

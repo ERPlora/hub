@@ -95,9 +95,7 @@ function patchConstructor(ctor: CustomElementConstructor): void {
  * Imported from `main.ts` next to its twins (`./ionic-select-interface.boot`). Unlike them it also
  * works on a tag that is already registered: it wraps a method, not a lifecycle callback.
  */
-export function bootIonicSelectInterface(
-  tags: readonly string[] = SELECT_INTERFACE_CONTROLS,
-): void {
+export function bootIonicSelectInterface(tags: readonly string[] = SELECT_INTERFACE_CONTROLS): void {
   const registered = patchIonicOnDefine(tags, patchConstructor);
   for (const tag of registered) {
     const ctor = globalThis.customElements?.get(tag);
