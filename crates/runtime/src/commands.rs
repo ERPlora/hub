@@ -1121,9 +1121,13 @@ async fn execute_wasm(
             RuntimeError::Wasm("command con bytes wasm pero sin handler".to_string())
         })?;
 
+    // hub#2166: one clock per command, like the declarative path binds system_params once — every
+    // operation and the handler's own `payload.now`/`context.now` share this same instant.
+    let now = crate::registry::now_rfc3339();
     // Input del guest: { "payload": <params del caller con system_params>, "context": {...} }.
     // Reutilizamos system_params para inyectar hub_id/current_user_id/now/new_id, no falsificables.
-    let bound_payload = crate::system_params(payload, ctx);
+    let mut bound_payload = crate::system_params(payload, ctx);
+    bound_payload.insert("now".into(), Json::String(now.clone()));
     // Lote de UUIDs pre-generados por el host para que el handler correlacione filas
     // padre→hijo (p.ej. 1 venta + N líneas que referencian el id de la venta). El guest
     // no puede generar UUIDs (sandbox sin aleatoriedad), así que toma ids de `new_ids`.
@@ -1135,7 +1139,7 @@ async fn execute_wasm(
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
     let reads = preload_reads(db, registry, cmd, ctx, payload).await?;
-    let mut context = handler_context(ctx, &new_ids);
+    let mut context = handler_context(ctx, &new_ids, &now);
     // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra el
     // catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
     context.insert("country_code".into(), json!(ctx.country_code));
@@ -1158,7 +1162,7 @@ async fn execute_wasm(
     let output = call_wasm_off_thread(compiled, &handler.function, input).await?;
 
     persist_handler_output(
-        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids, &now,
     )
     .await
 }
@@ -1171,12 +1175,18 @@ async fn execute_wasm(
 ///    grows a new kind of automated caller.
 ///  - `timezone` (hub#731, hub#1022): the business clock, IANA name already resolved — «tomorrow
 ///    at 09:00» is 09:00 at the SHOP. It also rides the payload as `:timezone`.
-fn handler_context(ctx: &RequestContext, new_ids: &[Json]) -> serde_json::Map<String, Json> {
+///  - `now` (hub#2166) is minted once per command by the caller and shared with `payload.now`
+///    and every operation's `:now`.
+fn handler_context(
+    ctx: &RequestContext,
+    new_ids: &[Json],
+    now: &str,
+) -> serde_json::Map<String, Json> {
     let mut context = serde_json::Map::new();
     context.insert("hub_id".into(), json!(ctx.hub_id));
     context.insert("current_user_id".into(), json!(ctx.user_id));
     context.insert("principal".into(), json!(ctx.principal.as_str()));
-    context.insert("now".into(), json!(crate::registry::now_rfc3339()));
+    context.insert("now".into(), json!(now));
     context.insert("new_ids".into(), Json::Array(new_ids.to_vec()));
     context.insert("timezone".into(), json!(ctx.timezone_name()));
     context
@@ -1286,13 +1296,16 @@ async fn execute_native(
     })?;
 
     // Mismo input que el WASM: payload con system_params + contexto con lote de ids.
-    let bound_payload = crate::system_params(payload, ctx);
+    // hub#2166: one clock per command, like the declarative path binds system_params once.
+    let now = crate::registry::now_rfc3339();
+    let mut bound_payload = crate::system_params(payload, ctx);
+    bound_payload.insert("now".into(), Json::String(now.clone()));
     let new_ids: Vec<Json> = (0..NEW_IDS_BATCH)
         .map(|_| Json::String(crate::registry::new_id()))
         .collect();
     let input = json!({
         "payload": Json::Object(bound_payload),
-        "context": Json::Object(handler_context(ctx, &new_ids)),
+        "context": Json::Object(handler_context(ctx, &new_ids, &now)),
     });
 
     let static_folder = registry
@@ -1311,7 +1324,7 @@ async fn execute_native(
     let output = engine.call(&handler.function, &input, &host).await?;
 
     persist_handler_output(
-        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
+        db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids, &now,
     )
     .await
 }
@@ -1335,6 +1348,9 @@ async fn persist_handler_output(
     // respuesta de varios KB de UUIDs fantasma. Por convención `new_ids[0]` es la entidad
     // principal (§5.3) — se preserva porque el orden del lote se mantiene al filtrar.
     new_ids: &[Json],
+    // The command's single `:now` (hub#2166), minted by the caller; every operation and the
+    // declared events bind it.
+    now: &str,
 ) -> Result<Json> {
     // hub#139: a business rejection is a normal guest output, not a WASM trap. It is checked
     // BEFORE looking at any intention: even a buggy guest that returns `error` together with
@@ -1416,6 +1432,7 @@ async fn persist_handler_output(
             schema.coerce_declared_number_shapes(&mut op_params);
         }
         let mut bound = crate::system_params(&op_params, ctx);
+        bound.insert("now".into(), Json::String(now.to_string()));
         keep_batch_new_id(&mut bound, &op.params, new_ids);
         let first = tx_ops.len();
         let count = sqls.len();
@@ -1511,7 +1528,8 @@ async fn persist_handler_output(
     // which carries the real document (`refund_ref`, ids), not the command's params. Enqueuing both
     // made every refund die in the dead-letter: `cash_register` refused the params-only copy while
     // every other listener reacted to an event that should not exist.
-    let declared_payload = crate::system_params(payload, ctx);
+    let mut declared_payload = crate::system_params(payload, ctx);
+    declared_payload.insert("now".into(), Json::String(now.to_string()));
     let declared: Vec<&crate::manifest::EmitDef> = cmd
         .def
         .emit
@@ -2373,9 +2391,12 @@ mod tests {
     fn handler_context_tells_the_handler_who_is_calling() {
         let person = RequestContext::new("h1", "u1", ["*".to_string()]);
         let machine = RequestContext::new("h1", "robot:1", ["*".to_string()]).as_machine();
-        assert_eq!(handler_context(&person, &[])["principal"], json!("human"));
         assert_eq!(
-            handler_context(&machine, &[])["principal"],
+            handler_context(&person, &[], "2026-09-26T00:00:00Z")["principal"],
+            json!("human")
+        );
+        assert_eq!(
+            handler_context(&machine, &[], "2026-09-26T00:00:00Z")["principal"],
             json!("machine")
         );
     }
@@ -4746,6 +4767,7 @@ mod tests {
             &[],
             &output,
             &[],
+            "2026-09-26T00:00:00Z",
         )
         .await
         .unwrap_err();
@@ -4785,6 +4807,7 @@ mod tests {
             &[],
             &output,
             &[],
+            "2026-09-26T00:00:00Z",
         )
         .await
         .expect("the happy path must be untouched");
