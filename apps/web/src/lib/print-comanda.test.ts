@@ -2,6 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { bootPrintComanda, buildComandaGroups, comandaRoute, onKitchenOrderCreated } from './print-comanda';
 import { CLIENT_INSTANCE } from './client-instance';
 import type { PrintRequest, PrintResult } from './print';
+import { createI18n } from 'vue-i18n';
+import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
+
+// The notice's words come from the catalogue (hub#2171): this stub echoes the key and its params,
+// so a test pins WHICH sentence is asked for, not its prose (ADR-0055).
+const t = (key: string, params?: Record<string, unknown>) => (params ? `${key}${JSON.stringify(params)}` : key);
 
 // La comanda sale al DISPARAR el pedido (ADR-0144), no al cobrar. Cada estación dice por dónde
 // sale la suya: la plancha imprime (nadie mira una pantalla con las manos ocupadas) y la barra
@@ -187,7 +194,7 @@ describe('aviso al entrar una comanda', () => {
     const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
     const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
 
-    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify });
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify, t });
 
     expect(notify).toHaveBeenCalledTimes(1);
     const [titulo, cuerpo] = notify.mock.calls[0]!;
@@ -209,7 +216,7 @@ describe('aviso al entrar una comanda', () => {
     const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'bar' }));
     const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
 
-    await onKitchenOrderCreated(soloPantalla, { order_id: 'k-2' }, { print, notify });
+    await onKitchenOrderCreated(soloPantalla, { order_id: 'k-2' }, { print, notify, t });
 
     expect(print).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledTimes(1);
@@ -223,7 +230,7 @@ describe('aviso al entrar una comanda', () => {
     });
 
     await expect(
-      onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify }),
+      onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify, t }),
     ).resolves.toBeUndefined();
     expect(print).toHaveBeenCalledTimes(1);
   });
@@ -234,6 +241,80 @@ describe('aviso al entrar una comanda', () => {
       onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print }),
     ).resolves.toBeUndefined();
     expect(print).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── The notice speaks the app's language (hub#2171) ─────────────────────────────────────────────
+// It used to be composed from fixed Spanish words, so a bar running the app in English got
+// «Nueva comanda · Mesa 4 — 3 líneas». The label and the order number are the business's own
+// data and travel as they are; only the words around them are translated.
+describe('the kitchen order notice speaks the app language (hub#2171)', () => {
+  const print = () => vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+
+  it('asks the catalogue for the title with the floor label and for the line count', async () => {
+    const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
+
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print: print(), notify, t });
+
+    const [title, body] = notify.mock.calls[0]!;
+    expect(title).toBe('print.comandaNoticeFor{"label":"Mesa 4"}');
+    expect(body).toBe('C-018 · print.comandaNoticeLines{"n":2}');
+  });
+
+  it('with no floor label the title is the plain sentence, never a hole', async () => {
+    const noLabel = fakeClient({
+      query: vi.fn(async (name: string) => {
+        if (name === 'kitchen.orders.items') return [CROQUETAS];
+        if (name === 'kitchen.orders.get') return [{ label: '', round_number: 1, order_number: 'C-020' }];
+        return [];
+      }),
+    });
+    const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
+
+    await onKitchenOrderCreated(noLabel, { order_id: 'k-3' }, { print: print(), notify, t });
+
+    expect(notify.mock.calls[0]![0]).toBe('print.comandaNotice');
+  });
+
+  it('the catalogue has the sentences in English and in Spanish, with the line count pluralised', async () => {
+    const said = async (locale: 'en' | 'es', lines: unknown[]) => {
+      // The options go in untyped: vue-i18n's inference over the whole catalogue is too deep for tsc.
+      const i18n = createI18n({ legacy: false, locale, fallbackLocale: 'en', messages: { en, es } } as never) as unknown as {
+        global: { t: (key: string, params: Record<string, unknown>) => string };
+      };
+      const translate = i18n.global.t;
+      const client = fakeClient({
+        query: vi.fn(async (name: string) => {
+          if (name === 'kitchen.orders.items') return lines;
+          if (name === 'kitchen.orders.get') return [{ label: 'Mesa 4', round_number: 1, order_number: 'C-018' }];
+          return [];
+        }),
+      });
+      const notify = vi.fn<(t: string, b: string) => Promise<void>>(async () => {});
+      await onKitchenOrderCreated(client, { order_id: 'k-1' }, {
+        print: print(),
+        notify,
+        t: (key, params) => translate(key, params ?? {}),
+      });
+      return notify.mock.calls[0]!;
+    };
+
+    const [enTitle, enOne] = await said('en', [CROQUETAS]);
+    const [esTitle, esOne] = await said('es', [CROQUETAS]);
+    const [, enTwo] = await said('en', [CROQUETAS, FLAN]);
+
+    // A key missing from the catalogue comes back as the key itself.
+    for (const s of [enTitle, enOne, esTitle, esOne, enTwo]) {
+      expect(s).not.toMatch(/comandaNotice/);
+      expect(s).not.toContain('{');
+    }
+    expect(enTitle).toContain('Mesa 4');
+    expect(enOne).toContain('C-018');
+    // The English app does not say it in Spanish.
+    expect(enTitle).not.toBe(esTitle);
+    expect(enOne).not.toBe(esOne);
+    // One line and two lines are two different sentences.
+    expect(enOne.replace('C-018 · ', '')).not.toBe(enTwo.replace('C-018 · ', '').replace('2', '1'));
   });
 });
 
@@ -525,6 +606,7 @@ describe('the kitchen ticket comes out once, at the printer it belongs to (hub#2
     return {
       print: vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' })),
       notify: vi.fn<(t: string, b: string) => Promise<void>>(async () => {}),
+      t,
       onFailure: vi.fn(),
     };
   }
