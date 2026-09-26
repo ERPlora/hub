@@ -140,9 +140,30 @@ describe('the list', () => {
     const text = wrapper.html();
     expect(text).toContain('Office laptop');
     // Somebody is on it right now: the fact that turns "I think I left it somewhere" into "cut it
-    // off". The id is shown too, because two tills can carry the same name.
-    expect(text).toContain('dev_abc');
+    // off".
     expect(text.toLowerCase()).toContain('in use');
+  });
+
+  it('never paints the internal device id (hub#2203)', async () => {
+    // The id is 128 random bits the browser minted for itself (ADR-0257): it tells a person nothing,
+    // and it ends up in every screenshot of Settings. Two rows that look alike are told apart by the
+    // name the business gives them and by their dates — the way Google, Apple or Shopify list the
+    // devices of an account. It still keys the buttons (`data-testid`), just never the words.
+    vi.mocked(listDevices).mockResolvedValue([
+      device({ current: true }),
+      device({ deviceId: 'dev_0123456789abcdef', name: 'Chrome · Mac', openSessions: 0 }),
+    ]);
+
+    const wrapper = await mountCard();
+    // What a person reads: the markup without its tags. `wrapper.text()` comes back empty under an
+    // `ion-card` root in happy-dom, so it would pass whatever the card painted.
+    const painted = wrapper.html().replace(/<[^>]*>/g, ' ');
+
+    expect(painted).toContain('Chrome · Mac');
+    expect(painted).not.toContain('dev_abc');
+    expect(painted).not.toContain('dev_0123456789abcdef');
+    // The rows are still there, and still actionable one by one.
+    expect(wrapper.find('[data-testid="devices-revoke-dev_0123456789abcdef"]').exists()).toBe(true);
   });
 
   it('marks the device the owner is holding', async () => {
