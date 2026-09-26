@@ -159,3 +159,53 @@ export function notificationPermissionState(
 ): Promise<NotificationPermission> {
   return devicePermissionState(ANDROID_NOTIFICATIONS_PERMISSION, TAG, check);
 }
+
+/**
+ * The modules the shell sends system notices for, today.
+ *
+ * The only notice the shell fires is the kitchen order (`print-comanda.ts`) — so a hub without an
+ * active module from this list has nothing that would ever use the permission, and asking there
+ * asks for nothing (hub#2046). Adding another source is a deliberate change to this list, not a
+ * side effect of adding a module.
+ */
+export const NOTICE_SOURCE_MODULES: readonly string[] = ['kitchen'] as const;
+
+/**
+ * Does this hub have anything installed that the shell would ever send a system notice for?
+ *
+ * `undefined` — the installed set could not be read — answers `false`: not knowing what is
+ * installed is never a reason to ask (hub#2046).
+ */
+export function hasNoticeSource(activeModuleIds: ReadonlySet<string> | undefined): boolean {
+  if (!activeModuleIds) return false;
+  return NOTICE_SOURCE_MODULES.some((id) => activeModuleIds.has(id));
+}
+
+/**
+ * The print-host alta's ask, now asked in context (hub#2046): refreshes what is installed and
+ * only then asks for the permission — and only when something active would ever use it. Asking on
+ * every hub regardless of what it runs is what left a salon — no kitchen — accepting a permission
+ * that would never fire.
+ *
+ * **Never propagates.** Neither a failed refresh nor a failed ask may break the alta that calls
+ * this: the print host still has to register either way.
+ */
+export async function warnIfThereIsSomethingToTell(deps: {
+  refresh: () => Promise<void>;
+  activeModules: () => ReadonlySet<string> | undefined;
+  ask: () => Promise<unknown>;
+}): Promise<void> {
+  try {
+    await deps.refresh();
+  } catch {
+    // Not knowing what is installed is not a reason to ask, nor to fail the alta.
+  }
+  if (hasNoticeSource(deps.activeModules())) {
+    try {
+      await deps.ask();
+    } catch {
+      // `ask` (`ensureNotificationPermission`) already never throws, but this call must not
+      // propagate either way.
+    }
+  }
+}
