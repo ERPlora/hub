@@ -111,4 +111,38 @@ test.describe('Apps list view on a phone (hub#2245)', () => {
       await statusAndActionFit(page, tab);
     });
   }
+
+  // rv-2250: dropping the columns the narrow list has no room for also dropped their filter —
+  // Category = Sales picked on the cards, then «List view», and all 23 apps came back. The narrow
+  // list hides those columns instead: the filter keeps narrowing the list and keeps its control.
+  test('#all: a category filter picked on the cards survives switching to the list view at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await withCatalog(page);
+    await withInstalled(page);
+    await loggedInSession(page);
+    await page.goto('/apps#all');
+    const table = tableOf(page, TABS[1]);
+    await expect(table.getByText('App 01', { exact: true })).toBeVisible();
+
+    const filters = page.getByRole('dialog', { name: 'Filtros' });
+    await table.getByRole('button', { name: 'Filtros' }).click();
+    await page.locator('ion-select').filter({ has: page.getByRole('button', { name: 'Categoría, Seleccionar' }) }).click();
+    await page.getByRole('checkbox', { name: 'Ventas' }).click();
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    // A real tap on «Aplicar» lands on the page's tab bar at this width (hub#2253), so the click is
+    // sent to the button itself.
+    await filters.getByRole('button', { name: 'Aplicar' }).dispatchEvent('click');
+    // The footer counts what the list holds: «6 registros» filtered, «Mostrando 1–10 de 23 …» not.
+    const footer = table.getByText(/\d+ registros/).first();
+    await expect(footer).toHaveText(/(^|\D)6 registros/);
+
+    await table.getByRole('button', { name: 'Vista lista' }).click();
+    await expect(appRow(page, TABS[1])).toBeVisible();
+    await expect(footer).toHaveText(/(^|\D)6 registros/);
+    await expect(table.getByRole('cell', { name: 'App 02', exact: true })).toHaveCount(0);
+
+    // The Category control is still in the panel, with Sales picked.
+    await table.getByRole('button', { name: 'Filtros' }).click();
+    await expect(filters.getByRole('button', { name: /^Categoría, Ventas/ })).toBeVisible();
+  });
 });

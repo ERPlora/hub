@@ -6,6 +6,8 @@
 // with nothing saying the table scrolls. Condensed like Shopify's index table on a phone: the list
 // keeps which app it is and whether it is there, and the table pins the row's action on its own.
 // The card view stacks fields instead of laying them side by side, so it keeps all of them.
+// The other columns are HIDDEN, never dropped: ok-data-table filters and sorts only by the columns
+// it is given, so a dropped Category took its active filter with it (rv-2250).
 
 export type TableView = 'table' | 'cards';
 
@@ -16,13 +18,13 @@ export type TableView = 'table' | 'cards';
  */
 export const TABLE_PHONE_QUERY = '(max-width: 640px)';
 
-/** What the catalog's narrow list view keeps: the app, and its status. */
+/** What the catalog's narrow list view shows: the app, and its status. */
 const NARROW_LIST_KEYS = new Set(['name', 'stateLabel']);
 
-export function columnsForScreen<T extends { key: string }>(
+export function columnsForScreen<T extends { key: string; hidden?: boolean }>(
   columns: T[],
   screen: { compact: boolean; view: TableView },
 ): T[] {
   if (!screen.compact || screen.view !== 'table') return columns;
-  return columns.filter((c) => NARROW_LIST_KEYS.has(c.key));
+  return columns.map((c) => (NARROW_LIST_KEYS.has(c.key) ? c : { ...c, hidden: true }));
 }
