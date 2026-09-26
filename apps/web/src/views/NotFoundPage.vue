@@ -19,24 +19,15 @@
 -->
 <template>
   <AppPage :title="t('notFound.title')" content-layout="detail">
-    <ok-empty-state
-      icon="help-circle-outline"
-      :heading="t('notFound.title')"
-      :message="t('notFound.body')"
-      data-testid="not-found"
-    >
-      <ion-button slot="action" router-link="/dashboard" data-testid="not-found-home">
-        {{ t('notFound.action') }}
-      </ion-button>
-    </ok-empty-state>
+    <NotFoundState />
   </AppPage>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { IonButton } from '@ionic/vue';
 
 import AppPage from '../components/AppPage.vue';
+import NotFoundState from '../components/NotFoundState.vue';
 
 const { t } = useI18n();
 </script>

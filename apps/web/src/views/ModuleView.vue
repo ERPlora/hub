@@ -66,6 +66,10 @@
       :message="t('moduleView.emptyHint')"
       data-testid="module-empty"
     />
+    <!-- hub#2205 — the address names a screen this app does not have. The SAME answer a wrong
+         address at the root gets (NotFoundPage), with the address left in the bar as evidence and
+         the app's tabbar still under it, so the right screen is one tap away. -->
+    <NotFoundState v-else-if="status === 'not-found'" />
     <!-- Pestaña sintética "Plan" (auto-inyectada para módulos con `billing`): panel del SHELL,
          no un WC del módulo. Se muestra en vez del outlet del WC cuando está activa. -->
     <ModulePlanPanel
@@ -166,6 +170,7 @@ import {
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
+import NotFoundState from '../components/NotFoundState.vue';
 import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
@@ -176,7 +181,6 @@ import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects'
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
 import { isOfflineError, isOnline, reportNetworkFailure } from '../lib/offline';
-import { toastInfo } from '../lib/toast';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -211,7 +215,7 @@ const SKELETON_ROWS = 6;
  * así que el módulo no tiene nada que ver. Son cuatro frases distintas y la pantalla no puede
  * decir una por otra.
  */
-const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline'>('loading');
+const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline' | 'not-found'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
@@ -381,8 +385,20 @@ async function mount(): Promise<void> {
       return;
     }
 
-    const entry: MenuEntry | undefined =
-      tabs.value.find((tb) => tb.nav.id === navId) ?? tabs.value[0];
+    const entry: MenuEntry | undefined = navId
+      ? tabs.value.find((tb) => tb.nav.id === navId)
+      : tabs.value[0];
+    if (navId && !entry && tabs.value.length > 0) {
+      // hub#2205 — a tab this app does not have is a 404, not another tab. Swapping in the first
+      // one (hub#1723's toast) painted a valid-looking screen under a wrong address, and the root
+      // answers the same mistake with «This page does not exist»: same answer here, and the bar
+      // keeps the address so the bad link can be read back.
+      moduleName.value = shellTabHeading(tabs.value, manifest, moduleId);
+      activeNavId.value = '';
+      if (outlet.value) outlet.value.replaceChildren(); // the previous tab's WC must not stay mounted
+      status.value = 'not-found';
+      return;
+    }
     if (!entry) {
       // El menú vino bien; este módulo simplemente no aporta ninguna pestaña. Vacío, no fallo
       // (hub#1169): un Reintentar aquí solo puede repetir la misma respuesta.
@@ -461,19 +477,9 @@ async function mount(): Promise<void> {
     // observa el outlet, así que el anuncio llega al WC recién puesto sin que la vista lo toque.
     chromeControls.value = chromeControlsFor(manifest, entry.nav.id);
     status.value = 'ready';
-    // Un navId retirado o mal escrito no puede dejar la URL afirmando una pestaña mientras se
-    // muestra otra. Canonizamos al primer tab real (también cubre bookmarks de versiones viejas).
-    if (navId !== entry.nav.id) {
-      // hub#1723 — and it is SAID. Canonising in silence is the same defect the shell's catch-all
-      // had one floor up: `/m/sales/list` painted «Sell» as if that had been the address, so
-      // whoever pasted the link believed they were on the sales list. Same remedy hub#1175 gave
-      // the module the entitlement never names: still go where there IS a screen, but with the
-      // sentence that explains why it is not the one that was asked for.
-      //
-      // Only when the URL CLAIMED a tab: a bare `/m/sales` — the address the launcher, «My apps»
-      // and /apps all use — claims none, so opening the first one corrects nothing, and a notice
-      // there would be noise on the busiest screen of the product.
-      if (navId) void toastInfo(t('moduleView.unknownTabToast', { tab: entry.nav.label }));
+    // `/m/<id>` names no tab (the launcher, «My apps» and /apps all open it that way): the app
+    // opens its first one and the bar says which. A tab it does NOT have never gets here (hub#2205).
+    if (!navId) {
       void router.replace(`/m/${moduleId}/${entry.nav.id}`);
     }
   } catch (error) {
