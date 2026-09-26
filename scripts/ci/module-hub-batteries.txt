@@ -147,9 +147,9 @@ kitchen/tests/closed_check.hub.test.py
 # pending-publication: kitchen#95 until 2026-10-25
 kitchen/tests/rush_after_fire.hub.test.py
 
-# customers: fusionar dos fichas duplicadas contra el kernel real — el manifest con la guarda
-# `expect_rows` ANCLADA se instala, el dispatcher liga las 15 sentencias, la fusión mueve el
-# timeline y un id repetido o una ficha ya retirada se rechazan con `customers.customer_unavailable`
-# (customers#86, capa 1). Cobertura nueva, no mudada.
+# customers: merge two duplicate customer records against the real kernel — the manifest with the
+# ANCHORED `expect_rows` guard installs, the dispatcher binds the 15 statements, the merge moves the
+# timeline, and a repeated id or an already-retired record is rejected with
+# `customers.customer_unavailable` (customers#86, layer 1). New coverage, not moved.
 # pending-publication: customers#87 until 2026-10-26
 customers/tests/merge.hub.test.py
