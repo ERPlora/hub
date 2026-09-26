@@ -297,7 +297,7 @@ async function submit(): Promise<void> {
 
   const alert = await alertController.create({
     header: t('settings.resetConfirmTitle'),
-    message: `${t('settings.resetConfirmBody', { total })}\n${desglose}`,
+    message: `${t('settings.resetConfirmBody', { n: total })}\n${desglose}`,
     inputs: [
       {
         name: 'name',

@@ -50,12 +50,13 @@ export default {
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
     deadLettersTitle: 'Eventos caídos',
-    deadLettersBody: 'Hay {count} evento(s) que el relay no pudo entregar. Revísalos y reenvíalos.',
+    deadLettersBody:
+      'Hay {count} evento que el relay no pudo entregar. Revísalo y reenvíalo. | Hay {count} eventos que el relay no pudo entregar. Revísalos y reenvíalos.',
     // Impresión sin drenar (hub#987). Nombra la estación: «la impresión está parada» manda al dueño
     // a mirar cuatro impresoras; «la cocina está parada» lo manda a una.
     printingStalledTitle: 'Nadie está imprimiendo «{station}»',
     printingStalledBody:
-      'Hay {count} documento(s) esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
+      'Hay {count} documento esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida. | Hay {count} documentos esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
@@ -208,7 +209,7 @@ export default {
     // leer la frase que dice cuántos van a caer.
     confirmDestructive: 'Esto no se puede deshacer desde la pantalla. Escribe {expected} para confirmar.',
     confirmDestructiveWord: 'BORRAR',
-    confirmBulkAffected: 'Vas a borrar {count} registros.',
+    confirmBulkAffected: 'Vas a borrar {count} registro. | Vas a borrar {count} registros.',
     confirmBulkUnknown:
       'No puedo saber cuántos registros borraría esto, así que no lo hago desde aquí. Abre la pantalla, donde puedes verlos.',
   },
@@ -576,7 +577,7 @@ export default {
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Hasta cerrar sesión',
     idleMinutesConsequence:
-      'Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.',
+      'Una caja que nadie toca durante {n} minuto cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona. | Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.',
     idleUntilSignOutConsequence:
       'La caja no se bloquea sola por inactividad: la sesión sigue abierta hasta que quien entró cierre sesión, o hasta que caduque por el dispositivo.',
     adminOnly: 'Solo un administrador puede cambiar si se pregunta.',
@@ -682,16 +683,17 @@ export default {
     resetSectionsTitle: 'O borrar por secciones',
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
-    resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
+    resetUndoBody:
+      'Se borrará la fila que trajo este blueprint. Lo que creaste después se conserva. | Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
     resetUndoEdited: 'Cambiaste {areas} después de importar. Al deshacer solo se quedan tus cambios ahí: lo que este blueprint sustituyó no vuelve.',
     resetUndoNotRestored: 'En {areas} solo se han quedado tus cambios: lo que el blueprint había sustituido no ha vuelto. Revisa esa pantalla.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} fila | {n} filas',
     resetSubmit: 'Restablecer el negocio',
-    resetDeleted: '{n} filas borradas',
+    resetDeleted: '{n} fila borrada | {n} filas borradas',
     resetConfirmTitle: 'Esto no se puede deshacer',
-    resetConfirmBody: 'Se borrarán definitivamente {total} filas:',
+    resetConfirmBody: 'Se borrará definitivamente {n} fila: | Se borrarán definitivamente {n} filas:',
     resetConfirmPlaceholder: 'nombre del negocio',
     resetCancel: 'Cancelar',
     resetConfirm: 'Borrar definitivamente',
@@ -1231,7 +1233,7 @@ export default {
     attempts: 'intentos',
     retryAll: 'Reenviar todos',
     retryDone: 'Evento reenviado al relay.',
-    retryAllDone: '{count} evento(s) reenviado(s) al relay.',
+    retryAllDone: '{count} evento reenviado al relay. | {count} eventos reenviados al relay.',
     retryFailed: 'No se pudo reenviar: {reason}',
     discardDone: 'Evento descartado (se conserva para auditoría).',
     discardFailed: 'No se pudo descartar: {reason}',
@@ -1700,7 +1702,7 @@ export default {
     free: 'Gratis',
     perMonth: '/mes',
     perYear: '/año',
-    trialDays: '{n} días de prueba',
+    trialDays: '{n} día de prueba | {n} días de prueba',
     quota: 'Incluye {quota}',
     overage: '{price} por unidad extra',
     noTiers: 'Este módulo no ofrece planes de pago.',

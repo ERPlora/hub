@@ -52,12 +52,14 @@ export default {
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
     deadLettersTitle: 'Failed events',
-    deadLettersBody: '{count} event(s) the relay could not deliver. Review and resend them.',
+    // Plurals via vue-i18n (`singular | plural`, picked by the `count`/`n` option): «1 event(s)» (hub#2212).
+    deadLettersBody:
+      '{count} event the relay could not deliver. Review and resend it. | {count} events the relay could not deliver. Review and resend them.',
     // Undrained printing (hub#987). It names the station because "printing is stuck" sends the
     // owner to look at four printers; "the kitchen is stuck" sends them to one.
     printingStalledTitle: 'Nothing is printing “{station}”',
     printingStalledBody:
-      '{count} document(s) waiting for {minutes} min. Check the till that prints there is on.',
+      '{count} document waiting for {minutes} min. Check the till that prints there is on. | {count} documents waiting for {minutes} min. Check the till that prints there is on.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',
@@ -223,7 +225,7 @@ export default {
     // forces reading the sentence that says how many are about to go.
     confirmDestructive: 'This cannot be undone from the screen. Type {expected} to confirm.',
     confirmDestructiveWord: 'DELETE',
-    confirmBulkAffected: 'You are about to delete {count} records.',
+    confirmBulkAffected: 'You are about to delete {count} record. | You are about to delete {count} records.',
     confirmBulkUnknown:
       'I cannot tell how many records this would delete, so I will not do it from here. Open the screen, where you can see them.',
   },
@@ -631,7 +633,7 @@ export default {
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Until you sign out',
     idleMinutesConsequence:
-      'A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
+      'A till nobody has touched for {n} minute signs the user out and shows the PIN pad, so the next sale carries the next person’s name. | A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
     idleUntilSignOutConsequence:
       'The till never locks itself for inactivity: the session stays open until whoever signed in signs out, or until the device says it expires.',
     adminOnly: 'Only an administrator can change whether it asks.',
@@ -749,16 +751,17 @@ export default {
     resetSectionsTitle: 'Or delete by section',
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
-    resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
+    resetUndoBody:
+      '{n} row brought in by this blueprint will be deleted. What you created afterwards is kept. | {n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
     resetUndoEdited: 'You changed {areas} after importing. Undoing keeps only your changes there: what this blueprint replaced will not come back.',
     resetUndoNotRestored: 'In {areas} only your own changes were kept: what the blueprint had replaced did not come back. Check that screen.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} row | {n} rows',
     resetSubmit: 'Reset the business',
-    resetDeleted: '{n} rows deleted',
+    resetDeleted: '{n} row deleted | {n} rows deleted',
     resetConfirmTitle: 'This cannot be undone',
-    resetConfirmBody: '{total} rows will be permanently deleted:',
+    resetConfirmBody: '{n} row will be permanently deleted: | {n} rows will be permanently deleted:',
     resetConfirmPlaceholder: 'business name',
     resetCancel: 'Cancel',
     resetConfirm: 'Delete permanently',
@@ -1413,7 +1416,7 @@ export default {
     attempts: 'attempts',
     retryAll: 'Resend all',
     retryDone: 'Event resent to the relay.',
-    retryAllDone: '{count} event(s) resent to the relay.',
+    retryAllDone: '{count} event resent to the relay. | {count} events resent to the relay.',
     retryFailed: 'Could not resend: {reason}',
     discardDone: 'Event discarded (kept for audit).',
     discardFailed: 'Could not discard: {reason}',

@@ -50,9 +50,9 @@ const i18n = createI18n({
         // Pluralización de vue-i18n: `singular | plural`. El `n` de las opciones decide cuál.
         resetRows: '{n} row | {n} rows',
         resetSubmit: 'Reset hub',
-        resetDeleted: '{n} rows deleted',
+        resetDeleted: '{n} row deleted | {n} rows deleted',
         resetConfirmTitle: 'This cannot be undone',
-        resetConfirmBody: '{total} rows will be permanently deleted:',
+        resetConfirmBody: '{n} row will be permanently deleted: | {n} rows will be permanently deleted:',
         resetConfirmPlaceholder: 'business name',
         resetCancel: 'Cancel',
         resetImportsTitle: 'Undo an import',
@@ -60,7 +60,7 @@ const i18n = createI18n({
         resetSectionsTitle: 'Or delete by section',
         resetUndo: 'Undo',
         resetUndoTitle: 'Undo {name}',
-        resetUndoBody: '{n} rows brought in by this blueprint will be deleted.',
+        resetUndoBody: '{n} row brought in by this blueprint will be deleted. | {n} rows brought in by this blueprint will be deleted.',
         resetUndoEdited: 'You changed {areas} after importing: only your changes stay there.',
         resetUndoNotRestored: 'Only your changes were kept in {areas}.',
         resetConfirm: 'Delete permanently',
@@ -533,6 +533,6 @@ describe('ResetPanel · deshacer una importación', () => {
     await flush(w);
 
     const lines = w.findAll('[data-testid="reset-report-line"]').map((l) => l.text());
-    expect(lines).toEqual(['Hub settings — 1 rows deleted', 'Inventory — 124 rows deleted']);
+    expect(lines).toEqual(['Hub settings — 1 row deleted', 'Inventory — 124 rows deleted']);
   });
 })
