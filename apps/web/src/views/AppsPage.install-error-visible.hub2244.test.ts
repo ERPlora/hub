@@ -121,8 +121,7 @@ function mountApps(locale: 'en' | 'es' = 'en') {
 
 type Wrapper = ReturnType<typeof mountApps>;
 
-const catalogTable = (w: Wrapper): TableEl =>
-  w.findAll('ok-data-table').map((t) => t.element as TableEl)[1];
+const catalogTable = (w: Wrapper): TableEl => w.findAll('ok-data-table').map((t) => t.element as TableEl)[1];
 
 /** The page's single `<ion-toast>` (stubbed by `shallow`, but it keeps the props it was bound). */
 function toast(w: Wrapper) {
@@ -137,7 +136,8 @@ function toast(w: Wrapper) {
 }
 
 /** A request-install failure as `requestInstall` throws it: the runtime's sentence rides in `detail`. */
-const runtimeFailure = (sentence: string): Error => Object.assign(new Error('request-install flows → 502'), { detail: sentence });
+const runtimeFailure = (sentence: string): Error =>
+  Object.assign(new Error('request-install flows → 502'), { detail: sentence });
 
 async function settle(): Promise<void> {
   await flushPromises();
@@ -189,7 +189,13 @@ describe('a failed install stays readable and can be retried (hub#2244)', () => 
     expect(close.role).toBe('cancel');
     expect(requestInstallMock).toHaveBeenCalledTimes(1);
 
-    requestInstallMock.mockResolvedValue({ ok: true, module_id: 'flows', version: '1.0.0', status: 'installed', also_installed: [] });
+    requestInstallMock.mockResolvedValue({
+      ok: true,
+      module_id: 'flows',
+      version: '1.0.0',
+      status: 'installed',
+      also_installed: [],
+    });
     await buttons[0].handler?.();
     await settle();
 
@@ -215,7 +221,12 @@ describe('a failed install stays readable and can be retried (hub#2244)', () => 
     // `didDismiss`. That late event used to set `isOpen = false` and close the error ~0.3 s after it
     // rose: the red flash at the bottom edge of hub#2244.
     let fail: (e: unknown) => void = () => {};
-    requestInstallMock.mockImplementation(() => new Promise((_, reject) => { fail = reject; }));
+    requestInstallMock.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
     const w = mountApps('en');
     await settle();
     await pressInstall(w, 'flows');
@@ -259,7 +270,13 @@ describe('a failed install stays readable and can be retried (hub#2244)', () => 
   });
 
   it('a success still goes away on its own (no buttons, not sticky)', async () => {
-    requestInstallMock.mockResolvedValue({ ok: true, module_id: 'flows', version: '1.0.0', status: 'installed', also_installed: [] });
+    requestInstallMock.mockResolvedValue({
+      ok: true,
+      module_id: 'flows',
+      version: '1.0.0',
+      status: 'installed',
+      also_installed: [],
+    });
     const w = mountApps('en');
     await settle();
     await pressInstall(w, 'flows');
