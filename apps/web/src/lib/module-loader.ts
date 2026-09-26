@@ -416,7 +416,7 @@ export interface InstalledManifest {
   manifest: ModuleManifest;
   /** URL del bundle ESM del WC del módulo (`/modules/<id>/<ui.entry>`). */
   entryUrl: string;
-  /** Traducciones del módulo para el idioma activo (o `undefined` si no trae/idioma canónico). */
+  /** The module strings for the active language (`undefined` if it ships no `locales/<lang>.json`). */
   locale?: ModuleLocaleFile;
 }
 
@@ -469,8 +469,10 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
     moduleIds.push(item.module_id);
   }
 
-  // Idioma activo (ADR-0055): para el canónico inglés no se busca locale (el manifest ya está en EN);
-  // para otros se intenta `locales/<lang>.json` (best-effort, fallback al título del manifest).
+  // Active language (ADR-0055): `locales/<lang>.json` is read for EVERY language, English included
+  // (hub#2179). The manifest is canonical English for names and navigation, but `commands[].label`
+  // has no place in it — `locales/en.json` is its only English source, and skipping it left the
+  // approval dialog saying «an action in Sales / POS». Best-effort: missing file → manifest fallback.
   const lang = getLocale();
   const out: InstalledManifest[] = [];
   for (const moduleId of moduleIds) {
@@ -485,7 +487,7 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
     // widget que SÍ están horneados salían vacíos si su módulo no tenía entrada de navegación (P2).
     await loadIconMap(base, manifest.ui.entry);
     void loadOutfitkitStamp(base, manifest.ui.entry, moduleId);
-    const locale = lang === 'en' ? undefined : await loadModuleLocale(base, lang);
+    const locale = await loadModuleLocale(base, lang);
     out.push({
       moduleId,
       manifest,
