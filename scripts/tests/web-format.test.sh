@@ -94,7 +94,7 @@ fi
 printf 'import { ref } from "vue";\n\nexport const probe = ref(0);\n' >"$probe"
 probe_out=$(cd "$web" && pnpm run --silent format:check 2>&1)
 probe_rc=$?
-if [ "$probe_rc" -ne 0 ] && printf '%s\n' "$probe_out" | grep -qF "$(basename "$probe")"; then
+if [ "$probe_rc" -ne 0 ] && grep -qF "$(basename "$probe")" <<<"$probe_out"; then
     ok "a new double-quoted file fails format:check"
 else
     bad "a new double-quoted file fails format:check" "exit ${probe_rc}; output did not name $(basename "$probe")"
