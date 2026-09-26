@@ -821,10 +821,14 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
           : raw.price),
       );
   const tiers = Array.isArray(raw.tiers) ? (raw.tiers as Record<string, unknown>[]) : [];
-  const includedInPlan = !isFree
-    && priceAmount === null
-    && tiers.length > 0
-    && tiers.every((tier) => positiveDecimal(tier?.price) === null);
+  // The catalog says it explicitly (saas#2324); deduce from zero prices only for an older store
+  // that does not send the field (hub#2161).
+  const includedInPlan = typeof raw.included_in_plan === 'boolean'
+    ? raw.included_in_plan
+    : (!isFree
+      && priceAmount === null
+      && tiers.length > 0
+      && tiers.every((tier) => positiveDecimal(tier?.price) === null));
   const interval =
     raw.subscription_interval === 'year'
       ? 'year'
