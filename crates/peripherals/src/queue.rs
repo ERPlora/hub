@@ -181,40 +181,92 @@ mod tests {
         }
     }
 
-    /// A "black hole" printer: a listener whose tiny backlog is saturated and never accepts.
-    /// Further SYNs are absorbed — neither accepted nor refused — so a bare `connect` against it
-    /// hangs until some deadline fires. Models the hub#596 failure mode (loose cable, stale IP,
-    /// filtered port) without hardware. Keep the value alive: dropping it frees the port again.
+    /// A "black hole" printer: a local address whose SYNs are absorbed — neither accepted nor
+    /// refused — so a bare `connect` against it hangs until some deadline fires. Models the
+    /// hub#596 failure mode (loose cable, stale IP, filtered port) without hardware. Keep the
+    /// value alive: dropping it frees the port again.
+    ///
+    /// No single loopback trick absorbs on every kernel (hub#1972): macOS drops the SYN to a
+    /// bound socket that does not listen but resets a connect to a saturated backlog; Linux
+    /// does the opposite. So `start` builds the first shape and keeps it only if a probe
+    /// connect really hangs, and falls back to the second one otherwise.
     struct BlackHolePrinter {
         target: NetworkTarget,
-        _listener: TcpListener,
-        _backlog_guards: Vec<TcpStream>,
+        _hole: BlackHole,
+    }
+
+    enum BlackHole {
+        /// Bound but not listening: macOS drops the SYN.
+        Unlistened { _socket: tokio::net::TcpSocket },
+        /// A listener whose backlog is full and never accepts: Linux drops further SYNs.
+        SaturatedBacklog { _listener: TcpListener, _guards: Vec<TcpStream> },
     }
 
     impl BlackHolePrinter {
+        const PROBE: Duration = Duration::from_millis(150);
+
         async fn start() -> Self {
             let socket = tokio::net::TcpSocket::new_v4().unwrap();
             socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let addr = socket.local_addr().unwrap();
+            if Self::absorbs(addr).await {
+                return Self::at(addr, BlackHole::Unlistened { _socket: socket });
+            }
+
             let listener = socket.listen(1).unwrap();
-            let addr = listener.local_addr().unwrap();
             let mut guards = Vec::new();
             for _ in 0..4 {
-                match tokio::time::timeout(Duration::from_millis(200), TcpStream::connect(addr))
-                    .await
-                {
+                match tokio::time::timeout(Self::PROBE, TcpStream::connect(addr)).await {
                     Ok(Ok(stream)) => guards.push(stream),
                     // The backlog is full: this connect already hangs, the hole is ready.
                     _ => break,
                 }
             }
+            Self::at(addr, BlackHole::SaturatedBacklog { _listener: listener, _guards: guards })
+        }
+
+        async fn absorbs(addr: std::net::SocketAddr) -> bool {
+            tokio::time::timeout(Self::PROBE, TcpStream::connect(addr)).await.is_err()
+        }
+
+        fn at(addr: std::net::SocketAddr, hole: BlackHole) -> Self {
             Self {
                 target: NetworkTarget {
                     host: addr.ip().to_string(),
                     port: addr.port(),
                 },
-                _listener: listener,
-                _backlog_guards: guards,
+                _hole: hole,
             }
+        }
+    }
+
+    /// A printer that is switched off but keeps its address. The socket is bound, so no other
+    /// socket can take the port, yet it does not listen, so no connect gets through (Linux
+    /// refuses it, macOS drops the SYN) — what a powered-off printer on the LAN does. `switch_on` listens on that same socket, so the
+    /// port never goes back to the OS in between (hub#1961).
+    struct SwitchedOffPrinter {
+        socket: tokio::net::TcpSocket,
+        addr: std::net::SocketAddr,
+        target: NetworkTarget,
+    }
+
+    impl SwitchedOffPrinter {
+        fn new() -> Self {
+            let socket = tokio::net::TcpSocket::new_v4().unwrap();
+            socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let addr = socket.local_addr().unwrap();
+            Self {
+                socket,
+                addr,
+                target: NetworkTarget {
+                    host: addr.ip().to_string(),
+                    port: addr.port(),
+                },
+            }
+        }
+
+        fn switch_on(self) -> TcpListener {
+            self.socket.listen(16).expect("listen on the reserved port")
         }
     }
 
@@ -286,15 +338,40 @@ mod tests {
         );
     }
 
+    /// The switched-off printer is a real off printer AND keeps its address (hub#1961): while
+    /// off, a connect does not get through and no other socket can take the port; once switched on, the
+    /// very same address accepts. Rebinding a dropped port instead let a parallel test grab it
+    /// in between and fail with `AddrInUse`.
+    #[tokio::test]
+    async fn a_switched_off_printer_refuses_connections_and_keeps_its_port() {
+        let printer = SwitchedOffPrinter::new();
+        let addr = printer.addr;
+
+        // Linux refuses the connect outright; macOS drops the SYN. Either way it never connects.
+        let off = tokio::time::timeout(Duration::from_millis(200), TcpStream::connect(addr)).await;
+        assert!(
+            !matches!(off, Ok(Ok(_))),
+            "an off printer must not take the connection, got {off:?}"
+        );
+        let stolen = TcpListener::bind(addr)
+            .await
+            .expect_err("the port stays reserved");
+        assert_eq!(stolen.kind(), std::io::ErrorKind::AddrInUse);
+
+        let listener = printer.switch_on();
+        let (connected, accepted) = tokio::join!(TcpStream::connect(addr), listener.accept());
+        connected.expect("a switched-on printer accepts on the same address");
+        accepted.expect("and the listener sees the connection");
+    }
+
     /// **La impresora apagada un momento no pierde el trabajo.** Es el requisito §2.7 entero: el
     /// primer intento falla con el puerto cerrado y un reintento posterior, ya con la impresora de
     /// vuelta, entrega. Sin esto un tique se pierde cada vez que alguien tropieza con el cable.
     #[tokio::test]
     async fn a_printer_that_comes_back_still_gets_its_job() {
-        // Reserva un puerto y ciérralo: "impresora apagada" en una dirección que luego revive.
-        let probe = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = probe.local_addr().unwrap();
-        drop(probe);
+        // Switched off at an address that comes back later; the port stays ours meanwhile.
+        let printer = SwitchedOffPrinter::new();
+        let target = printer.target.clone();
 
         let captured = Arc::new(tokio::sync::Mutex::new(Vec::new()));
         let accepted = Arc::new(AtomicU32::new(0));
@@ -302,9 +379,9 @@ mod tests {
         let cap = captured.clone();
         let seen = accepted.clone();
         let revive = tokio::spawn(async move {
-            // Vuelve a levantarse mientras la cola hace backoff.
+            // Comes back while the queue is backing off.
             tokio::time::sleep(Duration::from_millis(40)).await;
-            let listener = TcpListener::bind(addr).await.expect("rebind del puerto");
+            let listener = printer.switch_on();
             if let Ok((mut sock, _)) = listener.accept().await {
                 seen.fetch_add(1, Ordering::SeqCst);
                 let mut buf = Vec::new();
@@ -320,10 +397,6 @@ mod tests {
             write_timeout_ms: 1000,
         }));
         let mut outcomes = spawn_worker(queue.clone());
-        let target = NetworkTarget {
-            host: addr.ip().to_string(),
-            port: addr.port(),
-        };
         queue.enqueue(job(target, b"resilient job")).unwrap();
 
         assert!(
@@ -388,6 +461,18 @@ mod tests {
             .enqueue(job(unreachable_target(), b"nowhere"))
             .expect_err("la cola cerrada no acepta trabajos");
         assert!(matches!(err, PeripheralError::InvalidPayload(_)));
+    }
+
+    /// The black hole really absorbs the connect on this OS (hub#1972): neither accepted nor
+    /// refused. If it resets instead, the deadline tests below go green or red for the wrong
+    /// reason — a fast `ConnectionReset` never exercises `connect_timeout_ms`.
+    #[tokio::test]
+    async fn the_black_hole_printer_absorbs_the_connect() {
+        let hole = BlackHolePrinter::start().await;
+        let addr = hole.target.socket_addr();
+        let probe =
+            tokio::time::timeout(Duration::from_millis(300), TcpStream::connect(&addr)).await;
+        assert!(probe.is_err(), "a black hole must leave the connect hanging, got {probe:?}");
     }
 
     /// **The connect deadline is the queue's own, not the OS one** (hub#596). Against a printer
@@ -480,6 +565,7 @@ mod tests {
         }));
         let mut outcomes = spawn_worker(queue.clone());
 
+        let started = std::time::Instant::now();
         queue
             .enqueue(PrintJob {
                 job_id: Some("dead".into()),
@@ -507,6 +593,13 @@ mod tests {
             }
             other => panic!("a black-holed printer cannot complete: {other:?}"),
         }
+        // The failure must have waited out the connect deadline on every attempt: an instant
+        // refusal or reset (hub#1972) would also end as `Failed`, without exercising it.
+        assert!(
+            started.elapsed() >= Duration::from_millis(300),
+            "three attempts must each wait out the 100 ms connect deadline (took {:?})",
+            started.elapsed()
+        );
 
         let second = tokio::time::timeout(Duration::from_secs(2), outcomes.recv())
             .await

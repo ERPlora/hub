@@ -213,9 +213,12 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             // autorización de representación (Anexo I) que la celda exige para cualquier envío, y
             // ningún registro remitido se puede deshacer (ADR-0189). Así que esta vía **prueba el
             // camino en vez de usarlo** — y es además la comprobación más fuerte disponible aquí:
-            // la identidad de máquina abre el ingress mTLS de la celda, el plano de control ya
-            // acuñó el Bearer para construir el acceso, y la celda dice si su Sello puede firmar
-            // hoy. `aeat` se queda a null, que es el «no enviado» que la pantalla ya pinta.
+            // el plano de control ya acuñó el Bearer para construir el acceso, la conexión se
+            // ancla en la CA interna, y la celda dice si su Sello puede firmar hoy. En el carril
+            // mutuo, además, la identidad de máquina abre el ingress mTLS, así que llegar a la
+            // respuesta ES el enrolamiento funcionando; en el carril de pruebas (hub#1936) no hay
+            // identidad que presentar y eso no se prueba aquí, pero el resto sí.
+            // `aeat` se queda a null, que es el «no enviado» que la pantalla ya pinta.
             let route = TransmitRoute::Gateway(access);
             let TransmitRoute::Gateway(ref access) = route else {
                 unreachable!("this arm matched Gateway")
@@ -668,6 +671,22 @@ pub(crate) async fn next_sequence(
 /// identidades distintas en el mismo `ObligadoEmision`, que la AEAT rechaza.
 pub(crate) fn obligado_name(config: &Json) -> String {
     str_field(config, "issuer_name")
+}
+
+/// `config` answering [`obligado_name`] for `record` (hub#2131): the saved registered name when
+/// there is one, and otherwise the name the record was sealed with — the obligado its own alta
+/// declares. A hub that never saved its VeriFactu settings transmits on the defaults
+/// (`config::transmission_config`), which carry no name, and a consult on its behalf would not
+/// even be built.
+pub(crate) fn with_obligado_name_of(config: &Json, record: &Json) -> Json {
+    let mut config = config.clone();
+    if obligado_name(&config).trim().is_empty() {
+        let sealed = str_field(record, "issuer_name");
+        if let Some(fields) = config.as_object_mut() {
+            fields.insert("issuer_name".into(), Json::String(sealed));
+        }
+    }
+    config
 }
 
 /// Consulta a la AEAT los registros del emisor en el periodo actual y los parsea, **por la vía

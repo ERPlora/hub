@@ -358,6 +358,36 @@ fn refuse_unless_own(headers: &HeaderMap, module: &str) -> Result<(), Response> 
     }
 }
 
+/// **A module may restore its OWN recipes, and so may the gallery that edits everybody's**
+/// (hub#2059). Unlike [`refuse_unless_own`], a caller naming a DIFFERENT module is not refused
+/// outright: it is let through when that module holds `manage_flows` — the same capability
+/// [`list_templates`] already widens the SCOPE by, because Automations (the module `flows`) is
+/// where the owner sees «there is a newer version» and it already edits any flow and its
+/// permissions. Restoring one is not more power than that; it is the same power through a shortcut.
+async fn refuse_unless_own_or_editor(
+    rt: &erplora_runtime::Runtime,
+    headers: &HeaderMap,
+    module: &str,
+) -> Result<(), Response> {
+    let Some(caller) = calling_module(headers) else {
+        return Ok(());
+    };
+    if caller == module
+        || rt
+            .has_module_capability(&caller, CapabilityKind::ManageFlows)
+            .await
+    {
+        return Ok(());
+    }
+    Err(flow_err(RuntimeError::Domain {
+        code: templates::ERR_TEMPLATE_NOT_YOURS.to_string(),
+        message: format!(
+            "`{caller}` cannot restore the automations of `{module}`: a module may only restore \
+             its own, unless it holds `manage_flows`"
+        ),
+    }))
+}
+
 // ── flows ─────────────────────────────────────────────────────────────────────────────────────
 
 pub async fn list_flows(State(st): State<AppState>, headers: HeaderMap) -> Response {
@@ -668,7 +698,16 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
                 // «this hub is too old to know», and an absent key reads as the second one.
                 "installed": installed
                     .get(&templates::template_ref(module_id, &tpl.family))
-                    .map(|(flow_id, enabled)| json!({ "flow_id": flow_id, "enabled": enabled }))
+                    .map(|(flow_id, enabled, stored_digest)| {
+                        // hub#2059: `outdated` compares what the flow was BUILT from against what
+                        // this registry serves NOW. `null` on a flow built before this hub kept the
+                        // digest — «cannot tell», never a guess dressed up as `false`.
+                        let outdated = match stored_digest {
+                            Some(digest) => json!(*digest != templates::recipe_digest(tpl)),
+                            None => Value::Null,
+                        };
+                        json!({ "flow_id": flow_id, "enabled": enabled, "outdated": outdated })
+                    })
                     .unwrap_or(Value::Null),
             })
         })
@@ -683,12 +722,18 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
         .into_iter()
         .filter(|(module_id, _)| mine(module_id))
         .map(|(module_id, discard)| {
-            json!({
+            let mut row = json!({
                 "module": module_id,
                 "family": discard.family,
                 "code": discard.code,
                 "detail": discard.detail,
-            })
+            });
+            // hub#2123: the neighbour a floor names, as data. Only the floor codes carry it; on
+            // the rest the key is absent, not `null` (a `null` would read as «no neighbour needed»).
+            if let Some(requires) = &discard.requires {
+                row["requires"] = json!(requires);
+            }
+            row
         })
         .collect();
     Json(json!({ "ok": true, "data": data, "discarded": discarded })).into_response()
@@ -743,6 +788,34 @@ pub async fn deactivate_template(
     }
     let rt = arc.read().await;
     match rt.deactivate_flow_template(&module, &family, &who).await {
+        Ok(flow) => Json(json!({ "ok": true, "data": flow })).into_response(),
+        Err(e) => flow_err(e),
+    }
+}
+
+/// `POST /api/hub/flows/templates/{module}/{family}/restore` — **the explicit «restore the
+/// factory recipe»** (hub#2059).
+///
+/// Turning it back on is a switch (hub#1684) that never touches the document again, on purpose —
+/// so a module that has shipped a better recipe since had no way to hand it to a business that
+/// already activated the old one. This is that way in, and it is deliberately not automatic: it
+/// OVERWRITES the flow's document with the module's CURRENT one and its grants with exactly the
+/// sidecar's, pins included. Same flow id — its run history keeps an owner — and it keeps running
+/// or stays paused exactly as it was: restoring replaces WHAT it does, never WHETHER it does it.
+///
+/// A family never activated in this hub is `404`: there is nothing to restore, and building one is
+/// `activate`'s door.
+pub async fn restore_template(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path((module, family)): Path<(String, String)>,
+) -> Response {
+    let (arc, who) = admin_session_no_capability!(st, headers);
+    let rt = arc.read().await;
+    if let Err(response) = refuse_unless_own_or_editor(&rt, &headers, &module).await {
+        return response;
+    }
+    match rt.restore_flow_template(&module, &family, &who).await {
         Ok(flow) => Json(json!({ "ok": true, "data": flow })).into_response(),
         Err(e) => flow_err(e),
     }
@@ -952,6 +1025,8 @@ mod tests {
             // shape as a recipient nobody could be found for, and pinned here rather than left to
             // the `not_found` suffix rule, so renaming it cannot silently turn it into a `400`.
             (notify::ERR_OPTIONS_NOT_FOUND, StatusCode::NOT_FOUND),
+            // …and the text it promised, on the same terms (hub#1660).
+            (notify::ERR_TEXT_NOT_FOUND, StatusCode::NOT_FOUND),
             // Refused by an authority.
             (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
             (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),

@@ -23,6 +23,13 @@ pub const LINE_WIDTH: usize = 32;
 /// drift apart again.
 pub const PRODUCT_NAME: &str = "ERPlora";
 
+/// Module size, in dots, of a QR on the paper (fiscal and «pide tu factura»).
+const QR_MODULE_DOTS: u8 = 4;
+
+/// The promotional QR (hub#2009) at 3 dots — 75 % of the fiscal one, the nearest whole dot to the
+/// 70 % `<ok-receipt>` draws on screen.
+const PROMO_QR_MODULE_DOTS: u8 = 3;
+
 /// Tipos de documento soportados (espejo del `if document_type == …` de `PrinterManager`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -81,14 +88,56 @@ pub enum Align {
 
 /// Constructor de un buffer ESC/POS. Cada método empuja bytes al buffer interno.
 /// Porta `_RawNetworkPrinter.{set,text,cut,barcode}` (codificación cp437).
-#[derive(Default)]
 pub struct EscposBuilder {
     buf: Vec<u8>,
+    /// Decimals every amount is printed with: the scale of the document's currency (hub#2129).
+    decimals: usize,
+}
+
+impl Default for EscposBuilder {
+    fn default() -> Self {
+        Self {
+            buf: Vec::new(),
+            decimals: DEFAULT_MONEY_DECIMALS,
+        }
+    }
+}
+
+/// The scale a document without `decimals` is printed in: the euro's, which is what every paper
+/// printed before hub#2129.
+const DEFAULT_MONEY_DECIMALS: usize = 2;
+
+/// The widest scale ISO 4217 defines (CLF, UYW). A document asking for more is not trusted.
+const MAX_MONEY_DECIMALS: u64 = 4;
+
+/// The currency scale a document declares in `decimals` (hub#2129): JPY 0, EUR 2, KWD 3.
+///
+/// The amounts reach the paper as major-unit floats that the producer (`sales`) already divided by
+/// that scale, so the paper only needs to know how many digits to show. Anything that is not a
+/// whole number in `0..=4` falls back to two decimals — the paper of every document that predates
+/// the field — rather than printing a ticket with nine.
+fn money_decimals(data: &serde_json::Value) -> usize {
+    data.get("decimals")
+        .and_then(|v| v.as_u64())
+        .filter(|d| *d <= MAX_MONEY_DECIMALS)
+        .map_or(DEFAULT_MONEY_DECIMALS, |d| d as usize)
 }
 
 impl EscposBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Prints every amount with `decimals` digits (the currency's scale, hub#2129).
+    pub fn with_money_decimals(mut self, decimals: usize) -> Self {
+        self.decimals = decimals;
+        self
+    }
+
+    /// An amount as the paper shows it, in the currency's scale: `1500` in yen, `12.50` in euros,
+    /// `1.234` in dinars.
+    pub fn money(&self, amount: f64) -> String {
+        format!("{amount:.prec$}", prec = self.decimals)
     }
 
     /// Estado de impresión: alineación + negrita + doble alto/ancho (`ESC a`, `ESC E`, `GS !`).
@@ -178,6 +227,12 @@ impl EscposBuilder {
     /// fn 180 (almacenar datos) → fn 181 (imprimir). Datos vacíos o > límite del comando
     /// (~7 KB) → no-op.
     pub fn qr(&mut self, data: &str) -> &mut Self {
+        self.qr_sized(data, QR_MODULE_DOTS)
+    }
+
+    /// [`Self::qr`] with its module size in dots (fn 167): a secondary code prints smaller so the
+    /// one the paper is for stays the one the eye goes to.
+    pub fn qr_sized(&mut self, data: &str, module_dots: u8) -> &mut Self {
         let bytes = data.as_bytes();
         if bytes.is_empty() || bytes.len() > 7080 {
             return self;
@@ -186,7 +241,7 @@ impl EscposBuilder {
         // GS ( k 4 0 49 65 50 0 — fn 165: seleccionar modelo 2.
         self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 4, 0, 49, 65, 50, 0]);
         // GS ( k 3 0 49 67 n — fn 167: tamaño de módulo (puntos).
-        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 67, 4]);
+        self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 67, module_dots]);
         // GS ( k 3 0 49 69 n — fn 169: nivel de corrección M (49).
         self.buf.extend_from_slice(&[0x1d, 0x28, 0x6b, 3, 0, 49, 69, 49]);
         // GS ( k pL pH 49 80 48 d1..dk — fn 180: almacenar los datos (len = k + 3).
@@ -210,7 +265,7 @@ impl EscposBuilder {
 
     /// Línea de total alineada a la derecha: `Etiqueta        12.50`. Porta `_print_total_line`.
     pub fn total_line(&mut self, label: &str, amount: f64) -> &mut Self {
-        let amount_str = format!("{amount:.2}");
+        let amount_str = self.money(amount);
         let padding = (LINE_WIDTH as isize - label.len() as isize - amount_str.len() as isize).max(1)
             as usize;
         self.text(&format!("{label}{}{amount_str}\n", " ".repeat(padding)));
@@ -263,10 +318,15 @@ pub fn render_document(doc: DocumentType, data: &serde_json::Value) -> Result<Ve
                 .to_string(),
         ));
     }
-    let mut b = EscposBuilder::new();
+    if doc == DocumentType::Invoice {
+        check_full_invoice(data)?;
+    }
+    let mut b = EscposBuilder::new().with_money_decimals(money_decimals(data));
     match doc {
-        // invoice == receipt (`_print_invoice` delega en `_print_receipt`).
-        DocumentType::Receipt | DocumentType::Invoice => render_receipt(&mut b, data),
+        DocumentType::Receipt => render_receipt(&mut b, data, Fiscal::Ticket),
+        // hub#2005 — the same body as the ticket (lines, totals, QR, duplicate mark) plus what
+        // makes it a FULL invoice; see [`check_full_invoice`] for the fields it reads.
+        DocumentType::Invoice => render_receipt(&mut b, data, Fiscal::FullInvoice),
         // NOT an arm of `render_receipt` with a flag: what the bill must not print is precisely
         // what a receipt exists to print, so sharing the body would put the fiscal furniture one
         // forgotten `if` away from the paper the waiter hands over.
@@ -389,6 +449,13 @@ enum Label {
     Tendered,
     Change,
     Thanks,
+    Duplicate,
+    // The full invoice (hub#2005).
+    InvoiceTitle,
+    InvoiceNumber,
+    BreakdownRate,
+    BreakdownBase,
+    BreakdownTax,
     // The bill taken to the table.
     BillTitle,
     TableOrCustomer,
@@ -486,6 +553,15 @@ impl Locale {
             Label::Tendered => ("Tendered", "Entregado"),
             Label::Change => ("Change", "Cambio"),
             Label::Thanks => ("Thank you for your purchase", "Gracias por su compra"),
+            // RD 1619/2012 art. 14.4: every copy after the original says «duplicado».
+            Label::Duplicate => ("DUPLICATE", "DUPLICADO"),
+            Label::InvoiceTitle => ("INVOICE", "FACTURA"),
+            Label::InvoiceNumber => ("Invoice: ", "Factura: "),
+            // The three columns of the VAT breakdown; «Cuota» is what a Spanish invoice calls the
+            // tax amount of a rate.
+            Label::BreakdownRate => ("Rate", "Tipo"),
+            Label::BreakdownBase => ("Base", "Base"),
+            Label::BreakdownTax => ("Tax", "Cuota"),
             Label::BillTitle => ("BILL", "CUENTA"),
             Label::TableOrCustomer => ("Table/Customer: ", "Mesa/Cliente: "),
             // The notice is what keeps this paper from passing for an invoice, so it has a
@@ -559,9 +635,142 @@ fn modifier_lines(item: &serde_json::Value) -> Vec<String> {
 
 // ─── Renderizadores de documento (porta `printer.py`) ────────────────────────
 
-/// Porta `_print_receipt`.
-fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
+/// Which fiscal paper [`render_receipt`] cuts: the ticket (simplified invoice) or the full invoice.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fiscal {
+    Ticket,
+    FullInvoice,
+}
+
+/// Width of the rate column of the VAT breakdown; the base and the quota take 12 columns each, so
+/// a row fills the 32 of the roll exactly.
+const BREAKDOWN_RATE_WIDTH: usize = LINE_WIDTH - 2 * BREAKDOWN_AMOUNT_WIDTH;
+const BREAKDOWN_AMOUNT_WIDTH: usize = 12;
+
+/// **What a `invoice` must carry to be printed as a FULL invoice on the roll** (hub#2005).
+///
+/// `invoice` used to fall into the ticket's body, which reads neither the customer's tax id nor a
+/// per-rate breakdown: a customer who asked for their invoice took home a ticket, and nothing said
+/// so. Spanish tills (Ágora, Revo, Glop) print the full invoice on the 80 mm roll, and it is valid
+/// as long as it carries every datum RD 1619/2012 art. 6 asks for. So the document either brings
+/// them or is REFUSED here, naming the field — the print host reports the refusal instead of
+/// cutting a mute ticket. The contract (field → paper):
+///
+/// | Field | Required | Paper |
+/// |---|---|---|
+/// | `vat_number` | yes | issuer's tax id, under the business name |
+/// | `receipt_id` | yes | `Factura: <number>` |
+/// | `customer_name` | yes | `Cliente: <name>` |
+/// | `customer_tax_id` | yes | `NIF: <tax id>`, right under the name |
+/// | `customer_address` | no | `Dir: <address>`, under the tax id |
+/// | `tax_breakdown` | yes, non-empty array | one row per rate: `{ rate, base, tax, label? }` |
+///
+/// `rate` is the percentage (`21`, `5.2`), `base` and `tax` are amounts in the document's unit
+/// (the same as `total`), and `label` overrides the row's name (`RE 5.2%` for a surcharge; the
+/// default is `IVA <rate>%`). The rest of the fields are the ticket's.
+fn check_full_invoice(data: &serde_json::Value) -> Result<()> {
+    let refuse = |field: &str, what: &str| {
+        Err(crate::PeripheralError::InvalidPayload(format!(
+            "a full invoice needs `{field}` ({what})"
+        )))
+    };
+    for (field, what) in [
+        ("vat_number", "the issuer's tax id"),
+        ("receipt_id", "the invoice number"),
+        ("customer_name", "the customer's name"),
+        ("customer_tax_id", "the customer's tax id"),
+    ] {
+        if str_field(data, field, "").trim().is_empty() {
+            return refuse(field, what);
+        }
+    }
+    let rows = data.get("tax_breakdown").and_then(|v| v.as_array());
+    let valid = rows.is_some_and(|rows| {
+        !rows.is_empty()
+            && rows.iter().all(|row| {
+                ["rate", "base", "tax"]
+                    .iter()
+                    .all(|k| row.get(k).and_then(|v| v.as_f64()).is_some())
+            })
+    });
+    if !valid {
+        return refuse(
+            "tax_breakdown",
+            "a non-empty array of `{ rate, base, tax }`, one per VAT rate",
+        );
+    }
+    Ok(())
+}
+
+/// A rate as a person writes it: `21`, `5.2` — not `21.00` or `5.20`.
+fn fmt_rate(rate: f64) -> String {
+    let s = format!("{rate:.2}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+/// The VAT breakdown of a full invoice: a header naming the columns and one row per rate, the
+/// amounts right-aligned in fixed columns so the bases and the quotas read as two columns. A
+/// label wider than its column gets a line of its own rather than pushing the amounts out.
+fn render_tax_breakdown(b: &mut EscposBuilder, data: &serde_json::Value, t: Locale) {
+    let Some(rows) = data.get("tax_breakdown").and_then(|v| v.as_array()) else {
+        return;
+    };
+    let row_line = |name: &str, base: &str, tax: &str| {
+        format!(
+            "{name:<rate_w$}{base:>amount_w$}{tax:>amount_w$}\n",
+            rate_w = BREAKDOWN_RATE_WIDTH,
+            amount_w = BREAKDOWN_AMOUNT_WIDTH
+        )
+    };
+    b.set(Align::Left, false, false, false);
+    b.text(&row_line(
+        t.label(Label::BreakdownRate),
+        t.label(Label::BreakdownBase),
+        t.label(Label::BreakdownTax),
+    ));
+    for row in rows {
+        let num = |k: &str| row.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let name = match row.get("label").and_then(|v| v.as_str()).map(str::trim) {
+            Some(label) if !label.is_empty() => label.to_string(),
+            _ => format!("{} {}%", t.label(Label::Tax), fmt_rate(num("rate"))),
+        };
+        let (base, tax) = (b.money(num("base")), b.money(num("tax")));
+        if name.chars().count() > BREAKDOWN_RATE_WIDTH {
+            b.text(&format!("{name}\n"));
+            b.text(&row_line("", &base, &tax));
+        } else {
+            b.text(&row_line(&name, &base, &tax));
+        }
+    }
+    b.text("--------------------------------\n");
+}
+
+/// Porta `_print_receipt`; with [`Fiscal::FullInvoice`] it is also the full invoice (hub#2005).
+fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal) {
     let t = Locale::from_document(data);
+
+    // The fiscal QR (VeriFactu, `qr_data`) OPENS the ticket (sales#339): the AEAT's QR
+    // specification (v0.5.0 §3, per Orden HAC/1177/2024 art. 21.1) places it «at the beginning of
+    // the invoice, before the content generated by the invoicing system», always preceded by the
+    // text «QR tributario:» above it. The producer sends that fixed legal text as `qr_heading`.
+    // Heading and legend in bold so they read at least as clearly as the rest of the data.
+    if is_truthy(data, "qr_data") {
+        if is_truthy(data, "qr_heading") {
+            b.set(Align::Center, true, false, false);
+            b.text(&format!("{}\n", str_field(data, "qr_heading", "")));
+        }
+        b.set(Align::Center, false, false, false);
+        b.qr(str_field(data, "qr_data", ""));
+        // sales#327 — the legal legend of the fiscal QR («VERI*FACTU», RD 1619/2012 art. 6.5.b),
+        // right under it (Orden HAC/1177/2024 art. 20.1.b). Only with the QR: alone it would
+        // name nothing.
+        if is_truthy(data, "qr_legend") {
+            b.set(Align::Center, true, false, false);
+            b.text(&format!("{}\n", str_field(data, "qr_legend", "")));
+        }
+        b.text("\n");
+    }
+
     b.set(Align::Center, true, false, false);
     let business_name = str_field(data, "business_name", PRODUCT_NAME);
     b.text(&format!("{business_name}\n"));
@@ -579,11 +788,30 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
         b.text(&format!("{}{}\n", t.label(Label::Phone), str_field(data, "phone", "")));
     }
 
+    // hub#1931 — only one original of an invoice may exist (RD 1619/2012 art. 14): a reprint is a
+    // duplicate and has to say so. Only an explicit `true` prints it, because the word is a legal
+    // statement about the paper, not decoration a truthy string should switch on.
+    if data.get("duplicate").and_then(|v| v.as_bool()) == Some(true) {
+        b.set(Align::Center, true, false, false);
+        b.text(&format!("{}\n", t.label(Label::Duplicate)));
+    }
+
     b.text("================================\n");
+
+    // hub#2005 — the paper says what it is, before its data: the cheapest way to tell a full
+    // invoice from a ticket at a glance.
+    if kind == Fiscal::FullInvoice {
+        b.set(Align::Center, true, true, false);
+        b.text(&format!("{}\n", t.label(Label::InvoiceTitle)));
+    }
 
     b.set(Align::Left, false, false, false);
     let receipt_id = str_field(data, "receipt_id", "");
-    b.text(&format!("{}{receipt_id}\n", t.label(Label::Ticket)));
+    let number_label = match kind {
+        Fiscal::Ticket => Label::Ticket,
+        Fiscal::FullInvoice => Label::InvoiceNumber,
+    };
+    b.text(&format!("{}{receipt_id}\n", t.label(number_label)));
     b.text(&format!("{}{}\n", t.label(Label::Date), now_dmy_hm()));
 
     if is_truthy(data, "cashier") {
@@ -592,6 +820,15 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     if is_truthy(data, "customer_name") {
         b.text(&format!("{}{}\n", t.label(Label::Customer), str_field(data, "customer_name", "")));
+    }
+
+    // hub#2005 — the customer IDENTIFIED, right under their name. Only on the full invoice: the
+    // ticket's paper does not move.
+    if kind == Fiscal::FullInvoice {
+        b.text(&format!("{}{}\n", t.label(Label::VatNumber), str_field(data, "customer_tax_id", "")));
+        if is_truthy(data, "customer_address") {
+            b.text(&format!("{}{}\n", t.label(Label::Address), str_field(data, "customer_address", "")));
+        }
     }
 
     b.text("--------------------------------\n");
@@ -604,7 +841,7 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
             b.set(Align::Left, false, false, false);
             let line = format!("{}x {name}", fmt_qty(item.get("quantity"), qty));
-            let total_str = format!("{total:.2}");
+            let total_str = b.money(total);
             let padding = (LINE_WIDTH as isize - line.len() as isize - total_str.len() as isize)
                 .max(1) as usize;
             b.text(&format!("{line}{}{total_str}\n", " ".repeat(padding)));
@@ -655,6 +892,10 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     b.text("--------------------------------\n");
 
+    if kind == Fiscal::FullInvoice {
+        render_tax_breakdown(b, data, t);
+    }
+
     if let Some(subtotal) = data.get("subtotal").and_then(|v| v.as_f64()) {
         b.total_line(t.label(Label::Subtotal), subtotal);
     }
@@ -692,12 +933,6 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
         }
     }
 
-    // QR opcional del ticket (p.ej. VeriFactu / enlace a factura): campo `qr_data` del payload.
-    if is_truthy(data, "qr_data") {
-        b.set(Align::Center, false, false, false);
-        b.qr(str_field(data, "qr_data", ""));
-    }
-
     // **El SEGUNDO QR: «pide tu factura»** (hub#963). No sustituye al de arriba y por eso son dos
     // campos: el de VeriFactu apunta a la Sede de la AEAT (`ValidarQR`) y sirve para COTEJAR; este
     // apunta a este hub y sirve para PEDIR. Ágora imprime «CREAR FACTURA», Cuiner imprime
@@ -730,6 +965,18 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     b.set(Align::Center, false, false, false);
     b.text(&format!("\n{}\n\n", t.label(Label::Thanks)));
+
+    // **The business's promotional QR** (hub#2009): reviews, social media — the link it set in
+    // the POS settings. It closes the paper, like `<ok-receipt>` and the browser paper (sales#345),
+    // and prints smaller than the fiscal QR. Without the URL nothing prints: a note alone names
+    // nothing. Only on the ticket — the full invoice is formal, like the A4.
+    if kind == Fiscal::Ticket && is_truthy(data, "promo_qr") {
+        if is_truthy(data, "promo_note") {
+            b.text(&format!("{}\n", str_field(data, "promo_note", "")));
+        }
+        b.qr_sized(str_field(data, "promo_qr", ""), PROMO_QR_MODULE_DOTS);
+        b.text("\n");
+    }
 
     b.cut();
 }
@@ -1058,7 +1305,8 @@ fn render_barcode_label(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     if let Some(price) = data.get("price").and_then(|v| v.as_f64()) {
         b.set(Align::Center, true, true, false);
-        b.text(&format!("{price:.2}\n"));
+        let price = b.money(price);
+        b.text(&format!("{price}\n"));
     }
 
     b.cut();
@@ -1826,6 +2074,247 @@ mod tests {
         );
     }
 
+    // ── A reprint says «duplicado» (hub#1931, RD 1619/2012 art. 14.4) ───────────────────────────
+
+    fn fiscal_paper(doc: DocumentType, extra: serde_json::Value) -> Vec<(String, bool, bool)> {
+        let mut data = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-42",
+            "items": [{ "name": "Cafe", "quantity": 2, "total": 2.4 }],
+            "total": 2.4,
+        });
+        // A full invoice is refused without its parties and its breakdown (hub#2005), so the
+        // invoice gets them here: what these tests look at is the mark, not the refusal.
+        if doc == DocumentType::Invoice {
+            for (k, v) in full_invoice().as_object().expect("an object") {
+                if data.get(k).is_none() {
+                    data[k] = v.clone();
+                }
+            }
+        }
+        for (k, v) in extra.as_object().expect("extra fields are an object") {
+            data[k] = v.clone();
+        }
+        let bytes = render_document(doc, &data).expect("a well-formed fiscal document renders");
+        lines_with_modes(&bytes)
+    }
+
+    fn says(lines: &[(String, bool, bool)], word: &str) -> bool {
+        lines.iter().any(|(text, _, _)| text.contains(word))
+    }
+
+    /// Only one original of an invoice may exist, and every other copy has to say «duplicado»
+    /// (art. 14.4). A simplified invoice (the ticket) is an invoice too, so both documents carry it,
+    /// in bold above the ticket data — where whoever gets the paper reads it first.
+    #[test]
+    fn a_duplicate_ticket_or_invoice_says_so_above_its_data() {
+        for doc in [DocumentType::Receipt, DocumentType::Invoice] {
+            let lines = fiscal_paper(doc, json!({ "duplicate": true }));
+            let mark = lines
+                .iter()
+                .position(|(text, _, _)| text.trim() == "DUPLICADO")
+                .unwrap_or_else(|| panic!("{doc:?}: the duplicate carries the mark, got {lines:?}"));
+            assert!(lines[mark].1, "{doc:?}: the mark is printed in bold");
+            let ticket = lines
+                .iter()
+                .position(|(text, _, _)| text.contains("T-42"))
+                .expect("the document number is on the paper");
+            assert!(mark < ticket, "{doc:?}: the mark comes before the ticket data");
+        }
+    }
+
+    /// The original — the first print, the automatic one at checkout — carries no mark, and
+    /// neither does a document that says `duplicate: false` or something that is not a boolean:
+    /// the word is a legal statement, so only an explicit `true` prints it.
+    #[test]
+    fn the_original_carries_no_duplicate_mark() {
+        for extra in [json!({}), json!({ "duplicate": false }), json!({ "duplicate": "yes" })] {
+            let lines = fiscal_paper(DocumentType::Receipt, extra.clone());
+            assert!(!says(&lines, "DUPLICADO"), "{extra}: no mark on the original, got {lines:?}");
+        }
+    }
+
+    /// The mark speaks the language of the paper, like every other label (hub#1159).
+    #[test]
+    fn the_duplicate_mark_speaks_the_language_of_the_paper() {
+        let lines = fiscal_paper(DocumentType::Receipt, json!({ "duplicate": true, "locale": "en" }));
+        assert!(says(&lines, "DUPLICATE"), "an English paper says DUPLICATE, got {lines:?}");
+        assert!(!says(&lines, "DUPLICADO"), "and not the Spanish word");
+    }
+
+    // ── A full invoice on the thermal roll (hub#2005) ──────────────────────────────────────────
+
+    /// What makes an invoice a FULL invoice (RD 1619/2012 art. 6): both parties identified and
+    /// the VAT broken down per rate. Two rates on purpose: a single-rate sale is the case where a
+    /// breakdown and a lone `tax_amount` look the same on paper.
+    fn full_invoice() -> serde_json::Value {
+        json!({
+            "business_name": "Bar Manolo",
+            "vat_number": "B11111111",
+            "receipt_id": "F-2026-000007",
+            "customer_name": "Talleres Paco SL",
+            "customer_tax_id": "B12345678",
+            "customer_address": "Calle Mayor 3, Madrid",
+            "items": [
+                { "name": "Menu", "quantity": 1, "total": 11.0 },
+                { "name": "Vino", "quantity": 1, "total": 12.1 }
+            ],
+            "tax_breakdown": [
+                { "rate": 10, "base": 10.0, "tax": 1.0 },
+                { "rate": 21, "base": 10.0, "tax": 2.1 }
+            ],
+            "subtotal": 20.0,
+            "tax_amount": 3.1,
+            "total": 23.1,
+        })
+    }
+
+    fn invoice_paper(data: &serde_json::Value) -> Vec<(String, bool, bool)> {
+        let bytes = render_document(DocumentType::Invoice, data).expect("a full invoice renders");
+        lines_with_modes(&bytes)
+    }
+
+    fn line_index(lines: &[(String, bool, bool)], pred: impl Fn(&str) -> bool, what: &str) -> usize {
+        lines
+            .iter()
+            .position(|(text, _, _)| pred(text))
+            .unwrap_or_else(|| panic!("{what} is not on the paper: {lines:#?}"))
+    }
+
+    /// The paper says what it is: «FACTURA», bold and double height, above the document data —
+    /// the first thing whoever gets it reads, and what tells it from a ticket at a glance.
+    #[test]
+    fn a_full_invoice_is_titled_factura_above_its_data() {
+        let lines = invoice_paper(&full_invoice());
+        let title = line_index(&lines, |l| l.trim() == "FACTURA", "the title");
+        assert!(lines[title].1 && lines[title].2, "the title is bold and double height: {lines:#?}");
+        let number = line_index(&lines, |l| l.contains("F-2026-000007"), "the invoice number");
+        assert!(title < number, "the title comes before the number");
+        assert!(
+            lines[number].0.starts_with("Factura: "),
+            "the number is the invoice's, not a ticket's: {:?}",
+            lines[number].0
+        );
+        assert!(!says(&lines, "Ticket: "), "an invoice does not call itself a ticket");
+    }
+
+    /// The customer is IDENTIFIED: name, tax id and address, together, under the document data.
+    #[test]
+    fn a_full_invoice_identifies_the_customer_with_their_tax_id() {
+        let lines = invoice_paper(&full_invoice());
+        let name = line_index(&lines, |l| l == "Cliente: Talleres Paco SL", "the customer's name");
+        let tax_id = line_index(&lines, |l| l == "NIF: B12345678", "the customer's tax id");
+        let address = line_index(&lines, |l| l == "Dir: Calle Mayor 3, Madrid", "the address");
+        assert_eq!((tax_id, address), (name + 1, name + 2), "the three lines go together");
+        let issuer = line_index(&lines, |l| l.contains("B11111111"), "the issuer's tax id");
+        assert!(issuer < name, "the issuer heads the paper, the customer comes after");
+    }
+
+    /// The address is printed when it comes and its absence is not a refusal: a customer's tax id
+    /// is what the law cannot do without, and the address is often not on file.
+    #[test]
+    fn a_full_invoice_without_a_customer_address_still_prints() {
+        let mut data = full_invoice();
+        data.as_object_mut().unwrap().remove("customer_address");
+        let lines = invoice_paper(&data);
+        assert!(says(&lines, "NIF: B12345678"));
+        assert!(!says(&lines, "Dir: "), "no empty address line");
+    }
+
+    /// One row per rate with its BASE and its QUOTA, under a header naming the columns — the
+    /// breakdown a full invoice carries (RD 1619/2012 art. 6.1.g/h). The amounts are right-aligned
+    /// in fixed columns so the bases and the quotas read as two columns, not as prose.
+    #[test]
+    fn a_full_invoice_breaks_the_vat_down_per_rate_with_base_and_quota() {
+        let lines = invoice_paper(&full_invoice());
+        let header = line_index(&lines, |l| l.starts_with("Tipo") && l.contains("Base") && l.ends_with("Cuota"), "the header");
+        let ten = line_index(&lines, |l| l.starts_with("IVA 10%"), "the 10% row");
+        let twenty_one = line_index(&lines, |l| l.starts_with("IVA 21%"), "the 21% row");
+        assert!(header < ten && ten < twenty_one, "header, then the rates in the order sent");
+        assert_eq!(lines[ten].0, format!("{:<8}{:>12}{:>12}", "IVA 10%", "10.00", "1.00"));
+        assert_eq!(lines[twenty_one].0, format!("{:<8}{:>12}{:>12}", "IVA 21%", "10.00", "2.10"));
+        for row in [header, ten, twenty_one] {
+            assert_eq!(lines[row].0.chars().count(), LINE_WIDTH, "a row fills the 80 mm line exactly");
+        }
+        let total = line_index(&lines, |l| l.starts_with("TOTAL"), "the total");
+        assert!(twenty_one < total, "the breakdown comes before the total");
+    }
+
+    /// A row may name itself (a surcharge, `RE 5.2%`) and a decimal rate prints as the rate, not
+    /// as `5.20`. A label longer than the rate column gets a line of its own instead of pushing
+    /// the amounts out of their columns.
+    #[test]
+    fn a_breakdown_row_can_name_itself_and_keeps_its_columns() {
+        let mut data = full_invoice();
+        data["tax_breakdown"] = json!([
+            { "rate": 5.2, "base": 10.0, "tax": 0.52 },
+            { "rate": 1.4, "base": 10.0, "tax": 0.14, "label": "Recargo equivalencia 1.4%" }
+        ]);
+        let lines = invoice_paper(&data);
+        assert!(says(&lines, &format!("{:<8}{:>12}{:>12}", "IVA 5.2%", "10.00", "0.52")), "{lines:#?}");
+        let long = line_index(&lines, |l| l == "Recargo equivalencia 1.4%", "the long label");
+        assert_eq!(lines[long + 1].0, format!("{:<8}{:>12}{:>12}", "", "10.00", "0.14"));
+    }
+
+    /// English paper, English labels (hub#1159): the invoice is not a Spanish-only document.
+    #[test]
+    fn a_full_invoice_speaks_the_language_of_the_paper() {
+        let mut data = full_invoice();
+        data["locale"] = json!("en");
+        let lines = invoice_paper(&data);
+        assert!(lines.iter().any(|(l, _, _)| l.trim() == "INVOICE"), "{lines:#?}");
+        assert!(says(&lines, "Invoice: F-2026-000007"));
+        assert!(says(&lines, "Customer: Talleres Paco SL"));
+        assert!(says(&lines, "VAT: B12345678"));
+        assert!(says(&lines, "VAT 21%"));
+        assert!(!says(&lines, "FACTURA") && !says(&lines, "Cuota"), "no Spanish left over");
+    }
+
+    /// **An invoice missing what makes it an invoice is REFUSED, never cut as a mute ticket**
+    /// (hub#2005). Before, `invoice` fell into the ticket's body and a customer who asked for their
+    /// invoice took home paper without their tax id or the breakdown — the silent failure. The
+    /// refusal names the missing field, so the print host's error says what to fix.
+    #[test]
+    fn an_invoice_missing_what_makes_it_an_invoice_is_refused_naming_the_field() {
+        type Breaks = Box<dyn Fn(&mut serde_json::Value)>;
+        let broken: Vec<(&str, Breaks)> = vec![
+            ("vat_number", Box::new(|d| { d.as_object_mut().unwrap().remove("vat_number"); })),
+            ("receipt_id", Box::new(|d| d["receipt_id"] = json!(""))),
+            ("customer_name", Box::new(|d| { d.as_object_mut().unwrap().remove("customer_name"); })),
+            ("customer_tax_id", Box::new(|d| { d.as_object_mut().unwrap().remove("customer_tax_id"); })),
+            ("customer_tax_id", Box::new(|d| d["customer_tax_id"] = json!("  "))),
+            ("tax_breakdown", Box::new(|d| { d.as_object_mut().unwrap().remove("tax_breakdown"); })),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([]))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!({ "21.00": { "base": 10.0, "tax": 2.1 } }))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([{ "rate": 21, "base": 10.0 }]))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([{ "rate": 21, "tax": 2.1 }]))),
+            ("tax_breakdown", Box::new(|d| d["tax_breakdown"] = json!([{ "base": 10.0, "tax": 2.1 }]))),
+        ];
+        for (field, breaks) in broken {
+            let mut data = full_invoice();
+            breaks(&mut data);
+            match render_document(DocumentType::Invoice, &data) {
+                Err(crate::PeripheralError::InvalidPayload(msg)) => assert!(
+                    msg.contains(field),
+                    "the refusal names `{field}`, got: {msg}"
+                ),
+                other => panic!("an invoice without a valid `{field}` is refused, got {other:?}"),
+            }
+        }
+    }
+
+    /// The ticket does not change: the same fields on a `receipt` print no title, no customer tax
+    /// id and no breakdown, and a receipt without them is still a receipt. Every till of the fleet
+    /// prints this paper, so the invoice's body must not leak into it.
+    #[test]
+    fn a_receipt_does_not_grow_the_invoice_body() {
+        let bytes = render_document(DocumentType::Receipt, &full_invoice()).expect("a receipt renders");
+        let lines = lines_with_modes(&bytes);
+        assert!(says(&lines, "Ticket: F-2026-000007"));
+        assert!(!says(&lines, "FACTURA"), "{lines:#?}");
+        assert!(!says(&lines, "B12345678") && !says(&lines, "Cuota"), "{lines:#?}");
+    }
+
     /// **The bill the waiter takes to the table is a document this printer knows** (hub#748).
     ///
     /// It is the most frequently printed paper of a restaurant service — it comes out before every
@@ -1890,6 +2379,167 @@ mod tests {
         assert!(
             text.contains("ABCD1234ABCD1234\n"),
             "and the locator in PLAIN TEXT below it: the camera is not always an option"
+        );
+    }
+
+    /// **«VERI*FACTU» under the fiscal QR** (sales#327). RD 1619/2012 art. 6.5.b (7.5 for the
+    /// simplified invoice a ticket is) wants the legend beside the QR of every invoice from a
+    /// system that remits all its records, and Orden HAC/1177/2024 art. 20.1.b wants it as
+    /// visible as the rest of the data. The producer sends it as `qr_legend`; the renderer prints
+    /// it right under the fiscal QR — before the second QR, so it cannot be read as its caption.
+    #[test]
+    fn the_verifactu_legend_is_printed_right_under_the_fiscal_qr() {
+        let doc = json!({
+            "receipt_id": "T-44",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "qr_legend": "VERI*FACTU",
+            "claim_note": "Pide tu factura",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &doc).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+
+        let fiscal = text.find("ValidarQR").expect("the fiscal QR is printed");
+        let legend = text
+            .find("VERI*FACTU\n")
+            .expect("the legend is printed, on its own line");
+        let claim = text.find("Pide tu factura").expect("the claim block is printed");
+        assert!(fiscal < legend, "the legend goes under the fiscal QR");
+        assert!(legend < claim, "and before the second QR, which is not what it names");
+
+        // «bien visible» (Orden HAC/1177/2024 art. 20.1.b): the last emphasis command before the
+        // legend is ESC E 1 (bold on), so it is not printed as one more 8-px caption.
+        let legend_at = bytes
+            .windows(b"VERI*FACTU".len())
+            .position(|w| w == b"VERI*FACTU")
+            .expect("legend bytes");
+        let last_bold = bytes[..legend_at]
+            .windows(3)
+            .rposition(|w| w[0] == 0x1b && w[1] == 0x45)
+            .expect("an ESC E command precedes the legend");
+        assert_eq!(bytes[last_bold + 2], 1, "the legend is printed in bold");
+    }
+
+    /// No fiscal QR → no legend, whatever the producer sends: the legend names the QR, and alone
+    /// it would claim a verification the paper does not offer. The bill never carries it.
+    #[test]
+    fn the_verifactu_legend_needs_the_fiscal_qr() {
+        let no_qr = json!({
+            "receipt_id": "T-45",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_legend": "VERI*FACTU",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &no_qr).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("VERI*FACTU"));
+
+        let bill = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "qr_legend": "VERI*FACTU",
+        });
+        let bytes = render_document(DocumentType::parse("prebill").unwrap(), &bill).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&bytes).contains("VERI*FACTU"),
+            "a bill is not an invoice and cannot say it is verifiable"
+        );
+    }
+
+    /// **«QR tributario:» above the fiscal QR, and the QR at the very top** (sales#339). The AEAT's
+    /// QR specification (v0.5.0 §3, which Orden HAC/1177/2024 art. 21.1 points at) wants the QR
+    /// «always preceded» by the text «QR tributario:», above it, and the QR «at the beginning of
+    /// the invoice, before the content generated by the invoicing system». The producer sends the
+    /// heading as `qr_heading` (a fixed legal text, not translated); the second QR stays at the foot.
+    #[test]
+    fn the_fiscal_qr_opens_the_ticket_under_its_qr_tributario_heading() {
+        let doc = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-46",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "qr_heading": "QR tributario:",
+            "qr_legend": "VERI*FACTU",
+            "claim_note": "Pide tu factura",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &doc).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+
+        let heading = text
+            .find("QR tributario:\n")
+            .expect("the heading is printed, on its own line");
+        let fiscal = text.find("ValidarQR").expect("the fiscal QR is printed");
+        let legend = text.find("VERI*FACTU\n").expect("the legend is printed");
+        let business = text.find("Bar Manolo").expect("the business name is printed");
+        let items = text.find("Cafe").expect("the lines are printed");
+        let claim = text.find("Pide tu factura").expect("the claim block is printed");
+        assert!(heading < fiscal, "the heading goes ABOVE the fiscal QR");
+        assert!(fiscal < legend, "the legend stays right under it");
+        assert!(
+            legend < business,
+            "the fiscal block opens the ticket, before anything the system writes"
+        );
+        assert!(business < items && items < claim, "the second QR stays at the foot");
+
+        // Same size as the rest of the data or bigger, never a smaller caption: printed in bold,
+        // centred over the code.
+        let heading_at = bytes
+            .windows(b"QR tributario:".len())
+            .position(|w| w == b"QR tributario:")
+            .expect("heading bytes");
+        let last_bold = bytes[..heading_at]
+            .windows(3)
+            .rposition(|w| w[0] == 0x1b && w[1] == 0x45)
+            .expect("an ESC E command precedes the heading");
+        assert_eq!(bytes[last_bold + 2], 1, "the heading is printed in bold");
+        let last_align = bytes[..heading_at]
+            .windows(3)
+            .rposition(|w| w[0] == 0x1b && w[1] == 0x61)
+            .expect("an ESC a command precedes the heading");
+        assert_eq!(bytes[last_align + 2], 1, "the heading is centred over the QR");
+    }
+
+    /// No fiscal QR → no heading: alone it would announce a code the paper does not carry. And a
+    /// producer that does not send the key yet (an older `sales`) still gets its QR at the top.
+    #[test]
+    fn the_qr_tributario_heading_needs_the_fiscal_qr() {
+        let no_qr = json!({
+            "receipt_id": "T-47",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_heading": "QR tributario:",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &no_qr).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("QR tributario:"));
+
+        let bill = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "qr_heading": "QR tributario:",
+        });
+        let bytes = render_document(DocumentType::parse("prebill").unwrap(), &bill).unwrap();
+        assert!(
+            !String::from_utf8_lossy(&bytes).contains("QR tributario:"),
+            "a bill carries no fiscal QR, so no heading either"
+        );
+
+        let old_producer = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-48",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+        });
+        let bytes = render_document(DocumentType::parse("receipt").unwrap(), &old_producer).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(
+            text.find("ValidarQR").unwrap() < text.find("Bar Manolo").unwrap(),
+            "the fiscal QR opens the ticket with or without the heading key"
         );
     }
 
@@ -2670,6 +3320,12 @@ mod tests {
         let data = json!({
             "business_name": "SALON AURORA SL",
             "tax_id": "12345678Z",
+            // What an invoice cannot be printed without (hub#2005).
+            "vat_number": "B11111111",
+            "receipt_id": "F-1",
+            "customer_name": "Cliente SL",
+            "customer_tax_id": "B12345678",
+            "tax_breakdown": [{ "rate": 21, "base": 9.92, "tax": 2.08 }],
             "ticket_number": "TICKET-2026-000001",
             "title": "Aviso",
             "items": [{ "name": "Corte", "quantity": 1, "total": 12.0 }],
@@ -2702,6 +3358,248 @@ mod tests {
                  from the tree by hub#340"
             );
         }
+    }
+
+    const PROMO_URL: &str = "https://g.page/r/bar-manolo/review";
+
+    fn ticket_with_promo() -> serde_json::Value {
+        json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-44",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "claim_note": "Pide tu factura",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+            "claim_locator": "ABCD1234ABCD1234",
+            "receipt_footer": "Vuelva pronto",
+            "promo_qr": PROMO_URL,
+            "promo_note": "Escanea y dejanos una resena",
+        })
+    }
+
+    fn position(bytes: &[u8], needle: &str) -> usize {
+        bytes
+            .windows(needle.len())
+            .position(|w| w == needle.as_bytes())
+            .unwrap_or_else(|| panic!("`{needle}` is not on the paper"))
+    }
+
+    /// The module size (`GS ( k … 49 67 n`, fn 167) of every QR on the paper, in printing order.
+    fn qr_module_sizes(bytes: &[u8]) -> Vec<u8> {
+        bytes
+            .windows(8)
+            .filter(|w| w[..7] == [0x1d, 0x28, 0x6b, 3, 0, 49, 67])
+            .map(|w| w[7])
+            .collect()
+    }
+
+    /// **The business's promotional QR reaches the thermal paper** (hub#2009, sale of sales#345).
+    /// The screen (`<ok-receipt>`) and the browser paper already carry it; the roll printed nothing
+    /// and the business believed its ticket did.
+    #[test]
+    fn a_ticket_prints_the_promotional_qr_with_its_note() {
+        let bytes =
+            render_document(DocumentType::parse("receipt").unwrap(), &ticket_with_promo()).unwrap();
+        assert_eq!(qr_symbols(&bytes), 3, "fiscal + «pide tu factura» + promotional");
+        position(&bytes, PROMO_URL);
+        assert!(
+            position(&bytes, "Escanea y dejanos una resena") < position(&bytes, PROMO_URL),
+            "the note goes ABOVE its QR, or nobody knows what the code is for"
+        );
+    }
+
+    /// Where it goes: it CLOSES the paper, after the fiscal QR, after «pide tu factura» and after
+    /// the footer and the thanks — the same order as the screen and the browser paper.
+    #[test]
+    fn the_promotional_qr_closes_the_ticket() {
+        let bytes =
+            render_document(DocumentType::parse("receipt").unwrap(), &ticket_with_promo()).unwrap();
+        let note = position(&bytes, "Escanea y dejanos una resena");
+        assert!(note > position(&bytes, "ValidarQR"), "after the fiscal QR");
+        assert!(note > position(&bytes, "/p/ABCD1234ABCD1234"), "after «pide tu factura»");
+        assert!(note > position(&bytes, "Vuelva pronto"), "after the footer");
+        assert!(note > position(&bytes, "Gracias por su compra"), "after the thanks");
+        let cut = bytes
+            .windows(2)
+            .rposition(|w| w == [0x1d, 0x56])
+            .expect("the ticket is cut");
+        assert!(position(&bytes, PROMO_URL) < cut, "and before the cut");
+    }
+
+    /// Smaller than the fiscal QR, like `<ok-receipt>` draws it: the fiscal proof is the code
+    /// the paper is for, the promotion is an extra.
+    #[test]
+    fn the_promotional_qr_is_smaller_than_the_fiscal_one() {
+        let bytes =
+            render_document(DocumentType::parse("receipt").unwrap(), &ticket_with_promo()).unwrap();
+        let sizes = qr_module_sizes(&bytes);
+        assert_eq!(sizes.len(), 3, "{sizes:?}");
+        assert!(sizes[2] < sizes[0], "promotional {sizes:?} not smaller than the fiscal");
+        assert!(sizes[2] > 0, "a zero module size prints nothing");
+    }
+
+    /// No URL, no promotion: a note alone names nothing, and a ticket of a business that did not
+    /// configure it prints byte for byte what it printed before.
+    #[test]
+    fn a_promotional_note_without_its_qr_prints_nothing() {
+        let mut with_note = ticket_with_promo();
+        with_note.as_object_mut().unwrap().remove("promo_qr");
+        let mut without = with_note.clone();
+        without.as_object_mut().unwrap().remove("promo_note");
+        let receipt = DocumentType::parse("receipt").unwrap();
+        assert_eq!(
+            render_document(receipt, &with_note).unwrap(),
+            render_document(receipt, &without).unwrap()
+        );
+    }
+
+    /// The full invoice is formal: no promotion on it, like the A4 (sales#345). A producer that
+    /// builds the invoice from its ticket (sales `saleToInvoicePrintDocument`) must not smuggle
+    /// the review link onto an invoice.
+    #[test]
+    fn a_full_invoice_carries_no_promotional_qr() {
+        let mut doc = full_invoice();
+        doc["promo_qr"] = json!(PROMO_URL);
+        doc["promo_note"] = json!("Escanea y dejanos una resena");
+        let bytes = render_document(DocumentType::parse("invoice").unwrap(), &doc).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(!text.contains(PROMO_URL), "no promotional QR on an invoice");
+        assert!(!text.contains("Escanea"), "nor its note");
+    }
+
+    /// The module size of every QR on the paper is a contract, not a relation (rv-2012): the fiscal
+    /// QR and «pide tu factura» keep the 4 dots (0.5 mm at 203 dpi) they printed at before hub#2009,
+    /// and the promotional one prints at 3. «Smaller than the fiscal» alone lets the fiscal one drift
+    /// to 5 or the promotional one to 2 (0.25 mm, which a phone no longer reads) without a test going red.
+    #[test]
+    fn every_qr_prints_at_its_contracted_module_size() {
+        let receipt = DocumentType::parse("receipt").unwrap();
+        let with_promo = render_document(receipt, &ticket_with_promo()).unwrap();
+        assert_eq!(qr_module_sizes(&with_promo), vec![4, 4, 3], "fiscal, claim, promotional");
+        let mut without = ticket_with_promo();
+        without.as_object_mut().unwrap().remove("promo_qr");
+        let bytes = render_document(receipt, &without).unwrap();
+        assert_eq!(qr_module_sizes(&bytes), vec![4, 4], "byte for byte what it printed before");
+    }
+
+    // ── The paper prints money in the currency's own scale (hub#2129) ──────────────────────────
+
+    /// The paper's text lines, whatever the document type.
+    fn money_paper(doc: DocumentType, data: &serde_json::Value) -> Vec<String> {
+        let bytes = render_document(doc, data).expect("a valid document");
+        lines_with_modes(&bytes).into_iter().map(|(text, _, _)| text).collect()
+    }
+
+    /// The line that starts with `label`, trimmed — the amount is what is right of it.
+    fn line_of<'a>(lines: &'a [String], label: &str) -> &'a str {
+        lines
+            .iter()
+            .map(|l| l.trim())
+            .find(|l| l.starts_with(label))
+            .unwrap_or_else(|| panic!("no line starting with {label:?} in {lines:#?}"))
+    }
+
+    fn yen_ticket() -> serde_json::Value {
+        json!({
+            "business_name": "Sushi Tanaka",
+            "decimals": 0,
+            "items": [{ "name": "Nigiri", "quantity": 2, "total": 1500.0 }],
+            "subtotal": 1364.0,
+            "tax_amount": 136.0,
+            "discount": 100.0,
+            "total": 1400.0,
+            "payment_method": "Efectivo",
+            "paid": 2000.0,
+            "change": 600.0,
+        })
+    }
+
+    /// **A yen shop's ticket has no cents** (hub#2129): `sales` sends the amounts already divided
+    /// by the currency's scale and says which scale it is; the paper used to add «.00» to every
+    /// one of them while the screen and the HTML ticket showed «1500».
+    #[test]
+    fn a_yen_ticket_prints_every_amount_without_decimals() {
+        let lines = money_paper(DocumentType::Receipt, &yen_ticket());
+        assert!(!lines.iter().any(|l| l.contains(".00")), "{lines:#?}");
+        assert!(line_of(&lines, "2x Nigiri").ends_with(" 1500"), "{lines:#?}");
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1400"), "{lines:#?}");
+        assert!(line_of(&lines, "Subtotal").ends_with(" 1364"), "{lines:#?}");
+        assert!(line_of(&lines, "Descuento").ends_with(" -100"), "{lines:#?}");
+        assert!(line_of(&lines, "Entregado").ends_with(" 2000"), "{lines:#?}");
+        assert!(line_of(&lines, "Cambio").ends_with(" 600"), "{lines:#?}");
+    }
+
+    /// The bill the waiter takes to the table, same scale.
+    #[test]
+    fn a_yen_bill_prints_every_amount_without_decimals() {
+        let lines = money_paper(DocumentType::Prebill, &yen_ticket());
+        assert!(!lines.iter().any(|l| l.contains(".00")), "{lines:#?}");
+        assert!(line_of(&lines, "2x Nigiri").ends_with(" 1500"), "{lines:#?}");
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1400"), "{lines:#?}");
+    }
+
+    /// **A dinar has three decimals, and the third one is money** (hub#2129): `1.234` KWD used to
+    /// print as `1.23`, a fil lost on every amount — the VAT breakdown included.
+    #[test]
+    fn a_dinar_invoice_keeps_its_third_decimal_on_every_amount() {
+        let mut data = full_invoice();
+        data["decimals"] = json!(3);
+        data["items"] = json!([{ "name": "Menu", "quantity": 1, "total": 1.234 }]);
+        data["tax_breakdown"] = json!([{ "rate": 10, "base": 1.122, "tax": 0.112 }]);
+        data["subtotal"] = json!(1.122);
+        data["tax_amount"] = json!(0.112);
+        data["total"] = json!(1.234);
+        let lines = money_paper(DocumentType::Invoice, &data);
+        assert!(line_of(&lines, "1x Menu").ends_with(" 1.234"), "{lines:#?}");
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1.234"), "{lines:#?}");
+        let row = line_of(&lines, "IVA 10%");
+        assert!(row.contains(" 1.122") && row.ends_with(" 0.112"), "{lines:#?}");
+    }
+
+    /// The cash report and the shelf label are money too: a yen till closes in yen.
+    #[test]
+    fn a_yen_cash_report_and_shelf_label_print_without_decimals() {
+        let report = money_paper(
+            DocumentType::CashSessionReport,
+            &json!({
+                "decimals": 0,
+                "opening_balance": 10000.0,
+                "closing_balance": 25000.0,
+                "transactions": [{ "label": "Venta", "amount": 15000.0 }],
+            }),
+        );
+        assert!(!report.iter().any(|l| l.contains(".00")), "{report:#?}");
+        assert!(line_of(&report, "Venta").ends_with(" 15000"), "{report:#?}");
+        let label = money_paper(
+            DocumentType::BarcodeLabel,
+            &json!({ "decimals": 0, "product_name": "Te verde", "price": 480.0 }),
+        );
+        assert!(label.iter().any(|l| l.trim() == "480"), "{label:#?}");
+    }
+
+    /// **A document without `decimals` prints exactly as before** — two decimals. Every module
+    /// in the fleet that predates hub#2129 sends none, and a euro ticket must not change a byte.
+    /// A scale that is not a whole number between 0 and 4 (the widest ISO 4217 scale) is not
+    /// trusted either: two decimals, never a ticket with nine.
+    #[test]
+    fn a_document_without_a_valid_scale_prints_two_decimals() {
+        let mut data = yen_ticket();
+        data.as_object_mut().unwrap().remove("decimals");
+        let without = render_document(DocumentType::Receipt, &data).expect("valid");
+        let lines = money_paper(DocumentType::Receipt, &data);
+        assert!(line_of(&lines, "TOTAL").ends_with(" 1400.00"), "{lines:#?}");
+        for bad in [json!(5), json!(-1), json!("0"), json!(2.5), json!(null)] {
+            data["decimals"] = bad.clone();
+            let bytes = render_document(DocumentType::Receipt, &data).expect("valid");
+            assert_eq!(bytes, without, "decimals = {bad} must print as if absent");
+        }
+        data["decimals"] = json!(2);
+        assert_eq!(
+            render_document(DocumentType::Receipt, &data).expect("valid"),
+            without,
+            "an explicit 2 is today's paper"
+        );
     }
 }
 

@@ -19,7 +19,9 @@ use erplora_runtime::flows::def::{
     MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_OPTION_ROWS, MAX_QUERY_ROWS, MAX_WAIT_HOOKS,
     SCHEMA_VERSION,
 };
-use erplora_runtime::host_notify::Channel;
+use erplora_runtime::host_notify::{
+    button_url_index, Channel, BUTTON_URL_VAR_PATTERN, HEADER_VARS,
+};
 
 fn schema() -> serde_json::Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -623,6 +625,37 @@ fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides()
     assert!(step(serde_json::json!("{{input.phone}}")).is_err());
 }
 
+/// **A template's media header** (hub#2101) is declared by NAME on both sides: the editor reads
+/// `vars.properties` to know whether THIS hub sends a header, instead of guessing from a version —
+/// and a key the runtime turns into Meta's `header` parameter that the schema did not name would
+/// be a picture the editor can never offer.
+#[test]
+fn the_header_media_vars_are_the_same_on_both_sides() {
+    let declared = keys_at(&schema(), "/$defs/step/properties/vars/properties");
+    let runtime: BTreeSet<String> = HEADER_VARS.iter().map(|(key, _)| key.to_string()).collect();
+    assert_eq!(declared, runtime);
+    // The text header (hub#2111) is one of them: the editor asks for its value only when the hub
+    // declares it.
+    assert!(declared.contains("header_text"), "{declared:?}");
+}
+
+/// **A template's link button** (hub#2110) is declared as a PATTERN, the one the runtime reads:
+/// the editor looks for it to know whether THIS hub sends a button's variable end, and a key the
+/// runtime turns into Meta's `button` component that the schema did not name would be a field the
+/// editor can never offer.
+#[test]
+fn the_url_button_vars_are_the_same_on_both_sides() {
+    let declared = keys_at(&schema(), "/$defs/step/properties/vars/patternProperties");
+    assert_eq!(
+        declared,
+        BTreeSet::from([BUTTON_URL_VAR_PATTERN.to_string()])
+    );
+    // The pattern and the parser agree on the edges a regex engine would read differently.
+    assert_eq!(button_url_index("button_url_0"), Some(0));
+    assert_eq!(button_url_index("button_url_9"), Some(9));
+    assert_eq!(button_url_index("button_url_10"), None);
+}
+
 /// Every key the runtime parses for an `ai` step must be declared, or the editor would flag as
 /// unknown something the hub reads — the mirror image of hub#521, and just as confusing.
 #[test]
@@ -729,4 +762,36 @@ fn the_failure_policy_is_the_same_closed_vocabulary_on_both_sides() {
     )
     .is_err());
     assert!(step("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_err());
+}
+
+/// **Whether a step applies at all** (hub#2066), on both sides. `run_if` is the step-level guard:
+/// when it does not match, the step is skipped and the run carries on. The editor and the toolkit
+/// judge documents against the schema, so a schema that did not declare it would have them
+/// flagging the one key the WhatsApp recipes need to answer a customer whose assistant failed.
+#[test]
+fn the_step_guard_is_declared_on_both_sides() {
+    let schema = schema();
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/run_if/$ref"),
+        Some(&serde_json::json!("#/$defs/condition")),
+        "the schema must declare `run_if` as the same condition language `when` speaks"
+    );
+
+    // …and the runtime refuses it exactly where the schema's description says it does: on a
+    // `condition`, whose `when` already IS the guard.
+    let parse = |kind: &str, extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "s", "kind": kind, "run_if": { "input.x": { "eq": 1 } }
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(parse("command", serde_json::json!({ "command": "crm.note.add" })).is_ok());
+    assert!(parse("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_ok());
+    assert!(parse("condition", serde_json::json!({ "when": {} })).is_err());
 }

@@ -23,7 +23,14 @@
 // ⚠️ El escalón 3 NO existe dentro de la app instalada (hub#862): en su WebView `window.print()` no
 // imprime nada. Allí acabar en el navegador es un FALLO (`via:'none'`) y se devuelve como tal — dar
 // por bueno un `via:'browser'` es lo que dejó a la QA creyendo que el papel había salido.
+//
+// A4 in the installed app (desktop hub#2006, Android hub#2008): a document with `format:'a4'` and its `html` goes
+// FIRST to the shell's native print dialog (`print_document`) — the system's own, with its printer
+// list and «Save as PDF». It answers `via:'browser'` because it is the same thing the browser does
+// with an A4. Where the shell cannot (older build) the door takes its usual route.
 import { isTauri } from './device';
+import { printDocumentNatively } from './native-print';
+import { hubCurrencyDecimals } from './money';
 
 /** Dispositivo tal y como lo registra el Bridge. */
 export interface PrintDevice {
@@ -77,10 +84,24 @@ export interface PrintRequest {
    * formato por defecto salía con el ancho de un tiquet.
    */
   format?: PrintFormat;
+  /**
+   * The hub's print queue and nowhere else (hub#2029): no printer of this device, no dialog.
+   *
+   * For a document EVERY open shell is told to print at once — a kitchen ticket no till fired (API,
+   * flow, online ordering). Each shell printing it on its own printer put one ticket per till at the
+   * pass; asking the queue for the same `jobId` from all of them leaves one job, printed once by the
+   * device that drains the station. If the queue does not take it, the answer says so.
+   */
+  queueOnly?: boolean;
 }
 
 export interface PrintResult {
-  /** Por dónde salió: el Bridge, la cola del hub, el navegador, o por ningún sitio. */
+  /**
+   * Por dónde salió: el Bridge, la cola del hub, el navegador, o por ningún sitio.
+   *
+   * `browser` means «handed to a print dialog»: the browser's, or — for an A4 inside the installed
+   * app — the system's own, opened by the shell (desktop hub#2006, Android hub#2008).
+   */
   via: 'bridge' | 'queue' | 'browser' | 'none';
   role: string;
   printerId?: string;
@@ -169,6 +190,18 @@ function mintJobId(documentType: string): string {
 }
 
 /**
+ * Can this device hand a job to that printer? A network printer needs an address; a bonded Bluetooth
+ * one (ADR-0204) has none and is reached by its MAC. ONE definition, shared by the global door
+ * (`printerIdForRole`) and by the print host's alta (`printerRolesOfDevices`): since hub#2029 a
+ * kitchen ticket can reach the printer's device ONLY through the queue, so a printer the door can
+ * print to but the alta does not claim is a station nobody drains.
+ */
+export function isReachablePrinter(device: PrintDevice | undefined): boolean {
+  if (!device) return false;
+  return Boolean(device.ip || (device.type === 'bluetooth' && device.mac));
+}
+
+/**
  * Impresora del Bridge con ese ROL, en el formato que espera `peripherals.print`.
  *
  * A bonded Bluetooth printer (ADR-0204, Android only) registers with NO ip — its identity is the
@@ -176,9 +209,7 @@ function mintJobId(documentType: string): string {
  * `network::0`: a job sent to nowhere, failing at some socket far from here.
  */
 export function printerIdForRole(devices: PrintDevice[], role: string): string | undefined {
-  const d = (devices || []).find(
-    (x) => x?.role === role && (x?.ip || (x?.type === 'bluetooth' && x?.mac)),
-  );
+  const d = (devices || []).find((x) => x?.role === role && isReachablePrinter(x));
   if (!d) return undefined;
   if (d.type === 'bluetooth') return `bluetooth:${d.mac}`;
   return `network:${d.ip}:${d.port ?? 9100}`;
@@ -249,6 +280,17 @@ export function createPrintService(
      * papel que no existe — es lo que hizo invisible el fallo durante toda la QA de hub#862.
      */
     installedApp?: () => boolean;
+    /**
+     * Opens the system print dialog of the installed app with an A4 `html` (hub#2006). By default
+     * the shell command `print_document`. Rejects when the shell has no dialog to open.
+     */
+    nativePrint?: (html: string) => Promise<void>;
+    /**
+     * The hub currency's scale (JPY 0, EUR 2, KWD 3), by default {@link hubCurrencyDecimals}.
+     * Stamped as `decimals` on what goes STRAIGHT to the printer (hub#2129): the renderer prints
+     * every amount with that many digits, and two without it.
+     */
+    currencyDecimals?: () => number;
   } = {},
 ): (req: PrintRequest) => Promise<PrintResult> {
   const browserPrint = opts.browserPrint ?? (() => globalThis.print?.());
@@ -256,12 +298,16 @@ export function createPrintService(
     opts.iframePrint ?? ((html: string, format?: PrintFormat) => printHtmlInIframe(html, document, format));
   const enqueue = opts.enqueue;
   const installedApp = opts.installedApp ?? isTauri;
+  const nativePrint = opts.nativePrint ?? printDocumentNatively;
+  const currencyDecimals = opts.currencyDecimals ?? hubCurrencyDecimals;
 
   return async function print(req: PrintRequest): Promise<PrintResult> {
     const role = req.role || 'receipt';
     const allowBrowser = req.fallbackToBrowser !== false;
     const documentType = req.documentType || 'receipt';
     const data = req.data ?? {};
+    // Why the system print dialog could not open (hub#2006), kept for the `via:'none'` answer.
+    let nativeError: string | undefined;
 
     // Encola en el hub y devuelve vía 'queue'. Solo para tiques térmicos (receipt/kitchen…): el
     // A4 (facturas/albaranes) no tiene cola, va al navegador. Si el runtime rechaza el encolado,
@@ -309,7 +355,7 @@ export function createPrintService(
         return {
           via: 'none',
           role,
-          error: [error, 'la app instalada no imprime por el navegador: asigna un rol a la impresora']
+          error: [nativeError, error, 'la app instalada no imprime por el navegador: asigna un rol a la impresora']
             .filter(Boolean)
             .join(' · '),
         };
@@ -320,6 +366,20 @@ export function createPrintService(
       return { via: 'browser', role, error };
     };
 
+    if (req.queueOnly) return toQueue();
+
+    // A4 inside the installed app: the system print dialog, before any thermal route (hub#2006).
+    // An invoice on a till roll is the wrong paper; the dialog is where the user picks the laser
+    // printer or «Save as PDF». Only when someone is in front of it (`fallbackToBrowser` not false),
+    // and only with the document's own html — there is nothing else to show in the dialog.
+    if (req.format === 'a4' && req.html && allowBrowser && installedApp()) {
+      try {
+        await nativePrint(req.html);
+        return { via: 'browser', role };
+      } catch (e) {
+        nativeError = e instanceof Error ? e.message : String(e);
+      }
+    }
     let devices: PrintDevice[];
     try {
       devices = await client.peripherals.getDevices();
@@ -344,7 +404,10 @@ export function createPrintService(
     }
 
     try {
-      await client.peripherals.print(printerId, documentType, data, req.jobId);
+      // hub#2129 — the scale of the amounts, stamped here because this road never passes through
+      // the hub's queue, which stamps its own. A producer that stated it keeps it.
+      const paper = data.decimals == null ? { ...data, decimals: currencyDecimals() } : data;
+      await client.peripherals.print(printerId, documentType, paper, req.jobId);
       return { via: 'bridge', role, printerId };
     } catch (e) {
       // La impresora existe pero falló (sin papel, apagada…). A la cola antes que al navegador: si

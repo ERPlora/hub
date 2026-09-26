@@ -120,6 +120,8 @@ use crate::registry::{Registry, RequestContext};
 pub const ITEM_APPS: &str = "apps";
 /// Stable key of the core item "your business details" (legal name + tax id).
 pub const ITEM_BUSINESS_IDENTITY: &str = "business_identity";
+/// Stable key of the core item "your printer" (hub#1948).
+pub const ITEM_PRINTER: &str = "printer";
 /// Stable key of the core item "your team".
 pub const ITEM_TEAM: &str = "team";
 
@@ -194,6 +196,8 @@ pub const PERMISSIONS_ROUTE: &str = "/settings?tab=permissions";
 /// `architecture/hub/setup-status.md`): sell first, invoice after.
 const ORDER_APPS: i64 = 10;
 const ORDER_BUSINESS_IDENTITY: i64 = 40;
+/// The slot the `printing` module held until printing#44 retired its item (hub#1948).
+const ORDER_PRINTER: i64 = 70;
 const ORDER_TEAM: i64 = 80;
 
 /// A core item before it becomes JSON. Split out so the English strings and the reserved slots read
@@ -242,9 +246,25 @@ const CORE_ITEMS: &[CoreItem] = &[
         title: "Your business details",
         description: "Legal name and tax id: without them the hub cannot issue an invoice.",
         icon: "business-outline",
-        route: "/settings",
+        // The `business` tab, not bare `/settings` (that opens General, where the tax id is not; hub#1954).
+        route: "/settings#business",
         required: true,
         actions: &["manual", "assistant"],
+        permission: crate::hub_users::ADMINISTER_PERMISSION,
+    },
+    CoreItem {
+        key: ITEM_PRINTER,
+        order: ORDER_PRINTER,
+        title: "Set up your printer",
+        description: "Register the device that prints your customers' receipts.",
+        icon: "print-outline",
+        // The core's own receipts screen, not a module's: it exists whatever is installed, and it
+        // leads on to the Printers app — or to installing it (hub#761).
+        route: "/settings#tickets",
+        // Without a printer the business still sells: the ticket waits in the queue and the till
+        // says so (hub#1731). A notice, never a wall.
+        required: false,
+        actions: &["manual"],
         permission: crate::hub_users::ADMINISTER_PERMISSION,
     },
     CoreItem {
@@ -824,6 +844,17 @@ async fn core_item_state(
                 && !setting("business_tax_id").is_empty()
                 && crate::settings::is_valid_tax_id(&setting("business_tax_id")),
         )),
+        // Some device registered to print the `receipt` station (ADR-0196 §6) — the one that prints
+        // the customer's ticket. Registered, not live: see `print_hosts::is_registered_for`.
+        ITEM_PRINTER => Some(done_or_pending(
+            crate::print_hosts::is_registered_for(
+                db,
+                hub_id,
+                crate::print_stations::PROTECTED_KEY,
+            )
+            .await
+            .ok()?,
+        )),
         // At least one hub user besides the administrator. A solo business legitimately has one,
         // which is why this item is 🟡 recommended and never nags.
         ITEM_TEAM => {
@@ -1118,7 +1149,12 @@ mod tests {
         let orders: Vec<i64> = CORE_ITEMS.iter().map(|c| c.order).collect();
         assert_eq!(
             orders,
-            vec![ORDER_APPS, ORDER_BUSINESS_IDENTITY, ORDER_TEAM]
+            vec![
+                ORDER_APPS,
+                ORDER_BUSINESS_IDENTITY,
+                ORDER_PRINTER,
+                ORDER_TEAM
+            ]
         );
         assert!(
             orders.windows(2).all(|w| w[1] - w[0] > 1),
@@ -1183,6 +1219,19 @@ mod tests {
                 "`{key}` is on the ⛔ list but is not an item the core emits"
             );
         }
+    }
+
+    #[test]
+    fn the_business_identity_item_lands_on_the_settings_tab_that_holds_the_tax_id() {
+        // hub#1954: plain `/settings` opens the General tab, where neither the legal name nor the
+        // tax id live — the one button that unblocks invoicing left the owner halfway. The shell
+        // deep-links Settings tabs by hash (`apps/web/src/lib/settings-tabs.ts`), and the fields
+        // this item asks for are on the `business` tab.
+        let identity = CORE_ITEMS
+            .iter()
+            .find(|c| c.key == ITEM_BUSINESS_IDENTITY)
+            .expect("the core emits the business identity item");
+        assert_eq!(identity.route, "/settings#business");
     }
 
     #[test]

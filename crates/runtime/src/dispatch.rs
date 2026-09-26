@@ -78,6 +78,15 @@ impl Runtime {
         if let Err(e) = &r {
             self.report_dispatch_error(e, "command", name, payload);
         }
+        // What the people of the business DO here (saas#2129), recorded at the one funnel every
+        // external command goes through. Only on success — a refund that was refused is not a
+        // refund — and only for the PUBLIC doors (`activity_log::kind_for_command`): the internal
+        // relays one sale fans out into run inside this same call and would count it four times.
+        if r.is_ok() {
+            if let Some(kind) = crate::activity_log::kind_for_command(name) {
+                crate::activity_log::record_best_effort(self.db(), self.hub_id(), kind, ctx).await;
+            }
+        }
         r
     }
 
@@ -208,6 +217,10 @@ impl Runtime {
         // already fixed, but a run that is ALREADY asleep is only ever read by the very comparison
         // the offset breaks, so nothing else would reach it. Re-running it is a no-op.
         flows::store::normalize_wake_at(self.db.as_ref(), &self.hub_id).await?;
+        // 2a-ter) The triggers a flow lost before hub#2061 (two on the same event collapsed into
+        // one row). Same criterion: nobody re-saves an automation that «is on», so the boot is the
+        // only path that reaches it. It only touches flows missing a row; re-running is a no-op.
+        flows::store::reseed_lost_triggers(self.db.as_ref(), &self.hub_id).await?;
         // 2b) The device row an id that names the HUB left behind (hub#454). Not a versioned
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.
@@ -419,6 +432,7 @@ mod tests {
                 ai: None,
                 expose_api: false,
                 internal: false,
+                on_unique: Default::default(),
             },
             sql: vec![sql.to_string()],
             wasm: None,

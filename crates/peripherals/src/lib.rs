@@ -60,4 +60,21 @@ pub enum PeripheralError {
     Json(#[from] serde_json::Error),
 }
 
+impl PeripheralError {
+    /// The stable word a screen branches on (ADR-0055: codes, never prose). The message is for the
+    /// log; this is what survives the trip through `invoke` to a module that has to say, in the
+    /// user's language, which of two opposite things went wrong — a typo in the address, or a
+    /// printer that did not answer (hub#1924).
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidPrinterId(_) => "invalid_printer_address",
+            Self::Unreachable(_) => "printer_unreachable",
+            Self::UnknownDocumentType(_) => "unknown_document_type",
+            Self::InvalidPayload(_) => "invalid_payload",
+            Self::Io(_) => "io_error",
+            Self::Json(_) => "invalid_payload",
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, PeripheralError>;

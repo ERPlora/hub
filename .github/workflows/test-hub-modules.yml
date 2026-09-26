@@ -294,6 +294,12 @@ jobs:
             > "$RUNNER_TEMP/module-batteries.out" \
             2> "$RUNNER_TEMP/module-batteries.err" || rc=$?
           cat "$RUNNER_TEMP/module-batteries.err" >&2
+          # hub#1994: una batería «pendiente de publicar» (nadie la corre aún) o una marca ya
+          # obsoleta dejan el paso en VERDE; solo en el log no las ve nadie. Cada línea sale
+          # además como anotación `::warning::`, visible en el run y en la PR. `|| true`: sin
+          # ninguna, `grep` devuelve 1 y no es un fallo.
+          grep -E '^module-hub-batteries: (stale-)?pending-publication: ' "$RUNNER_TEMP/module-batteries.err" |
+            sed 's/^module-hub-batteries: /::warning::/' || true
           if [ "$rc" -ne 0 ]; then
             # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
             # Actions, y el guard se corre también en local, donde solo sería ruido.

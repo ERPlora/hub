@@ -71,9 +71,16 @@ on:
       # esperar a los 45 min del job de módulos: una PR que solo toque el corredor se entera aquí.
       - 'scripts/ci/run-module-hub-batteries.sh'
       - 'scripts/tests/run-module-hub-batteries.test.sh'
+      # El cerrojo entre las dos listas (hub#1995): una PR que borra un e2e del kernel no puede
+      # dejar su relevo «pendiente de publicar». Sus SUJETOS son las dos listas de arriba; estas
+      # rutas son para el cerrojo y su test, que no dispararían nada por su cuenta.
+      - 'scripts/ci/pending-publication-lock.sh'
+      - 'scripts/tests/pending-publication-lock.test.sh'
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
+      # Same for the crates.io job of erplora-guest-sdk (hub#2119).
+      - 'scripts/tests/publish-guest-sdk-workflow.test.sh'
       # El contrato del job que crea el canario al publicar (saas#1895), por lo mismo: vive fuera
       # de `.github/`, así que sin esta ruta una PR que solo lo tocara no lo ejecutaría.
       - 'scripts/tests/canary-on-publish.test.sh'
@@ -154,6 +161,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # En una PR el checkout es el merge commit: con profundidad 2 su primer padre (`HEAD^1`,
+          # la rama base) está a mano para el cerrojo de «pendiente de publicar» (hub#1995).
+          fetch-depth: 2
 
       # Pinned version + official downloader (a ~3 MB static Go binary; no
       # package manager involved, so it works the same on ci-runner-1 and on
@@ -302,6 +313,22 @@ jobs:
           set -euo pipefail
           bash ./scripts/tests/run-module-hub-batteries.test.sh
 
+      # ── Y el cerrojo entre las dos listas (hub#1995) ──────────────────────────────────
+      # La marca `# pending-publication:` (kitchen#84) sirve para baterías NUEVAS. Si la misma PR
+      # que borra un e2e del kernel la pone sobre su heredera, la cobertura no la corre nadie
+      # hasta que la marca caduca (hasta 30 días, hub#1994): el hueco de hub#1381 con plazo. Solo
+      # en PR, porque compara con la base: `HEAD^1` es el primer padre del merge commit.
+      - name: Cerrojo de «pendiente de publicar» (hub#1995)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/pending-publication-lock.test.sh
+
+      - name: Una PR que borra un e2e del kernel no deja su relevo pendiente (hub#1995)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          bash ./scripts/ci/pending-publication-lock.sh --base HEAD^1
+
       # ── El job que publica @erplora/module-sdk (hub#1308) ─────────────────────────────
       # El 403 de cada tag no era un permiso que faltara —el run imprime `Packages: write`—
       # sino la cuota de paquetes de la organización. Ese diagnóstico equivocado es justo el
@@ -313,6 +340,14 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/publish-module-sdk-workflow.test.sh
+
+      # ── The job that publishes erplora-guest-sdk to crates.io (hub#2119) ──────────────
+      # A crates.io version cannot be deleted: the tag-only guard, the stamped version and the
+      # named missing token are what this pins. Seconds; also a step of `build-hub.yml`.
+      - name: Contrato del job publish-guest-sdk (hub#2119)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/publish-guest-sdk-workflow.test.sh
 
       # ── El canario que publica cada release (ERPlora/saas#1895) ───────────────────────
       # El job `fleet-canary` es lo único que contesta «¿arranca lo que acabamos de publicar?»,
@@ -331,12 +366,14 @@ jobs:
       # nada en el repo hacía la pregunta. Lo que corre aquí son los casos HERMÉTICOS del
       # control —SaaS y hub falsos en 127.0.0.1, sin red ni credenciales—: que caza el slug que
       # no es de la cuenta, el hub caído, el hub sin módulos y la falta de configuración, y que
-      # nunca imprime la contraseña. El control DE VERDAD lo corre una persona antes de enviar
-      # (apps/tauri/GOOGLE-PLAY.md); aquí solo se prueba que sabe decir que NO.
-      - name: Contrato de la guardia del revisor de Play (hub#1718)
+      # nunca imprime la contraseña. El control DE VERDAD lo corre el job `publish-play` de
+      # tauri-release.yml antes de subir nada (hub#1888); el segundo test exige que ese paso
+      # siga ahí, antes del upload, sin `if:` ni `continue-on-error` y con la contraseña en un secret.
+      - name: Contrato de la guardia del revisor de Play (hub#1718, hub#1888)
         run: |
           set -euo pipefail
           bash ./scripts/tests/play-reviewer-preflight.test.sh
+          bash ./scripts/tests/play-reviewer-preflight-on-publish.test.sh
 
       # ── Los puertos de los service containers (hub#898) ───────────────────────────────
       # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y

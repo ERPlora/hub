@@ -178,18 +178,19 @@ import {
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { moduleNav, refreshModuleNav } from '../lib/nav';
+import { fetchSystemInfo } from '../lib/system';
 import { reloadForModuleUpdate } from '../lib/module-loader';
-import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
+import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
-  alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled,
+  alsoInstalledNames, catalogActionFor, catalogPrice, catalogRowState, catalogVisibleAction, hubTooOldFor, isModuleInstalled,
   modulesWithUnknownPublication, publicationOf,
-  type CatalogRowState, type PublicationStatus,
+  type CatalogBusyAction, type CatalogPrice, type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
-  defaultVersion, pendingUpdate, shouldPickVersion, updateLabel,
+  defaultVersion, pendingUpdate, shouldPickVersion, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo,
 } from '../lib/module-updates';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
@@ -209,6 +210,8 @@ interface Mod {
   version?: string;
   /** Ids de los permisos que declara el manifest, según el catálogo Cloud (pm#132). */
   capabilities: string[];
+  /** Minimum ERPlora version the announced `version` needs, or `null` (saas#2239, hub#2054). */
+  minErploraVersion: string | null;
 }
 
 type AppsTab = 'mine' | 'all' | 'paid';
@@ -247,6 +250,8 @@ interface DataTableAction {
   disabled?: (row: Row) => boolean;
   /** ADITIVO (OutfitKit ≥0.1.14): spinner en lugar del icono mientras la fila está en curso. */
   loading?: (row: Row) => boolean;
+  /** ADDITIVE (OutfitKit ≥0.1.84): the action is not painted for that row (list, card or «⋮»). */
+  hidden?: (row: Row) => boolean;
 }
 
 // --- Estado ---
@@ -382,6 +387,7 @@ function stateCell(row: Row): Node {
   if (row.state === 'updatable') return badgeCell(String(row.stateLabel ?? ''), 'primary');
   if (row.state === 'installed') return badgeCell(t('apps.stateInstalled'), 'success');
   if (row.state === 'unavailable') return badgeCell(t('apps.stateUnavailable'), 'warning');
+  if (row.state === 'needs_newer_hub') return badgeCell(String(row.stateLabel ?? ''), 'warning');
   return badgeCell(t('apps.stateAvailable'), 'medium');
 }
 
@@ -390,6 +396,16 @@ function stateCell(row: Row): Node {
 // (`mark_installed` es best-effort), así que lo cruzamos con la lista local para no mostrar
 // "Disponible" (ni el botón Instalar activo) en un módulo ya instalado. (Bug demo 2026-07-12.)
 const installedIds = computed<Set<string>>(() => new Set(installedModules.value.map((m) => m.id)));
+
+// The version this hub runs (`/api/system`, e.g. `v1.4.0`), to compare with each app's floor before
+// anyone presses «Install» (hub#2054). `null` until it answers — or when it cannot — and then no card
+// is blocked: the runtime still refuses a too-new app at install time (hub#1620).
+const hubVersion = ref<string | null>(null);
+async function loadHubVersion(): Promise<void> {
+  const info = await fetchSystemInfo();
+  if (!info) console.warn('[apps] could not read the hub version: the catalog cannot warn about app floors');
+  hubVersion.value = info?.hubVersion ?? null;
+}
 
 // Los ids que el CATÁLOGO trae hoy. Estar ahí ya es la respuesta: la lista del marketplace sólo
 // sirve `publication_status='listed'` (lo filtra el SaaS en su acción `list`), así que un módulo
@@ -484,10 +500,14 @@ const filteredModules = computed<Row[]>(() => {
       hasUpdate: update !== null,
       available: m.available,
       busy: prog !== null || updatingIds.value.has(m.id),
+      needsNewerHub: hubTooOldFor(m.minErploraVersion, hubVersion.value),
+      updateNeedsNewerHub: updateNeedsNewerHub(update, hubVersion.value),
     });
     return {
       ...m,
       state,
+      // Which operation is running, so its button keeps the spinner and the other one stays out.
+      busyAction: updatingIds.value.has(m.id) ? 'update' : prog !== null ? 'install' : null,
       stateLabel:
         state === 'installing'
           ? t('apps.stateInstalling')
@@ -497,7 +517,11 @@ const filteredModules = computed<Row[]>(() => {
               ? t('apps.stateInstalled')
               : state === 'unavailable'
                 ? t('apps.stateUnavailable')
-                : t('apps.stateAvailable'),
+                : state === 'needs_newer_hub'
+                  ? update
+                    ? t('apps.stateUpdateNeedsNewerHub', { version: update.latest, floor: update.latest_min_erplora_version ?? '' })
+                    : t('apps.stateNeedsNewerHub', { version: m.minErploraVersion ?? '' })
+                  : t('apps.stateAvailable'),
       progress: prog,
     };
   });
@@ -538,13 +562,18 @@ const catalogEmptyMessage = computed(() =>
 // Instalados desde el runtime, como filas de la tabla. Se les cuelga la actualización pendiente
 // (hub#516) para que la celda de versión y el predicado de la acción la vean sin recalcularla.
 const installedRows = computed<Row[]>(() =>
-  installedModules.value.map((m) => ({
-    ...m,
-    update: pendingUpdate(m.id, moduleUpdates.value),
-    updating: updatingIds.value.has(m.id),
-    // ADR-0380 (hub#1134): si el marketplace lo sigue ofreciendo. `null` = no se pudo preguntar.
-    publicationStatus: publicationOf(m.id, catalogIds.value, publicationStatuses.value),
-  })) as unknown as Row[],
+  installedModules.value.map((m) => {
+    const update = pendingUpdate(m.id, moduleUpdates.value);
+    return {
+      ...m,
+      update,
+      // hub#2082: the pending version needs a newer ERPlora — no «Update», the row says why instead.
+      updateNeedsNewerHub: updateNeedsNewerHub(update, hubVersion.value),
+      updating: updatingIds.value.has(m.id),
+      // ADR-0380 (hub#1134): si el marketplace lo sigue ofreciendo. `null` = no se pudo preguntar.
+      publicationStatus: publicationOf(m.id, catalogIds.value, publicationStatuses.value),
+    };
+  }) as unknown as Row[],
 );
 
 // --- Columnas + acciones ---
@@ -563,7 +592,16 @@ const mineColumns = computed<DataTableColumn[]>(() => [
     header: t('apps.colVersion'),
     // DE → A cuando hay actualización (`1.1.1 → 1.1.2`), y solo lo que corre cuando no la hay
     // (ADR-0269 §3.5). «Inventario 1.1.2» no dice nada; «1.1.1 → 1.1.2» sí.
-    format: (r) => updateLabel(String(r.version ?? ''), (r.update as ModuleUpdateInfo | null) ?? null),
+    format: (r) => {
+      const update = (r.update as ModuleUpdateInfo | null) ?? null;
+      // hub#2082: an update this hub is too old for is not «1.0.0 → 2.0.0»: it names what it needs.
+      if (update && r.updateNeedsNewerHub === true) {
+        return `${String(r.version ?? '')} · ${t('apps.stateUpdateNeedsNewerHub', {
+          version: update.latest, floor: update.latest_min_erplora_version ?? '',
+        })}`;
+      }
+      return updateLabel(String(r.version ?? ''), update);
+    },
   },
   {
     key: 'status', header: t('apps.colStatus'), filterable: true, filterType: 'select',
@@ -597,8 +635,9 @@ const mineActions = computed<DataTableAction[]>(() => {
         icon: 'open-outline',
         color: 'primary',
         // A module that paints nothing, or one that is switched off, has no screen to open — and a
-        // button that lands on an empty page is worse than no button. `canOpenModule` decides.
-        disabled: (row) => !canOpenModule(row as unknown as InstalledModule, nav),
+        // button that lands on an empty page is worse than no button. `canOpenModule` decides, and
+        // the button is left out rather than greyed out (hub#2015).
+        hidden: (row) => !canOpenModule(row as unknown as InstalledModule, nav),
       },
       {
         // El botón «Actualizar» de ADR-0269 §3.5: **por módulo**, para ADELANTAR. Que el sistema
@@ -606,9 +645,19 @@ const mineActions = computed<DataTableAction[]>(() => {
         id: 'update',
         label: t('apps.actionUpdate'),
         icon: 'arrow-up-circle-outline',
-        // Sin versión nueva no hay nada que pulsar; con una en curso, spinner en vez del icono.
-        disabled: (row) => !row.update || row.updating === true,
+        // No new version, no button (hub#2015). While one runs it stays, with the spinner instead
+        // of the icon, and a second press cannot start it again.
+        hidden: (row) => hidesUpdateAction(row),
+        disabled: (row) => row.updating === true,
         loading: (row) => row.updating === true,
+      },
+      {
+        // hub#2082: in place of «Update» when the new version needs a newer ERPlora. The hub updates
+        // itself (ADR-0269), so this leads to where its version and what changed are shown.
+        id: 'see_hub_updates',
+        label: t('apps.actionSeeHubUpdates'),
+        icon: 'information-circle-outline',
+        hidden: (row) => row.updateNeedsNewerHub !== true || row.updating === true,
       },
       { id: 'toggle', label: t('apps.actionToggle'), icon: 'power-outline' },
       { id: 'uninstall', label: t('apps.actionUninstall'), icon: 'trash', color: 'danger' },
@@ -631,23 +680,34 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
 // único que se lee (aria-label + tooltip), así que a un teclado y a un lector de pantalla se les
 // estaba diciendo el verbo equivocado de la operación que iban a lanzar.
 //
-// Cada una vive exactamente donde su operación aplica; `catalogActionFor` decide, y es la misma
-// función que los tests fijan. Nunca están las dos vivas en la misma fila.
+// Each one is painted only where its operation applies — the other is left out, not greyed out
+// (hub#2019, same as «My apps» in hub#2015). `catalogVisibleAction` decides, and while a row is busy it
+// keeps the running one, disabled and with its spinner. Never both on the same row.
 const catalogActions = computed<DataTableAction[]>(() => isAdmin.value && !config.demo
   ? [
       {
         id: 'install',
         label: t('apps.actionInstall'),
         icon: 'download-outline',
-        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'install',
+        hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'install',
+        disabled: (row) => row.state === 'installing',
         loading: (row) => row.state === 'installing',
       },
       {
         id: 'update',
         label: t('apps.actionUpdate'),
         icon: 'arrow-up-circle-outline',
-        disabled: (row) => catalogActionFor(row.state as CatalogRowState) !== 'update',
+        hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'update',
+        disabled: (row) => row.state === 'installing',
         loading: (row) => row.state === 'installing',
+      },
+      {
+        // hub#2054: in place of «Install» on an app this hub is too old for. The hub updates itself
+        // (ADR-0269), so this leads to where its version and what changed are shown.
+        id: 'see_hub_updates',
+        label: t('apps.actionSeeHubUpdates'),
+        icon: 'information-circle-outline',
+        hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== 'see_hub_updates',
       },
     ]
   : []);
@@ -1133,18 +1193,28 @@ async function removeModule(m: InstalledModule): Promise<void> {
   }
 }
 
+/** Words for a card's price line; the unit never goes out without its amount (hub#2072). */
+function priceText(p: CatalogPrice): string {
+  switch (p.kind) {
+    case 'label':
+      return p.label;
+    case 'free':
+      return t('apps.priceFree');
+    case 'included_in_plan':
+      return t('apps.priceIncludedInPlan');
+    case 'monthly':
+      return t('apps.priceMonthly', { price: p.amount });
+    case 'yearly':
+      return t('apps.priceYearly', { price: p.amount });
+    case 'one_time':
+      return t('apps.priceOneTime', { price: p.amount });
+    case 'on_request':
+      return t('apps.priceOnRequest');
+  }
+}
+
 function toViewModule(m: CloudMarketplaceModule): Mod {
-  const amount = m.priceAmount ?? '';
-  const price = m.isFree
-    ? t('apps.priceFree')
-    : m.priceLabel
-      || (m.priceInterval === 'month'
-        ? t('apps.priceMonthly', { price: amount })
-        : m.priceInterval === 'year'
-          ? t('apps.priceYearly', { price: amount })
-          : amount
-            ? t('apps.priceOneTime', { price: amount })
-            : t('apps.priceOnRequest'));
+  const price = priceText(catalogPrice(m));
   return {
     id: m.id,
     name: m.name,
@@ -1156,6 +1226,7 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
     cat: m.category,
     version: m.version,
     capabilities: m.capabilities,
+    minErploraVersion: m.minErploraVersion,
   };
 }
 
@@ -1190,9 +1261,9 @@ const catalogTable = ref<HTMLElement | null>(null);
 function handleMineAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
   const m = row as unknown as InstalledModule;
-  // Abrir la app (hub#773). `canOpenModule` ya deshabilitó el botón cuando no hay pantalla, pero se
-  // vuelve a preguntar aquí: el evento puede llegar de un teclado sobre un estado recién cambiado, y
-  // navegar a `/m/<id>` de un módulo apagado deja al usuario en una pantalla vacía sin explicación.
+  // Open the app (hub#773). `canOpenModule` already left the button out when there is no screen,
+  // but it is asked again here: the event can come from a keyboard over a state that just changed,
+  // and navigating to `/m/<id>` of a switched-off module leaves the person on an empty screen.
   if (actionId === 'open') {
     if (canOpenModule(m, moduleNav.value)) void router.push(moduleRoutePath(m.id));
     return;
@@ -1200,6 +1271,7 @@ function handleMineAction(e: Event): void {
   if (actionId === 'toggle') void toggleModule(m);
   else if (actionId === 'uninstall') void removeModule(m);
   else if (actionId === 'update') void updateInstalledModule(m.id, m.name);
+  else if (actionId === 'see_hub_updates') void router.push('/system#updates');
 }
 function handleCatalogAction(e: Event): void {
   const { actionId, row } = (e as CustomEvent<{ actionId: string; row: Row }>).detail;
@@ -1210,6 +1282,7 @@ function handleCatalogAction(e: Event): void {
   const offered = catalogActionFor(row.state as CatalogRowState);
   if (actionId === 'update' && offered === 'update') void updateInstalledModule(mod.id, mod.name);
   else if (actionId === 'install' && offered === 'install') void installModule(mod);
+  else if (actionId === 'see_hub_updates' && offered === 'see_hub_updates') void router.push('/system#updates');
 }
 
 // Cablea una tabla (labels del locale activo + listener de rowAction). La vista inicial = tarjetas la fija el
@@ -1265,6 +1338,7 @@ onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
   void loadCatalog();
   void loadInstalled();
+  void loadHubVersion();
   // Qué módulos publican pantalla, para el botón «Abrir» (hub#773). El shell ya la carga al entrar,
   // pero esta pantalla no puede depender de eso: entrar por `/apps` directamente (deep-link, F5)
   // dejaría todos los «Abrir» en gris hasta que algo más la refrescase.

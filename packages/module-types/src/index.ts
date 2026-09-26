@@ -50,6 +50,12 @@ export interface ModuleManifest {
    */
   widgets?: Record<string, WidgetManifestDef>;
   /**
+   * Counters the module puts on the shell's notification bell (hub#1678). Map
+   * `<full.namespaced.id> -> BellManifestDef`. Read by the shell only (`lib/bell-counters.ts`);
+   * the runtime just transports it, like `widgets`.
+   */
+  bell?: Record<string, BellManifestDef>;
+  /**
    * Chequeo de CONFIGURACIÓN del módulo (ADR-0063, extendido por hub#369). Declarativo y genérico:
    * el **runtime** lo evalúa para cada módulo instalado y activo y lo devuelve como un ítem de la
    * query core `hub.setup.status`, unido a los ítems del core (tus apps · datos del negocio · tu
@@ -279,6 +285,20 @@ export type WidgetKind = 'kpi' | 'stat' | 'sparkline' | 'bar-list' | 'timeline' 
 
 /** Sector/tipo de negocio al que aplica un widget (preset "Recomendado"). */
 export type WidgetSector = 'hosteleria' | 'retail' | 'gestoria' | 'rrhh' | 'general';
+
+/**
+ * One counter of the `bell` block (hub#1678). `query` is a query of the SAME module whose first
+ * row carries a numeric `count`; `nav` is the module tab the bell row leads to (absent = its first
+ * tab). A tab, never a free path: the bell cannot send anyone outside the module that raised it.
+ */
+export interface BellManifestDef {
+  label: string;
+  icon?: string;
+  query: string;
+  params?: Record<string, unknown>;
+  nav?: string;
+  permission?: string;
+}
 
 /**
  * Definición de un widget de dashboard en el `module.json` (campo `widgets`). EXACTAMENTE UNO de

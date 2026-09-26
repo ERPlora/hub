@@ -280,6 +280,24 @@
                   </p>
                 </ion-label>
               </ion-item>
+              <!-- What the installed modules raise through their `bell` block (hub#1678): an
+                   appointment to confirm, say. The label and the destination come from the
+                   module, so the shell never learns what an appointment is. -->
+              <ion-item
+                v-for="counter in bellCounters"
+                :key="counter.key"
+                lines="none"
+                button
+                detail
+                data-testid="topbar-bell-counter"
+                @click="goToBellCounter(counter.path)"
+              >
+                <HubIcon slot="start" :name="counter.icon || 'notifications-outline'" color="warning" />
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ counter.label }}</h3>
+                </ion-label>
+                <ion-badge slot="end" color="warning">{{ counter.count }}</ion-badge>
+              </ion-item>
               <ion-item v-if="notificationCount === 0" lines="none">
                 <ion-label class="ion-text-wrap" style="opacity:.6">{{ t('topbar.noNotifications') }}</ion-label>
               </ion-item>
@@ -316,6 +334,7 @@ import {
   railCollapsed,
 } from '../lib/shell';
 import { undrainedStations } from '../lib/print-alert';
+import { bellCounters } from '../lib/bell-counters';
 import { canOpenManagement, openManagement } from '../lib/management-link';
 import { canChangeHub, requestChangeHub } from '../lib/change-hub';
 import { isCompactViewport } from '../lib/viewport';
@@ -448,10 +467,18 @@ function goToDeadLetters(): void {
 /** Lo que aporta cada fuente, para pintar SU fila y no el total (hub#987). */
 const deadLetterCount = computed(() => notificationCountOf('deadLetters'));
 
-// Y de impresión parada: a la pantalla donde se ve la cobertura por estación y se registra el host
-// (hub#987). Es la misma que ya pintaba el aviso donde nadie lo veía.
+// And for stopped printing: to the Tickets tab, where the per-station coverage is shown and the
+// print host is registered (hub#987). It used to push `#receipts`, a tab that does not exist, and
+// landed on General (hub#2016) — `settings-tab-links.hub2016.test.ts` keeps every such link honest.
 function goToPrinting(): void {
-  void router.push({ path: '/settings', hash: '#receipts' });
+  void router.push({ path: '/settings', hash: '#tickets' });
+}
+
+// A module counter leads to the module tab it declared (hub#1678). `lib/bell-counters.ts` builds
+// the path from the module id and a tab id, so it can never point outside that module.
+function goToBellCounter(path: string): void {
+  notifOpen.value = false;
+  void router.push(path);
 }
 </script>
 

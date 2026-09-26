@@ -101,7 +101,57 @@ describe('Apps · what an installed app card offers', () => {
     // Only when there is a screen to open: `canOpenModule` is the one that decides, and it is
     // covered by its own tests. Here we only check the card asks it.
     expect(mineActions).toContain('canOpenModule(');
-    expect(source).toContain("import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions'");
+    expect(source).toContain("import { canOpenModule, dependentsOf, hidesUpdateAction, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions'");
+  });
+
+  // hub#2015 — a greyed-out button next to a live one reads as «something is broken». What a card
+  // cannot do is not painted at all (OutfitKit ≥0.1.84 `DataTableAction.hidden`), like the app lists
+  // of Shopify or the app stores: no screen, no «Open»; no new version, no «Update».
+  it('hides «Open» and «Update» where they do not apply instead of greying them out', () => {
+    const action = (id: string) => {
+      const from = mineActions.indexOf(`id: '${id}'`);
+      expect(from, `action ${id} must exist`).toBeGreaterThan(-1);
+      return mineActions.slice(from, mineActions.indexOf('},', from));
+    };
+    expect(action('open')).toContain('hidden: (row) => !canOpenModule(');
+    expect(action('open')).not.toContain('disabled:');
+    expect(action('update')).toContain('hidden: (row) => hidesUpdateAction(row)');
+    // While it runs it stays visible with its spinner, and a second press must not start it again.
+    expect(action('update')).toContain('loading: (row) => row.updating === true');
+    expect(action('update')).toContain('disabled: (row) => row.updating === true');
+    // The local mirror of OutfitKit's type has to carry the field, or `hidden` does not typecheck.
+    const iface = source.slice(source.indexOf('interface DataTableAction'), source.indexOf('// --- Estado ---'));
+    expect(iface).toContain('hidden?: (row: Row) => boolean;');
+  });
+
+  // 0.1.84 is the first OutfitKit whose row actions honour `hidden`. The floor is asserted by
+  // semver, not by equality: CI runs `pnpm add @erplora/outfitkit@latest` before verifying
+  // (hub#1793), which rewrites the range on every release, and an equality pin turned every PR red
+  // the day 0.1.85 shipped (hub#2048).
+  it('requires the OutfitKit that knows how to hide a row action', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+    const range = pkg.dependencies['@erplora/outfitkit'];
+    expect(rangeFloorIsAtLeast(range, '0.1.84'), `@erplora/outfitkit is "${range}"`).toBe(true);
+  });
+
+  it.each([
+    ['^0.1.83', false],
+    ['^0.1.84', true],
+    ['^0.1.85', true],
+    ['~0.1.84', true],
+    ['>=0.1.84', true],
+    ['0.1.84', true],
+    ['^0.2.0', true],
+    ['^1.0.0', true],
+    // Numeric, not lexical: 0.1.9 sorts after 0.1.84 as text but is an older release.
+    ['^0.1.9', false],
+    ['^0.0.99', false],
+    // A range whose lowest version cannot be read guarantees no floor at all.
+    ['*', false],
+    ['latest', false],
+    [undefined, false],
+  ])('reads the OutfitKit floor of %s as at least 0.1.84: %s', (range, expected) => {
+    expect(rangeFloorIsAtLeast(range, '0.1.84')).toBe(expected);
   });
 
   it('always asks before flipping the switch, and the question names the future state', () => {
@@ -129,8 +179,28 @@ describe('Apps · what an installed app card offers', () => {
     expect(catalogActions).toContain("id: 'install'");
     expect(catalogActions).toContain("id: 'update'");
     // Each one lives exactly where its own operation applies — never both on the same row.
-    expect(catalogActions).toContain("catalogActionFor(row.state as CatalogRowState) !== 'install'");
-    expect(catalogActions).toContain("catalogActionFor(row.state as CatalogRowState) !== 'update'");
+    expect(catalogActions).toContain('catalogVisibleAction(');
+  });
+
+  // hub#2019 — same recipe as hub#2015 in «My apps»: the action that does not apply is left out, not
+  // greyed out. Grey is kept only for the one that applies but cannot be pressed now (it is running).
+  it('hides «Install» and «Update» where they do not apply instead of greying them out', () => {
+    const start = source.indexOf('const catalogActions');
+    const catalogActions = source.slice(start, source.indexOf('// --- Handlers ---', start));
+    const action = (id: string) => {
+      const from = catalogActions.indexOf(`id: '${id}'`);
+      expect(from, `action ${id} must exist`).toBeGreaterThan(-1);
+      return catalogActions.slice(from, catalogActions.indexOf('},', from));
+    };
+    for (const id of ['install', 'update']) {
+      expect(action(id)).toContain(`hidden: (row) => catalogVisibleAction(row.state as CatalogRowState, row.busyAction as CatalogBusyAction) !== '${id}'`);
+      expect(action(id)).toContain("disabled: (row) => row.state === 'installing'");
+      expect(action(id)).toContain("loading: (row) => row.state === 'installing'");
+      expect(action(id)).not.toContain('catalogActionFor(');
+    }
+    // The row says WHICH operation is running, so the spinner stays on that button and not the other.
+    const rows = source.slice(source.indexOf('const filteredModules'), source.indexOf('const installedDisplay'));
+    expect(rows).toContain("busyAction: updatingIds.value.has(m.id) ? 'update' : prog !== null ? 'install' : null");
   });
 
   it('routes the catalog press by the ROW state, not by the Cloud flag', () => {
@@ -241,3 +311,19 @@ describe('Apps · what an installed app card offers', () => {
     expect(fn).toContain('apps.uninstallBlocked');
   });
 });
+
+/**
+ * Whether the lowest version an npm range admits is at least `floor`. Only the plain forms
+ * `package.json` uses (`^x.y.z`, `~x.y.z`, `>=x.y.z`, `x.y.z`) have a readable lowest version;
+ * anything else guarantees no floor, so it answers false.
+ */
+function rangeFloorIsAtLeast(range: string | undefined, floor: string): boolean {
+  const lowest = /^(?:\^|~|>=)?(\d+)\.(\d+)\.(\d+)$/.exec(range?.trim() ?? '');
+  if (!lowest) return false;
+  const want = floor.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const have = Number(lowest[i + 1]);
+    if (have !== want[i]) return have > want[i];
+  }
+  return true;
+}

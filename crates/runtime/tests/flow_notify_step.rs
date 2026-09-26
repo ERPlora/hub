@@ -736,6 +736,47 @@ async fn a_flow_offers_the_customer_options_to_tap_and_they_reach_the_transport_
     );
 }
 
+/// **A template's link button with a variable end, end to end** (hub#2110): «See your
+/// appointment» pointing at `https://…/c/{{1}}`. The step names the end in `vars.button_url_0`,
+/// mapped against the run like the rest of the copy; what a unit test of the parser cannot prove
+/// is that it survives the queue row and the relay and reaches the transport RENDERED, under the
+/// key the transport turns into Meta's `button` component.
+#[tokio::test]
+async fn a_template_with_a_link_button_reaches_the_transport_with_its_end_rendered() {
+    let (rt, transport) = runtime().await;
+    let flow_id = create_flow(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "confirm",
+                "kind": "notify",
+                "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "template": "appointment_confirmed",
+                "vars": { "when": "{{input.when}}", "button_url_0": "c/{{input.customer_id}}" }
+            }]
+        }),
+    )
+    .await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    run_flow(&rt, &flow_id).await;
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "one run, one message");
+    let intent = &sent[0].0;
+    assert_eq!(intent.to, PHONE);
+    assert_eq!(intent.template, "appointment_confirmed");
+    assert_eq!(
+        intent.vars["button_url_0"],
+        json!("c/c-1"),
+        "the button's end is rendered against the run like any other copy"
+    );
+    assert_eq!(intent.vars["when"], json!("martes"));
+}
+
 /// **The whole point of hub#1641, end to end**: the list is ALREADY in the database, so nothing
 /// asks a language model to read it out loud. A `query` step publishes it whole, and the tappable
 /// message names it with ONE bare path — `steps.<id>.options` — which is exactly the mapping the
@@ -811,20 +852,39 @@ async fn a_read_fills_the_tappable_list_and_it_reaches_the_transport_whole() {
         "and the rest of the message is rendered as it always was"
     );
 
-    // The control, so the assertion above is about the read and not about anything a message now
-    // grows on its own: with the notes gone, the same flow sends the same message with no rows.
+    // **No free slots** (hub#1651). With the notes gone the read publishes an empty list, and a
+    // list without rows is one Meta refuses: it used to be queued anyway, the customer received
+    // nothing and the refusal landed hours later in the proxy. Now the run stops at the message —
+    // a halt, not a failure: the run did nothing wrong — and the step says why.
     rt.db_for_test()
         .execute("DELETE FROM crm_note", &Params::new())
         .await
         .unwrap();
-    run_flow(&rt, &flow_id).await;
-    rt.drain_outbox().await.unwrap();
-    let sent = transport.sent();
-    assert_eq!(sent.len(), 2);
+    let run_id = run_flow(&rt, &flow_id).await;
+    let (run, steps) = rt.get_flow_run(&run_id).await.unwrap();
     assert_eq!(
-        sent[1].0.interactive["action"]["sections"][0]["rows"],
-        json!([]),
-        "an empty read is an empty list, and the run does not fail over it"
+        run.status,
+        store::STATUS_DONE,
+        "an empty read is not an error: {}",
+        run.last_error
+    );
+    let ask = steps
+        .iter()
+        .find(|s| s.step_id == "ask")
+        .expect("the message step is in the history");
+    assert_eq!(ask.status, "stopped", "{ask:?}");
+    assert_eq!(ask.output["reason"], json!("flow.nothing_to_offer"));
+    assert_eq!(ask.output["queued"], json!(false));
+    rt.drain_outbox().await.unwrap();
+    assert_eq!(
+        transport.sent().len(),
+        1,
+        "the first run's message and nothing more: a list with nothing to tap never leaves"
+    );
+    assert_eq!(
+        queued_notifications(&rt).await.len(),
+        1,
+        "and the second run queued nothing to be refused later"
     );
 }
 
@@ -924,4 +984,82 @@ async fn a_list_the_failed_step_never_published_stops_the_message_instead_of_sen
         sent[0].0.interactive["action"]["sections"][0]["rows"][0]["title"],
         json!("martes 10:30")
     );
+}
+
+/// **The step that writes the answer failed, the run carried on, and the empty answer did NOT go
+/// out** (hub#1660) — the WhatsApp recipes' own shape: `confirm_to_customer` says
+/// `{{steps.book_appointment.text}}`, and every word of it comes from the step before.
+///
+/// Same deterministic failure as the list above (a read the flow was never granted), same
+/// leftover: a step that failed under `continue` publishes `{status, error}` and no `text`. Before
+/// this, the template filled in as `""` and the message was queued with nothing to say; the
+/// customer got nothing useful and the proxy's refusal landed hours later in a background tick.
+#[tokio::test]
+async fn an_answer_the_failed_step_never_wrote_stops_the_message_instead_of_sending_it_empty() {
+    let (rt, transport) = runtime().await;
+
+    let answering = json!({
+        "schema_version": 1,
+        "steps": [
+            { "id": "book", "kind": "query", "query": "crm.note.list", "limit": 1,
+              "result": "first", "on_error": "continue" },
+            { "id": "confirm_to_customer", "kind": "notify", "channel": "whatsapp",
+              "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                      "field": "phone" },
+              "template": "",
+              "vars": { "text": "{{steps.book.text}}" } }
+        ]
+    });
+
+    let flow_id = create_flow(&rt, answering.clone()).await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    let run_id = run_flow(&rt, &flow_id).await;
+
+    let (run, steps) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_FAILED);
+    assert!(
+        run.last_error.contains("flow.text_not_found"),
+        "the run says the answer was missing, not the transport hours later: {}",
+        run.last_error
+    );
+    assert!(
+        run.last_error.contains("`book`"),
+        "…and names the step that owed it: {}",
+        run.last_error
+    );
+    assert_eq!(steps.len(), 2, "the read failed and the run went on to the message");
+
+    rt.drain_outbox().await.unwrap();
+    assert!(transport.sent().is_empty(), "no empty message reached the transport");
+    assert!(
+        queued_notifications(&rt).await.is_empty(),
+        "and none was queued either: the refusal is before the outbox, not in it"
+    );
+
+    // **The control.** Same document, same read, now granted: the answer is written and it goes
+    // out with its words. Without this half the assertions above would hold just as well if
+    // `notify` had stopped working altogether.
+    let mut p = Params::new();
+    p.insert("id".into(), json!("n-1"));
+    p.insert("hub".into(), json!(HUB));
+    rt.db_for_test()
+        .execute(
+            "INSERT INTO crm_note (id, hub_id, created_by, customer_id, text) \
+             VALUES (:id, :hub, 'seed', 'c-1', 'Te espero el martes a las 10:30')",
+            &p,
+        )
+        .await
+        .unwrap();
+    let allowed = create_flow(&rt, answering).await;
+    let mut grants = both_grants();
+    grants.push(GrantSpec::pair(GrantKind::Query, "crm.note.list"));
+    set_grants(&rt, &allowed, &grants).await;
+    let run_id = run_flow(&rt, &allowed).await;
+    let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_DONE, "{}", run.last_error);
+
+    rt.drain_outbox().await.unwrap();
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "the answer did go out");
+    assert_eq!(sent[0].0.vars["text"], json!("Te espero el martes a las 10:30"));
 }

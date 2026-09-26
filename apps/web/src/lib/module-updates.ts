@@ -6,6 +6,8 @@
 // solo lo que cambió**. Una lista de 24 módulos donde 23 dicen «sin cambios» es ruido, y el ruido
 // se deja de leer.
 
+import { hubTooOldFor } from './apps-catalog';
+
 /** Lo que el runtime dice de un módulo instalado (`GET /api/modules/updates`). */
 export interface ModuleUpdateInfo {
   module_id: string;
@@ -16,6 +18,22 @@ export interface ModuleUpdateInfo {
   update_available: boolean;
   /** Pin de soporte (`hub_module.pinned_version`). No es una opción de producto. */
   pinned: string | null;
+  /**
+   * The ERPlora the `latest` version needs (hub#2082), `null` when it declares none. Absent from a
+   * runtime older than the field — read the same as `null`: nothing to warn about.
+   */
+  latest_min_erplora_version?: string | null;
+}
+
+/**
+ * Whether the pending update needs a newer ERPlora than this hub runs (hub#2082).
+ *
+ * Same comparison as the catalog card ({@link hubTooOldFor}, hub#2054) and the runtime's refusal.
+ * Only a floor and a hub version that can BOTH be read say «too old»: otherwise «Update» stays, and
+ * the runtime still refuses at update time.
+ */
+export function updateNeedsNewerHub(update: ModuleUpdateInfo | null, hubVersion: string | null | undefined): boolean {
+  return update !== null && hubTooOldFor(update.latest_min_erplora_version ?? null, hubVersion);
 }
 
 /**

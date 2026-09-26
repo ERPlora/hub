@@ -137,6 +137,12 @@ impl BluetoothPrintArgs {
     }
 }
 
+/// What `bluetoothPrint` answers with once the bytes are on the printer: nothing. Kotlin's
+/// `invoke.resolve()` with no data reaches Rust as JSON `null`, so it is read and ignored whatever
+/// its shape — reading it as [`Empty`] reported a ticket already on paper as `failed` (hub#2024,
+/// the same trap as `printHtml` in hub#2008).
+type BluetoothPrintAnswer = serde::de::IgnoredAny;
+
 /// A bonded printer as Kotlin announces it: `id` is `bluetooth:{MAC}` (the printer_id contract of
 /// ADR-0204), `mac` the raw identity the registry keys on.
 #[derive(Debug, Clone, Deserialize)]
@@ -151,6 +157,31 @@ pub struct BluetoothPrinter {
 pub struct BluetoothPrinterList {
     pub printers: Vec<BluetoothPrinter>,
 }
+
+/// The command that opens Android's print screen with an A4 document (hub#2008). Mirror of
+/// `ErploraAndroidPlugin.printHtml`; a test below checks the two never drift apart.
+pub const PRINT_HTML_COMMAND: &str = "printHtml";
+
+/// An A4 document on its way to Kotlin (hub#2008): its html, already checked by the shell. A
+/// string and not a path: an invoice is tens of KB, and the shell caps it well below what the
+/// bridge carries.
+#[derive(Debug, Serialize)]
+struct PrintHtmlArgs {
+    html: String,
+}
+
+/// What `printHtml` answers with. Kotlin's `invoke.resolve()` with no data reaches Rust as JSON
+/// `null`, so the answer is read and ignored whatever its shape — reading it as [`Empty`] turned a
+/// print screen that DID open into a failure (seen on the emulator, hub#2008).
+type PrintHtmlAnswer = serde::de::IgnoredAny;
+
+/// `leaveApp` resolves with no data (`invoke.resolve()` → `null`): read it as anything (hub#2024).
+type LeaveAppAnswer = serde::de::IgnoredAny;
+
+/// `openAppSettings` resolves with no data (`invoke.resolve()` → `null`): read it as anything
+/// (hub#2024).
+#[cfg(target_os = "android")]
+type OpenAppSettingsAnswer = serde::de::IgnoredAny;
 
 /// How long reader mode may stay open on one call (hub#988). Kotlin clamps it: an argument nobody
 /// typed by hand must never be the reason a till has no reader.
@@ -224,6 +255,35 @@ pub struct ErploraAndroid<R: Runtime>(tauri::plugin::PluginHandle<R>);
 pub struct ErploraAndroid<R: Runtime>(std::marker::PhantomData<fn() -> R>);
 
 impl<R: Runtime> ErploraAndroid<R> {
+    /// hub#1906 — sends the app to the background, as the system Back does on a root screen.
+    pub fn leave_app(&self) -> Result<(), Error> {
+        #[cfg(target_os = "android")]
+        {
+            return self
+                .0
+                .run_mobile_plugin::<LeaveAppAnswer>("leaveApp", Empty {})
+                .map(|_| ())
+                .map_err(|e| Error::PluginInvoke(e.to_string()));
+        }
+        #[cfg(not(target_os = "android"))]
+        Ok(())
+    }
+
+    /// hub#1886 — opens this app's page in the device settings, the only place left to turn a
+    /// permission on once Android stops showing its dialog. On desktop there is no such page.
+    pub fn open_app_settings(&self) -> Result<(), Error> {
+        #[cfg(target_os = "android")]
+        {
+            return self
+                .0
+                .run_mobile_plugin::<OpenAppSettingsAnswer>("openAppSettings", Empty {})
+                .map(|_| ())
+                .map_err(|e| Error::PluginInvoke(e.to_string()));
+        }
+        #[cfg(not(target_os = "android"))]
+        Ok(())
+    }
+
     /// Permisos concedidos ahora mismo. En escritorio, siempre vacío: no hay nada que conceder.
     pub fn check_permissions(&self) -> Result<PermissionStatus, Error> {
         #[cfg(target_os = "android")]
@@ -284,7 +344,10 @@ impl<R: Runtime> ErploraAndroid<R> {
         {
             return self
                 .0
-                .run_mobile_plugin::<Empty>("bluetoothPrint", BluetoothPrintArgs::new(mac, payload))
+                .run_mobile_plugin::<BluetoothPrintAnswer>(
+                    "bluetoothPrint",
+                    BluetoothPrintArgs::new(mac, payload),
+                )
                 .map(|_| ())
                 .map_err(|e| Error::PluginInvoke(e.to_string()));
         }
@@ -374,6 +437,37 @@ impl<R: Runtime> ErploraAndroid<R> {
     }
 }
 
+impl<R: Runtime> ErploraAndroid<R> {
+    /// Opens Android's print screen with `html`, preset to A4: every printer the device knows and
+    /// «Save as PDF» (hub#2008). Resolves once the screen has been asked for; what the user does
+    /// in it is the system's.
+    ///
+    /// ⚠️ **Blocks**, like [`Self::save_to_downloads`]: call it from an `async` command, never
+    /// from the main thread.
+    pub fn print_html(&self, html: &str) -> Result<(), Error> {
+        #[cfg(target_os = "android")]
+        {
+            return self
+                .0
+                .run_mobile_plugin::<PrintHtmlAnswer>(
+                    PRINT_HTML_COMMAND,
+                    PrintHtmlArgs {
+                        html: html.to_string(),
+                    },
+                )
+                .map(|_| ())
+                .map_err(|e| Error::PluginInvoke(e.to_string()));
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            // Unreachable by construction: the shell only routes here on Android. A refusal all
+            // the same, because a desktop that got here has opened no print screen.
+            let _ = html;
+            Err(Error::PluginInvoke("print_html is Android only".into()))
+        }
+    }
+}
+
 pub trait ErploraAndroidExt<R: Runtime> {
     fn erplora_android(&self) -> &ErploraAndroid<R>;
 }
@@ -382,6 +476,21 @@ impl<R: Runtime, T: Manager<R>> ErploraAndroidExt<R> for T {
     fn erplora_android(&self) -> &ErploraAndroid<R> {
         self.state::<ErploraAndroid<R>>().inner()
     }
+}
+
+/// hub#1906 — leaves the app the way the system Back does on a root screen (the task goes to
+/// the background; nothing is killed). The shell calls it when it holds the Back button and there
+/// is nothing left to close nor to go back to. On desktop there is no such button: a no-op.
+#[tauri::command]
+async fn leave_app<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Error> {
+    app.erplora_android().leave_app()
+}
+
+/// hub#1886 — takes the owner to this app's page in the device settings. The shell only offers it
+/// on a device that really has a permission refused, so on desktop it is never called: a no-op.
+#[tauri::command]
+async fn open_app_settings<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Error> {
+    app.erplora_android().open_app_settings()
 }
 
 #[tauri::command]
@@ -399,7 +508,12 @@ async fn request_permissions<R: Runtime>(
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("erplora-android")
-        .invoke_handler(tauri::generate_handler![check_permissions, request_permissions])
+        .invoke_handler(tauri::generate_handler![
+            check_permissions,
+            request_permissions,
+            leave_app,
+            open_app_settings
+        ])
         .setup(|app, _api| {
             #[cfg(target_os = "android")]
             let handle = _api.register_android_plugin(PLUGIN_IDENTIFIER, "ErploraAndroidPlugin")?;
@@ -417,6 +531,98 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub#1906 — once the shell takes the Android Back button (Tauri's `onBackButtonPress`),
+    /// Tauri no longer leaves the app on its own when the WebView has no history left: the shell
+    /// has to ask for it, and Tauri's own `exit` has no ACL permission to grant. `leave_app` is that
+    /// door. Four places have to agree or the press dies in silence: the build (which generates the
+    /// permission), the invoke handler, the default permission set the hub capability grants, and
+    /// the Kotlin command that actually leaves.
+    const PLUGIN_KT: &str = include_str!("../android/src/main/java/com/erplora/android/ErploraAndroidPlugin.kt");
+    const BUILD_RS: &str = include_str!("../build.rs");
+    const LIB_RS: &str = include_str!("lib.rs");
+    const DEFAULT_PERMISSIONS: &str = include_str!("../permissions/default.toml");
+
+    #[test]
+    fn leave_app_is_declared_wired_granted_and_implemented_hub1906() {
+        assert!(BUILD_RS.contains("\"leave_app\""), "build.rs does not declare leave_app: no permission is generated");
+        // Only the code above the tests: this very assertion spells the handler too.
+        let production = LIB_RS.split("#[cfg(test)]").next().unwrap_or_default();
+        assert!(
+            production
+                .split("generate_handler![")
+                .nth(1)
+                .and_then(|rest| rest.split(']').next())
+                .is_some_and(|handler| handler.split(',').any(|c| c.trim() == "leave_app")),
+            "leave_app is not wired to the invoke handler"
+        );
+        assert!(
+            DEFAULT_PERMISSIONS.contains("\"allow-leave-app\""),
+            "erplora-android:default does not grant allow-leave-app: the hub's capability would refuse it"
+        );
+        let kotlin = PLUGIN_KT.split("fun leaveApp(invoke: Invoke)").nth(1).expect("no Kotlin leaveApp command");
+        let before = PLUGIN_KT.split("fun leaveApp(invoke: Invoke)").next().unwrap_or_default();
+        assert!(before.trim_end().ends_with("@Command"), "Kotlin leaveApp is not a @Command");
+        let body = kotlin.split("\n    }").next().unwrap_or_default();
+        assert!(body.contains("moveTaskToBack(true)"), "leaveApp does not leave the way the system Back does");
+        assert!(body.contains("invoke.resolve()"), "leaveApp never answers: the web would wait forever");
+    }
+
+    /// hub#1886 — once Android stops showing a permission dialog, the only way back is the app's
+    /// page in the device settings, and the shell offers a button that takes the owner there.
+    /// Four places have to agree or the tap dies in silence on a real device only: the build
+    /// (which generates the permission), the invoke handler, the default permission set the hub
+    /// capability grants, and the Kotlin command that opens the page.
+    const PLUGIN_KT_SOURCE: &str =
+        include_str!("../android/src/main/java/com/erplora/android/ErploraAndroidPlugin.kt");
+    const BUILD_RS_SOURCE: &str = include_str!("../build.rs");
+    const LIB_RS_SOURCE: &str = include_str!("lib.rs");
+    const DEFAULT_PERMISSIONS_TOML: &str = include_str!("../permissions/default.toml");
+
+    #[test]
+    fn open_app_settings_is_declared_wired_granted_and_implemented_hub1886() {
+        assert!(
+            BUILD_RS_SOURCE.contains("\"open_app_settings\""),
+            "build.rs does not declare open_app_settings: no permission is generated"
+        );
+        // Only the code above the tests: this very assertion spells the command too.
+        let production = LIB_RS_SOURCE.split("#[cfg(test)]").next().unwrap_or_default();
+        let handler = production
+            .split("generate_handler![")
+            .nth(1)
+            .and_then(|rest| rest.split(']').next())
+            .expect("no invoke handler");
+        assert!(
+            handler.split(',').any(|c| c.trim() == "open_app_settings"),
+            "open_app_settings is not wired to the invoke handler"
+        );
+        assert!(
+            DEFAULT_PERMISSIONS_TOML.contains("\"allow-open-app-settings\""),
+            "erplora-android:default does not grant allow-open-app-settings: the hub's capability \
+             would refuse it"
+        );
+        let signature = "fun openAppSettings(invoke: Invoke)";
+        let before = PLUGIN_KT_SOURCE.split(signature).next().unwrap_or_default();
+        assert!(before.trim_end().ends_with("@Command"), "Kotlin openAppSettings is not a @Command");
+        let body = PLUGIN_KT_SOURCE
+            .split(signature)
+            .nth(1)
+            .and_then(|rest| rest.split("\n    }").next())
+            .expect("no Kotlin openAppSettings command");
+        assert!(
+            body.contains("Settings.ACTION_APPLICATION_DETAILS_SETTINGS"),
+            "openAppSettings does not open the app's own page in the device settings"
+        );
+        assert!(
+            body.contains("Uri.fromParts(\"package\", activity.packageName, null)"),
+            "openAppSettings does not point the settings at THIS app"
+        );
+        assert!(body.contains("invoke.resolve()"), "openAppSettings never answers: the web would wait forever");
+        assert!(
+            body.contains("invoke.reject("),
+            "openAppSettings swallows a device with no settings page: the web must hear it to fall back"
+        );
+    }
 
     #[test]
     fn el_estado_serializa_como_un_mapa_permiso_a_booleano() {
@@ -873,5 +1079,167 @@ mod tests {
             code.contains("val a = 1") && code.contains("val b = 2"),
             "{code:?}"
         );
+    }
+
+    // ── The A4 document through Android's own print service (hub#2008) ───────────────────────
+    //
+    // The WebView that prints lives in Kotlin (`HtmlPrinter.kt`); Rust owns the command name and
+    // the argument key, both bare literals on the two sides.
+
+    const HTML_PRINTER_KT: &str =
+        include_str!("../android/src/main/java/com/erplora/android/HtmlPrinter.kt");
+
+    #[test]
+    fn the_a4_document_crosses_to_kotlin_under_the_key_kotlin_reads() {
+        let json = serde_json::to_value(PrintHtmlArgs {
+            html: "<p>F-1</p>".into(),
+        })
+        .expect("serializable");
+        assert_eq!(json["html"], "<p>F-1</p>");
+
+        let code = without_kotlin_comments(ERPLORA_ANDROID_PLUGIN_KT);
+        for literal in [
+            "getString(\"html\"".to_string(),
+            format!("fun {PRINT_HTML_COMMAND}(invoke: Invoke)"),
+        ] {
+            assert!(
+                code.contains(&literal),
+                "{literal} is not in ErploraAndroidPlugin.kt — the invoice would reach Kotlin as \
+                 `command not found` or with no document, on a real device only"
+            );
+        }
+    }
+
+    #[test]
+    fn an_answer_with_no_data_is_a_print_screen_that_opened() {
+        // `invoke.resolve()` with no data arrives as `null` (and a `JSObject()` as `{}`): both
+        // mean the print screen opened. Reading either as an error sent the invoice to the till
+        // roll right behind the dialog the user was looking at.
+        for answer in [serde_json::Value::Null, serde_json::json!({})] {
+            assert!(
+                serde_json::from_value::<PrintHtmlAnswer>(answer.clone()).is_ok(),
+                "{answer} must read as success"
+            );
+        }
+    }
+
+    #[test]
+    fn the_printed_document_runs_no_code() {
+        // The same frontier as the desktop print window's CSP (hub#2006): the html comes from a
+        // remote page, so the WebView that renders it runs no script and exposes no bridge.
+        let code = without_kotlin_comments(HTML_PRINTER_KT);
+        assert!(code.contains("javaScriptEnabled = false"), "{code}");
+        assert!(!code.contains("javaScriptEnabled = true"), "{code}");
+        assert!(!code.contains("addJavascriptInterface"), "{code}");
+    }
+
+    #[test]
+    fn desktop_refuses_to_print_through_the_android_plugin() {
+        // Unreachable by construction (the shell only routes here on Android), and a refusal
+        // anyway: a resolved call would read as a dialog that opened (hub#475).
+        let desktop = ErploraAndroid::<tauri::Wry>(std::marker::PhantomData);
+        assert!(desktop.print_html("<p>F-1</p>").is_err());
+    }
+
+    // ── Kotlin answers with no data (hub#2024) ──────────────────────────────────────────────
+    //
+    // `invoke.resolve()` with no data reaches Rust as JSON `null`. Read as a struct, that `null`
+    // is a deserialize error, so a call that DID its job came back as a failure: the ticket was
+    // on paper and the print host reported it `failed`.
+
+    #[test]
+    fn a_bluetooth_answer_with_no_data_is_a_ticket_on_paper() {
+        for answer in [serde_json::Value::Null, serde_json::json!({})] {
+            assert!(
+                serde_json::from_value::<BluetoothPrintAnswer>(answer.clone()).is_ok(),
+                "{answer} must read as a printed ticket"
+            );
+        }
+    }
+
+    /// The Rust source outside this test module.
+    fn production_rust() -> &'static str {
+        const LIB_RS: &str = include_str!("lib.rs");
+        LIB_RS
+            .split("#[cfg(test)]\nmod tests")
+            .next()
+            .expect("lib.rs has code before its tests")
+    }
+
+    /// Commands whose Kotlin side resolves with a bare `invoke.resolve()` somewhere.
+    fn kotlin_commands_resolving_with_no_data(kotlin: &str) -> Vec<String> {
+        let code = without_kotlin_comments(kotlin);
+        let mut names = Vec::new();
+        let mut rest = code.as_str();
+        while let Some(at) = rest.find("(invoke: Invoke)") {
+            let name = rest[..at]
+                .rsplit(|c: char| !c.is_alphanumeric() && c != '_')
+                .next()
+                .unwrap_or_default()
+                .to_string();
+            rest = &rest[at + "(invoke: Invoke)".len()..];
+            let body_end = rest.find("(invoke: Invoke)").unwrap_or(rest.len());
+            if rest[..body_end].contains("invoke.resolve()") {
+                names.push(name);
+            }
+        }
+        names
+    }
+
+    /// The type each `run_mobile_plugin::<T>(command, …)` reads its answer as, by command name.
+    fn rust_answer_types(rust: &str) -> Vec<(String, String)> {
+        const CALL: &str = "run_mobile_plugin::<";
+        let mut found = Vec::new();
+        let mut rest = rust;
+        while let Some(at) = rest.find(CALL) {
+            rest = &rest[at + CALL.len()..];
+            let Some(close) = rest.find(">(") else { break };
+            let ty = rest[..close].trim().to_string();
+            let arg = rest[close + 2..].trim_start();
+            let command = if let Some(quoted) = arg.strip_prefix('"') {
+                quoted.split('"').next().unwrap_or_default().to_string()
+            } else {
+                let ident: String = arg
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                let decl = format!("const {ident}: &str = \"");
+                rust.split(&decl)
+                    .nth(1)
+                    .and_then(|v| v.split('"').next())
+                    .unwrap_or_default()
+                    .to_string()
+            };
+            found.push((command, ty));
+        }
+        found
+    }
+
+    #[test]
+    fn every_command_kotlin_resolves_with_no_data_is_read_whatever_its_shape() {
+        let rust = production_rust();
+        let empty_answers = kotlin_commands_resolving_with_no_data(ERPLORA_ANDROID_PLUGIN_KT);
+        // Positive control: the scan sees the two commands known to answer with nothing.
+        for known in ["bluetoothPrint", "printHtml"] {
+            assert!(
+                empty_answers.iter().any(|n| n == known),
+                "{known} not found by the scan: {empty_answers:?}"
+            );
+        }
+        let answers = rust_answer_types(rust);
+        for command in &empty_answers {
+            let ty = answers
+                .iter()
+                .find(|(c, _)| c == command)
+                .map(|(_, t)| t.as_str())
+                .unwrap_or_else(|| panic!("no run_mobile_plugin::<T> call for {command}"));
+            let reads_anything = ty == "serde::de::IgnoredAny"
+                || rust.contains(&format!("type {ty} = serde::de::IgnoredAny;"));
+            assert!(
+                reads_anything,
+                "{command} answers `null` from Kotlin but Rust reads it as {ty}: a call that did \
+                 its job would come back as a failure (hub#2024)"
+            );
+        }
     }
 }

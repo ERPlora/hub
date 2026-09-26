@@ -71,6 +71,9 @@ describe('cloudModuleSubscription — which plan, not only whether you bought on
       trialEnd: null,
       periodEnd: null,
       tier: 'free',
+      // Keys added by hub#1686 (saas#1952); this SaaS answer does not send them.
+      source: null,
+      planName: null,
     });
   });
 
@@ -84,6 +87,8 @@ describe('cloudModuleSubscription — which plan, not only whether you bought on
       trialEnd: null,
       periodEnd: null,
       tier: null,
+      source: null,
+      planName: null,
     });
   });
 

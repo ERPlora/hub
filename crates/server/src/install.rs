@@ -58,6 +58,15 @@ pub enum InstallError {
     },
     #[error("runtime: {0}")]
     Runtime(String),
+    /// The module declares it needs a newer core than this hub runs (hub#1620). Its own variant,
+    /// not a [`InstallError::Runtime`] string: the shell translates it with both numbers instead
+    /// of painting the engine's English sentence.
+    #[error("the module `{module}` requires ERPlora {required} and this hub runs {core}")]
+    CoreVersionTooOld {
+        module: String,
+        required: String,
+        core: String,
+    },
     /// Se pidió **actualizar** un módulo que este hub no tiene instalado (hub#516). Actualizar no
     /// es una puerta trasera para instalar: un id mal escrito debe decirlo, no instalar algo nuevo.
     #[error("el módulo `{0}` no está instalado en este hub: no hay nada que actualizar")]
@@ -80,6 +89,26 @@ pub enum InstallError {
 }
 
 impl InstallError {
+    /// The one door every runtime refusal of the install pipeline takes (hub#1620).
+    ///
+    /// «This app needs a newer hub» is lifted out with its numbers because it is the one refusal
+    /// the owner can act on — update the hub — and the shell has to be able to say so in their
+    /// language. Everything else keeps travelling as `install_runtime_failed`.
+    pub fn from_runtime(e: erplora_runtime::RuntimeError) -> Self {
+        match e {
+            erplora_runtime::RuntimeError::CoreVersionTooOld {
+                module,
+                required,
+                core,
+            } => InstallError::CoreVersionTooOld {
+                module,
+                required,
+                core,
+            },
+            other => InstallError::Runtime(other.to_string()),
+        }
+    }
+
     /// Código de error **estable** (canal de errores de dominio, hub#139): la UI programa y
     /// traduce contra él, nunca contra el mensaje. Un fallo de instalación deja de ser mudo.
     pub fn code(&self) -> &'static str {
@@ -91,6 +120,7 @@ impl InstallError {
             InstallError::MissingSha256 { .. } => "install_missing_sha256",
             InstallError::Blocked { .. } => "install_blocked",
             InstallError::Runtime(_) => "install_runtime_failed",
+            InstallError::CoreVersionTooOld { .. } => "core_version_too_old",
             InstallError::NotInstalled(_) => "update_not_installed",
             InstallError::CloudDenied => "install_cloud_denied",
             InstallError::NotInCatalog { .. } => "install_not_in_catalog",
@@ -760,7 +790,7 @@ pub async fn restore_from_local_packages(
 }
 
 /// Repone UN módulo de su copia local. `Ok(false)` = este hub no tiene copia guardada.
-async fn restore_one(
+pub(crate) async fn restore_one(
     cache_root: &std::path::Path,
     runtime: &mut erplora_runtime::Runtime,
     module_id: &str,
@@ -768,7 +798,7 @@ async fn restore_one(
 ) -> Result<bool, InstallError> {
     let stored = erplora_runtime::module_package::load(runtime.db(), runtime.hub_id(), module_id)
         .await
-        .map_err(|e| InstallError::Runtime(e.to_string()))?;
+        .map_err(InstallError::from_runtime)?;
     let Some(stored) = stored else {
         return Ok(false);
     };
@@ -786,6 +816,7 @@ async fn restore_one(
         file_size_bytes: 0,
         sha256: Some(stored.sha256.clone()),
         signature: signature.clone(),
+        min_erplora_version: None,
     };
     let store = ModuleStore::new(cache_root);
     let dir = acquire(
@@ -828,15 +859,42 @@ pub async fn resolve_target(
     installed: &str,
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
+    resolve_offer(http, cloud_base_url, auth, module_id, installed, pinned)
+        .await
+        .0
+}
+
+/// [`resolve_target`] plus the ERPlora floor of the version it offers (hub#2082).
+///
+/// The floor is `Some` only for an UPDATE and only when that very version declares one: it is read
+/// off the same `versions/` answer the resolver chose from, so a newer version the resolver skipped
+/// (quarantine) never lends its floor to the one offered. The pin short-circuits exactly as in
+/// [`resolve_target`] — nothing is offered, nothing is asked.
+pub async fn resolve_offer(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+    installed: &str,
+    pinned: Option<&str>,
+) -> (erplora_runtime::module_update::Target, Option<String>) {
     use erplora_runtime::module_update::{resolve, Target};
 
     if let Some(pin) = pinned {
-        return Target::StayPut(pin.to_string());
+        return (Target::StayPut(pin.to_string()), None);
     }
 
-    let available = available_versions(http, cloud_base_url, auth, module_id).await;
-
-    resolve(installed, None, &available)
+    let published = versions_as_published(http, cloud_base_url, auth, module_id).await;
+    let target = resolve(installed, None, &as_available(&published));
+    let floor = if target.is_update() {
+        published
+            .into_iter()
+            .find(|v| v.version == target.version())
+            .and_then(|v| v.min_erplora_version)
+    } else {
+        None
+    };
+    (target, floor)
 }
 
 /// Lo que el marketplace publica hoy para un módulo (`versions/`), tal cual.
@@ -850,8 +908,28 @@ pub async fn available_versions(
     auth: &Auth,
     module_id: &str,
 ) -> Vec<erplora_runtime::module_update::Available> {
-    use erplora_runtime::module_update::Available;
+    as_available(&versions_as_published(http, cloud_base_url, auth, module_id).await)
+}
 
+/// What the resolver needs from each published version.
+fn as_available(published: &[ModuleVersion]) -> Vec<erplora_runtime::module_update::Available> {
+    published
+        .iter()
+        .map(|v| erplora_runtime::module_update::Available {
+            version: v.version.clone(),
+            is_active: v.is_active,
+        })
+        .collect()
+}
+
+/// The marketplace's `versions/` answer as published, or empty when it could not be read — the
+/// same «I don't know» [`available_versions`] documents.
+async fn versions_as_published(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+) -> Vec<ModuleVersion> {
     let request = CloudClient::new(cloud_base_url).versions(auth, module_id);
     let mut call = http.get(&request.url);
     for (name, value) in &request.headers {
@@ -861,13 +939,7 @@ pub async fn available_versions(
         Ok(response) => response
             .json::<Vec<ModuleVersion>>()
             .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|v| Available {
-                version: v.version,
-                is_active: v.is_active,
-            })
-            .collect(),
+            .unwrap_or_default(),
         Err(error) => {
             tracing::warn!(
                 module_id = %module_id,
@@ -1237,6 +1309,7 @@ async fn execute_plan(
             file_size_bytes: 0,
             sha256: Some(sha.to_string()),
             signature: signature.clone(),
+            min_erplora_version: None,
         };
         let dir = acquire_from_file(
             &store,
@@ -1254,7 +1327,7 @@ async fn execute_plan(
         // falls back to manifest resolution. Registering would only die in `MissingDependency`.
         let missing: Vec<String> = runtime
             .missing_dependencies(&dir)
-            .map_err(|e| InstallError::Runtime(e.to_string()))?
+            .map_err(InstallError::from_runtime)?
             .into_iter()
             .filter(|dep| !planned.contains(dep.as_str()))
             .collect();
@@ -1410,7 +1483,7 @@ fn install_recursive<'a>(
         //     aquí se satisface ese contrato descargándolas del Cloud en orden de profundidad.
         let missing = runtime
             .missing_dependencies(&dir)
-            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+            .map_err(InstallError::from_runtime)?;
         installing.insert(module_id.clone());
         for dep in missing {
             // Ya en la cadena en curso (ciclo) o ya instalada por otra rama (dep en diamante): saltar.
@@ -1477,7 +1550,7 @@ fn install_recursive<'a>(
 /// versión anterior vuelve si el intento falla—; la diferencia es el contrato: `update_from_dir`
 /// **se niega** si el módulo no está instalado, de modo que una actualización nunca puede acabar
 /// instalando algo que este hub no tenía.
-async fn register(
+pub(crate) async fn register(
     runtime: &mut erplora_runtime::Runtime,
     dir: &std::path::Path,
     module_id: &str,
@@ -1489,5 +1562,39 @@ async fn register(
     } else {
         runtime.install_from_dir(dir).await
     };
-    result.map_err(|e| InstallError::Runtime(e.to_string()))
+    result.map_err(InstallError::from_runtime)
+}
+
+#[cfg(test)]
+mod register_tests {
+    use super::*;
+
+    /// hub#1620 — `register` is also reached WITHOUT the `missing_dependencies` read that catches
+    /// the floor first on a fresh install: restoring the local copy (`restore_one`) and the
+    /// reconciler go straight here. It has to keep the same stable fact, not flatten it into
+    /// `install_runtime_failed`.
+    #[tokio::test]
+    async fn register_keeps_the_newer_hub_refusal_as_its_own_code() {
+        let dir = std::env::temp_dir().join(format!(
+            "erplora-hub1620-register-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::fs::write(
+            dir.join("module.json"),
+            r#"{"id":"whatsapp_inbox","name":"whatsapp_inbox","version":"1.0.0",
+                "compatibility":{"min_erplora_version":"999.0.0"}}"#,
+        )
+        .expect("manifest");
+
+        let mut rt =
+            erplora_runtime::Runtime::new(Box::new(erplora_db::testutil::fresh_db().await));
+        let err = register(&mut rt, &dir, "whatsapp_inbox", None)
+            .await
+            .expect_err("a module that needs a newer hub is refused");
+
+        assert_eq!(err.code(), "core_version_too_old", "{err:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

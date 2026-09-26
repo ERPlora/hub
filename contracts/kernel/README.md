@@ -16,7 +16,7 @@ No es un invento nuestro: es lo que hacen Kotlin (`apiCheck` / binary-compatibil
 | Fichero | Qué congela | Lo genera |
 |---|---|---|
 | `routes.snapshot` | Cada ruta HTTP/WS de `app()`: método · ruta · clase de auth | `cargo test -p erplora-server --test kernel_contract_routes` |
-| `engine.snapshot` | Motor declarativo: params inyectados, `hub.*`, capabilities, orígenes del dispatcher, `kind`s de migración **y los verbos que sacan una migración de `expand`**, guardas de fila | `cargo test -p erplora-runtime --test kernel_contract_engine` |
+| `engine.snapshot` | Motor declarativo: params inyectados, `hub.*`, capabilities, orígenes del dispatcher, `kind`s de migración **y los verbos que sacan una migración de `expand`**, guardas de fila, `emit[]`, y lo que un permiso de flujo puede fijar (`[flow_pin_*]`, `[flow_path_roots]`; module-toolkit#234) | `cargo test -p erplora-runtime --test kernel_contract_engine` |
 | `guest.snapshot` | Contrato del guest WASM: campos de `Input`/`Output` y topes de `WasmLimits` | `cargo test -p erplora-runtime --test kernel_contract_guest` |
 | `tables.snapshot` | Tablas de sistema (`hub_*`, `_*`) con sus columnas, **reflejadas** de un hub recién arrancado | `cargo test -p erplora-runtime --test kernel_contract_tables` (necesita Postgres, `DATABASE_URL`) |
 | `sdk.d.ts` | API pública de `@erplora/module-sdk`, tal cual la emite `tsc` | `pnpm -F @erplora/module-sdk contract:check` (va en `pnpm verify`) |
@@ -107,7 +107,7 @@ API está ahí, y solo ejecutarla dice que funciona.
 | `kernel_conformance_events.rs` | `emit` → `_event_outbox` → listener; el evento de un handler por el mismo camino; un command que falla no emite; nombre fuera de `events.emits` **rechazado nombrándolo** |
 | `kernel_conformance_slots_navigation.rs` | `navigation` (permiso, `chrome`), `provides_slots` y los `locales/` del módulo (`en` canónico, `es` traducido) |
 | `kernel_conformance_errors.rs` | El catálogo `errors` (ADR-0398/0412): servido ordenado, `deprecated` marcado, `expect_rows.error` fuera del catálogo rechazado **al instalar**, y un código fuera del catálogo devuelto por un handler es contrato roto (`Wasm`), nunca un `Domain` que la UI intente traducir |
-| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad**; el guest no alcanza ni un command inexistente ni el de un módulo VECINO (un gemelo del fixture bajo otro id) |
+| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad**; el guest no alcanza ni un command inexistente ni el de un módulo VECINO (un gemelo del fixture bajo otro id); el guest recibe `context.principal` (`human`/`machine`) y lo devuelve, así el camino WASM queda tan cubierto como el nativo (hub#2117) |
 | `kernel_conformance_update.rs` | Update en caliente (hub#516): los datos sobreviven, solo corre la migración nueva, y un update que falla deja **corriendo la versión anterior** |
 
 Todas usan el **módulo fixture del propio kernel** —`crates/runtime/tests/fixtures/kernel-fixture/`,

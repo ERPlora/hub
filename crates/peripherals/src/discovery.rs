@@ -266,6 +266,99 @@ pub async fn discover_printers(
     })
 }
 
+/// How long a typed address gets to answer before it is refused as unreachable (hub#1924).
+///
+/// Longer than the sweep's [`SCAN_CONNECT_TIMEOUT`] on purpose: this is ONE connect the owner is
+/// waiting on, often to another subnet through a router, and refusing a printer that was merely
+/// slow sends them to check a cable that is fine.
+pub const MANUAL_PRINTER_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Adds a network printer by the address the owner TYPED (hub#1924) — the way out when the scan
+/// cannot see it (another subnet, an isolated guest Wi-Fi, mDNS blocked by the router).
+///
+/// Three answers, and only the first saves anything:
+/// - it answers on `host:port` → registered as [`Device::manual`](crate::protocol::Device) and
+///   returned as the same [`PrinterInfo`] the scan would have produced;
+/// - not a dotted IPv4 or port 0 → [`PeripheralError::InvalidPrinterId`](crate::PeripheralError),
+///   before any connect;
+/// - nobody answers within `probe_timeout` → [`PeripheralError::Unreachable`](crate::PeripheralError).
+///   Saving it anyway would leave a printer in the list that every ticket silently fails on.
+///
+/// IPv4 only: it is what a thermal printer's self-test sheet prints, and it keeps the
+/// `network:{ip}:{port}` id unambiguous.
+pub async fn add_network_printer(
+    registry: &DeviceRegistry,
+    host: &str,
+    port: u16,
+    probe_timeout: Duration,
+) -> Result<PrinterInfo> {
+    let host = host.trim();
+    let ip: std::net::Ipv4Addr = host.parse().map_err(|_| {
+        crate::PeripheralError::InvalidPrinterId(format!("not an IPv4 address: `{host}`"))
+    })?;
+    if port == 0 {
+        return Err(crate::PeripheralError::InvalidPrinterId(format!(
+            "port 0 in: {ip}:{port}"
+        )));
+    }
+
+    let addr = SocketAddr::from((ip, port));
+    match tokio::time::timeout(probe_timeout, TcpStream::connect(addr)).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => {
+            return Err(crate::PeripheralError::Unreachable(format!("{addr}: {e}")));
+        }
+        Err(_) => {
+            return Err(crate::PeripheralError::Unreachable(format!(
+                "{addr}: no answer within {} ms",
+                probe_timeout.as_millis()
+            )));
+        }
+    }
+
+    let ip = ip.to_string();
+    let name = format!("Network Printer ({ip})");
+    registry.register_manual(&ip, port, &name)?;
+    Ok(PrinterInfo {
+        id: format!("network:{ip}:{port}"),
+        name,
+        kind: "network".into(),
+        // Answering on a raw port says nothing about the language it speaks (see the sweep).
+        category: crate::protocol::default_printer_category(),
+        status: "ready".into(),
+        paper_width: 80,
+        mac: None,
+    })
+}
+
+/// Adds the printers the owner typed by hand ([`add_network_printer`]) that this scan did not
+/// see, so a printer on another subnet does not vanish from the list at the next «Re-scan»
+/// (hub#1924). Their state is the watchdog's (`offline` → `offline`, anything else → `ready`).
+///
+/// A blocked scan stays blocked: the screen has to ask for the permission first, and a typed
+/// printer is behind that same permission.
+pub fn with_manual_printers(outcome: PrinterDiscovery, registry: &DeviceRegistry) -> PrinterDiscovery {
+    let PrinterDiscovery::Scanned { mut printers } = outcome else {
+        return outcome;
+    };
+    for device in registry.get_all().into_iter().filter(|d| d.manual) {
+        let id = format!("network:{}:{}", device.ip, device.port);
+        if printers.iter().any(|p| p.id == id) {
+            continue;
+        }
+        printers.push(PrinterInfo {
+            id,
+            name: device.name,
+            kind: "network".into(),
+            category: crate::protocol::default_printer_category(),
+            status: if device.status == "offline" { "offline" } else { "ready" }.into(),
+            paper_width: 80,
+            mac: device.mac,
+        });
+    }
+    PrinterDiscovery::Scanned { printers }
+}
+
 /// The scan itself: mDNS + subnet sweep, deduplicated, MAC-enriched and registered.
 async fn scan_network(registry: &DeviceRegistry) -> Result<Vec<PrinterInfo>> {
     // mDNS gana ante colisión de IP → se inserta primero y el escaneo solo añade IDs nuevos.
@@ -877,5 +970,140 @@ mod tests {
             registry.get_all().is_empty(),
             "a scan that never ran must not register a single device"
         );
+    }
+
+    // ── hub#1924: a printer the scan cannot see, added by typing its address ─────────────────────
+    //
+    // The sweep only covers the device's own /24 and mDNS stops at the router; a printer on another
+    // subnet or an isolated guest Wi-Fi never shows up. Every POS lets the owner type the IP from
+    // the printer's self-test sheet. These pin the three answers that door can give.
+
+    #[tokio::test]
+    async fn a_typed_address_that_answers_is_registered_as_a_manual_network_printer() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let registry = temp_registry("manual-ok");
+
+        let printer = add_network_printer(&registry, "127.0.0.1", port, Duration::from_secs(2))
+            .await
+            .expect("a printer that answers must be added");
+
+        let id = format!("network:127.0.0.1:{port}");
+        assert_eq!(printer.id, id);
+        assert_eq!(printer.kind, "network");
+        assert_eq!(printer.status, "ready");
+        let device = registry.get(&id).expect("the typed printer must be in the registry");
+        assert!(device.manual, "the registry must remember it was typed, or the next scan loses it");
+        assert_eq!(device.kind, "network", "the watchdog only watches `network` devices");
+    }
+
+    #[tokio::test]
+    async fn a_typed_address_nobody_answers_is_refused_and_not_registered() {
+        let port = {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+            l.local_addr().expect("addr").port()
+        }; // dropped: nothing listens there any more
+        let registry = temp_registry("manual-unreachable");
+
+        let err = add_network_printer(&registry, "127.0.0.1", port, Duration::from_secs(2))
+            .await
+            .expect_err("nobody answers: it must not be added as if it worked");
+
+        assert_eq!(err.code(), "printer_unreachable");
+        assert!(registry.get_all().is_empty(), "a printer that did not answer must not be saved");
+    }
+
+    #[tokio::test]
+    async fn a_typed_address_that_is_not_an_ipv4_is_refused_before_connecting() {
+        let registry = temp_registry("manual-invalid");
+        for (host, port) in [
+            ("192.168.1", 9100),
+            ("192.168.1.300", 9100),
+            ("printer.local", 9100),
+            ("", 9100),
+            ("  ", 9100),
+            ("192.168.1.20", 0),
+        ] {
+            let err = add_network_printer(&registry, host, port, Duration::from_secs(2))
+                .await
+                .expect_err("not a usable address");
+            assert_eq!(err.code(), "invalid_printer_address", "{host}:{port}");
+        }
+        assert!(registry.get_all().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_typed_address_is_trimmed_before_it_becomes_the_printer_id() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let registry = temp_registry("manual-trim");
+
+        let printer = add_network_printer(&registry, " 127.0.0.1 ", port, Duration::from_secs(2))
+            .await
+            .expect("added");
+
+        assert_eq!(printer.id, format!("network:127.0.0.1:{port}"));
+    }
+
+    fn scanned(printers: Vec<PrinterInfo>) -> PrinterDiscovery {
+        PrinterDiscovery::Scanned { printers }
+    }
+
+    #[test]
+    fn a_manual_printer_the_scan_does_not_see_stays_in_the_list() {
+        let registry = temp_registry("manual-merge");
+        registry.register_manual("10.9.9.9", 9100, "Network Printer (10.9.9.9)").expect("manual");
+        // A printer found once by the scan and gone now is NOT kept: only what the owner typed.
+        registry
+            .register(None, "10.1.1.1", 9100, "Network Printer (10.1.1.1)", "network")
+            .expect("scanned");
+
+        let merged = with_manual_printers(scanned(vec![]), &registry);
+
+        let ids: Vec<&str> = merged.scanned_printers().expect("scanned").iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, vec!["network:10.9.9.9:9100"]);
+    }
+
+    #[test]
+    fn a_manual_printer_the_scan_also_found_is_listed_once() {
+        let registry = temp_registry("manual-dedupe");
+        registry.register_manual("10.9.9.9", 9100, "Network Printer (10.9.9.9)").expect("manual");
+        let found = PrinterInfo {
+            id: "network:10.9.9.9:9100".into(),
+            name: "Network Printer (10.9.9.9)".into(),
+            kind: "network".into(),
+            category: crate::protocol::default_printer_category(),
+            status: "ready".into(),
+            paper_width: 80,
+            mac: None,
+        };
+
+        let merged = with_manual_printers(scanned(vec![found]), &registry);
+
+        assert_eq!(merged.scanned_printers().expect("scanned").len(), 1);
+    }
+
+    #[test]
+    fn a_manual_printer_the_watchdog_saw_go_down_is_listed_offline() {
+        let registry = temp_registry("manual-offline");
+        registry.register_manual("10.9.9.9", 9100, "Network Printer (10.9.9.9)").expect("manual");
+        registry.set_status("network:10.9.9.9:9100", "offline").expect("status");
+
+        let merged = with_manual_printers(scanned(vec![]), &registry);
+
+        assert_eq!(merged.scanned_printers().expect("scanned")[0].status, "offline");
+    }
+
+    #[test]
+    fn a_blocked_scan_stays_blocked_even_with_manual_printers() {
+        let registry = temp_registry("manual-denied");
+        registry.register_manual("10.9.9.9", 9100, "Network Printer (10.9.9.9)").expect("manual");
+
+        let merged = with_manual_printers(
+            PrinterDiscovery::PermissionDenied { permission: ANDROID_LOCAL_NETWORK.into() },
+            &registry,
+        );
+
+        assert_eq!(merged.denied_permission(), Some(ANDROID_LOCAL_NETWORK));
     }
 }

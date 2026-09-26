@@ -146,6 +146,11 @@ docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_as
 export E2E_DATABASE_URL=postgres://postgres:test@localhost:5433/hub_e2e_assistant
 ```
 
+Eso es para correrlos **a mano**, y esas dos bases persisten entre corridas. El pre-push no las usa:
+cada pasada suya crea `hub_e2e_web_<pid>` y `hub_e2e_assistant_<pid>` vacías, las borra al terminar
+y poda las de pasadas muertas (hub#1998). Si a mano ves un login del Demo rechazado tras un cambio
+del seed, bórralas y vuelve a crearlas: el seed nunca sobrescribe un Demo que ya existe.
+
 Las capturas de `toHaveScreenshot` **se generan donde corren**: las baselines que manda el
 repo son las del runner Linux, y se regeneran con el workflow **«Regenerar baselines visuales
 (Linux)»** (Run workflow → `confirm: true` → artefacto `playwright-baselines`, que se commitea

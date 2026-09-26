@@ -1995,7 +1995,92 @@ CREATE INDEX IF NOT EXISTS ix_policy_checkpoint ON _policy (hub_id, checkpoint);
         postgres: "ALTER TABLE _hub_certificate \
                      ADD COLUMN IF NOT EXISTS use_for_transmission INTEGER NOT NULL DEFAULT 1;",
     },
-
+    // ── v64 — saas#2129: `_hub_activity_log`, WHAT the people of the business do here ──────────
+    //
+    // `_hub_activity` (v39) holds ONE timestamp: somebody entered. That is enough to decide
+    // whether a free hub is abandoned, and not nearly enough to answer "are they USING it": a
+    // business in its first week — entering, building the catalogue, opening the till, not
+    // charging yet — looks identical to a dead one, because the only business signal the Cloud
+    // had was the sale count. These are EVENTS, each a distinct fact, so they get rows.
+    //
+    // WHY A TABLE AND NOT AN ATOMIC, which is what the sibling signal uses: with
+    // `order: start-first` (ADR-0269) every update kills a task, so a sale between the last beat
+    // and a routine deploy would die in memory. And this data CANNOT be rebuilt afterwards —
+    // what October does not record is gone — which is why the buffer is durable from the first
+    // write rather than from the first successful beat.
+    //
+    // `id` is minted by the HUB (uuid v4) and is the dedup key the Cloud stores: delivery is
+    // at-least-once (a batch is re-sent until a beat answers 2xx), so the id is what turns that
+    // into exactly-once storage on the other side.
+    //
+    // `actor` is the hub's own id for that person (`RequestContext::user_id`) — the PIN-only
+    // cashier never reaches the SaaS at all. NO NAME, NO EMAIL, and nothing whatsoever about the
+    // END CUSTOMER: there is no column for it, so it cannot leak by somebody filling a field in
+    // later.
+    //
+    // Timestamps are RFC3339 UTC TEXT like `_hub_activity`/`_print_queue`: fixed width and always
+    // `Z`, so the ordering that decides what a beat takes is a text comparison with no cast.
+    //
+    // No `deleted_at`: a reported event is DELETED, not soft-deleted. The Cloud is the durable
+    // store from the moment it acknowledges, and a till's disk is not the place to keep a second
+    // copy of a year of telemetry.
+    //
+    // ⚠️ v64: re-check the number against `origin/develop` right before the push (hub#573). Three
+    // branches in flight have renumbered themselves over this catalogue in a single week, and
+    // `apply` only shouts once a hub already carries the higher number — far too late.
+    SystemMigration {
+        version: 64,
+        name: "hub_activity_log",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_activity_log (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, activity_type TEXT NOT NULL, \
+  actor TEXT NOT NULL, occurred_at TEXT NOT NULL, \
+  PRIMARY KEY (id));\
+CREATE INDEX IF NOT EXISTS ix_hub_activity_log_pending \
+  ON _hub_activity_log (hub_id, occurred_at, id);",
+    },
+    // ── v65 — hub#1940: WHEN the certificate expires, stored next to its bytes ─────────────────
+    // A live hub signing with an expired own certificate charged tickets the AEAT then refused.
+    // The rule that decides whether a hub can file (`fiscal_profile::filing_gap`) runs on every
+    // command, and reading `notAfter` from the container there would decrypt and parse a PKCS#12
+    // per sale. So the upsert that writes the bytes writes their `notAfter` too — the same upsert,
+    // like `certificate_type` (v21), because it describes THOSE bytes.
+    //
+    // RFC 3339 UTC instant, `''` = «not stored»: rows written before this column carry `''` and
+    // `certificate::signing_not_after` reads the container for them until the next upload — the
+    // v21 story, without a blind backfill. Additive and re-runnable, so the auto-rollback can
+    // leave it behind (ADR-0269).
+    SystemMigration {
+        version: 65,
+        name: "hub_certificate_not_after",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _hub_certificate \
+                     ADD COLUMN IF NOT EXISTS not_after TEXT NOT NULL DEFAULT '';",
+    },
+    // ── v66 — hub#2059: the fingerprint of the factory recipe a flow was built from ────────────
+    // «Activate» twice lands on the SAME flow (hub#1684) — the second tap only switches it on and
+    // never touches its document again, on purpose: an owner who edited the recipe must not have
+    // those edits silently overwritten. That leaves no way to tell «the module improved its recipe
+    // since» from «this is still the one it shipped», so the gallery could never flag a flow whose
+    // factory version had moved on. `template_digest` is what a listing compares against the
+    // digest the registry computes NOW for that `<module>/<family>` (`templates::recipe_digest`).
+    //
+    // `NULL` on purpose for every flow built before this column existed: there is no recipe version
+    // to compare against, and the listing has to answer «unknown», not «up to date» — the second
+    // would tell exactly the businesses this issue is about that nothing changed. No backfill: the
+    // digest of the recipe a hub built from, years ago, at whatever version the module was then, is
+    // not recoverable from what is stored today.
+    //
+    // `ALTER … ADD COLUMN IF NOT EXISTS`, additive and re-runnable, and it is what ADR-0269 retires
+    // by leaving it unwritten. When it was written the maximum was v65 on `origin/develop` and no
+    // remote ref asked for a v66.
+    SystemMigration {
+        version: 66,
+        name: "flow_template_digest",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_digest TEXT;",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3950,7 +4035,28 @@ mod kind_contract_tests {
         // additive, so ADR-0269 retires it by leaving it unwritten. When it was written the maximum
         // was v62 on `origin/develop` and across the 98 remote branches that carry the file — none
         // asks for a v63.
-        assert_eq!(MIGRATIONS.len(), 60, "el catálogo cambió de tamaño");
+        // + `hub_activity_log` (v64, saas#2129): `_hub_activity_log`, one row per thing somebody of
+        // the business DID here — entering, leaving, selling, refunding, opening and closing the
+        // till — with the hub's own id for who did it. A TABLE and not another column on
+        // `_hub_activity` because these are events, each a distinct fact; and durable from the
+        // first write because `order: start-first` kills a task on every update and this data
+        // cannot be rebuilt afterwards. `CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT
+        // EXISTS`, so it is additive and re-runnable, and ADR-0269 retires it by leaving it
+        // unwritten. When it was written the maximum was v63 on `origin/develop` and across the 31
+        // remote branches that carry the file — none asks for a v64 (`git grep -l "version: 6[4-9]"`
+        // over every remote ref came back empty).
+        // + `hub_certificate_not_after` (v65, hub#1940): the `notAfter` of the certificate, written
+        // in the same upsert as its bytes so the rule that decides whether a live hub can file
+        // knows an expired own certificate without decrypting it on every sale. `ADD COLUMN IF NOT
+        // EXISTS … DEFAULT ''`, additive and re-runnable. When it was written the maximum was v64
+        // on `origin/develop` and no remote ref asked for a v65 or above.
+        // + `flow_template_digest` (v66, hub#2059): the `template_digest` column of `_flow` — the
+        // fingerprint of the factory recipe a flow was built from, so the gallery can tell «the
+        // module improved its recipe since» from «still the one it shipped». `NULL` on every flow
+        // built before this column existed, with no backfill: an old digest is not recoverable.
+        // `ADD COLUMN IF NOT EXISTS`, additive and re-runnable. When it was written the maximum was
+        // v65 on `origin/develop` and no remote ref asked for a v66.
+        assert_eq!(MIGRATIONS.len(), 63, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

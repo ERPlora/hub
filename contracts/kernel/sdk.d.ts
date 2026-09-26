@@ -4,10 +4,14 @@
 
 // ── index.d.ts ────────────────────────────────────────────────────────────
 export { QUANTITY_SCALE, toMicro, fromMicro, parseQuantity, formatQuantity, onGrid, } from './quantity.ts';
+export interface EventMeta {
+    clientInstance?: string;
+}
 export interface ErploraTransport {
     query(name: string, params?: Record<string, unknown>): Promise<unknown>;
     command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
     subscribe(event: string, cb: (payload: unknown) => void): () => void;
+    subscribeWithMeta?(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void;
     fetchMediaBlob?(ref: string, opts?: MediaFetchOptions): Promise<Blob | null>;
 }
 export interface MediaFetchOptions {
@@ -160,6 +164,7 @@ export declare class HttpWsTransport implements ErploraTransport {
     private post;
     coreRequest(req: CoreRequest, extraHeaders?: Record<string, string>): Promise<unknown>;
     fetchMediaBlob(ref: string, opts?: MediaFetchOptions): Promise<Blob | null>;
+    coreBlobRequest(path: string, extraHeaders?: Record<string, string>): Promise<Blob>;
     private send;
     query(name: string, params?: Record<string, unknown>): Promise<unknown>;
     command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
@@ -167,6 +172,7 @@ export declare class HttpWsTransport implements ErploraTransport {
     private elevate;
     private approveElevation;
     subscribe(event: string, cb: (payload: unknown) => void): () => void;
+    subscribeWithMeta(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void;
     private handleFrame;
     private ensurePush;
     private ensureWs;
@@ -191,6 +197,7 @@ export interface CoreRequest {
     method: CoreMethod;
     path: string;
     body?: unknown;
+    envelope?: boolean;
 }
 export interface CoreApiTransport {
     coreRequest(req: CoreRequest, headers?: Record<string, string>): Promise<unknown>;
@@ -243,8 +250,21 @@ export declare class FlowsApi {
     deleteSecret(name: string): Promise<unknown>;
     schema(): Promise<FlowSchema>;
     templates(): Promise<ModuleFlowTemplate[]>;
+    templateDiscards(): Promise<FlowTemplateDiscard[]>;
     activateTemplate(family: string): Promise<Flow>;
     deactivateTemplate(family: string): Promise<Flow>;
+    restoreTemplate(family: string): Promise<Flow>;
+}
+export interface FlowTemplateDiscard {
+    module: string;
+    family: string;
+    code: string;
+    detail: string;
+    requires?: {
+        module: string;
+        floor: string;
+        installed: string | null;
+    };
 }
 export interface ModuleFlowTemplate {
     module: string;
@@ -254,11 +274,13 @@ export interface ModuleFlowTemplate {
         kind: string;
         value: string;
         payload?: Record<string, unknown>;
+        reason?: Record<string, string>;
     }>;
     requires: Record<string, string>;
     installed?: {
         flow_id: string;
         enabled: boolean;
+        outdated?: boolean | null;
     } | null;
 }
 export interface EventFieldShape {
@@ -377,6 +399,15 @@ export declare class WhatsappTemplatesApi {
     register(template: WhatsappTemplateInput): Promise<WhatsappTemplate>;
     remove(name: string): Promise<void>;
 }
+export declare const WHATSAPP_MEDIA_BASE_PATH = "/api/hub/whatsapp/media";
+export interface CoreBlobTransport {
+    coreBlobRequest(path: string, headers?: Record<string, string>): Promise<Blob>;
+}
+export declare class WhatsappMediaApi {
+    private readonly fetchBlob;
+    constructor(fetchBlob: (path: string) => Promise<Blob>);
+    get(mediaId: string): Promise<Blob>;
+}
 export declare const CERTIFICATE_BASE_PATH = "/api/business/certificate";
 export interface CertificateSlot {
     present: boolean;
@@ -426,6 +457,7 @@ export declare class ErploraClient {
     private eventsApi?;
     private printApi?;
     private whatsappTemplatesApi?;
+    private whatsappMediaApi?;
     private certificateApi?;
     constructor(transport: ErploraTransport, opts?: {
         permissions?: () => ReadonlySet<string>;
@@ -443,6 +475,7 @@ export declare class ErploraClient {
     get flows(): FlowsApi;
     get events(): EventsApi;
     get whatsappTemplates(): WhatsappTemplatesApi;
+    get whatsappMedia(): WhatsappMediaApi;
     get certificate(): CertificateApi;
     get printQueue(): PrintApi;
     query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
@@ -453,6 +486,7 @@ export declare class ErploraClient {
     command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
     commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T | undefined>;
     on(event: string, cb: (payload: unknown) => void): () => void;
+    onEvent(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void;
     hasPermission(perm: string): boolean;
     notify(n: Notification): void;
     get locale(): string;
@@ -518,9 +552,13 @@ export interface BridgeTransport {
     testPrint(printerId: string, data?: Record<string, unknown>): Promise<void>;
     openDrawer(printerId: string, pin?: number): Promise<void>;
     setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]>;
+    addNetworkPrinter?(host: string, port?: number): Promise<BridgePrinter>;
     notify(title: string, body: string): Promise<void>;
 }
 export declare const HARDWARE_UNAVAILABLE = "hardware_unavailable";
+export declare const INVALID_PRINTER_ADDRESS = "invalid_printer_address";
+export declare const PRINTER_UNREACHABLE = "printer_unreachable";
+export declare const PRINTER_ADD_FAILED = "printer_add_failed";
 export declare class UnavailableBridgeTransport implements BridgeTransport {
     private readonly message;
     constructor(message?: string);
@@ -532,6 +570,7 @@ export declare class UnavailableBridgeTransport implements BridgeTransport {
     testPrint(): Promise<void>;
     openDrawer(): Promise<void>;
     setDeviceRole(): Promise<BridgeDevice[]>;
+    addNetworkPrinter(): Promise<BridgePrinter>;
     notify(): Promise<void>;
 }
 export declare const ANDROID_LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK";
@@ -548,6 +587,7 @@ export declare class IpcBridgeTransport implements BridgeTransport {
     testPrint(printerId: string, data?: Record<string, unknown>): Promise<void>;
     openDrawer(printerId: string, pin?: number): Promise<void>;
     setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]>;
+    addNetworkPrinter(host: string, port?: number): Promise<BridgePrinter>;
     notify(title: string, body: string): Promise<void>;
 }
 export declare function majorToMinor(amount: string | number | undefined, decimals: number): number;

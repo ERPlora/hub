@@ -53,6 +53,10 @@ pub const CLOCK_ISO: &str = "iso";
 /// silently treated as a literal string — a step that thinks it is sending a secret and sends the
 /// text `secret.API_KEY` is worse than one that will not save.
 const ROOT_SECRET: &str = "secret";
+/// Every root above — what [`is_path`] reads as a reference into the run. Published in the kernel
+/// contract (`[flow_path_roots]`, module-toolkit#234) because `erplora validate` has to tell a
+/// reference from a literal exactly as this does.
+pub const PATH_ROOTS: [&str; 5] = [ROOT_INPUT, ROOT_STEPS, ROOT_EVENT, ROOT_SECRET, ROOT_NOW];
 
 /// The methods an `http` step may use. Frozen and small: the point of the step is to call a
 /// business API, and `CONNECT`/`TRACE` are how an allow-listed URL becomes a tunnel.
@@ -820,6 +824,13 @@ pub struct StepDef {
     /// does not match is the flow working, not an error, and offering a policy for a failure that
     /// cannot happen is a guard nobody executes.
     pub on_error: ErrorPolicy,
+    /// **Whether this step applies at all** (hub#2066). When it does not match, THIS step does not
+    /// run and the run carries on with the next one — unlike a `condition`, which ends the run.
+    /// The spine stays linear: nothing branches or jumps, a step just may not be its turn. It is
+    /// the step-level `if:` of GitHub Actions and the «run after: has failed» of Power Automate,
+    /// and it exists so a document can say «tell her we will call back, ONLY if the assistant
+    /// failed» (whatsapp_inbox#122) without the guard also ending the run before the confirmation.
+    pub run_if: Option<Condition>,
 }
 
 impl StepDef {
@@ -1370,12 +1381,7 @@ fn as_text(v: &Json) -> Option<String> {
 /// Is `s` a bare path into the run (`input.…`, `steps.…`, `event.…`, `secret.…`, `now.…`)?
 pub fn is_path(s: &str) -> bool {
     matches!(s.split('.').next(), Some(root)
-        if (root == ROOT_INPUT
-            || root == ROOT_STEPS
-            || root == ROOT_EVENT
-            || root == ROOT_SECRET
-            || root == ROOT_NOW)
-            && s.len() > root.len() + 1)
+        if PATH_ROOTS.contains(&root) && s.len() > root.len() + 1)
 }
 
 /// The run clock as the mapping language addresses it, ready to be merged into a scope.
@@ -1505,8 +1511,9 @@ fn stringify(v: &Json) -> String {
     }
 }
 
-/// Every `{{path}}` inside a value, for the save-time checks.
-fn template_paths(expr: &Json, out: &mut Vec<String>) {
+/// Every `{{path}}` inside a value, for the save-time checks — and for `notify`, which asks
+/// whether the run had any of what a text was built from (hub#1660).
+pub(crate) fn template_paths(expr: &Json, out: &mut Vec<String>) {
     match expr {
         Json::String(s) => {
             if is_path(s) {
@@ -1668,6 +1675,25 @@ impl FlowDefinition {
                     ));
                 }
             }
+            // A `run_if` is a comparison on EVERY kind, `http` included (hub#2066): the call may
+            // carry a credential, but whether to make it is decided in the open, and a guard
+            // comparing against a secret is how it gets guessed byte by byte.
+            if let Some(guard) = &step.run_if {
+                let mut paths = Vec::new();
+                for expr in guard.expressions() {
+                    template_paths(&expr, &mut paths);
+                }
+                if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
+                    return Err(invalid(
+                        ERR_SECRET_NOT_AVAILABLE,
+                        format!(
+                            "step `{}`: `{path}` — the `run_if` of a step cannot read a flow \
+                             secret (ADR-0283 §4)",
+                            step.id
+                        ),
+                    ));
+                }
+            }
         }
         // A trigger runs before any step and its scope is the EVENT, so there is nothing a secret
         // could mean there.
@@ -1809,9 +1835,9 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     })?;
 
     let allowed: &[&str] = match kind {
-        StepKind::Command => &["id", "kind", "command", "params", "on_error"],
+        StepKind::Command => &["id", "kind", "command", "params", "on_error", "run_if"],
         StepKind::Query => &[
-            "id", "kind", "query", "params", "result", "limit", "options", "on_error",
+            "id", "kind", "query", "params", "result", "limit", "options", "on_error", "run_if",
         ],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &[
@@ -1825,9 +1851,10 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "cancel_on",
             "reschedule_on",
             "on_error",
+            "run_if",
         ],
         StepKind::Http => &[
-            "id", "kind", "method", "url", "headers", "body", "timeout", "on_error",
+            "id", "kind", "method", "url", "headers", "body", "timeout", "on_error", "run_if",
         ],
         StepKind::Ai => &[
             "id",
@@ -1840,6 +1867,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "on_reject",
             "on_error",
             "output",
+            "run_if",
         ],
         StepKind::Notify => &[
             "id",
@@ -1850,6 +1878,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "vars",
             "interactive",
             "on_error",
+            "run_if",
         ],
         StepKind::Approval => &[
             "id",
@@ -1860,6 +1889,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "expires_in",
             "on_expire",
             "on_reject",
+            "run_if",
         ],
     };
     for key in map.keys() {
@@ -1896,6 +1926,20 @@ fn parse_step(value: &Json) -> Result<StepDef> {
                     "step `{id}`: `on_error` is one of {}",
                     joined(ErrorPolicy::ALL.iter().map(|p| p.as_str()))
                 ),
+            ))
+        }
+    };
+
+    // **Whether this step applies at all** (hub#2066): the same `{path: {op: value}}` a `condition`
+    // speaks, parsed the same way so a bad operator is refused here and not at 3 AM. The allow-list
+    // above leaves it off `condition`, whose `when` already IS the guard.
+    let run_if = match map.get("run_if") {
+        None | Some(Json::Null) => None,
+        Some(value @ Json::Object(_)) => Some(Condition::parse(value)?),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `run_if` is an object of `{{path: {{op: value}}}}`"),
             ))
         }
     };
@@ -2023,6 +2067,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         kind,
         spec,
         on_error,
+        run_if,
     })
 }
 
@@ -2693,6 +2738,82 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     }
 
+    // **A template's header**: `vars.header_<kind>` is the text value (hub#2111) or the media link
+    // (hub#2101) the transport turns into Meta's `header` parameter. It only travels with ONE whatsapp template — an email
+    // and a free text have no header, and dropping the picture at send time would ship a message
+    // nobody wrote, eight retries after the owner stopped looking.
+    let headers: Vec<&str> = crate::host_notify::HEADER_VARS
+        .iter()
+        .map(|(key, _)| *key)
+        .filter(|key| vars.contains_key(*key))
+        .collect();
+    if let Some(first) = headers.first() {
+        let problem = if channel != Channel::Whatsapp {
+            Some(format!(
+                "`vars.{first}` is a whatsapp template's header — an email has none"
+            ))
+        } else if template_name.is_empty() {
+            Some(format!(
+                "`vars.{first}` needs the `template` it belongs to: a free text has no header"
+            ))
+        } else if headers.len() > 1 {
+            Some(format!(
+                "{} — a template has ONE header, keep the one its approved header asks for",
+                headers
+                    .iter()
+                    .map(|k| format!("`vars.{k}`"))
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            ))
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: {problem}"),
+            ));
+        }
+    }
+
+    // **A template's link button** (hub#2110): `vars.button_url_<n>` is the end the transport
+    // appends to the URL button at position `<n>`. Like the header, it only travels with a
+    // whatsapp template; a near miss of the key would otherwise go out as a body variable Meta
+    // refuses, so it is refused here, where it was typed.
+    let mut buttons: Vec<&str> = vars
+        .keys()
+        .map(String::as_str)
+        .filter(|key| key.starts_with(crate::host_notify::BUTTON_URL_VAR_PREFIX))
+        .collect();
+    buttons.sort_unstable();
+    if let Some(first) = buttons.first() {
+        let problem = if let Some(bad) = buttons
+            .iter()
+            .find(|key| crate::host_notify::button_url_index(key).is_none())
+        {
+            Some(format!(
+                "`vars.{bad}` is not a link button: the key is `button_url_<n>`, with `<n>` the \
+                 button's position in the template (0-9)"
+            ))
+        } else if channel != Channel::Whatsapp {
+            Some(format!(
+                "`vars.{first}` is a whatsapp template's link button — an email has none"
+            ))
+        } else if template_name.is_empty() {
+            Some(format!(
+                "`vars.{first}` needs the `template` it belongs to: a free text has no buttons"
+            ))
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: {problem}"),
+            ));
+        }
+    }
+
     Ok(NotifyStep {
         interactive,
         channel,
@@ -3221,6 +3342,174 @@ mod tests {
                 format!("{err}").contains("to") || format!("{err}").contains("query"),
                 "{err}"
             );
+        }
+    }
+
+    /// **A template's media header** (hub#2101): the link rides in `vars.header_<kind>`, mapped
+    /// against the run like the rest of the copy, and parses without anybody writing Meta's
+    /// `components` block by hand.
+    #[test]
+    fn a_whatsapp_template_step_can_carry_its_header_media() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "promo", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "template": "autumn_promo",
+                "vars": { "header_image": "{{input.picture_url}}", "who": "{{input.name}}" }
+            }]
+        }))
+        .expect("a template with an image header is an ordinary whatsapp step");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.vars["header_image"], json!("{{input.picture_url}}"));
+    }
+
+    /// **A template's text header with a variable** (hub#2111): the value of «Your appointment on
+    /// {{1}}» rides in `vars.header_text`, mapped against the run like the rest of the copy.
+    #[test]
+    fn a_whatsapp_template_step_can_carry_its_header_text() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "remind", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "template": "appointment_reminder",
+                "vars": { "header_text": "{{input.day}}", "who": "{{input.name}}" }
+            }]
+        }))
+        .expect("a template with a text header is an ordinary whatsapp step");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.vars["header_text"], json!("{{input.day}}"));
+    }
+
+    /// The text header is refused where it could not be sent, like the media one: an email and a
+    /// free text have no header, and next to a media link it would be a second header.
+    #[test]
+    fn header_text_is_refused_where_it_could_not_be_sent() {
+        let cases = [
+            (
+                "email",
+                "promo",
+                json!({ "header_text": "Hi", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "",
+                json!({ "header_text": "Hi", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "promo",
+                json!({ "header_text": "Hi", "header_image": "https://a/x.jpg" }),
+            ),
+        ];
+        for (channel, template, vars) in cases {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": template, "vars": vars.clone()
+                }]
+            }))
+            .expect_err("a header only travels with one whatsapp template");
+            assert!(
+                format!("{err}").contains("header_text"),
+                "{err} for {channel} {vars}"
+            );
+        }
+    }
+
+    /// Where a header cannot travel it is refused at save time, not dropped at send time: an
+    /// email and a free WhatsApp text have no header, and a template has only one.
+    #[test]
+    fn header_media_is_refused_where_it_could_not_be_sent() {
+        let cases = [
+            (
+                "email",
+                "promo",
+                json!({ "header_image": "https://a/x.jpg", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "",
+                json!({ "header_video": "https://a/x.mp4", "text": "hola" }),
+            ),
+            (
+                "whatsapp",
+                "promo",
+                json!({ "header_image": "https://a/x.jpg", "header_document": "https://a/x.pdf" }),
+            ),
+        ];
+        for (channel, template, vars) in cases {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": template, "vars": vars.clone()
+                }]
+            }))
+            .expect_err("a header only travels with one whatsapp template");
+            assert!(
+                format!("{err}").contains("header_"),
+                "{err} for {channel} {vars}"
+            );
+        }
+    }
+
+    /// **A template's link button with a variable end** (hub#2110): `vars.button_url_<n>`, mapped
+    /// against the run like the rest of the copy, parses without anybody writing Meta's
+    /// `components` block by hand.
+    #[test]
+    fn a_whatsapp_template_step_can_carry_its_url_button_values() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "confirm", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "template": "appointment_confirmed",
+                "vars": {
+                    "button_url_0": "{{input.appointment_code}}",
+                    "button_url_1": "{{input.payment_code}}",
+                    "header_image": "{{input.picture_url}}"
+                }
+            }]
+        }))
+        .expect("a template with link buttons is an ordinary whatsapp step");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        assert_eq!(step.vars["button_url_0"], json!("{{input.appointment_code}}"));
+    }
+
+    /// Where a link button's end cannot travel it is refused at save time, not dropped (or turned
+    /// into a body variable Meta rejects) at send time: an email and a free WhatsApp text have no
+    /// buttons, and the position is one digit.
+    #[test]
+    fn url_button_values_are_refused_where_they_could_not_be_sent() {
+        let cases = [
+            ("email", "promo", json!({ "button_url_0": "A1", "text": "hola" }), "button_url_0"),
+            ("whatsapp", "", json!({ "button_url_0": "A1", "text": "hola" }), "button_url_0"),
+            ("whatsapp", "promo", json!({ "button_url_10": "A1" }), "button_url_10"),
+            ("whatsapp", "promo", json!({ "button_url_x": "A1" }), "button_url_x"),
+            ("whatsapp", "promo", json!({ "button_url_": "A1" }), "button_url_"),
+        ];
+        for (channel, template, vars, key) in cases {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": channel,
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": template, "vars": vars.clone()
+                }]
+            }))
+            .expect_err("a link button's end only travels with a whatsapp template");
+            assert!(format!("{err}").contains(key), "{err} for {channel} {vars}");
         }
     }
 

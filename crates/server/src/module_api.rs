@@ -399,7 +399,7 @@ pub(crate) async fn list_module_updates(
 
     let mut out = Vec::with_capacity(installed.len());
     for (module_id, version, pinned) in installed {
-        let target = install::resolve_target(
+        let (target, floor) = install::resolve_offer(
             &st.http,
             &st.config.cloud_base_url,
             &auth,
@@ -414,6 +414,9 @@ pub(crate) async fn list_module_updates(
             "latest": target.version(),
             "update_available": target.is_update(),
             "pinned": pinned,
+            // hub#2082: the ERPlora the offered version needs (`null` = none declared), so the
+            // Apps page says «needs ERPlora X» instead of an «Update» the runtime would refuse.
+            "latest_min_erplora_version": floor,
         }));
     }
     Json(json!({ "ok": true, "data": out })).into_response()
@@ -520,6 +523,9 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         // Actualizar algo que no está instalado: no hay recurso al que aplicar la operación.
         install::InstallError::NotInstalled(_) => StatusCode::NOT_FOUND,
         install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        // hub#1620: the hub refuses a module it cannot run whole. Same status as any other runtime
+        // refusal — what differs is the code and the two numbers in the body.
+        install::InstallError::CoreVersionTooOld { .. } => StatusCode::UNPROCESSABLE_ENTITY,
         // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
         // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
         install::InstallError::Source(source::SourceError::BadSignature(_)) => {
@@ -616,6 +622,17 @@ pub(crate) fn install_error_response(e: &install::InstallError) -> Response {
                 "purchase_url": p.purchase_url,
             }))
             .collect::<Vec<_>>());
+    }
+    // hub#1620: the translated sentence names both versions, so they travel as data.
+    if let install::InstallError::CoreVersionTooOld {
+        module,
+        required,
+        core,
+    } = e
+    {
+        body["module_id"] = json!(module);
+        body["required"] = json!(required);
+        body["core"] = json!(core);
     }
     (install_error_status(e), Json(body)).into_response()
 }
@@ -1041,6 +1058,7 @@ mod install_error_status_tests {
         MissingSha256,
         Blocked,
         Runtime,
+        CoreVersionTooOld,
         NotInstalled,
         CloudDenied,
         NotInCatalog,
@@ -1055,6 +1073,7 @@ mod install_error_status_tests {
             install::InstallError::MissingSha256 { .. } => Tag::MissingSha256,
             install::InstallError::Blocked { .. } => Tag::Blocked,
             install::InstallError::Runtime(_) => Tag::Runtime,
+            install::InstallError::CoreVersionTooOld { .. } => Tag::CoreVersionTooOld,
             install::InstallError::NotInstalled(_) => Tag::NotInstalled,
             install::InstallError::CloudDenied => Tag::CloudDenied,
             install::InstallError::NotInCatalog { .. } => Tag::NotInCatalog,
@@ -1079,6 +1098,11 @@ mod install_error_status_tests {
                 purchase: Vec::new(),
             },
             Tag::Runtime => install::InstallError::Runtime("migration failed".into()),
+            Tag::CoreVersionTooOld => install::InstallError::CoreVersionTooOld {
+                module: "whatsapp_inbox".into(),
+                required: "1.1.16".into(),
+                core: "1.1.15".into(),
+            },
             Tag::NotInstalled => install::InstallError::NotInstalled("sales".into()),
             Tag::CloudDenied => install::InstallError::CloudDenied,
             Tag::NotInCatalog => install::InstallError::NotInCatalog {
@@ -1244,5 +1268,37 @@ mod update_outcome_status_tests {
             sentence.contains("sales") && sentence.contains("rollback failed"),
             "{sentence}"
         );
+    }
+    /// hub#1620 — «this app needs a newer hub» reaches the shell with its OWN code and the two
+    /// numbers the translated sentence names, instead of `install_runtime_failed` + the engine's
+    /// English line. `from_runtime` is the one door every runtime refusal of the pipeline takes.
+    #[tokio::test]
+    async fn an_app_that_needs_a_newer_hub_answers_its_code_and_both_versions() {
+        let e = install::InstallError::from_runtime(
+            erplora_runtime::RuntimeError::CoreVersionTooOld {
+                module: "whatsapp_inbox".into(),
+                required: "1.1.16".into(),
+                core: "1.1.15".into(),
+            },
+        );
+        let response = install_error_response(&e);
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["ok"], false, "{body}");
+        assert_eq!(body["code"], "core_version_too_old", "{body}");
+        assert_eq!(body["required"], "1.1.16", "{body}");
+        assert_eq!(body["core"], "1.1.15", "{body}");
+        assert_eq!(body["module_id"], "whatsapp_inbox", "{body}");
+    }
+
+    /// Every OTHER runtime refusal keeps travelling as `install_runtime_failed`: `from_runtime`
+    /// lifts out the one fact the shell can act on, it does not reinvent the rest.
+    #[test]
+    fn other_runtime_refusals_stay_install_runtime_failed() {
+        let e = install::InstallError::from_runtime(erplora_runtime::RuntimeError::Wasm("boom".into()));
+        assert_eq!(e.code(), "install_runtime_failed");
     }
 }

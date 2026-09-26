@@ -33,9 +33,13 @@ DELETE  /api/devices/:device_id                        auth:admin
 PUT     /api/devices/:device_id                        auth:admin
 POST    /api/elevation/approve                         auth:any-credential
 GET     /api/entitlement                               auth:session
+POST    /api/entitlement/refresh                       auth:none
 POST    /api/error-report                              auth:none
 GET     /api/events                                    auth:api-key
 POST    /api/events/ticket                             auth:session
+DELETE  /api/fiscal/go-live                            auth:admin+capability
+GET     /api/fiscal/go-live                            auth:capability+session
+POST    /api/fiscal/go-live                            auth:admin+capability
 GET     /api/fiscal/representation-grant               auth:session
 POST    /api/fiscal/representation-grant               auth:admin
 POST    /api/fiscal/representation-grant/model         auth:admin
@@ -71,6 +75,7 @@ PUT     /api/hub/flows/secrets/:name                   auth:admin+capability
 GET     /api/hub/flows/templates                       auth:admin
 POST    /api/hub/flows/templates/:module/:family/activate auth:admin
 POST    /api/hub/flows/templates/:module/:family/deactivate auth:admin
+POST    /api/hub/flows/templates/:module/:family/restore auth:admin
 POST    /api/hub/import                                auth:admin+any-credential
 GET     /api/hub/import/batches                        auth:admin+any-credential
 POST    /api/hub/import/inspect                        auth:admin
@@ -96,6 +101,7 @@ PUT     /api/hub/users/:id                             auth:admin
 GET     /api/hub/whatsapp/config                       auth:admin
 POST    /api/hub/whatsapp/connect                      auth:admin
 POST    /api/hub/whatsapp/disconnect/:phone_number_id  auth:admin
+GET     /api/hub/whatsapp/media/:media_id              auth:capability+session
 GET     /api/hub/whatsapp/numbers                      auth:admin
 GET     /api/hub/whatsapp/templates                    auth:admin+capability
 POST    /api/hub/whatsapp/templates                    auth:admin+capability
@@ -164,6 +170,7 @@ POST    /csp-report/                                   auth:none
 GET     /healthz                                       auth:none
 GET     /modules/:id/*path                             auth:none
 GET     /modules/:id/v/:version/*path                  auth:none
+GET     /p/-/country-names.js                          auth:none
 GET     /p/:locator                                    auth:none
 POST    /p/:locator                                    auth:none
 GET     /readyz                                        auth:none

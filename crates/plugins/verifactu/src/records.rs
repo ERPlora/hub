@@ -435,6 +435,10 @@ pub(crate) async fn create_record(input: &Json, host: &dyn NativeHost) -> Result
             invoice_id: payload.get("invoice_id").cloned().unwrap_or(Json::Null),
             recipient_nif: str_field(&payload, "recipient_nif"),
             recipient_name: str_field(&payload, "recipient_name"),
+            // Optional in the public door's schema (hub#1975): empty, the prefix of
+            // `recipient_nif` decides, as since hub#1965.
+            recipient_country: str_field(&payload, "recipient_country"),
+            recipient_id_type: str_field(&payload, "recipient_id_type"),
             // Sustitución (F3): el caller manual puede pasarlos; normalmente vacíos.
             substitutes_number: str_field(&payload, "substitutes_number"),
             substitutes_date: str_field(&payload, "substitutes_date"),
@@ -528,6 +532,11 @@ pub(crate) struct RecordInput {
     /// para tiquets simplificados (F2). Se usa al construir el SOAP en la transmisión inline.
     pub(crate) recipient_nif: String,
     pub(crate) recipient_name: String,
+    /// The customer's country (ISO 3166 alpha-2) and the AEAT `IDType` of its document
+    /// (hub#1967): with them a foreign customer goes as `IDOtro` (see `aeat::recipient_identity`).
+    /// Empty when unknown — the tax id's prefix decides, as before.
+    pub(crate) recipient_country: String,
+    pub(crate) recipient_id_type: String,
     /// Factura SUSTITUIDA (F3 → F2, ADR-0140): nº+serie, fecha de expedición y NIF del emisor de la
     /// simplificada que esta factura completa sustituye. Alimentan el bloque XML `FacturasSustituidas`
     /// (XSD IDFacturaARType). Vacíos si el registro no es una sustitución (todo lo que no sea F3).
@@ -719,6 +728,13 @@ pub(crate) async fn build_record_output(
                 // anchor/sequence were read above; the SQL COALESCE fallback is only for older
                 // engines that omit the param.
                 "environment": environment,
+                // Destinatarios (hub#1975): who the customer is, persisted with the record. A
+                // deferred send rebuilds the XML from the row alone, and an F1 without its
+                // customer is refused before it leaves (AEAT 1189) with its chain number spent.
+                "recipient_nif": r.recipient_nif,
+                "recipient_name": r.recipient_name,
+                "recipient_country": r.recipient_country,
+                "recipient_id_type": r.recipient_id_type,
                 // F3 → FacturasSustituidas (ADR-0140): snapshot de la F2 sustituida para reconstruir
                 // el XML en contingencia/reintento sin releer la factura. Vacíos si no es sustitución.
                 "substitutes_number": r.substitutes_number,
@@ -817,6 +833,8 @@ pub(crate) async fn build_record_output(
         "environment": environment,
         "recipient_nif": r.recipient_nif,
         "recipient_name": r.recipient_name,
+        "recipient_country": r.recipient_country,
+        "recipient_id_type": r.recipient_id_type,
         "substitutes_number": r.substitutes_number,
         "substitutes_date": r.substitutes_date,
         "substitutes_nif": r.substitutes_nif,
@@ -1235,13 +1253,44 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
     /// receipt whose digest is recomputed over the bytes IT decoded — like the real one, so the
     /// canary of hub#1461 holds.
     pub(crate) async fn spawn_fake_cell() -> (String, Arc<Mutex<Vec<Json>>>) {
+        spawn_fake_cell_answering(
+            "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+             <EstadoRegistro>Correcto</EstadoRegistro>\
+             <CSV>A-HUB1934TEST</CSV></soapenv:Envelope>",
+        )
+        .await
+    }
+
+    /// The same cell, relaying `aeat_response` as the AEAT's answer to every envelope — a SOAP
+    /// Fault as much as a verdict (hub#2124).
+    pub(crate) async fn spawn_fake_cell_answering(
+        aeat_response: &'static str,
+    ) -> (String, Arc<Mutex<Vec<Json>>>) {
+        spawn_fake_cell_answering_in_sequence(&[aeat_response]).await
+    }
+
+    /// An answer the cell never gives: it takes the envelope and hangs up without a word — the
+    /// cut of the wire in the middle of a chain recovery (hub#2134).
+    pub(crate) const CELL_HANGS_UP: &str = "\u{0}the cell hangs up";
+
+    /// The same cell, relaying `answers[n]` to the n-th envelope and the last one to every
+    /// envelope after it — so a chain recovery (refusal → consult → resend) can be played through
+    /// the one door both legs take (hub#2127). [`CELL_HANGS_UP`] as an answer cuts the wire.
+    pub(crate) async fn spawn_fake_cell_answering_in_sequence(
+        answers: &[&'static str],
+    ) -> (String, Arc<Mutex<Vec<Json>>>) {
         use base64::Engine as _;
+        assert!(!answers.is_empty(), "the cell needs something to answer");
+        let answers = answers.to_vec();
         let seen: Arc<Mutex<Vec<Json>>> = Arc::new(Mutex::new(Vec::new()));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let recorder = Arc::clone(&seen);
         tokio::spawn(async move {
+            let mut served = 0usize;
             while let Ok((mut socket, _)) = listener.accept().await {
+                let aeat_response = answers[served.min(answers.len() - 1)];
+                served += 1;
                 let mut buffer = Vec::new();
                 let mut chunk = [0u8; 8192];
                 while let Ok(n) = socket.read(&mut chunk).await {
@@ -1271,16 +1320,16 @@ pub(crate) mod testing_always_reaches_the_aeat_hub1934 {
                     })
                     .unwrap_or_default();
                 recorder.lock().unwrap().push(envelope.clone());
+                if aeat_response == CELL_HANGS_UP {
+                    let _ = socket.shutdown().await;
+                    continue;
+                }
                 let receipt = json!({
                     "schema_version": 1,
                     "transmission_id": envelope["transmission_id"],
                     "request_sha256": request_sha256,
                     "aeat_http_status": 200,
-                    "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(
-                        "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
-                         <EstadoRegistro>Correcto</EstadoRegistro>\
-                         <CSV>A-HUB1934TEST</CSV></soapenv:Envelope>",
-                    ),
+                    "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(aeat_response),
                     "aeat_response_sha256": "00".repeat(32),
                     "received_at": "2026-09-19T10:00:00Z",
                 })

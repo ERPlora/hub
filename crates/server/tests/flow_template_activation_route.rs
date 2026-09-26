@@ -52,8 +52,10 @@ const CANCEL: &str = "appointments.appointments.cancel";
 
 struct Fixture {
     router: axum::Router,
+    state: AppState,
     admin: String,
     employee: String,
+    modules: PathBuf,
 }
 
 async fn body_json(response: axum::response::Response) -> Value {
@@ -121,20 +123,38 @@ fn whatsapp_dir(root: &Path, floor: &str) -> PathBuf {
 /// El mismo módulo con el sidecar de permisos que se le pase, que es lo que permite construir el
 /// caso en el que `grants::replace` FALLA a mitad de la activación.
 fn whatsapp_dir_with_grants(root: &Path, floor: &str, grants: Value) -> PathBuf {
-    let dir = root.join(WHATSAPP);
+    whatsapp_release(
+        &root.join(WHATSAPP),
+        "2.1.50",
+        floor,
+        grants,
+        [
+            ("en", "Book from WhatsApp"),
+            ("es", "Reservar por WhatsApp"),
+        ],
+    )
+}
+
+/// One release of the module that publishes the recipe: its version, and the words its recipe
+/// ships with. Two releases whose `names` differ are «the module improved its recipe» (hub#2059).
+fn whatsapp_release(
+    dir: &Path,
+    version: &str,
+    floor: &str,
+    grants: Value,
+    names: [(&str, &str); 2],
+) -> PathBuf {
+    let dir = dir.to_path_buf();
     std::fs::create_dir_all(dir.join("flows")).unwrap();
     std::fs::write(
         dir.join("module.json"),
         serde_json::to_string_pretty(&json!({
-            "id": WHATSAPP, "name": "WhatsApp Inbox", "version": "2.1.50"
+            "id": WHATSAPP, "name": "WhatsApp Inbox", "version": version
         }))
         .unwrap(),
     )
     .unwrap();
-    for (lang, name) in [
-        ("en", "Book from WhatsApp"),
-        ("es", "Reservar por WhatsApp"),
-    ] {
+    for (lang, name) in names {
         let doc = json!({
             "schema_version": 1,
             "name": name,
@@ -281,10 +301,13 @@ async fn fixture_with_grants(floor: &str, grants: Option<Value>) -> Fixture {
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
+    let state = AppState::with_config(rt, cfg);
     Fixture {
-        router: app(AppState::with_config(rt, cfg)),
+        router: app(state.clone()),
+        state,
         admin,
         employee,
+        modules,
     }
 }
 
@@ -350,7 +373,11 @@ async fn activating_a_factory_template_leaves_it_running() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -382,7 +409,11 @@ async fn a_module_cannot_activate_a_template_that_is_not_its_own() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(INTRUDER)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(INTRUDER),
+        ),
     )
     .await;
 
@@ -423,7 +454,11 @@ async fn the_limit_the_module_put_on_a_permission_survives_the_activation() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(response.status(), StatusCode::CREATED);
@@ -433,7 +468,11 @@ async fn the_limit_the_module_put_on_a_permission_survives_the_activation() {
         .to_string();
 
     let grants = grants_of(&fx, &flow_id).await;
-    assert_eq!(grants.len(), 2, "exactamente los dos del sidecar, ni uno más");
+    assert_eq!(
+        grants.len(),
+        2,
+        "exactamente los dos del sidecar, ni uno más"
+    );
     let cancel = grants
         .iter()
         .find(|g| g["value"] == CANCEL)
@@ -450,15 +489,26 @@ async fn activating_twice_neither_duplicates_the_flow_nor_its_permissions() {
 
     let first = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(first.status(), StatusCode::CREATED);
-    let first_id = body_json(first).await["data"]["id"].as_str().unwrap().to_string();
+    let first_id = body_json(first).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let second = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(
@@ -466,7 +516,10 @@ async fn activating_twice_neither_duplicates_the_flow_nor_its_permissions() {
         StatusCode::OK,
         "la segunda vez REUTILIZA: `200`, no `201`"
     );
-    let second_id = body_json(second).await["data"]["id"].as_str().unwrap().to_string();
+    let second_id = body_json(second).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     assert_eq!(first_id, second_id, "el mismo flujo, no uno nuevo");
     assert_eq!(flows(&fx).await.len(), 1, "y sigue habiendo UNO en el hub");
@@ -482,14 +535,25 @@ async fn deactivating_pauses_it_and_keeps_the_permissions() {
     let fx = fixture().await;
     let activated = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
-    let flow_id = body_json(activated).await["data"]["id"].as_str().unwrap().to_string();
+    let flow_id = body_json(activated).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let response = send(
         &fx.router,
-        post(&deactivate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -503,12 +567,19 @@ async fn deactivating_pauses_it_and_keeps_the_permissions() {
 
     let again = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert_eq!(again.status(), StatusCode::OK);
     let body = body_json(again).await;
-    assert_eq!(body["data"]["id"], flow_id, "vuelve a encender el MISMO flujo");
+    assert_eq!(
+        body["data"]["id"], flow_id,
+        "vuelve a encender el MISMO flujo"
+    );
     assert_eq!(body["data"]["enabled"], true);
 }
 
@@ -518,7 +589,11 @@ async fn deactivating_a_family_that_was_never_activated_is_a_not_found() {
 
     let response = send(
         &fx.router,
-        post(&deactivate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -535,7 +610,11 @@ async fn a_template_this_hub_discarded_refuses_with_the_reason_it_discarded_it()
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -545,10 +624,7 @@ async fn a_template_this_hub_discarded_refuses_with_the_reason_it_discarded_it()
         "template_floor_module_too_old",
         "el código del descarte, el mismo que ya sirve el listado"
     );
-    assert!(
-        flows(&fx).await.is_empty(),
-        "y no se montó nada a medias"
-    );
+    assert!(flows(&fx).await.is_empty(), "y no se montó nada a medias");
 }
 
 #[tokio::test]
@@ -557,7 +633,11 @@ async fn a_family_no_module_ships_is_a_not_found() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, "there-is-no-such-family"), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, "there-is-no-such-family"),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
 
@@ -576,7 +656,10 @@ async fn without_a_human_admin_session_the_door_is_shut() {
         (None, StatusCode::UNAUTHORIZED),
         (Some(fx.employee.clone()), StatusCode::FORBIDDEN),
     ] {
-        for uri in [activate_uri(WHATSAPP, FAMILY), deactivate_uri(WHATSAPP, FAMILY)] {
+        for uri in [
+            activate_uri(WHATSAPP, FAMILY),
+            deactivate_uri(WHATSAPP, FAMILY),
+        ] {
             let response = send(&fx.router, post(&uri, session.as_deref(), Some(WHATSAPP))).await;
             assert_eq!(
                 response.status(),
@@ -608,10 +691,17 @@ async fn the_listing_says_which_templates_are_already_running() {
 
     let activated = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
-    let flow_id = body_json(activated).await["data"]["id"].as_str().unwrap().to_string();
+    let flow_id = body_json(activated).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let after = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
     let body = body_json(after).await;
@@ -620,7 +710,11 @@ async fn the_listing_says_which_templates_are_already_running() {
 
     send(
         &fx.router,
-        post(&deactivate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     let paused = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
@@ -670,7 +764,11 @@ async fn a_recipe_whose_permissions_are_refused_is_never_left_running() {
 
     let response = send(
         &fx.router,
-        post(&activate_uri(WHATSAPP, FAMILY), Some(&fx.admin), Some(WHATSAPP)),
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
     )
     .await;
     assert!(
@@ -708,7 +806,10 @@ async fn a_recipe_whose_permissions_are_refused_is_never_left_running() {
         ),
     )
     .await;
-    assert!(ok.status().is_success(), "control: una receta sana sí se enciende");
+    assert!(
+        ok.status().is_success(),
+        "control: una receta sana sí se enciende"
+    );
     assert_eq!(body_json(ok).await["data"]["enabled"], json!(true));
 }
 
@@ -794,4 +895,627 @@ async fn a_module_is_told_about_its_own_discards_and_nobody_elses() {
             .is_empty(),
         "y no se entera del descarte ajeno"
     );
+}
+
+fn put(uri: &str, session: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("PUT")
+        .uri(uri)
+        .header("x-hub-session", session)
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// Enciende la receta de WhatsApp por la puerta de un toque y devuelve el id del flujo.
+async fn activated(fx: &Fixture) -> String {
+    let response = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert!(response.status().is_success(), "{}", response.status());
+    body_json(response).await["data"]["id"]
+        .as_str()
+        .expect("el flujo montado")
+        .to_string()
+}
+
+/// El interruptor de la pantalla del módulo: apagar y volver a encender.
+async fn toggle(fx: &Fixture) -> Value {
+    let off = send(
+        &fx.router,
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(off.status(), StatusCode::OK);
+    let on = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(on.status(), StatusCode::OK, "reutiliza: `200`");
+    body_json(on).await["data"].clone()
+}
+
+/// Una receta que el dueño reescribió en el editor: otro nombre y dos pasos.
+fn owner_recipe() -> Value {
+    json!({
+        "schema_version": 1,
+        "name": "Citas de la tarde",
+        "triggers": [{ "kind": "manual" }],
+        "steps": [
+            { "id": "s1", "kind": "command", "command": CREATE },
+            { "id": "s2", "kind": "command", "command": CREATE }
+        ]
+    })
+}
+
+fn grant_values(grants: &[Value]) -> Vec<String> {
+    let mut values: Vec<String> = grants
+        .iter()
+        .map(|g| g["value"].as_str().unwrap_or_default().to_string())
+        .collect();
+    values.sort();
+    values
+}
+
+#[tokio::test]
+async fn turning_it_back_on_keeps_the_permissions_the_owner_retired() {
+    // hub#1684: en Automatizaciones el dueño RETIRA un permiso (ADR-0470 §4, «cada grant con
+    // Límites y Retirar»). Volver a encender desde la pantalla del módulo tiene que ENCENDER, no
+    // devolverle en silencio lo que él quitó — igual que apagar respeta lo suyo.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+
+    let narrowed = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}/grants"),
+            &fx.admin,
+            json!({ "grants": [
+                { "kind": "command", "value": CANCEL, "payload": { "channel": "customer" } },
+            ]}),
+        ),
+    )
+    .await;
+    assert_eq!(narrowed.status(), StatusCode::OK);
+
+    // Un segundo «Activar» a secas…
+    let again = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(again.status(), StatusCode::OK);
+    assert_eq!(
+        grant_values(&grants_of(&fx, &flow_id).await),
+        vec![CANCEL.to_string()],
+        "un segundo «Activar» no devuelve el permiso que el dueño retiró"
+    );
+
+    // …y «Desactivar» + «Activar».
+    let body = toggle(&fx).await;
+    assert_eq!(body["enabled"], true, "y sí queda encendida");
+    let grants = grants_of(&fx, &flow_id).await;
+    assert_eq!(
+        grant_values(&grants),
+        vec![CANCEL.to_string()],
+        "apagar y encender no devuelve el permiso que el dueño retiró"
+    );
+    assert_eq!(
+        grants[0]["payload"]["channel"], "customer",
+        "y el que dejó conserva su límite"
+    );
+}
+
+#[tokio::test]
+async fn turning_it_back_on_keeps_what_the_owner_wrote_in_the_editor() {
+    // hub#1684: el dueño cambia la receta en el editor (nombre, texto, pasos). Encenderla otra vez
+    // desde el módulo no es «restaurar la de fábrica»: eso es borrarla y volver a activarla.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+
+    let edited = owner_recipe();
+    let response = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": edited }),
+        ),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = toggle(&fx).await;
+    assert_eq!(body["id"], flow_id.as_str());
+    assert_eq!(body["enabled"], true);
+    assert_eq!(
+        body["name"], "Citas de la tarde",
+        "el nombre que puso el dueño"
+    );
+    assert_eq!(
+        body["definition"]["steps"].as_array().map(Vec::len),
+        Some(2),
+        "los pasos que escribió el dueño, no los de fábrica"
+    );
+    assert_eq!(grants_of(&fx, &flow_id).await.len(), 2, "y sus permisos");
+}
+
+#[tokio::test]
+async fn a_recipe_left_without_any_permission_gets_the_modules_back_when_turned_on() {
+    // La otra mitad de la regla, y la que sostiene la recuperación del orden validar → crear en
+    // pausa → grants → encender: una receta que se quedó SIN NINGÚN permiso (una activación que
+    // cayó a mitad, o el dueño que los retiró todos) no puede hacer nada. «Activar» ahí significa
+    // «déjala funcionando», así que recibe los del módulo — si no, el toque encendería una
+    // automatización que falla en cada paso con `flow.grant_denied`.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let renamed = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(renamed.status(), StatusCode::OK);
+
+    let emptied = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}/grants"),
+            &fx.admin,
+            json!({ "grants": [] }),
+        ),
+    )
+    .await;
+    assert_eq!(emptied.status(), StatusCode::OK);
+
+    let body = toggle(&fx).await;
+    assert_eq!(body["enabled"], true);
+    assert_eq!(
+        body["name"], "Citas de la tarde",
+        "recibe los permisos del módulo, no su receta: lo que escribió el dueño se queda"
+    );
+    assert_eq!(
+        grant_values(&grants_of(&fx, &flow_id).await),
+        {
+            let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
+            v.sort();
+            v
+        },
+        "sin ningún permiso, recibe exactamente los del módulo"
+    );
+}
+
+#[tokio::test]
+async fn deleting_it_and_activating_again_brings_back_the_factory_recipe() {
+    // hub#1684: como «Activar» ya no restaura, el camino explícito para volver a la de fábrica es
+    // borrarla en Automatizaciones y activarla otra vez. Si ese camino no existiera, el dueño
+    // que se equivocó editando no tendría forma de recuperar la receta del módulo.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let edited = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(edited.status(), StatusCode::OK);
+
+    let deleted = send(
+        &fx.router,
+        Request::builder()
+            .method("DELETE")
+            .uri(format!("/api/hub/flows/{flow_id}"))
+            .header("x-hub-session", fx.admin.as_str())
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(deleted.status().is_success(), "{}", deleted.status());
+
+    let again = send(
+        &fx.router,
+        post(
+            &activate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(again.status(), StatusCode::CREATED, "monta una nueva");
+    let body = body_json(again).await["data"].clone();
+    assert_ne!(body["id"], flow_id.as_str());
+    assert_ne!(
+        body["name"], "Citas de la tarde",
+        "con el nombre de fábrica"
+    );
+    assert_ne!(
+        body["definition"]["steps"].as_array().map(Vec::len),
+        Some(2),
+        "y los pasos de fábrica"
+    );
+    let id = body["id"].as_str().expect("el flujo nuevo").to_string();
+    assert_eq!(
+        grant_values(&grants_of(&fx, &id).await),
+        {
+            let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
+            v.sort();
+            v
+        },
+        "y exactamente los permisos del módulo"
+    );
+}
+
+// ── hub#2059: the module improved its recipe — say so, and restore it only when asked ────────
+
+fn restore_uri(module: &str, family: &str) -> String {
+    format!("{TEMPLATES}/{module}/{family}/restore")
+}
+
+/// The sidecar every release in this file ships: one wide permission and one PINNED one.
+fn factory_grants() -> Value {
+    json!({ "grants": [
+        { "kind": "command", "value": CREATE },
+        { "kind": "command", "value": CANCEL, "payload": { "channel": "customer" } },
+    ]})
+}
+
+const IMPROVED: &str = "Book from WhatsApp, with a reminder";
+
+/// The module publishes a new release through the update door (hub#516). `names` are the words its
+/// recipe ships with: the same ones as today is «a release that did not touch the recipe».
+async fn publish_release(fx: &Fixture, version: &str, names: [(&str, &str); 2]) {
+    let dir = whatsapp_release(
+        &fx.modules.join(format!("{WHATSAPP}-{version}")),
+        version,
+        "1.1.69",
+        factory_grants(),
+        names,
+    );
+    fx.state
+        .runtime
+        .write()
+        .await
+        .update_from_dir(&dir)
+        .await
+        .expect("the module updates");
+}
+
+async fn publish_improved_recipe(fx: &Fixture) {
+    publish_release(
+        fx,
+        "2.1.51",
+        // The same words in both languages on purpose: which one a hub serves is `hub_language`'s
+        // business, and these tests are about the version of the recipe, not its language.
+        [("en", IMPROVED), ("es", IMPROVED)],
+    )
+    .await;
+}
+
+/// `installed` of the WhatsApp recipe, as the module's own screen reads it.
+async fn installed_of(fx: &Fixture) -> Value {
+    let response = send(&fx.router, get(TEMPLATES, &fx.admin, Some(WHATSAPP))).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    body_json(response).await["data"][0]["installed"].clone()
+}
+
+fn both_factory_grants() -> Vec<String> {
+    let mut v = vec![CREATE.to_string(), CANCEL.to_string()];
+    v.sort();
+    v
+}
+
+#[tokio::test]
+async fn a_recipe_the_module_improved_is_flagged_and_nothing_is_overwritten() {
+    // The symptom of hub#2059: the module ships a better recipe and the business that already had
+    // it on keeps the old one with nobody telling it. Since hub#1684 «Activate» no longer replaces
+    // it — so the listing is the only place that can say «there is a newer one».
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(false),
+        "just built from the recipe the module ships: not outdated"
+    );
+
+    publish_improved_recipe(&fx).await;
+
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(true),
+        "the module now ships a different recipe than the one this hub built"
+    );
+    let flow = flows(&fx)
+        .await
+        .into_iter()
+        .find(|f| f["id"] == flow_id.as_str())
+        .expect("the flow is still there");
+    assert_ne!(
+        flow["name"], IMPROVED,
+        "and nothing was overwritten on its own: the owner decides"
+    );
+}
+
+#[tokio::test]
+async fn a_release_that_leaves_the_recipe_as_it_was_does_not_flag_it() {
+    // The other half, and what stops «flag it on every update»: a new version of the module that
+    // did not touch this recipe must not invite the owner to throw away their changes for nothing.
+    let fx = fixture().await;
+    activated(&fx).await;
+
+    publish_release(
+        &fx,
+        "2.1.51",
+        [
+            ("en", "Book from WhatsApp"),
+            ("es", "Reservar por WhatsApp"),
+        ],
+    )
+    .await;
+
+    assert_eq!(installed_of(&fx).await["outdated"], json!(false));
+}
+
+#[tokio::test]
+async fn the_owners_own_edits_do_not_make_it_outdated() {
+    // «Outdated» compares what the MODULE ships with what the hub built from, never with what the
+    // owner wrote on top: editing the recipe in Automations is not «the module has a new one».
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let edited = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(edited.status(), StatusCode::OK);
+
+    assert_eq!(installed_of(&fx).await["outdated"], json!(false));
+}
+
+#[tokio::test]
+async fn restoring_brings_the_improved_recipe_and_exactly_the_modules_permissions() {
+    // The explicit gesture the issue asks for: «Restore the factory one», knowing the owner's own
+    // changes are lost. Same automation (same id, its history keeps an owner), the module's CURRENT
+    // document and exactly its permissions — pins included.
+    let fx = fixture().await;
+    let flow_id = activated(&fx).await;
+    let edited = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}"),
+            &fx.admin,
+            json!({ "name": "Citas de la tarde", "enabled": true, "definition": owner_recipe() }),
+        ),
+    )
+    .await;
+    assert_eq!(edited.status(), StatusCode::OK);
+    let narrowed = send(
+        &fx.router,
+        put(
+            &format!("/api/hub/flows/{flow_id}/grants"),
+            &fx.admin,
+            json!({ "grants": [{ "kind": "command", "value": CREATE }] }),
+        ),
+    )
+    .await;
+    assert_eq!(narrowed.status(), StatusCode::OK);
+    publish_improved_recipe(&fx).await;
+
+    let restored = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.admin), None),
+    )
+    .await;
+
+    assert_eq!(restored.status(), StatusCode::OK);
+    let body = body_json(restored).await["data"].clone();
+    assert_eq!(
+        body["id"],
+        flow_id.as_str(),
+        "the same automation, not a new one"
+    );
+    assert_eq!(body["name"], IMPROVED, "with the module's improved recipe");
+    assert_eq!(
+        body["definition"]["name"], IMPROVED,
+        "the document is the new one, not only the name"
+    );
+    assert_eq!(
+        body["definition"]["steps"].as_array().map(Vec::len),
+        Some(1),
+        "and the owner's extra step is gone: that is what «restore» means"
+    );
+    assert_eq!(body["enabled"], true, "it was running, it keeps running");
+    let grants = grants_of(&fx, &flow_id).await;
+    assert_eq!(grant_values(&grants), both_factory_grants());
+    let pinned = grants
+        .iter()
+        .find(|g| g["value"] == CANCEL)
+        .expect("the pinned permission");
+    assert_eq!(pinned["payload"]["channel"], "customer", "with its pin");
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(false),
+        "and the card stops announcing a newer version"
+    );
+}
+
+#[tokio::test]
+async fn restoring_a_paused_recipe_leaves_it_paused() {
+    // Restoring replaces WHAT it does, not WHETHER it runs: the owner paused it, and a button that
+    // says «restore the factory one» must not switch on an automation that writes to customers.
+    let fx = fixture().await;
+    activated(&fx).await;
+    let off = send(
+        &fx.router,
+        post(
+            &deactivate_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(off.status(), StatusCode::OK);
+    publish_improved_recipe(&fx).await;
+
+    let restored = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.admin), None),
+    )
+    .await;
+
+    assert_eq!(restored.status(), StatusCode::OK);
+    let body = body_json(restored).await["data"].clone();
+    assert_eq!(body["enabled"], false);
+    assert_eq!(body["name"], IMPROVED);
+}
+
+#[tokio::test]
+async fn restoring_a_recipe_that_was_never_activated_is_a_not_found() {
+    // Nothing to restore: turning it on is `activate`'s job, and a restore that built it would be
+    // a second door that switches automations on.
+    let fx = fixture().await;
+
+    let response = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.admin), None),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(body_json(response).await["error"]["code"], "flow.not_found");
+    assert!(flows(&fx).await.is_empty(), "and nothing was built");
+}
+
+#[tokio::test]
+async fn the_gallery_may_restore_any_recipe_and_a_stranger_may_not() {
+    // Automations (the module holding `manage_flows`) is where the owner sees «there is a newer
+    // version», and it already edits any flow and its permissions — restoring is not more power.
+    // A module without it may only point at its OWN recipes, like activate (ADR-0470 §1).
+    let fx = fixture().await;
+    activated(&fx).await;
+    publish_improved_recipe(&fx).await;
+
+    let stranger = send(
+        &fx.router,
+        post(
+            &restore_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(INTRUDER),
+        ),
+    )
+    .await;
+    assert_eq!(stranger.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(stranger).await["error"]["code"],
+        "flow.template_not_yours"
+    );
+    assert_eq!(
+        installed_of(&fx).await["outdated"],
+        json!(true),
+        "and the refusal wrote nothing"
+    );
+
+    let own = send(
+        &fx.router,
+        post(
+            &restore_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(WHATSAPP),
+        ),
+    )
+    .await;
+    assert_eq!(own.status(), StatusCode::OK, "its own module may");
+
+    publish_release(
+        &fx,
+        "2.1.52",
+        [
+            ("en", "Book from WhatsApp 3"),
+            ("es", "Book from WhatsApp 3"),
+        ],
+    )
+    .await;
+    let gallery = send(
+        &fx.router,
+        post(
+            &restore_uri(WHATSAPP, FAMILY),
+            Some(&fx.admin),
+            Some(EDITOR),
+        ),
+    )
+    .await;
+    assert_eq!(gallery.status(), StatusCode::OK, "and so may Automations");
+    assert_eq!(
+        body_json(gallery).await["data"]["name"],
+        "Book from WhatsApp 3"
+    );
+}
+
+#[tokio::test]
+async fn restoring_needs_a_human_admin_session() {
+    let fx = fixture().await;
+    activated(&fx).await;
+
+    let anonymous = send(&fx.router, post(&restore_uri(WHATSAPP, FAMILY), None, None)).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    let cashier = send(
+        &fx.router,
+        post(&restore_uri(WHATSAPP, FAMILY), Some(&fx.employee), None),
+    )
+    .await;
+    assert_eq!(cashier.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn a_recipe_built_before_the_hub_remembered_its_version_is_unknown_not_up_to_date() {
+    // Every recipe activated before hub#2059 has no record of which version it was built from.
+    // Answering `false` there would tell exactly the businesses this issue is about «you are up to
+    // date»; answering `true` would push them to throw away their edits for nothing. `null` =
+    // «this hub cannot tell», and the screen still offers the explicit restore.
+    let fx = fixture().await;
+    activated(&fx).await;
+    {
+        let rt = fx.state.runtime.read().await;
+        let mut p = erplora_db::Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        rt.db()
+            .execute(
+                "UPDATE _flow SET template_digest = NULL WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("forget the version, as a recipe built before hub#2059");
+    }
+
+    let installed = installed_of(&fx).await;
+    assert!(installed["flow_id"].is_string(), "it is still installed");
+    assert_eq!(installed["outdated"], Value::Null);
 }

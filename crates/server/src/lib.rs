@@ -69,13 +69,14 @@ pub mod inbound_poll;
 pub mod ingest;
 pub mod install;
 pub mod install_guard;
-pub mod logging;
 /// Shared `tracing` capture for the tests of this crate (hub#1796). Test-only: it never ships.
 #[cfg(test)]
 mod log_capture;
+pub mod logging;
 pub mod login_throttle;
 pub mod media;
 pub mod members;
+pub mod module_reconcile;
 pub mod module_storage;
 pub mod notify_transport;
 pub mod openapi;
@@ -104,6 +105,7 @@ pub mod version;
 pub mod whatsapp_connect;
 pub mod whatsapp_quota;
 pub mod whatsapp_templates;
+pub mod whatsapp_media;
 
 pub use state::{
     AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, SignatureMode, WsEvent,

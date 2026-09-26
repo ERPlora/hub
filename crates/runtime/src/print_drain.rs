@@ -496,11 +496,12 @@ mod tests {
             .expect("the registered host is handed the ticket");
         assert_eq!(job.job_id, "j1");
         // The structured document travels to the host — plus the language the queue stamps on
-        // every job (hub#1159), which is what the device picks its labels in.
+        // every job (hub#1159), which is what the device picks its labels in, and the scale of the
+        // hub's currency (hub#2129), which is how many decimals it prints amounts with.
         assert_eq!(
             job.document,
-            serde_json::json!({ "receipt_id": "j1", "locale": "es" }),
-            "the structured document travels to the host, stamped with the hub's language"
+            serde_json::json!({ "receipt_id": "j1", "locale": "es", "decimals": 2 }),
+            "the structured document travels to the host, stamped with the hub's language and currency scale"
         );
 
         assert!(confirm(&db, "h1", "till-1", "j1").await.unwrap());

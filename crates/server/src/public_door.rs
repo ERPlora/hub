@@ -28,6 +28,13 @@
 //! by a hydration failure — the trap that already cost `<noscript>` once. Inline `<style>` **is**
 //! allowed by the same policy, so the page can still look like something.
 //!
+//! One exception, and it is optional (sales#335): the module that mints a claim may offer the
+//! answers a field accepts (`field_choices`, rendered as `<select>`s). When one of them is a list
+//! of ISO region codes — which codes is the module's knowledge, never the core's (hub#1407) — the
+//! page loads ONE same-origin file ([`NAMES_SCRIPT_PATH`]) that names them with the browser's
+//! `Intl.DisplayNames`. Nothing inline, no handler attributes, and the form submits the same
+//! without it (the codes are the labels then).
+//!
 //! Spanish and English both, chosen from the hub's own `language` setting and overridable with
 //! `?lang=`: the page is read by the merchant's CUSTOMER, who never logged in anywhere and whose
 //! browser is the only hint we have.
@@ -66,8 +73,37 @@ pub struct MintRequest {
     pub sealed_payload: Value,
     #[serde(default)]
     pub public_fields: Vec<String>,
+    /// sales#335 — the answers the minter offers for some of `public_fields` (see
+    /// [`NewClaim::field_choices`]). A separate key on purpose: a hub that predates it ignores it
+    /// and still mints, so the ticket never loses its QR over a newer module.
+    #[serde(default)]
+    pub public_field_choices: Value,
     #[serde(default)]
     pub expires_at: Option<String>,
+}
+
+/// The most options one field may carry. A claim is a row per printed ticket; a country list is
+/// ~250, so this leaves room without letting a minter park anything in it.
+const MAX_CHOICE_OPTIONS: usize = 400;
+
+/// `public_field_choices`, kept to the fields the visitor may actually fill, or `None` when it is
+/// not an object of `{options: [...]}` within [`MAX_CHOICE_OPTIONS`].
+fn accepted_choices(raw: &Value, fields: &[String]) -> Option<Value> {
+    if raw.is_null() {
+        return Some(json!({}));
+    }
+    let map = raw.as_object()?;
+    let mut kept = serde_json::Map::new();
+    for (field, spec) in map {
+        let options = spec.get("options")?.as_array()?;
+        if options.len() > MAX_CHOICE_OPTIONS {
+            return None;
+        }
+        if fields.contains(field) {
+            kept.insert(field.clone(), spec.clone());
+        }
+    }
+    Some(Value::Object(kept))
 }
 
 /// `POST /api/hub/public-claims` — mint the locator for a ticket.
@@ -110,6 +146,14 @@ pub async fn mint_claim(
             "minting a claim hands out this command; you must be able to run it yourself",
         );
     }
+    let Some(field_choices) = accepted_choices(&req.public_field_choices, &req.public_fields)
+    else {
+        return refusal(
+            StatusCode::BAD_REQUEST,
+            "invalid_choices",
+            "public_field_choices must map fields to {options: [...]} of at most 400 options",
+        );
+    };
     let spec = NewClaim {
         kind: req.kind,
         subject_id: req.subject_id,
@@ -120,6 +164,7 @@ pub async fn mint_claim(
             req.sealed_payload
         },
         public_fields: req.public_fields,
+        field_choices,
         expires_at: req.expires_at,
         created_by: ctx.user_id.clone(),
     };
@@ -166,9 +211,15 @@ pub async fn show(
     }
     let now = public_claim::now();
     match public_claim::redeemable(rt.db(), &hub_id, &locator, &now).await {
-        Ok(Ok(_)) => {
+        Ok(Ok(claim)) => {
             st.login_throttle.record_success(&key);
-            page(StatusCode::OK, &lang, Body::Form, &locator)
+            let (fields, choices) = (claim.public_fields, claim.field_choices);
+            page(
+                StatusCode::OK,
+                &lang,
+                Body::Form { fields, choices },
+                &locator,
+            )
         }
         Ok(Err(ClaimRefusal::AlreadyRedeemed(_))) => {
             st.login_throttle.record_success(&key);
@@ -332,7 +383,17 @@ pub async fn redeem(
             page(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 &lang,
-                Body::Retry(detail),
+                Body::Retry {
+                    problem: detail,
+                    // hub#1989: what they typed comes back — only the fields they may fill.
+                    typed: form
+                        .fields
+                        .into_iter()
+                        .filter(|(key, _)| claim.public_fields.contains(key))
+                        .collect(),
+                    fields: claim.public_fields.clone(),
+                    choices: claim.field_choices.clone(),
+                },
                 &locator,
             )
         }
@@ -445,12 +506,18 @@ fn refusal(status: StatusCode, code: &str, message: &str) -> Response {
 // ── the page itself ─────────────────────────────────────────────────────────────────────────
 
 enum Body {
-    /// Ask for the tax details.
-    Form,
+    /// Ask for the tax details — only the ones the claim lets the visitor fill.
+    Form { fields: Vec<String>, choices: Value },
     /// Already issued (now or before) — show the reference.
     Done { reference: String },
     /// The form again, with what went wrong on top.
-    Retry(String),
+    Retry {
+        problem: String,
+        /// What the visitor sent, already narrowed to the claim's `public_fields` (hub#1989).
+        typed: Typed,
+        fields: Vec<String>,
+        choices: Value,
+    },
     /// A dead end: unknown locator, expired, or a hub-side failure.
     Message(String),
 }
@@ -522,8 +589,15 @@ fn t(lang: &str, key: &str) -> &'static str {
 fn page(status: StatusCode, lang: &str, body: Body, locator: &str) -> Response {
     let title = esc(t(lang, "title"));
     let main = match &body {
-        Body::Form => form_html(lang, locator, None),
-        Body::Retry(problem) => form_html(lang, locator, Some(problem)),
+        Body::Form { fields, choices } => {
+            form_html(lang, locator, None, fields, choices, &Typed::new())
+        }
+        Body::Retry {
+            problem,
+            typed,
+            fields,
+            choices,
+        } => form_html(lang, locator, Some(problem), fields, choices, typed),
         Body::Done { reference } => {
             let ref_line = if reference.is_empty() {
                 String::new()
@@ -558,22 +632,38 @@ fn page(status: StatusCode, lang: &str, body: Body, locator: &str) -> Response {
         .into_response()
 }
 
-fn form_html(lang: &str, locator: &str, problem: Option<&str>) -> String {
+fn form_html(
+    lang: &str,
+    locator: &str,
+    problem: Option<&str>,
+    fields: &[String],
+    choices: &Value,
+    typed: &Typed,
+) -> String {
     let warn = problem
         .map(|p| format!("<p class=\"warn\">{}</p>", esc(p)))
         .unwrap_or_default();
+    let (choice_selects, names_script) = choice_fields_html(lang, fields, choices, typed);
+    // hub#1989: a refused attempt comes back with what was typed, as an attribute value — escaped.
+    let value = |field: &str| {
+        typed
+            .get(field)
+            .map(|v| format!(" value=\"{}\"", esc(v)))
+            .unwrap_or_default()
+    };
     format!(
         "<h1>{title}</h1><p>{intro}</p>{warn}\
 <p class=\"loc\"><span>{loc_label}</span><code>{locator}</code></p>\
 <form method=\"post\" action=\"{prefix}/{locator}?lang={lang}\">\
 <label for=\"tax\">{tax}</label>\
-<input id=\"tax\" name=\"customer_tax_id\" required autocomplete=\"off\" autocapitalize=\"characters\" spellcheck=\"false\">\
+<input id=\"tax\" name=\"customer_tax_id\"{tax_value} required autocomplete=\"off\" autocapitalize=\"characters\" spellcheck=\"false\">\
 <label for=\"name\">{name}</label>\
-<input id=\"name\" name=\"customer_name\" required autocomplete=\"organization\">\
+<input id=\"name\" name=\"customer_name\"{name_value} required autocomplete=\"organization\">\
 <label for=\"addr\">{address}</label>\
-<input id=\"addr\" name=\"customer_address\" autocomplete=\"street-address\">\
+<input id=\"addr\" name=\"customer_address\"{address_value} autocomplete=\"street-address\">\
+{choice_selects}\
 <button type=\"submit\">{submit}</button>\
-</form>",
+</form>{names_script}",
         title = esc(t(lang, "title")),
         intro = esc(t(lang, "intro")),
         loc_label = esc(t(lang, "locator")),
@@ -583,7 +673,129 @@ fn form_html(lang: &str, locator: &str, problem: Option<&str>) -> String {
         name = esc(t(lang, "name")),
         address = esc(t(lang, "address")),
         submit = esc(t(lang, "submit")),
+        tax_value = value("customer_tax_id"),
+        name_value = value("customer_name"),
+        address_value = value("customer_address"),
     )
+}
+
+/// sales#335 — the fields a module offers answers for, as `<select>`s after the fixed inputs.
+///
+/// The core does not know what the answers mean: which countries a tax regime accepts, which
+/// document kinds it has — that is the module's knowledge (hub#1407), sent in the claim as
+/// `field_choices`. Only fields the claim lets the visitor fill are shown (an answer the door drops
+/// would be worse than no question). The first option is the default. `names: "region"` marks a
+/// select of ISO region codes the browser names ([`NAMES_SCRIPT`]); the second value says whether
+/// the page needs that script.
+fn choice_fields_html(
+    lang: &str,
+    fields: &[String],
+    choices: &Value,
+    typed: &Typed,
+) -> (String, String) {
+    let mut html = String::new();
+    let mut wants_names = false;
+    for field in fields {
+        let Some(spec) = choices.get(field).filter(|c| c.is_object()) else {
+            continue;
+        };
+        let Some(options) = spec.get("options").and_then(Value::as_array) else {
+            continue;
+        };
+        let names = spec.get("names").and_then(Value::as_str) == Some("region");
+        wants_names |= names;
+        let id = format!("f-{}", esc(field));
+        let value_of = |option: &Value| {
+            option
+                .as_str()
+                .or_else(|| option.get("value").and_then(Value::as_str))
+                .unwrap_or_default()
+                .to_string()
+        };
+        // The option the visitor chose stays chosen on a retry (hub#1989) — if it is one of the
+        // offered ones; otherwise the module's default (the first) is.
+        let chosen = typed
+            .get(field)
+            .filter(|v| options.iter().any(|o| value_of(o) == **v))
+            .cloned()
+            .unwrap_or_else(|| options.first().map(value_of).unwrap_or_default());
+        // One `selected` even if a module repeats a value.
+        let first_with = |v: &str| options.iter().position(|o| value_of(o) == v).unwrap_or(0);
+        let rendered: String = options
+            .iter()
+            .enumerate()
+            .map(|(i, option)| {
+                let value = option
+                    .as_str()
+                    .or_else(|| option.get("value").and_then(Value::as_str))
+                    .unwrap_or_default();
+                let label = option
+                    .get("label")
+                    .and_then(|l| localized(l, lang))
+                    .unwrap_or(value);
+                let selected = if value == chosen && i == first_with(value) {
+                    " selected"
+                } else {
+                    ""
+                };
+                format!(
+                    "<option value=\"{}\"{selected}>{}</option>",
+                    esc(value),
+                    esc(label)
+                )
+            })
+            .collect();
+        let label = spec
+            .get("label")
+            .and_then(|l| localized(l, lang))
+            .unwrap_or(field);
+        let data_names = if names { " data-names=\"region\"" } else { "" };
+        html.push_str(&format!(
+            "<label for=\"{id}\">{}</label>\
+<select id=\"{id}\" name=\"{}\"{data_names}>{rendered}</select>",
+            esc(label),
+            esc(field),
+        ));
+    }
+    let script = if wants_names {
+        format!("<script src=\"{NAMES_SCRIPT_PATH}\" defer></script>")
+    } else {
+        String::new()
+    };
+    (html, script)
+}
+
+/// A module-sent `{en, es}` label in the page's language, English when that one is missing.
+fn localized<'a>(label: &'a Value, lang: &str) -> Option<&'a str> {
+    label
+        .get(lang)
+        .and_then(Value::as_str)
+        .or_else(|| label.get("en").and_then(Value::as_str))
+        .filter(|s| !s.is_empty())
+}
+
+/// What the visitor typed, by field name (hub#1989).
+type Typed = std::collections::BTreeMap<String, String>;
+
+/// The one script the page may load, same-origin because `script-src 'self'` drops anything
+/// inline. It only puts names on the country codes; the form works without it.
+pub const NAMES_SCRIPT_PATH: &str = "/p/-/country-names.js";
+const NAMES_SCRIPT: &str = include_str!("../assets/public-claim-names.js");
+
+/// `GET /p/-/country-names.js` — public like the page that loads it.
+pub async fn names_script() -> Response {
+    (
+        StatusCode::OK,
+        [
+            (
+                axum::http::header::CONTENT_TYPE,
+                "text/javascript; charset=utf-8",
+            ),
+            (axum::http::header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        NAMES_SCRIPT,
+    )
+        .into_response()
 }
 
 const STYLE: &str = "\
@@ -598,11 +810,11 @@ p{margin:0 0 1rem}\
 .warn{padding:.75rem 1rem;background:#fff4e5;border:1px solid #f0c48a;border-radius:.5rem}\
 form{display:flex;flex-direction:column;gap:.35rem;margin-top:1.5rem}\
 label{font-weight:600;font-size:.9rem;margin-top:.75rem}\
-input{padding:.7rem .8rem;font:inherit;border:1px solid #c6cdd6;border-radius:.5rem;background:#fff;color:inherit}\
+input,select{padding:.7rem .8rem;font:inherit;border:1px solid #c6cdd6;border-radius:.5rem;background:#fff;color:inherit}\
 button{margin-top:1.5rem;padding:.85rem 1rem;font:inherit;font-weight:600;color:#fff;background:#1f5fd8;border:0;border-radius:.5rem;cursor:pointer}\
 @media (prefers-color-scheme:dark){\
 body{background:#11161c;color:#e6ebf2}\
-.loc,.ref,input{background:#1b222b;border-color:#2f3945}\
+.loc,.ref,input,select{background:#1b222b;border-color:#2f3945}\
 .warn{background:#3a2a12;border-color:#7a5a22}}";
 
 #[cfg(test)]
@@ -614,7 +826,14 @@ mod tests {
     /// on the customer's phone.
     #[test]
     fn the_page_carries_no_script_at_all() {
-        let rendered = form_html("es", "ABCD1234ABCD1234", None);
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &[],
+            &json!({}),
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<script"));
         assert!(!rendered.contains("onclick"));
         assert!(!rendered.contains("javascript:"));
@@ -623,9 +842,326 @@ mod tests {
     /// The locator comes off a URL a stranger typed; it reaches the page as text, never as markup.
     #[test]
     fn a_locator_cannot_inject_markup_into_the_page() {
-        let rendered = form_html("es", "<img src=x onerror=alert(1)>", None);
+        let rendered = form_html(
+            "es",
+            "<img src=x onerror=alert(1)>",
+            None,
+            &[],
+            &json!({}),
+            &Typed::new(),
+        );
         assert!(!rendered.contains("<img"));
         assert!(rendered.contains("&lt;img"));
+    }
+
+    fn claim_fields() -> Vec<String> {
+        vec![
+            "customer_tax_id".into(),
+            "customer_name".into(),
+            "customer_address".into(),
+            "customer_country".into(),
+            "customer_id_type".into(),
+        ]
+    }
+
+    /// What a module sends (sales#335): the answers IT knows a field accepts. The core has no
+    /// idea these are countries or document kinds — and must not (hub#1407).
+    fn module_choices() -> Value {
+        json!({
+            "customer_country": {
+                "label": {"en": "Country", "es": "País"},
+                "names": "region",
+                "options": [{"value": "", "label": {"en": "Home", "es": "Casa"}}, "US", "DE"],
+            },
+            "customer_id_type": {
+                "label": {"en": "Your number is", "es": "Tu número es"},
+                "options": [
+                    {"value": "", "label": {"en": "A tax number", "es": "Un NIF"}},
+                    {"value": "03", "label": {"en": "A passport", "es": "Un pasaporte"}},
+                ],
+            },
+        })
+    }
+
+    /// A declared field with choices becomes a `<select>` in the page's language; the first option
+    /// is the default; an option with no label shows its value.
+    #[test]
+    fn a_field_the_module_offers_choices_for_becomes_a_select() {
+        let es = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &Typed::new(),
+        );
+        assert!(
+            es.contains("<label for=\"f-customer_country\">País</label>"),
+            "{es}"
+        );
+        assert!(
+            es.contains("<select id=\"f-customer_country\" name=\"customer_country\" data-names=\"region\">"),
+            "{es}"
+        );
+        assert!(
+            es.contains("<option value=\"\" selected>Casa</option>"),
+            "{es}"
+        );
+        assert!(es.contains("<option value=\"US\">US</option>"), "{es}");
+        assert!(
+            es.contains("<select id=\"f-customer_id_type\" name=\"customer_id_type\">"),
+            "{es}"
+        );
+        assert!(
+            es.contains("<option value=\"03\">Un pasaporte</option>"),
+            "{es}"
+        );
+        let en = form_html(
+            "en",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &Typed::new(),
+        );
+        assert!(
+            en.contains(">Country</label>") && en.contains(">A passport</option>"),
+            "{en}"
+        );
+    }
+
+    /// A label the module did not translate falls back to English, then to the field's own name —
+    /// never an empty label.
+    #[test]
+    fn an_untranslated_label_falls_back_to_english_then_to_the_name() {
+        let choices = json!({
+            "customer_country": {"label": {"en": "Country"}, "options": ["US"]},
+            "customer_id_type": {"options": [{"value": "03", "label": {"en": "A passport"}}]},
+        });
+        let es = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &Typed::new(),
+        );
+        assert!(es.contains(">Country</label>"), "{es}");
+        assert!(es.contains(">customer_id_type</label>"), "{es}");
+        assert!(
+            es.contains("<option value=\"03\" selected>A passport</option>"),
+            "{es}"
+        );
+    }
+
+    /// Choices for a field the claim does not let the visitor fill are not shown: the door would
+    /// drop the answer, so the customer would pick «United States» and get a Spanish NIF. And a
+    /// claim with no choices — every ticket printed before sales#335 — keeps the old form.
+    #[test]
+    fn choices_only_show_for_declared_fields() {
+        let old: Vec<String> = vec![
+            "customer_tax_id".into(),
+            "customer_name".into(),
+            "customer_address".into(),
+        ];
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &old,
+            &module_choices(),
+            &Typed::new(),
+        );
+        assert!(!rendered.contains("<select"), "{rendered}");
+        assert!(!rendered.contains("<script"), "{rendered}");
+        let plain = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &json!({}),
+            &Typed::new(),
+        );
+        assert!(!plain.contains("<select"), "{plain}");
+    }
+
+    /// Labels and values are the module's, but they reach a stranger's page: text, never markup.
+    #[test]
+    fn choices_cannot_inject_markup_into_the_page() {
+        let choices = json!({
+            "customer_country": {
+                "label": {"es": "<b>x</b>"},
+                "options": ["\"><script>alert(1)</script>", {"value": "a", "label": {"es": "<img src=x>"}}],
+            }
+        });
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &Typed::new(),
+        );
+        assert!(!rendered.contains("<script>alert"), "{rendered}");
+        assert!(
+            !rendered.contains("<img") && !rendered.contains("<b>"),
+            "{rendered}"
+        );
+    }
+
+    /// Names for region codes come from the customer's own browser (`Intl.DisplayNames`), through
+    /// ONE same-origin file, loaded only when a select asks for it. Nothing inline.
+    #[test]
+    fn region_names_come_from_one_same_origin_script() {
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &Typed::new(),
+        );
+        assert_eq!(rendered.matches("<script").count(), 1, "{rendered}");
+        assert!(rendered.contains(&format!(
+            "<script src=\"{NAMES_SCRIPT_PATH}\" defer></script>"
+        )));
+        assert!(NAMES_SCRIPT_PATH.starts_with("/p/") && is_public_path(NAMES_SCRIPT_PATH));
+        assert!(!rendered.contains("onclick") && !rendered.contains("onchange"));
+        assert!(NAMES_SCRIPT.contains("Intl.DisplayNames"));
+        let mut no_region = module_choices();
+        no_region["customer_country"]
+            .as_object_mut()
+            .unwrap()
+            .remove("names");
+        let rendered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &no_region,
+            &Typed::new(),
+        );
+        assert!(!rendered.contains("<script"), "{rendered}");
+    }
+
+    /// A claim is a row per printed ticket: only choices for fields the visitor may fill are
+    /// kept (the page would never show the rest), each list is capped, and a malformed map is a
+    /// refusal rather than something stored half-read.
+    #[test]
+    fn minted_choices_keep_only_declared_fields_within_the_cap() {
+        let fields = vec!["customer_country".to_string()];
+        let raw = json!({
+            "customer_country": {"options": ["US"]},
+            "sealed_thing": {"options": ["x"]},
+        });
+        assert_eq!(
+            accepted_choices(&raw, &fields),
+            Some(json!({"customer_country": {"options": ["US"]}}))
+        );
+        assert_eq!(accepted_choices(&Value::Null, &fields), Some(json!({})));
+        let too_many: Vec<Value> = (0..=MAX_CHOICE_OPTIONS)
+            .map(|i| json!(i.to_string()))
+            .collect();
+        assert_eq!(
+            accepted_choices(&json!({"customer_country": {"options": too_many}}), &fields),
+            None
+        );
+        assert_eq!(accepted_choices(&json!(["US"]), &fields), None);
+        assert_eq!(
+            accepted_choices(&json!({"customer_country": "US"}), &fields),
+            None
+        );
+    }
+
+    /// hub#1989 — on a retry the chosen option stays chosen; a value the module never offered
+    /// (a tampered POST) leaves the module's default explicitly selected, never no selection.
+    #[test]
+    fn a_retry_keeps_the_chosen_option_and_ignores_one_never_offered() {
+        let mut typed = Typed::new();
+        typed.insert("customer_country".into(), "DE".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            kept.contains("<option value=\"DE\" selected>DE</option>"),
+            "{kept}"
+        );
+        assert!(kept.contains("<option value=\"\">Casa</option>"), "{kept}");
+        typed.insert("customer_country".into(), "ZZ".into());
+        let tampered = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            tampered.contains("<option value=\"\" selected>Casa</option>"),
+            "{tampered}"
+        );
+        assert!(!tampered.contains("ZZ"), "{tampered}");
+    }
+
+    /// hub#1989 — the three text fields come back on a retry, the address included (the issue
+    /// names it and nothing else asked for it), each one as an attribute value, never as markup.
+    #[test]
+    fn a_retry_keeps_the_address_and_the_rest_as_attribute_text() {
+        let mut typed = Typed::new();
+        typed.insert("customer_tax_id".into(), "B1234567X".into());
+        typed.insert("customer_name".into(), "Bar \"Pepe\" & Co".into());
+        typed.insert("customer_address".into(), "Calle Mayor 1 <b>2º</b>".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &module_choices(),
+            &typed,
+        );
+        assert!(
+            kept.contains("name=\"customer_tax_id\" value=\"B1234567X\""),
+            "{kept}"
+        );
+        assert!(
+            kept.contains("name=\"customer_name\" value=\"Bar &quot;Pepe&quot; &amp; Co\""),
+            "{kept}"
+        );
+        assert!(
+            kept.contains(
+                "name=\"customer_address\" value=\"Calle Mayor 1 &lt;b&gt;2º&lt;/b&gt;\""
+            ),
+            "{kept}"
+        );
+        assert!(!kept.contains("<b>"), "{kept}");
+    }
+
+    /// hub#1989 — a module that repeats a value gets exactly one `selected`, on the first copy.
+    #[test]
+    fn a_repeated_option_value_is_selected_once() {
+        let choices = json!({
+            "customer_country": {"options": ["ES", "DE", "DE"]},
+        });
+        let mut typed = Typed::new();
+        typed.insert("customer_country".into(), "DE".into());
+        let kept = form_html(
+            "es",
+            "ABCD1234ABCD1234",
+            None,
+            &claim_fields(),
+            &choices,
+            &typed,
+        );
+        assert_eq!(kept.matches(" selected").count(), 1, "{kept}");
+        assert!(
+            kept.contains("<option value=\"ES\">ES</option><option value=\"DE\" selected>DE</option><option value=\"DE\">DE</option>"),
+            "{kept}"
+        );
     }
 
     /// Both languages, and the customer's page is the Spanish one by default — the merchant's

@@ -141,6 +141,12 @@ export default {
     action: 'Download',
     cancel: 'Not now',
     failed: 'We could not open your browser. Go to erplora.com to get the new version.',
+    android: {
+      confirmBody:
+        'The ERPlora listing opens on Google Play. Google Play installs version {version}: there is no file to download or open.',
+      action: 'Open Google Play',
+      failed: 'We could not open Google Play. Search for ERPlora there to get the new version.',
+    },
   },
   assistant: {
     confirmTitle: 'The assistant wants to run an action',
@@ -168,6 +174,10 @@ export default {
     quotaTitle: 'You have used all your assistant messages',
     quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
     quotaCta: 'See plans',
+    includedInPlan: 'Included in your {plan} plan.',
+    includedInHubPlan: 'Included in your plan.',
+    upgradeHubPlan: 'Upgrade your plan',
+    planOpenFailed: 'Your plan page could not be opened in your browser. Try again.',
     // hub#1183 — knowing the limit only once it is spent is knowing it at the worst possible
     // moment. From 80% on, the drawer says what is left and when it comes back.
     quotaRemaining: 'Plan {tier} — {remaining} of {limit} messages left this month.',
@@ -181,6 +191,7 @@ export default {
     plansConfirm: 'Go to payment',
     planOption: '{name} — {price} €/month',
     plansUnavailable: 'There are no plans to upgrade to right now.',
+    checkoutOpenFailed: 'The payment page could not be opened in your browser. Try again, and if it keeps failing, update the ERPlora app.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
@@ -301,9 +312,21 @@ export default {
   // hub#1743 — the shell-wide band for «there is no network right now». Says the CONSEQUENCE, not
   // the state: «offline» on its own reads as a setting somebody turned on. Nothing here names a
   // module or a screen, because the outage is not about any of them.
+  // hub#2143 — painted before the shell mounts, when the hub did not answer its boot context.
+  boot: {
+    unreachable: {
+      title: 'We cannot connect to your business',
+      body: 'ERPlora is not answering. Check that this device is connected to the internet and try again. If it keeps happening, the problem may be on our side.',
+      retry: 'Try again',
+    },
+  },
   offline: {
     title: 'No internet connection',
     body: 'Anything that needs the internet — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
+    // hub#2085 — the browser says it has a network, but ERPlora does not answer. Names what is
+    // known and both places the fault can be; never claims «no internet», which may be false here.
+    hubTitle: 'ERPlora is not responding',
+    hubBody: 'Your device seems to be online, but ERPlora is not answering: it may be your internet connection or a problem on our side. Anything that needs it — loading screens, syncing, sending invoices — will not work until it is back. This notice disappears on its own.',
   },
   setup: {
     title: 'Finish setting up your business',
@@ -411,6 +434,10 @@ export default {
       business_identity: {
         title: 'Your business details',
         description: 'Legal name and tax id: without them you cannot issue an invoice.',
+      },
+      printer: {
+        title: 'Set up your printer',
+        description: "Register the device that prints your customers' receipts, so the first sale comes out on paper.",
       },
       team: {
         title: 'Your team',
@@ -702,9 +729,9 @@ export default {
     taxRegimeDesc: 'Invoicing regime',
     regimeGeneral: 'General regime',
     regimeEquivalence: 'Equivalence surcharge',
-    receiptTemplate: 'Receipt template',
-    receiptTemplateDesc: 'Printed and digital receipt settings',
-    receiptTemplateMissing: 'Install the Printing app to set up your receipt',
+    receiptTemplate: 'Printers and receipt',
+    receiptTemplateDesc: 'Add your printer and set up the printed and digital receipt',
+    receiptTemplateMissing: 'Install the Printing app to add your printer and set up your receipt',
     tabHub: 'General',
     tabBusiness: 'Business',
     tabTickets: 'Receipts',
@@ -723,6 +750,8 @@ export default {
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
     resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
+    resetUndoEdited: 'You changed {areas} after importing. Undoing keeps only your changes there: what this blueprint replaced will not come back.',
+    resetUndoNotRestored: 'In {areas} only your own changes were kept: what the blueprint had replaced did not come back. Check that screen.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} row | {n} rows',
@@ -738,6 +767,7 @@ export default {
     reset_media: 'Files and images',
     reset_fiscal: 'Tax configuration',
     reset_roles: 'Active roles',
+    reset_print_queue: 'Print queue',
     permissionsTitle: 'App permissions',
     permissionsDesc: 'Grant or revoke the permissions each app asks for (internet access, certificate, printer, notifications, manage automations). For safety, everything is denied until you grant it.',
     permissionsAdminOnly: 'Only an administrator can change permissions.',
@@ -850,6 +880,15 @@ export default {
       cloud_unreachable: CLOUD_UNREACHABLE,
       unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
+      // hub#1624: the codes erplora.com sends next to its prose (saas#1902). `meta_unreachable` is the
+      // only one where trying again helps, so it is the only one that says so.
+      meta_unreachable: 'WhatsApp is not answering right now. Try again in a few minutes.',
+      meta_api_error: 'WhatsApp refused the connection because of a problem on our side. Contact support.',
+      no_access_token: 'Facebook did not give the permission to connect. Open the connection again and accept the permissions.',
+      missing_code: 'The Facebook window closed before finishing. Open the connection again and complete every step.',
+      hub_not_found: 'erplora.com does not recognise this hub. Contact support.',
+      number_not_found: 'That number is no longer connected.',
+      internal_error: 'erplora.com could not finish the connection. Contact support if it keeps happening.',
       default: 'Something went wrong while connecting. Try again in a minute.',
     },
   },
@@ -888,6 +927,9 @@ export default {
     stateInstalled: 'Installed',
     stateAvailable: 'Available',
     stateUnavailable: 'Unavailable',
+    stateNeedsNewerHub: 'Needs ERPlora {version}',
+    // hub#2082: installed, and its next version needs a newer ERPlora than this one runs.
+    stateUpdateNeedsNewerHub: 'Version {version} needs ERPlora {floor}',
     stateInstalling: 'Installing…',
     // hub#516: installed, but a newer version is published. Names the version — «there is an
     // update» without saying which one is a nag, not information.
@@ -901,6 +943,7 @@ export default {
     actionUninstall: 'Uninstall',
     actionInstall: 'Install',
     actionUpdate: 'Update',
+    actionSeeHubUpdates: 'See your ERPlora version and updates',
     // Icon-only like every action (Ioan 2026-07-16 on ADR-0133): okdt puts this in `aria-label`
     // and `title`, never on the face of the button.
     actionOpen: 'Open',
@@ -909,6 +952,7 @@ export default {
     priceYearly: '€{price}/year',
     priceOneTime: '€{price}',
     priceOnRequest: 'On request',
+    priceIncludedInPlan: 'Included in your plan',
     alreadyInstalled: '{name} is already installed.',
     installing: 'Installing {name}…',
     installSuccess: '{name} installed successfully.',
@@ -1389,32 +1433,41 @@ export default {
       printerUnknown: "We couldn't check the printer",
       printerUnknownDetail:
         "We don't know whether it is connected — nothing else is affected. We will check again on our own.",
+      // hub#1629 — WhatsApp that stopped on its own (expired permission, revoked by Meta, unlinked).
+      whatsappDown: 'WhatsApp stopped working',
+      whatsappDownDetail:
+        "Customer messages aren't coming in and your replies aren't going out until you connect it again.",
+      whatsappAction: 'Connect WhatsApp again',
       notMeasured: "We couldn't read this",
     },
+    // hub#1886 — the button on the two blocked cards (notices, printer search) that opens THIS
+    // app's page in the device settings: once Android stops asking, that page is the only way back.
+    openDeviceSettings: 'Open settings',
     // hub#1732 — the notices, and the permission that lets them exist at all.
     //
     // The sheet that goes in FRONT of Android's dialog. Android's own says «Allow ERPlora to send
     // you notifications?» and nothing about what for; asked cold it reads as opportunistic and
-    // gets refused, and two refusals close the dialog for the life of the install. So this names
-    // the one thing the till actually notifies about — an order arriving — and never says
-    // «permission», «POST_NOTIFICATIONS» or «Android».
+    // gets refused, and two refusals close the dialog for the life of the install. So this says
+    // what the notices are for — and never «permission», «POST_NOTIFICATIONS» or «Android». In
+    // words that fit EVERY business: the sheet appears on a salon's front desk as much as on a
+    // restaurant's till, and «orders in the kitchen» got it refused there (hub#1927).
     notices: {
-      primerHeader: 'Let us warn you about new orders',
+      primerHeader: 'Let us keep you posted',
       primerMessage:
-        'When an order comes into the kitchen we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
+        'When something needs your attention, we can warn you, even if nobody is looking at this screen. Your device will ask you next.',
       primerLater: 'Not now',
       primerAllow: 'Turn on notices',
       // The row on System › your printer, which is where somebody who never got warned would
       // look. Only ever shown when the notices really are off ON THIS DEVICE.
       blockedTitle: 'Notices are off',
       blockedDetail:
-        "This device won't warn you when an order comes in. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
+        "This device won't warn you when something needs your attention. Turn the notices on and it says so out loud, even with nobody looking at the screen.",
       blockedAction: 'Turn on notices',
       // After asking again and still getting nothing: the system stops showing its dialog once
       // it has been refused, and from then on the only way through is the device's own settings.
       blockedInSettings:
         "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
-      turnedOn: 'Done — this device will warn you about new orders.',
+      turnedOn: 'Done — this device will warn you when something needs your attention.',
     },
   },
   planLimits: {
@@ -1801,6 +1854,11 @@ export default {
     // that issued them (a VeriFactu chain, a TicketBai one), so they only ever come back to it.
     reasonInstallationBoundData:
       'Records discarded: {n}. This app keeps an official record chained to the till that issued it, so it only travels back to that same till. Yours starts its own — nothing here has been changed.',
+    // hub#1947 — the template was published against an older version of the app, which kept data
+    // the version installed here no longer has. Naming the APP and not the table is deliberate:
+    // `appointments_schedule` is our word, and what she needs to know is that nothing is broken.
+    reasonTableGoneInInstalledVersion:
+      'Rows discarded: {n}. The template was built for an earlier version of this app, and the one installed here no longer keeps that data. Everything else went in — there is nothing for you to fix.',
     // hub#473 — the file came from ANOTHER hub and brought the permissions its owner had given to
     // its apps. Those are decisions about THIS terminal's printer, certificate and internet access,
     // so a downloaded file never makes them: you grant them here, once, and only if you want to.
@@ -1889,6 +1947,7 @@ export default {
     yourPlan: 'Your plan',
     managePlan: 'Manage plan',
     managePlanError: 'Could not open plan management. Try again.',
+    upgradeHubPlan: 'Upgrade your plan for more',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
     // What the hub has already SPENT of what its plan includes (whatsapp_inbox#131). The tier
     // cards say what a plan includes; without these the one number that warns a channel is about
@@ -1919,6 +1978,8 @@ export default {
       // Expiring does not leave you outside when the module ships a free tier: it drops you back
       // onto it. Saying "subscribe again to keep using it" there is simply not true.
       expiredOnFree: 'Your subscription has expired. You are still on {plan}.',
+      includedInPlan: 'Included in your {plan} plan.',
+      includedInHubPlan: 'Included in your plan.',
       canceled: 'Your subscription is canceled.',
       past_due: 'There is a pending payment on your subscription.',
     },
@@ -2013,6 +2074,12 @@ export default {
       duplicate: 'This hub already has that value.',
     },
   },
+  // hub#1620 — the same codes when the runtime ALSO sent the facts the line names (`core_version_too_old`
+  // → `required`, `core`). Only `moduleFailureMessage` reads these, and only when every fact arrived.
+  runtimeErrorFacts: {
+    core_version_too_old:
+      'This app needs a newer hub (ERPlora {required}). Yours runs {core}: update the hub and try again.',
+  },
   // What the runtime answers a screen when a cloud-facing door fails: a short stable code, not a
   // sentence (hub#1689 made it a code precisely so it COULD be translated). Every back-office
   // screen turns it into one of these lines through `lib/runtime-error-sentence.ts`; a code with
@@ -2030,6 +2097,10 @@ export default {
     install_not_in_catalog: 'That app is not available in your catalogue.',
     install_cloud_rejected:
       'erplora.com could not attend to this installation right now. Try again in a few minutes.',
+    // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
+    // not run whole); the owner can act on it by updating the hub. The line that names both versions
+    // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.
+    core_version_too_old: 'This app needs a newer hub: update the hub and try again.',
     cloud_rejected: 'erplora.com could not attend to this right now. Try again in a few minutes.',
     cloud_unreadable: 'erplora.com answered something this hub could not read. Try again in a few minutes.',
     hub_not_enrolled: 'This hub is not connected to erplora.com yet.',

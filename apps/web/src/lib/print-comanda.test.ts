@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildComandaGroups, onKitchenOrderCreated } from './print-comanda';
+import { bootPrintComanda, buildComandaGroups, comandaRoute, onKitchenOrderCreated } from './print-comanda';
+import { CLIENT_INSTANCE } from './client-instance';
 import type { PrintRequest, PrintResult } from './print';
 
 // La comanda sale al DISPARAR el pedido (ADR-0144), no al cobrar. Cada estación dice por dónde
@@ -354,6 +355,88 @@ describe('quién mandó la ronda sale EN EL PAPEL (hub#1410 · recorte de kitche
   });
 });
 
+describe('a team member with no app login is named on the paper too (hub#2033 · kitchen#82)', () => {
+  // Since sales#318/#320 the till can say a round is served by a staff record with no hub user:
+  // `waiter_id` is then that record's id, which `hub.users.list` never lists. The KDS card names
+  // it from the staff app (kitchen#82); the paper has to say the same thing as the screen.
+  function clientWithTeam(team: unknown, users: unknown = [{ id: 'u-9', name: 'Marta' }]) {
+    const query = vi.fn(async (name: string) => {
+      if (name === 'kitchen.orders.items') return [CROQUETAS];
+      if (name === 'kitchen.orders.get') {
+        return [{ id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018', waiter_id: 'sm-7' }];
+      }
+      if (name === 'hub.users.list') return users;
+      return [];
+    });
+    const queryAllOptional = vi.fn(async (name: string) => {
+      if (name !== 'staff.members.list') return undefined;
+      if (team instanceof Error) throw team;
+      return team;
+    });
+    return { client: { query, queryAllOptional } as never, query, queryAllOptional };
+  }
+
+  const okPrint = () =>
+    vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+
+  it('names the staff record by its full name', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([
+      { id: 'sm-1', full_name: 'Luis Gil' },
+      { id: 'sm-7', full_name: 'Carmen Ruiz', user_id: null },
+    ]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen Ruiz');
+  });
+
+  it('falls back to first + last name when the record has no full name', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([{ id: 'sm-7', first_name: 'Carmen', last_name: 'Ruiz' }]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen Ruiz');
+  });
+
+  it('still names a terminated or inactive member: who fired the round is a historical fact', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([{ id: 'sm-7', full_name: 'Carmen Ruiz', status: 'terminated', is_active: false }]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen Ruiz');
+  });
+
+  it('a hub user is resolved first and the staff app is not asked', async () => {
+    const print = okPrint();
+    const { client, queryAllOptional } = clientWithTeam([{ id: 'sm-7', full_name: 'Carmen Ruiz' }], [
+      { id: 'sm-7', name: 'Carmen (user)' },
+    ]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Carmen (user)');
+    expect(queryAllOptional).not.toHaveBeenCalled();
+  });
+
+  it('without the staff app installed the paper prints as before — no name, no id', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam(undefined);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+
+  it('if reading the team fails (no permission), the ticket still prints without a name', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam(new Error('permission_denied'));
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+
+  it('an id the team does not list either never reaches the paper', async () => {
+    const print = okPrint();
+    const { client } = clientWithTeam([{ id: 'sm-1', full_name: 'Luis Gil' }]);
+    await onKitchenOrderCreated(client, { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+});
+
 describe('la ronda `rush` manda el aviso `!! URGENTE !!` al pie (hub#1411)', () => {
   // El renderizador ESC/POS ya sabía pintar el aviso al pie del papel — pero solo reacciona a la
   // forma EXACTA `priority: "HIGH"` (`escpos.rs`, contrato de dispositivo que no se toca: lo lee
@@ -407,5 +490,100 @@ describe('la ronda `rush` manda el aviso `!! URGENTE !!` al pie (hub#1411)', () 
     const print = okPrint();
     await onKitchenOrderCreated(clientWithPriority('vip'), { order_id: 'k-1' }, { print });
     expect(print.mock.calls[0]![0].data).not.toHaveProperty('priority');
+  });
+});
+
+// hub#2029 — two tills that both reach the kitchen printer. Every open shell hears every
+// `kitchen.order.created` (one broadcast per hub), so the ticket came out once per open till and
+// the pass cooked the dish twice. The hub stamps the frame with the shell tab that fired the order
+// (`clientInstance`, hub#1980, carried across the relay by hub#2029): that till prints the ticket,
+// the others only get the system notice. An order no till fired (API, flow, online ordering) goes to
+// the hub's print queue, which keeps ONE job per `kitchen-<order>-<role>` — so it comes out once too.
+describe('the kitchen ticket comes out once, at the printer it belongs to (hub#2029)', () => {
+  const TILL_NEXT_DOOR = 'till-next-door-7c1e';
+
+  function tillHearing() {
+    const listeners: ((payload: unknown, meta: { clientInstance?: string }) => void)[] = [];
+    const client = fakeClient({
+      on: () => {
+        throw new Error('the kitchen ticket must listen with onEvent: `on` cannot tell which till fired');
+      },
+      onEvent: (event: string, cb: (typeof listeners)[number]) => {
+        if (event === 'kitchen.order.created') listeners.push(cb);
+        return () => {};
+      },
+    });
+    const emit = async (payload: unknown, meta: { clientInstance?: string }) => {
+      for (const cb of listeners) cb(payload, meta);
+      // The listener fires async work: let it finish its queries and its print.
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    return { client, emit };
+  }
+
+  function deps() {
+    return {
+      print: vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' })),
+      notify: vi.fn<(t: string, b: string) => Promise<void>>(async () => {}),
+      onFailure: vi.fn(),
+    };
+  }
+
+  it('an order fired at the till next door prints nothing here', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(d.print).not.toHaveBeenCalled();
+    // Somebody else's ticket is not a failure: no warning either.
+    expect(d.onFailure).not.toHaveBeenCalled();
+  });
+
+  it('…but the system notice still reaches this device: a KDS tablet with no printer lives on it', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(d.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('the till that fired the order prints its ticket, by its usual route', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, { clientInstance: CLIENT_INSTANCE });
+
+    expect(d.print).toHaveBeenCalledTimes(1);
+    const req = d.print.mock.calls[0]![0];
+    expect(req.jobId).toBe('kitchen-k-1-kitchen');
+    // Its own printer if it has one: nothing forces it through the queue.
+    expect(req.queueOnly).toBeFalsy();
+  });
+
+  it('an order no till fired goes ONLY to the hub queue, where it is one job for every till', async () => {
+    const d = deps();
+    const { client, emit } = tillHearing();
+    bootPrintComanda(client, d);
+
+    await emit({ order_id: 'k-1' }, {});
+
+    expect(d.print).toHaveBeenCalledTimes(1);
+    const req = d.print.mock.calls[0]![0];
+    expect(req.queueOnly).toBe(true);
+    // The queue's key: the same order and station from every till is the same row.
+    expect(req.jobId).toBe('kitchen-k-1-kitchen');
+  });
+});
+
+describe('comandaRoute — who prints a kitchen ticket (hub#2029)', () => {
+  it('this tab fired it → here; another tab → elsewhere; no tab → queue', () => {
+    expect(comandaRoute({ clientInstance: CLIENT_INSTANCE })).toBe('here');
+    expect(comandaRoute({ clientInstance: 'till-next-door-7c1e' })).toBe('elsewhere');
+    expect(comandaRoute({})).toBe('queue');
   });
 });

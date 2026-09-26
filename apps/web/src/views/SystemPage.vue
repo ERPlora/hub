@@ -235,6 +235,15 @@
                 <HubIcon slot="start" name="print-outline" />
                 {{ t('hardware.localNetwork.blockedAction') }}
               </ion-button>
+              <ion-button
+                size="small"
+                fill="outline"
+                data-testid="system-local-network-open-settings"
+                @click="openDeviceSettings('hardware.localNetwork.blockedInSettings')"
+              >
+                <HubIcon slot="start" name="settings-outline" />
+                {{ t('system.openDeviceSettings') }}
+              </ion-button>
             </div>
           </ion-card-content>
         </ion-card>
@@ -268,6 +277,15 @@
               >
                 <HubIcon slot="start" name="notifications-outline" />
                 {{ t('system.notices.blockedAction') }}
+              </ion-button>
+              <ion-button
+                size="small"
+                fill="outline"
+                data-testid="system-notices-open-settings"
+                @click="openDeviceSettings('system.notices.blockedInSettings')"
+              >
+                <HubIcon slot="start" name="settings-outline" />
+                {{ t('system.openDeviceSettings') }}
               </ion-button>
             </div>
           </ion-card-content>
@@ -543,6 +561,7 @@ import {
   localNetworkPrimerLabelsFrom,
   type LocalNetworkPermission,
 } from '../lib/local-network-permission';
+import { openAppSettings } from '../lib/device-permission';
 import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te, locale } = useI18n();
@@ -984,6 +1003,18 @@ async function allowPrinterSearch(): Promise<void> {
   } finally {
     askingForLocalNetwork.value = false;
   }
+}
+
+/**
+ * Takes the owner to this app's page in the device settings (hub#1886).
+ *
+ * Both blocked cards end up there, because Android stops asking after two refusals and that page
+ * is the only way back. Nothing to say when it opens — the settings are on screen, and coming back
+ * re-reads the state through {@link onVisibleAgain}. When it cannot open (an installed app older
+ * than the command), the card's own sentence says where to go by hand.
+ */
+async function openDeviceSettings(fallbackKey: string): Promise<void> {
+  if (!(await openAppSettings('system'))) void toast(t(fallbackKey));
 }
 
 async function turnOnNotices(): Promise<void> {

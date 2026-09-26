@@ -29,7 +29,12 @@ impl Runtime {
     /// D2/D4, hub#550). The host calls it at boot **after re-hydrating the registry** — that is the
     /// first instant both halves of the answer exist: what the hub owes, and who is mounted to
     /// comply. Idempotent, so every restart and every redeploy runs it.
+    ///
+    /// It first writes down, ONCE, a go-live that happened through the VeriFactu select before
+    /// hub#2079 ([`fiscal_profile::adopt_module_environment`]): from then on the engine files where
+    /// the profile says, so the profile has to know.
     pub async fn refresh_fiscal_profile(&self) -> Result<fiscal_profile::FiscalMode> {
+        fiscal_profile::adopt_module_environment(self.db.as_ref(), &self.hub_id).await?;
         fiscal_profile::refresh(self.db.as_ref(), &self.registry, &self.hub_id).await
     }
 
@@ -38,6 +43,12 @@ impl Runtime {
     /// misma condición que enseña la checklist— y que el hub pueda hacerlo (una demo no).
     pub async fn fiscal_go_live(&self) -> Result<fiscal_profile::FiscalProfile> {
         fiscal_profile::go_live(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// **One-off, at boot (hub#2079):** a hub that went live through the VeriFactu select is
+    /// written down as live in the core. See [`fiscal_profile::adopt_module_environment`].
+    pub async fn adopt_module_fiscal_environment(&self) -> Result<bool> {
+        fiscal_profile::adopt_module_environment(self.db.as_ref(), &self.hub_id).await
     }
 
     /// **Apaga el go-live**, y solo mientras no haya salido ni un registro hacia la Hacienda real
@@ -105,6 +116,7 @@ impl Runtime {
             password,
             by,
             certificate::derive_certificate_type(pkcs12_b64, password),
+            certificate::derive_not_after(pkcs12_b64, password),
         )
         .await
     }
@@ -153,7 +165,14 @@ impl Runtime {
                 // file on it is ONE rule (hub#1935) — the same one the dispatcher refuses a sale
                 // with. Two copies would be how the switch and the till end up disagreeing.
                 let enrolled = crate::gateway_identity::is_enrolled(db, &self.hub_id).await?;
-                match fiscal_profile::filing_gap(&profile, certificate::ROUTE_DELEGATED, enrolled) {
+                // `false`: the road left behind is ERPlora's, where no certificate of the business
+                // signs, so its expiry (hub#1940) cannot be what is missing there.
+                match fiscal_profile::filing_gap(
+                    &profile,
+                    certificate::ROUTE_DELEGATED,
+                    enrolled,
+                    false,
+                ) {
                     Some(fiscal_profile::NO_REPRESENTATION) => {
                         return Err(RuntimeError::Domain {
                             code: fiscal_profile::NO_REPRESENTATION.to_string(),

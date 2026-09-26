@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="UTF-8"?><env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/"><env:Body><env:Fault><faultcode>env:Client</faultcode><faultstring>Codigo[4104].Error en la cabecera: el valor del campo NIF del bloque ObligadoEmision no está identificado.. NIF:12345678Z. NOMBRE_RAZON:Salon Aurora SL</faultstring></env:Fault></env:Body></env:Envelope>

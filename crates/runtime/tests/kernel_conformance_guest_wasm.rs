@@ -70,6 +70,127 @@ async fn guest_operations_become_rows_through_the_host_hub1238() {
         vec!["a", "b", "c"],
         "the list engine sorts by its declared `default_sort`, not by insertion order"
     );
+    // hub#1357: counting the ids is not enough — the response could name ids no row carries.
+    assert_eq!(
+        sorted_ids(&out["new_ids"]),
+        listed_ids(&rows),
+        "every id reported in `new_ids` must be a row the host wrote"
+    );
+}
+
+/// Runs `kfx.items.bulk` with `payload` and returns the response plus the listed rows.
+async fn bulk_then_list(payload: serde_json::Value) -> (serde_json::Value, Vec<serde_json::Value>) {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    install_fixture(&mut rt).await;
+
+    let payload: Params = serde_json::from_value(payload).expect("payload is an object");
+    let out = rt
+        .execute_command("kfx.items.bulk", &payload, &admin())
+        .await
+        .expect("the guest's operations run");
+    let rows = rt
+        .execute_query("kfx.items.list", &Params::new(), &admin())
+        .await
+        .expect("list the rows the guest asked for");
+    (out, rows)
+}
+
+fn sorted_ids(value: &serde_json::Value) -> Vec<String> {
+    let mut ids: Vec<String> = value
+        .as_array()
+        .expect("`new_ids` is an array")
+        .iter()
+        .map(|id| id.as_str().expect("ids are strings").to_string())
+        .collect();
+    ids.sort();
+    ids
+}
+
+fn listed_ids(rows: &[serde_json::Value]) -> Vec<String> {
+    let mut ids: Vec<String> = rows
+        .iter()
+        .map(|r| r["id"].as_str().expect("rows carry an id").to_string())
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// hub#1357: a guest that hands the batch id over under `new_id` — because the command's SQL
+/// binds `:new_id`, as `customers.create` does — gets THAT id on the row. The host used to
+/// overwrite it with a fresh one while still reporting the batch id in `new_ids`, so
+/// `customers.bulk_create` answered with ids no customer had.
+#[tokio::test]
+async fn a_batch_id_passed_as_new_id_names_the_row_hub1357() {
+    let (out, rows) = bulk_then_list(json!({
+        "names": ["a", "b", "c"],
+        "escape_to": "kfx.item.create",
+        "id_key": "new_id",
+    }))
+    .await;
+    assert_eq!(rows.len(), 3, "one row per operation: {out}");
+    assert_eq!(
+        sorted_ids(&out["new_ids"]),
+        listed_ids(&rows),
+        "the ids the host reports are the ids the rows carry"
+    );
+}
+
+/// hub#1357, the other half: the host stays the only authority of ids. A `new_id` the guest did
+/// NOT take from the batch is not trusted — the row gets a host-minted id, and the response does
+/// not claim the invented one.
+#[tokio::test]
+async fn a_new_id_outside_the_batch_is_replaced_by_the_host_hub1357() {
+    let invented = "00000000-0000-4000-8000-000000001357";
+    let (out, rows) = bulk_then_list(json!({
+        "names": ["a"],
+        "escape_to": "kfx.item.create",
+        "id_key": "new_id",
+        "invented_id": invented,
+    }))
+    .await;
+    assert_eq!(rows.len(), 1, "the operation still runs: {out}");
+    assert_ne!(
+        rows[0]["id"],
+        json!(invented),
+        "an id the guest invented must never reach a row"
+    );
+    assert_eq!(out["new_ids"], json!([]), "no batch id was consumed");
+}
+
+/// Runs `kfx.items.bulk` as `ctx` and returns `context.principal` as the compiled guest saw it —
+/// the guest echoes it back in `Output.result`.
+async fn principal_seen_by_the_guest(ctx: &RequestContext) -> serde_json::Value {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    install_fixture(&mut rt).await;
+
+    let mut payload = Params::new();
+    payload.insert("names".into(), json!(["a"]));
+    let out = rt
+        .execute_command("kfx.items.bulk", &payload, ctx)
+        .await
+        .expect("the guest runs");
+    out["result"]["principal"].clone()
+}
+
+/// hub#2117: the WASM path tells the guest WHO is calling, end to end through a real `.wasm`.
+/// Twin of `handler_context_params_e2e.rs` (native): without it, a WASM path rewritten without the
+/// shared `handler_context` builder could drop `principal` and no test would notice.
+#[tokio::test]
+async fn the_guest_is_told_a_person_is_calling_hub2117() {
+    assert_eq!(principal_seen_by_the_guest(&admin()).await, json!("human"));
+}
+
+/// hub#2117: an automation is told `machine`, whatever its `current_user_id` looks like.
+#[tokio::test]
+async fn the_guest_is_told_an_automation_is_calling_hub2117() {
+    let machine =
+        RequestContext::new("h1", "robot-of-the-future:7", ["*".to_string()]).as_machine();
+    assert_eq!(
+        principal_seen_by_the_guest(&machine).await,
+        json!("machine")
+    );
 }
 
 /// A guest's `Output.error` reaches the caller as a `Domain` error carrying the CODE, never prose.

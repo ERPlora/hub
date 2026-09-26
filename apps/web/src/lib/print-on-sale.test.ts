@@ -10,9 +10,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import { bootPrintOnSale } from './print-on-sale';
+import { CLIENT_INSTANCE } from './client-instance';
 import type { PrintRequest, PrintResult } from './print';
 
-type Listener = (payload: unknown) => void;
+type Listener = (payload: unknown, meta?: { clientInstance?: string }) => void;
 
 /** The minimum client: the sale event, the queries it reads and the drawer's hardware. */
 function fakeClient(over: {
@@ -24,6 +25,11 @@ function fakeClient(over: {
   const openDrawer = vi.fn(async () => undefined);
   const client = {
     on: (event: string, cb: Listener) => {
+      (listeners[event] ??= []).push(cb);
+      return () => {};
+    },
+    // The SDK door that also says which shell tab caused the event (hub#1980).
+    onEvent: (event: string, cb: Listener) => {
       (listeners[event] ??= []).push(cb);
       return () => {};
     },
@@ -47,8 +53,10 @@ function fakeClient(over: {
   return {
     client: client as never,
     openDrawer,
-    emit: async (payload: unknown) => {
-      for (const cb of listeners['sale.completed'] ?? []) cb(payload);
+    // By default the sale was charged HERE, in this very tab — the case every test below is about.
+    // hub#1980's tests pass another tab's instance, or none.
+    emit: async (payload: unknown, meta: { clientInstance?: string } = { clientInstance: CLIENT_INSTANCE }) => {
+      for (const cb of listeners['sale.completed'] ?? []) cb(payload, meta);
       // The listener is synchronous and fires async work: give it a turn to finish.
       await new Promise((r) => setTimeout(r, 0));
     },
@@ -348,5 +356,124 @@ describe('a receipt that went out before its VeriFactu QR (hub#1867)', () => {
 
     expect(onFailure.mock.calls[0]![0]).toMatchObject({ awaitingHost: true });
     expect(onPrintedWithoutFiscal).not.toHaveBeenCalled();
+  });
+});
+
+// ERPlora/sales#283 — the «Print receipt» switch of the charge sheet. The till sends the cashier's
+// choice with the sale (`print_receipt`) and it wins over `auto_print_on_sale` for THAT sale, in
+// both directions (Square/Toast: the setting is the switch's default). Absent — every other
+// producer of sales — the setting decides exactly as before.
+describe('the charge sheet «Print receipt» switch (sales#283)', () => {
+  it('switched OFF with auto-print ON: no receipt', async () => {
+    const gate = fakeGate();
+    const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 1 } });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: false });
+
+    expect(gate.print).not.toHaveBeenCalled();
+  });
+
+  it('switched ON with auto-print OFF: the receipt is printed', async () => {
+    const gate = fakeGate();
+    const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 0 } });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: true });
+
+    expect(gate.print).toHaveBeenCalledTimes(1);
+    expect(gate.calls[0].data).toEqual(PAPER);
+  });
+
+  it('with no choice in the event the setting still decides', async () => {
+    for (const [setting, printed] of [[1, 1], [0, 0]] as const) {
+      const gate = fakeGate();
+      const { client, emit } = fakeClient({ settings: { auto_print_on_sale: setting } });
+      bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+      await emit({ sale_id: '42', print_receipt: 'yes' });
+      await emit({ sale_id: '43' });
+
+      expect(gate.print).toHaveBeenCalledTimes(printed * 2);
+    }
+  });
+
+  it('the switch is about the paper: the drawer opens whatever it says', async () => {
+    const gate = fakeGate();
+    const { client, openDrawer, emit } = fakeClient({
+      devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }],
+      settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
+    });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: false });
+
+    expect(gate.print).not.toHaveBeenCalled();
+    expect(openDrawer).toHaveBeenCalledWith('network:10.0.0.5:9100');
+  });
+});
+
+// hub#1980 — two tills, each with its own receipt printer and «print on payment» on. Every open shell
+// hears every `sale.completed` (one broadcast per hub), so the ticket came out at BOTH tills, and
+// both papers were originals. The hub now stamps the frame with the shell tab that charged
+// (`clientInstance`); the till prints — and opens its drawer — only for its own sales.
+describe('only the till that charged prints the ticket and opens the drawer (hub#1980)', () => {
+  const TILL_NEXT_DOOR = 'till-next-door-7c1e';
+
+  function tillWithPrinterAndDrawer() {
+    return fakeClient({
+      devices: async () => [{ role: 'receipt', ip: '10.0.0.5', port: 9100 }],
+      settings: { auto_print_on_sale: 1, open_drawer_on_sale: 1 },
+    });
+  }
+
+  it('a sale charged at the till next door prints nothing here and leaves this drawer shut', async () => {
+    const gate = fakeGate({ via: 'bridge', role: 'receipt' });
+    const saleDocument = paperSource();
+    const onFailure = vi.fn();
+    const { client, openDrawer, emit } = tillWithPrinterAndDrawer();
+    bootPrintOnSale(client, { print: gate.print, onFailure, saleDocument });
+
+    await emit({ sale_id: '42' }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(gate.print).not.toHaveBeenCalled();
+    expect(saleDocument).not.toHaveBeenCalled();
+    expect(openDrawer).not.toHaveBeenCalled();
+    // Not this till's sale is not a failure: no warning either.
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('the till that charged prints its one original and opens its drawer', async () => {
+    const gate = fakeGate({ via: 'bridge', role: 'receipt' });
+    const { client, openDrawer, emit } = tillWithPrinterAndDrawer();
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42' }, { clientInstance: CLIENT_INSTANCE });
+
+    expect(gate.calls).toHaveLength(1);
+    expect(gate.calls[0]!.jobId).toBe('sale-42');
+    expect(openDrawer).toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('a sale no till charged (an API integration, a flow) prints at no till', async () => {
+    const gate = fakeGate({ via: 'bridge', role: 'receipt' });
+    const { client, openDrawer, emit } = tillWithPrinterAndDrawer();
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42' }, {});
+
+    expect(gate.print).not.toHaveBeenCalled();
+    expect(openDrawer).not.toHaveBeenCalled();
+  });
+
+  it('the cashier\'s «Print receipt» switch of the till next door does not make THIS till print', async () => {
+    // sales#283's switch travels with the sale and wins over the setting — for the till that charged.
+    const gate = fakeGate({ via: 'bridge', role: 'receipt' });
+    const { client, emit } = fakeClient({ settings: { auto_print_on_sale: 0 } });
+    bootPrintOnSale(client, { print: gate.print, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42', print_receipt: true }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(gate.print).not.toHaveBeenCalled();
   });
 });

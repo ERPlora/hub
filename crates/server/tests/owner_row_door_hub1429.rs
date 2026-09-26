@@ -52,21 +52,27 @@ async fn fixture(hub_id: &str) -> Fixture {
         .unwrap();
 
     let admin = rt
-        .create_hub_user(&NewHubUser {
-            name: "Ana Soto".into(),
-            email: "ana@example.com".into(),
-            role: "admin".into(),
-            ..NewHubUser::default()
-        }, 0)
+        .create_hub_user(
+            &NewHubUser {
+                name: "Ana Soto".into(),
+                email: "ana@example.com".into(),
+                role: "admin".into(),
+                ..NewHubUser::default()
+            },
+            0,
+        )
         .await
         .unwrap();
     let employee = rt
-        .create_hub_user(&NewHubUser {
-            name: "Luis Prat".into(),
-            email: "luis@example.com".into(),
-            role: "employee".into(),
-            ..NewHubUser::default()
-        }, 0)
+        .create_hub_user(
+            &NewHubUser {
+                name: "Luis Prat".into(),
+                email: "luis@example.com".into(),
+                role: "employee".into(),
+                ..NewHubUser::default()
+            },
+            0,
+        )
         .await
         .unwrap();
 

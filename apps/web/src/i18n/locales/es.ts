@@ -135,6 +135,12 @@ export default {
     action: 'Descargar',
     cancel: 'Ahora no',
     failed: 'No hemos podido abrir tu navegador. Entra en erplora.com para conseguir la nueva versión.',
+    android: {
+      confirmBody:
+        'Se abre la ficha de ERPlora en Google Play. La versión {version} la instala Google Play: no hay ningún archivo que descargar ni que abrir.',
+      action: 'Abrir Google Play',
+      failed: 'No hemos podido abrir Google Play. Búscalo allí como ERPlora para conseguir la nueva versión.',
+    },
   },
   assistant: {
     confirmTitle: 'El asistente quiere ejecutar una acción',
@@ -158,6 +164,10 @@ export default {
     quotaTitle: 'Has usado todos tus mensajes del asistente',
     quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
     quotaCta: 'Ver planes',
+    includedInPlan: 'Incluido en tu plan {plan}.',
+    includedInHubPlan: 'Incluido en tu plan.',
+    upgradeHubPlan: 'Subir de plan',
+    planOpenFailed: 'No se pudo abrir la página de tu plan en el navegador. Inténtalo de nuevo.',
     quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
     quotaResets: 'Se renuevan el {date}.',
     quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
@@ -166,6 +176,7 @@ export default {
     plansConfirm: 'Ir al pago',
     planOption: '{name} — {price} €/mes',
     plansUnavailable: 'Ahora mismo no hay planes a los que ampliar.',
+    checkoutOpenFailed: 'No se pudo abrir la página de pago en el navegador. Inténtalo de nuevo y, si sigue fallando, actualiza la app de ERPlora.',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
@@ -280,9 +291,18 @@ export default {
   // La checklist de configuración — la superficie del panel de `hub.setup.status` (hub#372).
   // `items.<key>` cubre SOLO los ítems del core: la clave de un ítem del core es también su clave
   // i18n; el título de un módulo viaja en inglés en su manifest y se pinta tal cual.
+  boot: {
+    unreachable: {
+      title: 'No podemos conectar con tu negocio',
+      body: 'ERPlora no responde. Comprueba que este dispositivo tiene conexión a Internet y vuelve a intentarlo. Si sigue pasando, el problema puede ser nuestro.',
+      retry: 'Reintentar',
+    },
+  },
   offline: {
     title: 'Sin conexión a Internet',
     body: 'Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
+    hubTitle: 'ERPlora no responde',
+    hubBody: 'Tu dispositivo parece tener conexión, pero ERPlora no contesta: puede ser tu Internet o un problema por nuestra parte. Lo que lo necesita —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.',
   },
   setup: {
     title: 'Termina de configurar tu negocio',
@@ -371,6 +391,10 @@ export default {
       business_identity: {
         title: 'Los datos de tu negocio',
         description: 'Razón social y NIF: sin ellos no puedes emitir una factura.',
+      },
+      printer: {
+        title: 'Configura la impresora',
+        description: 'Da de alta el dispositivo que imprime los tiques de tus clientes, para que la primera venta salga en papel.',
       },
       team: {
         title: 'Tu equipo',
@@ -638,9 +662,9 @@ export default {
     taxRegimeDesc: 'Régimen de facturación',
     regimeGeneral: 'Régimen general',
     regimeEquivalence: 'Recargo de equivalencia',
-    receiptTemplate: 'Plantilla de tique',
-    receiptTemplateDesc: 'Configuración del recibo impreso y digital',
-    receiptTemplateMissing: 'Instala la app Impresión para configurar tu tique',
+    receiptTemplate: 'Impresoras y tique',
+    receiptTemplateDesc: 'Da de alta tu impresora y configura el tique impreso y digital',
+    receiptTemplateMissing: 'Instala la app Impresión para dar de alta tu impresora y configurar el tique',
     tabHub: 'General',
     tabBusiness: 'Negocio',
     tabTickets: 'Tiques',
@@ -659,6 +683,8 @@ export default {
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
     resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
+    resetUndoEdited: 'Cambiaste {areas} después de importar. Al deshacer solo se quedan tus cambios ahí: lo que este blueprint sustituyó no vuelve.',
+    resetUndoNotRestored: 'En {areas} solo se han quedado tus cambios: lo que el blueprint había sustituido no ha vuelto. Revisa esa pantalla.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} fila | {n} filas',
@@ -674,6 +700,7 @@ export default {
     reset_media: 'Ficheros e imágenes',
     reset_fiscal: 'Configuración fiscal',
     reset_roles: 'Roles activos',
+    reset_print_queue: 'Cola de impresión',
     permissionsTitle: 'Permisos de las apps',
     permissionsDesc: 'Concede o revoca los permisos que cada app pide (acceso a internet, certificado, impresora, notificaciones, administrar automatizaciones). Por seguridad, todo está denegado hasta que lo concedas.',
     permissionsAdminOnly: 'Solo un administrador puede cambiar los permisos.',
@@ -752,6 +779,13 @@ export default {
       cloud_unreachable: CLOUD_UNREACHABLE,
       unreachable: CLOUD_UNREACHABLE,
       forbidden: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
+      meta_unreachable: 'WhatsApp no responde ahora mismo. Vuelve a intentarlo en unos minutos.',
+      meta_api_error: 'WhatsApp ha rechazado la conexión por un problema de nuestra parte. Contacta con soporte.',
+      no_access_token: 'Facebook no ha dado el permiso para conectar. Abre de nuevo la conexión y acepta los permisos.',
+      missing_code: 'La ventana de Facebook se cerró antes de terminar. Abre de nuevo la conexión y completa todos los pasos.',
+      hub_not_found: 'erplora.com no reconoce este hub. Contacta con soporte.',
+      number_not_found: 'Ese número ya no está conectado.',
+      internal_error: 'erplora.com no ha podido terminar la conexión. Contacta con soporte si sigue pasando.',
       default: 'Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.',
     },
   },
@@ -785,6 +819,8 @@ export default {
     stateInstalled: 'Instalado',
     stateAvailable: 'Disponible',
     stateUnavailable: 'No disponible',
+    stateNeedsNewerHub: 'Necesita ERPlora {version}',
+    stateUpdateNeedsNewerHub: 'La versión {version} necesita ERPlora {floor}',
     stateInstalling: 'Instalando…',
     // hub#516: instalado, pero hay una versión más nueva publicada. Se nombra la versión — decir
     // «hay actualización» sin decir cuál es una insistencia, no una información.
@@ -798,12 +834,14 @@ export default {
     actionUninstall: 'Desinstalar',
     actionInstall: 'Instalar',
     actionUpdate: 'Actualizar',
+    actionSeeHubUpdates: 'Ver tu versión de ERPlora y sus actualizaciones',
     actionOpen: 'Abrir',
     priceFree: 'Gratis',
     priceMonthly: '{price} €/mes',
     priceYearly: '{price} €/año',
     priceOneTime: '{price} €',
     priceOnRequest: 'Consultar',
+    priceIncludedInPlan: 'Incluida en tu plan',
     alreadyInstalled: '{name} ya está instalado.',
     installing: 'Instalando {name}…',
     installSuccess: '{name} instalado correctamente.',
@@ -1219,21 +1257,28 @@ export default {
       printerUnknown: 'No hemos podido comprobar la impresora',
       printerUnknownDetail:
         'No sabemos si está conectada; no afecta a nada más. Volveremos a comprobarlo solos.',
+      // hub#1629 — WhatsApp que se cae solo (permiso caducado, revocado por Meta, desvinculado).
+      whatsappDown: 'WhatsApp ha dejado de funcionar',
+      whatsappDownDetail:
+        'No entran los mensajes de los clientes ni salen tus respuestas hasta que lo vuelvas a conectar.',
+      whatsappAction: 'Volver a conectar WhatsApp',
       notMeasured: 'No hemos podido leerlo',
     },
+    // hub#1886 — ver el comentario gemelo en `en.ts`.
+    openDeviceSettings: 'Abrir los ajustes',
     notices: {
-      primerHeader: 'Deja que te avisemos de las comandas',
+      primerHeader: 'Deja que te avisemos',
       primerMessage:
-        'Cuando entre una comanda en cocina podemos avisarte, aunque nadie esté mirando esta pantalla. Tu dispositivo te lo preguntará a continuación.',
+        'Cuando algo necesite tu atención podemos avisarte, aunque nadie esté mirando esta pantalla. Tu dispositivo te lo preguntará a continuación.',
       primerLater: 'Ahora no',
       primerAllow: 'Activar los avisos',
       blockedTitle: 'Los avisos están desactivados',
       blockedDetail:
-        'Este dispositivo no te avisará cuando entre una comanda. Actívalos y lo dirá en voz alta, aunque nadie esté mirando la pantalla.',
+        'Este dispositivo no te avisará cuando algo necesite tu atención. Actívalos y lo dirá en voz alta, aunque nadie esté mirando la pantalla.',
       blockedAction: 'Activar los avisos',
       blockedInSettings:
         'Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.',
-      turnedOn: 'Listo: este dispositivo te avisará de las comandas nuevas.',
+      turnedOn: 'Listo: este dispositivo te avisará cuando algo necesite tu atención.',
     },
   },
   planLimits: {
@@ -1582,6 +1627,8 @@ export default {
       'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
     reasonInstallationBoundData:
       'Registros descartados: {n}. Esta app lleva un registro oficial encadenado a la caja que lo emitió, así que solo vuelve a esa misma caja. La tuya empieza el suyo — aquí no se ha cambiado nada.',
+    reasonTableGoneInInstalledVersion:
+      'Filas descartadas: {n}. La plantilla se hizo para una versión anterior de esta app, y la que tienes instalada ya no guarda esos datos. Todo lo demás ha entrado — no hay nada que tengas que arreglar.',
     reasonCapabilityGrantsNotPortable:
       'Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal. No se ha permitido nada \u2014 concede lo que necesites en Ajustes \u203a Permisos.',
     reasonCapabilitiesNotGrantable:
@@ -1649,6 +1696,7 @@ export default {
     yourPlan: 'Tu plan',
     managePlan: 'Gestionar plan',
     managePlanError: 'No se pudo abrir la gestión del plan. Inténtalo de nuevo.',
+    upgradeHubPlan: 'Sube de plan para tener más',
     purchaseDetected: 'Confirmado. Tu plan se ha actualizado.',
     // Lo que este hub lleva GASTADO de lo que incluye su plan (whatsapp_inbox#131). El nombre de
     // la métrica lo pone el módulo (`lib/module-quota.ts`): aquí nunca se escribe «conversaciones».
@@ -1673,6 +1721,8 @@ export default {
       none: 'Aún no tienes un plan para este módulo.',
       free: 'Estás en {plan}, el plan con el que entra todo el mundo.',
       expiredOnFree: 'Tu suscripción ha caducado. Sigues en {plan}.',
+      includedInPlan: 'Incluido en tu plan {plan}.',
+      includedInHubPlan: 'Incluido en tu plan.',
       canceled: 'Tu suscripción está cancelada.',
       past_due: 'Hay un pago pendiente en tu suscripción.',
     },
@@ -1749,6 +1799,10 @@ export default {
       duplicate: 'Este hub ya tiene ese valor.',
     },
   },
+  runtimeErrorFacts: {
+    core_version_too_old:
+      'Esta app necesita un hub más nuevo (ERPlora {required}). El tuyo tiene la {core}: actualiza el hub e inténtalo de nuevo.',
+  },
   // Traducción de `runtimeErrors` en `en.ts`: lo que el runtime contesta cuando falla una puerta
   // que habla con la nube. Un código sin frase aquí no se pinta nunca; el llamador cae a `default`.
   runtimeErrors: {
@@ -1759,6 +1813,7 @@ export default {
     install_not_in_catalog: 'Esa app no está disponible en tu catálogo.',
     install_cloud_rejected:
       'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
+    core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',
     hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',

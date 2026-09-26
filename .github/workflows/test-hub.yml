@@ -187,10 +187,18 @@ jobs:
       # and only known for sure AFTER the lock-limits step restarts the container (the restart
       # rebinds the ephemeral port). That step resolves the real port with `docker port` and
       # exports DATABASE_URL to $GITHUB_ENV for the test steps.
-      # Sin debuginfo: el `target/` del workspace (wasmtime/extism/sqlx + decenas de binarios de
-      # test) desbordaba los ~14 GB del runner y el LINK moría con SIGBUS/ENOSPC. El debuginfo es
-      # el grueso del target; quitarlo hace que `cargo test --workspace` quepa de sobra.
-      RUSTFLAGS: "-C debuginfo=0"
+      # A thin `target/` (infra#294): the runner builds this suite in six slots at once on a 301 GB
+      # disk, one `target/` each. 91 % of a target is the ~318 linked test executables, and with
+      # the old `RUSTFLAGS=-C debuginfo=0` each one still carried std's precompiled DWARF, the
+      # DWARF of the C libraries `cc` builds with `-g` (it follows the PROFILE, not RUSTFLAGS) and
+      # a symbol table only a printed backtrace reads — CI never sets `RUST_BACKTRACE`. A panic
+      # still names its `file:line:col` (`Location`, in `.rodata`). Measured on Linux with this
+      # job's clippy + test build: 35.5 GB → 14.9 GB (38 GB → ~16 GB on the runner), so six fit.
+      # Profile env, not rustflags: the `test` profile inherits `dev`, and local builds keep their
+      # debuginfo. Need a symbolised backtrace from CI? Set `CARGO_PROFILE_DEV_STRIP: none` and
+      # `RUST_BACKTRACE: 1` on that run. Guarded by `scripts/tests/test-hub-workflow.test.sh` §6.
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_DEV_STRIP: symbols
       CARGO_TERM_COLOR: always
 
     steps:
@@ -374,6 +382,14 @@ jobs:
         with:
           cache-bin: false
           save-if: ${{ runner.environment != 'self-hosted' }}
+
+      # Third-party handler contract (hub#2115): `scripts/package-guest-sdk.sh` emits the
+      # guest-sdk as a self-contained crate, and a minimal vendor handler builds to wasm32
+      # against it in a directory OUTSIDE this checkout. Here, after the toolchain step, because
+      # it needs cargo and the wasm32 target; it compiles ~10 small crates (seconds, cached in
+      # `target/guest-sdk-standalone`).
+      - name: Contrato del handler de terceros (hub#2115)
+        run: bash scripts/tests/guest-sdk-standalone.test.sh
 
       # `--exclude erplora-tauri`: el shell de escritorio (ADR-0159) arrastra tauri/wry → GTK/
       # webkit2gtk, system-libs que este runner no tiene y que inflarían el target (el disco ya

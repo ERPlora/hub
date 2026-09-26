@@ -1163,6 +1163,45 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Hand the hub its new entitlement (called by the SaaS)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"token\": \"{{entitlement_token}}\"\n}"
+            },
+            "description": "What the SaaS calls after a plan change (hub#2105, saas#1959): the body carries the RS256 token of `GET /api/v1/hub/device/entitlement/` and the hub applies it at once, without a restart or closing sessions. No session or key: the signature is the authentication. `200 {\"ok\": true}` only when applied; `401 entitlement_token_invalid`, `403 entitlement_wrong_hub`, `409 entitlement_stale`, `429 entitlement_push_throttled` otherwise.\n\n(auth: none)",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "entitlement",
+                "refresh"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/entitlement/refresh"
+            }
+          },
+          "response": []
         }
       ],
       "name": "entitlement"
@@ -1255,6 +1294,87 @@
     },
     {
       "item": [
+        {
+          "name": "GET /api/fiscal/go-live",
+          "request": {
+            "description": "auth: capability+session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "go-live"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/go-live"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/fiscal/go-live",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "go-live"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/go-live"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/fiscal/go-live",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "go-live"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/go-live"
+            }
+          },
+          "response": []
+        },
         {
           "name": "GET /api/fiscal/representation-grant",
           "request": {
@@ -2047,6 +2167,37 @@
               ],
               "query": [],
               "raw": "{{hub_url}}/api/hub/flows/templates/{{module}}/{{family}}/deactivate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/flows/templates/:module/:family/restore",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "templates",
+                "{{module}}",
+                "{{family}}",
+                "restore"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/templates/{{module}}/{{family}}/restore"
             }
           },
           "response": []
@@ -3018,6 +3169,35 @@
               ],
               "query": [],
               "raw": "{{hub_url}}/api/hub/whatsapp/disconnect/{{phone_number_id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/whatsapp/media/:media_id",
+          "request": {
+            "description": "auth: capability+session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "media",
+                "{{media_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/media/{{media_id}}"
             }
           },
           "response": []
@@ -4929,6 +5109,30 @@
               ],
               "query": [],
               "raw": "{{hub_url}}/modules/{{id}}/{{path}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /p/-/country-names.js",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "p",
+                "-",
+                "country-names.js"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/p/-/country-names.js"
             }
           },
           "response": []

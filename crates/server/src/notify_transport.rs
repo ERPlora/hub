@@ -45,7 +45,8 @@ use async_trait::async_trait;
 use cloud_client::{Auth, CloudClient, PreparedRequest};
 use erplora_runtime::errors::{Result, RuntimeError};
 use erplora_runtime::host_notify::{
-    Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
+    button_url_index, Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
+    BUTTON_URL_VAR_PREFIX, HEADER_VARS,
 };
 use serde_json::{json, Value};
 
@@ -152,7 +153,20 @@ impl CloudNotifyTransport {
 
         let status = response.status();
         if status.is_success() {
-            return Ok(SendOutcome::Sent);
+            // The id the provider gave the message — Meta's `wamid` (hub#1951). A 200 is a send
+            // whatever the body says: email has no id worth threading a conversation by, and a
+            // proxy that answers something other than JSON has still delivered. Bounded for the
+            // same reason `detail` is: this ends up in a column, and nothing about a `wamid`
+            // needs three hundred characters.
+            let body: Value = response.json().await.unwrap_or(Value::Null);
+            let message_id: String = body
+                .get("message_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .chars()
+                .take(MAX_DETAIL)
+                .collect();
+            return Ok(SendOutcome::Sent { message_id });
         }
 
         // The reason has to reach whoever reads the dead-letter row: `quota_exceeded`,
@@ -257,6 +271,28 @@ fn email_body(intent: &NotifyIntent) -> Result<Value> {
 /// `template` is Meta's OBJECT (`{name, language, components}`), which the SaaS forwards verbatim
 /// — not the bare template name the Rust client's doc-comment used to promise (hub#663).
 fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
+    let header = template_header(intent)?;
+    if let (Some((key, _)), true) = (
+        &header,
+        intent.template.trim().is_empty() || !intent.interactive.is_null(),
+    ) {
+        return Err(RuntimeError::Notify(format!(
+            "whatsapp notification with `vars.{key}` outside a template: only an approved template \
+             has a header, and dropping it would send a message nobody wrote"
+        )));
+    }
+    let url_buttons = url_buttons(intent)?;
+    if let (Some((first, _)), true) = (
+        url_buttons.first(),
+        intent.template.trim().is_empty() || !intent.interactive.is_null(),
+    ) {
+        return Err(RuntimeError::Notify(format!(
+            "whatsapp notification with `vars.{BUTTON_URL_VAR_PREFIX}{}` outside a template: only \
+             an approved template has link buttons, and dropping their end would send a link \
+             nobody wrote",
+            first
+        )));
+    }
     let mut body = json!({ "to": intent.to.trim() });
     // Optional: one of THIS hub's numbers. A foreign one is a 404 at the proxy, by design.
     if let Some(phone_number_id) = var_str(intent, "phone_number_id") {
@@ -302,7 +338,7 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
     if let Some(language) = var_str(intent, "language") {
         template["language"] = json!(language);
     }
-    if let Some(components) = template_components(intent) {
+    if let Some(components) = template_components(intent, header, url_buttons) {
         template["components"] = components;
     }
     body["template"] = template;
@@ -314,30 +350,141 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
 /// `vars.components` wins verbatim: a template with POSITIONAL variables has no other way to be
 /// filled, and the proxy passes the block to Meta untouched. Otherwise the remaining `vars` become
 /// NAMED body parameters, sorted so the same intent always produces the same payload (Meta matches
-/// them by name, so the order is only ours to keep stable — and testable).
-fn template_components(intent: &NotifyIntent) -> Option<Value> {
+/// them by name, so the order is only ours to keep stable — and testable). The header
+/// ([`template_header`]: text hub#2111, media hub#2101) goes first, as Meta's own `header`
+/// component, and the link
+/// buttons' variable ends ([`url_buttons`]) last (hub#2110).
+fn template_components(
+    intent: &NotifyIntent,
+    header: Option<(&str, Value)>,
+    url_buttons: Vec<(u8, Value)>,
+) -> Option<Value> {
     if let Some(explicit) = intent.vars.get("components").filter(|v| v.is_array()) {
         return Some(explicit.clone());
     }
 
+    let mut components = Vec::new();
+    if let Some((_, parameter)) = header {
+        components.push(json!({ "type": "header", "parameters": [parameter] }));
+    }
+
     let mut named: Vec<(&String, &Value)> = intent
         .vars
-        .as_object()?
-        .iter()
-        .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
-        .collect();
-    if named.is_empty() {
-        return None;
-    }
-    named.sort_by(|a, b| a.0.cmp(b.0));
-
-    let parameters: Vec<Value> = named
+        .as_object()
         .into_iter()
-        .map(
-            |(key, value)| json!({ "type": "text", "parameter_name": key, "text": as_text(value) }),
-        )
+        .flatten()
+        .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
+        .filter(|(key, _)| !HEADER_VARS.iter().any(|(header, _)| header == key))
+        .filter(|(key, _)| !key.starts_with(BUTTON_URL_VAR_PREFIX))
         .collect();
-    Some(json!([{ "type": "body", "parameters": parameters }]))
+    named.sort_by(|a, b| a.0.cmp(b.0));
+    if !named.is_empty() {
+        let parameters: Vec<Value> = named
+            .into_iter()
+            .map(|(key, value)| {
+                json!({ "type": "text", "parameter_name": key, "text": as_text(value) })
+            })
+            .collect();
+        components.push(json!({ "type": "body", "parameters": parameters }));
+    }
+    components.extend(url_buttons.into_iter().map(|(_, button)| button));
+
+    (!components.is_empty()).then(|| Value::Array(components))
+}
+
+/// Meta's `button` components for the template's link buttons, with their position (hub#2110).
+/// Meta matches each one by its `index`, so the array order is only the `vars` key order — stable,
+/// which keeps the payload testable.
+///
+/// `vars.button_url_<n>` is the text Meta appends to the `{{1}}` of the URL button at position
+/// `<n>`. Refused before the network when Meta could only answer an opaque 400 after the call was
+/// paid for: a key whose position is not one digit (it would otherwise travel as a body variable),
+/// or an end that is empty or not a scalar (a link to the bare prefix, or to `{"a":1}`).
+fn url_buttons(intent: &NotifyIntent) -> Result<Vec<(u8, Value)>> {
+    let mut buttons: Vec<(u8, Value)> = Vec::new();
+    for (key, value) in intent.vars.as_object().into_iter().flatten() {
+        if !key.starts_with(BUTTON_URL_VAR_PREFIX) {
+            continue;
+        }
+        let index = button_url_index(key).ok_or_else(|| {
+            RuntimeError::Notify(format!(
+                "whatsapp notification with `vars.{key}`: a link button is `button_url_<n>`, with \
+                 `<n>` the button's position in the template (0-9)"
+            ))
+        })?;
+        let text = match value {
+            Value::String(text) => text.trim().to_string(),
+            Value::Number(number) => number.to_string(),
+            _ => String::new(),
+        };
+        if text.is_empty() {
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{key}` is empty or not text: it is the end of \
+                 the button's link, and without it the customer would tap a link to nowhere"
+            )));
+        }
+        buttons.push((
+            index,
+            json!({
+                "type": "button",
+                "sub_type": "url",
+                "index": index.to_string(),
+                "parameters": [{ "type": "text", "text": text }]
+            }),
+        ));
+    }
+    Ok(buttons)
+}
+
+/// The header the intent asks for, as `(var key, Meta's header parameter)`: the value of a text
+/// header's `{{1}}` (hub#2111) or the link of a media header (hub#2101).
+///
+/// Refused before the network when it cannot be what Meta expects: two of them (a template has
+/// one header), a text value that is empty or not a scalar (a title with a hole), or a media value
+/// that is not an http(s) link Meta can fetch — all would come back as an opaque 400 once the call
+/// was paid for, or as a promotion without its picture.
+fn template_header(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)>> {
+    let present: Vec<(&'static str, &'static str, &Value)> = HEADER_VARS
+        .iter()
+        .filter_map(|(key, kind)| intent.vars.get(*key).map(|value| (*key, *kind, value)))
+        .collect();
+    let (key, kind, value) = match present.as_slice() {
+        [] => return Ok(None),
+        [one] => *one,
+        many => {
+            let keys: Vec<String> = many.iter().map(|(k, _, _)| format!("`vars.{k}`")).collect();
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification with {}: a template has ONE header, so keep only the \
+                 one its approved header asks for",
+                keys.join(" and ")
+            )));
+        }
+    };
+    if kind == "text" {
+        let text = match value {
+            Value::String(text) => text.trim().to_string(),
+            Value::Number(number) => number.to_string(),
+            _ => String::new(),
+        };
+        if text.is_empty() {
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{key}` is empty or not text: it fills the \
+                 variable of the template's title, and Meta refuses a title with a hole"
+            )));
+        }
+        return Ok(Some((key, json!({ "type": "text", "text": text }))));
+    }
+    let link = value
+        .as_str()
+        .map(str::trim)
+        .filter(|link| link.starts_with("https://") || link.starts_with("http://"))
+        .ok_or_else(|| {
+            RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{key}` is not an http(s) link: Meta downloads \
+                 the header media itself, so it has to be a public address it can fetch"
+            ))
+        })?;
+    Ok(Some((key, json!({ "type": kind, kind: { "link": link } }))))
 }
 
 /// A template variable as the text Meta will print. A string goes through unquoted; anything else
@@ -512,7 +659,12 @@ mod tests {
             )
             .await
             .expect("a 200 from the proxy is a send");
-        assert_eq!(sent, SendOutcome::Sent);
+        assert_eq!(
+            sent,
+            SendOutcome::Sent {
+                message_id: "<a@b>".to_string()
+            }
+        );
 
         let calls = cloud.calls();
         assert_eq!(calls.len(), 1);
@@ -527,6 +679,61 @@ mod tests {
         // phishing with ERPlora's own sender (saas#1347).
         assert!(body.get("reply_to").is_none());
         assert!(body.get("from").is_none());
+    }
+
+    /// **hub#1951 — the send brings back the id the provider gave it.**
+    ///
+    /// The proxy already answers `{"message_id": "wamid…"}` and this side threw it away, so the
+    /// hub knew a question had gone out but not WHICH message it was. That id is the only thing
+    /// Meta puts in `context.id` when the customer taps, so without it a tap cannot be matched to
+    /// the question it answers.
+    #[tokio::test]
+    async fn a_send_brings_back_the_id_the_provider_gave_it() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.9"})).await;
+        let sent = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "appointment_reminder",
+                    json!({"text": "¿Confirmas?"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a 200 from the proxy is a send");
+        assert_eq!(
+            sent,
+            SendOutcome::Sent {
+                message_id: "wamid.9".to_string()
+            }
+        );
+    }
+
+    /// **Empty, never an error.** Email has no `wamid` worth threading a conversation by, and a
+    /// SaaS older than the field names nothing: a 200 is a send in both cases. Refusing one here
+    /// would turn "delivered, unidentified" into eight retries and a dead-letter.
+    #[tokio::test]
+    async fn a_send_the_provider_did_not_name_is_still_a_send() {
+        let cloud = fake_cloud(StatusCode::OK, json!({})).await;
+        let sent = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Email,
+                    "cliente@x.com",
+                    "appointment_reminder",
+                    json!({"subject": "Tu cita", "text": "Te esperamos"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a 200 with no id is still a send");
+        assert_eq!(
+            sent,
+            SendOutcome::Sent {
+                message_id: String::new()
+            }
+        );
     }
 
     /// Without a subject in `vars`, the template NAME is the subject — the SaaS rejects an empty
@@ -851,5 +1058,352 @@ mod tests {
         })
         .expect_err("an email has nothing to tap");
         assert!(format!("{err}").contains("interactive"), "{err}");
+    }
+
+    /// **A template with media in its header** (hub#2101). Meta refuses the send unless the header
+    /// parameter travels with it, and before this the only way to write one was `vars.components`
+    /// by hand — the one thing the flow editor cannot offer an owner. `vars.header_<kind>` is the
+    /// link; the remaining vars stay the named body parameters they always were.
+    #[test]
+    fn whatsapp_template_with_a_header_image_sends_it_as_the_header_parameter() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "autumn_promo",
+            json!({"header_image": " https://cdn.example.com/salon.jpg ", "who": "Ana"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [
+                    {"type": "image", "image": {"link": "https://cdn.example.com/salon.jpg"}}
+                ]},
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]}
+            ])
+        );
+    }
+
+    /// Video and document are the same parameter under another type; a template whose body has
+    /// no variables still needs its header.
+    #[test]
+    fn whatsapp_template_header_video_and_document_need_no_body_variables() {
+        for (key, kind) in [("header_video", "video"), ("header_document", "document")] {
+            let body = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "menu_of_the_day",
+                json!({ key: "https://cdn.example.com/file", "language": "es" }),
+            ))
+            .unwrap();
+            assert_eq!(
+                body["template"]["components"],
+                json!([{ "type": "header", "parameters": [
+                    { "type": kind, kind: {"link": "https://cdn.example.com/file"} }
+                ]}]),
+                "{key}"
+            );
+        }
+    }
+
+    /// A template has ONE header. Two media keys is a flow that does not know which one it meant,
+    /// and picking one by precedence would send a message nobody approved.
+    #[test]
+    fn whatsapp_refuses_two_header_media_before_the_network() {
+        let err = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "promo",
+            json!({"header_image": "https://a/x.jpg", "header_video": "https://a/x.mp4"}),
+        ))
+        .expect_err("a template has one header");
+        let text = format!("{err}");
+        assert!(
+            text.contains("header_image") && text.contains("header_video"),
+            "{text}"
+        );
+    }
+
+    /// Meta fetches the media itself: anything that is not an http(s) link comes back as an
+    /// opaque 400 after the call was paid for — or, blank, as a message without its picture.
+    #[test]
+    fn whatsapp_refuses_a_header_that_is_not_a_link() {
+        for bad in [
+            json!("salon.jpg"),
+            json!(""),
+            json!(7),
+            json!("ftp://a/x.jpg"),
+        ] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({ "header_image": bad.clone() }),
+            ))
+            .expect_err("the header is a link Meta can fetch");
+            assert!(format!("{err}").contains("header_image"), "{err} for {bad}");
+        }
+    }
+
+    /// Free text has no header: dropping the picture silently would send a message the owner did
+    /// not write.
+    #[test]
+    fn whatsapp_free_text_refuses_header_media() {
+        let err = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "",
+            json!({"text": "hola", "header_image": "https://a/x.jpg"}),
+        ))
+        .expect_err("only a template has a header");
+        assert!(format!("{err}").contains("header_image"), "{err}");
+    }
+
+    /// A tappable message wins over the template (hub#1633) and returns before the components are
+    /// built, so a header riding next to `interactive` would vanish without a word. A flow cannot
+    /// pair them (`flows::def` refuses it), but a module emitting the intent can — and it is told.
+    #[test]
+    fn whatsapp_interactive_refuses_header_media() {
+        let err = whatsapp_body(&NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"header_image": "https://a/x.jpg"}),
+            )
+        })
+        .expect_err("a tappable message has no template header");
+        assert!(format!("{err}").contains("header_image"), "{err}");
+    }
+
+    /// **A template whose text header has a variable** (hub#2111): «Your appointment on {{1}}».
+    /// Meta refuses the send unless the `header` component fills that `{{1}}`, and before this the
+    /// only way to write it was `vars.components` by hand. `vars.header_text` is the value; it is
+    /// never a body variable, and the rest of the vars stay the named body parameters.
+    #[test]
+    fn whatsapp_template_with_a_header_text_sends_it_as_the_header_parameter() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "appointment_reminder",
+            json!({"header_text": " 3 October ", "who": "Ana", "button_url_0": "A1"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [{"type": "text", "text": "3 October"}] },
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]},
+                { "type": "button", "sub_type": "url", "index": "0", "parameters": [
+                    {"type": "text", "text": "A1"}
+                ]}
+            ])
+        );
+    }
+
+    /// A number mapped from the run (a table, a day) is still the header's text, and a template
+    /// whose body has no variables still needs its header.
+    #[test]
+    fn whatsapp_template_header_text_takes_a_number_and_needs_no_body_variables() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "table_ready",
+            json!({"header_text": 12, "language": "es"}),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([{ "type": "header", "parameters": [{"type": "text", "text": "12"}] }])
+        );
+    }
+
+    /// An empty header value is a title with a hole Meta refuses after the call was paid for; an
+    /// object or a list is not a title at all.
+    #[test]
+    fn whatsapp_refuses_a_header_text_without_a_value() {
+        for bad in [
+            json!(""),
+            json!("   "),
+            json!(null),
+            json!({"a": 1}),
+            json!(["x"]),
+        ] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "appointment_reminder",
+                json!({ "header_text": bad.clone() }),
+            ))
+            .expect_err("the header's variable needs a value");
+            assert!(format!("{err}").contains("header_text"), "{err} for {bad}");
+        }
+    }
+
+    /// A template has ONE header: a text value next to a media link is a flow that does not know
+    /// which header its template has.
+    #[test]
+    fn whatsapp_refuses_a_header_text_next_to_header_media() {
+        let err = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "promo",
+            json!({"header_text": "Hi", "header_image": "https://a/x.jpg"}),
+        ))
+        .expect_err("a template has one header");
+        let text = format!("{err}");
+        assert!(
+            text.contains("header_text") && text.contains("header_image"),
+            "{text}"
+        );
+    }
+
+    /// Outside a template (free text or a tappable message) there is no header to fill.
+    #[test]
+    fn whatsapp_refuses_a_header_text_outside_a_template() {
+        let free = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "",
+            json!({"text": "hola", "header_text": "Hi"}),
+        ))
+        .expect_err("only a template has a header");
+        assert!(format!("{free}").contains("header_text"), "{free}");
+        let tappable = whatsapp_body(&NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"header_text": "Hi"}),
+            )
+        })
+        .expect_err("a tappable message has no template header");
+        assert!(format!("{tappable}").contains("header_text"), "{tappable}");
+    }
+
+    /// **A template's link button with a variable end** (hub#2110): «See your appointment»
+    /// pointing at `https://…/c/{{1}}`. Meta refuses the send unless the `button` component
+    /// carries that end, and before this the only way to write it was `vars.components` by hand.
+    /// `vars.button_url_<n>` is the end of the button at position `<n>`; the buttons follow the
+    /// header and the body.
+    #[test]
+    fn whatsapp_template_with_url_buttons_sends_their_variable_part() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "appointment_confirmed",
+            json!({
+                "button_url_1": "pay/A1B2",
+                "who": "Ana",
+                "header_image": "https://cdn.example.com/salon.jpg",
+                "button_url_0": 4521,
+            }),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [
+                    {"type": "image", "image": {"link": "https://cdn.example.com/salon.jpg"}}
+                ]},
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]},
+                { "type": "button", "sub_type": "url", "index": "0", "parameters": [
+                    {"type": "text", "text": "4521"}
+                ]},
+                { "type": "button", "sub_type": "url", "index": "1", "parameters": [
+                    {"type": "text", "text": "pay/A1B2"}
+                ]}
+            ])
+        );
+    }
+
+    /// A template whose only variable is the button's end still sends it.
+    #[test]
+    fn whatsapp_template_url_button_needs_no_body_variables() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "order_ready",
+            json!({ "button_url_0": " R-77 ", "language": "es" }),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([{ "type": "button", "sub_type": "url", "index": "0", "parameters": [
+                {"type": "text", "text": "R-77"}
+            ]}])
+        );
+    }
+
+    /// An empty end is a link to the bare prefix — the customer taps «Pay» and lands nowhere — and
+    /// Meta answers an opaque 400 after the call was paid for. Refused before the network.
+    #[test]
+    fn whatsapp_refuses_a_url_button_without_a_value() {
+        for bad in [
+            json!(""),
+            json!("   "),
+            json!(null),
+            json!({}),
+            json!([]),
+            json!(true),
+        ] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "order_ready",
+                json!({ "button_url_0": bad.clone() }),
+            ))
+            .expect_err("the button's end is text Meta appends to the link");
+            assert!(format!("{err}").contains("button_url_0"), "{err} for {bad}");
+        }
+    }
+
+    /// A near miss of the key is a typo, not a body variable named `button_url_x` that Meta would
+    /// refuse with a message nobody can read.
+    #[test]
+    fn whatsapp_refuses_a_malformed_url_button_key() {
+        for key in ["button_url_", "button_url_10", "button_url_x"] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "order_ready",
+                json!({ key: "A1" }),
+            ))
+            .expect_err("the position is one digit");
+            assert!(format!("{err}").contains(key), "{err} for {key}");
+        }
+    }
+
+    /// Only a template has buttons: next to free text or a tappable message the end would vanish
+    /// without a word.
+    #[test]
+    fn whatsapp_refuses_a_url_button_outside_a_template() {
+        let free_text = intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "",
+            json!({"text": "hola", "button_url_0": "A1"}),
+        );
+        let tappable = NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "promo",
+                json!({"button_url_0": "A1"}),
+            )
+        };
+        for intent in [free_text, tappable] {
+            let err = whatsapp_body(&intent).expect_err("only a template has link buttons");
+            assert!(format!("{err}").contains("button_url_0"), "{err}");
+        }
     }
 }

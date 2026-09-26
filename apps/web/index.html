@@ -12,9 +12,42 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0091CE" />
+    <!-- hub#2073: the shell mounts only after the hub answers (`bootHubContext`, the courier), and
+         until then this is all there is on screen. Styled here, not in the bundle, because the
+         bundle has not loaded yet; Vue replaces `#app`'s content when it mounts. No words: this
+         document cannot translate. -->
+    <style>
+      .boot-progress {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .boot-progress-spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid rgba(0, 145, 206, 0.2);
+        border-top-color: #0091ce;
+        border-radius: 50%;
+        animation: boot-progress-spin 0.8s linear infinite;
+      }
+      @keyframes boot-progress-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-progress-spinner {
+          animation-duration: 2.4s;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="boot-progress" role="status" aria-busy="true"><div class="boot-progress-spinner"></div></div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

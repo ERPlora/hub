@@ -310,9 +310,10 @@ describe('refreshAppUpdate', () => {
   }
 
   beforeEach(async () => {
-    const { appUpdate, appUpdateDestination } = await import('./app-update');
+    const { appUpdate, appUpdateDestination, appUpdatePlatform } = await import('./app-update');
     appUpdate.value = { state: 'unknown', installed: null, latest: null };
     appUpdateDestination.value = null;
+    appUpdatePlatform.value = null;
     const { setUser } = await import('./session');
     setUser(null);
   });
@@ -329,6 +330,43 @@ describe('refreshAppUpdate', () => {
 
     expect(appUpdate.value.state).toBe('attention');
     expect(appUpdateDestination.value).toBe('https://erplora.com/app/download/windows/');
+  });
+
+  it('says which platform the offer is for, so the notice can speak its language (hub#1898)', async () => {
+    // An APK installed by hand is sent to the Cloud's Android page, which hands it to Google Play:
+    // there is no file to download there, and the confirmation must not promise one.
+    installedAppOn('android', '1.2.3');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    const { refreshAppUpdate, appUpdateDestination, appUpdatePlatform } = await import('./app-update');
+    await refreshAppUpdate();
+
+    expect(appUpdateDestination.value).toBe('https://erplora.com/app/download/android/');
+    expect(appUpdatePlatform.value).toBe('android');
+  });
+
+  it('keeps the desktop platform for a desktop offer', async () => {
+    installedAppOn('windows', '1.2.3');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    const { refreshAppUpdate, appUpdatePlatform } = await import('./app-update');
+    await refreshAppUpdate();
+
+    expect(appUpdatePlatform.value).toBe('windows');
+  });
+
+  it('forgets the platform when there is nothing to offer', async () => {
+    const { refreshAppUpdate, appUpdatePlatform } = await import('./app-update');
+    appUpdatePlatform.value = 'android';
+    installedAppOn('android', '1.4.0');
+    cloudSays(200, { version: '1.4.0' });
+    await signInAdministrator();
+
+    await refreshAppUpdate();
+
+    expect(appUpdatePlatform.value).toBeNull();
   });
 
   it('does not look for a destination when there is nothing to offer', async () => {

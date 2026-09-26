@@ -23,6 +23,12 @@ import {
   parseQuantity,
   formatQuantity,
   onGrid,
+  UnavailableBridgeTransport,
+  HARDWARE_UNAVAILABLE,
+  ANDROID_LOCAL_NETWORK_PERMISSION,
+  INVALID_PRINTER_ADDRESS,
+  PRINTER_UNREACHABLE,
+  PRINTER_ADD_FAILED,
 } from './index.ts';
 
 // The barrel re-exports the quantity contract (ADR-0147) from `./quantity.ts`. Asserting the
@@ -254,6 +260,49 @@ test('subscribe abre el WS lazy y enruta eventos por nombre', () => {
   unsub();
   FakeWs.last!.onmessage!({ data: JSON.stringify({ event: 'sale.completed', payload: { total: 1 } }) });
   assert.equal(seen.length, 1, 'tras unsub no se reciben más');
+});
+
+// hub#1980 — every till hears every `sale.completed`; the frame says which shell tab caused it
+// (`client_instance`, stamped by the hub from the charging request's `X-Client-Instance`) and
+// `onEvent` hands that to the listener, so only the till that charged prints the ticket.
+test('onEvent delivers the payload AND the tab that caused it (hub#1980)', () => {
+  const t = new HttpWsTransport({ baseUrl: 'http://h', WebSocketImpl: FakeWs as unknown as typeof WebSocket });
+  const client = new ErploraClient(t);
+  const seen: unknown[] = [];
+  const unsub = client.onEvent('sale.completed', (payload, meta) => seen.push([payload, meta.clientInstance]));
+
+  FakeWs.last!.onmessage!({
+    data: JSON.stringify({ name: 'sale.completed', module: 'sales', client_instance: 'till-a', payload: { sale_id: '1' } }),
+  });
+  // Nobody's till (an API sale, a flow): the listener hears it, with no instance.
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', payload: { sale_id: '2' } }) });
+  // A non-string instance is not an instance.
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', client_instance: 7, payload: { sale_id: '3' } }) });
+  assert.deepEqual(seen, [
+    [{ sale_id: '1' }, 'till-a'],
+    [{ sale_id: '2' }, undefined],
+    [{ sale_id: '3' }, undefined],
+  ]);
+
+  unsub();
+  FakeWs.last!.onmessage!({ data: JSON.stringify({ name: 'sale.completed', client_instance: 'till-a', payload: {} }) });
+  assert.equal(seen.length, 3, 'unsubscribed');
+});
+
+test('onEvent over a transport that only knows `subscribe` still delivers, with no instance (hub#1980)', () => {
+  let cb: ((p: unknown) => void) | undefined;
+  const client = new ErploraClient({
+    query: async () => [],
+    command: async () => ({}),
+    subscribe: (_event, fn) => {
+      cb = fn;
+      return () => {};
+    },
+  });
+  const seen: unknown[] = [];
+  client.onEvent('sale.completed', (payload, meta) => seen.push([payload, meta.clientInstance]));
+  cb!({ sale_id: '9' });
+  assert.deepEqual(seen, [[{ sale_id: '9' }, undefined]]);
 });
 
 // ── HttpWsTransport: push por SSE (hub#19) ──────────────────────────────────
@@ -1912,5 +1961,70 @@ test('hub#1094: a refusal that names no field leaves `fields` undefined, not an 
   await assert.rejects(
     () => t.command('kitchen.settings.update', {}),
     (e: unknown) => e instanceof ErploraError && e.fields === undefined,
+  );
+});
+
+// ── hub#1924: a printer the scan cannot see, added by typing its address ─────────────────────────
+
+function fakeAddShell(answer: (args: Record<string, unknown>) => unknown) {
+  const calls: { cmd: string; args: Record<string, unknown> }[] = [];
+  const tauri = {
+    invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
+      calls.push({ cmd, args });
+      if (cmd === 'erplora_add_network_printer') return answer(args);
+      return {};
+    },
+    listen: async () => () => {},
+  };
+  return { transport: new IpcBridgeTransport(tauri), calls };
+}
+
+test('addNetworkPrinter: asks for the LAN first, then adds host+port and returns the printer', async () => {
+  const { transport, calls } = fakeAddShell(() => A_PRINTER);
+
+  const printer = await transport.addNetworkPrinter!('192.168.1.50', 9100);
+
+  assert.deepEqual(printer, A_PRINTER);
+  assert.deepEqual(
+    calls.map((c) => c.cmd),
+    ['plugin:erplora-android|request_permissions', 'erplora_add_network_printer'],
+  );
+  assert.deepEqual(calls[0].args, { permissions: [ANDROID_LOCAL_NETWORK_PERMISSION] });
+  assert.deepEqual(calls[1].args, { host: '192.168.1.50', port: 9100 });
+});
+
+test('addNetworkPrinter: with no port it uses 9100, the raw ESC/POS port', async () => {
+  const { transport, calls } = fakeAddShell(() => A_PRINTER);
+  await transport.addNetworkPrinter!('192.168.1.50');
+  assert.equal(calls[1].args.port, 9100);
+});
+
+test('addNetworkPrinter: the shell refusal keeps its CODE, so the page can tell typo from silence', async () => {
+  for (const code of [PRINTER_UNREACHABLE, INVALID_PRINTER_ADDRESS]) {
+    const { transport } = fakeAddShell(() => {
+      throw { code, message: 'detail for the log' };
+    });
+    await assert.rejects(
+      () => transport.addNetworkPrinter!('192.168.1.50', 9100),
+      (e: unknown) => e instanceof ErploraError && e.code === code,
+    );
+  }
+});
+
+test('addNetworkPrinter: an app that does not know the command still rejects with a code', async () => {
+  // An installed app older than the hub answers a bare string ("command … not found").
+  const { transport } = fakeAddShell(() => {
+    throw 'Command erplora_add_network_printer not found';
+  });
+  await assert.rejects(
+    () => transport.addNetworkPrinter!('192.168.1.50', 9100),
+    (e: unknown) => e instanceof ErploraError && e.code === PRINTER_ADD_FAILED,
+  );
+});
+
+test('addNetworkPrinter: in a plain browser there is no hardware to add a printer to', async () => {
+  await assert.rejects(
+    () => new UnavailableBridgeTransport().addNetworkPrinter!(),
+    (e: unknown) => e instanceof ErploraError && e.code === HARDWARE_UNAVAILABLE,
   );
 });

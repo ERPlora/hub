@@ -507,7 +507,10 @@ pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
 ///
 /// * **`testing` → nothing is missing.** In pruebas there is nothing to authorize (ADR-0360) and
 ///   the road to the AEAT's sandbox always exists (hub#1934).
-/// * **The own certificate is a road on its own** (ADR-0320 §1): no grant, no cell.
+/// * **The own certificate is a road on its own** (ADR-0320 §1): no grant, no cell — **while it
+///   has not expired** (hub#1940). The AEAT refuses an expired certificate, so past its `notAfter`
+///   ([`crate::certificate::signing_certificate_expired`], the `own_expired` the caller passes) the
+///   road is gone and the code says what fixes it: renewing, or handing filing to ERPlora.
 /// * **ERPlora's road needs the grant first** — the cell refuses a `production` envelope without
 ///   one (verifactu-gateway, `hub_not_authorized`) — and it is the first thing said, in the order
 ///   the go-live says it (hub#817). `has_certificate` never looked at it: that is the hole.
@@ -515,9 +518,17 @@ pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
 ///
 /// Offline on purpose, like `gateway_identity::is_enrolled`: a cell or an AEAT that is DOWN is a
 /// contingency and the till keeps charging; only a road that does not EXIST stops it.
-pub fn filing_gap(profile: &FiscalProfile, route: &str, enrolled: bool) -> Option<&'static str> {
-    if profile.environment == ENV_TESTING || route == crate::certificate::ROUTE_OWN {
+pub fn filing_gap(
+    profile: &FiscalProfile,
+    route: &str,
+    enrolled: bool,
+    own_expired: bool,
+) -> Option<&'static str> {
+    if profile.environment == ENV_TESTING {
         return None;
+    }
+    if route == crate::certificate::ROUTE_OWN {
+        return own_expired.then_some(crate::certificate::OWN_CERTIFICATE_EXPIRED);
     }
     if profile.representation_status != REPRESENTATION_VIGENTE {
         return Some(NO_REPRESENTATION);
@@ -643,6 +654,26 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
                 .to_string(),
         });
     }
+    // An own certificate past its `notAfter` is no road at all (hub#1973): the AEAT refuses it, and
+    // the till would refuse the FIRST sale with this same code (hub#1940). Said here, before anything
+    // is frozen, so the owner renews or hands filing to ERPlora while the hub is still in `testing`.
+    // An expiry the hub cannot read blocks nothing, exactly as on the sale's path. Only the certificate
+    // that SIGNS is asked: on ERPlora's road the own one is switched off and answers `false`.
+    if crate::certificate::signing_certificate_expired(db, hub_id).await? {
+        return Err(RuntimeError::Domain {
+            code: crate::certificate::OWN_CERTIFICATE_EXPIRED.to_string(),
+            message: "the hub's own certificate has expired and the tax authority does not accept \
+                      it: upload a renewed certificate, or let ERPlora file for you, and try again"
+                .to_string(),
+        });
+    }
+    freeze_live(db, hub_id).await
+}
+
+/// The write half of the go-live: `ACTIVE`, `production`, the instant, and the taxpayer frozen from
+/// the business identity. Shared by [`go_live`] (after its checks) and by
+/// [`adopt_module_environment`] (a hub that is ALREADY live), so both freeze the same four facts.
+async fn freeze_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalProfile> {
     let taxpayer_id = crate::settings::get_all(db, hub_id)
         .await
         .unwrap_or(json!({}))
@@ -667,6 +698,68 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
     )
     .await?;
     reload(db, hub_id).await
+}
+
+/// `_hub_meta` marker of [`adopt_module_environment`]: once written, the adoption never runs again.
+const MODULE_ENVIRONMENT_ADOPTED: &str = "fiscal_environment_adopted";
+
+/// **One-off transition of hub#2079: a hub that went live through the VeriFactu select is live.**
+///
+/// Until hub#2079 the module's settings screen wrote `production` into its own
+/// `verifactu_config.environment` and the engine filed from there, so a hub could be sending real
+/// records to the AEAT while this profile still said `testing`. The engine now asks the CORE which
+/// AEAT to use ([`crate::native::NativeHost::fiscal_environment`]); left alone, such a hub would
+/// send its next real invoices to the test agency — invoices the AEAT never sees (ADR-0189).
+///
+/// So, ONCE per hub (the `_hub_meta` marker), a profile still in `testing` whose module row says
+/// `production` takes the go-live's write half ([`freeze_live`]) without its checks: this is not a
+/// go-live, it is writing down one that already happened. Never for a demo (`can_go_live = 0`,
+/// hub#552) nor for a ceased hub (hub#557). Once only, because afterwards the row is a mirror: a
+/// stand-down must not be undone by the next boot reading a stale mirror.
+///
+/// The core names the module's table here and only here, the way `reset` and `export` already do:
+/// it is the data of the transition, not a dependency — a hub without the table adopts nothing.
+///
+/// Returns whether the profile was promoted.
+pub async fn adopt_module_environment(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    if crate::hub_meta::get(db, MODULE_ENVIRONMENT_ADOPTED)
+        .await?
+        .is_some()
+    {
+        return Ok(false);
+    }
+    let profile = ensure(db, hub_id).await?;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("production".into(), json!(ENV_PRODUCTION));
+    let went_live_in_the_module = db
+        .query(
+            "SELECT to_regclass('verifactu_config') IS NOT NULL AS present",
+            &Params::new(),
+        )
+        .await?
+        .rows
+        .first()
+        .and_then(|row| row["present"].as_bool())
+        .unwrap_or(false)
+        && !db
+            .query(
+                "SELECT 1 AS live FROM verifactu_config \
+                 WHERE hub_id = :hub_id AND is_deleted = 0 AND environment = :production",
+                &p,
+            )
+            .await?
+            .rows
+            .is_empty();
+    let adopt = went_live_in_the_module
+        && profile.environment == ENV_TESTING
+        && profile.can_go_live
+        && profile.status != FiscalStatus::Closed;
+    if adopt {
+        freeze_live(db, hub_id).await?;
+    }
+    crate::hub_meta::set(db, MODULE_ENVIRONMENT_ADOPTED, &now_rfc3339()).await?;
+    Ok(adopt)
 }
 
 /// **Stands the hub back down to the sandbox** — allowed *while nothing has left for the real tax
@@ -1552,7 +1645,7 @@ mod tests {
             ..live(REPRESENTATION_ABSENT)
         };
         assert_eq!(
-            filing_gap(&testing, crate::certificate::ROUTE_DELEGATED, false),
+            filing_gap(&testing, crate::certificate::ROUTE_DELEGATED, false, false),
             None
         );
     }
@@ -1564,6 +1657,7 @@ mod tests {
             filing_gap(
                 &live(REPRESENTATION_ABSENT),
                 crate::certificate::ROUTE_OWN,
+                false,
                 false
             ),
             None
@@ -1583,7 +1677,12 @@ mod tests {
             "",
         ] {
             assert_eq!(
-                filing_gap(&live(state), crate::certificate::ROUTE_DELEGATED, true),
+                filing_gap(
+                    &live(state),
+                    crate::certificate::ROUTE_DELEGATED,
+                    true,
+                    false
+                ),
                 Some(NO_REPRESENTATION),
                 "{state:?}"
             );
@@ -1597,9 +1696,56 @@ mod tests {
             filing_gap(
                 &live(REPRESENTATION_VIGENTE),
                 crate::certificate::ROUTE_DELEGATED,
+                false,
                 false
             ),
             Some(crate::certificate::GATEWAY_NOT_ENROLLED)
+        );
+    }
+
+    /// 🔴 hub#1940 — the own road stops being a road the moment its certificate expires: the AEAT
+    /// refuses an expired certificate, so a live hub signing with one would charge tickets that
+    /// never reach it. The code is its own, because what fixes it is renewing the certificate (or
+    /// handing filing to ERPlora), not the grant nor the connection.
+    #[test]
+    fn the_own_route_with_an_expired_certificate_is_missing_a_valid_certificate() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_VIGENTE),
+                crate::certificate::ROUTE_OWN,
+                true,
+                true
+            ),
+            Some(crate::certificate::OWN_CERTIFICATE_EXPIRED)
+        );
+    }
+
+    /// The expiry is a fact about the OWN certificate: on ERPlora's road an expired `.p12` that
+    /// is switched off signs nothing, so it cannot be what is missing there.
+    #[test]
+    fn an_expired_own_certificate_does_not_block_erplora_s_road() {
+        assert_eq!(
+            filing_gap(
+                &live(REPRESENTATION_VIGENTE),
+                crate::certificate::ROUTE_DELEGATED,
+                true,
+                true
+            ),
+            None
+        );
+    }
+
+    /// In `testing` nothing is missing (hub#1934) — an expired certificate included: the till of
+    /// a business that is still trying things out never stops.
+    #[test]
+    fn in_testing_an_expired_own_certificate_is_not_missing_anything() {
+        let testing = FiscalProfile {
+            environment: ENV_TESTING.into(),
+            ..live(REPRESENTATION_ABSENT)
+        };
+        assert_eq!(
+            filing_gap(&testing, crate::certificate::ROUTE_OWN, false, true),
+            None
         );
     }
 
@@ -1609,7 +1755,8 @@ mod tests {
             filing_gap(
                 &live(REPRESENTATION_VIGENTE),
                 crate::certificate::ROUTE_DELEGATED,
-                true
+                true,
+                false
             ),
             None
         );

@@ -89,7 +89,23 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
         .await
     {
-        Ok(_) => tracing::info!("arranque: avisado al Cloud de que este hub ya atiende"),
+        Ok(ref answer) => {
+            // The boot beat settles activity exactly like the tick, and it matters more here: it
+            // is the FIRST beat after a restart, so it is the one that delivers whatever the
+            // previous process left behind (saas#2129). It drains in this same pass, too — a hub
+            // that has been down for days comes back with a backlog, and the next chance is
+            // 24 hours away.
+            daily_usage::settle_activity(
+                &state.runtime,
+                &state.http,
+                &state.config.cloud_base_url,
+                &auth,
+                &usage.activity,
+                answer.activity_ack,
+            )
+            .await;
+            tracing::info!("arranque: avisado al Cloud de que este hub ya atiende")
+        }
         // Best-effort literal: el sondeo del SaaS es exactamente el respaldo de este caso.
         Err(error) => {
             tracing::warn!(%error, "arranque: no se pudo avisar al Cloud (queda el sondeo)")
@@ -124,10 +140,21 @@ pub fn announce_route_change(state: &AppState) {
         match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
             .await
         {
-            Ok(_) => tracing::info!(
-                route = ?usage.transmission_route,
-                "fiscal route changed: the SaaS has been told"
-            ),
+            Ok(ref answer) => {
+                daily_usage::settle_activity(
+                    &state.runtime,
+                    &state.http,
+                    &state.config.cloud_base_url,
+                    &auth,
+                    &usage.activity,
+                    answer.activity_ack,
+                )
+                .await;
+                tracing::info!(
+                    route = ?usage.transmission_route,
+                    "fiscal route changed: the SaaS has been told"
+                )
+            }
             Err(error) => tracing::warn!(
                 %error,
                 "fiscal route changed but the SaaS could not be told: the daily heartbeat will"

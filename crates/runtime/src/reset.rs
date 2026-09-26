@@ -87,6 +87,11 @@ pub struct SectionOutcome {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ResetReport {
     pub sections: Vec<SectionOutcome>,
+    /// Undo only (hub#1556): tables whose previous content (the placeholder the batch retired)
+    /// did NOT come back, because the business wrote its own rows there after importing. Empty
+    /// when the hub went back to exactly how it was.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub not_restored: Vec<String>,
 }
 
 /// **Dry-run**: inventaría las secciones del hub con el número de filas que se borrarían y los
@@ -382,6 +387,7 @@ pub async fn execute_reset(
                 rows_deleted,
             })
             .collect(),
+        not_restored: Vec::new(),
     })
 }
 
@@ -614,6 +620,7 @@ mod tests {
                 section: "hub_settings".into(),
                 rows_deleted: 7,
             }],
+            not_restored: Vec::new(),
         };
         let back: ResetReport =
             serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
@@ -734,6 +741,10 @@ pub struct ImportBatch {
     /// Filas que ESTE lote insertó realmente.
     pub rows: i64,
     pub created_at: String,
+    /// Tables the business edited after this import (hub#1556): undoing now keeps only its own
+    /// rows there — what the import replaced does not come back. The confirmation warns off this.
+    #[serde(default)]
+    pub edited_after_import: Vec<String>,
 }
 
 const ENSURE_BATCH_TABLES: &str = "\
@@ -1026,16 +1037,77 @@ pub async fn list_import_batches(rt: &Runtime, hub_id: &str) -> crate::Result<Ve
         )
         .await
         .map_err(|e| crate::RuntimeError::Other(format!("reset: listar lotes: {e}")))?;
-    Ok(res
-        .rows
-        .iter()
-        .map(|r| ImportBatch {
-            id: r["id"].as_str().unwrap_or_default().to_string(),
+    let mut batches = Vec::with_capacity(res.rows.len());
+    for r in &res.rows {
+        let id = r["id"].as_str().unwrap_or_default().to_string();
+        let edited_after_import = edited_after_import(db, hub_id, &id).await?;
+        batches.push(ImportBatch {
             name: r["name"].as_str().unwrap_or_default().to_string(),
             rows: r["rows"].as_i64().unwrap_or(0),
             created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
-        })
-        .collect())
+            id,
+            edited_after_import,
+        });
+    }
+    Ok(batches)
+}
+
+/// Tables where undoing `batch_id` now would NOT give back what the batch retired (hub#1556).
+///
+/// The rule is the one `undo_import` applies (hub#1551): the retired placeholder only comes back
+/// while the hole it left is still there — i.e. once this batch's own rows are gone, nothing live
+/// is left in the table. A live row the batch did not insert was written by a person after
+/// importing, so the table is theirs and undoing leaves them with ONLY those rows. Computing it in
+/// one place keeps the warning the Data tab shows and what the undo then does from drifting apart.
+async fn edited_after_import(
+    db: &dyn erplora_db::DatabaseAdapter,
+    hub_id: &str,
+    batch_id: &str,
+) -> crate::Result<Vec<String>> {
+    let mut p = hub_params(hub_id);
+    p.insert("batch".into(), serde_json::json!(batch_id));
+    let retired = db
+        .query(
+            "SELECT DISTINCT table_name FROM _hub_import_retired_row WHERE batch_id = :batch",
+            &p,
+        )
+        .await
+        .map_err(|e| {
+            crate::RuntimeError::Other(format!("reset: read what the batch retired: {e}"))
+        })?;
+    let mut edited = Vec::new();
+    for table in retired.rows.iter().filter_map(|r| r["table_name"].as_str()) {
+        if !safe_ident(table) {
+            continue;
+        }
+        let mut tp = p.clone();
+        tp.insert("table_name".into(), serde_json::json!(table));
+        let inserted = db
+            .query(
+                "SELECT row_id FROM _hub_import_row \
+                 WHERE batch_id = :batch AND table_name = :table_name",
+                &tp,
+            )
+            .await
+            .map_err(|e| {
+                crate::RuntimeError::Other(format!("reset: read the rows the batch inserted: {e}"))
+            })?;
+        let inserted: Vec<&str> = inserted
+            .rows
+            .iter()
+            .filter_map(|r| r["row_id"].as_str())
+            .collect();
+        let survivors = live_row_ids(db, hub_id, table)
+            .await?
+            .into_iter()
+            .filter(|id| !inserted.contains(&id.as_str()))
+            .count();
+        if survivors > 0 {
+            edited.push(table.to_string());
+        }
+    }
+    edited.sort();
+    Ok(edited)
 }
 
 /// The actionable report of an import — the thing `ImportPanel.vue` paints and the Dashboard
@@ -1253,6 +1325,7 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
     // sigue ahí y se puede reintentar (y si no, deshacer otra vez es un no-op limpio).
     // Los marcadores vuelven ANTES de consumir el registro del lote, y en la misma transacción
     // que los borrados: o el hub vuelve entero a como estaba, o no se mueve nada.
+    let not_restored = edited_after_import(db, hub_id, batch_id).await?;
     let mut retired_by_table: Vec<(String, Vec<String>)> = Vec::new();
     for r in &retired.rows {
         let (Some(t), Some(id)) = (r["table_name"].as_str(), r["row_id"].as_str()) else {
@@ -1279,17 +1352,8 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
         // escribió una persona después de importar: la tabla ya es suya y el marcador se queda
         // retirado. No hay forma de devolverlo «solo por los días que falten» — no hay clave
         // declarada, que es precisamente el motivo de que exista hub#1535.
-        let batch_rows: &[String] = by_table
-            .iter()
-            .find(|(t, _)| t == table)
-            .map(|(_, i)| i.as_slice())
-            .unwrap_or(&[]);
-        let survivors = live_row_ids(db, hub_id, table)
-            .await?
-            .into_iter()
-            .filter(|id| !batch_rows.contains(id))
-            .count();
-        if survivors > 0 {
+        // hub#1556: and the report says which tables stayed that way, so the result is not mute.
+        if not_restored.contains(table) {
             continue;
         }
         let list = ids
@@ -1396,5 +1460,8 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
             "reset: deshacer el import falló, nada se borró: {e}"
         ))
     })?;
-    Ok(ResetReport { sections: outcomes })
+    Ok(ResetReport {
+        sections: outcomes,
+        not_restored,
+    })
 }

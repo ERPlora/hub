@@ -506,6 +506,21 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         }
     }
 
+    // hub#1875: from here on, what ANOTHER task of this hub installs or updates is followed too. In a
+    // rolling deploy the outgoing task keeps serving while it drains, and a module updated there
+    // moved `hub_module` without this task ever looking again: the list said one version, the
+    // database another, and the runtime served the old code until the button was pressed again.
+    // Started after the boot restore above on purpose — that block already brought the registry to
+    // `hub_module`, so the first tick waits a full interval instead of racing it.
+    module_reconcile::spawn(
+        state.clone(),
+        std::time::Duration::from_secs(module_reconcile::interval_secs(
+            std::env::var(module_reconcile::INTERVAL_ENV)
+                .ok()
+                .as_deref(),
+        )),
+    );
+
     // Backfill del índice vectorial (§9.6): la ingesta normal corre en el hook de INSTALL, que ya
     // pasó para todo hub existente — sin esto, su índice quedaría vacío para siempre y el router
     // (§9.2b) nunca se activaría. Solo embebe la DIFERENCIA (módulos activos aún no indexados):
@@ -913,8 +928,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 )
                 .await
                 {
-                    whatsapp_quota::QuotaSync::Written(limit) => {
-                        tracing::debug!(monthly_limit = limit, "cuota de WhatsApp al día")
+                    whatsapp_quota::QuotaSync::Written {
+                        monthly_limit,
+                        monthly_usage,
+                    } => {
+                        tracing::debug!(monthly_limit, monthly_usage, "cuota de WhatsApp al día")
                     }
                     // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
                     // en la flota que no compró el canal): aquí no se repite el ruido.
@@ -923,7 +941,28 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 match heartbeat_result {
                     // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
                     // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
-                    Ok(_) => {
+                    Ok(ref answer) => {
+                        // The same, one step further down (saas#2129): the events this beat
+                        // carried are settled, and the buffer keeps draining in THIS tick while
+                        // the bite comes full — the tick is daily, so leaving the surplus for the
+                        // next one is how a busy till loses its oldest events for ever. Only
+                        // `activity_ack` deletes: a bare 2xx is also what a broken ingest answers.
+                        let settled = daily_usage::settle_activity(
+                            &st.runtime,
+                            &st.http,
+                            &st.config.cloud_base_url,
+                            &auth,
+                            &usage.activity,
+                            answer.activity_ack,
+                        )
+                        .await;
+                        if settled.confirmed > 0 {
+                            tracing::debug!(
+                                confirmed = settled.confirmed,
+                                rounds = settled.rounds,
+                                "business activity delivered to the Cloud"
+                            );
+                        }
                         if let Some(ts) = pending_activity {
                             st.activity.mark_reported(ts);
                         }
@@ -954,6 +993,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // gasta una llamada, así que una flota de hubs que firman con su propio certificado no le
     // cuesta nada al plano de control ni llena de revisiones el escritorio del operador.
     gateway_enrolment::spawn_enrolment_service(&state);
+
+    // hub#1939: the hub's copy of the representation grant decides whether a live hub on
+    // ERPlora's road may charge (hub#1935), and only the grant screen used to refresh it — a grant
+    // revoked at ERPlora kept the till charging until somebody opened that screen. Hourly, and only
+    // the hubs whose charging it decides ask (`representation_grant::sync_once`).
+    representation_grant::spawn_sync(&state);
 
     // «Llama a MI nube con MI credencial de máquina» (hub#1459): el primitivo genérico con el
     // que un motor first-party pide algo al plano de control sin sostener jamás el `X-Hub-Token`.

@@ -291,9 +291,12 @@ async fn install_issued(
         .decode(encoded.as_bytes())
         // The decoder error names positions, never content — but the encoded value itself is the
         // one thing that must not travel, so it is not interpolated either.
-        .map_err(|_| EnrolmentRefusal::new(ISSUED_NOT_BASE64, "el certificado emitido no es base64"))?;
-    let chain = String::from_utf8(bytes)
-        .map_err(|_| EnrolmentRefusal::new(ISSUED_NOT_BASE64, "el certificado emitido no es UTF-8"))?;
+        .map_err(|_| {
+            EnrolmentRefusal::new(ISSUED_NOT_BASE64, "el certificado emitido no es base64")
+        })?;
+    let chain = String::from_utf8(bytes).map_err(|_| {
+        EnrolmentRefusal::new(ISSUED_NOT_BASE64, "el certificado emitido no es UTF-8")
+    })?;
 
     let (certificate_pem, rest) = split_leaf_and_chain(&chain);
     let ca_pem = if rest.trim().is_empty() {
@@ -331,7 +334,10 @@ fn split_leaf_and_chain(chain: &str) -> (String, String) {
     match chain.find(END) {
         Some(at) => {
             let cut = at + END.len();
-            (chain[..cut].to_string(), chain[cut..].trim_start().to_string())
+            (
+                chain[..cut].to_string(),
+                chain[cut..].trim_start().to_string(),
+            )
         }
         None => (chain.to_string(), String::new()),
     }
@@ -386,7 +392,9 @@ fn refusal_from(status: u16, body: &str) -> EnrolmentRefusal {
                 .map(str::to_owned)
         });
     match code {
-        Some(code) => EnrolmentRefusal::new(code, format!("{LEGAL_DOCUMENTS_PATH}: status {status}")),
+        Some(code) => {
+            EnrolmentRefusal::new(code, format!("{LEGAL_DOCUMENTS_PATH}: status {status}"))
+        }
         None => EnrolmentRefusal::new(
             CLOUD_REFUSED,
             format!("{LEGAL_DOCUMENTS_PATH}: status {status}"),
@@ -693,7 +701,10 @@ mod tests {
     }
 
     fn budget() -> CallBudget {
-        CallBudget::new(MAX_ENROLMENT_PASSES_PER_HOUR, std::time::Duration::from_secs(3600))
+        CallBudget::new(
+            MAX_ENROLMENT_PASSES_PER_HOUR,
+            std::time::Duration::from_secs(3600),
+        )
     }
 
     // ── The door itself ───────────────────────────────────────────────────────────────────────
@@ -743,7 +754,12 @@ mod tests {
             .unwrap_or_default();
         assert_eq!(cn, gateway_identity::common_name(HUB));
 
-        let headers = stub.post_headers.lock().unwrap().clone().expect("cabeceras");
+        let headers = stub
+            .post_headers
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("cabeceras");
         assert_eq!(headers.get("X-Hub-Token").unwrap(), "machine-tok");
         assert_eq!(headers.get("X-Hub-Id").unwrap(), HUB);
     }
@@ -754,7 +770,9 @@ mod tests {
     async fn an_approved_certificate_is_collected_and_the_identity_becomes_usable() {
         ensure_master_key();
         let db = db_ready().await;
-        let csr = gateway_identity::ensure_key_and_csr(&db, HUB).await.unwrap();
+        let csr = gateway_identity::ensure_key_and_csr(&db, HUB)
+            .await
+            .unwrap();
         let (leaf, ca) = sign_with_test_ca(&csr);
 
         let stub = cloud_stub(
@@ -792,7 +810,9 @@ mod tests {
     async fn a_certificate_without_the_internal_ca_is_refused_and_nothing_is_installed() {
         ensure_master_key();
         let db = db_ready().await;
-        let csr = gateway_identity::ensure_key_and_csr(&db, HUB).await.unwrap();
+        let csr = gateway_identity::ensure_key_and_csr(&db, HUB)
+            .await
+            .unwrap();
         let (leaf, _ca) = sign_with_test_ca(&csr);
 
         let stub = cloud_stub(
@@ -828,7 +848,9 @@ mod tests {
     async fn a_renewal_with_the_certificate_alone_reuses_the_ca_already_stored() {
         ensure_master_key();
         let db = db_ready().await;
-        let csr = gateway_identity::ensure_key_and_csr(&db, HUB).await.unwrap();
+        let csr = gateway_identity::ensure_key_and_csr(&db, HUB)
+            .await
+            .unwrap();
         let (first, ca) = sign_with_test_ca(&csr);
         gateway_identity::install_certificate(&db, HUB, &first, &ca)
             .await
@@ -862,7 +884,9 @@ mod tests {
     async fn a_rejected_request_is_never_refiled_by_the_hub() {
         ensure_master_key();
         let db = db_ready().await;
-        gateway_identity::ensure_key_and_csr(&db, HUB).await.unwrap();
+        gateway_identity::ensure_key_and_csr(&db, HUB)
+            .await
+            .unwrap();
 
         let body = serde_json::json!({
             "id": "doc-1", "kind": KIND_FISCAL_GATEWAY_IDENTITY, "regime": "es-verifactu",
@@ -891,7 +915,10 @@ mod tests {
                 reason: "wrong_key".into()
             }
         );
-        assert!(stub.posted().is_empty(), "un rechazo NO se vuelve a presentar");
+        assert!(
+            stub.posted().is_empty(),
+            "un rechazo NO se vuelve a presentar"
+        );
     }
 
     /// The control plane's refusal codes are the contract (`invalid_csr`,
@@ -1026,7 +1053,9 @@ mod tests {
             "sin clave nadie ha pedido nada: el servicio no debe gastar una llamada"
         );
 
-        let csr = gateway_identity::ensure_key_and_csr(&db, HUB).await.unwrap();
+        let csr = gateway_identity::ensure_key_and_csr(&db, HUB)
+            .await
+            .unwrap();
         assert!(
             enrolment_in_flight(&db, HUB).await,
             "con clave y sin certificado hay un alta en curso"

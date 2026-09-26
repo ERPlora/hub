@@ -322,6 +322,17 @@ pub async fn enqueue(
                 );
             }
         }
+        // hub#2129 — and the scale of the hub's currency, on the same terms: the renderer prints
+        // every amount with `decimals` digits (JPY 0, KWD 3) and two without it. A producer that
+        // already stated the scale of the amounts it divided keeps it.
+        if stamped.get("decimals").is_none_or(|v| v.is_null()) {
+            if let Some(obj) = stamped.as_object_mut() {
+                obj.insert(
+                    "decimals".into(),
+                    json!(crate::settings::currency_decimals_of(db, hub_id).await),
+                );
+            }
+        }
         stamped.to_string()
     };
     if job.format != FORMAT_RECEIPT && job.format != FORMAT_A4 {
@@ -1103,6 +1114,99 @@ mod tests {
         );
     }
 
+    // ── hub#2129 · the paper prints money in the hub's currency scale ─────────────────────────
+    //
+    // The renderer prints every amount with `document.decimals` digits (EUR 2, JPY 0, KWD 3) and
+    // falls back to two without it. Stamped HERE for the same reason as `locale`: one door for
+    // every producer (sales, invoice, cash_register, inventory…), so a yen hub's ticket stops
+    // saying «1500.00» without a single module having to remember the field.
+
+    /// The `decimals` a queued job's document ended up carrying.
+    async fn queued_decimals(db: &PgAdapter, hub_id: &str, job_id: &str) -> Option<u64> {
+        all(db, hub_id)
+            .await
+            .into_iter()
+            .find(|j| j.job_id == job_id)
+            .expect("the job was queued")
+            .document
+            .get("decimals")
+            .and_then(|v| v.as_u64())
+    }
+
+    async fn set_setting(db: &PgAdapter, key: &str, value: serde_json::Value) {
+        let mut updates = serde_json::Map::new();
+        updates.insert(key.into(), value);
+        crate::settings::set_many(db, "h1", &updates, "test")
+            .await
+            .expect("setting saved");
+    }
+
+    /// A yen hub queues documents in yen's scale — zero decimals — from the ISO registry.
+    #[tokio::test]
+    async fn a_queued_document_carries_the_scale_of_the_hub_currency() {
+        let db = queue_db().await;
+        set_setting(&db, "currency", json!("JPY")).await;
+        enqueue(&db, "h1", &job("j-jpy", "receipt", "T-1"))
+            .await
+            .expect("queued");
+        assert_eq!(queued_decimals(&db, "h1", "j-jpy").await, Some(0));
+    }
+
+    /// A hub that declared its scale by hand (a currency the registry does not know) wins over
+    /// the registry, the same precedence as the screen (`/api/hub/context`).
+    #[tokio::test]
+    async fn a_hub_declared_scale_wins_over_the_registry() {
+        let db = queue_db().await;
+        set_setting(&db, "currency_decimals", json!(3)).await;
+        enqueue(&db, "h1", &job("j-kwd", "receipt", "T-1"))
+            .await
+            .expect("queued");
+        assert_eq!(queued_decimals(&db, "h1", "j-kwd").await, Some(3));
+    }
+
+    /// A hub that never chose a currency is a euro hub: two decimals, today's paper.
+    #[tokio::test]
+    async fn a_euro_hub_queues_two_decimals() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j-eur", "receipt", "T-1"))
+            .await
+            .expect("queued");
+        assert_eq!(queued_decimals(&db, "h1", "j-eur").await, Some(2));
+    }
+
+    /// The scale is the queueing hub's own: a yen hub on the same database does not turn a euro
+    /// hub's ticket into one without cents.
+    #[tokio::test]
+    async fn the_scale_comes_from_the_queueing_hub_not_a_neighbour() {
+        let db = queue_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        let mut updates = serde_json::Map::new();
+        updates.insert("currency".into(), json!("JPY"));
+        crate::settings::set_many(&db, "h2", &updates, "test")
+            .await
+            .expect("the neighbour counts in yen");
+        enqueue(&db, "h1", &job("j-h1", "receipt", "T-1"))
+            .await
+            .expect("queued");
+        enqueue(&db, "h2", &job("j-h2", "receipt", "T-1"))
+            .await
+            .expect("queued");
+        assert_eq!(queued_decimals(&db, "h1", "j-h1").await, Some(2));
+        assert_eq!(queued_decimals(&db, "h2", "j-h2").await, Some(0));
+    }
+
+    /// A producer that already states the scale of its amounts KEEPS it: it divided them, so it
+    /// knows how many digits they have.
+    #[tokio::test]
+    async fn a_producer_that_states_the_scale_is_not_overruled() {
+        let db = queue_db().await;
+        set_setting(&db, "currency", json!("JPY")).await;
+        let mut named = job("j-own", "receipt", "T-1");
+        named.document = json!({ "receipt_id": "T-1", "total": 12.5, "decimals": 2 });
+        enqueue(&db, "h1", &named).await.expect("queued");
+        assert_eq!(queued_decimals(&db, "h1", "j-own").await, Some(2));
+    }
+
     /// The station a queued job really landed on.
     async fn landed_on(db: &PgAdapter, hub_id: &str, job_id: &str) -> String {
         all(db, hub_id)
@@ -1750,9 +1854,10 @@ mod tests {
             .unwrap()
             .expect("the host claims the ticket");
         // Every field the PRODUCER sent arrives untouched, and nothing was rendered on the way:
-        // that is hub#501's guarantee. The queue adds exactly one field of its own — `locale`
+        // that is hub#501's guarantee. The queue adds exactly two fields of its own — `locale`
         // (hub#1159), the language the device picks its labels in — so this asserts the producer's
-        // document is a subset that survived intact rather than a blob compared by luck.
+        // document is a subset that survived intact rather than a blob compared by luck. And the
+        // scale of the hub's currency, `decimals` (hub#2129), that the renderer prints amounts in.
         for (key, value) in document.as_object().expect("an object") {
             assert_eq!(
                 claimed.document.get(key),
@@ -1762,8 +1867,8 @@ mod tests {
         }
         assert_eq!(
             claimed.document.as_object().map(|o| o.len()),
-            document.as_object().map(|o| o.len() + 1),
-            "and the queue added nothing but the language stamp"
+            document.as_object().map(|o| o.len() + 2),
+            "and the queue added nothing but the language and currency-scale stamps"
         );
         assert_eq!(claimed.document_type, "receipt");
     }

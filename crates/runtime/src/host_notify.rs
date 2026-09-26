@@ -95,12 +95,51 @@ impl Channel {
 /// payload de un módulo no abre nada.
 pub const RESOLVED_VIA_KEY: &str = "resolved_via";
 
+/// **Which STEP of the flow asked**, in the payload of a kernel-released `*.reminder.due`
+/// (hub#1951). The relay reads it only on the path a module cannot reach (`module_id` empty AND
+/// `run_id` present, see `outbox::deliver_host_notify`), so a module writing this key into its own
+/// payload names nothing.
+pub const FLOW_STEP_KEY: &str = "flow_step";
+
 /// Prefijo del valor de [`RESOLVED_VIA_KEY`]: `flow_grant:<id del grant recipient_query>`.
 pub const FLOW_GRANT_PREFIX: &str = "flow_grant:";
 
 /// Cómo se escribe la pista de arriba para un grant concreto.
 pub fn flow_grant_release(grant_id: &str) -> String {
     format!("{FLOW_GRANT_PREFIX}{grant_id}")
+}
+
+/// **The header of a WhatsApp template**: the `vars` key that fills it, and the Meta parameter type
+/// it becomes — the value of a text header's `{{1}}` (hub#2111) or the link of a media header
+/// (hub#2101). A template has at most one header, so at most one of these may be set;
+/// `flows::def` refuses the rest at save time and the transport before the network.
+/// `schemas/flow.schema.json` declares the same keys under `vars.properties`.
+pub const HEADER_VARS: &[(&str, &str)] = &[
+    ("header_text", "text"),
+    ("header_image", "image"),
+    ("header_video", "video"),
+    ("header_document", "document"),
+];
+
+/// **The variable part of a WhatsApp template's link button** (hub#2110): `vars.button_url_<n>`
+/// is the text Meta appends to the `{{1}}` of the URL button at position `<n>` (0-based, as Meta
+/// counts the template's buttons). `flows::def` refuses at save time what the transport would
+/// refuse before the network; `schemas/flow.schema.json` declares the same key under
+/// `vars.patternProperties` with exactly [`BUTTON_URL_VAR_PATTERN`].
+pub const BUTTON_URL_VAR_PREFIX: &str = "button_url_";
+
+/// The key [`button_url_index`] accepts, as the schema's `patternProperties` writes it. Meta allows
+/// at most ten buttons on a template, so the position is one digit.
+pub const BUTTON_URL_VAR_PATTERN: &str = "^button_url_[0-9]$";
+
+/// The button position a `vars` key names, or `None` when the key is not a well-formed
+/// `button_url_<n>`. A key that starts with [`BUTTON_URL_VAR_PREFIX`] and still answers `None` is a
+/// typo the callers refuse, never a body variable.
+pub fn button_url_index(key: &str) -> Option<u8> {
+    match key.strip_prefix(BUTTON_URL_VAR_PREFIX)?.as_bytes() {
+        [digit] if digit.is_ascii_digit() => Some(digit - b'0'),
+        _ => None,
+    }
 }
 
 /// La intención de notificación que un command emite en el payload del evento `*.reminder.due`.
@@ -332,7 +371,12 @@ pub enum Routing {
 /// retryable by hand**: unlike a revoked release, a quota comes back (top-up, next period).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendOutcome {
-    Sent,
+    /// Handed to the provider, carrying **the id the provider gave the message** — Meta's `wamid`
+    /// (hub#1951). Empty when the channel has no such id worth threading a conversation by, or
+    /// when the proxy did not name one: a send is a send either way.
+    Sent {
+        message_id: String,
+    },
     /// What the proxy said, trimmed — the reason has to reach whoever reads the dead-letter row.
     QuotaExceeded {
         detail: String,
@@ -372,6 +416,9 @@ pub struct MockTransport {
     fail: bool,
     /// If `true`, `send` answers `Ok(SendOutcome::QuotaExceeded)` — the proxy's «no quota left».
     quota_exhausted: bool,
+    /// What the provider calls the message it just accepted (hub#1951). Empty by default: most
+    /// tests do not care, and an empty id is what email and a pre-saas#1919 proxy really answer.
+    message_id: String,
 }
 
 impl MockTransport {
@@ -391,6 +438,14 @@ impl MockTransport {
     pub fn quota_exhausted() -> Self {
         Self {
             quota_exhausted: true,
+            ..Self::default()
+        }
+    }
+
+    /// Variant whose sends come back named, the way the WhatsApp proxy answers (hub#1951).
+    pub fn naming(message_id: &str) -> Self {
+        Self {
+            message_id: message_id.to_string(),
             ..Self::default()
         }
     }
@@ -417,7 +472,9 @@ impl NotifyTransport for MockTransport {
         if let Ok(mut g) = self.sent.lock() {
             g.push((intent.clone(), routing));
         }
-        Ok(SendOutcome::Sent)
+        Ok(SendOutcome::Sent {
+            message_id: self.message_id.clone(),
+        })
     }
 }
 
@@ -436,6 +493,26 @@ mod tests {
     use super::*;
     use erplora_db::Params;
     use serde_json::json;
+
+    /// **A link button's position** (hub#2110): one digit after the prefix, nothing else — Meta
+    /// counts at most ten buttons, and a near miss must not pass for a body variable.
+    #[test]
+    fn button_url_index_reads_one_digit_after_the_prefix() {
+        assert_eq!(button_url_index("button_url_0"), Some(0));
+        assert_eq!(button_url_index("button_url_9"), Some(9));
+        for bad in [
+            "button_url_",
+            "button_url_10",
+            "button_url_x",
+            "button_url_-1",
+            "button_url_ 1",
+            "Button_url_1",
+            "url_1",
+            "who",
+        ] {
+            assert_eq!(button_url_index(bad), None, "{bad}");
+        }
+    }
 
     fn intent_params(channel: &str) -> Params {
         let mut p = Params::new();
@@ -608,7 +685,13 @@ mod tests {
         let t = MockTransport::new();
         let intent = NotifyIntent::from_event_payload(&intent_params("sms")).unwrap();
         let out = t.send(&intent, Routing::Tenant).await.unwrap();
-        assert_eq!(out, SendOutcome::Sent);
+        assert_eq!(
+            out,
+            SendOutcome::Sent {
+                message_id: String::new()
+            },
+            "a plain mock names nothing, the way email and a pre-saas#1919 proxy answer"
+        );
         assert_eq!(t.sent().len(), 1);
         assert_eq!(t.sent()[0].1, Routing::Tenant);
     }

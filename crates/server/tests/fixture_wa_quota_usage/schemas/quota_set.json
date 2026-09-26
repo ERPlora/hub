@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "whatsapp_inbox._quota.set",
+  "description": "Mirror of `schemas/quota_set.json` in ERPlora/whatsapp_inbox AFTER whatsapp_inbox#155: the meter takes the spend from the platform as well as the cap. `monthly_usage` is optional on purpose — the cap must keep arriving on a tick where the platform did not report a usable spend.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["monthly_limit"],
+  "properties": {
+    "monthly_limit": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Billable messages per calendar month the plan allows. 0 = no cap."
+    },
+    "monthly_usage": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Billable messages already spent this calendar month, as the platform counts them. Absent = the platform did not say; the meter keeps whatever it had."
+    }
+  }
+}

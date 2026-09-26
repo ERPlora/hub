@@ -13,6 +13,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
 pub mod access_email;
+pub mod activity_log;
 pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;

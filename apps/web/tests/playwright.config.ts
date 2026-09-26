@@ -68,7 +68,14 @@ const E2E_HUB_ID = process.env.HUB_ID ?? 'e2e00000-0000-4000-8000-000000000001';
 
 // Directorio de módulos VACÍO a propósito: los specs afirman sobre el hub recién creado, y con el
 // workspace de módulos del monorepo delante afirmarían sobre otra cosa distinta en cada máquina.
-const EMPTY_MODULES_DIR = mkdtempSync(join(tmpdir(), 'e2e-empty-modules-'));
+//
+// hub#1797 — it is also the only folder the bench's runtime lets a spec install from
+// (`POST /api/modules/install {dir}` is confined to it in dev mode), so it is exported for the one
+// spec that needs real modules on screen and uninstalls them when it is done. Reused when already
+// set: this file is evaluated twice (runner + worker) and both have to name the SAME folder.
+const EMPTY_MODULES_DIR =
+  process.env.HUB_E2E_MODULES_DIR ?? mkdtempSync(join(tmpdir(), 'e2e-empty-modules-'));
+process.env.HUB_E2E_MODULES_DIR = EMPTY_MODULES_DIR;
 
 export default defineConfig({
   testDir: './e2e',

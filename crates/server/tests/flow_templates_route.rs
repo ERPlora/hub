@@ -91,7 +91,7 @@ fn module_dir(root: &Path, id: &str, extra: Value, with_templates: bool) -> Path
         // de `whatsapp_inbox`: anular una cita **como clienta**, nunca de parte del salón.
         std::fs::write(
             dir.join("flows/appointment-from-whatsapp.grants.json"),
-            r#"{"grants":[{"kind":"command","value":"appointments.appointments.create"},{"kind":"command","value":"appointments.appointments.cancel","payload":{"channel":"customer"}}]}"#,
+            r#"{"grants":[{"kind":"command","value":"appointments.appointments.create"},{"kind":"command","value":"appointments.appointments.cancel","payload":{"channel":"customer"},"reason":{"en":"Cancel as the customer","es":"Anular como la clienta"}}]}"#,
         )
         .unwrap();
         std::fs::write(
@@ -112,6 +112,16 @@ async fn fixture(granted: bool) -> Fixture {
 /// (`requires.json` pide `appointments >= 1.1.69`). Con `false`, el suelo NO se cumple y la
 /// plantilla no debe ofrecerse, que es la otra mitad del contrato de la carpeta.
 async fn fixture_with(granted: bool, appointments_installed: bool) -> Fixture {
+    fixture_full(granted, appointments_installed, false).await
+}
+
+/// `whatsapp_paused` = the module that ships the template is paused (hub#2123: a discard that is
+/// not about a floor).
+async fn fixture_full(
+    granted: bool,
+    appointments_installed: bool,
+    whatsapp_paused: bool,
+) -> Fixture {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -153,6 +163,9 @@ async fn fixture_with(granted: bool, appointments_installed: bool) -> Fixture {
     rt.install_from_dir(&module_dir(&modules, WHATSAPP, json!({}), true))
         .await
         .unwrap();
+    if whatsapp_paused {
+        rt.deactivate(WHATSAPP).await.unwrap();
+    }
     if granted {
         rt.set_module_capability(EDITOR, "manage_flows", true, "hub_user:admin")
             .await
@@ -278,6 +291,40 @@ async fn the_limit_the_module_put_on_a_permission_reaches_the_gallery() {
 }
 
 #[tokio::test]
+async fn the_sentence_the_module_wrote_for_a_permission_reaches_the_gallery() {
+    // flows#114 — sin la frase, la galería solo puede pintar el nombre interno del permiso
+    // (`staff.schedules.list_for_member`) y el dueño autoriza identificadores. La frase la escribe
+    // el módulo en su `<family>.grants.json` como `reason: { en, es }` y esta ruta la sirve tal cual.
+    let fx = fixture(true).await;
+
+    let response = send(
+        &fx.router,
+        request(TEMPLATES, Some(&fx.admin), Some(EDITOR)),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    let grants = body["data"][0]["grants"]
+        .as_array()
+        .expect("los permisos que la plantilla pedirá");
+    let explained = grants
+        .iter()
+        .find(|g| g["value"] == "appointments.appointments.cancel")
+        .expect("el permiso explicado se ofrece");
+    assert_eq!(
+        explained["reason"],
+        json!({ "en": "Cancel as the customer", "es": "Anular como la clienta" })
+    );
+    // El que el módulo no explicó viaja sin `reason`, no con uno vacío.
+    let bare = grants
+        .iter()
+        .find(|g| g["value"] == "appointments.appointments.create")
+        .expect("el permiso sin frase se ofrece igual");
+    assert!(bare.get("reason").is_none(), "{bare}");
+}
+
+#[tokio::test]
 async fn without_the_capability_the_module_reads_none_of_the_business_automations() {
     // hub#1677 enmienda el SEGUNDO gate de hub#714: `manage_flows` deja de ser PUERTA y pasa a ser
     // ALCANCE. Lo que protegía sigue protegido y por eso este test sigue aquí: sin la capability,
@@ -398,7 +445,9 @@ async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
     );
     // hub#1649: y la puerta DICE por qué. Una galería que solo enumera lo que hay deja «el módulo
     // no trae ninguna» y «la trae y el hub la ha descartado» exactamente iguales en pantalla.
-    let discarded = body["discarded"].as_array().expect("una lista de descartes");
+    let discarded = body["discarded"]
+        .as_array()
+        .expect("una lista de descartes");
     assert_eq!(discarded.len(), 1, "el descarte se cuenta: {discarded:?}");
     assert_eq!(discarded[0]["module"], "whatsapp_inbox");
     assert_eq!(discarded[0]["family"], "appointment-from-whatsapp");
@@ -409,5 +458,33 @@ async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
             .is_some_and(|d| d.contains("appointments")),
         "el motivo nombra al vecino que falta: {:?}",
         discarded[0]["detail"]
+    );
+    // hub#2123: and it names the neighbour as DATA, so a module never parses `detail` (ADR-0055).
+    // `installed: null` and not absent: «not installed» is an answer, not «unknown».
+    assert_eq!(
+        discarded[0]["requires"],
+        json!({ "module": "appointments", "floor": "1.1.69", "installed": null }),
+        "the floor discard carries its neighbour: {discarded:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_discard_that_is_not_about_a_floor_names_no_neighbour() {
+    // hub#2123: `requires` is ABSENT, not `null`, on the codes that are not a floor — a module
+    // reading it must never see «this one needs a neighbour» where there is none.
+    let fx = fixture_full(true, true, true).await;
+
+    let response = send(&fx.router, request(TEMPLATES, Some(&fx.admin), None)).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    let discarded = body["discarded"]
+        .as_array()
+        .expect("una lista de descartes");
+    assert_eq!(discarded.len(), 1, "{discarded:?}");
+    assert_eq!(discarded[0]["code"], "template_owner_paused");
+    assert!(
+        discarded[0].get("requires").is_none(),
+        "no neighbour on a non-floor discard: {discarded:?}"
     );
 }

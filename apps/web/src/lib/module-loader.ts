@@ -286,20 +286,23 @@ export async function loadMenu(): Promise<MenuEntry[]> {
     else byModule.set(item.module_id, [item]);
   }
 
-  const entries: MenuEntry[] = [];
-  for (const [moduleId, items] of byModule) {
-    const manifest = await loadManifest(moduleId);
-    if (!manifest) continue; // sin manifest no sabemos qué bundle importar → se omite el módulo.
-    // La versión la manda el RUNTIME (hub#935); el manifest es solo el respaldo para un runtime
-    // anterior. Creerle al manifest cuando el runtime ha hablado reconstruiría el bug: un
-    // `module.json` servido de una caché apuntaría a la url —también cacheada— de la versión vieja.
-    const base = moduleBase(moduleId, items[0].module_version ?? manifest.version);
-    const entry = manifest.ui.entry;
-    const icons = await loadIconMap(base, entry);
-    for (const item of items) {
-      entries.push({
+  // Every module is read AT ONCE (hub#2021). The reads are independent, and one after another they
+  // cost a round-trip per app: ~7 s on a 21-app hub after `module.activated` empties the manifest
+  // cache, with the «Open» button of the app just switched on waiting for the last one. The
+  // navigation order is kept: `Promise.all` answers in the order it was asked, not the order it heard.
+  const perModule = await Promise.all(
+    [...byModule].map(async ([moduleId, items]): Promise<MenuEntry[]> => {
+      const manifest = await loadManifest(moduleId);
+      if (!manifest) return []; // no manifest, no way to know which bundle to import → module left out.
+      // The RUNTIME decides the version (hub#935); the manifest is only the fallback for an older
+      // runtime. Believing the manifest once the runtime has spoken would rebuild the bug: a cached
+      // `module.json` would point at the —also cached— url of the old version.
+      const base = moduleBase(moduleId, items[0].module_version ?? manifest.version);
+      const entry = manifest.ui.entry;
+      const icons = await loadIconMap(base, entry);
+      return items.map((item) => ({
         moduleId,
-        // Nombre traducido que da el runtime (ADR-0055); fallback al del manifest si faltara.
+        // Translated name from the runtime (ADR-0055); the manifest's one if it were missing.
         moduleName: item.module_name || manifest.name,
         nav: {
           id: item.id,
@@ -309,9 +312,10 @@ export async function loadMenu(): Promise<MenuEntry[]> {
         },
         entryUrl: `${base}/${entry}`,
         iconSvg: item.icon ? icons[item.icon] : undefined,
-      });
-    }
-  }
+      }));
+    }),
+  );
+  const entries = perModule.flat();
   // Cero apps que montar cuando el runtime esperaba menú = contradicción (hub#894). Lo afirmó él
   // (`active_modules`), así que la lista vacía no puede ser la respuesta: se sube como fallo para que
   // se pinte un error y no la frase «aún no tienes apps», que manda al dueño a instalar lo que ya
@@ -380,6 +384,8 @@ export function reloadForModuleUpdate(delayMs = MODULE_UPDATE_RELOAD_DELAY_MS): 
  */
 export interface ModuleLocaleFile {
   widgets?: Record<string, { title?: string; label?: string }>;
+  /** The label of each `bell` counter (hub#1678), by full id (`appointments.to_confirm`). */
+  bell?: Record<string, { label?: string }>;
   /** Nombre del módulo traducido (el runtime ya lo resuelve para la nav; aquí sirve al diálogo de
    *  aprobación, que no pasa por `GET /api/navigation`). */
   name?: string;

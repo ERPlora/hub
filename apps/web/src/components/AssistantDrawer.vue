@@ -135,11 +135,26 @@
                  403 y un error genérico. Al resto se le dice a quién pedírselo — que es lo que
                  hacen Shopify, Square y Business Central con las acciones de facturación. -->
             <div v-if="assistantQuota && i === messages.length - 1" class="chat-quota-cta">
+              <!-- hub#1686 (ADR-0474): when the hub plan gives the level, the assistant is not sold
+                   on its own — the sentence says where the level comes from and the only way to
+                   more is a bigger HUB plan, on the account page, behind the same gates. -->
+              <p v-if="includedInPlanText" class="chat-quota-ask" data-testid="assistant-included-in-plan">
+                {{ includedInPlanText }}
+              </p>
+              <ion-button
+                v-if="isAdmin && canOfferPlans && levelFromPlan"
+                size="small"
+                data-testid="assistant-upgrade-hub-plan"
+                @click="openHubPlan()"
+              >
+                <HubIcon slot="start" name="arrow-up-circle-outline" />
+                {{ t('assistant.upgradeHubPlan') }}
+              </ion-button>
               <!-- …and only where this copy may lead to paying at all (hub#1910): on the Google Play
                    build the checkout is steering, so there it NAMES erplora.com and opens nothing —
                    the same answer as the plan-limits panel and a paid module's screen (hub#479). -->
               <ion-button
-                v-if="isAdmin && canOfferPlans"
+                v-else-if="isAdmin && canOfferPlans"
                 size="small"
                 data-testid="assistant-quota-cta"
                 :disabled="checkoutPending"
@@ -353,7 +368,9 @@ import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
 import { getClient } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import { getDeviceContext, isTauri } from '../lib/device';
-import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from '../lib/upgrade-plan-link';
+import { saasDoor } from '../lib/saas-door';
+import { openExternal } from '../lib/open-external';
 
 const { t, te, locale } = useI18n();
 const router = useRouter();
@@ -481,7 +498,19 @@ const quotaWarningText = computed<string>(() => {
     limit: p.limit,
   });
   const resets = formatResetDate(p.resetsAt);
-  return resets ? `${line} ${t('assistant.quotaResets', { date: resets })}` : line;
+  const withReset = resets ? `${line} ${t('assistant.quotaResets', { date: resets })}` : line;
+  return includedInPlanText.value ? `${withReset} ${includedInPlanText.value}` : withReset;
+});
+
+/** Does the hub PLAN give the assistant level (hub#1686, ERPlora/saas#1952)? Only a literal
+ *  `source: "plan"` from the SaaS says so; without it the drawer keeps the assistant checkout. */
+const levelFromPlan = computed(() => plan.value?.source === 'plan');
+
+/** «Included in your Standard plan.» — `''` when the level does not come from the plan. */
+const includedInPlanText = computed<string>(() => {
+  if (!levelFromPlan.value) return '';
+  const name = plan.value?.planName;
+  return name ? t('assistant.includedInPlan', { plan: name }) : t('assistant.includedInHubPlan');
 });
 
 /** La fecha de renovación en el idioma activo, o `''` si no vino o no se puede leer. Una fecha
@@ -526,7 +555,22 @@ function applyUsage(usage: AssistantUsage): void {
     limit: usage.messagesLimit ?? current?.limit,
     resetsAt: usage.resetsAt ?? current?.resetsAt,
     paidTiers: current?.paidTiers ?? [],
+    // The usage frame says nothing about where the level comes from: keep what the config said,
+    // or the drawer would put the assistant checkout back one message later (hub#1686).
+    source: current?.source ?? null,
+    planName: current?.planName ?? null,
   };
+}
+
+/** Opens the hub plan page in the customer's account — the same door as the side menu (hub#1686).
+ *  Coming back re-reads the plan, as after a checkout. */
+async function openHubPlan(): Promise<void> {
+  try {
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
+    watchForCheckoutReturn();
+  } catch {
+    toastError(t('assistant.planOpenFailed'));
+  }
 }
 
 /** Cómo se lee un plan en la hoja de selección: nombre y precio, o solo el nombre si el SaaS no
@@ -546,6 +590,11 @@ function tierLabel(tier: AssistantTierOption): string {
  *
  * Si no llega url NO se navega: mejor no moverse que llevar a una página vacía justo cuando el
  * dueño está intentando pagar.
+ *
+ * The checkout leaves through the one door out of the till (`openExternal`, hub#475), like every
+ * other checkout: navigating this window onto it left the owner of the installed app on
+ * erplora.com's «upgrade complete» page with no Back button and no way back (hub#1914). The till
+ * stays behind, and coming back to it re-reads the plan so the purchase shows.
  */
 async function openPlans(): Promise<void> {
   if (checkoutPending.value) return;
@@ -560,11 +609,37 @@ async function openPlans(): Promise<void> {
   checkoutPending.value = true;
   try {
     const url = await startAssistantCheckout(chosen);
-    if (url) window.location.assign(url);
-    else toastError(t('assistant.error'));
+    if (!url) {
+      toastError(t('assistant.error'));
+      return;
+    }
+    try {
+      await openExternal(url);
+      watchForCheckoutReturn();
+    } catch {
+      toastError(t('assistant.checkoutOpenFailed'));
+    }
   } finally {
     checkoutPending.value = false;
   }
+}
+
+/** Re-reads the plan when the owner comes back from the checkout (hub#1914), the same
+ *  recheck-on-focus `ModulePlanPanel` uses. Only armed once a checkout was actually opened: every
+ *  focus of the till is not a reason to call the SaaS. It stays armed while the drawer lives, since
+ *  the payment can land after the first return (the SaaS learns it from Stripe's webhook). */
+let checkoutReturnWatched = false;
+
+function onCheckoutReturn(): void {
+  if (document.visibilityState !== 'visible') return;
+  void loadPlan();
+}
+
+function watchForCheckoutReturn(): void {
+  if (checkoutReturnWatched) return;
+  checkoutReturnWatched = true;
+  window.addEventListener('focus', onCheckoutReturn);
+  document.addEventListener('visibilitychange', onCheckoutReturn);
 }
 
 /** La hoja de selección: el MISMO `alertController` con radios que ya usa la tarjeta de
@@ -998,6 +1073,8 @@ watch(
 
 onBeforeUnmount(() => {
   abort?.();
+  window.removeEventListener('focus', onCheckoutReturn);
+  document.removeEventListener('visibilitychange', onCheckoutReturn);
   // Never leave the mic light on: an unmount mid-recording releases the stream.
   recording.value?.cancel();
   recording.value = null;

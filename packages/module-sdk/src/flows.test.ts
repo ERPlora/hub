@@ -22,6 +22,7 @@ import {
   MODULE_SCOPE_REQUIRED,
   RELEASE_REVOKED,
 } from './index.ts';
+import type { FlowTemplateDiscard, ModuleFlowTemplate } from './index.ts';
 
 const SESSION = 's3ss10n-of-a-human-admin';
 const EDITOR = 'flows_editor';
@@ -115,10 +116,12 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     'reject',
     'remove',
     'replaceGrants',
+    'restoreTemplate',
     'run',
     'runs',
     'schema',
     'secrets',
+    'templateDiscards',
     'templates',
     'update',
   ]);
@@ -143,8 +146,11 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
   await flows.deleteSecret('API_KEY');
   await flows.schema();
   await flows.templates();
+  // The default answer carries no `discarded` list, so this one refuses; only its URL matters here.
+  await flows.templateDiscards().catch(() => undefined);
   await flows.activateTemplate('appointment-from-whatsapp');
   await flows.deactivateTemplate('appointment-from-whatsapp');
+  await flows.restoreTemplate('appointment-from-whatsapp');
 
   assert.deepEqual(
     calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
@@ -169,10 +175,14 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
       // hub#1611 — the automations the installed modules ship. A static segment, so it never
       // collides with `/flows/:id`; the hub side pins that against the real router.
       'GET /api/hub/flows/templates',
+      // hub#2123 — the same listing, read for its other half: what this hub left out and why.
+      'GET /api/hub/flows/templates',
       // hub#1677 / ADR-0470 — turning MY OWN recipe on in one tap. The module id in the path is
       // the client's own and is never an argument: see the test below.
       'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/activate',
       'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/deactivate',
+      // hub#2059 — the explicit «restore the factory one», MY OWN recipe only, like activate.
+      'POST /api/hub/flows/templates/flows_editor/appointment-from-whatsapp/restore',
     ],
   );
   for (const call of calls) {
@@ -689,4 +699,91 @@ test('hub#1677: a family that would not survive a URL is refused before it is pa
     );
   }
   assert.deepEqual(calls, [], 'and nothing was sent');
+});
+
+test('hub#2069: a recipe grant carries the sentence that explains it, per language, verbatim', async () => {
+  // The runtime serves it since flows#114 (`FlowTemplateGrant.reason`): the module writes it in its
+  // `<family>.grants.json` and the permission screen paints it next to the pin. The public type has
+  // to announce it, or the next gallery only learns it exists by reading the hub.
+  const template: ModuleFlowTemplate = {
+    module: 'appointments',
+    family: 'appointment-from-whatsapp',
+    documents: { en: { name: 'Book from WhatsApp' } },
+    grants: [
+      { kind: 'command', value: 'appointments.appointments.create' },
+      {
+        kind: 'command',
+        value: 'appointments.appointments.cancel',
+        payload: { channel: 'customer' },
+        reason: { en: 'Cancel as the customer', es: 'Anular como la clienta' },
+      },
+    ],
+    requires: {},
+    installed: null,
+  };
+  const { client } = scoped({ ok: true, data: [template] });
+
+  const [served] = await client.flows.templates();
+
+  const reason: Record<string, string> | undefined = served.grants[1].reason;
+  assert.deepEqual(reason, { en: 'Cancel as the customer', es: 'Anular como la clienta' });
+  assert.equal(served.grants[0].reason, undefined, 'optional: a grant without one stays without one');
+});
+
+test('hub#2123: templateDiscards() hands the module what the hub left out, with the neighbour as data', async () => {
+  // `GET /flows/templates` answers `{ ok, data, discarded }` since hub#1649, and `templates()` went
+  // through the envelope unwrap that keeps `data` only: `discarded` never reached a module. The
+  // WhatsApp card (whatsapp_inbox#210) needs it to say «Needs Staff, which is paused» instead of a
+  // generic sentence that is false when the neighbour at fault is another one.
+  const floor: FlowTemplateDiscard = {
+    module: EDITOR,
+    family: 'appointment-from-whatsapp',
+    code: 'template_floor_module_paused',
+    detail: 'necesita `staff` >= 2.0.4 y está pausado',
+    requires: { module: 'staff', floor: '2.0.4', installed: '2.0.4' },
+  };
+  const owner: FlowTemplateDiscard = {
+    module: EDITOR,
+    family: 'reminder',
+    code: 'template_owner_paused',
+    detail: '`flows_editor` está pausado',
+  };
+  const { client, calls } = scoped({ ok: true, data: [], discarded: [floor, owner] });
+
+  const discards = await client.flows.templateDiscards();
+
+  assert.deepEqual(discards, [floor, owner], 'served verbatim, `requires` included');
+  assert.equal(discards[1].requires, undefined, 'a discard that is not a floor names no neighbour');
+  assert.deepEqual(
+    calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
+    ['GET /api/hub/flows/templates'],
+  );
+  assert.equal(calls[0].headers[MODULE_HEADER], EDITOR, 'same scope as templates(): only my own');
+
+  // And `templates()` keeps its shape: flows and whatsapp_inbox read it as an array.
+  assert.deepEqual(await client.flows.templates(), []);
+});
+
+test('hub#2123: templateDiscards() refuses exactly like templates() does', async () => {
+  const { client } = scoped({
+    ok: false,
+    error: { code: MODULE_SCOPE_REQUIRED, message: 'no capability' },
+  });
+
+  await assert.rejects(client.flows.templateDiscards(), (e: unknown) => {
+    assert.ok(e instanceof ErploraError);
+    assert.equal(e.code, MODULE_SCOPE_REQUIRED);
+    return true;
+  });
+});
+
+test('hub#2123: an answer without `discarded` is not read as «nothing was left out»', async () => {
+  // «Nothing discarded» is a claim; a body that does not carry the list cannot make it.
+  const { client } = scoped({ ok: true, data: [] });
+
+  await assert.rejects(client.flows.templateDiscards(), (e: unknown) => {
+    assert.ok(e instanceof ErploraError);
+    assert.equal(e.code, 'server_unavailable');
+    return true;
+  });
 });

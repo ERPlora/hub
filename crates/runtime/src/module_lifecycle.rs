@@ -357,6 +357,49 @@ impl Runtime {
         fiscal_profile::ensure_provider_remains(&profile, &self.registry, leaving)
     }
 
+    /// Puts back a status that is ALREADY persisted, after the module was registered again
+    /// (hub#1875: another task of this hub installed or updated it). Registering always leaves a
+    /// module active, so without this a module the admin switched off would come back on just
+    /// because it was reloaded. Same rule as the rehydration at boot: restoring a persisted state is
+    /// not a new decision, so it does not go through the retention gate (hub#314).
+    pub async fn restore_persisted_status(
+        &mut self,
+        module_id: &str,
+        status: ModuleStatus,
+    ) -> Result<()> {
+        match status {
+            ModuleStatus::Active => Ok(()),
+            ModuleStatus::Inactive => self.deactivate_unchecked(module_id).await,
+            ModuleStatus::InactiveAuto => {
+                installer::set_status(
+                    self.db.as_ref(),
+                    &mut self.registry,
+                    &self.hub_id,
+                    module_id,
+                    ModuleStatus::InactiveAuto,
+                )
+                .await
+            }
+        }
+    }
+
+    /// Drops from THIS task's registry a module another task of the hub already uninstalled
+    /// (hub#2039). Memory only, on purpose: the other task went through every guard of
+    /// [`Self::uninstall`] and did all the writing — the `hub_module` row, the roles, the scheduled
+    /// tasks and the stored package are gone. Doing it again here would be a second decision.
+    /// Returns `false` if the module was not registered.
+    pub fn forget_uninstalled_elsewhere(&mut self, module_id: &str) -> bool {
+        self.registry.remove_module(module_id)
+    }
+
+    /// Applies to THIS task's registry the status another task recorded for a module (hub#2039).
+    /// Memory only, and without cascading: the other task already ran the cascade (ADR-0128) and
+    /// recorded every module it touched, so each row arrives here as it was decided. Returns
+    /// `false` if the module is not registered.
+    pub fn adopt_recorded_status(&mut self, module_id: &str, status: ModuleStatus) -> bool {
+        self.registry.set_status(module_id, status)
+    }
+
     /// [`Self::deactivate`] SIN el retention gate: repone un estado inactivo YA persistido
     /// (arranque/rehidratación), que no es una decisión nueva del admin. Gatearlo aquí solo podría
     /// tumbar el arranque o resucitar un módulo que el admin había apagado (hub#314).

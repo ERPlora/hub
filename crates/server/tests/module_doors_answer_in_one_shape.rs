@@ -87,6 +87,14 @@ const ANSWERS_OUTSIDE_THE_ENVELOPE_ON_PURPOSE: &[(&str, &str, &str)] = &[
         "bytes, not JSON: the SDK reads it with `fetchMediaBlob`, which hands the module a `Blob` \
          and never looks for `ok`",
     ),
+    (
+        "GET",
+        "/api/hub/whatsapp/media/:media_id",
+        "bytes, not JSON: a WhatsApp attachment streamed from the SaaS (hub#2114). The SDK reads \
+         a `2xx` as a `Blob` (`coreBlobRequest`) and only a refusal through `unwrap`; that the \
+         refusals travel in the envelope with the SaaS's own code is pinned by \
+         `whatsapp_media_proxy.rs`",
+    ),
 ];
 
 /// `(method, path)` of every route in the committed kernel contract, with its auth class.
@@ -288,8 +296,9 @@ fn sdk_source() -> String {
     files
         .iter()
         .map(|file| {
-            std::fs::read_to_string(file)
-                .unwrap_or_else(|e| panic!("{} is part of the module surface ({e})", file.display()))
+            std::fs::read_to_string(file).unwrap_or_else(|e| {
+                panic!("{} is part of the module surface ({e})", file.display())
+            })
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -372,7 +381,11 @@ fn sdk_named_shapes() -> BTreeSet<String> {
     }
     let unseen: Vec<&String> = mentioned
         .iter()
-        .filter(|m| !shapes.iter().any(|s| s == *m || s.starts_with(&format!("{m}/"))))
+        .filter(|m| {
+            !shapes
+                .iter()
+                .any(|s| s == *m || s.starts_with(&format!("{m}/")))
+        })
         .collect();
     assert!(
         unseen.is_empty(),
@@ -547,7 +560,9 @@ async fn fake_plain_saas() -> String {
 fn a_capability_gated_door_is_walked_even_when_the_sdk_does_not_name_it() {
     let walked = module_reachable_routes();
     assert!(
-        walked.iter().any(|(m, p)| m == "GET" && p == "/api/business/certificate"),
+        walked
+            .iter()
+            .any(|(m, p)| m == "GET" && p == "/api/business/certificate"),
         "the certificate a module screen reads is outside the walk: its envelope is unguarded"
     );
 }
@@ -604,7 +619,9 @@ async fn every_door_a_module_can_reach_answers_in_the_envelope_the_sdk_reads() {
             continue;
         };
         if body.get("ok").and_then(Value::as_bool).is_none() {
-            offenders.push(format!("{door} answered {status} outside the envelope: {body}"));
+            offenders.push(format!(
+                "{door} answered {status} outside the envelope: {body}"
+            ));
         } else if body["ok"] == Value::Bool(false)
             && body
                 .get("error")

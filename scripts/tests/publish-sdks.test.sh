@@ -213,10 +213,9 @@ else
     fi
 fi
 
-# ── 5. `erplora-guest-sdk` es consumible por git tag ─────────────────────────
-# Un módulo lo declarará `erplora-guest-sdk = { git = "…/hub", tag = "vX.Y.Z" }`. Cargo clona el
-# repo y resuelve el crate DENTRO de su workspace, así que basta con que el crate no dependa de
-# nada por ruta: un `path = "…"` fuera de este repo lo haría irresoluble en el clon.
+# ── 5. `erplora-guest-sdk` is publishable to crates.io — and ONLY there (hub#2119) ──
+# A vendor declares `erplora-guest-sdk = "X.Y.Z"`: ERPlora/hub is private, so the git-tag route of
+# hub#1236 never reached them. A `path = "…"` dependency would make `cargo publish` refuse the crate.
 if [ ! -f "$guest_sdk_manifest" ]; then
     bad "crates/guest-sdk/Cargo.toml existe" "no está"
 else
@@ -235,11 +234,25 @@ else
         ok "erplora-guest-sdk no tiene dependencias \`path =\` (resuelve en un clon por tag)"
     fi
 
-    if grep -qE '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "$guest_sdk_manifest"; then
-        ok "erplora-guest-sdk lleva \`publish = false\` (se consume por git tag, nunca por crates.io)"
+    # `publish = ["crates-io"]`, not a bare absence of `publish = false`: it pins the ONE registry
+    # the crate may go to, so a stray `--registry` in a workflow cannot upload it anywhere else.
+    if grep -qE '^[[:space:]]*publish[[:space:]]*=[[:space:]]*\[[[:space:]]*"crates-io"[[:space:]]*\]' "$guest_sdk_manifest"; then
+        ok "erplora-guest-sdk lleva \`publish = [\"crates-io\"]\` (publicable, y solo en crates.io)"
     else
-        bad "erplora-guest-sdk lleva \`publish = false\`" \
-            "sin él un \`cargo publish\` mandaría al registro PÚBLICO el SDK de un repo privado, y en crates.io una versión no se retira"
+        bad "erplora-guest-sdk lleva \`publish = [\"crates-io\"]\`" \
+            "$(grep -nE '^[[:space:]]*publish[[:space:]]*=' "$guest_sdk_manifest" || echo 'sin clave publish') — con \`false\` un tercero no puede descargarlo; sin clave, cualquier registro valdría"
+    fi
+
+    # crates.io rejects an upload without `description` and `license` (or `license-file`).
+    if grep -qE '^[[:space:]]*description[[:space:]]*=[[:space:]]*"[^"]+"' "$guest_sdk_manifest"; then
+        ok "erplora-guest-sdk declara \`description\` (crates.io la exige)"
+    else
+        bad "erplora-guest-sdk declara \`description\`" "crates.io rechaza la subida sin ella"
+    fi
+    if grep -qE '^[[:space:]]*license(\.workspace[[:space:]]*=[[:space:]]*true|[[:space:]]*=[[:space:]]*"[^"]+")' "$guest_sdk_manifest"; then
+        ok "erplora-guest-sdk declara su licencia (crates.io la exige)"
+    else
+        bad "erplora-guest-sdk declara su licencia" "crates.io rechaza la subida sin \`license\`"
     fi
 fi
 

@@ -13,17 +13,23 @@ import { createI18n } from 'vue-i18n';
 
 import type { AppUpdate } from '../lib/app-update';
 
-const { appUpdate, appUpdateDestination, canUpdateApp } = await vi.hoisted(async () => {
+const { appUpdate, appUpdateDestination, appUpdatePlatform, canUpdateApp } = await vi.hoisted(async () => {
   const { ref } = await import('vue');
   return {
     // Real `ref`s: a plain object would make every `v-if` a constant, and the guards would look
     // wired while none of them ever closed.
     appUpdate: ref<AppUpdate>({ state: 'attention', installed: '1.2.3', latest: '1.4.0' }),
     appUpdateDestination: ref<string | null>('https://erplora.com/app/download/windows/'),
+    appUpdatePlatform: ref<string | null>('windows'),
     canUpdateApp: ref(true),
   };
 });
-vi.mock('../lib/app-update', () => ({ appUpdate, appUpdateDestination, canUpdateApp }));
+vi.mock('../lib/app-update', () => ({
+  appUpdate,
+  appUpdateDestination,
+  appUpdatePlatform,
+  canUpdateApp,
+}));
 
 const { openExternal, OpenExternalError, toastError, alertCreate } = vi.hoisted(() => {
   class OpenExternalError extends Error {}
@@ -72,6 +78,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   appUpdate.value = { state: 'attention', installed: '1.2.3', latest: '1.4.0' };
   appUpdateDestination.value = 'https://erplora.com/app/download/windows/';
+  appUpdatePlatform.value = 'windows';
   canUpdateApp.value = true;
   alertAnswering('confirm');
 });
@@ -151,6 +158,72 @@ describe('pressing it', () => {
     await Promise.resolve();
 
     expect(toastError).toHaveBeenCalled();
+  });
+});
+
+describe('on Android (hub#1898)', () => {
+  // A hand-installed APK is sent to the Cloud's Android page, which hands it to Google Play. There
+  // is no file to download and nothing to open afterwards, so the desktop sentence would leave the
+  // owner waiting for a download that never arrives.
+  type Copy = { appUpdate: Record<string, string> & { android: Record<string, string> } };
+  const copyOf = (catalogue: unknown) => (catalogue as Copy).appUpdate;
+
+  beforeEach(() => {
+    appUpdateDestination.value = 'https://erplora.com/app/download/android/';
+    appUpdatePlatform.value = 'android';
+  });
+
+  async function press(locale: string) {
+    const wrapper = mountItem(locale);
+    await entry(wrapper).trigger('click');
+    await Promise.resolve();
+    await Promise.resolve();
+    return alertCreate.mock.calls[0][0] as {
+      message: string;
+      buttons: { text: string; role: string }[];
+    };
+  }
+
+  it.each([
+    ['en', en],
+    ['es', es],
+  ])('confirms with the Google Play copy, never the download one (%s)', async (locale, catalogue) => {
+    const copy = copyOf(catalogue);
+    const options = await press(locale);
+
+    expect(options.message).toBe(copy.android.confirmBody.replace('{version}', '1.4.0'));
+    expect(options.message).not.toBe(copy.confirmBody.replace('{version}', '1.4.0'));
+    expect(options.buttons.find((b) => b.role === 'confirm')?.text).toBe(copy.android.action);
+    expect(options.buttons.find((b) => b.role === 'cancel')?.text).toBe(copy.cancel);
+  });
+
+  it('still hands the Cloud address to the system browser', async () => {
+    await press('en');
+    expect(openExternal).toHaveBeenCalledWith('https://erplora.com/app/download/android/');
+  });
+
+  it('says Google Play could not be opened when the trip out fails', async () => {
+    openExternal.mockRejectedValueOnce(new OpenExternalError('nope'));
+    await press('es');
+    await Promise.resolve();
+    expect(toastError).toHaveBeenCalledWith(copyOf(es).android.failed);
+  });
+
+  it('keeps the desktop copy on the desktop', async () => {
+    appUpdateDestination.value = 'https://erplora.com/app/download/windows/';
+    appUpdatePlatform.value = 'windows';
+    const options = await press('es');
+    expect(options.message).toBe(copyOf(es).confirmBody.replace('{version}', '1.4.0'));
+    expect(options.buttons.find((b) => b.role === 'confirm')?.text).toBe(copyOf(es).action);
+  });
+
+  it('exists in both catalogues, with the version in its body', () => {
+    for (const catalogue of [en, es]) {
+      const android = copyOf(catalogue).android;
+      expect(android.confirmBody).toContain('{version}');
+      expect(android.action.length).toBeGreaterThan(0);
+      expect(android.failed.length).toBeGreaterThan(0);
+    }
   });
 });
 

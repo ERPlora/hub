@@ -2016,7 +2016,8 @@ mod tests {
     #[test]
     fn a_refused_turn_is_not_mute_in_the_hub_log() {
         let k = std::collections::HashMap::new();
-        let refusal = "data: {\"type\":\"error\",\"error\":\"No active credential for provider 'openai'\"}";
+        let refusal =
+            "data: {\"type\":\"error\",\"error\":\"No active credential for provider 'openai'\"}";
 
         let log = captured(|| {
             translate_sse_line(refusal, &k);
@@ -2192,6 +2193,7 @@ mod tests {
                 }),
                 expose_api: false,
                 internal,
+                on_unique: Default::default(),
             }
         }
 

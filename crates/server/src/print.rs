@@ -227,10 +227,12 @@ pub async fn list_jobs(
             // The stamp names a person (hub#1565), and only the back office reads it: a counter
             // session resolves nothing, which is both the right answer and the cheap one.
             let names = match audience {
-                print_queue::QueueAudience::Admin => match rt.print_queue_actor_names(&jobs).await {
-                    Ok(names) => names,
-                    Err(e) => return crate::err_response(e),
-                },
+                print_queue::QueueAudience::Admin => {
+                    match rt.print_queue_actor_names(&jobs).await {
+                        Ok(names) => names,
+                        Err(e) => return crate::err_response(e),
+                    }
+                }
                 print_queue::QueueAudience::Counter => print_queue::ActorNames::none(),
             };
             let jobs: Vec<Value> = jobs
@@ -365,10 +367,7 @@ pub async fn retry_job(
         Ok(actor) => actor,
         Err(response) => return response,
     };
-    match rt
-        .retry_print_job(&job_id, &actor.who, &actor.module)
-        .await
-    {
+    match rt.retry_print_job(&job_id, &actor.who, &actor.module).await {
         // The stamp travels back for the same reason the discard's does: what the caller reads is
         // what was STORED, so a screen showing "re-fired by" cannot drift from the row.
         Ok(RequeueOutcome::Requeued(stamp)) => Json(json!({

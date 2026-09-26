@@ -118,6 +118,25 @@ pub fn elevation_token(headers: &HeaderMap) -> Option<String> {
     header(headers, "x-elevation-token").filter(|t| !t.is_empty())
 }
 
+/// Longest `X-Client-Instance` the hub repeats (hub#1980). A UUID is 36; the room above it is for
+/// whatever id a shell prefers, not for text.
+pub const CLIENT_INSTANCE_MAX_LEN: usize = 64;
+
+/// The shell tab a request comes from (`X-Client-Instance`, hub#1980), if it is a plain short id.
+///
+/// It only NAMES — it authorises nothing — but it is repeated on the live frames to every listener
+/// of the hub, so it is held to the shape of an id (ASCII letters, digits, `-`, `_`, at most
+/// [`CLIENT_INSTANCE_MAX_LEN`]). Anything else is dropped, never trimmed into shape: a value the hub
+/// had to repair is not the one the shell will compare against.
+pub fn client_instance(headers: &HeaderMap) -> Option<String> {
+    header(headers, "x-client-instance").filter(|v| {
+        !v.is_empty()
+            && v.len() <= CLIENT_INSTANCE_MAX_LEN
+            && v.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    })
+}
+
 /// Bearer `erpl_live_<id>_<secret>` de una **API key** (`Authorization: Bearer …`), si viene y
 /// tiene el prefijo de API key. Distinto del JWT de usuario (que también va en `Authorization:
 /// Bearer` pero NO empieza por `erpl_live_`): así un endpoint sabe qué tipo de bearer le llega.

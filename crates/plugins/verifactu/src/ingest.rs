@@ -49,10 +49,17 @@ pub(crate) async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Resul
     // in ADR-0405, but the rows already sealed — and every verbatim F3 — still carry it. It goes as
     // subconsulta de ESTA lectura, no como una segunda: un listener que abre dos lecturas por venta
     // es una lectura de más en cada tique, y ADR-0058 acota la excepción a UNA.
+    //
+    // The customer's country and document kind (hub#1967) are read through `to_jsonb(i)`, not as
+    // columns: the hub runtime and the `invoice` module update on their own schedules, and a hub
+    // whose invoice module predates those columns must keep sealing its sales — a missing column
+    // there would fail every invoice. An absent key reads as '' (the country is unknown).
     let rows = host
         .read(
             "SELECT i.invoice_type, i.number, i.issue_date, i.issuer_nif, i.issuer_name, \
              i.customer_tax_id, i.customer_name, i.description, \
+             COALESCE(to_jsonb(i) ->> 'customer_country', '') AS customer_country, \
+             COALESCE(to_jsonb(i) ->> 'customer_id_type', '') AS customer_id_type, \
              i.base_amount, i.tax_amount, i.total_amount, i.tax_breakdown, \
              COALESCE(sub.number, '') AS substitutes_number, \
              COALESCE(sub.issue_date, '') AS substitutes_date, \
@@ -163,6 +170,10 @@ pub(crate) async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Resul
             // → vacío → sin Destinatarios. Evita el error AEAT 1189 en facturas completas.
             recipient_nif,
             recipient_name: str_field(&inv, "customer_name"),
+            // hub#1967: who the customer is abroad — ISO country and AEAT `IDType` — decides the
+            // identity block (`NIF` or `IDOtro`). Empty on invoices that do not know it.
+            recipient_country: str_field(&inv, "customer_country"),
+            recipient_id_type: str_field(&inv, "customer_id_type"),
             // F3 → FacturasSustituidas: datos de la F2 sustituida (del LEFT JOIN). Vacíos si no es F3.
             substitutes_number: str_field(&inv, "substitutes_number"),
             substitutes_date: str_field(&inv, "substitutes_date"),

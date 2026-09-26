@@ -43,7 +43,8 @@ async fn fixture(hub_id: &str) -> (axum::Router, AppState, String, String) {
         .await
         .unwrap();
 
-    let temp = std::env::temp_dir().join(format!("erplora-hub1801-{hub_id}-{}", std::process::id()));
+    let temp =
+        std::env::temp_dir().join(format!("erplora-hub1801-{hub_id}-{}", std::process::id()));
     let cfg = HubConfig {
         demo: false,
         hub_id: hub_id.into(),
@@ -79,7 +80,10 @@ async fn probe(router: &axum::Router, session: &str) -> (StatusCode, Value) {
         .unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 #[tokio::test]

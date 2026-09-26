@@ -26,7 +26,7 @@ const TERMS: [&str; 4] = ["verifactu", "ticketbai", "agenciatributaria", "aeat"]
 /// knowledge, frozen at their 2026-09-02 values. The rule is a RATCHET: shrink freely
 /// (update the number down in the same PR), never grow — growth means country
 /// knowledge is leaking back into the base. A file not listed here has budget 0.
-const RATCHET: [(&str, usize, &str); 10] = [
+const RATCHET: [(&str, usize, &str); 11] = [
     (
         "crates/server/src/boot.rs",
         2,
@@ -36,6 +36,12 @@ const RATCHET: [(&str, usize, &str); 10] = [
         "crates/runtime/src/export.rs",
         1,
         "verifactu_config gating in export",
+    ),
+    (
+        "crates/runtime/src/fiscal_profile.rs",
+        2,
+        "one-off adoption of a go-live done through the module's own select (hub#2079): the \
+         module's config table is the DATA of that transition, read once at boot and never again",
     ),
     (
         "crates/runtime/src/import.rs",

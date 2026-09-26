@@ -23,6 +23,14 @@ mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
 mod navigation;
 pub use navigation::{NavigationVerdict, navigation_verdict};
+mod native_print;
+pub use native_print::{
+    check_print_document, native_print_supported, print_document_id, print_document_url, print_window_label,
+    print_window_may_navigate, PrintDocuments, MAX_PRINT_DOCUMENT_BYTES, PRINT_DOCUMENT_CSP,
+    PRINT_SCHEME,
+};
+#[cfg(desktop)]
+pub use native_print::open_print_window;
 
 /// Id de dispositivo estable por instalación (`X-Device-Id` del login; sesión única ADR-0154).
 const DEVICE_ID_FILE: &str = "device.id";
@@ -72,6 +80,16 @@ pub enum ShellError {
     /// locked out by a card that demonstrably worked the day it was set up.
     #[error("nfc_random_uid")]
     NfcRandomUid,
+    /// The page sent no document to print, or one too big to hold (hub#2006).
+    #[error("print_document_refused")]
+    PrintDocumentRefused,
+    /// This platform has no system print dialog for a webview (iOS). The print door
+    /// takes its usual route instead.
+    #[error("native_print_unsupported")]
+    NativePrintUnsupported,
+    /// The print window could not be opened.
+    #[error("native_print_failed: {0}")]
+    NativePrintFailed(String),
 }
 
 impl Serialize for ShellError {
@@ -216,6 +234,13 @@ const HUB_DOMAIN_SUFFIX: &str = ".erplora.com";
 /// [`HUB_DOMAIN_SUFFIX`] without the leading dot that makes that one a suffix match, and it is
 /// deliberately NOT a hub: only [`external_browser_url`] accepts it.
 const ERPLORA_DOMAIN: &str = "erplora.com";
+
+/// Stripe's hosted checkout, matched by EXACT host. The assistant's paid upgrade is its own Stripe
+/// subscription (ADR-0033) and the SaaS answers it with this page directly — there is no
+/// erplora.com page in between to send the browser to. Without it the assistant's «See plans» could
+/// only fail inside the installed app (hub#1914). No other Stripe host, and no suffix match: the
+/// dashboard or a look-alike is not a checkout the till starts.
+const STRIPE_CHECKOUT_HOST: &str = "checkout.stripe.com";
 
 /// Is this host a hub of ours — `<label>[.<label>…].erplora.com`?
 ///
@@ -365,7 +390,8 @@ pub fn external_browser_url(raw: &str) -> Option<String> {
     let host = url.host_str()?;
     let allowed = match url.scheme() {
         // Everything we serve: the SaaS at the apex plus every hub, auras by wildcard.
-        "https" => host == ERPLORA_DOMAIN || is_hub_domain(host),
+        // Plus Stripe's hosted checkout, where the assistant's upgrade is paid (hub#1914).
+        "https" => host == ERPLORA_DOMAIN || host == STRIPE_CHECKOUT_HOST || is_hub_domain(host),
         // Development against a local SaaS (`VITE_CLOUD_API_URL=http://127.0.0.1:8001`). Nothing
         // outside this machine can serve loopback, so nobody else can steer it.
         "http" => is_loopback_host(host),
@@ -847,6 +873,39 @@ fn save_download(
     }
 }
 
+/// `print_document` — the system print dialog for an A4 document the page holds (hub#2006).
+///
+/// The page keeps the html, the shell keeps the dialog: on the desktop a window of its own shows
+/// the document and the OS prints it, with its printer list and «Save as PDF» ([`native_print`]);
+/// on Android the plugin renders it in a WebView of its own and opens the system print service
+/// (`PrintManager`, hub#2008). Where there is no dialog it answers `native_print_unsupported` and
+/// the print door takes its usual route — a refusal, never a pretended page.
+///
+/// ⚠️ `(async)` is load-bearing: creating a window from a synchronous command deadlocks on Windows.
+#[tauri::command(async)]
+fn print_document(app: tauri::AppHandle, html: String) -> Result<(), ShellError> {
+    if !native_print_supported(std::env::consts::OS) {
+        return Err(ShellError::NativePrintUnsupported);
+    }
+    #[cfg(desktop)]
+    {
+        native_print::open_print_window(&app, html)
+    }
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_erplora_android::ErploraAndroidExt;
+        check_print_document(&html)?;
+        app.erplora_android()
+            .print_html(&html)
+            .map_err(|e| ShellError::NativePrintFailed(e.to_string()))
+    }
+    #[cfg(not(any(desktop, target_os = "android")))]
+    {
+        let _ = (&app, &html);
+        Err(ShellError::NativePrintUnsupported)
+    }
+}
+
 /// Hands the bytes to Kotlin so they land in Android's **public** Downloads collection (hub#499).
 ///
 /// The file is staged in the app's own cache first and handed over as a **path**: a 5 MB export has
@@ -1250,6 +1309,25 @@ impl Serialize for HardwareError {
     }
 }
 
+/// Refusal of `erplora_add_network_printer` (hub#1924): the stable `code` the page branches on
+/// next to the message for the log. `HardwareError` travels as a bare string, and the two answers
+/// this command can give send the owner to opposite places — fix the typed address, or go check
+/// the printer — so the page must be able to tell them apart without parsing prose (ADR-0055).
+#[derive(Debug, Serialize)]
+struct AddPrinterError {
+    code: &'static str,
+    message: String,
+}
+
+impl From<erplora_peripherals::PeripheralError> for AddPrinterError {
+    fn from(e: erplora_peripherals::PeripheralError) -> Self {
+        Self {
+            code: e.code(),
+            message: e.to_string(),
+        }
+    }
+}
+
 /// `erplora_bridge_status` — el `IpcBridgeTransport.detect()` lo invoca para saber si el canal de
 /// hardware existe (en el shell siempre existe: el shell ES el bridge). Devuelve la versión.
 #[tauri::command]
@@ -1474,10 +1552,33 @@ async fn erplora_discover_printers(
     // only monitors `network`, so a queue never enters the health probe or the ARP recovery sweep.
     register_discovered_queues(&state.registry, &usb);
 
+    // Printers the owner typed by address (hub#1924) stay listed even when the sweep cannot see
+    // them — that is why they were typed.
+    let outcome = discovery::with_manual_printers(outcome, &state.registry);
+
     Ok(merge_usb_printers(
         merge_bluetooth_printers(outcome, bonded),
         usb,
     ))
+}
+
+/// `erplora_add_network_printer` — adds a network printer by the address the owner TYPED
+/// (hub#1924): the way in when the scan cannot see it (another subnet, an isolated Wi-Fi, mDNS
+/// blocked by the router). It connects first and only a printer that answers is saved; the next
+/// discovery keeps listing it. Returns the printer as the scan would have.
+#[tauri::command]
+async fn erplora_add_network_printer(
+    state: tauri::State<'_, PeripheralsState>,
+    host: String,
+    port: u16,
+) -> Result<erplora_peripherals::protocol::PrinterInfo, AddPrinterError> {
+    Ok(discovery::add_network_printer(
+        &state.registry,
+        &host,
+        port,
+        discovery::MANUAL_PRINTER_PROBE_TIMEOUT,
+    )
+    .await?)
 }
 
 /// `erplora_get_devices` — contenido del registro persistente de dispositivos (con sus roles).
@@ -1864,6 +1965,14 @@ pub fn run() {
     ));
 
     builder
+        // The A4 document of `print_document` (hub#2006), served from memory to its print window
+        // with a CSP that runs no code. Any other path is a 404.
+        .register_uri_scheme_protocol(PRINT_SCHEME, |ctx, request| {
+            use tauri::Manager;
+            ctx.app_handle()
+                .state::<PrintDocuments>()
+                .respond(request.uri().path())
+        })
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_erplora_android::init())
         // The user's own browser (hub#475). Registered for its RUST api only: no `opener:*`
@@ -1923,6 +2032,7 @@ pub fn run() {
                 .map(|d| d.join(DEVICES_FILE))
                 .unwrap_or_else(|| PathBuf::from(DEVICES_FILE));
             app.manage(build_peripherals_state(devices_path));
+            app.manage(PrintDocuments::default());
             // Ventana única: onboarding del SaaS o el hub capturado (modo app).
             if let Err(e) = open_main_window(app, cache_dir) {
                 eprintln!("no se pudo crear la ventana principal: {e}");
@@ -1934,6 +2044,8 @@ pub fn run() {
             forget_hub,
             open_external_url,
             save_download,
+            // The system print dialog for an A4 document (hub#2006).
+            print_document,
             // The way out when the network dies under the window (hub#1716).
             shell_retry,
             // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
@@ -1945,6 +2057,7 @@ pub fn run() {
             erplora_test_print,
             erplora_open_drawer,
             erplora_set_device_role,
+            erplora_add_network_printer,
             erplora_set_device_name,
             erplora_remove_device,
             erplora_notify,
@@ -1965,6 +2078,27 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#1924: adding a printer by typing its address ─────────────────────────────────────────
+    //
+    // The screen has to tell a typo from a printer that did not answer, in the user's language. A
+    // bare string (what `HardwareError` sends) cannot be branched on without parsing prose, so this
+    // command's refusal carries the stable code next to the message.
+
+    #[test]
+    fn a_refused_manual_printer_reaches_the_page_as_a_code_and_a_message() {
+        let unreachable = AddPrinterError::from(erplora_peripherals::PeripheralError::Unreachable(
+            "10.0.0.9:9100: connection refused".into(),
+        ));
+        let wire = serde_json::to_value(&unreachable).expect("serializes");
+        assert_eq!(wire["code"], "printer_unreachable");
+        assert!(wire["message"].as_str().is_some_and(|m| m.contains("10.0.0.9")));
+
+        let typo = AddPrinterError::from(erplora_peripherals::PeripheralError::InvalidPrinterId(
+            "not an IPv4 address".into(),
+        ));
+        assert_eq!(serde_json::to_value(&typo).expect("serializes")["code"], "invalid_printer_address");
+    }
 
     fn url(s: &str) -> tauri::Url {
         s.parse().expect("url de test válida")

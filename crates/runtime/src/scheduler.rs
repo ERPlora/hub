@@ -345,9 +345,10 @@ fn advance_op(module_id: &str, name: &str, next_run: &str, now: &str) -> (String
 /// Contexto **de sistema** (sin usuario) con el que corre la tarea: el `hub_id` del despliegue
 /// (un ECS container por hub, §2.5), `user_id` vacío y permiso comodín `*`. Es el equivalente al
 /// contexto que el relay del outbox reconstruye para el emisor, pero sin usuario (ADR-0011: las
-/// scheduled tasks ejecutan sin usuario).
+/// scheduled tasks ejecutan sin usuario). Nobody is behind it, so it is a **machine** principal
+/// (hub#2113): the handler is told so, and the task is never offered a manager's PIN.
 fn system_ctx(hub_id: &str) -> RequestContext {
-    RequestContext::new(hub_id.to_string(), String::new(), ["*".to_string()])
+    RequestContext::new(hub_id.to_string(), String::new(), ["*".to_string()]).as_machine()
 }
 
 fn parse_payload(row: &Json) -> Params {
@@ -962,6 +963,17 @@ mod tests {
         PgAdapter,
     };
 
+    /// hub#2113: a scheduled task has nobody behind it, so its context is a MACHINE principal —
+    /// that is what the handler is told in `context.principal`, and it also keeps the task from
+    /// ever being offered a manager's PIN.
+    #[test]
+    fn a_scheduled_task_runs_as_a_machine() {
+        assert_eq!(
+            system_ctx("h1").principal,
+            crate::registry::Principal::Machine
+        );
+    }
+
     fn cmd(module: &str, sql: &str) -> RegisteredCommand {
         RegisteredCommand {
             module_id: module.to_string(),
@@ -978,6 +990,7 @@ mod tests {
                 schema: None,
                 expose_api: false,
                 internal: false,
+                on_unique: Default::default(),
             },
             sql: vec![sql.to_string()],
             wasm: None,

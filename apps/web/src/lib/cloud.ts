@@ -69,6 +69,12 @@ export interface CloudMarketplaceModule {
   priceAmount: string | null;
   priceInterval: 'month' | 'year' | null;
   isFree: boolean;
+  /**
+   * A paid module whose every tier costs nothing: an ERPlora premium module that comes only with the
+   * hub plan (ADR-0474), so the catalog has no amount to show for it (hub#2072). Never true without
+   * tiers — a missing price is not the same as «included».
+   */
+  includedInPlan: boolean;
   moduleType: 'free' | 'one_time' | 'subscription' | string;
   category: string;
   installed: boolean;
@@ -81,6 +87,12 @@ export interface CloudMarketplaceModule {
    * preguntar nada (pm#132). Declaración, nunca concesión.
    */
   capabilities: string[];
+  /**
+   * The minimum ERPlora version the announced `version` needs, or `null` when it declares none
+   * (saas#2239: the floor of THAT version for this hub's lane, not one per app). Additive: a SaaS
+   * older than the field omits it and nothing is blocked (hub#2054).
+   */
+  minErploraVersion: string | null;
 }
 
 // --- Token store (JWT del usuario activo) -----------------------------------
@@ -399,7 +411,14 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    const data = (await res.json().catch(() => ({}))) as {
+    const parsed: unknown = await res.json().catch(() => undefined);
+    // A 2xx without a JSON object is a broken answer (a proxy page, an empty body), never a
+    // success: returning `{}` as the door result let the courier store "undefined" tokens (hub#2149).
+    const isObject = typeof parsed === 'object' && parsed !== null;
+    if (res.ok && !isObject) {
+      throw new RuntimeError(`runtime ${path} → ${res.status} without a JSON body`, 'runtime_bad_response');
+    }
+    const data = (isObject ? parsed : {}) as {
       ok?: boolean;
       // Two shapes share this door: the hand-built ones in this file (`too_many_attempts`,
       // `device_untrusted`…) put `error` as plain prose with `code` alongside it at the top; a
@@ -801,6 +820,11 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
           ? raw.subscription_price_monthly ?? raw.monthly_price
           : raw.price),
       );
+  const tiers = Array.isArray(raw.tiers) ? (raw.tiers as Record<string, unknown>[]) : [];
+  const includedInPlan = !isFree
+    && priceAmount === null
+    && tiers.length > 0
+    && tiers.every((tier) => positiveDecimal(tier?.price) === null);
   const interval =
     raw.subscription_interval === 'year'
       ? 'year'
@@ -818,6 +842,7 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
     priceAmount,
     priceInterval: interval,
     isFree,
+    includedInPlan,
     moduleType,
     category: String(
       raw.category
@@ -831,6 +856,10 @@ export function normalizeMarketplaceModule(raw: Record<string, unknown>): CloudM
     available: Boolean(raw.can_install ?? raw.is_active ?? true) && raw.is_coming_soon !== true,
     version: raw.version ? String(raw.version) : undefined,
     capabilities: capabilityIds(raw.capabilities),
+    minErploraVersion:
+      typeof raw.min_erplora_version === 'string' && raw.min_erplora_version.trim()
+        ? raw.min_erplora_version.trim()
+        : null,
   };
 }
 
@@ -906,7 +935,20 @@ export interface CloudModuleSubscription {
    * ADDITIVE: a SaaS older than saas#1921 does not send the key and it stays `null` here.
    */
   tier: string | null;
+  /**
+   * Where that level COMES FROM (ERPlora/saas#1952, hub#1686): `plan` = the hub plan gives it and it
+   * is not sold separately (ERPlora's own modules, ADR-0474); `purchase`/`trial`/`free` = the
+   * per-module path third-party modules keep. `null` = the SaaS did not say (older than saas#1952)
+   * or said something this hub does not know — and only a literal `plan` changes the screen.
+   */
+  source: ModuleLevelSource | null;
+  /** Display name of the hub plan («Standard»), or `null` when it does not arrive. */
+  planName: string | null;
 }
+
+/** Where a module level comes from (ERPlora/saas#1952). */
+export type ModuleLevelSource = 'plan' | 'purchase' | 'trial' | 'free';
+const LEVEL_SOURCES = ['plan', 'purchase', 'trial', 'free'] as const;
 
 const SUB_STATUS = ['active', 'trialing', 'expired', 'none', 'canceled', 'past_due'] as const;
 function normSubStatus(s: unknown): ModuleSubscriptionStatus {
@@ -920,6 +962,8 @@ export async function cloudModuleSubscription(moduleSlug: string): Promise<Cloud
     trial_end?: string | null;
     period_end?: string | null;
     tier?: string | null;
+    source?: string | null;
+    plan_name?: string | null;
   }>(`/api/v1/hub/device/module-subscription/?module=${encodeURIComponent(moduleSlug)}`);
   return {
     status: normSubStatus(data.status),
@@ -928,6 +972,10 @@ export async function cloudModuleSubscription(moduleSlug: string): Promise<Cloud
     // Empty string = says nothing, same as absent: normalised to `null` so the reader has ONE form
     // of "I don't know", not two.
     tier: typeof data.tier === 'string' && data.tier ? data.tier : null,
+    source: (LEVEL_SOURCES as readonly unknown[]).includes(data.source)
+      ? (data.source as ModuleLevelSource)
+      : null,
+    planName: typeof data.plan_name === 'string' && data.plan_name ? data.plan_name : null,
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { printerIdForRole, createPrintService, printHtmlInIframe, type EnqueuePrintJob } from './print';
+import { hubSettings } from './hub-settings';
 
 // El Hub expone UNA puerta de impresión para TODOS los módulos (sales, kitchen, cash_register…).
 // Dos vías: si hay Bridge se imprime por la impresora del ROL pedido (ESC/POS); si no, se cae al
@@ -568,5 +569,108 @@ describe('la cola dice si hay alguien que la drene (hub#1731)', () => {
 
     expect(r.via).toBe('bridge');
     expect(r.awaitingHost).toBeFalsy();
+  });
+});
+
+// hub#2029 — a kitchen ticket no till fired (API, flow, online ordering) is heard by EVERY open
+// till. Each one printing it on its own printer is what put two tickets at the pass. `queueOnly`
+// sends it to the hub's queue and nowhere else: every till asks for the same `jobId`, the queue keeps
+// one row, and the device that drains the station prints it once.
+describe('queueOnly: the hub queue and nowhere else (hub#2029)', () => {
+  it('with a printer for the role right here, it still goes to the queue and not to the printer', async () => {
+    const client = fakeClient();
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const print = createPrintService(client, { enqueue });
+
+    const r = await print({
+      role: 'kitchen',
+      documentType: 'kitchen_order',
+      jobId: 'kitchen-k-1-kitchen',
+      data: { items: [] },
+      fallbackToBrowser: false,
+      queueOnly: true,
+    });
+
+    expect(r.via).toBe('queue');
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ jobId: 'kitchen-k-1-kitchen', role: 'kitchen' }));
+    expect((client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print).not.toHaveBeenCalled();
+  });
+
+  it('when the queue refuses it, it says so instead of printing here', async () => {
+    const client = fakeClient();
+    const enqueue = vi.fn(async () => ({ queued: false }));
+    const print = createPrintService(client, { enqueue });
+
+    const r = await print({
+      role: 'kitchen',
+      documentType: 'kitchen_order',
+      jobId: 'kitchen-k-1-kitchen',
+      data: { items: [] },
+      fallbackToBrowser: false,
+      queueOnly: true,
+    });
+
+    expect(r.via).toBe('none');
+    expect((client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print).not.toHaveBeenCalled();
+  });
+
+  it('without queueOnly the printer of the role right here still wins (control)', async () => {
+    const client = fakeClient();
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const print = createPrintService(client, { enqueue });
+
+    const r = await print({ role: 'kitchen', documentType: 'kitchen_order', jobId: 'kitchen-k-1-kitchen', data: { items: [] } });
+
+    expect(r.via).toBe('bridge');
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+});
+
+// hub#2129 — the thermal paper prints every amount with `data.decimals` digits (JPY 0, KWD 3) and
+// two without it. The hub's queue stamps it on what it queues; the direct road to the app's printer
+// never passes through the queue, so the door stamps it there — for every module, none of them
+// having to remember the field.
+describe('escala de la moneda en el papel térmico (hub#2129)', () => {
+  it('printing straight to the printer stamps the hub currency scale on the document', async () => {
+    const client = fakeClient();
+    const print = createPrintService(client, { currencyDecimals: () => 0 });
+
+    await print({ role: 'receipt', documentType: 'receipt', data: { total: 1500 } });
+
+    const printed = (client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print;
+    expect(printed.mock.calls[0][2]).toEqual({ total: 1500, decimals: 0 });
+  });
+
+  it('by default the scale is the hub currency the shell booted with', async () => {
+    hubSettings.value = { currency: 'KWD' } as never;
+    try {
+      const client = fakeClient();
+      await createPrintService(client)({ role: 'receipt', documentType: 'receipt', data: { total: 1.234 } });
+      const printed = (client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print;
+      expect(printed.mock.calls[0][2]).toMatchObject({ decimals: 3 });
+    } finally {
+      hubSettings.value = null;
+    }
+  });
+
+  it('a producer that states the scale of its amounts keeps it', async () => {
+    const client = fakeClient();
+    const print = createPrintService(client, { currencyDecimals: () => 0 });
+
+    await print({ role: 'receipt', documentType: 'receipt', data: { total: 12.5, decimals: 2 } });
+
+    const printed = (client as { peripherals: { print: ReturnType<typeof vi.fn> } }).peripherals.print;
+    expect(printed.mock.calls[0][2]).toEqual({ total: 12.5, decimals: 2 });
+  });
+
+  it('the queue receives the producer document as it was: the hub stamps its own scale', async () => {
+    const enqueue = vi.fn(async () => ({ queued: true, liveHosts: 1 }));
+    const client = fakeClient({ peripherals: { getDevices: vi.fn(async () => []) } });
+    const print = createPrintService(client, { enqueue: enqueue as never, currencyDecimals: () => 0, installedApp: () => false });
+
+    await print({ role: 'receipt', documentType: 'receipt', data: { total: 1500 } });
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect((enqueue.mock.calls[0] as unknown as [{ document: unknown }])[0].document).toEqual({ total: 1500 });
   });
 });

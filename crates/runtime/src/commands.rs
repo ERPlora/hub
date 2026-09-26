@@ -150,6 +150,84 @@ pub(crate) async fn execute_at(
     origin: Origin,
     grants: Option<&Grants>,
 ) -> Result<Json> {
+    execute_unnamed(
+        db, registry, name, payload, ctx, depth, extra_ops, origin, grants,
+    )
+    .await
+    .map_err(|err| name_unique_violation(registry, name, err))
+}
+
+/// hub#2081: a unique violation of an index the command DECLARES in `on_unique` becomes the
+/// module's domain code; every other error passes through untouched.
+///
+/// One wrapper around the whole dispatch rather than a branch per path, because the violation
+/// reaches the database from three places (declarative SQL, a WASM handler's operations, a native
+/// plugin's) and a mapping that only one of them honoured would be the same unexplained `db`
+/// on the other two.
+fn name_unique_violation(registry: &Registry, name: &str, err: RuntimeError) -> RuntimeError {
+    let RuntimeError::Db(erplora_db::DbError::Sqlx(sqlx_err)) = &err else {
+        return err;
+    };
+    let Some(db_err) = sqlx_err.as_database_error() else {
+        return err;
+    };
+    if db_err.code().as_deref() != Some(UNIQUE_VIOLATION) {
+        return err;
+    }
+    let Some(cmd) = registry.get_command(name) else {
+        return err;
+    };
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    match unique_violation_code(
+        &cmd.def.on_unique,
+        &cmd.module_id,
+        &installed,
+        db_err.constraint(),
+        db_err.table(),
+    ) {
+        Some(code) => RuntimeError::Domain {
+            code: code.to_string(),
+            // Generated fallback, like `expect_rows`: states the refusal without internals. The
+            // module's `locales/<lang>.json` translates the code; this is only the last resort.
+            message: format!("the operation `{name}` conflicts with a record that already exists"),
+        },
+        None => err,
+    }
+}
+
+/// SQLSTATE `unique_violation`.
+const UNIQUE_VIOLATION: &str = "23505";
+
+/// The code `on_unique` declares for a violation of `constraint` on `table`, if any (hub#2081).
+///
+/// Kept away from the database so each refusal to map is testable on its own. The index must be
+/// one the command names, AND the table must belong to the command's module (longest installed
+/// prefix, the same rule as export/reset): a manifest cannot rename the refusal of another
+/// module's index — or a core table's — into a code of its own.
+fn unique_violation_code<'a>(
+    on_unique: &'a std::collections::BTreeMap<String, String>,
+    module_id: &str,
+    installed: &[String],
+    constraint: Option<&str>,
+    table: Option<&str>,
+) -> Option<&'a str> {
+    let code = on_unique.get(constraint?)?;
+    let owner = crate::export::table_owner(table?, installed)?;
+    (owner == module_id).then_some(code.as_str())
+}
+
+#[allow(clippy::too_many_arguments)] // the body of `execute_at`, same signature
+async fn execute_unnamed(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    name: &str,
+    payload: &Params,
+    ctx: &RequestContext,
+    depth: u32,
+    extra_ops: &[(String, Params)],
+    origin: Origin,
+    grants: Option<&Grants>,
+) -> Result<Json> {
     if depth > MAX_EVENT_DEPTH {
         return Err(RuntimeError::EventLoop);
     }
@@ -196,14 +274,22 @@ pub(crate) async fn execute_at(
         // certificate is active and `can_transmit` is exactly `is_enrolled`. An unreadable profile
         // gates nothing here, the same as the mode below: `ensure` failing is the database the
         // sale itself is about to write to.
+        //
+        // The own certificate's expiry (hub#1940) is only read where it can change the answer — a
+        // live hub on the own road — so no other command pays the query. An expiry that cannot be
+        // read is not known, and an unknown expiry blocks nothing, as before the date was stored.
         let filing_gap = match &profile {
-            Ok(p) => crate::fiscal_profile::filing_gap(
-                p,
-                crate::certificate::transmission_route(db, &ctx.hub_id)
+            Ok(p) => {
+                let route = crate::certificate::transmission_route(db, &ctx.hub_id)
                     .await
-                    .unwrap_or(crate::certificate::ROUTE_DELEGATED),
-                has_cert,
-            ),
+                    .unwrap_or(crate::certificate::ROUTE_DELEGATED);
+                let own_expired = p.environment != crate::fiscal_profile::ENV_TESTING
+                    && route == crate::certificate::ROUTE_OWN
+                    && crate::certificate::signing_certificate_expired(db, &ctx.hub_id)
+                        .await
+                        .unwrap_or(false);
+                crate::fiscal_profile::filing_gap(p, route, has_cert, own_expired)
+            }
             Err(_) => None,
         };
         let (fiscal_mode, fiscal_triggers, fiscal_providers, fiscal_environment) = match profile {
@@ -552,10 +638,11 @@ pub(crate) async fn execute_at(
     // sus propias consecuencias que una venta sin identidad SIGUE cerrándose, y lo que muere es el
     // listener de la factura, en dead-letter. Cobrado y sin factura.
     enforce_fiscal_capacity(
+        registry,
         ctx,
         &cmd.module_id,
         name.starts_with(crate::hub_users::CORE_NAMESPACE),
-        &cmd.def.emit,
+        cmd.def.emit.iter().map(|e| e.event()),
     )?;
     // hub#1935: a hub that files for real does not open a fiscal chain it cannot deliver.
     enforce_fiscal_road(registry, ctx, cmd.def.emit.iter().map(|e| e.event()))?;
@@ -658,10 +745,12 @@ pub(crate) async fn execute_at(
     // Notificación al WS (UI en vivo), tras commit y solo si commiteó. Efímera; la entrega
     // durable a listeners la hace el relay desde el outbox. El emisor viaja con el evento
     // (hub#529): es lo único que el canal puede creerse para filtrar por módulo.
+    // hub#1980: and the shell tab that sent the request, so only the till that charged prints.
     for event in &cmd.def.emit {
-        events::notify_sink(
+        events::notify_sink_from(
             registry,
             crate::registry::EventSource::Module(&cmd.module_id),
+            ctx.client_instance.as_deref(),
             event.event(),
             &bound,
         );
@@ -1046,22 +1135,15 @@ async fn execute_wasm(
     // que sin esto solo sabe lo que le cuenta el cliente. Aquí el host le entrega el **catálogo de
     // confianza del hub**.
     let reads = preload_reads(db, registry, cmd, ctx, payload).await?;
+    let mut context = handler_context(ctx, &new_ids);
+    // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra el
+    // catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
+    context.insert("country_code".into(), json!(ctx.country_code));
+    context.insert("region_code".into(), json!(ctx.region_code));
+    context.insert("reads".into(), reads);
     let input = json!({
         "payload": Json::Object(bound_payload),
-        "context": {
-            "hub_id": ctx.hub_id,
-            "current_user_id": ctx.user_id,
-            "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids.clone(),
-            // Identidad fiscal del hub: con esto + `reads`, el handler resuelve el impuesto contra
-            // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
-            "country_code": ctx.country_code,
-            "region_code": ctx.region_code,
-            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022): nombre IANA ya resuelto — «mañana a las
-            // 09:00» son las 09:00 de la TIENDA. Viaja también como `:timezone` en el payload.
-            "timezone": ctx.timezone_name(),
-            "reads": reads,
-        },
+        "context": Json::Object(context),
     });
 
     // hub#926: el código compilado se pide a la caché del registro, que lo compila la PRIMERA vez
@@ -1079,6 +1161,25 @@ async fn execute_wasm(
         db, registry, cmd, payload, ctx, depth, extra_ops, &output, &new_ids,
     )
     .await
+}
+
+/// The `context` every handler receives, WASM or native — ONE builder so the two paths cannot
+/// drift apart (the WASM path adds its fiscal identity and `reads` on top).
+///
+///  - `principal` (hub#2113): `human` or `machine` — WHO is calling, a kernel fact. A module must
+///    never infer it from the shape of `current_user_id`: that guess fails open the day the hub
+///    grows a new kind of automated caller.
+///  - `timezone` (hub#731, hub#1022): the business clock, IANA name already resolved — «tomorrow
+///    at 09:00» is 09:00 at the SHOP. It also rides the payload as `:timezone`.
+fn handler_context(ctx: &RequestContext, new_ids: &[Json]) -> serde_json::Map<String, Json> {
+    let mut context = serde_json::Map::new();
+    context.insert("hub_id".into(), json!(ctx.hub_id));
+    context.insert("current_user_id".into(), json!(ctx.user_id));
+    context.insert("principal".into(), json!(ctx.principal.as_str()));
+    context.insert("now".into(), json!(crate::registry::now_rfc3339()));
+    context.insert("new_ids".into(), Json::Array(new_ids.to_vec()));
+    context.insert("timezone".into(), json!(ctx.timezone_name()));
+    context
 }
 
 /// Margen (ms) que el host espera POR ENCIMA del timeout interno del guest antes de rendirse.
@@ -1191,15 +1292,7 @@ async fn execute_native(
         .collect();
     let input = json!({
         "payload": Json::Object(bound_payload),
-        "context": {
-            "hub_id": ctx.hub_id,
-            "current_user_id": ctx.user_id,
-            "now": crate::registry::now_rfc3339(),
-            "new_ids": new_ids.clone(),
-            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022), mismo contrato que el camino WASM: el
-            // handler nativo agenda con el mismo IANA resuelto que un guest.
-            "timezone": ctx.timezone_name(),
-        },
+        "context": Json::Object(handler_context(ctx, &new_ids)),
     });
 
     let static_folder = registry
@@ -1322,7 +1415,8 @@ async fn persist_handler_output(
         if let Some(schema) = target.and_then(|t| t.schema.as_ref()) {
             schema.coerce_declared_number_shapes(&mut op_params);
         }
-        let bound = crate::system_params(&op_params, ctx);
+        let mut bound = crate::system_params(&op_params, ctx);
+        keep_batch_new_id(&mut bound, &op.params, new_ids);
         let first = tx_ops.len();
         let count = sqls.len();
         for sql in sqls {
@@ -1363,7 +1457,20 @@ async fn persist_handler_output(
     // WASM/nativo — que es por donde pasan los listeners del relay del Outbox y las tareas
     // programadas. Un gate que solo cubriera el camino declarativo dejaría fuera justo la mitad por
     // la que viaja la cadena fiscal.
-    enforce_fiscal_capacity(ctx, &cmd.module_id, false, &cmd.def.emit)?;
+    //
+    // hub#1938: on the events the handler RETURNED as well as the declared ones — a sale's
+    // `sale.completed` comes back from its handler, and a restored hub charged it anyway.
+    enforce_fiscal_capacity(
+        registry,
+        ctx,
+        &cmd.module_id,
+        false,
+        cmd.def
+            .emit
+            .iter()
+            .map(|e| e.event())
+            .chain(output.events.iter().map(|ev| ev.name.as_str())),
+    )?;
 
     // Fiscal environment pin (ADR-0197 §4, hub#376) on what the handler RESOLVED to: the native
     // VeriFactu engine emits its own operations, so the pin has to see the params it bound — not
@@ -1478,11 +1585,12 @@ async fn persist_handler_output(
     // eventos del handler salen con el módulo del command (hub#529) — que es también el único
     // namespace en el que hub#240 les deja llamarse.
     let source = crate::registry::EventSource::Module(&cmd.module_id);
+    let instance = ctx.client_instance.as_deref();
     for event in &declared {
-        events::notify_sink(registry, source, event.event(), &declared_payload);
+        events::notify_sink_from(registry, source, instance, event.event(), &declared_payload);
     }
     for (name, payload) in &handler_events {
-        events::notify_sink(registry, source, name, payload);
+        events::notify_sink_from(registry, source, instance, name, payload);
     }
 
     let mut response = json!({
@@ -1497,6 +1605,21 @@ async fn persist_handler_output(
         response["result"] = result.clone();
     }
     Ok(response)
+}
+
+/// Restores the `new_id` a handler operation took from the host's batch (hub#1357).
+///
+/// `system_params` mints a fresh `:new_id` for every statement, which is right for a caller's
+/// payload but wrong here: a guest whose SQL binds `:new_id` (`customers.create`) hands the batch
+/// id over under that very name, and overwriting it wrote the row with one id while
+/// [`consumed_new_ids`] reported the batch one. Only a batch id is kept — the host stays the sole
+/// authority of ids (§5.3), so anything else keeps the id `system_params` minted, exactly as
+/// before: published guests that forward the payload (whose `new_id` is host-minted but not part
+/// of the batch) keep working.
+fn keep_batch_new_id(bound: &mut Params, op_params: &Params, new_ids: &[Json]) {
+    if let Some(id) = op_params.get("new_id").filter(|id| new_ids.contains(id)) {
+        bound.insert("new_id".into(), id.clone());
+    }
 }
 
 /// The batch ids the handler's operations actually CONSUMED, in batch order (hub#776).
@@ -1964,7 +2087,10 @@ async fn seal_first_record_if_fiscal(
 /// Two hardnesses, deliberately different:
 ///
 /// - **`BLOCKED`** (recoverable) rejects only the **fiscal chain** — the transactions that would
-///   start one. The rest of the till keeps working. Killing the whole hub because a module failed
+///   start one: any event of [`crate::fiscal_profile::fiscal_chain_events`], declared or returned
+///   by a handler (hub#1938 — the sale is a handler, and its `sale.completed` is not the
+///   provider's trigger: a hub restored elsewhere charged it on another installation's chain).
+///   The rest of the till keeps working. Killing the whole hub because a module failed
 ///   to mount is disproportionate and pushes the user to work around us.
 /// - **`CLOSED`** (the owner's decision, irreversible) is **default-deny on writes**, with two
 ///   exceptions the core can classify by itself without naming anybody: commands of the reserved
@@ -1973,11 +2099,12 @@ async fn seal_first_record_if_fiscal(
 ///
 /// **Queries are never gated** — that is where "✅ consult · ✅ export · ✅ accounting" comes from,
 /// free of charge.
-fn enforce_fiscal_capacity(
+fn enforce_fiscal_capacity<'a>(
+    registry: &Registry,
     ctx: &RequestContext,
     module_id: &str,
     is_core_command: bool,
-    emitted: &[crate::manifest::EmitDef],
+    emitted: impl IntoIterator<Item = &'a str>,
 ) -> Result<()> {
     // `None` means UNRESOLVED, never "nothing owed": a path that did not stamp the mode must not
     // read as compliant. Nothing can be decided here, so nothing is allowed through on its word —
@@ -2000,10 +2127,14 @@ fn enforce_fiscal_capacity(
         }
         crate::fiscal_profile::FiscalMode::Blocked(reason) => {
             // Only what would OPEN a fiscal chain is refused. Everything else keeps working.
-            if !emitted
-                .iter()
-                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e.event()))
-            {
+            // The chain starts at the sale, not at the provider's own trigger (hub#1938): the
+            // same set `enforce_fiscal_road` reads.
+            let emitted: Vec<&str> = emitted.into_iter().map(str::trim).collect();
+            if emitted.is_empty() {
+                return Ok(());
+            }
+            let chain = crate::fiscal_profile::fiscal_chain_events(registry, &ctx.fiscal_triggers);
+            if !emitted.iter().any(|e| chain.contains(*e)) {
                 return Ok(());
             }
             Err(RuntimeError::Domain {
@@ -2149,10 +2280,105 @@ fn enforce_fiscal_environment_pin<'a>(
 
 #[cfg(test)]
 mod tests {
+
+    // ── hub#2081: which unique violations `on_unique` may rename ──────────────────────────────
+
+    fn on_unique_staff() -> std::collections::BTreeMap<String, String> {
+        [(
+            "uq_staff_member_hub_user".to_string(),
+            "staff.user_already_linked".to_string(),
+        )]
+        .into_iter()
+        .collect()
+    }
+
+    fn installed(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| id.to_string()).collect()
+    }
+
+    #[test]
+    fn a_declared_index_on_an_own_table_is_renamed_hub2081() {
+        let map = on_unique_staff();
+        assert_eq!(
+            unique_violation_code(
+                &map,
+                "staff",
+                &installed(&["staff", "sales"]),
+                Some("uq_staff_member_hub_user"),
+                Some("staff_member"),
+            ),
+            Some("staff.user_already_linked")
+        );
+    }
+
+    #[test]
+    fn an_undeclared_index_is_not_renamed_hub2081() {
+        let map = on_unique_staff();
+        assert_eq!(
+            unique_violation_code(
+                &map,
+                "staff",
+                &installed(&["staff"]),
+                Some("staff_member_pkey"),
+                Some("staff_member"),
+            ),
+            None
+        );
+    }
+
+    /// 🔴 A manifest cannot rename another module's refusal: the same index NAME on a table owned
+    /// by someone else (or by the core) stays the database's error.
+    #[test]
+    fn a_declared_name_on_a_foreign_or_core_table_is_not_renamed_hub2081() {
+        let map = on_unique_staff();
+        for table in ["sales_order", "hub_users", "staffing_shift"] {
+            assert_eq!(
+                unique_violation_code(
+                    &map,
+                    "staff",
+                    &installed(&["staff", "sales", "staffing"]),
+                    Some("uq_staff_member_hub_user"),
+                    Some(table),
+                ),
+                None,
+                "`{table}` is not `staff`'s"
+            );
+        }
+    }
+
+    #[test]
+    fn a_violation_without_constraint_or_table_is_not_renamed_hub2081() {
+        let map = on_unique_staff();
+        let ids = installed(&["staff"]);
+        assert_eq!(
+            unique_violation_code(&map, "staff", &ids, None, Some("staff_member")),
+            None
+        );
+        assert_eq!(
+            unique_violation_code(&map, "staff", &ids, Some("uq_staff_member_hub_user"), None),
+            None
+        );
+    }
+
     use super::*;
     use crate::manifest::CommandDef;
     use crate::registry::ModuleStatus;
     use serde_json::Map;
+
+    /// hub#2113: the ONE context builder both handler paths (WASM and native) share tells the
+    /// handler who is calling. Pinned at the builder because the WASM path has no echoing guest:
+    /// the native e2e (`handler_context_params_e2e.rs`) proves the wiring, this proves the WASM
+    /// path gets the very same field.
+    #[test]
+    fn handler_context_tells_the_handler_who_is_calling() {
+        let person = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let machine = RequestContext::new("h1", "robot:1", ["*".to_string()]).as_machine();
+        assert_eq!(handler_context(&person, &[])["principal"], json!("human"));
+        assert_eq!(
+            handler_context(&machine, &[])["principal"],
+            json!("machine")
+        );
+    }
 
     fn cmd_def() -> CommandDef {
         CommandDef {
@@ -2168,6 +2394,7 @@ mod tests {
             schema: None,
             expose_api: false,
             internal: false,
+            on_unique: Default::default(),
         }
     }
 
@@ -2452,13 +2679,9 @@ mod tests {
             &["invoice.created"],
             &[],
         );
-        let err = enforce_fiscal_capacity(
-            &ctx,
-            "sales",
-            false,
-            &[crate::manifest::EmitDef::from("invoice.created")],
-        )
-        .expect_err("sin proveedor no se abre una cadena fiscal");
+        let err =
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "sales", false, ["invoice.created"])
+                .expect_err("sin proveedor no se abre una cadena fiscal");
         assert_eq!(code_of(&err), "fiscal.provider_missing");
     }
 
@@ -2474,15 +2697,16 @@ mod tests {
         );
         assert!(
             enforce_fiscal_capacity(
+                &Registry::new(),
                 &ctx,
                 "inventory",
                 false,
-                &[crate::manifest::EmitDef::from("inventory.stock.moved")]
+                ["inventory.stock.moved"]
             )
             .is_ok(),
             "mover stock no abre ninguna cadena fiscal"
         );
-        assert!(enforce_fiscal_capacity(&ctx, "inventory", false, &[]).is_ok());
+        assert!(enforce_fiscal_capacity(&Registry::new(), &ctx, "inventory", false, []).is_ok());
     }
 
     /// La otra rama: estos registros los emitió OTRA instalación. Seguir mezclaría dos cadenas.
@@ -2493,13 +2717,9 @@ mod tests {
             &["invoice.created"],
             &["verifactu"],
         );
-        let err = enforce_fiscal_capacity(
-            &ctx,
-            "sales",
-            false,
-            &[crate::manifest::EmitDef::from("invoice.created")],
-        )
-        .expect_err("una cadena ajena no se continúa");
+        let err =
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "sales", false, ["invoice.created"])
+                .expect_err("una cadena ajena no se continúa");
         assert_eq!(code_of(&err), "fiscal.installation_mismatch");
     }
 
@@ -2508,10 +2728,11 @@ mod tests {
     fn an_active_hub_with_its_provider_mounted_is_not_gated() {
         let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
         assert!(enforce_fiscal_capacity(
+            &Registry::new(),
             &ctx,
             "sales",
             false,
-            &[crate::manifest::EmitDef::from("invoice.created")]
+            ["invoice.created"]
         )
         .is_ok());
     }
@@ -2520,7 +2741,7 @@ mod tests {
     #[test]
     fn a_closed_hub_refuses_writes() {
         let ctx = fiscal_ctx(FiscalMode::Closed, &["invoice.created"], &["verifactu"]);
-        let err = enforce_fiscal_capacity(&ctx, "inventory", false, &[])
+        let err = enforce_fiscal_capacity(&Registry::new(), &ctx, "inventory", false, [])
             .expect_err("un hub cerrado no escribe");
         assert_eq!(code_of(&err), "fiscal.hub_closed");
     }
@@ -2532,11 +2753,11 @@ mod tests {
     fn a_closed_hub_still_lets_the_core_and_its_provider_work() {
         let ctx = fiscal_ctx(FiscalMode::Closed, &["invoice.created"], &["verifactu"]);
         assert!(
-            enforce_fiscal_capacity(&ctx, "hub", true, &[]).is_ok(),
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "hub", true, []).is_ok(),
             "el hub se tiene que poder seguir operando"
         );
         assert!(
-            enforce_fiscal_capacity(&ctx, "verifactu", false, &[]).is_ok(),
+            enforce_fiscal_capacity(&Registry::new(), &ctx, "verifactu", false, []).is_ok(),
             "el proveedor tiene que poder drenar lo que aún deba"
         );
     }
@@ -2549,10 +2770,11 @@ mod tests {
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         assert_eq!(ctx.fiscal_mode, None);
         assert!(enforce_fiscal_capacity(
+            &Registry::new(),
             &ctx,
             "sales",
             false,
-            &[crate::manifest::EmitDef::from("invoice.created")]
+            ["invoice.created"]
         )
         .is_ok());
     }

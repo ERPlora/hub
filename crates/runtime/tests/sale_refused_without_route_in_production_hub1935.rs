@@ -561,3 +561,145 @@ async fn the_till_learns_before_charging_what_the_dispatcher_would_refuse() {
         "{broken}"
     );
 }
+
+// ── hub#1940: the own road with an expired certificate ───────────────────────────────────────
+
+/// Every road at once: the own certificate AND ERPlora's cell with its grant, so the owner can
+/// hand filing to ERPlora when their certificate runs out.
+const OWN_AND_CELL: Road = Road {
+    own_certificate: true,
+    enrolled: true,
+    grant_approved: true,
+};
+
+/// The own certificate's `notAfter`, as the upload door stores it, a day in the past.
+async fn expire_own_certificate(db: &dyn DatabaseAdapter) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    p.insert(
+        "not_after".into(),
+        json!((chrono::Utc::now() - chrono::Duration::days(1))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string()),
+    );
+    db.execute(
+        "UPDATE _hub_certificate SET not_after = :not_after WHERE hub_id = :hub_id AND kind = 'own'",
+        &p,
+    )
+    .await
+    .expect("the own certificate expired");
+}
+
+/// 🔴 **hub#1940.** A live hub signing with its own certificate lets it expire: the AEAT refuses
+/// every record it would sign, so the till does not charge — and says WHY with its own code.
+#[tokio::test]
+async fn a_live_hub_whose_own_certificate_expired_does_not_charge() {
+    if !erplora_runtime::require_modules_workspace() || !wasm() {
+        eprintln!("SKIP: modules workspace or handler.wasm missing");
+        return;
+    }
+    let rt = live_hub(OWN).await;
+    expire_own_certificate(rt.db()).await;
+
+    let told = filing_blocked(&rt).await;
+    let code = refused_with(charge(&rt, "hub1940-expired").await);
+
+    assert_eq!(code, erplora_runtime::certificate::OWN_CERTIFICATE_EXPIRED);
+    assert_eq!(
+        told["filing_blocked"],
+        json!(code),
+        "the till was told first: {told}"
+    );
+    assert_eq!(sale_count(&rt).await, 0, "nothing was charged");
+}
+
+/// The way out the issue names besides renewing: hand filing to ERPlora. Switched off, the expired
+/// certificate signs nothing and the sale goes through ERPlora's road.
+#[tokio::test]
+async fn handing_filing_to_erplora_charges_again_with_the_certificate_expired() {
+    if !erplora_runtime::require_modules_workspace() || !wasm() {
+        eprintln!("SKIP: modules workspace or handler.wasm missing");
+        return;
+    }
+    let rt = live_hub(OWN_AND_CELL).await;
+    expire_own_certificate(rt.db()).await;
+    assert_eq!(
+        refused_with(charge(&rt, "hub1940-before-switch").await),
+        erplora_runtime::certificate::OWN_CERTIFICATE_EXPIRED
+    );
+
+    rt.set_business_certificate_use(false)
+        .await
+        .expect("ERPlora may file for this live hub: grant approved and connection enrolled");
+
+    charge(&rt, "hub1940-after-switch")
+        .await
+        .expect("the sale is charged on ERPlora's road");
+    assert_eq!(sale_count(&rt).await, 1);
+}
+
+// ── hub#1938: a hub restored into another installation ───────────────────────────────────────
+
+/// What a restore into a different deployment leaves behind: the profile says its records were
+/// filed by ANOTHER installation (`system_id`), and the boot derives BLOCKED from it (ADR-0273 D8).
+async fn restored_into_another_installation(rt: &Runtime) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    rt.db()
+        .execute(
+            "UPDATE _hub_fiscal_profile SET system_id = 'hub-where-these-rows-were-written' \
+             WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        rt.refresh_fiscal_profile().await.unwrap(),
+        fiscal_profile::FiscalMode::Blocked(fiscal_profile::BlockedReason::InstallationMismatch)
+    );
+}
+
+/// 🔴 **hub#1938.** The real sale is a handler: `sale.completed` comes back from it, it is not
+/// declared, and it is not the provider's trigger either (`invoice.created` is). A gate that read
+/// only the declared events and only the provider's words charged the sale and issued its invoice
+/// on another installation's chain — exactly what BLOCKED exists to stop.
+#[tokio::test]
+async fn a_hub_restored_into_another_installation_does_not_charge() {
+    if !erplora_runtime::require_modules_workspace() || !wasm() {
+        eprintln!("SKIP: modules workspace or handler.wasm missing");
+        return;
+    }
+    let rt = live_hub(OWN).await;
+    restored_into_another_installation(&rt).await;
+
+    let code = refused_with(charge(&rt, "hub1938-restored").await);
+    rt.drain_outbox().await.unwrap();
+
+    assert_eq!(code, "fiscal.installation_mismatch");
+    assert_eq!(sale_count(&rt).await, 0, "nothing was charged");
+    assert_eq!(invoice_count(&rt).await, 0, "nothing was invoiced");
+}
+
+/// The way out stays the explicit one: once somebody adopts the installation, the till charges and
+/// the chain carries on to the invoice — a chain of this installation's own.
+#[tokio::test]
+async fn adopting_the_installation_charges_and_invoices_again() {
+    if !erplora_runtime::require_modules_workspace() || !wasm() {
+        eprintln!("SKIP: modules workspace or handler.wasm missing");
+        return;
+    }
+    let rt = live_hub(OWN).await;
+    restored_into_another_installation(&rt).await;
+    refused_with(charge(&rt, "hub1938-before-adopting").await);
+
+    rt.fiscal_adopt_installation("hub_user:1")
+        .await
+        .expect("somebody takes the installation over on purpose");
+
+    charge(&rt, "hub1938-after-adopting")
+        .await
+        .expect("the sale is charged on this installation's own chain");
+    rt.drain_outbox().await.unwrap();
+    assert_eq!(sale_count(&rt).await, 1);
+    assert_eq!(invoice_count(&rt).await, 1);
+}

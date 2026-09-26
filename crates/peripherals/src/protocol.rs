@@ -137,6 +137,12 @@ pub struct Device {
     pub last_seen: String,
     /// `online` | `offline`.
     pub status: String,
+    /// The owner typed its address by hand (hub#1924) instead of the scan finding it. A typed
+    /// printer usually sits where the scan cannot look — another subnet, an isolated Wi-Fi — so it
+    /// is listed from the registry on every discovery, or it would vanish at the next «Re-scan».
+    /// Scanned printers are not, so a printer found once and gone now does not linger forever.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub manual: bool,
 }
 
 fn default_drawer_pin() -> u8 {

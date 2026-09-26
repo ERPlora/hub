@@ -192,6 +192,10 @@
           "$ref": "#/$defs/condition",
           "description": "Solo `kind: condition` — guarda. Si no pasa, el run TERMINA (`done`, no `failed`): una guarda que no pasa es el flujo funcionando."
         },
+        "run_if": {
+          "$ref": "#/$defs/condition",
+          "description": "Every kind except `condition` (hub#2066) — whether THIS step applies. When it does not match, the step does not run and the run carries on with the next one; later steps read `steps.<id>.skipped == true`. The opposite of a `condition`, which ENDS the run: the spine stays linear, a step just may not be its turn (GitHub Actions `if:`, Power Automate «run after: has failed»). Typical use, with `on_error: \"continue\"` on the step before: `{\"steps.book.status\": {\"eq\": \"failed\"}}` sends the fallback message only when that step failed. A skipped step writes no history row. It may not read a flow secret, on any kind."
+        },
         "seconds": {
           "type": "integer",
           "minimum": 0,
@@ -355,7 +359,16 @@
         },
         "vars": {
           "$ref": "#/$defs/mapping",
-          "description": "Solo `kind: notify` — el texto y sus variables, mapeados contra el run (`vars.text` es lo que dice un email o un WhatsApp libre). Un `{{secret.X}}` aquí se RECHAZA al guardar: sería una credencial enviada a un cliente."
+          "description": "Solo `kind: notify` — el texto y sus variables, mapeados contra el run (`vars.text` es lo que dice un email o un WhatsApp libre). Un `{{secret.X}}` aquí se RECHAZA al guardar: sería una credencial enviada a un cliente. Las claves `header_image`/`header_video`/`header_document` (hub#2101) son el ENLACE del medio de la cabecera de una plantilla de WhatsApp y `header_text` (hub#2111) el valor del `{{1}}` de su título de texto: el transporte las convierte en el parámetro `header` de Meta, así que la dueña no escribe `vars.components` a mano. Como mucho UNA, solo en `whatsapp` y solo con `template`; lo demás se RECHAZA al guardar.",
+          "properties": {
+            "header_text": { "description": "hub#2111 — el VALOR del hueco `{{1}}` del TÍTULO de texto de la plantilla de WhatsApp («Tu cita del {{1}}»). Parámetro `header` de tipo `text`. Excluyente con `header_image`/`header_video`/`header_document` (una plantilla tiene UNA cabecera); un valor vacío se RECHAZA." },
+            "header_image": { "description": "Enlace http(s) público de la IMAGEN de la cabecera de la plantilla (Meta lo descarga). Parámetro `header` de tipo `image`." },
+            "header_video": { "description": "Enlace http(s) público del VÍDEO de la cabecera de la plantilla (Meta lo descarga). Parámetro `header` de tipo `video`." },
+            "header_document": { "description": "Enlace http(s) público del DOCUMENTO de la cabecera de la plantilla (Meta lo descarga). Parámetro `header` de tipo `document`." }
+          },
+          "patternProperties": {
+            "^button_url_[0-9]$": { "description": "hub#2110 — la PARTE VARIABLE del botón de enlace de la plantilla de WhatsApp en la posición `<n>` (0-9, como Meta cuenta los botones de la plantilla): el texto que Meta pone en el `{{1}}` de su URL (el código de la cita, el del pedido). El transporte lo convierte en el componente `button` (`sub_type: url`) de Meta. Solo en `whatsapp` y solo con `template`; un valor vacío o una clave con otra posición se RECHAZAN." }
+          }
         },
         "interactive": {
           "type": "object",

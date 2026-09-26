@@ -629,10 +629,17 @@ pub(crate) async fn write_taking_a_seat(
             "SELECT pg_advisory_xact_lock(hashtext(:seat_key))".to_string(),
             p.clone(),
         ),
-        (format!("{sql_up_to_the_seat_clause}{SEAT_IS_FREE}"), p.clone()),
+        (
+            format!("{sql_up_to_the_seat_clause}{SEAT_IS_FREE}"),
+            p.clone(),
+        ),
     ];
     // Solo la escritura lleva puerta: el candado afecta 0 filas siempre y sumarlo la haría vacua.
-    let gates = [RowGate { first: 1, count: 1, min: 1 }];
+    let gates = [RowGate {
+        first: 1,
+        count: 1,
+        min: 1,
+    }];
     Ok(matches!(
         db.execute_tx_gated(&ops, &gates).await?,
         TxGatedOutcome::Committed { .. }
@@ -1582,6 +1589,18 @@ pub async fn create_session_with_credential(
         &p,
     )
     .await?;
+    // Somebody of the business signed in (saas#2129), and AFTER the row exists: recorded before
+    // the insert, a failed insert would leave behind a login that never happened. Hooked here, at
+    // the single funnel every door goes through (`create_session` delegates, and so do PIN,
+    // badge, cloud and courier), for the same reason `track_user_activity` is one middleware:
+    // hanging it off each caller desynchronises the moment somebody adds the next door.
+    crate::activity_log::record_best_effort_for(
+        db,
+        hub_id,
+        crate::activity_log::Kind::Login,
+        user_id,
+    )
+    .await;
     Ok(token)
 }
 
@@ -1756,7 +1775,10 @@ pub async fn resolve_session_with_credential(
                     .as_str()
                     .unwrap_or_default()
                     .to_string(),
-                reference: row["credential_ref"].as_str().unwrap_or_default().to_string(),
+                reference: row["credential_ref"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
             },
         )
     }))
@@ -1767,11 +1789,31 @@ pub async fn delete_session(db: &dyn DatabaseAdapter, hub_id: &str, token: &str)
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("token".into(), json!(token));
+    // WHO is leaving has to be read BEFORE the row goes: after the delete there is nothing left
+    // to attribute the event to, and an event with no actor is one the Cloud drops.
+    let leaving = db
+        .query(
+            "SELECT user_id FROM hub_session WHERE hub_id = :hub_id AND token = :token",
+            &p,
+        )
+        .await
+        .ok()
+        .and_then(|result| result.rows.into_iter().next())
+        .and_then(|row| row["user_id"].as_str().map(str::to_owned));
     db.execute(
         "DELETE FROM hub_session WHERE hub_id = :hub_id AND token = :token",
         &p,
     )
     .await?;
+    if let Some(user_id) = leaving {
+        crate::activity_log::record_best_effort_for(
+            db,
+            hub_id,
+            crate::activity_log::Kind::Logout,
+            &user_id,
+        )
+        .await;
+    }
     Ok(())
 }
 
@@ -2317,7 +2359,10 @@ mod tests {
                 "una sesión desalojada NO puede autenticar"
             );
             assert_eq!(
-                session_end_reason(&db, HUB, token).await.unwrap().as_deref(),
+                session_end_reason(&db, HUB, token)
+                    .await
+                    .unwrap()
+                    .as_deref(),
                 Some(SESSION_EVICTED_DEVICE_LIMIT),
                 "…y tiene que poder decir por qué murió"
             );
@@ -2369,7 +2414,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            session_end_reason(&db, HUB, &evicted).await.unwrap().as_deref(),
+            session_end_reason(&db, HUB, &evicted)
+                .await
+                .unwrap()
+                .as_deref(),
             Some(SESSION_EVICTED_DEVICE_LIMIT)
         );
         assert_eq!(
@@ -2407,7 +2455,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            session_end_reason(&db, HUB, &second).await.unwrap().as_deref(),
+            session_end_reason(&db, HUB, &second)
+                .await
+                .unwrap()
+                .as_deref(),
             Some(SESSION_EVICTED_DEVICE_LIMIT),
             "el último desalojado sí tiene su explicación"
         );

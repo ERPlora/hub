@@ -11,8 +11,17 @@
 // rejects with a `TypeError` whose wording every engine spells differently, and the browser also
 // keeps a flag of its own. Both are read here, in one place, so no screen has to invent the rule
 // again (the same shape `isViewLoadError` uses in `router/view-load-recovery.ts`).
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { isNetworkFailure, isOffline, isOfflineError, isOnline } from './offline';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  isNetworkFailure,
+  isOffline,
+  isOfflineError,
+  isOnline,
+  makeHubProbe,
+  offlineCause,
+  reportNetworkFailure,
+  startHubWatch,
+} from './offline';
 
 function goOffline(): void {
   window.dispatchEvent(new Event('offline'));
@@ -116,5 +125,224 @@ describe('isOfflineError — the question a screen actually asks', () => {
     expect(
       isOfflineError(new TypeError('Failed to fetch dynamically imported module: /modules/x.js')),
     ).toBe(true);
+  });
+});
+
+// hub#2085 — the half hub#1743 left open, and the commonest shape of the outage: the router is up,
+// so `navigator.onLine` stays `true`, but nothing behind it answers. Until this block the band only
+// listened to the flag, so a till on a router with no uplink looked perfectly healthy right up to
+// the moment a sale would not go through. The shell now ASKS the hub, lightly, and believes the
+// answer over the flag.
+describe('hub#2085 — a hub that does not answer is an outage, whatever the browser flag says', () => {
+  let stop: (() => void) | undefined;
+  let visibility: DocumentVisibilityState = 'visible';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    visibility = 'visible';
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
+  });
+
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+    vi.useRealTimers();
+  });
+
+  const unreachable = () => vi.fn<() => Promise<void>>().mockRejectedValue(new TypeError('Failed to fetch'));
+  const answering = () => vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+
+  async function flush(): Promise<void> {
+    // Let the probe's promise settle without moving the clock.
+    await vi.advanceTimersByTimeAsync(0);
+  }
+
+  it('one missed answer is not an outage; two in a row are', async () => {
+    const probe = unreachable();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+
+    expect(probe).toHaveBeenCalledTimes(1);
+    // A single miss can be the hub restarting for a deploy; the band must not flash on that.
+    expect(isOffline.value, 'one miss raised the band').toBe(false);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(isOffline.value, 'two misses in a row and the till still looked healthy').toBe(true);
+    expect(isOnline.value).toBe(false);
+    expect(offlineCause.value).toBe('hub');
+  });
+
+  it('comes back on the first answer, and says nothing more', async () => {
+    const probe = unreachable();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(true);
+
+    probe.mockResolvedValue(undefined);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value, 'the band outlived the outage').toBe(false);
+    expect(offlineCause.value).toBeNull();
+  });
+
+  it('asks every 30 s while everything is fine, and not more often', async () => {
+    const probe = answering();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(probe).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it('🔴 leaves a hidden tab alone, and asks the moment it is looked at again', async () => {
+    // A till that is minimised is not a till anybody is reading; probing it is traffic for nobody.
+    // The moment it is brought back the person IS reading it, and the first thing they need to know
+    // is whether it still works.
+    const probe = answering();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    visibility = 'hidden';
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(probe, 'the shell kept polling a tab nobody was looking at').toHaveBeenCalledTimes(1);
+
+    visibility = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it('a screen that just failed to reach the hub makes it ask at once', async () => {
+    // `ModuleView` already knows when a load reached nobody (hub#1743). Waiting up to 30 s to
+    // confirm what a failure just proved would leave the band behind the screen that failed.
+    const probe = answering();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    reportNetworkFailure();
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(2);
+  });
+
+  it('🔴 the browser flag keeps the first word: with no network at all, the cause is the network', async () => {
+    // Two facts, one band. When the browser itself says there is no network, that is the sentence
+    // the person can act on (the wifi), whatever the hub did or did not answer.
+    const probe = unreachable();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(offlineCause.value).toBe('hub');
+
+    goOffline();
+    expect(offlineCause.value).toBe('network');
+    goOnline();
+    expect(offlineCause.value).toBe('hub');
+  });
+
+  it('stopping the watch stops the asking and forgets the verdict', async () => {
+    const probe = unreachable();
+    const stopNow = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(true);
+
+    stopNow();
+    expect(isOffline.value).toBe(false);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(probe).toHaveBeenCalledTimes(2);
+  });
+  it('🔴 after an outage ends, one miss is one miss again, not a new outage', async () => {
+    // The two-misses rule is about EVERY outage, not only the first: with the count never reset,
+    // every hub restart after the first cut would flash the band the rule exists to keep down.
+    const probe = unreachable();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(true);
+
+    probe.mockResolvedValue(undefined);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(false);
+
+    probe.mockRejectedValue(new TypeError('Failed to fetch'));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(probe).toHaveBeenCalledTimes(4);
+    expect(isOffline.value, 'a single miss after a recovery raised the band').toBe(false);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(isOffline.value).toBe(true);
+  });
+
+  it('🔴 the browser saying «online» again makes it ask at once: the flag is not a promise', async () => {
+    const probe = answering();
+    stop = startHubWatch({ probe, intervalMs: 30_000, retryMs: 5_000 });
+    await flush();
+    expect(probe).toHaveBeenCalledTimes(1);
+
+    goOffline();
+    goOnline();
+    await flush();
+    expect(probe, 'the flag came back and nobody asked the hub').toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('hub#2085 — what «the hub answered» means for the probe', () => {
+  // Reachability is a question about the NETWORK, not about the hub's health: a 500 is an answer,
+  // and a hub that answers 500 is one the person can still be told about by the screen that got it.
+  // Only «nothing came back» — the rejection every engine spells differently, or a request that
+  // never finished — counts as not reaching it.
+  it('any status is an answer, a 500 included', async () => {
+    const fetchImpl = vi.fn(async () => new Response('boom', { status: 500 }));
+    const probe = makeHubProbe('http://hub.test', { fetchImpl, timeoutMs: 10_000 });
+    await expect(probe()).resolves.toBeUndefined();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://hub.test/healthz');
+    // No cache: a cached «ok» from before the router died is exactly the lie being fought here.
+    expect(init.cache).toBe('no-store');
+  });
+
+  it('a fetch that reached nobody is not an answer', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const probe = makeHubProbe('http://hub.test', { fetchImpl, timeoutMs: 10_000 });
+    await expect(probe()).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it('🔴 a request that never finishes is not an answer either', async () => {
+    // With a router that has no uplink the SYN goes nowhere: the browser's own timeout is over a
+    // minute, and a band that takes a minute to rise is a band that rises after the cashier gave up.
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          }),
+      );
+      const probe = makeHubProbe('http://hub.test', {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        timeoutMs: 10_000,
+      });
+      const verdict = probe();
+      const outcome = verdict.then(
+        () => 'answered',
+        () => 'silent',
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expect(outcome).resolves.toBe('silent');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

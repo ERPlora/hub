@@ -1,8 +1,12 @@
 package com.erplora.android
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -47,6 +51,42 @@ import java.io.File
     ]
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
+
+    /**
+     * `leave_app` (hub#1906) — the app goes to the background, which is what the system Back does
+     * on a root screen since Android 12 (the task moves back; nothing is finished or killed).
+     *
+     * Needed because the shell now HOLDS the Back button through Tauri's `onBackButtonPress`: with a
+     * listener registered, Tauri no longer leaves on its own when the WebView has no history, and
+     * its own `exit` command has no permission a capability could grant.
+     */
+    @Command
+    fun leaveApp(invoke: Invoke) {
+        invoke.resolve()
+        activity.moveTaskToBack(true)
+    }
+
+    /**
+     * `open_app_settings` (hub#1886) — opens ERPlora's own page in the device settings.
+     *
+     * Refused twice, Android stops showing a permission dialog for the life of the install, and
+     * from then on that page is the only place to turn it back on. Sending the owner to look for it
+     * among ten differently organised settings apps is what this replaces. A device with no such
+     * page (a locked-down kiosk build) REJECTS, so the shell can fall back to saying where to go.
+     */
+    @Command
+    fun openAppSettings(invoke: Invoke) {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", activity.packageName, null),
+        )
+        try {
+            activity.startActivity(intent)
+            invoke.resolve()
+        } catch (e: ActivityNotFoundException) {
+            invoke.reject("app_settings_unavailable")
+        }
+    }
 
     /**
      * `check_permissions` — qué hay concedido AHORA, sin molestar al usuario.
@@ -150,6 +190,29 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
             // say the file did NOT arrive — that is the whole lesson of hub#475.
             invoke.reject(e.message ?: e.toString(), e)
         }
+    }
+
+    /**
+     * `print_html` — the system print screen with an A4 document, printer or «Save as PDF»
+     * (hub#2008). The rendering and the `PrintManager` call are [HtmlPrinter]'s.
+     *
+     * Resolves once the print screen has been asked for — the same moment the desktop answers,
+     * because what the user does in it (print, save, cancel) is the system's. Anything that stops
+     * it from opening REJECTS: a resolve there would read as a document handed over (hub#475).
+     */
+    @Command
+    fun printHtml(invoke: Invoke) {
+        val html = invoke.getArgs().getString("html", null)
+        if (html.isNullOrBlank()) {
+            invoke.reject("print_html needs the html of the document")
+            return
+        }
+        HtmlPrinter.print(
+            activity,
+            html,
+            onOpened = { invoke.resolve() },
+            onFailed = { e -> invoke.reject(e.message ?: e.toString(), e) },
+        )
     }
 
     /**

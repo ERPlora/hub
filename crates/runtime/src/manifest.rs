@@ -1337,7 +1337,8 @@ pub struct QueryDef {
 /// para componer el SQL paginado. ARQUITECTURA.md §4, §8.2.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ListSpec {
-    /// Columnas sobre las que aplica el buscador global (LIKE).
+    /// Columns the global search box looks into: a «contains» that ignores case and accents
+    /// (hub#2096, see `queries::contains_ci`).
     #[serde(default)]
     pub search: Vec<String>,
     /// Whitelist de columnas ordenables (anti-inyección: solo estas se interpolan en ORDER BY).
@@ -1543,6 +1544,21 @@ pub struct CommandDef {
     /// módulos que prefieren blindarlo explícitamente sin ese prefijo. Ver [`CommandDef::is_internal`].
     #[serde(default)]
     pub internal: bool,
+    /// **What a refusal of one of the module's unique indexes MEANS** (hub#2081): index name →
+    /// domain code of the module's catalogue (`{"uq_staff_member_hub_user":
+    /// "staff.user_already_linked"}`).
+    ///
+    /// A module guards "is this already taken?" with a read and backs it with a unique index,
+    /// because two requests can pass the read at the same time. The index stops the second write,
+    /// and without this the loser of that race got `db` — "the request could not be completed" —
+    /// instead of the reason the module gives when there is no race. The dispatcher maps a
+    /// `23505` on a DECLARED index of a table the module OWNS to [`RuntimeError::Domain`] with the
+    /// declared code; anything else stays a database error. The installer checks each code the
+    /// same way it checks `expect_rows.error` (own namespace, listed in `errors` when present).
+    ///
+    /// [`RuntimeError::Domain`]: crate::errors::RuntimeError::Domain
+    #[serde(default)]
+    pub on_unique: BTreeMap<String, String>,
 }
 
 impl CommandDef {
@@ -1660,6 +1676,7 @@ const ROOT_FIELDS: &[&str] = &[
     "commands",
     "events",
     "widgets",
+    "bell",
     "setup",
     "settings",
     "network",
@@ -1694,6 +1711,7 @@ const COMMAND_FIELDS: &[&str] = &[
     "ai",
     "expose_api",
     "internal",
+    "on_unique",
 ];
 
 const QUERY_FIELDS: &[&str] = &["permission", "sql", "schema", "list", "ai", "expose_api"];
@@ -1719,6 +1737,9 @@ const PROTECTS_FIELDS: &[&str] = &[
     "component",
     "resume_on",
 ];
+/// hub#1678: one counter a module puts on the shell's notification bell. Read by the SHELL, like
+/// `widgets`; the runtime only judges the shape.
+const BELL_FIELDS: &[&str] = &["label", "icon", "query", "params", "nav", "permission"];
 const WIDGET_FIELDS: &[&str] = &[
     "title",
     "icon",
@@ -1775,6 +1796,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "navigation[]" => NAV_FIELDS,
         "protects[]" => PROTECTS_FIELDS,
         "widgets.*" => WIDGET_FIELDS,
+        "bell.*" => BELL_FIELDS,
         "setup" => SETUP_FIELDS,
         "settings" => SETTINGS_FIELDS,
         "agent" => AGENT_FIELDS,
@@ -1931,6 +1953,7 @@ impl Manifest {
             ("commands", "commands.*"),
             ("queries", "queries.*"),
             ("widgets", "widgets.*"),
+            ("bell", "bell.*"),
             ("records", "records.*"),
             ("errors", "errors.*"),
         ] {
@@ -2354,6 +2377,7 @@ impl FlowTemplateScan {
             family: family.to_string(),
             code: code.to_string(),
             detail,
+            requires: None,
         });
     }
 }
@@ -2372,6 +2396,23 @@ pub struct FlowTemplateDiscard {
     pub code: String,
     /// Qué fichero y qué le pasa, en una frase sobre la que se puede actuar.
     pub detail: String,
+    /// The neighbour a version floor names, as data (hub#2123). Only on the floor codes
+    /// (`template_floor_*`): `detail` is prose and is never parsed (ADR-0055), so without this a
+    /// module could not say WHICH module to install, resume or update. Absent on every other code.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires: Option<FloorRequirement>,
+}
+
+/// Which module a template's version floor names, what it asks for and what this hub has
+/// (hub#2123).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct FloorRequirement {
+    /// The neighbour module id (`staff`), never the module that ships the template.
+    pub module: String,
+    /// The floor the template declares in `<family>.requires.json`, verbatim.
+    pub floor: String,
+    /// The version installed in this hub, or `None` when the module is not installed.
+    pub installed: Option<String>,
 }
 
 /// `<family>.<lang>.flow.json` sin idioma: el nombre no separa familia e idioma.
@@ -2453,6 +2494,39 @@ pub struct FlowTemplateGrant {
     /// fuera se ve, y `erplora validate` ya lo caza antes de publicar.
     #[serde(default, skip_serializing_if = "Params::is_empty")]
     pub payload: Params,
+    /// La frase que explica el permiso al dueño, por idioma (`{ en, es }`, flows#114). Sin ella la
+    /// galería solo puede pintar el nombre interno (`staff.schedules.list_for_member`).
+    ///
+    /// Es PROSA, no parte de lo que el permiso concede: por eso no viaja a `_flow_grants`
+    /// ([`crate::flows::templates`] copia `kind`/`value`/`payload` y nada más) y por eso, al
+    /// revés que `payload`, una frase mal escrita se IGNORA en vez de tumbar la familia —
+    /// perder una receta por una errata de texto sería peor que pintar el nombre del permiso.
+    /// `erplora validate` ya la rechaza antes de publicar.
+    #[serde(
+        default,
+        deserialize_with = "readable_reason",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub reason: Option<HashMap<String, String>>,
+}
+
+/// `reason` de un grant: las lenguas con una frase de verdad, o nada (flows#114).
+fn readable_reason<'de, D>(de: D) -> std::result::Result<Option<HashMap<String, String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = <serde_json::Value as serde::Deserialize>::deserialize(de)?;
+    let Some(map) = raw.as_object() else {
+        return Ok(None);
+    };
+    let kept: HashMap<String, String> = map
+        .iter()
+        .filter_map(|(lang, text)| {
+            let text = text.as_str()?.trim();
+            (!text.is_empty()).then(|| (lang.clone(), text.to_string()))
+        })
+        .collect();
+    Ok((!kept.is_empty()).then_some(kept))
 }
 
 /// `<family>.grants.json` — las claves `_*` del fichero son documentación y se ignoran.
@@ -2507,6 +2581,48 @@ pub struct NavLocale {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// flows#114 — la frase de un permiso es para leerla, no para decidir nada: una `reason` mal
+    /// formada se ignora (la galería pinta el nombre del permiso) en vez de tumbar la receta
+    /// entera. `erplora validate` ya la rechaza antes de publicar; esto es la red del hub.
+    #[test]
+    fn a_grant_reason_is_kept_when_readable_and_dropped_when_not() {
+        let read = |raw: &str| serde_json::from_str::<FlowTemplateGrant>(raw).expect(raw);
+        let ok = read(
+            r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":"Buscar"}}"#,
+        );
+        assert_eq!(
+            ok.reason,
+            Some(HashMap::from([
+                ("en".to_string(), "Look up".to_string()),
+                ("es".to_string(), "Buscar".to_string()),
+            ]))
+        );
+        for bad in [
+            r#""Look up""#,
+            r#"["Look up"]"#,
+            r#"null"#,
+            r#"{}"#,
+            r#"{"en":7}"#,
+            r#"{"en":"  "}"#,
+        ] {
+            let grant = read(&format!(
+                r#"{{"kind":"query","value":"customers.list","reason":{bad}}}"#
+            ));
+            assert_eq!(grant.reason, None, "{bad}");
+            assert_eq!(grant.value, "customers.list", "{bad}");
+        }
+        // Una lengua ilegible no se lleva por delante la legible.
+        let partial =
+            read(r#"{"kind":"query","value":"customers.list","reason":{"en":"Look up","es":7}}"#);
+        assert_eq!(
+            partial.reason,
+            Some(HashMap::from([("en".to_string(), "Look up".to_string())]))
+        );
+        let none = read(r#"{"kind":"query","value":"customers.list"}"#);
+        assert_eq!(none.reason, None);
+        assert!(serde_json::to_value(&none).unwrap().get("reason").is_none());
+    }
 
     /// Un `risk` fuera del vocabulario NO puede impedir que el módulo se instale (hub#1042).
     ///

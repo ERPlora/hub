@@ -2,9 +2,19 @@
   "id": "whatsapp_inbox",
   "name": "WhatsApp Inbox",
   "version": "2.1.29",
-  "permissions": ["whatsapp_inbox.manage_connections"],
-  "role_permissions": { "admin": ["*"] },
-  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "permissions": [
+    "whatsapp_inbox.manage_connections"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
   "queries": {
     "whatsapp_inbox.settings.get": {
       "permission": "whatsapp_inbox.manage_connections",
@@ -16,7 +26,10 @@
       "permission": "whatsapp_inbox.manage_connections",
       "internal": true,
       "transaction": true,
-      "sql": ["commands/quota_set.sql"]
+      "sql": [
+        "commands/quota_set.sql"
+      ],
+      "schema": "schemas/quota_set.json"
     }
   }
 }

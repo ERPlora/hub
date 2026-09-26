@@ -2542,6 +2542,302 @@ grep -q 'install-hooks.sh' <<<"$out"     && errs="$errs sends-you-to-downgrade-t
     && ok "drift: a canonical installed copy is not sent to resync from a stale checkout" \
     || bad "drift: a canonical installed copy is not sent to resync from a stale checkout" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Un árbol que Actions YA probó (hub#1679)
+# ─────────────────────────────────────────────────────────────────────────────
+#  Promoting develop → main pushes a commit whose TREE is, byte for byte, one
+#  Actions already ran `cargo test --workspace` on. Today that push has to pay
+#  the suite again (>40 min) from a checkout parked on that exact tree — so in
+#  practice it is pushed with SKIP_HUB_TESTS=1 and the release carries NO seal.
+#  The gate already reuses a green it recorded itself (case 32); these cases say
+#  it must also accept the proof Actions produced on the identical tree.
+#
+#  It is not a softening: `merge-pr.sh` treats the CI check as the AUTHORITY and
+#  the local attestation as "an additional signal, never accepted in place of
+#  the check". And the seal names its provenance, per hub#1207 §4: a run that
+#  happened in Actions publishes `local-gate/hub-tests-ci`, never the context
+#  that claims the pusher's machine.
+
+# ── 63. The release case: proof lives on the PARENT with the identical tree ───
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+base=$(git -C "$repo" rev-parse HEAD)
+echo two > "$repo/file"
+git -C "$repo" commit -qam two            # develop head — this is what CI tested
+dev=$(git -C "$repo" rev-parse HEAD)
+# The promotion commit: develop's tree, parented on main. The remote has never
+# seen it, so nothing can be asked about the pushed sha itself.
+prom=$(git -C "$repo" commit-tree "$dev^{tree}" -p "$base" -p "$dev" -m "Merge pull request #1 from ERPlora/develop")
+git -C "$repo" update-ref refs/remotes/origin/develop "$dev"   # the remote knows develop…
+echo three > "$repo/file"
+git -C "$repo" commit -qam three          # …and the checkout moves on
+code=$(run_hook "$repo" "refs/heads/main $prom refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="[ \"\$1\" = $dev ] && printf 'success\tcargo test --workspace\n'; true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                   || errs="$errs exit=$code(want 0)"
+[ ! -f "$repo/RAN" ]                              || errs="$errs suite-rerun-on-an-already-proven-tree"
+grep -q "^$prom local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+                                                  || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')(want $prom local-gate/hub-tests-ci)"
+# The proof is Actions', so it must NOT be filed as a local green: the next
+# push would then claim `local-gate/hub-tests` — a run on this machine that
+# never happened.
+ls "$repo/.state"/*.green >/dev/null 2>&1         && errs="$errs recorded-actions-run-as-a-local-green"
+[ -z "$errs" ] \
+    && ok "hub#1679: tree already green in Actions — push passes, nothing recompiled, seal names CI" \
+    || bad "hub#1679: tree already green in Actions — push passes, nothing recompiled, seal names CI" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
+
+# ── 64. A RED workspace check on that tree proves nothing → refuse ────────────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"   # the remote has it…
+echo two > "$repo/file"
+git -C "$repo" commit -qam two            # checkout moves on: hub#855 would refuse
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'failure\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-a-red-run"
+ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
+[ -z "$errs" ] \
+    && ok "hub#1679: CI workspace check RED on that tree — still refused, nothing attested" \
+    || bad "hub#1679: CI workspace check RED on that tree — still refused, nothing attested" "$errs"
+
+# ── 65. Green checks that do not RUN the workspace prove nothing (hub#640) ────
+#    The exact shape merge-pr.sh was built against: two greens, and nothing
+#    anywhere executed the code. Only `cargo test --workspace` answers this.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'success\tpnpm verify (vue-tsc + vitest + module-sdk)\nsuccess\tcargo test -p erplora-tauri + Kotlin del plugin\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-without-the-workspace-check"
+[ -z "$errs" ] \
+    && ok "hub#1679: green checks that never ran the workspace — refused, not accepted as proof" \
+    || bad "hub#1679: green checks that never ran the workspace — refused, not accepted as proof" "$errs"
+
+# ── 66. The proof must be on THIS tree, not merely somewhere in history ───────
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+old=$(git -C "$repo" rev-parse HEAD)       # green in CI…
+echo two > "$repo/file"
+git -C "$repo" commit -qam two             # …but we push THIS one, another tree
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"   # both are on the remote
+echo three > "$repo/file"
+git -C "$repo" commit -qam three           # and the checkout moves on again
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="[ \"\$1\" = $old ] && printf 'success\tcargo test --workspace\n'; true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-from-another-tree"
+[ -z "$errs" ] \
+    && ok "hub#1679: CI green on a DIFFERENT tree — the proof must be this content" \
+    || bad "hub#1679: CI green on a DIFFERENT tree — the proof must be this content" "$errs"
+
+
+# ── 67. An ordinary push asks GitHub NOTHING (hub#1679 must cost the fleet 0) ──
+#    Case 63 runs BEFORE the depth dispatch, so it is on the path of every push
+#    this machine makes — ~19 worktrees. A brand-new commit carries a tree the
+#    remote has never seen, so probing it is a guaranteed 404: the candidate is
+#    filtered LOCALLY (is it reachable from a remote-tracking ref?) and the
+#    network is never touched.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+echo two > "$repo/file"
+git -C "$repo" commit -qam two            # a commit the remote cannot know
+sha=$(git -C "$repo" rev-parse HEAD)
+echo three > "$repo/file"
+git -C "$repo" commit -qam three          # …pushed from a checkout that moved on
+code=$(run_hook "$repo" "refs/heads/feature $sha refs/heads/feature $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="touch $repo/ASKED; true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]              || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/ASKED" ]       || errs="$errs asked-github-about-a-sha-it-cannot-have"
+[ ! -f "$repo/STATUS" ]      || errs="$errs attested"
+[ -z "$errs" ] \
+    && ok "hub#1679: ordinary push — the CI lookup is filtered out locally, GitHub is never asked" \
+    || bad "hub#1679: ordinary push — the CI lookup is filtered out locally, GitHub is never asked" "$errs"
+
+# ── 68. A check whose name merely CONTAINS the workspace check is another check ─
+#    The match is the whole line. `cargo test --workspace (shard 2)` green says
+#    nothing about the job `merge-pr.sh` treats as the authority — a substring
+#    match survived every other case of this block (review of hub#1956).
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'success\tcargo test --workspace (shard 2)\nnot-success\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-from-a-lookalike-check"
+[ -z "$errs" ] \
+    && ok "hub#1679: a green check that only CONTAINS the workspace name — refused" \
+    || bad "hub#1679: a green check that only CONTAINS the workspace name — refused" "$errs"
+
+# ── 69. The same commit carries the workspace check RED and GREEN → no proof ───
+#    One sha holds one check run PER EVENT (measured on c0fbc3fc: a `push` run
+#    and a `pull_request` run, both named `cargo test --workspace`). "Any line is
+#    green" would seal a tree that Actions ALSO saw fail: the red run is evidence
+#    about this very content, so it falls through to the refusal — the safe side.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'success\tcargo test --workspace\nfailure\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 1 ]                            || errs="$errs exit=$code(want 1)"
+[ ! -f "$repo/STATUS" ]                    || errs="$errs attested-a-tree-actions-also-saw-fail"
+[ -z "$errs" ] \
+    && ok "hub#1679: workspace check green AND red on the same commit — refused, nothing attested" \
+    || bad "hub#1679: workspace check green AND red on the same commit — refused, nothing attested" "$errs"
+
+# ── 70. …but a CANCELLED twin is not evidence: concurrency cancels runs all day ─
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
+echo two > "$repo/file"
+git -C "$repo" commit -qam two
+code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_CI_CHECKS_CMD="printf 'cancelled\tcargo test --workspace\nsuccess\tcargo test --workspace\n'" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true")
+errs=""
+[ "$code" = 0 ]                            || errs="$errs exit=$code(want 0)"
+grep -q "^$sha local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+                                           || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')"
+[ -z "$errs" ] \
+    && ok "hub#1679: a cancelled twin next to the green one — still sealed" \
+    || bad "hub#1679: a cancelled twin next to the green one — still sealed" "$errs"
+
+# ── hub#1998: every web pass starts on a FRESH e2e bench ─────────────────────
+# The bench databases used to be created only when missing, so they PERSISTED
+# between pushes. The demo seed never overwrites (`WHERE NOT EXISTS … 'Demo'`), so
+# once hub#1929 moved the Demo PIN to six digits, the bench kept the old `0000`
+# Demo: 401 → 429 too_many_attempts → 18 red specs on every push touching web,
+# unrelated to the diff. The bench must be born empty on every pass.
+#
+# And it cannot be emptied IN PLACE: two worktrees run the web stage at the same
+# time on this Mac (per-PID ports, hub#1812/#1756), so dropping a SHARED database
+# would kill the neighbour's run. Each pass gets databases of its own, drops them
+# when it ends, and prunes the ones a dead pass left behind — never a live one.
+#
+# `docker` is faked with STATE: one file per database under $dbs, its content the
+# rows. The stubbed `pnpm` is the first command of the default web stage, so it
+# records what the bench looks like at the exact moment the specs would start.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+fakebin="${repo}-pgstate"; dbs="$fakebin/dbs"; mkdir -p "$dbs"
+cat > "$fakebin/docker" <<DOCK
+#!/usr/bin/env bash
+dbs="$dbs"
+DOCK
+cat >> "$fakebin/docker" <<'DOCK'
+if [ "$1" = ps ]; then
+    for a in "$@"; do case "$a" in *Names*) echo erplora-test-pg-5433; exit 0 ;; esac; done
+    exit 0
+fi
+[ "$1" = exec ] || exit 0
+sql="${!#}"
+case "$sql" in
+    *max_locks_per_transaction*) echo 1228800 ;;
+    *pg_database*)
+        # Existence probe or listing: answer from the state dir.
+        for f in "$dbs"/*; do [ -e "$f" ] || continue; n=$(basename "$f")
+            case "$sql" in
+                *"datname='$n'"*) echo 1 ;;
+                *"datname='"*) ;;
+                *) echo "$n" ;;
+            esac
+        done ;;
+    *"DROP DATABASE"*)
+        n=$(printf '%s' "$sql" | sed -E 's/.*DROP DATABASE (IF EXISTS )?"?([a-z0-9_]+)"?.*/\2/')
+        rm -f "$dbs/$n" ;;
+    *"CREATE DATABASE"*)
+        n=$(printf '%s' "$sql" | sed -E 's/.*CREATE DATABASE "?([a-z0-9_]+)"?.*/\1/')
+        [ -e "$dbs/$n" ] && { echo "ERROR: database \"$n\" already exists" >&2; exit 1; }
+        : > "$dbs/$n" ;;
+esac
+exit 0
+DOCK
+chmod +x "$fakebin/docker"
+cat > "$fakebin/pnpm" <<PNPM
+#!/usr/bin/env bash
+{ for u in "\$HUB_E2E_DATABASE_URL" "\$E2E_DATABASE_URL"; do
+    n=\${u##*/}
+    if [ ! -e "$dbs/\$n" ]; then echo "\$n=MISSING"
+    elif [ -s "$dbs/\$n" ]; then echo "\$n=STALE:\$(cat "$dbs/\$n")"
+    else echo "\$n=FRESH"; fi
+  done; } > "$repo/BENCH"
+exit 0
+PNPM
+chmod +x "$fakebin/pnpm"
+# The stale bench of the incident: both databases exist, holding the four-digit Demo.
+echo "Demo pin=0000" > "$dbs/hub_e2e_web"
+echo "Demo pin=0000" > "$dbs/hub_e2e_assistant"
+# A pass that died without cleaning up (its PID is gone) and one still running.
+sleep 300 & live_pid=$!
+dead_pid=$( (sh -c 'echo $$') )
+echo "rows" > "$dbs/hub_e2e_web_${dead_pid}"
+echo "rows" > "$dbs/hub_e2e_web_${live_pid}"
+run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    PATH="$fakebin:$PATH" DATABASE_URL= HUB_E2E_DATABASE_URL= E2E_DATABASE_URL= \
+    HUB_GATE_TEST_CMD="true" >/dev/null
+bench=$(tr '\n' ' ' < "$repo/BENCH" 2>/dev/null)
+errs=""
+[ -n "$bench" ] || errs="$errs CONTROL-the-web-stage-never-ran"
+case "$bench" in *STALE*|*MISSING*) errs="$errs bench-not-fresh:[$bench]" ;; esac
+[ "$(printf '%s' "$bench" | grep -o '=FRESH' | wc -l | tr -d ' ')" = 2 ] || errs="$errs want-2-fresh:[$bench]"
+case "$bench" in *"hub_e2e_web="*|*"hub_e2e_assistant="*) errs="$errs uses-the-SHARED-database:[$bench]" ;; esac
+[ -e "$dbs/hub_e2e_web_${live_pid}" ] || errs="$errs dropped-a-LIVE-neighbour"
+[ ! -e "$dbs/hub_e2e_web_${dead_pid}" ] || errs="$errs left-a-dead-pass-leftover"
+for n in $(printf '%s' "$bench" | grep -oE 'hub_e2e_[a-z]+_[0-9]+'); do
+    [ ! -e "$dbs/$n" ] || errs="$errs leaked-its-own:$n"
+done
+kill "$live_pid" 2>/dev/null; wait "$live_pid" 2>/dev/null
+[ -z "$errs" ] \
+    && ok "hub#1998: each web pass runs on fresh bench databases of its own (stale/dead dropped, live neighbour kept)" \
+    || bad "hub#1998: each web pass runs on fresh bench databases of its own (stale/dead dropped, live neighbour kept)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 400)"
+
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

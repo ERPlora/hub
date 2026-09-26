@@ -304,15 +304,22 @@ pub(crate) async fn transmit_one(
     // visible. Un no-veredicto lleva el motivo del otro lado a bordo (`faultstring`): se normaliza
     // AQUÍ a la misma rama que un fallo de conexión — contingencia con backoff y el motivo en el
     // evento — en vez de inventarle un veredicto.
-    let transport = transport.and_then(|body| match fault_reason(&body) {
-        Some(reason) => Err(VerifactuError::Transmission(reason)),
-        None => Ok(body),
+    //
+    // Except a Fault the AEAT will answer again the same way (hub#2124): the header names an
+    // obligado it does not know or cannot read, and the envelope is frozen. That one IS its
+    // verdict — a refusal with its code — and resending it every hour changes nothing.
+    let transport = transport.and_then(|body| {
+        if let Some(refusal) = permanent_fault(&body) {
+            return Ok(refusal);
+        }
+        match fault_reason(&body) {
+            Some(reason) => Err(VerifactuError::Transmission(reason)),
+            None => Ok(aeat::parse_response(&body)),
+        }
     });
 
     match transport {
-        Ok(body) => {
-            let resp = aeat::parse_response(&body);
-
+        Ok(resp) => {
             // ── Recuperación automática: SOLO si la AEAT rechazó de verdad ─────────────────
             // El caso que se quería cubrir es **restaurar un backup**: la cadena local retrocede
             // y el envío sale con `PrimerRegistro=S` cuando la AEAT ya tiene registros de ese
@@ -351,34 +358,44 @@ pub(crate) async fn transmit_one(
                     &resp,
                     recovery_id,
                     event_id,
+                    queue_id,
                     remission,
                 )
                 .await
                 {
-                    // Re-anclado y reintentado: ese es el resultado que vale.
+                    // Re-anclado y reintentado: ese es el resultado que vale — y sale de la cola
+                    // con la misma regla que cualquier otro envío (hub#2127).
                     Ok(Some(result)) => return Ok(result),
                     // La AEAT no dio ancla utilizable → se registra el rechazo original.
                     Ok(None) => {}
-                    // La recuperación falló (consulta caída, sin certificado…). El rechazo
-                    // original se registra igual, con el motivo del fallo anotado: nunca se
-                    // traga en silencio.
+                    // The recovery could not complete (the consult or the resend never got an
+                    // answer, the road broke…). That is not the AEAT's last word on this record:
+                    // it is retried like any send the wire broke (hub#2134), with the refusal it
+                    // was recovering from in its reason, and the next pass runs the whole
+                    // recovery again — the frozen envelope draws the same refusal.
                     Err(e) => {
-                        return Ok(response_ops(
+                        let reason = format!(
+                            "{} {} — automatic chain recovery failed: {e}",
+                            resp.codigo_error,
+                            resp.descripcion_error.trim()
+                        );
+                        return wire_failure(
+                            host,
+                            ctx,
                             record,
-                            &resp,
+                            config,
                             &destination,
-                            &xml,
-                            &xml_storage_path,
-                            event_id,
-                            &ctx.now,
-                            &record_id,
-                            Some(&format!("recuperación automática fallida: {e}")),
-                        ))
+                            (&xml, &xml_storage_path),
+                            (event_id, queue_id, &record_id),
+                            reason.trim(),
+                            None,
+                        )
+                        .await;
                     }
                 }
             }
 
-            Ok(response_ops(
+            let outcome = response_ops(
                 record,
                 &resp,
                 &destination,
@@ -388,7 +405,8 @@ pub(crate) async fn transmit_one(
                 &ctx.now,
                 &record_id,
                 None,
-            ))
+            );
+            refusal_leaves_the_queue(host, ctx, &verdict, &record_id, queue_id, outcome).await
         }
         Err(err) => {
             // 🪦 Aquí iba el **tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4,
@@ -403,60 +421,94 @@ pub(crate) async fn transmit_one(
             // correcto: el registro se encola en contingencia con backoff y el error se ve.
             //
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
-            let reason = err.to_string();
-            let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, &reason).await?;
-            let environment = &destination.environment;
-            let backoff_minutes = retry.backoff_minutes;
-            let ops = vec![
-                apply_transmission(
-                    &record_id,
-                    "error",
-                    "",
-                    &reason,
-                    "",
-                    &xml,
-                    &xml_storage_path,
-                    &record_id,
-                    1,
-                ),
-                op(
-                    "verifactu._insert_event",
-                    json!({
-                        "event_id": event_id,
-                        "record_id": record_id.clone(),
-                        "event_type": "transmission_failure",
-                        "severity": "error",
-                        "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
-                        "details": details_for("verifactu.transmission_retry", json!({
-                            "environment": environment,
-                            "backoff_minutes": backoff_minutes,
-                            "error": reason.clone(),
-                            "attempts": retry.attempts,
-                        })),
-                        "timestamp": ctx.now,
-                    }),
-                ),
-                retry.operation,
-            ];
-            Ok((
-                ops,
-                // For the owner this is the same problem as a refusal — the invoice is not at the
-                // AEAT. `reason` is what tells an operator that the wire failed, not the filing.
-                vec![Event::new(
-                    EVENT_RECORD_REJECTED,
-                    failure_payload(
-                        record,
-                        REASON_TRANSMISSION_FAILED,
-                        "error",
-                        "",
-                        &reason,
-                        environment,
-                    ),
-                )],
-                false,
-            ))
+            wire_failure(
+                host,
+                ctx,
+                record,
+                config,
+                &destination,
+                (&xml, &xml_storage_path),
+                (event_id, queue_id, &record_id),
+                &err.to_string(),
+                None,
+            )
+            .await
         }
     }
+}
+
+/// The send reached no verdict — the wire broke, or the AEAT answered a Fault the next send can
+/// clear: the record is filed as `error` and queued with its backoff, the reason in the event and
+/// in the queue entry (WASM-TODO §5). Shared by the first send, by the re-chained resend
+/// (hub#2127) and by a chain recovery the wire broke (hub#2134), so all of them retry the same way.
+#[allow(clippy::too_many_arguments)]
+async fn wire_failure(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    record: &Json,
+    config: &Json,
+    destination: &Destination,
+    (xml, xml_storage_path): (&str, &str),
+    (event_id, queue_id, transmission_id): (&str, &str, &str),
+    reason: &str,
+    note: Option<&str>,
+) -> Result<(Vec<Operation>, Vec<Event>, bool)> {
+    let record_id = str_field(record, "id");
+    let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, reason).await?;
+    let environment = &destination.environment;
+    let backoff_minutes = retry.backoff_minutes;
+    let mut details = json!({
+        "environment": environment,
+        "backoff_minutes": backoff_minutes,
+        "error": reason,
+        "attempts": retry.attempts,
+    });
+    if let (Some(note), Some(map)) = (note, details.as_object_mut()) {
+        map.insert("note".into(), json!(note));
+    }
+    let ops = vec![
+        apply_transmission(
+            &record_id,
+            "error",
+            "",
+            reason,
+            "",
+            xml,
+            xml_storage_path,
+            transmission_id,
+            1,
+        ),
+        op(
+            "verifactu._insert_event",
+            json!({
+                "event_id": event_id,
+                "record_id": record_id,
+                "event_type": "transmission_failure",
+                "severity": "error",
+                "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
+                "details": details_for("verifactu.transmission_retry", details),
+                "timestamp": ctx.now,
+            }),
+        ),
+        retry.operation,
+    ];
+    Ok((
+        ops,
+        // For the owner this is the same problem as a refusal — the invoice is not at the
+        // AEAT. `reason` is what tells an operator that the wire failed, not the filing.
+        vec![Event::new(
+            EVENT_RECORD_REJECTED,
+            failure_payload(
+                record,
+                REASON_TRANSMISSION_FAILED,
+                "error",
+                "",
+                reason,
+                environment,
+            ),
+        )],
+        false,
+    ))
 }
 
 /// Contingency entry for a record that could NOT be remitted: attempt count + the 5/10/20/40/60
@@ -504,6 +556,77 @@ pub(crate) fn fault_reason(body: &str) -> Option<String> {
                  RespuestaRegFactuSistemaFacturacion ni faultstring)"
             .to_owned(),
     })
+}
+
+/// Fault codes the AEAT answers again, byte for byte, to the same envelope (hub#2124).
+///
+/// A queued record resends its FROZEN envelope, so a Fault about what that envelope says is
+/// permanent: `4102` (it does not meet the schema), `4104` (the obligado is not in the census —
+/// measured on 2026-09-23 with `12345678Z`) and `4116` (the obligado's tax id is malformed —
+/// measured on 2026-09-02 with `B00000000`). NOT here: `4112` (the presenter may not present for
+/// this obligado) — the presenter is stamped on every send (`aeat::set_representative`), so the
+/// next one can go through once the representation exists. Anything not listed keeps the retry.
+const PERMANENT_FAULT_CODES: &[&str] = &["4102", "4104", "4116"];
+
+/// A Fault in [`PERMANENT_FAULT_CODES`] as the refusal it is: `Incorrecto` with the AEAT's code
+/// and its `faultstring`, so it is filed like any other refused record. `None` for anything else.
+pub(crate) fn permanent_fault(body: &str) -> Option<aeat::AeatResponse> {
+    let fault = body
+        .split("<faultstring>")
+        .nth(1)?
+        .split("</faultstring>")
+        .next()?
+        .trim();
+    let code = fault.strip_prefix("Codigo[")?.split(']').next()?;
+    PERMANENT_FAULT_CODES
+        .contains(&code)
+        .then(|| aeat::AeatResponse {
+            estado_envio: "Incorrecto".to_owned(),
+            estado_registro: "Incorrecto".to_owned(),
+            csv: String::new(),
+            codigo_error: code.to_owned(),
+            descripcion_error: fault.to_owned(),
+        })
+}
+
+/// A record the AEAT REFUSED is corrected with a new record, never filed again as it is — so if
+/// the queue was retrying it, its entry leaves as `failed` (hub#2124): kept as the trace of what
+/// was tried, never due again. Without this the entry stayed due and the drain resent the same
+/// envelope on every pass. A record that never held an entry is not given one.
+async fn refusal_leaves_the_queue(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    verdict: &aeat::Verdict,
+    record_id: &str,
+    queue_id: &str,
+    (mut ops, events, success): (Vec<Operation>, Vec<Event>, bool),
+) -> Result<(Vec<Operation>, Vec<Event>, bool)> {
+    if verdict.status != "rejected" {
+        return Ok((ops, events, success));
+    }
+    let entry = host
+        .read(
+            "SELECT attempts FROM verifactu_contingencyqueue \
+             WHERE record_id = :record_id AND hub_id = :hub_id AND is_deleted = 0 LIMIT 1",
+            &params(json!({ "record_id": record_id, "hub_id": ctx.hub_id })),
+        )
+        .await?;
+    if let Some(entry) = entry.first() {
+        ops.push(op(
+            "verifactu._enqueue_contingency",
+            json!({
+                "queue_id": queue_id,
+                "record_id": record_id,
+                "priority": 2,
+                "attempts": int_field(entry, "attempts", 0) + 1,
+                "last_attempt_at": ctx.now,
+                "last_error": format!("{} {}", verdict.code, verdict.message).trim(),
+                "next_attempt_at": Json::Null,
+                "queue_status": "failed",
+            }),
+        ));
+    }
+    Ok((ops, events, success))
 }
 
 pub(crate) async fn enqueue_retry(
@@ -817,6 +940,10 @@ pub(crate) fn anchor_as_prev(anchor: &aeat::ConsultRecord) -> Json {
 ///
 /// Un solo reintento, a propósito: si el segundo envío también se rechaza, el problema no era el
 /// eslabón y reintentar en bucle solo quemaría números de cadena.
+///
+/// Its outcome follows the rule of every other send (hub#2127): a refusal — a verdict or a Fault
+/// the AEAT will repeat — leaves the queue as `failed`, and a Fault the next send can clear keeps
+/// the retry with its backoff and its reason.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn auto_rechain_and_retry(
     host: &dyn NativeHost,
@@ -834,11 +961,15 @@ pub(crate) async fn auto_rechain_and_retry(
     rejection: &aeat::AeatResponse,
     recovery_id: &str,
     event_id: &str,
+    queue_id: &str,
     // El re-anclado hereda el origen del envío que lo disparó (hub#322): un registro que salió
     // de la cola sigue saliendo de la cola cuando se reintenta sobre el ancla que dio la AEAT.
     remission: Remission,
 ) -> Result<Option<(Vec<Operation>, Vec<Event>, bool)>> {
     let issuer_nif = str_field(record, "issuer_nif");
+    // Who asks is the record's obligado (hub#2131): a business that never saved the settings
+    // screen has no registered name in its config, and the consult cannot leave without one.
+    let config = &diagnostics::with_obligado_name_of(config, record);
     // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
     // tax agency for the anchor would re-chain this record onto a link from the other chain,
     // which is precisely the crossing that guard R4 exists to prevent.
@@ -884,6 +1015,23 @@ pub(crate) async fn auto_rechain_and_retry(
 
     let (rechained, rechain_op) = rechain_record(record, anchor, anchor_seq + 1);
     let record_id = str_field(record, "id");
+    // The refusal that triggered the recovery is filed FIRST (hub#2127): `_rechain_record` only
+    // rewrites a record already refused — the guard that keeps an accepted or in-flight record
+    // from being re-chained — and without this row the record reached it still `pending`, so the
+    // UPDATE matched nothing and the row kept its old link while the AEAT took the new one. The
+    // envelope and its path are left to the resend below, which overwrites both.
+    let refused = aeat::classify(rejection);
+    let refusal_op = apply_transmission(
+        &record_id,
+        refused.status,
+        &refused.code,
+        &refused.message,
+        "",
+        "",
+        "",
+        &record_id,
+        0,
+    );
     let xml = aeat::build_soap(
         &rechained,
         config,
@@ -928,8 +1076,6 @@ pub(crate) async fn auto_rechain_and_retry(
             .await?
         }
     };
-    let resp = aeat::parse_response(&body);
-
     let note = format!(
         "re-anclado automáticamente tras {} ({}) y reintentado sobre la huella {}…",
         if rejection.codigo_error.is_empty() {
@@ -940,7 +1086,31 @@ pub(crate) async fn auto_rechain_and_retry(
         rejection.descripcion_error.trim(),
         short(&chain::normalize_hash(&anchor.record_hash)),
     );
-    let (mut ops, events, success) = response_ops(
+    // The resend's answer is read like the first send's (hub#2124): a Fault the AEAT will repeat
+    // is its refusal, any other Fault is a wire failure to retry, and only the rest is a verdict.
+    let resp = match permanent_fault(&body) {
+        Some(refusal) => refusal,
+        None => match fault_reason(&body) {
+            Some(reason) => {
+                let (mut ops, events, success) = wire_failure(
+                    host,
+                    ctx,
+                    record,
+                    config,
+                    destination,
+                    (&xml, &xml_storage_path),
+                    (event_id, queue_id, &delivery_id),
+                    &reason,
+                    Some(&note),
+                )
+                .await?;
+                ops.splice(0..0, [refusal_op, anchor_op, rechain_op]);
+                return Ok(Some((ops, events, success)));
+            }
+            None => aeat::parse_response(&body),
+        },
+    };
+    let outcome = response_ops(
         record,
         &resp,
         destination,
@@ -951,9 +1121,18 @@ pub(crate) async fn auto_rechain_and_retry(
         &delivery_id,
         Some(&note),
     );
-    // El ancla y el re-encadenado se aplican ANTES del resultado del reintento (orden del Output).
-    ops.insert(0, rechain_op);
-    ops.insert(0, anchor_op);
+    let (mut ops, events, success) = refusal_leaves_the_queue(
+        host,
+        ctx,
+        &aeat::classify(&resp),
+        &record_id,
+        queue_id,
+        outcome,
+    )
+    .await?;
+    // El rechazo original, el ancla y el re-encadenado se aplican ANTES del resultado del
+    // reintento (orden del Output).
+    ops.splice(0..0, [refusal_op, anchor_op, rechain_op]);
     Ok(Some((ops, events, success)))
 }
 
@@ -1043,6 +1222,64 @@ pub(crate) const DUE_NEVER_QUEUED: &str = "q.id IS NULL AND r.status = 'pending'
 pub(crate) const DUE_FROM_QUEUE: &str = "q.status IN ('pending','retrying') \
      AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= :now)";
 
+/// **A full invoice the hub itself rejected because it forgot its customer** (hub#1978).
+///
+/// Before hub#1975 the row did not keep the customer, so a full invoice sealed without a road
+/// reached the drain with no `Destinatarios` and the hub's own schema check rejected it
+/// (`aeat_response_code = 'XSD'`) — chain number spent, never seen by the AEAT. Only that case:
+/// an `alta` of a type that requires the customer, linked to the invoice it came from, whose row
+/// has no customer and whose rejected envelope carries no `Destinatarios`. The last condition is
+/// what makes it happen once — the envelope a revived record leaves with does carry them.
+///
+/// The customer column is read through `to_jsonb(r)`: a hub whose `verifactu` module predates
+/// migration 017 has no such column, and the drain must keep running there.
+/// The mark [`due_for_remission`] leaves on a row picked by [`DUE_FORGOTTEN_CUSTOMER`].
+const FORGOTTEN_CUSTOMER: &str = "forgotten_customer";
+
+pub(crate) const DUE_FORGOTTEN_CUSTOMER: &str = "r.status = 'rejected' \
+     AND r.aeat_response_code = 'XSD' AND r.record_type = 'alta' \
+     AND r.invoice_type IN ('F1','F3','R1','R2','R3','R4') \
+     AND COALESCE(r.invoice_id, '') <> '' \
+     AND COALESCE(to_jsonb(r) ->> 'recipient_nif', '') = '' \
+     AND COALESCE(r.xml_content, '') NOT LIKE '%Destinatarios>%'";
+
+/// Gives a record picked by [`DUE_FORGOTTEN_CUSTOMER`] its customer back, from the invoice it
+/// was sealed from, and drops the envelope the hub rejected so the send rebuilds it. `None` when
+/// there is no customer to give back — the invoice is gone, names none, or cannot be read —: the
+/// record then stays rejected as it was, since without `Destinatarios` the AEAT refuses it (1189).
+///
+/// The invoice is read the way `ingest_invoice` reads it (ADR-0058's bounded read by id), with the
+/// country and document kind of hub#1967 through `to_jsonb(i)` for the same reason.
+async fn with_its_customer_back(host: &dyn NativeHost, ctx: &Ctx, record: Json) -> Option<Json> {
+    let invoice = host
+        .read(
+            "SELECT i.customer_tax_id, i.customer_name, \
+             COALESCE(to_jsonb(i) ->> 'customer_country', '') AS customer_country, \
+             COALESCE(to_jsonb(i) ->> 'customer_id_type', '') AS customer_id_type \
+             FROM invoice_invoice i \
+             WHERE i.id = :invoice_id AND i.hub_id = :hub_id AND i.is_deleted = 0 LIMIT 1",
+            &params(json!({
+                "invoice_id": str_field(&record, "invoice_id"),
+                "hub_id": ctx.hub_id,
+            })),
+        )
+        .await
+        .ok()?
+        .into_iter()
+        .next()?;
+    let tax_id = str_field(&invoice, "customer_tax_id");
+    if tax_id.trim().is_empty() {
+        return None;
+    }
+    let mut record = record;
+    record["recipient_nif"] = json!(tax_id);
+    record["recipient_name"] = json!(str_field(&invoice, "customer_name"));
+    record["recipient_country"] = json!(str_field(&invoice, "customer_country"));
+    record["recipient_id_type"] = json!(str_field(&invoice, "customer_id_type"));
+    record["xml_content"] = json!("");
+    Some(record)
+}
+
 /// **What leaves in this drain, in the order the chain was sealed** (verifactu#111).
 ///
 /// Two sources, and before verifactu#111 the drain only read the first: the queue entries that are
@@ -1079,7 +1316,27 @@ async fn due_for_remission(host: &dyn NativeHost, ctx: &Ctx, limit: i64) -> Resu
             &binds,
         )
         .await?;
-    let mut due: Vec<Json> = queued.into_iter().chain(never_queued).collect();
+    let forgotten = host
+        .read(
+            &format!(
+                "SELECT r.id AS record_id, r.environment, r.issuer_nif, r.sequence_number \
+                 FROM verifactu_record r \
+                 WHERE r.hub_id = :hub_id AND r.is_deleted = 0 AND {DUE_FORGOTTEN_CUSTOMER} \
+                 ORDER BY r.environment, r.issuer_nif, r.sequence_number \
+                 LIMIT :limit"
+            ),
+            &binds,
+        )
+        .await?;
+    let forgotten_ids: std::collections::HashSet<String> = forgotten
+        .iter()
+        .map(|row| str_field(row, "record_id"))
+        .collect();
+    let mut due: Vec<Json> = queued
+        .into_iter()
+        .chain(never_queued)
+        .chain(forgotten)
+        .collect();
     // Stable: within one position the queue keeps its own order. An orphan entry (its record is
     // gone) has no position and goes last; the loop below drops it.
     due.sort_by_key(|row| {
@@ -1094,6 +1351,12 @@ async fn due_for_remission(host: &dyn NativeHost, ctx: &Ctx, limit: i64) -> Resu
         let id = str_field(row, "record_id");
         !id.is_empty() && seen.insert(id)
     });
+    // Marked here, after the merge, so the mark survives whichever source the record came from.
+    for row in &mut due {
+        if forgotten_ids.contains(&str_field(row, "record_id")) {
+            row[FORGOTTEN_CUSTOMER] = json!(true);
+        }
+    }
     Ok(due)
 }
 
@@ -1140,6 +1403,14 @@ pub(crate) async fn process_contingency_queue(
         let rec = match rec {
             Some(r) => r,
             None => continue, // registro borrado: ignorar la entrada huérfana
+        };
+        let rec = if q.get(FORGOTTEN_CUSTOMER).is_some() {
+            match with_its_customer_back(host, &ctx, rec).await {
+                Some(revived) => revived,
+                None => continue,
+            }
+        } else {
+            rec
         };
         if str_field(&rec, "status") == "accepted" {
             // Ya aceptado: limpiar la entrada de cola obsoleta.
@@ -1221,7 +1492,10 @@ pub(crate) async fn process_contingency_queue(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{archive_transmission_xml, derive_tax_rate, fault_reason, NativeHost, Params, Result};
+    use super::{
+        archive_transmission_xml, derive_tax_rate, fault_reason, permanent_fault, NativeHost,
+        Params, Result,
+    };
     use serde_json::Value as Json;
     use std::sync::Mutex;
 
@@ -1256,6 +1530,29 @@ pub(crate) mod tests {
         let reason = fault_reason("<html><body>502 Bad Gateway</body></html>")
             .expect("HTML is not a verdict");
         assert!(reason.contains("veredicto"), "{reason}");
+    }
+
+    /// A schema Fault on a frozen envelope is permanent too (hub#2124): the same bytes fail the
+    /// same way on every resend. The faultstring is the AEAT's real `4102` wording.
+    #[test]
+    fn a_schema_fault_is_a_refusal_with_its_code() {
+        let body = "<env:Envelope><env:Body><env:Fault><faultcode>env:Client</faultcode>\
+            <faultstring>Codigo[4102].El XML no cumple el esquema. Falta informar campo \
+            obligatorio.: IDVersion</faultstring></env:Fault></env:Body></env:Envelope>";
+
+        let refusal = permanent_fault(body).expect("4102 is permanent");
+
+        assert_eq!(refusal.codigo_error, "4102");
+        assert_eq!(refusal.estado_registro, "Incorrecto");
+    }
+
+    /// Neither a verdict nor an intermediary's HTML is read as a permanent Fault.
+    #[test]
+    fn only_a_listed_fault_is_permanent() {
+        let verdict =
+            include_str!("../tests/fixtures/alta_2007_aceptado_con_errores_2026-08-02.xml");
+        assert!(permanent_fault(verdict).is_none());
+        assert!(permanent_fault("<html><body>502 Bad Gateway</body></html>").is_none());
     }
 
     // ── the two roads of ADR-0320, resolved in one place (hub#1432) ───────────────────────────
@@ -2292,8 +2589,12 @@ pub(crate) mod tests {
             "el registro tiene que quedar re-encadenado: {:?}",
             ops.iter().map(|o| &o.command).collect::<Vec<_>>()
         );
+        // The LAST apply is the resend's verdict: the first one files the refusal that triggered
+        // the recovery, so that `_rechain_record` (which only rewrites a refused record) applies
+        // (hub#2127).
         let applied = ops
             .iter()
+            .rev()
             .find(|o| o.command == "verifactu._apply_transmission")
             .expect("el veredicto llega al registro");
         assert_eq!(
@@ -3910,7 +4211,9 @@ mod late_remission_verifactu111 {
     //! and a fake host answers whatever its author thought the SQL meant. Only the network is fake:
     //! a cell that keeps every envelope it is handed, in arrival order.
 
-    use crate::records::testing_always_reaches_the_aeat_hub1934::spawn_fake_cell;
+    use crate::records::testing_always_reaches_the_aeat_hub1934::{
+        spawn_fake_cell, spawn_fake_cell_answering, spawn_fake_cell_answering_in_sequence,
+    };
     use base64::Engine as _;
     use erplora_db::testutil::fresh_db;
     use erplora_db::Params;
@@ -4042,7 +4345,29 @@ mod late_remission_verifactu111 {
             if !erplora_runtime::require_modules_workspace() {
                 return None;
             }
-            let (url, cell) = spawn_fake_cell().await;
+            Self::on_cell(hub_id, spawn_fake_cell().await).await
+        }
+
+        /// A bench whose AEAT answers every envelope with `aeat_response` (hub#2124).
+        async fn answering(hub_id: &str, aeat_response: &'static str) -> Option<Self> {
+            if !erplora_runtime::require_modules_workspace() {
+                return None;
+            }
+            Self::on_cell(hub_id, spawn_fake_cell_answering(aeat_response).await).await
+        }
+
+        /// A bench whose AEAT answers the n-th envelope with `answers[n]` (hub#2127).
+        async fn answering_in_sequence(hub_id: &str, answers: &[&'static str]) -> Option<Self> {
+            if !erplora_runtime::require_modules_workspace() {
+                return None;
+            }
+            Self::on_cell(hub_id, spawn_fake_cell_answering_in_sequence(answers).await).await
+        }
+
+        async fn on_cell(
+            hub_id: &str,
+            (url, cell): (String, Arc<Mutex<Vec<Json>>>),
+        ) -> Option<Self> {
             let road = Arc::new(Road::default());
             road.archive_takes.store(usize::MAX, Ordering::SeqCst);
             *road.cell.lock().unwrap() = url;
@@ -4445,5 +4770,1248 @@ mod late_remission_verifactu111 {
             !hub.sent().await[1..].contains(&(1, true)),
             "record 1 is at the AEAT and is never filed twice"
         );
+    }
+
+    // ── hub#1967 · the customer's country travels from the invoice to the XML ─────────────────
+
+    /// One full invoice (`F1`, 100,00 € + 21 %) written straight into the real `invoice_invoice`,
+    /// then ingested as `invoice.created` would. `country` is `None` when the invoice module of
+    /// the hub predates the country columns; the hub runtime updates on its own schedule, so the
+    /// ingest has to read both shapes.
+    async fn ingest_invoice_to(
+        bench: &Bench,
+        tax_id: &str,
+        country: Option<(&str, &str)>,
+    ) -> String {
+        let db = bench.rt.db();
+        let ddl = if country.is_some() {
+            "ALTER TABLE invoice_invoice \
+               ADD COLUMN IF NOT EXISTS customer_country TEXT NOT NULL DEFAULT '', \
+               ADD COLUMN IF NOT EXISTS customer_id_type TEXT NOT NULL DEFAULT ''"
+        } else {
+            "ALTER TABLE invoice_invoice \
+               DROP COLUMN IF EXISTS customer_country, DROP COLUMN IF EXISTS customer_id_type"
+        };
+        db.execute_batch(ddl).await.expect(ddl);
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("tax_id".into(), json!(tax_id));
+        db.execute(
+            "INSERT INTO invoice_invoice (id, hub_id, invoice_type, series, number, issue_date, \
+               issuer_nif, issuer_name, customer_tax_id, customer_name, description, \
+               base_amount, tax_amount, total_amount, tax_breakdown, created_at, updated_at) \
+             VALUES ('inv-1967', :hub_id, 'F1', 'FACT', 'FACT-2026-000001', '2026-09-22', \
+               'B12345674', 'Salon Lucia SL', :tax_id, 'Client Inc', 'Corte y peinado', \
+               10000, 2100, 12100, '{\"21.00\":{\"base\":10000,\"tax\":2100}}', \
+               '2026-09-22T10:00:00Z', '2026-09-22T10:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("the invoice row");
+        if let Some((code, kind)) = country {
+            let mut p = Params::new();
+            p.insert("code".into(), json!(code));
+            p.insert("kind".into(), json!(kind));
+            db.execute(
+                "UPDATE invoice_invoice SET customer_country = :code, customer_id_type = :kind \
+                 WHERE id = 'inv-1967'",
+                &p,
+            )
+            .await
+            .expect("the customer's country");
+        }
+        bench.open_the_road();
+        bench
+            .rt
+            .execute_command(
+                "verifactu.records.ingest_invoice",
+                json!({ "invoice_id": "inv-1967" }).as_object().unwrap(),
+                &bench.ctx(),
+            )
+            .await
+            .expect("the invoice is ingested");
+        let sent = bench.cell.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "the record reaches the cell once");
+        assert_eq!(sent[0]["environment"], "testing", "only the TEST AEAT");
+        let xml = base64::engine::general_purpose::STANDARD
+            .decode(sent[0]["xml_b64"].as_str().expect("xml_b64"))
+            .expect("base64");
+        String::from_utf8(xml).expect("utf-8")
+    }
+
+    /// 🔴 hub#1967: an invoice to a company in the United States reaches the AEAT with the
+    /// customer declared as a foreigner (`IDOtro`, `CodigoPais` US, `IDType 04`), not as a
+    /// Spanish `NIF` the AEAT cannot find in its census.
+    #[tokio::test]
+    async fn an_invoice_to_a_customer_outside_the_eu_reaches_the_aeat_as_idotro() {
+        let Some(bench) = Bench::new("19670000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        let xml = ingest_invoice_to(&bench, "123456789", Some(("US", ""))).await;
+        assert!(
+            xml.contains(
+                "<sum1:IDOtro><sum1:CodigoPais>US</sum1:CodigoPais>\
+                 <sum1:IDType>04</sum1:IDType><sum1:ID>123456789</sum1:ID></sum1:IDOtro>"
+            ),
+            "{xml}"
+        );
+        assert!(!xml.contains("<sum1:NIF>123456789</sum1:NIF>"), "{xml}");
+    }
+
+    /// The document kind the invoice declares (a tourist's passport) is the one that goes out.
+    #[tokio::test]
+    async fn a_passport_on_the_invoice_reaches_the_aeat_as_idtype_03() {
+        let Some(bench) = Bench::new("19670000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        let xml = ingest_invoice_to(&bench, "XA1234567", Some(("US", "03"))).await;
+        assert!(xml.contains("<sum1:IDType>03</sum1:IDType>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:CodigoPais>US</sum1:CodigoPais>"),
+            "{xml}"
+        );
+    }
+
+    /// A hub whose invoice module has no country columns yet still seals and sends its invoices,
+    /// exactly as before hub#1967 — the runtime must not break a sale over a column it reads.
+    #[tokio::test]
+    async fn an_invoice_module_without_the_country_still_seals_and_sends() {
+        let Some(bench) = Bench::new("19670000-0000-4000-8000-000000000003").await else {
+            return;
+        };
+        let xml = ingest_invoice_to(&bench, "B87654321", None).await;
+        assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
+    }
+
+    // ── hub#1975 · a deferred full invoice still knows who its customer was ────────────────────
+
+    /// One full invoice (`F1`, 100,00 € + 21 %) to `recipient` through `verifactu.records.create`
+    /// while the hub has NO road, then the road opens and the drain sends it: the envelope is
+    /// rebuilt from the `verifactu_record` row alone. Returns the XML that reached the cell.
+    async fn defer_a_full_invoice_and_drain(bench: &Bench, recipient: Json) -> String {
+        let mut payload = json!({
+            "record_type": "alta", "issuer_nif": NIF, "issuer_name": "Salon Lucia SL",
+            "invoice_number": "FACT-2026-000001", "invoice_date": "2026-09-22",
+            "invoice_type": "F1", "description": "Corte y peinado",
+            "base_amount": 10000, "tax_rate": 21.0, "tax_amount": 2100, "total_amount": 12100,
+            "tax_breakdown": r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
+                                  "base":10000,"quota":2100}]"#,
+        });
+        for (key, value) in recipient.as_object().expect("recipient fields") {
+            payload[key] = value.clone();
+        }
+        bench
+            .rt
+            .execute_command(
+                "verifactu.records.create",
+                payload.as_object().unwrap(),
+                &bench.ctx(),
+            )
+            .await
+            .expect("the invoice is sealed");
+        assert!(
+            bench.cell.lock().unwrap().is_empty(),
+            "no road: nothing leaves at the time of the sale"
+        );
+        assert_eq!(
+            bench.chain().await,
+            pending(&[1]),
+            "the record waits for the road"
+        );
+
+        bench.open_the_road();
+        bench.drain().await;
+
+        let sent = bench.cell.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "the drain sends the deferred invoice once");
+        assert_eq!(sent[0]["environment"], "testing", "only the TEST AEAT");
+        assert_ne!(
+            bench.chain().await[0].1,
+            "rejected",
+            "the hub must not reject its own invoice for a customer it forgot"
+        );
+        let xml = base64::engine::general_purpose::STANDARD
+            .decode(sent[0]["xml_b64"].as_str().expect("xml_b64"))
+            .expect("base64");
+        String::from_utf8(xml).expect("utf-8")
+    }
+
+    /// 🔴 hub#1975: an F1 sealed without a road reached the drain with no customer — the row did
+    /// not keep it — and the hub itself rejected it (1189) with its chain number spent.
+    #[tokio::test]
+    async fn a_deferred_full_invoice_reaches_the_aeat_with_its_customer() {
+        let Some(bench) = Bench::new("19750000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        let xml = defer_a_full_invoice_and_drain(
+            &bench,
+            json!({ "recipient_nif": "B87654321", "recipient_name": "Peluqueria Norte SL" }),
+        )
+        .await;
+        assert!(
+            xml.contains(
+                "<sum1:Destinatarios><sum1:IDDestinatario>\
+                 <sum1:NombreRazon>Peluqueria Norte SL</sum1:NombreRazon>\
+                 <sum1:NIF>B87654321</sum1:NIF>"
+            ),
+            "{xml}"
+        );
+    }
+
+    /// The foreign customer's country and document kind (hub#1967) survive the wait too: a
+    /// deferred invoice to a tourist's passport goes out as `IDOtro` US 03, not as a Spanish NIF.
+    #[tokio::test]
+    async fn a_deferred_invoice_to_a_foreigner_keeps_the_country_and_document() {
+        let Some(bench) = Bench::new("19750000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        let xml = defer_a_full_invoice_and_drain(
+            &bench,
+            json!({
+                "recipient_nif": "XA1234567", "recipient_name": "Jane Doe",
+                "recipient_country": "US", "recipient_id_type": "03",
+            }),
+        )
+        .await;
+        assert!(
+            xml.contains(
+                "<sum1:IDOtro><sum1:CodigoPais>US</sum1:CodigoPais>\
+                 <sum1:IDType>03</sum1:IDType><sum1:ID>XA1234567</sum1:ID></sum1:IDOtro>"
+            ),
+            "{xml}"
+        );
+    }
+
+    // ── hub#1978 · the invoices the hub rejected for a customer it forgot come back ────────────
+
+    /// One full invoice (`F1`) to `tax_id` written into the real `invoice_invoice` and ingested
+    /// while the hub has NO road, left exactly as a hub before hub#1975 left it: the row sealed
+    /// without its customer, then the road opened and the drain rejected it LOCALLY
+    /// (`verifactu.xsd_invalid`, «una F1 exige Destinatarios»), with nothing reaching the AEAT.
+    /// Returns the record's id.
+    async fn an_invoice_rejected_for_a_forgotten_customer(
+        bench: &Bench,
+        invoice_id: &str,
+        tax_id: &str,
+    ) -> String {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("invoice_id".into(), json!(invoice_id));
+        p.insert("tax_id".into(), json!(tax_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "INSERT INTO invoice_invoice (id, hub_id, invoice_type, series, number, issue_date, \
+                   issuer_nif, issuer_name, customer_tax_id, customer_name, description, \
+                   base_amount, tax_amount, total_amount, tax_breakdown, created_at, updated_at) \
+                 VALUES (:invoice_id, :hub_id, 'F1', 'FACT', 'FACT-2026-000001', '2026-09-22', \
+                   'B12345674', 'Salon Lucia SL', :tax_id, 'Peluqueria Norte SL', 'Corte y peinado', \
+                   10000, 2100, 12100, '{\"21.00\":{\"base\":10000,\"tax\":2100}}', \
+                   '2026-09-22T10:00:00Z', '2026-09-22T10:00:00Z')",
+                &p,
+            )
+            .await
+            .expect("the invoice row");
+        bench
+            .rt
+            .execute_command(
+                "verifactu.records.ingest_invoice",
+                json!({ "invoice_id": invoice_id }).as_object().unwrap(),
+                &bench.ctx(),
+            )
+            .await
+            .expect("the invoice is sealed");
+        assert_eq!(bench.chain().await, pending(&[1]), "no road: it waits");
+        // What a hub before hub#1975 kept: no customer on the row.
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE verifactu_record SET recipient_nif = '', recipient_name = '', \
+                   recipient_country = '', recipient_id_type = '' WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("the customer is forgotten");
+        bench.open_the_road();
+        bench.drain().await;
+        assert_eq!(
+            bench.chain().await,
+            vec![(1, "rejected".to_owned())],
+            "the legacy state: the hub rejected its own invoice"
+        );
+        assert!(
+            bench.cell.lock().unwrap().is_empty(),
+            "and nothing reached the AEAT"
+        );
+        assert!(
+            bench
+                .details_of(1)
+                .await
+                .iter()
+                .any(|d| d["message_key"] == "verifactu.xsd_invalid"),
+            "rejected by the hub's own schema check"
+        );
+        bench.record_id(1).await
+    }
+
+    /// The XMLs that reached the cell, decoded, each with the environment it was sent to.
+    fn envelopes(bench: &Bench) -> Vec<(String, String)> {
+        bench
+            .cell
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let xml = base64::engine::general_purpose::STANDARD
+                    .decode(e["xml_b64"].as_str().expect("xml_b64"))
+                    .expect("base64");
+                (
+                    e["environment"].as_str().unwrap_or_default().to_owned(),
+                    String::from_utf8(xml).expect("utf-8"),
+                )
+            })
+            .collect()
+    }
+
+    /// 🔴 hub#1978: the invoice the hub rejected before hub#1975 takes its customer back from the
+    /// invoice it was sealed from and leaves on the next drain — once, to the TEST AEAT only,
+    /// declaring the incidence and with its `Destinatarios`.
+    #[tokio::test]
+    async fn an_invoice_the_hub_rejected_for_a_forgotten_customer_reaches_the_aeat() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000001").await else {
+            return;
+        };
+        an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-1", "B87654321").await;
+
+        bench.drain().await;
+
+        let sent = envelopes(&bench);
+        assert_eq!(sent.len(), 1, "the rejected invoice leaves once: {sent:?}");
+        let (environment, xml) = &sent[0];
+        assert_eq!(environment, "testing", "only the TEST AEAT");
+        assert!(
+            xml.contains(
+                "<sum1:Destinatarios><sum1:IDDestinatario>\
+                 <sum1:NombreRazon>Peluqueria Norte SL</sum1:NombreRazon>\
+                 <sum1:NIF>B87654321</sum1:NIF>"
+            ),
+            "{xml}"
+        );
+        assert!(
+            xml.contains("<sum1:Incidencia>S</sum1:Incidencia>"),
+            "a late remission declares the incidence: {xml}"
+        );
+        assert_ne!(bench.chain().await[0].1, "rejected", "it is no longer dead");
+
+        bench.drain().await;
+        assert_eq!(envelopes(&bench).len(), 1, "and it is never filed twice");
+    }
+
+    /// Only the hub's OWN schema rejection is undone: an invoice the AEAT itself refused was seen
+    /// by it, and filing it again is not a late remission but a correction — it stays as it is.
+    #[tokio::test]
+    async fn an_invoice_the_aeat_itself_rejected_is_left_alone() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000002").await else {
+            return;
+        };
+        let record_id =
+            an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-2", "B87654321").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("id".into(), json!(record_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE verifactu_record SET aeat_response_code = '1189' \
+                 WHERE hub_id = :hub_id AND id = :id",
+                &p,
+            )
+            .await
+            .expect("the AEAT's own verdict");
+
+        bench.drain().await;
+
+        assert!(envelopes(&bench).is_empty(), "nothing leaves");
+        assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
+    }
+
+    /// An invoice with no customer to take back cannot be declared either: it stays rejected
+    /// instead of leaving without the `Destinatarios` the AEAT would refuse (1189).
+    #[tokio::test]
+    async fn an_invoice_whose_invoice_names_no_customer_stays_rejected() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000003").await else {
+            return;
+        };
+        an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-3", "B87654321").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE invoice_invoice SET customer_tax_id = '' WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("an invoice with no customer");
+
+        bench.drain().await;
+
+        assert!(envelopes(&bench).is_empty(), "nothing leaves");
+        assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
+        assert_eq!(
+            schema_refusals(&bench).await,
+            1,
+            "and it is not rebuilt to be refused again"
+        );
+    }
+
+    /// How many times the hub's own schema check refused record 1.
+    async fn schema_refusals(bench: &Bench) -> usize {
+        bench
+            .details_of(1)
+            .await
+            .iter()
+            .filter(|d| d["message_key"] == "verifactu.xsd_invalid")
+            .count()
+    }
+
+    /// A rejected envelope that already carried `Destinatarios` was refused for something else —
+    /// which is also where a revived invoice lands if its new envelope is refused too. It is not
+    /// the forgotten-customer case, and it is not rebuilt on every drain to be refused again.
+    #[tokio::test]
+    async fn an_envelope_refused_with_its_customer_is_not_revived() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000004").await else {
+            return;
+        };
+        let record_id =
+            an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-4", "B87654321").await;
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(bench.hub_id));
+        p.insert("id".into(), json!(record_id));
+        bench
+            .rt
+            .db()
+            .execute(
+                "UPDATE verifactu_record SET xml_content = replace(xml_content, \
+                   '</sum1:RegistroAlta>', \
+                   '<sum1:Destinatarios><sum1:IDDestinatario><sum1:NombreRazon>X</sum1:NombreRazon>\
+                   <sum1:NIF>B87654321</sum1:NIF></sum1:IDDestinatario></sum1:Destinatarios>\
+                   </sum1:RegistroAlta>') \
+                 WHERE hub_id = :hub_id AND id = :id",
+                &p,
+            )
+            .await
+            .expect("an envelope refused with its customer on board");
+
+        bench.drain().await;
+        bench.drain().await;
+
+        assert!(envelopes(&bench).is_empty(), "nothing leaves");
+        assert_eq!(bench.chain().await, vec![(1, "rejected".to_owned())]);
+        assert_eq!(
+            schema_refusals(&bench).await,
+            1,
+            "and it is not refused again"
+        );
+    }
+
+    /// A hub whose `verifactu` module predates the customer columns (migration 017) — the runtime
+    /// and the module update on their own schedules — keeps draining, and still gives the
+    /// rejected invoice its customer back from the invoice.
+    #[tokio::test]
+    async fn a_module_without_the_customer_columns_still_drains_and_revives() {
+        let Some(bench) = Bench::new("19780000-0000-4000-8000-000000000005").await else {
+            return;
+        };
+        an_invoice_rejected_for_a_forgotten_customer(&bench, "inv-1978-5", "B87654321").await;
+        bench
+            .rt
+            .db()
+            .execute_batch(
+                "ALTER TABLE verifactu_record DROP COLUMN recipient_nif, \
+                   DROP COLUMN recipient_name, DROP COLUMN recipient_country, \
+                   DROP COLUMN recipient_id_type",
+            )
+            .await
+            .expect("a module before 017");
+
+        bench.drain().await;
+
+        let sent = envelopes(&bench);
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(sent[0].0, "testing", "only the TEST AEAT");
+        assert!(
+            sent[0].1.contains("<sum1:NIF>B87654321</sum1:NIF>"),
+            "{}",
+            sent[0].1
+        );
+    }
+
+    // ── a Fault the AEAT will answer again the same way is a verdict (hub#2124) ───────────────
+
+    /// The AEAT preproduction's answer to the Play reviewer hub's seeded identity (`12345678Z`, not
+    /// in the census), frozen on 2026-09-23.
+    const FAULT_4104: &str =
+        include_str!("../tests/fixtures/play_reviewer_seeded_answer_2026-09-23.xml");
+    /// Its answer to the old demo tax id (`B00000000`, malformed), captured on 2026-09-02.
+    const FAULT_4116: &str = r#"<?xml version="1.0" encoding="UTF-8"?><env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/"><env:Body><env:Fault><faultcode>env:Client</faultcode><faultstring>Codigo[4116].Error en la cabecera: el campo NIF del bloque ObligadoEmision tiene un formato incorrecto.. NIF:B00000000. NOMBRE_RAZON:ERPlora Demo SL</faultstring></env:Fault></env:Body></env:Envelope>"#;
+    /// The presenter may not present for this obligado (the wording recorded next to
+    /// `settings::DEMO_BUSINESS_TAX_ID`). The presenter is stamped on EVERY send, so the next one
+    /// can go through once the representation exists: this Fault is not the record's fault.
+    const FAULT_4112: &str = r#"<?xml version="1.0" encoding="UTF-8"?><env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/"><env:Body><env:Fault><faultcode>env:Client</faultcode><faultstring>Codigo[4112].El titular del certificado debe ser Obligado Emisión, Colaborador Social, Apoderado o Sucesor.</faultstring></env:Fault></env:Body></env:Envelope>"#;
+    /// An ordinary verdict that refuses the record.
+    const VERDICT_REFUSED: &str = "<soapenv:Envelope><EstadoEnvio>Incorrecto</EstadoEnvio>\
+        <EstadoRegistro>Incorrecto</EstadoRegistro><CodigoErrorRegistro>1100</CodigoErrorRegistro>\
+        <DescripcionErrorRegistro>Valor o tipo incorrecto del campo</DescripcionErrorRegistro>\
+        </soapenv:Envelope>";
+
+    impl Bench {
+        async fn column(&self, sequence: i64, column: &str) -> Json {
+            self.rows(&format!(
+                "SELECT {column} FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND sequence_number = {sequence}"
+            ))
+            .await[0][column]
+                .clone()
+        }
+
+        /// The queue status of one record's entry, `None` when it holds none.
+        async fn queue_status(&self, sequence: i64) -> Option<String> {
+            let id = self.record_id(sequence).await;
+            self.rows(&format!(
+                "SELECT status FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+            ))
+            .await
+            .first()
+            .and_then(|r| r["status"].as_str().map(ToOwned::to_owned))
+        }
+
+        /// 🔒 Every envelope of these tests went to the TEST AEAT — none may name production.
+        fn only_testing_was_reached(&self) {
+            let envelopes = self.cell.lock().unwrap().clone();
+            assert!(!envelopes.is_empty(), "the control needs something sent");
+            for envelope in envelopes {
+                assert_eq!(envelope["environment"], "testing", "{envelope}");
+            }
+        }
+    }
+
+    /// 🔴 THE bug: the AEAT refuses the whole envelope for a header it will refuse forever (the
+    /// obligado is not in its census, or its tax id is malformed). The record was filed as a wire
+    /// failure and resent every hour for ever. It is a refusal, with the AEAT's code on it.
+    #[tokio::test]
+    async fn a_fault_the_aeat_will_repeat_rejects_the_record_instead_of_retrying_it() {
+        for (n, (fault, code)) in [(FAULT_4104, "4104"), (FAULT_4116, "4116")]
+            .into_iter()
+            .enumerate()
+        {
+            let Some(hub) =
+                Bench::answering(&format!("01110000-0000-4000-8000-00000000212{n}"), fault).await
+            else {
+                return;
+            };
+            hub.open_the_road();
+            hub.sell(1).await;
+
+            assert_eq!(hub.sent().await.len(), 1, "{code}");
+            assert_eq!(
+                hub.chain().await,
+                vec![(1, "rejected".to_owned())],
+                "{code}"
+            );
+            assert_eq!(hub.column(1, "aeat_response_code").await, code);
+            assert_eq!(hub.queue_status(1).await, None, "{code}: nothing to retry");
+            assert!(
+                hub.details_of(1).await.iter().any(|d| {
+                    d["message_key"] == "verifactu.aeat_verdict" && d["codigo_error"] == code
+                }),
+                "the owner reads the AEAT's code: {:?}",
+                hub.details_of(1).await
+            );
+
+            hub.drain().await;
+            assert_eq!(hub.sent().await.len(), 1, "{code}: never filed again");
+            hub.only_testing_was_reached();
+        }
+    }
+
+    /// 🔴 The same Fault on a record the queue was retrying: it leaves the queue as `failed` —
+    /// kept as the trace of what was tried, never due again.
+    #[tokio::test]
+    async fn a_queued_record_the_aeat_faults_for_good_leaves_the_queue_as_failed() {
+        let Some(hub) = Bench::answering("01110000-0000-4000-8000-000000002130", FAULT_4104).await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+
+        hub.open_the_road();
+        hub.drain().await;
+
+        assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
+        assert_eq!(hub.column(1, "aeat_response_code").await, "4104");
+        assert_eq!(hub.queue_status(1).await.as_deref(), Some("failed"));
+
+        hub.drain().await;
+        assert_eq!(hub.sent().await.len(), 1, "never filed again");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 A queued record the AEAT refuses with an ordinary verdict is not filed again either: the
+    /// queue entry it held would otherwise stay due and resend it on every pass.
+    #[tokio::test]
+    async fn a_queued_record_the_aeat_refuses_is_not_filed_again() {
+        let Some(hub) =
+            Bench::answering("01110000-0000-4000-8000-000000002131", VERDICT_REFUSED).await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+
+        hub.open_the_road();
+        hub.drain().await;
+        hub.drain().await;
+
+        assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
+        assert_eq!(hub.queue_status(1).await.as_deref(), Some("failed"));
+        assert_eq!(hub.sent().await.len(), 1, "never filed again");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔒 Tenancy: the entry the refusal retires is THIS hub's. Another hub's row that names the
+    /// same record id is never read, so it is never rewritten (`_enqueue_contingency` upserts on
+    /// `record_id` alone).
+    #[tokio::test]
+    async fn a_refusal_never_touches_another_hubs_queue_row() {
+        let Some(hub) = Bench::answering("01110000-0000-4000-8000-000000002133", FAULT_4104).await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        let record_id = hub.record_id(1).await;
+        let mut p = Params::new();
+        p.insert("record_id".into(), json!(record_id));
+        hub.rt
+            .db()
+            .execute(
+                "INSERT INTO verifactu_contingencyqueue (id, hub_id, record_id, priority, \
+                 queued_at, attempts, last_attempt_at, last_error, next_attempt_at, status, \
+                 is_deleted, created_by, updated_by, created_at, updated_at) VALUES \
+                 ('q-other', '01110000-0000-4000-8000-0000000021ff', :record_id, 2, \
+                 '2026-09-01T00:00:00+00:00', 1, '2026-09-01T00:00:00+00:00', 'theirs', \
+                 '2999-01-01T00:00:00+00:00', 'retrying', 0, 'u1', 'u1', \
+                 '2026-09-01T00:00:00+00:00', '2026-09-01T00:00:00+00:00')",
+                &p,
+            )
+            .await
+            .expect("the other hub's row");
+
+        hub.open_the_road();
+        let payload = json!({ "record_id": record_id });
+        hub.rt
+            .execute_command(
+                "verifactu.records.transmit",
+                payload.as_object().unwrap(),
+                &hub.ctx(),
+            )
+            .await
+            .expect("sent by hand");
+
+        assert_eq!(hub.chain().await, vec![(1, "rejected".to_owned())]);
+        let theirs = hub
+            .rows("SELECT status, attempts FROM verifactu_contingencyqueue WHERE id = 'q-other'")
+            .await;
+        assert_eq!(theirs[0]["status"], "retrying", "{theirs:?}");
+        assert_eq!(theirs[0]["attempts"], 1, "{theirs:?}");
+        hub.only_testing_was_reached();
+    }
+
+    /// The positive control: a Fault the next send can clear (the presenter, stamped on every
+    /// send, may not present for this obligado YET) keeps the retry it has today.
+    #[tokio::test]
+    async fn a_fault_the_next_send_can_clear_keeps_being_retried() {
+        let Some(hub) = Bench::answering("01110000-0000-4000-8000-000000002132", FAULT_4112).await
+        else {
+            return;
+        };
+        hub.open_the_road();
+        hub.sell(1).await;
+
+        assert_eq!(hub.chain().await, vec![(1, "error".to_owned())]);
+        assert_eq!(hub.queue_status(1).await.as_deref(), Some("retrying"));
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2127: the resend after re-chaining follows the rule of hub#2124 ────────────────────
+
+    /// The refusal a restored backup draws: the chain says «first record» when the AEAT already
+    /// holds later ones. It is what triggers the automatic re-chain.
+    const REFUSED_FOR_ITS_CHAIN: &str = "<soapenv:Envelope><EstadoEnvio>Incorrecto</EstadoEnvio>\
+        <EstadoRegistro>Incorrecto</EstadoRegistro><CodigoErrorRegistro>2007</CodigoErrorRegistro>\
+        <DescripcionErrorRegistro>No debe informarse como primer registro, existen facturas \
+        emitidas con el obligado emisión y el sistema informático actual.\
+        </DescripcionErrorRegistro></soapenv:Envelope>";
+    /// The consult answer: the AEAT's last link for this obligado, the anchor of the re-chain.
+    const CONSULT_WITH_AN_ANCHOR: &str = "<env:Envelope><env:Body>\
+        <tikLRRC:RespuestaConsultaFactuSistemaFacturacion>\
+        <tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>\
+        <tikLRRC:IDFactura><tik:IDEmisorFactura>B12345674</tik:IDEmisorFactura>\
+        <tik:NumSerieFactura>PREVIA-9</tik:NumSerieFactura>\
+        <tik:FechaExpedicionFactura>02-09-2026</tik:FechaExpedicionFactura></tikLRRC:IDFactura>\
+        <tikLRRC:DatosRegistroFacturacion>\
+        <tikLRRC:FechaHoraHusoGenRegistro>2026-09-02T10:00:00Z</tikLRRC:FechaHoraHusoGenRegistro>\
+        <tikLRRC:Huella>3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696\
+        </tikLRRC:Huella></tikLRRC:DatosRegistroFacturacion>\
+        <tikLRRC:EstadoRegistro><tikLRRC:EstadoRegistro>Correcto</tikLRRC:EstadoRegistro>\
+        </tikLRRC:EstadoRegistro>\
+        </tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>\
+        </tikLRRC:RespuestaConsultaFactuSistemaFacturacion></env:Body></env:Envelope>";
+
+    impl Bench {
+        /// A sale born without a road and queued by an earlier attempt, then the road opens and
+        /// the drain takes it: refused for its chain → consult → the re-chained resend. Returns
+        /// the record's id (its sequence number moves when it is re-chained).
+        async fn restored_backup_resend(&self) -> String {
+            self.save_the_config().await;
+            self.restored_backup_resend_as_it_is().await
+        }
+
+        /// The business saves the VeriFactu settings screen once.
+        async fn save_the_config(&self) {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(self.hub_id));
+            self.rt
+                .db()
+                .execute(
+                    "INSERT INTO verifactu_config (id, hub_id, enabled, environment, issuer_nif, \
+                     issuer_name, created_at) VALUES ('cfg-' || :hub_id, :hub_id, 1, 'testing', \
+                     'B12345674', 'Salon Lucia SL', '2026-09-01T00:00:00+00:00')",
+                    &p,
+                )
+                .await
+                .expect("config row");
+        }
+
+        /// [`Self::restored_backup_resend`] on the hub as it stands — with or without a saved
+        /// config.
+        async fn restored_backup_resend_as_it_is(&self) -> String {
+            self.sell(1).await;
+            let id = self.record_id(1).await;
+            self.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+            self.open_the_road();
+            self.scheduled_drain().await;
+            let sent = self.cell.lock().unwrap().len();
+            assert_eq!(
+                sent,
+                3,
+                "the refusal, the consult and the re-chained resend: {:?}",
+                self.rows(&format!(
+                    "SELECT message, details FROM verifactu_event \
+                     WHERE hub_id = :hub_id AND record_id = '{id}'"
+                ))
+                .await
+            );
+            id
+        }
+
+        /// The drain as the scheduler runs it every five minutes (`scheduler::system_ctx`): the
+        /// re-chain writes the anchor, which is above what a cashier's context may reach.
+        async fn scheduled_drain(&self) {
+            let system = RequestContext::new(&self.hub_id, "", ["*".to_string()]).as_machine();
+            self.rt
+                .execute_command("verifactu.contingency.process", &Params::new(), &system)
+                .await
+                .expect("the scheduled drain runs");
+        }
+
+        async fn record(&self, id: &str) -> Json {
+            self.rows(&format!(
+                "SELECT status, aeat_response_code, previous_hash FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND id = '{id}'"
+            ))
+            .await
+            .remove(0)
+        }
+
+        async fn queue_status_of(&self, id: &str) -> Option<String> {
+            self.rows(&format!(
+                "SELECT status FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+            ))
+            .await
+            .first()
+            .and_then(|r| r["status"].as_str().map(ToOwned::to_owned))
+        }
+
+        /// `(status, attempts, last_error)` of one record's queue entry.
+        async fn queue_entry(&self, id: &str) -> (String, i64, String) {
+            let row = self
+                .rows(&format!(
+                    "SELECT status, attempts, last_error FROM verifactu_contingencyqueue \
+                     WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+                ))
+                .await
+                .remove(0);
+            (
+                row["status"].as_str().unwrap_or_default().to_owned(),
+                row["attempts"].as_i64().unwrap_or_default(),
+                row["last_error"].as_str().unwrap_or_default().to_owned(),
+            )
+        }
+    }
+
+    /// 🔴 THE bug: the AEAT refuses the re-chained resend too. The record is refused, and the
+    /// queue entry it came from leaves as `failed` — before, it stayed due and the drain re-ran
+    /// the whole recovery on every pass.
+    #[tokio::test]
+    async fn a_resend_refused_after_rechaining_leaves_the_queue_as_failed() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002127",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                VERDICT_REFUSED,
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "rejected", "{record}");
+        assert_eq!(record["aeat_response_code"], "1100", "{record}");
+        assert_eq!(hub.queue_entry(&id).await.0, "failed");
+
+        hub.scheduled_drain().await;
+        assert_eq!(hub.cell.lock().unwrap().len(), 3, "never filed again");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 A Fault the AEAT will repeat, answered to the re-chained resend, is its refusal: the
+    /// record is refused with the AEAT's code and leaves the queue — not an empty verdict filed
+    /// as an `error` that nobody retries and nobody can read.
+    #[tokio::test]
+    async fn a_resend_the_aeat_faults_for_good_after_rechaining_is_refused_with_its_code() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002128",
+            &[REFUSED_FOR_ITS_CHAIN, CONSULT_WITH_AN_ANCHOR, FAULT_4104],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "rejected", "{record}");
+        assert_eq!(record["aeat_response_code"], "4104", "{record}");
+        assert_eq!(hub.queue_entry(&id).await.0, "failed");
+
+        hub.scheduled_drain().await;
+        assert_eq!(hub.cell.lock().unwrap().len(), 3, "never filed again");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 A Fault the next send can clear, answered to the re-chained resend, keeps the retry of
+    /// any other send: the entry counts the attempt, waits out its backoff and says why. The
+    /// re-chain stays — the anchor is what the AEAT holds — so the retry resends the re-chained
+    /// envelope, not the one the AEAT refused for its chain.
+    #[tokio::test]
+    async fn a_resend_the_next_send_can_clear_after_rechaining_is_retried_with_its_reason() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002129",
+            &[REFUSED_FOR_ITS_CHAIN, CONSULT_WITH_AN_ANCHOR, FAULT_4112],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "error", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "the re-chain is kept: {record}"
+        );
+        let (status, attempts, last_error) = hub.queue_entry(&id).await;
+        assert_eq!(status, "retrying");
+        assert_eq!(attempts, 2, "the resend counts as an attempt");
+        assert!(last_error.contains("4112"), "{last_error}");
+
+        hub.scheduled_drain().await;
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            3,
+            "it waits out its backoff"
+        );
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 The re-chain is PERSISTED when the resend is accepted: the record the AEAT holds now
+    /// hangs from the anchor, so the local row must say so — its previous hash and its place after
+    /// the anchor. `_rechain_record` only rewrites a record already refused, and the engine never
+    /// filed the first refusal before re-chaining, so the row kept its old link while the AEAT
+    /// held the new one, and the next sale chained onto a hash the AEAT never saw.
+    #[tokio::test]
+    async fn an_accepted_resend_after_rechaining_keeps_the_new_link() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-00000000212a",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        let id = hub.restored_backup_resend().await;
+
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        assert_eq!(
+            hub.rows(&format!(
+                "SELECT sequence_number FROM verifactu_record WHERE hub_id = :hub_id AND id = '{id}'"
+            ))
+            .await[0]["sequence_number"],
+            3,
+            "after the anchor (2), which is after the record's old place (1)"
+        );
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2131: a business that never saved the VeriFactu settings re-chains too ──────────
+
+    /// The XML of the `n`-th envelope the cell received.
+    fn xml_sent(hub: &Bench, n: usize) -> String {
+        use base64::Engine as _;
+        let envelope = hub.cell.lock().unwrap()[n].clone();
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(envelope["xml_b64"].as_str().unwrap_or_default())
+            .unwrap_or_default();
+        String::from_utf8(bytes).unwrap_or_default()
+    }
+
+    /// 🔴 THE bug: every new business bills on the defaults and never saves the settings screen,
+    /// so there is no saved registered name. The consult that recovers the anchor asked for it
+    /// there, found nothing and never left the hub — the record was refused for good and never
+    /// reached the AEAT. The name the record itself was sealed with is the obligado's, the same
+    /// one its alta carries.
+    #[tokio::test]
+    async fn a_business_without_saved_settings_recovers_its_chain_and_the_record_arrives() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-00000000213c",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        assert!(
+            hub.rows("SELECT id FROM verifactu_config WHERE hub_id = :hub_id")
+                .await
+                .is_empty(),
+            "the bench is a hub that never saved its config"
+        );
+        let id = hub.restored_backup_resend_as_it_is().await;
+
+        let consult = xml_sent(&hub, 1);
+        assert!(
+            consult.contains("ConsultaFactuSistemaFacturacion")
+                && consult.contains(">Salon Lucia SL<"),
+            "the consult names the obligado by the record's name: {consult}"
+        );
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        let anchor = hub
+            .rows(
+                "SELECT issuer_name FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND record_hash = \
+                 '3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696'",
+            )
+            .await;
+        assert_eq!(anchor.len(), 1, "one anchor: {anchor:?}");
+        assert_eq!(anchor[0]["issuer_name"], "Salon Lucia SL", "{anchor:?}");
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    /// 🔴 The same business asks by hand from the recovery screen («Recover from AEAT»): the
+    /// engine demanded a saved config before asking anything, so the button failed the same way.
+    /// It asks with the defaults its records are sealed with and names the obligado as its
+    /// records do.
+    #[tokio::test]
+    async fn a_business_without_saved_settings_recovers_its_chain_by_hand() {
+        let Some(hub) = Bench::answering(
+            "01110000-0000-4000-8000-00000000213b",
+            CONSULT_WITH_AN_ANCHOR,
+        )
+        .await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        // Another hub's record, same NIF, a later number and another name: never this hub's.
+        for sql in [
+            "CREATE TABLE other_hub_record AS SELECT * FROM verifactu_record WHERE hub_id = :hub_id",
+            "UPDATE other_hub_record SET id = 'other-hub-record', hub_id = 'other-hub', \
+             issuer_name = 'Otro Negocio SL', sequence_number = 99",
+            "INSERT INTO verifactu_record SELECT * FROM other_hub_record",
+        ] {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub.hub_id));
+            hub.rt.db().execute(sql, &p).await.expect(sql);
+        }
+        hub.open_the_road();
+
+        let mut input = Params::new();
+        input.insert("issuer_nif".into(), json!(NIF));
+        hub.rt
+            .execute_command(
+                "verifactu.recovery.from_aeat",
+                &input,
+                // The owner, from the recovery screen: every VeriFactu permission.
+                &RequestContext::new(
+                    &hub.hub_id,
+                    "u1",
+                    [
+                        "verifactu.configure_verifactu",
+                        "verifactu.manage_verifactu",
+                        "verifactu.view_verifactu",
+                        "verifactu.transmit_verifactu",
+                    ]
+                    .map(String::from),
+                ),
+            )
+            .await
+            .expect("the recovery runs without a saved config");
+
+        let consult = xml_sent(&hub, 0);
+        assert!(
+            consult.contains("ConsultaFactuSistemaFacturacion")
+                && consult.contains(">Salon Lucia SL<"),
+            "the consult names the obligado by its records' name: {consult}"
+        );
+        let anchor = hub
+            .rows(
+                "SELECT issuer_name, environment FROM verifactu_record \
+                 WHERE hub_id = :hub_id AND record_hash = \
+                 '3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696'",
+            )
+            .await;
+        assert_eq!(anchor.len(), 1, "one anchor: {anchor:?}");
+        assert_eq!(anchor[0]["issuer_name"], "Salon Lucia SL", "{anchor:?}");
+        assert_eq!(anchor[0]["environment"], "testing", "{anchor:?}");
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2134: the wire breaks in the middle of the chain recovery ──────────────────────────
+
+    /// 🔴 THE bug: the AEAT refuses the record for its chain and the wire breaks before the
+    /// recovery completes (the consult never gets its answer). That is a cut of the wire, not the
+    /// AEAT's last word: the record must stay in the queue with its backoff and its reason, like
+    /// any send the wire broke — not leave it as `failed` with nobody to retry it. And once the
+    /// wire is back, the next drain runs the whole recovery again and the record reaches the AEAT
+    /// on the anchor it holds.
+    #[tokio::test]
+    async fn a_chain_recovery_the_wire_breaks_is_retried_until_it_completes() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-000000002134",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                crate::records::testing_always_reaches_the_aeat_hub1934::CELL_HANGS_UP,
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub.hub_id));
+        hub.rt
+            .db()
+            .execute(
+                "INSERT INTO verifactu_config (id, hub_id, enabled, environment, issuer_nif, \
+                 issuer_name, created_at) VALUES ('cfg-' || :hub_id, :hub_id, 1, 'testing', \
+                 'B12345674', 'Salon Lucia SL', '2026-09-01T00:00:00+00:00')",
+                &p,
+            )
+            .await
+            .expect("config row");
+        hub.sell(1).await;
+        let id = hub.record_id(1).await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+        hub.open_the_road();
+
+        hub.scheduled_drain().await;
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            2,
+            "the refusal and the cut consult"
+        );
+        let record = hub.record(&id).await;
+        assert_ne!(record["status"], "accepted", "{record}");
+        let (status, attempts, last_error) = hub.queue_entry(&id).await;
+        assert_eq!(status, "retrying", "a cut wire is retried: {last_error}");
+        assert_eq!(attempts, 2, "the cut recovery counts as an attempt");
+        assert!(
+            last_error.contains("2007"),
+            "the reason says what was being recovered: {last_error}"
+        );
+        let due = hub
+            .rows(&format!(
+                "SELECT next_attempt_at FROM verifactu_contingencyqueue \
+                 WHERE hub_id = :hub_id AND record_id = '{id}' AND is_deleted = 0"
+            ))
+            .await;
+        assert!(
+            !due[0]["next_attempt_at"].is_null(),
+            "it waits out a backoff: {due:?}"
+        );
+
+        // The backoff runs out; the wire is back.
+        hub.rt
+            .db()
+            .execute(
+                "UPDATE verifactu_contingencyqueue \
+                 SET next_attempt_at = '2026-09-01T00:05:00+00:00' WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .expect("backoff over");
+        hub.scheduled_drain().await;
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            5,
+            "the whole recovery again: refusal, consult, re-chained resend"
+        );
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    // ── hub#2132: the drain launched by hand re-chains like the scheduled one ─────────────────
+
+    /// 🔴 THE bug: a manager (manage + transmit, not configure) sends the pending tickets by hand
+    /// and one of them needs re-chaining. Writing the recovered anchor asked for the configure
+    /// permission, so the dispatcher refused it and the whole drain stopped with a permission
+    /// error — while the scheduled drain, running as the system, did the same recovery fine.
+    /// Filing the anchor is part of sending, like `_rechain_record`: the same permission.
+    #[tokio::test]
+    async fn a_drain_launched_by_hand_rechains_and_the_ticket_reaches_the_aeat() {
+        let Some(hub) = Bench::answering_in_sequence(
+            "01110000-0000-4000-8000-0000000021d2",
+            &[
+                REFUSED_FOR_ITS_CHAIN,
+                CONSULT_WITH_AN_ANCHOR,
+                "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                 <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV>\
+                 </soapenv:Envelope>",
+            ],
+        )
+        .await
+        else {
+            return;
+        };
+        hub.save_the_config().await;
+        hub.sell(1).await;
+        let id = hub.record_id(1).await;
+        hub.queue(1, "retrying", "2026-09-01T00:05:00+00:00").await;
+        hub.open_the_road();
+
+        hub.rt
+            .execute_command("verifactu.contingency.process", &Params::new(), &hub.ctx())
+            .await
+            .expect("the manager's drain runs");
+
+        assert_eq!(
+            hub.cell.lock().unwrap().len(),
+            3,
+            "the refusal, the consult and the re-chained resend"
+        );
+        let record = hub.record(&id).await;
+        assert_eq!(record["status"], "accepted", "{record}");
+        assert_eq!(
+            record["previous_hash"],
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696",
+            "{record}"
+        );
+        assert_eq!(hub.queue_status_of(&id).await, None, "nothing left to send");
+        hub.only_testing_was_reached();
+    }
+
+    /// The positive control of the one above: the doors that write an anchor ON DEMAND (the
+    /// recovery screen) keep asking for the configure permission. Only the anchor the send itself
+    /// needs travels with the send's permission.
+    #[tokio::test]
+    async fn a_manager_still_cannot_recover_the_chain_from_the_recovery_screen() {
+        let Some(hub) = Bench::answering(
+            "01110000-0000-4000-8000-0000000021d3",
+            CONSULT_WITH_AN_ANCHOR,
+        )
+        .await
+        else {
+            return;
+        };
+        hub.sell(1).await;
+        hub.open_the_road();
+
+        let mut input = Params::new();
+        input.insert("issuer_nif".into(), json!(NIF));
+        let refused = hub
+            .rt
+            .execute_command("verifactu.recovery.from_aeat", &input, &hub.ctx())
+            .await;
+
+        assert!(
+            matches!(
+                refused,
+                Err(erplora_runtime::RuntimeError::PermissionDenied(_))
+            ),
+            "{refused:?}"
+        );
+        assert!(hub.cell.lock().unwrap().is_empty(), "nothing was asked");
     }
 }

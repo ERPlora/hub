@@ -4,9 +4,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::manifest::{
-    CommandDef, FlowTemplateDiscard, FlowTemplateScan, Manifest, ModuleFlowTemplate, ModuleLocale,
-    Nav, QueryDef, FLOOR_MODULE_MISSING, FLOOR_MODULE_PAUSED, FLOOR_MODULE_TOO_OLD,
-    FLOOR_UNREADABLE, OWNER_PAUSED,
+    CommandDef, FloorRequirement, FlowTemplateDiscard, FlowTemplateScan, Manifest,
+    ModuleFlowTemplate, ModuleLocale, Nav, QueryDef, FLOOR_MODULE_MISSING, FLOOR_MODULE_PAUSED,
+    FLOOR_MODULE_TOO_OLD, FLOOR_UNREADABLE, OWNER_PAUSED,
 };
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
@@ -305,6 +305,20 @@ impl EventSource<'_> {
 /// one the scope filter can only refuse — a silent loss of events with nothing to point at.
 pub trait EventSink: Send + Sync + std::fmt::Debug {
     fn emit(&self, source: EventSource<'_>, event: &str, payload: &serde_json::Value);
+
+    /// [`Self::emit`], plus the shell tab whose request caused the event (hub#1980,
+    /// [`RequestContext::client_instance`]). A sink that has nowhere to put it keeps the default,
+    /// which drops it: the instance is a hint for live listeners, never part of the event.
+    fn emit_from(
+        &self,
+        source: EventSource<'_>,
+        client_instance: Option<&str>,
+        event: &str,
+        payload: &serde_json::Value,
+    ) {
+        let _ = client_instance;
+        self.emit(source, event, payload);
+    }
 }
 
 /// Un módulo que el hub recibió la orden de instalar y **no** se instaló (hub#1477).
@@ -681,14 +695,24 @@ impl Registry {
         let mut needed: Vec<(&String, &String)> = tpl.requires.iter().collect();
         needed.sort();
         for (module_id, floor) in needed {
+            // hub#2123: the neighbour travels as data too, so a module can name it without
+            // parsing `detail`. `installed` is `None` only when the module is not installed.
+            let installed = self
+                .is_installed(module_id)
+                .then(|| self.module_version(module_id));
             let discard = |code: &str, detail: String| {
                 Some(FlowTemplateDiscard {
                     family: tpl.family.clone(),
                     code: code.to_string(),
                     detail,
+                    requires: Some(FloorRequirement {
+                        module: module_id.clone(),
+                        floor: floor.clone(),
+                        installed: installed.clone(),
+                    }),
                 })
             };
-            if !self.is_installed(module_id) {
+            if installed.is_none() {
                 return discard(
                     FLOOR_MODULE_MISSING,
                     format!("necesita `{module_id}` >= {floor} y no está instalado"),
@@ -758,6 +782,7 @@ impl Registry {
                             family: tpl.family.clone(),
                             code: OWNER_PAUSED.to_string(),
                             detail: format!("`{module_id}` está pausado"),
+                            requires: None,
                         },
                     )
                 }));
@@ -1282,6 +1307,15 @@ pub struct RequestContext {
     /// [`crate::elevation::Grants`] — **never** a claim: an unknown, expired or foreign token is
     /// indistinguishable from no token at all, and the payload is never read for it.
     pub elevation_token: Option<String>,
+    /// **Which open shell sent this request** (hub#1980): the `X-Client-Instance` a shell tab makes
+    /// for itself at load, read by the command door and nowhere else. It only NAMES — it grants
+    /// nothing, and an unknown or absent one changes no decision of the dispatcher. It exists to
+    /// travel on the live frames this request's events produce, so the till that charged a sale is
+    /// the one that prints it: every shell hears `sale.completed`, and before this none could tell
+    /// its own sales from the till next to it.
+    ///
+    /// `None` = nobody's shell (an API integration, a flow, a scheduled task, a listener).
+    pub client_instance: Option<String>,
     /// **What this hub owes right now** (ADR-0273 D2, hub#550): the fiscal profile's status
     /// resolved against what is mounted, including the derived `BLOCKED`. The dispatcher fills it
     /// alongside the business identity and the certificate flag, from the core's own tables — no
@@ -1396,6 +1430,18 @@ pub enum Principal {
     Machine,
 }
 
+impl Principal {
+    /// The name handlers receive in `context.principal` (hub#2113): the kernel TELLS a module
+    /// whether a person or an automation is calling, so no module has to guess it from the shape
+    /// of `current_user_id` — a guess that fails open the day a new machine caller appears.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Principal::Human => "human",
+            Principal::Machine => "machine",
+        }
+    }
+}
+
 impl RequestContext {
     pub fn new(
         hub_id: impl Into<String>,
@@ -1423,6 +1469,7 @@ impl RequestContext {
             fiscal_filing_gap: String::new(),
             principal: Principal::Human,
             elevation_token: None,
+            client_instance: None,
             approved_by: None,
             automation: None,
             parent_event_id: String::new(),
@@ -1494,6 +1541,12 @@ impl RequestContext {
     /// command stays pure data and a hostile client cannot smuggle authority through it.
     pub fn with_elevation_token(mut self, token: impl Into<String>) -> Self {
         self.elevation_token = Some(token.into());
+        self
+    }
+
+    /// Names the shell tab this request came from (hub#1980). See [`Self::client_instance`].
+    pub fn with_client_instance(mut self, instance: impl Into<String>) -> Self {
+        self.client_instance = Some(instance.into());
         self
     }
 
@@ -1837,6 +1890,7 @@ mod tests {
             ai: None,
             expose_api,
             internal,
+            on_unique: Default::default(),
         }
     }
 
@@ -1935,6 +1989,14 @@ mod tests {
             Principal::default(),
             "`new` and the derive must not drift apart"
         );
+    }
+
+    /// hub#2113: the wire names handlers read in `context.principal`. They are a contract with
+    /// every module (appointments reads them), so they are pinned here, not only through an e2e.
+    #[test]
+    fn principal_wire_names_are_human_and_machine() {
+        assert_eq!(Principal::Human.as_str(), "human");
+        assert_eq!(Principal::Machine.as_str(), "machine");
     }
 
     // ── Setup item i18n (ADR-0055, hub#762) ──────────────────────────────────────────────────

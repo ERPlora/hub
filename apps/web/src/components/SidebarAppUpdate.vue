@@ -41,7 +41,7 @@ import { alertController, IonItem, IonLabel } from '@ionic/vue';
 import { useI18n } from 'vue-i18n';
 
 import HubIcon from './HubIcon.vue';
-import { appUpdate, appUpdateDestination, canUpdateApp } from '../lib/app-update';
+import { appUpdate, appUpdateDestination, appUpdatePlatform, canUpdateApp } from '../lib/app-update';
 import { openExternal } from '../lib/open-external';
 import { toastError } from '../lib/toast';
 
@@ -56,16 +56,20 @@ const offered = computed(
 
 const label = computed(() => t('appUpdate.available', { version: appUpdate.value.latest ?? '' }));
 
+// On Android the Cloud's page hands over to Google Play: no file is downloaded and nothing is opened
+// afterwards, so the desktop sentence would be a promise the product does not keep (hub#1898).
+const copy = computed(() => (appUpdatePlatform.value === 'android' ? 'appUpdate.android' : 'appUpdate'));
+
 async function onUpdate(): Promise<void> {
   const destination = appUpdateDestination.value;
   if (!destination) return;
 
   const alert = await alertController.create({
     header: t('appUpdate.confirmTitle'),
-    message: t('appUpdate.confirmBody', { version: appUpdate.value.latest ?? '' }),
+    message: t(`${copy.value}.confirmBody`, { version: appUpdate.value.latest ?? '' }),
     buttons: [
       { text: t('appUpdate.cancel'), role: 'cancel' },
-      { text: t('appUpdate.action'), role: 'confirm' },
+      { text: t(`${copy.value}.action`), role: 'confirm' },
     ],
   });
   await alert.present();
@@ -79,7 +83,7 @@ async function onUpdate(): Promise<void> {
     await openExternal(destination);
   } catch {
     // A press that does nothing, with no window and no error, is the defect hub#475 ended.
-    void toastError(t('appUpdate.failed'));
+    void toastError(t(`${copy.value}.failed`));
   }
 }
 </script>

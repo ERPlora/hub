@@ -97,6 +97,24 @@ export function requestDevicePermission(
 }
 
 /**
+ * `open_app_settings` — opens THIS app's page in the device settings (hub#1886).
+ *
+ * Once Android stops showing a permission dialog, that page is the only place left to turn the
+ * permission back on. Resolves `true` when the page opened and `false` when it could not — an
+ * installed app older than the command (the web ships with the hub, the APK with the store) or a
+ * device with no such page — so the caller can say where to go instead of leaving the tap silent.
+ */
+export async function openAppSettings(tag: string): Promise<boolean> {
+  try {
+    await invokeTauri<null>('plugin:erplora-android|open_app_settings');
+    return true;
+  } catch (e) {
+    console.warn(`[${tag}] the device settings could not be opened`, e);
+    return false;
+  }
+}
+
+/**
  * The in-app sheet. A plain `ion-alert`, like every other confirmation in the shell: the system
  * dialog is what comes next, and two modals of our own before it would be one too many.
  */

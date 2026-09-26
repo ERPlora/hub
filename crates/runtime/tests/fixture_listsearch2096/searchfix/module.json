@@ -1,0 +1,36 @@
+{
+  "id": "searchfix",
+  "name": "List Search Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "searchfix.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "searchfix.customers.list": {
+      "permission": "searchfix.read",
+      "sql": "queries/customers_list.sql",
+      "list": {
+        "search": [
+          "name",
+          "phone"
+        ],
+        "sort": [
+          "id"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "city": {
+            "op": "like"
+          }
+        },
+        "page_size": 50
+      }
+    }
+  }
+}

@@ -123,6 +123,14 @@ pub fn app(state: AppState) -> Router {
             "/api/fiscal/representation-grant/model",
             post(representation_grant::post_representation_grant_model),
         )
+        // La salida a producción (hub#2079): la ÚNICA puerta a `production`, la del core, con todas
+        // sus comprobaciones. La pantalla de VeriFactu la usa en vez de escribir su propia columna.
+        .route(
+            "/api/fiscal/go-live",
+            get(settings::get_go_live)
+                .post(settings::post_go_live)
+                .delete(settings::delete_go_live),
+        )
         .route(
             "/api/business/fiscal-identity",
             post(settings::publish_fiscal_identity),
@@ -221,6 +229,10 @@ pub fn app(state: AppState) -> Router {
         .route("/modules/:id/*path", get(serve_module_asset))
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
+        // hub#2105: the SaaS hands the running hub its new entitlement after a plan change, so
+        // the change lands now instead of on the daily tick or a restart. The RS256 signature is
+        // the authentication (no session, no key); see `entitlement::push_refresh`.
+        .route("/api/entitlement/refresh", post(entitlement::push_refresh))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
         // «Connect WhatsApp» from the hub (hub#1600, ADR-0452): owner/admin session here, the
         // hub's machine credential towards the SaaS, which keeps the Meta token.
@@ -251,6 +263,13 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/hub/whatsapp/templates/:name",
             axum::routing::delete(whatsapp_templates::whatsapp_template_delete),
+        )
+        // A customer's photo, voice note, video or document (hub#2114, saas#2285): Meta hands an
+        // asset id, the SaaS swaps it for the bytes, the runtime streams them with its machine
+        // credential. Read-only; gated on reading the inbox plus `notify:whatsapp` for a module.
+        .route(
+            "/api/hub/whatsapp/media/:media_id",
+            get(whatsapp_media::whatsapp_media),
         )
         // Qué dice el marketplace de UN módulo (hub#1134). El catálogo de arriba sólo trae lo que
         // se sigue OFRECIENDO, así que no puede contestar por un módulo que este hub corre y el
@@ -421,6 +440,13 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/flows/templates/:module/:family/deactivate",
             post(flows_api::deactivate_template),
         )
+        // …y el gesto explícito de traer de vuelta la de fábrica cuando el módulo la ha mejorado
+        // (hub#2059): misma puerta, y además la galería de Automatizaciones (`manage_flows`) puede
+        // restaurar cualquiera, no solo la suya — es donde el dueño ve «hay una versión nueva».
+        .route(
+            "/api/hub/flows/templates/:module/:family/restore",
+            post(flows_api::restore_template),
+        )
         // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
         // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
         .route("/api/hub/flows/secrets", get(flows_api::list_secrets))
@@ -500,6 +526,8 @@ pub fn app(state: AppState) -> Router {
             "/p/:locator",
             get(public_door::show).post(public_door::redeem),
         )
+        // sales#335 — the one script `/p/:locator` may load; must equal `NAMES_SCRIPT_PATH`.
+        .route("/p/-/country-names.js", get(public_door::names_script))
         .route("/api/hub/public-claims", post(public_door::mint_claim))
         .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))
@@ -808,13 +836,8 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         //
         // Precedencia: lo que el hub declare a mano (`currency_decimals`, para monedas que el
         // registro no conoce) → el registro ISO-4217 → el default explícito.
-        let currency_decimals = settings
-            .get("currency_decimals")
-            .and_then(|v| v.as_i64())
-            .map(|n| n as u32)
-            .unwrap_or_else(|| {
-                erplora_runtime::settings::decimals_of(currency.as_str().unwrap_or("EUR"))
-            });
+        // The paper resolves it with the same function (hub#2129), so the two cannot disagree.
+        let currency_decimals = erplora_runtime::settings::currency_decimals_in(&settings);
         let language = settings
             .get("language")
             .cloned()

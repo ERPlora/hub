@@ -30,6 +30,7 @@ import { setRuntimeClientKind } from './device';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 import { sessionEndReason } from './session-end-reason';
+import { CLIENT_INSTANCE } from './client-instance';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -149,6 +150,9 @@ export function runtimeHeaders(): Record<string, string> {
   // JWT del usuario: fallback hub-scoped (marketplace/install) cuando el hub no está enrolado.
   const token = getAccessToken();
   if (token) h['Authorization'] = `Bearer ${token}`;
+  // hub#1980: which shell tab is calling. The hub repeats it on the live frames this call produces,
+  // so only the till that charged a sale prints its ticket. It names, it grants nothing.
+  h['X-Client-Instance'] = CLIENT_INSTANCE;
   return h;
 }
 
@@ -463,13 +467,37 @@ export class InstallFailedError extends Error {
    * nothing», which is the only way to know whether there is a sentence worth replacing ours with.
    */
   readonly detail: string | null;
+  /**
+   * The facts the translated sentence names, or `null` when the code needs none (hub#1620): «this
+   * app needs ERPlora {required} and your hub runs {core}» travels as data, never parsed out of
+   * the engine's English line.
+   */
+  readonly params: Record<string, string> | null;
 
-  constructor(message: string, code: string, detail: string | null = null) {
+  constructor(
+    message: string,
+    code: string,
+    detail: string | null = null,
+    params: Record<string, string> | null = null,
+  ) {
     super(message);
     this.name = 'InstallFailedError';
     this.code = code;
     this.detail = detail;
+    this.params = params;
   }
+}
+
+/**
+ * The versions a `core_version_too_old` refusal carries (hub#1620), or `null` when the body does
+ * not bring both — a half sentence («needs ERPlora  · yours is 1.1.15») is worse than none.
+ */
+function coreVersionParams(body: Record<string, unknown> | null): Record<string, string> | null {
+  const required = body?.required;
+  const core = body?.core;
+  return typeof required === 'string' && typeof core === 'string' && required && core
+    ? { required, core }
+    : null;
 }
 
 /**
@@ -516,7 +544,7 @@ export async function requestInstall(moduleId: string, version: string): Promise
           : [];
         throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code, detail);
+      throw new InstallFailedError(message, code, detail, coreVersionParams(body));
     }
     return (await res.json()) as InstallRequestResult;
   } finally {
@@ -719,7 +747,7 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
           : [];
         throw new InstallBlockedError(message, (body?.blocked_on as string[]) ?? [], purchase, detail);
       }
-      throw new InstallFailedError(message, code, detail);
+      throw new InstallFailedError(message, code, detail, coreVersionParams(body));
     }
     return (await res.json()) as ModuleUpdateResult;
   } finally {
@@ -1049,6 +1077,10 @@ export const SECTION_DISCARD_CODES = [
   'flow_grants_not_portable',
   'flows_paused_without_grants',
   'flows_not_restorable',
+  // hub#1947 — la plantilla se publicó contra una versión anterior de la app y trae filas de una
+  // tabla que la versión instalada ya no guarda (Citas devolvió el horario del negocio a Horarios).
+  // Esas filas no pueden aterrizar en ningún sitio; lo que sí entró es el resto de la sección.
+  'table_gone_in_installed_version',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */
@@ -1498,14 +1530,24 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
  * Se llama una vez en el boot (main.ts). Si el runtime no responde, deja el fallback
  * (VITE_HUB_ID) que ya trae `config`. No lanza: el boot del shell no debe romperse aquí.
  */
+/**
+ * How long the boot waits for `/api/hub/context` before «the hub is not answering» is the verdict
+ * (hub#2143). Without it a request that never finishes kept the boot spinner turning for ever; the
+ * browser's own timeout is over a minute. Same bound as the hub probe (`HUB_PROBE_TIMEOUT_MS`).
+ */
+export const BOOT_CONTEXT_TIMEOUT_MS = 10_000;
+
 export async function bootHubContext(): Promise<HubContext | null> {
   // Cloud callers wait for this answer (hub#1164): a login that raced ahead would hit the
   // build-time URL and be blocked by the hub's own CSP.
   markCloudApiUrlPending();
   let cloudBaseUrl: string | null = null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BOOT_CONTEXT_TIMEOUT_MS);
   try {
     const res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
     });
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
@@ -1543,6 +1585,7 @@ export async function bootHubContext(): Promise<HubContext | null> {
   } catch {
     return null;
   } finally {
+    clearTimeout(timer);
     // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
     resolveCloudApiUrl(cloudBaseUrl);
   }
@@ -1627,6 +1670,11 @@ export interface ResetSectionOutcome {
 /** Informe final del reset (`POST /api/hub/reset`). */
 export interface ResetReport {
   sections: ResetSectionOutcome[];
+  /**
+   * Undo only (hub#1556): tables where what the import replaced did NOT come back, because the
+   * business had written its own rows there afterwards. Absent/empty when nothing was lost.
+   */
+  not_restored?: string[];
 }
 
 /**
@@ -1672,6 +1720,11 @@ export interface ImportBatch {
   /** Filas que ESE lote insertó realmente. */
   rows: number;
   created_at: string;
+  /**
+   * Tables the business edited after this import (hub#1556): undoing it now keeps only its own
+   * rows there. The undo confirmation warns off this.
+   */
+  edited_after_import?: string[];
 }
 
 /** Importaciones del hub, de la más reciente a la más antigua (`GET /api/hub/import/batches`). */

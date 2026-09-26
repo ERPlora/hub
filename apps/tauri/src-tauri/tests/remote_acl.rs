@@ -217,7 +217,12 @@ fn the_hub_origin_can_drive_the_hardware() {
         .map(|(_, permission)| permission)
         .collect();
 
-    for needed in ["allow-erplora-print", "allow-erplora-open-drawer"] {
+    // `add-network-printer` (hub#1924): without it a printer the scan cannot see has no way in.
+    for needed in [
+        "allow-erplora-print",
+        "allow-erplora-open-drawer",
+        "allow-erplora-add-network-printer",
+    ] {
         assert!(
             granted.iter().any(|permission| permission == needed),
             "the hub PWA does not get `{needed}` → the till cannot work"
@@ -384,6 +389,22 @@ fn the_hub_origin_can_save_a_file_where_the_user_will_find_it() {
     assert!(
         granted.iter().any(|p| p == "allow-save-download"),
         "no capability lets the till PWA save a file; granted: {granted:?}"
+    );
+}
+
+#[test]
+fn the_hub_origin_can_open_the_system_print_dialog() {
+    // hub#2006: an A4 invoice reaches a laser printer or «Save as PDF» through `print_document`.
+    // Without this grant the ACL refuses the command and the door falls back to the till roll —
+    // on the installed app only, where no dev run would show it.
+    let granted: Vec<String> = permissions_granted_to("https://panaderia.a.erplora.com/m/sales")
+        .into_iter()
+        .map(|(_, permission)| permission)
+        .collect();
+
+    assert!(
+        granted.iter().any(|p| p == "allow-print-document"),
+        "no capability lets the till PWA open the print dialog; granted: {granted:?}"
     );
 }
 

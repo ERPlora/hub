@@ -61,6 +61,8 @@ const i18n = createI18n({
         resetUndo: 'Undo',
         resetUndoTitle: 'Undo {name}',
         resetUndoBody: '{n} rows brought in by this blueprint will be deleted.',
+        resetUndoEdited: 'You changed {areas} after importing: only your changes stay there.',
+        resetUndoNotRestored: 'Only your changes were kept in {areas}.',
         resetConfirm: 'Delete permanently',
         reset_hub_settings: 'Hub settings',
         reset_hub_users: 'Employees',
@@ -291,6 +293,28 @@ describe('ResetPanel', () => {
     }
   });
 
+  // hub#2055 (found in review): the runtime plans SIX core sections (`reset.rs`), and every one
+  // of them is painted with `t('settings.reset_<section>')`. `print_queue` (hub#502) had no string
+  // in either locale, so a hub with pending receipts saw an internal name where the owner expects
+  // «Print queue». The list is the runtime's, not the locales': a new core section without its
+  // strings has to fail HERE, before it reaches a screen.
+  it('every core section the runtime plans has its string in English AND Spanish', async () => {
+    const CORE_SECTIONS = ['hub_settings', 'hub_users', 'media', 'fiscal', 'roles', 'print_queue'];
+    const [en, es] = await Promise.all([
+      import('../i18n/locales/en'),
+      import('../i18n/locales/es'),
+    ]);
+    for (const [lang, mod] of [['en', en], ['es', es]] as const) {
+      const messages = mod.default as unknown as Record<string, Record<string, string>>;
+      for (const section of CORE_SECTIONS) {
+        expect(
+          messages.settings?.[`reset_${section}`],
+          `missing settings.reset_${section} in ${lang}`,
+        ).toBeTruthy();
+      }
+    }
+  });
+
   it('ofrece exportar antes de borrar (red de seguridad de un clic)', async () => {
     const w = mountPanel();
     await flush(w);
@@ -392,5 +416,123 @@ describe('ResetPanel · deshacer una importación', () => {
     const opts = alertCreate.mock.calls[0][0] as { inputs?: unknown[] };
     expect(opts.inputs ?? []).toHaveLength(0);
     expect(undoImport).toHaveBeenCalled();
+  });
+
+  // hub#1556: the business adjusted ONE day of the imported week and then undid the import. The
+  // seeded week cannot come back on top of its own row, so it is left with only that day — and
+  // nothing said so. The runtime now flags the tables it edited; the dialog has to warn.
+  it('warns in the confirmation when the business edited the imported data afterwards', async () => {
+    fetchImportBatches.mockResolvedValue([
+      {
+        id: 'batch-1',
+        name: 'peluqueria_es',
+        rows: 7,
+        created_at: '2026-07-31T10:14:00Z',
+        edited_after_import: ['schedules_business_hours'],
+      },
+    ]);
+    listInstalledModules.mockResolvedValue([{ id: 'schedules', name: 'Opening hours', version: '1.0.0' }]);
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    const opts = alertCreate.mock.calls[0][0] as { message?: string };
+    expect(opts.message).toContain('You changed Opening hours after importing');
+  });
+
+  it('does not warn when nothing imported was edited', async () => {
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+
+    const opts = alertCreate.mock.calls[0][0] as { message?: string };
+    expect(opts.message).not.toContain('You changed');
+  });
+
+  it('says after undoing which data kept only the business changes', async () => {
+    undoImport.mockResolvedValue({
+      sections: [{ section: 'schedules_business_hours', rows_deleted: 7 }],
+      not_restored: ['schedules_business_hours'],
+    });
+    listInstalledModules.mockResolvedValue([{ id: 'schedules', name: 'Opening hours', version: '1.0.0' }]);
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const note = w.find('[data-testid="reset-undo-not-restored"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain('Only your changes were kept in Opening hours');
+  });
+
+  // hub#2055: the undo report comes back per TABLE (`schedules_business_hours`), not per reset
+  // section. Without a table→module lookup the list painted the raw i18n key
+  // `settings.reset_schedules_business_hours` instead of a name the business understands.
+  it('names each undone table by the app it belongs to, never by an internal key', async () => {
+    undoImport.mockResolvedValue({
+      sections: [{ section: 'schedules_business_hours', rows_deleted: 7 }],
+    });
+    listInstalledModules.mockResolvedValue([{ id: 'schedules', name: 'Opening hours', version: '1.0.0' }]);
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const report = w.find('[data-testid="reset-report"]');
+    expect(report.text()).toContain('Opening hours — 7 rows deleted');
+    expect(report.text()).not.toContain('settings.reset_');
+    expect(report.text()).not.toContain('schedules_business_hours');
+  });
+
+  it('adds up the tables of the same app into a single line', async () => {
+    undoImport.mockResolvedValue({
+      sections: [
+        { section: 'inventory_product', rows_deleted: 300 },
+        { section: 'inventory_category', rows_deleted: 12 },
+        { section: 'customers_customer', rows_deleted: 5 },
+      ],
+    });
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const lines = w.findAll('[data-testid="reset-report-line"]').map((l) => l.text());
+    expect(lines).toEqual(['Inventory — 312 rows deleted', 'Customers — 5 rows deleted']);
+  });
+
+  it('a table no installed app claims falls back to its own name, not to a raw i18n key', async () => {
+    undoImport.mockResolvedValue({ sections: [{ section: 'orphan_table', rows_deleted: 2 }] });
+    const w = mountPanel();
+    await flush(w);
+
+    await w.vm.undo('batch-1');
+    await flush(w);
+
+    const report = w.find('[data-testid="reset-report"]');
+    expect(report.text()).toContain('orphan_table — 2 rows deleted');
+    expect(report.text()).not.toContain('settings.reset_');
+  });
+
+  it('a full reset report still names core sections by their translated name', async () => {
+    resetHub.mockResolvedValue({
+      sections: [
+        { section: 'hub_settings', rows_deleted: 1 },
+        { section: 'modules/inventory', rows_deleted: 124 },
+      ],
+    });
+    const w = mountPanel();
+    await flush(w);
+    await w.vm.toggle('modules/inventory');
+    await w.vm.submit();
+    await flush(w);
+
+    const lines = w.findAll('[data-testid="reset-report-line"]').map((l) => l.text());
+    expect(lines).toEqual(['Hub settings — 1 rows deleted', 'Inventory — 124 rows deleted']);
   });
 })

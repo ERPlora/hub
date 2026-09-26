@@ -236,6 +236,7 @@ import { refreshSetupStatus } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
 import { bootUndrainedPrintingWatch } from './lib/print-alert';
+import { bootBellCountersWatch } from './lib/bell-counters';
 
 registerWhatsAppConnectElement();
 
@@ -358,6 +359,9 @@ async function gateAndRefresh(): Promise<void> {
   // filtra por rol — quien está en el mostrador es quien puede encender la caja y quien se va a
   // quedar sin darle el tique al cliente, así que el aviso tiene que llegarle a él.
   bootUndrainedPrintingWatch();
+  // What the installed modules raise through their `bell` block (hub#1678): an appointment to
+  // confirm, say. Not filtered by role here — each counter carries its own permission.
+  bootBellCountersWatch();
 
   // La nav de módulos se refresca GLOBALMENTE al instalarse un módulo. El único oyente de
   // `module.installed` vivía en AppsPage (montada solo en /apps): instalar desde el DRAWER del

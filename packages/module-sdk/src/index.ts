@@ -27,10 +27,27 @@ export {
   // importa el módulo directamente y por sí solo pasaba en verde.
 } from './quantity.ts';
 
+/**
+ * What the hub says about a live event beyond its payload (hub#1980).
+ *
+ * `clientInstance` is the shell tab whose request produced the event — the `X-Client-Instance` it
+ * sent, stamped on the frame by the hub, never by the emitting module. Absent when no shell caused
+ * it (an API integration, a flow, a scheduled task). Every till hears every `sale.completed`; this
+ * is how the till that charged tells its own sale from the one next to it.
+ */
+export interface EventMeta {
+  clientInstance?: string;
+}
+
 export interface ErploraTransport {
   query(name: string, params?: Record<string, unknown>): Promise<unknown>;
   command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
   subscribe(event: string, cb: (payload: unknown) => void): () => void;
+  /**
+   * `subscribe` with the frame's [`EventMeta`] (hub#1980). Optional so a transport without frames
+   * keeps working: the client then delivers an empty meta.
+   */
+  subscribeWithMeta?(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void;
   /**
    * Descarga autenticada de un fichero de `media/`. Es opcional para que transportes sin HTTP
    * (y shells anteriores) sigan siendo compatibles; el cliente degrada a `null`.
@@ -978,7 +995,7 @@ export class HttpWsTransport implements ErploraTransport {
 
   private ws?: WebSocket;
   private es?: EventSource;
-  private readonly listeners = new Map<string, Set<(p: unknown) => void>>();
+  private readonly listeners = new Map<string, Set<(p: unknown, meta: EventMeta) => void>>();
   private pushStarted = false;
 
   constructor(opts: HttpWsOptions = {}) {
@@ -1013,7 +1030,7 @@ export class HttpWsTransport implements ErploraTransport {
    * thing on the client that can call it is {@link FlowsApi}, whose method list is pinned by a test.
    */
   coreRequest(req: CoreRequest, extraHeaders: Record<string, string> = {}): Promise<unknown> {
-    return this.send(req.method, req.path, req.body, extraHeaders);
+    return this.send(req.method, req.path, req.body, extraHeaders, req.envelope === true);
   }
 
   /**
@@ -1042,11 +1059,60 @@ export class HttpWsTransport implements ErploraTransport {
     }
   }
 
+  /**
+   * **Bytes from the hub's own REST surface** (hub#2114) — the `GET` twin of {@link coreRequest}
+   * for the one kind of door that answers a FILE instead of an envelope: a WhatsApp attachment the
+   * runtime streams from the SaaS. Same seal as `coreRequest`: module code cannot reach it — only
+   * {@link WhatsappMediaApi} calls it, with a path it built from a fixed prefix.
+   *
+   * A `2xx` is the file, handed back as a `Blob` so the module makes a local object URL and no
+   * credential ever lands in the DOM. A refusal is still the runtime's envelope and is read like
+   * every other one (`unwrap`), so the module gets the SaaS's own `code` (`media_not_found`,
+   * `media_unavailable`…). Anything that is neither — the proxy's HTML page, a dead network — is
+   * {@link SERVER_UNAVAILABLE}, with none of its text.
+   */
+  async coreBlobRequest(path: string, extraHeaders: Record<string, string> = {}): Promise<Blob> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: 'GET',
+        headers: { ...this.headers(), ...extraHeaders },
+        // Never follow a 30x: `fetch` could carry the hub session to another origin.
+        redirect: 'error',
+      });
+    } catch {
+      // A fixed phrase: the browser's own message is nothing the cashier can act on.
+      throw new ErploraError(SERVER_UNAVAILABLE, `request to ${path} failed`);
+    }
+    if (res.status >= 200 && res.status < 300) return await res.blob();
+    const ct = res.headers?.get?.('content-type');
+    if (!ct || !ct.toLowerCase().includes('application/json')) {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `unexpected response from ${path}: HTTP ${res.status}`,
+      );
+    }
+    let env: Envelope;
+    try {
+      env = (await res.json()) as Envelope;
+    } catch {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        `request to ${path} returned an invalid JSON body`,
+      );
+    }
+    // A refusal throws here with its own code; an `ok` envelope on a non-2xx status is nothing
+    // the runtime writes, so it is not taken for a file.
+    if (!env.ok) unwrap(env);
+    throw new ErploraError(SERVER_UNAVAILABLE, `unexpected response from ${path}: HTTP ${res.status}`);
+  }
+
   private async send(
     method: string,
     path: string,
     body: unknown,
     extraHeaders: Record<string, string> = {},
+    envelope = false,
   ): Promise<unknown> {
     // hub#782: the proxy's `5xx text/html` page (the hub container died — OOM exit 137 / hub#759;
     // any deploy window) used to reach `res.json()` and blow up as a raw `SyntaxError`, which is
@@ -1105,7 +1171,8 @@ export class HttpWsTransport implements ErploraTransport {
         `request to ${path} returned an invalid JSON body`,
       );
     }
-    return unwrap(env);
+    const data = unwrap(env);
+    return envelope ? env : data;
   }
 
   /**
@@ -1206,6 +1273,10 @@ export class HttpWsTransport implements ErploraTransport {
   }
 
   subscribe(event: string, cb: (payload: unknown) => void): () => void {
+    return this.subscribeWithMeta(event, (payload) => cb(payload));
+  }
+
+  subscribeWithMeta(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void {
     let set = this.listeners.get(event);
     if (!set) {
       set = new Set();
@@ -1221,7 +1292,7 @@ export class HttpWsTransport implements ErploraTransport {
 
   /** Reparte un frame del wire (texto JSON) a los suscriptores. Común a WS y SSE. */
   private handleFrame(raw: unknown): void {
-    let msg: { event?: string; name?: string; type?: string; payload?: unknown };
+    let msg: { event?: string; name?: string; type?: string; payload?: unknown; client_instance?: unknown };
     try {
       msg = JSON.parse(typeof raw === 'string' ? raw : '');
     } catch {
@@ -1244,7 +1315,10 @@ export class HttpWsTransport implements ErploraTransport {
       return;
     }
     const set = this.listeners.get(name);
-    if (set) for (const cb of set) cb(msg.payload ?? msg);
+    if (!set) return;
+    // hub#1980: the tab that caused it, as the hub stamped it next to `module`. Only a string counts.
+    const meta: EventMeta = typeof msg.client_instance === 'string' ? { clientInstance: msg.client_instance } : {};
+    for (const cb of set) cb(msg.payload ?? msg, meta);
   }
 
   /** Abre el canal push (lazy) la primera vez que alguien se suscribe, según `push`. */
@@ -1411,6 +1485,11 @@ export interface CoreRequest {
   method: CoreMethod;
   path: string;
   body?: unknown;
+  /**
+   * Hand back the whole `ok` envelope instead of its `data` (hub#2123): for a route whose answer
+   * carries a sibling of `data` — `discarded` on `GET /flows/templates`. A refusal throws the same.
+   */
+  envelope?: boolean;
 }
 
 /** A transport that can reach the core's REST surface (as opposed to the dispatcher). */
@@ -1687,6 +1766,33 @@ export class FlowsApi {
   }
 
   /**
+   * `GET /api/hub/flows/templates`, read for its other half (hub#2123): **the automations of this
+   * module that the hub is NOT offering, and why**.
+   *
+   * The hub computes it since hub#1649 and answers it next to `data`, but {@link templates} returns
+   * `data` alone, so no module could tell «I ship none» from «the hub left mine out». Read the
+   * `code`; `detail` is prose for a person and is never compared (ADR-0055). On the floor codes
+   * (`template_floor_*`) `requires` names the neighbour as data — which module, the floor, and the
+   * version installed here (`null` = not installed) — so the card can say «Needs Staff, which is
+   * paused» in the user's language.
+   *
+   * Same request and scope as {@link templates}: only this module's own. A separate method so the
+   * array `templates()` returns keeps its shape. A hub older than this method leaves it
+   * **absent**: `typeof flows.templateDiscards` is the probe.
+   */
+  async templateDiscards(): Promise<FlowTemplateDiscard[]> {
+    const path = `${FLOWS_BASE_PATH}/templates`;
+    const env = (await this.send({ method: 'GET', path, envelope: true })) as {
+      discarded?: unknown;
+    };
+    // «Nothing was left out» is a claim; an answer that does not carry the list cannot make it.
+    if (!Array.isArray(env?.discarded)) {
+      throw new ErploraError(SERVER_UNAVAILABLE, `unexpected response from ${path}: no discarded list`);
+    }
+    return env.discarded as FlowTemplateDiscard[];
+  }
+
+  /**
    * `POST /api/hub/flows/templates/{thisModule}/{family}/activate` — **the one tap** (hub#1677,
    * ADR-0470).
    *
@@ -1728,6 +1834,51 @@ export class FlowsApi {
       path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/deactivate`,
     }) as Promise<Flow>;
   }
+
+  /**
+   * `POST /api/hub/flows/templates/{thisModule}/{family}/restore` — the explicit **«restore the
+   * factory recipe»** gesture (hub#2059).
+   *
+   * Same flow (id and run history kept), rebuilt from the module's CURRENT document and given
+   * exactly the permissions it declares today — pins included. The owner's own edits to the flow
+   * are lost; that is the whole point of the button, never a side effect of something softer.
+   * Paused stays paused, running stays running: this is not {@link activateTemplate}.
+   *
+   * A family that was never activated answers `flow.not_found` — there is no factory recipe here
+   * to restore. A module may only restore its OWN recipes through this method, exactly like
+   * {@link activateTemplate}; the gallery that holds `manage_flows` may restore any module's, but
+   * that is a different door, not this one.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * {@link activateTemplate}: `typeof flows.restoreTemplate` is the probe.
+   */
+  async restoreTemplate(family: string): Promise<Flow> {
+    const own = checkedSegment('module id', this.moduleId, ID_PATTERN);
+    const target = checkedSegment('template family', family, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/restore`,
+    }) as Promise<Flow>;
+  }
+}
+
+/**
+ * A factory automation of this module that the hub is NOT offering, and why (hub#1649, hub#2123).
+ */
+export interface FlowTemplateDiscard {
+  /** The module that ships it — always the caller itself. */
+  module: string;
+  /** The family left out, or the file name when it did not even name one. */
+  family: string;
+  /** Stable reason code (`template_floor_module_paused`, `template_owner_paused`…). Read this. */
+  code: string;
+  /** A sentence for a person. Never compared (ADR-0055). */
+  detail: string;
+  /**
+   * Only on the floor codes (`template_floor_*`): the neighbour the floor names. `installed` is the
+   * version this hub has, or `null` when it is not installed.
+   */
+  requires?: { module: string; floor: string; installed: string | null };
 }
 
 /**
@@ -1753,8 +1904,17 @@ export interface ModuleFlowTemplate {
    * turns «may cancel appointments» into «may cancel appointments AS THE CUSTOMER». Paint it and
    * hand it back on `PUT …/flows/<id>/grants` unchanged — a pin dropped between this list and the
    * permission screen is a wide permission granted by an owner who believed they narrowed it.
+   *
+   * `reason` is the sentence that explains the permission, `lang -> text` (hub#2069, flows#114):
+   * the module writes it in its `<family>.grants.json` and the hub serves it verbatim. Optional —
+   * absent means the module gave none, and the screen falls back to the bare command name.
    */
-  grants: Array<{ kind: string; value: string; payload?: Record<string, unknown> }>;
+  grants: Array<{
+    kind: string;
+    value: string;
+    payload?: Record<string, unknown>;
+    reason?: Record<string, string>;
+  }>;
   /** Per-template version floor (`module -> SemVer`). Unmet -> do not offer it. */
   requires: Record<string, string>;
   /**
@@ -1768,7 +1928,21 @@ export interface ModuleFlowTemplate {
    * families of the same module apart: with two appointment recipes and one of them on, both read
    * as «you already have this one».
    */
-  installed?: { flow_id: string; enabled: boolean } | null;
+  installed?: {
+    flow_id: string;
+    enabled: boolean;
+    /**
+     * Whether the installed flow was built from an OLDER version of the recipe this module ships
+     * today (hub#2059).
+     *
+     * `true` — the module now ships a different recipe than the one this flow was built from:
+     * offer «Restore the factory one» ({@link FlowsApi.restoreTemplate}), never overwrite it on its
+     * own. `false` — the flow already matches what the module ships. `null` — this hub cannot tell
+     * (the flow was built before the hub started remembering the recipe's version). Absent — a hub
+     * older than hub#2059, which never computed this at all.
+     */
+    outdated?: boolean | null;
+  } | null;
 }
 
 /**
@@ -2260,6 +2434,50 @@ export class WhatsappTemplatesApi {
   }
 }
 
+/** Where a WhatsApp attachment is downloaded from. Every path {@link WhatsappMediaApi} can build
+ *  starts here — `crates/server/src/whatsapp_media.rs` (hub#2114). */
+export const WHATSAPP_MEDIA_BASE_PATH = '/api/hub/whatsapp/media';
+
+/**
+ * A Meta media id, exactly as the runtime and the SaaS define it (`whatsapp_media.rs::
+ * media_id_is_safe`, saas#2289): digits, 1 to 32. It is pasted into a path, and `fetch` normalises
+ * `..` out of a URL, so anything else is refused before a request exists.
+ */
+const MEDIA_ID_PATTERN = /^\d{1,32}$/;
+
+/** A transport that can fetch bytes from the core's REST surface (hub#2114). */
+export interface CoreBlobTransport {
+  coreBlobRequest(path: string, headers?: Record<string, string>): Promise<Blob>;
+}
+
+/**
+ * **A WhatsApp attachment** (hub#2114) — the photo, voice note, video or document a customer sent.
+ *
+ * Meta hands the business an asset id (`payload.image.id`, `payload.audio.id`…), never the file;
+ * the SaaS swaps it for the bytes and the runtime streams them with the hub's machine credential,
+ * which never reaches the browser (ADR-0003). One method and no more: the path is one fixed prefix
+ * plus an id checked against {@link MEDIA_ID_PATTERN}, and the method list is pinned by
+ * `whatsapp-media.test.ts`.
+ */
+export class WhatsappMediaApi {
+  constructor(private readonly fetchBlob: (path: string) => Promise<Blob>) {}
+
+  /**
+   * `GET /api/hub/whatsapp/media/{mediaId}` — the file, as a `Blob` whose `type` is Meta's MIME
+   * (`image/jpeg`, `audio/ogg; codecs=opus`…). Make an object URL of it and revoke it when the
+   * bubble goes away.
+   *
+   * A refusal arrives as an {@link ErploraError} with the code to act on: `media_not_found` (Meta
+   * no longer keeps it — do not retry), `media_unavailable` (Meta did not answer — offer «Retry»),
+   * `meta_permission_denied` (reconnect WhatsApp), `no_whatsapp_number`, `capability_denied`
+   * (`notify` on `whatsapp` not granted), `permission_denied` (this person cannot read the inbox).
+   */
+  async get(mediaId: string): Promise<Blob> {
+    const id = checkedSegment('WhatsApp media id', mediaId, MEDIA_ID_PATTERN);
+    return this.fetchBlob(`${WHATSAPP_MEDIA_BASE_PATH}/${id}`);
+  }
+}
+
 /** Where the business certificate lives. Every path {@link CertificateApi} can build is this one. */
 export const CERTIFICATE_BASE_PATH = '/api/business/certificate';
 
@@ -2449,6 +2667,7 @@ export class ErploraClient {
   private eventsApi?: EventsApi;
   private printApi?: PrintApi;
   private whatsappTemplatesApi?: WhatsappTemplatesApi;
+  private whatsappMediaApi?: WhatsappMediaApi;
   private certificateApi?: CertificateApi;
 
   constructor(
@@ -2583,6 +2802,7 @@ export class ErploraClient {
     scoped.eventsApi = undefined;
     scoped.printApi = undefined;
     scoped.whatsappTemplatesApi = undefined;
+    scoped.whatsappMediaApi = undefined;
     scoped.certificateApi = undefined;
     return scoped;
   }
@@ -2701,6 +2921,37 @@ export class ErploraClient {
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
       transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
+  /**
+   * **A WhatsApp attachment** (hub#2114) — `get(mediaId)` → the `Blob` of the photo, voice note,
+   * video or document a customer sent.
+   *
+   * Module-scoped and gated twice by the runtime: a person with a session who may read the inbox
+   * (`whatsapp_inbox.view_conversation`), plus **`notify`** on the `whatsapp` channel declared in the
+   * module's `module.json` and granted by the owner — the criterion of {@link whatsappTemplates}.
+   *
+   * Reading this getter on a scoped client NEVER throws: the inbox reads it on every render of a
+   * thread, and a throw there would take the whole conversation down instead of one attachment. A
+   * transport that cannot fetch bytes (a shell older than this surface) makes `get` reject with
+   * {@link SERVER_UNAVAILABLE} instead.
+   */
+  get whatsappMedia(): WhatsappMediaApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'WhatsApp attachments are module-scoped: use `erplora.forModule("<your module id>").whatsappMedia`',
+      );
+    }
+    const transport = this.transport as Partial<CoreBlobTransport>;
+    return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
+      typeof transport.coreBlobRequest === 'function'
+        ? transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId })
+        : Promise.reject(
+            new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
+          ),
     ));
   }
 
@@ -2921,6 +3172,14 @@ export class ErploraClient {
   /** Suscribe a un evento de dominio; devuelve una función para cancelar. */
   on(event: string, cb: (payload: unknown) => void): () => void {
     return this.transport.subscribe(event, cb);
+  }
+  /**
+   * [`on`] with the hub's [`EventMeta`] (hub#1980): which shell tab caused the event. A transport
+   * without frames delivers an empty meta — «no tab known», never a guessed one.
+   */
+  onEvent(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void {
+    if (this.transport.subscribeWithMeta) return this.transport.subscribeWithMeta(event, cb);
+    return this.transport.subscribe(event, (payload) => cb(payload, {}));
   }
   /**
    * SOLO para mostrar/ocultar UI. La seguridad real la revalida Rust en cada call:
@@ -3253,6 +3512,23 @@ export interface BridgeTransport {
    */
   setDeviceRole(keyOrMac: string, role: string): Promise<BridgeDevice[]>;
   /**
+   * Adds a network printer by the address the owner TYPED (hub#1924) — the way in when the scan
+   * cannot see it: another subnet, an isolated guest Wi-Fi, mDNS blocked by the router.
+   *
+   * The app connects to `host:port` first and saves ONLY a printer that answers; from then on it
+   * is listed by every `discoverPrinters()` and takes a role like any other. Resolves with that
+   * printer. Rejects with an {@link ErploraError} whose `code` is {@link INVALID_PRINTER_ADDRESS},
+   * {@link PRINTER_UNREACHABLE} or {@link PRINTER_ADD_FAILED} (or `hardware_unavailable` outside
+   * the app).
+   *
+   * **Optional** because a module can run on a hub whose SDK predates it: check that it exists
+   * before offering the form.
+   *
+   * @param host  A dotted IPv4 address, as the printer's self-test sheet prints it.
+   * @param port  The raw print port; 9100 when omitted.
+   */
+  addNetworkPrinter?(host: string, port?: number): Promise<BridgePrinter>;
+  /**
    * Muestra una notificación del SISTEMA — la del SO, no un toast dentro de la app.
    *
    * Para eso existe: avisar cuando **nadie está mirando la pantalla**. El caso que la motiva es la
@@ -3276,6 +3552,17 @@ export interface BridgeTransport {
  * impresora en este dispositivo y lo que toca es instalar la app.
  */
 export const HARDWARE_UNAVAILABLE = 'hardware_unavailable';
+
+/**
+ * The three `code`s {@link BridgeTransport.addNetworkPrinter} rejects with (hub#1924). A screen
+ * compares against these, never against the message. The first two send the owner to opposite
+ * places — fix what they typed, or go look at the printer — which is why they are kept apart.
+ */
+export const INVALID_PRINTER_ADDRESS = 'invalid_printer_address';
+/** Nothing answered on that address and port: the printer was NOT added. */
+export const PRINTER_UNREACHABLE = 'printer_unreachable';
+/** Anything else — e.g. an installed app older than this hub, that does not know the command. */
+export const PRINTER_ADD_FAILED = 'printer_add_failed';
 
 /**
  * El entorno NO tiene acceso al hardware — hoy, un navegador a secas (ADR-0196 §3).
@@ -3335,6 +3622,10 @@ export class UnavailableBridgeTransport implements BridgeTransport {
   }
 
   setDeviceRole(): Promise<BridgeDevice[]> {
+    return this.refuse();
+  }
+
+  addNetworkPrinter(): Promise<BridgePrinter> {
     return this.refuse();
   }
 
@@ -3475,6 +3766,25 @@ export class IpcBridgeTransport implements BridgeTransport {
     return this.tauri.invoke('erplora_set_device_role', { mac: keyOrMac, role }) as Promise<
       BridgeDevice[]
     >;
+  }
+
+  /**
+   * The refusal keeps the shell's `code` (hub#1924): `{code, message}` from an app that knows the
+   * command, a bare string from one that does not — the latter becomes {@link PRINTER_ADD_FAILED}
+   * so the page still has a code to branch on.
+   */
+  async addNetworkPrinter(host: string, port = 9100): Promise<BridgePrinter> {
+    // The connect crosses the LAN, which Android gates at runtime like printing does (hub#337).
+    await this.ensurePermissions([ANDROID_LOCAL_NETWORK_PERMISSION]);
+    try {
+      return (await this.tauri.invoke('erplora_add_network_printer', { host, port })) as BridgePrinter;
+    } catch (e) {
+      const refusal = e as { code?: unknown; message?: unknown } | null;
+      if (refusal && typeof refusal === 'object' && typeof refusal.code === 'string') {
+        throw new ErploraError(refusal.code, String(refusal.message ?? refusal.code));
+      }
+      throw new ErploraError(PRINTER_ADD_FAILED, e instanceof Error ? e.message : String(e));
+    }
   }
 
   /** Notificación del SO por el shell (que ES el bridge en Tauri). Best-effort: no propaga fallos. */

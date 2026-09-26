@@ -42,14 +42,18 @@ landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a 
    `PLAY_REVIEWER_HUB` nombra un hub que no es suyo, si ese hub no responde `status: UP` o si está
    vacío de módulos. Los cuatro son el mismo rechazo: el revisor no ve la app. **Sale en rojo si
    faltan las credenciales**, nunca en verde por no poder comprobarlo. Si falla, se arregla el hub
-   o la variable y se vuelve a correr: **no se envía con esto en rojo.**
+   o la variable y se vuelve a correr: **no se envía con esto en rojo.** Con el canal de CI
+   encendido (paso 3) la corre además el job `publish-play` antes de subir cada tag (hub#1888).
 
 1. Enviar a revisión el lote de la Alpha cerrada (botón «Submit N changes for review»).
 2. Aprobada: crear release de **Producción** y enviarla también. Hasta que Producción esté LIVE,
    `play.google.com/store/apps/details?id=com.erplora.app` responde **404**.
 3. Service account (invitada en Play Console con «Release to testing tracks») → secret
    `PLAY_SERVICE_ACCOUNT_JSON` + Variable `PLAY_PACKAGE_NAME` **en el repo `ERPlora/hub`**: las
-   Variables de la organización NO llegan a un repo privado con el plan Free.
+   Variables de la organización NO llegan a un repo privado con el plan Free. En el MISMO repo y
+   **antes** de poner `PLAY_PACKAGE_NAME`: Variables `PLAY_REVIEWER_EMAIL` y `PLAY_REVIEWER_HUB` +
+   secret `PLAY_REVIEWER_PASSWORD` (los valores del `.env`). El job corre la guardia del paso 0
+   antes de subir, y sin ellas cada tag sale en rojo `missing_credentials` (hub#1888).
 4. Quitar **`play`** de `RELEASE_CHANNELS_PENDING` — hacerlo antes deja los tags en rojo.
 5. Mergear el cambio del SaaS que retira el APK de Android (`store_url_for`), **solo cuando el
    paso 2 esté LIVE**: antes mandaría al usuario a un 404 de Google.

@@ -220,6 +220,67 @@ while IFS=$'\t' read -r verdict name detail; do
     if [ "$verdict" = PASS ]; then ok "$name"; else bad "$name" "$detail"; fi
 done <<<"$budget_out"
 
+# ── 6. the suite's target/ fits the runner's disk six times over (infra#294) ──
+# The runner has six slots on a 301 GB disk, and every slot builds its own `target/`. With
+# `RUSTFLAGS=-C debuginfo=0` alone a mature target was 38 GB (6 × 38 + ~122 GB of base = 350 GB):
+# the disk filled up and tests died with «No space left on device», which reads as a broken test.
+# 91 % of that target is the ~318 linked test executables, and each one still carried two things
+# nothing in CI ever reads:
+#   · DWARF (8.2 of 32.4 GB) — the rustflag only reaches rustc; std's precompiled DWARF and the C
+#     libraries built by `cc` with `-g` (it follows the PROFILE's `debug`, not RUSTFLAGS) are
+#     linked into every binary;
+#   · the symbol table (11.3 GB) — only a printed backtrace uses it, and CI never sets
+#     `RUST_BACKTRACE`. A panic still names its `file:line:col` (that is `Location`, in `.rodata`).
+# So the job builds with the PROFILE saying no debuginfo and strip the symbols, which drops both.
+# Configured through the profile env on purpose: `CARGO_PROFILE_DEV_*` is inherited by the `test`
+# profile, and it keeps local builds (debuggers, backtraces) untouched.
+disk_out="$(WF="$WF" python3 - <<'PY'
+import os
+
+import yaml
+
+
+def emit(ok, name, detail=""):
+    print(("PASS" if ok else "FAIL") + "\t" + name + "\t" + detail)
+
+
+def thin_target(env):
+    """Why the target/ of the test job would NOT be thin; empty when it is."""
+    env = {k: str(v).strip().lower() for k, v in (env or {}).items()}
+    for profile in ("DEV", "TEST"):
+        # TEST inherits DEV: a key TEST leaves unset takes the value of DEV.
+        debug = env.get(f"CARGO_PROFILE_{profile}_DEBUG", env.get("CARGO_PROFILE_DEV_DEBUG"))
+        strip = env.get(f"CARGO_PROFILE_{profile}_STRIP", env.get("CARGO_PROFILE_DEV_STRIP"))
+        if debug not in ("0", "false", "none"):
+            return f"CARGO_PROFILE_{profile}_DEBUG is {debug!r}: the profile still asks for DWARF"
+        if strip not in ("symbols", "true"):
+            return f"CARGO_PROFILE_{profile}_STRIP is {strip!r}: every test binary keeps its symbol table"
+    return ""
+
+
+doc = yaml.safe_load(open(os.environ["WF"], encoding="utf-8"))
+job = (doc.get("jobs") or {}).get("test") or {}
+why = thin_target(job.get("env"))
+emit(not why, "the test job builds a thin target/ — no DWARF, no symbol table (infra#294)", why)
+
+# Positive control: the state that filled the disk (rustflag only) and a half fix (DWARF gone,
+# symbols kept: ~29 GB per slot, still 298 GB for six) must both be caught; a TEST override that
+# undoes DEV too.
+old = {"RUSTFLAGS": "-C debuginfo=0"}
+half = {"CARGO_PROFILE_DEV_DEBUG": 0, "CARGO_PROFILE_DEV_STRIP": "debuginfo"}
+undone = {"CARGO_PROFILE_DEV_DEBUG": 0, "CARGO_PROFILE_DEV_STRIP": "symbols",
+          "CARGO_PROFILE_TEST_STRIP": "none"}
+good = {"CARGO_PROFILE_DEV_DEBUG": 0, "CARGO_PROFILE_DEV_STRIP": "symbols"}
+emit(all(thin_target(e) for e in (old, half, undone)) and not thin_target(good),
+     "the thin-target guard catches the rustflag-only env and a half strip (infra#294)",
+     "the guard accepts an env that leaves DWARF or the symbol table in every test binary")
+PY
+)" || bad "the disk contract could be evaluated" "python3/PyYAML failed on $WF"
+while IFS=$'\t' read -r verdict name detail; do
+    [ -n "${verdict:-}" ] || continue
+    if [ "$verdict" = PASS ]; then ok "$name"; else bad "$name" "$detail"; fi
+done <<<"$disk_out"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
