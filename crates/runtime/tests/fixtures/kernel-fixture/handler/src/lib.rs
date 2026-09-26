@@ -14,6 +14,8 @@
 //!
 //! 5. `context.principal` (`human` | `machine`, hub#2113) is echoed back in `Output.result`, so the
 //!    suite proves the WASM path tells a guest WHO is calling (hub#2117).
+//! 6. `context.now` and `payload.now` are echoed back too (`now`, `payload_now`), so the suite
+//!    proves the WASM path hands the guest the ONE clock its operations bind (hub#2166).
 //!
 //! `escape_to` exists so the suite can prove the HOST refuses an operation naming a command the
 //! module does not own — the guest is allowed to ask; the kernel is what says no.
@@ -94,6 +96,8 @@ pub fn handle_pure(input: Value) -> Output {
     out.with_result(json!({
         "count": names.len(),
         "principal": input["context"]["principal"],
+        "now": input["context"]["now"],
+        "payload_now": input["payload"]["now"],
     }))
 }
 
@@ -139,6 +143,16 @@ mod tests {
         value["context"]["principal"] = json!("machine");
         let out = handle_pure(value);
         assert_eq!(out.result.unwrap()["principal"], json!("machine"));
+    }
+
+    #[test]
+    fn echoes_the_clock_it_was_handed_from_context_and_payload() {
+        let mut value = input(json!(["a"]));
+        value["context"]["now"] = json!("2026-09-26T00:00:00+00:00");
+        value["payload"]["now"] = json!("2026-09-26T00:00:00+00:00");
+        let result = handle_pure(value).result.unwrap();
+        assert_eq!(result["now"], json!("2026-09-26T00:00:00+00:00"));
+        assert_eq!(result["payload_now"], json!("2026-09-26T00:00:00+00:00"));
     }
 
     #[test]
