@@ -227,6 +227,13 @@
   "GET /modules/:id/*path": {
     "name": "Static asset of an installed module (public)"
   },
+  "POST /api/hub/whatsapp/template-header-samples": {
+    "name": "Upload the sample of a photo, video or PDF template header to Meta",
+    "description": "Meta registers a template whose header is a file only with an example of that file already uploaded to it. Send the file as the multipart field `file`; the hub relays the form in streaming to the SaaS, which uploads it with the business's Meta token and answers `201 {header_handle, format, mime_type, size}`. Register the template with `header_format` (`IMAGE`, `VIDEO` or `DOCUMENT`, the `format` answered here) and `header_handle`, and upload again on every edit. The kind is decided by the file's bytes: JPEG/PNG up to 5 MB, MP4 up to 16 MB, PDF up to 100 MB. Refusals come back as a code: `whatsapp.invalid_header_sample_upload` (not a multipart form with its boundary), `whatsapp.header_sample_length_required` (no `Content-Length`), `header_sample_too_large`, `missing_file`, `unsupported_header_sample`, `no_whatsapp_number`, `whatsapp_not_configured`, `meta_permission_denied`, `meta_rate_limited`, `meta_unreachable`, `meta_template_failed`. A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).whatsappTemplates.uploadHeaderSample(file)`) also needs the `notify` capability, declared in its `module.json` with the `whatsapp` channel and granted by the owner in Settings → Permissions; without either the answer is `403 capability_denied`. The shell names no module and is unaffected.",
+    "form": [
+      "file"
+    ]
+  },
   "GET /api/hub/whatsapp/templates": {
     "name": "WhatsApp templates — what Meta says about each one",
     "description": "This hub's templates with the verdict Meta gave each one (`APPROVED`, `PENDING`, `REJECTED` + `rejected_reason`). `stale: true` means the SaaS could not reach Meta and is answering with what it had stored. Read it when the tab opens, never on a timer: every call refreshes against Meta and that path has no throttle. A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).whatsappTemplates`) also needs the `notify` capability, declared in its `module.json` with the `whatsapp` channel and granted by the owner in Settings → Permissions; without either the answer is `403 capability_denied`. The shell names no module and is unaffected."
