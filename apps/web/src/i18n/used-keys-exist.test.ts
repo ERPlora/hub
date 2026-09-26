@@ -6,7 +6,7 @@
 // «files.moveSuccess» in the toast. The API docs retry button had the same hole (`apiDocs.retry`).
 //
 // The sweep reads the source of every view, component and lib as text and collects the literal keys
-// in the three shapes the shell uses to name a string: a `t('…')` / `$t('…')` call, a `…Key: '…'` /
+// in the three shapes the shell uses to name a string: a `t('…')` / `$t('…')` / `i18n.global.t('…')` call, a `…Key: '…'` /
 // `…Key = '…'` field (nav sections, health rows, error keys) and the fallback of Files' `reasonFor`.
 // Only literals whose first segment is a namespace of `en` count, so error codes such as
 // `print.not_ready` or storage keys never enter. Keys built at runtime (`t(\`x.${code}\`)`) are out of
@@ -21,7 +21,7 @@ const sources = import.meta.glob<string>(
 
 const KEY = String.raw`(['"])([A-Za-z_][\w-]*(?:\.[\w-]+)+)\1`;
 const KEY_SITES = [
-  new RegExp(String.raw`(?<![\w.])\$?t\(\s*` + KEY, 'g'),
+  new RegExp(String.raw`(?<![\w$])\$?t\(\s*` + KEY, 'g'),
   new RegExp(String.raw`[A-Za-z]Key\s*[:=]\s*` + KEY, 'g'),
   new RegExp(String.raw`\breasonFor\([^()]*?,\s*` + KEY, 'g'),
 ];
@@ -61,6 +61,9 @@ describe('keys used by the shell exist in `en` (hub#2197)', () => {
     expect(missingKeys('probe.vue', "t('files.noSuchKey')")).toEqual(['probe.vue: files.noSuchKey']);
     expect(missingKeys('probe.vue', "reasonFor(outcome, 'files.noSuchKey')")).toEqual(['probe.vue: files.noSuchKey']);
     expect(missingKeys('probe.ts', "labelKey: 'nav.noSuchKey'")).toEqual(['probe.ts: nav.noSuchKey']);
+    // Toasts outside components call the translator through an object: `i18n.global.t`, `deps.t`.
+    expect(missingKeys('probe.ts', "i18n.global.t('print.noSuchKey')")).toEqual(['probe.ts: print.noSuchKey']);
+    expect(missingKeys('probe.ts', "deps.t('print.noSuchKey', { n })")).toEqual(['probe.ts: print.noSuchKey']);
     // A namespace (an object, not a sentence) is not a string either.
     expect(missingKeys('probe.vue', "t('files.errors')")).toEqual(['probe.vue: files.errors']);
     // Error codes and other dotted literals outside the catalogue namespaces are not keys.
