@@ -115,7 +115,8 @@ function toast(msg: string): void {
   toastOpen.value = true;
 }
 
-// Etiquetas i18n del componente (merge sobre sus defaults en español).
+// The component's i18n labels (merged over its built-in Spanish defaults): every one it renders
+// goes here, or a hub in English reads that one in Spanish (hub#2197).
 function labels(): Record<string, string> {
   return {
     upload: t('files.upload'),
@@ -128,6 +129,11 @@ function labels(): Record<string, string> {
     delete: t('files.delete'),
     open: t('files.open'),
     newFolder: t('files.newFolder'),
+    move: t('files.move'),
+    rename: t('files.rename'),
+    renameFolder: t('files.renameFolder'),
+    deleteFolder: t('files.deleteFolder'),
+    noLimit: t('files.noLimit'),
   };
 }
 
@@ -367,7 +373,9 @@ async function onMove(e: Event): Promise<void> {
   if (from === to) return;
   const outcome = await moveMedia(from, to);
   const ok = outcome.ok;
-  toast(ok ? t('files.moveSuccess') : reasonFor(outcome, 'files.moveError'));
+  // hub#2197: say WHERE it went; the top level has no name of its own, so it reads as Files.
+  const folder = to.split('/').pop() || t('files.title');
+  toast(ok ? t('files.moveSuccess', { folder }) : reasonFor(outcome, 'files.moveError'));
   if (!ok) return;
   // Si movimos la carpeta en la que estamos (o algo dentro de la vista actual), recargamos la
   // carpeta actual; si movimos la propia carpeta activa a otra parte, subimos a su padre.
