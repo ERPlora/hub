@@ -59,9 +59,7 @@ describe('keys used by the shell exist in `en` (hub#2197)', () => {
 
   it('catches a key the catalogue does not declare (positive control)', () => {
     expect(missingKeys('probe.vue', "t('files.noSuchKey')")).toEqual(['probe.vue: files.noSuchKey']);
-    expect(missingKeys('probe.vue', "reasonFor(outcome, 'files.noSuchKey')")).toEqual([
-      'probe.vue: files.noSuchKey',
-    ]);
+    expect(missingKeys('probe.vue', "reasonFor(outcome, 'files.noSuchKey')")).toEqual(['probe.vue: files.noSuchKey']);
     expect(missingKeys('probe.ts', "labelKey: 'nav.noSuchKey'")).toEqual(['probe.ts: nav.noSuchKey']);
     // A namespace (an object, not a sentence) is not a string either.
     expect(missingKeys('probe.vue', "t('files.errors')")).toEqual(['probe.vue: files.errors']);

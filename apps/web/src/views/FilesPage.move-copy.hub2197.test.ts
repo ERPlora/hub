@@ -36,8 +36,21 @@ import FilesPage from './FilesPage.vue';
 // Every label `ok-file-manager` renders (its DEFAULT_LABELS, all in Spanish): each one the screen
 // leaves out is shown in Spanish whatever the hub's language.
 const MANAGER_LABELS = [
-  'upload', 'import', 'search', 'folders', 'space', 'empty', 'download', 'delete', 'open', 'move',
-  'newFolder', 'rename', 'renameFolder', 'deleteFolder', 'noLimit',
+  'upload',
+  'import',
+  'search',
+  'folders',
+  'space',
+  'empty',
+  'download',
+  'delete',
+  'open',
+  'move',
+  'newFolder',
+  'rename',
+  'renameFolder',
+  'deleteFolder',
+  'noLimit',
 ];
 
 const FILE = { id: 'facturas/a.pdf', name: 'a.pdf', ext: 'pdf', url: '/api/media/raw?path=facturas/a.pdf' };
