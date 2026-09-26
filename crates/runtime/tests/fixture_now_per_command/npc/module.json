@@ -1,0 +1,28 @@
+{
+  "id": "npc",
+  "name": "One :now per command fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "npc.touch": {
+      "permission": "",
+      "transaction": true,
+      "emit": ["npc.touched"],
+      "handler": {
+        "type": "native",
+        "function": "touch"
+      }
+    },
+    "npc._stamp": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/stamp.sql"]
+    },
+    "npc._trail": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/trail.sql"]
+    }
+  }
+}
