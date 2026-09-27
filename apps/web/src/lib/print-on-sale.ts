@@ -126,7 +126,7 @@ async function printTicket(deps: Deps, saleId: string): Promise<void> {
   try {
     ({ document: data, complete } = await deps.saleDocument(saleId));
   } catch (e) {
-    deps.onFailure?.({ saleId, error: e instanceof Error ? e.message : String(e), notComposed: true });
+    fail(deps, { saleId, error: e instanceof Error ? e.message : String(e), notComposed: true });
     return;
   }
 
@@ -161,12 +161,22 @@ async function printTicket(deps: Deps, saleId: string): Promise<void> {
       return;
     }
   } else if (result.via !== 'bridge') {
-    deps.onFailure?.({ saleId, error: result.error ?? 'sin impresora' });
+    fail(deps, { saleId, error: result.error ?? 'receipt_not_delivered' });
     return;
   }
   // Delivered. If it went out before its fiscal number or QR, the till hears where the complete
   // copy is (hub#1867) — only now, so a paper that never came out gets one warning, not two.
   if (!complete) deps.onPrintedWithoutFiscal?.(saleId);
+}
+
+/**
+ * The receipt did not come out. The reason is the door's (a code, or a sentence of the queue in
+ * whatever language it was written): it goes to the log, where somebody diagnosing the till can
+ * read it, and the till hears only the fact — what to say is the notice's (hub#2239).
+ */
+function fail(deps: Deps, f: SaleTicketFailure): void {
+  console.warn(`[print-on-sale] receipt of sale ${f.saleId} not printed: ${f.error}`);
+  deps.onFailure?.(f);
 }
 
 async function kickDrawer(client: ErploraClient): Promise<void> {

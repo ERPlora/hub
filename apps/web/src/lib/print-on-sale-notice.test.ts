@@ -94,6 +94,34 @@ describe('no warning about the sale’s receipt shows its internal id', () => {
   }
 });
 
+// hub#2239 — «El tique NO se imprimió: el runtime rechazó el encolado». The machine's reason told
+// the cashier nothing they could act on (and «sin impresora» came out in Spanish on a hub in
+// English): the receipt that did not print says what to do, and the reason stays in the log.
+describe('the receipt that did not print does not show the machine’s reason (hub#2239)', () => {
+  const locale = i18n.global.locale;
+  const before = locale.value;
+  afterEach(() => {
+    locale.value = before;
+  });
+
+  const REASON = 'el runtime rechazó el encolado · printer_offline';
+
+  for (const lang of ['en', 'es'] as const) {
+    it(`not in what is painted (${lang})`, () => {
+      locale.value = lang;
+      const n = saleTicketFailureNotice({ saleId: SALE_ID, error: REASON });
+      const text = painted(n);
+      expect(text).not.toBe(n.messageKey);
+      expect(text).not.toContain(REASON);
+      expect(n.params ?? {}).not.toHaveProperty('error');
+      // Nor asked for by the sentence: a placeholder with nothing to fill it paints an empty gap.
+      const raw = (i18n.global.getLocaleMessage(lang) as Record<string, Record<string, string>>).print.ticketFailed;
+      expect(raw).toBeTypeOf('string');
+      expect(raw).not.toContain('{error}');
+    });
+  }
+});
+
 // `main.ts` is the shell's boot and cannot be mounted in a unit test (see
 // main-asks-for-notices.hub1732.test.ts): the wire is read from the source, scoped to the call.
 const MAIN = readFileSync(fileURLToPath(new URL('../main.ts', import.meta.url)), 'utf8');
@@ -118,6 +146,14 @@ describe('the shell paints the receipt warnings through these notices', () => {
     // paint the waiting receipt red again while every test above stays green.
     expect(call.match(/, n\.color, n\.duration\)/g)).toHaveLength(2);
     expect(call).not.toMatch(/'(danger|warning|primary|success|medium)'/);
+  });
+
+  it('the failure is painted as the notice’s sentence, never with the raw reason (hub#2239)', () => {
+    const call = printOnSaleCall(MAIN);
+    // The text too, not only the tone: the notice's key, translated WITH its parameters (without
+    // them a sentence that asks for one paints a gap), and nothing of the failure's own `error`.
+    expect(call).toContain('i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration)');
+    expect(call).not.toContain('.error');
   });
 
   it('and the region asserted really is only that call', () => {

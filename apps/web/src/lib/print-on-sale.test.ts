@@ -477,3 +477,53 @@ describe('only the till that charged prints the ticket and opens the drawer (hub
     expect(gate.print).not.toHaveBeenCalled();
   });
 });
+
+// hub#2239 — the till used to paint the door's reason as it came («el runtime rechazó el encolado»,
+// or the literal «sin impresora» on a hub in English). The reason is for whoever diagnoses the till,
+// not for the cashier: it travels as a CODE and is written to the log; the sentence is the notice's.
+describe('the reason a receipt did not print is for the log, not for the till (hub#2239)', () => {
+  it('a door that gives no reason still hands over a code, not a sentence in one language', async () => {
+    const onFailure = vi.fn();
+    const { client, emit } = fakeClient();
+    bootPrintOnSale(client, { print: fakeGate({ via: 'none', role: 'receipt' }).print, onFailure, saleDocument: paperSource() });
+
+    await emit({ sale_id: '42' });
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0].error).toMatch(/^[a-z][a-z_]*$/);
+  });
+
+  it('the door’s own reason is written to the log, with the sale', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const { client, emit } = fakeClient();
+      const gate = fakeGate({ via: 'none', role: 'receipt', error: 'el runtime rechazó el encolado' });
+      bootPrintOnSale(client, { print: gate.print, onFailure: vi.fn(), saleDocument: paperSource() });
+
+      await emit({ sale_id: '42' });
+
+      const logged = warn.mock.calls.map((c) => c.map(String).join(' '));
+      expect(logged.some((l) => l.includes('el runtime rechazó el encolado') && l.includes('42'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('so is the reason the paper could not be composed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const { client, emit } = fakeClient();
+      const saleDocument = vi.fn(async () => {
+        throw new Error('sale_document_timeout');
+      });
+      bootPrintOnSale(client, { print: fakeGate().print, onFailure: vi.fn(), saleDocument });
+
+      await emit({ sale_id: '42' });
+
+      const logged = warn.mock.calls.map((c) => c.map(String).join(' '));
+      expect(logged.some((l) => l.includes('sale_document_timeout') && l.includes('42'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

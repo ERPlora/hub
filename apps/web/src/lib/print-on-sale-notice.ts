@@ -8,6 +8,8 @@
 // - Waiting for a printer is NOT a fault (hub#1731): the job is safe in the queue and comes out on
 //   its own once a printer is set up — informative tone, long enough to read the way out.
 // - Lost on the way / never composed: the paper did not come out, and the cashier has to act — error.
+//   The sentence says what to do (reprint from the receipt screen), never the machine's reason
+//   (hub#2239): that one is logged by `print-on-sale.ts`.
 // - Out before its VeriFactu QR (hub#1867): the paper is in the customer's hand — warning.
 //
 // No sentence names the sale: these notices only reach the till that charged it (hub#1980), right
@@ -35,7 +37,8 @@ export function saleTicketFailureNotice(f: SaleTicketFailure): PrintNotice {
     return { messageKey: 'print.ticketWaitingForPrinter', color: 'primary', duration: READ_A_SENTENCE_MS };
   }
   if (f.notComposed) return { messageKey: 'print.ticketNotComposed', color: 'danger', duration: ERROR_MS };
-  return { messageKey: 'print.ticketFailed', params: { error: f.error }, color: 'danger', duration: ERROR_MS };
+  // hub#2239: the door's reason (`f.error`) is for the log — it told the cashier nothing to act on.
+  return { messageKey: 'print.ticketFailed', color: 'danger', duration: ERROR_MS };
 }
 
 /** hub#1867 — the receipt came out, but before its fiscal number or VeriFactu QR were ready. */
