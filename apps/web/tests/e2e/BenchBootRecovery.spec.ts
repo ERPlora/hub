@@ -304,4 +304,29 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
     expect(bootReloadsOf(page).map((reload) => reload.storm)).toEqual([true]);
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
+
+  test('a reload the spec asks for is recovered like a navigation', async ({ page }) => {
+    // hub#2274, the same storm on the other door: `SettingsBillingBox.spec.ts` reloads the page to
+    // prove a save persisted, and in run 36311751240 seven of the app's own modules died of
+    // `ERR_NETWORK_CHANGED` ~500 ms after that `page.reload()`. The bench only wrapped `goto`, so
+    // the reload handed the spec a shell that never mounted. Here the screen dies twice AFTER the
+    // reload's `load` event — the first navigation is left alone on purpose.
+    await page.goto('/login');
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+
+    let viewRequests = 0;
+    await page.route('**/src/views/LoginPage.vue*', async (route) => {
+      viewRequests += 1;
+      if (viewRequests > 2) return route.continue();
+      await nextLoad(page);
+      return route.abort('internetdisconnected');
+    });
+
+    await page.reload();
+
+    expect(viewRequests, 'the screen was never asked for again after the reload').toBeGreaterThan(2);
+    expect(bootReloadsOf(page).every((reload) => reload.storm)).toBe(true);
+    await expect(page.getByTestId('login-box')).toBeVisible();
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+  });
 });
