@@ -49,6 +49,7 @@ import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/pr
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import { comandaFailureNotice } from './lib/print-comanda-notice';
 import { bootAppointmentNotices } from './lib/appointment-notice';
 import {
   ensureNotificationPermission,
@@ -64,7 +65,7 @@ import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
-import { bootActionFeedback, toast, toastError } from './lib/toast';
+import { bootActionFeedback, toast } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { redeemShellCourier, takeShellCourierCode } from './lib/courier';
 import { bootUntilReachable } from './lib/boot';
@@ -311,19 +312,17 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
     }),
 });
 
-// Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
-// tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
-// Si la impresora falla NO se bloquea al camarero —la comanda ya está en la BD y el KDS es la
-// fuente de verdad—: se avisa, y desde el KDS se reimprime.
+// Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
+// `kitchen` because it has to print always, not only with the KDS mounted: a hot kitchen is often
+// paper only. If the printer fails the waiter is NOT blocked —the order is already in the database
+// and the KDS is the source of truth—: the floor is told to check the printer and warn the station.
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
+  // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
-    void toastError(
-      f.awaitingHost
-        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
-        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
-    );
+    const n = comandaFailureNotice(f, i18n.global);
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
