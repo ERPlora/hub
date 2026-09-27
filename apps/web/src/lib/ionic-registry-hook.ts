@@ -1,16 +1,16 @@
 // The shell's single hook on `customElements.define`.
 //
-// Two things the shell has to get right about Ionic cannot be done from the outside, because the
+// Three things the shell has to get right about Ionic cannot be done from the outside, because the
 // controls a merchant actually types into are rendered by module Web Components — foreign bundles,
 // from 27 separate repos, inside their own shadow roots:
 //
 //   · `fill` must paint a box (hub#1060 → `./ionic-fill`);
 //   · the buttons of the selection dialogs must speak the user's language (hub#1736 →
 //     `./ionic-select-text`);
-//   · a single-choice select must close on pick (hub#2223 → `./ionic-select-interface`, which
-//     wraps `open()` and so does not depend on the ordering the other two do).
+//   · a single-choice select must close on pick (hub#2223 → `./ionic-select-interface`).
 //
-// The first two need the SAME hook, and for the same three reasons (the long version is in `./ionic-fill`):
+// The last two wrap `open()`, a plain method, so they also patch a tag registered before them
+// (hub#2226). `fill` needs the hook itself, for three reasons (the long version is in `./ionic-fill`):
 // a document stylesheet cannot cross a shadow boundary, a MutationObserver fires after the element
 // is already connected, and patching a prototype AFTER `customElements.define` is a silent no-op —
 // the HTML spec captures a custom element's lifecycle callbacks inside `define`. Wrapping `define`

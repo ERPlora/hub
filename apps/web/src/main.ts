@@ -6,19 +6,18 @@
 // Guard: `src/theme/ionic-fill-needs-md.test.ts`. Detalle: `src/lib/ionic-fill.ts`.
 import './lib/ionic-fill.boot';
 
-// 🔴 Segundo import del shell, y por el MISMO motivo que el de arriba (hub#1736): los dos botones
-// de los diálogos de selección de Ionic son literales ingleses («Cancel» / «OK») que no tienen
-// clave de configuración global, así que el shell los traduce enganchando `customElements.define`
-// ANTES de que nadie registre `ion-select`. Si este import baja de `@ionic/vue`, todos los
-// desplegables del hub —los de los módulos incluidos— vuelven al inglés sin un solo error.
-// Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
+// Second shell hook (hub#1736, hub#2226): the two buttons of Ionic's selection dialogs are English
+// literals («Cancel» / «OK») with no global config key, so the shell writes them in the active
+// language right before each dialog opens — module Web Components included, and a language switch
+// with no reload included. It wraps `open()`, a plain method, so it would survive a late import.
+// Guard: `src/lib/ionic-select-text.test.ts`. Detail: `src/lib/ionic-select-text.ts`.
 import './lib/ionic-select-text.boot';
 
 // Third shell hook on the same registry (hub#2223): `ion-select` opens an alert by default, which
 // only keeps the choice after OK, and Ionic has no global key to change it. The shell makes every
 // SINGLE-choice select open a popover, which closes on pick (multiple keeps its confirm button) —
-// module Web Components included. It wraps `open()`, a plain method, so unlike the two above it
-// would survive a late import; it sits here so the three hooks are read together.
+// module Web Components included. It wraps `open()` too, so like the one above it would survive a
+// late import; it sits here so the three hooks are read together.
 // Guard: `src/lib/ionic-select-interface.test.ts`. Detail: `src/lib/ionic-select-interface.ts`.
 import './lib/ionic-select-interface.boot';
 
@@ -49,6 +48,7 @@ import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/pr
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import { comandaFailureNotice } from './lib/print-comanda-notice';
 import { bootAppointmentNotices } from './lib/appointment-notice';
 import {
   ensureNotificationPermission,
@@ -64,7 +64,7 @@ import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
-import { bootActionFeedback, toast, toastError } from './lib/toast';
+import { bootActionFeedback, toast } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { redeemShellCourier, takeShellCourierCode } from './lib/courier';
 import { bootUntilReachable } from './lib/boot';
@@ -311,19 +311,17 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
     }),
 });
 
-// Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
-// tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
-// Si la impresora falla NO se bloquea al camarero —la comanda ya está en la BD y el KDS es la
-// fuente de verdad—: se avisa, y desde el KDS se reimprime.
+// Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
+// `kitchen` because it has to print always, not only with the KDS mounted: a hot kitchen is often
+// paper only. If the printer fails the waiter is NOT blocked —the order is already in the database
+// and the KDS is the source of truth—: the floor is told to check the printer and warn the station.
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
+  // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
-    void toastError(
-      f.awaitingHost
-        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
-        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
-    );
+    const n = comandaFailureNotice(f, i18n.global);
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell

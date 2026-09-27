@@ -139,6 +139,9 @@ on:
       # `.github/workflows/**`; esta ruta es para el script en sí, que vive en `scripts/` y no
       # dispararía nada por su cuenta.
       - 'scripts/branch_drift.py'
+      # The apt-lock wrapper (infra#313): its test enters through the `scripts/tests/*.test.sh`
+      # glob and the steps it guards through `.github/workflows/**`; this path is the wrapper.
+      - 'scripts/ci/apt-lock-retry.sh'
   workflow_dispatch:
 
 permissions:
@@ -387,6 +390,16 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/service-container-ports.test.sh
+
+      # ── Waiting out the shared runner's apt lock (infra#313) ──────────────────────────────
+      # The slots of `ci-runner-1` share one `/var/lib/apt`: a job that runs `apt-get` (or
+      # `playwright install --with-deps`) while another holds the lock dies at once with every
+      # test green. This sweeps EVERY workflow for such a line and requires it to go through
+      # `scripts/ci/apt-lock-retry.sh`, and runs the wrapper's own cases against a fake apt.
+      - name: apt lock on the shared runner (infra#313)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/apt-lock-retry.test.sh
 
       # ── Unit tests for scripts/ci/n-minus-one.sh (hub#1282) ───────────────────────────
       # Every external dependency (git tags, docker, curl, building+booting the branch's own

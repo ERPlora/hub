@@ -852,9 +852,16 @@ export default {
     // so the customer's copy lacks it. The receipt screen prints the complete one.
     ticketWithoutFiscal:
       'The receipt came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
-    comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
+    // hub#2257: the way out, never the machine's reason (that one is logged); {station} is one of
+    // the station* words below, or the role as it is when the catalogue does not know it.
+    comandaFailed:
+      'The {station} order for {label} did not print. Check the printer and let the {station} know: the order is on the kitchen screen.',
+    // hub#2238: a warning, not an error — the docket is queued, and the way out is in the sentence.
     comandaWaitingForPrinter:
-      'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
+      'The {station} order for {label} is waiting: no printer is set up for that station yet. Set one up and it will print on its own.',
+    // The station a kitchen order goes to, as it reads inside those two sentences (hub#2257).
+    stationKitchen: 'kitchen',
+    stationBar: 'bar',
     // The system notice when a kitchen order comes in (hub#2171): `comandaNoticeFor` names the
     // floor label («Table 4», «Bar») when the order has one; the body is the order number and the
     // line count, pluralised by `n`.
