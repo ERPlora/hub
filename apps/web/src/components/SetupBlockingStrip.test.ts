@@ -243,6 +243,8 @@ describe('on a short screen it folds to one row (hub#2272)', () => {
     expect(toggle.exists()).toBe(true);
     expect(toggle.attributes('aria-expanded')).toBe('false');
     expect(toggle.text()).toBe(enCatalogue.setup.blocking.showMissing);
+    // The trimmed padding that keeps the folded band to one row rides on this class.
+    expect(w.find('[data-testid="setup-strip"]').classes()).toContain('setup-strip--folded');
   });
 
   it('paints the headline ONCE: not as the band heading and again in the row', () => {
@@ -280,8 +282,12 @@ describe('on a short screen it folds to one row (hub#2272)', () => {
     expect(w.find('[data-testid="setup-strip-action-verifactu.setup"]').attributes('routerlink')).toBe(
       '/m/verifactu',
     );
-    // The toggle says which region it opens.
-    expect(toggle.attributes('aria-controls')).toBe(w.find('.setup-strip-detail').attributes('id'));
+    // The toggle says which region it opens — a real id, not two missing attributes that match.
+    const detailId = w.find('.setup-strip-detail').attributes('id');
+    expect(detailId).toMatch(/^setup-strip-detail-/);
+    expect(toggle.attributes('aria-controls')).toBe(detailId);
+    // Opened, the band gets its full padding back: the detail is not squeezed into a one-row band.
+    expect(w.find('[data-testid="setup-strip"]').classes()).not.toContain('setup-strip--folded');
 
     await toggle.trigger('click');
 
@@ -316,6 +322,7 @@ describe('on a short screen it folds to one row (hub#2272)', () => {
 
     expect(w.find('[data-testid="setup-strip-toggle"]').exists()).toBe(false);
     expect(w.find('[data-testid="setup-strip-title"]').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-strip"]').classes()).not.toContain('setup-strip--folded');
   });
 });
 
