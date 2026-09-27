@@ -6,7 +6,7 @@
 //   - it is there when the runtime is going to reject the sale, and nowhere else;
 //   - it names what is missing and every name carries its own way in;
 //   - it does not repeat the panel's card on the panel's own screen.
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
@@ -14,6 +14,19 @@ import { createI18n } from 'vue-i18n';
 // HubIcon bakes its SVGs through `~icons/…?raw`, which the test environment denies (same
 // workaround as SetupChecklistCard.test.ts).
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
+
+// hub#2272 — on a short screen (a phone on its side) the strip folds to one row. `isShortViewport` is
+// the shell's ONE reactive answer to "is the screen short?" (`lib/viewport.ts`); mocked here so each
+// test can move it without touching a real `matchMedia`.
+const { isShortViewport } = await vi.hoisted(async () => {
+  const { ref } = await import('vue');
+  return { isShortViewport: ref(false) };
+});
+vi.mock('../lib/viewport', () => ({ isShortViewport }));
+
+beforeEach(() => {
+  isShortViewport.value = false;
+});
 
 import SetupBlockingStrip from './SetupBlockingStrip.vue';
 import { parseSetupStatus, type SetupStatus } from '../lib/setup-status';
@@ -206,6 +219,103 @@ describe('not twice on the same screen', () => {
     const w = mountStrip({ status: status([item('business_identity')]), checklistOnScreen: false });
 
     expect(w.find('[data-testid="setup-strip"]').exists()).toBe(true);
+  });
+});
+
+// hub#2272 — on a phone held sideways (667×375) the whole strip took ~113px of the 375 and the till's
+// open ticket was left without room for one line. On a short screen it folds to ONE row: the headline
+// and a way to open what is missing. What it must not lose while folded is the part that justifies
+// the band: that the hub will refuse, and a way through to every missing thing.
+describe('on a short screen it folds to one row (hub#2272)', () => {
+  const blocking = () =>
+    status([
+      item('business_identity', { route: '/settings' }),
+      item('verifactu.setup', { title: 'Configure VeriFactu', route: '/m/verifactu' }),
+    ]);
+
+  it('keeps the headline and offers the rest behind one toggle', () => {
+    isShortViewport.value = true;
+    const w = mountStrip({ status: blocking() });
+
+    expect(w.find('[data-testid="setup-strip"]').exists()).toBe(true);
+    expect(w.find('[data-testid="setup-strip-title"]').text()).toBe(enCatalogue.setup.blocking.title);
+    const toggle = w.find('[data-testid="setup-strip-toggle"]');
+    expect(toggle.exists()).toBe(true);
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(toggle.text()).toBe(enCatalogue.setup.blocking.showMissing);
+  });
+
+  it('paints the headline ONCE: not as the band heading and again in the row', () => {
+    isShortViewport.value = true;
+    const w = mountStrip({ status: blocking() });
+
+    expect(w.find('[data-testid="setup-strip"]').attributes('heading')).toBeUndefined();
+    expect(w.html().split(enCatalogue.setup.blocking.title).length - 1).toBe(1);
+  });
+
+  it('folded, the body and the list are not there — not hidden, absent', () => {
+    // Absent and not `display:none`: a folded list left in the DOM would still be read out and
+    // tabbed through, two copies of every «Set up» button of which one is invisible.
+    isShortViewport.value = true;
+    const w = mountStrip({ status: blocking() });
+
+    expect(w.text()).not.toContain(enCatalogue.setup.blocking.body);
+    expect(w.find('.setup-strip-items').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-strip-action-business_identity"]').exists()).toBe(false);
+  });
+
+  it('one tap opens what is missing, each with its own way in, and a second tap folds it back', async () => {
+    isShortViewport.value = true;
+    const w = mountStrip({ status: blocking() });
+
+    await w.find('[data-testid="setup-strip-toggle"]').trigger('click');
+
+    const toggle = w.find('[data-testid="setup-strip-toggle"]');
+    expect(toggle.attributes('aria-expanded')).toBe('true');
+    expect(toggle.text()).toBe(enCatalogue.setup.blocking.hideMissing);
+    expect(w.text()).toContain(enCatalogue.setup.blocking.body);
+    expect(w.find('[data-testid="setup-strip-action-business_identity"]').attributes('routerlink')).toBe(
+      '/settings',
+    );
+    expect(w.find('[data-testid="setup-strip-action-verifactu.setup"]').attributes('routerlink')).toBe(
+      '/m/verifactu',
+    );
+    // The toggle says which region it opens.
+    expect(toggle.attributes('aria-controls')).toBe(w.find('.setup-strip-detail').attributes('id'));
+
+    await toggle.trigger('click');
+
+    expect(w.find('[data-testid="setup-strip-toggle"]').attributes('aria-expanded')).toBe('false');
+    expect(w.find('.setup-strip-items').exists()).toBe(false);
+  });
+
+  it('a delegated wall still says who can, once opened', async () => {
+    isShortViewport.value = true;
+    const w = mountStrip({ status: status([item('business_identity', { actionable: false })]) });
+
+    await w.find('[data-testid="setup-strip-toggle"]').trigger('click');
+
+    expect(w.find('[data-testid="setup-strip-note-business_identity"]').exists()).toBe(true);
+  });
+
+  it('turning the phone upright gives the full strip back, with no toggle left over', async () => {
+    isShortViewport.value = true;
+    const w = mountStrip({ status: blocking() });
+
+    isShortViewport.value = false;
+    await w.vm.$nextTick();
+
+    expect(w.find('[data-testid="setup-strip-toggle"]').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-strip"]').attributes('heading')).toBe(enCatalogue.setup.blocking.title);
+    expect(w.text()).toContain(enCatalogue.setup.blocking.body);
+    expect(w.find('[data-testid="setup-strip-action-business_identity"]').exists()).toBe(true);
+  });
+
+  it('on a tall screen there is no fold at all', () => {
+    const w = mountStrip({ status: blocking() });
+
+    expect(w.find('[data-testid="setup-strip-toggle"]').exists()).toBe(false);
+    expect(w.find('[data-testid="setup-strip-title"]').exists()).toBe(false);
   });
 });
 

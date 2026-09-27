@@ -149,3 +149,57 @@ describe('the width the panel cards read to fold (hub#1197)', () => {
     expect(isPhoneViewport.value).toBe(false);
   });
 });
+
+// hub#2272 — a phone held sideways is WIDE (667px, past both width steps) and SHORT (375px). The
+// blocking strip that sits over every screen took ~113px of those 375 and left the till's open
+// ticket without room for a single line. The fold there is about HEIGHT, so it is its own query.
+describe('the height the blocking strip reads to fold (hub#2272)', () => {
+  it('is already known at the first render — a strip that starts tall would jump on every boot', async () => {
+    installMatchMedia(true);
+
+    const { isShortViewport } = await load();
+
+    expect(isShortViewport.value).toBe(true);
+  });
+
+  it('follows the screen live: turning the phone upright gives the strip its detail back', async () => {
+    const screen = installMatchMedia(true);
+    const { isShortViewport, SHORT_VIEWPORT_QUERY } = await load();
+
+    screen.fire(false, SHORT_VIEWPORT_QUERY);
+
+    expect(isShortViewport.value).toBe(false);
+  });
+
+  it('asks about a HEIGHT of 500px: every phone on its side, no phone upright, no tablet', async () => {
+    const screen = installMatchMedia(false);
+
+    const { SHORT_VIEWPORT_QUERY } = await load();
+
+    expect(SHORT_VIEWPORT_QUERY).toBe('(max-height: 500px)');
+    expect(screen.media()).toContain(SHORT_VIEWPORT_QUERY);
+  });
+
+  it('is its OWN breakpoint: a wide landscape phone folds the strip and keeps the wide topbar', async () => {
+    installMatchMedia({
+      '(max-width: 767px)': false,
+      '(max-width: 540px)': false,
+      '(max-height: 500px)': true,
+    });
+
+    const { isCompactViewport, isPhoneViewport, isShortViewport } = await load();
+
+    expect(isShortViewport.value).toBe(true);
+    expect(isCompactViewport.value).toBe(false);
+    expect(isPhoneViewport.value).toBe(false);
+  });
+
+  it('is false on a runtime without `matchMedia`: the strip stays whole', async () => {
+    // @ts-expect-error — deliberately modelling a runtime that has no media queries at all.
+    window.matchMedia = undefined;
+
+    const { isShortViewport } = await load();
+
+    expect(isShortViewport.value).toBe(false);
+  });
+});
