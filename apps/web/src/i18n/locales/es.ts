@@ -1586,6 +1586,7 @@ export default {
     colTemplate: 'Plantilla',
     colDescription: 'Descripción',
     colLanguage: 'Idioma',
+    colCountry: 'País',
     colVersion: 'Versión',
     colDownloads: 'Descargas',
     colSize: 'Tamaño',
