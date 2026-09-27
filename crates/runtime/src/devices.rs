@@ -89,6 +89,106 @@ pub struct TrustedDevice {
     /// When the longest-lived of those sessions runs out; `""` when nobody is signed in. This is
     /// the thirty days a `personal` device is worth, spelled out.
     pub signed_in_until: String,
+    /// When it was **really** last used (hub#2215): its last sign-in, open session or not. Written
+    /// by the hub at every login (`last_seen_at`), so it survives the session — the row of a till
+    /// whose shift ended last night says "last night", not "never". `""` only for a row this hub
+    /// knows nothing about beyond its trust.
+    pub last_used_at: String,
+    /// `true` when nobody has used it for [`STALE_AFTER_DAYS`] — the rows "remove the unused ones"
+    /// would take, decided by the SAME rule [`prune_stale`] applies, so the count on the button is
+    /// the count that goes. Says nothing about the caller: the door keeps the device asking.
+    pub stale: bool,
+}
+
+/// How long a device has to go unused before the bulk clean-up may take it (hub#2215). Thirty
+/// days is what the account screens people already know use (Google, Microsoft), and it is also
+/// the life of a `personal` session (hub#358), so a device that signs in once a month still counts
+/// as in use through the whole of it.
+pub const STALE_AFTER_DAYS: i64 = 30;
+
+/// What a bulk clean-up actually did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct Pruned {
+    /// Devices forgotten by this call.
+    pub removed: usize,
+}
+
+/// The ONE definition of "unused" (hub#2215), as SQL over a `hub_trusted_device` row, bound to
+/// `:cutoff` (now − [`STALE_AFTER_DAYS`]). All three have to hold:
+///
+///  - nobody signed in on it since the cutoff (`last_seen_at`);
+///  - it was not first trusted since the cutoff either — a row written before `last_seen_at`
+///    existed (`''`) is judged by the date the hub does know;
+///  - **no session of it was still alive after the cutoff.** A `personal` tablet signs in ONCE and
+///    then works for thirty days without writing anything; judging it by the sign-in alone would
+///    take a tablet somebody used yesterday.
+///
+/// Used by the list (which rows are stale) and by the delete itself (which re-checks it, so a
+/// device that signs in between the two is not taken).
+const STALE: &str = "last_seen_at < :cutoff AND trusted_at < :cutoff \
+    AND NOT EXISTS (SELECT 1 FROM hub_session s \
+                     WHERE s.hub_id = hub_trusted_device.hub_id \
+                       AND s.device_id = hub_trusted_device.device_id \
+                       AND s.expires_at > :cutoff)";
+
+/// The instant before which a device counts as unused, in the same RFC 3339 shape every date of
+/// these rows is written in (they compare as text, like `expires_at > :now`).
+fn stale_cutoff() -> String {
+    (chrono::Utc::now() - chrono::Duration::days(STALE_AFTER_DAYS)).to_rfc3339()
+}
+
+/// Forget every device of **this hub** nobody has used for [`STALE_AFTER_DAYS`] (hub#2215), except
+/// `keep` — the device the administrator is holding. `""` keeps nothing in particular.
+///
+/// What goes for each one is what a [`revoke`] takes: the trust row (with its mode and its PIN
+/// sign-in) and its sessions — all of them long dead by the rule above. It never reaches a device
+/// in use: the delete re-checks [`STALE`] row by row, so one that signs in while this runs stays,
+/// and a session opened in that instant (it runs out in the future, past the cutoff) is not swept.
+///
+/// **Scoped to `hub_id`** on every statement, like [`revoke`]: the same browser can be a dead row
+/// here and a live till in the business next door.
+pub async fn prune_stale(db: &dyn DatabaseAdapter, hub_id: &str, keep: &str) -> Result<Pruned> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("cutoff".into(), json!(stale_cutoff()));
+    let candidates = db
+        .query(
+            &format!("SELECT device_id FROM hub_trusted_device WHERE hub_id = :hub_id AND {STALE}"),
+            &p,
+        )
+        .await?;
+    let keep = keep.trim();
+    let mut removed = 0;
+    for row in &candidates.rows {
+        let Some(device_id) = row["device_id"].as_str() else {
+            continue;
+        };
+        if device_id == keep {
+            continue;
+        }
+        let mut one = p.clone();
+        one.insert("device_id".into(), json!(device_id));
+        let forgotten = db
+            .execute(
+                &format!(
+                    "DELETE FROM hub_trusted_device \
+                      WHERE hub_id = :hub_id AND device_id = :device_id AND {STALE}"
+                ),
+                &one,
+            )
+            .await?;
+        if forgotten.affected == 0 {
+            continue; // used in the meantime: it stays, and so do its sessions.
+        }
+        db.execute(
+            "DELETE FROM hub_session \
+              WHERE hub_id = :hub_id AND device_id = :device_id AND expires_at <= :cutoff",
+            &one,
+        )
+        .await?;
+        removed += 1;
+    }
+    Ok(Pruned { removed })
 }
 
 /// What a revocation actually did — the honest report, not "ok".
@@ -209,17 +309,35 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedD
     scope.insert("hub_id".into(), json!(hub_id));
     let devices = db
         .query(
-            "SELECT device_id, name, label, trusted_at, mode, mode_set_at, mode_set_by \
+            "SELECT device_id, name, label, trusted_at, last_seen_at, mode, mode_set_at, \
+                    mode_set_by \
                FROM hub_trusted_device WHERE hub_id = :hub_id",
             &scope,
         )
         .await?;
+    scope.insert("cutoff".into(), json!(stale_cutoff()));
+    let stale: std::collections::HashSet<String> = db
+        .query(
+            &format!("SELECT device_id FROM hub_trusted_device WHERE hub_id = :hub_id AND {STALE}"),
+            &scope,
+        )
+        .await?
+        .rows
+        .iter()
+        .filter_map(|r| r["device_id"].as_str().map(str::to_string))
+        .collect();
     let mut listed: Vec<TrustedDevice> = devices
         .rows
         .iter()
         .map(|r| {
             let device_id = r["device_id"].as_str().unwrap_or_default().to_string();
             let sessions = open.get(&device_id).cloned().unwrap_or_default();
+            // The newest of the two: the stored mark, and an open session that (on a row written
+            // before the mark existed) may be the only trace of the last sign-in.
+            let last_used_at = std::cmp::max(
+                r["last_seen_at"].as_str().unwrap_or_default().to_string(),
+                sessions.last_sign_in.clone(),
+            );
             TrustedDevice {
                 name: r["name"].as_str().unwrap_or_default().to_string(),
                 label: r["label"].as_str().unwrap_or_default().to_string(),
@@ -230,6 +348,8 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedD
                 open_sessions: sessions.count,
                 last_sign_in: sessions.last_sign_in,
                 signed_in_until: sessions.until,
+                last_used_at,
+                stale: stale.contains(&device_id),
                 device_id,
             }
         })
@@ -238,8 +358,8 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedD
     // list. Ties fall back to the hub's own clock and then to the id, so the order is total and the
     // screen never reshuffles between two reads that saw the same data.
     listed.sort_by(|a, b| {
-        b.last_sign_in
-            .cmp(&a.last_sign_in)
+        b.last_used_at
+            .cmp(&a.last_used_at)
             .then_with(|| b.trusted_at.cmp(&a.trusted_at))
             .then_with(|| a.device_id.cmp(&b.device_id))
     });

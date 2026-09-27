@@ -953,6 +953,26 @@ impl CloudClient {
         )
     }
 
+    /// **Upload a template header's sample to Meta** (hub#2232, saas#2377) —
+    /// `POST /api/v1/hub/device/whatsapp/template-header-samples/`, multipart field `file`.
+    ///
+    /// Meta registers an IMAGE, VIDEO or DOCUMENT header only with an example already uploaded to
+    /// it, named by a handle; the upload needs the business's Meta token, which only the SaaS holds
+    /// (ADR-0012). `201 {header_handle, format, mime_type, size}`; the handle goes in the
+    /// template's `header_handle` when it is registered. Refusals are `{"error": <code>, "detail"}`
+    /// (`missing_file`, `unsupported_header_sample`, `header_sample_too_large`,
+    /// `no_whatsapp_number`, `whatsapp_not_configured`, `meta_*`).
+    pub fn whatsapp_template_header_sample(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!(
+                "{}/api/v1/hub/device/whatsapp/template-header-samples/",
+                self.base_url
+            ),
+            auth,
+        )
+    }
+
     /// **One WhatsApp attachment, as bytes** (hub#2114, saas#2285) —
     /// `GET /api/v1/hub/device/whatsapp/media/<media_id>/` with the **machine** credential.
     ///
@@ -2367,6 +2387,29 @@ mod tests {
             "a name with a path separator escaped the delete route: {}",
             hostile.url
         );
+    }
+
+    /// hub#2232 — the door a template's header sample (photo, video or PDF) goes up through
+    /// (saas#2377). A POST next to the templates door, machine credential only: the upload is made
+    /// with the business's Meta token, which only the SaaS holds.
+    #[test]
+    fn whatsapp_template_header_sample_is_a_machine_authenticated_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_template_header_sample(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/template-header-samples/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
     }
 
     /// hub#2114 — the door the WhatsApp inbox downloads a customer's photo, voice note or document

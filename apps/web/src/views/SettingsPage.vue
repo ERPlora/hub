@@ -328,21 +328,23 @@
             >
               {{ t('settings.businessAddressLegacy', { address: legacyAddress }) }}
             </ion-note>
-            <!-- ADR-0201 (7/11): the identity is written ONCE here and the copy goes UP. The
-                 runtime makes the call (the machine token never reaches this webview). -->
+            <!-- ADR-0201 (7/11) + hub#2217: a box of THIS form, saved by «Save changes» like any
+                 other field — never an action of its own. On save the runtime publishes the
+                 identity and tells ERPlora whether it is also who ERPlora invoices (the machine
+                 token never reaches this webview). -->
             <ion-item lines="none" class="mt-2">
-              <ion-label>
-                <h2>{{ t('settings.shareWithErplora') }}</h2>
-                <p>{{ t('settings.shareWithErploraDesc') }}</p>
-              </ion-label>
-              <ion-toggle
+              <ion-checkbox
+                v-model="shareWithErplora"
                 data-testid="settings-share-with-erplora"
-                :checked="shareWithErplora"
-                :disabled="!isAdmin || sharingFiscalIdentity"
-                :aria-label="t('settings.shareWithErplora')"
-                @ion-change="onShareWithErploraToggle($event)"
-                slot="end"
-              />
+                justify="space-between"
+                label-placement="start"
+                :disabled="!isAdmin"
+              >
+                <ion-label class="ion-text-wrap">
+                  <h2>{{ t('settings.shareWithErplora') }}</h2>
+                  <p>{{ t('settings.shareWithErploraDesc') }}</p>
+                </ion-label>
+              </ion-checkbox>
             </ion-item>
           </ion-card-content>
         </ion-card>
@@ -559,6 +561,7 @@ import {
   IonSelect,
   IonSelectOption,
   IonToggle,
+  IonCheckbox,
   IonButton,
   IonInput,
   IonSpinner,
@@ -592,7 +595,6 @@ import {
   listInstalledModules,
   getModuleCapabilities,
   putModuleCapabilities,
-  publishFiscalIdentity,
   refreshHubTimezone,
   type ModuleCapability,
 } from '../lib/runtime';
@@ -723,6 +725,7 @@ watch(hubSettings, (s) => {
   businessStreetNumber.value = s.business_street_number;
   businessPostalCode.value = s.business_postal_code;
   businessCity.value = s.business_city;
+  shareWithErplora.value = s.business_identity_for_erplora_billing;
 });
 
 // El reloj de las opciones de zona horaria avanza mientras Ajustes está abierta (hub#1154), y se
@@ -787,12 +790,11 @@ const legacyAddress = computed<string>(() => {
   return hasParts ? '' : (s.business_address ?? '').trim();
 });
 
-// ADR-0201 (7/11): «usar estos datos también para mi factura de ERPlora». No es un ajuste que se
-// guarde: es una ACCIÓN puntual (sube una copia de la identidad al SaaS, que crea/actualiza el
-// BillingProfile). Sin marcarla, el perfil se rellena aparte en el SaaS — el caso de la gestoría
-// que paga los hubs de sus clientes.
-const shareWithErplora = ref<boolean>(false);
-const sharingFiscalIdentity = ref<boolean>(false);
+// ADR-0201 (7/11) + hub#2217: «use these details for my ERPlora invoice too» is a SETTING of this
+// form, stored by «Save changes» with the rest. Unticked (the default), ERPlora still learns who the
+// taxpayer is but leaves alone the profile that pays the hub — the accounting firm that pays its
+// clients' hubs (saas#2370).
+const shareWithErplora = ref<boolean>(hubSettings.value?.business_identity_for_erplora_billing ?? false);
 
 // Textos i18n del ok-theme-picker (defaults en inglés dentro del componente, ADR-0055).
 const pickerLabels = computed(() => ({
@@ -930,31 +932,6 @@ function onApiDocsToggle(e: Event): void {
   });
 }
 
-async function onShareWithErploraToggle(e: Event): Promise<void> {
-  if (!isAdmin.value) return; // defensa: el toggle ya está disabled para no-admin
-  const checked = (e as CustomEvent<{ checked: boolean }>).detail.checked;
-  if (!checked) {
-    shareWithErplora.value = false; // desmarcar no borra nada en el SaaS: deja de compartir y ya
-    return;
-  }
-  if (!businessTaxId.value.trim()) {
-    shareWithErplora.value = false;
-    await toastError(t('settings.shareWithErploraNeedsTaxId'));
-    return;
-  }
-  sharingFiscalIdentity.value = true;
-  try {
-    await publishFiscalIdentity();
-    shareWithErplora.value = true;
-    await toastSuccess(t('settings.shareWithErploraDone'));
-  } catch {
-    shareWithErplora.value = false; // el :checked vuelve solo al valor real
-    await toastError(t('settings.shareWithErploraError'));
-  } finally {
-    sharingFiscalIdentity.value = false;
-  }
-}
-
 async function saveTaxSettings(): Promise<void> {
   // Persists the GLOBAL business identity (server-side, /api/settings — ADR-0061). Admin only (the
   // runtime re-checks); the tax id is normalised by the runtime. Taxes/e-invoicing no longer live here.
@@ -968,6 +945,7 @@ async function saveTaxSettings(): Promise<void> {
       business_street_number: businessStreetNumber.value.trim(),
       business_postal_code: businessPostalCode.value.trim(),
       business_city: businessCity.value.trim(),
+      business_identity_for_erplora_billing: shareWithErplora.value,
     },
     () => {
       // Nothing to roll back: this is a form with a Save button, so until a save lands the fields

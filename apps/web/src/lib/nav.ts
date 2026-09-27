@@ -19,6 +19,11 @@ export interface ModuleNavItem {
    * (pasar un data-URI ya resuelto haría que HubIcon lo re-resolviese y cayera al fallback).
    */
   icon: string;
+  /**
+   * The module's screens as its tab bar names them (`navigation[]`, translated by the runtime), so
+   * the assistant can say «Till › Sessions» instead of the raw path (hub#2204).
+   */
+  tabs?: { id: string; label: string }[];
 }
 
 /** Entradas de menú de los módulos instalados (sección "Módulos" del shell). */
@@ -44,11 +49,15 @@ export async function refreshModuleNav(): Promise<void> {
     // de la primera entrada de navegación.
     const byModule = new Map<string, ModuleNavItem>();
     for (const e of entries) {
-      if (!byModule.has(e.moduleId)) {
+      const known = byModule.get(e.moduleId);
+      if (known) {
+        known.tabs?.push({ id: e.nav.id, label: e.nav.label });
+      } else {
         byModule.set(e.moduleId, {
           path: `/m/${e.moduleId}`,
           label: e.moduleName,
           icon: e.iconSvg ?? e.nav.icon ?? '',
+          tabs: [{ id: e.nav.id, label: e.nav.label }],
         });
       }
     }

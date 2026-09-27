@@ -372,3 +372,149 @@ async fn the_explicit_door_reports_an_unreachable_control_plane_by_code_too() {
         "reqwest's prose (control-plane address included) leaked out of the door: {text}"
     );
 }
+
+// ── hub#2217 — «use these details for my ERPlora invoice too» is a BOX of the form ─────────────
+//
+// It used to be a toggle that fired `POST /api/business/fiscal-identity` the moment it was
+// pressed, with whatever was STORED (not what the owner had just typed), and it was never
+// remembered. Now it is a setting saved with «Save changes», and every publication tells the
+// control plane whether the owner ticked it: the tax id of the taxpayer always goes up (the grant
+// needs it), but only a ticked box may touch WHO ERPlora invoices (saas#2370, ADR-0201 d. 5).
+
+const BILLING_BOX: &str = "business_identity_for_erplora_billing";
+
+/// 🔴 The owner types the tax id, ticks the box and presses Save: ONE save, and the publication
+/// says the identity is also for ERPlora's invoice.
+#[tokio::test]
+async fn ticking_the_box_and_saving_publishes_the_identity_for_billing() {
+    let (cloud, published) = spawn_cloud(StatusCode::OK).await;
+    let (router, admin) = fixture("box-ticked", &cloud, Some("machine-secret"), None).await;
+
+    let response = put(
+        &router,
+        &admin,
+        json!({
+            "business_tax_id": "B12345674",
+            "business_legal_name": "Bar Manolo SL",
+            BILLING_BOX: true,
+        }),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(
+        body[BILLING_BOX],
+        json!(true),
+        "the box is remembered: {body}"
+    );
+    let published = published.lock().unwrap();
+    assert_eq!(published.len(), 1, "one save, one publication");
+    assert_eq!(published[0].1["tax_id"], json!("B12345674"));
+    assert_eq!(published[0].1["use_for_billing"], json!(true));
+}
+
+/// 🔴 The box unticked (its default) still publishes the taxpayer — and says so EXPLICITLY:
+/// `false` travels instead of being left out, so the choice never rests on the control plane's
+/// default for an absent flag (saas#2370 reads it as `false`; an older control plane ignores it).
+#[tokio::test]
+async fn an_unticked_box_publishes_the_identity_not_for_billing() {
+    let (cloud, published) = spawn_cloud(StatusCode::OK).await;
+    let (router, admin) = fixture("box-default", &cloud, Some("machine-secret"), None).await;
+
+    let response = put(
+        &router,
+        &admin,
+        json!({ "business_tax_id": "B12345674", "business_legal_name": "Bar Manolo SL" }),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let published = published.lock().unwrap();
+    assert_eq!(published.len(), 1, "the taxpayer is published regardless");
+    assert_eq!(
+        published[0].1["use_for_billing"],
+        json!(false),
+        "the default must travel as an explicit false: {:?}",
+        published[0].1
+    );
+}
+
+/// 🔴 Saving ONLY the change of the box is a change of what the identity is for: it publishes,
+/// both ways, or unticking would never reach the control plane.
+#[tokio::test]
+async fn saving_only_the_box_publishes_its_new_value() {
+    let (cloud, published) = spawn_cloud(StatusCode::OK).await;
+    let (router, admin) = fixture(
+        "box-only",
+        &cloud,
+        Some("machine-secret"),
+        Some("B12345674"),
+    )
+    .await;
+
+    let response = put(&router, &admin, json!({ BILLING_BOX: true })).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let response = put(&router, &admin, json!({ BILLING_BOX: false })).await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let published = published.lock().unwrap();
+    assert_eq!(published.len(), 2, "ticking and unticking both publish");
+    assert_eq!(published[0].1["use_for_billing"], json!(true));
+    assert_eq!(published[1].1["use_for_billing"], json!(false));
+}
+
+/// The box is a boolean: anything else is refused at the door (`422`, like every invalid setting),
+/// before a row is written.
+#[tokio::test]
+async fn the_box_only_accepts_a_boolean() {
+    let (cloud, published) = spawn_cloud(StatusCode::OK).await;
+    let (router, admin) = fixture(
+        "box-type",
+        &cloud,
+        Some("machine-secret"),
+        Some("B12345674"),
+    )
+    .await;
+
+    let response = put(&router, &admin, json!({ BILLING_BOX: "yes" })).await;
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(published.lock().unwrap().is_empty());
+}
+
+/// The explicit door no longer has a screen behind it, but it stays for existing callers: it
+/// publishes the STORED identity with the STORED box — never a hard-coded «for billing».
+#[tokio::test]
+async fn the_explicit_door_publishes_the_stored_box() {
+    let (cloud, published) = spawn_cloud(StatusCode::OK).await;
+    let (router, admin) = fixture(
+        "box-door",
+        &cloud,
+        Some("machine-secret"),
+        Some("B12345674"),
+    )
+    .await;
+
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/business/fiscal-identity")
+                .header("x-hub-session", &admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let published = published.lock().unwrap();
+    assert_eq!(published.len(), 1);
+    assert_eq!(
+        published[0].1["use_for_billing"],
+        json!(false),
+        "nobody ticked the box on this hub"
+    );
+}

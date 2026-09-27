@@ -1586,6 +1586,8 @@ mod tests {
             "business_address",
             crate::host_notify::ALLOWED_RECIPIENTS_SETTING,
             "api_docs_enabled",
+            // Who pays ERPlora for THIS hub is not sector configuration (hub#2217).
+            crate::settings::BILLING_IDENTITY_SETTING,
         ] {
             assert!(
                 !is_portable_setting(key),

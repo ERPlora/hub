@@ -57,6 +57,9 @@ export interface HubSettings {
   business_postal_code: string;
   /** Municipio. */
   business_city: string;
+  /** «Use these details for my ERPlora invoice too» (hub#2217): whether the identity above is also
+   *  who ERPlora invoices. Saved with the Business form; the runtime sends it on every publication. */
+  business_identity_for_erplora_billing: boolean;
   /** Paleta de tema GLOBAL del hub (ADR-0138): valor de `data-ok-palette` de OutfitKit
    *  palettes.css; 'erplora' = marca por defecto. El override POR USUARIO vive en
    *  `hub_user_pref` y gana a esta. */
@@ -160,6 +163,7 @@ function setHubSettings(raw: unknown): HubSettings {
     business_street_number: typeof r.business_street_number === 'string' ? r.business_street_number : '',
     business_postal_code: typeof r.business_postal_code === 'string' ? r.business_postal_code : '',
     business_city: typeof r.business_city === 'string' ? r.business_city : '',
+    business_identity_for_erplora_billing: r.business_identity_for_erplora_billing === true,
     theme_palette: typeof r.theme_palette === 'string' && r.theme_palette.trim() ? r.theme_palette.trim() : 'erplora',
     // El dial «pedir PIN» (hub#359). Lo normaliza `publishPinPolicy` —cerrado, sin trim ni
     // minúsculas— porque lo que NO se puede leer no puede degradar a `never`: esa es la posición

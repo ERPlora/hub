@@ -567,6 +567,15 @@ export default {
     adminOnly: 'Solo un administrador puede quitar un dispositivo.',
     loadError: 'No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.',
     revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+    // hub#2215 — quitar de golpe los dispositivos que ya nadie usa.
+    pruneStale:
+      'Quitar el dispositivo sin usar desde hace 30 días | Quitar los {n} dispositivos sin usar desde hace 30 días',
+    pruneConfirm:
+      '¿Quitar 1 dispositivo que nadie usa desde hace 30 días? | ¿Quitar {n} dispositivos que nadie usa desde hace 30 días?',
+    pruneConsequence:
+      'Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.',
+    pruneAction: 'Quitar',
+    pruneError: 'No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.',
   },
   pinPolicy: {
     lengthTitle: 'Dígitos del PIN',
@@ -657,10 +666,8 @@ export default {
     businessAddressLegacy: 'Dirección actual: {address}. Rellena los campos de arriba para sustituirla.',
     fiscalAddress: 'Dirección fiscal',
     shareWithErplora: 'Usar estos datos también para mi factura de ERPlora',
-    shareWithErploraDesc: 'Envía tu razón social, NIF y dirección a ERPlora para que sus facturas hacia ti los lleven. Tu negocio sigue facturando a sus clientes con estos mismos datos — no se comparte nada más.',
-    shareWithErploraDone: 'Datos compartidos con ERPlora.',
+    shareWithErploraDesc: 'Al guardar, ERPlora también pone tu razón social, NIF y dirección en sus facturas hacia ti. Déjala sin marcar si a ERPlora le paga otra persona por este negocio, como tu gestoría. ERPlora siempre sabe quién es el negocio, porque lo necesita para presentar ante Hacienda.',
     shareWithErploraError: 'No se han podido compartir los datos con ERPlora.',
-    shareWithErploraNeedsTaxId: 'Rellena antes el NIF.',
     defaultVat: 'IVA por defecto',
     defaultVatDesc: 'Tipo aplicado a productos nuevos',
     vatGeneral: '21% (general)',
@@ -745,13 +752,13 @@ export default {
     ready: 'Imprimiendo en {hosts}',
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
-    ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
+    ticketFailed: 'El tique NO se imprimió: {error}',
     ticketWaitingForPrinter:
-      'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+      'El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
     ticketNotComposed:
-      'El tique de la venta {saleId} no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
+      'El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
     ticketWithoutFiscal:
-      'El tique de la venta {saleId} salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
+      'El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
     comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
     comandaWaitingForPrinter:
       'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
@@ -871,6 +878,9 @@ export default {
     // has_dependents` de hub#1101, que ya nombra lo que rompería un desinstalar.
     installSuccessWithDependencies: '{name} instalado correctamente. También se instaló: {names}.',
     installError: 'No se pudo iniciar la instalación de {name}.',
+    // hub#2244: the sticky install error's two ways out.
+    installRetry: 'Reintentar',
+    noticeClose: 'Cerrar',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
     // hub#516 — el botón de actualizar. `updateError` dice lo único que importa: el módulo NO se
@@ -1579,6 +1589,7 @@ export default {
     colTemplate: 'Plantilla',
     colDescription: 'Descripción',
     colLanguage: 'Idioma',
+    colCountry: 'País',
     colVersion: 'Versión',
     colDownloads: 'Descargas',
     colSize: 'Tamaño',
@@ -1680,6 +1691,9 @@ export default {
     protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
     emptyTitle: 'Aquí todavía no hay nada',
     emptyHint: 'Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.',
+    notInstalledTitle: 'Esta app no está instalada',
+    notInstalledHint: 'Este hub no tiene esta app. Búscala en el catálogo de Apps o abre otra desde el menú.',
+    notInstalledAction: 'Ir al catálogo',
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'Esta app no está disponible para este hub.',

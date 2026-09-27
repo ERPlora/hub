@@ -14,6 +14,14 @@ import './lib/ionic-fill.boot';
 // Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
 import './lib/ionic-select-text.boot';
 
+// Third shell hook on the same registry (hub#2223): `ion-select` opens an alert by default, which
+// only keeps the choice after OK, and Ionic has no global key to change it. The shell makes every
+// SINGLE-choice select open a popover, which closes on pick (multiple keeps its confirm button) —
+// module Web Components included. It wraps `open()`, a plain method, so unlike the two above it
+// would survive a late import; it sits here so the three hooks are read together.
+// Guard: `src/lib/ionic-select-interface.test.ts`. Detail: `src/lib/ionic-select-interface.ts`.
+import './lib/ionic-select-interface.boot';
+
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
 import { addIcons } from 'ionicons';
@@ -37,6 +45,7 @@ import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
@@ -256,22 +265,17 @@ bootPrintOnSale(getClient(), {
   // The paper is the one the ticket screen prints, composed by the sales module (hub#1921).
   saleDocument: (saleId) =>
     saleTicketDocument(saleId, { loadViewer: () => loadModuleElement('sales', SALE_DOCUMENT_TAG) }),
+  // What happened to the paper is decided in lib/print-on-sale; how the till is told (sentence and
+  // tone) in lib/print-on-sale-notice (hub#2210): a receipt waiting for a printer is not a fault
+  // (hub#1731), the lost and the never-composed ones are (hub#1921), the one out without its
+  // VeriFactu QR is a warning (hub#1867) — and none of them names the sale by its internal id.
   onFailure: (f) => {
-    // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
-    // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
-    // A third (hub#1921): the paper was never made — a sentence, not the code, and the way out.
-    void toastError(
-      f.awaitingHost
-        ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
-        : f.notComposed
-          ? i18n.global.t('print.ticketNotComposed', { saleId: f.saleId })
-          : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
-    );
+    const n = saleTicketFailureNotice(f);
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
-  // hub#1867: the paper is in the customer's hand but lacks the VeriFactu QR — a warning, not an
-  // error, and long enough to read where the complete copy is.
-  onPrintedWithoutFiscal: (saleId) => {
-    void toast(i18n.global.t('print.ticketWithoutFiscal', { saleId }), 'warning', 6000);
+  onPrintedWithoutFiscal: () => {
+    const n = saleTicketWithoutFiscalNotice();
+    void toast(i18n.global.t(n.messageKey), n.color, n.duration);
   },
 });
 

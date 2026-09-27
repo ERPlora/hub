@@ -32,19 +32,59 @@
         <ion-list lines="none">
           <ion-item v-for="field in fields" :key="field.key">
             <HubIcon v-if="settings.icon && field === fields[0]" slot="start" :name="settings.icon" />
-            <ion-label>
-              <h2>{{ field.label }}</h2>
-              <p v-if="field.description">{{ field.description }}</p>
-              <!-- El motivo POR CAMPO. El runtime nombra los campos que rechazó (`error.fields`,
-                   hub#1094); la frase de cada violación viaja en el mensaje y se pinta arriba. -->
-              <p
-                v-if="invalidFields.has(field.key)"
-                class="field-invalid"
-                :data-testid="`module-settings-invalid-${field.key}`"
-              >
-                {{ t('moduleSettings.fieldInvalid') }}
-              </p>
-            </ion-label>
+            <!-- Label and, for a number or text setting, its field (hub#2224). The field used to sit
+                 in `slot="end"`, where Ionic lets it keep its intrinsic ~175px while the label gets
+                 `min-content`: on a phone the label was left a sliver and broke almost word by word.
+                 Inside this wrapper the two share one container query: side by side when the row is
+                 wide, the field under its label when it is not. Toggles and selects are compact and
+                 stay in `slot="end"`. -->
+            <div class="setting-entry">
+              <ion-label>
+                <h2>{{ field.label }}</h2>
+                <p v-if="field.description">{{ field.description }}</p>
+                <!-- The reason PER FIELD. The runtime names the fields it refused (`error.fields`,
+                     hub#1094); the sentence for each violation travels in the message, shown above. -->
+                <p
+                  v-if="invalidFields.has(field.key)"
+                  class="field-invalid"
+                  :data-testid="`module-settings-invalid-${field.key}`"
+                >
+                  {{ t('moduleSettings.fieldInvalid') }}
+                </p>
+              </ion-label>
+
+              <!-- integer/number → ion-input type=number -->
+              <ion-input
+                v-if="field.control === 'number'"
+                class="setting-input setting-input--number"
+                fill="outline"
+                mode="md"
+                type="number"
+                :data-testid="`module-settings-field-${field.key}`"
+                :aria-label="field.label"
+                :aria-invalid="ariaInvalid(field.key)"
+                :readonly="!canEdit"
+                :value="model[field.key] as number | null"
+                @ion-input="model[field.key] = toNumber($event.detail.value)"
+              />
+
+              <!-- string → ion-input. The placeholder is what makes an EMPTY field visible: without
+                   it a bare input paints nothing (hub#959 — "the fields do not exist"). -->
+              <ion-input
+                v-else-if="field.control === 'text'"
+                class="setting-input"
+                fill="outline"
+                mode="md"
+                :data-testid="`module-settings-field-${field.key}`"
+                :aria-label="field.label"
+                :aria-invalid="ariaInvalid(field.key)"
+                :placeholder="t('moduleSettings.textPlaceholder')"
+                :readonly="!canEdit"
+                :maxlength="field.maxLength"
+                :value="(model[field.key] as string | null) ?? ''"
+                @ion-input="model[field.key] = $event.detail.value ?? ''"
+              />
+            </div>
 
             <!-- boolean → ion-toggle -->
             <ion-toggle
@@ -81,35 +121,6 @@
                 {{ opt.label }}
               </ion-select-option>
             </ion-select>
-
-            <!-- integer/number → ion-input type=number -->
-            <ion-input
-              v-else-if="field.control === 'number'"
-              slot="end"
-              class="text-right"
-              type="number"
-              :data-testid="`module-settings-field-${field.key}`"
-              :aria-label="field.label"
-              :aria-invalid="ariaInvalid(field.key)"
-              :readonly="!canEdit"
-              :value="model[field.key] as number | null"
-              @ion-input="model[field.key] = toNumber($event.detail.value)"
-            />
-
-            <!-- string → ion-input. The placeholder is what makes an EMPTY field visible: without
-                 it a bare `slot="end"` input paints nothing (hub#959 — "the fields do not exist"). -->
-            <ion-input
-              v-else
-              slot="end"
-              :data-testid="`module-settings-field-${field.key}`"
-              :aria-label="field.label"
-              :aria-invalid="ariaInvalid(field.key)"
-              :placeholder="t('moduleSettings.textPlaceholder')"
-              :readonly="!canEdit"
-              :maxlength="field.maxLength"
-              :value="(model[field.key] as string | null) ?? ''"
-              @ion-input="model[field.key] = $event.detail.value ?? ''"
-            />
 
             <!-- Acción de PRUEBA que el módulo declara para ESTE campo (hub#1426). El botón lo
                  pinta el shell (rótulo traducido, mismo sitio en todos los módulos); lo que hace
@@ -514,6 +525,44 @@ onMounted(() => void boot());
   font-weight: 600;
   margin: 0 0 0.5rem;
   padding-inline: 0.25rem;
+}
+
+/* hub#2224 — the body of a setting row: its label and, for a number or text setting, its field.
+   It is the flex item of the row in place of a bare `ion-label`, so it takes the room the label
+   had (`flex: 1`) and gives it back the vertical margins Ionic applies only to a direct label. */
+.setting-entry {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 1rem;
+}
+
+.setting-entry > ion-label {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 10px 0;
+}
+
+/* Narrow row (a phone): a full-row basis wraps the field under its label, as wide as the row. */
+.setting-input {
+  flex: 1 1 100%;
+  margin-bottom: 10px;
+}
+
+/* Wide row: label and field side by side, the field bounded so the label keeps the rest. The
+   threshold leaves the label at least half of the row next to a 12rem field. */
+@container (min-width: 30rem) {
+  .setting-input {
+    flex: 0 0 12rem;
+    margin-bottom: 0;
+  }
+
+  .setting-input--number {
+    text-align: end;
+  }
 }
 
 .field-invalid {

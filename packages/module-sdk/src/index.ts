@@ -1123,13 +1123,18 @@ export class HttpWsTransport implements ErploraTransport {
     // `permission_denied` is a domain refusal with its own code, not a transport failure.
     let res: Response;
     // A `GET`/`DELETE` carries no body and must not announce one: some proxies reject the pair.
+    // A form (hub#2232) goes as it is and WITHOUT a `Content-Type` of ours: `fetch` writes the
+    // multipart one with its boundary, and any value set here would drop it.
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
     const framing: Record<string, string> =
-      body === undefined ? {} : { 'Content-Type': 'application/json' };
+      body === undefined || isForm ? {} : { 'Content-Type': 'application/json' };
     try {
       res = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers: { ...framing, ...this.headers(), ...extraHeaders },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(body === undefined
+          ? {}
+          : { body: isForm ? (body as FormData) : JSON.stringify(body) }),
       });
     } catch (e) {
       // A network-level failure (DNS, CORS, abort, `TypeError: Failed to fetch`): same meaning for
@@ -2338,6 +2343,11 @@ export class EventsApi {
  *  starts here — `crates/server/src/whatsapp_templates.rs` (hub#1610). */
 export const WHATSAPP_TEMPLATES_BASE_PATH = '/api/hub/whatsapp/templates';
 
+/** Where the sample of a template's photo, video or PDF header goes up — the one path
+ *  {@link WhatsappTemplatesApi.uploadHeaderSample} posts to (`crates/server/src/
+ *  whatsapp_header_samples.rs`, hub#2232). */
+export const WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH = '/api/hub/whatsapp/template-header-samples';
+
 /**
  * A Meta template name, exactly as the runtime defines it
  * (`whatsapp_templates.rs::template_name_is_safe`, itself the SaaS's `NAME_RE`): lowercase letters,
@@ -2392,15 +2402,42 @@ export interface WhatsappTemplateInput {
   name: string;
   language: string;
   category?: string;
+  /**
+   * A header that is a file (hub#2232, saas#2377): `IMAGE`, `VIDEO` or `DOCUMENT`, with no header
+   * text. Absent or `TEXT` is a text header, exactly as before.
+   */
+  header_format?: 'TEXT' | WhatsappHeaderSampleFormat;
+  /**
+   * With a file header: the {@link WhatsappTemplateHeaderSample.header_handle} that
+   * {@link WhatsappTemplatesApi.uploadHeaderSample} returned. Asked on EVERY save — Meta holds the
+   * sample, not a handle it would take back.
+   */
+  header_handle?: string;
   [field: string]: unknown;
+}
+
+/** The kinds of file a template header can be, as Meta names them. */
+export type WhatsappHeaderSampleFormat = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+
+/**
+ * What {@link WhatsappTemplatesApi.uploadHeaderSample} answers (saas#2377). `format` is decided by
+ * the file's BYTES, not by the type the browser declared: register the header with this one.
+ */
+export interface WhatsappTemplateHeaderSample {
+  header_handle: string;
+  format: WhatsappHeaderSampleFormat;
+  mime_type: string;
+  size: number;
 }
 
 /**
  * **The templates the business promises Meta** (hub#1682) — the only way a module reaches them.
  *
- * Three methods and no more. It is not a proxy and must not become one: the paths are built from
- * one fixed prefix, the only value that ever reaches a path is a template name checked against
- * {@link TEMPLATE_NAME_PATTERN} first, and the method list is pinned by `whatsapp-templates.test.ts`.
+ * Four methods and no more. It is not a proxy and must not become one: the paths are two fixed
+ * constants ({@link WHATSAPP_TEMPLATES_BASE_PATH} and, for a header's sample,
+ * {@link WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH}), the only value that ever reaches a path is a
+ * template name checked against {@link TEMPLATE_NAME_PATTERN} first, and the method list is pinned
+ * by `whatsapp-templates.test.ts`.
  *
  * The credential is never here. The shell puts `X-Hub-Session` on the transport and the runtime
  * swaps it for the hub's machine credential on its way to the SaaS (ADR-0003), which is what keeps
@@ -2443,6 +2480,29 @@ export class WhatsappTemplatesApi {
       path: WHATSAPP_TEMPLATES_BASE_PATH,
       body: template,
     }) as Promise<WhatsappTemplate>;
+  }
+
+  /**
+   * `POST /api/hub/whatsapp/template-header-samples` — upload the sample of a photo, video or PDF
+   * header to Meta and get back the `header_handle` the template is registered with (hub#2232).
+   *
+   * The file goes as the multipart field `file`, relayed by the runtime in streaming to the SaaS,
+   * which holds the Meta token. What kind it is and how big it may be is decided THERE, from its
+   * bytes (JPEG/PNG up to 5 MB, MP4 up to 16 MB, PDF up to 100 MB): a refusal arrives as an
+   * {@link ErploraError} with its code — `unsupported_header_sample`, `header_sample_too_large`,
+   * `missing_file`, `no_whatsapp_number`, `whatsapp_not_configured`, `meta_*`.
+   *
+   * A `File` keeps its name; a bare `Blob` goes up as `blob` (what `FormData` names it), still a
+   * file part — a multipart part without a filename is not a file to the SaaS.
+   */
+  async uploadHeaderSample(file: Blob): Promise<WhatsappTemplateHeaderSample> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH,
+      body: form,
+    }) as Promise<WhatsappTemplateHeaderSample>;
   }
 
   /**

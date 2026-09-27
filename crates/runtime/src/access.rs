@@ -598,6 +598,14 @@ impl Runtime {
         devices::revoke(self.db.as_ref(), &self.hub_id, device_id).await
     }
 
+    /// Forgets every device of this hub nobody has used for `devices::STALE_AFTER_DAYS`
+    /// (hub#2215) — the rows `stale` in [`Self::list_devices`] — except `keep_device_id`, the one
+    /// the administrator is holding. Each goes the way a revocation takes it: trust row and its
+    /// (long dead) sessions.
+    pub async fn prune_stale_devices(&self, keep_device_id: &str) -> Result<devices::Pruned> {
+        devices::prune_stale(self.db.as_ref(), &self.hub_id, keep_device_id).await
+    }
+
     /// **Nombra** un dispositivo que este hub ya conoce (hub#494): «Barra», «Cocina», «Portátil
     /// despacho». Es lo único de la fila que decide el negocio, y por eso es lo único de fiar al
     /// señalar cuál cortar. No crea filas: un dispositivo se lista porque se confió en él, nunca

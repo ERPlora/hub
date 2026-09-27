@@ -66,6 +66,20 @@
       :message="t('moduleView.emptyHint')"
       data-testid="module-empty"
     />
+    <!-- hub#2190 — the app is not on this hub at all (the runtime's installed list does not name
+         it). Saying «installed» here contradicted Apps; the way out is the catalogue, where an app
+         you do not have gets installed. -->
+    <ok-empty-state
+      v-else-if="status === 'not-installed'"
+      icon="apps-outline"
+      :heading="t('moduleView.notInstalledTitle')"
+      :message="t('moduleView.notInstalledHint')"
+      data-testid="module-not-installed"
+    >
+      <ion-button slot="action" router-link="/apps#all" data-testid="module-not-installed-catalog">
+        {{ t('moduleView.notInstalledAction') }}
+      </ion-button>
+    </ok-empty-state>
     <!-- hub#2205 — the address names a screen this app does not have. The SAME answer a wrong
          address at the root gets (NotFoundPage), with the address left in the bar as evidence and
          the app's tabbar still under it, so the right screen is one tap away. -->
@@ -166,7 +180,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSkeletonText,
-  onIonViewDidLeave, onIonViewWillEnter
+  onIonViewDidLeave, onIonViewWillEnter, onIonViewWillLeave
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -176,7 +190,7 @@ import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { shellTabHeading } from '../lib/module-settings';
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
-import { clientInjectionKey, getClient } from '../lib/runtime';
+import { clientInjectionKey, getClient, listInstalledModules } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
@@ -215,7 +229,7 @@ const SKELETON_ROWS = 6;
  * así que el módulo no tiene nada que ver. Son cuatro frases distintas y la pantalla no puede
  * decir una por otra.
  */
-const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline' | 'not-found'>('loading');
+const status = ref<'loading' | 'ready' | 'error' | 'empty' | 'offline' | 'not-found' | 'not-installed'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
@@ -317,6 +331,13 @@ let onScreen = true;
 let mountedPath = '';
 /** This copy let go of its module when it left the screen (hub#1797): coming back mounts it again. */
 let released = false;
+/**
+ * Whether the last word Ionic said to this copy was «you are leaving» (hub#2241). Ionic Vue calls
+ * `onIonViewWillEnter` BEFORE awaiting the outlet's commit, and commits run one at a time: on a
+ * quick A → B → A the way back's WillEnter reaches A before the way out's DidLeave. A DidLeave that
+ * finds this `false` is that late way out — the copy is the one on show, and it must not let go.
+ */
+let leaving = false;
 
 let mountGeneration = 0;
 /**
@@ -408,7 +429,21 @@ async function mount(): Promise<void> {
       // is not entitled, so it contributes no tab. «Nothing to show» is the wrong sentence for it
       // (the module IS active; the entitlement is what stops it): `ready` lets the `blocked-card`
       // above say why, the same card a module blocked for non-payment gets.
-      status.value = isBlocked.value ? 'ready' : 'empty';
+      if (isBlocked.value) {
+        status.value = 'ready';
+        return;
+      }
+      // hub#2190 — the menu answers «no tab» both for an installed app that is switched off and for
+      // an app this hub never had; only the runtime's installed list tells them apart. If that
+      // question fails, the catch below says so instead of guessing either sentence.
+      const installed = await listInstalledModules();
+      if (generation !== mountGeneration) return;
+      const mine = installed.find((m) => m.id === moduleId);
+      // Without tabs the heading above falls back to the bare id («cart_checkout»): an installed
+      // app has its translated name in the same list, and one the hub lacks has no name to show,
+      // so the header says what the page says, like the root 404 (NotFoundPage).
+      moduleName.value = mine ? mine.name || moduleName.value : t('moduleView.notInstalledTitle');
+      status.value = mine ? 'empty' : 'not-installed';
       return;
     }
     moduleName.value = entry.moduleName;
@@ -557,7 +592,14 @@ watch(isOnline, (back) => {
  * way back (`history.back`) it built a new till anyway, so keeping it alive bought nothing. Only
  * the screen on show runs a module; a mount still in flight is cancelled so it cannot land here.
  */
+onIonViewWillLeave(() => {
+  leaving = true;
+});
+
 onIonViewDidLeave(() => {
+  // hub#2241 — a way back was announced after this way out began: this copy is on show again.
+  // Acting on it cancelled the mount in flight and left the screen on its skeleton for good.
+  if (!leaving) return;
   onScreen = false;
   window.removeEventListener('focus', recheckEntitlement);
   stopChrome?.();
@@ -571,6 +613,7 @@ onIonViewDidLeave(() => {
 
 /** Back on screen: take back what was released and mount the screen the route names. */
 onIonViewWillEnter(() => {
+  leaving = false;
   onScreen = true;
   window.addEventListener('focus', recheckEntitlement);
   if (!stopChrome && outlet.value) stopChrome = installChrome(outlet.value, chromeControls);

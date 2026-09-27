@@ -132,7 +132,7 @@ pub(crate) async fn whatsapp_media(
                 )
             }
         };
-        return media_refusal(status, body);
+        return cloud_proxy::cloud_envelope_named_refusal(status, body);
     }
 
     let content_type = upstream
@@ -165,37 +165,6 @@ pub(crate) async fn whatsapp_media(
             )
         }
     }
-}
-
-/// A refusal of the SaaS, in the envelope the SDK reads.
-///
-/// [`cloud_proxy::cloud_envelope_passthrough`] already does this — status and `code` untouched on
-/// a `4xx`, `424` on a `5xx` so the edge does not swap the body for its page (hub#1763). What it
-/// drops on a `5xx` is the code, because a DRF crash names none. Here the SaaS DOES name one on
-/// purpose: `502 media_unavailable` is «Meta did not answer, try again», and it is the one refusal
-/// the inbox offers «Retry» for. So a `5xx` that carries a code keeps it; one that does not (a real
-/// crash) still falls through to the shared passthrough and reads `cloud_rejected`.
-fn media_refusal(status: StatusCode, body: axum::body::Bytes) -> Response {
-    if status.is_server_error() {
-        let named = serde_json::from_slice::<Value>(&body).ok().and_then(|v| {
-            let code = v.get("error")?.as_str()?.to_string();
-            let detail = v
-                .get("detail")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .unwrap_or_else(|| code.clone());
-            Some((code, detail))
-        });
-        if let Some((code, detail)) = named {
-            tracing::warn!(
-                status = status.as_u16(),
-                code = %code,
-                "erplora.com could not fetch a WhatsApp attachment"
-            );
-            return refused(cloud_proxy::CLOUD_FAILED, &code, &detail);
-        }
-    }
-    cloud_proxy::cloud_envelope_passthrough(status, body)
 }
 
 #[cfg(test)]

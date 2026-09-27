@@ -118,18 +118,20 @@
       </ion-content>
     </ion-modal>
 
-    <!-- Toast simple (Ionic IonToast no requiere importaciones extra en el template) -->
+    <!-- Page notices, anchored above the tab bar (hub#2244). -->
     <ion-toast
       :is-open="toastOpen"
       :message="toastMsg"
       :color="toastColor"
       :duration="toastDuration"
       :buttons="toastButtons"
-      @did-dismiss="toastOpen = false"
+      position="bottom"
+      :position-anchor="pageShown ? TOAST_ANCHOR : undefined"
+      @did-dismiss="onToastDismissed"
     />
     <!-- Tabs en footer -->
     <template #footer>
-      <ion-footer class="ion-no-border">
+      <ion-footer :id="TOAST_ANCHOR" class="ion-no-border">
       <ion-toolbar>
         <ion-segment class="ok-tabbar" :value="tab" @ion-change="onTabChange">
           <ion-segment-button value="mine">
@@ -160,7 +162,7 @@ import {
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
   IonToast,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
-  IonList, IonItem, alertController,
+  IonList, IonItem, alertController, onIonViewWillEnter, onIonViewWillLeave,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -287,9 +289,50 @@ const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
 // Duración del toast (ms). 0 = persistente (lo usamos para "Instalando…" mientras corre la
 // instalación en background; el resultado lo cierra y muestra el suyo). Por defecto 2.5s.
 const toastDuration = ref<number>(2500);
-// Acciones del toast. Vacío = toast informativo. Se usa para llevar a Ajustes → Permisos cuando un
-// módulo entra sin sus permisos (pm#132): la ruta escrita en palabras no bastaba.
-const toastButtons = ref<Array<{ text: string; handler: () => void }>>([]);
+// Toast actions. Empty = informative toast. Used to go to Settings → Permissions when a module
+// comes in without its permissions (pm#132), and to retry/close a failed install (hub#2244).
+type ToastButton = { text: string; role?: 'cancel'; handler?: () => void };
+const toastButtons = ref<ToastButton[]>([]);
+// hub#2244 — every notice of this page sits ABOVE the Apps tab bar (the footer below), not at the
+// window edge under it: on a desktop the error rose over the tabs, bottom edge 10 px from the frame.
+const TOAST_ANCHOR = 'apps-footer';
+// …but only while Apps is on screen. Ionic keeps a page it left in the DOM, hidden, and places a
+// notice anchored to a hidden footer from a zero-size box: above the TOP edge of the window. The
+// result of an install still running when the person left shows at the bottom of where they are.
+const pageShown = ref(true);
+onIonViewWillEnter(() => {
+  pageShown.value = true;
+});
+onIonViewWillLeave(() => {
+  pageShown.value = false;
+});
+// hub#2244 — `didDismiss` of a notice the page REPLACED arrives after its successor is already open
+// (Ionic finishes the leave animation first). Counted here so that late event does not close the
+// new notice: it closed the install error ~0.3 s after it rose.
+let replacedToasts = 0;
+
+function onToastDismissed(): void {
+  if (replacedToasts > 0) {
+    replacedToasts -= 1;
+    return;
+  }
+  toastOpen.value = false;
+}
+
+/** Shows a notice, replacing the one on screen (closed first, so the new one is re-presented). */
+function showToast(msg: string, color: 'primary' | 'success' | 'danger', duration: number, buttons: ToastButton[]): void {
+  // A declarative ion-toast does NOT update its message/duration while open, so chaining notices
+  // («Installing…» → «installed») is dismiss + re-present on the next tick.
+  if (toastOpen.value) replacedToasts += 1;
+  toastOpen.value = false;
+  void nextTick(() => {
+    toastMsg.value = msg;
+    toastColor.value = color;
+    toastDuration.value = duration;
+    toastButtons.value = buttons;
+    toastOpen.value = true;
+  });
+}
 
 // --- Progreso de instalación por módulo (feedback visual en la card) ---
 // Clave = módulo pedido (root); valor = módulo en curso (puede ser una dep anidada) + fase.
@@ -742,17 +785,12 @@ function onTabChange(ev: Event): void {
 }
 
 function notify(msg: string, color: 'primary' | 'success' | 'danger', duration = 2500): void {
-  // Cerrar + reabrir en el siguiente tick: un ion-toast declarativo NO actualiza su mensaje/
-  // duración mientras sigue abierto, así que para encadenar toasts (p. ej. "Instalando…" →
-  // "instalado") hay que dismiss + re-present.
-  toastOpen.value = false;
-  void nextTick(() => {
-    toastMsg.value = msg;
-    toastColor.value = color;
-    toastDuration.value = duration;
-    toastButtons.value = [];
-    toastOpen.value = true;
-  });
+  showToast(msg, color, duration, []);
+}
+
+/** «Close» for a sticky notice: a notice that never expires needs a way out. */
+function closeButton(): ToastButton {
+  return { text: t('apps.noticeClose'), role: 'cancel' };
 }
 
 /**
@@ -764,16 +802,9 @@ function notify(msg: string, color: 'primary' | 'success' | 'danger', duration =
  * módulo y no bastaba.
  */
 function notifyGrantFailed(name: string): void {
-  toastOpen.value = false;
-  void nextTick(() => {
-    toastMsg.value = t('apps.installedButNoPermissions', { name });
-    toastColor.value = 'danger';
-    toastDuration.value = 0;
-    toastButtons.value = [
-      { text: t('apps.goToPermissions'), handler: () => { void router.push('/settings#permissions'); } },
-    ];
-    toastOpen.value = true;
-  });
+  showToast(t('apps.installedButNoPermissions', { name }), 'danger', 0, [
+    { text: t('apps.goToPermissions'), handler: () => { void router.push('/settings#permissions'); } },
+  ]);
 }
 
 // Cliente del runtime (provide en main.ts; fallback al singleton) para escuchar `module.installed`
@@ -1022,11 +1053,13 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
     // no se ha instalado nada. Decirlo y nombrarlos es la diferencia entre que el usuario sepa qué
     // contratar y que vea un «no se pudo» opaco. La compra es suya: aquí nunca se cobra.
     if (e instanceof InstallBlockedError) {
-      // Sticky (0): el usuario tiene que poder LEER qué le falta contratar, no verlo pasar.
-      notify(
+      // Sticky (0): the user has to be able to READ what is missing, not watch it go by. No
+      // «Retry»: nothing changes until they subscribe (hub#2244).
+      showToast(
         t('apps.installBlocked', { name: mod.name, missing: e.blockedOn.join(', ') }),
         'danger',
         0,
+        [closeButton()],
       );
     } else {
       // This is where the second discard of hub#673 lived. `e` carried the runtime's sentence —no
@@ -1034,7 +1067,17 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
       // migration blown up— and this `else` threw it away to print the same line every time. With
       // six causes indistinguishable, the fleet-wide install breakage of 08-09 (saas#1352) was
       // invisible from the till.
-      notify(moduleFailureMessage(e, t('apps.installError', { name: mod.name }), { t, te }), 'danger');
+      // hub#2244: sticky, with «Retry» — the same app, version and granted permissions (the consent
+      // was already given) — because the failure can be transient and 2.5 s was not enough to read it.
+      showToast(moduleFailureMessage(e, t('apps.installError', { name: mod.name }), { t, te }), 'danger', 0, [
+        {
+          text: t('apps.installRetry'),
+          handler: () => {
+            if (!installing.value.has(mod.id)) void doInstall(mod, version, grantCaps);
+          },
+        },
+        closeButton(),
+      ]);
     }
   } finally {
     clearProgress(mod.id);

@@ -620,6 +620,15 @@ export default {
     adminOnly: 'Only an administrator can remove a device.',
     loadError: 'The devices could not be loaded. Check the connection and try again.',
     revokeError: 'This device could not be removed. Check the connection and try again.',
+    // hub#2215 — clearing, in one gesture, the devices nobody uses any more.
+    pruneStale:
+      'Remove the device not used in 30 days | Remove the {n} devices not used in 30 days',
+    pruneConfirm:
+      'Remove 1 device nobody has used in 30 days? | Remove {n} devices nobody has used in 30 days?',
+    pruneConsequence:
+      'They stop appearing here, and to use one again somebody has to sign in on it with their account. Devices used in the last 30 days and the one you are using stay.',
+    pruneAction: 'Remove',
+    pruneError: 'The unused devices could not be removed. Check the connection and try again.',
   },
   // hub#359 — the dial the OWNER turns, on top of the device mode above. Every option says what it
   // does to the business, never what it is called: "never" means nothing to a shopkeeper, "whoever
@@ -725,10 +734,8 @@ export default {
     businessAddressLegacy: 'Current address: {address}. Fill in the fields above to replace it.',
     fiscalAddress: 'Fiscal address',
     shareWithErplora: 'Use these details for my ERPlora invoice too',
-    shareWithErploraDesc: 'Sends your legal name, tax id and address to ERPlora so its invoices to you carry them. Your business keeps invoicing its own customers with these same details — nothing else is shared.',
-    shareWithErploraDone: 'Details shared with ERPlora.',
+    shareWithErploraDesc: 'When you save, ERPlora also puts your legal name, tax id and address on its invoices to you. Leave it unticked if someone else pays ERPlora for this business, such as your accounting firm. ERPlora always learns who the business is, as it needs that to file with the tax agency.',
     shareWithErploraError: 'Could not share the details with ERPlora.',
-    shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
     // One question, two EXCLUSIVE answers (ADR-0320 §1 — hub#1314): either the business files with
     // its own certificate, or ERPlora files on its behalf with the signed grant. Never both.
     defaultVat: 'Default VAT',
@@ -834,17 +841,17 @@ export default {
     // printer set up — the job is safe in the queue and comes out on its own once there is one.
     // Naming what to do next matters more than naming the fault: «did not print» sends the
     // cashier hunting for a jam that is not there.
-    ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
+    ticketFailed: 'The receipt did NOT print: {error}',
     ticketWaitingForPrinter:
-      'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+      'The receipt is waiting: no printer is set up yet. Set one up and it will print on its own.',
     // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so
     // nothing went to the printer. The way out is the print button on the receipt screen.
     ticketNotComposed:
-      'The receipt for sale {saleId} could not be prepared and did NOT print. Print it from the receipt screen.',
+      'The receipt could not be prepared and did NOT print. Print it from the receipt screen.',
     // hub#1867: the receipt came out, but Hacienda's QR was not ready within the wait (a slow AEAT),
     // so the customer's copy lacks it. The receipt screen prints the complete one.
     ticketWithoutFiscal:
-      'The receipt for sale {saleId} came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
+      'The receipt came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
     comandaWaitingForPrinter:
       'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
@@ -991,6 +998,9 @@ export default {
     // `409 has_dependents`, which already names what an uninstall would break.
     installSuccessWithDependencies: '{name} installed successfully. Also installed: {names}.',
     installError: 'Could not start installation of {name}.',
+    // hub#2244: the sticky install error's two ways out.
+    installRetry: 'Retry',
+    noticeClose: 'Close',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
     // hub#516 — the update button. `updateError` says the one thing that matters: the module did
@@ -1790,6 +1800,7 @@ export default {
     colTemplate: 'Template',
     colDescription: 'Description',
     colLanguage: 'Language',
+    colCountry: 'Country',
     colVersion: 'Version',
     colDownloads: 'Downloads',
     colSize: 'Size',
@@ -1936,6 +1947,11 @@ export default {
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
     emptyTitle: 'Nothing to show here yet',
     emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
+    // hub#2190 — an app this hub does not have at all (the runtime does not list it). Not the empty
+    // state above: that one is for an installed app, and saying «installed» here contradicted Apps.
+    notInstalledTitle: 'This app is not installed',
+    notInstalledHint: 'This hub does not have this app. Look for it in the Apps catalogue, or open another one from the menu.',
+    notInstalledAction: 'Go to the catalogue',
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'This app is not available for this hub.',

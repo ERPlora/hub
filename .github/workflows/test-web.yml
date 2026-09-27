@@ -77,12 +77,26 @@
 # a release batch, the cron will not fire on its own — `workflow_dispatch` still works
 # meanwhile (same caveat `image-freshness.yml` carries).
 #
+# ── Merge-check: the MERGED tree, at merge time (ERPlora/pm#331) ─────────────
+# The `pull_request` run proves the merge with the base AS IT WAS when it started, and
+# nothing re-runs it when the base moves. On 2026-09-11 hub#1815 went green 36 min before
+# hub#1813 landed the very file its new guard forbids; both merged green and `develop`
+# stayed red for 2 h 58 min — and every other PR with it. So `merge-pr.sh` (ERPlora/pm)
+# compares the base each green ran on with the tip of the base, and when it moved it
+# dispatches THIS file with `pr` + `head_sha` + `base_sha`: `verify` checks out
+# `base_sha`, builds the merge (`scripts/ci/merge-check-tree.sh`) and runs `pnpm verify`
+# on it; `e2e` is skipped (the door is waiting on this run). The door finds its run by
+# the `run-name` below — change the title and `merge_check_title` in merge-pr.sh together.
+#
 # Contrato de este fichero: `scripts/tests/test-web-workflow.test.sh`, que corre
 # como un paso del job `verify` (un test de la guarda que no corre en ningún
 # sitio es la lista de la compra, no una guarda).
 # ==============================================================================
 
 name: Web tests (typecheck · vitest · e2e)
+# Only a merge-check gets a title of its own (pm#331); every other event evaluates to ''
+# and keeps GitHub's default (the commit or PR title).
+run-name: ${{ inputs.pr && format('merge-check hub#{0} {1} onto {2}', inputs.pr, inputs.head_sha, inputs.base_sha) || '' }}
 
 on:
   push:
@@ -98,6 +112,8 @@ on:
       # only touched `no-dead-packages.test.mjs` triggered no check at all (hub#1247).
       - "scripts/tests/no-dead-packages.test.mjs"
       - "scripts/tests/web-format.test.sh"
+      - "scripts/ci/merge-check-tree.sh"
+      - "scripts/tests/merge-check-tree.test.sh"
       - ".github/workflows/test-web.yml"
   # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Fuera del 29/08 al 03/09 (pm#197): la suite
   # corría en el gate pre-push local. Medido en la tanda R2 del 02/09: ese gate es UN lock para
@@ -118,6 +134,8 @@ on:
       - "scripts/tests/test-web-workflow.test.sh"
       - "scripts/tests/no-dead-packages.test.mjs"
       - "scripts/tests/web-format.test.sh"
+      - "scripts/ci/merge-check-tree.sh"
+      - "scripts/tests/merge-check-tree.test.sh"
       - ".github/workflows/test-web.yml"
   schedule:
     - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
@@ -127,9 +145,24 @@ on:
         description: "Regenerar las capturas de toHaveScreenshot EN ESTE RUNNER y subirlas como artefacto (luego se commitean a mano)"
         type: boolean
         default: false
+      # The merge-check of ERPlora/pm#331 — the three together, or none.
+      pr:
+        description: "merge-check: número de la PR cuyo árbol fusionado se prueba (lo rellena merge-pr.sh)"
+        type: string
+        default: ""
+      head_sha:
+        description: "merge-check: sha de la cabeza de la PR que merge-pr.sh va a mergear"
+        type: string
+        default: ""
+      base_sha:
+        description: "merge-check: sha de la punta de la base sobre la que se fusiona"
+        type: string
+        default: ""
 
 concurrency:
-  group: test-web-${{ github.ref }}
+  # A merge-check carries its PR (pm#331): every dispatch runs on `refs/heads/develop`, and
+  # sharing that group would let one merge cancel another's check — and the develop push run.
+  group: test-web-${{ github.ref }}${{ inputs.pr && format('-merge-check-{0}', inputs.pr) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -155,10 +188,22 @@ jobs:
       # (default branch) and by default would check out THAT branch; on any other
       # event this behaves as before (the event's own ref — `github.ref` already is
       # that, so the `||` is a no-op outside the cron).
+      #
+      # A merge-check (pm#331) checks out `base_sha` instead, with the whole history —
+      # a depth-1 checkout has no merge base to merge the PR onto.
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
+          ref: ${{ inputs.base_sha || (github.event_name == 'schedule' && 'develop' || github.ref) }}
+          fetch-depth: ${{ inputs.pr && '0' || '1' }}
+
+      - name: Merge-check — build the merged tree of the PR (pm#331)
+        if: ${{ inputs.pr }}
+        env:
+          PR: ${{ inputs.pr }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: bash ./scripts/ci/merge-check-tree.sh
 
       # Same runtime as the image build (docker/Dockerfile: node:22-bookworm-slim + corepack),
       # so a green run here means the `vue-tsc` inside `build-hub.yml` is green too.
@@ -199,8 +244,14 @@ jobs:
       - name: Contrato del formato del shell (scripts/tests/web-format.test.sh)
         run: bash ./scripts/tests/web-format.test.sh
 
+      - name: Contrato del árbol fusionado del merge-check (scripts/tests/merge-check-tree.test.sh)
+        run: bash scripts/tests/merge-check-tree.test.sh
+
   e2e:
     name: playwright (test:e2e, runtime real)
+    # A merge-check (pm#331) proves only `pnpm verify` on the merged tree: the door is
+    # waiting on it, and playwright would add ~20 min to every merge.
+    if: ${{ !inputs.pr }}
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 40
 
