@@ -1137,8 +1137,8 @@ fn plan_unreachable(e: reqwest::Error) -> PlanUnavailable {
 
 /// Por qué no hay plan ejecutable.
 enum PlanUnavailable {
-    /// El plan SÍ llegó y dice `blocked` (error de dominio), o el marketplace no contestó a
-    /// tiempo (hub#2251): el error termina la instalación, no hay fallback.
+    /// The plan DID arrive and says `blocked` (a domain error), or the marketplace did not answer
+    /// in time (hub#2251): the error ends the install, there is no fallback.
     Blocked(InstallError),
     /// El plan no se pudo obtener/parsear → usar la resolución anidada por manifest.
     Degraded(String),

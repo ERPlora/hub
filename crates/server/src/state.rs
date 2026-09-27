@@ -928,17 +928,6 @@ pub type HubId = Arc<RwLock<String>>;
 /// a sale scaled linearly with the number of tills (11 ms → 197 ms from 1 to 10 tills, measured).
 pub type SharedRuntime = Arc<tokio::sync::RwLock<Runtime>>;
 
-/// Estado de la app Axum. El runtime va tras el [`SharedRuntime`] de arriba (lectores en
-/// paralelo, escritores exclusivos); para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) sobra.
-///
-/// **Dos modos de topología** (ADR-0005):
-///  - **single-tenant (N=1)** — `tenants = None`: hay UN runtime (`runtime`), el del hub/org del
-///    despliegue. Es el modo actual (un contenedor ECS por hub, o local Tauri). Todas las
-///    peticiones usan ese runtime. **Comportamiento sin cambios.**
-///  - **cloud compartido (N orgs)** — `tenants = Some(router)`: el proceso sirve **N** orgs; el
-///    runtime de cada petición se resuelve por su `hub_id` vía el [`TenantRouter`] (un pool por
-///    org). El campo `runtime` sigue existiendo como **fallback/bootstrap** (tablas de sistema,
-///    arranque), pero el camino de datos va por el router. Ver [`AppState::runtime_for`].
 /// How long the marketplace may stay silent — no connection, no headers, no next chunk of the
 /// zip — before an install or update gives up (hub#2251).
 pub const MARKETPLACE_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
@@ -959,6 +948,17 @@ pub fn marketplace_client(stall: std::time::Duration) -> reqwest::Client {
         })
 }
 
+/// Estado de la app Axum. El runtime va tras el [`SharedRuntime`] de arriba (lectores en
+/// paralelo, escritores exclusivos); para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) sobra.
+///
+/// **Dos modos de topología** (ADR-0005):
+///  - **single-tenant (N=1)** — `tenants = None`: hay UN runtime (`runtime`), el del hub/org del
+///    despliegue. Es el modo actual (un contenedor ECS por hub, o local Tauri). Todas las
+///    peticiones usan ese runtime. **Comportamiento sin cambios.**
+///  - **cloud compartido (N orgs)** — `tenants = Some(router)`: el proceso sirve **N** orgs; el
+///    runtime de cada petición se resuelve por su `hub_id` vía el [`TenantRouter`] (un pool por
+///    org). El campo `runtime` sigue existiendo como **fallback/bootstrap** (tablas de sistema,
+///    arranque), pero el camino de datos va por el router. Ver [`AppState::runtime_for`].
 #[derive(Clone)]
 pub struct AppState {
     pub runtime: SharedRuntime,
