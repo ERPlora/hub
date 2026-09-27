@@ -10,19 +10,33 @@
 // Chosen over "the bench installs @latest itself" because it keeps the lockfile reproducible: the
 // bench never rewrites node_modules behind the developer's back, it tells them to bump the pin.
 //
-// In CI the workflow has just installed `latest`, so this passes by construction. Offline, the
-// latest version cannot be known: the bench runs and prints OUTFITKIT_LATEST_UNKNOWN instead of
-// blocking someone without network.
-import { resolve } from 'node:path';
+// CI and the pre-push gate install `latest` right before building, so they pass — except for a
+// release in the minutes between that install and Playwright (13 releases on 2026-09-26). That
+// race is not drift (rv-2265): the guard only fails when the install was ALREADY behind when it
+// was made — some version newer than the installed one had been published at or before the moment
+// pnpm wrote node_modules. A newer release after the install is OUTFITKIT_LATEST_NEWER_THAN_INSTALL,
+// a warning. Offline, the latest version cannot be known: the bench runs and prints
+// OUTFITKIT_LATEST_UNKNOWN instead of blocking someone without network.
+import { statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveOutfitkitVersion } from '../outfitkit-version';
 
-export const OUTFITKIT_LATEST_URL = 'https://registry.npmjs.org/@erplora/outfitkit/latest';
+// The FULL document (~750 KB): only it carries `time`, the publish date of every version.
+export const OUTFITKIT_REGISTRY_URL = 'https://registry.npmjs.org/@erplora/outfitkit';
 export const WEB_DIR = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
+const WORKSPACE_DIR = resolve(WEB_DIR, '..', '..');
 const FIX_COMMAND = 'pnpm -F @erplora/web add @erplora/outfitkit@latest';
 const REGISTRY_TIMEOUT_MS = 10_000;
 
 export type OutfitkitVersionState = 'behind' | 'current' | 'ahead' | 'unknown';
+export type OutfitkitGuardResult = Exclude<OutfitkitVersionState, 'behind'> | 'newer-than-install';
+
+export interface OutfitkitRegistry {
+  latest: string;
+  /** Publish time (ISO) per version, as the registry's `time` map gives it. */
+  published: Record<string, string>;
+}
 
 function parseVersion(v: string): number[] | null {
   const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v.trim());
@@ -40,16 +54,39 @@ export function compareOutfitkitVersions(installed: string, latest: string): Out
   return 'current';
 }
 
-export async function fetchLatestOutfitkitVersion(fetchImpl: typeof fetch = fetch): Promise<string> {
-  const res = await fetchImpl(OUTFITKIT_LATEST_URL, {
+export async function fetchOutfitkitRegistry(fetchImpl: typeof fetch = fetch): Promise<OutfitkitRegistry> {
+  const res = await fetchImpl(OUTFITKIT_REGISTRY_URL, {
     signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`npm registry answered ${res.status} for ${OUTFITKIT_LATEST_URL}`);
-  const doc = (await res.json()) as { version?: unknown };
-  if (typeof doc.version !== 'string') {
-    throw new Error(`npm registry document for ${OUTFITKIT_LATEST_URL} has no version`);
+  if (!res.ok) throw new Error(`npm registry answered ${res.status} for ${OUTFITKIT_REGISTRY_URL}`);
+  const doc = (await res.json()) as { 'dist-tags'?: { latest?: unknown }; time?: unknown };
+  const latest = doc['dist-tags']?.latest;
+  if (typeof latest !== 'string') {
+    throw new Error(`npm registry document for ${OUTFITKIT_REGISTRY_URL} has no dist-tags.latest`);
   }
-  return doc.version;
+  const published = doc.time && typeof doc.time === 'object' ? (doc.time as Record<string, string>) : {};
+  return { latest, published };
+}
+
+/** When pnpm last wrote the workspace's node_modules: `install` and `add` both rewrite this file. */
+export function readInstallTime(workspaceDir: string): Date | null {
+  try {
+    return statSync(join(workspaceDir, 'node_modules', '.modules.yaml')).mtime;
+  } catch {
+    return null;
+  }
+}
+
+/** True when some version newer than `installed` existed at or before `installedAt`. */
+function wasBehindAtInstall(installed: string, installedAt: Date | null, registry: OutfitkitRegistry): boolean {
+  if (!installedAt) return true;
+  const newer = [registry.latest, ...Object.keys(registry.published)].filter(
+    (v) => compareOutfitkitVersions(installed, v) === 'behind',
+  );
+  return newer.some((v) => {
+    const at = Date.parse(registry.published[v] ?? '');
+    return Number.isNaN(at) || at <= installedAt.getTime();
+  });
 }
 
 export class OutfitkitBehindLatestError extends Error {
@@ -68,15 +105,16 @@ export class OutfitkitBehindLatestError extends Error {
 
 export interface OutfitkitGuardDeps {
   readInstalled: () => string;
-  fetchLatest: () => Promise<string>;
+  readInstalledAt: () => Date | null;
+  fetchRegistry: () => Promise<OutfitkitRegistry>;
   warn: (message: string) => void;
 }
 
-export async function assertOutfitkitIsLatest(deps: OutfitkitGuardDeps): Promise<OutfitkitVersionState> {
+export async function assertOutfitkitIsLatest(deps: OutfitkitGuardDeps): Promise<OutfitkitGuardResult> {
   const installed = deps.readInstalled();
-  let latest: string;
+  let registry: OutfitkitRegistry;
   try {
-    latest = await deps.fetchLatest();
+    registry = await deps.fetchRegistry();
   } catch (e) {
     deps.warn(
       `OUTFITKIT_LATEST_UNKNOWN: could not read the published @erplora/outfitkit version ` +
@@ -84,8 +122,20 @@ export async function assertOutfitkitIsLatest(deps: OutfitkitGuardDeps): Promise
     );
     return 'unknown';
   }
+  const { latest } = registry;
   const state = compareOutfitkitVersions(installed, latest);
-  if (state === 'behind') throw new OutfitkitBehindLatestError(installed, latest);
+  if (state === 'behind') {
+    const installedAt = deps.readInstalledAt();
+    if (wasBehindAtInstall(installed, installedAt, registry)) {
+      throw new OutfitkitBehindLatestError(installed, latest);
+    }
+    deps.warn(
+      `OUTFITKIT_LATEST_NEWER_THAN_INSTALL: @erplora/outfitkit ${latest} was published after this ` +
+        `install (${installedAt?.toISOString()}, which had the then-latest ${installed}); the bench ` +
+        `runs with ${installed}. Reinstall to test ${latest}.`,
+    );
+    return 'newer-than-install';
+  }
   if (state === 'unknown') {
     deps.warn(
       `OUTFITKIT_LATEST_UNKNOWN: cannot compare installed ${JSON.stringify(installed)} with ` +
@@ -95,11 +145,12 @@ export async function assertOutfitkitIsLatest(deps: OutfitkitGuardDeps): Promise
   return state;
 }
 
-export default function outfitkitLatestGuard(): Promise<OutfitkitVersionState> {
+export default function outfitkitLatestGuard(): Promise<OutfitkitGuardResult> {
   return assertOutfitkitIsLatest({
     // The same resolution the image's build stamp uses (hub#1588): app first, then workspace root.
     readInstalled: () => resolveOutfitkitVersion(WEB_DIR),
-    fetchLatest: () => fetchLatestOutfitkitVersion(),
+    readInstalledAt: () => readInstallTime(WORKSPACE_DIR),
+    fetchRegistry: () => fetchOutfitkitRegistry(),
     warn: (message) => console.warn(message),
   });
 }
