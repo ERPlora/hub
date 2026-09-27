@@ -69,7 +69,7 @@
         v-show="tab !== 'mine'"
         ref="catalogTable"
         fill
-        :columns="catalogColumns"
+        :columns="catalogColumnsOnScreen"
         :rows="filteredModules"
         :views="['cards', 'table']"
         default-view="cards"
@@ -189,6 +189,7 @@ import {
   type CatalogBusyAction, type CatalogPrice, type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
+import { columnsForScreen, TABLE_PHONE_QUERY, type TableView } from '../lib/apps-list-columns';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
@@ -717,6 +718,26 @@ const catalogColumns = computed<DataTableColumn[]>(() => [
   // valor crudo de la fila → el filtro select y el buscador ven la misma etiqueta que el usuario.
   { key: 'stateLabel', header: t('apps.colStatus'), align: 'center', filterable: true, filterType: 'select', render: (r) => stateCell(r) },
 ]);
+// hub#2245 — on a phone the catalog's list view keeps the app and its status (the table pins the
+// row's action), so nothing sits off-screen; the card view keeps every field. «My apps» has three
+// columns and already fits. Which view the catalog shows: cards first (`default-view`), then it
+// follows `viewChange` and the phone step.
+const tablePhone = ref(typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  && window.matchMedia(TABLE_PHONE_QUERY).matches);
+const catalogView = ref<TableView>('cards');
+const catalogColumnsOnScreen = computed(() =>
+  columnsForScreen(catalogColumns.value, { compact: tablePhone.value, view: catalogView.value }));
+let tablePhoneQuery: MediaQueryList | null = null;
+// Into a phone, ok-data-table switches itself to cards without a `viewChange` (#274); out of one,
+// which view it shows no longer matters here (a wide screen keeps every column).
+function onTablePhoneChange(e: MediaQueryListEvent): void {
+  tablePhone.value = e.matches;
+  if (e.matches) catalogView.value = 'cards';
+}
+const onCatalogViewChange = (e: Event): void => {
+  catalogView.value = (e as CustomEvent<TableView>).detail;
+};
+
 // DOS acciones, no una con dos significados (hub#795). Antes había un solo botón «Instalar» que
 // servía también para actualizar: la columna de estado decía «Update to 1.2.22» y el nombre
 // accesible del botón de al lado seguía siendo «Install». Con actions solo-icono el `label` ES lo
@@ -1328,15 +1349,20 @@ function handleCatalogAction(e: Event): void {
   else if (actionId === 'see_hub_updates' && offered === 'see_hub_updates') void router.push('/system#updates');
 }
 
-// Cablea una tabla (labels del locale activo + listener de rowAction). La vista inicial = tarjetas la fija el
-// propio WC vía el atributo `default-view="cards"` (robusto, no depende del ref).
-function wireTable(el: HTMLElement | null, handler: (e: Event) => void): void {
+// Wires a table: labels of the active locale, the rowAction listener and, when given, the
+// viewChange listener (hub#2245). The initial view (cards) is set by the WC itself through
+// `default-view="cards"`.
+function wireTable(el: HTMLElement | null, handler: (e: Event) => void, onView?: (e: Event) => void): void {
   if (!el) return;
   (el as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
   // Idempotente: quitar antes de añadir evita listeners duplicados si el mismo elemento persiste
   // entre re-cableados (`handler` es una referencia estable, así que removeEventListener casa).
   el.removeEventListener('rowAction', handler);
   el.addEventListener('rowAction', handler);
+  if (onView) {
+    el.removeEventListener('viewChange', onView);
+    el.addEventListener('viewChange', onView);
+  }
 }
 
 // Cablear cada vez que APAREZCA un elemento de tabla nuevo. Un elemento nuevo no conserva los
@@ -1350,13 +1376,13 @@ watch(
   [mineTable, catalogTable],
   () => {
     wireTable(mineTable.value, handleMineAction);
-    wireTable(catalogTable.value, handleCatalogAction);
+    wireTable(catalogTable.value, handleCatalogAction, onCatalogViewChange);
   },
   { immediate: true, flush: 'post' },
 );
 watch(locale, () => {
   wireTable(mineTable.value, handleMineAction);
-  wireTable(catalogTable.value, handleCatalogAction);
+  wireTable(catalogTable.value, handleCatalogAction, onCatalogViewChange);
   // La preferencia personal se hidrata después del shell. Recargamos con `Accept-Language`
   // efectivo para no mezclar cabeceras traducidas con metadatos del catálogo en otro idioma.
   void loadCatalog();
@@ -1379,6 +1405,10 @@ const recheckEntitlement = (): void => void resolveEntitlement().then(() => load
 
 onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
+  if (typeof window.matchMedia === 'function') {
+    tablePhoneQuery = window.matchMedia(TABLE_PHONE_QUERY);
+    tablePhoneQuery.addEventListener('change', onTablePhoneChange);
+  }
   void loadCatalog();
   void loadInstalled();
   void loadHubVersion();
@@ -1443,6 +1473,8 @@ onBeforeUnmount(() => {
   unsubUninstalled?.();
   mineTable.value?.removeEventListener('rowAction', handleMineAction);
   catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
+  catalogTable.value?.removeEventListener('viewChange', onCatalogViewChange);
+  tablePhoneQuery?.removeEventListener('change', onTablePhoneChange);
 });
 </script>
 
