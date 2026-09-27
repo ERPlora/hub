@@ -14,6 +14,14 @@ import './lib/ionic-fill.boot';
 // Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
 import './lib/ionic-select-text.boot';
 
+// Third shell hook on the same registry (hub#2223): `ion-select` opens an alert by default, which
+// only keeps the choice after OK, and Ionic has no global key to change it. The shell makes every
+// SINGLE-choice select open a popover, which closes on pick (multiple keeps its confirm button) —
+// module Web Components included. It wraps `open()`, a plain method, so unlike the two above it
+// would survive a late import; it sits here so the three hooks are read together.
+// Guard: `src/lib/ionic-select-interface.test.ts`. Detail: `src/lib/ionic-select-interface.ts`.
+import './lib/ionic-select-interface.boot';
+
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
 import { addIcons } from 'ionicons';
