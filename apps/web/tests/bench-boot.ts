@@ -412,7 +412,6 @@ export const test = base.extend({
     const settle = async (): Promise<void> => {
       const deadline = Date.now() + BOOT_SETTLE_MS;
       while (Date.now() < deadline) {
-        if (!isOwn(page.url())) return;
         const quiet = inFlight.size === 0 && Date.now() - lastActivity >= BOOT_QUIET_MS;
         if (quiet) {
           if (lost.length > 0 || ownFailures > 0) return;

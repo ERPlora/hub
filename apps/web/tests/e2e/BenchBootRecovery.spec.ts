@@ -19,7 +19,14 @@
 // `route.abort()` has no code for a network change; both are in `TRANSIENT_TRANSPORT_ERRORS` and
 // take the same path. The real code is pinned by name in `tests/bench-boot.test.ts`.
 
-import { BOOT_RELOAD_LIMIT, bootReloadsOf, expect, test, type Page } from '../bench-boot';
+import {
+  BOOT_RELOAD_LIMIT,
+  BOOT_SETTLE_MS,
+  bootReloadsOf,
+  expect,
+  test,
+  type Page,
+} from '../bench-boot';
 
 test.describe('bench boot recovery (hub#1806)', () => {
   test('a network change that kills the module graph costs a reload, not a red build', async ({
@@ -98,7 +105,12 @@ test.describe('bench boot recovery (hub#1806)', () => {
       await route.abort('failed');
     });
 
+    const started = Date.now();
     await page.goto('/settings#data');
+
+    // hub#2270: since the bench waits for a load to settle, a defect of ours has to END that wait
+    // — the spec gets its red page at once, not after the bench's settle ceiling.
+    expect(Date.now() - started, 'the bench sat on a failure of ours').toBeLessThan(BOOT_SETTLE_MS);
 
     // hub#1839: «no reload was spent on IT», not «no reload at all». A genuine accident of the
     // runner inside this navigation makes the bench reload — that is its job — and the next
