@@ -752,13 +752,13 @@ export default {
     ready: 'Imprimiendo en {hosts}',
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
-    ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
+    ticketFailed: 'El tique NO se imprimió: {error}',
     ticketWaitingForPrinter:
-      'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+      'El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
     ticketNotComposed:
-      'El tique de la venta {saleId} no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
+      'El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
     ticketWithoutFiscal:
-      'El tique de la venta {saleId} salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
+      'El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
     comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
     comandaWaitingForPrinter:
       'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',

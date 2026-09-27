@@ -841,17 +841,17 @@ export default {
     // printer set up — the job is safe in the queue and comes out on its own once there is one.
     // Naming what to do next matters more than naming the fault: «did not print» sends the
     // cashier hunting for a jam that is not there.
-    ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
+    ticketFailed: 'The receipt did NOT print: {error}',
     ticketWaitingForPrinter:
-      'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+      'The receipt is waiting: no printer is set up yet. Set one up and it will print on its own.',
     // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so
     // nothing went to the printer. The way out is the print button on the receipt screen.
     ticketNotComposed:
-      'The receipt for sale {saleId} could not be prepared and did NOT print. Print it from the receipt screen.',
+      'The receipt could not be prepared and did NOT print. Print it from the receipt screen.',
     // hub#1867: the receipt came out, but Hacienda's QR was not ready within the wait (a slow AEAT),
     // so the customer's copy lacks it. The receipt screen prints the complete one.
     ticketWithoutFiscal:
-      'The receipt for sale {saleId} came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
+      'The receipt came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
     comandaWaitingForPrinter:
       'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
