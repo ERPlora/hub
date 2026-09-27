@@ -26,6 +26,7 @@ export {
   // `index.test.ts` entero — que es como se coló, porque `quantity.test.ts`
   // importa el módulo directamente y por sí solo pasaba en verde.
 } from './quantity.ts';
+import { toMicro } from './quantity.ts';
 
 /**
  * What the hub says about a live event beyond its payload (hub#1980).
@@ -230,9 +231,14 @@ export function buildListParams(p: ListParams): Record<string, unknown> {
 /** Forma de una página de lista. Alias de `Page`, para los consumidores del controlador. */
 export type ListPage<T = unknown> = Page<T>;
 
-/** Subconjunto del cliente SDK que necesita el controlador (inyectable para tests). */
+/** The slice of the SDK client the controller needs (injectable in tests). */
 export interface ListClient {
   queryPage<R = unknown>(name: string, params: ListParams): Promise<Page<R>>;
+  /**
+   * Decimals of the hub currency (`erplora().currencyDecimals`). Required only when the
+   * controller declares `moneyFilters`: it is the scale of what the person types.
+   */
+  readonly currencyDecimals?: number;
 }
 
 export interface ListControllerOptions {
@@ -245,6 +251,14 @@ export interface ListControllerOptions {
   filters?: Record<string, unknown>;
   /** Params de contexto obligatorios iniciales (sub-listas: `{ bom_id }`). */
   context?: Record<string, unknown>;
+  /**
+   * Columns whose filter is MONEY stored in minor units (hub#2271). The person types the major
+   * unit («12» for twelve euros); each edge travels as `majorToMinor(edge, client.currencyDecimals)`
+   * so «from 12» does not match 0,12 €. The controller state keeps what was typed.
+   */
+  moneyFilters?: readonly string[];
+  /** Columns whose filter is a QUANTITY stored in the 10⁶ scale (ADR-0147): «1,5» → 1 500 000. */
+  quantityFilters?: readonly string[];
 }
 
 export interface ListControllerState {
@@ -266,6 +280,8 @@ export class ListController<T = Record<string, unknown>> {
   readonly state: ListControllerState;
   /** Descarta respuestas obsoletas si llegan fuera de orden (race de cargas concurrentes). */
   private seq = 0;
+  private readonly moneyFilters: ReadonlySet<string>;
+  private readonly quantityFilters: ReadonlySet<string>;
 
   constructor(
     private readonly client: ListClient,
@@ -282,6 +298,35 @@ export class ListController<T = Record<string, unknown>> {
       filters: { ...(opts.filters ?? {}) },
       context: { ...(opts.context ?? {}) },
     };
+    this.moneyFilters = new Set(opts.moneyFilters ?? []);
+    this.quantityFilters = new Set(opts.quantityFilters ?? []);
+    if (this.moneyFilters.size > 0 && typeof client.currencyDecimals !== 'number') {
+      // Guessing 2 would filter 100 times off in a yen hub: refuse where the screen is wired.
+      throw new ErploraError(
+        'list_money_filters_need_currency_decimals',
+        'moneyFilters needs a list client that exposes currencyDecimals',
+      );
+    }
+  }
+
+  /**
+   * The filters as the runtime compares them: money and quantity columns scaled from what the
+   * person typed to the stored integer. `state.filters` stays as typed, so a table that echoes it
+   * back keeps showing «12», not «1200».
+   */
+  private wireFilters(): Record<string, unknown> {
+    if (this.moneyFilters.size === 0 && this.quantityFilters.size === 0) return this.state.filters;
+    const decimals = this.client.currencyDecimals ?? 0;
+    const out: Record<string, unknown> = {};
+    for (const [col, value] of Object.entries(this.state.filters)) {
+      const scale = this.moneyFilters.has(col)
+        ? (n: number) => majorToMinor(n, decimals)
+        : this.quantityFilters.has(col)
+          ? toMicro
+          : null;
+      out[col] = scale ? scaleFilterValue(value, scale) : value;
+    }
+    return out;
   }
 
   /** Nº de páginas según el total del servidor (mínimo 1). */
@@ -303,7 +348,7 @@ export class ListController<T = Record<string, unknown>> {
         search: s.search,
         sort: s.sort,
         dir: s.dir,
-        filters: s.filters,
+        filters: this.wireFilters(),
         params: s.context,
       });
       if (mySeq !== this.seq) return; // llegó una carga más reciente
@@ -379,6 +424,28 @@ export class ListController<T = Record<string, unknown>> {
     this.state.filters = {};
     void this.load();
   }
+}
+
+/**
+ * One typed edge (major units) → the stored integer. The table emits a Number from the panel and
+ * text from the inline control («12,5» included). Empty or not a number → `''`, which
+ * `buildListParams` drops: a stray keystroke never becomes «from 0».
+ */
+function scaleFilterEdge(edge: unknown, scale: (n: number) => number): unknown {
+  const text = typeof edge === 'string' ? edge.trim().replace(',', '.') : edge;
+  if (text === '' || text === null || text === undefined) return '';
+  const n = Number(text);
+  return Number.isFinite(n) ? scale(n) : '';
+}
+
+/** A `{ from?, to? }` range scaled edge by edge; a plain value is one edge. */
+function scaleFilterValue(value: unknown, scale: (n: number) => number): unknown {
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([edge, v]) => [edge, scaleFilterEdge(v, scale)]),
+    );
+  }
+  return scaleFilterEdge(value, scale);
 }
 
 /** Fábrica del controlador de lista (azúcar sobre `new ListController`). */
