@@ -1822,10 +1822,10 @@ for e2e_rc in 0 1 kill; do
         HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
         PATH="$bin:$PATH" DATABASE_URL=postgres://stub HUB_GATE_E2E_DB_CMD=true \
         HUB_GATE_TEST_CMD="true" "$scope_env")
-    add_line=$(grep -n -- '--filter @erplora/web add @erplora/outfitkit@latest' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
-    install_line=$(grep -n -- 'install --frozen-lockfile' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
-    verify_line=$(grep -nx -- 'verify' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
-    e2e_line=$(grep -n -- 'test:e2e' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
+    add_line=$(grep -m1 -n -- '--filter @erplora/web add @erplora/outfitkit@latest' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    install_line=$(grep -m1 -n -- 'install --frozen-lockfile' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    verify_line=$(grep -m1 -nx -- 'verify' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    e2e_line=$(grep -m1 -n -- 'test:e2e' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
     errs=""
     if [ "$e2e_rc" = 0 ]; then
         [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
