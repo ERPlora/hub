@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "e2e_settings.settings.update",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "track_stock": { "type": "integer", "title": "Track stock", "enum": [0, 1], "default": 1 },
+    "low_stock_threshold": {
+      "type": "integer",
+      "title": "Low stock threshold",
+      "minimum": 0,
+      "default": 10,
+      "description": "In whole units. Inherited by products that do not set their own threshold; a product's own threshold wins over this one."
+    },
+    "receipt_footer": {
+      "type": "string",
+      "title": "Receipt footer",
+      "maxLength": 120,
+      "default": "",
+      "description": "Printed at the bottom of every receipt, under the totals."
+    }
+  }
+}

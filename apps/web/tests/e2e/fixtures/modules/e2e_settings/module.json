@@ -1,0 +1,23 @@
+{
+  "id": "e2e_settings",
+  "name": "E2E Settings",
+  "version": "1.0.0",
+  "ui": {
+    "entry": "dist/e2e_settings.esm.js"
+  },
+  "navigation": [
+    {
+      "id": "home",
+      "label": "Home",
+      "icon": "cube-outline",
+      "component": "erp-e2e-settings-home"
+    }
+  ],
+  "settings": {
+    "title": "E2E Settings",
+    "icon": "cube-outline",
+    "schema": "schemas/settings.json",
+    "get": "e2e_settings.settings.get",
+    "set": "e2e_settings.settings.update"
+  }
+}
