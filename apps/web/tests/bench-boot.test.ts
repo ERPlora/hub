@@ -16,6 +16,9 @@ import {
   declaresTestMatch,
   isBootTransportFailure,
   listE2eSpecs,
+  NETWORK_CHANGE_BUDGET_MS,
+  NETWORK_CHANGE_ERRORS,
+  nextBootStep,
   specTakesTestFromPlaywright,
   TRANSIENT_TRANSPORT_ERRORS,
 } from './bench-boot';
@@ -115,6 +118,61 @@ describe('BOOT_RELOAD_LIMIT', () => {
   // about it. Raising it is allowed — deciding it here, in the open, is the point.
   it('spends at most two reloads, so a real defect is not re-rolled into green', () => {
     expect(BOOT_RELOAD_LIMIT).toBe(2);
+  });
+});
+
+// Regression test for ERPlora/hub#2270 — a network-change STORM on the runner outlasted the two
+// reloads. Measured in the CI traces of the four reds of 27/09 (runs 36311116780, 36311742482,
+// 36311756274): every one was `net::ERR_NETWORK_CHANGED` and nothing else, in bursts spread over
+// 0.3–1.4 s (the 390 px case: five bursts, at +0, +54, +696, +1149 and +1266 ms). One Docker
+// network created by a neighbour job is several kernel events — the bridge, its address, each
+// veth and its IPv6 link-local address — and Chromium cancels every in-flight socket on each one.
+// A reload takes ~300 ms on the dev server, so a storm eats both reloads in well under a second.
+describe('nextBootStep', () => {
+  it('hands the page over when nothing of ours died on the wire', () => {
+    expect(nextBootStep([], 0, 0)).toBe('hand-over');
+  });
+
+  it('reloads a navigation the network changed under, without spending the reload budget', () => {
+    // Only the browser can produce these, and only because the machine's network moved: no
+    // defect of ours, of the dev server or of the runtime answers with them. So a reload for them
+    // re-rolls nothing — which is why they do not come out of the budget that exists to stop
+    // re-rolls.
+    expect(nextBootStep(['net::ERR_NETWORK_CHANGED'], BOOT_RELOAD_LIMIT, 1_400)).toBe('reload-storm');
+    expect(nextBootStep(['net::ERR_INTERNET_DISCONNECTED'], BOOT_RELOAD_LIMIT, 0)).toBe('reload-storm');
+  });
+
+  it('stops reloading a storm that outlives its budget, so an outage still ends red', () => {
+    expect(nextBootStep(['net::ERR_NETWORK_CHANGED'], 0, NETWORK_CHANGE_BUDGET_MS)).toBe('hand-over');
+  });
+
+  it('spends the reload budget on a lost connection, which a crashing server can also cause', () => {
+    expect(nextBootStep(['net::ERR_CONNECTION_RESET'], 0, 0)).toBe('reload');
+    expect(nextBootStep(['net::ERR_CONNECTION_RESET'], BOOT_RELOAD_LIMIT - 1, 0)).toBe('reload');
+    expect(nextBootStep(['net::ERR_CONNECTION_RESET'], BOOT_RELOAD_LIMIT, 0)).toBe('hand-over');
+  });
+
+  it('treats a network change mixed with a lost connection as the lost connection', () => {
+    // Anything that is not the browser's own verdict on the network could be ours, so a load that
+    // died of both is paid from the budget, never excused by the storm.
+    expect(
+      nextBootStep(['net::ERR_NETWORK_CHANGED', 'net::ERR_CONNECTION_RESET'], BOOT_RELOAD_LIMIT, 0),
+    ).toBe('hand-over');
+  });
+
+  it('excuses only the codes the browser derives from the machine network changing', () => {
+    // Pinned like the list above: widening it moves codes a server can cause out of the budget.
+    expect([...NETWORK_CHANGE_ERRORS].sort()).toEqual([
+      'net::ERR_INTERNET_DISCONNECTED',
+      'net::ERR_NETWORK_CHANGED',
+    ]);
+  });
+
+  it('gives a storm five seconds, several times the longest one measured', () => {
+    // Written out, not derived, for the reason hub#1842 gives: the longest storm in the traces
+    // lasted 1.4 s; a network that keeps changing for five is an outage of the runner, and has to
+    // end as a red test.
+    expect(NETWORK_CHANGE_BUDGET_MS).toBe(5_000);
   });
 });
 
