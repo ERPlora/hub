@@ -177,3 +177,9 @@ appointments/tests/history_trail.hub.test.py
 # (pricing#46). Cobertura nueva, no mudada.
 # pending-publication: pricing#46 until 2026-10-26
 pricing/tests/duplicate_list_code.hub.test.py
+# services: a second live category with the same name in the hub is refused with
+# `services.category_name_taken` — whatever the case and spacing — through the manifest's
+# `on_unique`, and a deleted one frees its name, against the real kernel (services#107).
+# New coverage, not moved.
+# pending-publication: services#112 until 2026-10-26
+services/tests/category_name_taken.hub.test.py
