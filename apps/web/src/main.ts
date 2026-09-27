@@ -312,16 +312,16 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
     }),
 });
 
-// Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
-// tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
-// Si la impresora falla NO se bloquea al camarero —la comanda ya está en la BD y el KDS es la
-// fuente de verdad—: se avisa, y desde el KDS se reimprime.
+// Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
+// `kitchen` because it has to print always, not only with the KDS mounted: a hot kitchen is often
+// paper only. If the printer fails the waiter is NOT blocked —the order is already in the database
+// and the KDS is the source of truth—: the floor is told to check the printer and warn the station.
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
   // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const n = comandaFailureNotice(f, i18n.global.t('print.comandaDefaultLabel'));
+    const n = comandaFailureNotice(f, i18n.global);
     void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y

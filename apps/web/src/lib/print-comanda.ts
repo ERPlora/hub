@@ -254,22 +254,22 @@ export async function onKitchenOrderCreated(
       // la comanda de cocina por la impresora de tiquets deja al camarero con el papel y a la
       // cocina sin comida.
       if (result.via === 'none') {
-        deps.onFailure?.({ orderId, role: group.role, label, error: result.error ?? 'sin impresora' });
+        fail(deps, { orderId, role: group.role, label, error: result.error ?? 'comanda_not_delivered' });
       } else if (result.via === 'queue' && result.awaitingHost) {
         // Encolada y sin nadie dado de alta para esa estación (hub#1731): la hoja no se ha perdido
         // —sale en cuanto se dé de alta la impresora— pero AHORA no va a por ella nadie, y una
         // comanda que nadie saca es un plato que no se empieza. Callarlo era el fallo mudo: la
         // cola se leía como entregada. `awaitingHost` sin contestar NO cuenta como «no hay nadie».
-        deps.onFailure?.({
+        fail(deps, {
           orderId,
           role: group.role,
           label,
-          error: result.error ?? 'no printer set up for this station',
+          error: result.error ?? 'station_has_no_printer',
           awaitingHost: true,
         });
       }
     } catch (e) {
-      deps.onFailure?.({
+      fail(deps, {
         orderId,
         role: group.role,
         label,
@@ -277,6 +277,16 @@ export async function onKitchenOrderCreated(
       });
     }
   }
+}
+
+/**
+ * The docket did not come out (or is waiting). The reason is the door's (a code, or a sentence of
+ * the queue in whatever language it was written): it goes to the log, where somebody diagnosing the
+ * printer can read it, and the floor hears only the fact — what to say is the notice's (hub#2257).
+ */
+function fail(deps: Deps, f: ComandaPrintFailure): void {
+  console.warn(`[print-comanda] ${f.role} docket of order ${f.orderId} not printed: ${f.error}`);
+  deps.onFailure?.(f);
 }
 
 /**

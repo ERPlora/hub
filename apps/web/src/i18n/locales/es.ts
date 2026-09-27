@@ -759,9 +759,12 @@ export default {
       'El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
     ticketWithoutFiscal:
       'El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
-    comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
+    comandaFailed:
+      'No se imprimió la comanda de {station} de {label}. Revisa la impresora y avisa en {station}: la comanda está en la pantalla de cocina.',
     comandaWaitingForPrinter:
-      'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.',
+      'La comanda de {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.',
+    stationKitchen: 'cocina',
+    stationBar: 'barra',
     // hub#2171 — the system notice when a kitchen order comes in.
     comandaNotice: 'Nueva comanda',
     comandaNoticeFor: 'Nueva comanda · {label}',
