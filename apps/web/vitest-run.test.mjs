@@ -114,13 +114,27 @@ describe('runWithStartRetry', () => {
   }
 
   const green = { exitCode: 0, specifications: [A, B], testModules: [passed(A), passed(B)], unhandledErrors: [] };
-  const unstartedA = { exitCode: 1, specifications: [A, B], testModules: [passed(B)], unhandledErrors: [startFailure([A])] };
+  const unstartedA = {
+    exitCode: 1,
+    specifications: [A, B],
+    testModules: [passed(B)],
+    unhandledErrors: [startFailure([A])],
+  };
 
   it('a green run is green, with a single pass', async () => {
     const { calls, runPass } = recorder([green]);
     expect(await runWithStartRetry(['src'], { runPass, log: quiet })).toBe(0);
     expect(calls).toHaveLength(1);
     expect(calls[0].filters).toEqual(['src']);
+  });
+
+  // Only a red run can be owed a retry: if vitest itself exited 0 (e.g. the config sets
+  // `dangerouslyIgnoreUnhandledErrors`), the wrapper does not second-guess it.
+  it('never retries a run that vitest itself called green', async () => {
+    const ignoredStartFailure = { ...unstartedA, exitCode: 0 };
+    const { calls, runPass } = recorder([ignoredStartFailure, green]);
+    expect(await runWithStartRetry([], { runPass, log: quiet })).toBe(0);
+    expect(calls).toHaveLength(1);
   });
 
   it('a start failure alone re-runs only the unstarted files, with one worker, and ends green', async () => {
@@ -156,7 +170,12 @@ describe('runWithStartRetry', () => {
   });
 
   it('a real failure is red with no retry', async () => {
-    const failed = { exitCode: 1, specifications: [A, B], testModules: [passed(A), { moduleId: B, state: 'failed' }], unhandledErrors: [] };
+    const failed = {
+      exitCode: 1,
+      specifications: [A, B],
+      testModules: [passed(A), { moduleId: B, state: 'failed' }],
+      unhandledErrors: [],
+    };
     const { calls, runPass } = recorder([failed, green]);
     expect(await runWithStartRetry([], { runPass, log: quiet })).toBe(1);
     expect(calls).toHaveLength(1);
