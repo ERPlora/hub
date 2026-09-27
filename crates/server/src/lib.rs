@@ -109,8 +109,8 @@ pub mod whatsapp_header_samples;
 pub mod whatsapp_media;
 
 pub use state::{
-    AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, SignatureMode, WsEvent,
-    DEV_HUB_ID,
+    marketplace_client, AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime,
+    SignatureMode, WsEvent, DEV_HUB_ID, MARKETPLACE_STALL_TIMEOUT,
 };
 pub use tenant::{
     EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,

@@ -321,7 +321,7 @@ async fn load(
     let no_progress = |_: &str, _: &str| {};
     if installed {
         install::update_from_cloud(
-            &state.http,
+            &state.marketplace_http,
             &cloud,
             &cache_root,
             &machine,
@@ -336,7 +336,7 @@ async fn load(
         .map_err(|e| e.to_string())?;
     } else {
         install::install_from_cloud(
-            &state.http,
+            &state.marketplace_http,
             &cloud,
             &cache_root,
             &machine,

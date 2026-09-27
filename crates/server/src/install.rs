@@ -86,6 +86,10 @@ pub enum InstallError {
     /// «no llegué»; y no dijo cuál de los dos casos de arriba es, así que solo cabe reintentar.
     #[error("el Cloud contestó con un error ({status})")]
     CloudRejected { status: u16 },
+    /// The marketplace took the call and then went silent past the stall limit (hub#2251):
+    /// no headers, or the zip stopped arriving. Retrying later is all there is to do.
+    #[error("the marketplace did not answer in time")]
+    CloudTimeout,
 }
 
 impl InstallError {
@@ -125,6 +129,7 @@ impl InstallError {
             InstallError::CloudDenied => "install_cloud_denied",
             InstallError::NotInCatalog { .. } => "install_not_in_catalog",
             InstallError::CloudRejected { .. } => "install_cloud_rejected",
+            InstallError::CloudTimeout => "install_cloud_timeout",
         }
     }
 }
@@ -207,6 +212,10 @@ async fn resolve_version(
 /// The `Display` of a `reqwest` error names the address this hub calls erplora.com on. It goes
 /// to the hub's log; the person on the marketplace gets the stable code (hub#1689).
 fn cloud_unreachable(e: reqwest::Error) -> InstallError {
+    if e.is_timeout() {
+        tracing::warn!(error = %e, "the marketplace went silent past the stall limit (hub#2251)");
+        return InstallError::CloudTimeout;
+    }
     InstallError::Cloud(crate::cloud_proxy::cloud_unreachable(&e.to_string()).to_string())
 }
 
@@ -1115,9 +1124,21 @@ pub async fn update_from_cloud(
     })
 }
 
+/// A plan call that failed. Only a SILENT marketplace ends the install here (hub#2251): the
+/// manifest fallback would ask the same marketplace again and double the wait in front of
+/// «Installing…». Any other failure degrades as before.
+fn plan_unreachable(e: reqwest::Error) -> PlanUnavailable {
+    if e.is_timeout() {
+        PlanUnavailable::Blocked(cloud_unreachable(e))
+    } else {
+        PlanUnavailable::Degraded(e.to_string())
+    }
+}
+
 /// Por qué no hay plan ejecutable.
 enum PlanUnavailable {
-    /// El plan SÍ llegó y dice `blocked`: es un error de dominio, no un fallback.
+    /// El plan SÍ llegó y dice `blocked` (error de dominio), o el marketplace no contestó a
+    /// tiempo (hub#2251): el error termina la instalación, no hay fallback.
     Blocked(InstallError),
     /// El plan no se pudo obtener/parsear → usar la resolución anidada por manifest.
     Degraded(String),
@@ -1153,15 +1174,9 @@ async fn fetch_install_plan(
     for (k, v) in &prepared.request.headers {
         r = r.header(*k, v);
     }
-    let resp = r
-        .send()
-        .await
-        .map_err(|e| PlanUnavailable::Degraded(e.to_string()))?;
+    let resp = r.send().await.map_err(plan_unreachable)?;
     let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| PlanUnavailable::Degraded(e.to_string()))?;
+    let body = resp.text().await.map_err(plan_unreachable)?;
     if !status.is_success() {
         // 404/405 = Cloud sin ADR-0060 desplegado; 5xx = caído. En ambos casos: degradar.
         return Err(PlanUnavailable::Degraded(format!("HTTP {status}")));

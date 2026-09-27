@@ -51,7 +51,7 @@ pub(crate) async fn request_install(
 
     let mut rt = st.runtime.write().await;
     let result = install::install_from_cloud(
-        &st.http,
+        &st.marketplace_http,
         &st.config.cloud_base_url,
         &st.config.module_cache,
         &auth,
@@ -219,7 +219,7 @@ pub(crate) async fn update_module(
     let target = {
         let rt = st.runtime.read().await;
         install::resolve_update_target(
-            &st.http,
+            &st.marketplace_http,
             &st.config.cloud_base_url,
             &auth,
             &rt,
@@ -261,7 +261,7 @@ pub(crate) async fn update_module(
         async move {
             let mut rt = st.runtime.write().await;
             let result = install::update_from_cloud(
-                &st.http,
+                &st.marketplace_http,
                 &st.config.cloud_base_url,
                 &st.config.module_cache,
                 &auth,
@@ -400,7 +400,7 @@ pub(crate) async fn list_module_updates(
     let mut out = Vec::with_capacity(installed.len());
     for (module_id, version, pinned) in installed {
         let (target, floor) = install::resolve_offer(
-            &st.http,
+            &st.marketplace_http,
             &st.config.cloud_base_url,
             &auth,
             &module_id,
@@ -483,7 +483,7 @@ pub(crate) async fn list_module_versions(
     };
 
     let versions = install::offered_versions(
-        &st.http,
+        &st.marketplace_http,
         &st.config.cloud_base_url,
         &auth,
         &module_id,
@@ -545,7 +545,8 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         | install::InstallError::Source(_)
         | install::InstallError::MissingSha256 { .. }
         | install::InstallError::CloudDenied
-        | install::InstallError::CloudRejected { .. } => StatusCode::FAILED_DEPENDENCY,
+        | install::InstallError::CloudRejected { .. }
+        | install::InstallError::CloudTimeout => StatusCode::FAILED_DEPENDENCY,
     }
 }
 
@@ -1063,6 +1064,7 @@ mod install_error_status_tests {
         CloudDenied,
         NotInCatalog,
         CloudRejected,
+        CloudTimeout,
     );
 
     fn tag(e: &install::InstallError) -> Tag {
@@ -1078,6 +1080,7 @@ mod install_error_status_tests {
             install::InstallError::CloudDenied => Tag::CloudDenied,
             install::InstallError::NotInCatalog { .. } => Tag::NotInCatalog,
             install::InstallError::CloudRejected { .. } => Tag::CloudRejected,
+            install::InstallError::CloudTimeout => Tag::CloudTimeout,
         }
     }
 
@@ -1109,6 +1112,7 @@ mod install_error_status_tests {
                 module_id: "sales".into(),
             },
             Tag::CloudRejected => install::InstallError::CloudRejected { status: 500 },
+            Tag::CloudTimeout => install::InstallError::CloudTimeout,
         }
     }
 

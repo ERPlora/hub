@@ -939,6 +939,26 @@ pub type SharedRuntime = Arc<tokio::sync::RwLock<Runtime>>;
 ///    runtime de cada petición se resuelve por su `hub_id` vía el [`TenantRouter`] (un pool por
 ///    org). El campo `runtime` sigue existiendo como **fallback/bootstrap** (tablas de sistema,
 ///    arranque), pero el camino de datos va por el router. Ver [`AppState::runtime_for`].
+/// How long the marketplace may stay silent — no connection, no headers, no next chunk of the
+/// zip — before an install or update gives up (hub#2251).
+pub const MARKETPLACE_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The client every install/update/version call to the marketplace goes through (hub#2251).
+///
+/// `stall` bounds each wait — connecting, the headers, every next chunk — not the whole call: a
+/// slow line that keeps sending finishes the zip, a silent one ends as `install_cloud_timeout`.
+/// The shared `http` client cannot take this limit: the assistant's stream may be quiet for longer.
+pub fn marketplace_client(stall: std::time::Duration) -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(stall)
+        .read_timeout(stall)
+        .build()
+        .unwrap_or_else(|e| {
+            tracing::error!(error = %e, "marketplace client without stall limit (hub#2251)");
+            reqwest::Client::new()
+        })
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub runtime: SharedRuntime,
@@ -952,6 +972,9 @@ pub struct AppState {
     pub hub_id: HubId,
     /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
     pub http: reqwest::Client,
+    /// Client for the marketplace side of erplora.com: install, update and version listings
+    /// (hub#2251). Unlike `http` it gives up on a stalled answer, so «Installing…» always ends.
+    pub marketplace_http: reqwest::Client,
     /// Gateway multi-tenant (ADR-0005, hub#24). `None` = modo single-tenant actual (N=1); `Some` =
     /// tier "cloud compartido" (N orgs, un pool por org). Aditivo: no rompe el modo single-tenant.
     pub tenants: Option<Arc<crate::tenant::TenantRouter>>,
@@ -1038,6 +1061,7 @@ impl AppState {
             machine_token,
             hub_id,
             http: reqwest::Client::new(),
+            marketplace_http: marketplace_client(MARKETPLACE_STALL_TIMEOUT),
             tenants: None,
             vector: None,
             entitlement: crate::entitlement::new_shared(),
