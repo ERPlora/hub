@@ -45,6 +45,7 @@ describe('the kitchen order waiting for a printer (hub#2238)', () => {
       words,
     );
 
+  // Regression test for ERPlora/hub#2238: the waiting docket was painted in the error red.
   it('is a warning, not an error', () => {
     const waiting = waitingNotice();
     expect(waiting.messageKey).toBe('print.comandaWaitingForPrinter');
