@@ -129,9 +129,8 @@ test.describe('Apps list view on a phone (hub#2245)', () => {
     await page.locator('ion-select').filter({ has: page.getByRole('button', { name: 'Categoría, Seleccionar' }) }).click();
     await page.getByRole('checkbox', { name: 'Ventas' }).click();
     await page.getByRole('button', { name: 'Cancelar' }).click();
-    // A real tap on «Aplicar» lands on the page's tab bar at this width (hub#2253), so the click is
-    // sent to the button itself.
-    await filters.getByRole('button', { name: 'Aplicar' }).dispatchEvent('click');
+    // A real tap: the panel's footer ends above the page's tab bar (hub#2253).
+    await filters.getByRole('button', { name: 'Aplicar' }).click();
     // The footer counts what the list holds: «6 registros» filtered, «Mostrando 1–10 de 23 …» not.
     const footer = table.getByText(/\d+ registros/).first();
     await expect(footer).toHaveText(/(^|\D)6 registros/);
