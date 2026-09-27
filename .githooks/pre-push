@@ -676,6 +676,47 @@ prune_dead_e2e_databases() {
     done
 }
 
+# hub#2259 / rv-2265 — the default web stage tests the OutfitKit PRODUCTION runs: `test-web.yml` and
+# the Dockerfile add `@erplora/outfitkit@latest` over the pin, and so does this gate. Without it the
+# bench guard (`apps/web/tests/outfitkit-latest-guard.ts`) would abort every web push of the fleet
+# after each OutfitKit release until that branch bumped its pin. That `add` rewrites
+# `apps/web/package.json` and `pnpm-lock.yaml`; they are put back as they were — green, red or
+# killed — so the worker's tree stays the tree it pushed (hub#855).
+OUTFITKIT_PIN_FILES="apps/web/package.json pnpm-lock.yaml"
+OUTFITKIT_PIN_BACKUP=""
+save_outfitkit_pin() {
+    OUTFITKIT_PIN_BACKUP=$(mktemp -d) || return 1
+    local f
+    for f in $OUTFITKIT_PIN_FILES; do
+        [ -f "$f" ] || continue # absent before → removed after (restore_outfitkit_pin)
+        mkdir -p "$OUTFITKIT_PIN_BACKUP/$(dirname "$f")"
+        if ! cp "$f" "$OUTFITKIT_PIN_BACKUP/$f"; then
+            echo "❌ pre-push: no pude guardar '$f' antes de instalar OutfitKit @latest (hub#2259)." >&2
+            rm -rf "$OUTFITKIT_PIN_BACKUP"
+            OUTFITKIT_PIN_BACKUP=""
+            return 1
+        fi
+    done
+}
+restore_outfitkit_pin() {
+    [ -n "$OUTFITKIT_PIN_BACKUP" ] || return 0
+    local f
+    for f in $OUTFITKIT_PIN_FILES; do
+        if [ -f "$OUTFITKIT_PIN_BACKUP/$f" ]; then
+            cp "$OUTFITKIT_PIN_BACKUP/$f" "$f" \
+                || echo "⚠️  pre-push: no pude restaurar '$f' tras la etapa web: 'git checkout -- $f' (hub#2259)." >&2
+        else
+            rm -f "$f"
+        fi
+    done
+    rm -rf "$OUTFITKIT_PIN_BACKUP"
+    OUTFITKIT_PIN_BACKUP=""
+}
+# THE restore, for every outcome: bash runs the EXIT trap on a normal exit and on TERM/INT/HUP.
+# A no-op when nothing was saved; the lock's EXIT trap (further down) replaces this one and calls it
+# as well.
+trap 'restore_outfitkit_pin' EXIT
+
 run_web_stage() {
     if [ "$web_touched" != 1 ] && [ "$web_light_touched" != 1 ]; then
         return 0
@@ -729,9 +770,11 @@ run_web_stage() {
             echo "   Instálalos (corepack enable) o sáltate la etapa con SKIP_HUB_WEB=1." >&2
             return 1
         }
-        # Lo mismo que corría `test-web.yml`, en el mismo orden: instalar, verificar
-        # (vue-tsc + vitest + module-sdk) y los e2e de playwright contra el runtime real.
+        # Lo mismo que corría `test-web.yml`, en el mismo orden: instalar, OutfitKit @latest como la
+        # imagen (hub#2259), verificar (vue-tsc + vitest + module-sdk) y los e2e de playwright contra
+        # el runtime real.
         web_cmd='pnpm install --frozen-lockfile \
+            && pnpm --filter @erplora/web add @erplora/outfitkit@latest \
             && pnpm verify \
             && cargo build -p erplora-server \
             && pnpm -F @erplora/web exec vite build \
@@ -749,6 +792,10 @@ run_web_stage() {
     ensure_e2e_databases "$gate_owns_web_cmd" || return 1
     echo "🧪 pre-push: el diff toca web → pnpm verify + playwright en local…" >&2
     local web_rc=0
+    if [ "$gate_owns_web_cmd" = 1 ]; then
+        save_outfitkit_pin || { drop_e2e_databases; return 1; }
+    fi
+    # The pin comes back in the EXIT trap (above): green, red or killed, one mechanism.
     eval "$web_cmd" || web_rc=$?
     drop_e2e_databases
     if [ "$web_rc" != 0 ]; then
@@ -1246,7 +1293,7 @@ done
 write_lock_owner
 # Release only OUR lock: if someone wrongly broke ours and a new holder took
 # over, their owner pid differs and we must not delete their lock.
-trap 'p="$(lock_owner_field pid)"; if [ -z "$p" ] || [ "$p" = "$$" ]; then rm -rf "$LOCK" 2>/dev/null || true; fi' EXIT
+trap 'restore_outfitkit_pin; p="$(lock_owner_field pid)"; if [ -z "$p" ] || [ "$p" = "$$" ]; then rm -rf "$LOCK" 2>/dev/null || true; fi' EXIT
 
 # Whoever held the lock may have just turned this very tree green.
 if [ -f "$green" ]; then

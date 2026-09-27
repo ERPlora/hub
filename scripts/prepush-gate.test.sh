@@ -1765,6 +1765,81 @@ errs=""
     && ok "web: con el comando web fijado el gate no toca docker ni el banco de e2e" \
     || bad "web: con el comando web fijado el gate no toca docker ni el banco de e2e" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 
+# 1c. hub#2259 / rv-2265 — la etapa web POR DEFECTO prueba la OutfitKit de producción, no el pin.
+#     `test-web.yml` y el Dockerfile instalan `@erplora/outfitkit@latest`; el gate instalaba solo
+#     el lockfile, así que tras cada release de OutfitKit (13 el 26/09) la guarda del banco
+#     (`apps/web/tests/outfitkit-latest-guard.ts`) habría abortado TODO push web de la flota hasta
+#     que cada rama subiera su pin — y todas chocarían en `pnpm-lock.yaml`. El gate hace lo mismo que
+#     la CI y deja `package.json` + `pnpm-lock.yaml` como estaban, en verde Y en rojo: el árbol del
+#     worker no se ensucia (la guardia hub#855 compara el árbol con lo empujado). `pnpm`/`cargo` son
+#     stubs FUERA del repo; el de `pnpm add` escribe en los dos ficheros como el de verdad.
+web_default_repo() {
+    local repo
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    mkdir -p "$repo/apps/web"
+    printf '{ "dependencies": { "@erplora/outfitkit": "^0.1.84" } }\n' > "$repo/apps/web/package.json"
+    printf "'@erplora/outfitkit@0.1.84': {}\n" > "$repo/pnpm-lock.yaml"
+    git -C "$repo" add apps/web/package.json pnpm-lock.yaml
+    git -C "$repo" commit -qm pin
+    echo "$repo"
+}
+web_default_stubs() {
+    local bin=$1 e2e_rc=$2
+    mkdir -p "$bin"
+    cat > "$bin/pnpm" <<STUB
+#!/bin/sh
+printf '%s\n' "\$*" >> "$bin/calls.log"
+case "\$*" in
+    *"add @erplora/outfitkit@latest"*)
+        echo latest >> apps/web/package.json; echo latest >> pnpm-lock.yaml ;;
+    *test:e2e*)
+        grep -q latest apps/web/package.json && echo "e2e-saw-latest" >> "$bin/calls.log"
+        # "kill": the hook dies mid-playwright (Ctrl-C, the fleet's timeout) — our parent is it.
+        [ "$e2e_rc" = kill ] && { kill -TERM "\$PPID"; sleep 1; exit 1; }
+        exit $e2e_rc ;;
+esac
+exit 0
+STUB
+    printf '#!/bin/sh\nexit 0\n' > "$bin/cargo"
+    chmod +x "$bin/pnpm" "$bin/cargo"
+}
+for e2e_rc in 0 1 kill; do
+    repo=$(web_default_repo)
+    sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+    bin="${repo}-webbin"
+    web_default_stubs "$bin" "$e2e_rc"
+    code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        PATH="$bin:$PATH" DATABASE_URL=postgres://stub HUB_GATE_E2E_DB_CMD=true \
+        HUB_GATE_TEST_CMD="true")
+    add_line=$(grep -n -- '--filter @erplora/web add @erplora/outfitkit@latest' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
+    install_line=$(grep -n -- 'install --frozen-lockfile' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
+    e2e_line=$(grep -n -- 'test:e2e' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
+    errs=""
+    if [ "$e2e_rc" = 0 ]; then
+        [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+        label="web: la etapa por defecto prueba OutfitKit @latest como la CI y deja el pin como estaba (hub#2259)"
+    elif [ "$e2e_rc" = 1 ]; then
+        [ "$code" != 0 ] || errs="$errs exit=0(want red)"
+        label="web: con playwright en rojo el pin de OutfitKit también se restaura (hub#2259)"
+    else
+        [ "$code" != 0 ] || errs="$errs exit=0(want killed)"
+        label="web: si matan el gate a mitad de playwright el pin de OutfitKit también se restaura (hub#2259)"
+    fi
+    [ -n "$add_line" ] || errs="$errs no-outfitkit-latest-step"
+    [ -n "$add_line" ] && [ -n "$install_line" ] && [ "$install_line" -lt "$add_line" ] \
+        || errs="$errs latest-not-after-install"
+    [ -n "$add_line" ] && [ -n "$e2e_line" ] && [ "$add_line" -lt "$e2e_line" ] \
+        || errs="$errs latest-not-before-e2e"
+    grep -q e2e-saw-latest "$bin/calls.log" 2>/dev/null || errs="$errs e2e-ran-on-the-pin"
+    git -C "$repo" diff --quiet -- apps/web/package.json pnpm-lock.yaml \
+        || errs="$errs pin-left-modified=$(git -C "$repo" diff --stat | tr '\n' ' ')"
+    [ -z "$errs" ] \
+        && ok "$label" \
+        || bad "$label" "$errs calls=$(tr '\n' '|' < "$bin/calls.log" 2>/dev/null) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+done
+
 # 2. Web en rojo = push ABORTADO (sin push no hay PR: es la puerta que pidió Ioan).
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
