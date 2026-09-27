@@ -19,7 +19,7 @@
 // `route.abort()` has no code for a network change; both are in `TRANSIENT_TRANSPORT_ERRORS` and
 // take the same path. The real code is pinned by name in `tests/bench-boot.test.ts`.
 
-import { BOOT_RELOAD_LIMIT, bootReloadsOf, expect, test } from '../bench-boot';
+import { BOOT_RELOAD_LIMIT, bootReloadsOf, expect, test, type Page } from '../bench-boot';
 
 test.describe('bench boot recovery (hub#1806)', () => {
   test('a network change that kills the module graph costs a reload, not a red build', async ({
@@ -60,11 +60,20 @@ test.describe('bench boot recovery (hub#1806)', () => {
     // very accident hub#1806 exists for — landing inside the recovery. The bench did its job and
     // the shell mounted, and the spec still went red on `Expected: 2, Received: 3`, putting a PR
     // that touches none of this in red. So this spec had become the flake it was written to cure.
+    //
+    // hub#2270 moved the bound once more: a network-change STORM is reloaded outside the budget, so
+    // `BOOT_RELOAD_LIMIT + 1` is no longer a ceiling on fetches. What stays exact is the accounting:
+    // every extra fetch is a reload the bench wrote down, and the ones paid from the budget stay
+    // within it.
+    const reloads = bootReloadsOf(page);
     expect(mainRequests, 'the bench did not re-fetch the bootstrap it lost').toBeGreaterThan(1);
+    expect(mainRequests, 'every extra fetch has to be a reload the bench accounted for').toBe(
+      1 + reloads.length,
+    );
     expect(
-      mainRequests,
-      'the bench re-fetched the bootstrap past its own limit',
-    ).toBeLessThanOrEqual(BOOT_RELOAD_LIMIT + 1);
+      reloads.filter((reload) => !reload.storm).length,
+      'the bench spent more than its reload budget',
+    ).toBeLessThanOrEqual(BOOT_RELOAD_LIMIT);
 
     // And the shell is on screen. `#app` with children IS the mount: while it was empty every
     // `getByTestId` in the suite reported "element(s) not found", which is the red that landed on
@@ -175,5 +184,112 @@ test.describe('bench boot recovery (hub#1806)', () => {
     // And it gives up honestly: the screen is blank and the spec that asked for it goes red on its
     // own assertions. Recovering is the bench's job; pretending to have recovered is not.
     await expect(page.locator('#app')).toBeEmpty();
+  });
+});
+
+// Regression tests for ERPlora/hub#2270 — the two holes the CI traces of 27/09 showed in the
+// recovery above. Every red of that day (MenuButtonFirstFrame at 1440 and 390 px, AppsVisual,
+// DashboardVisual) was `net::ERR_NETWORK_CHANGED` and nothing else:
+//   · A — the loss came 60 ms AFTER `goto` resolved: the router was still fetching the screen, and
+//     the bench only looked at what died before the `load` event;
+//   · B — the losses came in a STORM of bursts spread over 0.3–1.4 s, and each reload takes
+//     ~300 ms, so the two reloads of the budget were spent in under a second.
+// `route.abort('internetdisconnected')` is the injectable twin of a network change: Chromium
+// derives both from the machine's network moving, and `NETWORK_CHANGE_ERRORS` holds both.
+test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
+  /** Resolves on the next `load` event of the page, i.e. once the current document has loaded. */
+  function nextLoad(page: Page): Promise<void> {
+    return new Promise((resolve) => page.once('load', () => resolve()));
+  }
+
+  test('a screen that dies after the load event is still recovered by the bench', async ({
+    page,
+  }) => {
+    // Hole A. The screen's own module is fetched by the router, and it dies twice AFTER the
+    // document has loaded — once for the first document and once for the app's own reload
+    // (`view-load-recovery`), which is what the 1440 trace shows. Before the fix `goto` handed the
+    // page over at `load`, the app's second failure painted its failure notice, and the login
+    // form never came.
+    let viewRequests = 0;
+    await page.route('**/src/views/LoginPage.vue*', async (route) => {
+      viewRequests += 1;
+      if (viewRequests > 2) return route.continue();
+      await nextLoad(page);
+      return route.abort('internetdisconnected');
+    });
+
+    await page.goto('/login');
+
+    expect(viewRequests, 'the screen was never asked for again').toBeGreaterThan(2);
+    await expect(page.getByTestId('login-box')).toBeVisible();
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+  });
+
+  test('a storm longer than the reload budget is recovered without spending it', async ({
+    page,
+  }) => {
+    // Hole B. Four loads in a row die of a network change — more than `BOOT_RELOAD_LIMIT` can pay
+    // for, fewer than a real outage. Before the fix the bench stopped after two reloads with
+    // `#app` empty.
+    let mainRequests = 0;
+    await page.route('**/src/main.ts', async (route) => {
+      mainRequests += 1;
+      if (mainRequests <= 4) return route.abort('internetdisconnected');
+      return route.continue();
+    });
+
+    await page.goto('/login');
+
+    const reloads = bootReloadsOf(page);
+    expect(mainRequests).toBe(5);
+    expect(reloads.map((reload) => reload.storm)).toEqual([true, true, true, true]);
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+  });
+
+  test('a network that never comes back still ends red, after its time budget', async ({
+    page,
+  }) => {
+    // The other half of B: the storm budget is TIME, and it ends. A runner whose network never
+    // settles has to give the spec an empty page, not a bench that reloads forever — delete the
+    // budget from `nextBootStep` and this test hangs until Playwright kills it.
+    let mainRequests = 0;
+    await page.route('**/src/main.ts', async (route) => {
+      mainRequests += 1;
+      await route.abort('internetdisconnected');
+    });
+
+    await page.goto('/login');
+
+    const reloads = bootReloadsOf(page);
+    expect(reloads.length, 'the storm was not reloaded past the budget').toBeGreaterThan(
+      BOOT_RELOAD_LIMIT,
+    );
+    expect(reloads.every((reload) => reload.storm)).toBe(true);
+    expect(mainRequests).toBe(1 + reloads.length);
+    await expect(page.locator('#app')).toBeEmpty();
+  });
+
+  test('a document that dies of a network change is fetched again instead of throwing', async ({
+    page,
+  }) => {
+    // Seen in the local replay of the storm: when the burst lands on the DOCUMENT, Playwright's
+    // `goto` throws `net::ERR_INTERNET_DISCONNECTED` and the page sits on Chromium's error page.
+    // Before the fix that throw reached the spec as its own failure.
+    let documents = 0;
+    await page.route(
+      (url) => url.pathname === '/login',
+      async (route) => {
+        if (route.request().resourceType() !== 'document') return route.continue();
+        documents += 1;
+        if (documents === 1) return route.abort('internetdisconnected');
+        return route.continue();
+      },
+    );
+
+    await page.goto('/login');
+
+    expect(documents).toBe(2);
+    expect(bootReloadsOf(page).map((reload) => reload.storm)).toEqual([true]);
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 });
