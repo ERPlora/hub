@@ -121,7 +121,8 @@ describe('fetchLatestOutfitkitVersion (hub#2259)', () => {
   });
 
   it('a registry error status is an error, not a version', async () => {
-    const fetchImpl = vi.fn(async () => new Response('{"error":"Not found"}', { status: 404 }));
+    // The body carries a version on purpose: only the status can reject it.
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ version: '0.1.105' }), { status: 503 }));
     await expect(fetchLatestOutfitkitVersion(fetchImpl as typeof fetch)).rejects.toThrow();
   });
 
