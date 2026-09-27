@@ -251,7 +251,7 @@ async fn an_update_against_a_marketplace_that_never_answers_ends() {
 }
 
 /// The production hub gives up after [`MARKETPLACE_STALL_TIMEOUT`] of silence, not never: the
-/// client `AppState` builds carries both limits.
+/// client `AppState` builds carries the stall limit.
 #[tokio::test]
 async fn the_production_marketplace_client_has_a_stall_limit() {
     let db = fresh_db().await;
@@ -265,5 +265,64 @@ async fn the_production_marketplace_client_has_a_stall_limit() {
     assert!(
         MARKETPLACE_STALL_TIMEOUT <= Duration::from_secs(60),
         "nobody waits more than a minute in front of «Installing…»"
+    );
+}
+
+/// Every server call into the marketplace goes through `marketplace_http`, not the shared `http`
+/// (which has no limit, for the assistant's stream): boot, reconcile, import, and the update and
+/// version lists hang the same way when the marketplace goes silent. The functions are the ones
+/// in `install.rs` that take the HTTP client first, so a new one is covered the day it appears.
+#[test]
+fn every_marketplace_call_uses_the_client_with_the_stall_limit() {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let install = std::fs::read_to_string(src.join("install.rs")).expect("install.rs");
+    let squash = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let install_flat = squash(&install);
+    let takes_client: Vec<String> = install_flat
+        .split("async fn ")
+        .skip(1)
+        .filter(|rest| {
+            rest.split_once('(')
+                .is_some_and(|(_, args)| args.trim_start().starts_with("http: &reqwest::Client"))
+        })
+        .map(|rest| rest.split('(').next().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        takes_client.iter().any(|f| f == "install_from_cloud")
+            && takes_client.iter().any(|f| f == "update_from_cloud"),
+        "the scan no longer finds the marketplace functions: {takes_client:?}"
+    );
+
+    let mut calls = 0;
+    let mut wrong = Vec::new();
+    for entry in std::fs::read_dir(&src).expect("src") {
+        let path = entry.expect("entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        let flat = squash(&std::fs::read_to_string(&path).expect("source"));
+        for f in &takes_client {
+            let needle = format!("install::{f}(");
+            for (at, _) in flat.match_indices(&needle) {
+                calls += 1;
+                let first_arg = flat[at + needle.len()..]
+                    .split(',')
+                    .next()
+                    .unwrap_or_default()
+                    .trim();
+                if !first_arg.ends_with(".marketplace_http") {
+                    let file = path.file_name().unwrap_or_default().to_string_lossy();
+                    wrong.push(format!("{file}: install::{f}({first_arg}, …)"));
+                }
+            }
+        }
+    }
+    assert!(
+        calls >= 10,
+        "the scan found only {calls} marketplace calls — it no longer sees them"
+    );
+    assert!(
+        wrong.is_empty(),
+        "marketplace calls without the stall limit: {wrong:#?}"
     );
 }

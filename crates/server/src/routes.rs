@@ -624,11 +624,12 @@ pub fn app(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// La versión que debe correr un módulo en este arranque (hub#516).
+/// The version a module has to run on this boot (hub#516).
 ///
-/// Delega en [`install::resolve_target`] — **el mismo resolutor que usa el botón «Actualizar»** y
-/// que `/api/modules/updates`. Una segunda copia de esta decisión sería una segunda política: la
-/// automática y la manual acabarían ofreciendo cosas distintas.
+/// Delegates to [`install::resolve_target`] — **the same resolver the «Update» button** and
+/// `/api/modules/updates` use. A second copy of this decision would be a second policy: the
+/// automatic and the manual path would end up offering different things. Through the client with
+/// the stall limit, so a silent marketplace does not hold up the boot (hub#2251).
 pub(crate) async fn resolve_module_target(
     state: &AppState,
     machine: &cloud_client::Auth,
@@ -637,7 +638,7 @@ pub(crate) async fn resolve_module_target(
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
     install::resolve_target(
-        &state.http,
+        &state.marketplace_http,
         &state.config.cloud_base_url,
         machine,
         module_id,
