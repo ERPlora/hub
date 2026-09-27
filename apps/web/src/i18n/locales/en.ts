@@ -841,7 +841,8 @@ export default {
     // printer set up — the job is safe in the queue and comes out on its own once there is one.
     // Naming what to do next matters more than naming the fault: «did not print» sends the
     // cashier hunting for a jam that is not there.
-    ticketFailed: 'The receipt did NOT print: {error}',
+    // hub#2239: no machine reason after the colon — it told the cashier nothing to act on.
+    ticketFailed: 'The receipt did NOT print. Print it again from the receipt screen.',
     ticketWaitingForPrinter:
       'The receipt is waiting: no printer is set up yet. Set one up and it will print on its own.',
     // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so

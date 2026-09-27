@@ -752,7 +752,7 @@ export default {
     ready: 'Imprimiendo en {hosts}',
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
-    ticketFailed: 'El tique NO se imprimió: {error}',
+    ticketFailed: 'El tique NO se imprimió. Vuelve a imprimirlo desde la pantalla del tique.',
     ticketWaitingForPrinter:
       'El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
     ticketNotComposed:
