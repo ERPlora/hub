@@ -111,6 +111,14 @@ describe('the shell paints the kitchen order warnings through this notice', () =
     expect(call).not.toMatch(/'(danger|warning|primary|success|medium)'/);
   });
 
+  it('paints the sentence the notice picked, naming the table and the station', () => {
+    const call = comandaFailureCallback(MAIN);
+    // Without the params the toast reads «{label} ({role})»; without t() it reads the raw key.
+    expect(call).toContain('i18n.global.t(n.messageKey, n.params');
+    // A docket with no label of its own is named by the translated fallback, never left blank.
+    expect(call).toContain("comandaFailureNotice(f, i18n.global.t('print.comandaDefaultLabel'))");
+  });
+
   it('and the region asserted really is that callback', () => {
     const call = comandaFailureCallback(MAIN);
     expect(call.startsWith('onFailure:')).toBe(true);
