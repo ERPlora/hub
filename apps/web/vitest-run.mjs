@@ -56,6 +56,8 @@ export async function runWithStartRetry(argv, { runPass, log }) {
     delete options.exclude;
   }
   if (filter.some((f) => f.includes(':'))) options.includeTaskLocation ??= true;
+  // And what `prepareVitest` does: `vitest run` never watches (a TTY would default to watch mode).
+  if (options.run) options.watch = false;
   const first = await runPass(filter, options);
   if (first.exitCode === 0) return 0;
 
@@ -82,7 +84,16 @@ async function runPass(filters, options) {
   const vitest = await createVitest('test', options);
   try {
     const specifications = (await vitest.globTestSpecifications(filters)).map((s) => s.moduleId);
-    const { testModules, unhandledErrors } = await vitest.start(filters);
+    let started;
+    try {
+      started = await vitest.start(filters);
+    } catch (error) {
+      // `startVitest` swallows "no test files": vitest already printed it and set the exit code
+      // (1, or 0 with --passWithNoTests). Anything else is a crash and stays one.
+      if (error?.code !== 'VITEST_FILES_NOT_FOUND') throw error;
+      started = { testModules: [], unhandledErrors: [] };
+    }
+    const { testModules, unhandledErrors } = started;
     return {
       exitCode: Number(process.exitCode ?? 0),
       specifications,

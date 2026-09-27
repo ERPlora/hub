@@ -163,6 +163,16 @@ describe('runWithStartRetry', () => {
     expect(calls[0].options.includeTaskLocation).toBe(true);
   });
 
+  // `vitest run` never watches (`prepareVitest`: `options.run` → `watch: false`). Without that, a
+  // human terminal (TTY, not CI) falls back to vitest's default `watch: true`: "DEV" banner, file
+  // watcher, VITEST_MODE=WATCH in the workers — not the `vitest run` the gate and CI run.
+  it('runs in run mode, never watch mode, like `vitest run`', async () => {
+    const { calls, runPass } = recorder([unstartedA, green]);
+    await runWithStartRetry([], { runPass, log: quiet });
+    expect(calls[0].options.watch).toBe(false);
+    expect(calls[1].options.watch).toBe(false);
+  });
+
   it('a red retry is red, and there is no third pass', async () => {
     const { calls, runPass } = recorder([unstartedA, unstartedA, green]);
     expect(await runWithStartRetry([], { runPass, log: quiet })).toBe(1);
@@ -199,14 +209,14 @@ describe('vitest-run.mjs against the real vitest', () => {
     return root;
   }
 
-  function run(root, env = {}) {
+  function run(root, env = {}, args = []) {
     // This test runs INSIDE a vitest worker: drop what vitest set on it (VITEST*, TEST, NODE_ENV)
     // so the nested run starts from a shell's environment, as `pnpm test` does.
     const inherited = (k) => k.startsWith('VITEST') || k === 'TEST' || k === 'NODE_ENV';
     const clean = Object.fromEntries(Object.entries(process.env).filter(([k]) => !inherited(k)));
-    const res = spawnSync(process.execPath, [SCRIPT, '--globals'], {
+    const res = spawnSync(process.execPath, [SCRIPT, '--globals', ...args], {
       cwd: root,
-      env: { ...clean, ...env, VITEST_MAX_WORKERS: '2' },
+      env: { ...clean, VITEST_MAX_WORKERS: '2', ...env },
       encoding: 'utf8',
       timeout: 240_000,
     });
@@ -246,8 +256,53 @@ describe('vitest-run.mjs against the real vitest', () => {
     }
   });
 
-  it('a worker that never starts is retried and its file really runs', () => {
-    const root = project({ 'a.test.js': '', 'b.test.js': '' });
+  // `vitest run` treats "no test files" as a verdict, not a crash (`startVitest` swallows
+  // FilesNotFoundError): 1 by default, 0 with --passWithNoTests.
+  it('no test files: exit 1, or 0 with --passWithNoTests, like `vitest run`', () => {
+    const root = project({ 'ok.test.js': '' });
+    try {
+      const strict = run(root, {}, ['no-such-file']);
+      expect(strict.status, strict.out).toBe(1);
+      expect(strict.out).toContain('No test files found, exiting with code 1');
+      const lenient = run(root, {}, ['no-such-file', '--passWithNoTests']);
+      expect(lenient.status, lenient.out).toBe(0);
+      expect(lenient.out).not.toContain('vitest-run: retrying');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // `startVitest` only forgives "no test files"; any other error out of `start()` is red.
+  it('a start error other than "no test files" is red', () => {
+    const root = project({ 'ok.test.js': '' });
+    writeFileSync(
+      join(root, 'vitest.config.mjs'),
+      "export default { test: { reporters: [{ onInit() { throw new Error('reporter crashed'); } }] } };\n",
+    );
+    try {
+      const { status, out } = run(root);
+      expect(status, out).toBe(1);
+      expect(out).toContain('reporter crashed');
+      expect(existsSync(join(root, 'ran', 'ok.test.js'))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('a config that cannot load is red', () => {
+    const root = project({ 'ok.test.js': '' });
+    writeFileSync(join(root, 'vitest.config.mjs'), "throw new Error('broken config');\n");
+    try {
+      const { status, out } = run(root);
+      expect(status, out).toBe(1);
+      expect(out).toContain('broken config');
+      expect(existsSync(join(root, 'ran', 'ok.test.js'))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  function parkFirstWorker(root) {
     const preload = join(root, 'park-first-worker.cjs');
     writeFileSync(
       preload,
@@ -258,6 +313,12 @@ describe('vitest-run.mjs against the real vitest', () => {
         `  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 65_000);\n` +
         `}\n`,
     );
+    return preload;
+  }
+
+  it('a worker that never starts is retried and its file really runs', () => {
+    const root = project({ 'a.test.js': '', 'b.test.js': '' });
+    const preload = parkFirstWorker(root);
     try {
       const { status, out } = run(root, { NODE_OPTIONS: `--require ${preload}` });
       expect(out).toContain('Failed to start forks worker');
@@ -265,6 +326,24 @@ describe('vitest-run.mjs against the real vitest', () => {
       expect(status, out).toBe(0);
       expect(existsSync(join(root, 'ran', 'a.test.js'))).toBe(true);
       expect(existsSync(join(root, 'ran', 'b.test.js'))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 300_000);
+
+  // The dangerous mix: a worker that never started AND a file that really failed. Retrying the
+  // unstarted file would end green and swallow the red one. One worker, so the order is vitest's
+  // sequencer (bigger file first, no cache): `a` is parked, `bad` runs and fails.
+  it('a start failure next to a really failed file stays red, with no retry', () => {
+    const root = project({ 'a.test.js': `/* ${'pad '.repeat(200)}*/`, 'bad.test.js': 'expect(1).toBe(2);' });
+    const preload = parkFirstWorker(root);
+    try {
+      const { status, out } = run(root, { NODE_OPTIONS: `--require ${preload}`, VITEST_MAX_WORKERS: '1' });
+      expect(out).toContain('Failed to start forks worker');
+      expect(existsSync(join(root, 'ran', 'bad.test.js')), out).toBe(true);
+      expect(out).not.toContain('vitest-run: retrying');
+      expect(status, out).toBe(1);
+      expect(existsSync(join(root, 'ran', 'a.test.js'))).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
