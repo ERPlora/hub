@@ -725,10 +725,8 @@ export default {
     businessAddressLegacy: 'Current address: {address}. Fill in the fields above to replace it.',
     fiscalAddress: 'Fiscal address',
     shareWithErplora: 'Use these details for my ERPlora invoice too',
-    shareWithErploraDesc: 'Sends your legal name, tax id and address to ERPlora so its invoices to you carry them. Your business keeps invoicing its own customers with these same details — nothing else is shared.',
-    shareWithErploraDone: 'Details shared with ERPlora.',
+    shareWithErploraDesc: 'When you save, ERPlora also puts your legal name, tax id and address on its invoices to you. Leave it unticked if someone else pays ERPlora for this business, such as your accounting firm. ERPlora always learns who the business is, as it needs that to file with the tax agency.',
     shareWithErploraError: 'Could not share the details with ERPlora.',
-    shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
     // One question, two EXCLUSIVE answers (ADR-0320 §1 — hub#1314): either the business files with
     // its own certificate, or ERPlora files on its behalf with the signed grant. Never both.
     defaultVat: 'Default VAT',

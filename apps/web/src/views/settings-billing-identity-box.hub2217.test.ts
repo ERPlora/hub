@@ -1,20 +1,21 @@
 // @vitest-environment happy-dom
-// **The fiscal address is typed in parts** (hub#1846).
+// **«Use these details for my ERPlora invoice too» is a box of the form, not a button** (hub#2217).
 //
-// Settings → Business kept the address as ONE free line, and official papers ask for it in parts:
-// the tax authority's grant model reads «con domicilio fiscal en (municipio) … (vía pública) … nº …».
-// With no parts to read, the VeriFactu app asked for the address AGAIN under the tax id and the
-// legal name that already live here — and an address typed in two places ends up being two.
+// It was a toggle that published to ERPlora the moment it was pressed — with what was STORED, not
+// what the owner had just typed — so a new business typing its tax id and ticking it before «Save
+// changes» got «Could not share the details with ERPlora», the toggle stayed on anyway, and on the
+// next visit it was off again because nothing remembered it.
 //
-// So the address is written here once, in fields: street, number, postal code and city. The single
-// line every invoice prints is composed from them by the runtime, and a business that never touches
-// the fields keeps the line it typed (it is shown, so it is not silently lost).
+// Now it behaves like every other field of the Business form: ticking it does nothing by itself,
+// «Save changes» stores it with the rest (and the runtime tells ERPlora, hub-side), and it shows
+// what was stored.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
 import { createI18n } from 'vue-i18n';
 
 import en from '../i18n/locales/en';
+import { IonCheckbox } from '@ionic/vue';
 
 // Same seams as the neighbouring Settings tests (`settings-setup-refresh.test.ts`): the icon
 // registry drags ~70 virtual `~icons/…?raw` ids this environment denies, and it has its own test.
@@ -40,10 +41,6 @@ const hubSettings = ref({
   business_tax_id: '',
   business_legal_name: '',
   business_address: '',
-  business_street: '',
-  business_street_number: '',
-  business_postal_code: '',
-  business_city: '',
   theme_palette: 'erplora',
   pin_policy: 'never',
   pin_inactivity_minutes: 5,
@@ -124,81 +121,104 @@ async function save(wrapper: Awaited<ReturnType<typeof mountBusinessTab>>): Prom
   await flushPromises();
 }
 
+const BOX = 'business_identity_for_erplora_billing';
+
+/** The billing box, as the component that renders it. */
+function box(wrapper: Awaited<ReturnType<typeof mountBusinessTab>>) {
+  const found = wrapper
+    .findAllComponents(IonCheckbox)
+    .find((c) => c.attributes('data-testid') === 'settings-share-with-erplora');
+  expect(found, 'the billing choice is a checkbox of the Business form').toBeTruthy();
+  return found!;
+}
+
+/** Ticks (or unticks) the box the way Ionic does: the v-model update plus its change event. */
+async function tick(wrapper: Awaited<ReturnType<typeof mountBusinessTab>>, checked: boolean): Promise<void> {
+  const b = box(wrapper);
+  b.vm.$emit('update:modelValue', checked);
+  b.vm.$emit('ionChange', new CustomEvent('ionChange', { detail: { checked } }));
+  await flushPromises();
+}
+
+const fetchMock = vi.fn(async () => new Response('{}', { status: 404 }));
+
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 404 })));
-  hubSettings.value = { ...hubSettings.value, fiscal_identity_publish_error: undefined };
-  // The real client writes the runtime's answer into the cache; this seam does the same thing.
-  updateHubSettings.mockReset().mockImplementation(async () => {
-    hubSettings.value = { ...hubSettings.value };
+  fetchMock.mockClear();
+  vi.stubGlobal('fetch', fetchMock);
+  hubSettings.value = {
+    ...hubSettings.value,
+    business_tax_id: '',
+    business_legal_name: '',
+    [BOX]: false,
+    fiscal_identity_publish_error: undefined,
+  };
+  updateHubSettings.mockReset().mockImplementation(async (partial: Record<string, unknown>) => {
+    hubSettings.value = { ...hubSettings.value, ...partial };
     return hubSettings.value;
   });
   toastSuccess.mockReset();
   toastError.mockReset();
 });
 
-describe('Settings › Business · the fiscal address, in parts (hub#1846)', () => {
-  it('asks for street, number, postal code and city — not for one free line', async () => {
+describe('Settings › Business · the ERPlora-invoice box is part of the form (hub#2217)', () => {
+  it('🔴 ticking the box sends nothing and says nothing', async () => {
     const wrapper = await mountBusinessTab();
+    fetchMock.mockClear();
 
-    for (const id of [
-      'settings-business-street',
-      'settings-business-street-number',
-      'settings-business-postal-code',
-      'settings-business-city',
-    ]) {
-      expect(wrapper.find(`[data-testid="${id}"]`).exists(), `the Business tab has no «${id}»`).toBe(true);
-    }
-    expect(
-      wrapper.find('[data-testid="settings-business-address"]').exists(),
-      'the free-text line is still editable: two addresses that can disagree',
-    ).toBe(false);
+    await tick(wrapper, true);
+
+    expect(updateHubSettings, 'ticking is not saving').not.toHaveBeenCalled();
+    expect(fetchMock, 'ticking must not call anything').not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('saves the four parts, which is what the runtime composes the printed line from', async () => {
+  it('🔴 «Save changes» stores the box with the rest of the business details', async () => {
     const wrapper = await mountBusinessTab();
-    const vm = wrapper.vm as unknown as {
-      businessStreet: string;
-      businessStreetNumber: string;
-      businessPostalCode: string;
-      businessCity: string;
-    };
-    vm.businessStreet = ' Rúa do Príncipe ';
-    vm.businessStreetNumber = '10';
-    vm.businessPostalCode = '36202';
-    vm.businessCity = 'Vigo';
+    const vm = wrapper.vm as unknown as { businessTaxId: string; businessLegalName: string };
+    vm.businessTaxId = 'B12345674';
+    vm.businessLegalName = 'Bar Manolo SL';
 
+    await tick(wrapper, true);
     await save(wrapper);
 
     expect(updateHubSettings).toHaveBeenCalledTimes(1);
     expect(updateHubSettings.mock.calls[0][0]).toMatchObject({
-      business_street: 'Rúa do Príncipe',
-      business_street_number: '10',
-      business_postal_code: '36202',
-      business_city: 'Vigo',
+      business_tax_id: 'B12345674',
+      business_legal_name: 'Bar Manolo SL',
+      [BOX]: true,
     });
-    expect(updateHubSettings.mock.calls[0][0]).not.toHaveProperty('business_address');
+    expect(toastError).not.toHaveBeenCalled();
+    expect(box(wrapper).props('modelValue'), 'the box stays ticked after the save').toBe(true);
   });
 
-  // 🔴 A hub that typed its address as one line before this change must not see it vanish: the
-  // fields are empty, and an empty form reads as «you have no address». The old line is shown.
-  it('shows the old one-line address until the parts are filled, so it is not silently lost', async () => {
-    hubSettings.value = { ...hubSettings.value, business_address: 'Calle Falsa 123, Madrid' };
+  it('🔴 an unticked box is saved as unticked', async () => {
+    hubSettings.value = { ...hubSettings.value, business_tax_id: 'B12345674', [BOX]: true };
     const wrapper = await mountBusinessTab();
 
-    const legacy = wrapper.find('[data-testid="settings-business-address-legacy"]');
-    expect(legacy.exists()).toBe(true);
-    expect(legacy.text()).toContain('Calle Falsa 123, Madrid');
+    await tick(wrapper, false);
+    await save(wrapper);
+
+    expect(updateHubSettings.mock.calls[0][0]).toMatchObject({ [BOX]: false });
   });
 
-  it('once the parts exist, the old line is not shown twice', async () => {
-    hubSettings.value = {
-      ...hubSettings.value,
-      business_address: 'Rúa do Príncipe 10, 36202 Vigo',
-      business_street: 'Rúa do Príncipe',
-      business_city: 'Vigo',
-    };
+  it('🔴 shows what was stored, and follows the stored value when it changes', async () => {
+    hubSettings.value = { ...hubSettings.value, [BOX]: true };
+    const wrapper = await mountBusinessTab();
+    expect(box(wrapper).props('modelValue'), 'a ticked box is remembered').toBe(true);
+
+    hubSettings.value = { ...hubSettings.value, [BOX]: false };
+    await flushPromises();
+    expect(box(wrapper).props('modelValue')).toBe(false);
+  });
+
+  it('a refused save keeps the box as the owner left it', async () => {
+    updateHubSettings.mockRejectedValue(new Error('403'));
     const wrapper = await mountBusinessTab();
 
-    expect(wrapper.find('[data-testid="settings-business-address-legacy"]').exists()).toBe(false);
+    await tick(wrapper, true);
+    await save(wrapper);
+
+    expect(box(wrapper).props('modelValue'), 'a refused save must not undo the draft').toBe(true);
   });
 });
