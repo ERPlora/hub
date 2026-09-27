@@ -63,6 +63,54 @@ export const TRANSIENT_TRANSPORT_ERRORS: readonly string[] = [
 /** How many times a single navigation may be re-fetched before the failure is the test's answer. */
 export const BOOT_RELOAD_LIMIT = 2;
 
+/**
+ * The transport errors Chromium derives from the MACHINE's network changing, and from nothing else
+ * (ERPlora/hub#2270).
+ *
+ * `ERR_NETWORK_CHANGED` is the network-change notifier cancelling every in-flight socket;
+ * `ERR_INTERNET_DISCONNECTED` is the same notifier reporting "no network" for the instant between
+ * two changes. No defect of ours, of the dev server or of the runtime can answer a request with
+ * either, so a reload for them re-rolls nothing — and that is why they are paid from their own
+ * time budget, not from `BOOT_RELOAD_LIMIT`. Every other transient code (a reset, an empty
+ * response…) is something a crashing server can ALSO cause, and stays in the budget.
+ */
+export const NETWORK_CHANGE_ERRORS: readonly string[] = [
+  'net::ERR_NETWORK_CHANGED',
+  'net::ERR_INTERNET_DISCONNECTED',
+];
+
+/**
+ * How long a navigation may keep being reloaded for network changes alone (ERPlora/hub#2270).
+ *
+ * The longest storm in the CI traces of 27/09 lasted 1.4 s (five bursts in the 390 px case). A
+ * network that keeps changing for five seconds is an outage of the runner, and has to end as a
+ * red test rather than as a bench that reloads forever.
+ */
+export const NETWORK_CHANGE_BUDGET_MS = 5_000;
+
+/** What the bench does after a load of a navigation has settled. */
+export type BootStep = 'hand-over' | 'reload' | 'reload-storm';
+
+/**
+ * The bench's decision after one load of a navigation, from the codes of the app's own requests
+ * that died on the wire during it.
+ *
+ * Nothing died → the page is the spec's. Only network-change codes → reload without spending the
+ * budget, while the storm is younger than `NETWORK_CHANGE_BUDGET_MS`. Anything else (alone or
+ * mixed with a network change) → reload from the budget, which a crashing server can exhaust.
+ */
+export function nextBootStep(
+  codes: readonly string[],
+  countedReloads: number,
+  elapsedMs: number,
+): BootStep {
+  if (codes.length === 0) return 'hand-over';
+  if (codes.every((code) => NETWORK_CHANGE_ERRORS.includes(code))) {
+    return elapsedMs < NETWORK_CHANGE_BUDGET_MS ? 'reload-storm' : 'hand-over';
+  }
+  return countedReloads < BOOT_RELOAD_LIMIT ? 'reload' : 'hand-over';
+}
+
 function originOf(url: string | undefined): string | undefined {
   if (url === undefined) return undefined;
   try {
@@ -268,7 +316,29 @@ export function specTakesTestFromPlaywright(source: string): boolean {
 export interface BootReload {
   url: string;
   codes: string[];
+  /** Paid from the network-change time budget rather than from `BOOT_RELOAD_LIMIT` (hub#2270). */
+  storm: boolean;
 }
+
+/**
+ * The longest the bench waits for one load of a navigation to settle (ERPlora/hub#2270).
+ *
+ * A load settles when the app has mounted, or something of ours died, and the app's own requests
+ * have stopped. This ceiling only matters for a page that never gets there — a bootstrap that
+ * throws, say — and then the spec gets the page as it is, to fail on its own assertions.
+ */
+export const BOOT_SETTLE_MS = 10_000;
+
+/** How long the app's own requests have to stay quiet before a load counts as settled. */
+const BOOT_QUIET_MS = 150;
+
+const BOOT_POLL_MS = 25;
+
+/** Where the shell's own document stands: no `#app` at all, not yet mounted, or mounted. */
+type ShellState = 'no-app' | 'booting' | 'mounted';
+
+/** The resource types a load of the shell is made of; XHR and fetch are the spec's business. */
+const BOOT_RESOURCE_TYPES = new Set(['document', 'script', 'stylesheet']);
 
 const booksByPage = new WeakMap<object, BootReload[]>();
 
@@ -296,34 +366,114 @@ export function bootReloadsOf(page: object): readonly BootReload[] {
  */
 export const test = base.extend({
   page: async ({ page, baseURL }, use) => {
+    const appOrigin = originOf(baseURL);
+    const isOwn = (url: string): boolean => appOrigin !== undefined && originOf(url) === appOrigin;
     const lost: string[] = [];
+    const inFlight = new Set<object>();
+    let ownFailures = 0;
+    let lastActivity = Date.now();
 
+    page.on('request', (req) => {
+      if (!isOwn(req.url()) || !BOOT_RESOURCE_TYPES.has(req.resourceType())) return;
+      inFlight.add(req);
+      lastActivity = Date.now();
+    });
+    page.on('requestfinished', (req) => {
+      if (inFlight.delete(req)) lastActivity = Date.now();
+    });
     page.on('requestfailed', (req) => {
+      if (inFlight.delete(req)) lastActivity = Date.now();
       const errorText = req.failure()?.errorText;
-      if (isBootTransportFailure(req.url(), errorText, baseURL)) lost.push(errorText as string);
+      if (isBootTransportFailure(req.url(), errorText, baseURL)) {
+        lost.push(errorText as string);
+      } else if (isOwn(req.url()) && errorText !== 'net::ERR_ABORTED') {
+        // A failure of ours that is not the network's: the load is over, and it is the spec's red.
+        ownFailures += 1;
+      }
     });
 
+    const shellState = async (): Promise<ShellState> => {
+      try {
+        return await page.evaluate(() => {
+          const app = document.getElementById('app');
+          if (app === null) return 'no-app';
+          return app.hasAttribute('data-v-app') ? 'mounted' : 'booting';
+        });
+      } catch {
+        // The document is being replaced under us (a reload of the app's own): still booting.
+        return 'booting';
+      }
+    };
+
+    // hub#2270, hole A: `load` is not the end of a load. The router fetches the screen after it,
+    // and `main.ts` mounts only once that screen has arrived — the 1440 red died 60 ms after `goto`
+    // resolved. So wait for the app's own verdict (mounted, or something of ours died), and for its
+    // own requests to go quiet, before deciding anything.
+    const settle = async (): Promise<void> => {
+      const deadline = Date.now() + BOOT_SETTLE_MS;
+      while (Date.now() < deadline) {
+        if (!isOwn(page.url())) return;
+        const quiet = inFlight.size === 0 && Date.now() - lastActivity >= BOOT_QUIET_MS;
+        if (quiet) {
+          if (lost.length > 0 || ownFailures > 0) return;
+          if ((await shellState()) !== 'booting' && inFlight.size === 0) return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, BOOT_POLL_MS));
+      }
+    };
+
     const navigate = page.goto.bind(page);
+    const reloadPage = page.reload.bind(page);
+
+    // A load whose own document died of the network throws in Playwright. That throw is the same
+    // accident as a dead module, so it is settled and decided like one; any other throw is the
+    // spec's.
+    const attempt = async (
+      load: () => Promise<Awaited<ReturnType<typeof navigate>>>,
+    ): Promise<Awaited<ReturnType<typeof navigate>>> => {
+      try {
+        return await load();
+      } catch (error) {
+        if (lost.length === 0) throw error;
+        return null;
+      }
+    };
 
     page.goto = async (url, options) => {
       lost.length = 0;
+      ownFailures = 0;
       const books: BootReload[] = [];
       booksByPage.set(page, books);
-      let response = await navigate(url, options);
+      const started = Date.now();
+      let counted = 0;
+      let response = await attempt(() => navigate(url, options));
 
-      for (let reload = 1; lost.length > 0 && reload <= BOOT_RELOAD_LIMIT; reload += 1) {
+      for (;;) {
+        await settle();
+        const codes = [...new Set(lost)];
+        const step = nextBootStep(codes, counted, Date.now() - started);
+        if (step === 'hand-over') break;
+        const storm = step === 'reload-storm';
+        if (!storm) counted += 1;
         // Said out loud, never swallowed: a bench that heals itself in silence is a bench whose
-        // flake rate nobody can measure, and this issue exists because one went unmeasured for a
+        // flake rate nobody can measure, and hub#1806 exists because one went unmeasured for a
         // week. The line names the browser's own error so the next reader does not have to guess.
         // eslint-disable-next-line no-console
         console.warn(
           `[bench] ${lost.length} request(s) for the app's own code died on the wire ` +
-            `(${[...new Set(lost)].join(', ')}) while loading ${url} — reloading ` +
-            `(${reload}/${BOOT_RELOAD_LIMIT}). See hub#1806.`,
+            `(${codes.join(', ')}) while loading ${url} — reloading ` +
+            (storm
+              ? `(network change, outside the budget; see hub#2270).`
+              : `(${counted}/${BOOT_RELOAD_LIMIT}). See hub#1806.`),
         );
-        books.push({ url, codes: [...new Set(lost)] });
+        books.push({ url, codes, storm });
         lost.length = 0;
-        response = await page.reload(options);
+        ownFailures = 0;
+        // A document that died leaves the page on Chromium's error page, where a reload would
+        // reload the error; going back to the navigation's own URL is what fetches it again.
+        response = await attempt(() =>
+          page.url().startsWith('chrome-error://') ? navigate(url, options) : reloadPage(options),
+        );
       }
 
       return response;
