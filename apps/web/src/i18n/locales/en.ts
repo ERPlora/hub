@@ -436,6 +436,8 @@ export default {
     blocking: {
       title: 'You cannot issue invoices yet',
       body: 'No ticket or invoice can be issued until this is set up:',
+      showMissing: "See what's missing",
+      hideMissing: 'Hide',
     },
     items: {
       apps: {

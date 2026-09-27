@@ -5,44 +5,66 @@
   <ok-inline-feedback
     v-if="view.visible"
     class="setup-strip"
+    :class="{ 'setup-strip--folded': folded }"
     tone="danger"
     icon="alert-circle-outline"
-    :heading="t('setup.blocking.title')"
+    :heading="isShortViewport ? undefined : t('setup.blocking.title')"
     data-testid="setup-strip"
   >
-    <!-- The consequence first. «Your business details» on its own reads as one more chore; what
-         justifies a band across the whole app is that the hub will REFUSE to issue the document. -->
-    <p class="setup-strip-body">{{ t('setup.blocking.body') }}</p>
-    <ul class="setup-strip-items">
-      <li
-        v-for="item in view.items"
-        :key="item.key"
-        class="setup-strip-item"
-        :data-testid="`setup-strip-item-${item.key}`"
+    <!-- A phone on its side (hub#2272): the band over every screen folds to ONE row — the headline
+         and a way to open what is missing. The headline moves into the row (and out of the band's
+         own heading) so the button can sit beside it instead of under it. -->
+    <div v-if="isShortViewport" class="setup-strip-fold">
+      <strong class="setup-strip-title" data-testid="setup-strip-title">{{ t('setup.blocking.title') }}</strong>
+      <!-- A native button and not `ion-button`: Ionic copies `aria-*` onto its inner button ONCE, at
+           load, so `aria-expanded` would keep announcing «collapsed» after the tap (measured in the
+           bench, hub#2272). The disclosure state has to follow the tap. -->
+      <button
+        type="button"
+        class="setup-strip-toggle"
+        :aria-expanded="expanded ? 'true' : 'false'"
+        :aria-controls="detailId"
+        data-testid="setup-strip-toggle"
+        @click="expanded = !expanded"
       >
-        <HubIcon class="setup-strip-icon" :name="item.icon || 'settings-outline'" />
-        <span class="setup-strip-name">{{ titleOf(item) }}</span>
-        <!-- One way in PER thing missing. There are at most two gates (the business identity and the
-             certificate), so picking a «primary» one would hide the other behind a guess. -->
-        <ion-button
-          v-if="isActionable(item)"
-          class="setup-strip-cta"
-          size="small"
-          fill="outline"
-          color="danger"
-          :router-link="item.route"
-          router-direction="forward"
-          :data-testid="`setup-strip-action-${item.key}`"
+        {{ expanded ? t('setup.blocking.hideMissing') : t('setup.blocking.showMissing') }}
+      </button>
+    </div>
+    <div v-if="!folded" :id="detailId" class="setup-strip-detail">
+      <!-- The consequence first. «Your business details» on its own reads as one more chore; what
+         justifies a band across the whole app is that the hub will REFUSE to issue the document. -->
+      <p class="setup-strip-body">{{ t('setup.blocking.body') }}</p>
+      <ul class="setup-strip-items">
+        <li
+          v-for="item in view.items"
+          :key="item.key"
+          class="setup-strip-item"
+          :data-testid="`setup-strip-item-${item.key}`"
         >
-          {{ t('setup.configure') }}
-        </ion-button>
-        <!-- …and when the way in is not THIS session's to take (hub#435), who can take it. The band
+          <HubIcon class="setup-strip-icon" :name="item.icon || 'settings-outline'" />
+          <span class="setup-strip-name">{{ titleOf(item) }}</span>
+          <!-- One way in PER thing missing. There are at most two gates (the business identity and the
+             certificate), so picking a «primary» one would hide the other behind a guess. -->
+          <ion-button
+            v-if="isActionable(item)"
+            class="setup-strip-cta"
+            size="small"
+            fill="outline"
+            color="danger"
+            :router-link="item.route"
+            router-direction="forward"
+            :data-testid="`setup-strip-action-${item.key}`"
+          >
+            {{ t('setup.configure') }}
+          </ion-button>
+          <!-- …and when the way in is not THIS session's to take (hub#435), who can take it. The band
              cannot be dismissed, so a name with neither a button nor an errand is a dead end. -->
-        <span v-else class="setup-strip-note" :data-testid="`setup-strip-note-${item.key}`">
-          {{ t('setup.delegatedHint') }}
-        </span>
-      </li>
-    </ul>
+          <span v-else class="setup-strip-note" :data-testid="`setup-strip-note-${item.key}`">
+            {{ t('setup.delegatedHint') }}
+          </span>
+        </li>
+      </ul>
+    </div>
   </ok-inline-feedback>
 </template>
 
@@ -63,12 +85,17 @@
 //   When the way out is not this session's to take (hub#435) the way out is a NAME, not a button:
 //   whoever is at the till cannot type the tax id, but the refusal is going to land on them.
 // * **It does not repeat the panel's card.** Same items, same call to action, one screenful apart.
-import { computed } from 'vue';
+//
+// On a SHORT screen (a phone on its side, hub#2272) it folds to one row: the headline and «See what's
+// missing». In full it took ~113px of a 667×375 phone and left the till's open ticket without room
+// for a single line. The detail opens in place on tap — the same items and ways in, one tap further.
+import { computed, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonButton } from '@ionic/vue';
 
 import HubIcon from './HubIcon.vue';
 import { blockingView, isActionable, type SetupItem, type SetupStatus } from '../lib/setup-status';
+import { isShortViewport } from '../lib/viewport';
 
 const props = withDefaults(
   defineProps<{
@@ -83,6 +110,11 @@ const props = withDefaults(
 const { t, te } = useI18n();
 
 const view = computed(() => blockingView(props.status, { checklistOnScreen: props.checklistOnScreen }));
+
+/** Short screen only: whether the person opened what is missing. Folded is the default there. */
+const expanded = ref(false);
+const folded = computed(() => isShortViewport.value && !expanded.value);
+const detailId = `setup-strip-detail-${useId()}`;
 
 /**
  * The item's title. A CORE item's key is also its i18n key; a module's `title` travels in English
@@ -135,6 +167,52 @@ function titleOf(item: SetupItem): string {
   flex: none;
   white-space: nowrap;
   text-transform: none;
+}
+/* Folded (hub#2272): one row, the band's own padding trimmed to what a small button needs. */
+.setup-strip--folded {
+  --padding: 0.5rem 0.75rem;
+}
+.setup-strip-fold {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.setup-strip-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.setup-strip-toggle {
+  flex: none;
+  /* A thumb-sized target whose extra height spills into the band's padding instead of growing the
+     row: the row stays the height of the headline, level with the band's icon. */
+  min-height: 2.25rem;
+  margin-block: -0.45rem;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ion-color-danger, #c5000f);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.setup-strip-toggle:active {
+  background: rgba(var(--ion-color-danger-rgb, 197, 0, 15), 0.12);
+}
+.setup-strip-toggle:focus-visible {
+  outline: 2px solid var(--ion-color-danger, #c5000f);
+  outline-offset: 1px;
+}
+/* Opened on a short screen: the detail sits under the row, not glued to it. */
+.setup-strip-fold + .setup-strip-detail {
+  margin-top: 0.25rem;
 }
 /* The stand-in for the button when the errand is somebody else's: same row, plainly not pressable. */
 .setup-strip-note {

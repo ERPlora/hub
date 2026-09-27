@@ -390,6 +390,8 @@ export default {
     blocking: {
       title: 'Todavía no puedes facturar',
       body: 'No se podrá emitir ningún ticket ni factura hasta que configures esto:',
+      showMissing: 'Ver qué falta',
+      hideMissing: 'Ocultar',
     },
     items: {
       apps: {
