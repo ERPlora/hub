@@ -6,19 +6,18 @@
 // Guard: `src/theme/ionic-fill-needs-md.test.ts`. Detalle: `src/lib/ionic-fill.ts`.
 import './lib/ionic-fill.boot';
 
-// 🔴 Segundo import del shell, y por el MISMO motivo que el de arriba (hub#1736): los dos botones
-// de los diálogos de selección de Ionic son literales ingleses («Cancel» / «OK») que no tienen
-// clave de configuración global, así que el shell los traduce enganchando `customElements.define`
-// ANTES de que nadie registre `ion-select`. Si este import baja de `@ionic/vue`, todos los
-// desplegables del hub —los de los módulos incluidos— vuelven al inglés sin un solo error.
-// Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
+// Second shell hook (hub#1736, hub#2226): the two buttons of Ionic's selection dialogs are English
+// literals («Cancel» / «OK») with no global config key, so the shell writes them in the active
+// language right before each dialog opens — module Web Components included, and a language switch
+// with no reload included. It wraps `open()`, a plain method, so it would survive a late import.
+// Guard: `src/lib/ionic-select-text.test.ts`. Detail: `src/lib/ionic-select-text.ts`.
 import './lib/ionic-select-text.boot';
 
 // Third shell hook on the same registry (hub#2223): `ion-select` opens an alert by default, which
 // only keeps the choice after OK, and Ionic has no global key to change it. The shell makes every
 // SINGLE-choice select open a popover, which closes on pick (multiple keeps its confirm button) —
-// module Web Components included. It wraps `open()`, a plain method, so unlike the two above it
-// would survive a late import; it sits here so the three hooks are read together.
+// module Web Components included. It wraps `open()` too, so like the one above it would survive a
+// late import; it sits here so the three hooks are read together.
 // Guard: `src/lib/ionic-select-interface.test.ts`. Detail: `src/lib/ionic-select-interface.ts`.
 import './lib/ionic-select-interface.boot';
 
