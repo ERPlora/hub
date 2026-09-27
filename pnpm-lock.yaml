@@ -31,8 +31,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/module-types
       '@erplora/outfitkit':
-        specifier: ^0.1.84
-        version: 0.1.84
+        specifier: ^0.1.105
+        version: 0.1.105
       '@iconify/vue':
         specifier: ^5.0.1
         version: 5.0.1(vue@3.5.35(typescript@5.9.3))
@@ -146,8 +146,8 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@erplora/outfitkit@0.1.84':
-    resolution: {integrity: sha512-8ketrNF/M1GmU/+8Z0eScKTPla6+4S0nU02sygFmc6B9WZsbRzoMjK4e9HRt+FuZS2dS8tK8vP6RjJD9vpCcfw==}
+  '@erplora/outfitkit@0.1.105':
+    resolution: {integrity: sha512-ReQz7G6GwOP4aHlqGedJnCy3yq3pyfjB8ChvPQJjqKmsaBnIoRI712cdSl01wHy6G6hTBMdkeqeesJdZuGuv7Q==}
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -1689,7 +1689,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@erplora/outfitkit@0.1.84':
+  '@erplora/outfitkit@0.1.105':
     dependencies:
       lit: 3.3.3
 
