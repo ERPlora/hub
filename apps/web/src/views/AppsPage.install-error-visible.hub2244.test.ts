@@ -35,8 +35,10 @@ const { lifecycle } = vi.hoisted(() => ({
 }));
 // The global notices the page hands over to once it is unmounted (hub#2252). A spy: happy-dom
 // cannot animate a real overlay (the browser side is tests/e2e/InstallResultAfterLeaving.spec.ts).
-const { globalToasts } = vi.hoisted(() => ({
+const { globalToasts, createDelay } = vi.hoisted(() => ({
   globalToasts: [] as Array<{ opts: Record<string, unknown>; dismissed: boolean }>,
+  // A real `toastController.create` resolves a few ms later (it waits for the element).
+  createDelay: { ms: 0 },
 }));
 vi.mock('@ionic/vue', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@ionic/vue')>()),
@@ -44,6 +46,7 @@ vi.mock('@ionic/vue', async (importOriginal) => ({
   onIonViewWillLeave: (fn: () => void) => lifecycle.willLeave.push(fn),
   toastController: {
     create: async (opts: Record<string, unknown>) => {
+      if (createDelay.ms) await new Promise((r) => setTimeout(r, createDelay.ms));
       const entry = { opts, dismissed: false };
       globalToasts.push(entry);
       return {
@@ -190,6 +193,7 @@ beforeEach(() => {
   lifecycle.willEnter.length = 0;
   lifecycle.willLeave.length = 0;
   globalToasts.length = 0;
+  createDelay.ms = 0;
 });
 
 describe('a failed install stays readable and can be retried (hub#2244)', () => {
@@ -350,6 +354,32 @@ describe('a failed install stays readable and can be retried (hub#2244)', () => 
       enCatalogue.apps.installRetry,
       enCatalogue.apps.noticeClose,
     ]);
+  });
+
+  it('an outcome that lands while the handed-over «Installing…» is still being created replaces it (hub#2252)', async () => {
+    // Two global notices in a row: the second must not read «nothing on screen yet» while the
+    // first is still being created, or «Installing…» (no duration) stays up for good.
+    let fail: (e: unknown) => void = () => {};
+    requestInstallMock.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
+    const w = mountApps('en');
+    await settle();
+    await pressInstall(w, 'flows');
+    createDelay.ms = 20;
+
+    mounted.splice(mounted.indexOf(w), 1);
+    w.unmount();
+    fail(runtimeFailure('The marketplace did not answer'));
+    await new Promise((r) => setTimeout(r, 80));
+    await settle();
+
+    const installing = enCatalogue.apps.installing.replace('{name}', 'Automations');
+    expect(globalToasts.map((g) => g.opts.message)).toEqual([installing, 'The marketplace did not answer']);
+    expect(globalToasts.map((g) => g.dismissed)).toEqual([true, false]);
   });
 
   it('the sticky «blocked» notice can be closed (no Retry: nothing changes until they subscribe)', async () => {

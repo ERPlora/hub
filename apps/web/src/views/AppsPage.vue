@@ -327,13 +327,19 @@ function onToastDismissed(): void {
 const pageToast = ref<{ $el: HTMLIonToastElement } | null>(null);
 let unmounted = false;
 let handedOver: HTMLIonToastElement | null = null;
+// One after another: `create` resolves later, and a second notice arriving meanwhile would read
+// «nothing on screen» and leave the first one («Installing…», no duration) up for good.
+let handOverQueue: Promise<void> = Promise.resolve();
 
-async function showHandedOver(msg: string, color: 'primary' | 'success' | 'danger', duration: number, buttons: ToastButton[]): Promise<void> {
-  const previous = handedOver;
-  const next = await toastController.create({ message: msg, color, duration, buttons, position: 'bottom' });
-  handedOver = next;
-  await previous?.dismiss();
-  await next.present();
+function showHandedOver(msg: string, color: 'primary' | 'success' | 'danger', duration: number, buttons: ToastButton[]): Promise<void> {
+  handOverQueue = handOverQueue.then(async () => {
+    const previous = handedOver;
+    const next = await toastController.create({ message: msg, color, duration, buttons, position: 'bottom' });
+    handedOver = next;
+    await previous?.dismiss();
+    await next.present();
+  }).catch((e: unknown) => console.error('hub#2252: handed-over notice failed', e));
+  return handOverQueue;
 }
 
 /** Shows a notice, replacing the one on screen (closed first, so the new one is re-presented). */
