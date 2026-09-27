@@ -305,6 +305,29 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
+  test('a document that fails for a reason of ours still throws, from goto and from reload', async ({
+    page,
+  }) => {
+    // The other side of the catch above: only a document the NETWORK killed is swallowed. Let the
+    // catch swallow every throw and a navigation that fails for a reason of ours (or times out)
+    // hands the spec `null` and a half-loaded page instead of its red — the blanket retry this
+    // bench must never become. Both doors go through that catch, so both are pinned.
+    await page.goto('/login');
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+
+    await page.route(
+      (url) => url.pathname === '/login',
+      async (route) => {
+        if (route.request().resourceType() !== 'document') return route.continue();
+        return route.abort('failed');
+      },
+    );
+
+    await expect(page.reload()).rejects.toThrow('net::ERR_FAILED');
+    await expect(page.goto('/login')).rejects.toThrow('net::ERR_FAILED');
+    expect(bootReloadsOf(page), 'a failure of ours must not be reloaded away').toEqual([]);
+  });
+
   test('a reload the spec asks for is recovered like a navigation', async ({ page }) => {
     // hub#2274, the same storm on the other door: `SettingsBillingBox.spec.ts` reloads the page to
     // prove a save persisted, and in run 36311751240 seven of the app's own modules died of
