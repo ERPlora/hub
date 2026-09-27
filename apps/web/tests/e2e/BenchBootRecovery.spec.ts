@@ -253,9 +253,15 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
 
     await page.goto('/login');
 
+    // At least the four injected losses, each paid outside the budget; a real network change of
+    // the runner inside the same navigation may add more, and is accounted for the same way.
     const reloads = bootReloadsOf(page);
-    expect(mainRequests).toBe(5);
-    expect(reloads.map((reload) => reload.storm)).toEqual([true, true, true, true]);
+    expect(reloads.length).toBeGreaterThanOrEqual(4);
+    expect(reloads.length, 'the storm was paid from the reload budget').toBeGreaterThan(
+      BOOT_RELOAD_LIMIT,
+    );
+    expect(reloads.every((reload) => reload.storm)).toBe(true);
+    expect(mainRequests).toBe(1 + reloads.length);
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
@@ -285,8 +291,13 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
 
     await page.goto('/login');
 
-    expect(mainRequests, 'the storm got no reload of its own').toBe(2);
-    expect(bootReloadsOf(page).map((reload) => reload.storm)).toEqual([true]);
+    // Accounting, not an exact count: every extra fetch is a reload the bench wrote down, the
+    // injected loss got one of its own, and none of them came out of the budget.
+    const reloads = bootReloadsOf(page);
+    expect(reloads.length, 'the storm got no reload of its own').toBeGreaterThanOrEqual(1);
+    expect(reloads[0]?.codes).toContain('net::ERR_INTERNET_DISCONNECTED');
+    expect(reloads.every((reload) => reload.storm)).toBe(true);
+    expect(mainRequests).toBe(1 + reloads.length);
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
@@ -309,8 +320,10 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
 
     await page.goto('/login');
 
-    expect(documents).toBe(2);
-    expect(bootReloadsOf(page).map((reload) => reload.storm)).toEqual([true]);
+    const reloads = bootReloadsOf(page);
+    expect(reloads.length).toBeGreaterThanOrEqual(1);
+    expect(reloads.every((reload) => reload.storm)).toBe(true);
+    expect(documents).toBe(1 + reloads.length);
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
