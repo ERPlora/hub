@@ -29,7 +29,13 @@ const INSTALLING = 'Instalando Automations';
 const INSTALLED = 'Automations instalado correctamente.';
 const ANSWER_AFTER_MS = 2500;
 
-interface Notice { text: string; top: number; bottom: number; left: number; right: number }
+interface Notice {
+  text: string;
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
 
 /** Every notice actually on screen: presented (not `overlay-hidden`) and with a box. */
 async function visibleNotices(page: Page): Promise<Notice[]> {
@@ -93,7 +99,9 @@ const SIZES = [
 
 test.describe('leaving Apps while an app installs (hub#2252)', () => {
   for (const { width, height } of SIZES) {
-    test(`${width}px: the error reaches the new screen, with «Reintentar», and «Instalando…» goes`, async ({ page }) => {
+    test(`${width}px: the error reaches the new screen, with «Reintentar», and «Instalando…» goes`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height });
       await installThenLeaveBySideMenu(page, 'error');
 
@@ -124,9 +132,7 @@ test.describe('leaving Apps while an app installs (hub#2252)', () => {
 
     await retry.click();
     await expect.poll(install.calls).toBe(2);
-    await expect
-      .poll(async () => (await visibleNotices(page)).some((n) => n.text.includes(INSTALLING)))
-      .toBe(true);
+    await expect.poll(async () => (await visibleNotices(page)).some((n) => n.text.includes(INSTALLING))).toBe(true);
   });
 
   test('a successful install says so on the new screen, and «Instalando…» goes', async ({ page }) => {
