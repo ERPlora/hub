@@ -1801,35 +1801,53 @@ case "\$*" in
 esac
 exit 0
 STUB
-    printf '#!/bin/sh\nexit 0\n' > "$bin/cargo"
+    # `cargo metadata` is the real one: the gate needs it to see that a web-only diff has no Rust
+    # (the path that runs the web stage BEFORE the lock and its EXIT trap exist).
+    printf '#!/bin/sh\n[ "$1" = metadata ] && exec "%s" "$@"\nexit 0\n' "$REAL_CARGO" > "$bin/cargo"
     chmod +x "$bin/pnpm" "$bin/cargo"
 }
+REAL_CARGO=$(command -v cargo)
+# Two paths reach the web stage and each restores the pin through its own EXIT trap: a web-only
+# diff (no Rust → web stage before the lock) and a diff that runs the Hub suite (web stage after
+# the lock, whose trap replaces the early one).
+for path in web-only suite; do
 for e2e_rc in 0 1 kill; do
     repo=$(web_default_repo)
     sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
     bin="${repo}-webbin"
     web_default_stubs "$bin" "$e2e_rc"
+    scope_env=HUB_GATE_SCOPE_POLICY=scoped
+    [ "$path" = suite ] && scope_env=HUB_GATE_SCOPE=workspace
     code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
         HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
         PATH="$bin:$PATH" DATABASE_URL=postgres://stub HUB_GATE_E2E_DB_CMD=true \
-        HUB_GATE_TEST_CMD="true")
+        HUB_GATE_TEST_CMD="true" "$scope_env")
     add_line=$(grep -n -- '--filter @erplora/web add @erplora/outfitkit@latest' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
     install_line=$(grep -n -- 'install --frozen-lockfile' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
+    verify_line=$(grep -nx -- 'verify' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
     e2e_line=$(grep -n -- 'test:e2e' "$bin/calls.log" 2>/dev/null | head -1 | cut -d: -f1)
     errs=""
     if [ "$e2e_rc" = 0 ]; then
         [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
-        label="web: la etapa por defecto prueba OutfitKit @latest como la CI y deja el pin como estaba (hub#2259)"
+        label="web ($path): la etapa por defecto prueba OutfitKit @latest como la CI y deja el pin como estaba (hub#2259)"
     elif [ "$e2e_rc" = 1 ]; then
         [ "$code" != 0 ] || errs="$errs exit=0(want red)"
-        label="web: con playwright en rojo el pin de OutfitKit también se restaura (hub#2259)"
+        label="web ($path): con playwright en rojo el pin de OutfitKit también se restaura (hub#2259)"
     else
         [ "$code" != 0 ] || errs="$errs exit=0(want killed)"
-        label="web: si matan el gate a mitad de playwright el pin de OutfitKit también se restaura (hub#2259)"
+        label="web ($path): si matan el gate a mitad de playwright el pin de OutfitKit también se restaura (hub#2259)"
+    fi
+    if [ "$path" = web-only ]; then
+        grep -q 'no Rust in this diff' "$repo/.out" || errs="$errs did-not-take-the-no-rust-path"
+    else
+        grep -q 'running the whole Hub suite' "$repo/.out" || errs="$errs did-not-take-the-suite-path"
     fi
     [ -n "$add_line" ] || errs="$errs no-outfitkit-latest-step"
     [ -n "$add_line" ] && [ -n "$install_line" ] && [ "$install_line" -lt "$add_line" ] \
         || errs="$errs latest-not-after-install"
+    # Same order as test-web.yml: vue-tsc + vitest run on @latest too, not only playwright.
+    [ -n "$add_line" ] && [ -n "$verify_line" ] && [ "$add_line" -lt "$verify_line" ] \
+        || errs="$errs latest-not-before-verify"
     [ -n "$add_line" ] && [ -n "$e2e_line" ] && [ "$add_line" -lt "$e2e_line" ] \
         || errs="$errs latest-not-before-e2e"
     grep -q e2e-saw-latest "$bin/calls.log" 2>/dev/null || errs="$errs e2e-ran-on-the-pin"
@@ -1839,6 +1857,27 @@ for e2e_rc in 0 1 kill; do
         && ok "$label" \
         || bad "$label" "$errs calls=$(tr '\n' '|' < "$bin/calls.log" 2>/dev/null) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 done
+done
+# A pin file that did not exist before the `add` does not exist after it either: the tree stays
+# the pushed tree (hub#855), not one with an untracked lockfile the worker never wrote.
+repo=$(web_default_repo)
+git -C "$repo" rm -q pnpm-lock.yaml
+git -C "$repo" commit -qm "no lockfile"
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+bin="${repo}-webbin"
+web_default_stubs "$bin" 0
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    PATH="$bin:$PATH" DATABASE_URL=postgres://stub HUB_GATE_E2E_DB_CMD=true \
+    HUB_GATE_TEST_CMD="true")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+grep -q e2e-saw-latest "$bin/calls.log" 2>/dev/null || errs="$errs e2e-ran-on-the-pin"
+[ ! -e "$repo/pnpm-lock.yaml" ] || errs="$errs lockfile-created-by-the-add-left-behind"
+git -C "$repo" diff --quiet -- apps/web/package.json || errs="$errs package-json-left-modified"
+[ -z "$errs" ] \
+    && ok "web: un fichero del pin que no existía antes del add @latest no queda después (hub#2259)" \
+    || bad "web: un fichero del pin que no existía antes del add @latest no queda después (hub#2259)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 
 # 2. Web en rojo = push ABORTADO (sin push no hay PR: es la puerta que pidió Ioan).
 repo=$(make_cargo_repo)
