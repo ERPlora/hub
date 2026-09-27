@@ -90,6 +90,9 @@ pub fn app(state: AppState) -> Router {
             "/api/devices/:device_id",
             axum::routing::delete(devices::revoke_device).put(devices::rename_device),
         )
+        // Quitar de golpe los que nadie usa desde hace 30 días (hub#2215): el mismo gate admin, y
+        // el dispositivo que lo pide nunca entra en el grupo. Ruta estática: gana a `:device_id`.
+        .route("/api/devices/prune", post(devices::prune_devices))
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
             "/api/profile",

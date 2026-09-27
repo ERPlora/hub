@@ -49,6 +49,54 @@
           <ion-note class="note" data-testid="devices-empty">{{ t('devices.empty') }}</ion-note>
         </ion-item>
 
+        <!-- hub#2215 — every sign-in from a new browser leaves a row, and one by one is not how
+             anybody clears thirty of them. One gesture for the ones nobody has used in 30 days; which
+             rows those are is the hub's call (`stale`), and the device in your hands never counts. -->
+        <ion-item v-if="isAdmin && staleCount > 0" lines="none">
+          <ion-button
+            fill="clear"
+            color="danger"
+            :disabled="busy"
+            data-testid="devices-prune"
+            @click="askPrune"
+          >
+            <HubIcon slot="start" name="trash-outline" />
+            {{ t('devices.pruneStale', { n: staleCount }, staleCount) }}
+          </ion-button>
+        </ion-item>
+
+        <ion-item
+          v-if="askingPrune && staleCount > 0"
+          lines="none"
+          class="confirm"
+          data-testid="devices-prune-confirm-block"
+        >
+          <ion-label>
+            <h3>{{ t('devices.pruneConfirm', { n: staleCount }, staleCount) }}</h3>
+            <p>{{ t('devices.pruneConsequence') }}</p>
+            <div class="actions">
+              <ion-button
+                size="small"
+                color="danger"
+                :disabled="busy"
+                data-testid="devices-prune-confirm"
+                @click="prune"
+              >
+                {{ t('devices.pruneAction') }}
+              </ion-button>
+              <ion-button
+                size="small"
+                fill="clear"
+                :disabled="busy"
+                data-testid="devices-prune-cancel"
+                @click="askingPrune = false"
+              >
+                {{ t('devices.cancel') }}
+              </ion-button>
+            </div>
+          </ion-label>
+        </ion-item>
+
         <template v-for="device in devices" :key="device.deviceId">
           <ion-item lines="none">
             <ion-label>
@@ -178,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import {
@@ -195,6 +243,7 @@ import {
 import HubIcon from './HubIcon.vue';
 import {
   listDevices,
+  pruneStaleDevices,
   renameDevice,
   revokeDevice,
   type HubDevice,
@@ -217,6 +266,11 @@ const naming = ref('');
 /** Lo tecleado en ese momento. */
 const draftName = ref('');
 const busy = ref(false);
+/** Whether the confirmation for clearing the unused devices is open (hub#2215). */
+const askingPrune = ref(false);
+
+/** The rows the clean-up would take: the hub marks them, and the one you are holding never counts. */
+const staleCount = computed(() => devices.value.filter((d) => d.stale && !d.current).length);
 
 /**
  * El mismo tope que impone la puerta (`crates/server/src/devices.rs`). Aquí no es la regla —el
@@ -259,7 +313,10 @@ function when(iso: string): string {
  */
 function activityOf(device: HubDevice): string {
   if (device.openSessions > 0) return t('devices.inUse');
-  if (device.lastSignIn) return t('devices.lastUsed', { when: when(device.lastSignIn) });
+  // hub#2215 — the hub remembers the last sign-in even after its session ended; before, a closed
+  // session erased it and a till used yesterday read «never used».
+  const lastUsed = device.lastUsedAt || device.lastSignIn;
+  if (lastUsed) return t('devices.lastUsed', { when: when(lastUsed) });
   return t('devices.neverUsed', { when: when(device.trustedAt) });
 }
 
@@ -283,7 +340,16 @@ function ask(deviceId: string): void {
   // Nunca las dos cosas abiertas a la vez: la confirmación de quitar y el campo del nombre en la
   // misma fila serían dos botones primarios con consecuencias muy distintas.
   naming.value = '';
+  askingPrune.value = false;
   asking.value = deviceId;
+}
+
+function askPrune(): void {
+  if (!isAdmin.value) return;
+  loadError.value = '';
+  asking.value = '';
+  naming.value = '';
+  askingPrune.value = true;
 }
 
 /** Abre el campo con el nombre que ya tiene, para corregir en vez de reescribir. */
@@ -291,6 +357,7 @@ function startNaming(device: HubDevice): void {
   if (!isAdmin.value) return;
   loadError.value = '';
   asking.value = '';
+  askingPrune.value = false;
   draftName.value = device.name;
   naming.value = device.deviceId;
 }
@@ -342,11 +409,29 @@ async function revoke(device: HubDevice): Promise<void> {
   }
 }
 
+/**
+ * Clears the unused devices in one go. The hub re-checks every row and keeps the one asking; the
+ * list is then reloaded from it, never patched here. A refusal is SAID and the rows stay put.
+ */
+async function prune(): Promise<void> {
+  if (!isAdmin.value || busy.value) return;
+  busy.value = true;
+  try {
+    await pruneStaleDevices();
+    askingPrune.value = false;
+    await load();
+  } catch (error) {
+    loadError.value = reasonOf(error, t('devices.pruneError'));
+  } finally {
+    busy.value = false;
+  }
+}
+
 onMounted(() => {
   void load();
 });
 
-defineExpose({ load, ask, revoke, startNaming, rename, devices });
+defineExpose({ load, ask, revoke, startNaming, rename, prune, devices });
 </script>
 
 <style scoped>

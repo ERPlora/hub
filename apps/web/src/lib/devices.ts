@@ -43,6 +43,16 @@ export interface HubDevice {
   lastSignIn: string;
   /** When the longest-lived of those runs out; `''` when nobody is signed in. */
   signedInUntil: string;
+  /**
+   * When it was really last used (hub#2215): its last sign-in, whether or not that session is still
+   * open. Written by the hub at every login. `''` = the hub knows nothing beyond its trust.
+   */
+  lastUsedAt: string;
+  /**
+   * `true` when nobody has used it for 30 days: the rows {@link pruneStaleDevices} would take,
+   * decided by the hub with the same rule the clean-up applies. Only a real `true` counts.
+   */
+  stale: boolean;
   /** `true` when this is the device the owner is holding right now. Decided by the **hub**. */
   current: boolean;
 }
@@ -145,6 +155,8 @@ export async function listDevices(): Promise<HubDevice[]> {
       openSessions: count(row.open_sessions),
       lastSignIn: text(row.last_sign_in),
       signedInUntil: text(row.signed_in_until),
+      lastUsedAt: text(row.last_used_at),
+      stale: row.stale === true,
       // Decided by the hub, which compares against the header it received. Guessing it here would
       // put the "this is the device you are holding" warning on the wrong row.
       current: row.current === true,
@@ -206,4 +218,24 @@ export async function revokeDevice(deviceId: string): Promise<Revocation> {
     sessionsClosed: count(data.sessions_closed),
     wasCurrent: data.was_current === true,
   };
+}
+
+/**
+ * Forget every device nobody has used for 30 days (`POST /api/devices/prune`, **admin session**,
+ * hub#2215), and answer how many went. The device asking is named in the header so the hub keeps
+ * it whatever its dates say; which rows qualify is the hub's call, never this client's.
+ */
+export async function pruneStaleDevices(): Promise<number> {
+  let res: Response;
+  try {
+    res = await fetch(`${RUNTIME_URL}/api/devices/prune`, {
+      method: 'POST',
+      headers: await headers(),
+    });
+  } catch (error) {
+    throw new DevicesError(error instanceof Error ? error.message : 'devices → offline');
+  }
+  const body = (await res.json().catch(() => null)) as { data?: Record<string, unknown> } | null;
+  if (!res.ok) throw rejection(body, res.status);
+  return count(body?.data?.removed);
 }

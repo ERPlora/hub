@@ -567,6 +567,15 @@ export default {
     adminOnly: 'Solo un administrador puede quitar un dispositivo.',
     loadError: 'No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.',
     revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+    // hub#2215 — quitar de golpe los dispositivos que ya nadie usa.
+    pruneStale:
+      'Quitar el dispositivo sin usar desde hace 30 días | Quitar los {n} dispositivos sin usar desde hace 30 días',
+    pruneConfirm:
+      '¿Quitar 1 dispositivo que nadie usa desde hace 30 días? | ¿Quitar {n} dispositivos que nadie usa desde hace 30 días?',
+    pruneConsequence:
+      'Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.',
+    pruneAction: 'Quitar',
+    pruneError: 'No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.',
   },
   pinPolicy: {
     lengthTitle: 'Dígitos del PIN',

@@ -2081,6 +2081,40 @@ CREATE INDEX IF NOT EXISTS ix_hub_activity_log_pending \
         kind: Kind::Expand,
         postgres: "ALTER TABLE _flow ADD COLUMN IF NOT EXISTS template_digest TEXT;",
     },
+    // ── v67 — hub#2215: WHEN a device was last used, kept past the end of its session ──────────
+    // Settings → Devices worked the "last used" line out of the sessions that are still OPEN, so a
+    // row whose session had run out said "added on X, never used since" — false — and every browser
+    // that lost its storage left one of those behind for good. Telling a dead browser from the
+    // counter till, and clearing the dead ones in one gesture, needs a date that survives the
+    // session: `last_seen_at`, written at the single funnel every login goes through
+    // (`identity::create_session_with_credential`) and by the online login that trusts the device.
+    //
+    // RFC 3339 UTC like `trusted_at`, `''` = «not known» (never NULL, the contract of the row).
+    // Additive and re-runnable (`ADD COLUMN IF NOT EXISTS`), so the auto-rollback leaves it behind
+    // (ADR-0269). When it was written the maximum was v66 on `origin/develop` and no remote ref
+    // asked for a v67 or a v68.
+    SystemMigration {
+        version: 67,
+        name: "hub_trusted_device_last_seen",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_trusted_device \
+                     ADD COLUMN IF NOT EXISTS last_seen_at TEXT NOT NULL DEFAULT '';",
+    },
+    // ── v68 — hub#2215: backfill of v67 from what the hub already knows ─────────────────────────
+    // Sessions are not swept when they expire (only a takeover's tombstones are), so the newest
+    // `created_at` of a device's sessions IS its last sign-in; a device with none left falls back to
+    // `trusted_at`, its first online login — a use too. `GREATEST` because a session can predate a
+    // re-trust. Idempotent: only rows still at `''` are written, so a re-run changes nothing.
+    SystemMigration {
+        version: 68,
+        name: "hub_trusted_device_last_seen_backfill",
+        kind: Kind::Backfill,
+        postgres: "UPDATE hub_trusted_device d \
+                      SET last_seen_at = GREATEST(d.trusted_at, COALESCE( \
+                            (SELECT MAX(s.created_at) FROM hub_session s \
+                              WHERE s.hub_id = d.hub_id AND s.device_id = d.device_id), '')) \
+                    WHERE d.last_seen_at = '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3524,6 +3558,73 @@ mod tests {
         apply(&db, "hub-test").await.unwrap();
     }
 
+    /// hub#2215 — the rows a deployed hub already has learn when they were last used from what the
+    /// hub kept: the newest sign-in of THEIR sessions (of this hub only), or their first trust when
+    /// no session is left. A mark already written is not touched, so a re-run changes nothing.
+    #[tokio::test]
+    async fn devices_already_trusted_inherit_their_last_sign_in_v68() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        apply(&db, "hub-test").await.unwrap();
+        db.execute_batch(
+            "INSERT INTO hub_trusted_device (hub_id, device_id, label, trusted_at, last_seen_at) VALUES \
+               ('hub-test', 'till-1', '', '2026-01-01T00:00:00+00:00', ''), \
+               ('hub-test', 'old-browser', '', '2026-02-01T00:00:00+00:00', ''), \
+               ('hub-test', 'marked', '', '2026-01-01T00:00:00+00:00', '2026-05-05T00:00:00+00:00'); \
+             INSERT INTO hub_session (token, hub_id, user_id, created_at, expires_at, device_id) VALUES \
+               ('t1', 'hub-test', 'u', '2026-03-01T00:00:00+00:00', '2026-03-01T12:00:00+00:00', 'till-1'), \
+               ('t2', 'hub-test', 'u', '2026-04-01T00:00:00+00:00', '2026-04-01T12:00:00+00:00', 'till-1'), \
+               ('t3', 'hub-next-door', 'u', '2026-09-01T00:00:00+00:00', '2026-09-01T12:00:00+00:00', 'till-1'), \
+               ('t4', 'hub-test', 'u', '2026-06-01T00:00:00+00:00', '2026-06-01T12:00:00+00:00', 'marked');",
+        )
+        .await
+        .unwrap();
+
+        let backfill = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_trusted_device_last_seen_backfill")
+            .expect("the backfill is in the catalogue");
+        for _ in 0..2 {
+            for stmt in split_statements(backfill.postgres) {
+                db.execute(&stmt, &Params::new()).await.unwrap();
+            }
+        }
+
+        let seen = |rows: &erplora_db::QueryResult, id: &str| {
+            rows.rows
+                .iter()
+                .find(|r| r["device_id"] == json!(id))
+                .map(|r| r["last_seen_at"].clone())
+                .unwrap_or_else(|| panic!("{id} is listed"))
+        };
+        let rows = db
+            .query(
+                "SELECT device_id, last_seen_at FROM hub_trusted_device WHERE hub_id = 'hub-test'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            seen(&rows, "till-1"),
+            json!("2026-04-01T00:00:00+00:00"),
+            "its newest sign-in HERE — the neighbour's September session is not this till's use"
+        );
+        assert_eq!(
+            seen(&rows, "old-browser"),
+            json!("2026-02-01T00:00:00+00:00"),
+            "no session left: its first trust, which was a use too"
+        );
+        assert_eq!(
+            seen(&rows, "marked"),
+            json!("2026-05-05T00:00:00+00:00"),
+            "a mark already written is the hub's own record and is not rewritten"
+        );
+    }
+
     /// hub#573: a system migration whose version is ≤ the max applied, but which is **not
     /// registered** as applied, is an **incoherent catalogue** — not "already done". Two parallel
     /// branches that picked the same number (or a migration that landed below the max after a
@@ -4056,7 +4157,13 @@ mod kind_contract_tests {
         // built before this column existed, with no backfill: an old digest is not recoverable.
         // `ADD COLUMN IF NOT EXISTS`, additive and re-runnable. When it was written the maximum was
         // v65 on `origin/develop` and no remote ref asked for a v66.
-        assert_eq!(MIGRATIONS.len(), 63, "el catálogo cambió de tamaño");
+        // + `hub_trusted_device_last_seen` (v67, hub#2215) and its backfill (v68): WHEN a device
+        // was last used, written at every login so it outlives the session — Settings → Devices
+        // stops saying «never used» about a till whose shift ended, and the bulk clean-up of
+        // unused devices has a date to judge by. The column is `ADD COLUMN IF NOT EXISTS … DEFAULT
+        // ''` (additive, re-runnable); the backfill only writes rows still at `''`. When it was
+        // written the maximum was v66 on `origin/develop` and no remote ref asked for a v67.
+        assert_eq!(MIGRATIONS.len(), 65, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

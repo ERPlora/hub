@@ -288,7 +288,17 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
   // `DevicesCard.test.ts` moves with them, in this same commit.
   'components/DevicesCard.vue': {
     prefix: 'devices-',
-    contract: ['devices-admin-only', 'devices-card', 'devices-empty', 'devices-error'],
+    contract: [
+      'devices-admin-only',
+      'devices-card',
+      'devices-empty',
+      'devices-error',
+      // hub#2215 — clearing the devices nobody uses in one gesture.
+      'devices-prune',
+      'devices-prune-cancel',
+      'devices-prune-confirm',
+      'devices-prune-confirm-block',
+    ],
     computed: [
       'devices-cancel-',
       'devices-cancel-name-',

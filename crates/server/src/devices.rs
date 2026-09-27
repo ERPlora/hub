@@ -1,5 +1,6 @@
-//! HTTP door of **the devices of a business** (hub#455): `GET /api/devices` and
-//! `DELETE /api/devices/:device_id`.
+//! HTTP door of **the devices of a business** (hub#455): `GET /api/devices`,
+//! `DELETE /api/devices/:device_id`, `PUT /api/devices/:device_id` (hub#494) and
+//! `POST /api/devices/prune` (hub#2215).
 //!
 //! The gesture it exists for is "somebody walked off with the tablet". `untrust_device` had been in
 //! the runtime since hub#15 holding up half the security argument of hub#357/hub#358, and no route
@@ -208,6 +209,35 @@ pub async fn revoke_device(
         .into_response(),
         // A blank segment (`/api/devices/%20`) is a mis-built URL, not an instruction: the runtime
         // refuses it (422) instead of running a `DELETE` keyed on nothing.
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/devices/prune — forget every device nobody has used for thirty days (hub#2215).
+///
+/// Every browser that loses its storage comes back as a new device, and the row of the old one
+/// stayed in the list for good. This is the "remove the ones you no longer use" of the account
+/// screens people know (Google, Apple, Microsoft): one gesture, with the rule decided by the
+/// runtime (`devices::STALE_AFTER_DAYS`, `stale` on each row of the list) so the count the screen
+/// shows is the count that goes.
+///
+/// Auth = **admin session**, like the revocation it repeats. The device asking (`X-Device-Id`) is
+/// **kept** whatever its dates say — here the header decides something, but only in the direction
+/// of taking LESS: naming a device can spare it, never add one. No body: the window is not the
+/// caller's to choose, because a shorter one is how the counter till that has no session at night
+/// would go.
+pub async fn prune_devices(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match runtime(&st).await {
+        Ok(arc) => arc,
+        Err(response) => return response,
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.prune_stale_devices(device_id_of(&headers)).await {
+        Ok(pruned) => Json(json!({ "ok": true, "data": { "removed": pruned.removed } }))
+            .into_response(),
         Err(e) => crate::err_response(e),
     }
 }
