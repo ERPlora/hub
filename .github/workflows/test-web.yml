@@ -381,10 +381,12 @@ jobs:
             echo "E2E_DATABASE_URL=postgres://postgres:test@localhost:${PG_PORT}/hub_e2e_assistant"
           } >> "$GITHUB_ENV"
 
-      # `--with-deps`: un runner limpio no tiene las librerías del sistema que pide Chromium, y sin
-      # ellas el navegador muere al lanzarse con un error que no menciona ninguna dependencia.
+      # `--with-deps`: a clean runner lacks the system libraries Chromium needs, and without them
+      # the browser dies on launch with an error that names no dependency. It runs `apt-get`, so
+      # it goes through the wrapper that waits out another job's apt lock on the shared runner
+      # (infra#313).
       - name: Instalar el navegador de Playwright
-        run: pnpm -F @erplora/web exec playwright install --with-deps chromium
+        run: bash scripts/ci/apt-lock-retry.sh pnpm -F @erplora/web exec playwright install --with-deps chromium
 
       - name: pnpm -F @erplora/web test:e2e
         id: e2e
