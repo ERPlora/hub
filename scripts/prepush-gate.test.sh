@@ -631,9 +631,10 @@ sleep 2
 log="$repo/.state/publish-status.log"
 errs=""
 [ "$code" = 0 ]                             || errs="$errs exit=$code(want 0)"
-grep -qi 'could not be published' "$log" 2>/dev/null || errs="$errs no-verdict"
-grep -q 'HTTP 403' "$log" 2>/dev/null       || errs="$errs no-gh-error"
-grep -q 'other-company' "$log" 2>/dev/null  || errs="$errs no-account"
+# The report is written by the same background step as the seal: wait for it.
+await_grep "$log" -i 'could not be published' || errs="$errs no-verdict"
+await_grep "$log" 'HTTP 403'                   || errs="$errs no-gh-error"
+await_grep "$log" 'other-company'              || errs="$errs no-account"
 [ -z "$errs" ] \
     && ok "the status POST failing is reported, not swallowed" \
     || bad "the status POST failing is reported, not swallowed" "$errs log=$(head -3 "$log" 2>/dev/null)"
@@ -1899,6 +1900,9 @@ GH
         HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true" \
         SKIP_HUB_WEB="$skip" >/dev/null
     sleep 2
+    # The control run must wait for its seal (published in the background, hub#2277);
+    # the skipped run keeps the fixed wait: it asserts that nothing was posted.
+    [ "$skip" = 1 ] || await_line "$repo/POSTARGS" context=local-gate/hub-tests
     tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null
 }
 # Control primero: corriendo TODO si atestigua (si no, el caso de abajo no probaria nada).
