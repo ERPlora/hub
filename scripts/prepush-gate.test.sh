@@ -64,6 +64,24 @@ run_hook() {
     echo $?
 }
 
+# The hook publishes its seal in the BACKGROUND and returns without waiting for it,
+# so a case that reads STATUS the instant the hook returns races the publisher and
+# goes red on a loaded machine with the seal landing a moment later (hub#2277).
+# `await_grep <file> <grep args…>` polls until $file matches, up to SEAL_WAIT_SECS; a
+# seal that is never published still fails, only later. `await_line <file> <line>`
+# waits for that exact line. The fake `gh` that writes POSTED/POSTARGS is reached by
+# the same background step, so its readers wait the same way.
+SEAL_WAIT_SECS="${SEAL_WAIT_SECS:-15}"
+await_grep() {
+    local file=$1 deadline=$((SECONDS + SEAL_WAIT_SECS))
+    shift
+    until grep -q "$@" "$file" 2>/dev/null; do
+        [ "$SECONDS" -lt "$deadline" ] || return 1
+        sleep 0.1
+    done
+}
+await_line() { await_grep "$1" -xF -- "$2"; }
+
 echo "pre-push local gate"
 
 # ── 1. Disarmed is the default: it must never block anyone ────────────────────
@@ -119,8 +137,8 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_STATE_DIR="$repo/.state" \
     HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
     HUB_GATE_TEST_CMD="true")
-sleep 1   # the status is published in the background, after the push lands
-[ "$code" = 0 ] && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
+# The status is published in the background, after the push lands.
+[ "$code" = 0 ] && await_line "$repo/STATUS" "$sha" && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
     && ok "green suite: push proceeds and the status carries the pushed sha" \
     || bad "green suite: push proceeds and the status carries the pushed sha" "exit=$code status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
 
@@ -180,11 +198,10 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_DEPTH=full \
     HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
     HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
-sleep 1
 [ "$code" = 0 ] && [ -s "$repo/SUITE" ] && [ ! -s "$repo/FAST" ] \
     && ok "depth=full (control): corre la SUITE y no el rápido" \
     || bad "depth=full (control): corre la SUITE y no el rápido" "exit=$code suite=$(cat "$repo/SUITE" 2>/dev/null) fast=$(cat "$repo/FAST" 2>/dev/null)"
-[ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
+await_line "$repo/STATUS" "$sha" && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
     && ok "depth=full (control): SÍ atestigua sobre el sha empujado" \
     || bad "depth=full (control): SÍ atestigua" "status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
 
@@ -644,7 +661,7 @@ sleep 2
 out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                    || errs="$errs exit=$code(want 0)"
-[ -f "$repo/POSTED" ]              || errs="$errs not-posted"
+await_line "$repo/POSTED" posted   || errs="$errs not-posted"
 grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
 [ -z "$errs" ] \
     && ok "green + a working gh: the status is posted and nothing cries wolf" \
@@ -725,7 +742,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 sleep 2
 errs=""
 [ "$code" = 0 ]                                              || errs="$errs exit=$code(want 0)"
-grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-hook-hash-in-description args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)"
+await_grep "$repo/POSTARGS" -E 'hook [0-9a-f]{12}'           || errs="$errs no-hook-hash-in-description args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)"
 [ -z "$errs" ] \
     && ok "the posted status says which hook attested (12-hex hash)" \
     || bad "the posted status says which hook attested (12-hex hash)" "$errs"
@@ -1070,7 +1087,7 @@ sleep 2
 out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                || errs="$errs exit=$code(want 0)"
-[ -f "$repo/POSTED" ]                          || errs="$errs not-posted"
+await_line "$repo/POSTED" posted               || errs="$errs not-posted"
 grep -qi 'verified on origin' <<<"$out"        || errs="$errs message-does-not-defer-to-verification"
 grep -qiE 'green → pushing|green -> pushing' <<<"$out" && errs="$errs still-claims-pushing"
 [ -z "$errs" ] \
@@ -1103,7 +1120,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 sleep 2
 errs=""
 [ "$code" = 0 ]           || errs="$errs exit=$code(want 0)"
-[ -f "$repo/POSTED" ]     || errs="$errs not-posted log=$(head -8 "$repo/.state/publish-status.log" 2>/dev/null | tr '\n' ' ')"
+await_line "$repo/POSTED" posted || errs="$errs not-posted log=$(head -8 "$repo/.state/publish-status.log" 2>/dev/null | tr '\n' ' ')"
 [ -z "$errs" ] \
     && ok "ref moved past the sha: still counts as landed (ancestor check), status posts" \
     || bad "ref moved past the sha: still counts as landed (ancestor check), status posts" "$errs"
@@ -1294,6 +1311,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
     HUB_GATE_TEST_CMD="true")
 sleep 2
+await_grep "$repo/POSTARGS" -e '^description='
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                    || errs="$errs exit=$code(want 0)"
@@ -1461,6 +1479,7 @@ GH
         HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
         HUB_GATE_TEST_CMD="true")
     sleep 2
+    await_grep "$repo/POSTARGS" -e '^description='
     args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
     errs=""
     [ "$code" = 0 ]                          || errs="$errs exit=$code(want 0)"
@@ -1495,6 +1514,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
     HUB_GATE_TEST_CMD="true")
 sleep 2
+await_grep "$repo/POSTARGS" -e '^description='
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                     || errs="$errs exit=$code(want 0)"
@@ -2263,6 +2283,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
 sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
           # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+await_line "$repo/POSTARGS" context=local-gate/hub-web
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
@@ -2297,6 +2318,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true" HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
 sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
           # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+await_line "$repo/POSTARGS" context=local-gate/no-suite-needed
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
@@ -2333,6 +2355,8 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
 sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
           # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+await_line "$repo/POSTARGS" context=local-gate/hub-tests
+await_line "$repo/POSTARGS" context=local-gate/hub-web
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                   || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
@@ -2580,7 +2604,7 @@ out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                   || errs="$errs exit=$code(want 0)"
 [ ! -f "$repo/RAN" ]                              || errs="$errs suite-rerun-on-an-already-proven-tree"
-grep -q "^$prom local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+await_line "$repo/STATUS" "$prom local-gate/hub-tests-ci" \
                                                   || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')(want $prom local-gate/hub-tests-ci)"
 # The proof is Actions', so it must NOT be filed as a local green: the next
 # push would then claim `local-gate/hub-tests` — a run on this machine that
@@ -2733,14 +2757,17 @@ sha=$(git -C "$repo" rev-parse HEAD)
 git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
 echo two > "$repo/file"
 git -C "$repo" commit -qam two
+# hub#2277: the publisher lands LATE on purpose (`sleep 1`), as it does on a loaded
+# machine — the seal is published in the background, so the case must wait for it
+# instead of reading STATUS the instant the hook returns.
 code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
     HUB_GATE_STATE_DIR="$repo/.state" \
-    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_STATUS_CMD="sleep 1; printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
     HUB_GATE_CI_CHECKS_CMD="printf 'cancelled\tcargo test --workspace\nsuccess\tcargo test --workspace\n'" \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 errs=""
 [ "$code" = 0 ]                            || errs="$errs exit=$code(want 0)"
-grep -q "^$sha local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+await_line "$repo/STATUS" "$sha local-gate/hub-tests-ci" \
                                            || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')"
 [ -z "$errs" ] \
     && ok "hub#1679: a cancelled twin next to the green one — still sealed" \
