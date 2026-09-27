@@ -2261,6 +2261,34 @@ PY
     && ok "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" \
     || bad "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" "$mismatch"
 
+# (a2) …and triggering is not enough: the default light command RUNS the check of every light
+#      file. `web-format.test.sh` (hub#2156) and `merge-check-tree*` (pm#331) entered
+#      `on.push.paths` without entering the hook; listing them alone would trigger a stage that
+#      never runs them — green with the contract unproven.
+light_gap=$(HOOK="$HOOK" python3 - <<'PY'
+import os, re
+hook = open(os.environ["HOOK"], encoding="utf-8").read()
+m = re.search(r'^WEB_LIGHT_FILES="([^"]*)"', hook, re.M)
+files = m.group(1).split() if m else []
+m = re.search(r"light_cmd='([^']*)'", hook)
+cmd = m.group(1) if m else ""
+def check_of(f):
+    if f == ".github/workflows/test-web.yml":
+        return "scripts/tests/test-web-workflow.test.sh"
+    ci = re.match(r"^scripts/ci/(.+)\.sh$", f)
+    return "scripts/tests/%s.test.sh" % ci.group(1) if ci else f
+if not files or not cmd:
+    print("NO-PUDE-LEER-WEB_LIGHT_FILES-o-light_cmd")
+else:
+    gaps = [f for f in files if check_of(f) not in cmd]
+    if gaps:
+        print("sin-comprobacion-en-light_cmd: " + " ".join(gaps))
+PY
+)
+[ -z "$light_gap" ] \
+    && ok "hub#1356: la etapa ligera corre la comprobación de cada fichero que la dispara" \
+    || bad "hub#1356: la etapa ligera corre la comprobación de cada fichero que la dispara" "$light_gap"
+
 # (b) Tocar SOLO la guardia dispara la etapa — hoy no dispara nada.
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true

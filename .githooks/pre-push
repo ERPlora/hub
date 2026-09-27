@@ -573,14 +573,16 @@ ensure_postgres() {
 WEB_PREFIXES="apps/web/ packages/"
 WEB_FILES="package.json pnpm-lock.yaml pnpm-workspace.yaml"
 # Los que DEFINEN la tubería web en vez de ser la app: la guardia que `pnpm verify` corre
-# primero (hub#1244/#1247), el contrato del workflow y el propio YAML. Faltaban de la lista,
+# primero (hub#1244/#1247), el contrato del workflow y el propio YAML — y, desde hub#2259, el
+# contrato del formato del shell (hub#2156) y el árbol del merge-check (pm#331), que entraron en
+# `on.push.paths` sin entrar aquí. Faltaban de la lista,
 # y sin `pull_request` en `test-web.yml` eso dejaba un agujero: un push que solo tocara uno
 # de los tres no disparaba la etapa web en local NI ningún check en la nube — la única red
 # era el push a develop/main, o sea POST-MERGE (hub#1356).
 # Disparan, sí, pero por el camino BARATO: lo que cambió es la guardia, no el navegador.
 # Meterlos en la lista de arriba haría que un comentario del YAML se llevara
 # `cargo build` + `vite build` + playwright, ~20-40 min por nada.
-WEB_LIGHT_FILES="scripts/tests/no-dead-packages.test.mjs scripts/tests/test-web-workflow.test.sh .github/workflows/test-web.yml"
+WEB_LIGHT_FILES="scripts/tests/no-dead-packages.test.mjs scripts/tests/test-web-workflow.test.sh .github/workflows/test-web.yml scripts/tests/web-format.test.sh scripts/ci/merge-check-tree.sh scripts/tests/merge-check-tree.test.sh"
 # Si no hay base contra la que diffear no se sabe qué toca el cambio. Para Rust el gate ya se
 # ensancha al workspace; aquí igual —pero solo si este repo TIENE web: ensanchar en un repo sin
 # `apps/web` no protegería nada y rompería cualquier push (no hay `package.json` que instalar).
@@ -722,8 +724,8 @@ run_web_stage() {
         return 0
     fi
 
-    # Nivel LIGERO: solo lo que esos ficheros gobiernan de verdad. Node basta —la guardia
-    # usa únicamente builtins—, así que no hace falta `pnpm install` ni Postgres ni docker.
+    # Nivel LIGERO: solo lo que esos ficheros gobiernan de verdad. Ni Postgres ni docker ni
+    # navegador; el único `pnpm install` (congelado) es el que necesita el contrato del formato.
     #
     # 🔴 Corre SIEMPRE que el diff toque la tubería web, TAMBIÉN cuando además corre la
     # etapa completa. No son excluyentes: la completa se para en `pnpm verify`, que
@@ -741,8 +743,13 @@ run_web_stage() {
             if [ -n "${HUB_GATE_WEB_LIGHT_CMD:-}" ]; then
                 light_cmd="$HUB_GATE_WEB_LIGHT_CMD"
             else
+                # `web-format.test.sh` runs prettier from node_modules: the one check here
+                # that needs `pnpm install` (frozen — it rewrites nothing in the tree).
                 light_cmd='node --test scripts/tests/no-dead-packages.test.mjs \
-                    && bash scripts/tests/test-web-workflow.test.sh'
+                    && bash scripts/tests/test-web-workflow.test.sh \
+                    && bash scripts/tests/merge-check-tree.test.sh \
+                    && pnpm install --frozen-lockfile \
+                    && bash scripts/tests/web-format.test.sh'
             fi
             echo "🧪 pre-push: el diff toca la tubería web (guardia/contrato/YAML) → sus comprobaciones…" >&2
             if ! eval "$light_cmd"; then
