@@ -204,6 +204,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',
       'sync-modules.test.mjs',
+      'vitest-run.test.mjs',
       'vite.config.test.ts',
       'outfitkit-version.test.ts',
       // hub#1752 — un GLOB, no la lista de ficheros que había aquí: `include` es un allowlist,
