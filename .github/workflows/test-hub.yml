@@ -202,11 +202,43 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
-      # Sin `fetch-depth`: el default (1 commit) basta. Los dos commits que se pedían aquí eran
-      # para el `git diff HEAD^1 HEAD` del paso de alcance, y ese paso se fue con hub#1463 — nada
-      # más en este workflow lee historia.
+      # `fetch-depth: 2`: en una PR el checkout es el merge commit (refs/pull/N/merge) y su primer
+      # padre es la base; el paso `scope` necesita los dos para `git diff HEAD^1 HEAD`.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # 26/09: una PR que no toca Rust NO ocupa un runner con la suite de Rust. 43 de las 60 PRs
+      # del hub desde el 24/09 no tocaban Rust y cada una retenía un runner ~47 min (clippy 3 +
+      # `cargo test --workspace` 44) para no probar nada, con las PRs de módulo en cola detrás.
+      # Decide scripts/ci/touches-rust.sh: fuentes Rust + todo lo de fuera de `crates/` que un test
+      # de Rust LEE (su contrato lo escanea y se pone rojo si falta alguno). Fuera de una PR, y si
+      # el diff no se puede leer, rust=true: el `push` a develop/main corre SIEMPRE todo (hub#572).
+      - name: Alcance de la suite (una PR sin Rust no corre clippy ni cargo test)
+        id: scope
+        run: |
+          set -uo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"; echo "no es una PR (${{ github.event_name }}): suite completa"; exit 0
+          fi
+          if ! files=$(git diff --name-only HEAD^1 HEAD); then
+            echo "::warning::no pude leer el diff de la PR: corro la suite completa"
+            echo "rust=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Solo el «no» explícito (exit 1) omite la suite: cualquier otro fallo del clasificador
+          # (no está, no arranca) cuenta como «sí», y los `if:` de abajo son `!= 'false'` para que
+          # una salida ausente (paso fallido) también corra la suite, nunca la salte en silencio.
+          rc=0; printf '%s\n' "$files" | bash scripts/ci/touches-rust.sh || rc=$?
+          if [ "$rc" -eq 1 ]; then
+            echo "rust=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Suite de Rust omitida::esta PR no toca Rust ni nada que los tests de Rust lean; la suite corre igualmente en el push a develop (hub#572)."
+          else
+            echo "rust=true" >> "$GITHUB_OUTPUT"; echo "la PR toca Rust (o algo que Rust lee), o el clasificador falló (rc=$rc): suite completa"
+          fi
+
+      - name: Contrato del clasificador de alcance (scripts/tests/touches-rust.test.sh)
+        run: bash scripts/tests/touches-rust.test.sh
 
       # Contrato del cableado de lints (hub#1242): que la tabla `[workspace.lints]` exista, que
       # TODOS los miembros la hereden y que el paso de clippy de más abajo siga aquí y antes de la
@@ -425,6 +457,7 @@ jobs:
       # el propio `timeout` no llegara a arrancar.
       - name: cargo clippy --workspace
         id: clippy
+        if: steps.scope.outputs.rust != 'false'
         timeout-minutes: 8
         run: |
           set -uo pipefail
@@ -453,6 +486,7 @@ jobs:
       # dejar el `cancelled` mudo que bloqueaba la cola.
       - name: cargo test --workspace (sin doc-tests)
         id: tests
+        if: steps.scope.outputs.rust != 'false'
         timeout-minutes: 50
         run: |
           set -uo pipefail
@@ -478,6 +512,7 @@ jobs:
       # coger nada, esto se pone rojo en vez de mentir.
       - name: cargo test --doc (doc-tests, contados)
         id: doctests
+        if: steps.scope.outputs.rust != 'false'
         timeout-minutes: 8
         run: |
           set -uo pipefail

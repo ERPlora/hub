@@ -669,3 +669,47 @@ describe('comandaRoute — who prints a kitchen ticket (hub#2029)', () => {
     expect(comandaRoute({})).toBe('queue');
   });
 });
+
+// hub#2257 — the floor used to read the door's reason as it came («el runtime rechazó el
+// encolado», `sin papel`), or the literal «sin impresora» on a hub in English. The reason is for
+// whoever diagnoses the printer, not for the waiter: it travels as a CODE and goes to the log; the
+// sentence is the notice's (print-comanda-notice.ts). Same recipe as the receipt's (hub#2239).
+describe('the reason a kitchen order did not print is for the log, not for the floor (hub#2257)', () => {
+  it('a door that gives no reason still hands over a code, not a sentence in one language', async () => {
+    const print = vi.fn(async () => ({ via: 'none' as const, role: 'kitchen' }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0].error).toMatch(/^[a-z][a-z_]*$/);
+  });
+
+  it('so does a queue with nobody set up for that station', async () => {
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen', awaitingHost: true }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, onFailure });
+    expect(onFailure.mock.calls[0]![0].error).toMatch(/^[a-z][a-z_]*$/);
+  });
+
+  for (const [what, print] of [
+    ['the door’s own reason', async () => ({ via: 'none' as const, role: 'kitchen', error: 'el runtime rechazó el encolado' })],
+    [
+      'the reason the door threw',
+      async () => {
+        throw new Error('el runtime rechazó el encolado');
+      },
+    ],
+  ] as const) {
+    it(`${what} is written to the log, with the order and the station`, async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print: vi.fn(print), onFailure: vi.fn() });
+        const logged = warn.mock.calls.map((c) => c.map(String).join(' '));
+        expect(
+          logged.some((l) => l.includes('el runtime rechazó el encolado') && l.includes('k-1') && l.includes('kitchen')),
+        ).toBe(true);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  }
+});

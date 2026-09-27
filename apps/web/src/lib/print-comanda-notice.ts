@@ -7,28 +7,40 @@
 // - Waiting for a printer (hub#1731): the docket is safe in the queue and comes out on its own once
 //   that station's printer is set up — but until then nobody in the kitchen picks it up, so the dish
 //   is not started. Not a fault, yet someone has to act: warning, long enough to read.
-// - Lost on the way: the docket did not come out — error (reprint from the KDS).
+// - Lost on the way: the docket did not come out — error, as long as a sentence with an instruction;
+//   it says what to do, never the machine's reason (hub#2257): that one is logged by `print-comanda.ts`.
+//
+// Both name the station in the app's language (hub#2257), not in the code's word («kitchen»).
 import type { ComandaPrintFailure } from './print-comanda';
-import { ERROR_MS, READ_A_SENTENCE_MS, type PrintNotice } from './print-on-sale-notice';
+import { READ_A_SENTENCE_MS, type PrintNotice } from './print-on-sale-notice';
+
+/** The slice of the app's catalogue the notice reads: the words that fill its sentence. */
+export interface NoticeWords {
+  t: (key: string) => string;
+}
+
+// The stations with a word of their own in the catalogue (pinned en + es by the notice's test).
+const STATION_KEY: Record<string, string> = {
+  kitchen: 'print.stationKitchen',
+  bar: 'print.stationBar',
+};
+
+/** A station the catalogue does not know is named as it is, never as a broken key. */
+function stationName(role: string, words: NoticeWords): string {
+  const key = STATION_KEY[role];
+  return key ? words.t(key) : role;
+}
 
 /**
- * `defaultLabel` names a docket with no label of its own (takeaway, no table plan) — the caller
- * owns i18n (ADR-0055), so it comes already translated.
+ * `words` is the app's catalogue (the caller owns the language, ADR-0055): it names the station and
+ * a docket with no label of its own (takeaway, no table plan).
  */
-export function comandaFailureNotice(f: ComandaPrintFailure, defaultLabel: string): PrintNotice {
-  const label = f.label || defaultLabel;
+export function comandaFailureNotice(f: ComandaPrintFailure, words: NoticeWords): PrintNotice {
+  const params = { label: f.label || words.t('print.comandaDefaultLabel'), station: stationName(f.role, words) };
   if (f.awaitingHost) {
-    return {
-      messageKey: 'print.comandaWaitingForPrinter',
-      params: { label, role: f.role },
-      color: 'warning',
-      duration: READ_A_SENTENCE_MS,
-    };
+    return { messageKey: 'print.comandaWaitingForPrinter', params, color: 'warning', duration: READ_A_SENTENCE_MS };
   }
-  return {
-    messageKey: 'print.comandaFailed',
-    params: { label, role: f.role, error: f.error },
-    color: 'danger',
-    duration: ERROR_MS,
-  };
+  // hub#2257: the door's reason (`f.error`) is for the log — it told the floor nothing to act on.
+  // Its sentence carries the way out, so it stays up as long as the waiting one, not toastError's.
+  return { messageKey: 'print.comandaFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS };
 }
