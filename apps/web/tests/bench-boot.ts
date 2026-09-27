@@ -369,6 +369,9 @@ export const test = base.extend({
     const appOrigin = originOf(baseURL);
     const isOwn = (url: string): boolean => appOrigin !== undefined && originOf(url) === appOrigin;
     const lost: string[] = [];
+    // When the first request of ours died on the wire in the current navigation: the storm's age
+    // is counted from here, not from the navigation's start (hub#2270).
+    let firstLossAt: number | undefined;
     const inFlight = new Set<object>();
     let ownFailures = 0;
     let lastActivity = Date.now();
@@ -385,6 +388,7 @@ export const test = base.extend({
       if (inFlight.delete(req)) lastActivity = Date.now();
       const errorText = req.failure()?.errorText;
       if (isBootTransportFailure(req.url(), errorText, baseURL)) {
+        firstLossAt ??= Date.now();
         lost.push(errorText as string);
       } else if (isOwn(req.url()) && errorText !== 'net::ERR_ABORTED') {
         // A failure of ours that is not the network's: the load is over, and it is the spec's red.
@@ -450,16 +454,20 @@ export const test = base.extend({
     ): Promise<Awaited<ReturnType<typeof navigate>>> => {
       lost.length = 0;
       ownFailures = 0;
+      firstLossAt = undefined;
       const books: BootReload[] = [];
       booksByPage.set(page, books);
-      const started = Date.now();
       let counted = 0;
       let response = await attempt(first);
 
       for (;;) {
         await settle();
         const codes = [...new Set(lost)];
-        const step = nextBootStep(codes, counted, Date.now() - started);
+        // The age of the storm, never of the navigation: a first load that was merely slow (Vite
+        // transforming the shell cold, a loaded runner) must not spend the budget before anything
+        // died.
+        const stormAge = firstLossAt === undefined ? 0 : Date.now() - firstLossAt;
+        const step = nextBootStep(codes, counted, stormAge);
         if (step === 'hand-over') break;
         const storm = step === 'reload-storm';
         if (!storm) counted += 1;

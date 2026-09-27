@@ -24,6 +24,7 @@ import {
   BOOT_SETTLE_MS,
   bootReloadsOf,
   expect,
+  NETWORK_CHANGE_BUDGET_MS,
   test,
   type Page,
 } from '../bench-boot';
@@ -258,27 +259,25 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
-  test('a network that never comes back still ends red, after its time budget', async ({
-    page,
-  }) => {
-    // The other half of B: the storm budget is TIME, and it ends. A runner whose network never
-    // settles has to give the spec an empty page, not a bench that reloads forever — delete the
-    // budget from `nextBootStep` and this test hangs until Playwright kills it.
+  test('a storm that starts after a slow first load still gets its reloads', async ({ page }) => {
+    // The storm budget is the age of the STORM, not of the navigation. A first load that is slow
+    // before anything dies — Vite transforming the shell cold, a runner six jobs deep — used to
+    // spend the whole budget before the first decision, and the bench handed over an empty `#app`
+    // without a single reload (measured on the loaded pre-push gate of 27/09: 0 reloads).
+    test.setTimeout(NETWORK_CHANGE_BUDGET_MS + 60_000);
     let mainRequests = 0;
     await page.route('**/src/main.ts', async (route) => {
       mainRequests += 1;
-      await route.abort('internetdisconnected');
+      if (mainRequests > 1) return route.continue();
+      await new Promise((resolve) => setTimeout(resolve, NETWORK_CHANGE_BUDGET_MS + 1_000));
+      return route.abort('internetdisconnected');
     });
 
     await page.goto('/login');
 
-    const reloads = bootReloadsOf(page);
-    expect(reloads.length, 'the storm was not reloaded past the budget').toBeGreaterThan(
-      BOOT_RELOAD_LIMIT,
-    );
-    expect(reloads.every((reload) => reload.storm)).toBe(true);
-    expect(mainRequests).toBe(1 + reloads.length);
-    await expect(page.locator('#app')).toBeEmpty();
+    expect(mainRequests, 'the storm got no reload of its own').toBe(2);
+    expect(bootReloadsOf(page).map((reload) => reload.storm)).toEqual([true]);
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
   test('a document that dies of a network change is fetched again instead of throwing', async ({
