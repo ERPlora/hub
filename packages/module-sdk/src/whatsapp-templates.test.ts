@@ -115,7 +115,7 @@ test('hub#1682: an unscoped client has NO template surface — naming yourself i
   );
 });
 
-test('hub#1682: the surface is THREE methods and nothing else', async () => {
+test('hub#1682: the surface is FOUR methods and nothing else', async () => {
   const { client, calls } = scoped();
   const templates = client.whatsappTemplates;
 
@@ -125,7 +125,9 @@ test('hub#1682: the surface is THREE methods and nothing else', async () => {
   const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(templates))
     .filter((n) => n !== 'constructor')
     .sort();
-  assert.deepEqual(methods, ['list', 'register', 'remove']);
+  // hub#2232 added the fourth, `uploadHeaderSample`, to ONE fixed path of its own (pinned in
+  // `whatsapp-template-header-samples.test.ts`).
+  assert.deepEqual(methods, ['list', 'register', 'remove', 'uploadHeaderSample']);
 
   // 2. Every URL the surface can produce lands under ONE prefix.
   await templates.list();

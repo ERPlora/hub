@@ -264,6 +264,13 @@ pub fn app(state: AppState) -> Router {
             "/api/hub/whatsapp/templates/:name",
             axum::routing::delete(whatsapp_templates::whatsapp_template_delete),
         )
+        // A template header's sample — photo, video or PDF (hub#2232, saas#2377): same gate as the
+        // templates door; the form is relayed in streaming, never read whole (a PDF weighs 100 MB),
+        // so no `DefaultBodyLimit` applies and the handler holds the line on the declared length.
+        .route(
+            "/api/hub/whatsapp/template-header-samples",
+            post(whatsapp_header_samples::whatsapp_template_header_sample),
+        )
         // A customer's photo, voice note, video or document (hub#2114, saas#2285): Meta hands an
         // asset id, the SaaS swaps it for the bytes, the runtime streams them with its machine
         // credential. Read-only; gated on reading the inbox plus `notify:whatsapp` for a module.
