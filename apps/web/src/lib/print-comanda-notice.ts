@@ -7,12 +7,12 @@
 // - Waiting for a printer (hub#1731): the docket is safe in the queue and comes out on its own once
 //   that station's printer is set up — but until then nobody in the kitchen picks it up, so the dish
 //   is not started. Not a fault, yet someone has to act: warning, long enough to read.
-// - Lost on the way: the docket did not come out — error; the sentence says what to do, never the
-//   machine's reason (hub#2257): that one is logged by `print-comanda.ts`.
+// - Lost on the way: the docket did not come out — error, as long as a sentence with an instruction;
+//   it says what to do, never the machine's reason (hub#2257): that one is logged by `print-comanda.ts`.
 //
 // Both name the station in the app's language (hub#2257), not in the code's word («kitchen»).
 import type { ComandaPrintFailure } from './print-comanda';
-import { ERROR_MS, READ_A_SENTENCE_MS, type PrintNotice } from './print-on-sale-notice';
+import { READ_A_SENTENCE_MS, type PrintNotice } from './print-on-sale-notice';
 
 /** The slice of the app's catalogue the notice reads: the words that fill its sentence. */
 export interface NoticeWords {
@@ -41,5 +41,6 @@ export function comandaFailureNotice(f: ComandaPrintFailure, words: NoticeWords)
     return { messageKey: 'print.comandaWaitingForPrinter', params, color: 'warning', duration: READ_A_SENTENCE_MS };
   }
   // hub#2257: the door's reason (`f.error`) is for the log — it told the floor nothing to act on.
-  return { messageKey: 'print.comandaFailed', params, color: 'danger', duration: ERROR_MS };
+  // Its sentence carries the way out, so it stays up as long as the waiting one, not toastError's.
+  return { messageKey: 'print.comandaFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS };
 }

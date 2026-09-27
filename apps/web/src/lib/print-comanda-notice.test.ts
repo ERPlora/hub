@@ -68,6 +68,13 @@ describe('the kitchen order that did NOT print is still an error', () => {
     expect(n.color).toBe('danger');
     expect(n.params).toEqual({ label: 'Table 4', station: 'bar' });
   });
+
+  it('stays up long enough to read the way out, like the waiting one (hub#2257)', () => {
+    // Its sentence now carries an instruction: toastError's 4.5 s is shorter than that, and the
+    // docket that really did not print must not vanish before the one that is only waiting.
+    const n = comandaFailureNotice({ orderId: 'k-1', role: 'kitchen', label: 'Table 4', error: 'x' }, words);
+    expect(n.duration).toBeGreaterThanOrEqual(6000);
+  });
 });
 
 describe('a docket with no label of its own (takeaway, no table plan)', () => {
@@ -122,9 +129,20 @@ describe('the kitchen order that did not print does not show the machine’s rea
       expect(text).not.toContain('{');
       expect(n.params ?? {}).not.toHaveProperty('error');
       // Nor asked for by the sentence: a placeholder with nothing to fill it paints an empty gap.
-      const raw = (i18n.global.getLocaleMessage(lang) as Record<string, Record<string, string>>).print.comandaFailed;
-      expect(raw).toBeTypeOf('string');
-      expect(raw).not.toContain('{error}');
+      const catalogue = (i18n.global.getLocaleMessage(lang) as Record<string, Record<string, string>>).print;
+      for (const key of ['comandaFailed', 'comandaWaitingForPrinter'] as const) {
+        expect(catalogue[key]).toBeTypeOf('string');
+        expect(catalogue[key]).not.toContain('{error}');
+      }
+    });
+
+    it(`says what to do after the fact, not only the fact (${lang})`, () => {
+      locale.value = lang;
+      const text = painted(
+        comandaFailureNotice({ orderId: 'k-1', role: 'kitchen', label: 'Table 4', error: REASON }, words),
+      );
+      // «did not print.» and then the way out: a second sentence, never the fact alone.
+      expect(text.split(/(?<=\.)\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(2);
     });
   }
 });
