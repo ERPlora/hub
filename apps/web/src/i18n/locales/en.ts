@@ -2153,6 +2153,9 @@ export default {
     install_not_in_catalog: 'That app is not available in your catalogue.',
     install_cloud_rejected:
       'erplora.com could not attend to this installation right now. Try again in a few minutes.',
+    // hub#2251 — erplora.com took the call and then went silent: the hub gave up waiting.
+    install_cloud_timeout:
+      'erplora.com did not answer in time, so the app was not installed. Try again in a few minutes.',
     // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
     // not run whole); the owner can act on it by updating the hub. The line that names both versions
     // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.

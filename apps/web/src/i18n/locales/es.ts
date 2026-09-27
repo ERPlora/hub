@@ -1853,6 +1853,8 @@ export default {
     install_not_in_catalog: 'Esa app no está disponible en tu catálogo.',
     install_cloud_rejected:
       'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
+    install_cloud_timeout:
+      'ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.',
     core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',

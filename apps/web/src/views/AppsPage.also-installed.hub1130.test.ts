@@ -46,6 +46,11 @@ const cloudMarketplaceModules = vi.fn(async () => CATALOG);
 const listInstalledModules = vi.fn(async () => [] as Array<Record<string, unknown>>);
 const requestInstallMock = vi.fn();
 
+// hub#2252 — unmounting with a notice open hands it to a global toast; happy-dom cannot animate one.
+vi.mock('@ionic/vue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@ionic/vue')>()),
+  toastController: { create: async () => ({ present: async () => {}, dismiss: async () => {} }) },
+}));
 vi.mock('../lib/cloud', () => ({
   cloudMarketplaceModules: () => cloudMarketplaceModules(),
 }));

@@ -120,6 +120,7 @@
 
     <!-- Page notices, anchored above the tab bar (hub#2244). -->
     <ion-toast
+      ref="pageToast"
       :is-open="toastOpen"
       :message="toastMsg"
       :color="toastColor"
@@ -162,7 +163,7 @@ import {
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
   IonToast,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
-  IonList, IonItem, alertController, onIonViewWillEnter, onIonViewWillLeave,
+  IonList, IonItem, alertController, toastController, onIonViewWillEnter, onIonViewWillLeave,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -319,8 +320,35 @@ function onToastDismissed(): void {
   toastOpen.value = false;
 }
 
+// hub#2252 — leaving Apps through the side menu (`router-direction="root"`) UNMOUNTS this page, and
+// Ionic does not dismiss an inline toast on unmount: «Installing…» stayed over the next screen for
+// good, while the install still running wrote its outcome into a page that no longer existed. So
+// on unmount the notice on screen moves to a global one (`toastController`, not tied to this page)
+// and every later notice — the outcome, «Retry» — goes there, wherever the person is.
+const pageToast = ref<{ $el: HTMLIonToastElement } | null>(null);
+let unmounted = false;
+let handedOver: HTMLIonToastElement | null = null;
+// One after another: `create` resolves later, and a second notice arriving meanwhile would read
+// «nothing on screen» and leave the first one («Installing…», no duration) up for good.
+let handOverQueue: Promise<void> = Promise.resolve();
+
+function showHandedOver(msg: string, color: 'primary' | 'success' | 'danger', duration: number, buttons: ToastButton[]): Promise<void> {
+  handOverQueue = handOverQueue.then(async () => {
+    const previous = handedOver;
+    const next = await toastController.create({ message: msg, color, duration, buttons, position: 'bottom' });
+    handedOver = next;
+    await previous?.dismiss();
+    await next.present();
+  }).catch((e: unknown) => console.error('hub#2252: handed-over notice failed', e));
+  return handOverQueue;
+}
+
 /** Shows a notice, replacing the one on screen (closed first, so the new one is re-presented). */
 function showToast(msg: string, color: 'primary' | 'success' | 'danger', duration: number, buttons: ToastButton[]): void {
+  if (unmounted) {
+    void showHandedOver(msg, color, duration, buttons);
+    return;
+  }
   // A declarative ion-toast does NOT update its message/duration while open, so chaining notices
   // («Installing…» → «installed») is dismiss + re-present on the next tick.
   if (toastOpen.value) replacedToasts += 1;
@@ -1465,6 +1493,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  unmounted = true;
   window.removeEventListener('focus', recheckEntitlement);
   unsubInstalled?.();
   unsubProgress?.();
@@ -1475,6 +1504,12 @@ onBeforeUnmount(() => {
   catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
   catalogTable.value?.removeEventListener('viewChange', onCatalogViewChange);
   tablePhoneQuery?.removeEventListener('change', onTablePhoneChange);
+  // Last, so the cleanup above always runs. `dismiss` only exists once Ionic has defined
+  // `ion-toast` (not the case in unit tests).
+  if (toastOpen.value) {
+    void pageToast.value?.$el.dismiss?.();
+    void showHandedOver(toastMsg.value, toastColor.value, toastDuration.value, toastButtons.value);
+  }
 });
 </script>
 

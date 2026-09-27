@@ -709,7 +709,7 @@ pub(crate) async fn run_import(
                     // a backup reinstalls it and only substitutes it once pruned (hub#751/#752),
                     // while a template installs the newest compatible one (hub#1904).
                     let outcome = install::install_bundle_module(
-                        &st.http,
+                        &st.marketplace_http,
                         &st.config.cloud_base_url,
                         &st.config.module_cache,
                         auth_cred,
