@@ -349,7 +349,7 @@ const booksByPage = new WeakMap<object, BootReload[]>();
  * bench did not reload at all, because a genuine accident of the runner inside the same navigation
  * makes it reload, correctly. The warning line says why, but it is printed by the bench's Node
  * process, where `page.on('console')` never sees it; these are the same facts, readable from the
- * spec. Reset on every `goto`, like the reloads themselves.
+ * spec. Reset on every `goto` and every `reload` the spec asks for, like the reloads themselves.
  */
 export function bootReloadsOf(page: object): readonly BootReload[] {
   return booksByPage.get(page) ?? [];
@@ -438,14 +438,23 @@ export const test = base.extend({
       }
     };
 
-    page.goto = async (url, options) => {
+    type LoadOptions = Parameters<typeof reloadPage>[0];
+
+    // One navigation, from its first load to the page the spec gets. `goto` and `reload` both come
+    // through here: the spec's reload is a fresh load of the whole shell, as exposed to the runner's
+    // network as the first one (hub#2274 died ~500 ms after `page.reload()`).
+    const recover = async (
+      url: string,
+      first: () => Promise<Awaited<ReturnType<typeof navigate>>>,
+      options: LoadOptions,
+    ): Promise<Awaited<ReturnType<typeof navigate>>> => {
       lost.length = 0;
       ownFailures = 0;
       const books: BootReload[] = [];
       booksByPage.set(page, books);
       const started = Date.now();
       let counted = 0;
-      let response = await attempt(() => navigate(url, options));
+      let response = await attempt(first);
 
       for (;;) {
         await settle();
@@ -476,6 +485,12 @@ export const test = base.extend({
       }
 
       return response;
+    };
+
+    page.goto = async (url, options) => recover(url, () => navigate(url, options), options);
+    page.reload = async (options) => {
+      const url = page.url();
+      return recover(url, () => reloadPage(options), options);
     };
 
     await use(page);
