@@ -188,7 +188,7 @@ async fn an_install_whose_connection_never_opens_ends() {
     let (status, body, _) = install_against("http://192.0.2.1:81".into()).await;
 
     assert!(status.is_client_error(), "got {status}: {body}");
-    assert_eq!(body["ok"], Value::Bool(false), "{body}");
+    assert_eq!(body["code"], "install_cloud_timeout", "{body}");
 }
 
 /// «Update» walks the same marketplace: a silent one must end «Updating…» too, and the app keeps

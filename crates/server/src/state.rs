@@ -945,12 +945,12 @@ pub const MARKETPLACE_STALL_TIMEOUT: std::time::Duration = std::time::Duration::
 
 /// The client every install/update/version call to the marketplace goes through (hub#2251).
 ///
-/// `stall` bounds each wait — connecting, the headers, every next chunk — not the whole call: a
-/// slow line that keeps sending finishes the zip, a silent one ends as `install_cloud_timeout`.
+/// `stall` bounds each wait — connecting, the headers, every next chunk (reqwest arms the read
+/// limit when the request starts) — not the whole call: a slow line that keeps sending finishes
+/// the zip, a silent one ends as `install_cloud_timeout`.
 /// The shared `http` client cannot take this limit: the assistant's stream may be quiet for longer.
 pub fn marketplace_client(stall: std::time::Duration) -> reqwest::Client {
     reqwest::Client::builder()
-        .connect_timeout(stall)
         .read_timeout(stall)
         .build()
         .unwrap_or_else(|e| {
