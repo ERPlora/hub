@@ -40,10 +40,11 @@
         <div v-if="messages.length === 0 && !streaming" class="chat-empty" data-testid="assistant-empty">
           <HubIcon name="sparkles-outline" class="chat-empty-icon" />
           <p>{{ setupChat ? t('assistant.emptySetup') : t('assistant.empty') }}</p>
-          <!-- Quick chips when the chat opened on the configuration: one per PENDING item of
-               `hub.setup.status` (never an `unavailable` — there is nothing to ask about something
-               nobody can do) plus the overall one. Picking one loads the chat ON that item. -->
-          <div v-if="setupChat" class="chat-suggestions">
+          <!-- Quick chips, however the panel was opened (hub#2204: from the topbar it used to show
+               none): one per PENDING item of `hub.setup.status` (never an `unavailable` — there is
+               nothing to ask about something nobody can do) plus the overall one. Picking one loads
+               the chat ON that item. -->
+          <div class="chat-suggestions">
             <button
               class="chat-suggestion"
               data-testid="assistant-suggest-missing"
@@ -85,11 +86,11 @@
               <div v-else-if="messageText(m.content)" class="chat-md">
                 <template v-for="(b, bi) in parseMarkdown(messageText(m.content))" :key="bi">
                   <component :is="`h${Math.min(b.level + 2, 6)}`" v-if="b.type === 'heading'" class="md-h">
-                    <span v-for="(s, si) in b.spans" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                    <component :is="spanTag(s, m.grounding)" v-for="(s, si) in b.spans" :key="si" :class="spanClass(s, m.grounding)" v-bind="spanAttrs(s, m.grounding)" @click="onSpanClick($event, s, m.grounding)">{{ spanText(s) }}</component>
                   </component>
                   <component :is="b.ordered ? 'ol' : 'ul'" v-else-if="b.type === 'list'" class="md-list">
                     <li v-for="(item, ii) in b.items" :key="ii">
-                      <span v-for="(s, si) in item" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                      <component :is="spanTag(s, m.grounding)" v-for="(s, si) in item" :key="si" :class="spanClass(s, m.grounding)" v-bind="spanAttrs(s, m.grounding)" @click="onSpanClick($event, s, m.grounding)">{{ spanText(s) }}</component>
                     </li>
                   </component>
                   <!-- La tabla scrollea DENTRO de su envoltorio: a 390 px el drawer no se mueve. -->
@@ -98,21 +99,21 @@
                       <thead>
                         <tr>
                           <th v-for="(cell, ci) in b.head" :key="ci">
-                            <span v-for="(s, si) in cell" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                            <component :is="spanTag(s, m.grounding)" v-for="(s, si) in cell" :key="si" :class="spanClass(s, m.grounding)" v-bind="spanAttrs(s, m.grounding)" @click="onSpanClick($event, s, m.grounding)">{{ spanText(s) }}</component>
                           </th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr v-for="(row, ri) in b.rows" :key="ri">
                           <td v-for="(cell, ci) in row" :key="ci">
-                            <span v-for="(s, si) in cell" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                            <component :is="spanTag(s, m.grounding)" v-for="(s, si) in cell" :key="si" :class="spanClass(s, m.grounding)" v-bind="spanAttrs(s, m.grounding)" @click="onSpanClick($event, s, m.grounding)">{{ spanText(s) }}</component>
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                   <p v-else class="md-p">
-                    <span v-for="(s, si) in b.spans" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                    <component :is="spanTag(s, m.grounding)" v-for="(s, si) in b.spans" :key="si" :class="spanClass(s, m.grounding)" v-bind="spanAttrs(s, m.grounding)" @click="onSpanClick($event, s, m.grounding)">{{ spanText(s) }}</component>
                   </p>
                 </template>
               </div>
@@ -361,7 +362,8 @@ import {
   type AssistantPlan,
   type AssistantTierOption,
 } from '../lib/assistant-plan';
-import { parseMarkdown, type Inline } from '../lib/assistant-markdown';
+import { parseMarkdown, SCREEN_PATH, type Inline } from '../lib/assistant-markdown';
+import { routeLabel } from '../lib/assistant-routes';
 import { elevationCatalogue } from '../lib/elevation-label';
 import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
@@ -380,33 +382,35 @@ const router = useRouter();
  * en las que el LLM puede mencionar una pantalla (gracias al seed conoce /m/…, /settings#…,
  * /apps#…, /dashboard#…, /system#…, /billing#…, /employees#…). Devuelve {url,label} únicas.
  */
-const ROUTE_RE = /(\/(?:m\/[\w-]+(?:\/[\w-]+)?|settings|apps|dashboard|system|billing|employees)(?:#[\w-]+)?)/g;
+const ROUTE_RE = new RegExp(SCREEN_PATH.source, 'g');
+/** The whole of an href is a screen of the shell — the only kind of link the drawer follows. */
+const SCREEN_HREF = new RegExp(`^(?:${SCREEN_PATH.source})$`);
 interface ExtractedRoute { url: string; label: string }
+
+/** Did the audit find this screen missing from the hub (hub#1048)? */
+function isUnknownRoute(url: string, grounding?: TurnAudit): boolean {
+  const key = url.toLowerCase().replace(/\/+$/, '');
+  return (grounding?.unknownRoutes ?? []).some((r) => r.toLowerCase() === key);
+}
+
+/** The screen as the shell names it — «Till › Settings», never `Cash_register › settings` (hub#2204). */
+function labelFor(url: string): string {
+  return routeLabel(url, { modules: moduleNav.value, t });
+}
+
 function extractRoutes(text: string, grounding?: TurnAudit): ExtractedRoute[] {
   const matches = text.match(ROUTE_RE);
   if (!matches) return [];
   // A route the audit could not find in this hub never becomes a button (hub#1048): offering
   // «Go to» for an invented screen sends the user to /dashboard via the catch-all and leaves
   // them sure their hub is broken.
-  const unknown = new Set((grounding?.unknownRoutes ?? []).map((r) => r.toLowerCase()));
   const seen = new Set<string>();
   const out: ExtractedRoute[] = [];
   for (const url of matches) {
     if (seen.has(url)) continue;
     seen.add(url);
-    if (unknown.has(url.toLowerCase().replace(/\/+$/, ''))) continue;
-    // Etiqueta legible: "VeriFactu › Ajustes" para /m/verifactu/settings; el nombre del tab para los #hash.
-    let label = url;
-    const m = url.match(/^\/m\/([\w-]+)(?:\/([\w-]+))?/);
-    if (m) {
-      label = m[1].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      if (m[2]) label += ` › ${m[2]}`;
-    } else {
-      const h = url.match(/^\/([\w-]+)#([\w-]+)/);
-      if (h) label = `${h[1]} › ${h[2]}`;
-      else label = url.replace(/^\//, '');
-    }
-    out.push({ url, label });
+    if (isUnknownRoute(url, grounding)) continue;
+    out.push({ url, label: labelFor(url) });
   }
   return out.slice(0, 4); // máximo 4 CTAs por mensaje
 }
@@ -427,9 +431,38 @@ function knownRoutes(): string[] {
   return [...shell, ...modules];
 }
 
+/**
+ * A link of the answer is followed only when it points at a screen of THIS hub (hub#2204): an
+ * external address or a screen the audit could not find (hub#1048) is read as plain text — the
+ * assistant's text is written by a model, and a click on it must never leave the hub.
+ */
+function isNavLink(span: Inline, grounding?: TurnAudit): boolean {
+  return span.kind === 'link' && SCREEN_HREF.test(span.href) && !isUnknownRoute(span.href, grounding);
+}
+
 /** La clase de un span en línea. `text` no lleva ninguna: es lo corriente. */
-function spanClass(span: Inline): string {
+function spanClass(span: Inline, grounding?: TurnAudit): string {
+  if (span.kind === 'link') return isNavLink(span, grounding) ? 'md-link' : '';
   return span.kind === 'text' ? '' : `md-${span.kind}`;
+}
+
+function spanTag(span: Inline, grounding?: TurnAudit): string {
+  return isNavLink(span, grounding) ? 'a' : 'span';
+}
+
+function spanAttrs(span: Inline, grounding?: TurnAudit): Record<string, string> {
+  return span.kind === 'link' && isNavLink(span, grounding) ? { href: span.href } : {};
+}
+
+/** What is read: a bare screen path is named like the screen, never printed (hub#2204). */
+function spanText(span: Inline): string {
+  return span.kind === 'link' ? span.text || labelFor(span.href) : span.text;
+}
+
+function onSpanClick(event: Event, span: Inline, grounding?: TurnAudit): void {
+  if (span.kind !== 'link' || !isNavLink(span, grounding)) return;
+  event.preventDefault();
+  navigateTo(span.href);
 }
 
 /** Navega a una ruta interna del shell (router.push) y cierra el drawer para que vea la pantalla. */
@@ -1057,10 +1090,11 @@ watch(
   (open) => {
     document.documentElement.classList.toggle('assistant-open', open);
     if (open) void scrollToBottom();
-    // Opened on the configuration: read the query BEFORE painting the chips, or the drawer would
-    // offer the items of whatever screen last happened to read it (or none at all, from a screen
-    // that never does).
-    if (open && setupChat.value) void refreshSetupStatus(getClient());
+    // Read the query BEFORE painting the chips, or the drawer would offer the items of whatever
+    // screen last happened to read it (or none at all, from a screen that never does).
+    // Every opening, not only the one from Home (hub#2204): the chips are offered from the topbar
+    // too, and they have to be this hub's pending items, not whatever an earlier screen read.
+    if (open) void refreshSetupStatus(getClient());
     // Qué plan tiene este hub y cuánto lleva gastado (hub#1183). Una lectura por APERTURA, no por
     // turno: dentro del hilo el contador lo mueve el frame `usage` de cada respuesta.
     if (open) {
@@ -1251,6 +1285,12 @@ onBeforeUnmount(() => {
 .chat-md :where(p, ul, ol, h3, h4, h5, h6):last-child { margin-bottom: 0; }
 .md-bold { font-weight: 600; }
 .md-italic { font-style: italic; }
+.md-link {
+  color: var(--ion-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 .md-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.92em;

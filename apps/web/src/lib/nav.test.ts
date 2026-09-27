@@ -47,6 +47,20 @@ describe('refreshModuleNav', () => {
     expect(moduleNavState.value).toBe('ready');
   });
 
+  // hub#2204: the assistant names a screen «Till › Sessions», not by its path — so the app keeps
+  // the translated label of every tab it declares, not just its first one.
+  it('keeps every tab of the app with its translated label', async () => {
+    loadMenu.mockResolvedValue([
+      { moduleId: 'cash_register', moduleName: 'Caja', nav: { id: 'sessions', label: 'Sesiones' } },
+      { moduleId: 'cash_register', moduleName: 'Caja', nav: { id: 'movements', label: 'Movimientos' } },
+    ]);
+    await refreshModuleNav();
+    expect(moduleNav.value[0].tabs).toEqual([
+      { id: 'sessions', label: 'Sesiones' },
+      { id: 'movements', label: 'Movimientos' },
+    ]);
+  });
+
   it('an empty hub is «ready» and empty — that is a real answer', async () => {
     loadMenu.mockResolvedValue([]);
     await refreshModuleNav();
