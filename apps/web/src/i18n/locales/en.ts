@@ -998,6 +998,9 @@ export default {
     // `409 has_dependents`, which already names what an uninstall would break.
     installSuccessWithDependencies: '{name} installed successfully. Also installed: {names}.',
     installError: 'Could not start installation of {name}.',
+    // hub#2244: the sticky install error's two ways out.
+    installRetry: 'Retry',
+    noticeClose: 'Close',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
     // hub#516 — the update button. `updateError` says the one thing that matters: the module did
