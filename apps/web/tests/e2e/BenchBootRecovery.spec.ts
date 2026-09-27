@@ -272,6 +272,16 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
       await new Promise((resolve) => setTimeout(resolve, NETWORK_CHANGE_BUDGET_MS + 1_000));
       return route.abort('internetdisconnected');
     });
+    // And the runner's own network moves again inside the recovery — run 36340311649 (PR #2275):
+    // 0.7 s after the injected loss, 54 requests of the reload died of a REAL
+    // `ERR_NETWORK_CHANGED`. The bench reloaded once more, as it should, and a spec that counted
+    // exactly two fetches went red on a recovery that worked (the trap hub#1838 already named).
+    let clientRequests = 0;
+    await page.route('**/@vite/client', async (route) => {
+      clientRequests += 1;
+      if (clientRequests === 2) return route.abort('internetdisconnected');
+      return route.continue();
+    });
 
     await page.goto('/login');
 
