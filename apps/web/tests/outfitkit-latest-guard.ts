@@ -13,9 +13,9 @@
 // In CI the workflow has just installed `latest`, so this passes by construction. Offline, the
 // latest version cannot be known: the bench runs and prints OUTFITKIT_LATEST_UNKNOWN instead of
 // blocking someone without network.
-import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveOutfitkitVersion } from '../outfitkit-version';
 
 export const OUTFITKIT_LATEST_URL = 'https://registry.npmjs.org/@erplora/outfitkit/latest';
 export const WEB_DIR = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -38,13 +38,6 @@ export function compareOutfitkitVersions(installed: string, latest: string): Out
     if (a[i] > b[i]) return 'ahead';
   }
   return 'current';
-}
-
-export function readInstalledOutfitkitVersion(webDir: string): string {
-  const pkg = JSON.parse(
-    readFileSync(join(webDir, 'node_modules', '@erplora', 'outfitkit', 'package.json'), 'utf8'),
-  ) as { version?: unknown };
-  return typeof pkg.version === 'string' ? pkg.version : '';
 }
 
 export async function fetchLatestOutfitkitVersion(fetchImpl: typeof fetch = fetch): Promise<string> {
@@ -104,7 +97,8 @@ export async function assertOutfitkitIsLatest(deps: OutfitkitGuardDeps): Promise
 
 export default function outfitkitLatestGuard(): Promise<OutfitkitVersionState> {
   return assertOutfitkitIsLatest({
-    readInstalled: () => readInstalledOutfitkitVersion(WEB_DIR),
+    // The same resolution the image's build stamp uses (hub#1588): app first, then workspace root.
+    readInstalled: () => resolveOutfitkitVersion(WEB_DIR),
     fetchLatest: () => fetchLatestOutfitkitVersion(),
     warn: (message) => console.warn(message),
   });

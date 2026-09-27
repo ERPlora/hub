@@ -8,15 +8,12 @@
 // already fixed for customers since 0.1.98. The guard below turns that drift into a red bench
 // with the command that fixes it, instead of a silent difference.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { resolveOutfitkitVersion } from '../outfitkit-version.ts';
 import {
   OUTFITKIT_LATEST_URL,
   assertOutfitkitIsLatest,
   compareOutfitkitVersions,
   fetchLatestOutfitkitVersion,
-  readInstalledOutfitkitVersion,
 } from './outfitkit-latest-guard.ts';
 
 describe('compareOutfitkitVersions (hub#2259)', () => {
@@ -139,16 +136,6 @@ describe('fetchLatestOutfitkitVersion (hub#2259)', () => {
   });
 });
 
-describe('readInstalledOutfitkitVersion (hub#2259)', () => {
-  it('reads the version the bench actually resolves from node_modules', () => {
-    const webDir = mkdtempSync(join(tmpdir(), 'okguard-'));
-    const pkgDir = join(webDir, 'node_modules', '@erplora', 'outfitkit');
-    mkdirSync(pkgDir, { recursive: true });
-    writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ version: '0.1.84' }));
-    expect(readInstalledOutfitkitVersion(webDir)).toBe('0.1.84');
-  });
-});
-
 // The pure pieces above prove the decision; this proves the bench RUNS it. Without the wiring the
 // guard is a function nobody calls — the exact gap hub#1250's config test exists for.
 describe('playwright.config wires the guard (hub#2259)', () => {
@@ -187,7 +174,7 @@ describe('playwright.config wires the guard (hub#2259)', () => {
 
   it('the default export lets the bench run when node_modules has the published latest', async () => {
     const guard = await import('./outfitkit-latest-guard.ts');
-    const installed = guard.readInstalledOutfitkitVersion(guard.WEB_DIR);
+    const installed = resolveOutfitkitVersion(guard.WEB_DIR);
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ version: installed }))),
