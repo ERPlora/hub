@@ -1,0 +1,95 @@
+diff --git a/dist/index.js b/dist/index.js
+index 56807374194f8231aa978440339a317e9f8d6eac..33f98d8da70cbe35c55cdd3d9f7199b94ef7d68f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1502,12 +1502,49 @@ const IonRouterOutlet = /*@__PURE__*/ defineComponent({
+             });
+             return result;
+         };
+-        const handlePageTransition = async () => {
++        /**
++         * ERPlora hub#2242 — one page transition at a time, each reading the route when it STARTS
++         * and sliding out the page that is on SCREEN (see `runPageTransition`). `transition()` marks
++         * the entering page `ion-page-invisible` before it waits for the outlet's lock, so a
++         * navigation that arrived while another one was still queued saw the page it wanted as
++         * "already visible" and the one on screen as invisible, returned early below, and the
++         * queued slide then left the previous page on screen under the new address. Queued here,
++         * the late navigation runs after the slide ends and sees the real screen. Idle, it still
++         * starts synchronously, exactly as before.
++         */
++        let pageTransitionTail;
++        const handlePageTransition = () => {
++            const current = pageTransitionTail
++                ? pageTransitionTail.then(runPageTransition)
++                : runPageTransition();
++            // A failed transition must not stall the ones behind it, nor go quiet: it is reported
++            // as an uncaught error (the window `error` event), as it surfaced before this queue.
++            const tail = current.then(() => undefined, (err) => {
++                if (typeof reportError === "function")
++                    reportError(err);
++                else
++                    void Promise.reject(err);
++            }).then(() => {
++                if (pageTransitionTail === tail)
++                    pageTransitionTail = undefined;
++            });
++            pageTransitionTail = tail;
++            return current;
++        };
++        const runPageTransition = async () => {
+             const routeInfo = ionRouter.getCurrentRouteInfo();
+             const { routerDirection, routerAction, routerAnimation, prevRouteLastPathname, delta, } = routeInfo;
+             const enteringViewItem = viewStacks.findViewItemByRouteInfo(routeInfo, id);
+             let leavingViewItem = viewStacks.findLeavingViewItemByRouteInfo(routeInfo, id);
+             const enteringEl = enteringViewItem.ionPageElement;
++            /**
++             * ERPlora hub#2242 — a turn that waited in the queue can come before the page of the
++             * latest route has rendered its `<ion-page>`. Its registration queues its own turn,
++             * so this one has nothing to do.
++             */
++            if (enteringEl === undefined && enteringViewItem.registerCallback) {
++                return;
++            }
+             /**
+              * All views that can be transitioned to must have
+              * an `<ion-page>` element for transitions and lifecycle
+@@ -1523,6 +1560,18 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
+             if (!leavingViewItem && prevRouteLastPathname) {
+                 leavingViewItem = viewStacks.findViewItemByPathname(prevRouteLastPathname, id);
+             }
++            /**
++             * ERPlora hub#2242 — the page on SCREEN is the one that leaves. A turn that waited in the
++             * queue reads the latest route, whose `lastPathname` can name a page that never reached
++             * the screen (Staff → Settings → Customers tapped mid-slide: Customers' last page is
++             * Settings); sliding that one out left Staff visible under Customers for good.
++             */
++            const shownViewItem = viewStacks
++                .getChildrenToRender(id)
++                .find((v) => v !== enteringViewItem && v.ionPageElement && isViewVisible(v.ionPageElement));
++            if (shownViewItem) {
++                leavingViewItem = shownViewItem;
++            }
+             /**
+              * If the entering view is already
+              * visible, then no transition is needed.
+@@ -1547,6 +1596,20 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
+                 !isViewVisible(leavingViewItem.ionPageElement)) {
+                 return;
+             }
++            /**
++             * ERPlora hub#2242 — pages a quick finger skipped (registered, never slid in) are hidden
++             * like any page that left, instead of staying laid out, invisible, over the others.
++             */
++            for (const skipped of viewStacks.getChildrenToRender(id)) {
++                const el = skipped.ionPageElement;
++                if (skipped !== enteringViewItem &&
++                    skipped !== leavingViewItem &&
++                    el &&
++                    !el.classList.contains("ion-page-hidden")) {
++                    el.classList.add("ion-page-hidden");
++                    el.setAttribute("aria-hidden", "true");
++                }
++            }
+             fireLifecycle(enteringViewItem.vueComponent, enteringViewItem.vueComponentRef, LIFECYCLE_WILL_ENTER);
+             if ((leavingViewItem === null || leavingViewItem === void 0 ? void 0 : leavingViewItem.ionPageElement) &&
+                 enteringViewItem !== leavingViewItem) {
