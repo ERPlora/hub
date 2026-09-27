@@ -49,6 +49,7 @@ import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/pr
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import { comandaFailureNotice } from './lib/print-comanda-notice';
 import { bootAppointmentNotices } from './lib/appointment-notice';
 import {
   ensureNotificationPermission,
@@ -64,7 +65,7 @@ import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
-import { bootActionFeedback, toast, toastError } from './lib/toast';
+import { bootActionFeedback, toast } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
 import { redeemShellCourier, takeShellCourierCode } from './lib/courier';
 import { bootUntilReachable } from './lib/boot';
@@ -317,13 +318,11 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
 // fuente de verdad—: se avisa, y desde el KDS se reimprime.
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
+  // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
-    void toastError(
-      f.awaitingHost
-        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
-        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
-    );
+    const n = comandaFailureNotice(f, i18n.global.t('print.comandaDefaultLabel'));
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell

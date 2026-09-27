@@ -761,7 +761,7 @@ export default {
       'El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
     comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
     comandaWaitingForPrinter:
-      'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
+      'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.',
     // hub#2171 — the system notice when a kitchen order comes in.
     comandaNotice: 'Nueva comanda',
     comandaNoticeFor: 'Nueva comanda · {label}',

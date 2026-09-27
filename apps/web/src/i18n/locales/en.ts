@@ -853,8 +853,9 @@ export default {
     ticketWithoutFiscal:
       'The receipt came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
     comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
+    // hub#2238: a warning, not an error — the docket is queued, and the way out is in the sentence.
     comandaWaitingForPrinter:
-      'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
+      'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet. Set one up and it will print on its own.',
     // The system notice when a kitchen order comes in (hub#2171): `comandaNoticeFor` names the
     // floor label («Table 4», «Bar») when the order has one; the body is the order number and the
     // line count, pluralised by `n`.
