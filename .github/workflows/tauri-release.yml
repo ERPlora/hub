@@ -137,11 +137,13 @@ jobs:
       #     que nadie escribió y se lleva por delante el paso entero.
       # La imagen de GitHub trae las dos; un Ubuntu de Hetzner no. Guardado por
       # `release_runner_assumptions.rs`, que además explica cuál rompe qué (hub#878).
+      # Through the apt-lock wrapper: on the shared runner another job may hold apt's lock, and on
+      # a tag that red lands in the middle of a release (infra#313).
       - name: Install Linux build deps
         if: matrix.label == 'linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          bash scripts/ci/apt-lock-retry.sh sudo apt-get update
+          bash scripts/ci/apt-lock-retry.sh sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \

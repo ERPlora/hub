@@ -26,9 +26,9 @@ export interface PrintNotice {
 }
 
 /** Long enough to read a sentence with an instruction in it (the same as the fiscal warning). */
-const READ_A_SENTENCE_MS = 6000;
+export const READ_A_SENTENCE_MS = 6000;
 /** `toastError`'s duration: the failures keep the time they always had. */
-const ERROR_MS = 4500;
+export const ERROR_MS = 4500;
 
 export function saleTicketFailureNotice(f: SaleTicketFailure): PrintNotice {
   if (f.awaitingHost) {

@@ -170,7 +170,12 @@ dead=$(sort -u "$tmp/dead")
 [ -z "$dead" ] && ok "ningun paso filtra por un evento imposible" \
     || bad "hay una rama inalcanzable en test-hub.yml" "$dead"
 
-echo "hub#1463: la suite del workspace corre SIEMPRE, sin condicion que la pueda saltar"
+# Contrato AJUSTADO el 26/09: hub#1463 exigia «cargo test sin if:» porque la unica condicion
+# posible era una referencia colgante. Desde el 26/09 la suite se omite en una PR que no toca Rust
+# (scripts/ci/touches-rust.sh), asi que el guardia pasa a exigir la forma SEGURA de esa condicion:
+# exactamente `steps.scope.outputs.rust != 'false'` — solo un «no» explicito la salta; una salida
+# ausente (paso fallido, referencia colgante) evalua a cadena vacia y la suite CORRE.
+echo "hub#1463: la suite del workspace solo se omite con un rust=false explicito, nunca en silencio"
 python3 - "$wf" > "$tmp/gated" <<'PYEOF'
 import sys
 
@@ -181,21 +186,29 @@ for job in (doc.get("jobs") or {}).values():
     for step in (job.get("steps") or []):
         if "cargo test" not in (step.get("run") or ""):
             continue
-        if step.get("if"):
-            print("%s -> if: %s" % (step.get("name", "?"), step["if"]))
+        cond = str(step.get("if") or "").strip()
+        if cond and cond != "steps.scope.outputs.rust != 'false'":
+            print("%s -> if: %s" % (step.get("name", "?"), cond))
 PYEOF
 [ $? -eq 0 ] || bad "the guard itself could not run (python3 with PyYAML is required)"
 gated=$(cat "$tmp/gated")
-[ -z "$gated" ] && ok "cargo test --workspace no lleva if:" \
+[ -z "$gated" ] && ok "cargo test solo lleva la condicion segura (rust != 'false')" \
     || bad "un cargo test puede saltarse en silencio" "$gated"
 
 echo "hub#1463: nadie lee una salida del paso borrado"
 # Una referencia colgante a steps.<id>.outputs.* NO es un error en Actions: evalua a cadena vacia.
 # Un `if:` comparado con 'workspace' seria entonces falso y la suite se saltaria EN SILENCIO, que
 # es peor que el paso muerto que se quita.
-dangling=$(grep -n "steps\.scope\.outputs" "$wf" || true)
-[ -z "$dangling" ] && ok "no quedan referencias a steps.scope.outputs" \
-    || bad "referencia colgante: evalua a cadena vacia y salta el paso sin avisar" "$dangling"
+# La referencia ya no cuelga: tiene que existir el paso `scope` que la escribe, con los dos valores.
+if grep -qE "steps\.scope\.outputs" "$wf"; then
+    if grep -qE "^        id: scope$" "$wf" && grep -q 'rust=true' "$wf" && grep -q 'rust=false' "$wf"; then
+        ok "steps.scope.outputs lo escribe un paso scope que existe (rust=true / rust=false)"
+    else
+        bad "referencia colgante: evalua a cadena vacia" "hay steps.scope.outputs pero ningun paso id: scope que escriba rust=true y rust=false"
+    fi
+else
+    ok "no hay referencias a steps.scope.outputs"
+fi
 
 echo
 echo "$pass passed, $fail failed"

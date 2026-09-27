@@ -166,9 +166,10 @@ jobs:
           PG_PORT: ${{ job.services.postgres.ports['5432'] }}
         run: echo "HUB_E2E_DATABASE_URL=postgres://postgres:test@localhost:${PG_PORT}/hub_e2e_web" >> "$GITHUB_ENV"
 
-      # `--with-deps`: un runner limpio no tiene las librerías del sistema que pide Chromium.
+      # `--with-deps`: a clean runner lacks the system libraries Chromium needs. It runs `apt-get`,
+      # so it goes through the wrapper that waits out another job's apt lock (infra#313).
       - name: Instalar el navegador de Playwright
-        run: pnpm -F @erplora/web exec playwright install --with-deps chromium
+        run: bash scripts/ci/apt-lock-retry.sh pnpm -F @erplora/web exec playwright install --with-deps chromium
 
       # `exec playwright` y no `test:e2e --`: pnpm mete un `--` literal en la lista de argumentos
       # y Playwright se lo come sin quejarse, dejando el filtro siguiente sin efecto (mismo gotcha

@@ -10,13 +10,13 @@
 // ask every module author to remember two attributes whose absence is only visible in the finished
 // app: it has to make the default correct, once, for everyone.
 //
-// So the shell localizes the DEFAULT at element-registration time — the same hook, and for the
-// same reasons, as the `fill` fix of hub#1060 (`./ionic-registry-hook`).
+// So the shell localizes the DEFAULT, once, through the same registry hook as the `fill` fix of
+// hub#1060 (`./ionic-registry-hook`).
 //
-// The value is installed as a LIVE per-instance getter, not as a copied string: the hub changes
-// language on the fly (`i18n/index.ts` → `setLocale`, no reload), and Ionic reads `this.okText`
-// when the dialog OPENS, so a select mounted before the change must still open in the new
-// language.
+// The labels are written right before each dialog OPENS, not when the element connects (hub#2226):
+// the hub changes language on the fly (`i18n/index.ts` → `setLocale`, no reload), and Stencil
+// freezes whatever the shell puts on the element at connect time, so a select mounted before the
+// change must still open in the new language.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../i18n/locales/en';
@@ -70,7 +70,7 @@ function defineSelectProbe(tag: string): void {
     }
 
     /** What Ionic's `openAlert()` puts on the two buttons, read at the moment it opens. */
-    open(): string[] {
+    open(_ev?: Event): string[] {
       return [this.cancelText, this.okText];
     }
   }
@@ -175,28 +175,52 @@ describe('the selection dialogs speak the app language (hub#1736)', () => {
     expect(el.okText).toBe('Elegir');
   });
 
-  it('keeps the element working: the original connectedCallback still runs', () => {
+  it('a property set after the shell already labelled the dialog wins, even across a language switch', () => {
+    // Once a dialog opened, the element carries the shell's own label; a module that writes its
+    // own afterwards must not be taken for the shell and overwritten on the next open.
+    const tag = uniq('ion-select');
+    let locale = 'es';
+    bootIonicSelectText(
+      (prop) => (locale === 'es' ? spanish(prop) : prop === 'okText' ? 'OK' : 'Cancel'),
+      [tag],
+    );
+    defineSelectProbe(tag);
+    const el = mountInShadowRoot(`<${tag}></${tag}>`, tag);
+    expect(el.open()).toEqual(['Cancelar', 'Aceptar']);
+    el.okText = 'Elegir';
+    locale = 'en';
+    expect(el.open()).toEqual(['Cancel', 'Elegir']);
+  });
+
+  it("keeps the element working: Ionic's own `open` still runs, with the click, and its result", async () => {
     const tag = uniq('ion-select');
     bootIonicSelectText(spanish, [tag]);
-    let connected = false;
+    let received: Event | undefined;
     class Probed extends HTMLElement {
       okText = 'OK';
       cancelText = 'Cancel';
-      connectedCallback(): void {
-        connected = true;
+      open(ev?: Event): Promise<string> {
+        received = ev;
+        return Promise.resolve('opened');
       }
     }
     customElements.define(tag, Probed);
-    document.body.append(document.createElement(tag));
-    expect(connected).toBe(true);
+    const el = document.createElement(tag) as unknown as Probed;
+    document.body.append(el);
+    const click = new MouseEvent('click');
+    await expect(el.open(click)).resolves.toBe('opened');
+    expect(received).toBe(click);
   });
 
   it('is idempotent: booting twice does not double-patch or throw', () => {
     const tag = uniq('ion-select');
-    bootIonicSelectText(spanish, [tag]);
-    bootIonicSelectText(spanish, [tag]);
+    const asked = vi.fn(spanish);
+    bootIonicSelectText(asked, [tag]);
+    bootIonicSelectText(asked, [tag]);
     defineSelectProbe(tag);
+    bootIonicSelectText(asked, [tag]); // and once more with the tag already registered
     expect(mountInShadowRoot(`<${tag}></${tag}>`, tag).open()).toEqual(['Cancelar', 'Aceptar']);
+    expect(asked, 'one question per button and dialog: a double wrap asks twice').toHaveBeenCalledTimes(2);
   });
 
   it('a translation that blows up falls back to Ionic English instead of breaking the dialog', () => {
@@ -235,14 +259,23 @@ describe('the selection dialogs speak the app language (hub#1736)', () => {
     }
   });
 
-  it('booting TOO LATE is reported, not swallowed — the whole fix hinges on the order', () => {
+  it('booting LATE still works: a select registered before the shell hooked it opens in Spanish', () => {
+    // `open` is a plain prototype method, not a lifecycle callback the spec freezes inside
+    // `define`, so the shell can still wrap it on a tag that is already registered.
     const tag = uniq('ion-select');
     defineSelectProbe(tag);
+    bootIonicSelectText(spanish, [tag]);
+    expect(mountInShadowRoot(`<${tag}></${tag}>`, tag).open()).toEqual(['Cancelar', 'Aceptar']);
+  });
+
+  it('an element with no `open()` is reported and left alone — not the select this was written for', () => {
+    const tag = uniq('ion-select');
     const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       bootIonicSelectText(spanish, [tag]);
+      customElements.define(tag, class extends HTMLElement {});
       expect(reported).toHaveBeenCalledTimes(1);
-      expect(String(reported.mock.calls[0]?.[0])).toContain(tag);
+      expect(String(reported.mock.calls[0]?.[0])).toContain('open()');
     } finally {
       reported.mockRestore();
     }
@@ -288,47 +321,70 @@ describe('the premise still holds', () => {
 
     expect(select).toContain("this.cancelText = 'Cancel'");
     expect(select).toContain("this.okText = 'OK'");
+    // …and reads them when the dialog opens, which is why the shell writes them right before.
+    expect(select).toContain('text: this.okText');
+    expect(select).toContain('text: this.cancelText');
   });
 
-  it('the REAL `ion-select` of @ionic/core comes out localized once the shell hooked it', async () => {
-    // The probes above are faithful by construction; this one removes the construction. It boots
-    // the hook, registers Ionic's own element and reads the labels Ionic itself would put on the
-    // dialog's buttons. It runs LAST because `customElements.define` cannot be undone.
-    // Control positive, before the element is connected: Ionic's constructor writes the English
-    // literals, which is the bug the issue reports. (There is no second registry in which to mount
-    // an unpatched one — a definition is forever — so the control is taken here.)
-    bootIonicSelectText(spanish);
+  it('hub#2226 — the REAL `ion-select`, mounted in Spanish, opens in English after the switch', async () => {
+    // The language changes with no reload (`setLocale`) while the selects of the screen stay
+    // mounted. Stencil strips every own property of the element when it connects, so whatever the
+    // shell decides at connect time is frozen there: the labels have to be decided when the dialog
+    // OPENS. Only the overlay is stubbed (happy-dom cannot present one); the labels are read at the
+    // moment Ionic's own `open()` hands over to it, which is where `openAlert()` reads them. It runs
+    // LAST among the REAL ones because `customElements.define` cannot be undone.
+    let locale = 'es';
+    bootIonicSelectText((prop) =>
+      locale === 'es' ? spanish(prop) : prop === 'okText' ? 'OK' : 'Cancel',
+    );
     const { defineCustomElement } = await import('@ionic/core/components/ion-select.js');
     defineCustomElement();
-    const el = document.createElement('ion-select') as HTMLElement & {
+
+    type RealSelect = HTMLElement & {
       okText: string;
       cancelText: string;
+      multiple: boolean;
+      open(ev?: Event): Promise<unknown>;
+      createOverlay?: (ev?: Event) => unknown;
     };
+    /** Opens `el` the way a click does and returns the two labels Ionic was about to paint. */
+    async function openedLabels(el: RealSelect): Promise<string[]> {
+      let seen: string[] = [];
+      el.createOverlay = () => {
+        seen = [el.cancelText, el.okText];
+        return {
+          addEventListener: () => {},
+          onDidDismiss: () => new Promise(() => {}), // stays open, like a real dialog
+          present: async () => {},
+        };
+      };
+      await el.open(new MouseEvent('click'));
+      (el as unknown as { isExpanded: boolean }).isExpanded = false; // ready for the next open
+      return seen;
+    }
+
+    const el = document.createElement('ion-select') as RealSelect;
+    // Control positive: Ionic's constructor still writes the English literals the issue reports.
     expect([el.cancelText, el.okText], 'Ionic still ships English defaults').toEqual([
       'Cancel',
       'OK',
     ]);
+    el.multiple = true; // the alert, the dialog that still carries both buttons
+    document.body.append(el);
+    expect(await openedLabels(el)).toEqual(['Cancelar', 'Aceptar']);
 
-    document.body.append(el); // connected: this is where the shell installs the localized default
-    expect([el.cancelText, el.okText]).toEqual(['Cancelar', 'Aceptar']);
+    locale = 'en';
+    expect(await openedLabels(el)).toEqual(['Cancel', 'OK']);
   });
 
-  it('the shell hooks element registration BEFORE @ionic/vue registers anything', async () => {
-    // `@ionic/vue` registers `ion-select` on import and the HTML spec captures a custom element's
-    // lifecycle callbacks inside `define`. Move the import down and the fix vanishes with no error
-    // at all — which is the exact failure mode this whole file is about.
+  it('`main.ts` imports the boot module — importing it is all the shell does', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     // `process.cwd()` is the package root under vitest — the house convention for source guards.
     // A wrong path throws here instead of passing on an empty read.
     const main = readFileSync(join(process.cwd(), 'src', 'main.ts'), 'utf8');
-    const boot = main.indexOf("import './lib/ionic-select-text.boot'");
-    const ionic = main.indexOf("from '@ionic/vue'");
-    expect(boot, 'main.ts must import ./lib/ionic-select-text.boot').toBeGreaterThanOrEqual(0);
-    expect(ionic, 'main.ts is supposed to import @ionic/vue').toBeGreaterThanOrEqual(0);
-    expect(
-      boot < ionic,
-      'the select-text hook must be imported before @ionic/vue, or it silently stops working',
-    ).toBe(true);
+    expect(main, 'main.ts must import ./lib/ionic-select-text.boot').toContain(
+      "import './lib/ionic-select-text.boot'",
+    );
   });
 });
