@@ -38,6 +38,10 @@ vi.mock('../lib/module-loader', () => ({
 vi.mock('../lib/runtime', () => ({
   clientInjectionKey: Symbol('runtime-client'),
   getClient: () => ({ forModule: () => ({}), on: () => () => {} }),
+  // `invoice_series` is installed on this hub (it holds data): only whether it is blocked varies.
+  listInstalledModules: async () => [
+    { id: routeParams.moduleId, name: 'Invoice series', version: '1.0.0', status: 'active' },
+  ],
 }));
 vi.mock('../lib/protects', () => ({ resolveProtectsGuard: vi.fn(async () => null) }));
 
@@ -137,7 +141,7 @@ describe('a module the entitlement names BLOCKED explains itself on screen (hub#
     const wrapper = mountModuleView();
     await settle();
 
-    expect(wrapper.find('ok-empty-state').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="module-empty"]').exists()).toBe(true);
     expect(wrapper.find('.blocked-card').exists()).toBe(false);
   });
 });

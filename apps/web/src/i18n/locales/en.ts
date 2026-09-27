@@ -1934,6 +1934,11 @@ export default {
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
     emptyTitle: 'Nothing to show here yet',
     emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
+    // hub#2190 — an app this hub does not have at all (the runtime does not list it). Not the empty
+    // state above: that one is for an installed app, and saying «installed» here contradicted Apps.
+    notInstalledTitle: 'This app is not installed',
+    notInstalledHint: 'This hub does not have this app. Look for it in the Apps catalogue, or open another one from the menu.',
+    notInstalledAction: 'Go to the catalogue',
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'This app is not available for this hub.',
