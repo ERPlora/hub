@@ -79,6 +79,10 @@ process.env.HUB_E2E_MODULES_DIR = EMPTY_MODULES_DIR;
 
 export default defineConfig({
   testDir: './e2e',
+  // hub#2259 — production, PRE and CI install `@erplora/outfitkit@latest`; the local bench runs the
+  // lockfile's pin. This fails the run before any spec when that pin is behind the published
+  // latest, so nobody chases a bug customers no longer see. See `outfitkit-latest-guard.ts`.
+  globalSetup: join(WEB_DIR, 'tests', 'outfitkit-latest-guard.ts'),
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],

@@ -12,7 +12,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "format:check": "prettier --check src",
-    "test": "vitest run",
+    "test": "node vitest-run.mjs",
     "test:e2e": "playwright test -c tests/playwright.config.ts",
     "verify": "pnpm run typecheck && pnpm run format:check && pnpm run test",
     "preview": "vite preview"
@@ -20,7 +20,7 @@
   "dependencies": {
     "@erplora/module-sdk": "workspace:*",
     "@erplora/module-types": "workspace:*",
-    "@erplora/outfitkit": "^0.1.105",
+    "@erplora/outfitkit": "^0.1.106",
     "@iconify/vue": "^5.0.1",
     "@ionic/core": "^8.8.8",
     "@ionic/vue": "^8.8.8",
