@@ -243,6 +243,8 @@ FIXTURES = [
     ("uv run playwright install-deps chromium", True),
     ("sudo apt install -y jq", True),
     ("sudo -E apt-get -o DPkg::Lock::Timeout=600 update", True),
+    # The wrapper has to come BEFORE apt on the line: after it, it guards nothing.
+    (f"sudo apt-get update && bash {WRAPPER} true", True),
     (f"bash {WRAPPER} sudo apt-get update", False),
     (f"bash {WRAPPER} sudo apt-get install -y \\\n  libgtk-3-dev", False),
     (f"bash {WRAPPER} pnpm -F @erplora/web exec playwright install --with-deps chromium", False),
