@@ -304,6 +304,28 @@ describe('playwright.config wires the guard (hub#2259)', () => {
     await expect(guard.default()).rejects.toMatchObject({ code: 'OUTFITKIT_BEHIND_LATEST' });
   });
 
+  it('rv-2265: the default export dates THIS checkout install, so a release right after it only warns', async () => {
+    const guard = await import('./outfitkit-latest-guard.ts');
+    const installedAt = readInstallTime(join(guard.WEB_DIR, '..', '..'));
+    expect(installedAt).not.toBeNull();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              'dist-tags': { latest: '999.0.0' },
+              time: { '999.0.0': new Date(installedAt!.getTime() + 1).toISOString() },
+            }),
+          ),
+      ),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(guard.default()).resolves.toBe('newer-than-install');
+    expect(warn.mock.calls[0][0]).toContain('OUTFITKIT_LATEST_NEWER_THAN_INSTALL');
+    warn.mockRestore();
+  });
+
   it('the default export lets the bench run when node_modules has the published latest', async () => {
     const guard = await import('./outfitkit-latest-guard.ts');
     const installed = resolveOutfitkitVersion(guard.WEB_DIR);
