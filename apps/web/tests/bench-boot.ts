@@ -111,6 +111,19 @@ export function nextBootStep(
   return countedReloads < BOOT_RELOAD_LIMIT ? 'reload' : 'hand-over';
 }
 
+/** How the bench fetches a navigation again: back to its own URL, or a reload of the page. */
+export type FetchAgain = 'navigate' | 'reload';
+
+/**
+ * How to fetch a navigation again once something of ours died on the wire during its load.
+ *
+ * A document that died leaves the page on Chromium's error page, where a reload would reload the
+ * error; going back to the navigation's own URL is what fetches it again.
+ */
+export function howToFetchAgain(onErrorPage: boolean): FetchAgain {
+  return onErrorPage ? 'navigate' : 'reload';
+}
+
 function originOf(url: string | undefined): string | undefined {
   if (url === undefined) return undefined;
   try {
@@ -485,10 +498,9 @@ export const test = base.extend({
         books.push({ url, codes, storm });
         lost.length = 0;
         ownFailures = 0;
-        // A document that died leaves the page on Chromium's error page, where a reload would
-        // reload the error; going back to the navigation's own URL is what fetches it again.
+        const onErrorPage = page.url().startsWith('chrome-error://');
         response = await attempt(() =>
-          page.url().startsWith('chrome-error://') ? navigate(url, options) : reloadPage(options),
+          howToFetchAgain(onErrorPage) === 'navigate' ? navigate(url, options) : reloadPage(options),
         );
       }
 
