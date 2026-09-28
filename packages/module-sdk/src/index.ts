@@ -578,11 +578,14 @@ export const SERVER_UNAVAILABLE = 'server_unavailable';
  * The honest sentence, per locale (en is the source, es the translation — ADR-0055). Localized
  * HERE, like `dataTableLabels`, because this error's `message` is what modules and the shell's
  * toast show verbatim; a technical English line in front of a cashier is the failure being fixed.
+ *
+ * It says only what holds for ANY command (hub#2342): the same sentence answers saving a flow, a
+ * template or the certificate, so a tail about charges and Sales would mislead there. The charge
+ * guidance lives in the charge flow itself — the POS of `sales` renders its own «we can't tell
+ * whether it charged» panel with a link to Sales (sales#91).
  */
-const COMMAND_VERDICT_EN =
-  "We can't tell whether the operation completed. Check the result before trying again — for a charge, check Sales before charging again.";
-const COMMAND_VERDICT_ES =
-  'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar — si era un cobro, comprueba en Ventas antes de volver a cobrar.';
+const COMMAND_VERDICT_EN = "We can't tell whether the operation completed. Check the result before trying again.";
+const COMMAND_VERDICT_ES = 'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar.';
 
 /** The unknown-outcome sentence for `locale` (same resolution rule as {@link dataTableLabels}). */
 export function commandVerdictMessage(locale = 'es'): string {
