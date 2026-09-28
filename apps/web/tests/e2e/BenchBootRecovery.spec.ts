@@ -210,10 +210,31 @@ test.describe('bench boot recovery (hub#1806)', () => {
 // `route.abort('internetdisconnected')` is the injectable twin of a network change: Chromium
 // derives both from the machine's network moving, and `NETWORK_CHANGE_ERRORS` holds both.
 test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
-  /** Resolves on the next `load` event of the page, i.e. once the current document has loaded. */
+  /**
+   * Resolves once the current document has loaded — at once if it already has. Not
+   * `page.once('load')`: that waits for the NEXT document, and a request that arrives after the
+   * load of its own document hangs there (hub#2296).
+   */
   function nextLoad(page: Page): Promise<void> {
-    return new Promise((resolve) => page.once('load', () => resolve()));
+    return page.waitForLoadState('load');
   }
+
+  test('the post-load wait of these specs does not wait for a load that already happened', async ({
+    page,
+  }) => {
+    // hub#2296, run 36402437763 attempt 1: on a slow runner the reloaded document fired `load`
+    // BEFORE the router asked for the screen again, and a wait for the NEXT `load` hung that
+    // request forever — no reload was coming, so the spec went red on its own injection.
+    await page.goto('/login');
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+
+    const waited = await Promise.race([
+      nextLoad(page).then(() => 'resolved' as const),
+      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 2_000)),
+    ]);
+
+    expect(waited).toBe('resolved');
+  });
 
   test('a screen that dies after the load event is still recovered by the bench', async ({
     page,
