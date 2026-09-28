@@ -667,6 +667,23 @@ const PLUMBING: Bilingual = {
 };
 
 /**
+ * The stable code the runtime gives a refusal that means «sign in again» (`AuthError::code`,
+ * `crates/server/src/auth.rs`, hub#1241). The two busiest doors, `/api/query` and `/api/command`,
+ * answer a dead session with a bare-string error and no code at all (`dispatch_api::unauthorized`),
+ * so {@link unwrap} names it for them from the 401 (hub#2281).
+ */
+const SESSION_REFUSED = 'unauthorized';
+
+/**
+ * «Your session is over: sign in again.» The same sentence the shell toasts when it closes the
+ * session (`auth.sessionEnded`), so the banner of a module and the toast above it agree.
+ */
+const SESSION_ENDED: Bilingual = {
+  en: 'Your session has ended: it expired or was opened on another device. Please sign in again.',
+  es: 'Tu sesión ha terminado: caducó o se abrió en otro dispositivo. Vuelve a entrar.',
+};
+
+/**
  * The codes a person can meet at a counter, and what to tell them.
  *
  * The plumbing family is every code whose message hub#1074 now redacts to a fixed English line
@@ -901,9 +918,25 @@ function refusalText(code: string, locale: string, serverMessage: string): strin
   return text.includes('{message}') ? text.replaceAll('{message}', serverMessage) : text;
 }
 
-function unwrap(env: Envelope): unknown {
+/**
+ * The envelope's `error` as the object this SDK reads, or `undefined` when it carries none.
+ *
+ * hub#2281: some doors still send `error` as a bare STRING of log prose — `/api/query` and
+ * `/api/command` among them, for a dead session (`dispatch_api::unauthorized`). A string has no
+ * code to branch on and nothing a person should read, so it counts as an empty refusal. A 401 that
+ * names no code of its own is the session being refused, and gets the runtime's code for it; a 401
+ * WITH a code (`hub_not_enrolled`: this hub has no machine credential) is about something else, and
+ * signing in again would not fix it.
+ */
+function refusalOf(error: unknown, status?: number): Envelope['error'] | undefined {
+  const e = error !== null && typeof error === 'object' ? (error as NonNullable<Envelope['error']>) : undefined;
+  if (status === 401 && !e?.code) return { ...e, code: SESSION_REFUSED, message: e?.message ?? '' };
+  return e;
+}
+
+function unwrap(env: Envelope, status?: number): unknown {
   if (!env.ok) {
-    const e = env.error;
+    const e = refusalOf(env.error, status);
     // hub#1102: a platform failure is told in the user's language and in business words; a module's
     // own refusal (and any code we do not know) keeps the sentence it arrived with.
     //
@@ -912,13 +945,23 @@ function unwrap(env: Envelope): unknown {
     // order is load-bearing: a platform code is never a module's to rewrite, and a code nobody
     // translated still keeps what arrived.
     const locale = activeLocale();
+    // hub#2281: a refusal of the SESSION is said here, in the transport, and NOT in the public
+    // platform table: the shell's own screens (Settings › Roles, hub#1705) run that table over their
+    // refusals and answer `unauthorized` from their own catalogue when it stays silent.
+    const sessionEnded = e?.code === SESSION_REFUSED;
     const spoken = e
-      ? (platformFailureMessage(e, locale) ??
-        (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
+      ? sessionEnded
+        ? (locale.toLowerCase().startsWith('en') ? SESSION_ENDED.en : SESSION_ENDED.es)
+        : (platformFailureMessage(e, locale) ??
+          (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
       : null;
+    // hub#2281: the last resort is a sentence a person can act on, in their language — never
+    // «unknown error». It is the plumbing one: from the counter, a refusal nobody explained is the
+    // same event as a failure the runtime redacted.
+    const lastResort = locale.toLowerCase().startsWith('en') ? PLUMBING.en : PLUMBING.es;
     throw new ErploraError(
       e?.code ?? 'error',
-      spoken ?? (e?.message || 'unknown error'),
+      spoken ?? (e?.message?.trim() || lastResort),
       e?.permission,
       // hub#1094: absent stays absent. An empty array would read as «the runtime looked and found
       // no bad field», which is a different statement from «this refusal is not about fields».
@@ -1170,7 +1213,7 @@ export class HttpWsTransport implements ErploraTransport {
     }
     // A refusal throws here with its own code; an `ok` envelope on a non-2xx status is nothing
     // the runtime writes, so it is not taken for a file.
-    if (!env.ok) unwrap(env);
+    if (!env.ok) unwrap(env, res.status);
     throw new ErploraError(SERVER_UNAVAILABLE, `unexpected response from ${path}: HTTP ${res.status}`);
   }
 
@@ -1243,7 +1286,7 @@ export class HttpWsTransport implements ErploraTransport {
         `request to ${path} returned an invalid JSON body`,
       );
     }
-    const data = unwrap(env);
+    const data = unwrap(env, res.status);
     return envelope ? env : data;
   }
 
