@@ -363,6 +363,36 @@ mod tests {
     }
 
     #[test]
+    fn the_lock_lasts_the_whole_lock_window() {
+        let g = AddressGuard::new();
+        let now = Instant::now();
+        for _ in 0..MAX_GUESSES {
+            g.record_guess_at(SHOP, now);
+        }
+        let almost = now + LOCK_WINDOW - Duration::from_secs(1);
+        assert_eq!(
+            g.locked_for_at(SHOP, almost),
+            Some(1),
+            "still locked a second before the end"
+        );
+        assert_eq!(g.locked_for_at(SHOP, now), Some(LOCK_WINDOW.as_secs()));
+    }
+
+    /// A till repeating a session that was already counted must not flood the log once the address
+    /// is locked: that line is what a watcher bans on (infra#338).
+    #[test]
+    fn a_counted_session_is_not_reported_again_while_locked() {
+        let g = AddressGuard::new();
+        let now = Instant::now();
+        assert!(g.record_rejected_session_at(SHOP, "dead-token", now));
+        for i in 0..MAX_FORGED_SESSIONS {
+            g.record_rejected_session_at(SHOP, &format!("forged-{i}"), now);
+        }
+        assert!(g.locked_for_at(SHOP, now).is_some());
+        assert!(!g.record_rejected_session_at(SHOP, "dead-token", now));
+    }
+
+    #[test]
     fn stale_addresses_are_swept_past_the_cap() {
         let g = AddressGuard::new();
         let start = Instant::now();

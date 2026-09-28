@@ -684,8 +684,9 @@ pub(crate) async fn track_user_activity(
 /// Read from the OUTSIDE of every handler on purpose: more than thirty doors resolve a session,
 /// and the only thing they all agree on is the `401`. The three credentials are the ones that take
 /// a request past the edge bouncer (infra#335): `X-Hub-Session`, the `erplora_media` cookie on the
-/// media read door, and the `ticket` of the event stream. A request that is signed in never gets
-/// here with a `401`, so whoever already has a session is never counted.
+/// media read door, and the `ticket` of the event stream. A session that still resolves is never
+/// counted: some doors answer `401` to a valid session whose role falls short (the admin metrics,
+/// export/import, reset), and that cashier invented nothing.
 pub(crate) async fn track_rejected_credentials(
     State(st): State<AppState>,
     request: axum::extract::Request,
@@ -696,6 +697,11 @@ pub(crate) async fn track_rejected_credentials(
     let response = next.run(request).await;
     if response.status() == StatusCode::UNAUTHORIZED {
         if let Some((reason, token)) = presented {
+            if reason == crate::address_guard::Failure::SessionInvalid
+                && session_resolves(&st, &token).await
+            {
+                return response;
+            }
             crate::address_guard::record_rejected_credential(
                 &st,
                 client.as_deref(),
@@ -705,6 +711,13 @@ pub(crate) async fn track_rejected_credentials(
         }
     }
     response
+}
+
+/// Whether `token` is a live session of this hub. Asked on the `401` path only. A database error
+/// answers `true`: an outage must not lock shops out of their PIN door.
+async fn session_resolves(st: &AppState, token: &str) -> bool {
+    let rt = st.runtime.read().await;
+    !matches!(rt.resolve_session(token).await, Ok(None))
 }
 
 /// The session credential this request presents, if any — in the order the doors read them.

@@ -85,6 +85,9 @@ async fn fixture() -> axum::Router {
     rt.create_user("Admin", "1111", "admin", None)
         .await
         .unwrap();
+    rt.create_user("Marta", "2222", "cashier", None)
+        .await
+        .unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-addr-guard-{}", std::process::id()));
     let cfg = HubConfig {
         demo: false,
@@ -346,4 +349,54 @@ async fn wrong_badges_count_towards_the_same_lock() {
         .body(Body::from(json!({ "badge": "card-x" }).to_string()))
         .unwrap();
     assert_eq!(send(&router, req).await.0, StatusCode::TOO_MANY_REQUESTS);
+}
+
+/// Some doors still answer `401` to a session that resolves but whose role falls short (the admin
+/// metrics, export/import, reset). That session is real, not invented: a shop whose cashiers sign
+/// in again and again and open one of those screens must never lock itself out of the PIN door.
+#[tokio::test]
+async fn valid_sessions_refused_for_their_role_never_lock_the_shop() {
+    let router = fixture().await;
+    let shop = "198.51.100.100";
+    for i in 0..MAX_FORGED_SESSIONS {
+        let (status, body) = send(&router, pin_login(shop, "Marta", "2222")).await;
+        assert_eq!(status, StatusCode::OK, "sign-in {i}: {body}");
+        let token = body["token"].as_str().expect("a session token").to_string();
+        let metrics = Request::builder()
+            .uri("/api/system/metrics")
+            .header("x-hub-session", &token)
+            .header("x-forwarded-for", forwarded(shop))
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            send(&router, metrics).await.0,
+            StatusCode::UNAUTHORIZED,
+            "precondition: the admin door answers 401 to a cashier"
+        );
+    }
+    assert_signs_in(&router, shop).await;
+    assert!(
+        failure_lines(shop).is_empty(),
+        "a session that resolves is not a failed sign-in: {:#?}",
+        failure_lines(shop)
+    );
+}
+
+/// Without a proxy address there is nobody to lock, but the failure is still a failure: the line
+/// must be there, with `client=-`. Every other test sends an address, so any such line is this one.
+#[tokio::test]
+async fn a_forged_session_without_an_address_is_still_logged() {
+    let router = fixture().await;
+    let req = Request::builder()
+        .uri("/api/profile")
+        .header("x-hub-session", "forged-without-address")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(send(&router, req).await.0, StatusCode::UNAUTHORIZED);
+    assert!(
+        failure_lines("-")
+            .iter()
+            .any(|l| l.contains("reason=session_invalid")),
+        "no auth_failed line with client=-"
+    );
 }
