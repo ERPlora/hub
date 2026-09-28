@@ -47,6 +47,7 @@ let INSTALLED: Array<Record<string, unknown>> = [];
 let UPDATES: Array<Record<string, unknown>> = [];
 
 const cloudMarketplaceModules = vi.fn(async () => CATALOG);
+const listModuleUpdates = vi.fn(async () => UPDATES);
 const updateModule = vi.fn(async (..._args: unknown[]) => ({
   ok: true,
   module_id: 'sales',
@@ -76,7 +77,7 @@ vi.mock('../lib/runtime', () => ({
   InstallBlockedError: class InstallBlockedError extends Error {},
   ModuleActionError: class ModuleActionError extends Error {},
   updateModule: (...args: unknown[]) => updateModule(...args),
-  listModuleUpdates: async () => UPDATES,
+  listModuleUpdates: () => listModuleUpdates(),
   listModuleVersions: async (id: string) => ({ module_id: id, installed: '1.0.0', latest: null, versions: [] }),
   modulePublicationStatus: async () => null,
 }));
@@ -142,6 +143,8 @@ beforeEach(() => {
   HUB_VERSION = 'v1.4.0';
   push.mockClear();
   updateModule.mockClear();
+  listModuleUpdates.mockReset();
+  listModuleUpdates.mockImplementation(async () => UPDATES);
   setNotificationCount(0, 'moduleUpdates');
   CATALOG = ['sales', 'kitchen', 'tables'].map((id) => ({ ...catalogueEntry(id), installed: true, version: '2.0.0' }));
   INSTALLED = ['sales', 'kitchen', 'tables'].map((id) => ({ id, name: id, version: '1.0.0', status: 'active' }));
@@ -179,6 +182,15 @@ describe('the Apps screen feeds the «apps have a new version» notice (hub#1172
     mountApps();
     await settle();
     expect(notificationCountOf('moduleUpdates')).toBe(1);
+  });
+
+  // «I don't know» is not «all up to date»: a failed fetch leaves the bell as it was.
+  it('a failed fetch on the Apps screen keeps the bell as it was', async () => {
+    setNotificationCount(3, 'moduleUpdates');
+    listModuleUpdates.mockRejectedValue(new Error('offline'));
+    mountApps();
+    await settle();
+    expect(notificationCountOf('moduleUpdates')).toBe(3);
   });
 
   it('🔴 updating the app there clears the bell at once', async () => {

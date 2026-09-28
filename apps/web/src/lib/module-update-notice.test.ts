@@ -2,6 +2,9 @@
 // hub#1172 — a hub ran 9 apps behind the marketplace and the owner had no way to know: the only
 // place that said «Update to X» was Apps → «My apps», and nobody opens that screen to look. The
 // bell now carries ONE aggregated notice («3 apps have a new version») that leads there.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { nextTick, ref } from 'vue';
@@ -214,6 +217,27 @@ describe('aggregated «apps have a new version» notice on the bell (hub#1172)',
       stopModuleUpdateNoticeWatch();
       vi.useRealTimers();
     }
+  });
+
+  // An admin's check still in flight when a cashier takes the till must not paint for the cashier.
+  it('a check overtaken by a PIN hand-over drops its result', async () => {
+    let answer: (u: ModuleUpdateInfo[]) => void = () => {};
+    listModuleUpdates.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const inFlight = refreshModuleUpdateNotice();
+
+    isAdmin.value = false;
+    await refreshModuleUpdateNotice();
+    isAdmin.value = true; // back to an admin before the stale answer lands: still stale
+    answer([upd('sales'), upd('kitchen')]);
+    await inFlight;
+
+    expect(notificationCountOf('moduleUpdates')).toBe(0);
+  });
+
+  // The watch only works if the shell starts it: nothing else boots it.
+  it('the shell starts the watch with the other bell sources', () => {
+    const app = readFileSync(join(process.cwd(), 'src/App.vue'), 'utf8');
+    expect(app).toMatch(/^\s*bootModuleUpdateNoticeWatch\(\);$/m);
   });
 
   it('signing out clears the notice without waiting for the next check', async () => {
