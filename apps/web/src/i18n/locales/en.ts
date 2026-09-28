@@ -335,6 +335,11 @@ export default {
       body: 'ERPlora is not answering. Check that this device is connected to the internet and try again. If it keeps happening, the problem may be on our side.',
       retry: 'Try again',
     },
+    refused: {
+      title: 'Your business is not available right now',
+      body: 'ERPlora answered, but it cannot open your business at the moment. This device and its connection are fine: there is nothing to check here. We will try again on our own every {seconds} seconds.',
+      retry: 'Try again now',
+    },
   },
   offline: {
     title: 'No internet connection',

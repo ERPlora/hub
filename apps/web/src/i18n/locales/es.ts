@@ -308,6 +308,11 @@ export default {
       body: 'ERPlora no responde. Comprueba que este dispositivo tiene conexión a Internet y vuelve a intentarlo. Si sigue pasando, el problema puede ser nuestro.',
       retry: 'Reintentar',
     },
+    refused: {
+      title: 'Tu negocio no está disponible ahora mismo',
+      body: 'ERPlora responde, pero ahora mismo no puede abrir tu negocio. Este dispositivo y su conexión están bien: no tienes que revisar nada. Lo volvemos a intentar solos cada {seconds} segundos.',
+      retry: 'Reintentar ahora',
+    },
   },
   offline: {
     title: 'Sin conexión a Internet',

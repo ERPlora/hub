@@ -32,7 +32,7 @@ import { i18n } from './i18n';
 import {
   getClient,
   clientInjectionKey,
-  bootHubContext,
+  bootContextOutcome,
   ensureMediaCookie,
   setOnRuntimeSessionExpired,
   RUNTIME_URL,
@@ -421,8 +421,8 @@ setOnHubGone(() => {
 const mountPoint = document.getElementById('app');
 const bootScreen = mountPoint ? createBootScreen(mountPoint) : null;
 void bootUntilReachable({
-  loadContext: bootHubContext,
-  showUnreachable: (retry) => bootScreen?.showUnreachable(retry),
+  loadContext: bootContextOutcome,
+  showUnreachable: (retry, failure) => bootScreen?.showUnreachable(retry, failure),
   showProgress: () => bootScreen?.showProgress(),
 }).then(async () => {
   // ADR-0159: if the SaaS sent a one-time shell courier, consume it before router mount so the

@@ -9,9 +9,10 @@ import { createApp, type App as VueApp } from 'vue';
 
 import BootUnreachable from '../components/BootUnreachable.vue';
 import { i18n, lastDeviceLocale } from '../i18n';
+import type { BootFailure } from './boot';
 
 export interface BootScreen {
-  showUnreachable(retry: () => void): void;
+  showUnreachable(retry: () => void, failure?: BootFailure): void;
   showProgress(): void;
 }
 
@@ -33,14 +34,14 @@ export function createBootScreen(el: HTMLElement): BootScreen {
   };
 
   return {
-    showUnreachable(retry) {
+    showUnreachable(retry, failure = 'unreachable') {
       unmountNotice();
       const deviceLocale = lastDeviceLocale();
       if (deviceLocale) {
         shellLocale = i18n.global.locale.value;
         i18n.global.locale.value = deviceLocale;
       }
-      notice = createApp(BootUnreachable, { onRetry: retry }).use(i18n);
+      notice = createApp(BootUnreachable, { onRetry: retry, failure }).use(i18n);
       notice.mount(el);
     },
     showProgress() {
