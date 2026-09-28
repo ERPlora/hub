@@ -334,17 +334,22 @@ export class ListController<T = Record<string, unknown>> {
     return Math.max(1, Math.ceil(this.total / this.state.pageSize));
   }
 
-  /** (Re)carga la página actual desde el servidor. */
+  /**
+   * (Re)loads the current page from the server. On a phone, after «Load more» (hub#2365), the
+   * current page is everything shown so far: a refresh brings back pages 0..page in one request.
+   */
   async load(): Promise<void> {
     const s = this.state;
     const mySeq = ++this.seq;
+    const paging = mobilePagingOf(this);
+    const window = nextListWindow(paging, s);
     this.loading = true;
     this.error = '';
     this.onChange();
     try {
       const page = await this.client.queryPage<T>(this.queryName, {
-        limit: s.pageSize,
-        offset: s.page * s.pageSize,
+        limit: window.limit,
+        offset: window.offset,
         search: s.search,
         sort: s.sort,
         dir: s.dir,
@@ -352,8 +357,13 @@ export class ListController<T = Record<string, unknown>> {
         params: s.context,
       });
       if (mySeq !== this.seq) return; // llegó una carga más reciente
-      this.rows = page.rows ?? [];
+      const rows = page.rows ?? [];
+      this.rows = window.append ? [...this.rows, ...rows] : rows;
       this.total = page.total ?? this.rows.length;
+      if (window.growsTo !== undefined) {
+        s.page = window.growsTo;
+        keepAccumulating(paging, () => void this.load());
+      }
     } catch (e) {
       if (mySeq !== this.seq) return;
       this.rows = [];
@@ -367,8 +377,19 @@ export class ListController<T = Record<string, unknown>> {
     }
   }
 
+  /**
+   * Goes to `page`. On a phone `<ok-data-table>` has no pager, only «Load more», which asks for
+   * `page + 1`: that one is ADDED under the rows already shown (hub#2365). Any other jump replaces.
+   */
   setPage(page: number): void {
-    this.state.page = Math.max(0, page);
+    const next = Math.max(0, page);
+    const paging = mobilePagingOf(this);
+    if (next === this.state.page + 1 && phoneViewport()?.matches) {
+      paging.growNext = true;
+    } else {
+      stopAccumulating(paging);
+      this.state.page = next;
+    }
     void this.load();
   }
 
@@ -424,6 +445,95 @@ export class ListController<T = Record<string, unknown>> {
     this.state.filters = {};
     void this.load();
   }
+}
+
+// ── «Load more» on a phone (hub#2365) ────────────────────────────────────────────────────────
+// Kept outside the class on purpose: it is private state, and a private field would still land in
+// the frozen kernel surface (`contracts/kernel/sdk.d.ts`) that the declarations are checked against.
+
+/** `<ok-data-table>`'s phone edge (OutfitKit `MOBILE_BREAKPOINT`): no pager there, only «Load more». */
+const PHONE_MEDIA = '(max-width: 640px)';
+
+interface ViewportQuery {
+  readonly matches: boolean;
+  addEventListener?(type: 'change', listener: (e: { matches: boolean }) => void): void;
+  removeEventListener?(type: 'change', listener: (e: { matches: boolean }) => void): void;
+}
+
+/** The phone media query, or `null` where there is no window (tests, workers). */
+function phoneViewport(): ViewportQuery | null {
+  const matchMedia = (globalThis as { matchMedia?: (query: string) => ViewportQuery }).matchMedia;
+  return typeof matchMedia === 'function' ? matchMedia(PHONE_MEDIA) : null;
+}
+
+interface MobilePaging {
+  /** `rows` hold pages 0..state.page (a phone asked for more at least once). */
+  accumulated: boolean;
+  /** The next `load()` grows the list by one page instead of reloading (set by `setPage`). */
+  growNext: boolean;
+  /** Stops watching the phone edge (watched only while `accumulated`). */
+  unwatch?: () => void;
+}
+
+const mobilePaging = new WeakMap<object, MobilePaging>();
+
+function mobilePagingOf(ctrl: object): MobilePaging {
+  let paging = mobilePaging.get(ctrl);
+  if (!paging) {
+    paging = { accumulated: false, growNext: false };
+    mobilePaging.set(ctrl, paging);
+  }
+  return paging;
+}
+
+interface ListWindow {
+  offset: number;
+  limit: number;
+  /** Glue the answer under the current rows instead of replacing them. */
+  append: boolean;
+  /** The page the list reaches when the answer lands (only when growing). */
+  growsTo?: number;
+}
+
+/** What the next `load()` asks for. Consumes a pending «Load more». */
+function nextListWindow(paging: MobilePaging, s: ListControllerState): ListWindow {
+  const size = s.pageSize;
+  const grow = paging.growNext;
+  paging.growNext = false;
+  if (grow) {
+    const target = s.page + 1;
+    // The rows cover 0..page (page 0, or already accumulated): only the next page is missing.
+    if (paging.accumulated || s.page === 0) {
+      return { offset: target * size, limit: size, append: true, growsTo: target };
+    }
+    // A page reached with a desktop pager (then turned into a phone): fill everything up to target.
+    return { offset: 0, limit: (target + 1) * size, append: false, growsTo: target };
+  }
+  if (s.page === 0) stopAccumulating(paging); // a new result set (search, filter, sort…) starts over
+  if (paging.accumulated) return { offset: 0, limit: (s.page + 1) * size, append: false };
+  return { offset: s.page * size, limit: size, append: false };
+}
+
+/** Marks the rows as accumulated and, once, watches for the phone turning into a desktop pager. */
+function keepAccumulating(paging: MobilePaging, reload: () => void): void {
+  paging.accumulated = true;
+  if (paging.unwatch) return;
+  const viewport = phoneViewport();
+  if (!viewport?.addEventListener) return;
+  const onChange = (e: { matches: boolean }): void => {
+    if (e.matches) return;
+    // The pager is back and says «page N»: show page N on its own, not everything up to it.
+    stopAccumulating(paging);
+    reload();
+  };
+  viewport.addEventListener('change', onChange);
+  paging.unwatch = () => viewport.removeEventListener?.('change', onChange);
+}
+
+function stopAccumulating(paging: MobilePaging): void {
+  paging.accumulated = false;
+  paging.unwatch?.();
+  paging.unwatch = undefined;
 }
 
 /**
