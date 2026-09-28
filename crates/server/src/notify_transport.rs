@@ -215,6 +215,11 @@ impl CloudNotifyTransport {
         let [(key, value)] = present.as_slice() else {
             return Ok(None);
         };
+        // Only a photo is ever stored in the folder (the door takes JPEG/PNG): a title reading
+        // like a file is its text, and a video or document naming one is refused as not-a-link.
+        if *key != "header_image" {
+            return Ok(None);
+        }
         let Some(file) = value.as_str().and_then(header_media_file) else {
             return Ok(None);
         };
@@ -240,8 +245,9 @@ impl CloudNotifyTransport {
             None
         };
         let Some(link) = link else {
-            // A `404` is a file deleted from Archivos after the step was saved. Either way the
-            // message does not leave without the picture its approved template promises.
+            // A refusal, or — once erplora.com checks the file exists before signing
+            // (ERPlora/saas#2393; today it signs any key) — a `404` for a file deleted from
+            // Archivos. Either way the message does not leave without its approved picture.
             return Err(RuntimeError::Notify(format!(
                 "the photo of `vars.{key}` (`{file}`) could not be signed: erplora.com answered \
                  {status} with no link to it — if it was deleted from Archivos, upload it again \
@@ -1319,6 +1325,8 @@ mod tests {
             "/whatsapp/headers/x.jpg",
             "whatsapp/headers\\x.jpg",
             "modules/verifactu/cert.p12",
+            "whatsapp/headers/a\nb.jpg",
+            &format!("whatsapp/headers/{}.jpg", "a".repeat(252)),
         ] {
             let err = transport(&cloud.base_url, Some("machine-tok"))
                 .send(
@@ -1403,6 +1411,48 @@ mod tests {
         assert!(format!("{err}").contains("header_image"), "{err}");
         let calls = cloud.calls();
         assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
+    }
+
+    /// Only the IMAGE header takes an uploaded file (the door stores JPEG/PNG only; video and PDF
+    /// are hub#2347). A title that happens to read like a stored file is the title's text, and a
+    /// video header naming a stored photo is refused as the not-a-link it is — neither is signed.
+    #[tokio::test]
+    async fn only_the_image_header_is_signed() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.13"})).await;
+        transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_text": "whatsapp/headers/0b8e.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a title is sent as written");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "nothing signed for a title: {calls:?}");
+        assert_eq!(
+            calls[0].2["template"]["components"][0]["parameters"][0]["text"],
+            "whatsapp/headers/0b8e.jpg"
+        );
+
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.14"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_video": "whatsapp/headers/0b8e.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("a stored photo is not a video link");
+        assert!(format!("{err}").contains("header_video"), "{err}");
+        assert!(cloud.calls().is_empty(), "{:?}", cloud.calls());
     }
 
     /// A template has ONE header. Two media keys is a flow that does not know which one it meant,
