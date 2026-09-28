@@ -10,7 +10,12 @@ import { toastError } from '../lib/toast';
 import { i18n } from '../i18n';
 import { showViewLoadFailure } from './view-load-failure-notice';
 import { installSystemBackButton } from './back-closes-overlay';
-import { browserRecoveryStorage, clearViewLoadRecovery, recoverFromViewLoadError } from './view-load-recovery';
+import {
+  browserRecoveryStorage,
+  clearViewLoadRecovery,
+  recoverFromViewLoadError,
+  sameHubHref,
+} from './view-load-recovery';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
@@ -212,8 +217,13 @@ router.onError((error, to, from) => {
       storage: browserRecoveryStorage(),
       reload: () => window.location.reload(),
       // Here the tab is still on `from`, so assigning `to` IS a document navigation — and the base
-      // path comes from the router, not from a hand-built string.
-      reopen: (toPath) => window.location.assign(router.resolve(toPath).href),
+      // path comes from the router, not from a hand-built string. Only if it stays on this hub: a
+      // path that resolves elsewhere reloads where the person is, which clears the failed file too.
+      reopen: (toPath) => {
+        const href = sameHubHref(router.resolve(toPath).href, window.location.href);
+        if (href) window.location.assign(href);
+        else window.location.reload();
+      },
       failedInApp: sectionsFailedInApp,
       isOnline: () => window.navigator.onLine !== false,
     },

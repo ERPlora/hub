@@ -19,6 +19,7 @@ import {
   clearViewLoadRecovery,
   isViewLoadError,
   recoverFromViewLoadError,
+  sameHubHref,
 } from './view-load-recovery';
 
 /** The three shapes of `Storage` this module touches, backed by a plain map. */
@@ -239,6 +240,26 @@ describe('recoverFromViewLoadError · retrying a section that failed with the ap
 
     expect(outcome).toBe('notify');
     expect(io.reopen).not.toHaveBeenCalled();
+  });
+});
+
+describe('sameHubHref · the reopen never leaves this hub (review of hub#2312)', () => {
+  // `router.resolve` hands back whatever path it is given: `//host/x` comes back as `//host/x`,
+  // which a browser reads as ANOTHER origin (measured with vue-router: `resolve('//erplora.com/
+  // checkout/').href` = `//erplora.com/checkout/`). Only an address of this very hub may be opened.
+  const HERE = 'https://demo.a.erplora.com/dashboard';
+
+  it('keeps a route of this hub, fragment and query included', () => {
+    expect(sameHubHref('/settings?tab=1#data', HERE)).toBe('https://demo.a.erplora.com/settings?tab=1#data');
+  });
+
+  it.each([
+    ['a protocol-relative address', '//erplora.com/checkout/'],
+    ['a backslash the browser reads as a slash', '/\\erplora.com/checkout/'],
+    ['three slashes', '///erplora.com/checkout/'],
+    ['an absolute address of the SaaS', 'https://erplora.com/checkout/'],
+  ])('refuses %s', (_name, href) => {
+    expect(sameHubHref(href, HERE)).toBeNull();
   });
 });
 

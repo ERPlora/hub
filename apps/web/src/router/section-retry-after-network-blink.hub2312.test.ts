@@ -45,6 +45,7 @@ const HEALTHY = '/hub2312-healthy';
 const BROKEN = '/hub2312-broken';
 const OTHER_BROKEN = '/hub2312-other-broken';
 const OFFLINE_BROKEN = '/hub2312-offline-broken';
+const ELSEWHERE_BROKEN = '/hub2312-elsewhere-broken';
 
 let assign: ReturnType<typeof vi.fn>;
 let reload: ReturnType<typeof vi.fn>;
@@ -60,13 +61,19 @@ beforeEach(() => {
 
   router.addRoute({ path: HEALTHY, name: 'hub2312-healthy', component: { render: () => null } });
   // Each broken section fails EVERY time, exactly like the browser's poisoned module map does.
-  for (const path of [BROKEN, OTHER_BROKEN, OFFLINE_BROKEN]) {
+  for (const path of [BROKEN, OTHER_BROKEN, OFFLINE_BROKEN, ELSEWHERE_BROKEN]) {
     router.addRoute({ path, name: path.slice(1), component: () => Promise.reject(CHUNK_ERROR) });
   }
 });
 
 afterEach(() => {
-  for (const name of ['hub2312-healthy', 'hub2312-broken', 'hub2312-other-broken', 'hub2312-offline-broken']) {
+  for (const name of [
+    'hub2312-healthy',
+    'hub2312-broken',
+    'hub2312-other-broken',
+    'hub2312-offline-broken',
+    'hub2312-elsewhere-broken',
+  ]) {
     router.removeRoute(name);
   }
   vi.restoreAllMocks();
@@ -91,7 +98,7 @@ describe('hub#2312 · a section that failed with the app open', () => {
     await navigate(`${BROKEN}#data`);
 
     expect(assign).toHaveBeenCalledTimes(1);
-    expect(assign).toHaveBeenCalledWith(router.resolve(`${BROKEN}#data`).href);
+    expect(assign).toHaveBeenCalledWith(new URL(`${BROKEN}#data`, window.location.href).href);
     // A plain reload would land back on the screen they came FROM, not the one they asked for.
     expect(reload).not.toHaveBeenCalled();
     expect(toastErrorSpy).not.toHaveBeenCalled();
@@ -100,6 +107,21 @@ describe('hub#2312 · a section that failed with the app open', () => {
     expect(reportSpy).toHaveBeenCalledWith(
       expect.objectContaining({ component: 'router', message: expect.stringContaining('router.onError[reopen]') }),
     );
+  });
+
+  it('never leaves this hub, even when the router resolves the section to another origin', async () => {
+    // Review of hub#2312: the router hands `//host/x` back unchanged and the browser reads it as
+    // another site. The reopen then stays here: a reload of this hub clears the failed file too.
+    await navigate(HEALTHY);
+    await navigate(ELSEWHERE_BROKEN);
+    vi.spyOn(router, 'resolve').mockReturnValue({ href: '//erplora.com/checkout/' } as ReturnType<
+      typeof router.resolve
+    >);
+
+    await navigate(ELSEWHERE_BROKEN);
+
+    expect(assign).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('a first failure of ANOTHER section never throws away the screen the person is on', async () => {

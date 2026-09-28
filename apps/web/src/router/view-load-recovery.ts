@@ -98,6 +98,20 @@ function sectionOf(path: string): string {
   return path.split(/[?#]/, 1)[0];
 }
 
+/**
+ * `href` as a full address of the hub at `here`, or `null` when it would leave it. The router keeps
+ * whatever path it is handed — `//host/x` or `/\\host/x` come back unchanged and the browser reads
+ * them as another origin — so rung 4 opens only what this check lets through.
+ */
+export function sameHubHref(href: string, here: string): string | null {
+  try {
+    const url = new URL(href, here);
+    return url.origin === new URL(here).origin ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Forgets the mark once a navigation lands, so a later hiccup can recover too. Never throws. */
 export function clearViewLoadRecovery(storage: RecoveryStorage): void {
   try {

@@ -135,10 +135,9 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     { what: "the SaaS's Google sign-in, which hands straight back to this hub (ADR-0157 §8)", reaches: /\bgoogleLoginUrl\(/ },
     { what: 'another hub, validated as one before leaving (deep links)', reaches: /\brequireHubUrl\(|\bhubDeepLink\(/ },
     { what: 'a file this till just generated (a download)', reaches: /\bURL\.createObjectURL\(/ },
-    // The shell's own router builds the address — its base and one of its routes — so the document
-    // stays on this hub; it only reloads a section whose file failed (hub#2312). A SaaS address
-    // handed to it is still caught below, by the hand-written-address rule.
-    { what: 'a route of this same hub, built by its own router (hub#2312)', reaches: /\brouter\.resolve\(/ },
+    // A section of this same hub whose file failed, reopened in a new document (hub#2312). The
+    // router alone is NOT the destination — it hands `//host/x` back unchanged — the origin check is.
+    { what: 'a route of this same hub, checked to stay on it (hub#2312)', reaches: /\bsameHubHref\(/ },
   ];
 
   /**
@@ -353,6 +352,15 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
       'router/index.ts',
       "window.location.assign(router.resolve('https://erplora.com/checkout/').href);",
     ],
+    // Review of hub#2312: `router.resolve(x).href` is NOT an address of this hub for any `x` —
+    // `//erplora.com/checkout/` comes back unchanged and the browser leaves. The router is not a
+    // destination; the check that its result stayed on this origin is.
+    [
+      'the router handed an address fetched from elsewhere',
+      'lib/x.ts',
+      'const planLink = await fetchPlanLink();\nwindow.location.assign(router.resolve(planLink).href);',
+    ],
+    ['the router handed whatever it is given', 'lib/x.ts', 'export function go(p: string): void {\n  window.location.assign(router.resolve(p).href);\n}'],
     ['an anchor built in code', 'lib/x.ts', "const a = document.createElement('a');\na.href = 'https://erplora.com/billing/';\na.click();"],
     // Second review of hub#1907: the two below left the rule green. The way out of a SHARED paid
     // door is written once, in its module, so the button that calls it was never looked at.
@@ -374,9 +382,9 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
   it.each([
     ['a page of this same hub', 'lib/x.ts', "window.location.assign('/login');"],
     [
-      'a route of this same hub, built by its own router (hub#2312)',
+      'a route of this same hub, checked to stay on it (hub#2312)',
       'router/index.ts',
-      'reopen: (toPath) => window.location.assign(router.resolve(toPath).href),',
+      'const href = sameHubHref(router.resolve(toPath).href, window.location.href);\nif (href) window.location.assign(href);',
     ],
     ['the account surface', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';\nconst plain = `${base}${CLOUD_ACCOUNT_PATH}`;\nawait openExternal(ok ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a') : plain);"],
     ['the installer', 'views/SystemPage.vue', 'await openExternal(appDownloadUrl(os.platform));'],
