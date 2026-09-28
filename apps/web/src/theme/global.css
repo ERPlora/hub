@@ -2,6 +2,17 @@
    Base de componentes = Ionic; aquí solo Tailwind + globales mínimos. */
 @import "tailwindcss";
 
+/* Tailwind's preflight resets `padding: 0` on `*`, and a document rule always beats a shadow
+   `:host` rule: it wiped the side padding Ionic gives `ion-title` (20px in md, 90px in ios), so
+   titles sat flush against the sheet edge in md and ran under the toolbar buttons in ios
+   (hub#2314). `revert-layer` inside the SAME `base` layer drops the reset for `ion-title` and
+   lets Ionic's own `:host` padding through, whatever values Ionic ships. */
+@layer base {
+  ion-title {
+    padding: revert-layer;
+  }
+}
+
 html,
 body,
 #app {
