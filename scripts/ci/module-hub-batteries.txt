@@ -86,6 +86,11 @@ inventory/tests/units.hub.test.py
 # ← invoice_e2e.rs (hub#1345)
 invoice/tests/create.hub.test.py
 invoice/tests/from_sale.hub.test.py
+# invoice: «Mark as paid» moves an issued invoice once; paid again, cancelled or unknown → the
+# translated refusal `invoice.cannot_mark_paid` (the command's `expect_rows`), against the real
+# kernel (invoice#109). New coverage, not moved.
+# pending-publication: invoice#123 until 2026-10-27
+invoice/tests/mark_paid.hub.test.py
 
 # ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
 services/tests/package_redeem.hub.test.py
