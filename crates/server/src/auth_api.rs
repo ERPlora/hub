@@ -1181,6 +1181,12 @@ nQIDAQAB
             lines[0].contains("cloud login refused: the user token does not verify"),
             "the only line is not the refusal's: {log:?}"
         );
+        // A refused sign-in is something an operator looks for; below the production filter it
+        // would never be written at all.
+        assert!(
+            lines[0].contains(" WARN erplora_server::auth_api:"),
+            "the refusal is not logged as a warning: {log:?}"
+        );
         let (_, error) = lines[0]
             .split_once(" error=\"")
             .unwrap_or_else(|| panic!("the error is not a quoted field: {log:?}"));
