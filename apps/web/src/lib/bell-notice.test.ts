@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { BellCounterRise } from './bell-counters';
 import { bellNoticeFor, bootBellNotices, onBellRise } from './bell-notice';
+import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './appointment-notice';
 import en from '../i18n/locales/en';
 import es from '../i18n/locales/es';
 
@@ -82,5 +83,17 @@ describe('the system notice of a bell counter (hub#2303)', () => {
       expect(locale.bellNotice.body.trim()).not.toBe('');
     }
     expect(es.bellNotice.body).not.toBe(en.bellNotice.body);
+  });
+
+  // The module the shell leaves out has to be the one whose bookings already ring: a constant that
+  // drifts from the events `appointment-notice.ts` listens to brings the double notice back.
+  it('leaves out exactly the module whose events the appointment notices listen to', () => {
+    const events: string[] = [];
+    const client = { onEvent: (name: string) => (events.push(name), () => {}) };
+
+    bootAppointmentNotices(client as never, { notify: async () => {}, t });
+
+    expect(events.length).toBeGreaterThan(0);
+    for (const name of events) expect(name.startsWith(`${APPOINTMENT_NOTICE_MODULE}.`)).toBe(true);
   });
 });

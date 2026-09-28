@@ -179,6 +179,21 @@ describe('a bell counter that goes up is announced (hub#2303)', () => {
     expect(rises).toEqual([]);
   });
 
+  // …and the shell never calls `stopBellCountersWatch` on a logout: the poll keeps running and sees
+  // the session gone. That path has to drop the baseline too, or the next login rings for the
+  // backlog that grew while nobody was logged in.
+  it('does not announce the backlog after a logout the shell only sees as a poll without session', async () => {
+    answers(0);
+    await refreshBellCounters();
+    isAuthed.value = false;
+    await refreshBellCounters();
+    isAuthed.value = true;
+    answers(3);
+    await refreshBellCounters();
+
+    expect(rises).toEqual([]);
+  });
+
   // A PIN hand-over to somebody who may see a counter the previous cashier could not: its count is
   // new to this session, not new to the business.
   it('does not announce a counter the session only just became allowed to see', async () => {
