@@ -107,9 +107,10 @@ test.describe('in ios a sheet title sits between the toolbar buttons (hub#2344)'
 
       expect(title.truncated, 'a title that does not fit is cut with «…»').toBe(true);
       expect(title.visibleRight, 'the title runs under the end button').toBeLessThanOrEqual(title.endLimit);
-      expect(title.visibleLeft, 'the title starts flush against the sheet edge').toBeGreaterThanOrEqual(
-        title.bodyStart,
-      );
+      expect(
+        Math.abs(title.visibleLeft - title.bodyStart),
+        'a long title does not start where the body text starts',
+      ).toBeLessThanOrEqual(1);
     });
   }
 
@@ -131,9 +132,7 @@ test.describe('in ios a sheet title sits between the toolbar buttons (hub#2344)'
     expect(title.visibleRight, 'the title runs under the end button').toBeLessThanOrEqual(title.endLimit);
   });
 
-  test('at 360px an ordinary title is whole and centred in the room the buttons leave', async ({
-    page,
-  }, testInfo) => {
+  test('at 360px an ordinary title is whole and centred in the room the buttons leave', async ({ page }, testInfo) => {
     await openShell(page, 360, 780);
     const title = await presentSheet(page, { mode: 'ios', title: SHORT_TITLE, endButton: 'Cancelar' });
     await testInfo.attach('sheet-short-title-360', { body: await page.screenshot(), contentType: 'image/png' });
@@ -141,5 +140,48 @@ test.describe('in ios a sheet title sits between the toolbar buttons (hub#2344)'
     expect(title.truncated, 'an ordinary title is cut on a 360px phone').toBe(false);
     expect(title.visibleRight, 'the title runs under the end button').toBeLessThanOrEqual(title.endLimit);
     expect(Math.abs(title.offCentre), 'the title is not centred in its room').toBeLessThanOrEqual(1);
+  });
+
+  // The rule is for ios only: an md sheet's title is laid out like any other md title (md's side
+  // padding is hub#2314's business, so it is compared with a title outside a sheet, not pinned).
+  test('in md a sheet title is laid out like any md title', async ({ page }) => {
+    await openShell(page, 390, 844);
+    const styles = await page.evaluate(async () => {
+      const read = (el: Element) => {
+        const s = getComputedStyle(el);
+        return { position: s.position, paddingLeft: s.paddingLeft, paddingRight: s.paddingRight };
+      };
+      const loose = document.createElement('ion-toolbar');
+      loose.setAttribute('mode', 'md');
+      loose.innerHTML = '<ion-title mode="md">Voucher movements</ion-title>';
+      document.querySelector('ion-app')!.append(loose);
+      const modal = document.createElement('ion-modal') as HTMLElement & { present(): Promise<void> };
+      modal.setAttribute('mode', 'md');
+      modal.innerHTML = `
+        <ion-header><ion-toolbar><ion-title>Voucher movements</ion-title>
+          <ion-buttons slot="end"><ion-button>Close</ion-button></ion-buttons></ion-toolbar></ion-header>
+        <ion-content class="ion-padding"><p>Body text</p></ion-content>`;
+      document.querySelector('ion-app')!.append(modal);
+      await modal.present();
+      await customElements.whenDefined('ion-title');
+      return { sheet: read(modal.querySelector('ion-title')!), loose: read(loose.querySelector('ion-title')!) };
+    });
+    expect(styles.sheet, 'the ios sheet rule leaks into md').toEqual(styles.loose);
+  });
+
+  // The rule is for sheets only: the shell's topbar keeps Ionic's ios layout, its title centred on
+  // the WHOLE bar even though its start and end buttons are of very different widths.
+  test('the shell topbar title stays centred on the whole bar', async ({ page }) => {
+    await openShell(page, 1440, 900);
+    const title = page.locator('ion-header.app-topbar ion-title');
+    await expect(title).toHaveText(/\S/);
+    const offCentre = await title.evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const text = range.getBoundingClientRect();
+      const bar = el.closest('ion-toolbar')!.getBoundingClientRect();
+      return (text.left + text.right) / 2 - (bar.left + bar.right) / 2;
+    });
+    expect(Math.abs(offCentre), 'the topbar title left the centre of the bar').toBeLessThanOrEqual(1);
   });
 });
