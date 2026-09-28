@@ -181,6 +181,31 @@ export async function refreshSetupStatus(client: ErploraClient): Promise<void> {
 }
 
 /**
+ * Re-reads the document when the shell language changes (hub#2356).
+ *
+ * The runtime translates the apps' items into the VIEWER's language, so an answer read before the
+ * switch keeps them in the old one while the shell's own labels change at once — and the blocking
+ * strip is on every screen, Profile included, where the language is changed. The locale is
+ * published only after `PUT /api/profile` answers (`applyProfile`), so the re-read already finds the
+ * new preference stored. The same language published again (saving the theme does) is not a change.
+ * Returns the unsubscribe.
+ */
+export function refreshSetupStatusOnLocaleChange(
+  client: () => ErploraClient,
+  isAuthed: () => boolean,
+): () => void {
+  let last: unknown;
+  const onChange = (event: Event) => {
+    const locale = (event as CustomEvent<{ locale?: string }>).detail?.locale;
+    if (locale === last) return;
+    last = locale;
+    if (isAuthed()) void refreshSetupStatus(client());
+  };
+  window.addEventListener('erplora:locale-changed', onChange);
+  return () => window.removeEventListener('erplora:locale-changed', onChange);
+}
+
+/**
  * Reads the runtime's payload. `null` when it is not the document (an error body, a shape we do not
  * know), so a broken answer can never be mistaken for a configured hub.
  */

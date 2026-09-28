@@ -232,7 +232,7 @@ import { openUserSwitch, userSwitchOffered } from './lib/user-switch';
 import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
-import { refreshSetupStatus } from './lib/setup-status';
+import { refreshSetupStatus, refreshSetupStatusOnLocaleChange } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
 import { bootUndrainedPrintingWatch } from './lib/print-alert';
@@ -463,6 +463,10 @@ watch(
     if (isAuthed.value) void refreshSetupStatus(getClient());
   },
 );
+// …and when the language changes (hub#2356): the runtime answers the apps' items in the viewer's
+// language, and without this the strip on the Profile screen kept them in the old one next to the
+// shell's labels already switched. App.vue never unmounts, so the subscription is never undone.
+refreshSetupStatusOnLocaleChange(getClient, () => isAuthed.value);
 // Si el entitlement resulta `needs_activation` (Tauri offline sin token cacheado, hub sin
 // derecho…), saca al usuario del negocio → pantalla de activación.
 watch(needsActivation, (needs) => {
