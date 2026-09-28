@@ -64,6 +64,9 @@ const { fetchUsageSeriesMock } = vi.hoisted(() => ({
   fetchUsageSeriesMock: vi.fn<() => Promise<UsageSeries | null>>(async () => contractSeries),
 }));
 
+// SystemPage reads the modules with a bell counter (hub#2306) through `module-loader`, whose icon
+// chain (`~icons/…?raw`) the vitest transform denies — stubbed like DataPanel/dashboard-widgets.
+vi.mock('../lib/module-loader', () => ({ loadInstalledManifests: vi.fn(async () => []) }));
 vi.mock('../lib/system-usage', async () => {
   const actual = await vi.importActual<typeof import('../lib/system-usage')>('../lib/system-usage');
   return { ...actual, fetchUsageSeries: fetchUsageSeriesMock };

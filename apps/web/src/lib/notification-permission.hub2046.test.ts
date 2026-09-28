@@ -50,6 +50,7 @@ describe('the ask at the print-host alta', () => {
         ids = new Set(['kitchen']);
       },
       activeModules: () => ids,
+      bellModules: async () => new Set(),
       ask,
     });
 
@@ -61,6 +62,7 @@ describe('the ask at the print-host alta', () => {
     await warnIfThereIsSomethingToTell({
       refresh: async () => {},
       activeModules: () => new Set(['customers', 'sales']),
+      bellModules: async () => new Set(),
       ask,
     });
     expect(ask).not.toHaveBeenCalled();
@@ -74,6 +76,7 @@ describe('the ask at the print-host alta', () => {
           throw new Error('offline');
         },
         activeModules: () => undefined,
+        bellModules: async () => new Set(),
         ask,
       }),
     ).resolves.toBeUndefined();

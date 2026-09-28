@@ -29,6 +29,9 @@ const { permissionStatus, ensureLanSpy } = vi.hoisted(() => ({
   ensureLanSpy: vi.fn<(deps: { force?: boolean }) => Promise<string>>(async () => 'granted'),
 }));
 
+// SystemPage reads the modules with a bell counter (hub#2306) through `module-loader`, whose icon
+// chain (`~icons/…?raw`) the vitest transform denies — stubbed like DataPanel/dashboard-widgets.
+vi.mock('../lib/module-loader', () => ({ loadInstalledManifests: vi.fn(async () => []) }));
 vi.mock('../lib/device', async () => {
   const actual = await vi.importActual<typeof import('../lib/device')>('../lib/device');
   return {

@@ -25,6 +25,8 @@
 //
 // The i18n lives with the CALLER (ADR-0055), same contract as `change-hub.ts`: this file decides
 // WHEN to ask and never what it says.
+import { watch, type WatchSource, type WatchStopHandle } from 'vue';
+
 import {
   devicePermissionState,
   ensureDevicePermission,
@@ -162,25 +164,33 @@ export function notificationPermissionState(
 }
 
 /**
- * The modules the shell sends system notices for, today.
+ * The modules the shell sends system notices for BY NAME.
  *
  * The shell fires a notice for the kitchen order (`print-comanda.ts`) and, since hub#2168, for a
  * booking or a cancellation that did not come from a till (`appointment-notice.ts`) — so a hub
- * without an active module from this list has nothing that would ever use the permission, and
- * asking there asks for nothing (hub#2046). Adding another source is a deliberate change to this
- * list, not a side effect of adding a module.
+ * without an active module from this list, nor one with a bell counter (below), has nothing that
+ * would ever use the permission, and asking there asks for nothing (hub#2046). Adding another
+ * named source is a deliberate change to this list, not a side effect of adding a module.
  */
 export const NOTICE_SOURCE_MODULES: readonly string[] = ['kitchen', 'appointments'] as const;
 
 /**
  * Does this hub have anything installed that the shell would ever send a system notice for?
  *
- * `undefined` — the installed set could not be read — answers `false`: not knowing what is
- * installed is never a reason to ask (hub#2046).
+ * The named sources above, plus — since hub#2303 sends a notice whenever a bell counter goes up —
+ * any ACTIVE module that puts a counter on the bell (`bellModuleIds`, read from the manifests by
+ * `loadBellCounterModuleIds`): a WhatsApp-only hub has something to warn about without the core
+ * knowing what WhatsApp is (hub#2306).
+ *
+ * `undefined` — the active set could not be read — answers `false`: not knowing what is installed
+ * is never a reason to ask (hub#2046).
  */
-export function hasNoticeSource(activeModuleIds: ReadonlySet<string> | undefined): boolean {
+export function hasNoticeSource(
+  activeModuleIds: ReadonlySet<string> | undefined,
+  bellModuleIds: ReadonlySet<string> = new Set(),
+): boolean {
   if (!activeModuleIds) return false;
-  return NOTICE_SOURCE_MODULES.some((id) => activeModuleIds.has(id));
+  return [...NOTICE_SOURCE_MODULES, ...bellModuleIds].some((id) => activeModuleIds.has(id));
 }
 
 /**
@@ -195,6 +205,8 @@ export function hasNoticeSource(activeModuleIds: ReadonlySet<string> | undefined
 export async function warnIfThereIsSomethingToTell(deps: {
   refresh: () => Promise<void>;
   activeModules: () => ReadonlySet<string> | undefined;
+  /** The modules with a bell counter (hub#2306). A failed read leaves only the named sources. */
+  bellModules: () => Promise<ReadonlySet<string>>;
   ask: () => Promise<unknown>;
 }): Promise<void> {
   try {
@@ -202,7 +214,8 @@ export async function warnIfThereIsSomethingToTell(deps: {
   } catch {
     // Not knowing what is installed is not a reason to ask, nor to fail the alta.
   }
-  if (hasNoticeSource(deps.activeModules())) {
+  const bell = await deps.bellModules().catch(() => new Set<string>());
+  if (hasNoticeSource(deps.activeModules(), bell)) {
     try {
       await deps.ask();
     } catch {
@@ -210,4 +223,28 @@ export async function warnIfThereIsSomethingToTell(deps: {
       // propagate either way.
     }
   }
+}
+
+/**
+ * The other moment somebody is in front of the device: a session opening on it (hub#2306).
+ *
+ * The print-host alta is the ask for a device that prints, but a device with no printer never
+ * registers — and the usual WhatsApp tablet has none, so its first ask came with the first customer
+ * left waiting, on a tablet propped on a shelf. A sign-in (or a boot with a session already open)
+ * means a person just typed their PIN here. `warn` is {@link warnIfThereIsSomethingToTell}:
+ * it asks only when there is something to tell, and `ensureNotificationPermission` asks at most once
+ * per install, so a later sign-in costs one storage read. **Never propagates.**
+ */
+export function askWhenSomeoneSignsIn(
+  signedIn: WatchSource<boolean>,
+  warn: () => Promise<void>,
+): WatchStopHandle {
+  return watch(
+    signedIn,
+    (now) => {
+      if (!now) return;
+      void warn().catch((e) => console.warn('[notification-permission] the sign-in ask failed', e));
+    },
+    { immediate: true },
+  );
 }
