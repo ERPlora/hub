@@ -1029,6 +1029,18 @@ export default {
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
+    // hub#2331 — «Update all» in «My apps». Same per-app update as the row button, one after another.
+    updateAllOffer: '{n} app has a new version. | {n} apps have a new version.',
+    updateAllAction: 'Update all',
+    updateAllProgress: 'Updating {name} ({current} of {total})…',
+    updateAllSummary: '{updated} of {total} apps updated.',
+    updateAllUpToDate: 'Already on the latest version',
+    updateAllRetry: 'Retry',
+    // Some apps were updated: the page has to reload to run them (hub#935), once the owner has read
+    // what failed.
+    updateAllReload: 'Reload now',
+    updateAllDoneReloading: '{n} app updated. Reloading to use the new version… | {n} apps updated. Reloading to use the new versions…',
+    updateAllNothingNew: 'Your apps were already on the latest version.',
     // Version picker (hub#675). Only shown when there is more than one option; the latest comes
     // first and preselected, so choosing another one is deliberate.
     versionPickTitle: 'Choose a version',
