@@ -255,6 +255,9 @@ FIXTURES = [
     (f"sudo apt-get update && bash {WRAPPER} true", True),
     (f"bash {WRAPPER} sudo apt-get update && sudo apt-get install -y jq", True),
     (f"bash {WRAPPER} sudo apt-get update; sudo apt-get install -y jq", True),
+    # No space after the separator: the apt match STARTS on `;`, so the command boundary has to
+    # include that character or the previous command's wrapper leaks into this one.
+    (f"bash {WRAPPER} sudo apt-get update;sudo apt-get install -y jq", True),
     (f"bash {WRAPPER} sudo apt-get update || sudo apt-get install -y jq", True),
     (f"bash {WRAPPER} sudo apt-get update && pnpm exec playwright install --with-deps chromium", True),
     (f"bash {WRAPPER} sudo apt-get update && bash {WRAPPER} sudo apt-get install -y jq", False),
