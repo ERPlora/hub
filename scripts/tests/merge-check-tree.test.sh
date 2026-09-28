@@ -23,6 +23,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
+# Hermetic against the git environment it inherits: `.githooks/pre-push` runs this
+# battery and git exports GIT_DIR (and `git -c` adds GIT_CONFIG_PARAMETERS) into
+# its hooks, which beat every `-C` below and point the fixtures at the pushing
+# repository (case 6). git names the set itself, as in
+# scripts/materialize-published-modules.sh (hub#1387/#1388).
+unset $(git rev-parse --local-env-vars 2>/dev/null)
+
 repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 script="$repo_root/scripts/ci/merge-check-tree.sh"
 TMP=$(mktemp -d)
@@ -143,6 +150,34 @@ elif ! grep -q 'merge_check_conflict' "$TMP/out"; then
     bad "a conflict refuses with merge_check_conflict" "$(cat "$TMP/out")"
 else
     ok "a PR that conflicts with the base refuses with merge_check_conflict"
+fi
+
+# ── 6. Run from a git hook, the fixtures never touch the repository that pushes ──
+#    `.githooks/pre-push` runs this battery, and git exports GIT_DIR into its hooks.
+#    An inherited GIT_DIR beats `-C`, so every `g -C "$TMP/seed" …` above landed on
+#    the pushing worktree: on 28/09 the push of hub#2304 got commits «base/pr/later»
+#    on its branch, a local branch `pr`, and a `git push origin` aimed at GitHub.
+#    Same class as hub#1387/#1388. The nested run is this very file under a canary
+#    GIT_DIR; the canary must come out exactly as it went in.
+if [ -z "${MERGE_CHECK_TREE_NESTED:-}" ]; then
+    canary="$TMP/canary"
+    g init -q "$canary"
+    echo keep > "$canary/keep.txt"
+    g -C "$canary" add keep.txt && g -C "$canary" commit -qm keep
+    snapshot() { g -C "$canary" for-each-ref --format='%(refname) %(objectname)'; g -C "$canary" symbolic-ref -q HEAD; g -C "$canary" status --porcelain; }
+    before=$(snapshot)
+    ( cd "$canary" && GIT_DIR="$canary/.git" MERGE_CHECK_TREE_NESTED=1 \
+        bash "$repo_root/scripts/tests/merge-check-tree.test.sh" ) > "$TMP/nested.out" 2>&1
+    nested_rc=$?
+    after=$(snapshot)
+    if [ "$before" != "$after" ]; then
+        bad "an inherited GIT_DIR (the pre-push hook) leaves the pushing repo untouched" \
+            "the fixtures wrote into it: $(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") | tr '\n' ' ')"
+    elif [ "$nested_rc" -ne 0 ]; then
+        bad "the battery passes under an inherited GIT_DIR (the pre-push hook)" "exit $nested_rc — $(tail -c 600 "$TMP/nested.out")"
+    else
+        ok "an inherited GIT_DIR (the pre-push hook) leaves the pushing repo untouched"
+    fi
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
