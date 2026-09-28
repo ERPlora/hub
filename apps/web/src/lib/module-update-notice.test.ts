@@ -219,6 +219,54 @@ describe('aggregated «apps have a new version» notice on the bell (hub#1172)',
     }
   });
 
+  // Switching back to the tab is the other way in: it must obey the same hours, or every alt-tab of
+  // an admin costs one marketplace call per installed app. And a hidden tab is not checked at all.
+  it('coming back to the tab re-checks only once the last check is hours old', async () => {
+    vi.useFakeTimers();
+    const setVisibility = (state: DocumentVisibilityState): void => {
+      Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    try {
+      listModuleUpdates.mockResolvedValue([]);
+      bootModuleUpdateNoticeWatch();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listModuleUpdates).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(60 * 60_000);
+      setVisibility('hidden');
+      setVisibility('visible');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listModuleUpdates).toHaveBeenCalledTimes(1);
+
+      setVisibility('hidden');
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60_000);
+      expect(listModuleUpdates).toHaveBeenCalledTimes(1);
+
+      setVisibility('visible');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listModuleUpdates).toHaveBeenCalledTimes(2);
+    } finally {
+      stopModuleUpdateNoticeWatch();
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      vi.useRealTimers();
+    }
+  });
+
+  // The owner updates an app on the Apps screen while a background check is still waiting on the
+  // marketplace: the older answer must not bring back the row the update just cleared.
+  it('what the Apps screen learns wins over a background check still in flight', async () => {
+    let answer: (u: ModuleUpdateInfo[]) => void = () => {};
+    listModuleUpdates.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const inFlight = refreshModuleUpdateNotice();
+
+    publishModuleUpdates([], 'v1.4.0');
+    answer([upd('sales'), upd('kitchen')]);
+    await inFlight;
+
+    expect(notificationCountOf('moduleUpdates')).toBe(0);
+  });
+
   // An admin's check still in flight when a cashier takes the till must not paint for the cashier.
   it('a check overtaken by a PIN hand-over drops its result', async () => {
     let answer: (u: ModuleUpdateInfo[]) => void = () => {};

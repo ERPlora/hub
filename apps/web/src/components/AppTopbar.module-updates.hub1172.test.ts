@@ -59,7 +59,10 @@ const mountTopbar = (locale: 'en' | 'es' = 'en') =>
       plugins: [createI18n({ legacy: false, locale, messages: { en, es } })],
       stubs: {
         // Render the popover's content in place: what is under test is the rows, not Ionic.
-        IonPopover: { template: '<div><slot /></div>' },
+        IonPopover: {
+          props: ['isOpen'],
+          template: '<div class="popover-stub" :data-open="String(!!isOpen)"><slot /></div>',
+        },
         IonContent: { template: '<div><slot /></div>' },
         IonLabel: { template: '<div><slot /></div>' },
       },
@@ -118,6 +121,22 @@ describe('apps with a new version on the bell (hub#1172)', () => {
     await wrapper.find(ROW).trigger('click');
 
     expect(push).toHaveBeenCalledWith('/apps#mine');
+  });
+
+  // A row that navigates and leaves the notifications open on top of «My apps» is a broken menu.
+  it('closes the notifications when it takes the owner away', async () => {
+    counts.value = { moduleUpdates: 2 };
+    notificationCount.value = 2;
+    const wrapper = mountTopbar();
+    await flushPromises();
+    const popover = () => wrapper.findAll('.popover-stub').find((p) => p.find(ROW).exists())!;
+
+    await wrapper.find('[data-testid="topbar-notifications"]').trigger('click');
+    expect(popover().attributes('data-open')).toBe('true');
+
+    await wrapper.find(ROW).trigger('click');
+
+    expect(popover().attributes('data-open')).toBe('false');
   });
 
   it('is not there when every app is up to date', async () => {
