@@ -33,7 +33,9 @@
 #     6 · a call without a command is a usage error, not a silent green.
 #   Part 2 — the workflows, read off the PARSED YAML (discovery-based, every workflow and composite
 #     action): every `run:` line that calls `apt-get`/`apt` update|install|upgrade, or Playwright
-#     with `--with-deps` / `install-deps`, goes through the wrapper. `KNOWN` is the proof the scan
+#     with `--with-deps` / `install-deps`, goes through the wrapper — EVERY such call on the line,
+#     each one inside its own command (a wrapper before `&&`/`;`/`||` guards only the call before
+#     it; hub#2267, hub#2268). `KNOWN` is the proof the scan
 #     still SEES the steps that exist today; the fixtures prove the detector catches the positive
 #     and leaves the harmless shapes alone.
 #
@@ -218,15 +220,20 @@ def logical_lines(run):
     return lines
 
 
+SEPARATOR = re.compile(r"&&|\|\||[;|&]")
+
+
+def guarded(line, match):
+    """The wrapper prefixes the command this apt call belongs to (text since the last `&&`/`;`/`|`)."""
+    return WRAPPER in SEPARATOR.split(line[: match.start() + 1])[-1]
+
+
 def unguarded(run):
-    """Every line that locks apt without going through the wrapper."""
+    """Every line with an apt call that does not go through the wrapper — ALL calls, not the first."""
     found = []
     for line in logical_lines(run):
-        match = APT.search(line) or PLAYWRIGHT_DEPS.search(line)
-        if not match:
-            continue
-        head = line[: match.start() + 1]
-        if WRAPPER not in head:
+        matches = [*APT.finditer(line), *PLAYWRIGHT_DEPS.finditer(line)]
+        if any(not guarded(line, match) for match in matches):
             found.append(line)
     return found
 
@@ -243,8 +250,14 @@ FIXTURES = [
     ("uv run playwright install-deps chromium", True),
     ("sudo apt install -y jq", True),
     ("sudo -E apt-get -o DPkg::Lock::Timeout=600 update", True),
-    # The wrapper has to come BEFORE apt on the line: after it, it guards nothing.
+    # The wrapper only guards the command it prefixes: later on the line, or before a second apt
+    # call chained with `&&`/`;`/`||`, it does not count (hub#2267, hub#2268).
     (f"sudo apt-get update && bash {WRAPPER} true", True),
+    (f"bash {WRAPPER} sudo apt-get update && sudo apt-get install -y jq", True),
+    (f"bash {WRAPPER} sudo apt-get update; sudo apt-get install -y jq", True),
+    (f"bash {WRAPPER} sudo apt-get update || sudo apt-get install -y jq", True),
+    (f"bash {WRAPPER} sudo apt-get update && pnpm exec playwright install --with-deps chromium", True),
+    (f"bash {WRAPPER} sudo apt-get update && bash {WRAPPER} sudo apt-get install -y jq", False),
     (f"bash {WRAPPER} sudo apt-get update", False),
     (f"bash {WRAPPER} sudo apt-get install -y \\\n  libgtk-3-dev", False),
     (f"bash {WRAPPER} pnpm -F @erplora/web exec playwright install --with-deps chromium", False),
