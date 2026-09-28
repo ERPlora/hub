@@ -449,14 +449,12 @@ mod tests {
     fn hub2293_the_fingerprint_rides_in_the_colours_the_edge_reads() {
         use tracing_subscriber::layer::SubscriberExt;
 
-        // Park the global interest anchor first (hub#1796), then capture WITH colours.
-        drop(crate::log_capture::capture_scope());
+        // Park the global interest anchor first (hub#1796), then capture WITH colours through
+        // the production console layer.
+        let _anchor = crate::log_capture::captured(|| {});
         let sink = crate::log_capture::CapturedLog::default();
-        let subscriber = tracing_subscriber::registry().with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(sink.clone())
-                .with_ansi(true),
-        );
+        let subscriber = tracing_subscriber::registry()
+            .with(crate::logging::console_layer(sink.clone()).with_ansi(true));
         tracing::subscriber::with_default(subscriber, || {
             report(Failure::SessionInvalid, Some(OTHER), Some("abc"), "h");
             report(Failure::Pin, Some(OTHER), None, "h");
