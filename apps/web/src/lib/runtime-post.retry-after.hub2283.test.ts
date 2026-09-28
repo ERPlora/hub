@@ -51,7 +51,7 @@ describe('a locked login door (hub#2283)', () => {
     ['missing', undefined],
     ['a string', '240'],
     ['negative', -5],
-    ['not finite', null],
+    ['null', null],
   ])('leaves the wait unknown when it is %s', async (_label, value) => {
     runtimeAnswering(429, { ok: false, code: 'too_many_attempts', retry_after_secs: value });
 

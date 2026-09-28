@@ -176,6 +176,16 @@ describe('a pinpad locked by too many failed attempts', () => {
     expect(lockSentence(1)).not.toBe(lockSentence(2).replace('2', '1'));
   });
 
+  it('never says «wait 0 minutes» when the lock is lifting right now', async () => {
+    seedTill();
+    vi.mocked(runtimePinLogin).mockRejectedValue(refusal('too_many_attempts', 0));
+
+    const wrapper = await mountLogin();
+    await typePin(wrapper);
+
+    expect(wrapper.text()).toContain(lockSentence(1));
+  });
+
   it('still says «wait» when the hub did not name the wait', async () => {
     seedTill();
     vi.mocked(runtimePinLogin).mockRejectedValue(refusal('too_many_attempts'));

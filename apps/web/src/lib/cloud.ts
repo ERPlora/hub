@@ -388,16 +388,27 @@ export interface CourierSessionResult extends HubSessionResult {
  * collapse into «Incorrect PIN». `undefined` when the runtime gave none, which is what an ordinary
  * wrong PIN looks like.
  *
+ * `retryAfterSecs` is the wait a lock names (`429 too_many_attempts` carries `retry_after_secs`,
+ * hub#2283), so a screen can say «wait N minutes» instead of a vague «a few». `undefined` when the
+ * runtime named no usable wait.
+ *
  * Mirrors `DeviceModeError` in `device-mode.ts` rather than inventing a second shape.
  */
 export class RuntimeError extends Error {
   readonly code?: string;
+  readonly retryAfterSecs?: number;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, retryAfterSecs?: number) {
     super(message);
     this.name = 'RuntimeError';
     this.code = code;
+    this.retryAfterSecs = retryAfterSecs;
   }
+}
+
+/** `retry_after_secs` of a refusal body, only when it is a usable wait (a non-negative number). */
+function retryAfterOf(value: unknown): number | undefined {
+  return typeof value === 'number' && value >= 0 ? value : undefined;
 }
 
 async function runtimePost<T>(path: string, body: unknown, headers: Record<string, string>): Promise<T> {
@@ -426,6 +437,7 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
       // `pin_current_mismatch`, or any `InvalidField`/`Domain`) nests both under `error` instead.
       error?: string | { code?: string; message?: string };
       code?: string;
+      retry_after_secs?: unknown;
     } & T;
     if (!res.ok || data.ok === false) {
       const nested = typeof data.error === 'object' && data.error !== null ? data.error : undefined;
@@ -433,7 +445,7 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
         nested?.message ??
         (typeof data.error === 'string' ? data.error : undefined) ??
         `runtime ${path} → ${res.status}`;
-      throw new RuntimeError(message, data.code ?? nested?.code);
+      throw new RuntimeError(message, data.code ?? nested?.code, retryAfterOf(data.retry_after_secs));
     }
     return data;
   } finally {
