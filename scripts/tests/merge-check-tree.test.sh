@@ -166,7 +166,10 @@ if [ -z "${MERGE_CHECK_TREE_NESTED:-}" ]; then
     g -C "$canary" add keep.txt && g -C "$canary" commit -qm keep
     snapshot() { g -C "$canary" for-each-ref --format='%(refname) %(objectname)'; g -C "$canary" symbolic-ref -q HEAD; g -C "$canary" status --porcelain; }
     before=$(snapshot)
-    ( cd "$canary" && GIT_DIR="$canary/.git" MERGE_CHECK_TREE_NESTED=1 \
+    # GIT_WORK_TREE and GIT_INDEX_FILE too: git can export them into a hook as well, and
+    # `unset GIT_DIR` alone would leave the fixtures committing the canary's files.
+    ( cd "$canary" && GIT_DIR="$canary/.git" GIT_WORK_TREE="$canary" GIT_INDEX_FILE="$canary/.git/index" \
+        MERGE_CHECK_TREE_NESTED=1 \
         bash "$repo_root/scripts/tests/merge-check-tree.test.sh" ) > "$TMP/nested.out" 2>&1
     nested_rc=$?
     after=$(snapshot)
