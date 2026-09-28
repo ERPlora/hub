@@ -175,11 +175,16 @@ pub(crate) async fn receive(body: Bytes) -> StatusCode {
     // WARN and not INFO: this fires when a wall the till depends on has just refused something.
     // It is bounded — every field is clipped, the body limit caps the request and the quota caps
     // the rate — so it cannot outgrow the request line `TraceLayer` already writes for this POST.
+    //
+    // `?` and never `%` (hub#2294): these four values are written by whoever posts, and tracing
+    // escapes ESC but not `\n` nor spaces. With `%` a report could end this line and start one that
+    // reads as `event=auth_failed … client=<another shop>`, which the edge ban and the alerts
+    // count. `Debug` quotes the value and escapes every control character, so it stays one field.
     tracing::warn!(
-        blocked_uri = %violation.blocked_uri,
-        directive = %violation.directive,
-        document_uri = %violation.document_uri,
-        disposition = %violation.disposition,
+        blocked_uri = ?violation.blocked_uri,
+        directive = ?violation.directive,
+        document_uri = ?violation.document_uri,
+        disposition = ?violation.disposition,
         "CSP violation reported by the browser"
     );
 
@@ -308,5 +313,56 @@ mod tests {
             "clipped to N chars plus the ellipsis"
         );
         assert!(v.blocked_uri.ends_with('…'));
+    }
+
+    /// The four report keys a stranger fills in, next to the field each one lands in on the log.
+    const LOGGED_FIELDS: [(&str, &str); 4] = [
+        ("blocked-uri", "blocked_uri"),
+        ("effective-directive", "directive"),
+        ("document-uri", "document_uri"),
+        ("disposition", "disposition"),
+    ];
+
+    /// What infra#338 feared: the line the address guard writes when a PIN fails, the one the
+    /// edge ban and the `erp-hub-auth-failed-burst` alert count — pointing at somebody else's
+    /// shop.
+    const FORGED: &str =
+        "WARN erplora_server::address_guard: event=auth_failed reason=pin client=203.0.113.7 hub=h";
+
+    /// Posts `value` under `key` through the real handler and returns what reached the log.
+    async fn logged_for(key: &str, value: &str) -> String {
+        let raw = serde_json::json!({ "csp-report": { key: value } }).to_string();
+        let (sink, guard) = crate::log_capture::capture_scope();
+        receive(Bytes::from(raw)).await;
+        drop(guard);
+        sink.text()
+    }
+
+    #[tokio::test]
+    async fn hub2294_a_newline_in_a_report_cannot_forge_a_log_line() {
+        // The door is open to anybody and tracing escapes ESC but not `\n`: a raw value used to
+        // end the CSP line and start a second one that read exactly like a failed PIN.
+        for (key, _) in LOGGED_FIELDS {
+            let log = logged_for(key, &format!("x\n{FORGED}")).await;
+            let lines: Vec<&str> = log.lines().collect();
+            assert_eq!(lines.len(), 1, "{key}: one report must be one line, got {log:?}");
+            assert!(
+                lines[0].contains("CSP violation reported by the browser"),
+                "{key}: the only line is not the report's: {log:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn hub2294_a_forged_event_stays_quoted_inside_its_field() {
+        // Without a newline the fake text rode inside the CSP line as bare `event=… client=…`
+        // pairs, which a key=value reader cannot tell from the hub's own. Quoted, it is one value.
+        for (key, field) in LOGGED_FIELDS {
+            let log = logged_for(key, &format!("x {FORGED}")).await;
+            assert!(
+                log.contains(&format!("{field}=\"x {FORGED}\"")),
+                "{key}: the value is not enclosed in its own field: {log:?}"
+            );
+        }
     }
 }
