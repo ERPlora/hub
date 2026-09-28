@@ -793,7 +793,7 @@ pub(crate) async fn auth_handoff(
             }
             Ok(None) => return refuse(StatusCode::UNAUTHORIZED, "handoff_session_required"),
             Err(e) => {
-                eprintln!("[handoff] could not resolve the session: {e}");
+                tracing::error!(error = ?e.to_string(), "handoff: could not resolve the session");
                 return refuse(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "handoff_session_unreadable",
@@ -820,13 +820,20 @@ pub(crate) async fn auth_handoff(
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
         // Without the public key the hub cannot check who the token names, and this door exists
         // precisely to check it. It says so; it does not open halfway.
-        eprintln!("[handoff] the hub has no SaaS public key: the door stays shut");
+        tracing::error!("handoff: the hub has no SaaS public key, the door stays shut");
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "handoff_not_configured");
     };
     let claims = match cloud_client::verify_user_jwt(&access, pem) {
         Ok(claims) => claims,
-        Err(e) => {
-            eprintln!("[handoff] invalid user JWT: {e}");
+        Err(error) => {
+            // `?` over the text and never `%` or `{e}` (hub#2300): `jsonwebtoken` repeats an
+            // unknown `alg` verbatim, so a raw `\n` in the caller's token used to end this line and
+            // start one that read as `event=auth_failed … client=<another shop>`. `Debug` of the
+            // string quotes it and escapes every control character, so it stays one field.
+            tracing::warn!(
+                error = ?error.to_string(),
+                "handoff refused: the user token does not verify"
+            );
             return refuse(StatusCode::UNAUTHORIZED, "handoff_user_token_invalid");
         }
     };
@@ -849,21 +856,24 @@ pub(crate) async fn auth_handoff(
             Ok(body) => match body.get("code").and_then(Value::as_str) {
                 Some(code) if !code.is_empty() => code.to_string(),
                 _ => {
-                    eprintln!("[handoff] the SaaS answered without a one-time code");
+                    tracing::warn!("handoff: the SaaS answered without a one-time code");
                     return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
                 }
             },
             Err(e) => {
-                eprintln!("[handoff] unreadable answer from the SaaS: {e}");
+                tracing::warn!(error = ?e.to_string(), "handoff: unreadable answer from the SaaS");
                 return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
             }
         },
         Ok(response) => {
-            eprintln!("[handoff] the SaaS refused the pass: {}", response.status());
+            tracing::warn!(
+                status = response.status().as_u16(),
+                "handoff: the SaaS refused the pass"
+            );
             return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
         }
         Err(e) => {
-            eprintln!("[handoff] could not ask the SaaS for the pass: {e}");
+            tracing::warn!(error = ?e.to_string(), "handoff: could not ask the SaaS for the pass");
             return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
         }
     };
@@ -950,5 +960,122 @@ pub(crate) async fn mint_session_with_extra(
             Json(payload).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Public half of a throwaway pair: the forged token is refused while its header is parsed,
+    /// so the key only has to be a valid RSA PEM.
+    const HANDOFF_PUB: &str = "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8xsyMiSRgmfQusugZuaw
+0g+qMj5urzS2z9VxNybCHbWcfMkQaX6Jo7ILZeQTYsVYKhQMbbOZu6HSdQN4tqCn
+QarFStcBfo6VWhH/DuvrbPvLN47vAGQslEjYwqkVDm1AvY4zgluVUlkp1LGXRjV1
+O1E1jrW7zsasviHRRNAznmsx/otkkkPlleLt+65YnRodBh2ErJ20Hh0cl2eIsmMQ
+n0A5ahgGAj6dxgrxHa2vk4mV5iXyJe2rPP3E6gWN8DrrHMAou6Rixjg0Mh/EGsDU
+oac71BzarU6Of6OA1U1n949C1CQwpZbMJDCETF/ZvTPQ4b6q+qg/XXovo7kfFsMh
+nQIDAQAB
+-----END PUBLIC KEY-----
+";
+
+    /// The line the address guard writes when a PIN fails — the one the edge ban and the
+    /// `erp-hub-auth-failed-burst` alert count — pointing at somebody else's shop.
+    const FORGED: &str =
+        "WARN erplora_server::address_guard: event=auth_failed reason=pin client=203.0.113.7 hub=h";
+
+    /// Asks for the pass to erplora.com through the real door, as an owner signed in with their
+    /// password, presenting a user token whose JWT header names the algorithm `alg`.
+    /// `jsonwebtoken` refuses an unknown `alg` with a serde error that repeats the value
+    /// verbatim — text the caller controls. Returns the status plus what reached the log.
+    async fn logged_handoff(alg: &str) -> (StatusCode, String) {
+        use base64::Engine as _;
+        let db = erplora_db::testutil::fresh_db().await;
+        let rt = erplora_runtime::Runtime::with_hub_id(Box::new(db), "hub-handoff-log");
+        rt.ensure_system_tables().await.unwrap();
+        let owner = rt
+            .create_user("Ana", "4729", "owner", Some("77"))
+            .await
+            .unwrap();
+        let session = rt
+            .create_session_with_credential(
+                &owner,
+                3600,
+                Some("till-1"),
+                &erplora_runtime::identity::Credential::cloud(),
+            )
+            .await
+            .unwrap();
+        let temp = std::env::temp_dir().join(format!("erplora-handoff-log-{}", std::process::id()));
+        let cfg = crate::HubConfig {
+            demo: false,
+            hub_id: "hub-handoff-log".into(),
+            cloud_base_url: "http://127.0.0.1:1".into(),
+            module_cache: temp.join("modules-cache"),
+            auth_mode: crate::state::AuthMode::Session,
+            jwt_public_key: Some(HANDOFF_PUB.into()),
+            cloud_api_token: None,
+            device_trust_enforce: false,
+            media_dir: temp,
+            sector: None,
+            dev_mode: false,
+            dev_modules_dir: None,
+            module_trusted_keys: Vec::new(),
+        };
+        let st = crate::AppState::with_config(rt, cfg);
+
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let header = b64.encode(json!({ "alg": alg, "typ": "JWT" }).to_string());
+        let token = format!("{header}.{}.{}", b64.encode("{}"), b64.encode("sig"));
+        let mut headers = HeaderMap::new();
+        headers.insert("x-hub-session", session.parse().unwrap());
+        headers.insert("authorization", format!("Bearer {token}").parse().unwrap());
+
+        let (sink, guard) = crate::log_capture::capture_scope();
+        let response = auth_handoff(State(st), headers, None).await;
+        drop(guard);
+        // The session lookup inside the door leaves its own `sqlx` DEBUG lines; they are not the
+        // refusal and a forged line cannot pass for one (it would carry no timestamp).
+        let log = sink
+            .text()
+            .lines()
+            .filter(|line| !line.contains(" DEBUG sqlx::"))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        (response.status(), log)
+    }
+
+    #[tokio::test]
+    async fn hub2300_a_newline_in_the_user_token_cannot_forge_a_log_line() {
+        // A signed-in employee used to end the refusal's line with a raw `\n` smuggled in the
+        // token's `alg`, and start a second one that read exactly like a failed PIN elsewhere.
+        let (status, log) = logged_handoff(&format!("x\n{FORGED}")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "one refused handoff must be one line, got {log:?}"
+        );
+        assert!(
+            lines[0].contains("handoff refused: the user token does not verify"),
+            "the only line is not the refusal's: {log:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2300_a_forged_event_stays_quoted_inside_the_error_field() {
+        // Without a newline the fake text rode as bare `event=… client=…` pairs, which a
+        // key=value reader cannot tell from the hub's own. Quoted, it is one value.
+        let (_, log) = logged_handoff(&format!("x {FORGED}")).await;
+        let line = log.lines().next().unwrap_or_default();
+        let (_, error) = line
+            .split_once(" error=\"")
+            .unwrap_or_else(|| panic!("the error is not a quoted field: {log:?}"));
+        assert!(
+            error.ends_with('"') && error.contains(FORGED),
+            "the forged text is not enclosed in the error field: {log:?}"
+        );
     }
 }
