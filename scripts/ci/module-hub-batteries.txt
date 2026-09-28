@@ -213,3 +213,9 @@ services/tests/grant_race.hub.test.py
 # still wins, against the real kernel (cart_checkout#34). New coverage, not moved.
 # pending-publication: cart_checkout#35 until 2026-10-28
 cart_checkout/tests/cart_currency.hub.test.py
+# verifactu: the Events screen's search box narrows the audit log to the words typed — the message,
+# the type's code and the type's name as the screen paints it, in Spanish and in English — and the
+# list opens on the newest event, through the list engine of the real kernel (verifactu#140,
+# verifactu#144). New coverage, not moved.
+# pending-publication: verifactu#148 until 2026-10-28
+verifactu/tests/events_list.hub.test.py
