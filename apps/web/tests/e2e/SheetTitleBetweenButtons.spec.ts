@@ -27,7 +27,9 @@ interface TitleGeometry {
   visibleLeft: number;
   /** Right edge of the title's visible text, in viewport px. */
   visibleRight: number;
-  /** Centre of the visible text minus centre of the title's own box (0 = centred in its room). */
+  /** Centre of the visible text minus centre of the `ion-title` host, the room the buttons leave
+   *  (0 = centred in it). The host, not the inner `.toolbar-title`: that one sits INSIDE the side
+   *  padding, so a lopsided padding would still read as centred there. */
   offCentre: number;
   /** Right edge of the start button, or the sheet's left edge when there is none. */
   startLimit: number;
@@ -66,6 +68,7 @@ async function presentSheet(
     const titleEl = modal.querySelector('ion-title')!;
     const box = titleEl.shadowRoot!.querySelector('.toolbar-title')!;
     const boxRect = box.getBoundingClientRect();
+    const room = titleEl.getBoundingClientRect();
     const textRange = document.createRange();
     textRange.selectNodeContents(titleEl);
     const run = textRange.getBoundingClientRect();
@@ -77,7 +80,7 @@ async function presentSheet(
     return {
       visibleLeft,
       visibleRight,
-      offCentre: (visibleLeft + visibleRight) / 2 - (boxRect.left + boxRect.right) / 2,
+      offCentre: (visibleLeft + visibleRight) / 2 - (room.left + room.right) / 2,
       startLimit: startBtn ? startBtn.getBoundingClientRect().right : sheet.left,
       endLimit: modal.querySelector('.end-btn')!.getBoundingClientRect().left,
       bodyStart: bodyRange.getClientRects()[0]!.left,
