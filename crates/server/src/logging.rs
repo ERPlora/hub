@@ -57,7 +57,9 @@ where
     S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
     W: for<'w> fmt::MakeWriter<'w> + 'static,
 {
-    fmt::layer().fmt_fields(SingleLineFields).with_writer(writer)
+    fmt::layer()
+        .fmt_fields(SingleLineFields)
+        .with_writer(writer)
 }
 
 /// The default field format of `tracing-subscriber`, with one promise added: **one event is one
@@ -221,14 +223,18 @@ mod tests {
     fn hub2300_every_other_line_breaker_is_escaped_too() {
         // Not every reader splits on `\n` alone: Python's `splitlines` (and others) also break on
         // vertical tab, form feed, the separators 0x1c-0x1e, NEL and U+2028/U+2029.
-        let breakers = ['\u{b}', '\u{c}', '\u{1c}', '\u{1e}', '\u{85}', '\u{2028}', '\u{2029}'];
+        let breakers = [
+            '\u{b}', '\u{c}', '\u{1c}', '\u{1e}', '\u{85}', '\u{2028}', '\u{2029}',
+        ];
         let log = captured(|| {
             let error: String = breakers.iter().map(|c| format!("{c}{FORGED}")).collect();
             tracing::warn!(%error, "refused");
         });
         let body = log.strip_suffix('\n').unwrap_or(&log);
         assert!(
-            !body.chars().any(|c| c.is_control() || breakers.contains(&c)),
+            !body
+                .chars()
+                .any(|c| c.is_control() || breakers.contains(&c)),
             "a line breaker reached the log raw: {log:?}"
         );
         assert!(log.contains(&format!("\\u{{2028}}{FORGED}")), "{log:?}");
@@ -241,7 +247,10 @@ mod tests {
             tracing::warn!("refused: {error}");
         });
         assert_eq!(log.lines().count(), 1, "{log:?}");
-        assert!(log.contains(&format!("refused: x\\r\\n{FORGED}")), "{log:?}");
+        assert!(
+            log.contains(&format!("refused: x\\r\\n{FORGED}")),
+            "{log:?}"
+        );
     }
 
     #[derive(Debug)]
@@ -275,7 +284,10 @@ mod tests {
         // An error recorded as such is printed with Display, and so is every one of its sources.
         let log = captured(|| {
             let error = Outer(Inner);
-            tracing::warn!(error = &error as &(dyn std::error::Error + 'static), "refused");
+            tracing::warn!(
+                error = &error as &(dyn std::error::Error + 'static),
+                "refused"
+            );
         });
         assert_eq!(log.lines().count(), 1, "{log:?}");
         assert!(log.contains(&format!("error=outer\\n{FORGED}")), "{log:?}");
@@ -333,7 +345,9 @@ mod tests {
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains("hub2300 refused"), "{stderr:?}");
         assert!(
-            !stderr.lines().any(|line| line.starts_with("WARN erplora_server::address_guard")),
+            !stderr
+                .lines()
+                .any(|line| line.starts_with("WARN erplora_server::address_guard")),
             "the hub's own log let a stranger start a line: {stderr:?}"
         );
     }
