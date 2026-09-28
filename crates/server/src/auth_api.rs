@@ -281,7 +281,11 @@ pub(crate) async fn auth_cloud(
     let Some(token) = auth::bearer(&headers) else {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+            Json(json!({
+                "ok": false,
+                "error": "missing Authorization: Bearer",
+                "code": "cloud_token_missing",
+            })),
         )
             .into_response();
     };
@@ -306,18 +310,34 @@ pub(crate) async fn open_cloud_session(
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "ok": false, "error": "login cloud no disponible (sin clave pública)" })),
+            Json(json!({
+                "ok": false,
+                "error": "cloud login unavailable: the hub has no SaaS public key",
+                "code": "cloud_login_not_configured",
+            })),
         )
             .into_response();
     };
     let claims = match cloud_client::verify_user_jwt(&token, pem) {
         Ok(c) => c,
-        Err(e) => {
+        Err(error) => {
+            // The detail goes to the log, never to the answer (hub#2310): `jsonwebtoken` repeats an
+            // unknown `alg` verbatim, so the body echoed the caller's own text and gave the screen
+            // no code to read. `?` over the text, never `%` or `{e}` (hub#2300), keeps a raw `\n`
+            // in that `alg` from ending this line and forging the next one.
+            tracing::warn!(
+                error = ?error.to_string(),
+                "cloud login refused: the user token does not verify"
+            );
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({ "ok": false, "error": format!("token inválido: {e}") })),
+                Json(json!({
+                    "ok": false,
+                    "error": "the user token does not verify",
+                    "code": "cloud_token_invalid",
+                })),
             )
-                .into_response()
+                .into_response();
         }
     };
     let hub_id = st.hub_id();
@@ -1077,5 +1097,125 @@ nQIDAQAB
             error.ends_with('"') && error.contains(FORGED),
             "the forged text is not enclosed in the error field: {log:?}"
         );
+    }
+
+    /// A hub with (or without) the SaaS public key, for the ordinary sign-in with an erplora.com
+    /// account. Nothing reaches the network: every case here is refused before the SaaS is asked.
+    async fn cloud_login_state(jwt_public_key: Option<&str>) -> crate::AppState {
+        let db = erplora_db::testutil::fresh_db().await;
+        let rt = erplora_runtime::Runtime::with_hub_id(Box::new(db), "hub-cloud-login");
+        rt.ensure_system_tables().await.unwrap();
+        let temp = std::env::temp_dir().join(format!("erplora-cloud-login-{}", std::process::id()));
+        let cfg = crate::HubConfig {
+            demo: false,
+            hub_id: "hub-cloud-login".into(),
+            cloud_base_url: "http://127.0.0.1:1".into(),
+            module_cache: temp.join("modules-cache"),
+            auth_mode: crate::state::AuthMode::Session,
+            jwt_public_key: jwt_public_key.map(str::to_string),
+            cloud_api_token: None,
+            device_trust_enforce: false,
+            media_dir: temp,
+            sector: None,
+            dev_mode: false,
+            dev_modules_dir: None,
+            module_trusted_keys: Vec::new(),
+        };
+        crate::AppState::with_config(rt, cfg)
+    }
+
+    /// Signs in through `POST /api/auth/cloud` with a user token whose JWT header names the
+    /// algorithm `alg` — the text `jsonwebtoken` repeats verbatim when it refuses it. Returns the
+    /// status, the JSON body and what reached the log.
+    async fn cloud_login_with_alg(alg: &str) -> (StatusCode, Value, String) {
+        use base64::Engine as _;
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let header = b64.encode(json!({ "alg": alg, "typ": "JWT" }).to_string());
+        let token = format!("{header}.{}.{}", b64.encode("{}"), b64.encode("sig"));
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", format!("Bearer {token}").parse().unwrap());
+        let st = cloud_login_state(Some(HANDOFF_PUB)).await;
+        let (sink, guard) = crate::log_capture::capture_scope();
+        let response = auth_cloud(State(st), headers, None).await;
+        drop(guard);
+        let log = sink
+            .text()
+            .lines()
+            .filter(|line| !line.contains(" DEBUG sqlx::"))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        let status = response.status();
+        (status, body_json(response).await, log)
+    }
+
+    async fn body_json(response: Response) -> Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn hub2310_a_refused_cloud_token_answers_a_stable_code_and_not_the_callers_text() {
+        // The body used to be `token inválido: <jsonwebtoken error>`: no code for the screen to
+        // read, and the caller's own `alg` echoed back inside it.
+        let (status, body, _) = cloud_login_with_alg(&format!("x {FORGED}")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["ok"], json!(false));
+        assert_eq!(body["code"], json!("cloud_token_invalid"), "{body}");
+        assert!(
+            !body.to_string().contains("event=auth_failed"),
+            "the caller's text came back in the answer: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2310_the_refused_cloud_token_is_logged_once_with_its_detail_quoted() {
+        // The detail leaves the answer but not the hub: it goes to the log, as one quoted field
+        // that a raw `\n` in the caller's `alg` cannot split into a second, forged line.
+        let (_, _, log) = cloud_login_with_alg(&format!("x\n{FORGED}")).await;
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "one refused sign-in must be one line: {log:?}"
+        );
+        assert!(
+            lines[0].contains("cloud login refused: the user token does not verify"),
+            "the only line is not the refusal's: {log:?}"
+        );
+        // A refused sign-in is something an operator looks for; below the production filter it
+        // would never be written at all.
+        assert!(
+            lines[0].contains(" WARN erplora_server::auth_api:"),
+            "the refusal is not logged as a warning: {log:?}"
+        );
+        let (_, error) = lines[0]
+            .split_once(" error=\"")
+            .unwrap_or_else(|| panic!("the error is not a quoted field: {log:?}"));
+        assert!(
+            error.ends_with('"') && error.contains(FORGED),
+            "the detail is not enclosed in the error field: {log:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2310_a_hub_without_the_saas_key_answers_a_stable_code() {
+        let st = cloud_login_state(None).await;
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer a.b.c".parse().unwrap());
+        let response = auth_cloud(State(st), headers, None).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = body_json(response).await;
+        assert_eq!(body["code"], json!("cloud_login_not_configured"), "{body}");
+    }
+
+    #[tokio::test]
+    async fn hub2310_a_cloud_sign_in_without_a_token_answers_a_stable_code() {
+        let st = cloud_login_state(Some(HANDOFF_PUB)).await;
+        let response = auth_cloud(State(st), HeaderMap::new(), None).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = body_json(response).await;
+        assert_eq!(body["code"], json!("cloud_token_missing"), "{body}");
     }
 }
