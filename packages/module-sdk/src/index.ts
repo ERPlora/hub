@@ -133,6 +133,7 @@ const DATA_TABLE_LABELS_ES = {
   noValues: 'Sin valores', selectAll: 'Seleccionar todo', selectRow: 'Seleccionar fila',
   select: 'Seleccionar', showing: 'Mostrando {from}–{to} de',
   recordSingular: 'registro', recordPlural: 'registros',
+  loadError: 'No se han podido cargar los datos', retry: 'Reintentar',
 } as const;
 
 const DATA_TABLE_LABELS_EN = {
@@ -147,10 +148,24 @@ const DATA_TABLE_LABELS_EN = {
   noValues: 'No values', selectAll: 'Select all', selectRow: 'Select row',
   select: 'Select', showing: 'Showing {from}–{to} of',
   recordSingular: 'record', recordPlural: 'records',
+  loadError: "Couldn't load the data", retry: 'Retry',
 } as const;
 
 export function dataTableLabels(locale = 'es'): Record<string, string> {
   return locale.toLowerCase().startsWith('en') ? DATA_TABLE_LABELS_EN : DATA_TABLE_LABELS_ES;
+}
+
+/**
+ * Whether the shell's `<ok-data-table>` paints a failed load itself (`error` + Retry, OutfitKit ≥
+ * 0.1.113, pm#530). A module paints with the SHELL's OutfitKit (ADR-0451), and a hub on an older
+ * image has a table without that state: there the module keeps its own banner, or the reason of
+ * the failure would be shown nowhere. Where the table does paint it, the banner is a duplicate.
+ */
+export function dataTableShowsLoadError(): boolean {
+  const registry = (globalThis as { customElements?: { get(tag: string): { prototype: object } | undefined } })
+    .customElements;
+  const table = registry?.get('ok-data-table');
+  return !!table && 'error' in table.prototype;
 }
 
 // ── Queries de lista (paginadas) — contrato del motor de listas del runtime (§4, §8.2) ──────
@@ -358,7 +373,10 @@ export class ListController<T = Record<string, unknown>> {
       if (mySeq !== this.seq) return;
       this.rows = [];
       this.total = 0;
-      this.error = e instanceof Error ? e.message : 'Error cargando datos';
+      // Never blank: a blank `error` is «no error» for the table, which would go back to
+      // «No customers» + «0 records» over a hub that did not answer (pm#530).
+      const reason = e instanceof Error ? e.message.trim() : '';
+      this.error = reason || listLoadFailedMessage(activeLocale());
     } finally {
       if (mySeq === this.seq) {
         this.loading = false;
@@ -446,6 +464,14 @@ function scaleFilterValue(value: unknown, scale: (n: number) => number): unknown
     );
   }
   return scaleFilterEdge(value, scale);
+}
+
+const LIST_LOAD_FAILED_EN = 'The hub did not return the data.';
+const LIST_LOAD_FAILED_ES = 'El hub no ha devuelto los datos.';
+
+/** The reason of a failed load that came without one (same locale rule as {@link dataTableLabels}). */
+function listLoadFailedMessage(locale: string): string {
+  return locale.toLowerCase().startsWith('en') ? LIST_LOAD_FAILED_EN : LIST_LOAD_FAILED_ES;
 }
 
 /** Fábrica del controlador de lista (azúcar sobre `new ListController`). */
