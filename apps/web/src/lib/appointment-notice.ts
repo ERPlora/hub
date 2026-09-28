@@ -13,6 +13,12 @@ import type { ErploraClient, EventMeta } from '@erplora/module-sdk';
 
 export type AppointmentNoticeKind = 'created' | 'cancelled';
 
+/**
+ * The module whose bookings this file announces. The bell's notice (hub#2303) leaves its counters
+ * out: its `to_confirm` goes up with the same booking that already rang here.
+ */
+export const APPOINTMENT_NOTICE_MODULE = 'appointments';
+
 export interface AppointmentNoticeDeps {
   /** Notification of the SYSTEM, the same door as the kitchen order's (`peripherals.notify`). */
   notify: (title: string, body: string) => Promise<void>;

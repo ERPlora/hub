@@ -15,6 +15,12 @@
  * Same rules as the other two sources: derived state with no read/dismiss (ADR-0067 — it clears
  * when the cause is dealt with), a poll and not a socket, and a failed fetch keeps the last known
  * value instead of flashing zero.
+ *
+ * **A counter that goes UP is also announced** (hub#2303): the bell only works for whoever looks at
+ * it, and a tablet propped on the counter or a phone in a pocket never does. Every rise between two
+ * polls reaches the {@link onBellCounterRise} listeners — `lib/bell-notice.ts` turns it into a
+ * system notice. What was already waiting at the first poll of a session is the backlog, not news,
+ * and is never announced.
  */
 import { ref, watch, type WatchStopHandle } from 'vue';
 import type { BellManifestDef, ModuleManifest } from '@erplora/module-types';
@@ -42,6 +48,35 @@ export interface BellCounter {
 
 /** The counters with something waiting, for the popover. */
 export const bellCounters = ref<BellCounter[]>([]);
+
+/** A counter that went up between two polls (hub#2303). */
+export interface BellCounterRise extends BellCounter {
+  /** The module that declared the counter. */
+  moduleId: string;
+  /** The count at the previous poll, lower than {@link BellCounter.count}. */
+  previous: number;
+}
+
+const riseListeners = new Set<(rise: BellCounterRise) => void>();
+
+/** Be told of every counter that goes up. Returns the function that stops it. */
+export function onBellCounterRise(listener: (rise: BellCounterRise) => void): () => void {
+  riseListeners.add(listener);
+  return () => {
+    riseListeners.delete(listener);
+  };
+}
+
+function announce(rise: BellCounterRise): void {
+  for (const listener of riseListeners) {
+    try {
+      listener(rise);
+    } catch (e) {
+      // A listener's failure is its own: the bell and the other listeners carry on.
+      console.warn('[bell-counters]', e);
+    }
+  }
+}
 
 /** Last count seen per counter, so a failed query keeps its value instead of reading as zero. */
 let lastCounts = new Map<string, number>();
@@ -86,6 +121,7 @@ export async function refreshBellCounters(): Promise<void> {
   const client = getClient();
   const next = new Map<string, number>();
   const counters: BellCounter[] = [];
+  const rises: BellCounterRise[] = [];
 
   for (const mod of mods) {
     const block = (mod.manifest as ModuleManifest).bell;
@@ -97,28 +133,39 @@ export async function refreshBellCounters(): Promise<void> {
       if (!def.query.startsWith(`${mod.moduleId}.`)) continue;
       if (def.permission && !hasPermission(def.permission)) continue;
 
+      const previous = lastCounts.get(key);
       let count: number;
+      let known = true;
       try {
         count = countOf(await client.query(def.query, def.params ?? {}));
       } catch {
-        count = lastCounts.get(key) ?? 0;
+        count = previous ?? 0;
+        // Nothing known yet stays unknown: the backlog this recovers into is not a rise.
+        known = previous !== undefined;
       }
       if (pass !== generation) return;
-      next.set(key, count);
+      if (known) next.set(key, count);
       if (count === 0) continue;
 
       const base = `/m/${encodeURIComponent(mod.moduleId)}`;
-      counters.push({
+      const counter: BellCounter = {
         key,
         label: mod.locale?.bell?.[key]?.label ?? def.label,
         icon: def.icon,
         count,
         path: def.nav ? `${base}/${encodeURIComponent(def.nav)}` : base,
-      });
+      };
+      counters.push(counter);
+      // A counter this session had not read before (first poll, a login, a permission just
+      // gained) sets the baseline; only a rise against a count already read is news.
+      if (previous !== undefined && count > previous) {
+        rises.push({ ...counter, moduleId: mod.moduleId, previous });
+      }
     }
   }
   lastCounts = next;
   publish(counters);
+  rises.forEach(announce);
 }
 
 let watching = false;
@@ -130,16 +177,18 @@ function onVisible(): void {
 }
 
 /**
- * Start polling: once now, then every {@link POLL_MS} while the tab is visible. Idempotent, like
+ * Start polling: once now, then every {@link POLL_MS}. Idempotent, like
  * `bootUndrainedPrintingWatch`, and started from the same place in `App.vue`.
+ *
+ * Unlike the other two sources it keeps polling with the window HIDDEN (hub#2303): a minimised
+ * window or the app in the background is exactly when a rise has to become a system notice. A
+ * browser throttles a hidden tab's timers on its own; coming back still refreshes at once.
  */
 export function bootBellCountersWatch(): void {
   if (watching) return;
   watching = true;
   void refreshBellCounters();
-  timer = setInterval(() => {
-    if (document.visibilityState === 'visible') void refreshBellCounters();
-  }, POLL_MS);
+  timer = setInterval(() => void refreshBellCounters(), POLL_MS);
   document.addEventListener('visibilitychange', onVisible);
   // A PIN hand-over swaps the user without a logout (`user-switch.ts`): repaint for the one who
   // arrived now, not at the next poll.
