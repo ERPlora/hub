@@ -788,9 +788,10 @@ export interface ModuleUpdateResult {
 /**
  * Qué versión ofrece hoy el marketplace para cada módulo instalado (`GET /api/modules/updates`).
  *
- * **Bajo demanda**: lo pide la pantalla de Apps al abrirse. Un sondeo en bucle costaría una llamada
- * por módulo al Cloud sin que nadie mire, y la vía desatendida ya la cubre el arranque. Un fallo
- * devuelve lista vacía: sin respuesta no se ofrece nada.
+ * **On demand, never a fast poll**: each call asks the Cloud once per installed module. The Apps
+ * screen asks when it opens, and the bell's «N apps have a new version» (hub#1172,
+ * `module-update-notice.ts`) asks when an admin session starts and then hours apart. A failure
+ * returns an empty list: with no answer, nothing is offered.
  */
 export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
   const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/updates`, { headers: runtimeHeaders() });

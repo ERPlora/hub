@@ -197,6 +197,7 @@ import {
   defaultVersion, pendingUpdate, shouldPickVersion, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo,
 } from '../lib/module-updates';
+import { publishModuleUpdates } from '../lib/module-update-notice';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
 import { isAdmin } from '../lib/session';
 
@@ -1139,10 +1140,19 @@ async function loadInstalled(): Promise<void> {
 async function loadModuleUpdates(): Promise<void> {
   try {
     moduleUpdates.value = await listModuleUpdates();
+    moduleUpdatesKnown.value = true;
   } catch {
     moduleUpdates.value = [];
   }
 }
+
+// What this screen learns replaces the bell's «N apps have a new version» at once (hub#1172):
+// updating an app here clears the notice without waiting hours for the background check. Only an
+// ANSWER is published — a failed fetch is «I don't know», and the bell keeps its last count.
+const moduleUpdatesKnown = ref(false);
+watch([moduleUpdates, hubVersion, moduleUpdatesKnown], () => {
+  if (moduleUpdatesKnown.value) publishModuleUpdates(moduleUpdates.value, hubVersion.value);
+});
 
 /** Dependientes transitivos ACTIVOS de `id` (los que la cascada apagará al desactivarlo). */
 function activeDependentsOf(id: string): InstalledModule[] {

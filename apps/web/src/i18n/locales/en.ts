@@ -61,6 +61,11 @@ export default {
     printingStalledTitle: 'Nothing is printing “{station}”',
     printingStalledBody:
       '{count} document waiting for {minutes} min. Check the till that prints there is on. | {count} documents waiting for {minutes} min. Check the till that prints there is on.',
+    // Installed apps with a newer version the owner can apply (hub#1172). The row leads to Apps →
+    // «My apps», where each update is one tap.
+    moduleUpdatesTitle: 'App updates available',
+    moduleUpdatesBody:
+      '{n} app has a new version. Update it from My apps. | {n} apps have a new version. Update them from My apps.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',

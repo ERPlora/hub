@@ -237,6 +237,7 @@ import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
 import { bootUndrainedPrintingWatch } from './lib/print-alert';
 import { bootBellCountersWatch } from './lib/bell-counters';
+import { bootModuleUpdateNoticeWatch } from './lib/module-update-notice';
 
 registerWhatsAppConnectElement();
 
@@ -362,6 +363,10 @@ async function gateAndRefresh(): Promise<void> {
   // What the installed modules raise through their `bell` block (hub#1678): an appointment to
   // confirm, say. Not filtered by role here — each counter carries its own permission.
   bootBellCountersWatch();
+  // Installed apps with a newer version (hub#1172): one row on the bell leading to «My apps». The
+  // watcher filters itself to admins and checks hours apart — each check asks the marketplace once
+  // per installed app.
+  bootModuleUpdateNoticeWatch();
 
   // La nav de módulos se refresca GLOBALMENTE al instalarse un módulo. El único oyente de
   // `module.installed` vivía en AppsPage (montada solo en /apps): instalar desde el DRAWER del
