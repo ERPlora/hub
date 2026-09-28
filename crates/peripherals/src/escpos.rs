@@ -452,6 +452,7 @@ enum Label {
     Duplicate,
     // The full invoice (hub#2005).
     InvoiceTitle,
+    RectifyingInvoiceTitle,
     InvoiceNumber,
     BreakdownRate,
     BreakdownBase,
@@ -556,6 +557,8 @@ impl Locale {
             // RD 1619/2012 art. 14.4: every copy after the original says «duplicado».
             Label::Duplicate => ("DUPLICATE", "DUPLICADO"),
             Label::InvoiceTitle => ("INVOICE", "FACTURA"),
+            // hub#2381 — what the A4, Holded, Odoo and Business Central title an R1–R4.
+            Label::RectifyingInvoiceTitle => ("CORRECTIVE INVOICE", "FACTURA RECTIFICATIVA"),
             Label::InvoiceNumber => ("Invoice: ", "Factura: "),
             // The three columns of the VAT breakdown; «Cuota» is what a Spanish invoice calls the
             // tax amount of a rate.
@@ -801,8 +804,15 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
     // hub#2005 — the paper says what it is, before its data: the cheapest way to tell a full
     // invoice from a ticket at a glance.
     if kind == Fiscal::FullInvoice {
+        // hub#2381 — a corrective invoice says so in its title. Only an explicit `true`, like
+        // `duplicate`: the word is a statement about the document.
+        let title = if data.get("rectifying").and_then(|v| v.as_bool()) == Some(true) {
+            Label::RectifyingInvoiceTitle
+        } else {
+            Label::InvoiceTitle
+        };
         b.set(Align::Center, true, true, false);
-        b.text(&format!("{}\n", t.label(Label::InvoiceTitle)));
+        b.text(&format!("{}\n", t.label(title)));
     }
 
     b.set(Align::Left, false, false, false);
@@ -2196,6 +2206,47 @@ mod tests {
             lines[number].0
         );
         assert!(!says(&lines, "Ticket: "), "an invoice does not call itself a ticket");
+    }
+
+    /// **A corrective invoice says so in its title** (hub#2381). An R1–R4 prints with a negative
+    /// total and, titled like any other invoice, reads at a glance as one more invoice; the A4 and
+    /// the market (Holded, Odoo, Business Central) title it «Factura rectificativa». Same place,
+    /// same weight as the plain title, and it fits the 80 mm line.
+    #[test]
+    fn a_corrective_invoice_is_titled_factura_rectificativa() {
+        for (locale, expected, plain) in [
+            ("es", "FACTURA RECTIFICATIVA", "FACTURA"),
+            ("en", "CORRECTIVE INVOICE", "INVOICE"),
+        ] {
+            let mut data = full_invoice();
+            data["rectifying"] = json!(true);
+            data["locale"] = json!(locale);
+            let lines = invoice_paper(&data);
+            let title = line_index(&lines, |l| l.trim() == expected, "the corrective title");
+            assert!(lines[title].1 && lines[title].2, "{locale}: bold and double height: {lines:#?}");
+            assert!(lines[title].0.chars().count() <= LINE_WIDTH, "{locale}: it fits the line");
+            let number = line_index(&lines, |l| l.contains("F-2026-000007"), "the invoice number");
+            assert!(title < number, "{locale}: the title comes before the number");
+            assert!(
+                !lines.iter().any(|(l, _, _)| l.trim() == plain),
+                "{locale}: the plain title is replaced, not printed twice: {lines:#?}"
+            );
+        }
+    }
+
+    /// Without the mark the paper does not move: the word is a statement about the document, so
+    /// only an explicit `true` switches it on — like `duplicate` (hub#1931).
+    #[test]
+    fn only_an_explicit_true_makes_an_invoice_corrective() {
+        for flag in [None, Some(json!(false)), Some(json!("yes")), Some(json!(1))] {
+            let mut data = full_invoice();
+            if let Some(flag) = flag.clone() {
+                data["rectifying"] = flag;
+            }
+            let lines = invoice_paper(&data);
+            assert!(lines.iter().any(|(l, _, _)| l.trim() == "FACTURA"), "{flag:?}: {lines:#?}");
+            assert!(!says(&lines, "RECTIFICATIVA"), "{flag:?}: {lines:#?}");
+        }
     }
 
     /// The customer is IDENTIFIED: name, tax id and address, together, under the document data.
