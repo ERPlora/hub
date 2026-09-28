@@ -178,9 +178,24 @@ export function writeAnsweredFlag(storageKey: string, tag: string): void {
  * scan, and none of them can fail because a permission could not be asked for: the order still
  * has to print. Everything that goes wrong is logged and answered with the honest state.
  */
-export async function ensureDevicePermission(
-  deps: EnsureDevicePermissionDeps,
-): Promise<DevicePermissionState> {
+/**
+ * The primer in flight, per permission. Two askers can reach it before anybody answers — a device
+ * booting with a session open AND a printer runs the print-host alta and the sign-in ask together
+ * (hub#2306) — and the answered flag is only written once the sheet closes, so both would open a
+ * sheet and the second «yes» would spend Android's second, and last, system dialog. The late one
+ * joins the sheet that is up; once it closes, the next ask starts fresh.
+ */
+const primerInFlight = new Map<string, Promise<DevicePermissionState>>();
+
+export function ensureDevicePermission(deps: EnsureDevicePermissionDeps): Promise<DevicePermissionState> {
+  const running = primerInFlight.get(deps.storageKey);
+  if (running) return running;
+  const asking = askOnce(deps).finally(() => primerInFlight.delete(deps.storageKey));
+  primerInFlight.set(deps.storageKey, asking);
+  return asking;
+}
+
+async function askOnce(deps: EnsureDevicePermissionDeps): Promise<DevicePermissionState> {
   const check = deps.check ?? checkDevicePermissions;
   const request = deps.request ?? (() => requestDevicePermission(deps.permission));
   const confirm = deps.confirm ?? confirmWithSheet;
