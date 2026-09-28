@@ -2482,7 +2482,9 @@ mod tests {
         assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
         let hostile = c.media_signed_link(&auth, "a.jpg&path=_logs/hub.log#x");
         assert!(
-            hostile.url.ends_with("?path=a.jpg%26path%3D_logs%2Fhub.log%23x"),
+            hostile
+                .url
+                .ends_with("?path=a.jpg%26path%3D_logs%2Fhub.log%23x"),
             "the path added a parameter: {}",
             hostile.url
         );

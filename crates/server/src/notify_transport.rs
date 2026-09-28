@@ -267,9 +267,7 @@ pub(crate) const HEADER_MEDIA_FOLDER: &str = "whatsapp/headers";
 /// and [`whatsapp_body`] refuses it as the not-a-link it is.
 pub(crate) fn header_media_file(value: &str) -> Option<&str> {
     let value = value.trim();
-    let name = value
-        .strip_prefix(HEADER_MEDIA_FOLDER)?
-        .strip_prefix('/')?;
+    let name = value.strip_prefix(HEADER_MEDIA_FOLDER)?.strip_prefix('/')?;
     let valid = !name.is_empty()
         && name != "."
         && name != ".."
@@ -681,13 +679,16 @@ mod tests {
             State(st): State<St>,
             uri: axum::http::Uri,
             headers: HeaderMap,
-            axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+            axum::extract::Query(q): axum::extract::Query<
+                std::collections::HashMap<String, String>,
+            >,
         ) -> (StatusCode, Json<Value>) {
             let path = q.get("path").cloned().unwrap_or_default();
-            st.seen
-                .lock()
-                .unwrap()
-                .push((uri.path().to_string(), headers, json!({ "path": path })));
+            st.seen.lock().unwrap().push((
+                uri.path().to_string(),
+                headers,
+                json!({ "path": path }),
+            ));
             if path.contains("missing") {
                 return (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })));
             }
@@ -704,7 +705,9 @@ mod tests {
             }
             (
                 StatusCode::OK,
-                Json(json!({ "url": format!("https://objects.example/{path}?X-Amz-Signature=s1") })),
+                Json(
+                    json!({ "url": format!("https://objects.example/{path}?X-Amz-Signature=s1") }),
+                ),
             )
         }
 
@@ -1257,7 +1260,10 @@ mod tests {
         let (path, headers, asked) = &calls[0];
         assert_eq!(path, "/api/v1/hub/device/media/raw/");
         assert_eq!(asked["path"], "whatsapp/headers/0b8e.jpg");
-        assert_eq!(headers["x-hub-token"], "machine-tok", "signed as the hub, like the send");
+        assert_eq!(
+            headers["x-hub-token"], "machine-tok",
+            "signed as the hub, like the send"
+        );
         let (path, _, body) = &calls[1];
         assert_eq!(path, "/api/v1/hub/device/notify/whatsapp/");
         assert_eq!(
@@ -1348,7 +1354,10 @@ mod tests {
             )
             .await
             .expect_err("no file, no send");
-        assert!(format!("{err}").contains("whatsapp/headers/missing.jpg"), "{err}");
+        assert!(
+            format!("{err}").contains("whatsapp/headers/missing.jpg"),
+            "{err}"
+        );
         let calls = cloud.calls();
         assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
         assert_eq!(calls[0].0, "/api/v1/hub/device/media/raw/");

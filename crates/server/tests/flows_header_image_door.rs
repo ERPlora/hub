@@ -132,7 +132,9 @@ async fn fake_saas(seen: Seen) -> String {
                 if refuse {
                     return (
                         StatusCode::BAD_GATEWAY,
-                        Json(json!({"error": "could not store the files", "saved": 0, "failed": 1})),
+                        Json(
+                            json!({"error": "could not store the files", "saved": 0, "failed": 1}),
+                        ),
                     )
                         .into_response();
                 }
@@ -290,7 +292,10 @@ async fn a_jpeg_lands_in_the_header_folder_and_its_reference_comes_back() {
     assert_eq!(seen.len(), 1, "{seen:?}");
     let stored = &seen[0];
     assert_eq!(stored.folder, "whatsapp/headers");
-    assert_eq!(stored.file_name, name, "the reference names the file stored");
+    assert_eq!(
+        stored.file_name, name,
+        "the reference names the file stored"
+    );
     assert_eq!(stored.bytes, JPEG, "the photo is stored untouched");
     assert_eq!(stored.content_type, "image/jpeg");
     assert_eq!(stored.header("x-hub-token"), Some("machine-secret"));
@@ -308,7 +313,11 @@ async fn a_png_is_stored_as_a_png_even_when_named_jpg() {
     let response = f
         .router
         .clone()
-        .oneshot(upload(photo("salon.jpg", PNG), Some(&f.admin), Some(EDITOR)))
+        .oneshot(upload(
+            photo("salon.jpg", PNG),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
@@ -330,7 +339,11 @@ async fn the_same_photo_twice_is_the_same_reference() {
         let response = f
             .router
             .clone()
-            .oneshot(upload(photo("salon.jpg", JPEG), Some(&f.admin), Some(EDITOR)))
+            .oneshot(upload(
+                photo("salon.jpg", JPEG),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
             .await
             .unwrap();
         refs.push(body_json(response).await["data"]["ref"].clone());
@@ -339,7 +352,11 @@ async fn the_same_photo_twice_is_the_same_reference() {
     let other = f
         .router
         .clone()
-        .oneshot(upload(photo("salon.jpg", PNG), Some(&f.admin), Some(EDITOR)))
+        .oneshot(upload(
+            photo("salon.jpg", PNG),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
         .await
         .unwrap();
     assert_ne!(body_json(other).await["data"]["ref"], refs[0]);
@@ -390,7 +407,11 @@ async fn a_photo_over_five_megabytes_is_refused_with_its_code() {
         let response = f
             .router
             .clone()
-            .oneshot(upload(photo("salon.jpg", bytes), Some(&f.admin), Some(EDITOR)))
+            .oneshot(upload(
+                photo("salon.jpg", bytes),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
             .await
             .unwrap();
         assert_eq!(
@@ -411,10 +432,18 @@ async fn a_photo_over_five_megabytes_is_refused_with_its_code() {
     let response = f
         .router
         .clone()
-        .oneshot(upload(photo("salon.jpg", &exactly), Some(&f.admin), Some(EDITOR)))
+        .oneshot(upload(
+            photo("salon.jpg", &exactly),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::CREATED, "5 MB exactly is taken");
+    assert_eq!(
+        response.status(),
+        StatusCode::CREATED,
+        "5 MB exactly is taken"
+    );
     assert_eq!(f.seen.lock().unwrap()[0].bytes.len(), MAX_IMAGE);
 }
 
@@ -456,7 +485,11 @@ async fn only_an_admin_through_the_flows_editor_can_store_a_header_photo() {
     let employee = f
         .router
         .clone()
-        .oneshot(upload(photo("salon.jpg", JPEG), Some(&f.employee), Some(EDITOR)))
+        .oneshot(upload(
+            photo("salon.jpg", JPEG),
+            Some(&f.employee),
+            Some(EDITOR),
+        ))
         .await
         .unwrap();
     assert_eq!(employee.status(), StatusCode::FORBIDDEN);
@@ -464,7 +497,11 @@ async fn only_an_admin_through_the_flows_editor_can_store_a_header_photo() {
     let stranger = f
         .router
         .clone()
-        .oneshot(upload(photo("salon.jpg", JPEG), Some(&f.admin), Some(INVENTORY)))
+        .oneshot(upload(
+            photo("salon.jpg", JPEG),
+            Some(&f.admin),
+            Some(INVENTORY),
+        ))
         .await
         .unwrap();
     assert_eq!(stranger.status(), StatusCode::FORBIDDEN);
@@ -473,7 +510,10 @@ async fn only_an_admin_through_the_flows_editor_can_store_a_header_photo() {
         "capability_denied"
     );
 
-    assert!(f.seen.lock().unwrap().is_empty(), "stored for a refused caller");
+    assert!(
+        f.seen.lock().unwrap().is_empty(),
+        "stored for a refused caller"
+    );
 
     // The shell and `curl` with an admin session name no module and are let in.
     let shell = f
@@ -495,7 +535,11 @@ async fn a_store_that_fails_reaches_the_editor_with_its_code_and_no_reference() 
     let response = f
         .router
         .clone()
-        .oneshot(upload(photo("salon.jpg", &bytes), Some(&f.admin), Some(EDITOR)))
+        .oneshot(upload(
+            photo("salon.jpg", &bytes),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
