@@ -1421,7 +1421,6 @@ export default {
     pinTooManyAttemptsNoWait: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     orSwipeBadge: '…o pasa tu placa: no hace falta elegir tu nombre antes.',
     badgeRejected: 'Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.',
-    badgeTooManyAttempts: 'Demasiados intentos fallidos con esta placa. Espera unos minutos o entra con tu PIN.',
     // hub#330. Sustituye a «PIN incorrecto» cuando lo que se rechazó fue el dispositivo, no los
     // dígitos. Decirle «PIN incorrecto» a quien lo ha escrito bien es la peor respuesta posible: lo
     // vuelve a teclear, y nada en pantalla nombra el gesto que lo arregla.
@@ -1499,7 +1498,6 @@ export default {
     notElevable:
       'Esto no se aprueba con un PIN. Tiene que hacerlo quien dirige tu negocio, entrando con su propia cuenta.',
     notRequired: 'Esto ya no necesita aprobación. Cierra esta ventana y vuelve a intentarlo.',
-    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     failed: 'No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.',
   },
   // hub#456 — el turno cambia en mitad de un ticket. Cada frase la lee alguien con una cola
@@ -1523,7 +1521,6 @@ export default {
     deviceNotEnrolled:
       'Este dispositivo todavía no está dado de alta para el PIN. Entra una vez con una cuenta de ERPlora en él y el PIN funcionará a partir de entonces.',
     deviceUnidentified: 'Este dispositivo no ha podido identificarse. Recarga la página y vuelve a intentarlo.',
-    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
   },
   activation: {
     title: 'Activación requerida',
