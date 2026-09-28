@@ -58,6 +58,28 @@ async function visibleNotices(page: Page): Promise<Notice[]> {
   );
 }
 
+/**
+ * Every notice on screen once none of them is moving: their enter and leave animations have
+ * ended. Not a fixed wait — on a loaded machine a notice was still sliding in after 600 ms and
+ * was measured half-way, outside the window (hub#2296).
+ */
+async function settledNotices(page: Page): Promise<Notice[]> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('ion-toast')].some((host) =>
+            [...host.getAnimations(), ...(host.shadowRoot?.getAnimations() ?? [])].some(
+              (a) => a.playState === 'running',
+            ),
+          ),
+        ),
+      { message: 'the notices never stopped moving', timeout: 15_000 },
+    )
+    .toBe(false);
+  return visibleNotices(page);
+}
+
 async function installThenLeaveBySideMenu(
   page: Page,
   answer: 'error' | 'success',
@@ -114,8 +136,7 @@ async function expectErrorOnScreen(page: Page, width: number, height: number): P
   await expect
     .poll(async () => (await visibleNotices(page)).some((n) => n.text.includes(SENTENCE)), { timeout: 8000 })
     .toBe(true);
-  await page.waitForTimeout(600); // the replaced notice finishes leaving
-  const notices = await visibleNotices(page);
+  const notices = await settledNotices(page);
   const error = notices.find((n) => n.text.includes(SENTENCE))!;
   expect(error.text, 'the way to try again travels with it').toContain('Reintentar');
   expect(error.top).toBeGreaterThanOrEqual(0);
@@ -146,9 +167,27 @@ test.describe('leaving Apps while an app installs (hub#2252)', () => {
     });
   }
 
-  test('a screen that is slow to open does not let the answer overtake the navigation', async ({
-    page,
-  }) => {
+  test('a notice that is still sliding in is measured where it stops, not half-way', async ({ page }) => {
+    // hub#2296: on a loaded machine the error notice was still sliding up when a fixed 600 ms
+    // wait ran out, and it was measured with its bottom at 916 of 844. Here every notice
+    // animation that starts after the answer is held on its first frame for three seconds, so a
+    // measure that does not wait for the animations to end always catches the notice below the
+    // window, where it starts.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const install = await installThenLeaveBySideMenu(page, 'error');
+    await page.evaluate((heldMs) => {
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+        const animation = animate.apply(this, args);
+        if (this.classList.contains('toast-wrapper')) animation.effect?.updateTiming({ delay: heldMs });
+        return animation;
+      };
+    }, 3000);
+    install.answer();
+    await expectErrorOnScreen(page, 390, 844);
+  });
+
+  test('a screen that is slow to open does not let the answer overtake the navigation', async ({ page }) => {
     // hub#2296, run 36402437763 attempt 3: on the loaded runner the side menu took 0.8 s to take
     // the click (the consent dialog was still leaving) and Settings 1 s more to open, so the
     // answer — then timed 2.5 s after the install began — landed inside the 700 ms this test
@@ -159,7 +198,10 @@ test.describe('leaving Apps while an app installs (hub#2252)', () => {
 
     await page.waitForTimeout(700);
     const notices = await visibleNotices(page);
-    expect(notices.some((n) => n.text.includes(INSTALLING)), 'the install is still running').toBe(true);
+    expect(
+      notices.some((n) => n.text.includes(INSTALLING)),
+      'the install is still running',
+    ).toBe(true);
   });
 
   test('«Reintentar» on the new screen asks the runtime again', async ({ page }) => {
@@ -183,20 +225,18 @@ test.describe('leaving Apps while an app installs (hub#2252)', () => {
     await expect
       .poll(async () => (await visibleNotices(page)).some((n) => n.text.includes(INSTALLED)), { timeout: 8000 })
       .toBe(true);
-    await page.waitForTimeout(600);
-    expect((await visibleNotices(page)).filter((n) => n.text.includes(INSTALLING))).toEqual([]);
+    expect((await settledNotices(page)).filter((n) => n.text.includes(INSTALLING))).toEqual([]);
   });
 
   test('while it is still running, the new screen keeps saying «Instalando…»', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await installThenLeaveBySideMenu(page, 'success');
 
-    await page.waitForTimeout(700);
-    const notices = await visibleNotices(page);
+    await page.waitForTimeout(700); // time passes on the new screen; the install has not answered
+    const notices = await settledNotices(page);
     expect(notices.some((n) => n.text.includes(INSTALLING))).toBe(true);
     const installing = notices.find((n) => n.text.includes(INSTALLING))!;
     expect(installing.top).toBeGreaterThanOrEqual(0);
     expect(installing.bottom).toBeLessThanOrEqual(1080);
   });
 });
-
