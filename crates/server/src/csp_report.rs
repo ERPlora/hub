@@ -345,7 +345,11 @@ mod tests {
         for (key, _) in LOGGED_FIELDS {
             let log = logged_for(key, &format!("x\n{FORGED}")).await;
             let lines: Vec<&str> = log.lines().collect();
-            assert_eq!(lines.len(), 1, "{key}: one report must be one line, got {log:?}");
+            assert_eq!(
+                lines.len(),
+                1,
+                "{key}: one report must be one line, got {log:?}"
+            );
             assert!(
                 lines[0].contains("CSP violation reported by the browser"),
                 "{key}: the only line is not the report's: {log:?}"
