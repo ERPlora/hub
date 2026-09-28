@@ -40,6 +40,7 @@ use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::Runtime;
 use erplora_server::{agent_runner, app, AppState, AuthMode, HubConfig};
 use erplora_wasm_host::Output;
+use futures_util::StreamExt;
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
@@ -93,12 +94,27 @@ impl FakeCloud {
                         .unwrap()
                         .pop()
                         .unwrap_or_else(|| sse_text("(no script left)"));
+                    // A scripted refusal (hub#2308): the proxy answers with a bare status and no
+                    // stream, the way the edge does while the SaaS restarts.
+                    if let Some(code) = turn.first().and_then(|c| c.strip_prefix(STATUS)) {
+                        return AxumResponse::builder()
+                            .status(code.parse::<u16>().unwrap())
+                            .body(Body::empty())
+                            .unwrap();
+                    }
                     // Each element is written as its OWN chunk, with a yield between them, so a
-                    // split line really crosses a read boundary on the hub's side.
-                    let stream = futures_util::stream::iter(
-                        turn.into_iter()
-                            .map(|chunk| Ok::<_, std::io::Error>(axum::body::Bytes::from(chunk))),
-                    );
+                    // split line really crosses a read boundary on the hub's side. A `BREAK` chunk
+                    // aborts the body there, the way a dropped connection does (hub#2308) — after
+                    // a pause, so the status and the first words have reached the hub and the cut
+                    // lands INSIDE the body rather than before the answer.
+                    let stream = futures_util::stream::iter(turn).then(|chunk| async move {
+                        if chunk == BREAK {
+                            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                            Err(std::io::Error::other("connection dropped mid-turn"))
+                        } else {
+                            Ok(axum::body::Bytes::from(chunk))
+                        }
+                    });
                     AxumResponse::builder()
                         .header("content-type", "text/event-stream")
                         .body(Body::from_stream(stream))
@@ -113,6 +129,38 @@ impl FakeCloud {
         });
         format!("http://{address}")
     }
+}
+
+/// Script marker: the proxy answers this status with no body (hub#2308).
+const STATUS: &str = "STATUS ";
+/// Script marker: the body is cut here, mid-stream (hub#2308).
+const BREAK: &str = "BREAK";
+
+/// A proxy that refuses the call with `code` and sends nothing else.
+fn refused_with(code: u16) -> Turn {
+    vec![format!("{STATUS}{code}")]
+}
+
+/// A turn whose connection drops after the first word, before the stream closes.
+fn dropped_mid_turn() -> Turn {
+    vec![
+        format!(
+            "data: {}\n\n",
+            json!({ "type": "text_delta", "text": "Tengo" })
+        ),
+        BREAK.to_string(),
+    ]
+}
+
+/// A turn the SaaS ends with an `error` event — the shape `proxy_chat_stream` streams when it
+/// cannot finish one (`{"type": "error", ...fields}`, then `[DONE]`).
+fn sse_error(fields: Value) -> Turn {
+    let mut event = json!({ "type": "error" });
+    event
+        .as_object_mut()
+        .unwrap()
+        .extend(fields.as_object().unwrap().clone());
+    vec![format!("data: {event}\n\ndata: [DONE]\n\n")]
 }
 
 /// A turn that answers in plain text and stops.
@@ -1895,4 +1943,298 @@ async fn hub2286_a_turn_parked_for_approval_keeps_its_text_trimmed() {
             "the model said {said:?}"
         );
     }
+}
+
+// ── hub#2308 — a failure that lasts a moment is asked again ───────────────────────────────────
+
+/// Why the agent step failed, where production writes it.
+async fn step_error(h: &Hub, run_id: &str) -> String {
+    let rt = h.state.runtime.read().await;
+    let (_, steps) = rt.get_flow_run(run_id).await.unwrap();
+    steps
+        .iter()
+        .find(|s| s.step_id == "agent")
+        .map(|s| s.error.clone())
+        .unwrap_or_default()
+}
+
+/// **hub#2308, the case of the issue.** The SaaS is restarting for a few seconds: the edge answers
+/// `503`, then the proxy is back. Until now the customer got «someone from the team will answer»
+/// for a failure that had already gone by the time she read it; the turn now asks again and the
+/// answer is what she gets.
+#[tokio::test]
+async fn hub2308_a_proxy_that_is_down_for_a_moment_is_asked_again_and_the_turn_answers() {
+    for (i, transient) in [502_u16, 503, 504, 500, 429, 408].into_iter().enumerate() {
+        let cloud = FakeCloud::with(vec![
+            refused_with(transient),
+            sse_text("Tengo hueco mañana a las 10."),
+        ]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("retry-status-{i}"),
+            agent_step("manual"),
+            &[],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+        perform(&h, &run_id).await;
+
+        assert_eq!(cloud.turns(), 2, "a {transient} is asked again, once");
+        assert_eq!(
+            step_output(&h, &run_id).await["text"],
+            "Tengo hueco mañana a las 10.",
+            "after a {transient} the answer is the second attempt's"
+        );
+        assert_eq!(step_error(&h, &run_id).await, "", "after a {transient}");
+    }
+}
+
+/// **hub#2308, the connection that drops mid-turn.** Half an answer is not an answer: the whole
+/// call is made again, and what is published is the complete second one — never «Tengo» glued to
+/// the retry.
+#[tokio::test]
+async fn hub2308_a_stream_cut_mid_turn_is_asked_again_from_the_start() {
+    let cloud = FakeCloud::with(vec![
+        dropped_mid_turn(),
+        sse_text("Tengo hueco mañana a las 10."),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "retry-broken",
+        agent_step("manual"),
+        &[],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(cloud.turns(), 2);
+    assert_eq!(
+        step_output(&h, &run_id).await["text"],
+        "Tengo hueco mañana a las 10."
+    );
+}
+
+/// **hub#2308, the provider that hiccups.** The SaaS reaches the model provider, the provider
+/// fails, and the proxy streams `{"type":"error"}` with no code — an overloaded model looks
+/// exactly like this. It is asked again.
+#[tokio::test]
+async fn hub2308_an_error_the_proxy_streams_without_a_final_code_is_asked_again() {
+    let cloud = FakeCloud::with(vec![
+        sse_error(json!({ "error": "AI service error: upstream overloaded" })),
+        sse_text("Tengo hueco mañana a las 10."),
+    ]);
+    let h = hub(cloud.serve().await, "retry-sse", agent_step("manual"), &[]).await;
+    let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(cloud.turns(), 2);
+    assert_eq!(
+        step_output(&h, &run_id).await["text"],
+        "Tengo hueco mañana a las 10."
+    );
+}
+
+/// **hub#2308, what waiting does not fix is not asked again.** The quota is spent until the month
+/// turns, the conversation is too big for the proxy, the credential is refused, the body is
+/// malformed: the same call gets the same answer a second later. The step fails at once, with its
+/// stable code, and the recipe's apology goes out without the customer waiting for nothing.
+#[tokio::test]
+async fn hub2308_a_final_refusal_is_not_asked_again() {
+    let finals: Vec<(&str, Turn)> = vec![
+        (
+            "quota",
+            sse_error(json!({
+                "error": "Monthly message limit reached",
+                "code": "quota_exceeded",
+                "upgrade_required": true
+            })),
+        ),
+        (
+            "quota-code",
+            sse_error(
+                json!({ "error": "Monthly message limit reached", "code": "quota_exceeded" }),
+            ),
+        ),
+        (
+            "legacy-quota",
+            sse_error(
+                json!({ "error": "Monthly message limit reached", "upgrade_required": true }),
+            ),
+        ),
+        (
+            "payload",
+            sse_error(json!({ "error": "Payload too large", "payload_too_large": true })),
+        ),
+        ("400", refused_with(400)),
+        ("401", refused_with(401)),
+        ("403", refused_with(403)),
+        ("404", refused_with(404)),
+        ("413", refused_with(413)),
+    ];
+    for (tag, refusal) in finals {
+        let cloud = FakeCloud::with(vec![refusal, sse_text("never read")]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("final-{tag}"),
+            agent_step("manual"),
+            &[],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+        perform(&h, &run_id).await;
+
+        assert_eq!(
+            cloud.turns(),
+            1,
+            "{tag}: a final refusal is not asked again"
+        );
+        assert!(
+            step_error(&h, &run_id)
+                .await
+                .starts_with(agent_runner::ERR_UPSTREAM),
+            "{tag}: the step fails with its stable code: {}",
+            step_error(&h, &run_id).await
+        );
+    }
+}
+
+/// **hub#2308, the retry is bounded.** A proxy that stays down is asked three times in all — the
+/// first call and two more — and then the step fails with its stable code, so the recipe's
+/// apology still goes out instead of the customer waiting on a hub that keeps knocking.
+#[tokio::test]
+async fn hub2308_a_proxy_that_stays_down_is_given_up_on_after_three_attempts() {
+    let cloud = FakeCloud::with(vec![
+        refused_with(503),
+        refused_with(503),
+        refused_with(503),
+        sse_text("never read"),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "retry-bounded",
+        agent_step("manual"),
+        &[],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+    let started = std::time::Instant::now();
+    perform(&h, &run_id).await;
+
+    assert_eq!(cloud.turns(), 3, "one call and two retries, then it stops");
+    // The retries wait for the moment to pass (1 s, then 3 s) instead of knocking again at once
+    // on a SaaS that is still restarting.
+    assert!(
+        started.elapsed() >= std::time::Duration::from_secs(4),
+        "the retries are spaced out: {:?}",
+        started.elapsed()
+    );
+    assert!(
+        step_error(&h, &run_id)
+            .await
+            .starts_with(agent_runner::ERR_UPSTREAM),
+        "{}",
+        step_error(&h, &run_id).await
+    );
+    assert_eq!(step_output(&h, &run_id).await["text"], Value::Null);
+}
+
+/// **hub#2308 against ADR-0283 §1: what is asked again is the MODEL, never the business.** The
+/// booking ran in the turn (`policy: auto`); the NEXT call to the model fails for a moment. The
+/// retry repeats that call with the same conversation — the booking's result included — and the
+/// booking is not written twice.
+#[tokio::test]
+async fn hub2308_a_retry_after_a_command_ran_does_not_run_the_command_again() {
+    let cloud = FakeCloud::with(vec![
+        sse_call(
+            "agenda.booking.create",
+            "c1",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+        ),
+        refused_with(503),
+        sse_text("Booked for tomorrow at 10."),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "retry-no-rerun",
+        agent_step("auto"),
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(cloud.turns(), 3);
+    assert_eq!(bookings(&h).await.len(), 1, "the booking is written once");
+    let bodies = cloud.bodies();
+    assert_eq!(
+        bodies[1]["messages"], bodies[2]["messages"],
+        "the retry sends the SAME conversation, not one with the tool run again"
+    );
+    assert_eq!(
+        step_output(&h, &run_id).await["text"],
+        "Booked for tomorrow at 10."
+    );
+}
+
+/// A door in front of the fake SaaS that hangs up on the first `drops` connections without a word
+/// — what a hub sees while the edge swaps the SaaS container — and lets the rest through. Returns
+/// its URL and how many connections it took.
+async fn flaky_door(upstream: String, drops: usize) -> (String, Arc<Mutex<usize>>) {
+    let upstream = upstream.trim_start_matches("http://").to_string();
+    let accepted = Arc::new(Mutex::new(0_usize));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let counter = accepted.clone();
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut inbound, _)) = listener.accept().await else {
+                return;
+            };
+            let seen = {
+                let mut n = counter.lock().unwrap();
+                *n += 1;
+                *n
+            };
+            if seen <= drops {
+                drop(inbound);
+                continue;
+            }
+            let upstream = upstream.clone();
+            tokio::spawn(async move {
+                let mut outbound = tokio::net::TcpStream::connect(upstream).await.unwrap();
+                let _ = tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await;
+            });
+        }
+    });
+    (format!("http://{address}"), accepted)
+}
+
+/// **hub#2308, the network error of the issue.** The connection is cut before the proxy says
+/// anything; the hub dials again and the customer gets the answer.
+#[tokio::test]
+async fn hub2308_a_connection_cut_before_any_answer_is_dialled_again() {
+    let cloud = FakeCloud::with(vec![sse_text("Tengo hueco mañana a las 10.")]);
+    let (door, accepted) = flaky_door(cloud.serve().await, 1).await;
+    let h = hub(door, "retry-connection", agent_step("manual"), &[]).await;
+    let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(
+        *accepted.lock().unwrap(),
+        2,
+        "dialled again after the hang-up"
+    );
+    assert_eq!(cloud.turns(), 1, "the proxy saw the turn once");
+    assert_eq!(
+        step_output(&h, &run_id).await["text"],
+        "Tengo hueco mañana a las 10."
+    );
 }
