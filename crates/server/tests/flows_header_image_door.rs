@@ -505,3 +505,37 @@ async fn a_store_that_fails_reaches_the_editor_with_its_code_and_no_reference() 
     assert!(body.get("data").is_none(), "{body}");
     assert!(!f.seen.lock().unwrap().is_empty(), "the store was asked");
 }
+
+/// A body that is not a form: the gate still answers first, and then the refusal comes in the
+/// envelope the SDK reads, with its code — never axum's plain-text rejection.
+#[tokio::test]
+async fn a_body_that_is_not_a_form_is_refused_in_the_envelope_after_the_gate() {
+    let f = fixture("not-a-form").await;
+    let request = |session: Option<&str>| {
+        let mut req = Request::builder()
+            .method("POST")
+            .uri(DOOR)
+            .header("content-type", "application/json");
+        if let Some(s) = session {
+            req = req.header("x-hub-session", s);
+        }
+        req.body(Body::from(r#"{"file":"salon.jpg"}"#)).unwrap()
+    };
+    let anonymous = f.router.clone().oneshot(request(None)).await.unwrap();
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+
+    let response = f
+        .router
+        .clone()
+        .oneshot(request(Some(&f.admin)))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false, "{body}");
+    assert_eq!(
+        body["error"]["code"], "whatsapp.invalid_header_image_upload",
+        "{body}"
+    );
+    assert!(f.seen.lock().unwrap().is_empty());
+}

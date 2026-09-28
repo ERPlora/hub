@@ -19,6 +19,7 @@
 //!
 //! Same door as the rest of the flows (`flows_api::admin_session!`): a human owner/admin session,
 //! and — when a module is the caller — the module the owner granted `manage_flows`.
+use axum::extract::multipart::MultipartRejection;
 use axum::extract::{DefaultBodyLimit, Multipart, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -43,6 +44,7 @@ const MISSING: &str = "whatsapp.header_image_missing";
 const UNSUPPORTED: &str = "whatsapp.header_image_unsupported";
 const TOO_LARGE: &str = "whatsapp.header_image_too_large";
 const NOT_SAVED: &str = "whatsapp.header_image_not_saved";
+const NOT_A_FORM: &str = "whatsapp.invalid_header_image_upload";
 
 /// The two kinds Meta takes as a header image, told apart by their first bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,6 +104,14 @@ fn too_large() -> Response {
     )
 }
 
+fn not_a_form() -> Response {
+    refusal(
+        StatusCode::BAD_REQUEST,
+        NOT_A_FORM,
+        "send the photo as a multipart form with its boundary, in the field `file`",
+    )
+}
+
 /// The photo in the form's `file` field, read up to one byte past the cap — enough to know it does
 /// not fit without holding more of it.
 enum Read {
@@ -143,7 +153,9 @@ async fn read_photo(mut form: Multipart) -> Read {
 pub async fn upload_whatsapp_header_image(
     State(st): State<AppState>,
     headers: HeaderMap,
-    form: Multipart,
+    // Taken as a `Result`: a body that is not a form must still meet the gate first, and then be
+    // refused in the envelope the SDK reads — not with axum's plain-text rejection.
+    form: Result<Multipart, MultipartRejection>,
 ) -> Response {
     // The gate before a byte of the body is read: a refused caller never gets to make the hub
     // hold 5 MB.
@@ -161,6 +173,9 @@ pub async fn upload_whatsapp_header_image(
         }
     }
 
+    let Ok(form) = form else {
+        return not_a_form();
+    };
     let bytes = match read_photo(form).await {
         Read::Photo(bytes) => bytes,
         Read::Missing => {
@@ -171,13 +186,7 @@ pub async fn upload_whatsapp_header_image(
             )
         }
         Read::TooLarge => return too_large(),
-        Read::Broken => {
-            return refusal(
-                StatusCode::BAD_REQUEST,
-                MISSING,
-                "the form could not be read",
-            )
-        }
+        Read::Broken => return not_a_form(),
     };
     let Some(kind) = HeaderImage::sniff(&bytes) else {
         return refusal(
