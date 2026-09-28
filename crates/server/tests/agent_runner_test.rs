@@ -40,6 +40,7 @@ use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::Runtime;
 use erplora_server::{agent_runner, app, AppState, AuthMode, HubConfig};
 use erplora_wasm_host::Output;
+use futures_util::StreamExt;
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
@@ -103,14 +104,17 @@ impl FakeCloud {
                     }
                     // Each element is written as its OWN chunk, with a yield between them, so a
                     // split line really crosses a read boundary on the hub's side. A `BREAK` chunk
-                    // aborts the body there, the way a dropped connection does (hub#2308).
-                    let stream = futures_util::stream::iter(turn.into_iter().map(|chunk| {
+                    // aborts the body there, the way a dropped connection does (hub#2308) — after
+                    // a pause, so the status and the first words have reached the hub and the cut
+                    // lands INSIDE the body rather than before the answer.
+                    let stream = futures_util::stream::iter(turn).then(|chunk| async move {
                         if chunk == BREAK {
+                            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                             Err(std::io::Error::other("connection dropped mid-turn"))
                         } else {
                             Ok(axum::body::Bytes::from(chunk))
                         }
-                    }));
+                    });
                     AxumResponse::builder()
                         .header("content-type", "text/event-stream")
                         .body(Body::from_stream(stream))
