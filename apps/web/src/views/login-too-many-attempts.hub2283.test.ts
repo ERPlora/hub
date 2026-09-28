@@ -125,9 +125,7 @@ function lockSentence(minutes: number): string {
 /** Type a PIN on the pinpad and let the promise settle. */
 async function typePin(wrapper: Awaited<ReturnType<typeof mountLogin>>): Promise<void> {
   const pinpad = wrapper.find('ok-pinpad');
-  pinpad.element.dispatchEvent(
-    new CustomEvent('ok-complete', { detail: { value: '1234' }, bubbles: true }),
-  );
+  pinpad.element.dispatchEvent(new CustomEvent('ok-complete', { detail: { value: '1234' }, bubbles: true }));
   await flushPromises();
 }
 
@@ -208,7 +206,9 @@ describe('a pinpad locked by too many failed attempts', () => {
 
     const text = wrapper.text();
     expect(text).toContain(lockSentence(5));
-    expect(lockSentence(5)).not.toBe(i18n.global.t('login.pinTooManyAttempts', { minutes: 5 }, { locale: 'en', plural: 5 }));
+    expect(lockSentence(5)).not.toBe(
+      i18n.global.t('login.pinTooManyAttempts', { minutes: 5 }, { locale: 'en', plural: 5 }),
+    );
     expect(text).not.toContain(es.login.pinIncorrect);
   });
 
