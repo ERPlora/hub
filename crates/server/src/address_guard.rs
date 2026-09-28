@@ -18,7 +18,10 @@
 //! the login screen.
 //!
 //! Every failure also leaves one stable line in the log (`event=auth_failed reason=… client=…
-//! hub=…`), the signal a watcher outside the hub can alert or ban on.
+//! hub=…`), the signal a watcher outside the hub can alert or ban on. A session credential's line
+//! also carries `token=<fingerprint>` before `hub=` (hub#2293): once an address is at its cap the
+//! hub stops remembering new tokens, so the same dead session can log on every request, and only
+//! the fingerprint lets a watcher count DISTINCT tokens instead of lines.
 //!
 //! In memory, like [`crate::login_throttle`]: it guards doors only this process serves.
 use std::collections::{HashMap, HashSet};
@@ -76,15 +79,29 @@ pub fn client_address(headers: &HeaderMap) -> Option<String> {
 }
 
 /// The stable line every failure leaves (`event=auth_failed reason=… client=… hub=…`). Matched
-/// on its fields, never on the prose. `client=-` when no proxy said who it was.
-pub fn report(reason: Failure, client: Option<&str>, hub_id: &str) {
+/// on its fields, never on the prose. `client=-` when no proxy said who it was. A rejected session
+/// credential adds `token=<`[`token_fingerprint`]`>` between `client=` and `hub=`; `hub=` stays
+/// last because the edge parser and alert are anchored on it (infra#345, infra#349).
+pub fn report(reason: Failure, client: Option<&str>, token: Option<&str>, hub_id: &str) {
+    let token = token.map(token_fingerprint);
     tracing::warn!(
         event = %"auth_failed",
         reason = %reason.code(),
         client = %client.unwrap_or("-"),
+        token = token.as_deref().map(tracing::field::display),
         hub = %hub_id,
         "sign-in failed"
     );
+}
+
+/// The first 8 hex digits of `sha256(token)`: enough for a watcher to tell one repeated token from
+/// thousands of invented ones, and 32 bits of a hash reveal nothing about a 244-bit token.
+pub fn token_fingerprint(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(token.as_bytes())[..4]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// A wrong PIN or badge: counted against the address and logged.
@@ -92,7 +109,7 @@ pub fn record_guess(st: &crate::AppState, client: Option<&str>, reason: Failure)
     if let Some(client) = client {
         st.address_guard.record_guess(client);
     }
-    report(reason, client, &st.hub_id());
+    report(reason, client, None, &st.hub_id());
 }
 
 /// A session credential that came back `401`: counted once per distinct token, and logged the
@@ -108,7 +125,7 @@ pub fn record_rejected_credential(
         None => true,
     };
     if first_sighting {
-        report(reason, client, &st.hub_id());
+        report(reason, client, Some(token), &st.hub_id());
     }
 }
 
@@ -416,6 +433,51 @@ mod tests {
         assert_eq!(client_address(&headers).as_deref(), Some(SHOP));
         headers.insert("x-forwarded-for", " ".parse().unwrap());
         assert_eq!(client_address(&headers), None);
+    }
+
+    /// hub#2293: 8 lowercase hex digits of `sha256(token)` — the known vector of "abc".
+    #[test]
+    fn hub2293_the_token_fingerprint_is_the_head_of_its_sha256() {
+        assert_eq!(token_fingerprint("abc"), "ba7816bf");
+        assert_ne!(token_fingerprint("abd"), token_fingerprint("abc"));
+    }
+
+    /// hub#2293: the fingerprint as production writes it — with the ANSI colours the edge parser
+    /// requires (infra#338) — sits between `client=` and `hub=`, and `hub=` still ends the line
+    /// (the parser and the alert are anchored on it, infra#345/#349). A guess carries no token.
+    #[test]
+    fn hub2293_the_fingerprint_rides_in_the_colours_the_edge_reads() {
+        use tracing_subscriber::layer::SubscriberExt;
+
+        // Park the global interest anchor first (hub#1796), then capture WITH colours through
+        // the production console layer.
+        let _anchor = crate::log_capture::captured(|| {});
+        let sink = crate::log_capture::CapturedLog::default();
+        let subscriber = tracing_subscriber::registry()
+            .with(crate::logging::console_layer(sink.clone()).with_ansi(true));
+        tracing::subscriber::with_default(subscriber, || {
+            report(Failure::SessionInvalid, Some(OTHER), Some("abc"), "h");
+            report(Failure::Pin, Some(OTHER), None, "h");
+        });
+        let field = |k: &str, v: &str| format!("\x1b[3m{k}\x1b[0m\x1b[2m=\x1b[0m{v}");
+        let text = sink.text();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "{text:?}");
+        let session_tail = format!(
+            "{} {} {} {}",
+            field("reason", "session_invalid"),
+            field("client", OTHER),
+            field("token", "ba7816bf"),
+            field("hub", "h")
+        );
+        assert!(lines[0].ends_with(&session_tail), "{:?}", lines[0]);
+        let pin_tail = format!(
+            "{} {} {}",
+            field("reason", "pin"),
+            field("client", OTHER),
+            field("hub", "h")
+        );
+        assert!(lines[1].ends_with(&pin_tail), "{:?}", lines[1]);
     }
 
     #[test]
