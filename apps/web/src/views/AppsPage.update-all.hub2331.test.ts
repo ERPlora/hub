@@ -288,6 +288,23 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     expect(reloadForModuleUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it('a failed line carries the alert icon and an updated one the check, so the two are told apart at a glance', async () => {
+    updateModule
+      .mockImplementationOnce(async () => {
+        throw failure('The marketplace did not answer in time');
+      })
+      .mockImplementationOnce(async () => ok('inventory'));
+    const w = mountApps();
+    await settle();
+
+    await pressUpdateAll(w);
+    await settle();
+    const icon = (id: string) =>
+      w.find(`[data-testid="apps-update-all-result"][data-id="${id}"]`).find('[name]').attributes('name');
+    expect(icon('sales')).toBe('alert-circle-outline');
+    expect(icon('inventory')).toBe('checkmark-circle-outline');
+  });
+
   it('🔴 with a failure on screen, «My apps» already shows the new version of the apps that did update', async () => {
     updateModule
       .mockImplementationOnce(async () => {
