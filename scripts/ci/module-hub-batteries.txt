@@ -195,3 +195,9 @@ cash_register/tests/count_currency.hub.test.py
 # the real kernel (services#118). New coverage, not moved.
 # pending-publication: services#125 until 2026-10-28
 services/tests/grant_adjust.hub.test.py
+# cart_checkout: a cart the assistant or an API integration creates WITHOUT a currency is born in the
+# HUB's currency — the setting `PUT /api/settings` writes is the one `cart_checkout.carts.create`
+# reads once the runtime has applied the schema — `null` counts as absent and an explicit currency
+# still wins, against the real kernel (cart_checkout#34). New coverage, not moved.
+# pending-publication: cart_checkout#35 until 2026-10-28
+cart_checkout/tests/cart_currency.hub.test.py
