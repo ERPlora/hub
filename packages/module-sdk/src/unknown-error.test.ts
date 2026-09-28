@@ -104,12 +104,19 @@ test('hub#2281: a 401 that carries a code of its OWN is not a session that ended
   assert.equal(e.message, 'this hub has no machine credential for erplora.com');
 });
 
-test('hub#2281: `unauthorized` is a platform code — its sentence exists in both languages', () => {
-  const es = platformFailureMessage({ code: 'unauthorized' }, 'es');
-  const en = platformFailureMessage({ code: 'unauthorized' }, 'en');
+test('hub#2281: `platformFailureMessage` stays silent on `unauthorized` — the shell\'s own screens say it', () => {
+  // Settings › Roles (hub#1705) and its siblings run the SAME function over their own refusals and
+  // fall back to their catalogue (`employeeForm.errors.unauthorized`) only when it answers `null`.
+  // The session sentence belongs to the module transport (`unwrap`), not to this public table.
+  assert.equal(platformFailureMessage({ code: 'unauthorized' }, 'es'), null);
+  assert.equal(platformFailureMessage({ code: 'unauthorized' }, 'en'), null);
+});
 
-  assert.ok(es && en);
-  assert.notEqual(es, en, 'es is a translation, not a copy of the source');
+test('hub#2281: the session sentence is a translation, not a copy of the source', async () => {
+  const es = await inLocale('es', () => refusal(transport(401, DEAD_SESSION).query('kitchen.stations.list', {})));
+  const en = await inLocale('en', () => refusal(transport(401, DEAD_SESSION).query('kitchen.stations.list', {})));
+
+  assert.notEqual(es.message, en.message);
 });
 
 test('hub#2281: a refusal with neither code nor message gets the translated sentence, never «unknown error»', async () => {

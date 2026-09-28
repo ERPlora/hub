@@ -105,7 +105,9 @@ describe('a module command refused for a dead session (hub#2281)', () => {
       ['/api/command', DEAD_SESSION],
     ]);
 
-    await getClient().command('kitchen.station_create', { name: 'Barra' }).catch(() => undefined);
+    await getClient()
+      .command('kitchen.station_create', { name: 'Barra' })
+      .catch(() => undefined);
     // Let the probe settle before asserting nothing happened.
     await new Promise((r) => setTimeout(r, 0));
 
@@ -119,7 +121,9 @@ describe('a module command refused for a dead session (hub#2281)', () => {
       ['/api/command', { status: 403, body: { ok: false, error: { code: 'permission_denied', message: 'x' } } }],
     ]);
 
-    await getClient().command('kitchen.station_create', { name: 'Barra' }).catch(() => undefined);
+    await getClient()
+      .command('kitchen.station_create', { name: 'Barra' })
+      .catch(() => undefined);
     await new Promise((r) => setTimeout(r, 0));
 
     expect(probeCalls(spy)).toBe(0);

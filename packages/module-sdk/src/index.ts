@@ -718,9 +718,6 @@ const PLATFORM_FAILURES: Record<
   // never had to answer it before the shell's own copy (`apps/web/src/lib/platform-failure.ts`,
   // hub#1258) started covering `manifest` over vue-i18n keys instead of here.
   manifest: () => PLUMBING,
-  // hub#2281: a refusal of the SESSION, not of the action — retrying cannot help and the runtime's
-  // prose («no autenticado: …») is written for the log. What helps is signing in again.
-  [SESSION_REFUSED]: () => SESSION_ENDED,
   // hub#1337: `other` is NOT one of them. `may_reach_the_client` puts `E::Other(_)` on the SPEAKING
   // side of the door — beside `Domain`, `PermissionDenied`, `InvalidField` — with
   // `carries_driver_text` as the net underneath, exactly so the readable half of the ~50
@@ -948,9 +945,15 @@ function unwrap(env: Envelope, status?: number): unknown {
     // order is load-bearing: a platform code is never a module's to rewrite, and a code nobody
     // translated still keeps what arrived.
     const locale = activeLocale();
+    // hub#2281: a refusal of the SESSION is said here, in the transport, and NOT in the public
+    // platform table: the shell's own screens (Settings › Roles, hub#1705) run that table over their
+    // refusals and answer `unauthorized` from their own catalogue when it stays silent.
+    const sessionEnded = e?.code === SESSION_REFUSED;
     const spoken = e
-      ? (platformFailureMessage(e, locale) ??
-        (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
+      ? sessionEnded
+        ? (locale.toLowerCase().startsWith('en') ? SESSION_ENDED.en : SESSION_ENDED.es)
+        : (platformFailureMessage(e, locale) ??
+          (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
       : null;
     // hub#2281: the last resort is a sentence a person can act on, in their language — never
     // «unknown error». It is the plumbing one: from the counter, a refusal nobody explained is the
