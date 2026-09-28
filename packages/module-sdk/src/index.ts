@@ -1569,6 +1569,22 @@ export interface TauriBridge {
 /** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
 export const FLOWS_BASE_PATH = '/api/hub/flows';
 
+/** Where the photo a WhatsApp template step sends in its header goes up — the one path
+ *  {@link FlowsApi.uploadWhatsappHeaderImage} posts to (`crates/server/src/flows_header_media.rs`,
+ *  hub#2335). */
+export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header-images';
+
+/**
+ * What {@link FlowsApi.uploadWhatsappHeaderImage} answers. `ref` is what the step stores in
+ * `vars.header_image`; the hub signs a fresh link to it on every send. `mime_type` is decided by
+ * the photo's BYTES, never by its name.
+ */
+export interface WhatsappHeaderImage {
+  ref: string;
+  mime_type: 'image/jpeg' | 'image/png';
+  size: number;
+}
+
 /** Where the hub's event catalogue lives. Every path {@link EventsApi} can build starts here. */
 export const EVENTS_BASE_PATH = '/api/hub/events';
 
@@ -1851,6 +1867,34 @@ export class FlowsApi {
    */
   async schema(): Promise<FlowSchema> {
     return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/schema` }) as Promise<FlowSchema>;
+  }
+
+  /**
+   * `POST /api/hub/flows/whatsapp-header-images` — **the photo a WhatsApp template step sends in
+   * its header** (hub#2335).
+   *
+   * A template approved with a photo header sends a photo on every message, and Meta downloads it
+   * from a link; the owner has the file, not a public link. The hub keeps it in its own files and
+   * answers a `ref` for the step's `vars.header_image`; every send signs a fresh link to it, so the
+   * file never has to be public and the link never expires in the queue. The same photo twice is
+   * the same `ref`.
+   *
+   * Only a JPEG or a PNG of up to 5 MB (Meta's cap), told by its bytes. A refusal arrives as an
+   * {@link ErploraError} with its code: `whatsapp.header_image_unsupported`,
+   * `whatsapp.header_image_too_large`, `whatsapp.header_image_missing`,
+   * `whatsapp.invalid_header_image_upload`, `whatsapp.header_image_not_saved`.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * {@link templates}: `typeof flows.uploadWhatsappHeaderImage` is the probe.
+   */
+  async uploadWhatsappHeaderImage(file: Blob): Promise<WhatsappHeaderImage> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
+      body: form,
+    }) as Promise<WhatsappHeaderImage>;
   }
 
   /**

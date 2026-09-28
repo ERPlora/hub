@@ -125,6 +125,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     'templateDiscards',
     'templates',
     'update',
+    'uploadWhatsappHeaderImage',
   ]);
 
   // 2. Every URL the surface can produce lands under ONE prefix, and it is the frozen table.
