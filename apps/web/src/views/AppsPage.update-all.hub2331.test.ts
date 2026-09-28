@@ -201,6 +201,8 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     const w = mountApps();
     await settle();
     expect(painted(w, '[data-testid="apps-update-all"]')).toContain(plural(enCatalogue.apps.updateAllOffer, 1));
+    // The singular only — not the whole «one | many» message.
+    expect(painted(w, '[data-testid="apps-update-all"]')).not.toContain('|');
   });
 
   it('is not there when nothing can be updated, nor for a non-admin', async () => {
@@ -343,6 +345,8 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     await settle();
     expect(updateModule).toHaveBeenCalledTimes(2);
     expect(reloadForModuleUpdate).not.toHaveBeenCalled();
+    // Nothing to report app by app: the result does not linger on screen.
+    expect(w.find('[data-testid="apps-update-all-result"]').exists()).toBe(false);
   });
 
   it('a row «Update» pressed while the batch runs does not start a second update', async () => {
@@ -355,12 +359,29 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
 
     const table = w
       .findAll('ok-data-table')
-      .map((t) => t.element as HTMLElement & { rows?: Array<Record<string, unknown>> })
+      .map(
+        (t) =>
+          t.element as HTMLElement & {
+            rows?: Array<Record<string, unknown>>;
+            actions?: Array<{ id: string; disabled?: (row: Record<string, unknown>) => boolean }>;
+          },
+      )
       .find((t) => (t.rows ?? []).some((r) => r.id === 'inventory' && 'status' in r))!;
     const row = table.rows!.find((r) => r.id === 'inventory')!;
+    // The queued app's own «Update» is greyed out while the batch owns the updates…
+    const rowUpdate = table.actions!.find((a) => a.id === 'update')!;
+    expect(rowUpdate.disabled?.(row)).toBe(true);
+    // …and even a press that gets through starts nothing.
     table.dispatchEvent(new CustomEvent('rowAction', { detail: { actionId: 'update', row } }));
     await settle();
     expect(updateModule).toHaveBeenCalledTimes(1);
     expect(listModuleVersions).not.toHaveBeenCalled();
+
+    // Once it is over, the row's own button works again.
+    first.resolve(ok('sales'));
+    updateModule.mockImplementationOnce(async () => ok('inventory'));
+    await settle();
+    const after = table.actions!.find((a) => a.id === 'update')!;
+    expect(after.disabled?.(table.rows!.find((r) => r.id === 'inventory')!)).toBe(false);
   });
 });
