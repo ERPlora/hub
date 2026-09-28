@@ -23,7 +23,9 @@ describe('the shell sends a system notice when a bell counter goes up', () => {
   it('goes through the permission gate and the same notify as the kitchen and the appointments', () => {
     const call = bellNoticesCall(MAIN);
     expect(call).toMatch(/if \(!shouldSendNotice\(await askToWarn\(\)\)\) return;/);
-    expect(call).toContain('getClient().peripherals.notify(title, body)');
+    // Since hub#2305 the shared door is the one that remembers where a tap leads.
+    expect(call).toContain('await notices.notify(title, body, path);');
+    expect(call).not.toContain('peripherals.notify(');
   });
 
   it('leaves out the module whose bookings the shell already announces', () => {

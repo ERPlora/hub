@@ -2,7 +2,7 @@
 //
 // The trigger (a counter rising between two polls) is pinned in `bell-counters.rise.hub2303.test.ts`.
 // This pins what the device is told: the module's own label with the new total, through the same
-// door as the kitchen order and the appointments (`peripherals.notify`, behind the permission gate
+// door as the kitchen order and the appointments (`notices.notify` since hub#2305, behind the permission gate
 // the caller owns), words by key (ADR-0055) — and NOT for a module the shell already announces on
 // its own, or a WhatsApp booking would ring twice: once as «New booking», once as «Appointments to
 // confirm».
