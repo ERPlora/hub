@@ -167,6 +167,21 @@ async fn two_requests_to_the_same_list_describe_it_once() {
     );
 }
 
+/// The other question for the same answer: a list sorted by a column other than `id` asks whether
+/// the SELECT projects an `id` to break ties with (hub#2352). Also once, not per page.
+#[tokio::test]
+async fn two_requests_sorted_by_another_column_describe_it_once() {
+    let (rt, describes) = counting_hub("v1", false).await;
+    let by_priority = params(&[("sort", json!("priority")), ("dir", json!("desc"))]);
+
+    let first = ids(&rt, &by_priority, "h1").await;
+    let second = ids(&rt, &by_priority, "h1").await;
+
+    assert_eq!(first, vec!["high", "mid", "low"]);
+    assert_eq!(second, first);
+    assert_eq!(describes.load(Ordering::SeqCst), 1);
+}
+
 /// A list that needs no column type still asks nothing — remembering must not turn a lazy
 /// question into an eager one.
 #[tokio::test]
