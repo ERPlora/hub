@@ -19,16 +19,19 @@ const SENTENCE = 'El marketplace no ha contestado a tiempo';
 
 async function openMyAppsWithUpdates(page: Page): Promise<{ calls: () => string[] }> {
   const calls: string[] = [];
-  await page.route(/\/api\/modules\?locale=/, (r) => r.fulfill({ json: { ok: true, data: APPS } }));
+  // What the runtime would answer: an app that updated runs 2.0.0 and has nothing new to offer.
+  const updated = new Set<string>();
+  const running = () => APPS.map((a) => ({ ...a, version: updated.has(a.id) ? '2.0.0' : a.version }));
+  await page.route(/\/api\/modules\?locale=/, (r) => r.fulfill({ json: { ok: true, data: running() } }));
   await page.route(/\/api\/modules\/updates/, (r) =>
     r.fulfill({
       json: {
         ok: true,
-        data: APPS.map((a) => ({
+        data: running().map((a) => ({
           module_id: a.id,
           installed: a.version,
           latest: '2.0.0',
-          update_available: true,
+          update_available: !updated.has(a.id),
           pinned: null,
         })),
       },
@@ -43,6 +46,7 @@ async function openMyAppsWithUpdates(page: Page): Promise<{ calls: () => string[
       return;
     }
     const from = APPS.find((a) => a.id === id)!.version;
+    updated.add(id);
     await r.fulfill({ json: { ok: true, module_id: id, from, to: '2.0.0', updated: true } });
   });
   await loggedInSession(page);
@@ -80,10 +84,22 @@ test.describe('«Actualizar todas» in «Mis apps» (hub#2331)', () => {
       await expect(offer).toContainText('2 de 3 apps actualizadas.', { timeout: 15_000 });
       expect(update.calls()).toEqual(['sales', 'inventory', 'kitchen']);
       await expect(page.locator('[data-testid="apps-update-all-result"][data-id="inventory"]')).toContainText(SENTENCE);
-      await expect(page.locator('[data-testid="apps-update-all-result"][data-id="sales"]')).toContainText('1.0.0 → 2.0.0');
+      await expect(page.locator('[data-testid="apps-update-all-result"][data-id="sales"]')).toContainText(
+        '1.0.0 → 2.0.0',
+      );
       await insideWindow(page, 'apps-update-all-retry', width, height);
       await insideWindow(page, 'apps-update-all-finish', width, height);
       await expect(page.getByTestId('apps-update-all-finish')).toHaveText('Recargar ahora');
+      // «My apps» already shows what each app runs now: the updated ones at 2.0.0 with nothing to
+      // update, the failed one still offering its new version.
+      // A row is `.grow-data` in the table and `.rcard` in the cards the phone gets.
+      const row = (name: string) =>
+        page.locator('ok-data-table').first().locator('.grow-data, .rcard, .rrow', { hasText: name }).first();
+      await expect(row('Ventas')).toContainText('2.0.0');
+      await expect(row('Ventas')).not.toContainText('1.0.0');
+      await expect(row('Cocina')).toContainText('2.0.0');
+      await expect(row('Cocina')).not.toContainText('0.9.0');
+      await expect(row('Inventario')).toContainText('1.2.0 → 2.0.0');
       // «My apps» is still there under the result, not pushed off the screen.
       const table = await page.locator('ok-data-table').first().boundingBox();
       expect(table!.height, 'the «My apps» list keeps room on screen').toBeGreaterThan(120);
