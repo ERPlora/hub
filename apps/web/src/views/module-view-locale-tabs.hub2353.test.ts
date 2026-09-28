@@ -37,10 +37,13 @@ const NAV: Record<string, { moduleName: string; labels: [string, string] }> = {
 vi.mock('../lib/module-loader', async () => {
   const { getLocale } = await import('../i18n');
   return {
-    // Like the real one: the language is the one active WHEN the request goes out.
+    // Like the real one: the language is the one active WHEN the request goes out, and the answer
+    // is the menu of the WHOLE hub — the screen keeps only its own app's entries.
     loadMenu: vi.fn(async () => {
       const { moduleName, labels } = NAV[getLocale()] ?? NAV.es;
+      const other = getLocale() === 'en' ? 'Customers' : 'Clientes';
       return [
+        { moduleId: 'customers', moduleName: other, nav: { id: 'list', label: other, icon: 'people' } },
         { moduleId: 'tickets', moduleName, nav: { id: 'all', label: labels[0], icon: 'list' } },
         { moduleId: 'tickets', moduleName, nav: { id: 'sla', label: labels[1], icon: 'time' } },
       ];
