@@ -1105,8 +1105,7 @@ nQIDAQAB
         let db = erplora_db::testutil::fresh_db().await;
         let rt = erplora_runtime::Runtime::with_hub_id(Box::new(db), "hub-cloud-login");
         rt.ensure_system_tables().await.unwrap();
-        let temp =
-            std::env::temp_dir().join(format!("erplora-cloud-login-{}", std::process::id()));
+        let temp = std::env::temp_dir().join(format!("erplora-cloud-login-{}", std::process::id()));
         let cfg = crate::HubConfig {
             demo: false,
             hub_id: "hub-cloud-login".into(),
@@ -1176,7 +1175,11 @@ nQIDAQAB
         // that a raw `\n` in the caller's `alg` cannot split into a second, forged line.
         let (_, _, log) = cloud_login_with_alg(&format!("x\n{FORGED}")).await;
         let lines: Vec<&str> = log.lines().collect();
-        assert_eq!(lines.len(), 1, "one refused sign-in must be one line: {log:?}");
+        assert_eq!(
+            lines.len(),
+            1,
+            "one refused sign-in must be one line: {log:?}"
+        );
         assert!(
             lines[0].contains("cloud login refused: the user token does not verify"),
             "the only line is not the refusal's: {log:?}"
