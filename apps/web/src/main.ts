@@ -42,7 +42,9 @@ import {
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
-import { invokeTauri } from './lib/device';
+import { invokeTauri, listenTauriPlugin } from './lib/device';
+import { sendSystemNotice } from './lib/bridge-transport';
+import { createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
@@ -312,6 +314,19 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
     }),
 });
 
+// Tapping a system notice opens the screen it is about (hub#2305) — the conversation waiting, the
+// diary, the kitchen — instead of the app wherever it was left. Every notice below goes through
+// this door, which sends it with an id of its own and remembers where that id leads; the tap comes
+// back from the notification plugin with the id (Android and iOS). The desktop plugin reports no
+// taps: there the notice still goes out and a click brings the app to the front, as before.
+// Ids start from the clock so a new session never reuses one still sitting in the tray.
+const notices = createNoticeDoor({
+  send: sendSystemNotice,
+  navigate: (path) => router.push(path),
+  firstId: Math.floor(Date.now() / 1000) % 1_000_000_000,
+});
+void listenForNoticeTaps(notices, (cb) => listenTauriPlugin('notification', 'actionPerformed', cb));
+
 // Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
 // `kitchen` because it has to print always, not only with the KDS mounted: a hot kitchen is often
 // paper only. If the printer fails the waiter is NOT blocked —the order is already in the database
@@ -324,24 +339,24 @@ bootPrintComanda(getClient(), {
     const n = comandaFailureNotice(f, i18n.global);
     void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
-  // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
-  // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
-  // en Tauri, el binario/WS en navegador), así que sale igual en escritorio y en Android.
+  // A SYSTEM notice, not a toast: a toast is only seen by whoever is looking at THIS screen, and in
+  // a kitchen the tablet is usually propped up, on another view or locked. It goes through the
+  // installed app (desktop and Android alike); a browser has no system notice.
   //
   // The permission first (hub#1732), and this is the FALLBACK trigger: a KDS screen with no
   // printer never registers as a print host, so the alta above never reaches it. Idempotent —
   // after the first answer this is one storage read.
   //
-  // And a refusal STOPS here instead of falling through to `peripherals.notify()`: that call asks
-  // for the permission itself, with no sentence of ours in front of it (hub#758's scope), so
+  // And a refusal STOPS here instead of falling through to the notice (`sendSystemNotice`): that
+  // call asks for the permission itself, with no sentence of ours in front of it (hub#758's scope), so
   // letting it through would pop Android's bare dialog in the middle of a service. Android drops
   // the notice either way; what the user gets instead is the row on System › your printer, which
   // says the notices are off and offers to ask again.
   // The notice's words come from the catalogue, in the app's language (hub#2171).
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
-  notify: async (title, body) => {
+  notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
-    await getClient().peripherals.notify(title, body);
+    await notices.notify(title, body, path);
   },
 });
 
@@ -349,13 +364,13 @@ bootPrintComanda(getClient(), {
 // not come from a till (WhatsApp, the web, a flow, the customer) gets a system notice too.
 //
 // Same permission gate as the kitchen notice — `askToWarn` asks for it at most once, and a
-// refusal stops here instead of falling through to `peripherals.notify()`, which would pop
-// Android's bare dialog with no sentence of ours in front of it.
+// refusal stops here instead of falling through to the notice (`sendSystemNotice`), which would
+// pop Android's bare dialog with no sentence of ours in front of it.
 bootAppointmentNotices(getClient(), {
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
-  notify: async (title, body) => {
+  notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
-    await getClient().peripherals.notify(title, body);
+    await notices.notify(title, body, path);
   },
 });
 
@@ -365,9 +380,9 @@ bootAppointmentNotices(getClient(), {
 bootBellNotices({
   ownNotice: new Set([APPOINTMENT_NOTICE_MODULE]),
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
-  notify: async (title, body) => {
+  notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
-    await getClient().peripherals.notify(title, body);
+    await notices.notify(title, body, path);
   },
 });
 

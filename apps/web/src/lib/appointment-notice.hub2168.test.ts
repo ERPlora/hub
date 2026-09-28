@@ -11,7 +11,13 @@
 // resolves in the business's clock (appointments#151), and a failure never escapes the listener.
 import { describe, expect, it, vi } from 'vitest';
 
-import { bootAppointmentNotices, onAppointmentEvent } from './appointment-notice';
+import {
+  APPOINTMENT_NOTICE_MODULE,
+  APPOINTMENT_NOTICE_PATH,
+  bootAppointmentNotices,
+  onAppointmentEvent,
+} from './appointment-notice';
+import { isNoticeTarget } from './notice-tap';
 import { CLIENT_INSTANCE } from './client-instance';
 import en from '../i18n/locales/en';
 import es from '../i18n/locales/es';
@@ -57,7 +63,21 @@ describe('a booking that did not come from a till', () => {
     expect(notify).toHaveBeenCalledWith(
       'appointmentNotice.createdFor{"customer":"Laura Gómez"}',
       'Corte y peinado · appointmentNotice.when{"date":"martes, 30 de septiembre de 2026","time":"10:30"} · Ana',
+      APPOINTMENT_NOTICE_PATH,
     );
+  });
+
+  // hub#2305: tapping «New booking» opens the diary, not whatever screen the app was left on.
+  it('leads to the appointments module, for a booking and for a cancellation alike', async () => {
+    const { client } = fakeClient();
+    const notify = vi.fn(async (_title: string, _body: string, _path?: string) => {});
+
+    await onAppointmentEvent(client, 'created', { appointment_id: 'apt-1' }, {}, { notify, t });
+    await onAppointmentEvent(client, 'cancelled', { appointment_id: 'apt-1' }, {}, { notify, t });
+
+    expect(APPOINTMENT_NOTICE_PATH).toBe(`/m/${APPOINTMENT_NOTICE_MODULE}`);
+    expect(isNoticeTarget(APPOINTMENT_NOTICE_PATH)).toBe(true);
+    expect(notify.mock.calls.map((c) => c[2])).toEqual([APPOINTMENT_NOTICE_PATH, APPOINTMENT_NOTICE_PATH]);
   });
 
   it('reads the id under its old name too (`new_id`)', async () => {
@@ -83,6 +103,7 @@ describe('a booking that did not come from a till', () => {
     expect(notify).toHaveBeenCalledWith(
       'appointmentNotice.createdFor{"customer":"Laura Gómez"}',
       'Corte y peinado · Ana',
+      APPOINTMENT_NOTICE_PATH,
     );
   });
 
@@ -147,6 +168,7 @@ describe('a cancellation', () => {
     expect(notify).toHaveBeenCalledWith(
       'appointmentNotice.cancelledFor{"customer":"Laura Gómez"}',
       'Corte y peinado · appointmentNotice.when{"date":"martes, 30 de septiembre de 2026","time":"10:30"} · Ana',
+      APPOINTMENT_NOTICE_PATH,
     );
   });
 
@@ -161,7 +183,7 @@ describe('a cancellation', () => {
     const { client } = fakeClient(async () => []);
     const notify = vi.fn(async (_title: string, _body: string) => {});
     await onAppointmentEvent(client, 'cancelled', { appointment_id: 'apt-1' }, {}, { notify, t });
-    expect(notify).toHaveBeenCalledWith('appointmentNotice.cancelled', '');
+    expect(notify).toHaveBeenCalledWith('appointmentNotice.cancelled', '', APPOINTMENT_NOTICE_PATH);
   });
 });
 
