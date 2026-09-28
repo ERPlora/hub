@@ -33,7 +33,7 @@
 
 import { readdirSync } from 'node:fs';
 
-import { test as base, expect, request } from '@playwright/test';
+import { test as base, expect, request, type Request } from '@playwright/test';
 
 // Re-exported so a spec needs ONE import line, not one for the bench and one for Playwright.
 export { expect, request };
@@ -375,8 +375,19 @@ export const test = base.extend({
     const inFlight = new Set<object>();
     let ownFailures = 0;
     let lastActivity = Date.now();
+    // The main frame's document request that has not committed yet. Only the commit of THIS
+    // request replaces the document: `framenavigated` also fires for a `pushState` of the router,
+    // which replaces nothing.
+    let pendingDocument: Request | undefined;
 
     page.on('request', (req) => {
+      if (
+        req.isNavigationRequest() &&
+        req.serviceWorker() === null &&
+        req.frame() === page.mainFrame()
+      ) {
+        pendingDocument = req;
+      }
       if (!isOwn(req.url()) || !BOOT_RESOURCE_TYPES.has(req.resourceType())) return;
       inFlight.add(req);
       lastActivity = Date.now();
@@ -384,9 +395,24 @@ export const test = base.extend({
     page.on('requestfinished', (req) => {
       if (inFlight.delete(req)) lastActivity = Date.now();
     });
+    // hub#2315: a request the OLD document had in flight when the new one committed gets a
+    // `request` event from Playwright and then nothing, ever — no `requestfinished`, no
+    // `requestfailed`. Waiting for it spent the whole `BOOT_SETTLE_MS`, which aged the storm past
+    // its budget and handed the spec a dead shell. The commit is the moment it stops being ours.
+    page.on('framenavigated', (frame) => {
+      // No document commits before its response is in: until then this is the router moving the
+      // URL of the live one, which can happen while the next document is still on its way.
+      if (frame !== page.mainFrame() || !pendingDocument?.existingResponse()) return;
+      for (const req of inFlight) if (req !== pendingDocument) inFlight.delete(req);
+      pendingDocument = undefined;
+      lastActivity = Date.now();
+    });
     page.on('requestfailed', (req) => {
       if (inFlight.delete(req)) lastActivity = Date.now();
       const errorText = req.failure()?.errorText;
+      // A document request aborted after its response (a download) never commits; any other
+      // failure of it still commits Chromium's error page, which is a new document all the same.
+      if (req === pendingDocument && errorText === 'net::ERR_ABORTED') pendingDocument = undefined;
       if (isBootTransportFailure(req.url(), errorText, baseURL)) {
         firstLossAt ??= Date.now();
         lost.push(errorText as string);
@@ -468,7 +494,19 @@ export const test = base.extend({
         // died.
         const stormAge = firstLossAt === undefined ? 0 : Date.now() - firstLossAt;
         const step = nextBootStep(codes, counted, stormAge);
-        if (step === 'hand-over') break;
+        if (step === 'hand-over') {
+          // Giving up with losses on the page hands the spec a shell that may never mount; the red
+          // that follows has to point here, not at the screen the spec was looking for (hub#2315).
+          if (codes.length > 0) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[bench] BENCH_GAVE_UP ${lost.length} request(s) for the app's own code died on the ` +
+                `wire (${codes.join(', ')}) while loading ${url}, after ${books.length} reload(s) ` +
+                `and a storm ${stormAge} ms old — handing the page over as it is. See hub#2315.`,
+            );
+          }
+          break;
+        }
         const storm = step === 'reload-storm';
         if (!storm) counted += 1;
         // Said out loud, never swallowed: a bench that heals itself in silence is a bench whose
