@@ -69,7 +69,7 @@
               :data-status="r.status"
             >
               <HubIcon
-                :name="r.status === 'failed' ? 'alert-circle-outline' : 'checkmark-circle-outline'"
+                :name="UPDATE_ALL_RESULT_ICON[r.status].icon"
                 :class="r.status === 'failed' ? 'update-all__icon--failed' : 'update-all__icon--ok'"
               />
               <span class="update-all__line">
@@ -1051,6 +1051,13 @@ const offeredUpdates = computed(() =>
 const updateAllRunning = ref(false);
 const updateAllStep = ref<{ name: string; current: number; total: number } | null>(null);
 // What happened to each app of the last batch, in its order. Emptied when the owner closes it.
+// The icon of each result line. Kept as `icon:` entries (not a literal ternary in the template) so
+// the icon registry test sees the names and does not read the status `'failed'` as an icon.
+const UPDATE_ALL_RESULT_ICON: Record<UpdateAllResult['status'], { icon: string }> = {
+  updated: { icon: 'checkmark-circle-outline' },
+  up_to_date: { icon: 'checkmark-circle-outline' },
+  failed: { icon: 'alert-circle-outline' },
+};
 const updateAllResults = ref<UpdateAllResult[]>([]);
 const updateAllUpdatedCount = computed(() => updateAllResults.value.filter((r) => r.status === 'updated').length);
 const updateAllTone = computed(() => {
