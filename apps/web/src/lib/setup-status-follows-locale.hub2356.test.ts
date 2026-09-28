@@ -29,7 +29,10 @@ afterEach(() => {
 describe('the setup document follows the shell language (hub#2356)', () => {
   it('re-reads the query when the language changes', () => {
     const c = client();
-    stop = refreshSetupStatusOnLocaleChange(() => c as never, () => true);
+    stop = refreshSetupStatusOnLocaleChange(
+      () => c as never,
+      () => true,
+    );
 
     changeLocale('en');
 
@@ -39,7 +42,10 @@ describe('the setup document follows the shell language (hub#2356)', () => {
 
   it('does not re-read when the language did not actually change (saving the theme republishes it)', () => {
     const c = client();
-    stop = refreshSetupStatusOnLocaleChange(() => c as never, () => true);
+    stop = refreshSetupStatusOnLocaleChange(
+      () => c as never,
+      () => true,
+    );
 
     changeLocale('en');
     changeLocale('en');
@@ -50,7 +56,10 @@ describe('the setup document follows the shell language (hub#2356)', () => {
 
   it('does not ask the runtime without a session (signing out resets the language too)', () => {
     const c = client();
-    stop = refreshSetupStatusOnLocaleChange(() => c as never, () => false);
+    stop = refreshSetupStatusOnLocaleChange(
+      () => c as never,
+      () => false,
+    );
 
     changeLocale('en');
 
@@ -59,7 +68,10 @@ describe('the setup document follows the shell language (hub#2356)', () => {
 
   it('stops listening once unsubscribed', () => {
     const c = client();
-    refreshSetupStatusOnLocaleChange(() => c as never, () => true)();
+    refreshSetupStatusOnLocaleChange(
+      () => c as never,
+      () => true,
+    )();
 
     changeLocale('en');
 

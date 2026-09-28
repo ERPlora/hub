@@ -190,10 +190,7 @@ export async function refreshSetupStatus(client: ErploraClient): Promise<void> {
  * new preference stored. The same language published again (saving the theme does) is not a change.
  * Returns the unsubscribe.
  */
-export function refreshSetupStatusOnLocaleChange(
-  client: () => ErploraClient,
-  isAuthed: () => boolean,
-): () => void {
+export function refreshSetupStatusOnLocaleChange(client: () => ErploraClient, isAuthed: () => boolean): () => void {
   let last: unknown;
   const onChange = (event: Event) => {
     const locale = (event as CustomEvent<{ locale?: string }>).detail?.locale;
