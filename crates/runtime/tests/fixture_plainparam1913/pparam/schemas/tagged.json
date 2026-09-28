@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pparam.items.tagged params",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "item_id": {
+      "type": "string"
+    },
+    "audit_tag": {
+      "type": "string",
+      "description": "Declared by the module in its schema: not a bind of the SQL, but DECLARED."
+    }
+  }
+}

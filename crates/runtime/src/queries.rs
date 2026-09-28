@@ -229,7 +229,16 @@ pub async fn execute_page(
 
     match &q.def.list {
         // Query simple: SQL tal cual; sin paginación.
+        // hub#1913: same door as the list below, checked on the CALLER's params — an unknown name
+        // used to bind NULL and answer zero rows, indistinguishable from "that record does not exist".
         None => {
+            reject_undeclared_plain_params(
+                name,
+                &q.sql,
+                q.schema.as_ref().map(|s| s.raw.as_ref()),
+                params,
+                ctx,
+            )?;
             let rows = db.query(&q.sql, &bound).await?.rows;
             let total = rows.len() as u64;
             Ok(QueryPage {
@@ -370,6 +379,67 @@ pub(crate) fn reject_undeclared_params(
         }
     }
     Ok(())
+}
+
+/// Refuses the first parameter a PLAIN query (no `list` block) does not know (hub#1913).
+///
+/// The silence it closes is the list's twin (hub#1173), on the reads that fetch ONE record:
+/// `appointments.appointments.get` asked with `{"id": …}` while its SQL binds `:appointment_id`
+/// bound NULL and answered zero rows — "Charge" from an appointment opened an empty ticket for
+/// weeks, with no error on screen or in the logs.
+///
+/// The vocabulary is what the query declares — every bind its SQL references (comments and
+/// literals excluded, same reader as the list) and the `properties` of its JSON Schema — plus the
+/// engine's paging pair (see [`plain_vocabulary`]) and the kernel's system params. Those are tolerated rather than refused because the runtime injects and
+/// OVERWRITES them on every call ([`crate::system_params`]): a caller that sends `hub_id` changes
+/// nothing, and refusing it would only break a harmless call. Their names come from calling
+/// `system_params` itself, never from a copied list that could drift.
+///
+/// Same error and code as the list (`unknown_filter`, 422): one family for "this query does not
+/// declare that parameter", whichever engine serves it.
+pub(crate) fn reject_undeclared_plain_params(
+    query: &str,
+    sql: &str,
+    schema: Option<&serde_json::Value>,
+    params: &Params,
+    ctx: &RequestContext,
+) -> Result<()> {
+    let accepted = plain_vocabulary(sql, schema);
+    let mut sent: Vec<&String> = params.keys().collect();
+    sent.sort();
+    for name in sent {
+        if accepted.iter().any(|a| a == name)
+            || crate::system_params(&Params::new(), ctx).contains_key(name)
+        {
+            continue;
+        }
+        return Err(RuntimeError::UnknownFilter {
+            query: query.to_string(),
+            param: name.clone(),
+            accepted,
+        });
+    }
+    Ok(())
+}
+
+/// What a plain query accepts: the engine's paging pair, its SQL binds and its schema
+/// `properties`, sorted.
+///
+/// `limit`/`offset` are there because the SDK's `queryAll`/`queryAllOptional` read the whole set
+/// of ANY query — list or plain — by sending `offset: 0` (and `limit` when the caller caps it), and
+/// the POS reads three plain `inventory` queries that way (sweep of the 27 modules, 29/09/2026).
+fn plain_vocabulary(sql: &str, schema: Option<&serde_json::Value>) -> Vec<String> {
+    let mut out: Vec<String> = vec!["limit".to_string(), "offset".to_string()];
+    out.extend(all_binds(sql));
+    if let Some(props) = schema
+        .and_then(|raw| raw.get("properties"))
+        .and_then(|p| p.as_object())
+    {
+        out.extend(props.keys().cloned());
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 /// Todos los binds `:name` que un SQL referencia, con las MISMAS reglas de lectura que
