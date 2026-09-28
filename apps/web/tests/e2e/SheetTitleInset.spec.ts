@@ -23,6 +23,8 @@ interface SheetGeometry {
   buttonsStart: number;
   /** Where the body's first line starts, measured from the sheet's left edge. */
   bodyStart: number;
+  /** Whether the title's text is cut (ellipsis): its text is wider than the box it is given. */
+  titleTruncated: boolean;
 }
 
 async function presentSheet(page: Page, mode: 'ios' | 'md', title: string): Promise<SheetGeometry> {
@@ -47,7 +49,8 @@ async function presentSheet(page: Page, mode: 'ios' | 'md', title: string): Prom
 
       const sheet = modal.shadowRoot!.querySelector('.modal-wrapper')!.getBoundingClientRect();
       const titleEl = modal.querySelector('ion-title')!;
-      const text = titleEl.shadowRoot!.querySelector('.toolbar-title')!.getBoundingClientRect();
+      const textEl = titleEl.shadowRoot!.querySelector('.toolbar-title')!;
+      const text = textEl.getBoundingClientRect();
       const buttons = modal.querySelector('ion-buttons')!.getBoundingClientRect();
       const range = document.createRange();
       range.selectNodeContents(modal.querySelector('ion-content p')!);
@@ -57,6 +60,7 @@ async function presentSheet(page: Page, mode: 'ios' | 'md', title: string): Prom
         titleEnd: text.right - sheet.left,
         buttonsStart: buttons.left - sheet.left,
         bodyStart: body.left - sheet.left,
+        titleTruncated: textEl.scrollWidth > textEl.clientWidth,
       };
       await modal.dismiss();
       modal.remove();
@@ -78,6 +82,21 @@ test.describe('a sheet title keeps its side padding (hub#2314)', () => {
     expect(sheet.titleStart, 'the title starts flush against the sheet edge').toBeGreaterThanOrEqual(
       sheet.bodyStart,
     );
+    expect(sheet.titleTruncated, 'a short title is cut by its own padding').toBe(false);
+  });
+
+  // The padding has to stop a long title, not a short one: in ios the title only gets what its side
+  // padding leaves (210px of a 390px phone with Ionic's 90px), so an inset larger than Ionic's would
+  // pass the two checks around it and still cut an ordinary sheet title.
+  test('in ios a short title on a phone is shown whole, not cut by its padding', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loggedInSession(page);
+    await page.goto('/settings');
+    await expect(page.locator('ion-app.hydrated')).toBeAttached();
+
+    const sheet = await presentSheet(page, 'ios', 'Movimientos del bono');
+    expect(sheet.titleTruncated, 'a short title is cut by its own padding').toBe(false);
+    expect(sheet.titleEnd, 'the title text runs under the end buttons').toBeLessThanOrEqual(sheet.buttonsStart);
   });
 
   test('in ios a long centred title stops before the end buttons instead of running under them', async ({
