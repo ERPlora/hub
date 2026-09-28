@@ -152,7 +152,7 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
             None,
             &instructions,
         );
-        let turn = one_turn(st, &auth, &body).await?;
+        let turn = one_turn_retrying(st, &auth, &body).await?;
         // **What gets published is trimmed at both ends** (hub#2286). Some models end a turn that
         // only calls a tool with a bare line break, and a recipe's guard (`text in ["", null]`)
         // cannot trim: it would send the customer a blank WhatsApp. The inside is left alone —
@@ -562,8 +562,69 @@ struct Turn {
     calls: Vec<ToolCall>,
 }
 
+/// How many times ONE call to the model is made before the step gives up on it (hub#2308): the
+/// first, and two more. Enough to ride out a restart of the SaaS or a provider that hiccups; few
+/// enough that a customer whose proxy is really down still gets the recipe's apology in seconds.
+pub const TURN_ATTEMPTS: usize = 3;
+
+/// The pause before each retry, one per retry — short, and growing, the shape every SDK of the
+/// market uses (OpenAI and Anthropic back off from half a second, two retries by default). Their
+/// sum stays far inside [`STEP_TIMEOUT`], which still bounds the whole step whatever happens here.
+const RETRY_PAUSES: [Duration; TURN_ATTEMPTS - 1] =
+    [Duration::from_secs(1), Duration::from_secs(3)];
+
+/// Why one call to the proxy did not bring a turn back, sorted by whether waiting can fix it.
+#[derive(Debug)]
+enum TurnFailure {
+    /// The proxy was unreachable, answered `5xx`/`408`/`429`, the stream broke, or the SaaS
+    /// streamed an error it did not mark as final (an overloaded provider looks like this).
+    Transient(String),
+    /// The same call would get the same answer a second later: the quota is spent, the
+    /// conversation is too big, the credential or the body is refused.
+    Final(String),
+}
+
+/// **One call to the model, asked again while the failure is one that passes** (hub#2308).
+///
+/// 🔴 What is repeated is the CALL, never the business. The tools the model asked for run in
+/// [`drive`] AFTER a turn comes back, and a failed call brought nothing back — so a retry sends the
+/// same conversation, with every tool result already in it, and no command runs twice. ADR-0283 §1
+/// (the kernel never re-runs a business command on its own) is untouched, which is why this is not
+/// a `retry` a document can ask for: it is the hub's own network discipline towards the proxy.
+///
+/// It also costs the business nothing: the SaaS meters a turn only when it completes
+/// (`orchestrator._record_turn`), so a call that failed was never counted against the quota.
+async fn one_turn_retrying(
+    st: &AppState,
+    auth: &cloud_client::Auth,
+    body: &Value,
+) -> Result<Turn, String> {
+    let mut pauses = RETRY_PAUSES.iter();
+    loop {
+        match one_turn(st, auth, body).await {
+            Ok(turn) => return Ok(turn),
+            Err(TurnFailure::Final(why)) => return Err(why),
+            Err(TurnFailure::Transient(why)) => match pauses.next() {
+                Some(pause) => {
+                    tracing::warn!(reason = %why, retry_in_ms = pause.as_millis() as u64, "agent turn failed for a moment; asking the proxy again");
+                    tokio::time::sleep(*pause).await;
+                }
+                None => {
+                    return Err(format!(
+                        "{why} (asked {TURN_ATTEMPTS} times, a few seconds apart, before giving up)"
+                    ))
+                }
+            },
+        }
+    }
+}
+
 /// POSTs one turn and aggregates its SSE. No lock is held for the length of this call.
-async fn one_turn(st: &AppState, auth: &cloud_client::Auth, body: &Value) -> Result<Turn, String> {
+async fn one_turn(
+    st: &AppState,
+    auth: &cloud_client::Auth,
+    body: &Value,
+) -> Result<Turn, TurnFailure> {
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let req = cloud.assistant_chat_stream(auth);
     let mut builder = st.http.post(&req.url).timeout(TURN_TIMEOUT).json(body);
@@ -571,31 +632,66 @@ async fn one_turn(st: &AppState, auth: &cloud_client::Auth, body: &Value) -> Res
         builder = builder.header(*k, v);
     }
 
-    let response = builder
-        .send()
-        .await
-        .and_then(|r| r.error_for_status())
-        .map_err(|e| {
-            format!(
-                "{ERR_UPSTREAM}: the assistant proxy did not answer: {}",
-                crate::cloud_proxy::cloud_unreachable(&e.to_string())
-            )
-        })?;
+    let unreachable = |e: &reqwest::Error| {
+        format!(
+            "{ERR_UPSTREAM}: the assistant proxy did not answer: {}",
+            crate::cloud_proxy::cloud_unreachable(&e.to_string())
+        )
+    };
+    let response = builder.send().await.map_err(|e| {
+        // A request this hub could not even build is a bug here, not a moment of network.
+        if e.is_builder() {
+            TurnFailure::Final(unreachable(&e))
+        } else {
+            TurnFailure::Transient(unreachable(&e))
+        }
+    })?;
+    let status = response.status();
+    if !status.is_success() {
+        let why =
+            format!("{ERR_UPSTREAM}: the assistant proxy refused the turn with HTTP {status}");
+        return Err(
+            if status.is_server_error()
+                || status == reqwest::StatusCode::REQUEST_TIMEOUT
+                || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+            {
+                TurnFailure::Transient(why)
+            } else {
+                TurnFailure::Final(why)
+            },
+        );
+    }
 
     let mut aggregator = Aggregator::default();
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| {
-            format!(
+            TurnFailure::Transient(format!(
                 "{ERR_UPSTREAM}: the stream broke mid-turn: {}",
                 crate::cloud_proxy::cloud_unreachable(&e.to_string())
-            )
+            ))
         })?;
-        if let Some(error) = aggregator.push(&String::from_utf8_lossy(&chunk)) {
-            return Err(format!("{ERR_UPSTREAM}: {error}"));
+        if let Some(failure) = aggregator.push(&String::from_utf8_lossy(&chunk)) {
+            return Err(failure);
         }
     }
     aggregator.finish()
+}
+
+/// Is an `error` event the SaaS streamed one that waiting cannot fix?
+///
+/// Read off the flags `proxy_chat_stream` already sends, never off the sentence: `code:
+/// "quota_exceeded"` (saas#1540), the older `upgrade_required` the same refusal still carries, and
+/// `payload_too_large`. Since saas#2390 every error frame also says `retriable`, and a literal
+/// `false` is final whatever its code (a missing credential, a provider turned off, an unknown
+/// model): reading the flag and not a list of codes means a new code needs no hub release.
+/// Anything else — `true`, or an older SaaS without the field — is a moment: asking again is
+/// bounded and costs no quota.
+fn is_final_stream_error(event: &Value) -> bool {
+    event.get("retriable").and_then(Value::as_bool) == Some(false)
+        || event.get("code").and_then(Value::as_str) == Some("quota_exceeded")
+        || event.get("upgrade_required").and_then(Value::as_bool) == Some(true)
+        || event.get("payload_too_large").and_then(Value::as_bool) == Some(true)
 }
 
 /// Turns a byte stream of SSE into one [`Turn`].
@@ -617,18 +713,18 @@ struct Aggregator {
     /// Insertion-ordered, because the order the model asked for calls is the order they run.
     order: Vec<String>,
     calls: HashMap<String, ToolCall>,
-    error: Option<String>,
+    error: Option<TurnFailure>,
 }
 
 impl Aggregator {
-    /// Feeds a network chunk. Returns `Some(error)` if the stream reported one.
-    fn push(&mut self, chunk: &str) -> Option<String> {
+    /// Feeds a network chunk. Returns the failure if the stream reported one.
+    fn push(&mut self, chunk: &str) -> Option<TurnFailure> {
         self.buffer.push_str(chunk);
         while let Some(idx) = self.buffer.find('\n') {
             let line: String = self.buffer.drain(..=idx).collect();
             self.consume(line.trim_end_matches(['\r', '\n']));
         }
-        self.error.clone()
+        self.error.take()
     }
 
     fn consume(&mut self, line: &str) {
@@ -677,13 +773,18 @@ impl Aggregator {
                 }
             }
             Some("error") => {
-                self.error = Some(
+                let why = format!(
+                    "{ERR_UPSTREAM}: {}",
                     event
                         .get("error")
                         .and_then(Value::as_str)
                         .unwrap_or("the assistant reported an error")
-                        .to_string(),
                 );
+                self.error = Some(if is_final_stream_error(&event) {
+                    TurnFailure::Final(why)
+                } else {
+                    TurnFailure::Transient(why)
+                });
             }
             _ => {}
         }
@@ -691,7 +792,7 @@ impl Aggregator {
 
     /// Closes the stream, translating whatever is left in the buffer (a body that ended without a
     /// trailing newline still carries a complete event).
-    fn finish(mut self) -> Result<Turn, String> {
+    fn finish(mut self) -> Result<Turn, TurnFailure> {
         if !self.buffer.is_empty() {
             let rest = std::mem::take(&mut self.buffer);
             self.consume(rest.trim());
@@ -987,11 +1088,46 @@ mod tests {
     #[test]
     fn an_error_event_fails_the_turn_instead_of_answering_nothing() {
         let mut agg = Aggregator::default();
-        agg.push("data: {\"type\":\"error\",\"error\":\"quota exceeded\"}\n\n");
-        let err = agg
-            .finish()
-            .expect_err("an error must not read as a silent answer");
-        assert!(err.contains("quota exceeded"), "{err}");
+        let failure = agg
+            .push("data: {\"type\":\"error\",\"error\":\"quota exceeded\"}\n\n")
+            .expect("an error must not read as a silent answer");
+        let TurnFailure::Transient(err) = failure else {
+            panic!("an error without a final flag is a moment, not a verdict: {failure:?}")
+        };
+        assert!(err.starts_with(ERR_UPSTREAM), "{err}");
+        assert!(
+            err.contains("quota exceeded"),
+            "the provider's own words are kept: {err}"
+        );
+    }
+
+    /// hub#2319: `retriable: false` survives the browser's SSE translation and makes the failure
+    /// final; only a literal `false` does — `true`, a string or no field at all stay a moment.
+    #[test]
+    fn only_a_literal_retriable_false_makes_an_error_final() {
+        let frame = |retriable: Value| {
+            let mut agg = Aggregator::default();
+            let mut event = json!({
+                "type": "error",
+                "error": "openai: model gpt-9 does not exist",
+                "code": "provider_rejected"
+            });
+            if !retriable.is_null() {
+                event["retriable"] = retriable;
+            }
+            agg.push(&format!("data: {event}\n\n"))
+                .expect("an error must not read as a silent answer")
+        };
+        let TurnFailure::Final(err) = frame(json!(false)) else {
+            panic!("`retriable: false` is a verdict")
+        };
+        assert!(err.contains("gpt-9 does not exist"), "{err}");
+        for moment in [json!(true), json!("false"), json!(0), Value::Null] {
+            assert!(
+                matches!(frame(moment.clone()), TurnFailure::Transient(_)),
+                "`retriable: {moment}` is not a verdict"
+            );
+        }
     }
 
     /// The briefing has to contradict the chat prompt's "you are in a drawer next to someone
