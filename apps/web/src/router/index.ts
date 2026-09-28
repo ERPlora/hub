@@ -192,6 +192,10 @@ router.beforeEach(authGate);
  * no ladder (a reload lands on the identical code) but it does get the message, because a person
  * staring at nothing is the defect, not the reason behind it.
  */
+// hub#2312 — sections whose file failed to arrive in this document (see rung 4 in
+// `./view-load-recovery`). Module scope = document scope, exactly like the browser's failed mark.
+const sectionsFailedInApp = new Set<string>();
+
 router.onError((error, to, from) => {
   // An empty `matched` is START_LOCATION: the document has not painted any route yet, which is the
   // only case where aborting the navigation leaves the person looking at nothing.
@@ -204,7 +208,15 @@ router.onError((error, to, from) => {
     // already has, differing at most in its fragment, is a fragment navigation per the HTML spec —
     // nothing reloads. The e2e that found this lands on `/settings#data`: measured in Chromium,
     // `assign('/settings#data')` = 1 document load (still blank), `reload()` = 2.
-    { storage: browserRecoveryStorage(), reload: () => window.location.reload() },
+    {
+      storage: browserRecoveryStorage(),
+      reload: () => window.location.reload(),
+      // Here the tab is still on `from`, so assigning `to` IS a document navigation — and the base
+      // path comes from the router, not from a hand-built string.
+      reopen: (toPath) => window.location.assign(router.resolve(toPath).href),
+      failedInApp: sectionsFailedInApp,
+      isOnline: () => window.navigator.onLine !== false,
+    },
   );
   // Reloaded once already (or the mark cannot be stored, which would loop): say it in the DOM,
   // because there is no Vue, no Ionic and no toast to say it with.
@@ -233,7 +245,7 @@ router.onError((error, to, from) => {
     // connection dropped, which here is a lie that sends them to reboot a working router.
     else void toastError(i18n.global.t('viewLoad.brokenToast'));
   }
-  // A navigation that fails without a trace is a failure nobody sees: all four rungs report it.
+  // A navigation that fails without a trace is a failure nobody sees: every rung reports it.
   // `reportClientError` posts with `keepalive`, so it survives the reload of the first rung.
   reportClientError({
     message: `router.onError[${outcome}] ${error instanceof Error ? error.message : String(error)}`,

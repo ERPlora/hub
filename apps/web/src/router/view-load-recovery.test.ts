@@ -33,6 +33,11 @@ function fakeStorage(seed: Record<string, string> = {}) {
   };
 }
 
+/** A fresh, empty in-app retry memory (hub#2312) for the cases that are not about it. */
+function retryIo() {
+  return { reopen: vi.fn(), failedInApp: new Set<string>(), isOnline: () => true };
+}
+
 /** The exact error Chromium hands the router when a view chunk dies mid-fetch. */
 const CHUNK_ERROR = new TypeError(
   'Failed to fetch dynamically imported module: http://localhost:5173/src/views/SettingsPage.vue',
@@ -69,7 +74,7 @@ describe('recoverFromViewLoadError · first navigation (the blank screen)', () =
     const outcome = recoverFromViewLoadError(
       CHUNK_ERROR,
       { toPath: '/settings#data', isInitial: true },
-      { storage, reload },
+      { storage, reload, ...retryIo() },
     );
 
     expect(outcome).toBe('reload');
@@ -84,7 +89,7 @@ describe('recoverFromViewLoadError · first navigation (the blank screen)', () =
     const outcome = recoverFromViewLoadError(
       CHUNK_ERROR,
       { toPath: '/settings#data', isInitial: true },
-      { storage, reload },
+      { storage, reload, ...retryIo() },
     );
 
     expect(outcome).toBe('exhausted');
@@ -99,7 +104,7 @@ describe('recoverFromViewLoadError · first navigation (the blank screen)', () =
     const outcome = recoverFromViewLoadError(
       CHUNK_ERROR,
       { toPath: '/settings#data', isInitial: true },
-      { storage, reload },
+      { storage, reload, ...retryIo() },
     );
 
     expect(outcome).toBe('reload');
@@ -124,7 +129,11 @@ describe('recoverFromViewLoadError · first navigation (the blank screen)', () =
     const reload = vi.fn();
 
     expect(
-      recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings', isInitial: true }, { storage: denied, reload }),
+      recoverFromViewLoadError(
+        CHUNK_ERROR,
+        { toPath: '/settings', isInitial: true },
+        { storage: denied, reload, ...retryIo() },
+      ),
     ).toBe('exhausted');
     expect(reload).not.toHaveBeenCalled();
   });
@@ -138,7 +147,7 @@ describe('recoverFromViewLoadError · navigating inside the app', () => {
     const outcome = recoverFromViewLoadError(
       CHUNK_ERROR,
       { toPath: '/settings#data', isInitial: false },
-      { storage, reload },
+      { storage, reload, ...retryIo() },
     );
 
     // The router already aborted the navigation, so nothing goes blank — but the tap did nothing,
@@ -148,13 +157,102 @@ describe('recoverFromViewLoadError · navigating inside the app', () => {
   });
 });
 
+describe('recoverFromViewLoadError · retrying a section that failed with the app open (hub#2312)', () => {
+  // The browser remembers a module URL that failed to fetch for as long as the DOCUMENT lives, so
+  // tapping the section again re-runs the same `import()` and fails without touching the network —
+  // measured in Chromium: second `import()` rejects with 0 new requests, a document navigation
+  // fetches it fine. The toast says "try again"; the retry has to be the one that can work.
+  function inApp(overrides: Partial<Parameters<typeof recoverFromViewLoadError>[2]> = {}) {
+    return {
+      storage: fakeStorage(),
+      reload: vi.fn(),
+      reopen: vi.fn(),
+      failedInApp: new Set<string>(),
+      isOnline: () => true,
+      ...overrides,
+    };
+  }
+
+  it('the first failure keeps the person where they are and only remembers the section', () => {
+    const io = inApp();
+
+    const outcome = recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings#data', isInitial: false }, io);
+
+    expect(outcome).toBe('notify');
+    expect(io.reopen).not.toHaveBeenCalled();
+    expect(io.reload).not.toHaveBeenCalled();
+  });
+
+  it('asking for the same section again opens it in a fresh document', () => {
+    const io = inApp();
+    recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings#data', isInitial: false }, io);
+
+    const outcome = recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings#data', isInitial: false }, io);
+
+    expect(outcome).toBe('reopen');
+    expect(io.reopen).toHaveBeenCalledTimes(1);
+    expect(io.reopen).toHaveBeenCalledWith('/settings#data');
+    expect(io.reload).not.toHaveBeenCalled();
+  });
+
+  it('counts the same section reached with another fragment or query as the same retry', () => {
+    // The menu opens `/settings`; the failed tap may have been a deep link to `/settings#data`.
+    // Both need the very same file, which is what the browser has marked as failed.
+    const io = inApp();
+    recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings#data', isInitial: false }, io);
+
+    const outcome = recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings?tab=1', isInitial: false }, io);
+
+    expect(outcome).toBe('reopen');
+    expect(io.reopen).toHaveBeenCalledWith('/settings?tab=1');
+  });
+
+  it('a DIFFERENT section failing for the first time still only notifies', () => {
+    // The person did not ask to retry this one: throwing away the screen they are on would lose
+    // whatever they had half-typed, for a section they never tried before.
+    const io = inApp();
+    recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings', isInitial: false }, io);
+
+    const outcome = recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/employees', isInitial: false }, io);
+
+    expect(outcome).toBe('notify');
+    expect(io.reopen).not.toHaveBeenCalled();
+  });
+
+  it('does not leave the app while the device says it is offline', () => {
+    // A document navigation without network is the browser's own error page: in the installed app
+    // or a full-screen till there is no way back from it. Staying put and saying so is better.
+    const io = inApp({ isOnline: () => false });
+    recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings', isInitial: false }, io);
+
+    const outcome = recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings', isInitial: false }, io);
+
+    expect(outcome).toBe('notify');
+    expect(io.reopen).not.toHaveBeenCalled();
+  });
+
+  it('a failure that is not a missing file is never remembered as one', () => {
+    const io = inApp();
+    recoverFromViewLoadError(new Error('boom'), { toPath: '/settings', isInitial: false }, io);
+
+    const outcome = recoverFromViewLoadError(CHUNK_ERROR, { toPath: '/settings', isInitial: false }, io);
+
+    expect(outcome).toBe('notify');
+    expect(io.reopen).not.toHaveBeenCalled();
+  });
+});
+
 describe('recoverFromViewLoadError · anything else', () => {
   it('leaves unrelated navigation errors alone for the caller to report', () => {
     const storage = fakeStorage();
     const reload = vi.fn();
 
     expect(
-      recoverFromViewLoadError(new Error('boom'), { toPath: '/dashboard', isInitial: true }, { storage, reload }),
+      recoverFromViewLoadError(
+        new Error('boom'),
+        { toPath: '/dashboard', isInitial: true },
+        { storage, reload, ...retryIo() },
+      ),
     ).toBe('ignored');
     expect(reload).not.toHaveBeenCalled();
   });

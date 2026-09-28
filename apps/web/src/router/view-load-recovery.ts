@@ -22,7 +22,13 @@
  *   2. it failed again after that reload (or the mark cannot be stored) → the caller paints a
  *      visible message; never a blank page;
  *   3. navigating inside an app that is already open → the router simply aborts, so the person
- *      keeps the screen (and the half-typed order) they were on; the caller says it out loud.
+ *      keeps the screen (and the half-typed order) they were on; the caller says it out loud;
+ *   4. the person asks for THAT section again (hub#2312) → open it in a fresh document. The toast
+ *      of rung 3 says "try again", and the in-place retry is the one that cannot work: the same
+ *      `import()` rejects with no request at all. Remembered in memory on purpose — the browser's
+ *      failed mark lives exactly as long as this document, and so does ours. Not while the device
+ *      says it is offline: that document navigation would be the browser's own error page, with no
+ *      way back to the till.
  */
 
 /** The slice of `Storage` this module needs. */
@@ -62,6 +68,8 @@ export type ViewLoadOutcome =
   | 'exhausted'
   /** The app is up and stays where it is; tell the person the screen would not open. */
   | 'notify'
+  /** The person asked again for a section that already failed here: opening it in a new document. */
+  | 'reopen'
   /** Not a fetch failure — the caller reports it as the bug it is. */
   | 'ignored';
 
@@ -85,6 +93,11 @@ function markPersisted(storage: RecoveryStorage, path: string): boolean {
   }
 }
 
+/** `/settings?tab=1#data` → `/settings`: every way of reaching a section needs the same file. */
+function sectionOf(path: string): string {
+  return path.split(/[?#]/, 1)[0];
+}
+
 /** Forgets the mark once a navigation lands, so a later hiccup can recover too. Never throws. */
 export function clearViewLoadRecovery(storage: RecoveryStorage): void {
   try {
@@ -103,10 +116,26 @@ export function clearViewLoadRecovery(storage: RecoveryStorage): void {
 export function recoverFromViewLoadError(
   error: unknown,
   nav: { toPath: string; isInitial: boolean },
-  io: { storage: RecoveryStorage; reload: () => void },
+  io: {
+    storage: RecoveryStorage;
+    reload: () => void;
+    /** Document navigation to `toPath` (rung 4). */
+    reopen: (toPath: string) => void;
+    /** Sections whose file failed to arrive in THIS document, by path without query or fragment. */
+    failedInApp: Set<string>;
+    isOnline: () => boolean;
+  },
 ): ViewLoadOutcome {
   if (!isViewLoadError(error)) return 'ignored';
-  if (!nav.isInitial) return 'notify';
+  if (!nav.isInitial) {
+    const section = sectionOf(nav.toPath);
+    if (!io.failedInApp.has(section) || !io.isOnline()) {
+      io.failedInApp.add(section);
+      return 'notify';
+    }
+    io.reopen(nav.toPath);
+    return 'reopen';
+  }
   if (readMark(io.storage) === nav.toPath) return 'exhausted';
   if (!markPersisted(io.storage, nav.toPath)) return 'exhausted';
   io.reload();
