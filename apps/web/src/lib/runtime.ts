@@ -277,6 +277,24 @@ async function runtimeFetch(input: string, init?: RequestInit): Promise<Response
 }
 
 /**
+ * The `fetch` of the MODULE transport (hub#2281): a 401 feeds the same central reaction as the
+ * shell's own calls, so a module screen that meets a dead session leads to the login instead of
+ * showing a refusal and nothing else.
+ *
+ * Unlike [`runtimeFetch`] it never throws: the response goes back to the SDK, which reads the
+ * refusal as `unauthorized`. A throw here would reach the SDK as a transport failure, and on a
+ * command that is the «we can't tell whether it completed» verdict (hub#906) — false for a 401,
+ * which the runtime answers before anything runs. The global `fetch` is read on every call, not
+ * captured once, like everywhere else in this file.
+ */
+function moduleTransportFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, init).then((res) => {
+    if (res.status === 401) void handleRuntime401();
+    return res;
+  });
+}
+
+/**
  * **The shell's credential for the event channel** (hub#504). The hub pushes nothing to a
  * connection that has not presented an API key of that hub with read access — including to us.
  *
@@ -340,6 +358,8 @@ export function getClient(): ErploraClient {
     const transport = new HttpWsTransport({
       baseUrl: RUNTIME_URL,
       headers: runtimeHeaders,
+      // hub#2281: a module's 401 goes through the same dead-session reaction as the shell's own.
+      fetchImpl: moduleTransportFetch,
       // hub#504: without this the socket connects and is told nothing — the live dashboard, the
       // auto-print on a sale, the kitchen docket and the install progress all go silent.
       streamCredential: fetchStreamTicket,
