@@ -222,7 +222,7 @@ if [ -z "$record_at" ]; then
 elif [ -z "$playwright_at" ] || [ "$record_at" -le "$playwright_at" ] || [ -z "$upload_at" ] || [ "$record_at" -ge "$upload_at" ]; then
     bad "la versión se escribe DESPUÉS de Playwright y ANTES de subir el artefacto (hub#2304)" \
         "orden encontrado — playwright: ${playwright_at:-?}, versión: $record_at, subida: ${upload_at:-?}"
-elif grep -v '^[[:space:]]*#' <<<"$record_step" | grep -qE '^[[:space:]]*if:'; then
+elif grep -qE '^[[:space:]]*if:' <<<"$record_step"; then  # a commented `# if:` does not match
     bad "la versión se anota en TODA regeneración, sin condición (hub#2304)" \
         "el paso que escribe \`$pin_rel\` lleva un \`if:\`: puede saltarse y el artefacto saldría con PNG nuevos y sin su OutfitKit"
 elif ! grep -qF "$pin_rel" <<<"$upload_block"; then
