@@ -65,12 +65,13 @@ where
 /// The default field format of `tracing-subscriber`, with one promise added: **one event is one
 /// line** (hub#2300).
 ///
-/// `tracing` escapes ESC inside a value but never `\n`, and every reader of this log — the edge's
-/// ban, the Loki alerts, a person investigating — splits it by lines. So any value printed with
-/// `%`, a message built with `format!`-style arguments, or an error and its sources, that carried
-/// a stranger's `\n` (an unknown JWT `alg`, a file name inside an uploaded blueprint…) ended the
-/// hub's line and started one of the stranger's choosing: `event=auth_failed client=<another
-/// shop>`. The per-site recipe (`error = ?e.to_string()`, hub#2294/#2297) closes one door; this
+/// `tracing` never escapes `\n`, and escapes ESC only in the message and in errors — a `%` field
+/// goes out with a stranger's REAL colour codes (measured in PRE, infra#345). Every reader of this
+/// log — the edge's ban, the Loki alerts, a person investigating — splits it by lines and anchors
+/// on those colours. So any value printed with `%`, a message built with `format!`-style
+/// arguments, or an error and its sources, that carried a stranger's `\n` or ESC (an unknown JWT
+/// `alg`, a file name inside an uploaded blueprint…) ended the hub's line and started one of the
+/// stranger's choosing, or painted a fake field: `event=auth_failed client=<another shop>`. The per-site recipe (`error = ?e.to_string()`, hub#2294/#2297) closes one door; this
 /// closes the pattern, including the call sites nobody has written yet.
 ///
 /// Every control character a value carries is written as its escape (`\n`, `\r`, `\t`,
@@ -209,8 +210,8 @@ mod tests {
 
     #[test]
     fn hub2300_a_displayed_field_cannot_forge_a_log_line() {
-        // `%` is Display: tracing escapes ESC in it, never `\n`, so a stranger's text used to
-        // end the line and start one that read like a failed PIN.
+        // `%` is Display: tracing escapes neither `\n` nor ESC in it, so a stranger's text used
+        // to end the line and start one that read like a failed PIN.
         let log = captured(|| {
             let error = format!("x\n{FORGED}");
             tracing::warn!(%error, "refused");
@@ -372,5 +373,29 @@ mod tests {
             log.contains("\x1b[3mevent\x1b[0m\x1b[2m=\x1b[0mauth_failed"),
             "{log:?}"
         );
+    }
+
+    #[test]
+    fn hub2300_a_displayed_field_cannot_forge_the_colours_the_edge_trusts() {
+        // Measured in PRE (infra#345): tracing sanitises ESC in the message and in errors, not
+        // in a `%` field, so a stranger's REAL escape codes reached the log and the alert counted
+        // the forged `event=auth_failed` as a genuine one — no newline needed.
+        const COLOURED: &str = "\x1b[3mevent\x1b[0m\x1b[2m=\x1b[0mauth_failed";
+        let _anchor = captured(|| {});
+        let sink = CapturedLog::default();
+        let subscriber = {
+            use tracing_subscriber::layer::SubscriberExt;
+            tracing_subscriber::registry().with(console_layer(sink.clone()).with_ansi(true))
+        };
+        tracing::subscriber::with_default(subscriber, || {
+            let error = format!("x {COLOURED} reason=pin client=203.0.113.7 hub=h");
+            tracing::warn!(%error, "refused");
+        });
+        let log = sink.text();
+        assert!(
+            !log.contains(COLOURED),
+            "a stranger's colours reached the log: {log:?}"
+        );
+        assert!(log.contains("\\u{1b}[3mevent"), "{log:?}");
     }
 }
