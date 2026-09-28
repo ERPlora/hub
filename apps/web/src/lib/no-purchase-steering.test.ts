@@ -135,6 +135,10 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     { what: "the SaaS's Google sign-in, which hands straight back to this hub (ADR-0157 §8)", reaches: /\bgoogleLoginUrl\(/ },
     { what: 'another hub, validated as one before leaving (deep links)', reaches: /\brequireHubUrl\(|\bhubDeepLink\(/ },
     { what: 'a file this till just generated (a download)', reaches: /\bURL\.createObjectURL\(/ },
+    // The shell's own router builds the address — its base and one of its routes — so the document
+    // stays on this hub; it only reloads a section whose file failed (hub#2312). A SaaS address
+    // handed to it is still caught below, by the hand-written-address rule.
+    { what: 'a route of this same hub, built by its own router (hub#2312)', reaches: /\brouter\.resolve\(/ },
   ];
 
   /**
@@ -344,6 +348,11 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     ['R7 · the panel without its trailing slash', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';\nawait openExternal(`${config.cloudApiUrl}/dashboard`);"],
     ['the account door back on the bare panel page', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/';\nawait openExternal(await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a'));"],
     ['a checkout nobody gates (hub#1910)', 'components/X.vue', 'const url = await startAssistantCheckout(t);\nif (url) window.location.assign(url);'],
+    [
+      'the router asked to build a SaaS address (hub#2312)',
+      'router/index.ts',
+      "window.location.assign(router.resolve('https://erplora.com/checkout/').href);",
+    ],
     ['an anchor built in code', 'lib/x.ts', "const a = document.createElement('a');\na.href = 'https://erplora.com/billing/';\na.click();"],
     // Second review of hub#1907: the two below left the rule green. The way out of a SHARED paid
     // door is written once, in its module, so the button that calls it was never looked at.
@@ -364,6 +373,11 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
   // …and its negative half: the doors that ARE fine stay fine, or the rule would be red for ever.
   it.each([
     ['a page of this same hub', 'lib/x.ts', "window.location.assign('/login');"],
+    [
+      'a route of this same hub, built by its own router (hub#2312)',
+      'router/index.ts',
+      'reopen: (toPath) => window.location.assign(router.resolve(toPath).href),',
+    ],
     ['the account surface', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';\nconst plain = `${base}${CLOUD_ACCOUNT_PATH}`;\nawait openExternal(ok ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a') : plain);"],
     ['the installer', 'views/SystemPage.vue', 'await openExternal(appDownloadUrl(os.platform));'],
     ['a gated plan door', 'App.vue', "x = planUpgradeIsOfferable(d);\nawait openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'p'));"],
