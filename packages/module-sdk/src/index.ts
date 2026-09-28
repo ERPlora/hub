@@ -589,6 +589,41 @@ export function commandVerdictMessage(locale = 'es'): string {
   return locale.toLowerCase().startsWith('en') ? COMMAND_VERDICT_EN : COMMAND_VERDICT_ES;
 }
 
+// ── hub#2288: a READ the hub never answered ──────────────────────────────────────────────────
+//
+// A query that failed did nothing, so there is no verdict to give — only what happened and what
+// to do: the screen could not load its data, and trying again is safe. Localized here for the same
+// reason as the command verdict: modules and the list controller paint `message` verbatim.
+const READ_UNREACHABLE_EN =
+  'The data could not be loaded because the hub is not responding. Check the connection and try again.';
+const READ_UNREACHABLE_ES =
+  'No se han podido cargar los datos porque el hub no responde. Comprueba la conexión e inténtalo de nuevo.';
+
+/**
+ * The error a read gets when its transport failed: {@link SERVER_UNAVAILABLE} as before (hub#782),
+ * the sentence a person may read as `message`, and the transport's technical line on `cause`.
+ * Anything else — a domain refusal, `module_not_installed` — passes through untouched.
+ */
+function unreachableRead(e: unknown, locale: string): unknown {
+  if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) return e;
+  const sentence = locale.toLowerCase().startsWith('en') ? READ_UNREACHABLE_EN : READ_UNREACHABLE_ES;
+  const read = new ErploraError(SERVER_UNAVAILABLE, sentence);
+  read.cause = e;
+  return read;
+}
+
+/**
+ * A `GET` on the core's REST surface is a read like any query — the flow gallery and the templates
+ * tab load through it — so a hub that never answered it gets the same sentence. A write is left as
+ * it arrives: it may have committed, and «could not be loaded» would be a lie.
+ */
+function coreRead<R>(request: Promise<R>, method: string, locale: string): Promise<R> {
+  if (method !== 'GET') return request;
+  return request.catch((e: unknown) => {
+    throw unreachableRead(e, locale);
+  });
+}
+
 /**
  * A command the hub never answered (hub#906). `code` stays {@link SERVER_UNAVAILABLE} — the
  * contract modules already key on since hub#782 — and the verdict travels as the **data field**
@@ -3039,7 +3074,7 @@ export class ErploraClient {
       );
     }
     return (this.flowsApi ??= new FlowsApi(
-      (req) => transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      (req) => coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
       moduleId,
     ));
   }
@@ -3071,7 +3106,7 @@ export class ErploraClient {
       );
     }
     return (this.eventsApi ??= new EventsApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3118,7 +3153,7 @@ export class ErploraClient {
       );
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3146,7 +3181,7 @@ export class ErploraClient {
     const transport = this.transport as Partial<CoreBlobTransport>;
     return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
       typeof transport.coreBlobRequest === 'function'
-        ? transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId })
+        ? coreRead(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
         : Promise.reject(
             new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
           ),
@@ -3179,7 +3214,7 @@ export class ErploraClient {
       );
     }
     return (this.certificateApi ??= new CertificateApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3205,7 +3240,7 @@ export class ErploraClient {
       );
     }
     return (this.printApi ??= new PrintApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3215,7 +3250,11 @@ export class ErploraClient {
    * `list` a su query. Para paginar de verdad (total/página) usa `queryPage`.
    */
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T> {
-    return this.transport.query(name, params).then(unwrapPage) as Promise<T>;
+    return this.transport.query(name, params).then(unwrapPage, (e: unknown) => {
+      // hub#2288: a read the hub never answered is told in the user's language, not the
+      // transport's technical line.
+      throw unreachableRead(e, this.locale);
+    }) as Promise<T>;
   }
   /**
    * Query a una integración **OPCIONAL** (ADR-0127): el módulo dueño puede no estar instalado en
@@ -3250,8 +3289,13 @@ export class ErploraClient {
    * `{rows,total,limit,offset}`. Úsala con `createListController` para el `<data-table>`.
    */
   async queryPage<T = unknown>(name: string, params: ListParams = {}): Promise<Page<T>> {
-    const data = (await this.transport.query(name, buildListParams(params))) as Page<T>;
-    return data;
+    try {
+      return (await this.transport.query(name, buildListParams(params))) as Page<T>;
+    } catch (e) {
+      // hub#2288: same sentence as `query()`. `queryAll`/`queryAllOptional` and the list
+      // controller read through here, so they get it without a wrap of their own.
+      throw unreachableRead(e, this.locale);
+    }
   }
   /**
    * Trae **TODAS** las filas de una query de lista. Sin tope, salvo que el llamador pase un `limit`.
