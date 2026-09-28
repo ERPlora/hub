@@ -163,16 +163,20 @@ describe('a pinpad locked by too many failed attempts', () => {
     expect(wrapper.text()).toContain(lockSentence(2));
   });
 
-  it('says one minute, in the singular, for the last seconds of the lock', async () => {
-    seedTill();
-    vi.mocked(runtimePinLogin).mockRejectedValue(refusal('too_many_attempts', 20));
+  it.each(['en', 'es'] as const)(
+    'says one minute, in the singular, for the last seconds of the lock (%s)',
+    async (locale) => {
+      i18n.global.locale.value = locale;
+      seedTill();
+      vi.mocked(runtimePinLogin).mockRejectedValue(refusal('too_many_attempts', 20));
 
-    const wrapper = await mountLogin();
-    await typePin(wrapper);
+      const wrapper = await mountLogin();
+      await typePin(wrapper);
 
-    expect(wrapper.text()).toContain(lockSentence(1));
-    expect(lockSentence(1)).not.toBe(lockSentence(2).replace('2', '1'));
-  });
+      expect(wrapper.text()).toContain(lockSentence(1));
+      expect(lockSentence(1)).not.toBe(lockSentence(2).replace('2', '1'));
+    },
+  );
 
   it('never says «wait 0 minutes» when the lock is lifting right now', async () => {
     seedTill();
