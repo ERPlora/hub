@@ -991,6 +991,24 @@ impl CloudClient {
         )
     }
 
+    /// **A signed link to one file of the hub's `media/`** (hub#2335) —
+    /// `GET /api/v1/hub/device/media/raw/?path=<rel>` with the **machine** credential, answering
+    /// `{"url": "<presigned>"}` (one hour, `apps/dashboard/hubs/files/services/s3_manager.py`).
+    ///
+    /// The outbox relay asks for it on every send of a WhatsApp template whose header is a photo
+    /// the owner uploaded: Meta downloads the header itself, so it needs a link it can fetch, and
+    /// one signed at send time never expires in the queue. The path is percent-encoded as a query
+    /// VALUE: an `&` or a `#` in it cannot add a parameter or cut the URL.
+    pub fn media_signed_link(&self, auth: &Auth, path: &str) -> PreparedRequest {
+        self.get(
+            &format!(
+                "/api/v1/hub/device/media/raw/?path={}",
+                encode_path_segment(path)
+            ),
+            auth,
+        )
+    }
+
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -2438,6 +2456,34 @@ mod tests {
         assert!(
             !hostile.url.contains("/../") && !hostile.url.contains("/templates/"),
             "a media id with a path separator escaped the media route: {}",
+            hostile.url
+        );
+    }
+
+    /// hub#2335 — the signed link to ONE file of the hub's `media/` (the photo a flow step sends in
+    /// a WhatsApp header). Machine credential: the asker is the outbox relay, with nobody logged
+    /// in. The path is a query VALUE, so an `&` or `#` in it cannot add a parameter or cut the URL.
+    #[test]
+    fn media_signed_link_is_a_machine_authenticated_get_that_names_the_file() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.media_signed_link(&auth, "whatsapp/headers/0b8e.jpg");
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/media/raw/?path=whatsapp%2Fheaders%2F0b8e.jpg"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+        let hostile = c.media_signed_link(&auth, "a.jpg&path=_logs/hub.log#x");
+        assert!(
+            hostile.url.ends_with("?path=a.jpg%26path%3D_logs%2Fhub.log%23x"),
+            "the path added a parameter: {}",
             hostile.url
         );
     }
