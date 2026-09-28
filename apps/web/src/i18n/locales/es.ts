@@ -1416,6 +1416,9 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    pinTooManyAttempts:
+      'Demasiados intentos fallidos. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     orSwipeBadge: '…o pasa tu placa: no hace falta elegir tu nombre antes.',
     badgeRejected: 'Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.',
     badgeTooManyAttempts: 'Demasiados intentos fallidos con esta placa. Espera unos minutos o entra con tu PIN.',

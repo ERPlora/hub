@@ -1625,6 +1625,11 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
+    // hub#2283. Shown INSTEAD of «Incorrect PIN» while the hub refuses PINs after too many failures:
+    // the PIN may be right, so the sentence says to wait, and how long when the hub names it.
+    pinTooManyAttempts:
+      'Too many failed attempts. Wait {minutes} minute and try again. | Too many failed attempts. Wait {minutes} minutes and try again.',
+    pinTooManyAttemptsNoWait: 'Too many failed attempts. Wait a few minutes and try again.',
     // hub#658 — one sentence for every way a badge can be refused, on purpose: the login door must
     // not become the way to find out which cards this business has issued.
     orSwipeBadge: '…or swipe your badge — no need to tap your name first.',
