@@ -238,10 +238,13 @@ describe('the module tabbar follows the language applied after boot (hub#2353)',
         { moduleId: 'tickets', moduleName, nav: { id: 'sla', label: labels[1], icon: 'time' } },
       ] as never;
     });
-    vi.mocked(loadMenu).mockImplementationOnce(async () => [
-      { moduleId: 'customers', moduleName: 'Customers', nav: { id: 'list', label: 'List', icon: 'people' } },
-      { moduleId: 'customers', moduleName: 'Customers', nav: { id: 'groups', label: 'Groups', icon: 'albums' } },
-    ] as never);
+    vi.mocked(loadMenu).mockImplementationOnce(
+      async () =>
+        [
+          { moduleId: 'customers', moduleName: 'Customers', nav: { id: 'list', label: 'List', icon: 'people' } },
+          { moduleId: 'customers', moduleName: 'Customers', nav: { id: 'groups', label: 'Groups', icon: 'albums' } },
+        ] as never,
+    );
 
     setLocale('en'); // refresh for Tickets goes out…
     await settle();
