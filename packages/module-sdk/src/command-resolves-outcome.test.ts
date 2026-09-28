@@ -146,3 +146,12 @@ test('hub#2375: commandOptional carries the option through to the verdict', asyn
   );
   assert.equal(net.length, 1, 'commandOptional without the option keeps the net');
 });
+
+test('hub#2375: the door a module actually holds — forModule(<id>) — honors the option too', async () => {
+  const notes: Notification[] = [];
+  const scoped = clientWith(webkitDeadFetch, notes).forModule('sales');
+  await assert.rejects(() => scoped.command('sales.refund', {}, { resolvesOutcome: true }), isUnknownOutcome);
+  assert.equal(notes.length, 0, 'the module-scoped client must not toast when the screen resolves the doubt');
+  await assert.rejects(() => scoped.command('sales.refund', {}), isUnknownOutcome);
+  assert.equal(notes.length, 1, 'and keeps the net when it does not');
+});
