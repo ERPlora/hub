@@ -68,4 +68,10 @@ fn the_page_and_the_shell_name_the_same_event_and_argument() {
         shell.contains("fn erplora_notify(app: tauri::AppHandle, title: String, body: String, id: Option<i64>)"),
         "`erplora_notify` no longer takes the `id` the page sends"
     );
+    // Taking the `id` is not enough: a command that shows the notice under `None` compiles with a
+    // mere warning, and every tap comes back under a random id that leads nowhere.
+    assert!(
+        shell.contains("notice_builder(&app, &title, &body, id).show()"),
+        "`erplora_notify` takes the `id` but no longer hands it to the notice it shows"
+    );
 }
