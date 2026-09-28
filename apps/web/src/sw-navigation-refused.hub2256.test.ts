@@ -70,10 +70,22 @@ function bootWorker(network: () => Promise<Response>) {
     return answer!;
   }
 
+  /** Whether the worker takes the page load of `path` at all (a passthrough leaves it to the browser). */
+  function intercepts(path: string): boolean {
+    let taken = false;
+    listeners.get('fetch')!({
+      request: { method: 'GET', mode: 'navigate', url: `${ORIGIN}${path}` },
+      respondWith: () => {
+        taken = true;
+      },
+    });
+    return taken;
+  }
+
   /** Lets the fire-and-forget cache writes of the handler land. */
   const settle = () => new Promise((r) => setTimeout(r, 0));
 
-  return { navigate, settle, store: caches.store };
+  return { navigate, intercepts, settle, store: caches.store };
 }
 
 const refused = () => Promise.resolve(new Response('', { status: 403 }));
@@ -141,5 +153,26 @@ describe('a page load the hub refuses still opens the app (hub#2256, hub#2255)',
     await sw.settle();
 
     expect(await sw.store.get('/')!.clone().text()).toBe(fresh);
+  });
+});
+
+// The ticket page (`/p/:locator`, hub#963) is not the app: the hub renders it for the diner, and its
+// 403/404/410/429 pages ARE the answer («already claimed», «not found», «too many tries»). Swapping
+// them for the cached shell would paint the back office where that sentence should be, and an OK
+// ticket page stored as the shell would open the next offline start on somebody's ticket.
+describe('the ticket page is left to the browser (hub#2256 review)', () => {
+  for (const status of [200, 403, 404, 410, 429]) {
+    it(`does not take a ${status} page load of /p/…`, () => {
+      const sw = bootWorker(() => Promise.resolve(new Response('<p>ticket</p>', { status })));
+
+      expect(sw.intercepts('/p/AB12CD')).toBe(false);
+    });
+  }
+
+  it('still takes the page loads of the app', () => {
+    const sw = bootWorker(ok);
+
+    expect(sw.intercepts('/pos')).toBe(true);
+    expect(sw.intercepts('/m/sales/pos')).toBe(true);
   });
 });

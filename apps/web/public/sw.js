@@ -54,6 +54,13 @@ function isUnversionedAsset(url) {
   return url.pathname.startsWith('/modules/');
 }
 
+// The ticket page (`/p/:locator`, hub#963) is a page the hub renders for the diner, not the app:
+// its 403/404/410/429 pages are the answer itself, and an OK one is not the shell. Left to the
+// browser, like /api.
+function isServerPage(url) {
+  return url.pathname.startsWith('/p/');
+}
+
 // The cached shell, only if it is a good one: a worker from before hub#2256 may have stored a
 // refusal (an empty 403) under it, and serving that back is the blank page all over again.
 function cachedShell() {
@@ -65,8 +72,15 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Cross-origin, API/WS/health o assets sin hash (/modules/): lo gestiona la red/runtime, nunca el SW.
-  if (url.origin !== self.location.origin || isApiRequest(url) || isUnversionedAsset(url)) return;
+  // Cross-origin, API/WS/health, unhashed assets (/modules/) and the ticket page (/p/): the network
+  // and the runtime handle them, never the SW.
+  if (
+    url.origin !== self.location.origin ||
+    isApiRequest(url) ||
+    isUnversionedAsset(url) ||
+    isServerPage(url)
+  )
+    return;
 
   // Page loads (SPA): network first; the cached shell when the network fails OR refuses.
   // hub#2256/hub#2255: an edge ban answered every page load with an empty 403 — an answer, not a
