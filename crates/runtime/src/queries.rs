@@ -6,11 +6,11 @@
 //!   subconsulta y compone, de forma genérica, búsqueda global + filtro por columna +
 //!   orden por whitelist (anti-inyección) + `LIMIT/OFFSET`, y devuelve `{rows,total,limit,
 //!   offset}` (§8.2). El módulo no escribe nada de esto a mano: lo declara en `module.json`.
-use std::collections::BTreeMap;
 
 use erplora_db::{ColumnKind, DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
+use crate::column_kinds_cache::{ColumnKinds, ColumnKindsCache};
 use crate::errors::{Result, RuntimeError};
 use crate::manifest::{FilterOp, ListSpec};
 use crate::permissions;
@@ -251,7 +251,16 @@ pub async fn execute_page(
                 q.schema.as_ref().map(|s| s.raw.as_ref()),
                 params,
             )?;
-            run_list(db, name, &q.sql, spec, &bound).await
+            run_list(
+                db,
+                &registry.list_column_kinds,
+                &ctx.hub_id,
+                name,
+                &q.sql,
+                spec,
+                &bound,
+            )
+            .await
         }
     }
 }
@@ -411,8 +420,12 @@ fn all_binds(sql: &str) -> Vec<String> {
 /// Compone y ejecuta el SQL paginado a partir del SELECT base y el `ListSpec`.
 /// `pub(crate)`: el core lo reutiliza para `hub.approvals.list` (hub#884) — mismo motor, mismo
 /// contrato, sin un segundo paginador.
+/// `shapes` remembers the column types of `base_sql` for `hub_id` between requests (hub#2359); it is
+/// the registry's, so it lives and dies with the installed version of the module.
 pub(crate) async fn run_list(
     db: &dyn DatabaseAdapter,
+    shapes: &ColumnKindsCache,
+    hub_id: &str,
     query: &str,
     base_sql: &str,
     spec: &ListSpec,
@@ -500,13 +513,14 @@ pub(crate) async fn run_list(
         }
     }
 
-    // El tipo REAL de las columnas del SELECT base, y solo cuando hace falta: lo pide el extremo
-    // de un `range` escrito como TEXTO (hub#1542). Es una pregunta al servidor, así que no se
-    // hace por costumbre — sin extremos de texto no hay nada que resolver y no se pregunta.
-    // Si el servidor no sabe responder, se sigue exactamente como antes: no saber tiene que
-    // dejar el extremo tal cual lo escribió quien llama, nunca inventarse una conversión.
-    let column_kinds = if needs_column_kinds(spec, &p) {
-        match db.column_kinds(base_sql).await {
+    // The REAL type of the base SELECT's columns, and only when needed: a `range` bound asks for
+    // it (hub#1542). It is a question to the server, so it is not asked out of habit — and since
+    // hub#2359 it is asked once per installed version, not per request (`shapes`). If the server
+    // cannot answer, things go on exactly as before: not knowing must leave the bound as the
+    // caller wrote it, never invent a conversion — and nothing is remembered, so the next request
+    // asks again.
+    let column_kinds: ColumnKinds = if needs_column_kinds(spec, &p) {
+        match shapes.get_or_describe(db, hub_id, base_sql).await {
             Ok(kinds) => kinds,
             Err(e) => {
                 // Degradar en silencio sería el mismo fallo mudo que este cambio viene a quitar:
@@ -518,11 +532,11 @@ pub(crate) async fn run_list(
                     "queries: no se pudo resolver el tipo de las columnas de `{query}` ({e}): los \
                      extremos de `range` se comparan sin convertir, como antes de hub#1542"
                 );
-                BTreeMap::new()
+                ColumnKinds::default()
             }
         }
     } else {
-        BTreeMap::new()
+        ColumnKinds::default()
     };
 
     for (col, f) in &spec.filters {

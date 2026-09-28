@@ -1,0 +1,38 @@
+{
+  "id": "listshape",
+  "name": "List Shape Fixture",
+  "version": "2.0.0",
+  "permissions": [
+    "listshape.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_add_score.sql"
+    ]
+  },
+  "queries": {
+    "listshape.items.list": {
+      "permission": "listshape.read",
+      "sql": "queries/items_list.sql",
+      "list": {
+        "sort": [
+          "id",
+          "priority",
+          "score"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "priority": {
+            "op": "range"
+          },
+          "score": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      }
+    }
+  }
+}
