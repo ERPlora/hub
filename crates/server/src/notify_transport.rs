@@ -236,7 +236,6 @@ impl CloudNotifyTransport {
                 .await
                 .ok()
                 .and_then(|v| v.get("url").and_then(Value::as_str).map(str::to_owned))
-                .filter(|url| url.starts_with("https://") || url.starts_with("http://"))
         } else {
             None
         };
@@ -691,6 +690,17 @@ mod tests {
                 .push((uri.path().to_string(), headers, json!({ "path": path })));
             if path.contains("missing") {
                 return (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })));
+            }
+            // A refusal whose body still carries a `url` (a proxy's error page, a half-written
+            // answer): the status decides, not the body.
+            if path.contains("refused") {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({ "url": format!("https://objects.example/{path}") })),
+                );
+            }
+            if path.contains("odd") {
+                return (StatusCode::OK, Json(json!({ "url": "file:///etc/passwd" })));
             }
             (
                 StatusCode::OK,
@@ -1296,7 +1306,10 @@ mod tests {
             "whatsapp/headers/../../_logs/hub.log",
             "whatsapp/headers/./x.jpg",
             "whatsapp/headers/",
+            "whatsapp/headers/.",
+            "whatsapp/headers/..",
             "whatsapp/headersx/x.jpg",
+            "whatsapp/headersx.jpg",
             "/whatsapp/headers/x.jpg",
             "whatsapp/headers\\x.jpg",
             "modules/verifactu/cert.p12",
@@ -1339,6 +1352,48 @@ mod tests {
         let calls = cloud.calls();
         assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
         assert_eq!(calls[0].0, "/api/v1/hub/device/media/raw/");
+    }
+
+    /// The SaaS refused to sign — whatever its body says, there is no link to send.
+    #[tokio::test]
+    async fn a_refused_signature_is_never_taken_as_a_link() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.11"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": "whatsapp/headers/refused.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("a refusal is not a link");
+        assert!(format!("{err}").contains("403"), "{err}");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
+    }
+
+    /// A signed answer that is not a web link is not handed to Meta either.
+    #[tokio::test]
+    async fn a_signed_answer_that_is_not_a_web_link_is_not_sent() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.12"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": "whatsapp/headers/odd.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("file:// is not a link Meta can fetch");
+        assert!(format!("{err}").contains("header_image"), "{err}");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
     }
 
     /// A template has ONE header. Two media keys is a flow that does not know which one it meant,
