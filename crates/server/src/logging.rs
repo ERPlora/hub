@@ -218,6 +218,23 @@ mod tests {
     }
 
     #[test]
+    fn hub2300_every_other_line_breaker_is_escaped_too() {
+        // Not every reader splits on `\n` alone: Python's `splitlines` (and others) also break on
+        // vertical tab, form feed, the separators 0x1c-0x1e, NEL and U+2028/U+2029.
+        let breakers = ['\u{b}', '\u{c}', '\u{1c}', '\u{1e}', '\u{85}', '\u{2028}', '\u{2029}'];
+        let log = captured(|| {
+            let error: String = breakers.iter().map(|c| format!("{c}{FORGED}")).collect();
+            tracing::warn!(%error, "refused");
+        });
+        let body = log.strip_suffix('\n').unwrap_or(&log);
+        assert!(
+            !body.chars().any(|c| c.is_control() || breakers.contains(&c)),
+            "a line breaker reached the log raw: {log:?}"
+        );
+        assert!(log.contains(&format!("\\u{{2028}}{FORGED}")), "{log:?}");
+    }
+
+    #[test]
     fn hub2300_a_formatted_message_cannot_forge_a_log_line() {
         let log = captured(|| {
             let error = format!("x\r\n{FORGED}");
