@@ -6,6 +6,7 @@ use crate::*;
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
     let activity_state = state.activity.clone();
+    let rejection_state = state.clone();
     // hub#1401: liveness/readiness viven en SU router, FUERA del presupuesto de peticiones en vuelo
     // que lleva la superficie de negocio (más abajo). Un chequeo de salud que reciba un `503` bajo
     // sobrecarga lo lee Swarm como «contenedor no sano» y reprograma el contenedor en plena punta
@@ -615,6 +616,11 @@ pub fn app(state: AppState) -> Router {
             activity_state,
             track_user_activity,
         ))
+        // hub#2282: a session credential that did not resolve counts against its address.
+        .layer(axum::middleware::from_fn_with_state(
+            rejection_state,
+            track_rejected_credentials,
+        ))
         // Primera barrera del runtime: una máquina real sin UUID+credencial Cloud solo puede
         // consultar salud/contexto para pintar el login. Demo es la única excepción.
         .layer(axum::middleware::from_fn_with_state(
@@ -671,6 +677,61 @@ pub(crate) async fn track_user_activity(
         activity.touch(entitlement::now_unix());
     }
     response
+}
+
+/// Counts a session credential that came back `401` against the client's address (hub#2282).
+///
+/// Read from the OUTSIDE of every handler on purpose: more than thirty doors resolve a session,
+/// and the only thing they all agree on is the `401`. The three credentials are the ones that take
+/// a request past the edge bouncer (infra#335): `X-Hub-Session`, the `erplora_media` cookie on the
+/// media read door, and the `ticket` of the event stream. A request that is signed in never gets
+/// here with a `401`, so whoever already has a session is never counted.
+pub(crate) async fn track_rejected_credentials(
+    State(st): State<AppState>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let presented = presented_credential(&request);
+    let client = crate::address_guard::client_address(request.headers());
+    let response = next.run(request).await;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        if let Some((reason, token)) = presented {
+            crate::address_guard::record_rejected_credential(&st, client.as_deref(), reason, &token);
+        }
+    }
+    response
+}
+
+/// The session credential this request presents, if any — in the order the doors read them.
+fn presented_credential(
+    request: &axum::extract::Request,
+) -> Option<(crate::address_guard::Failure, String)> {
+    use crate::address_guard::Failure;
+    let headers = request.headers();
+    if let Some(token) = auth::session_token(headers) {
+        return Some((Failure::SessionInvalid, token));
+    }
+    let path = request.uri().path();
+    if path == "/api/media/raw" {
+        if let Some(token) = auth::cookie(headers, crate::media::MEDIA_COOKIE) {
+            return Some((Failure::SessionInvalid, token));
+        }
+    }
+    if path == "/api/events" && auth::api_key_token(headers).is_none() {
+        let ticket = request
+            .uri()
+            .query()
+            .into_iter()
+            .flat_map(|q| q.split('&'))
+            .filter_map(|pair| pair.split_once('='))
+            .find(|(k, _)| *k == "ticket")
+            .map(|(_, v)| v.to_string())
+            .filter(|v| !v.is_empty());
+        if let Some(ticket) = ticket {
+            return Some((Failure::TicketInvalid, ticket));
+        }
+    }
+    None
 }
 
 /// Bloquea toda la superficie de negocio hasta completar el registro de la máquina. El login

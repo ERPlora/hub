@@ -36,7 +36,17 @@ pub(crate) struct CloudLoginReq {
 /// cuenta aquí»). Lo que sí se mantiene indistinguible es *desconocido* de *revocado*: los dos son
 /// `device_untrusted`, con el mismo texto, para que la puerta no confirme si alguien cortó un
 /// dispositivo perdido (ADR-0258).
-pub(crate) async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
+pub(crate) async fn auth_pin(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<PinReq>,
+) -> Response {
+    // Per-address guard (hub#2282): first and cheapest, before the device gate and the database.
+    let client = crate::address_guard::client_address(&headers);
+    if let Some(retry_after_secs) = client.as_deref().and_then(|c| st.address_guard.locked_for(c))
+    {
+        return too_many_attempts(retry_after_secs);
+    }
     let rt = st.runtime.read().await;
     // Qué dispositivo dice ser este cliente. **Se normaliza una sola vez** y de aquí sale todo lo
     // demás: una cabecera de espacios es un cliente que no se identificó, y tiene que caer en la
@@ -72,6 +82,11 @@ pub(crate) async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>
         }
         Ok(None) => {
             st.login_throttle.record_failure(&req.name);
+            crate::address_guard::record_guess(
+                &st,
+                client.as_deref(),
+                crate::address_guard::Failure::Pin,
+            );
             (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
@@ -189,7 +204,16 @@ pub(crate) struct BadgeReq {
 /// plan. La guarda se cuenta contra el **índice** de la tarjeta y no contra un nombre —aquí no hay
 /// nombre que teclear— y eso además la hace más precisa: bloquea la tarjeta que se está probando,
 /// sin que nadie pueda dejar fuera a un compañero pasando cinco veces una tarjeta rota a su nombre.
-pub(crate) async fn auth_badge(State(st): State<AppState>, Json(req): Json<BadgeReq>) -> Response {
+pub(crate) async fn auth_badge(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<BadgeReq>,
+) -> Response {
+    let client = crate::address_guard::client_address(&headers);
+    if let Some(retry_after_secs) = client.as_deref().and_then(|c| st.address_guard.locked_for(c))
+    {
+        return too_many_attempts(retry_after_secs);
+    }
     let rt = st.runtime.read().await;
     let device_id = req
         .device_id
@@ -227,6 +251,11 @@ pub(crate) async fn auth_badge(State(st): State<AppState>, Json(req): Json<Badge
         }
         Ok(None) => {
             st.login_throttle.record_failure(&throttle_key);
+            crate::address_guard::record_guess(
+                &st,
+                client.as_deref(),
+                crate::address_guard::Failure::Badge,
+            );
             (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({ "ok": false, "error": "placa no reconocida", "code": "badge_rejected" })),

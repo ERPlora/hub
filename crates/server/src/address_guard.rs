@@ -21,7 +21,8 @@
 //! hub=…`), the signal a watcher outside the hub can alert or ban on.
 //!
 //! In memory, like [`crate::login_throttle`]: it guards doors only this process serves.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -65,13 +66,102 @@ impl Failure {
 /// wrote). `None` without a proxy header — the hub is never exposed directly (ADR-0092), so there
 /// is no address to hold anybody to, and the per-name lock still applies.
 pub fn client_address(headers: &HeaderMap) -> Option<String> {
-    let _ = headers;
-    None
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.rsplit(',').next())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_owned)
 }
 
-/// Per-address failure counters.
+/// The stable line every failure leaves (`event=auth_failed reason=… client=… hub=…`). Matched
+/// on its fields, never on the prose. `client=-` when no proxy said who it was.
+pub fn report(reason: Failure, client: Option<&str>, hub_id: &str) {
+    tracing::warn!(
+        event = %"auth_failed",
+        reason = %reason.code(),
+        client = %client.unwrap_or("-"),
+        hub = %hub_id,
+        "sign-in failed"
+    );
+}
+
+/// A wrong PIN or badge: counted against the address and logged.
+pub fn record_guess(st: &crate::AppState, client: Option<&str>, reason: Failure) {
+    if let Some(client) = client {
+        st.address_guard.record_guess(client);
+    }
+    report(reason, client, &st.hub_id());
+}
+
+/// A session credential that came back `401`: counted once per distinct token, and logged the
+/// first time it is seen, so a till repeating its dead session does not flood the log.
+pub fn record_rejected_credential(
+    st: &crate::AppState,
+    client: Option<&str>,
+    reason: Failure,
+    token: &str,
+) {
+    let first_sighting = match client {
+        Some(client) => st.address_guard.record_rejected_session(client, token),
+        None => true,
+    };
+    if first_sighting {
+        report(reason, client, &st.hub_id());
+    }
+}
+
+/// What one address did in the current window.
+struct Attempts {
+    window_start: Instant,
+    guesses: u32,
+    /// Fingerprints of the session credentials that did not resolve — never the tokens themselves.
+    /// Bounded: it stops growing at [`MAX_FORGED_SESSIONS`], which is where the lock starts.
+    sessions: HashSet<u64>,
+    /// When the current lock expires. `None` = not locked.
+    locked_until: Option<Instant>,
+}
+
+impl Attempts {
+    fn new(now: Instant) -> Self {
+        Self {
+            window_start: now,
+            guesses: 0,
+            sessions: HashSet::new(),
+            locked_until: None,
+        }
+    }
+
+    fn is_locked(&self, now: Instant) -> bool {
+        self.locked_until.is_some_and(|until| until > now)
+    }
+
+    /// Nothing left to remember: the lock is over, or the window closed without one. Either way
+    /// the address starts from zero — a lock that forgot only the time would re-lock on the next
+    /// single failure, and the window would be permanent in practice.
+    fn is_stale(&self, now: Instant) -> bool {
+        match self.locked_until {
+            Some(until) => until <= now,
+            None => now.duration_since(self.window_start) >= WINDOW,
+        }
+    }
+
+    fn lock(&mut self, now: Instant) {
+        self.locked_until = Some(now + LOCK_WINDOW);
+    }
+}
+
+fn fingerprint(token: &str) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    token.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Per-address failure counters. Behind one `Mutex`, like [`crate::login_throttle`]: it is touched
+/// on failures only, never on the path of a request that is signed in.
 pub struct AddressGuard {
-    entries: Mutex<HashMap<String, ()>>,
+    entries: Mutex<HashMap<String, Attempts>>,
 }
 
 impl Default for AddressGuard {
@@ -88,6 +178,9 @@ impl AddressGuard {
     }
 
     /// Is this address locked right now? `Some(secs)` = locked, and how long to wait.
+    ///
+    /// Checked BEFORE verifying a PIN or badge, so a locked address stops getting the right/wrong
+    /// answer it is fishing for.
     pub fn locked_for(&self, address: &str) -> Option<u64> {
         self.locked_for_at(address, Instant::now())
     }
@@ -98,25 +191,78 @@ impl AddressGuard {
     }
 
     /// A session credential from `address` that did not resolve. Returns `true` the first time
-    /// this token is seen in the window, so the caller logs each forged token once.
+    /// this token is seen in the window, so the caller logs each forged token once and a till
+    /// repeating its dead session does not flood the log.
     pub fn record_rejected_session(&self, address: &str, token: &str) -> bool {
         self.record_rejected_session_at(address, token, Instant::now())
     }
 
-    fn locked_for_at(&self, _address: &str, _now: Instant) -> Option<u64> {
+    fn locked_for_at(&self, address: &str, now: Instant) -> Option<u64> {
+        let mut entries = self.lock();
+        let entry = entries.get(address)?;
+        if entry.is_locked(now) {
+            let until = entry.locked_until?;
+            return Some((until - now).as_secs().max(1));
+        }
+        if entry.is_stale(now) {
+            entries.remove(address);
+        }
         None
     }
 
-    fn record_guess_at(&self, _address: &str, _now: Instant) {}
+    fn record_guess_at(&self, address: &str, now: Instant) {
+        let mut entries = self.lock();
+        let entry = Self::current(&mut entries, address, now);
+        if entry.is_locked(now) {
+            return;
+        }
+        entry.guesses += 1;
+        if entry.guesses >= MAX_GUESSES {
+            entry.lock(now);
+        }
+    }
 
-    fn record_rejected_session_at(&self, _address: &str, _token: &str, _now: Instant) -> bool {
-        let _ = &self.entries;
-        false
+    fn record_rejected_session_at(&self, address: &str, token: &str, now: Instant) -> bool {
+        let mut entries = self.lock();
+        let entry = Self::current(&mut entries, address, now);
+        let print = fingerprint(token);
+        if entry.is_locked(now) || entry.sessions.len() >= MAX_FORGED_SESSIONS {
+            return !entry.sessions.contains(&print);
+        }
+        let first_sighting = entry.sessions.insert(print);
+        if entry.sessions.len() >= MAX_FORGED_SESSIONS {
+            entry.lock(now);
+        }
+        first_sighting
+    }
+
+    /// The live entry of `address`, started afresh if what it held is stale. A NEW address first
+    /// sweeps the stale ones once the map is at [`MAX_TRACKED`].
+    fn current<'a>(
+        entries: &'a mut HashMap<String, Attempts>,
+        address: &str,
+        now: Instant,
+    ) -> &'a mut Attempts {
+        if !entries.contains_key(address) && entries.len() >= MAX_TRACKED {
+            entries.retain(|_, attempts| !attempts.is_stale(now));
+        }
+        let entry = entries
+            .entry(address.to_string())
+            .or_insert_with(|| Attempts::new(now));
+        if entry.is_stale(now) {
+            *entry = Attempts::new(now);
+        }
+        entry
+    }
+
+    /// A poisoned mutex must not take the login down: recover the map and carry on.
+    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, Attempts>> {
+        self.entries.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     #[cfg(test)]
     fn tracked(&self) -> usize {
-        usize::MAX
+        self.lock().len()
     }
 }
 
