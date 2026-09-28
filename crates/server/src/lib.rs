@@ -35,6 +35,7 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
 pub mod activity;
+pub mod address_guard;
 /// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
 /// outside the runtime's global lock. It lives here and not in the runtime because it needs
 /// `cloud-client` — the runtime has no network by design.
