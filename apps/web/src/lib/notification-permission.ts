@@ -133,9 +133,10 @@ export type EnsureNotificationPermissionDeps = Omit<
  * Puts the explanation and then Android's dialog in front of the user — at most once — and
  * resolves with the state the system actually ended up in.
  *
- * **Never propagates.** It is called from the print-host alta and from the kitchen-order notice,
- * and neither can fail because a permission could not be asked for: the order still has to print.
- * Everything that goes wrong is logged and answered with the honest state.
+ * **Never propagates.** It is called from the print-host alta and from the kitchen-order and
+ * appointment notices (hub#2168), and none of them can fail because a permission could not be
+ * asked for: the order or the booking still has to go through. Everything that goes wrong is
+ * logged and answered with the honest state.
  */
 export function ensureNotificationPermission(
   deps: EnsureNotificationPermissionDeps,
@@ -158,4 +159,55 @@ export function notificationPermissionState(
   check?: () => Promise<Record<string, boolean> | null>,
 ): Promise<NotificationPermission> {
   return devicePermissionState(ANDROID_NOTIFICATIONS_PERMISSION, TAG, check);
+}
+
+/**
+ * The modules the shell sends system notices for, today.
+ *
+ * The shell fires a notice for the kitchen order (`print-comanda.ts`) and, since hub#2168, for a
+ * booking or a cancellation that did not come from a till (`appointment-notice.ts`) — so a hub
+ * without an active module from this list has nothing that would ever use the permission, and
+ * asking there asks for nothing (hub#2046). Adding another source is a deliberate change to this
+ * list, not a side effect of adding a module.
+ */
+export const NOTICE_SOURCE_MODULES: readonly string[] = ['kitchen', 'appointments'] as const;
+
+/**
+ * Does this hub have anything installed that the shell would ever send a system notice for?
+ *
+ * `undefined` — the installed set could not be read — answers `false`: not knowing what is
+ * installed is never a reason to ask (hub#2046).
+ */
+export function hasNoticeSource(activeModuleIds: ReadonlySet<string> | undefined): boolean {
+  if (!activeModuleIds) return false;
+  return NOTICE_SOURCE_MODULES.some((id) => activeModuleIds.has(id));
+}
+
+/**
+ * The print-host alta's ask, now asked in context (hub#2046): refreshes what is installed and
+ * only then asks for the permission — and only when something active would ever use it. Asking on
+ * every hub regardless of what it runs is what left a salon — no kitchen — accepting a permission
+ * that would never fire.
+ *
+ * **Never propagates.** Neither a failed refresh nor a failed ask may break the alta that calls
+ * this: the print host still has to register either way.
+ */
+export async function warnIfThereIsSomethingToTell(deps: {
+  refresh: () => Promise<void>;
+  activeModules: () => ReadonlySet<string> | undefined;
+  ask: () => Promise<unknown>;
+}): Promise<void> {
+  try {
+    await deps.refresh();
+  } catch {
+    // Not knowing what is installed is not a reason to ask, nor to fail the alta.
+  }
+  if (hasNoticeSource(deps.activeModules())) {
+    try {
+      await deps.ask();
+    } catch {
+      // `ask` (`ensureNotificationPermission`) already never throws, but this call must not
+      // propagate either way.
+    }
+  }
 }

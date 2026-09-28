@@ -281,6 +281,62 @@ while IFS=$'\t' read -r verdict name detail; do
     if [ "$verdict" = PASS ]; then ok "$name"; else bad "$name" "$detail"; fi
 done <<<"$disk_out"
 
+# ── 7. a PR that touches no Rust does not hold a runner for the Rust suite (26/09) ──────────
+# 43 of 60 hub PRs since 24/09 touched no Rust and still held a self-hosted runner ~47 min
+# (clippy + `cargo test --workspace`), queueing every module PR behind them. The `scope` step asks
+# scripts/ci/touches-rust.sh; clippy and both cargo test steps run only when it says Rust. `push`
+# to develop/main always runs everything (the post-merge net of hub#572 is untouched).
+scope_out="$(WF="$WF" python3 - <<'PY'
+import os
+import yaml
+
+doc = yaml.safe_load(open(os.environ["WF"], encoding="utf-8"))
+steps = doc["jobs"]["test"]["steps"]
+
+def emit(ok, name, detail):
+    print(("PASS" if ok else "FAIL") + "\t" + name + "\t" + detail)
+
+scope = [s for s in steps if s.get("id") == "scope"]
+emit(len(scope) == 1, "the job has ONE `scope` step", "found %d steps with id: scope" % len(scope))
+if scope:
+    run = scope[0].get("run", "")
+    idx = steps.index(scope[0])
+    emit("scripts/ci/touches-rust.sh" in run, "the scope step asks scripts/ci/touches-rust.sh",
+         "the classifier is not called: the skip would be decided by a look-alike")
+    emit("rc=$?" in run and '"$rc" -eq 1' in run,
+         "only the classifier's explicit «no» (exit 1) skips; any other failure runs the suite",
+         "a missing or crashing classifier must never read as «no Rust»")
+    emit("pull_request" in run and "rust=true" in run,
+         "the scope step answers rust=true outside a pull request",
+         "a push to develop/main must always run the suite (hub#572)")
+    emit("HEAD^1" in run, "the scope step diffs the merge commit against its first parent",
+         "without HEAD^1 the diff is not the PR's own change set")
+    costly = [s for s in steps if any(k in str(s.get("run", "")) for k in ("cargo clippy", "cargo test"))]
+    emit(len(costly) >= 3, "the costly steps are found (clippy + cargo test + doc-tests)",
+         "found %d: the step names changed and this check no longer sees them" % len(costly))
+    for s in costly:
+        cond = str(s.get("if", ""))
+        emit(cond.strip() == "steps.scope.outputs.rust != 'false'",
+             "step «%s» is skipped ONLY on an explicit rust=false (fail-safe)" % s.get("name", "?"),
+             "the condition must be exactly `steps.scope.outputs.rust != 'false'`: `== 'true'` skips the suite in silence when the output is missing (hub#1463), and no condition makes a web-only PR pay it")
+        emit(steps.index(s) > idx, "step «%s» comes after the scope step" % s.get("name", "?"),
+             "a step before `scope` cannot read its output")
+co = [s for s in steps if str(s.get("uses", "")).startswith("actions/checkout")]
+emit(bool(co) and (co[0].get("with") or {}).get("fetch-depth") == 2,
+     "checkout fetches 2 commits (the merge commit and its first parent)",
+     "with the default depth 1, HEAD^1 does not exist and every PR would fall back to the full suite")
+PY
+)" || bad "the scope contract could be evaluated" "python3/PyYAML failed on $WF"
+while IFS=$'\t' read -r verdict name detail; do
+    [ -n "${verdict:-}" ] || continue
+    if [ "$verdict" = PASS ]; then ok "$name"; else bad "$name" "$detail"; fi
+done <<<"$scope_out"
+if grep -q 'scripts/tests/touches-rust.test.sh' "$WF"; then
+    ok "test-hub.yml runs the classifier's contract"
+else
+    bad "test-hub.yml runs the classifier's contract" "add a step \`bash scripts/tests/touches-rust.test.sh\`"
+fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

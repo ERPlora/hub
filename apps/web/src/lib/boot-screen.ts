@@ -5,10 +5,10 @@
 // here, so the two cannot drift. The notice is its own small Vue app because the shell is not
 // mounted yet (and must not be: it would open with no hub behind it). Ionic's config (`mode: 'ios'`)
 // is already global by then — `main.ts` installs `IonicVue` when it creates the shell app.
-import { createApp, type App as VueApp } from "vue";
+import { createApp, type App as VueApp } from 'vue';
 
-import BootUnreachable from "../components/BootUnreachable.vue";
-import { i18n, lastDeviceLocale } from "../i18n";
+import BootUnreachable from '../components/BootUnreachable.vue';
+import { i18n, lastDeviceLocale } from '../i18n';
 
 export interface BootScreen {
   showUnreachable(retry: () => void): void;

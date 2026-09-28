@@ -39,6 +39,19 @@ const _phone = ref<boolean>(false);
 /** `true` while the screen is too narrow for the panel's cards to show everything at once. */
 export const isPhoneViewport: ComputedRef<boolean> = computed(() => _phone.value);
 
+/**
+ * The HEIGHT at which the blocking strip folds to one row (hub#2272): a phone on its side. Not a
+ * width: a landscape phone (667×375) is past both width steps above, and what it runs out of is the
+ * room between the topbar and the till's footer. 500px catches every phone on its side and no phone
+ * held upright, no tablet and no desktop window of a usable size.
+ */
+export const SHORT_VIEWPORT_QUERY = '(max-height: 500px)';
+
+const _short = ref<boolean>(false);
+
+/** `true` while the screen is too short for the chrome over every screen to show everything. */
+export const isShortViewport: ComputedRef<boolean> = computed(() => _short.value);
+
 // Bound at load, not on the first render: a topbar that painted its buttons and then swapped them
 // for a menu would flash on every boot of the till — and the same is true of a card that paints
 // every row and then folds most of them away a frame later.
@@ -53,5 +66,11 @@ if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
   _phone.value = phoneMql.matches;
   phoneMql.addEventListener('change', (event) => {
     _phone.value = event.matches;
+  });
+
+  const shortMql = window.matchMedia(SHORT_VIEWPORT_QUERY);
+  _short.value = shortMql.matches;
+  shortMql.addEventListener('change', (event) => {
+    _short.value = event.matches;
   });
 }

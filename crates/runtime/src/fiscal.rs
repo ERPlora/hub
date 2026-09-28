@@ -244,6 +244,7 @@ impl Runtime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::secret_box::test_support::{env_lock, EnvVarGuard};
     use erplora_db::testutil::fresh_db;
 
     // ── A DEMO hub holds its own business certificate like any hub (hub#1848) ─────────────
@@ -253,6 +254,9 @@ mod tests {
     /// the same bytes (here the missing master key, the guard next door) and never a demo closure.
     #[tokio::test]
     async fn a_demo_hub_uploads_a_business_certificate_like_a_real_hub() {
+        // hub#2184: both calls must see the SAME key state; unlocked, a parallel test flipped it.
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let real = Runtime::new(Box::new(fresh_db().await));
         let mut demo = Runtime::new(Box::new(fresh_db().await));
         demo.set_demo_hub(true);
@@ -287,6 +291,8 @@ mod tests {
     /// guard next door: what matters is that it is NOT `DemoLocked`.)
     #[tokio::test]
     async fn a_real_hub_uploads_its_certificate_as_always() {
+        let _lock = env_lock();
+        let _env = EnvVarGuard::unset();
         let rt = Runtime::new(Box::new(fresh_db().await));
         assert!(!rt.is_demo_hub(), "a runtime defaults to a normal hub");
         let err = rt

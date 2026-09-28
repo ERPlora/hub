@@ -50,6 +50,7 @@ export declare function buildListParams(p: ListParams): Record<string, unknown>;
 export type ListPage<T = unknown> = Page<T>;
 export interface ListClient {
     queryPage<R = unknown>(name: string, params: ListParams): Promise<Page<R>>;
+    readonly currencyDecimals?: number;
 }
 export interface ListControllerOptions {
     pageSize?: number;
@@ -57,6 +58,8 @@ export interface ListControllerOptions {
     dir?: 'asc' | 'desc';
     filters?: Record<string, unknown>;
     context?: Record<string, unknown>;
+    moneyFilters?: readonly string[];
+    quantityFilters?: readonly string[];
 }
 export interface ListControllerState {
     page: number;
@@ -77,7 +80,10 @@ export declare class ListController<T = Record<string, unknown>> {
     error: string;
     readonly state: ListControllerState;
     private seq;
+    private readonly moneyFilters;
+    private readonly quantityFilters;
     constructor(client: ListClient, queryName: string, onChange?: () => void, opts?: ListControllerOptions);
+    private wireFilters;
     get pageCount(): number;
     load(): Promise<void>;
     setPage(page: number): void;
@@ -254,6 +260,7 @@ export declare class FlowsApi {
     activateTemplate(family: string): Promise<Flow>;
     deactivateTemplate(family: string): Promise<Flow>;
     restoreTemplate(family: string): Promise<Flow>;
+    restoreModuleTemplate(module: string, family: string): Promise<Flow>;
 }
 export interface FlowTemplateDiscard {
     module: string;
@@ -373,6 +380,7 @@ export declare class EventsApi {
     trace(id: string): Promise<EventTrace>;
 }
 export declare const WHATSAPP_TEMPLATES_BASE_PATH = "/api/hub/whatsapp/templates";
+export declare const WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH = "/api/hub/whatsapp/template-header-samples";
 export interface WhatsappTemplate {
     name: string;
     language: string;
@@ -390,13 +398,23 @@ export interface WhatsappTemplateInput {
     name: string;
     language: string;
     category?: string;
+    header_format?: 'TEXT' | WhatsappHeaderSampleFormat;
+    header_handle?: string;
     [field: string]: unknown;
+}
+export type WhatsappHeaderSampleFormat = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+export interface WhatsappTemplateHeaderSample {
+    header_handle: string;
+    format: WhatsappHeaderSampleFormat;
+    mime_type: string;
+    size: number;
 }
 export declare class WhatsappTemplatesApi {
     private readonly send;
     constructor(send: (req: CoreRequest) => Promise<unknown>);
     list(): Promise<WhatsappTemplateList>;
     register(template: WhatsappTemplateInput): Promise<WhatsappTemplate>;
+    uploadHeaderSample(file: Blob): Promise<WhatsappTemplateHeaderSample>;
     remove(name: string): Promise<void>;
 }
 export declare const WHATSAPP_MEDIA_BASE_PATH = "/api/hub/whatsapp/media";

@@ -8,6 +8,11 @@ overrides:
   '@types/react': ^18.3.12
   '@types/react-dom': ^18.3.1
 
+patchedDependencies:
+  '@ionic/vue@8.8.9':
+    hash: 6e9049f537c14ebfca5408843adc0f125c2eec908cfd83ec9a9da4aed88a5cd0
+    path: patches/@ionic__vue@8.8.9.patch
+
 importers:
 
   .:
@@ -31,8 +36,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/module-types
       '@erplora/outfitkit':
-        specifier: ^0.1.84
-        version: 0.1.84
+        specifier: ^0.1.106
+        version: 0.1.106
       '@iconify/vue':
         specifier: ^5.0.1
         version: 5.0.1(vue@3.5.35(typescript@5.9.3))
@@ -41,7 +46,7 @@ importers:
         version: 8.8.9
       '@ionic/vue':
         specifier: ^8.8.8
-        version: 8.8.9(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))
+        version: 8.8.9(patch_hash=6e9049f537c14ebfca5408843adc0f125c2eec908cfd83ec9a9da4aed88a5cd0)(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))
       '@ionic/vue-router':
         specifier: ^8.8.8
         version: 8.8.9(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))
@@ -91,6 +96,9 @@ importers:
       happy-dom:
         specifier: ^20.10.6
         version: 20.10.6
+      prettier:
+        specifier: ^3.9.9
+        version: 3.9.9
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.0
@@ -143,8 +151,8 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@erplora/outfitkit@0.1.84':
-    resolution: {integrity: sha512-8ketrNF/M1GmU/+8Z0eScKTPla6+4S0nU02sygFmc6B9WZsbRzoMjK4e9HRt+FuZS2dS8tK8vP6RjJD9vpCcfw==}
+  '@erplora/outfitkit@0.1.106':
+    resolution: {integrity: sha512-qGzSQff74KUvcm0QQcWiJU5WtBpKgvsljzDbI2m/vL0yD7SkWwHhKRvM7xeOC4wgz2ktVlp6j+5yML/Eh46klg==}
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -1357,6 +1365,11 @@ packages:
     resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
 
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
+    engines: {node: '>=14'}
+    hasBin: true
+
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
 
@@ -1681,7 +1694,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@erplora/outfitkit@0.1.84':
+  '@erplora/outfitkit@0.1.106':
     dependencies:
       lit: 3.3.3
 
@@ -1806,13 +1819,13 @@ snapshots:
 
   '@ionic/vue-router@8.8.9(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))':
     dependencies:
-      '@ionic/vue': 8.8.9(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))
+      '@ionic/vue': 8.8.9(patch_hash=6e9049f537c14ebfca5408843adc0f125c2eec908cfd83ec9a9da4aed88a5cd0)(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))
     transitivePeerDependencies:
       - '@stencil/core'
       - vue
       - vue-router
 
-  '@ionic/vue@8.8.9(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))':
+  '@ionic/vue@8.8.9(patch_hash=6e9049f537c14ebfca5408843adc0f125c2eec908cfd83ec9a9da4aed88a5cd0)(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))':
     dependencies:
       '@ionic/core': 8.8.9
       '@stencil/vue-output-target': 0.10.7(@stencil/core@4.43.5)(vue-router@4.6.4(vue@3.5.35(typescript@5.9.3)))(vue@3.5.35(typescript@5.9.3))
@@ -2734,6 +2747,8 @@ snapshots:
       nanoid: 3.3.12
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  prettier@3.9.9: {}
 
   process-nextick-args@2.0.1: {}
 

@@ -35,6 +35,7 @@ export default {
     loading: 'Loading documentation…',
     errorTitle: 'Could not load the documentation',
     errorBody: 'The API spec could not be fetched. Sign in and try again.',
+    retry: 'Retry',
   },
   topbar: {
     back: 'Back',
@@ -52,12 +53,14 @@ export default {
     notifications: 'Notifications',
     noNotifications: 'All caught up. No notifications.',
     deadLettersTitle: 'Failed events',
-    deadLettersBody: '{count} event(s) the relay could not deliver. Review and resend them.',
+    // Plurals via vue-i18n (`singular | plural`, picked by the `count`/`n` option): «1 event(s)» (hub#2212).
+    deadLettersBody:
+      '{count} event the relay could not deliver. Review and resend it. | {count} events the relay could not deliver. Review and resend them.',
     // Undrained printing (hub#987). It names the station because "printing is stuck" sends the
     // owner to look at four printers; "the kitchen is stuck" sends them to one.
     printingStalledTitle: 'Nothing is printing “{station}”',
     printingStalledBody:
-      '{count} document(s) waiting for {minutes} min. Check the till that prints there is on.',
+      '{count} document waiting for {minutes} min. Check the till that prints there is on. | {count} documents waiting for {minutes} min. Check the till that prints there is on.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',
@@ -223,7 +226,7 @@ export default {
     // forces reading the sentence that says how many are about to go.
     confirmDestructive: 'This cannot be undone from the screen. Type {expected} to confirm.',
     confirmDestructiveWord: 'DELETE',
-    confirmBulkAffected: 'You are about to delete {count} records.',
+    confirmBulkAffected: 'You are about to delete {count} record. | You are about to delete {count} records.',
     confirmBulkUnknown:
       'I cannot tell how many records this would delete, so I will not do it from here. Open the screen, where you can see them.',
   },
@@ -297,6 +300,14 @@ export default {
     renameError: 'It could not be renamed. This folder may be read-only.',
     deleteFolderTitle: 'Delete folder',
     deleteFolderBody: 'You are about to delete “{name}” and everything inside it. This cannot be undone.',
+    // hub#2197 — the move toast names the folder the file went to; `{folder}` is its last segment.
+    moveSuccess: 'Moved to “{folder}”.',
+    moveError: 'It could not be moved. The destination folder may be read-only.',
+    // The rest of the labels `ok-file-manager` renders; without them it shows its built-in Spanish.
+    move: 'Move to…',
+    renameFolder: 'Rename folder',
+    deleteFolder: 'Delete folder',
+    noLimit: 'No limit',
     close: 'Close',
     previewZoomIn: 'Zoom in',
     previewZoomOut: 'Zoom out',
@@ -425,6 +436,8 @@ export default {
     blocking: {
       title: 'You cannot issue invoices yet',
       body: 'No ticket or invoice can be issued until this is set up:',
+      showMissing: "See what's missing",
+      hideMissing: 'Hide',
     },
     items: {
       apps: {
@@ -609,6 +622,15 @@ export default {
     adminOnly: 'Only an administrator can remove a device.',
     loadError: 'The devices could not be loaded. Check the connection and try again.',
     revokeError: 'This device could not be removed. Check the connection and try again.',
+    // hub#2215 — clearing, in one gesture, the devices nobody uses any more.
+    pruneStale:
+      'Remove the device not used in 30 days | Remove the {n} devices not used in 30 days',
+    pruneConfirm:
+      'Remove 1 device nobody has used in 30 days? | Remove {n} devices nobody has used in 30 days?',
+    pruneConsequence:
+      'They stop appearing here, and to use one again somebody has to sign in on it with their account. Devices used in the last 30 days and the one you are using stay.',
+    pruneAction: 'Remove',
+    pruneError: 'The unused devices could not be removed. Check the connection and try again.',
   },
   // hub#359 — the dial the OWNER turns, on top of the device mode above. Every option says what it
   // does to the business, never what it is called: "never" means nothing to a shopkeeper, "whoever
@@ -631,7 +653,7 @@ export default {
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Until you sign out',
     idleMinutesConsequence:
-      'A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
+      'A till nobody has touched for {n} minute signs the user out and shows the PIN pad, so the next sale carries the next person’s name. | A till nobody has touched for {n} minutes signs the user out and shows the PIN pad, so the next sale carries the next person’s name.',
     idleUntilSignOutConsequence:
       'The till never locks itself for inactivity: the session stays open until whoever signed in signs out, or until the device says it expires.',
     adminOnly: 'Only an administrator can change whether it asks.',
@@ -714,10 +736,8 @@ export default {
     businessAddressLegacy: 'Current address: {address}. Fill in the fields above to replace it.',
     fiscalAddress: 'Fiscal address',
     shareWithErplora: 'Use these details for my ERPlora invoice too',
-    shareWithErploraDesc: 'Sends your legal name, tax id and address to ERPlora so its invoices to you carry them. Your business keeps invoicing its own customers with these same details — nothing else is shared.',
-    shareWithErploraDone: 'Details shared with ERPlora.',
+    shareWithErploraDesc: 'When you save, ERPlora also puts your legal name, tax id and address on its invoices to you. Leave it unticked if someone else pays ERPlora for this business, such as your accounting firm. ERPlora always learns who the business is, as it needs that to file with the tax agency.',
     shareWithErploraError: 'Could not share the details with ERPlora.',
-    shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
     // One question, two EXCLUSIVE answers (ADR-0320 §1 — hub#1314): either the business files with
     // its own certificate, or ERPlora files on its behalf with the signed grant. Never both.
     defaultVat: 'Default VAT',
@@ -749,16 +769,17 @@ export default {
     resetSectionsTitle: 'Or delete by section',
     resetUndo: 'Undo',
     resetUndoTitle: 'Undo “{name}”',
-    resetUndoBody: '{n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
+    resetUndoBody:
+      '{n} row brought in by this blueprint will be deleted. What you created afterwards is kept. | {n} rows brought in by this blueprint will be deleted. What you created afterwards is kept.',
     resetUndoEdited: 'You changed {areas} after importing. Undoing keeps only your changes there: what this blueprint replaced will not come back.',
     resetUndoNotRestored: 'In {areas} only your own changes were kept: what the blueprint had replaced did not come back. Check that screen.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 rows» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} row | {n} rows',
     resetSubmit: 'Reset the business',
-    resetDeleted: '{n} rows deleted',
+    resetDeleted: '{n} row deleted | {n} rows deleted',
     resetConfirmTitle: 'This cannot be undone',
-    resetConfirmBody: '{total} rows will be permanently deleted:',
+    resetConfirmBody: '{n} row will be permanently deleted: | {n} rows will be permanently deleted:',
     resetConfirmPlaceholder: 'business name',
     resetCancel: 'Cancel',
     resetConfirm: 'Delete permanently',
@@ -822,23 +843,49 @@ export default {
     // printer set up — the job is safe in the queue and comes out on its own once there is one.
     // Naming what to do next matters more than naming the fault: «did not print» sends the
     // cashier hunting for a jam that is not there.
-    ticketFailed: 'The receipt for sale {saleId} did NOT print: {error}',
+    // hub#2239: no machine reason after the colon — it told the cashier nothing to act on.
+    ticketFailed: 'The receipt did NOT print. Print it again from the receipt screen.',
     ticketWaitingForPrinter:
-      'The receipt for sale {saleId} is waiting: no printer is set up yet. Set one up and it comes out on its own.',
+      'The receipt is waiting: no printer is set up yet. Set one up and it will print on its own.',
     // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so
     // nothing went to the printer. The way out is the print button on the receipt screen.
     ticketNotComposed:
-      'The receipt for sale {saleId} could not be prepared and did NOT print. Print it from the receipt screen.',
+      'The receipt could not be prepared and did NOT print. Print it from the receipt screen.',
     // hub#1867: the receipt came out, but Hacienda's QR was not ready within the wait (a slow AEAT),
     // so the customer's copy lacks it. The receipt screen prints the complete one.
     ticketWithoutFiscal:
-      'The receipt for sale {saleId} came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
-    comandaFailed: 'The kitchen order for {label} ({role}) did not print: {error}',
+      'The receipt came out before its VeriFactu QR was ready. Print it again from the receipt screen to give the customer the complete one.',
+    // hub#2257: the way out, never the machine's reason (that one is logged); {station} is one of
+    // the station* words below, or the role as it is when the catalogue does not know it.
+    comandaFailed:
+      'The {station} order for {label} did not print. Check the printer and let the {station} know: the order is on the kitchen screen.',
+    // hub#2238: a warning, not an error — the docket is queued, and the way out is in the sentence.
     comandaWaitingForPrinter:
-      'The kitchen order for {label} ({role}) is waiting: no printer is set up for that station yet.',
+      'The {station} order for {label} is waiting: no printer is set up for that station yet. Set one up and it will print on its own.',
+    // The station a kitchen order goes to, as it reads inside those two sentences (hub#2257).
+    stationKitchen: 'kitchen',
+    stationBar: 'bar',
+    // The system notice when a kitchen order comes in (hub#2171): `comandaNoticeFor` names the
+    // floor label («Table 4», «Bar») when the order has one; the body is the order number and the
+    // line count, pluralised by `n`.
+    comandaNotice: 'New kitchen order',
+    comandaNoticeFor: 'New kitchen order · {label}',
+    comandaNoticeLines: '{n} line | {n} lines',
     // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
     // named in the warning, or the sentence reads «the order for ()».
     comandaDefaultLabel: 'the floor',
+  },
+  // The system notices for a booking or a cancellation that did NOT come from a till (hub#2168):
+  // a salon's twin of the kitchen order's notice above. `createdFor`/`cancelledFor` name the
+  // customer when the event brought one; the plain `created`/`cancelled` cover the rest so the
+  // title never leaves a hole. `when` is the day and hour, already resolved in the business's own
+  // timezone by the appointments module (appointments#151) — this file only places it in a sentence.
+  appointmentNotice: {
+    created: 'New booking',
+    createdFor: 'New booking · {customer}',
+    cancelled: 'Booking cancelled',
+    cancelledFor: 'Booking cancelled · {customer}',
+    when: '{date} at {time}',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
@@ -961,6 +1008,9 @@ export default {
     // `409 has_dependents`, which already names what an uninstall would break.
     installSuccessWithDependencies: '{name} installed successfully. Also installed: {names}.',
     installError: 'Could not start installation of {name}.',
+    // hub#2244: the sticky install error's two ways out.
+    installRetry: 'Retry',
+    noticeClose: 'Close',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
     // hub#516 — the update button. `updateError` says the one thing that matters: the module did
@@ -1395,7 +1445,7 @@ export default {
     attempts: 'attempts',
     retryAll: 'Resend all',
     retryDone: 'Event resent to the relay.',
-    retryAllDone: '{count} event(s) resent to the relay.',
+    retryAllDone: '{count} event resent to the relay. | {count} events resent to the relay.',
     retryFailed: 'Could not resend: {reason}',
     discardDone: 'Event discarded (kept for audit).',
     discardFailed: 'Could not discard: {reason}',
@@ -1489,8 +1539,9 @@ export default {
     coresOf: '{used} of {limit} vCPU',
     cores: '{used} cores',
     dbNoQuota: 'No plan quota',
-    activeSessions: '{n} active sessions',
-    activeUsers: '{n} active people',
+    // Plural via vue-i18n (`singular | plural`, picked by the `n` option): «1 active sessions» (hub#2202).
+    activeSessions: '{n} active session | {n} active sessions',
+    activeUsers: '{n} active person | {n} active people',
     liveNote: 'Live — refreshes every few seconds while this page is open.',
     loadErrorTitle: 'Resource metrics are unavailable',
     loadErrorBody: "The Hub couldn't report its resource usage right now. You can try again.",
@@ -1599,6 +1650,10 @@ export default {
     // theirs) and what to do about it. Both gestures are offered, in the order that is free first.
     sessionTakenOverBody:
       'Your plan covers one device at a time, so signing in on another one signed this device out. Sign in again to use it here, or add devices to your plan.',
+    // hub#2152 — the pass from the ERPlora panel could not be redeemed; the login still works.
+    courierFailed: "Couldn't sign you in from the ERPlora panel",
+    courierFailedBody:
+      'Sign in here to continue.',
     setupChoosePin: 'Choose a {n}-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',
@@ -1755,6 +1810,7 @@ export default {
     colTemplate: 'Template',
     colDescription: 'Description',
     colLanguage: 'Language',
+    colCountry: 'Country',
     colVersion: 'Version',
     colDownloads: 'Downloads',
     colSize: 'Size',
@@ -1901,14 +1957,14 @@ export default {
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
     emptyTitle: 'Nothing to show here yet',
     emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
+    // hub#2190 — an app this hub does not have at all (the runtime does not list it). Not the empty
+    // state above: that one is for an installed app, and saying «installed» here contradicted Apps.
+    notInstalledTitle: 'This app is not installed',
+    notInstalledHint: 'This hub does not have this app. Look for it in the Apps catalogue, or open another one from the menu.',
+    notInstalledAction: 'Go to the catalogue',
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'This app is not available for this hub.',
-    // hub#1723 — an address that names a screen this app does not have. It is swapped for the one
-    // it does have (an old bookmark keeps working), and the swap is now said out loud, naming what
-    // ended up on screen: «that does not exist» on its own leaves the person wondering what they
-    // are looking at instead.
-    unknownTabToast: 'This app has no screen at that address — showing «{tab}».',
   },
   moduleSettings: {
     tab: 'Settings',
@@ -2097,6 +2153,9 @@ export default {
     install_not_in_catalog: 'That app is not available in your catalogue.',
     install_cloud_rejected:
       'erplora.com could not attend to this installation right now. Try again in a few minutes.',
+    // hub#2251 — erplora.com took the call and then went silent: the hub gave up waiting.
+    install_cloud_timeout:
+      'erplora.com did not answer in time, so the app was not installed. Try again in a few minutes.',
     // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
     // not run whole); the owner can act on it by updating the hub. The line that names both versions
     // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.

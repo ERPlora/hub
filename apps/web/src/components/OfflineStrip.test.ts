@@ -229,7 +229,8 @@ describe('every screen of the shell carries it', () => {
     // the hub's own (`lib/icons.ts` → `addIcons` in `main.ts`), not OutfitKit's smaller `BY_NAME`.
     const registry = source('../lib/icons.ts');
     for (const icon of ['cloud-offline-outline']) {
-      expect(registry, `${icon} is not baked into the shell`).toContain(`"${icon}":`);
+      // Quote-agnostic on purpose (hub#2156): the key is what is pinned, not the formatter's style.
+      expect(registry, `${icon} is not baked into the shell`).toMatch(new RegExp(`^\\s*(['"])${icon}\\1\\s*:`, 'm'));
     }
     expect(source('./OfflineStrip.vue')).toContain('icon="cloud-offline-outline"');
     expect(source('../views/ModuleView.vue')).toContain('icon="cloud-offline-outline"');

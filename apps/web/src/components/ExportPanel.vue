@@ -55,13 +55,25 @@
           <ion-item>
             <ion-radio-group v-model="purpose" data-testid="export-purpose">
               <ion-item>
-                <ion-radio value="backup" justify="start" label-placement="end" alignment="start" :disabled="isPurposeLocked">
+                <ion-radio
+                  value="backup"
+                  justify="start"
+                  label-placement="end"
+                  alignment="start"
+                  :disabled="isPurposeLocked"
+                >
                   <h2 class="cb-title">{{ t('exportPage.purposeBackup') }}</h2>
                   <p class="cb-desc">{{ t('exportPage.purposeBackupDesc') }}</p>
                 </ion-radio>
               </ion-item>
               <ion-item>
-                <ion-radio value="template" justify="start" label-placement="end" alignment="start" :disabled="isPurposeLocked">
+                <ion-radio
+                  value="template"
+                  justify="start"
+                  label-placement="end"
+                  alignment="start"
+                  :disabled="isPurposeLocked"
+                >
                   <h2 class="cb-title">{{ t('exportPage.purposeTemplate') }}</h2>
                   <p class="cb-desc">{{ t('exportPage.purposeTemplateDesc') }}</p>
                 </ion-radio>
@@ -288,16 +300,16 @@ const name = ref<string>('hub');
 const exportLocale = ref<string>(String(locale.value));
 
 /** Vista previa del nombre final del fichero (default editable, el manifest manda). */
-const filenamePreview = computed<string>(
-  () => `${(name.value.trim() || 'hub')}_${exportLocale.value}.blueprint.zip`,
-);
+const filenamePreview = computed<string>(() => `${name.value.trim() || 'hub'}_${exportLocale.value}.blueprint.zip`);
 
 // ── Secciones (usuarios/ajustes ON; fiscal OFF por defecto — incluye el .p12; media ON) ──
 // ADR-0195: para qué es este bundle. `backup` por defecto — es lo conservador: restaurar una
 // copia SIN identidades perdería roles y PINs. Al pasar a `template`, el motor excluye
 // identidades y fiscal del zip, así que la UI deja de ofrecer esas casillas (una casilla que el
 // motor va a ignorar es una mentira).
-const purpose = ref<BundlePurpose>('backup');
+// The choice is owned by Data & copies (hub#2207): switching to Import or Reset unmounts this panel,
+// and a purpose that lived here fell back to «Backup» on the way back.
+const purpose = defineModel<BundlePurpose>('purpose', { default: 'backup' });
 const esPlantilla = computed(() => purpose.value === 'template');
 
 // `purpose` IMPUESTO por el hub (hub#377, ADR-0195): un hub de desarrollo sin enrolar o una demo
@@ -342,8 +354,7 @@ watch(modulesTable, (el) => {
 });
 watch(locale, () => {
   if (modulesTable.value) {
-    (modulesTable.value as HTMLElement & { labels: Record<string, string> }).labels =
-      dataTableLabels(locale.value);
+    (modulesTable.value as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
   }
 });
 
@@ -391,9 +402,7 @@ const moduleColumns = computed<DataTableColumn[]>(() => [
 ]);
 
 /** «Seleccionar todo» ya aplicado: todas las filas con módulo + datos marcados. */
-const allSelected = computed<boolean>(
-  () => rows.value.length > 0 && rows.value.every((r) => r.include && r.withData),
-);
+const allSelected = computed<boolean>(() => rows.value.length > 0 && rows.value.every((r) => r.include && r.withData));
 
 /** Botón «Seleccionar todo»: marca módulo+datos de todas las filas (o lo deshace si ya está todo). */
 function toggleAll(): void {
@@ -493,18 +502,12 @@ async function doExport(): Promise<void> {
         })),
       purpose: purpose.value,
     };
-    const { blob, filename } = await exportHub(
-      name.value.trim() || 'hub',
-      exportLocale.value,
-      selection,
-    );
+    const { blob, filename } = await exportHub(name.value.trim() || 'hub', exportLocale.value, selection);
     // Dónde acaba el zip NO es igual en las tres superficies (hub#480): en un navegador lo coge su
     // gestor de descargas; dentro de la app instalada no hay gestor ninguno, así que lo guarda el
     // shell y devuelve la RUTA — que es lo único que le dice al usuario que su copia existe.
     const savedTo = await saveDownload(filename, blob);
-    await toastSuccess(
-      savedTo ? t('download.savedTo', { path: savedTo }) : t('exportPage.done', { filename }),
-    );
+    await toastSuccess(savedTo ? t('download.savedTo', { path: savedTo }) : t('exportPage.done', { filename }));
   } catch (e) {
     // Dos fallos distintos con la misma salida. El del EXPORT trae el mensaje HONESTO del server
     // (exportHub ya extrajo el envelope/texto) y se conserva tal cual. El de la DESCARGA no es una

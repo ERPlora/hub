@@ -191,9 +191,7 @@ describe('ImportPanel · el empty-state no puede mentir', () => {
     await flushPromises();
 
     expect(fetchBlueprintCatalog).toHaveBeenCalledTimes(2);
-    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
-      'importPage.catalogEmpty',
-    );
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe('importPage.catalogEmpty');
   });
 
   it('el reintento SOLO se ofrece cuando el catálogo falló: no cuando está vacío de verdad', async () => {
@@ -217,9 +215,7 @@ describe('ImportPanel · el empty-state no puede mentir', () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     const w = mountPanel();
     await flushPromises();
-    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
-      'importPage.catalogEmpty',
-    );
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe('importPage.catalogEmpty');
   });
 });
 
@@ -528,6 +524,41 @@ describe('ImportPanel · hub#763 — el informe no se pierde al navegar', () => 
     expect(w.find('[data-testid="import-report"]').exists()).toBe(false);
   });
 
+  // hub#2207 — on a phone the report is long and «See the templates» sits at its bottom. The step
+  // swapped in place and the page kept that scroll offset, so the catalogue opened on its LAST
+  // template. Every step of the panel starts at the top of the page's scroller.
+  it('«ver las plantillas» opens the catalogue from the top of the page', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    fetchImportReport.mockResolvedValue({
+      batch_id: 'b1',
+      name: 'pizzeria',
+      created_at: '2026-08-10T19:09:00Z',
+      report: partialReport(),
+    });
+    const scrollToTop = vi.fn().mockResolvedValue(undefined);
+    const content = Object.assign(document.createElement('ion-content'), { scrollToTop });
+    const host = document.createElement('div');
+    content.append(host);
+    document.body.append(content);
+    const w = mount(ImportPanel, {
+      shallow: true,
+      attachTo: host,
+      global: { plugins: [i18n], renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+    scrollToTop.mockClear();
+
+    await w.get('[data-testid="import-report-dismiss"]').trigger('click');
+    await flushPromises();
+
+    expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
+    expect(scrollToTop).toHaveBeenCalledWith(0);
+    w.unmount();
+    content.remove();
+  });
+
   it('sin informe persistido (hub nuevo) muestra el catálogo, como antes', async () => {
     fetchBlueprintCatalog.mockResolvedValue([
       { slug: 'rest', name: 'Restaurante', locale: 'es', latest_version: '1.0.0' },
@@ -619,9 +650,7 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
 
     const retry = w.get('[data-testid="import-report-retry"]');
     expect(retry.attributes('disabled')).toBe('true');
-    expect(w.get('[data-testid="import-retry-reason"]').text()).toContain(
-      en.importPage.retryNotRetryable,
-    );
+    expect(w.get('[data-testid="import-retry-reason"]').text()).toContain(en.importPage.retryNotRetryable);
   });
 
   it('un informe ANTERIOR al campo origin tampoco es reintentable (sin origen no hay garantía)', async () => {
@@ -649,9 +678,7 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
     await w.get('[data-testid="import-report-retry"]').trigger('click');
     await flushPromises();
 
-    expect(w.get('[data-testid="import-retry-error"]').text()).toContain(
-      en.importPage.retryVersionUnavailable,
-    );
+    expect(w.get('[data-testid="import-retry-error"]').text()).toContain(en.importPage.retryVersionUnavailable);
   });
   // ── hub#1693 · el código del runtime NUNCA llega a la pantalla ─────────────────────────────
   //
@@ -698,9 +725,7 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
     );
     await flushPromises();
 
-    expect(w.get('[data-testid="import-error"]').text()).toContain(
-      'el SaaS contestó 404 al resolver el blueprint',
-    );
+    expect(w.get('[data-testid="import-error"]').text()).toContain('el SaaS contestó 404 al resolver el blueprint');
   });
 
   it('el reintento que se cae por la nube tampoco enseña el código', async () => {
@@ -757,7 +782,12 @@ describe('hub#1905 · al terminar de importar se piden los permisos de sus apps'
       origin: salon.origin,
     };
     fetchImportReport
-      .mockResolvedValueOnce({ batch_id: 'b1', name: 'peluqueria', created_at: '2026-09-18T10:00:00Z', report: partial })
+      .mockResolvedValueOnce({
+        batch_id: 'b1',
+        name: 'peluqueria',
+        created_at: '2026-09-18T10:00:00Z',
+        report: partial,
+      })
       .mockResolvedValueOnce({ batch_id: 'b2', name: 'peluqueria', created_at: '2026-09-18T10:05:00Z', report: salon });
     retryImport.mockResolvedValue({ retried: true, code: undefined, report: salon });
     const w = mountPanel();

@@ -1589,6 +1589,23 @@ pub async fn create_session_with_credential(
         &p,
     )
     .await?;
+    // The device was USED (hub#2215). Written here, at the single funnel every login goes through
+    // (PIN, badge, cloud, courier), and not only by the online login that trusts a device: a till
+    // signs in by PIN every morning and never repeats that one. It outlives the session, which is
+    // what lets Settings → Devices say when a row was last used and clear the ones nobody uses.
+    // An `UPDATE`, never an upsert: a login does not make a device trusted.
+    if let Some(device_id) = device_id.map(str::trim).filter(|id| !id.is_empty()) {
+        let mut seen = Params::new();
+        seen.insert("hub_id".into(), json!(hub_id));
+        seen.insert("device_id".into(), json!(device_id));
+        seen.insert("now".into(), p["now"].clone());
+        db.execute(
+            "UPDATE hub_trusted_device SET last_seen_at = :now \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
+            &seen,
+        )
+        .await?;
+    }
     // Somebody of the business signed in (saas#2129), and AFTER the row exists: recorded before
     // the insert, a failed insert would leave behind a login that never happened. Hooked here, at
     // the single funnel every door goes through (`create_session` delegates, and so do PIN,
@@ -1858,9 +1875,11 @@ pub async fn trust_device(
     // eso el nombre que puso el dueño («Barra», «Cocina») sobrevive al siguiente login. Meterlo en
     // el `SET` sería reintroducir el bug entero: una etiqueta que nadie eligió a propósito,
     // reescrita por el cliente en cada turno, delante del botón que corta la tablet equivocada.
+    // `last_seen_at` (hub#2215) is born with the trust; every later use is written by the session
+    // funnel (`create_session_with_credential`), which the online login goes through right after.
     db.execute(
-        "INSERT INTO hub_trusted_device (hub_id, device_id, label, name, trusted_at) \
-          VALUES (:hub_id, :device_id, :label, :default_name, :now) \
+        "INSERT INTO hub_trusted_device (hub_id, device_id, label, name, trusted_at, last_seen_at) \
+          VALUES (:hub_id, :device_id, :label, :default_name, :now, :now) \
           ON CONFLICT (hub_id, device_id) DO UPDATE SET label = excluded.label",
         &p,
     )
@@ -2021,7 +2040,21 @@ mod tests {
         db.execute_batch(UNIT_TEST_HUB_SESSION_COLUMNS)
             .await
             .unwrap();
+        db.execute_batch(UNIT_TEST_TRUSTED_DEVICE_TABLE)
+            .await
+            .unwrap();
     }
+
+    /// `hub_trusted_device` in its final shape — system migrations v2 + v23 (`hub_id` and the PK,
+    /// hub#489) + v17 (mode) + v44 (`name`, hub#494) + v67 (`last_seen_at`, hub#2215). Every login
+    /// that names a device writes its `last_seen_at` (hub#2215), so a unit test that opens a session
+    /// on a device needs the table the boot would have created.
+    const UNIT_TEST_TRUSTED_DEVICE_TABLE: &str = "CREATE TABLE IF NOT EXISTS hub_trusted_device (\
+        hub_id TEXT NOT NULL, device_id TEXT NOT NULL, label TEXT NOT NULL DEFAULT '', \
+        name TEXT NOT NULL DEFAULT '', trusted_at TEXT NOT NULL, \
+        mode TEXT NOT NULL DEFAULT 'shared', mode_set_at TEXT NOT NULL DEFAULT '', \
+        mode_set_by TEXT NOT NULL DEFAULT '', last_seen_at TEXT NOT NULL DEFAULT '', \
+        PRIMARY KEY (hub_id, device_id));";
 
     /// `ensure_tables` + [`UNIT_TEST_HUB_USER_COLUMNS`]: las columnas que el login cloud necesita y
     /// el baseline v0 no trae, montadas a mano — igual que `setup_identity` monta el `device_id`
@@ -2038,6 +2071,9 @@ mod tests {
     async fn ensure_identity_with_sessions(db: &PgAdapter) {
         ensure_identity_email(db).await;
         db.execute_batch(UNIT_TEST_HUB_SESSION_COLUMNS)
+            .await
+            .unwrap();
+        db.execute_batch(UNIT_TEST_TRUSTED_DEVICE_TABLE)
             .await
             .unwrap();
     }
@@ -3248,16 +3284,11 @@ mod tests {
     async fn device_trust_gate() {
         let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
-        // La tabla la crean las migraciones de sistema v2 + v23 (que le añade el `hub_id` y
-        // recompone la PK, hub#489) + v44 (`name`, hub#494); en el test la creamos a mano ya en su
-        // forma final.
-        db.execute_batch(
-            "CREATE TABLE hub_trusted_device (hub_id TEXT NOT NULL, device_id TEXT NOT NULL, \
-              label TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '', \
-              trusted_at TEXT NOT NULL, PRIMARY KEY (hub_id, device_id));",
-        )
-        .await
-        .unwrap();
+        // The table is created by the system migrations (see `UNIT_TEST_TRUSTED_DEVICE_TABLE`);
+        // here it is built by hand, already in its final shape.
+        db.execute_batch(UNIT_TEST_TRUSTED_DEVICE_TABLE)
+            .await
+            .unwrap();
 
         assert!(
             !is_device_trusted(&db, "hub-1", "dev-1").await.unwrap(),

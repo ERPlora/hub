@@ -962,3 +962,88 @@ async fn hub1560_taking_the_name_back_does_not_blank_the_printer_card() {
         "Caja 1"
     );
 }
+
+// ── hub#2215: clearing the devices nobody uses ─────────────────────────────────────────────────
+
+/// Age a device of the fixture as a browser that lost its storage 40 days ago: trusted 60 days
+/// ago, last signed in 40 days ago, its last session run out 39 days ago.
+async fn make_dead(state: &AppState, hub_id: &str, device_id: &str) {
+    let days_ago = |d: i64| (chrono::Utc::now() - chrono::Duration::days(d)).to_rfc3339();
+    let mut p = erplora_db::Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("device_id".into(), json!(device_id));
+    p.insert("trusted".into(), json!(days_ago(60)));
+    p.insert("seen".into(), json!(days_ago(40)));
+    p.insert("expires".into(), json!(days_ago(39)));
+    let rt = state.runtime.read().await;
+    rt.db()
+        .execute(
+            "UPDATE hub_trusted_device SET trusted_at = :trusted, last_seen_at = :seen \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
+            &p,
+        )
+        .await
+        .unwrap();
+    rt.db()
+        .execute(
+            "UPDATE hub_session SET created_at = :seen, expires_at = :expires \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
+            &p,
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn clearing_unused_devices_is_an_admin_gesture() {
+    let (router, sessions) = fixture("hub-2215").await;
+
+    let anonymous = call(&router, "POST", "/api/devices/prune", None, &[]).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(body_json(anonymous).await["error"]["code"], "unauthorized");
+
+    let employee = call(
+        &router,
+        "POST",
+        "/api/devices/prune",
+        Some(&sessions.employee),
+        &[],
+    )
+    .await;
+    assert_eq!(employee.status(), StatusCode::FORBIDDEN);
+    assert_eq!(body_json(employee).await["error"]["code"], "forbidden");
+}
+
+#[tokio::test]
+async fn the_list_says_which_devices_are_unused_and_the_door_clears_exactly_those() {
+    let (router, sessions, state) = fixture_with_state("hub-2215").await;
+    make_dead(&state, "hub-2215", "till-1").await;
+
+    let listed = body_json(call(&router, "GET", "/api/devices", Some(&sessions.admin), &[]).await).await;
+    let rows = listed["data"]["devices"].as_array().expect("a list").clone();
+    let row = |id: &str| rows.iter().find(|d| d["device_id"] == id).cloned().unwrap();
+    assert_eq!(row("till-1")["stale"], true, "40 days unused");
+    assert_eq!(row("laptop-1")["stale"], false, "somebody is signed in on it right now");
+    assert!(
+        !row("till-1")["last_used_at"].as_str().unwrap_or_default().is_empty(),
+        "an unused device still says when it was last used"
+    );
+
+    // Cleaning from the dead till itself keeps it: the device in the administrator's hands never
+    // goes in the group, whatever its dates say.
+    let from_the_till = call(
+        &router,
+        "POST",
+        "/api/devices/prune",
+        Some(&sessions.admin),
+        &[("x-device-id", "till-1")],
+    )
+    .await;
+    assert_eq!(from_the_till.status(), StatusCode::OK);
+    assert_eq!(body_json(from_the_till).await["data"]["removed"], 0);
+
+    let response = call(&router, "POST", "/api/devices/prune", Some(&sessions.admin), &[]).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(body_json(response).await["data"]["removed"], 1);
+    assert_eq!(listed_ids(&router, &sessions.admin).await, vec!["laptop-1"]);
+}

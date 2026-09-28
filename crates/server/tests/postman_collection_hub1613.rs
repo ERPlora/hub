@@ -225,6 +225,17 @@ fn item(route: &Route, extra: Option<&Value>) -> Value {
             .expect("headers")
             .push(header("Content-Type", "application/octet-stream"));
         request["body"] = json!({ "mode": "file", "file": { "src": "" } });
+    } else if let Some(Value::Array(fields)) = get("form") {
+        // A multipart form (hub#2232): Postman writes the `Content-Type` with its boundary, so none
+        // is added here — a hand-set one would drop the boundary and the door would refuse it.
+        request["body"] = json!({
+            "mode": "formdata",
+            "formdata": fields
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|key| json!({ "key": key, "type": "file", "src": "" }))
+                .collect::<Vec<_>>(),
+        });
     }
 
     let name = get("name")
@@ -556,4 +567,34 @@ fn hub1613_credential_follows_the_auth_class() {
         "{{hub_url}}/api/hub/flows/{{id}}/runs"
     );
     assert_eq!(templated("/modules/:id/*path"), "/modules/{{id}}/{{path}}");
+}
+
+/// hub#2232: a door that takes a multipart FORM (the WhatsApp template header sample, field `file`)
+/// is exported as Postman's `formdata`, with the file field to pick. Neither a raw JSON body nor a
+/// binary one would reach it — the door refuses anything that is not `multipart/form-data` with its
+/// boundary — and no `Content-Type` is set by hand: Postman writes it, boundary included.
+#[test]
+fn hub2232_a_form_door_is_exported_as_formdata_with_its_file_field() {
+    let route = Route {
+        method: "POST".into(),
+        path: "/api/hub/whatsapp/template-header-samples".into(),
+        auth: "admin+capability".into(),
+    };
+    let form = item(&route, Some(&json!({ "form": ["file"] })));
+    assert_eq!(form["request"]["body"]["mode"], "formdata");
+    assert_eq!(
+        form["request"]["body"]["formdata"],
+        json!([{ "key": "file", "type": "file", "src": "" }])
+    );
+    assert!(
+        !form["request"]["header"]
+            .as_array()
+            .expect("headers")
+            .iter()
+            .any(|h| h["key"]
+                .as_str()
+                .unwrap_or("")
+                .eq_ignore_ascii_case("content-type")),
+        "a hand-set Content-Type drops the multipart boundary"
+    );
 }

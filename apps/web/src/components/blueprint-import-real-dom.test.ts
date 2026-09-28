@@ -142,6 +142,38 @@ describe('Ajustes › Datos › Importar — la tabla de plantillas PINTA', () =
     expect(painted!.querySelector('ion-searchbar')).toBeTruthy();
   });
 
+  // hub#2207 — a template brings the taxes and formats of ONE country, and the review step already
+  // announces it. The card folded the country into the language row and dropped it whenever the two
+  // codes matched («es» + «ES» → «ES» under «Idioma»), so the Spanish templates never said «España».
+  it('each card says which country the template is for, by name', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([
+      blueprint(),
+      blueprint({ slug: 'lisboa', name: 'Café', locale: 'pt', country: 'PT' }),
+    ]);
+    mount(ImportPanel, { attachTo: document.body, global: { plugins: [i18n] } });
+    await flushPromises();
+    await flushPromises();
+
+    const cards = [...document.querySelector('ok-data-table')!.shadowRoot!.querySelectorAll('ion-card')];
+    expect(cards).toHaveLength(2);
+    const [spain, portugal] = cards.map((card) => card.textContent ?? '');
+    expect(spain).toContain(es.importPage.colCountry);
+    expect(spain).toContain('España');
+    expect(portugal).toContain('Portugal');
+  });
+
+  it('the table view has a country column that names the country', async () => {
+    mount(ImportPanel, { attachTo: document.body, global: { plugins: [i18n] } });
+    await flushPromises();
+
+    const table = document.querySelector('ok-data-table') as unknown as {
+      columns: Array<{ key: string; header: string; format?: (row: Record<string, unknown>) => string }>;
+    };
+    const country = table.columns.find((column) => column.key === 'country');
+    expect(country?.header).toBe(es.importPage.colCountry);
+    expect(country?.format?.({ country: 'ES' })).toBe('España');
+  });
+
   it('sin plantillas publicadas pinta el estado vacío, nunca una tabla muda', async () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     mount(ImportPanel, { attachTo: document.body, global: { plugins: [i18n] } });

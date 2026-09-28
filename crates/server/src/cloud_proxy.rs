@@ -300,6 +300,40 @@ pub(crate) fn cloud_envelope_passthrough(status: StatusCode, body: axum::body::B
     envelope_error(status, code, &message)
 }
 
+/// [`cloud_envelope_passthrough`] for a refusal whose `5xx` the SaaS NAMED on purpose.
+///
+/// The shared passthrough drops the code of a `5xx`, because a DRF crash names none. Some doors
+/// name one deliberately — `502 media_unavailable` (hub#2114), `503 whatsapp_not_configured` and
+/// `502 meta_template_failed` (hub#2232) — and that name is what lets the module offer «Retry» or
+/// «reconnect WhatsApp» instead of «error». So a `5xx` that carries a code keeps it, still under
+/// [`CLOUD_FAILED`] so the edge does not swap the body for its page (hub#1763); one that does not
+/// (a real crash) falls through to the passthrough and reads `cloud_rejected`.
+pub(crate) fn cloud_envelope_named_refusal(
+    status: StatusCode,
+    body: axum::body::Bytes,
+) -> Response {
+    if status.is_server_error() {
+        let named = serde_json::from_slice::<Value>(&body).ok().and_then(|v| {
+            let code = v.get("error")?.as_str()?.to_string();
+            let detail = v
+                .get("detail")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .unwrap_or_else(|| code.clone());
+            Some((code, detail))
+        });
+        if let Some((code, detail)) = named {
+            tracing::warn!(
+                status = status.as_u16(),
+                code = %code,
+                "erplora.com named its server error"
+            );
+            return envelope_error(CLOUD_FAILED, &code, &detail);
+        }
+    }
+    cloud_envelope_passthrough(status, body)
+}
+
 /// One refusal, one shape: `{"ok": false, "error": {"code", "message"}}` — what `unwrap` reads.
 fn envelope_error(status: StatusCode, code: &str, message: &str) -> Response {
     (

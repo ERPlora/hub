@@ -134,6 +134,8 @@ describe('moduleFailureMessage · cada causa de instalación tiene SU frase, no 
     'install_cloud_denied',
     'install_not_in_catalog',
     'install_cloud_rejected',
+    // hub#2251 — the marketplace took the call and went silent.
+    'install_cloud_timeout',
   ] as const;
 
   it.each(CAUSES)('%s reads as a sentence of the catalogue, never as the engine prose', (code) => {

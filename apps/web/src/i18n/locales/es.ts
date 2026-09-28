@@ -33,6 +33,7 @@ export default {
     loading: 'Cargando documentación…',
     errorTitle: 'No se pudo cargar la documentación',
     errorBody: 'No se pudo obtener el spec de la API. Inicia sesión e inténtalo de nuevo.',
+    retry: 'Reintentar',
   },
   topbar: {
     back: 'Atrás',
@@ -50,12 +51,13 @@ export default {
     notifications: 'Notificaciones',
     noNotifications: 'Todo al día. Sin notificaciones.',
     deadLettersTitle: 'Eventos caídos',
-    deadLettersBody: 'Hay {count} evento(s) que el relay no pudo entregar. Revísalos y reenvíalos.',
+    deadLettersBody:
+      'Hay {count} evento que el relay no pudo entregar. Revísalo y reenvíalo. | Hay {count} eventos que el relay no pudo entregar. Revísalos y reenvíalos.',
     // Impresión sin drenar (hub#987). Nombra la estación: «la impresión está parada» manda al dueño
     // a mirar cuatro impresoras; «la cocina está parada» lo manda a una.
     printingStalledTitle: 'Nadie está imprimiendo «{station}»',
     printingStalledBody:
-      'Hay {count} documento(s) esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
+      'Hay {count} documento esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida. | Hay {count} documentos esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
@@ -208,7 +210,7 @@ export default {
     // leer la frase que dice cuántos van a caer.
     confirmDestructive: 'Esto no se puede deshacer desde la pantalla. Escribe {expected} para confirmar.',
     confirmDestructiveWord: 'BORRAR',
-    confirmBulkAffected: 'Vas a borrar {count} registros.',
+    confirmBulkAffected: 'Vas a borrar {count} registro. | Vas a borrar {count} registros.',
     confirmBulkUnknown:
       'No puedo saber cuántos registros borraría esto, así que no lo hago desde aquí. Abre la pantalla, donde puedes verlos.',
   },
@@ -279,6 +281,12 @@ export default {
     renameError: 'No se pudo renombrar. Puede que esta carpeta sea de solo lectura.',
     deleteFolderTitle: 'Eliminar carpeta',
     deleteFolderBody: 'Vas a eliminar «{name}» y todo su contenido. Esto no se puede deshacer.',
+    moveSuccess: 'Movido a «{folder}».',
+    moveError: 'No se pudo mover. Puede que la carpeta de destino sea de solo lectura.',
+    move: 'Mover a…',
+    renameFolder: 'Renombrar carpeta',
+    deleteFolder: 'Eliminar carpeta',
+    noLimit: 'Sin límite',
     close: 'Cerrar',
     previewZoomIn: 'Ampliar',
     previewZoomOut: 'Reducir',
@@ -382,6 +390,8 @@ export default {
     blocking: {
       title: 'Todavía no puedes facturar',
       body: 'No se podrá emitir ningún ticket ni factura hasta que configures esto:',
+      showMissing: 'Ver qué falta',
+      hideMissing: 'Ocultar',
     },
     items: {
       apps: {
@@ -559,6 +569,15 @@ export default {
     adminOnly: 'Solo un administrador puede quitar un dispositivo.',
     loadError: 'No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.',
     revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
+    // hub#2215 — quitar de golpe los dispositivos que ya nadie usa.
+    pruneStale:
+      'Quitar el dispositivo sin usar desde hace 30 días | Quitar los {n} dispositivos sin usar desde hace 30 días',
+    pruneConfirm:
+      '¿Quitar 1 dispositivo que nadie usa desde hace 30 días? | ¿Quitar {n} dispositivos que nadie usa desde hace 30 días?',
+    pruneConsequence:
+      'Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.',
+    pruneAction: 'Quitar',
+    pruneError: 'No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.',
   },
   pinPolicy: {
     lengthTitle: 'Dígitos del PIN',
@@ -576,7 +595,7 @@ export default {
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Hasta cerrar sesión',
     idleMinutesConsequence:
-      'Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.',
+      'Una caja que nadie toca durante {n} minuto cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona. | Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.',
     idleUntilSignOutConsequence:
       'La caja no se bloquea sola por inactividad: la sesión sigue abierta hasta que quien entró cierre sesión, o hasta que caduque por el dispositivo.',
     adminOnly: 'Solo un administrador puede cambiar si se pregunta.',
@@ -649,10 +668,8 @@ export default {
     businessAddressLegacy: 'Dirección actual: {address}. Rellena los campos de arriba para sustituirla.',
     fiscalAddress: 'Dirección fiscal',
     shareWithErplora: 'Usar estos datos también para mi factura de ERPlora',
-    shareWithErploraDesc: 'Envía tu razón social, NIF y dirección a ERPlora para que sus facturas hacia ti los lleven. Tu negocio sigue facturando a sus clientes con estos mismos datos — no se comparte nada más.',
-    shareWithErploraDone: 'Datos compartidos con ERPlora.',
+    shareWithErploraDesc: 'Al guardar, ERPlora también pone tu razón social, NIF y dirección en sus facturas hacia ti. Déjala sin marcar si a ERPlora le paga otra persona por este negocio, como tu gestoría. ERPlora siempre sabe quién es el negocio, porque lo necesita para presentar ante Hacienda.',
     shareWithErploraError: 'No se han podido compartir los datos con ERPlora.',
-    shareWithErploraNeedsTaxId: 'Rellena antes el NIF.',
     defaultVat: 'IVA por defecto',
     defaultVatDesc: 'Tipo aplicado a productos nuevos',
     vatGeneral: '21% (general)',
@@ -682,16 +699,17 @@ export default {
     resetSectionsTitle: 'O borrar por secciones',
     resetUndo: 'Deshacer',
     resetUndoTitle: 'Deshacer «{name}»',
-    resetUndoBody: 'Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
+    resetUndoBody:
+      'Se borrará la fila que trajo este blueprint. Lo que creaste después se conserva. | Se borrarán las {n} filas que trajo este blueprint. Lo que creaste después se conserva.',
     resetUndoEdited: 'Cambiaste {areas} después de importar. Al deshacer solo se quedan tus cambios ahí: lo que este blueprint sustituyó no vuelve.',
     resetUndoNotRestored: 'En {areas} solo se han quedado tus cambios: lo que el blueprint había sustituido no ha vuelto. Revisa esa pantalla.',
     // Pluralización vue-i18n (`singular | plural`): sin ella, una sección con 1 elemento leía
     // «1 filas» (hub#765). El `n` que pasa la llamada elige la forma.
     resetRows: '{n} fila | {n} filas',
     resetSubmit: 'Restablecer el negocio',
-    resetDeleted: '{n} filas borradas',
+    resetDeleted: '{n} fila borrada | {n} filas borradas',
     resetConfirmTitle: 'Esto no se puede deshacer',
-    resetConfirmBody: 'Se borrarán definitivamente {total} filas:',
+    resetConfirmBody: 'Se borrará definitivamente {n} fila: | Se borrarán definitivamente {n} filas:',
     resetConfirmPlaceholder: 'nombre del negocio',
     resetCancel: 'Cancelar',
     resetConfirm: 'Borrar definitivamente',
@@ -736,17 +754,32 @@ export default {
     ready: 'Imprimiendo en {hosts}',
     hostHint: 'Abre la app de ERPlora en el equipo conectado a esta impresora.',
     coverageError: 'No se ha podido comprobar quién está imprimiendo ahora mismo.',
-    ticketFailed: 'El tique de la venta {saleId} NO se imprimió: {error}',
+    ticketFailed: 'El tique NO se imprimió. Vuelve a imprimirlo desde la pantalla del tique.',
     ticketWaitingForPrinter:
-      'El tique de la venta {saleId} está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
+      'El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.',
     ticketNotComposed:
-      'El tique de la venta {saleId} no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
+      'El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.',
     ticketWithoutFiscal:
-      'El tique de la venta {saleId} salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
-    comandaFailed: 'No se imprimió la comanda de {label} ({role}): {error}',
+      'El tique salió antes de que estuviera listo su QR de VeriFactu. Vuelve a imprimirlo desde la pantalla del tique para darle al cliente el completo.',
+    comandaFailed:
+      'No se imprimió la comanda de {station} de {label}. Revisa la impresora y avisa en {station}: la comanda está en la pantalla de cocina.',
     comandaWaitingForPrinter:
-      'La comanda de {label} ({role}) está en espera: aún no hay ninguna impresora dada de alta para esa estación.',
+      'La comanda de {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.',
+    stationKitchen: 'cocina',
+    stationBar: 'barra',
+    // hub#2171 — the system notice when a kitchen order comes in.
+    comandaNotice: 'Nueva comanda',
+    comandaNoticeFor: 'Nueva comanda · {label}',
+    comandaNoticeLines: '{n} línea | {n} líneas',
     comandaDefaultLabel: 'sala',
+  },
+  // hub#2168 — system notices for a booking or cancellation that did NOT come from a till.
+  appointmentNotice: {
+    created: 'Nueva cita',
+    createdFor: 'Nueva cita · {customer}',
+    cancelled: 'Cita cancelada',
+    cancelledFor: 'Cita cancelada · {customer}',
+    when: '{date} a las {time}',
   },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
@@ -850,6 +883,9 @@ export default {
     // has_dependents` de hub#1101, que ya nombra lo que rompería un desinstalar.
     installSuccessWithDependencies: '{name} instalado correctamente. También se instaló: {names}.',
     installError: 'No se pudo iniciar la instalación de {name}.',
+    // hub#2244: the sticky install error's two ways out.
+    installRetry: 'Reintentar',
+    noticeClose: 'Cerrar',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
     // hub#516 — el botón de actualizar. `updateError` dice lo único que importa: el módulo NO se
@@ -1219,7 +1255,7 @@ export default {
     attempts: 'intentos',
     retryAll: 'Reenviar todos',
     retryDone: 'Evento reenviado al relay.',
-    retryAllDone: '{count} evento(s) reenviado(s) al relay.',
+    retryAllDone: '{count} evento reenviado al relay. | {count} eventos reenviados al relay.',
     retryFailed: 'No se pudo reenviar: {reason}',
     discardDone: 'Evento descartado (se conserva para auditoría).',
     discardFailed: 'No se pudo descartar: {reason}',
@@ -1300,8 +1336,8 @@ export default {
     coresOf: '{used} de {limit} vCPU',
     cores: '{used} núcleos',
     dbNoQuota: 'Sin cuota de plan',
-    activeSessions: '{n} sesiones activas',
-    activeUsers: '{n} personas activas',
+    activeSessions: '{n} sesión activa | {n} sesiones activas',
+    activeUsers: '{n} persona activa | {n} personas activas',
     liveNote: 'En vivo — se actualiza cada pocos segundos mientras esta página está abierta.',
     loadErrorTitle: 'Las métricas de recursos no están disponibles',
     loadErrorBody: 'El Hub no ha podido informar de su uso de recursos ahora mismo. Puedes reintentarlo.',
@@ -1403,6 +1439,10 @@ export default {
     // qué hacer. Se ofrecen los dos gestos, y primero el que no cuesta nada.
     sessionTakenOverBody:
       'Tu plan cubre un dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí, o amplía los dispositivos de tu plan.',
+    // hub#2152 — the pass from the ERPlora panel could not be redeemed; the login still works.
+    courierFailed: 'No se pudo entrar desde el panel de ERPlora',
+    courierFailedBody:
+      'Inicia sesión aquí para continuar.',
     setupChoosePin: 'Elige un PIN de {n} dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
@@ -1554,6 +1594,7 @@ export default {
     colTemplate: 'Plantilla',
     colDescription: 'Descripción',
     colLanguage: 'Idioma',
+    colCountry: 'País',
     colVersion: 'Versión',
     colDownloads: 'Descargas',
     colSize: 'Tamaño',
@@ -1655,13 +1696,12 @@ export default {
     protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
     emptyTitle: 'Aquí todavía no hay nada',
     emptyHint: 'Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.',
+    notInstalledTitle: 'Esta app no está instalada',
+    notInstalledHint: 'Este hub no tiene esta app. Búscala en el catálogo de Apps o abre otra desde el menú.',
+    notInstalledAction: 'Ir al catálogo',
     // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
     // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
     notAvailableToast: 'Esta app no está disponible para este hub.',
-    // hub#1723 — an address that names a screen this app does not have. It is swapped for the one
-    // it does have (an old link keeps working) and the swap is now said out loud, naming what
-    // ended up on screen: a bare «that does not exist» leaves the person wondering what they see.
-    unknownTabToast: 'Esta app no tiene ninguna pantalla en esa dirección; se muestra «{tab}».',
   },
   moduleSettings: {
     tab: 'Ajustes',
@@ -1684,7 +1724,7 @@ export default {
     free: 'Gratis',
     perMonth: '/mes',
     perYear: '/año',
-    trialDays: '{n} días de prueba',
+    trialDays: '{n} día de prueba | {n} días de prueba',
     quota: 'Incluye {quota}',
     overage: '{price} por unidad extra',
     noTiers: 'Este módulo no ofrece planes de pago.',
@@ -1813,6 +1853,8 @@ export default {
     install_not_in_catalog: 'Esa app no está disponible en tu catálogo.',
     install_cloud_rejected:
       'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
+    install_cloud_timeout:
+      'ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.',
     core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',

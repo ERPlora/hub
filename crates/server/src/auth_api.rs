@@ -457,10 +457,12 @@ pub(crate) struct CourierGrant {
 /// Boot courier for the native shell.  The browser submits only the opaque code to its same-origin
 /// runtime.  The runtime redeems it server-to-server with its machine credential, then feeds the
 /// access JWT through the exact same `/api/auth/cloud` implementation.  JWTs never appear in a URL.
-// `HeaderMap` va antes del `Json` a propósito: el extractor del cuerpo consume la petición y tiene
-// que ser el último. Lo necesita el nombre por defecto del dispositivo (hub#494): esta puerta abre
-// sesión igual que `/api/auth/cloud`, así que un login por el shell nativo no puede dejar la tablet
-// sin nombre solo por haber entrado por aquí.
+/// Every refusal carries a stable `code` (hub#2176): the shell reports the code, never the prose,
+/// so without it a failed courier reaches the team with no reason attached.
+// `HeaderMap` goes before `Json` on purpose: the body extractor consumes the request and must be
+// the last one. The default device name needs it (hub#494): this door opens a session exactly like
+// `/api/auth/cloud`, so a login through the native shell must not leave the tablet unnamed just
+// because it came in this way.
 pub(crate) async fn auth_courier(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -470,7 +472,7 @@ pub(crate) async fn auth_courier(
     if code.is_empty() || code.len() > 128 {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "ok": false, "error": "código courier inválido" })),
+            Json(json!({ "ok": false, "error": "código courier inválido", "code": "courier_invalid" })),
         )
             .into_response();
     }
@@ -479,7 +481,11 @@ pub(crate) async fn auth_courier(
         // back to the login form, and the edge replaces the body of a `5xx` with its own page.
         return (
             crate::cloud_proxy::CLOUD_FAILED,
-            Json(json!({ "ok": false, "error": "hub sin credencial de máquina" })),
+            Json(json!({
+                "ok": false,
+                "error": "hub sin credencial de máquina",
+                "code": crate::cloud_proxy::HUB_NOT_ENROLLED,
+            })),
         )
             .into_response();
     };
@@ -494,20 +500,32 @@ pub(crate) async fn auth_courier(
         Err(error) => {
             return (
                 crate::cloud_proxy::CLOUD_FAILED,
-                Json(json!({ "ok": false, "error": crate::cloud_proxy::cloud_unreachable(&error.to_string()) })),
+                Json(json!({
+                    "ok": false,
+                    "error": crate::cloud_proxy::CLOUD_UNREACHABLE,
+                    "code": crate::cloud_proxy::cloud_unreachable(&error.to_string()),
+                })),
             )
                 .into_response()
         }
     };
     if !response.status().is_success() {
-        let status = if response.status().as_u16() == 400 {
-            StatusCode::BAD_REQUEST
+        // Only a `400` is about the code itself (the SaaS answers «invalid or expired» without
+        // telling the two apart). Anything else refused the HUB — its machine credential — or
+        // failed, and the report has to point at that culprit, not at the person's code.
+        let (status, code) = if response.status().as_u16() == 400 {
+            (StatusCode::BAD_REQUEST, "courier_rejected")
         } else {
-            crate::cloud_proxy::CLOUD_FAILED
+            (
+                crate::cloud_proxy::CLOUD_FAILED,
+                crate::cloud_proxy::CLOUD_REJECTED,
+            )
         };
         return (
             status,
-            Json(json!({ "ok": false, "error": "código courier inválido o caducado" })),
+            Json(
+                json!({ "ok": false, "error": "código courier inválido o caducado", "code": code }),
+            ),
         )
             .into_response();
     }
@@ -516,7 +534,11 @@ pub(crate) async fn auth_courier(
         _ => {
             return (
                 crate::cloud_proxy::CLOUD_FAILED,
-                Json(json!({ "ok": false, "error": "respuesta courier inválida" })),
+                Json(json!({
+                    "ok": false,
+                    "error": "respuesta courier inválida",
+                    "code": crate::cloud_proxy::CLOUD_UNREADABLE,
+                })),
             )
                 .into_response()
         }

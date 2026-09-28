@@ -86,3 +86,34 @@ describe('updateHubSettings carries the fiscal-identity publication verdict', ()
     expect(hubSettings.value?.fiscal_identity_publish_error).toBeUndefined();
   });
 });
+
+describe('the ERPlora-invoice box survives the trip into the cache (hub#2217)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    hubSettings.value = null;
+  });
+
+  it('keeps a ticked box ticked', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => saved({ business_identity_for_erplora_billing: true })),
+    );
+
+    await updateHubSettings({ business_identity_for_erplora_billing: true });
+
+    expect(hubSettings.value?.business_identity_for_erplora_billing).toBe(true);
+  });
+
+  it('reads a missing or unreadable box as unticked, never as ticked', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => saved()));
+    await updateHubSettings({ business_tax_id: 'B12345674' });
+    expect(hubSettings.value?.business_identity_for_erplora_billing).toBe(false);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => saved({ business_identity_for_erplora_billing: 'true' })),
+    );
+    await updateHubSettings({ business_tax_id: 'B12345674' });
+    expect(hubSettings.value?.business_identity_for_erplora_billing).toBe(false);
+  });
+});

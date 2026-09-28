@@ -64,6 +64,24 @@ run_hook() {
     echo $?
 }
 
+# The hook publishes its seal in the BACKGROUND and returns without waiting for it,
+# so a case that reads STATUS the instant the hook returns races the publisher and
+# goes red on a loaded machine with the seal landing a moment later (hub#2277).
+# `await_grep <file> <grep args…>` polls until $file matches, up to SEAL_WAIT_SECS; a
+# seal that is never published still fails, only later. `await_line <file> <line>`
+# waits for that exact line. The fake `gh` that writes POSTED/POSTARGS is reached by
+# the same background step, so its readers wait the same way.
+SEAL_WAIT_SECS="${SEAL_WAIT_SECS:-15}"
+await_grep() {
+    local file=$1 deadline=$((SECONDS + SEAL_WAIT_SECS))
+    shift
+    until grep -q "$@" "$file" 2>/dev/null; do
+        [ "$SECONDS" -lt "$deadline" ] || return 1
+        sleep 0.1
+    done
+}
+await_line() { await_grep "$1" -xF -- "$2"; }
+
 echo "pre-push local gate"
 
 # ── 1. Disarmed is the default: it must never block anyone ────────────────────
@@ -119,8 +137,8 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_STATE_DIR="$repo/.state" \
     HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
     HUB_GATE_TEST_CMD="true")
-sleep 1   # the status is published in the background, after the push lands
-[ "$code" = 0 ] && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
+# The status is published in the background, after the push lands.
+[ "$code" = 0 ] && await_line "$repo/STATUS" "$sha" && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
     && ok "green suite: push proceeds and the status carries the pushed sha" \
     || bad "green suite: push proceeds and the status carries the pushed sha" "exit=$code status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
 
@@ -180,11 +198,10 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_DEPTH=full \
     HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
     HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
-sleep 1
 [ "$code" = 0 ] && [ -s "$repo/SUITE" ] && [ ! -s "$repo/FAST" ] \
     && ok "depth=full (control): corre la SUITE y no el rápido" \
     || bad "depth=full (control): corre la SUITE y no el rápido" "exit=$code suite=$(cat "$repo/SUITE" 2>/dev/null) fast=$(cat "$repo/FAST" 2>/dev/null)"
-[ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
+await_line "$repo/STATUS" "$sha" && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
     && ok "depth=full (control): SÍ atestigua sobre el sha empujado" \
     || bad "depth=full (control): SÍ atestigua" "status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
 
@@ -614,9 +631,10 @@ sleep 2
 log="$repo/.state/publish-status.log"
 errs=""
 [ "$code" = 0 ]                             || errs="$errs exit=$code(want 0)"
-grep -qi 'could not be published' "$log" 2>/dev/null || errs="$errs no-verdict"
-grep -q 'HTTP 403' "$log" 2>/dev/null       || errs="$errs no-gh-error"
-grep -q 'other-company' "$log" 2>/dev/null  || errs="$errs no-account"
+# The report is written by the same background step as the seal: wait for it.
+await_grep "$log" -i 'could not be published' || errs="$errs no-verdict"
+await_grep "$log" 'HTTP 403'                   || errs="$errs no-gh-error"
+await_grep "$log" 'other-company'              || errs="$errs no-account"
 [ -z "$errs" ] \
     && ok "the status POST failing is reported, not swallowed" \
     || bad "the status POST failing is reported, not swallowed" "$errs log=$(head -3 "$log" 2>/dev/null)"
@@ -644,7 +662,7 @@ sleep 2
 out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                    || errs="$errs exit=$code(want 0)"
-[ -f "$repo/POSTED" ]              || errs="$errs not-posted"
+await_line "$repo/POSTED" posted   || errs="$errs not-posted"
 grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
 [ -z "$errs" ] \
     && ok "green + a working gh: the status is posted and nothing cries wolf" \
@@ -725,7 +743,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 sleep 2
 errs=""
 [ "$code" = 0 ]                                              || errs="$errs exit=$code(want 0)"
-grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-hook-hash-in-description args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)"
+await_grep "$repo/POSTARGS" -E 'hook [0-9a-f]{12}'           || errs="$errs no-hook-hash-in-description args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)"
 [ -z "$errs" ] \
     && ok "the posted status says which hook attested (12-hex hash)" \
     || bad "the posted status says which hook attested (12-hex hash)" "$errs"
@@ -1070,7 +1088,7 @@ sleep 2
 out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                || errs="$errs exit=$code(want 0)"
-[ -f "$repo/POSTED" ]                          || errs="$errs not-posted"
+await_line "$repo/POSTED" posted               || errs="$errs not-posted"
 grep -qi 'verified on origin' <<<"$out"        || errs="$errs message-does-not-defer-to-verification"
 grep -qiE 'green → pushing|green -> pushing' <<<"$out" && errs="$errs still-claims-pushing"
 [ -z "$errs" ] \
@@ -1103,7 +1121,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 sleep 2
 errs=""
 [ "$code" = 0 ]           || errs="$errs exit=$code(want 0)"
-[ -f "$repo/POSTED" ]     || errs="$errs not-posted log=$(head -8 "$repo/.state/publish-status.log" 2>/dev/null | tr '\n' ' ')"
+await_line "$repo/POSTED" posted || errs="$errs not-posted log=$(head -8 "$repo/.state/publish-status.log" 2>/dev/null | tr '\n' ' ')"
 [ -z "$errs" ] \
     && ok "ref moved past the sha: still counts as landed (ancestor check), status posts" \
     || bad "ref moved past the sha: still counts as landed (ancestor check), status posts" "$errs"
@@ -1294,6 +1312,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
     HUB_GATE_TEST_CMD="true")
 sleep 2
+await_grep "$repo/POSTARGS" -e '^description='
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                    || errs="$errs exit=$code(want 0)"
@@ -1461,6 +1480,7 @@ GH
         HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
         HUB_GATE_TEST_CMD="true")
     sleep 2
+    await_grep "$repo/POSTARGS" -e '^description='
     args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
     errs=""
     [ "$code" = 0 ]                          || errs="$errs exit=$code(want 0)"
@@ -1495,6 +1515,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
     HUB_GATE_TEST_CMD="true")
 sleep 2
+await_grep "$repo/POSTARGS" -e '^description='
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                     || errs="$errs exit=$code(want 0)"
@@ -1765,6 +1786,120 @@ errs=""
     && ok "web: con el comando web fijado el gate no toca docker ni el banco de e2e" \
     || bad "web: con el comando web fijado el gate no toca docker ni el banco de e2e" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 
+# 1c. hub#2259 / rv-2265 — la etapa web POR DEFECTO prueba la OutfitKit de producción, no el pin.
+#     `test-web.yml` y el Dockerfile instalan `@erplora/outfitkit@latest`; el gate instalaba solo
+#     el lockfile, así que tras cada release de OutfitKit (13 el 26/09) la guarda del banco
+#     (`apps/web/tests/outfitkit-latest-guard.ts`) habría abortado TODO push web de la flota hasta
+#     que cada rama subiera su pin — y todas chocarían en `pnpm-lock.yaml`. El gate hace lo mismo que
+#     la CI y deja `package.json` + `pnpm-lock.yaml` como estaban, en verde Y en rojo: el árbol del
+#     worker no se ensucia (la guardia hub#855 compara el árbol con lo empujado). `pnpm`/`cargo` son
+#     stubs FUERA del repo; el de `pnpm add` escribe en los dos ficheros como el de verdad.
+web_default_repo() {
+    local repo
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    mkdir -p "$repo/apps/web"
+    printf '{ "dependencies": { "@erplora/outfitkit": "^0.1.84" } }\n' > "$repo/apps/web/package.json"
+    printf "'@erplora/outfitkit@0.1.84': {}\n" > "$repo/pnpm-lock.yaml"
+    git -C "$repo" add apps/web/package.json pnpm-lock.yaml
+    git -C "$repo" commit -qm pin
+    echo "$repo"
+}
+web_default_stubs() {
+    local bin=$1 e2e_rc=$2
+    mkdir -p "$bin"
+    cat > "$bin/pnpm" <<STUB
+#!/bin/sh
+printf '%s\n' "\$*" >> "$bin/calls.log"
+case "\$*" in
+    *"add @erplora/outfitkit@latest"*)
+        echo latest >> apps/web/package.json; echo latest >> pnpm-lock.yaml ;;
+    *test:e2e*)
+        grep -q latest apps/web/package.json && echo "e2e-saw-latest" >> "$bin/calls.log"
+        # "kill": the hook dies mid-playwright (Ctrl-C, the fleet's timeout) — our parent is it.
+        [ "$e2e_rc" = kill ] && { kill -TERM "\$PPID"; sleep 1; exit 1; }
+        exit $e2e_rc ;;
+esac
+exit 0
+STUB
+    # `cargo metadata` is the real one: the gate needs it to see that a web-only diff has no Rust
+    # (the path that runs the web stage BEFORE the lock and its EXIT trap exist).
+    printf '#!/bin/sh\n[ "$1" = metadata ] && exec "%s" "$@"\nexit 0\n' "$REAL_CARGO" > "$bin/cargo"
+    chmod +x "$bin/pnpm" "$bin/cargo"
+}
+REAL_CARGO=$(command -v cargo)
+# Two paths reach the web stage and each restores the pin through its own EXIT trap: a web-only
+# diff (no Rust → web stage before the lock) and a diff that runs the Hub suite (web stage after
+# the lock, whose trap replaces the early one).
+for path in web-only suite; do
+for e2e_rc in 0 1 kill; do
+    repo=$(web_default_repo)
+    sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+    bin="${repo}-webbin"
+    web_default_stubs "$bin" "$e2e_rc"
+    scope_env=HUB_GATE_SCOPE_POLICY=scoped
+    [ "$path" = suite ] && scope_env=HUB_GATE_SCOPE=workspace
+    code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        PATH="$bin:$PATH" DATABASE_URL=postgres://stub HUB_GATE_E2E_DB_CMD=true \
+        HUB_GATE_TEST_CMD="true" "$scope_env")
+    add_line=$(grep -m1 -n -- '--filter @erplora/web add @erplora/outfitkit@latest' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    install_line=$(grep -m1 -n -- 'install --frozen-lockfile' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    verify_line=$(grep -m1 -nx -- 'verify' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    e2e_line=$(grep -m1 -n -- 'test:e2e' "$bin/calls.log" 2>/dev/null | cut -d: -f1)
+    errs=""
+    if [ "$e2e_rc" = 0 ]; then
+        [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+        label="web ($path): la etapa por defecto prueba OutfitKit @latest como la CI y deja el pin como estaba (hub#2259)"
+    elif [ "$e2e_rc" = 1 ]; then
+        [ "$code" != 0 ] || errs="$errs exit=0(want red)"
+        label="web ($path): con playwright en rojo el pin de OutfitKit también se restaura (hub#2259)"
+    else
+        [ "$code" != 0 ] || errs="$errs exit=0(want killed)"
+        label="web ($path): si matan el gate a mitad de playwright el pin de OutfitKit también se restaura (hub#2259)"
+    fi
+    if [ "$path" = web-only ]; then
+        grep -q 'no Rust in this diff' "$repo/.out" || errs="$errs did-not-take-the-no-rust-path"
+    else
+        grep -q 'running the whole Hub suite' "$repo/.out" || errs="$errs did-not-take-the-suite-path"
+    fi
+    [ -n "$add_line" ] || errs="$errs no-outfitkit-latest-step"
+    [ -n "$add_line" ] && [ -n "$install_line" ] && [ "$install_line" -lt "$add_line" ] \
+        || errs="$errs latest-not-after-install"
+    # Same order as test-web.yml: vue-tsc + vitest run on @latest too, not only playwright.
+    [ -n "$add_line" ] && [ -n "$verify_line" ] && [ "$add_line" -lt "$verify_line" ] \
+        || errs="$errs latest-not-before-verify"
+    [ -n "$add_line" ] && [ -n "$e2e_line" ] && [ "$add_line" -lt "$e2e_line" ] \
+        || errs="$errs latest-not-before-e2e"
+    grep -q e2e-saw-latest "$bin/calls.log" 2>/dev/null || errs="$errs e2e-ran-on-the-pin"
+    git -C "$repo" diff --quiet -- apps/web/package.json pnpm-lock.yaml \
+        || errs="$errs pin-left-modified=$(git -C "$repo" diff --stat | tr '\n' ' ')"
+    [ -z "$errs" ] \
+        && ok "$label" \
+        || bad "$label" "$errs calls=$(tr '\n' '|' < "$bin/calls.log" 2>/dev/null) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+done
+done
+# A pin file that did not exist before the `add` does not exist after it either: the tree stays
+# the pushed tree (hub#855), not one with an untracked lockfile the worker never wrote.
+repo=$(web_default_repo)
+git -C "$repo" rm -q pnpm-lock.yaml
+git -C "$repo" commit -qm "no lockfile"
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+bin="${repo}-webbin"
+web_default_stubs "$bin" 0
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    PATH="$bin:$PATH" DATABASE_URL=postgres://stub HUB_GATE_E2E_DB_CMD=true \
+    HUB_GATE_TEST_CMD="true")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+grep -q e2e-saw-latest "$bin/calls.log" 2>/dev/null || errs="$errs e2e-ran-on-the-pin"
+[ ! -e "$repo/pnpm-lock.yaml" ] || errs="$errs lockfile-created-by-the-add-left-behind"
+git -C "$repo" diff --quiet -- apps/web/package.json || errs="$errs package-json-left-modified"
+[ -z "$errs" ] \
+    && ok "web: un fichero del pin que no existía antes del add @latest no queda después (hub#2259)" \
+    || bad "web: un fichero del pin que no existía antes del add @latest no queda después (hub#2259)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
 # 2. Web en rojo = push ABORTADO (sin push no hay PR: es la puerta que pidió Ioan).
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
@@ -1879,6 +2014,9 @@ GH
         HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true" \
         SKIP_HUB_WEB="$skip" >/dev/null
     sleep 2
+    # The control run must wait for its seal (published in the background, hub#2277);
+    # the skipped run keeps the fixed wait: it asserts that nothing was posted.
+    [ "$skip" = 1 ] || await_line "$repo/POSTARGS" context=local-gate/hub-tests
     tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null
 }
 # Control primero: corriendo TODO si atestigua (si no, el caso de abajo no probaria nada).
@@ -2147,6 +2285,34 @@ PY
     && ok "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" \
     || bad "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" "$mismatch"
 
+# (a2) …and triggering is not enough: the default light command RUNS the check of every light
+#      file. `web-format.test.sh` (hub#2156) and `merge-check-tree*` (pm#331) entered
+#      `on.push.paths` without entering the hook; listing them alone would trigger a stage that
+#      never runs them — green with the contract unproven.
+light_gap=$(HOOK="$HOOK" python3 - <<'PY'
+import os, re
+hook = open(os.environ["HOOK"], encoding="utf-8").read()
+m = re.search(r'^WEB_LIGHT_FILES="([^"]*)"', hook, re.M)
+files = m.group(1).split() if m else []
+m = re.search(r"light_cmd='([^']*)'", hook)
+cmd = m.group(1) if m else ""
+def check_of(f):
+    if f == ".github/workflows/test-web.yml":
+        return "scripts/tests/test-web-workflow.test.sh"
+    ci = re.match(r"^scripts/ci/(.+)\.sh$", f)
+    return "scripts/tests/%s.test.sh" % ci.group(1) if ci else f
+if not files or not cmd:
+    print("NO-PUDE-LEER-WEB_LIGHT_FILES-o-light_cmd")
+else:
+    gaps = [f for f in files if check_of(f) not in cmd]
+    if gaps:
+        print("sin-comprobacion-en-light_cmd: " + " ".join(gaps))
+PY
+)
+[ -z "$light_gap" ] \
+    && ok "hub#1356: la etapa ligera corre la comprobación de cada fichero que la dispara" \
+    || bad "hub#1356: la etapa ligera corre la comprobación de cada fichero que la dispara" "$light_gap"
+
 # (b) Tocar SOLO la guardia dispara la etapa — hoy no dispara nada.
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
@@ -2263,6 +2429,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
 sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
           # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+await_line "$repo/POSTARGS" context=local-gate/hub-web
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
@@ -2297,6 +2464,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true" HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
 sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
           # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+await_line "$repo/POSTARGS" context=local-gate/no-suite-needed
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
@@ -2333,6 +2501,8 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
 sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
           # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+await_line "$repo/POSTARGS" context=local-gate/hub-tests
+await_line "$repo/POSTARGS" context=local-gate/hub-web
 args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                   || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
@@ -2580,7 +2750,7 @@ out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
 [ "$code" = 0 ]                                   || errs="$errs exit=$code(want 0)"
 [ ! -f "$repo/RAN" ]                              || errs="$errs suite-rerun-on-an-already-proven-tree"
-grep -q "^$prom local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+await_line "$repo/STATUS" "$prom local-gate/hub-tests-ci" \
                                                   || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')(want $prom local-gate/hub-tests-ci)"
 # The proof is Actions', so it must NOT be filed as a local green: the next
 # push would then claim `local-gate/hub-tests` — a run on this machine that
@@ -2733,14 +2903,17 @@ sha=$(git -C "$repo" rev-parse HEAD)
 git -C "$repo" update-ref refs/remotes/origin/develop "$sha"
 echo two > "$repo/file"
 git -C "$repo" commit -qam two
+# hub#2277: the publisher lands LATE on purpose (`sleep 1`), as it does on a loaded
+# machine — the seal is published in the background, so the case must wait for it
+# instead of reading STATUS the instant the hook returns.
 code=$(run_hook "$repo" "refs/heads/main $sha refs/heads/main $ZERO" \
     HUB_GATE_STATE_DIR="$repo/.state" \
-    HUB_GATE_STATUS_CMD="printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
+    HUB_GATE_STATUS_CMD="sleep 1; printf '%s %s\n' \"\$1\" \"\$2\" >> $repo/STATUS" \
     HUB_GATE_CI_CHECKS_CMD="printf 'cancelled\tcargo test --workspace\nsuccess\tcargo test --workspace\n'" \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 errs=""
 [ "$code" = 0 ]                            || errs="$errs exit=$code(want 0)"
-grep -q "^$sha local-gate/hub-tests-ci$" "$repo/STATUS" 2>/dev/null \
+await_line "$repo/STATUS" "$sha local-gate/hub-tests-ci" \
                                            || errs="$errs seal=$(cat "$repo/STATUS" 2>/dev/null | tr '\n' ',')"
 [ -z "$errs" ] \
     && ok "hub#1679: a cancelled twin next to the green one — still sealed" \

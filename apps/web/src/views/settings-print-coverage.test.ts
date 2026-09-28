@@ -52,7 +52,6 @@ vi.mock('../lib/runtime', () => ({
   getModuleCapabilities: vi.fn(),
   putModuleCapabilities: vi.fn(),
   getBusinessCertificate: vi.fn().mockResolvedValue({ present: false }),
-  publishFiscalIdentity: vi.fn(),
   putBusinessCertificate: vi.fn(),
   deleteBusinessCertificate: vi.fn(),
 }));

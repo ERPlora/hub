@@ -46,6 +46,18 @@ sales/tests/orders.hub.test.py
 sales/tests/void.hub.test.py
 sales/tests/void_chain.hub.test.py
 
+# sales: el descuento de una cuenta abierta se autoriza al APLICARLO — la puerta normal rechaza
+# lo que pasa del tope con `sales.discount_over_limit` y la del encargado lo guarda, contra el
+# kernel real (sales#284). Cobertura nueva, no mudada.
+# Landed pending publication (sales#284); the module has published it: now a normal entry.
+sales/tests/order_discount_cap.hub.test.py
+
+# sales × services: a salon sells a haircut at the till — the service comes back from the till's
+# own reads with its family counted, goes on a check and is charged as a service line, against
+# the real kernel with `services` installed next to `sales` (sales#278). New coverage, not moved.
+# pending-publication: sales#278 until 2026-10-24
+sales/tests/service_sale.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
@@ -108,7 +120,7 @@ inventory/tests/combo_stock.hub.test.py
 # staff: un usuario del Hub cuelga de UNA sola ficha viva — el rechazo `staff.user_already_linked`,
 # el id que devuelve el alta y la guarda de rol tras pasar alta/edición a handler WASM, contra el
 # kernel real (staff#55). Cobertura nueva, no mudada.
-# pending-publication: staff#62 until 2026-10-23
+# Landed pending publication (staff#62); the module has published it: now a normal entry.
 staff/tests/user_link.hub.test.py
 
 # ── Cómo entra una batería NUEVA: `# pending-publication: <repo>#<n> until <fecha>` (kitchen#84) ─
@@ -141,3 +153,33 @@ staff/tests/user_link.hub.test.py
 # kernel real — lo único que resuelve las `reads` de `close_from_order` (kitchen#79).
 # Entró pendiente de publicar (kitchen#84) y kitchen#85 la publicó: ya es una entrada normal.
 kitchen/tests/closed_check.hub.test.py
+
+# kitchen: una ronda ya enviada pasa a urgente y vuelve por la puerta de SU hub, y otro hub ni la
+# ve ni la toca, contra el kernel real (kitchen#76). Cobertura nueva, no mudada.
+# Landed pending publication (kitchen#95); the module has published it: now a normal entry.
+kitchen/tests/rush_after_fire.hub.test.py
+
+# customers: merge two duplicate customer records against the real kernel — the manifest with the
+# ANCHORED `expect_rows` guard installs, the dispatcher binds the 15 statements, the merge moves the
+# timeline, and a repeated id or an already-retired record is rejected with
+# `customers.customer_unavailable` (customers#86, layer 1). New coverage, not moved.
+# Landed pending publication (customers#87); the module has published it: now a normal entry.
+customers/tests/merge.hub.test.py
+
+# appointments: mover y anular una cita dejan su línea de historial (quién lo pidió y por qué) y
+# un movimiento rechazado no deja ninguna, contra el kernel real (appointments#196). Cobertura
+# nueva, no mudada.
+# Landed pending publication (appointments#196); the module has published it: now a normal entry.
+appointments/tests/history_trail.hub.test.py
+
+# pricing: un código de lista repetido se rechaza con `pricing.duplicate_code` dentro del hub y el
+# mismo código en OTRO hub se acepta (unicidad por `(hub_id, code)`), contra el kernel real
+# (pricing#46). Cobertura nueva, no mudada.
+# pending-publication: pricing#46 until 2026-10-26
+pricing/tests/duplicate_list_code.hub.test.py
+# services: a second live category with the same name in the hub is refused with
+# `services.category_name_taken` — whatever the case and spacing — through the manifest's
+# `on_unique`, and a deleted one frees its name, against the real kernel (services#107).
+# New coverage, not moved.
+# pending-publication: services#112 until 2026-10-26
+services/tests/category_name_taken.hub.test.py

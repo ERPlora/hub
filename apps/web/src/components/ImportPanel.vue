@@ -1,5 +1,5 @@
 <template>
-  <section>
+  <section ref="panelRoot">
     <p class="page-lead" data-testid="import-lead">{{ t('importPage.lead') }}</p>
     <p v-if="!mayAdminister" class="page-lead admin-note">{{ t('importPage.adminOnly') }}</p>
 
@@ -23,11 +23,7 @@
           data-testid="import-upload-local"
           @click="triggerFilePicker"
         >
-          <ion-spinner
-            v-if="inspecting && activeSource === 'local'"
-            slot="start"
-            name="crescent"
-          />
+          <ion-spinner v-if="inspecting && activeSource === 'local'" slot="start" name="crescent" />
           <HubIcon v-else slot="start" name="cloud-upload-outline" />
           {{ t('importPage.fromLocal') }}
         </ion-button>
@@ -214,13 +210,7 @@
         {{ t('importPage.importErrorTitle') }}: {{ error }}
       </ion-note>
 
-      <ion-button
-        data-testid="import-submit"
-        class="mt-3"
-        expand="block"
-        :disabled="!mayAdminister"
-        @click="doImport"
-      >
+      <ion-button data-testid="import-submit" class="mt-3" expand="block" :disabled="!mayAdminister" @click="doImport">
         <HubIcon slot="start" name="cloud-upload-outline" />
         {{ t('importPage.import') }}
       </ion-button>
@@ -413,6 +403,20 @@ type Step = 'pick' | 'review' | 'importing' | 'report';
 const step = ref<Step>('pick');
 const error = ref<string>('');
 
+// hub#2207 — each step replaces the previous one in place, and the page's scroller kept its offset:
+// on a phone, «See the templates» (at the bottom of a long report) opened the catalogue on its LAST
+// card. A new step starts at the top, like any wizard.
+const panelRoot = ref<HTMLElement | null>(null);
+watch(
+  step,
+  () => {
+    const content = panelRoot.value?.closest('ion-content') as
+      (HTMLElement & { scrollToTop?: (duration?: number) => Promise<void> }) | null | undefined;
+    void content?.scrollToTop?.(0);
+  },
+  { flush: 'post' },
+);
+
 // ── Paso 1: fichero local → inspect ──
 const fileInput = ref<HTMLInputElement | null>(null);
 const inspecting = ref<boolean>(false);
@@ -495,9 +499,7 @@ async function inspectAndReview(zip: Blob): Promise<void> {
 // blueprints puede cargar. Solo admin puede importar, así que solo admin dispara la carga.
 const loadingCatalog = ref<boolean>(false);
 const catalog = ref<CatalogBlueprint[]>([]);
-const blueprintRows = computed<BlueprintRow[]>(() =>
-  catalog.value.map((blueprint) => ({ ...blueprint })),
-);
+const blueprintRows = computed<BlueprintRow[]>(() => catalog.value.map((blueprint) => ({ ...blueprint })));
 
 function formatSize(sizeBytes: number): string {
   if (sizeBytes <= 0) return '—';
@@ -505,6 +507,22 @@ function formatSize(sizeBytes: number): string {
   if (sizeBytes < 1024 * 1024) return `${Math.round(sizeBytes / 1024)} KB`;
   const megabytes = sizeBytes / (1024 * 1024);
   return `${megabytes >= 10 ? Math.round(megabytes) : megabytes.toFixed(1)} MB`;
+}
+
+/**
+ * The country a template is for, by name in the shell's language (hub#2207): «España», not «ES».
+ * A code the runtime cannot name is shown as the code; no country is «—».
+ */
+function countryName(code: unknown): string {
+  const region = String(code ?? '')
+    .trim()
+    .toUpperCase();
+  if (!region) return '—';
+  try {
+    return new Intl.DisplayNames([String(locale.value)], { type: 'region' }).of(region) ?? region;
+  } catch {
+    return region;
+  }
 }
 
 const blueprintColumns = computed<DataTableColumn[]>(() => [
@@ -520,6 +538,12 @@ const blueprintColumns = computed<DataTableColumn[]>(() => [
     header: t('importPage.colLanguage'),
     width: '4.5rem',
     format: (row) => String(row.locale ?? '').toUpperCase(),
+  },
+  {
+    key: 'country',
+    header: t('importPage.colCountry'),
+    width: '7rem',
+    format: (row) => countryName(row.country),
   },
   {
     key: 'latest_version',
@@ -589,15 +613,8 @@ function renderBlueprintCard(row: TableRow): Node {
   ].join(';');
   root.append(description);
 
-  const language = String(row.locale ?? '').toUpperCase() || '—';
-  const country = String(row.country ?? '').toUpperCase();
-  addCardRow(
-    root,
-    t('importPage.colLanguage'),
-    country && country.toLowerCase() !== language.toLowerCase()
-      ? `${language} · ${country}`
-      : language,
-  );
+  addCardRow(root, t('importPage.colLanguage'), String(row.locale ?? '').toUpperCase() || '—');
+  addCardRow(root, t('importPage.colCountry'), countryName(row.country));
   addCardRow(root, t('importPage.colVersion'), `v${String(row.latest_version ?? '')}`);
   addCardRow(
     root,
@@ -963,7 +980,10 @@ function noteTextColor(color: ReportRow['color']): ReportRow['color'] | 'medium'
 // El motor del runtime NO copia media (lo hace la capa server) y la reporta `Skipped`; su
 // resultado REAL viene en `report.media`. Traducimos ese contador al estado verdadero de la fila
 // para no mentir con un «Saltado» cuando las imágenes sí se copiaron (informe de review, hallazgo #1).
-function mediaStatus(m: NonNullable<ImportReport['media']>): { kind: 'applied' | 'skipped' | 'failed'; reason?: string } {
+function mediaStatus(m: NonNullable<ImportReport['media']>): {
+  kind: 'applied' | 'skipped' | 'failed';
+  reason?: string;
+} {
   const reason = m.failed > 0 ? t('importPage.mediaFailed', { n: m.failed }) : undefined;
   if (m.failed > 0) return { kind: 'failed', reason };
   if (m.copied > 0) return { kind: 'applied' };
@@ -1047,8 +1067,7 @@ const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   flow_grants_not_portable: () => t('importPage.reasonFlowGrantsNotPortable'),
   flows_paused_without_grants: () => t('importPage.reasonFlowsPausedWithoutGrants'),
   flows_not_restorable: (n) => t('importPage.reasonFlowsNotRestorable', { n }),
-  table_gone_in_installed_version: (n) =>
-    t('importPage.reasonTableGoneInInstalledVersion', { n }),
+  table_gone_in_installed_version: (n) => t('importPage.reasonTableGoneInInstalledVersion', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */
@@ -1060,8 +1079,7 @@ function reportReason(status: { reason?: string }, discardedRows: number): strin
 const reportRows = computed<ReportRow[]>(() =>
   (report.value?.sections ?? []).map((s) => {
     const media = report.value?.media;
-    const info =
-      s.section === 'media' && media ? mediaStatus(media) : sectionStatusInfo(s.status);
+    const info = s.section === 'media' && media ? mediaStatus(media) : sectionStatusInfo(s.status);
     const v = visual[info.kind];
     return {
       section: s.section,

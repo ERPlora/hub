@@ -551,6 +551,7 @@ import { isAdmin } from '../lib/session';
 import { toast, toastSuccess, toastError } from '../lib/toast';
 import {
   ensureNotificationPermission,
+  hasNoticeSource,
   notificationPermissionState,
   primerLabelsFrom,
   type NotificationPermission,
@@ -645,7 +646,20 @@ const installedModules = ref<InstalledModule[] | null>(null);
 // state and never on «is this Android».
 const notices = ref<NotificationPermission>('unsupported');
 const askingForNotices = ref(false);
-const noticesBlocked = computed(() => notices.value === 'denied');
+// hub#2046: a hub with no ACTIVE notice-source module (today `kitchen` and, since hub#2168,
+// `appointments`) has nothing that would ever use this permission, so the card stays hidden even
+// with the notices refused.
+const noticesBlocked = computed(
+  () =>
+    notices.value === 'denied' &&
+    hasNoticeSource(
+      new Set(
+        (installedModules.value ?? [])
+          .filter((module) => module.status === 'active')
+          .map((module) => module.id),
+      ),
+    ),
+);
 // Can this device look for a printer at all? (hub#1773) Same reading and the same reason as the
 // notices above: `unsupported` everywhere except an Android 17+ inside the installed app, so the
 // card keys on the state and never on «is this Android».

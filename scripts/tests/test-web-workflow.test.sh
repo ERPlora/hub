@@ -407,5 +407,97 @@ else
     done
 fi
 
+# ── 13. The merge-time check of the MERGED tree (ERPlora/pm#331) ─────────────
+# The per-PR run proves the merge with the base AS IT WAS when it started; on
+# 2026-09-11 two PRs green on their own left `develop` red for 2 h 58 min. So
+# `merge-pr.sh` dispatches this workflow with `pr` + `head_sha` + `base_sha` when
+# the base moved, and merges on THAT run. What it relies on, pinned here:
+#   · the three inputs exist (a dispatch with an unknown input is a 422);
+#   · `run-name` titles the run `merge-check hub#<pr> <head> onto <base>` — the
+#     only way the door tells ITS run from a neighbour's on the same develop;
+#   · the concurrency group carries the PR, or two merges cancel each other and
+#     the develop push run;
+#   · `verify` checks out `base_sha` with history and builds the merge BEFORE
+#     `pnpm verify` — a check of `develop` alone would prove nothing;
+#   · `e2e` (~20 min) does not run on it: the door waits on this run.
+dispatch_block=$(on_sub_block workflow_dispatch)
+mc_missing=""
+for input in pr head_sha base_sha; do
+    grep -qE "^      ${input}:" <<<"$dispatch_block" || mc_missing="$mc_missing $input"
+done
+if [ -n "$mc_missing" ]; then
+    bad "workflow_dispatch takes the merge-check inputs (pm#331)" \
+        "missing under \`on.workflow_dispatch.inputs\`:$mc_missing — merge-pr.sh's dispatch would be refused"
+else
+    ok "workflow_dispatch takes \`pr\`, \`head_sha\` and \`base_sha\` (pm#331)"
+fi
+
+run_name=$(awk '/^run-name:/ {print; exit}' "$workflow")
+if ! grep -qF "format('merge-check hub#{0} {1} onto {2}', inputs.pr, inputs.head_sha, inputs.base_sha)" <<<"$run_name"; then
+    bad "run-name titles a merge-check \`merge-check hub#<pr> <head> onto <base>\` (pm#331)" \
+        "top-level run-name is '${run_name:-absent}': merge-pr.sh finds its run by that exact title"
+elif ! grep -qF "|| ''" <<<"$run_name"; then
+    bad "run-name falls back to GitHub's default title on every other event (pm#331)" \
+        "'$run_name' has no \`|| ''\`: push and PR runs would lose their commit/PR title"
+else
+    ok "run-name titles a merge-check run and leaves every other run's title alone (pm#331)"
+fi
+
+concurrency_group=$(awk '/^concurrency:/ {f=1; next} f && /^  group:/ {print; exit} f && /^[A-Za-z]/ {exit}' "$workflow")
+if ! grep -qF 'inputs.pr' <<<"$concurrency_group"; then
+    bad "the concurrency group carries the merge-check's PR (pm#331)" \
+        "'$concurrency_group': every dispatch shares \`refs/heads/develop\` and cancel-in-progress kills the other merges' checks and the develop push run"
+else
+    ok "the concurrency group carries the merge-check's PR (pm#331)"
+fi
+
+verify_job=$(job_block verify)
+mc_step_at=$(awk '/bash \.\/scripts\/ci\/merge-check-tree\.sh/ && !/^[[:space:]]*#/ {print NR; exit}' <<<"$verify_job")
+verify_at=$(awk '/run: pnpm verify/ {print NR; exit}' <<<"$verify_job")
+install_at=$(awk '/pnpm install --frozen-lockfile/ {print NR; exit}' <<<"$verify_job")
+# On the checkout's `ref:` itself — the merge step's env also names `inputs.base_sha`.
+if ! grep -qE '^ +ref: .*inputs\.base_sha' <<<"$verify_job"; then
+    bad "\`verify\` checks out base_sha on a merge-check (pm#331)" \
+        "no \`inputs.base_sha\` in the job: it would test develop's tip, not the base the door read"
+elif ! grep -qE "fetch-depth: .*inputs\.pr" <<<"$verify_job"; then
+    bad "\`verify\` fetches the history a merge needs on a merge-check (pm#331)" \
+        "no \`fetch-depth\` conditioned on \`inputs.pr\`: a depth-1 checkout has no merge base"
+elif [ -z "$mc_step_at" ]; then
+    bad "\`verify\` builds the merged tree (\`bash ./scripts/ci/merge-check-tree.sh\`) (pm#331)" \
+        "no step runs it: the dispatch would re-test the base alone"
+elif [ -z "$install_at" ] || [ -z "$verify_at" ] || [ "$mc_step_at" -ge "$install_at" ]; then
+    bad "\`verify\` builds the merged tree BEFORE install and \`pnpm verify\` (pm#331)" \
+        "order — merge: $mc_step_at, install: ${install_at:-?}, verify: ${verify_at:-?}"
+elif ! awk -v at="$mc_step_at" 'NR < at && /if: .*inputs\.pr/ {f=1} END {exit !f}' <<<"$verify_job"; then
+    bad "the merge step runs only on a merge-check (\`if:\` on inputs.pr) (pm#331)" \
+        "without the guard, every push and PR run would try to merge with empty inputs"
+else
+    ok "\`verify\` checks out base_sha with history and builds the merge before \`pnpm verify\` (pm#331)"
+fi
+
+e2e_job=$(job_block e2e)
+if ! grep -qE "^    if: .*!inputs\.pr" <<<"$e2e_job"; then
+    bad "\`e2e\` does not run on a merge-check (pm#331)" \
+        "no job-level \`if:\` excluding \`inputs.pr\`: the door would wait ~20 min more per merge"
+else
+    ok "\`e2e\` is skipped on a merge-check (pm#331)"
+fi
+
+# The merged-tree builder and its test trigger the gate, and the test RUNS.
+for p in scripts/ci/merge-check-tree.sh scripts/tests/merge-check-tree.test.sh; do
+    if grep -qF "$p" <<<"$push_block" && grep -qF "$p" <<<"$(on_sub_block pull_request)"; then
+        ok "\`$p\` is in the push and pull_request \`paths\` (pm#331)"
+    else
+        bad "\`$p\` is in the push and pull_request \`paths\` (pm#331)" \
+            "a change to it alone would trigger no check"
+    fi
+done
+if grep -qE '^[[:space:]]*(run:[[:space:]]*)?bash (\./)?scripts/tests/merge-check-tree\.test\.sh[[:space:]]*$' "$workflow"; then
+    ok "test-web.yml runs \`scripts/tests/merge-check-tree.test.sh\` (pm#331)"
+else
+    bad "test-web.yml runs \`scripts/tests/merge-check-tree.test.sh\` (pm#331)" \
+        "no step executes it: the builder's contract would never run"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

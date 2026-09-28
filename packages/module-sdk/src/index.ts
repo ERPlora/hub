@@ -26,6 +26,7 @@ export {
   // `index.test.ts` entero — que es como se coló, porque `quantity.test.ts`
   // importa el módulo directamente y por sí solo pasaba en verde.
 } from './quantity.ts';
+import { toMicro } from './quantity.ts';
 
 /**
  * What the hub says about a live event beyond its payload (hub#1980).
@@ -230,9 +231,14 @@ export function buildListParams(p: ListParams): Record<string, unknown> {
 /** Forma de una página de lista. Alias de `Page`, para los consumidores del controlador. */
 export type ListPage<T = unknown> = Page<T>;
 
-/** Subconjunto del cliente SDK que necesita el controlador (inyectable para tests). */
+/** The slice of the SDK client the controller needs (injectable in tests). */
 export interface ListClient {
   queryPage<R = unknown>(name: string, params: ListParams): Promise<Page<R>>;
+  /**
+   * Decimals of the hub currency (`erplora().currencyDecimals`). Required only when the
+   * controller declares `moneyFilters`: it is the scale of what the person types.
+   */
+  readonly currencyDecimals?: number;
 }
 
 export interface ListControllerOptions {
@@ -245,6 +251,14 @@ export interface ListControllerOptions {
   filters?: Record<string, unknown>;
   /** Params de contexto obligatorios iniciales (sub-listas: `{ bom_id }`). */
   context?: Record<string, unknown>;
+  /**
+   * Columns whose filter is MONEY stored in minor units (hub#2271). The person types the major
+   * unit («12» for twelve euros); each edge travels as `majorToMinor(edge, client.currencyDecimals)`
+   * so «from 12» does not match 0,12 €. The controller state keeps what was typed.
+   */
+  moneyFilters?: readonly string[];
+  /** Columns whose filter is a QUANTITY stored in the 10⁶ scale (ADR-0147): «1,5» → 1 500 000. */
+  quantityFilters?: readonly string[];
 }
 
 export interface ListControllerState {
@@ -266,6 +280,8 @@ export class ListController<T = Record<string, unknown>> {
   readonly state: ListControllerState;
   /** Descarta respuestas obsoletas si llegan fuera de orden (race de cargas concurrentes). */
   private seq = 0;
+  private readonly moneyFilters: ReadonlySet<string>;
+  private readonly quantityFilters: ReadonlySet<string>;
 
   constructor(
     private readonly client: ListClient,
@@ -282,6 +298,35 @@ export class ListController<T = Record<string, unknown>> {
       filters: { ...(opts.filters ?? {}) },
       context: { ...(opts.context ?? {}) },
     };
+    this.moneyFilters = new Set(opts.moneyFilters ?? []);
+    this.quantityFilters = new Set(opts.quantityFilters ?? []);
+    if (this.moneyFilters.size > 0 && typeof client.currencyDecimals !== 'number') {
+      // Guessing 2 would filter 100 times off in a yen hub: refuse where the screen is wired.
+      throw new ErploraError(
+        'list_money_filters_need_currency_decimals',
+        'moneyFilters needs a list client that exposes currencyDecimals',
+      );
+    }
+  }
+
+  /**
+   * The filters as the runtime compares them: money and quantity columns scaled from what the
+   * person typed to the stored integer. `state.filters` stays as typed, so a table that echoes it
+   * back keeps showing «12», not «1200».
+   */
+  private wireFilters(): Record<string, unknown> {
+    if (this.moneyFilters.size === 0 && this.quantityFilters.size === 0) return this.state.filters;
+    const decimals = this.client.currencyDecimals ?? 0;
+    const out: Record<string, unknown> = {};
+    for (const [col, value] of Object.entries(this.state.filters)) {
+      const scale = this.moneyFilters.has(col)
+        ? (n: number) => majorToMinor(n, decimals)
+        : this.quantityFilters.has(col)
+          ? toMicro
+          : null;
+      out[col] = scale ? scaleFilterValue(value, scale) : value;
+    }
+    return out;
   }
 
   /** Nº de páginas según el total del servidor (mínimo 1). */
@@ -303,7 +348,7 @@ export class ListController<T = Record<string, unknown>> {
         search: s.search,
         sort: s.sort,
         dir: s.dir,
-        filters: s.filters,
+        filters: this.wireFilters(),
         params: s.context,
       });
       if (mySeq !== this.seq) return; // llegó una carga más reciente
@@ -379,6 +424,28 @@ export class ListController<T = Record<string, unknown>> {
     this.state.filters = {};
     void this.load();
   }
+}
+
+/**
+ * One typed edge (major units) → the stored integer. The table emits a Number from the panel and
+ * text from the inline control («12,5» included). Empty or not a number → `''`, which
+ * `buildListParams` drops: a stray keystroke never becomes «from 0».
+ */
+function scaleFilterEdge(edge: unknown, scale: (n: number) => number): unknown {
+  const text = typeof edge === 'string' ? edge.trim().replace(',', '.') : edge;
+  if (text === '' || text === null || text === undefined) return '';
+  const n = Number(text);
+  return Number.isFinite(n) ? scale(n) : '';
+}
+
+/** A `{ from?, to? }` range scaled edge by edge; a plain value is one edge. */
+function scaleFilterValue(value: unknown, scale: (n: number) => number): unknown {
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([edge, v]) => [edge, scaleFilterEdge(v, scale)]),
+    );
+  }
+  return scaleFilterEdge(value, scale);
 }
 
 /** Fábrica del controlador de lista (azúcar sobre `new ListController`). */
@@ -1123,13 +1190,18 @@ export class HttpWsTransport implements ErploraTransport {
     // `permission_denied` is a domain refusal with its own code, not a transport failure.
     let res: Response;
     // A `GET`/`DELETE` carries no body and must not announce one: some proxies reject the pair.
+    // A form (hub#2232) goes as it is and WITHOUT a `Content-Type` of ours: `fetch` writes the
+    // multipart one with its boundary, and any value set here would drop it.
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
     const framing: Record<string, string> =
-      body === undefined ? {} : { 'Content-Type': 'application/json' };
+      body === undefined || isForm ? {} : { 'Content-Type': 'application/json' };
     try {
       res = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers: { ...framing, ...this.headers(), ...extraHeaders },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(body === undefined
+          ? {}
+          : { body: isForm ? (body as FormData) : JSON.stringify(body) }),
       });
     } catch (e) {
       // A network-level failure (DNS, CORS, abort, `TypeError: Failed to fetch`): same meaning for
@@ -1847,7 +1919,7 @@ export class FlowsApi {
    * A family that was never activated answers `flow.not_found` — there is no factory recipe here
    * to restore. A module may only restore its OWN recipes through this method, exactly like
    * {@link activateTemplate}; the gallery that holds `manage_flows` may restore any module's, but
-   * that is a different door, not this one.
+   * that is a different door, not this one: {@link restoreModuleTemplate}.
    *
    * A hub older than this route leaves the method **absent** rather than broken, like
    * {@link activateTemplate}: `typeof flows.restoreTemplate` is the probe.
@@ -1858,6 +1930,34 @@ export class FlowsApi {
     return this.send({
       method: 'POST',
       path: `${FLOWS_BASE_PATH}/templates/${own}/${target}/restore`,
+    }) as Promise<Flow>;
+  }
+
+  /**
+   * `POST /api/hub/flows/templates/{module}/{family}/restore` — the Automations gallery's door
+   * (flows#136), for the `flows` module to restore a recipe that belongs to ANOTHER module, not
+   * its own.
+   *
+   * Unlike {@link restoreTemplate}, `module` is an argument here, so it is checked exactly like
+   * `family`. The path names the target module; the `X-Erplora-Module` header still names the
+   * calling module (`send` sets it, nothing to do here), and the hub judges that caller, not the
+   * path, in `refuse_unless_own_or_editor` (hub#2059, `crates/server/src/flows_api.rs`): it lets
+   * the call through only when the caller holds `manage_flows`, or the caller names itself — every
+   * other caller gets `403 flow.template_not_yours`.
+   *
+   * Same effect as {@link restoreTemplate} otherwise: same flow id and run history, its document
+   * and grants rebuilt from the target module's CURRENT recipe, enabled state unchanged. A family
+   * that was never activated answers `flow.not_found`, same as the other door.
+   *
+   * A hub older than this method leaves it **absent** rather than broken, like
+   * {@link restoreTemplate}: `typeof flows.restoreModuleTemplate` is the probe.
+   */
+  async restoreModuleTemplate(module: string, family: string): Promise<Flow> {
+    const targetModule = checkedSegment('module id', module, ID_PATTERN);
+    const targetFamily = checkedSegment('template family', family, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${FLOWS_BASE_PATH}/templates/${targetModule}/${targetFamily}/restore`,
     }) as Promise<Flow>;
   }
 }
@@ -2310,6 +2410,11 @@ export class EventsApi {
  *  starts here — `crates/server/src/whatsapp_templates.rs` (hub#1610). */
 export const WHATSAPP_TEMPLATES_BASE_PATH = '/api/hub/whatsapp/templates';
 
+/** Where the sample of a template's photo, video or PDF header goes up — the one path
+ *  {@link WhatsappTemplatesApi.uploadHeaderSample} posts to (`crates/server/src/
+ *  whatsapp_header_samples.rs`, hub#2232). */
+export const WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH = '/api/hub/whatsapp/template-header-samples';
+
 /**
  * A Meta template name, exactly as the runtime defines it
  * (`whatsapp_templates.rs::template_name_is_safe`, itself the SaaS's `NAME_RE`): lowercase letters,
@@ -2364,15 +2469,42 @@ export interface WhatsappTemplateInput {
   name: string;
   language: string;
   category?: string;
+  /**
+   * A header that is a file (hub#2232, saas#2377): `IMAGE`, `VIDEO` or `DOCUMENT`, with no header
+   * text. Absent or `TEXT` is a text header, exactly as before.
+   */
+  header_format?: 'TEXT' | WhatsappHeaderSampleFormat;
+  /**
+   * With a file header: the {@link WhatsappTemplateHeaderSample.header_handle} that
+   * {@link WhatsappTemplatesApi.uploadHeaderSample} returned. Asked on EVERY save — Meta holds the
+   * sample, not a handle it would take back.
+   */
+  header_handle?: string;
   [field: string]: unknown;
+}
+
+/** The kinds of file a template header can be, as Meta names them. */
+export type WhatsappHeaderSampleFormat = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+
+/**
+ * What {@link WhatsappTemplatesApi.uploadHeaderSample} answers (saas#2377). `format` is decided by
+ * the file's BYTES, not by the type the browser declared: register the header with this one.
+ */
+export interface WhatsappTemplateHeaderSample {
+  header_handle: string;
+  format: WhatsappHeaderSampleFormat;
+  mime_type: string;
+  size: number;
 }
 
 /**
  * **The templates the business promises Meta** (hub#1682) — the only way a module reaches them.
  *
- * Three methods and no more. It is not a proxy and must not become one: the paths are built from
- * one fixed prefix, the only value that ever reaches a path is a template name checked against
- * {@link TEMPLATE_NAME_PATTERN} first, and the method list is pinned by `whatsapp-templates.test.ts`.
+ * Four methods and no more. It is not a proxy and must not become one: the paths are two fixed
+ * constants ({@link WHATSAPP_TEMPLATES_BASE_PATH} and, for a header's sample,
+ * {@link WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH}), the only value that ever reaches a path is a
+ * template name checked against {@link TEMPLATE_NAME_PATTERN} first, and the method list is pinned
+ * by `whatsapp-templates.test.ts`.
  *
  * The credential is never here. The shell puts `X-Hub-Session` on the transport and the runtime
  * swaps it for the hub's machine credential on its way to the SaaS (ADR-0003), which is what keeps
@@ -2415,6 +2547,29 @@ export class WhatsappTemplatesApi {
       path: WHATSAPP_TEMPLATES_BASE_PATH,
       body: template,
     }) as Promise<WhatsappTemplate>;
+  }
+
+  /**
+   * `POST /api/hub/whatsapp/template-header-samples` — upload the sample of a photo, video or PDF
+   * header to Meta and get back the `header_handle` the template is registered with (hub#2232).
+   *
+   * The file goes as the multipart field `file`, relayed by the runtime in streaming to the SaaS,
+   * which holds the Meta token. What kind it is and how big it may be is decided THERE, from its
+   * bytes (JPEG/PNG up to 5 MB, MP4 up to 16 MB, PDF up to 100 MB): a refusal arrives as an
+   * {@link ErploraError} with its code — `unsupported_header_sample`, `header_sample_too_large`,
+   * `missing_file`, `no_whatsapp_number`, `whatsapp_not_configured`, `meta_*`.
+   *
+   * A `File` keeps its name; a bare `Blob` goes up as `blob` (what `FormData` names it), still a
+   * file part — a multipart part without a filename is not a file to the SaaS.
+   */
+  async uploadHeaderSample(file: Blob): Promise<WhatsappTemplateHeaderSample> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: WHATSAPP_TEMPLATE_HEADER_SAMPLES_PATH,
+      body: form,
+    }) as Promise<WhatsappTemplateHeaderSample>;
   }
 
   /**

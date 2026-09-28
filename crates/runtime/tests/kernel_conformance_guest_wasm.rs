@@ -193,6 +193,31 @@ async fn the_guest_is_told_an_automation_is_calling_hub2117() {
     );
 }
 
+/// hub#2166: the WASM path hands the guest ONE clock. `context.now` and `payload.now` are the very
+/// `:now` its operations bind (`kfx._insert_item` stamps `created_at = :now`). Twin of
+/// `handler_now_per_command_e2e.rs` (native): the native handler shares `persist_handler_output`,
+/// but the lines that seed `payload.now`/`context.now` in `execute_wasm` are the WASM path's own —
+/// without a real `.wasm` echoing them back, an `execute_wasm` that minted its own instant there
+/// would pass every native test.
+#[tokio::test]
+async fn the_guest_clock_is_the_clock_its_operations_bind_hub2166() {
+    let (out, rows) = bulk_then_list(json!({ "names": ["a"] })).await;
+    assert_eq!(rows.len(), 1, "the operation ran: {out}");
+    let stamped = rows[0]["created_at"].clone();
+    assert!(
+        stamped.is_string(),
+        "`kfx._insert_item` stamps `created_at = :now`: {rows:?}"
+    );
+    assert_eq!(
+        out["result"]["now"], stamped,
+        "context.now must be the `:now` the guest's operation bound"
+    );
+    assert_eq!(
+        out["result"]["payload_now"], stamped,
+        "payload.now must be the `:now` the guest's operation bound"
+    );
+}
+
 /// A guest's `Output.error` reaches the caller as a `Domain` error carrying the CODE, never prose.
 #[tokio::test]
 async fn guest_domain_error_travels_as_a_code_hub1238() {

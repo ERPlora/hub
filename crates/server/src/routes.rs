@@ -90,6 +90,9 @@ pub fn app(state: AppState) -> Router {
             "/api/devices/:device_id",
             axum::routing::delete(devices::revoke_device).put(devices::rename_device),
         )
+        // Quitar de golpe los que nadie usa desde hace 30 días (hub#2215): el mismo gate admin, y
+        // el dispositivo que lo pide nunca entra en el grupo. Ruta estática: gana a `:device_id`.
+        .route("/api/devices/prune", post(devices::prune_devices))
         // Perfil del usuario autenticado. Sin `/:id`: solo permite leer/editar el propio.
         .route(
             "/api/profile",
@@ -263,6 +266,13 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/hub/whatsapp/templates/:name",
             axum::routing::delete(whatsapp_templates::whatsapp_template_delete),
+        )
+        // A template header's sample — photo, video or PDF (hub#2232, saas#2377): same gate as the
+        // templates door; the form is relayed in streaming, never read whole (a PDF weighs 100 MB),
+        // so no `DefaultBodyLimit` applies and the handler holds the line on the declared length.
+        .route(
+            "/api/hub/whatsapp/template-header-samples",
+            post(whatsapp_header_samples::whatsapp_template_header_sample),
         )
         // A customer's photo, voice note, video or document (hub#2114, saas#2285): Meta hands an
         // asset id, the SaaS swaps it for the bytes, the runtime streams them with its machine
@@ -614,11 +624,12 @@ pub fn app(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// La versión que debe correr un módulo en este arranque (hub#516).
+/// The version a module has to run on this boot (hub#516).
 ///
-/// Delega en [`install::resolve_target`] — **el mismo resolutor que usa el botón «Actualizar»** y
-/// que `/api/modules/updates`. Una segunda copia de esta decisión sería una segunda política: la
-/// automática y la manual acabarían ofreciendo cosas distintas.
+/// Delegates to [`install::resolve_target`] — **the same resolver the «Update» button** and
+/// `/api/modules/updates` use. A second copy of this decision would be a second policy: the
+/// automatic and the manual path would end up offering different things. Through the client with
+/// the stall limit, so a silent marketplace does not hold up the boot (hub#2251).
 pub(crate) async fn resolve_module_target(
     state: &AppState,
     machine: &cloud_client::Auth,
@@ -627,7 +638,7 @@ pub(crate) async fn resolve_module_target(
     pinned: Option<&str>,
 ) -> erplora_runtime::module_update::Target {
     install::resolve_target(
-        &state.http,
+        &state.marketplace_http,
         &state.config.cloud_base_url,
         machine,
         module_id,

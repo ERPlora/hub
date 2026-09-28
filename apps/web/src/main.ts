@@ -6,13 +6,20 @@
 // Guard: `src/theme/ionic-fill-needs-md.test.ts`. Detalle: `src/lib/ionic-fill.ts`.
 import './lib/ionic-fill.boot';
 
-// 🔴 Segundo import del shell, y por el MISMO motivo que el de arriba (hub#1736): los dos botones
-// de los diálogos de selección de Ionic son literales ingleses («Cancel» / «OK») que no tienen
-// clave de configuración global, así que el shell los traduce enganchando `customElements.define`
-// ANTES de que nadie registre `ion-select`. Si este import baja de `@ionic/vue`, todos los
-// desplegables del hub —los de los módulos incluidos— vuelven al inglés sin un solo error.
-// Guard: `src/lib/ionic-select-text.test.ts`. Detalle: `src/lib/ionic-select-text.ts`.
+// Second shell hook (hub#1736, hub#2226): the two buttons of Ionic's selection dialogs are English
+// literals («Cancel» / «OK») with no global config key, so the shell writes them in the active
+// language right before each dialog opens — module Web Components included, and a language switch
+// with no reload included. It wraps `open()`, a plain method, so it would survive a late import.
+// Guard: `src/lib/ionic-select-text.test.ts`. Detail: `src/lib/ionic-select-text.ts`.
 import './lib/ionic-select-text.boot';
+
+// Third shell hook on the same registry (hub#2223): `ion-select` opens an alert by default, which
+// only keeps the choice after OK, and Ionic has no global key to change it. The shell makes every
+// SINGLE-choice select open a popover, which closes on pick (multiple keeps its confirm button) —
+// module Web Components included. It wraps `open()` too, so like the one above it would survive a
+// late import; it sits here so the three hooks are read together.
+// Guard: `src/lib/ionic-select-interface.test.ts`. Detail: `src/lib/ionic-select-interface.ts`.
+import './lib/ionic-select-interface.boot';
 
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
@@ -29,30 +36,37 @@ import {
   ensureMediaCookie,
   setOnRuntimeSessionExpired,
   RUNTIME_URL,
+  activeModuleIds,
+  refreshActiveModuleIds,
 } from './lib/runtime';
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
+import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
+import { comandaFailureNotice } from './lib/print-comanda-notice';
+import { bootAppointmentNotices } from './lib/appointment-notice';
 import {
   ensureNotificationPermission,
   primerLabelsFrom,
   shouldSendNotice,
+  warnIfThereIsSomethingToTell,
 } from './lib/notification-permission';
 import { createPrintService } from './lib/print';
 import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
+import { preloadTeleportedStyles } from './lib/teleported-styles';
 import { bootTheme } from './lib/theme';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
-import { bootActionFeedback, toast, toastError } from './lib/toast';
+import { bootActionFeedback, toast } from './lib/toast';
 import { installErrorReporting } from './lib/error-report';
-import { bootCourier, takeShellCourierCode } from './lib/courier';
+import { redeemShellCourier, takeShellCourierCode } from './lib/courier';
 import { bootUntilReachable } from './lib/boot';
 import { createBootScreen } from './lib/boot-screen';
 
@@ -187,6 +201,14 @@ bootActionFeedback();
 // o sea que afecta justo al tablet en vertical (768/834), el formato de sala. ADR-0143.
 const app = createApp(App).use(IonicVue, { mode: 'ios', swipeBackEnabled: false }).use(router).use(i18n);
 
+// hub#2162 — hydrates one hidden probe per mode of the non-shadow Ionic tags in the document, so
+// Stencil attaches their stylesheet there. Without this, an overlay a module opens inline (inside
+// its own shadow root) loses its styles the moment Ionic teleports it to `ion-app` on present.
+// It runs AFTER `use(IonicVue)` on purpose: that call is Ionic's `initialize()` (Stencil's
+// `setMode`); before it the probes hydrate without a mode and register no sheet at all.
+// Best-effort and non-blocking: it never throws and boot does not wait on it.
+void preloadTeleportedStyles();
+
 // Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
 // promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
 installErrorReporting(app);
@@ -243,22 +265,17 @@ bootPrintOnSale(getClient(), {
   // The paper is the one the ticket screen prints, composed by the sales module (hub#1921).
   saleDocument: (saleId) =>
     saleTicketDocument(saleId, { loadViewer: () => loadModuleElement('sales', SALE_DOCUMENT_TAG) }),
+  // What happened to the paper is decided in lib/print-on-sale; how the till is told (sentence and
+  // tone) in lib/print-on-sale-notice (hub#2210): a receipt waiting for a printer is not a fault
+  // (hub#1731), the lost and the never-composed ones are (hub#1921), the one out without its
+  // VeriFactu QR is a warning (hub#1867) — and none of them names the sale by its internal id.
   onFailure: (f) => {
-    // Dos hechos distintos, dos frases (hub#1731): el tique perdido manda a reimprimir; el tique
-    // en cola sin nadie que lo saque manda a dar de alta la impresora, y sale solo al hacerlo.
-    // A third (hub#1921): the paper was never made — a sentence, not the code, and the way out.
-    void toastError(
-      f.awaitingHost
-        ? i18n.global.t('print.ticketWaitingForPrinter', { saleId: f.saleId })
-        : f.notComposed
-          ? i18n.global.t('print.ticketNotComposed', { saleId: f.saleId })
-          : i18n.global.t('print.ticketFailed', { saleId: f.saleId, error: f.error }),
-    );
+    const n = saleTicketFailureNotice(f);
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
-  // hub#1867: the paper is in the customer's hand but lacks the VeriFactu QR — a warning, not an
-  // error, and long enough to read where the complete copy is.
-  onPrintedWithoutFiscal: (saleId) => {
-    void toast(i18n.global.t('print.ticketWithoutFiscal', { saleId }), 'warning', 6000);
+  onPrintedWithoutFiscal: () => {
+    const n = saleTicketWithoutFiscalNotice();
+    void toast(i18n.global.t(n.messageKey), n.color, n.duration);
   },
 });
 
@@ -279,23 +296,32 @@ bootPrintOnSale(getClient(), {
 // that gets TOLD an order came in, and somebody is standing at it setting it up. Asked at the
 // first order instead, the dialog appears on a tablet propped on a shelf with nobody in front of
 // it. `ensureNotificationPermission` asks at most once and never throws.
+// The ask itself is now IN CONTEXT (hub#2046): a shop with neither a kitchen nor appointments
+// (hub#2168 added the second source) has nothing that would ever use the permission, so asking on
+// every hub regardless of what it runs asked one for a permission that would never fire.
+// `warnIfThereIsSomethingToTell` refreshes what is installed and only asks when an active module
+// the shell sends notices for is there — the kitchen order and appointment notices below keep
+// being the fallback trigger.
 void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
-  onRegistered: () => void askToWarn(),
+  onRegistered: () =>
+    void warnIfThereIsSomethingToTell({
+      refresh: refreshActiveModuleIds,
+      activeModules: activeModuleIds,
+      ask: () => askToWarn(),
+    }),
 });
 
-// Comanda a cocina al DISPARAR el pedido (ADR-0144), no al cobrar. Aquí y no en `kitchen` porque
-// tiene que imprimir siempre, no solo con el KDS montado: la cocina caliente suele ser solo papel.
-// Si la impresora falla NO se bloquea al camarero —la comanda ya está en la BD y el KDS es la
-// fuente de verdad—: se avisa, y desde el KDS se reimprime.
+// Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
+// `kitchen` because it has to print always, not only with the KDS mounted: a hot kitchen is often
+// paper only. If the printer fails the waiter is NOT blocked —the order is already in the database
+// and the KDS is the source of truth—: the floor is told to check the printer and warn the station.
 bootPrintComanda(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
+  // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
+  // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const label = f.label || i18n.global.t('print.comandaDefaultLabel');
-    void toastError(
-      f.awaitingHost
-        ? i18n.global.t('print.comandaWaitingForPrinter', { label, role: f.role })
-        : i18n.global.t('print.comandaFailed', { label, role: f.role, error: f.error }),
-    );
+    const n = comandaFailureNotice(f, i18n.global);
+    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
   // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
   // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
@@ -310,6 +336,22 @@ bootPrintComanda(getClient(), {
   // letting it through would pop Android's bare dialog in the middle of a service. Android drops
   // the notice either way; what the user gets instead is the row on System › your printer, which
   // says the notices are off and offers to ask again.
+  // The notice's words come from the catalogue, in the app's language (hub#2171).
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
+  notify: async (title, body) => {
+    if (!shouldSendNotice(await askToWarn())) return;
+    await getClient().peripherals.notify(title, body);
+  },
+});
+
+// The salon's twin of the kitchen notice above (hub#2168): a booking or a cancellation that did
+// not come from a till (WhatsApp, the web, a flow, the customer) gets a system notice too.
+//
+// Same permission gate as the kitchen notice — `askToWarn` asks for it at most once, and a
+// refusal stops here instead of falling through to `peripherals.notify()`, which would pop
+// Android's bare dialog with no sentence of ours in front of it.
+bootAppointmentNotices(getClient(), {
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
   notify: async (title, body) => {
     if (!shouldSendNotice(await askToWarn())) return;
     await getClient().peripherals.notify(title, body);
@@ -371,12 +413,10 @@ void bootUntilReachable({
   showProgress: () => bootScreen?.showProgress(),
 }).then(async () => {
   // ADR-0159: if the SaaS sent a one-time shell courier, consume it before router mount so the
-  // first protected route sees an authenticated local session.  The fragment is scrubbed before
-  // this network call; failure falls through to the ordinary login page without logging the code.
-  try {
-    await bootCourier(shellCourierCode);
-  } catch {
-    // Login remains available and the one-time credential has already been removed from the URL.
-  }
+  // first protected route sees an authenticated local session. The fragment is scrubbed before
+  // this network call. `redeemShellCourier` never throws: a failure is reported through the
+  // client-error channel (the runtime's code, never the pass) and falls through to the ordinary
+  // login page, which explains it (hub#2152).
+  await redeemShellCourier(shellCourierCode);
   router.isReady().then(() => app.mount('#app'));
 });

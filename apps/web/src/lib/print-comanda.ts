@@ -93,18 +93,26 @@ export interface ComandaPrintFailure {
   awaitingHost?: boolean;
 }
 
-interface Deps {
+/** The notice and its words travel together: a notice without the catalogue would speak one language. */
+type NoticeDeps =
+  | {
+      /**
+       * SYSTEM notification when the order comes in. Optional: without it everything works as before.
+       *
+       * The paper is a copy and the KDS is the source of truth — but a screen nobody looks at warns
+       * nobody. In a hot kitchen the tablet is propped up, on another view or locked, and the OS
+       * notification is the only thing that gets through.
+       */
+      notify: (title: string, body: string) => Promise<void>;
+      /** The caller owns i18n (ADR-0055, hub#2171): this file only picks the key and its params. */
+      t: (key: string, params?: Record<string, unknown>) => string;
+    }
+  | { notify?: undefined; t?: undefined };
+
+type Deps = NoticeDeps & {
   print: (req: PrintRequest) => Promise<PrintResult>;
   onFailure?: (f: ComandaPrintFailure) => void;
-  /**
-   * Notificación del SISTEMA al entrar la comanda. Opcional: sin ella todo sigue igual.
-   *
-   * El papel es una copia y el KDS es la fuente de verdad — pero una pantalla que nadie mira no
-   * avisa de nada. En cocina caliente la tablet está apoyada, en otra vista o bloqueada, y la
-   * notificación del SO es lo único que atraviesa eso.
-   */
-  notify?: (title: string, body: string) => Promise<void>;
-}
+};
 
 /**
  * Agrupa las líneas en hojas de papel. Agrupa por **rol de impresora**, no por estación: dos
@@ -202,12 +210,14 @@ export async function onKitchenOrderCreated(
   //    impresora sin papel), y cocina debe enterarse ya.
   // Best-effort: si falla, la comanda sigue su curso — igual que con el papel.
   if (deps.notify) {
-    const titulo = label ? `Nueva comanda · ${label}` : 'Nueva comanda';
+    // The label and the order number are the business's own data and travel as they are; only
+    // the words around them come from the catalogue (hub#2171).
+    const title = label ? deps.t('print.comandaNoticeFor', { label }) : deps.t('print.comandaNotice');
     const total = (items ?? []).length;
-    const cuerpo = [orderNumber, total ? `${total} línea${total === 1 ? '' : 's'}` : '']
+    const body = [orderNumber, total ? deps.t('print.comandaNoticeLines', { n: total }) : '']
       .filter(Boolean)
       .join(' · ');
-    await deps.notify(titulo, cuerpo).catch(() => {});
+    await deps.notify(title, body).catch(() => {});
   }
 
   if (!groups.length) return; // todo era de pantalla, o la comanda venía vacía
@@ -244,22 +254,22 @@ export async function onKitchenOrderCreated(
       // la comanda de cocina por la impresora de tiquets deja al camarero con el papel y a la
       // cocina sin comida.
       if (result.via === 'none') {
-        deps.onFailure?.({ orderId, role: group.role, label, error: result.error ?? 'sin impresora' });
+        fail(deps, { orderId, role: group.role, label, error: result.error ?? 'comanda_not_delivered' });
       } else if (result.via === 'queue' && result.awaitingHost) {
         // Encolada y sin nadie dado de alta para esa estación (hub#1731): la hoja no se ha perdido
         // —sale en cuanto se dé de alta la impresora— pero AHORA no va a por ella nadie, y una
         // comanda que nadie saca es un plato que no se empieza. Callarlo era el fallo mudo: la
         // cola se leía como entregada. `awaitingHost` sin contestar NO cuenta como «no hay nadie».
-        deps.onFailure?.({
+        fail(deps, {
           orderId,
           role: group.role,
           label,
-          error: result.error ?? 'no printer set up for this station',
+          error: result.error ?? 'station_has_no_printer',
           awaitingHost: true,
         });
       }
     } catch (e) {
-      deps.onFailure?.({
+      fail(deps, {
         orderId,
         role: group.role,
         label,
@@ -267,6 +277,16 @@ export async function onKitchenOrderCreated(
       });
     }
   }
+}
+
+/**
+ * The docket did not come out (or is waiting). The reason is the door's (a code, or a sentence of
+ * the queue in whatever language it was written): it goes to the log, where somebody diagnosing the
+ * printer can read it, and the floor hears only the fact — what to say is the notice's (hub#2257).
+ */
+function fail(deps: Deps, f: ComandaPrintFailure): void {
+  console.warn(`[print-comanda] ${f.role} docket of order ${f.orderId} not printed: ${f.error}`);
+  deps.onFailure?.(f);
 }
 
 /**

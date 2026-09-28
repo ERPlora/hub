@@ -37,6 +37,7 @@ const { DevicesError } = vi.hoisted(() => ({
 vi.mock('../lib/devices', () => ({
   DevicesError,
   listDevices: vi.fn(),
+  pruneStaleDevices: vi.fn(),
   renameDevice: vi.fn(),
   revokeDevice: vi.fn(),
 }));
@@ -53,7 +54,7 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ replace }) }));
 import DevicesCard from './DevicesCard.vue';
 import enCatalogue from '../i18n/locales/en';
 import esCatalogue from '../i18n/locales/es';
-import { listDevices, renameDevice, revokeDevice } from '../lib/devices';
+import { listDevices, pruneStaleDevices, renameDevice, revokeDevice } from '../lib/devices';
 import { isAdmin, logout } from '../lib/session';
 
 // Read from the vitest root (`apps/web`): under happy-dom `import.meta.url` is not a `file:` URL.
@@ -91,7 +92,9 @@ function device(overrides: Record<string, unknown> = {}) {
     mode: 'personal' as const,
     openSessions: 1,
     lastSignIn: '2026-08-07T10:00:00+00:00',
+    lastUsedAt: '2026-08-07T10:00:00+00:00',
     signedInUntil: '2026-09-06T10:00:00+00:00',
+    stale: false,
     current: false,
     ...overrides,
   };
@@ -128,6 +131,7 @@ beforeEach(() => {
     wasCurrent: false,
   });
   vi.mocked(renameDevice).mockReset().mockResolvedValue('Cocina');
+  vi.mocked(pruneStaleDevices).mockReset().mockResolvedValue(0);
   vi.mocked(logout).mockReset();
   replace.mockClear();
   (isAdmin as unknown as { value: boolean }).value = true;
@@ -140,9 +144,30 @@ describe('the list', () => {
     const text = wrapper.html();
     expect(text).toContain('Office laptop');
     // Somebody is on it right now: the fact that turns "I think I left it somewhere" into "cut it
-    // off". The id is shown too, because two tills can carry the same name.
-    expect(text).toContain('dev_abc');
+    // off".
     expect(text.toLowerCase()).toContain('in use');
+  });
+
+  it('never paints the internal device id (hub#2203)', async () => {
+    // The id is 128 random bits the browser minted for itself (ADR-0257): it tells a person nothing,
+    // and it ends up in every screenshot of Settings. Two rows that look alike are told apart by the
+    // name the business gives them and by their dates — the way Google, Apple or Shopify list the
+    // devices of an account. It still keys the buttons (`data-testid`), just never the words.
+    vi.mocked(listDevices).mockResolvedValue([
+      device({ current: true }),
+      device({ deviceId: 'dev_0123456789abcdef', name: 'Chrome · Mac', openSessions: 0 }),
+    ]);
+
+    const wrapper = await mountCard();
+    // What a person reads: the markup without its tags. `wrapper.text()` comes back empty under an
+    // `ion-card` root in happy-dom, so it would pass whatever the card painted.
+    const painted = wrapper.html().replace(/<[^>]*>/g, ' ');
+
+    expect(painted).toContain('Chrome · Mac');
+    expect(painted).not.toContain('dev_abc');
+    expect(painted).not.toContain('dev_0123456789abcdef');
+    // The rows are still there, and still actionable one by one.
+    expect(wrapper.find('[data-testid="devices-revoke-dev_0123456789abcdef"]').exists()).toBe(true);
   });
 
   it('marks the device the owner is holding', async () => {
@@ -204,12 +229,28 @@ describe('the list', () => {
 
   it('a device nobody has used since it was added says exactly that', async () => {
     vi.mocked(listDevices).mockResolvedValue([
-      device({ openSessions: 0, lastSignIn: '', signedInUntil: '' }),
+      device({ openSessions: 0, lastSignIn: '', lastUsedAt: '', signedInUntil: '' }),
     ]);
 
     const wrapper = await mountCard();
 
     expect(wrapper.html()).toContain('never used since');
+  });
+
+  it('a device whose session already ended still says when it was last used (hub#2215)', async () => {
+    vi.mocked(listDevices).mockResolvedValue([
+      device({
+        openSessions: 0,
+        lastSignIn: '',
+        signedInUntil: '',
+        lastUsedAt: '2026-08-20T18:00:00+00:00',
+      }),
+    ]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.html()).toContain('Last used');
+    expect(wrapper.html()).not.toContain('never used since');
   });
 
   it('says the list is empty rather than showing nothing at all', async () => {
@@ -359,6 +400,100 @@ describe('revoking', () => {
   });
 });
 
+describe('clearing the devices nobody uses (hub#2215)', () => {
+  function stale(id: string, overrides: Record<string, unknown> = {}) {
+    return device({
+      deviceId: id,
+      openSessions: 0,
+      signedInUntil: '',
+      lastSignIn: '',
+      lastUsedAt: '2026-06-01T10:00:00+00:00',
+      stale: true,
+      ...overrides,
+    });
+  }
+
+  it('offers it only when there is something to clear, and says how many', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device(), stale('dev_old1'), stale('dev_old2')]);
+
+    const wrapper = await mountCard();
+
+    const offer = wrapper.get('[data-testid="devices-prune"]');
+    expect(offer.html()).toContain('Remove the 2 devices');
+
+    vi.mocked(listDevices).mockResolvedValue([device()]);
+    const clean = await mountCard();
+    expect(clean.find('[data-testid="devices-prune"]').exists()).toBe(false);
+  });
+
+  it('never counts the device you are holding, even when its dates say it is old', async () => {
+    vi.mocked(listDevices).mockResolvedValue([
+      stale('dev_old1'),
+      stale('dev_self', { current: true }),
+    ]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.get('[data-testid="devices-prune"]').html()).toContain('Remove the device');
+    expect(wrapper.get('[data-testid="devices-prune"]').html()).not.toContain('2 devices');
+  });
+
+  it('asks first, in the card, saying how many go and what that means', async () => {
+    vi.mocked(listDevices).mockResolvedValue([stale('dev_old1'), stale('dev_old2')]);
+    const wrapper = await mountCard();
+
+    await wrapper.get('[data-testid="devices-prune"]').trigger('click');
+
+    expect(pruneStaleDevices).not.toHaveBeenCalled();
+    const confirm = wrapper.get('[data-testid="devices-prune-confirm-block"]').html();
+    expect(confirm).toContain(i18n.global.t('devices.pruneConfirm', { n: 2 }));
+    expect(confirm).toContain(i18n.global.t('devices.pruneConsequence'));
+
+    await wrapper.get('[data-testid="devices-prune-cancel"]').trigger('click');
+    expect(wrapper.find('[data-testid="devices-prune-confirm-block"]').exists()).toBe(false);
+    expect(pruneStaleDevices).not.toHaveBeenCalled();
+  });
+
+  it('confirming clears them and reloads the list from the hub', async () => {
+    vi.mocked(listDevices).mockResolvedValue([device(), stale('dev_old1')]);
+    const wrapper = await mountCard();
+    vi.mocked(pruneStaleDevices).mockResolvedValue(1);
+    vi.mocked(listDevices).mockResolvedValue([device()]);
+
+    await wrapper.get('[data-testid="devices-prune"]').trigger('click');
+    await wrapper.get('[data-testid="devices-prune-confirm"]').trigger('click');
+    await flushPromises();
+
+    expect(pruneStaleDevices).toHaveBeenCalledTimes(1);
+    expect(listDevices).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-testid="devices-prune"]').exists()).toBe(false);
+  });
+
+  it('a refused clean-up keeps the reason on screen and the rows where they were', async () => {
+    vi.mocked(listDevices).mockResolvedValue([stale('dev_old1')]);
+    const wrapper = await mountCard();
+    vi.mocked(pruneStaleDevices).mockRejectedValue(new DevicesError('boom'));
+
+    await wrapper.get('[data-testid="devices-prune"]').trigger('click');
+    await wrapper.get('[data-testid="devices-prune-confirm"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="devices-error"]').html()).toContain(
+      i18n.global.t('devices.pruneError'),
+    );
+    expect(wrapper.find('[data-testid="devices-revoke-dev_old1"]').exists()).toBe(true);
+  });
+
+  it('an employee is not offered it', async () => {
+    (isAdmin as unknown as { value: boolean }).value = false;
+    vi.mocked(listDevices).mockResolvedValue([stale('dev_old1')]);
+
+    const wrapper = await mountCard();
+
+    expect(wrapper.find('[data-testid="devices-prune"]').exists()).toBe(false);
+  });
+});
+
 describe('the words', () => {
   it('says it in Spanish too, and without a word a shopkeeper does not use', async () => {
     const keys = [
@@ -382,6 +517,12 @@ describe('the words', () => {
       'save',
       'lastSignedInBy',
       'renameError',
+      // hub#2215 — clearing the devices nobody uses.
+      'pruneStale',
+      'pruneConfirm',
+      'pruneConsequence',
+      'pruneAction',
+      'pruneError',
     ];
     for (const key of keys) {
       const spanish = i18n.global.t(`devices.${key}`, 1, { locale: 'es' });
