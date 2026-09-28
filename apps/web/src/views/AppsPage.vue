@@ -1093,7 +1093,9 @@ async function runUpdateAll(targets: UpdateAllTarget[]): Promise<void> {
   const byId = new Map(fresh.map((r) => [r.id, r]));
   const kept = updateAllResults.value.map((r) => byId.get(r.id) ?? r);
   updateAllResults.value = [...kept, ...fresh.filter((r) => !kept.some((k) => k.id === r.id))];
-  await loadModuleUpdates();
+  // Unlike a single update, the page may not reload now (a failure stays on screen to be read), so
+  // «My apps» has to show the versions the updated apps run already.
+  await Promise.all([loadInstalled(), loadModuleUpdates()]);
 
   const results = updateAllResults.value;
   // Something failed: the reasons stay on screen, each with «Retry». Reloading now would wipe them.
@@ -1715,6 +1717,9 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+}
+.update-all > ion-button {
+  align-self: flex-start;
 }
 .update-all ion-progress-bar {
   min-width: 160px;

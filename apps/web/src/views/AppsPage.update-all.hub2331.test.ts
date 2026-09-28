@@ -288,6 +288,34 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     expect(reloadForModuleUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it('🔴 with a failure on screen, «My apps» already shows the new version of the apps that did update', async () => {
+    updateModule
+      .mockImplementationOnce(async () => {
+        throw failure('down');
+      })
+      .mockImplementationOnce(async () => {
+        // What the runtime answers from now on: inventory runs 2.0.0 and has nothing newer.
+        INSTALLED = INSTALLED.map((m) => (m.id === 'inventory' ? { ...m, version: '2.0.0' } : m));
+        UPDATES = UPDATES.map((u) =>
+          u.module_id === 'inventory' ? { ...u, installed: '2.0.0', update_available: false } : u,
+        );
+        return ok('inventory');
+      });
+    const w = mountApps();
+    await settle();
+    await pressUpdateAll(w);
+    await settle();
+    expect(reloadForModuleUpdate).not.toHaveBeenCalled();
+
+    const table = w
+      .findAll('ok-data-table')
+      .map((t) => t.element as HTMLElement & { rows?: Array<Record<string, unknown>> })
+      .find((t) => (t.rows ?? []).some((r) => r.id === 'inventory' && 'status' in r))!;
+    const inventory = table.rows!.find((r) => r.id === 'inventory')!;
+    expect(inventory.version).toBe('2.0.0');
+    expect(inventory.update).toBeNull();
+  });
+
   it('a paid dependency blocking one app is said in those words (ADR-0060)', async () => {
     const Blocked = runtime.InstallBlockedError as unknown as new (m: string, b: string[]) => Error;
     updateModule
