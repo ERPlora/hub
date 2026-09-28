@@ -23,7 +23,10 @@ afterEach(() => {
 describe('the boot check tells a refusal from no answer (hub#2255)', () => {
   for (const status of [403, 500, 502, 503]) {
     it(`an empty ${status} is a refusal, not a lost connection`, async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status })));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('', { status })),
+      );
 
       expect(await bootContextOutcome()).toBe('refused');
     });
@@ -80,8 +83,10 @@ describe('the boot check tells a refusal from no answer (hub#2255)', () => {
   });
 
   it('an OK page that is not the context (a proxy answering HTML) is a refusal too', async () => {
-
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>blocked</html>', { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>blocked</html>', { status: 200 })),
+    );
 
     expect(await bootContextOutcome()).toBe('refused');
   });
