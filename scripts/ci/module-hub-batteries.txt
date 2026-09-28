@@ -183,3 +183,15 @@ pricing/tests/duplicate_list_code.hub.test.py
 # New coverage, not moved.
 # pending-publication: services#112 until 2026-10-26
 services/tests/category_name_taken.hub.test.py
+# cash_register: the till count adds its notes and coins with the scale of the HUB currency — the
+# setting `PUT /api/settings` writes reaches the WASM handler through the `cash_register.currency_scale`
+# read, so yen count 5003 (not 500300), Kuwaiti dinars 515 fils and euros 10015 cents, against the
+# real kernel (cash_register#111). New coverage, not moved.
+# pending-publication: cash_register#111 until 2026-10-27
+cash_register/tests/count_currency.hub.test.py
+# services: a courtesy on a SOLD voucher — one more session revives a used-up one, days revive an
+# expired one — is refused by name (unlimited, never expires, adds nothing, not in this hub,
+# voided) with nothing written, and is announced and listed in the voucher's movements, against
+# the real kernel (services#118). New coverage, not moved.
+# pending-publication: services#125 until 2026-10-28
+services/tests/grant_adjust.hub.test.py

@@ -153,7 +153,11 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
             &instructions,
         );
         let turn = one_turn(st, &auth, &body).await?;
-        answered = turn.text.clone();
+        // **What gets published is trimmed at both ends** (hub#2286). Some models end a turn that
+        // only calls a tool with a bare line break, and a recipe's guard (`text in ["", null]`)
+        // cannot trim: it would send the customer a blank WhatsApp. The inside is left alone —
+        // the line breaks between two offered slots are the answer.
+        answered = turn.text.trim().to_string();
 
         if turn.calls.is_empty() {
             // **The document asked for data and got a sentence** (hub#1639). Publishing the turn
@@ -207,7 +211,7 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
             // Everything the turn has produced so far. It travels with an approval park so that a
             // decision taken hours later completes the WHOLE turn — the model's explanation and
             // the reads it did — and not just its ending.
-            let so_far = json!({ "text": turn.text, "tool_calls": calls_made });
+            let so_far = json!({ "text": answered, "tool_calls": calls_made });
             match dispatch(st, &request, &tools, call, &so_far).await? {
                 Dispatched::Result(result) => {
                     calls_made.push(json!({
