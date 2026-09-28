@@ -1091,6 +1091,10 @@ mod tests {
             panic!("an error without a final flag is a moment, not a verdict: {failure:?}")
         };
         assert!(err.starts_with(ERR_UPSTREAM), "{err}");
+        assert!(
+            err.contains("quota exceeded"),
+            "the provider's own words are kept: {err}"
+        );
     }
 
     /// The briefing has to contradict the chat prompt's "you are in a drawer next to someone
