@@ -1252,6 +1252,33 @@ pub(crate) async fn upload_bundle_media(
     report
 }
 
+/// Stores ONE file the runtime itself vetted and named (hub#2335: the photo of a WhatsApp header,
+/// uploaded from a flow step) in `media/<folder>/<name>`. `true` only when erplora.com says it
+/// stored it; a hub with no machine credential, a store that failed and an answer that never came
+/// are all `false` — the caller must not hand out a reference to a file that is not there.
+///
+/// Same road as a blueprint's media ([`upload_bundle_batch`]): the name is the caller's, so a retry
+/// overwrites the same file instead of leaving a second copy.
+pub(crate) async fn store_vetted_file(
+    st: &AppState,
+    folder: &str,
+    name: &str,
+    bytes: &[u8],
+) -> bool {
+    let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
+    let Some(headers) = cloud_headers(st, &url) else {
+        return false;
+    };
+    let file = BundleMediaUpload {
+        name: name.to_string(),
+        bytes,
+    };
+    upload_bundle_batch(st, &headers, folder, std::slice::from_ref(&file))
+        .await
+        .copied
+        == 1
+}
+
 // ─────────────────────────── Helpers ───────────────────────────
 
 /// Componente final del path (nombre de fichero); cadena vacía si no tiene.
