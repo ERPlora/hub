@@ -127,12 +127,13 @@ fn anchor_the_interest_cache() {
 /// else should reach for [`captured`], which is this function with the guard handled for you.
 pub(crate) fn capture_scope() -> (CapturedLog, tracing::subscriber::DefaultGuard) {
     anchor_the_interest_cache();
+    use tracing_subscriber::layer::SubscriberExt;
+
     let sink = CapturedLog::default();
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(sink.clone())
-        .with_ansi(false)
-        .with_max_level(tracing::Level::TRACE)
-        .finish();
+    // The production console layer (hub#2300): no level filter, so everything down to TRACE
+    // reaches the sink, and no colours, so assertions read plain text.
+    let subscriber = tracing_subscriber::registry()
+        .with(crate::logging::console_layer(sink.clone()).with_ansi(false));
     let guard = tracing::subscriber::set_default(subscriber);
     (sink, guard)
 }
