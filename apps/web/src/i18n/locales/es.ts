@@ -781,6 +781,11 @@ export default {
     cancelledFor: 'Cita cancelada · {customer}',
     when: '{date} a las {time}',
   },
+  // hub#2303 — system notice when a bell counter goes up; {label} is the module's own counter label.
+  bellNotice: {
+    title: '{label} ({count})',
+    body: 'Míralo en la campana para atenderlo.',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
