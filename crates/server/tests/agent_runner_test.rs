@@ -2123,9 +2123,17 @@ async fn hub2308_a_proxy_that_stays_down_is_given_up_on_after_three_attempts() {
     .await;
     let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
 
+    let started = std::time::Instant::now();
     perform(&h, &run_id).await;
 
     assert_eq!(cloud.turns(), 3, "one call and two retries, then it stops");
+    // The retries wait for the moment to pass (1 s, then 3 s) instead of knocking again at once
+    // on a SaaS that is still restarting.
+    assert!(
+        started.elapsed() >= std::time::Duration::from_secs(4),
+        "the retries are spaced out: {:?}",
+        started.elapsed()
+    );
     assert!(
         step_error(&h, &run_id)
             .await
