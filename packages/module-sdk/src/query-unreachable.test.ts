@@ -206,13 +206,20 @@ test('hub#2288: an attachment the hub never sent gets the read sentence', async 
 });
 
 test('hub#2288: a core REST WRITE is never told «the data could not be loaded»', async () => {
-  await assert.rejects(
-    () => clientWith(deadFetch).forModule('whatsapp_inbox').flows.remove('f1'),
-    (e: unknown) => {
+  const flows = clientWith(deadFetch).forModule('whatsapp_inbox').flows;
+  const flow = { name: 'f', definition: {} };
+  // Every write verb, not only DELETE: a create (POST) or an edit (PUT) that got no answer may have
+  // committed just the same.
+  for (const [verb, write] of [
+    ['POST', () => flows.create(flow)],
+    ['PUT', () => flows.update('f1', flow)],
+    ['DELETE', () => flows.remove('f1')],
+  ] as const) {
+    await assert.rejects(write, (e: unknown) => {
       assert.ok(e instanceof ErploraError);
       assert.equal(e.code, SERVER_UNAVAILABLE);
-      assert.ok(!e.message.includes(ES_SENTENCE), `a write was described as a failed load: ${e.message}`);
+      assert.ok(!e.message.includes(ES_SENTENCE), `a ${verb} was described as a failed load: ${e.message}`);
       return true;
-    },
-  );
+    });
+  }
 });
