@@ -1793,3 +1793,106 @@ async fn a_proxy_that_does_not_answer_leaves_no_address_in_the_run() {
         step.error
     );
 }
+
+// ── hub#2286 — the turn's text is published trimmed ───────────────────────────────────────────
+
+/// What the model wrote → what the step publishes as `text`. Some providers end a turn that only
+/// calls a tool with a bare line break; for a WhatsApp recipe that is a blank message sent to the
+/// customer, because its guard (`steps.<ai>.text in ["", null]`) cannot trim. Only the ends go:
+/// the line breaks INSIDE an answer are the answer.
+const TRIM_CASES: [(&str, &str); 4] = [
+    ("   \n", ""),
+    ("\n hola \n", "hola"),
+    ("Tengo estos huecos libres", "Tengo estos huecos libres"),
+    (
+        "\nLunes 10:00\n\nLunes 12:30  \n",
+        "Lunes 10:00\n\nLunes 12:30",
+    ),
+];
+
+/// **hub#2286, the turn that ends in words.** The step's output is what a later `notify` sends.
+#[tokio::test]
+async fn hub2286_a_turn_that_ends_in_words_publishes_its_text_trimmed() {
+    for (i, (said, published)) in TRIM_CASES.into_iter().enumerate() {
+        let cloud = FakeCloud::with(vec![sse_text(said)]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("trim-words-{i}"),
+            agent_step("manual"),
+            &[],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "hola" })).await;
+        perform(&h, &run_id).await;
+
+        assert_eq!(
+            step_output(&h, &run_id).await["text"],
+            json!(published),
+            "the model said {said:?}"
+        );
+    }
+}
+
+/// **hub#2286, the case of the issue.** The WhatsApp recipe's turn answers through `flow_answer`,
+/// and the stray line break comes glued to that call.
+#[tokio::test]
+async fn hub2286_a_turn_that_answers_with_flow_answer_publishes_its_text_trimmed() {
+    for (i, (said, published)) in TRIM_CASES.into_iter().enumerate() {
+        let cloud = FakeCloud::with(vec![sse_text_and_call(
+            said,
+            "flow_answer",
+            "c1",
+            json!({ "slots": two_slots(), "action": "asking" }),
+        )]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("trim-answer-{i}"),
+            agent_step_that_leaves_data_behind(),
+            &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+        perform(&h, &run_id).await;
+
+        let out = step_output(&h, &run_id).await;
+        assert_eq!(out["text"], json!(published), "the model said {said:?}");
+        assert_eq!(
+            out["slots"],
+            two_slots(),
+            "the data travels untouched: {out}"
+        );
+    }
+}
+
+/// **hub#2286, the turn parked on a write.** What it said is kept on the step and handed on once
+/// a person decides (hub#1622), so it is published the same way as an ending.
+#[tokio::test]
+async fn hub2286_a_turn_parked_for_approval_keeps_its_text_trimmed() {
+    for (i, (said, published)) in TRIM_CASES.into_iter().enumerate() {
+        let cloud = FakeCloud::with(vec![sse_text_and_call(
+            said,
+            "agenda.booking.create",
+            "c1",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }),
+        )]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("trim-park-{i}"),
+            agent_step("manual"),
+            &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "book me" })).await;
+        perform(&h, &run_id).await;
+
+        assert_eq!(
+            run_status(&h, &run_id).await,
+            store::STATUS_WAITING_APPROVAL
+        );
+        assert_eq!(
+            step_output(&h, &run_id).await["text"],
+            json!(published),
+            "the model said {said:?}"
+        );
+    }
+}
