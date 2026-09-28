@@ -157,7 +157,8 @@ describe('what must NOT sign anyone out', () => {
     });
     vi.stubGlobal('fetch', spy);
 
-    await expect(listModuleUpdates()).resolves.toEqual([]);
+    // An unconfirmed 401 is an error of this call (hub#1172: it rejects), never a sign-out.
+    await expect(listModuleUpdates()).rejects.not.toBeInstanceOf(RuntimeSessionExpiredError);
 
     expect(expired).not.toHaveBeenCalled();
     expect(getHubSession()).toBe('live-session-token');

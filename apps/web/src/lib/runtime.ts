@@ -786,18 +786,20 @@ export interface ModuleUpdateResult {
 }
 
 /**
- * Qué versión ofrece hoy el marketplace para cada módulo instalado (`GET /api/modules/updates`).
+ * Which version the marketplace offers today for each installed module (`GET /api/modules/updates`).
  *
  * **On demand, never a fast poll**: each call asks the Cloud once per installed module. The Apps
  * screen asks when it opens, and the bell's «N apps have a new version» (hub#1172,
  * `module-update-notice.ts`) asks when an admin session starts and then hours apart. A failure
- * returns an empty list: with no answer, nothing is offered.
+ * **throws**: «the runtime did not answer» is not «nothing to update», and the bell keeps its last
+ * count on a throw instead of clearing it. The Apps screen catches it and offers nothing.
  */
 export async function listModuleUpdates(): Promise<ModuleUpdateInfo[]> {
   const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/updates`, { headers: runtimeHeaders() });
-  if (!res.ok) return [];
-  const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleUpdateInfo[] };
-  return env.ok && env.data ? env.data : [];
+  if (!res.ok) throw new Error(`modules/updates → ${res.status}`);
+  const env = (await res.json()) as { ok?: boolean; data?: ModuleUpdateInfo[] };
+  if (!env.ok || !Array.isArray(env.data)) throw new Error('modules/updates → the runtime reported a failure');
+  return env.data;
 }
 
 /**

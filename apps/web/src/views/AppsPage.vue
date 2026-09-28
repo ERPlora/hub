@@ -1142,6 +1142,8 @@ async function loadModuleUpdates(): Promise<void> {
     moduleUpdates.value = await listModuleUpdates();
     moduleUpdatesKnown.value = true;
   } catch {
+    // Unknown again: the watch below must not publish the emptiness a failure leaves behind.
+    moduleUpdatesKnown.value = false;
     moduleUpdates.value = [];
   }
 }

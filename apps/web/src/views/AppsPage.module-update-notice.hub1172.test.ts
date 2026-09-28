@@ -193,6 +193,23 @@ describe('the Apps screen feeds the «apps have a new version» notice (hub#1172
     expect(notificationCountOf('moduleUpdates')).toBe(3);
   });
 
+  // A screen that already knew the answer and then fails to re-check must not publish the empty list
+  // its failure leaves behind: that would tell the owner «all up to date» while an app still waits.
+  it('🔴 a re-check that fails after a good one keeps the bell as it was', async () => {
+    UPDATES = UPDATES.map((u) => (u.module_id === 'tables' ? { ...u, latest: '2.0.0', update_available: true } : u));
+    const w = mountApps();
+    await settle();
+    expect(notificationCountOf('moduleUpdates')).toBe(2);
+
+    listModuleUpdates.mockRejectedValue(new Error('offline'));
+    mineTable(w).dispatchEvent(new CustomEvent('rowAction', { detail: { actionId: 'update', row: mineRow(w) } }));
+    await settle();
+
+    expect(updateModule).toHaveBeenCalled();
+    expect(listModuleUpdates).toHaveBeenCalledTimes(2);
+    expect(notificationCountOf('moduleUpdates')).toBe(2);
+  });
+
   it('🔴 updating the app there clears the bell at once', async () => {
     const w = mountApps();
     await settle();
