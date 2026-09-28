@@ -400,3 +400,119 @@ async fn a_forged_session_without_an_address_is_still_logged() {
         "no auth_failed line with client=-"
     );
 }
+
+/// First 8 hex digits of `sha256(token)`: what the line must carry, computed independently.
+fn expected_fingerprint(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(token.as_bytes()))[..8].to_string()
+}
+
+/// The `token=` value of an `auth_failed` line, if it has one.
+fn token_field(line: &str) -> Option<&str> {
+    line.split(' ').find_map(|pair| pair.strip_prefix("token="))
+}
+
+/// hub#2293: a rejected session credential names its token by a short fingerprint — never the
+/// token — right after `client=`, so `hub=` still ends the line (the edge parser and alert are
+/// anchored on it, infra#345/#349). Through each of the three credentials that skip the bouncer.
+#[tokio::test]
+async fn hub2293_a_rejected_session_line_carries_the_token_fingerprint() {
+    let router = fixture().await;
+    let client = "198.51.100.110";
+    send(&router, profile_with_session(client, "forged-header-2293")).await;
+    send(&router, media_with_cookie(client, "forged-cookie-2293")).await;
+    send(&router, events_with_ticket(client, "evt_forged_2293")).await;
+    let lines = failure_lines(client);
+    for (reason, token) in [
+        ("session_invalid", "forged-header-2293"),
+        ("session_invalid", "forged-cookie-2293"),
+        ("ticket_invalid", "evt_forged_2293"),
+    ] {
+        let tail = format!(
+            "reason={reason} client={client} token={} hub={HUB_ID}",
+            expected_fingerprint(token)
+        );
+        assert!(
+            lines.iter().any(|l| l.ends_with(&tail)),
+            "no line ending in {tail:?}: {lines:#?}"
+        );
+    }
+    assert!(
+        lines
+            .iter()
+            .all(|l| !l.contains("forged-") && !l.contains("evt_forged")),
+        "a token reached the log: {lines:#?}"
+    );
+}
+
+/// A wrong PIN or badge has no token: its line keeps the shape the edge already bans on.
+#[tokio::test]
+async fn hub2293_guess_lines_carry_no_token() {
+    let router = fixture().await;
+    let client = "198.51.100.111";
+    send(&router, pin_login(client, "Admin", "0000")).await;
+    let lines = failure_lines(client);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.ends_with(&format!("reason=pin client={client} hub={HUB_ID}"))),
+        "{lines:#?}"
+    );
+}
+
+/// What the edge could not tell apart (hub#2293): once an address is at its cap every request
+/// with a token it did not count logs again. A stale tab repeating ONE dead session must read as
+/// one token however many lines it leaves; somebody inventing sessions reads as many.
+#[tokio::test]
+async fn hub2293_a_stale_tab_and_a_session_guesser_differ_by_distinct_fingerprints() {
+    let router = fixture().await;
+    let shop = "198.51.100.112";
+    let guesser = "198.51.100.113";
+    for i in 0..MAX_FORGED_SESSIONS {
+        send(&router, profile_with_session(shop, &format!("counted-{i}"))).await;
+        send(
+            &router,
+            profile_with_session(guesser, &format!("counted-{i}")),
+        )
+        .await;
+    }
+    let before_shop = failure_lines(shop).len();
+    let before_guesser = failure_lines(guesser).len();
+    for i in 0..30 {
+        send(&router, profile_with_session(shop, "stale-tab-session")).await;
+        send(
+            &router,
+            profile_with_session(guesser, &format!("invented-{i}")),
+        )
+        .await;
+    }
+
+    let distinct = |lines: &[String]| -> std::collections::HashSet<String> {
+        lines
+            .iter()
+            .map(|l| {
+                token_field(l)
+                    .expect("a session line names its token")
+                    .to_string()
+            })
+            .collect()
+    };
+    let tab = failure_lines(shop).split_off(before_shop);
+    assert!(
+        tab.len() > 1,
+        "precondition: the capped address logs the repeat: {tab:#?}"
+    );
+    assert_eq!(
+        distinct(&tab),
+        [expected_fingerprint("stale-tab-session")]
+            .into_iter()
+            .collect(),
+        "a stale tab is one token however many lines"
+    );
+    let guesses = failure_lines(guesser).split_off(before_guesser);
+    assert_eq!(
+        distinct(&guesses).len(),
+        30,
+        "every invented session is a new token"
+    );
+}
