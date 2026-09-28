@@ -3045,7 +3045,7 @@ leak_errs() {
     # GIT_INDEX_FILE alone leaks too: the probe's `add -A` rewrites the pusher's index with the
     # scratch's files while HEAD, branches and the scratch commit all look right.
     git -C "$repo" diff --cached --quiet HEAD \
-        || errs="$errs pusher-index-rewritten:[$(git -C "$repo" ls-files | head -5 | tr '\n' ' ')]"
+        || errs="$errs pusher-index-rewritten:[$(head -5 <<<"$(git -C "$repo" ls-files)" | tr '\n' ' ')]"
     for tag in "$@"; do
         # Control positive: the probe really ran and landed where it aimed.
         git -C "$scratch" rev-parse -q --verify "refs/heads/clash-$tag" >/dev/null \
