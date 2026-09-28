@@ -261,6 +261,18 @@ test('the viewport is not watched once nothing is accumulated', async () => {
   assert.equal(listeners.size, 0, 'a new result set lets the viewport go (no leak per screen)');
 });
 
+test('«Load more» after «Load more» watches the viewport once, not once per page', async () => {
+  const { listeners, ctrl } = await phoneList(200);
+  for (const page of [1, 2, 3]) {
+    ctrl.setPage(page);
+    await flush();
+  }
+  assert.equal(listeners.size, 1, 'one rotation listener however many pages were added');
+  ctrl.setSearch('x');
+  await flush();
+  assert.equal(listeners.size, 0, 'and it goes away with the accumulated rows');
+});
+
 test('«Load more» on a page reached with the desktop pager fills everything up to it', async () => {
   const { viewport, server } = { ...setViewport(1440), server: fakeServer(200) };
   const ctrl = createListController<Row>(server, 'm.list');
