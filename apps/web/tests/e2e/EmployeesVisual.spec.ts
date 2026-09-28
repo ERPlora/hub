@@ -7,6 +7,8 @@ import { test, expect } from '../bench-boot';
 import { VIEWPORTS, freezeVisualClock, loggedInSession, skipIfBaselineMissingLocally, visualSnapshotMask, waitForVisualSettle } from './shell-visual-helpers';
 
 test.describe('contrato visual del shell — personal', () => {
+  // Regression test for ERPlora/hub#2302: the 390px baseline was regenerated for OutfitKit
+  // 0.1.109, whose ok-data-table footer no longer boxes the mobile cards in (outfitkit#223).
   for (const { width, height } of VIEWPORTS) {
     test(`la pestaña «Personal» se pinta igual a ${width}px (hub#1250)`, async ({ page }, testInfo) => {
       const snapshot = `employees-${width}.png`;
