@@ -1038,7 +1038,7 @@ export default {
     updateAllOffer: '{n} app has a new version. | {n} apps have a new version.',
     updateAllAction: 'Update all',
     updateAllProgress: 'Updating {name} ({current} of {total})…',
-    updateAllSummary: '{updated} of {total} apps updated.',
+    updateAllSummary: '{updated} of {total} app updated. | {updated} of {total} apps updated.',
     updateAllUpToDate: 'Already on the latest version',
     updateAllRetry: 'Retry',
     // Some apps were updated: the page has to reload to run them (hub#935), once the owner has read

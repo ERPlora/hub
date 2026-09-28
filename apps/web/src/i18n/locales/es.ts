@@ -907,7 +907,7 @@ export default {
     updateAllOffer: '{n} app tiene una versión nueva. | {n} apps tienen una versión nueva.',
     updateAllAction: 'Actualizar todas',
     updateAllProgress: 'Actualizando {name} ({current} de {total})…',
-    updateAllSummary: '{updated} de {total} apps actualizadas.',
+    updateAllSummary: '{updated} de {total} app actualizada. | {updated} de {total} apps actualizadas.',
     updateAllUpToDate: 'Ya estaba en la última versión',
     updateAllRetry: 'Reintentar',
     updateAllReload: 'Recargar ahora',
