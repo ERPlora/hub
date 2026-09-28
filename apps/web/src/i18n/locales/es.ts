@@ -58,6 +58,9 @@ export default {
     printingStalledTitle: 'Nadie está imprimiendo «{station}»',
     printingStalledBody:
       'Hay {count} documento esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida. | Hay {count} documentos esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
+    moduleUpdatesTitle: 'Actualizaciones de apps',
+    moduleUpdatesBody:
+      '{n} app tiene una versión nueva. Actualízala desde Mis apps. | {n} apps tienen una versión nueva. Actualízalas desde Mis apps.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
