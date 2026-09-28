@@ -271,7 +271,7 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     expect(reloadForModuleUpdate).not.toHaveBeenCalled();
 
     const text = painted(w, '[data-testid="apps-update-all"]');
-    expect(text).toContain(fill(enCatalogue.apps.updateAllSummary, { updated: 1, total: 2 }));
+    expect(text).toContain(fill(plural(enCatalogue.apps.updateAllSummary, 2), { updated: 1, total: 2 }));
     expect(painted(w, '[data-testid="apps-update-all-result"][data-id="sales"]')).toContain('Sales');
     expect(painted(w, '[data-testid="apps-update-all-result"][data-id="sales"]')).toContain(sentence);
     expect(painted(w, '[data-testid="apps-update-all-result"][data-id="inventory"]')).toContain('1.0.0 → 2.0.0');
@@ -358,7 +358,7 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     await pressUpdateAll(w);
     await settle();
     expect(painted(w, '[data-testid="apps-update-all"]')).toContain(
-      fill(enCatalogue.apps.updateAllSummary, { updated: 0, total: 2 }),
+      fill(plural(enCatalogue.apps.updateAllSummary, 2), { updated: 0, total: 2 }),
     );
     expect(painted(w, '[data-testid="apps-update-all-finish"]')).toBe(enCatalogue.apps.noticeClose);
     await w.find('[data-testid="apps-update-all-finish"]').trigger('click');
@@ -428,5 +428,73 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     await settle();
     const after = table.actions!.find((a) => a.id === 'update')!;
     expect(after.disabled?.(table.rows!.find((r) => r.id === 'inventory')!)).toBe(false);
+  });
+
+  it('«Update all» is greyed out while a row «Update» is still running (its reload would cut the batch short)', async () => {
+    const single = deferred<ReturnType<typeof ok>>();
+    listModuleVersions.mockImplementationOnce(async () => ({ versions: ['2.0.0'] }));
+    updateModule.mockImplementationOnce(() => single.promise);
+    const w = mountApps();
+    await settle();
+    expect(w.find('[data-testid="apps-update-all-button"]').attributes('disabled')).toBe('false');
+
+    const table = w
+      .findAll('ok-data-table')
+      .map((t) => t.element as HTMLElement & { rows?: Array<Record<string, unknown>> })
+      .find((t) => (t.rows ?? []).some((r) => r.id === 'sales' && 'status' in r))!;
+    const row = table.rows!.find((r) => r.id === 'sales')!;
+    table.dispatchEvent(new CustomEvent('rowAction', { detail: { actionId: 'update', row } }));
+    await settle();
+    expect(updateModule).toHaveBeenCalledTimes(1);
+    expect(w.find('[data-testid="apps-update-all-button"]').attributes('disabled')).toBe('true');
+
+    single.resolve(ok('sales'));
+    await settle();
+    expect(w.find('[data-testid="apps-update-all-button"]').attributes('disabled')).toBe('false');
+  });
+
+  it('the app being updated by the batch shows the spinner on its own row', async () => {
+    const first = deferred<ReturnType<typeof ok>>();
+    updateModule.mockImplementationOnce(() => first.promise);
+    const w = mountApps();
+    await settle();
+    await pressUpdateAll(w);
+    await settle();
+
+    const table = w
+      .findAll('ok-data-table')
+      .map(
+        (t) =>
+          t.element as HTMLElement & {
+            rows?: Array<Record<string, unknown>>;
+            actions?: Array<{ id: string; loading?: (row: Record<string, unknown>) => boolean }>;
+          },
+      )
+      .find((t) => (t.rows ?? []).some((r) => r.id === 'sales' && 'status' in r))!;
+    const rowUpdate = table.actions!.find((a) => a.id === 'update')!;
+    expect(rowUpdate.loading?.(table.rows!.find((r) => r.id === 'sales')!)).toBe(true);
+    expect(rowUpdate.loading?.(table.rows!.find((r) => r.id === 'inventory')!)).toBe(false);
+
+    first.resolve(ok('sales'));
+    await settle();
+  });
+
+  it('a batch of one says «… of 1 app updated», in English and in Spanish', async () => {
+    UPDATES = UPDATES.filter((u) => u.module_id !== 'inventory');
+    updateModule.mockImplementation(async () => {
+      throw failure('down');
+    });
+    for (const [locale, said] of [
+      ['en', '0 of 1 app updated.'],
+      ['es', '0 de 1 app actualizada.'],
+    ] as const) {
+      const w = mountApps(locale);
+      await settle();
+      await pressUpdateAll(w);
+      await settle();
+      const text = painted(w, '[data-testid="apps-update-all"]');
+      expect(text).toContain(said);
+      expect(text).not.toContain('|');
+    }
   });
 });

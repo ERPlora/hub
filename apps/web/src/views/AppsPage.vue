@@ -59,7 +59,7 @@
           <ion-progress-bar :value="(updateAllStep.current - 1) / updateAllStep.total" />
         </div>
         <div v-else-if="updateAllResults.length > 0" class="update-all">
-          <strong>{{ t('apps.updateAllSummary', { updated: updateAllUpdatedCount, total: updateAllResults.length }) }}</strong>
+          <strong>{{ t('apps.updateAllSummary', { updated: updateAllUpdatedCount, total: updateAllResults.length }, updateAllResults.length) }}</strong>
           <ul class="update-all__results">
             <li
               v-for="r in updateAllResults"
