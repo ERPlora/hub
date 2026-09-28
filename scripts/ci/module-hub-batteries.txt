@@ -195,6 +195,12 @@ cash_register/tests/count_currency.hub.test.py
 # the real kernel (services#118). New coverage, not moved.
 # pending-publication: services#125 until 2026-10-28
 services/tests/grant_adjust.hub.test.py
+# services: a void or a balance correction of a SOLD voucher waits for a till that is holding or
+# spending a session of the SAME voucher and is then refused by name (`services.grant_not_voidable`,
+# `services.grant_not_adjustable`), and a till that arrives after a void spends nothing — the doors
+# queue on the voucher's row lock, against the real kernel (services#120). New coverage, not moved.
+# pending-publication: services#129 until 2026-10-28
+services/tests/grant_race.hub.test.py
 # cart_checkout: a cart the assistant or an API integration creates WITHOUT a currency is born in the
 # HUB's currency — the setting `PUT /api/settings` writes is the one `cart_checkout.carts.create`
 # reads once the runtime has applied the schema — `null` counts as absent and an explicit currency
