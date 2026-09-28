@@ -682,10 +682,14 @@ async fn one_turn(
 ///
 /// Read off the flags `proxy_chat_stream` already sends, never off the sentence: `code:
 /// "quota_exceeded"` (saas#1540), the older `upgrade_required` the same refusal still carries, and
-/// `payload_too_large`. Everything else it streams — a provider that failed, `AI service error: …`
-/// — carries no code, and is treated as a moment: asking again is bounded and costs no quota.
+/// `payload_too_large`. Since saas#2390 every error frame also says `retriable`, and a literal
+/// `false` is final whatever its code (a missing credential, a provider turned off, an unknown
+/// model): reading the flag and not a list of codes means a new code needs no hub release.
+/// Anything else — `true`, or an older SaaS without the field — is a moment: asking again is
+/// bounded and costs no quota.
 fn is_final_stream_error(event: &Value) -> bool {
-    event.get("code").and_then(Value::as_str) == Some("quota_exceeded")
+    event.get("retriable").and_then(Value::as_bool) == Some(false)
+        || event.get("code").and_then(Value::as_str) == Some("quota_exceeded")
         || event.get("upgrade_required").and_then(Value::as_bool) == Some(true)
         || event.get("payload_too_large").and_then(Value::as_bool) == Some(true)
 }
@@ -1095,6 +1099,35 @@ mod tests {
             err.contains("quota exceeded"),
             "the provider's own words are kept: {err}"
         );
+    }
+
+    /// hub#2319: `retriable: false` survives the browser's SSE translation and makes the failure
+    /// final; only a literal `false` does — `true`, a string or no field at all stay a moment.
+    #[test]
+    fn only_a_literal_retriable_false_makes_an_error_final() {
+        let frame = |retriable: Value| {
+            let mut agg = Aggregator::default();
+            let mut event = json!({
+                "type": "error",
+                "error": "openai: model gpt-9 does not exist",
+                "code": "provider_rejected"
+            });
+            if !retriable.is_null() {
+                event["retriable"] = retriable;
+            }
+            agg.push(&format!("data: {event}\n\n"))
+                .expect("an error must not read as a silent answer")
+        };
+        let TurnFailure::Final(err) = frame(json!(false)) else {
+            panic!("`retriable: false` is a verdict")
+        };
+        assert!(err.contains("gpt-9 does not exist"), "{err}");
+        for moment in [json!(true), json!("false"), json!(0), Value::Null] {
+            assert!(
+                matches!(frame(moment.clone()), TurnFailure::Transient(_)),
+                "`retriable: {moment}` is not a verdict"
+            );
+        }
     }
 
     /// The briefing has to contradict the chat prompt's "you are in a drawer next to someone

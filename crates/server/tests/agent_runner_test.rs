@@ -2103,6 +2103,100 @@ async fn hub2308_a_final_refusal_is_not_asked_again() {
     }
 }
 
+/// **hub#2319 — the SaaS says which of its failures waiting cannot fix.** Since saas#2390 every
+/// `error` frame of the proxy carries `code` and `retriable`. A missing AI credential, a provider
+/// turned off, a model that does not exist, a plan without an AI tier: the same call gets the same
+/// answer a second later. The hub reads `retriable: false` — never the list of codes — so the
+/// apology goes out at once, and a code the SaaS adds tomorrow needs no hub release. The provider's
+/// own words still reach the run, so the history says WHY.
+#[tokio::test]
+async fn hub2319_a_failure_the_proxy_marks_not_retriable_is_not_asked_again() {
+    for (code, words) in [
+        (
+            "provider_not_configured",
+            "No active AI provider configured",
+        ),
+        ("provider_rejected", "openai: model gpt-9 does not exist"),
+        (
+            "tier_unavailable",
+            "No assistant tier available for this hub",
+        ),
+    ] {
+        let cloud = FakeCloud::with(vec![
+            sse_error(json!({ "error": words, "code": code, "retriable": false })),
+            sse_text("never read"),
+        ]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("final-{code}"),
+            agent_step("manual"),
+            &[],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+        perform(&h, &run_id).await;
+
+        assert_eq!(
+            cloud.turns(),
+            1,
+            "{code}: `retriable: false` is not asked again"
+        );
+        let error = step_error(&h, &run_id).await;
+        assert!(
+            error.starts_with(agent_runner::ERR_UPSTREAM),
+            "{code}: the step fails with its stable code: {error}"
+        );
+        assert!(
+            error.contains(words),
+            "{code}: the provider's own words are kept: {error}"
+        );
+    }
+}
+
+/// **hub#2319, the other half.** What the SaaS marks `retriable: true` — a provider that is busy
+/// or unreachable, a crash on its side — is still asked again; and so is anything that does not
+/// say a literal `false` (an older SaaS without the field is covered by hub#2308's own test).
+#[tokio::test]
+async fn hub2319_a_failure_the_proxy_marks_retriable_is_still_asked_again() {
+    for (tag, frame) in [
+        (
+            "provider_unavailable",
+            json!({ "error": "openai: upstream overloaded", "code": "provider_unavailable", "retriable": true }),
+        ),
+        (
+            "internal_error",
+            json!({ "error": "AI service error: boom", "code": "internal_error", "retriable": true }),
+        ),
+        (
+            "not-a-bool",
+            json!({ "error": "AI service error: boom", "code": "internal_error", "retriable": "false" }),
+        ),
+    ] {
+        let cloud = FakeCloud::with(vec![
+            sse_error(frame),
+            sse_text("Tengo hueco mañana a las 10."),
+        ]);
+        let h = hub(
+            cloud.serve().await,
+            &format!("transient-{tag}"),
+            agent_step("manual"),
+            &[],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "¿tenéis hueco mañana?" })).await;
+
+        perform(&h, &run_id).await;
+
+        assert_eq!(cloud.turns(), 2, "{tag}: a moment is asked again, once");
+        assert_eq!(
+            step_output(&h, &run_id).await["text"],
+            "Tengo hueco mañana a las 10.",
+            "{tag}: the answer is the second attempt's"
+        );
+    }
+}
+
 /// **hub#2308, the retry is bounded.** A proxy that stays down is asked three times in all — the
 /// first call and two more — and then the step fails with its stable code, so the recipe's
 /// apology still goes out instead of the customer waiting on a hub that keeps knocking.
