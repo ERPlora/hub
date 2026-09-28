@@ -696,7 +696,12 @@ pub(crate) async fn track_rejected_credentials(
     let response = next.run(request).await;
     if response.status() == StatusCode::UNAUTHORIZED {
         if let Some((reason, token)) = presented {
-            crate::address_guard::record_rejected_credential(&st, client.as_deref(), reason, &token);
+            crate::address_guard::record_rejected_credential(
+                &st,
+                client.as_deref(),
+                reason,
+                &token,
+            );
         }
     }
     response

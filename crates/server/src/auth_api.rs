@@ -43,7 +43,9 @@ pub(crate) async fn auth_pin(
 ) -> Response {
     // Per-address guard (hub#2282): first and cheapest, before the device gate and the database.
     let client = crate::address_guard::client_address(&headers);
-    if let Some(retry_after_secs) = client.as_deref().and_then(|c| st.address_guard.locked_for(c))
+    if let Some(retry_after_secs) = client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
     {
         return too_many_attempts(retry_after_secs);
     }
@@ -210,7 +212,9 @@ pub(crate) async fn auth_badge(
     Json(req): Json<BadgeReq>,
 ) -> Response {
     let client = crate::address_guard::client_address(&headers);
-    if let Some(retry_after_secs) = client.as_deref().and_then(|c| st.address_guard.locked_for(c))
+    if let Some(retry_after_secs) = client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
     {
         return too_many_attempts(retry_after_secs);
     }

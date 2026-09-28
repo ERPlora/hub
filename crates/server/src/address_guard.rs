@@ -280,7 +280,10 @@ mod tests {
         for _ in 0..MAX_GUESSES - 1 {
             g.record_guess_at(SHOP, now);
         }
-        assert!(g.locked_for_at(SHOP, now).is_none(), "one short of the limit");
+        assert!(
+            g.locked_for_at(SHOP, now).is_none(),
+            "one short of the limit"
+        );
         g.record_guess_at(SHOP, now);
         let secs = g.locked_for_at(SHOP, now).expect("locked at the limit");
         assert!(secs > 0 && secs <= LOCK_WINDOW.as_secs());
@@ -316,7 +319,10 @@ mod tests {
         for i in 0..MAX_FORGED_SESSIONS - 1 {
             assert!(g.record_rejected_session_at(SHOP, &format!("forged-{i}"), now));
         }
-        assert!(g.locked_for_at(SHOP, now).is_none(), "one short of the limit");
+        assert!(
+            g.locked_for_at(SHOP, now).is_none(),
+            "one short of the limit"
+        );
         g.record_rejected_session_at(SHOP, "forged-last", now);
         assert!(g.locked_for_at(SHOP, now).is_some());
         assert!(g.locked_for_at(OTHER, now).is_none());
@@ -365,7 +371,11 @@ mod tests {
         }
         let later = start + WINDOW + LOCK_WINDOW + Duration::from_secs(1);
         g.record_guess_at(SHOP, later);
-        assert!(g.tracked() <= 1, "every stale address is gone: {}", g.tracked());
+        assert!(
+            g.tracked() <= 1,
+            "every stale address is gone: {}",
+            g.tracked()
+        );
     }
 
     #[test]

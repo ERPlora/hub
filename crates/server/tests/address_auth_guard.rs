@@ -176,7 +176,11 @@ async fn rotating_names_does_not_escape_the_address_lock() {
     let attacker = "198.51.100.10";
     // Never five on the same name, so the per-name lock never fires: only the address can see it.
     for i in 0..MAX_GUESSES {
-        let (status, _) = send(&router, pin_login(attacker, &format!("guess-{}", i % 7), "0000")).await;
+        let (status, _) = send(
+            &router,
+            pin_login(attacker, &format!("guess-{}", i % 7), "0000"),
+        )
+        .await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "guess {i}");
     }
     assert_locked(&router, attacker).await;
@@ -186,9 +190,14 @@ async fn rotating_names_does_not_escape_the_address_lock() {
         .uri("/api/auth/pin")
         .header("content-type", "application/json")
         .header("x-forwarded-for", format!("1.1.1.1, {attacker}"))
-        .body(Body::from(json!({ "name": "Admin", "pin": "1111" }).to_string()))
+        .body(Body::from(
+            json!({ "name": "Admin", "pin": "1111" }).to_string(),
+        ))
         .unwrap();
-    assert_eq!(send(&router, spoofed).await.0, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        send(&router, spoofed).await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
     // Another address is untouched.
     assert_signs_in(&router, "198.51.100.11").await;
 }
@@ -209,11 +218,19 @@ async fn an_open_session_keeps_working_while_its_address_is_locked() {
     let shop = "198.51.100.30";
     let token = assert_signs_in(&router, shop).await;
     for i in 0..MAX_GUESSES {
-        send(&router, pin_login(shop, &format!("guess-{}", i % 7), "0000")).await;
+        send(
+            &router,
+            pin_login(shop, &format!("guess-{}", i % 7), "0000"),
+        )
+        .await;
     }
     assert_locked(&router, shop).await;
     let (status, body) = send(&router, profile_with_session(shop, &token)).await;
-    assert_eq!(status, StatusCode::OK, "the signed-in till is never touched: {body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the signed-in till is never touched: {body}"
+    );
 }
 
 #[tokio::test]
@@ -221,8 +238,16 @@ async fn invented_sessions_lock_the_address_out_of_the_pin_door() {
     let router = fixture().await;
     let attacker = "198.51.100.40";
     for i in 0..MAX_FORGED_SESSIONS {
-        let (status, _) = send(&router, profile_with_session(attacker, &format!("forged-{i:060}"))).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "a forged session is still a plain 401");
+        let (status, _) = send(
+            &router,
+            profile_with_session(attacker, &format!("forged-{i:060}")),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "a forged session is still a plain 401"
+        );
     }
     assert_locked(&router, attacker).await;
     assert_signs_in(&router, "198.51.100.41").await;
@@ -244,7 +269,11 @@ async fn invented_event_tickets_count_like_sessions() {
     let router = fixture().await;
     let attacker = "198.51.100.60";
     for i in 0..MAX_FORGED_SESSIONS {
-        let (status, _) = send(&router, events_with_ticket(attacker, &format!("evt_forged{i}"))).await;
+        let (status, _) = send(
+            &router,
+            events_with_ticket(attacker, &format!("evt_forged{i}")),
+        )
+        .await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
     assert_locked(&router, attacker).await;
@@ -256,7 +285,11 @@ async fn a_till_repeating_its_dead_session_never_locks_the_shop() {
     let router = fixture().await;
     let shop = "198.51.100.70";
     for _ in 0..(MAX_FORGED_SESSIONS * 5) {
-        send(&router, profile_with_session(shop, "dead-session-of-the-till")).await;
+        send(
+            &router,
+            profile_with_session(shop, "dead-session-of-the-till"),
+        )
+        .await;
         send(&router, media_with_cookie(shop, "dead-session-of-the-till")).await;
         send(&router, events_with_ticket(shop, "evt_used_ticket")).await;
     }
@@ -275,7 +308,8 @@ async fn every_failure_leaves_a_stable_log_line() {
         assert!(
             lines
                 .iter()
-                .any(|l| l.contains(&format!("reason={reason}")) && l.contains(&format!("hub={HUB_ID}"))),
+                .any(|l| l.contains(&format!("reason={reason}"))
+                    && l.contains(&format!("hub={HUB_ID}"))),
             "no auth_failed line with reason={reason}: {lines:#?}"
         );
     }
@@ -295,7 +329,9 @@ async fn wrong_badges_count_towards_the_same_lock() {
             .uri("/api/auth/badge")
             .header("content-type", "application/json")
             .header("x-forwarded-for", forwarded(attacker))
-            .body(Body::from(json!({ "badge": format!("card-{i}") }).to_string()))
+            .body(Body::from(
+                json!({ "badge": format!("card-{i}") }).to_string(),
+            ))
             .unwrap();
         let (status, body) = send(&router, req).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{body}");
