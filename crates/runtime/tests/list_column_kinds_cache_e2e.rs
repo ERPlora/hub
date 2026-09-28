@@ -156,7 +156,10 @@ async fn two_requests_to_the_same_list_describe_it_once() {
     let second = ids(&rt, &priority_from_text(), "h1").await;
 
     assert_eq!(first, vec!["high".to_string(), "mid".to_string()]);
-    assert_eq!(second, first, "the remembered shape must filter exactly like the asked one");
+    assert_eq!(
+        second, first,
+        "the remembered shape must filter exactly like the asked one"
+    );
     assert_eq!(
         describes.load(Ordering::SeqCst),
         1,
@@ -207,7 +210,11 @@ async fn an_update_that_migrates_the_table_is_seen_by_the_next_request() {
         vec!["high".to_string(), "low".to_string()],
         "a TEXT bound over the column v2 added must compare as a number"
     );
-    assert_eq!(describes.load(Ordering::SeqCst), 2, "one describe per installed version");
+    assert_eq!(
+        describes.load(Ordering::SeqCst),
+        2,
+        "one describe per installed version"
+    );
 }
 
 /// The same update on ONE pinned connection. sqlx keeps a per-connection cache of prepared

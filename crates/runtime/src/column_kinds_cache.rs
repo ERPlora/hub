@@ -133,7 +133,10 @@ mod tests {
         let b = cache.get_or_describe(&db, "h1", "SELECT b").await.unwrap();
 
         assert_eq!(db.asked.load(Ordering::SeqCst), 2);
-        assert!(b.contains_key("SELECT b"), "never another list's answer: {b:?}");
+        assert!(
+            b.contains_key("SELECT b"),
+            "never another list's answer: {b:?}"
+        );
     }
 
     #[tokio::test]
