@@ -42,6 +42,13 @@ const JPEG: &[u8] = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00the salon\xff\xd9";
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRthe salon";
 const PDF: &[u8] = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n";
 const GIF: &[u8] = b"GIF89a\x01\x00\x01\x00the salon";
+/// An MP4: its first box is `ftyp` (at byte 4) with an ISO brand.
+const MP4: &[u8] = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isomthe promo";
+/// A QuickTime `.mov` is also an `ftyp` box, but Meta takes only MP4 (and 3GPP) as a header video.
+const MOV: &[u8] = b"\x00\x00\x00\x14ftypqt  \x00\x00\x00\x00qt  the promo";
+/// Meta's cap for a header video (16 MB) and for a header document (100 MB).
+const MAX_VIDEO: usize = 16 * 1024 * 1024;
+const MAX_DOCUMENT: usize = 100 * 1024 * 1024;
 
 /// One upload as the fake SaaS saw it.
 #[derive(Debug, Clone)]
@@ -219,6 +226,29 @@ fn form(field: &str, file_name: &str, content_type: &str, bytes: &[u8]) -> Vec<u
     );
     body.extend_from_slice(bytes);
     body.extend_from_slice(format!("\r\n--{BOUNDARY}--\r\n").as_bytes());
+    body
+}
+
+/// A browser's `FormData` with the header's `kind` and its `file`, in either order.
+fn media(kind: &str, bytes: &[u8], kind_first: bool) -> Vec<u8> {
+    let kind_part = format!(
+        "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"kind\"\r\n\r\n{kind}\r\n"
+    );
+    let mut file_part = format!(
+        "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"promo\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+    )
+    .into_bytes();
+    file_part.extend_from_slice(bytes);
+    file_part.extend_from_slice(b"\r\n");
+    let mut body = Vec::new();
+    if kind_first {
+        body.extend_from_slice(kind_part.as_bytes());
+        body.extend_from_slice(&file_part);
+    } else {
+        body.extend_from_slice(&file_part);
+        body.extend_from_slice(kind_part.as_bytes());
+    }
+    body.extend_from_slice(format!("--{BOUNDARY}--\r\n").as_bytes());
     body
 }
 
@@ -582,4 +612,200 @@ async fn a_body_that_is_not_a_form_is_refused_in_the_envelope_after_the_gate() {
         "{body}"
     );
     assert!(f.seen.lock().unwrap().is_empty());
+}
+
+/// **A video or a PDF for the header** (hub#2347): the promotion's video and the restaurant's menu
+/// are stored like the photo — in the header folder, under a name the hub chose from the bytes,
+/// with the extension and type of what the bytes ARE — whichever order the form sends its fields.
+/// Relayed to erplora.com with its length declared: a body that big is streamed from disk, never
+/// held whole in a 96 MiB hub, and the store must still see a `Content-Length`, not a chunked body.
+#[tokio::test]
+async fn a_video_and_a_pdf_land_in_the_header_folder_as_what_their_bytes_are() {
+    let f = fixture("video-pdf").await;
+    let cases = [
+        ("video", MP4, "mp4", "video/mp4", true),
+        ("document", PDF, "pdf", "application/pdf", true),
+        ("document", PDF, "pdf", "application/pdf", false),
+    ];
+    for (index, (kind, bytes, ext, mime, kind_first)) in cases.into_iter().enumerate() {
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(
+                media(kind, bytes, kind_first),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED, "{kind}");
+        let body = body_json(response).await;
+        let reference = body["data"]["ref"].as_str().expect("a ref").to_string();
+        let name = stored_name(&reference, ext);
+        assert_eq!(body["data"]["mime_type"], mime, "{body}");
+        assert_eq!(body["data"]["size"], bytes.len(), "{body}");
+
+        let seen = f.seen.lock().unwrap().clone();
+        assert_eq!(seen.len(), index + 1, "{seen:?}");
+        let stored = &seen[index];
+        assert_eq!(stored.folder, "whatsapp/headers");
+        assert_eq!(stored.file_name, name);
+        assert_eq!(stored.bytes, bytes, "{kind}: stored untouched");
+        assert_eq!(stored.content_type, mime);
+        assert_eq!(stored.header("x-hub-token"), Some("machine-secret"));
+        assert!(
+            stored.header("content-length").is_some() && stored.header("transfer-encoding").is_none(),
+            "{kind}: the store gets the length, not a chunked body: {:?}",
+            stored.headers
+        );
+    }
+}
+
+/// **The file must be the kind its header is.** A step whose approved header is a video cannot
+/// keep a photo, a QuickTime movie or a PDF — Meta would refuse it at every send — and a step with
+/// a photo header (no `kind`: the form of hub#2335) still takes only a JPEG or a PNG. Refused
+/// before anything is stored, with the code of the header that was asked for, whether the form
+/// names its kind before the file or after it.
+#[tokio::test]
+async fn a_file_that_is_not_the_kind_of_its_header_is_refused_before_it_is_stored() {
+    let f = fixture("wrong-kind").await;
+    for (kind, bytes, kind_first) in [
+        ("video", JPEG, true),
+        ("video", MOV, true),
+        ("video", PDF, true),
+        ("video", b"".as_slice(), true),
+        ("document", MP4, true),
+        ("document", JPEG, true),
+        ("document", JPEG, false),
+        ("image", MP4, true),
+        ("image", PDF, false),
+    ] {
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(
+                media(kind, bytes, kind_first),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "{kind} {bytes:?}"
+        );
+        assert_eq!(
+            body_json(response).await["error"]["code"],
+            format!("whatsapp.header_{kind}_unsupported"),
+            "{kind} {bytes:?}"
+        );
+    }
+    let response = f
+        .router
+        .clone()
+        .oneshot(upload(photo("promo.mp4", MP4), Some(&f.admin), Some(EDITOR)))
+        .await
+        .unwrap();
+    assert_eq!(
+        body_json(response).await["error"]["code"],
+        "whatsapp.header_image_unsupported",
+        "no kind is a photo header"
+    );
+    assert!(f.seen.lock().unwrap().is_empty());
+}
+
+/// Meta's caps: a header video weighs 16 MB at most and a header document 100 MB. One byte over is
+/// refused with the code of its kind; exactly the cap is taken.
+#[tokio::test]
+async fn a_video_over_sixteen_and_a_pdf_over_a_hundred_megabytes_are_refused_with_their_code() {
+    let f = fixture("media-large").await;
+    for (kind, head, cap) in [("video", MP4, MAX_VIDEO), ("document", PDF, MAX_DOCUMENT)] {
+        let mut exactly = head.to_vec();
+        exactly.resize(cap, 0);
+        let mut over = exactly.clone();
+        over.push(0);
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(media(kind, &over, true), Some(&f.admin), Some(EDITOR)))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE, "{kind}");
+        assert_eq!(
+            body_json(response).await["error"]["code"],
+            format!("whatsapp.header_{kind}_too_large"),
+        );
+        assert!(f.seen.lock().unwrap().is_empty(), "{kind}");
+
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(
+                media(kind, &exactly, true),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED, "{kind}: the cap is taken");
+        let stored = f.seen.lock().unwrap().pop().expect("stored");
+        assert_eq!(stored.bytes.len(), cap, "{kind}");
+    }
+}
+
+/// A `kind` that is not a header Meta takes a file for is refused by name, before a byte is kept.
+#[tokio::test]
+async fn an_unknown_kind_is_refused_with_its_code() {
+    let f = fixture("unknown-kind").await;
+    for kind in ["text", "audio", "", "Video"] {
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(media(kind, PDF, true), Some(&f.admin), Some(EDITOR)))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{kind:?}");
+        assert_eq!(
+            body_json(response).await["error"]["code"],
+            "whatsapp.header_media_kind_unknown",
+            "{kind:?}"
+        );
+    }
+    assert!(f.seen.lock().unwrap().is_empty());
+}
+
+/// A missing file and a failed store answer with the code of the header that was asked for, so
+/// the editor words them as a video or a document, not as a photo.
+#[tokio::test]
+async fn a_missing_video_and_a_pdf_that_fails_to_store_answer_with_their_own_codes() {
+    let f = fixture("media-missing").await;
+    let only_kind = format!(
+        "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"kind\"\r\n\r\nvideo\r\n--{BOUNDARY}--\r\n"
+    );
+    let response = f
+        .router
+        .clone()
+        .oneshot(upload(only_kind.into_bytes(), Some(&f.admin), Some(EDITOR)))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body_json(response).await["error"]["code"],
+        "whatsapp.header_video_missing"
+    );
+    assert!(f.seen.lock().unwrap().is_empty());
+
+    let mut bytes = PDF.to_vec();
+    bytes.extend_from_slice(b"refuse-502");
+    let response = f
+        .router
+        .clone()
+        .oneshot(upload(media("document", &bytes, true), Some(&f.admin), Some(EDITOR)))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let body = body_json(response).await;
+    assert_eq!(body["error"]["code"], "whatsapp.header_document_not_saved");
+    assert!(body.get("data").is_none(), "{body}");
 }

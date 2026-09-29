@@ -1252,31 +1252,104 @@ pub(crate) async fn upload_bundle_media(
     report
 }
 
-/// Stores ONE file the runtime itself vetted and named (hub#2335: the photo of a WhatsApp header,
-/// uploaded from a flow step) in `media/<folder>/<name>`. `true` only when erplora.com says it
-/// stored it; a hub with no machine credential, a store that failed and an answer that never came
-/// are all `false` — the caller must not hand out a reference to a file that is not there.
+/// Stores ONE file the runtime itself vetted and named (hub#2335/hub#2347: the photo, video or PDF
+/// of a WhatsApp header, uploaded from a flow step) in `media/<folder>/<name>`. `true` only when
+/// erplora.com says it stored it; a hub with no machine credential, a file that cannot be read, a
+/// store that failed and an answer that never came are all `false` — the caller must not hand out
+/// a reference to a file that is not there.
 ///
-/// Same road as a blueprint's media ([`upload_bundle_batch`]): the name is the caller's, so a retry
-/// overwrites the same file instead of leaving a second copy.
+/// **Streamed from `path`, never held whole**: a header PDF weighs up to 100 MB and the hub runs in
+/// 96 MiB. The part declares its `size`, so the store gets a `Content-Length` and not a chunked
+/// body. Same road and retry ladder as a blueprint's media ([`upload_bundle_batch`]): the file is
+/// reopened for each attempt, and the name is the caller's, so a retry overwrites the same file
+/// instead of leaving a second copy.
 pub(crate) async fn store_vetted_file(
     st: &AppState,
     folder: &str,
     name: &str,
-    bytes: &[u8],
+    path: &Path,
+    size: u64,
+    mime: &str,
 ) -> bool {
     let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
     let Some(headers) = cloud_headers(st, &url) else {
         return false;
     };
-    let file = BundleMediaUpload {
-        name: name.to_string(),
-        bytes,
-    };
-    upload_bundle_batch(st, &headers, folder, std::slice::from_ref(&file))
-        .await
-        .copied
-        == 1
+    for attempt in 1..=BUNDLE_MEDIA_UPLOAD_MAX_ATTEMPTS {
+        let file = match std::fs::File::open(path) {
+            Ok(file) => file,
+            Err(error) => {
+                tracing::warn!(file = name, %error, "media: the vetted file could not be reopened");
+                return false;
+            }
+        };
+        let part = reqwest::multipart::Part::stream_with_length(
+            reqwest::Body::wrap_stream(file_chunks(file)),
+            size,
+        )
+        .file_name(name.to_string());
+        let part = match part.mime_str(mime) {
+            Ok(part) => part,
+            Err(error) => {
+                tracing::warn!(file = name, %error, "media: invalid MIME for a vetted file");
+                return false;
+            }
+        };
+        let form = reqwest::multipart::Form::new()
+            .text("folder", folder.to_string())
+            .part("files", part);
+        let mut request = st.http.post(&url).multipart(form);
+        for (key, value) in &headers {
+            request = request.header(*key, value);
+        }
+        let retry = match request.send().await {
+            Ok(response) => {
+                let status = response.status();
+                if !bundle_upload_status_retryable(status) {
+                    let payload = response.json::<Value>().await.ok();
+                    let report =
+                        bundle_upload_response_counts(status.is_success(), payload.as_ref(), 1);
+                    if report.copied != 1 {
+                        tracing::warn!(folder, file = name, %status, "media: erplora.com did not store the vetted file");
+                    }
+                    return report.copied == 1;
+                }
+                format!("{status}")
+            }
+            Err(error) => error.to_string(),
+        };
+        if attempt == BUNDLE_MEDIA_UPLOAD_MAX_ATTEMPTS {
+            tracing::warn!(folder, file = name, attempts = attempt, error = %retry, "media: the vetted file ran out of retries");
+            return false;
+        }
+        tracing::warn!(folder, file = name, attempt, error = %retry, "media: retrying the vetted file");
+        tokio::time::sleep(std::time::Duration::from_millis(
+            BUNDLE_MEDIA_UPLOAD_RETRY_BASE_MS * attempt as u64,
+        ))
+        .await;
+    }
+    false
+}
+
+/// A local file as a stream of 64 KiB chunks, read as the body is sent: at most one chunk of it is
+/// in memory at a time. A read error ends the body with that error (the request fails, never
+/// sends a truncated file as whole).
+fn file_chunks(
+    file: std::fs::File,
+) -> impl futures_util::Stream<Item = std::io::Result<Vec<u8>>> + Send + 'static {
+    futures_util::stream::unfold(Some(file), |file| async move {
+        use std::io::Read;
+        let mut file = file?;
+        let mut chunk = vec![0u8; 64 * 1024];
+        match file.read(&mut chunk) {
+            Ok(0) => None,
+            Ok(read) => {
+                chunk.truncate(read);
+                Some((Ok(chunk), Some(file)))
+            }
+            Err(error) => Some((Err(error), None)),
+        }
+    })
 }
 
 // ─────────────────────────── Helpers ───────────────────────────

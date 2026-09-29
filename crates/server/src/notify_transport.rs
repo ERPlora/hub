@@ -195,8 +195,9 @@ impl CloudNotifyTransport {
 }
 
 impl CloudNotifyTransport {
-    /// The intent with its header photo turned into a link Meta can fetch, when the header names
-    /// a file the owner uploaded to the hub ([`header_media_file`], hub#2335); `None` when there is
+    /// The intent with its header photo, video or PDF turned into a link Meta can fetch, when the
+    /// header names a file the owner uploaded to the hub ([`header_media_file`], hub#2335 and
+    /// hub#2347); `None` when there is
     /// nothing to sign — a typed link, no header, or a value [`whatsapp_body`] will refuse.
     ///
     /// Signed on EVERY attempt, never once when the step was saved: the link lasts an hour, and a
@@ -215,14 +216,18 @@ impl CloudNotifyTransport {
         let [(key, value)] = present.as_slice() else {
             return Ok(None);
         };
-        // Only a photo is ever stored in the folder (the door takes JPEG/PNG): a title reading
-        // like a file is its text, and a video or document naming one is refused as not-a-link.
-        if *key != "header_image" {
-            return Ok(None);
-        }
         let Some(file) = value.as_str().and_then(header_media_file) else {
             return Ok(None);
         };
+        // A header signs only a stored file of its OWN kind (the extension the door gave it from
+        // its bytes, hub#2347): a title reading like a file is its text, and a video header naming
+        // a stored photo is refused as the not-a-link it is — Meta would refuse it anyway.
+        let kind = HEADER_VARS
+            .iter()
+            .find_map(|(header, kind)| (header == key).then_some(*kind));
+        if kind.is_none() || kind != header_media_kind(file) {
+            return Ok(None);
+        }
         let request = self.cloud.media_signed_link(auth, file);
         let mut builder = self.http.get(&request.url);
         for (name, value) in &request.headers {
@@ -230,7 +235,7 @@ impl CloudNotifyTransport {
         }
         let response = builder.send().await.map_err(|e| {
             RuntimeError::Notify(format!(
-                "the photo of `vars.{key}` (`{file}`) could not be signed: {}",
+                "the file of `vars.{key}` (`{file}`) could not be signed: {}",
                 crate::cloud_proxy::cloud_unreachable(&e.to_string())
             ))
         })?;
@@ -249,7 +254,7 @@ impl CloudNotifyTransport {
             // (ERPlora/saas#2393; today it signs any key) — a `404` for a file deleted from
             // Archivos. Either way the message does not leave without its approved picture.
             return Err(RuntimeError::Notify(format!(
-                "the photo of `vars.{key}` (`{file}`) could not be signed: erplora.com answered \
+                "the file of `vars.{key}` (`{file}`) could not be signed: erplora.com answered \
                  {status} with no link to it — if it was deleted from Archivos, upload it again \
                  in the automation step"
             )));
@@ -260,7 +265,7 @@ impl CloudNotifyTransport {
     }
 }
 
-/// **Where a photo uploaded for a WhatsApp header lives** in the hub's `media/` (hub#2335). The
+/// **Where a file uploaded for a WhatsApp header lives** in the hub's `media/` (hub#2335). The
 /// flow step keeps `whatsapp/headers/<file>` and the transport signs it at send time.
 pub(crate) const HEADER_MEDIA_FOLDER: &str = "whatsapp/headers";
 
@@ -281,6 +286,18 @@ pub(crate) fn header_media_file(value: &str) -> Option<&str> {
         && !name.contains(['/', '\\', '?', '#'])
         && !name.chars().any(char::is_control);
     valid.then_some(value)
+}
+
+/// The kind of header a stored file can fill, from the extension the door named it with
+/// (`flows_header_media.rs` decides it from the file's bytes): `image`, `video` or `document` —
+/// the kinds of [`HEADER_VARS`] — or `None` for a name the door never gives.
+pub(crate) fn header_media_kind(file: &str) -> Option<&'static str> {
+    match file.rsplit_once('.')?.1 {
+        "jpg" | "png" => Some("image"),
+        "mp4" => Some("video"),
+        "pdf" => Some("document"),
+        _ => None,
+    }
 }
 
 #[async_trait]
@@ -1413,11 +1430,48 @@ mod tests {
         assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
     }
 
-    /// Only the IMAGE header takes an uploaded file (the door stores JPEG/PNG only; video and PDF
-    /// are hub#2347). A title that happens to read like a stored file is the title's text, and a
-    /// video header naming a stored photo is refused as the not-a-link it is — neither is signed.
+    /// **The video or the PDF the owner UPLOADED from the flow step** (hub#2347): the promotion's
+    /// video and the restaurant's menu go out exactly like the photo — a fresh link signed on every
+    /// send, in the header parameter of their own kind.
     #[tokio::test]
-    async fn only_the_image_header_is_signed() {
+    async fn a_header_video_or_document_uploaded_to_the_hub_goes_out_as_a_freshly_signed_link() {
+        for (key, file, kind) in [
+            ("header_video", "whatsapp/headers/0b8e.mp4", "video"),
+            ("header_document", "whatsapp/headers/0b8e.pdf", "document"),
+        ] {
+            let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.15"})).await;
+            transport(&cloud.base_url, Some("machine-tok"))
+                .send(
+                    &intent(
+                        Channel::Whatsapp,
+                        "+34600111222",
+                        "autumn_promo",
+                        json!({ key: format!(" {file} ") }),
+                    ),
+                    Routing::Tenant,
+                )
+                .await
+                .unwrap_or_else(|e| panic!("{key}: an uploaded header is sent: {e}"));
+            let calls = cloud.calls();
+            assert_eq!(calls.len(), 2, "{key}: sign, then send: {calls:?}");
+            assert_eq!(calls[0].0, "/api/v1/hub/device/media/raw/");
+            assert_eq!(calls[0].2["path"], file, "{key}");
+            assert_eq!(
+                calls[1].2["template"]["components"][0],
+                json!({ "type": "header", "parameters": [{ "type": kind, kind: {
+                    "link": format!("https://objects.example/{file}?X-Amz-Signature=s1")
+                }}]}),
+                "{key}"
+            );
+        }
+    }
+
+    /// **Each header signs only a file of its own kind** (the extension the door gave it from its
+    /// bytes): a stored photo is not a video, a video is not a PDF, and a title that happens to read
+    /// like a stored file is the title's text. Nothing is signed for them — a media header naming
+    /// the wrong kind is refused as the not-a-link it is, before the network.
+    #[tokio::test]
+    async fn each_media_header_signs_only_a_stored_file_of_its_own_kind() {
         let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.13"})).await;
         transport(&cloud.base_url, Some("machine-tok"))
             .send(
@@ -1438,21 +1492,32 @@ mod tests {
             "whatsapp/headers/0b8e.jpg"
         );
 
-        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.14"})).await;
-        let err = transport(&cloud.base_url, Some("machine-tok"))
-            .send(
-                &intent(
-                    Channel::Whatsapp,
-                    "+34600111222",
-                    "autumn_promo",
-                    json!({"header_video": "whatsapp/headers/0b8e.jpg"}),
-                ),
-                Routing::Tenant,
-            )
-            .await
-            .expect_err("a stored photo is not a video link");
-        assert!(format!("{err}").contains("header_video"), "{err}");
-        assert!(cloud.calls().is_empty(), "{:?}", cloud.calls());
+        for (key, file) in [
+            ("header_video", "whatsapp/headers/0b8e.jpg"),
+            ("header_video", "whatsapp/headers/0b8e.pdf"),
+            ("header_document", "whatsapp/headers/0b8e.mp4"),
+            ("header_document", "whatsapp/headers/0b8e.png"),
+            ("header_image", "whatsapp/headers/0b8e.mp4"),
+            ("header_image", "whatsapp/headers/0b8e.pdf"),
+            ("header_image", "whatsapp/headers/0b8e"),
+            ("header_video", "whatsapp/headers/mp4"),
+        ] {
+            let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.14"})).await;
+            let err = transport(&cloud.base_url, Some("machine-tok"))
+                .send(
+                    &intent(
+                        Channel::Whatsapp,
+                        "+34600111222",
+                        "autumn_promo",
+                        json!({ key: file }),
+                    ),
+                    Routing::Tenant,
+                )
+                .await
+                .expect_err(file);
+            assert!(format!("{err}").contains(key), "{key} {file}: {err}");
+            assert!(cloud.calls().is_empty(), "{key} {file}: {:?}", cloud.calls());
+        }
     }
 
     /// A template has ONE header. Two media keys is a flow that does not know which one it meant,
