@@ -207,13 +207,13 @@ impl CloudNotifyTransport {
         auth: &Auth,
         intent: &NotifyIntent,
     ) -> Result<Option<NotifyIntent>> {
-        let present: Vec<(&str, &Value)> = HEADER_VARS
+        let present: Vec<(&str, &str, &Value)> = HEADER_VARS
             .iter()
-            .filter_map(|(key, _)| intent.vars.get(*key).map(|value| (*key, value)))
+            .filter_map(|(key, kind)| intent.vars.get(*key).map(|value| (*key, *kind, value)))
             .collect();
         // Two headers are refused by `whatsapp_body` before the network; signing first would
         // spend a call on a message that is not going anywhere.
-        let [(key, value)] = present.as_slice() else {
+        let [(key, kind, value)] = present.as_slice() else {
             return Ok(None);
         };
         let Some(file) = value.as_str().and_then(header_media_file) else {
@@ -222,10 +222,7 @@ impl CloudNotifyTransport {
         // A header signs only a stored file of its OWN kind (the extension the door gave it from
         // its bytes, hub#2347): a title reading like a file is its text, and a video header naming
         // a stored photo is refused as the not-a-link it is — Meta would refuse it anyway.
-        let kind = HEADER_VARS
-            .iter()
-            .find_map(|(header, kind)| (header == key).then_some(*kind));
-        if kind.is_none() || kind != header_media_kind(file) {
+        if Some(*kind) != header_media_kind(file) {
             return Ok(None);
         }
         let request = self.cloud.media_signed_link(auth, file);

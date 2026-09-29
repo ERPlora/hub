@@ -461,6 +461,30 @@ mod tests {
     use super::*;
     use crate::notify_transport::{header_media_file, header_media_kind};
 
+    /// A form that already named its header's kind has a file of another kind refused on its first
+    /// bytes: a PDF on a photo header is not written to a temporary file and hashed first (the
+    /// handler would refuse it after, with the same code — this is the disk it does not spend).
+    #[tokio::test]
+    async fn a_file_of_another_kind_than_declared_is_refused_before_it_is_spooled() {
+        use axum::extract::FromRequest;
+
+        const B: &str = "sniffboundary";
+        let mut body = format!(
+            "--{B}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"menu\"\r\n\r\n"
+        )
+        .into_bytes();
+        body.extend_from_slice(b"%PDF-1.7\n1 0 obj\n");
+        body.extend_from_slice(format!("\r\n--{B}--\r\n").as_bytes());
+        let request = axum::http::Request::builder()
+            .header("content-type", format!("multipart/form-data; boundary={B}"))
+            .body(axum::body::Body::from(body))
+            .expect("request");
+        let mut form = Multipart::from_request(request, &()).await.expect("a form");
+        let field = form.next_field().await.expect("a field").expect("the file");
+        let read = read_file(field, Some(HeaderKind::Image)).await;
+        assert!(matches!(read, Ok(File::Unrecognised)), "a PDF is not a photo");
+    }
+
     #[test]
     fn a_header_file_is_told_by_its_bytes_not_its_name() {
         assert_eq!(

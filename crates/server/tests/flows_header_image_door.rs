@@ -754,6 +754,39 @@ async fn a_video_over_sixteen_and_a_pdf_over_a_hundred_megabytes_are_refused_wit
     }
 }
 
+/// A file of another kind that is ALSO over its own cap — a 17 MB video on a document header — is
+/// refused as not being of the header's kind, not as too large: «choose a lighter one» would send
+/// her to shrink a file that can never go there. Whether the form names its kind first or last.
+#[tokio::test]
+async fn a_file_of_another_kind_over_its_own_cap_is_refused_as_the_wrong_kind() {
+    let f = fixture("wrong-kind-large").await;
+    let mut video = MP4.to_vec();
+    video.resize(MAX_VIDEO + 1, 0);
+    for kind_first in [false, true] {
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(
+                media("document", &video, kind_first),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "kind first: {kind_first}"
+        );
+        assert_eq!(
+            body_json(response).await["error"]["code"],
+            "whatsapp.header_document_unsupported",
+            "kind first: {kind_first}"
+        );
+    }
+    assert!(f.seen.lock().unwrap().is_empty());
+}
+
 /// A `kind` that is not a header Meta takes a file for is refused by name, before a byte is kept.
 #[tokio::test]
 async fn an_unknown_kind_is_refused_with_its_code() {
