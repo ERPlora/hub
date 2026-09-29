@@ -1776,9 +1776,9 @@ export interface TauriBridge {
 /** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
 export const FLOWS_BASE_PATH = '/api/hub/flows';
 
-/** Where the photo a WhatsApp template step sends in its header goes up — the one path
- *  {@link FlowsApi.uploadWhatsappHeaderImage} posts to (`crates/server/src/flows_header_media.rs`,
- *  hub#2335). */
+/** Where the photo, video or PDF a WhatsApp template step sends in its header goes up — the one
+ *  path {@link FlowsApi.uploadWhatsappHeaderImage} and {@link FlowsApi.uploadWhatsappHeaderMedia}
+ *  post to (`crates/server/src/flows_header_media.rs`, hub#2335 and hub#2347). */
 export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header-images';
 
 /**
@@ -1789,6 +1789,21 @@ export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header
 export interface WhatsappHeaderImage {
   ref: string;
   mime_type: 'image/jpeg' | 'image/png';
+  size: number;
+}
+
+/** The header a file is uploaded for: the media kinds of a WhatsApp template header (hub#2347). */
+export type WhatsappHeaderMediaKind = 'image' | 'video' | 'document';
+
+/**
+ * What {@link FlowsApi.uploadWhatsappHeaderMedia} answers. `ref` is what the step stores in
+ * `vars.header_image`, `vars.header_video` or `vars.header_document`; the hub signs a fresh link to
+ * it on every send, and only for the header of its own kind. `mime_type` is decided by the file's
+ * BYTES, never by its name.
+ */
+export interface WhatsappHeaderMedia {
+  ref: string;
+  mime_type: 'image/jpeg' | 'image/png' | 'video/mp4' | 'application/pdf';
   size: number;
 }
 
@@ -2102,6 +2117,38 @@ export class FlowsApi {
       path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
       body: form,
     }) as Promise<WhatsappHeaderImage>;
+  }
+
+  /**
+   * `POST /api/hub/flows/whatsapp-header-images` with a `kind` — **the photo, the VIDEO or the PDF
+   * a WhatsApp template step sends in its header** (hub#2347).
+   *
+   * The same door as {@link uploadWhatsappHeaderImage}, for the header the approved template
+   * has: `image` (a JPEG or a PNG of up to 5 MB), `video` (an MP4 of up to 16 MB) or `document` (a
+   * PDF of up to 100 MB) — Meta's caps, the file told by its bytes and refused when it is not the
+   * kind asked for. The answer's `ref` goes in `vars.header_<kind>`.
+   *
+   * A refusal arrives as an {@link ErploraError} with the code of the kind asked for:
+   * `whatsapp.header_<kind>_unsupported`, `whatsapp.header_<kind>_too_large`,
+   * `whatsapp.header_<kind>_missing`, `whatsapp.header_<kind>_not_saved`, and
+   * `whatsapp.header_media_kind_unknown` or `whatsapp.invalid_header_image_upload`.
+   *
+   * A hub older than hub#2347 leaves the method **absent** (its door takes photos only):
+   * `typeof flows.uploadWhatsappHeaderMedia` is the probe.
+   */
+  async uploadWhatsappHeaderMedia(
+    file: Blob,
+    kind: WhatsappHeaderMediaKind,
+  ): Promise<WhatsappHeaderMedia> {
+    const form = new FormData();
+    // The kind first: the runtime refuses a file of another kind before reading the rest of it.
+    form.append('kind', kind);
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
+      body: form,
+    }) as Promise<WhatsappHeaderMedia>;
   }
 
   /**
