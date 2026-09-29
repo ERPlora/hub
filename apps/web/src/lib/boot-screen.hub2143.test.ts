@@ -36,6 +36,17 @@ describe('boot screen (hub#2143)', () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it('hub#2255: a refusal paints the «not available» notice, not the «check your connection» one', async () => {
+    const screen = createBootScreen(el);
+
+    screen.showUnreachable(() => undefined, 'refused');
+    await Promise.resolve();
+
+    const notice = el.querySelector('[data-testid="boot-unreachable"]')!;
+    expect(notice.getAttribute('data-failure')).toBe('refused');
+    expect(notice.getAttribute('heading')).toBe(es.boot.refused.title);
+  });
+
   it('brings the served spinner back, and the notice is gone', async () => {
     const screen = createBootScreen(el);
     screen.showUnreachable(() => undefined);
