@@ -2282,8 +2282,60 @@ elif missing:
 PY
 )
 [ -z "$mismatch" ] \
-    && ok "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" \
-    || bad "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" "$mismatch"
+    && ok "hub#1356: the web stage is triggered by the same files as test-web.yml" \
+    || bad "hub#1356: the web stage is triggered by the same files as test-web.yml" "$mismatch"
+
+# (a1) The rule above compares the hook with `test-web.yml`, so it has to RUN when either side
+#      changes. `test-gate.yml` only listed the hook's side: hub#2395 added two files to
+#      `test-web.yml`, this file never ran on that PR, and the mismatch reached develop, where
+#      it blocked the release batch (hub#2398). Both events, because a rule that runs on push
+#      alone is a rule that speaks after the merge.
+gate_wf_gap=$(ROOT="$ROOT" python3 - <<'PY'
+import os, re
+wf = open(os.path.join(os.environ["ROOT"], ".github/workflows/test-gate.yml"), encoding="utf-8").read()
+need = ".github/workflows/test-web.yml"
+
+def paths_of(event):
+    # on: → <event>: → paths:, up to the next key at the event's depth or shallower.
+    m = re.search(r"^on:\s*$", wf, re.M)
+    if not m:
+        return None
+    lines, out, state, depth = wf[m.end():].split("\n"), [], "seek", None
+    for l in lines:
+        s = l.strip()
+        if not s or s.startswith("#"):
+            continue
+        ind = len(l) - len(l.lstrip())
+        if ind == 0:
+            break
+        if state == "seek":
+            if re.match(r"^%s:\s*$" % re.escape(event), s):
+                state, depth = "event", ind
+        elif state == "event":
+            if ind <= depth:
+                break
+            if re.match(r"^paths:\s*$", s):
+                state = "paths"
+        elif state == "paths":
+            if not s.startswith("- "):
+                break
+            out.append(s[2:].strip().strip('"').strip("'"))
+    return out if state == "paths" or out else None
+
+gaps = []
+for event in ("push", "pull_request"):
+    paths = paths_of(event)
+    if paths is None:
+        gaps.append("NO-PUDE-LEER-on.%s.paths" % event)
+    elif need not in paths:
+        gaps.append("on.%s.paths" % event)
+if gaps:
+    print("test-web.yml-no-dispara-el-gate: " + " ".join(gaps))
+PY
+)
+[ -z "$gate_wf_gap" ] \
+    && ok "hub#2398: test-gate.yml runs when test-web.yml changes, on push and on pull_request" \
+    || bad "hub#2398: test-gate.yml runs when test-web.yml changes, on push and on pull_request" "$gate_wf_gap"
 
 # (a2) …and triggering is not enough: the default light command RUNS the check of every light
 #      file. `web-format.test.sh` (hub#2156) and `merge-check-tree*` (pm#331) entered

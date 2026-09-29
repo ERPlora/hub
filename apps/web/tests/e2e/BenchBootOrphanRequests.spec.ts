@@ -222,7 +222,15 @@ test.describe('bench boot and the requests of a replaced document (hub#2315)', (
 
       expect(held, 'the held module was never asked for').toBeGreaterThan(1);
       expect(bootReloadsOf(page)).toEqual([
-        { url: '/login', codes: ['net::ERR_CONNECTION_RESET'], storm: false },
+        // `documentDied: false` (hub#2398): the document stayed alive in all three cases — what
+        // died was a navigation on its way, not the page the module belongs to. The field
+        // arrived with hub#2348 while this spec was written against the record without it.
+        {
+          url: '/login',
+          codes: ['net::ERR_CONNECTION_RESET'],
+          storm: false,
+          documentDied: false,
+        },
       ]);
       await expect(page.getByTestId('login-box')).toBeVisible();
       await page.unrouteAll({ behavior: 'ignoreErrors' });
