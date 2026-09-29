@@ -8,9 +8,10 @@
 # `release-gate.test.sh`. Un test que no corre en ningún sitio es una lista de la
 # compra, no una guarda — y la regla de cero regresiones pide guarda.
 #
-# Se queda en un workflow propio, filtrado por rutas, en vez de colgarse de
-# `test-shell.yml` (30 min de stack Tauri) o de `test-hub.yml` (19 min de suite):
-# tarda ~2 min y solo se dispara cuando se toca el gate.
+# It stays in a workflow of its own, filtered by paths, instead of hanging from
+# `test-shell.yml` (30 min of Tauri stack) or `test-hub.yml` (19 min of suite): it takes
+# ~2 min and runs when the gate is touched — or `test-web.yml`, the file one of its rules
+# compares the hook with (hub#1356, hub#2398).
 # ==============================================================================
 
 name: Gate scripts (pre-push · install-hooks)
@@ -28,6 +29,10 @@ on:
       - "scripts/materialize-published-modules.sh"
       - "scripts/materialize-published-modules.test.sh"
       - ".github/workflows/test-gate.yml"
+      # hub#2398 — `prepush-gate.test.sh` compares the hook with this file (hub#1356), so a
+      # change on EITHER side has to run it. Without this line hub#2395 added two paths to
+      # `test-web.yml`, the rule never ran on the PR and develop went red after the merge.
+      - ".github/workflows/test-web.yml"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -38,6 +43,10 @@ on:
       - "scripts/materialize-published-modules.sh"
       - "scripts/materialize-published-modules.test.sh"
       - ".github/workflows/test-gate.yml"
+      # hub#2398 — `prepush-gate.test.sh` compares the hook with this file (hub#1356), so a
+      # change on EITHER side has to run it. Without this line hub#2395 added two paths to
+      # `test-web.yml`, the rule never ran on the PR and develop went red after the merge.
+      - ".github/workflows/test-web.yml"
   workflow_dispatch:
 
 concurrency:

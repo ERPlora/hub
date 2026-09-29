@@ -91,6 +91,14 @@ invoice/tests/from_sale.hub.test.py
 # kernel (invoice#109). New coverage, not moved.
 # pending-publication: invoice#123 until 2026-10-27
 invoice/tests/mark_paid.hub.test.py
+# invoice: an invoice the hub cannot read the tax rules (or, from a sale, the sale) for is NOT
+# issued — `invoice.create`, `invoice.create_from_sale` and `invoice.substitute` stop with
+# `read_unavailable`, write nothing and consume no number, and an existing sale is never reported
+# as `invoice.sale_not_found`; issuing recovers once the reads answer again. The tables are made
+# unreachable through `ERPLORA_HUB_PSQL`, against the real kernel (invoice#133). New coverage,
+# not moved.
+# pending-publication: invoice#137 until 2026-10-29
+invoice/tests/issuing_refuses_without_reads.hub.test.py
 
 # ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
 services/tests/package_redeem.hub.test.py
@@ -237,3 +245,10 @@ cash_register/tests/widget_params.hub.test.py
 # not moved.
 # pending-publication: payment_gateways#57 until 2026-10-28
 payment_gateways/tests/deleted_gateway_frees_its_code.hub.test.py
+# taxes: a tax calculation the hub cannot read the rules for STOPS with `read_unavailable` — it never
+# answers `no_rate`, never charges 0 % with `allow_missing_rate` and never takes the rules the
+# caller sent in the payload — and recovers once the rules are readable again; the rules table is
+# made unreachable through `ERPLORA_HUB_PSQL`, against the real kernel (taxes#82). New coverage,
+# not moved.
+# pending-publication: taxes#83 until 2026-10-29
+taxes/tests/calculate_refuses_without_rules.hub.test.py
