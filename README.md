@@ -154,7 +154,12 @@ del seed, bórralas y vuelve a crearlas: el seed nunca sobrescribe un Demo que y
 Las capturas de `toHaveScreenshot` **se generan donde corren**: las baselines que manda el
 repo son las del runner Linux, y se regeneran con el workflow **«Regenerar baselines visuales
 (Linux)»** (Run workflow → `confirm: true` → artefacto `playwright-baselines`, que se commitea
-en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/`). Las de un Mac no casan jamás con las de
+en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/` **junto con** `apps/web/tests/e2e/baselines-outfitkit.txt`).
+Ese fichero dice con qué OutfitKit se dibujaron las capturas (hub#2304): el e2e de una **PR**
+instala esa versión, así que una release de OutfitKit que mueve píxeles ya no pone en rojo las PRs
+ajenas; el de `develop`/`main` y el cron siguen probando la `latest` (la que embarca la imagen) y
+son ellos los que avisan, con la issue de alerta de develop. El arreglo es regenerar y commitear
+los PNG y el fichero en la misma PR. Las de un Mac no casan jamás con las de
 Linux y están en el `.gitignore`; en tu máquina el caso visual se salta diciéndolo (medido: no crea
 nada). Para tener baselines locales con las que trabajar, pídelas una vez —se escriben las de tu
 plataforma y las siguientes corridas comparan contra ellas—:

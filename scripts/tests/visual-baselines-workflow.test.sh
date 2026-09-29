@@ -202,5 +202,35 @@ else
     ok "las baselines se pintan con la OutfitKit que publica la imagen (hub#2011)"
 fi
 
+# ── 8. …and they say WHICH OutfitKit drew them (hub#2304) ─────────────────────────────────────
+#
+# A PR's e2e compares with the OutfitKit in `apps/web/tests/e2e/baselines-outfitkit.txt`, not with
+# `latest` (every release that moved a pixel turned every web PR red). So a regeneration must write
+# the version it just drew with into that file, AFTER Playwright redrew the photos, and ship the file
+# in the same artifact — committed together, the photos and their OutfitKit cannot drift apart.
+pin_rel="apps/web/tests/e2e/baselines-outfitkit.txt"
+record_at=$(awk -v f="> $pin_rel" 'index($0, f) && !/^[[:space:]]*#/ {print NR; exit}' "$workflow")
+upload_at=$(awk '/uses: actions\/upload-artifact/ {print NR; exit}' "$workflow")
+upload_block=$(awk -v from="${upload_at:-0}" 'NR >= from && NR < from + 8' "$workflow")
+# The whole step that writes the file (from its `- name:` to the next step): a condition on it
+# (`if:` copied from test-web.yml, whose `update_baselines` input does not exist here) would skip
+# it silently — the artifact still has PNGs, so `if-no-files-found: error` would not fire.
+record_step=$(awk -v at="${record_at:-0}" '/^      - / { if (NR > at) exit; buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' "$workflow")
+if [ -z "$record_at" ]; then
+    bad "la regeneración escribe la OutfitKit con la que dibujó en \`$pin_rel\` (hub#2304)" \
+        "ningún paso escribe \`> $pin_rel\`: se commitearían PNG nuevos y las PRs los compararían con la OutfitKit vieja"
+elif [ -z "$playwright_at" ] || [ "$record_at" -le "$playwright_at" ] || [ -z "$upload_at" ] || [ "$record_at" -ge "$upload_at" ]; then
+    bad "la versión se escribe DESPUÉS de Playwright y ANTES de subir el artefacto (hub#2304)" \
+        "orden encontrado — playwright: ${playwright_at:-?}, versión: $record_at, subida: ${upload_at:-?}"
+elif grep -qE '^[[:space:]]*if:' <<<"$record_step"; then  # a commented `# if:` does not match
+    bad "la versión se anota en TODA regeneración, sin condición (hub#2304)" \
+        "el paso que escribe \`$pin_rel\` lleva un \`if:\`: puede saltarse y el artefacto saldría con PNG nuevos y sin su OutfitKit"
+elif ! grep -qF "$pin_rel" <<<"$upload_block"; then
+    bad "el artefacto \`playwright-baselines\` lleva \`$pin_rel\` (hub#2304)" \
+        "la subida solo lleva los PNG: el fichero de versión se queda en el runner"
+else
+    ok "la regeneración deja la OutfitKit con la que dibujó en \`$pin_rel\`, dentro del artefacto (hub#2304)"
+fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

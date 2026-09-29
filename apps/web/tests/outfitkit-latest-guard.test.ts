@@ -210,6 +210,56 @@ describe('assertOutfitkitIsLatest (hub#2259)', () => {
   });
 });
 
+// hub#2304 — a pull request's bench compares its screenshots with the baselines, and those were
+// drawn with ONE OutfitKit (apps/web/tests/e2e/baselines-outfitkit.txt). With `latest` there, every
+// OutfitKit release that moves a pixel turned every web PR red (0.1.80 on 24/09, 0.1.109 on 28/09).
+// So the CI pins that version on purpose and says so with HUB_BENCH_OUTFITKIT: the guard then checks
+// the install IS that version, and does not demand `latest`.
+describe('assertOutfitkitIsLatest with a pinned bench (hub#2304)', () => {
+  const newerLongAgo = registry('0.1.112', { '0.1.112': '2000-01-01T00:00:00Z' });
+
+  it('REGRESSION: the pinned version passes even when a newer one was published before the install', async () => {
+    const fetchRegistry = vi.fn(newerLongAgo);
+    const warn = vi.fn();
+    await expect(
+      assertOutfitkitIsLatest({
+        readInstalled: () => '0.1.109',
+        readInstalledAt: () => INSTALLED_AT,
+        fetchRegistry,
+        warn,
+        pinned: '0.1.109',
+      }),
+    ).resolves.toBe('pinned');
+    expect(fetchRegistry).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('OUTFITKIT_PINNED');
+  });
+
+  it('an install that is not the pinned version fails with OUTFITKIT_NOT_PINNED_VERSION', async () => {
+    await expect(
+      assertOutfitkitIsLatest({
+        readInstalled: () => '0.1.112',
+        readInstalledAt: () => INSTALLED_AT,
+        fetchRegistry: newerLongAgo,
+        warn: vi.fn(),
+        pinned: '0.1.109',
+      }),
+    ).rejects.toMatchObject({ code: 'OUTFITKIT_NOT_PINNED_VERSION', installed: '0.1.112', pinned: '0.1.109' });
+  });
+
+  it('an empty pin is no pin: the bench still has to run latest', async () => {
+    await expect(
+      assertOutfitkitIsLatest({
+        readInstalled: () => '0.1.109',
+        readInstalledAt: () => INSTALLED_AT,
+        fetchRegistry: newerLongAgo,
+        warn: vi.fn(),
+        pinned: '',
+      }),
+    ).rejects.toMatchObject({ code: 'OUTFITKIT_BEHIND_LATEST' });
+  });
+});
+
 describe('fetchOutfitkitRegistry (hub#2259)', () => {
   const doc = { 'dist-tags': { latest: '0.1.106' }, time: { '0.1.105': 'a', '0.1.106': 'b', created: 'c' } };
 
@@ -269,9 +319,10 @@ describe('readInstallTime (hub#2259, rv-2265)', () => {
 // guard is a function nobody calls — the exact gap hub#1250's config test exists for.
 describe('playwright.config wires the guard (hub#2259)', () => {
   const saved: Record<string, string | undefined> = {};
-  const KEYS = ['HUB_BIND', 'HUB_RUNTIME_URL', 'HUB_WEB_URL', 'HUB_E2E_ASSISTANT_PORT'];
+  const KEYS = ['HUB_BIND', 'HUB_RUNTIME_URL', 'HUB_WEB_URL', 'HUB_E2E_ASSISTANT_PORT', 'HUB_BENCH_OUTFITKIT'];
   beforeEach(() => {
     for (const k of KEYS) saved[k] = process.env[k];
+    delete process.env.HUB_BENCH_OUTFITKIT;
   });
   afterEach(() => {
     for (const k of KEYS) {
@@ -323,6 +374,26 @@ describe('playwright.config wires the guard (hub#2259)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await expect(guard.default()).resolves.toBe('newer-than-install');
     expect(warn.mock.calls[0][0]).toContain('OUTFITKIT_LATEST_NEWER_THAN_INSTALL');
+    warn.mockRestore();
+  });
+
+  it('hub#2304: the default export honours HUB_BENCH_OUTFITKIT (the version the CI pinned)', async () => {
+    const guard = await import('./outfitkit-latest-guard.ts');
+    const installed = resolveOutfitkitVersion(guard.WEB_DIR);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ 'dist-tags': { latest: '999.0.0' }, time: { '999.0.0': '2000-01-01T00:00:00Z' } }),
+          ),
+      ),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.HUB_BENCH_OUTFITKIT = installed;
+    await expect(guard.default()).resolves.toBe('pinned');
+    process.env.HUB_BENCH_OUTFITKIT = '0.0.1';
+    await expect(guard.default()).rejects.toMatchObject({ code: 'OUTFITKIT_NOT_PINNED_VERSION' });
     warn.mockRestore();
   });
 
