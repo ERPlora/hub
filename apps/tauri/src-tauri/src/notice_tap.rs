@@ -116,8 +116,19 @@ pub fn show_with<R: Runtime>(
     tap: Option<NoticeTap>,
     deliver: Deliver<R>,
 ) -> Option<std::thread::JoinHandle<()>> {
-    let _ = (app, title, body, tap, deliver);
-    None
+    // One parked thread per notice still on screen or in the notification centre: a small stack
+    // keeps a busy kitchen's afternoon of notices cheap.
+    let spawned = std::thread::Builder::new().name("notice".into()).stack_size(256 * 1024).spawn(move || {
+        match deliver(&app, &title, &body) {
+            Ok(true) => on_click(&app, tap),
+            Ok(false) => {}
+            Err(e) => log::warn!("notify: the platform could not show «{title}» ({e}) — carrying on"),
+        }
+    });
+    if let Err(e) = &spawned {
+        log::warn!("notify: no thread to show the notice on ({e}) — carrying on");
+    }
+    spawned.ok()
 }
 
 #[cfg(target_os = "macos")]

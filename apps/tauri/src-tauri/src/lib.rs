@@ -1980,16 +1980,20 @@ fn erplora_take_notice_tap(app: tauri::AppHandle) -> Option<serde_json::Value> {
 /// The tap a desktop notice carries back: its id, when it has one the platform can hold, and its screen.
 #[cfg(desktop)]
 fn desktop_tap(id: Option<i64>, path: Option<String>) -> Option<notice_tap::NoticeTap> {
-    let _ = (id, path);
-    None
+    notice_id(id).map(|id| notice_tap::NoticeTap { id, path })
 }
 
 /// Kotlin's answer to «which tap started the app», in the shape the page reads every tap in.
 fn launch_tap_payload<E: std::fmt::Display>(
     answer: Result<Option<tauri_plugin_erplora_android::LaunchNoticeTap>, E>,
 ) -> Option<serde_json::Value> {
-    let _ = answer.map(|_| ()).map_err(|e| e.to_string());
-    None
+    match answer {
+        Ok(tap) => tap.map(|tap| notice_tap::NoticeTap::from_launch(tap.id, tap.notification.as_deref()).payload()),
+        Err(e) => {
+            log::warn!("notice: the tap that started the app could not be read ({e})");
+            None
+        }
+    }
 }
 
 fn take_notice_tap<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<serde_json::Value> {
