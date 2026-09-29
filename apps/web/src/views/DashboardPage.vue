@@ -362,7 +362,11 @@ async function loadWidgets(): Promise<void> {
       // no filtramos por permiso aquí (null = permisivo). Cuando el shell exponga los permisos de
       // la sesión, basta con devolver true/false en este resolutor.
       hasPermission: () => null,
-      labels: { empty: t('dashboard.widgetEmpty'), error: t('dashboard.widgetError') },
+      labels: {
+        empty: t('dashboard.widgetEmpty'),
+        error: t('dashboard.widgetError'),
+        recommended: t('dashboard.recommendedPreset'),
+      },
     });
     // A partial answer degrades HERE, inside the try, as the old spreads did: a missing list read
     // later from the board's watcher throws where nothing catches it.

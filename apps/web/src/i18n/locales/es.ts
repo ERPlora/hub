@@ -453,6 +453,8 @@ export default {
     noWidgets: 'Ninguna app instalada ofrece widgets todavía.',
     widgetEmpty: 'Sin datos',
     widgetError: 'No disponible',
+    // Name of the preset the picker offers from the business sector (sales#473).
+    recommendedPreset: 'Recomendado',
     // Tarjeta «Mis apps» (hub#367): el lanzador del panel. El título reutiliza `topbar.apps` — el
     // mismo nombre para lo mismo en las dos superficies.
     appsAdd: 'Añadir apps',
