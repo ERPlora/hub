@@ -154,9 +154,33 @@ describe('hub#2392 — a chart panel honours the format it declares', () => {
   it('a series of zeros still draws a scale instead of collapsing it', async () => {
     hubIn('EUR', 2);
     const chart = await renderChart({ format: 'currency' }, [{ day: '2026-09-29', total: 0 }]);
+    // One euro of headroom split in quarters, not a collapsed 0–0 axis.
     expect(chart.min).toBe(0);
-    expect(chart.max).toBeGreaterThan(0);
-    expect(plain(chart.axis)?.at(-1)).toBe('0 €');
+    expect(chart.max).toBe(1);
+    expect(plain(chart.axis)).toEqual(['1 €', '0,75 €', '0,5 €', '0,25 €', '0 €']);
+  });
+
+  it('binary noise does not add an extra tick above the data', async () => {
+    // 0.07 / 0.01 is 7.000000000000001 in floating point: rounded up blindly it would stretch the
+    // scale to 8 % and leave the top of the chart empty.
+    const chart = await renderChart({ format: 'percent', chartType: 'line' }, [
+      { day: 'Mon', total: 0.05 },
+      { day: 'Tue', total: 0.07 },
+    ]);
+    expect(chart.max).toBe(0.07);
+    expect(chart.min).toBe(0.05);
+    expect(plain(chart.axis)).toEqual(['7 %', '6 %', '5 %']);
+  });
+
+  it('binary noise does not add an extra tick below the data either', async () => {
+    // 0.15 / 0.025 is 5.999999999999999: rounded down blindly the scale would start at 12,5 %.
+    const chart = await renderChart({ format: 'percent', chartType: 'line' }, [
+      { day: 'Mon', total: 0.15 },
+      { day: 'Tue', total: 0.25 },
+    ]);
+    expect(chart.min).toBe(0.15);
+    expect(chart.max).toBe(0.25);
+    expect(plain(chart.axis)).toEqual(['25 %', '22,5 %', '20 %', '17,5 %', '15 %']);
   });
 });
 
