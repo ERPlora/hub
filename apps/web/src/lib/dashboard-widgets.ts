@@ -26,6 +26,8 @@ import type {
 } from '@erplora/module-types';
 import type { WidgetDef, WidgetPreset } from '@erplora/outfitkit';
 
+import { getLocale } from '../i18n';
+import { formatMoney, hubCurrency, hubCurrencyDecimals } from './money';
 import {
   loadInstalledManifests,
   loadModuleComponent,
@@ -130,9 +132,6 @@ export function normalizeRows(result: unknown): Row[] {
 
 type ValueFormat = 'currency' | 'number' | 'percent' | 'compact';
 
-/** Locale por defecto de los importes/números del dashboard (Hub es-ES). */
-const DEFAULT_LOCALE = 'es-ES';
-
 function formatValue(
   value: unknown,
   format: ValueFormat | undefined,
@@ -145,18 +144,15 @@ function formatValue(
     // Sin formato (o no numérico): muestra el valor crudo como texto.
     return String(value);
   }
-  const loc = locale ?? DEFAULT_LOCALE;
+  // Without a declared locale, the language of the UI — the same rule as `lib/money.ts` and as
+  // `ok-bar-list` (which follows `<html lang>`), not a fixed es-ES (hub#2387).
+  const loc = locale ?? getLocale();
   switch (format) {
     case 'currency':
-      // El dinero en ERPlora se almacena en CÉNTIMOS (INTEGER, ADR-0007): las queries de los
-      // widgets devuelven céntimos, así que para mostrarlos como divisa hay que pasar a la unidad
-      // mayor (÷100) y mostrar 2 decimales. Sin esta división el importe sale 100× inflado.
-      return new Intl.NumberFormat(loc, {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(num / 100);
+      // Money travels in MINOR units of the hub currency (ADR-0007, ADR-0123 §7): `formatMoney`
+      // scales by the decimals of that currency (EUR ÷100, JPY ÷1, KWD ÷1000), not a fixed ÷100
+      // that paints 1999 ¥ as 19,99 (hub#2387).
+      return formatMoney(num, { currency, locale: loc });
     case 'percent':
       return new Intl.NumberFormat(loc, { style: 'percent', maximumFractionDigits: 1 }).format(num);
     case 'compact':
@@ -322,7 +318,7 @@ function renderKpi(
   if (!row) return false;
   const rawValue = mapped(row, map, 'value');
   if (rawValue == null) return false;
-  const currency = str(opts, 'currency') ?? 'EUR';
+  const currency = str(opts, 'currency') ?? hubCurrency();
   const locale = str(opts, 'locale');
   const format = str(opts, 'format') as ValueFormat | undefined;
 
@@ -360,7 +356,7 @@ function renderStat(
   if (!row) return false;
   const rawValue = mapped(row, map, 'value');
   if (rawValue == null) return false;
-  const currency = str(opts, 'currency') ?? 'EUR';
+  const currency = str(opts, 'currency') ?? hubCurrency();
   const format = str(opts, 'format') as ValueFormat | undefined;
 
   const el = document.createElement('ok-stat') as HTMLElement & {
@@ -407,7 +403,7 @@ function renderSparkline(
 
   if (valueCol) {
     const last = rows[rows.length - 1];
-    const currency = str(opts, 'currency') ?? 'EUR';
+    const currency = str(opts, 'currency') ?? hubCurrency();
     const format = str(opts, 'format') as ValueFormat | undefined;
     const kpi = document.createElement('ok-kpi') as HTMLElement & {
       label?: string; value?: string; delta?: string; trend?: string; icon?: string;
@@ -446,10 +442,19 @@ function renderBarList(
   const valueCol = map?.value;
   if (!labelCol || !valueCol) return false;
   const colorCol = map?.color;
+  const valueFormat = (str(opts, 'valueFormat') as string | undefined) ?? 'number';
   // Algunas magnitudes viajan en punto fijo entero (cantidades ADR-0147 = escala 10⁶). El módulo
   // declara la frontera; el shell sigue siendo genérico y entrega al componente el valor lógico.
+  // Money is the exception: its scale belongs to the hub CURRENCY, not to the module (hub#2387) —
+  // the same ÷10^decimals as the kpi, so a declared `valueDivisor: 100` neither divides twice nor
+  // turns 500 ¥ into 5 ¥.
   const declaredDivisor = Number(opts.valueDivisor ?? 1);
-  const valueDivisor = Number.isFinite(declaredDivisor) && declaredDivisor > 0 ? declaredDivisor : 1;
+  const valueDivisor =
+    valueFormat === 'currency'
+      ? 10 ** hubCurrencyDecimals()
+      : Number.isFinite(declaredDivisor) && declaredDivisor > 0
+        ? declaredDivisor
+        : 1;
   const items = rows
     .map((r) => ({
       label: String(r[labelCol] ?? ''),
@@ -463,10 +468,9 @@ function renderBarList(
     items?: typeof items; valueFormat?: string; currency?: string; locale?: string; max?: number;
   };
   el.items = items;
-  el.valueFormat = (str(opts, 'valueFormat') as string | undefined) ?? 'number';
-  el.currency = str(opts, 'currency') ?? 'EUR';
-  const locale = str(opts, 'locale');
-  if (locale) el.locale = locale;
+  el.valueFormat = valueFormat;
+  el.currency = str(opts, 'currency') ?? hubCurrency();
+  el.locale = str(opts, 'locale') ?? getLocale();
   const max = opts.max != null ? Number(opts.max) : undefined;
   if (max != null && !Number.isNaN(max)) el.max = max;
   cell.appendChild(el);
