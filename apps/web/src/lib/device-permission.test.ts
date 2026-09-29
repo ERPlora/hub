@@ -144,3 +144,62 @@ describe('the memory the callers do NOT inject — the real one, in storage', ()
     expect(asked).toEqual([LAN]);
   });
 });
+
+describe('two askers at once get ONE sheet (hub#2306 review)', () => {
+  // A device booting with a session already open and a printer: the print-host alta and the
+  // sign-in ask both reach the primer before anybody has answered. Two stacked sheets would ask
+  // twice and could spend Android's second (and last) system dialog.
+  function slowDevice() {
+    const memory = new Set<string>();
+    const open: ((yes: boolean) => void)[] = [];
+    let sheets = 0;
+    let requests = 0;
+    const deps = {
+      permission: NOTICES,
+      storageKey: 'erplora.notifications.primerAnswered',
+      tag: 'test',
+      labels: LABELS,
+      check: async () => ({ [NOTICES]: false }),
+      request: async () => {
+        requests += 1;
+        return { [NOTICES]: true };
+      },
+      confirm: () => {
+        sheets += 1;
+        return new Promise<boolean>((resolve) => void open.push(resolve));
+      },
+      readAnswered: () => memory.has('erplora.notifications.primerAnswered'),
+      writeAnswered: () => void memory.add('erplora.notifications.primerAnswered'),
+    };
+    return {
+      deps,
+      answer: (yes: boolean) => open.splice(0).forEach((resolve) => resolve(yes)),
+      sheets: () => sheets,
+      requests: () => requests,
+    };
+  }
+
+  it('a second ask while the sheet is up joins it instead of stacking another', async () => {
+    const d = slowDevice();
+    const first = ensureDevicePermission(d.deps);
+    const second = ensureDevicePermission(d.deps);
+    await new Promise((r) => setTimeout(r, 0));
+    d.answer(true);
+    await expect(Promise.all([first, second])).resolves.toEqual(['granted', 'granted']);
+    expect(d.sheets()).toBe(1);
+    expect(d.requests()).toBe(1);
+  });
+
+  it('once it is answered, the next ask is a fresh one (nothing stays pinned)', async () => {
+    const d = slowDevice();
+    const first = ensureDevicePermission(d.deps);
+    await new Promise((r) => setTimeout(r, 0));
+    d.answer(false);
+    await expect(first).resolves.toBe('denied');
+    // Answered → no sheet, but the state is read again (not the old promise).
+    await expect(ensureDevicePermission({ ...d.deps, check: async () => ({ [NOTICES]: true }) })).resolves.toBe(
+      'granted',
+    );
+    expect(d.sheets()).toBe(1);
+  });
+});

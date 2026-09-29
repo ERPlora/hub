@@ -42,6 +42,9 @@ const { tauriMode, invokeSpy } = vi.hoisted(() => ({
 // Partial mocks: the surface is a double, everything else stays real. A wholesale mock of these
 // modules would have to re-declare every export the import graph reaches for, and the first one
 // forgotten fails as "no export defined" instead of as the behaviour under test.
+// SystemPage reads the modules with a bell counter (hub#2306) through `module-loader`, whose icon
+// chain (`~icons/…?raw`) the vitest transform denies — stubbed like DataPanel/dashboard-widgets.
+vi.mock('../lib/module-loader', () => ({ loadInstalledManifests: vi.fn(async () => []) }));
 vi.mock('../lib/device', async () => {
   const actual = await vi.importActual<typeof import('../lib/device')>('../lib/device');
   return { ...actual, isTauri: () => tauriMode.value, invokeTauri: invokeSpy };

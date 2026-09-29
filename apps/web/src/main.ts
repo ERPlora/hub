@@ -41,7 +41,7 @@ import {
 } from './lib/runtime';
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
-import { logout } from './lib/session';
+import { isAuthed, logout } from './lib/session';
 import { invokeTauri } from './lib/device';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
@@ -51,7 +51,9 @@ import { bootPrintComanda } from './lib/print-comanda';
 import { comandaFailureNotice } from './lib/print-comanda-notice';
 import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './lib/appointment-notice';
 import { bootBellNotices } from './lib/bell-notice';
+import { loadBellCounterModuleIds } from './lib/bell-counters';
 import {
+  askWhenSomeoneSignsIn,
   ensureNotificationPermission,
   primerLabelsFrom,
   shouldSendNotice,
@@ -302,12 +304,14 @@ bootPrintOnSale(getClient(), {
 // every hub regardless of what it runs asked one for a permission that would never fire.
 // `warnIfThereIsSomethingToTell` refreshes what is installed and only asks when an active module
 // the shell sends notices for is there — the kitchen order and appointment notices below keep
-// being the fallback trigger.
+// being the fallback trigger. A module with a bell counter counts as one too (hub#2306): since
+// hub#2303 its counter going up is a notice, and a WhatsApp-only hub has nothing else.
 void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
   onRegistered: () =>
     void warnIfThereIsSomethingToTell({
       refresh: refreshActiveModuleIds,
       activeModules: activeModuleIds,
+      bellModules: loadBellCounterModuleIds,
       ask: () => askToWarn(),
     }),
 });
@@ -431,5 +435,22 @@ void bootUntilReachable({
   // client-error channel (the runtime's code, never the pass) and falls through to the ordinary
   // login page, which explains it (hub#2152).
   await redeemShellCourier(shellCourierCode);
-  router.isReady().then(() => app.mount('#app'));
+  router.isReady().then(() => {
+    app.mount('#app');
+    // The ask for a device that never becomes a print host (hub#2306): a WhatsApp tablet has no
+    // printer, so the alta above never reaches it and its first ask came with the first customer
+    // left waiting. A sign-in — or this boot, with a session already open — means somebody is in
+    // front of it. After the mount on purpose: the sheet needs the app, and the active set needs
+    // the hub context resolved above.
+    askWhenSomeoneSignsIn(
+      () => isAuthed.value,
+      () =>
+        warnIfThereIsSomethingToTell({
+          refresh: refreshActiveModuleIds,
+          activeModules: activeModuleIds,
+          bellModules: loadBellCounterModuleIds,
+          ask: () => askToWarn(),
+        }),
+    );
+  });
 });
