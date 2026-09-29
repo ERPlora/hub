@@ -1,0 +1,32 @@
+{
+  "id": "listreader",
+  "name": "List Reader Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "listreader.read"
+  ],
+  "queries": {
+    "listreader.items.list": {
+      "permission": "listreader.read",
+      "sql": "queries/items_list.sql",
+      "list": {
+        "sort": [
+          "id",
+          "priority",
+          "score"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "priority": {
+            "op": "range"
+          },
+          "score": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      }
+    }
+  }
+}

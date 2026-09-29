@@ -194,6 +194,95 @@ impl CloudNotifyTransport {
     }
 }
 
+impl CloudNotifyTransport {
+    /// The intent with its header photo turned into a link Meta can fetch, when the header names
+    /// a file the owner uploaded to the hub ([`header_media_file`], hub#2335); `None` when there is
+    /// nothing to sign — a typed link, no header, or a value [`whatsapp_body`] will refuse.
+    ///
+    /// Signed on EVERY attempt, never once when the step was saved: the link lasts an hour, and a
+    /// `delay` step or the relay's backoff can hold a message far longer than that.
+    async fn sign_header_media(
+        &self,
+        auth: &Auth,
+        intent: &NotifyIntent,
+    ) -> Result<Option<NotifyIntent>> {
+        let present: Vec<(&str, &Value)> = HEADER_VARS
+            .iter()
+            .filter_map(|(key, _)| intent.vars.get(*key).map(|value| (*key, value)))
+            .collect();
+        // Two headers are refused by `whatsapp_body` before the network; signing first would
+        // spend a call on a message that is not going anywhere.
+        let [(key, value)] = present.as_slice() else {
+            return Ok(None);
+        };
+        // Only a photo is ever stored in the folder (the door takes JPEG/PNG): a title reading
+        // like a file is its text, and a video or document naming one is refused as not-a-link.
+        if *key != "header_image" {
+            return Ok(None);
+        }
+        let Some(file) = value.as_str().and_then(header_media_file) else {
+            return Ok(None);
+        };
+        let request = self.cloud.media_signed_link(auth, file);
+        let mut builder = self.http.get(&request.url);
+        for (name, value) in &request.headers {
+            builder = builder.header(*name, value);
+        }
+        let response = builder.send().await.map_err(|e| {
+            RuntimeError::Notify(format!(
+                "the photo of `vars.{key}` (`{file}`) could not be signed: {}",
+                crate::cloud_proxy::cloud_unreachable(&e.to_string())
+            ))
+        })?;
+        let status = response.status();
+        let link = if status.is_success() {
+            response
+                .json::<Value>()
+                .await
+                .ok()
+                .and_then(|v| v.get("url").and_then(Value::as_str).map(str::to_owned))
+        } else {
+            None
+        };
+        let Some(link) = link else {
+            // A refusal, or — once erplora.com checks the file exists before signing
+            // (ERPlora/saas#2393; today it signs any key) — a `404` for a file deleted from
+            // Archivos. Either way the message does not leave without its approved picture.
+            return Err(RuntimeError::Notify(format!(
+                "the photo of `vars.{key}` (`{file}`) could not be signed: erplora.com answered \
+                 {status} with no link to it — if it was deleted from Archivos, upload it again \
+                 in the automation step"
+            )));
+        };
+        let mut signed = intent.clone();
+        signed.vars[*key] = json!(link);
+        Ok(Some(signed))
+    }
+}
+
+/// **Where a photo uploaded for a WhatsApp header lives** in the hub's `media/` (hub#2335). The
+/// flow step keeps `whatsapp/headers/<file>` and the transport signs it at send time.
+pub(crate) const HEADER_MEDIA_FOLDER: &str = "whatsapp/headers";
+
+/// The hub file a header value names — `whatsapp/headers/<one file name>` — or `None`.
+///
+/// **Only that folder, and one level of it.** The rest of `media/` holds the hub's logs, its
+/// imports, a module's scans; a `vars.header_*` written by a flow or emitted by a module must not
+/// turn a customer's WhatsApp into a way out for them. So the name is ONE segment: no `/`, no `\`,
+/// no `.`/`..`, nothing that is not printable — a path that could climb out is simply not a ref,
+/// and [`whatsapp_body`] refuses it as the not-a-link it is.
+pub(crate) fn header_media_file(value: &str) -> Option<&str> {
+    let value = value.trim();
+    let name = value.strip_prefix(HEADER_MEDIA_FOLDER)?.strip_prefix('/')?;
+    let valid = !name.is_empty()
+        && name != "."
+        && name != ".."
+        && name.len() <= 255
+        && !name.contains(['/', '\\', '?', '#'])
+        && !name.chars().any(char::is_control);
+    valid.then_some(value)
+}
+
 #[async_trait]
 impl NotifyTransport for CloudNotifyTransport {
     async fn send(&self, intent: &NotifyIntent, _routing: Routing) -> Result<SendOutcome> {
@@ -201,10 +290,15 @@ impl NotifyTransport for CloudNotifyTransport {
         // no point building a body or opening a socket.
         let auth = self.machine_auth()?;
 
+        let signed;
         let (request, body) =
             match intent.channel {
                 Channel::Email => (self.cloud.notify_email(&auth), email_body(intent)?),
-                Channel::Whatsapp => (self.cloud.notify_whatsapp(&auth), whatsapp_body(intent)?),
+                Channel::Whatsapp => {
+                    signed = self.sign_header_media(&auth, intent).await?;
+                    let intent = signed.as_ref().unwrap_or(intent);
+                    (self.cloud.notify_whatsapp(&auth), whatsapp_body(intent)?)
+                }
                 Channel::Sms => return Err(RuntimeError::Notify(
                     "the sms channel has no transport yet: the SaaS proxies email and whatsapp \
                      only (ADR-0283 §5), and the hub holds no sms credential of its own"
@@ -585,10 +679,49 @@ mod tests {
             (st.status, Json(st.reply.clone()))
         }
 
+        /// The media manager's signing door (`GET …/media/raw/?path=`): a signed link to the path
+        /// asked for, or `404` for a file that is not there (any path naming `missing`).
+        async fn sign(
+            State(st): State<St>,
+            uri: axum::http::Uri,
+            headers: HeaderMap,
+            axum::extract::Query(q): axum::extract::Query<
+                std::collections::HashMap<String, String>,
+            >,
+        ) -> (StatusCode, Json<Value>) {
+            let path = q.get("path").cloned().unwrap_or_default();
+            st.seen.lock().unwrap().push((
+                uri.path().to_string(),
+                headers,
+                json!({ "path": path }),
+            ));
+            if path.contains("missing") {
+                return (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })));
+            }
+            // A refusal whose body still carries a `url` (a proxy's error page, a half-written
+            // answer): the status decides, not the body.
+            if path.contains("refused") {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({ "url": format!("https://objects.example/{path}") })),
+                );
+            }
+            if path.contains("odd") {
+                return (StatusCode::OK, Json(json!({ "url": "file:///etc/passwd" })));
+            }
+            (
+                StatusCode::OK,
+                Json(
+                    json!({ "url": format!("https://objects.example/{path}?X-Amz-Signature=s1") }),
+                ),
+            )
+        }
+
         let seen: Seen = Arc::new(Mutex::new(Vec::new()));
         let app = Router::new()
             .route("/api/v1/hub/device/notify/email/", post(record))
             .route("/api/v1/hub/device/notify/whatsapp/", post(record))
+            .route("/api/v1/hub/device/media/raw/", axum::routing::get(sign))
             .with_state(St {
                 seen: seen.clone(),
                 status,
@@ -1106,6 +1239,220 @@ mod tests {
                 "{key}"
             );
         }
+    }
+
+    /// **The photo the owner UPLOADED from the flow step** (hub#2335). She has no public link to
+    /// her salon's picture: the step stores the hub file (`whatsapp/headers/<id>.jpg`) and every
+    /// send asks the SaaS for a freshly signed link to it — a link signed when the step was saved
+    /// would have expired by the time a `delay` step or the relay's backoff lets the message out.
+    #[tokio::test]
+    async fn a_header_image_uploaded_to_the_hub_goes_out_as_a_freshly_signed_link() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.7"})).await;
+        transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": " whatsapp/headers/0b8e.jpg ", "who": "Ana"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("an uploaded header is sent");
+
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 2, "sign, then send: {calls:?}");
+        let (path, headers, asked) = &calls[0];
+        assert_eq!(path, "/api/v1/hub/device/media/raw/");
+        assert_eq!(asked["path"], "whatsapp/headers/0b8e.jpg");
+        assert_eq!(
+            headers["x-hub-token"], "machine-tok",
+            "signed as the hub, like the send"
+        );
+        let (path, _, body) = &calls[1];
+        assert_eq!(path, "/api/v1/hub/device/notify/whatsapp/");
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [{ "type": "image", "image": {
+                    "link": "https://objects.example/whatsapp/headers/0b8e.jpg?X-Amz-Signature=s1"
+                }}]},
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]}
+            ])
+        );
+    }
+
+    /// A link she typed is still hers to send: nothing is signed for it.
+    #[tokio::test]
+    async fn a_header_link_is_sent_as_written_without_asking_for_a_signature() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.8"})).await;
+        transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": "https://cdn.example.com/salon.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a link is sent");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "{calls:?}");
+        assert_eq!(calls[0].0, "/api/v1/hub/device/notify/whatsapp/");
+    }
+
+    /// **Only the header folder is signed.** The rest of `media/` holds the hub's logs, its
+    /// imports, a module's scans: a `vars.header_*` naming any of them — written by a flow or
+    /// emitted by a module — must not turn a customer's WhatsApp into a way out for the hub's
+    /// files. Refused before the network: nothing is signed, nothing is sent.
+    #[tokio::test]
+    async fn a_hub_file_outside_the_header_folder_never_leaves_by_whatsapp() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.9"})).await;
+        for stray in [
+            "_logs/hub.log",
+            "whatsapp/headers/../../_logs/hub.log",
+            "whatsapp/headers/./x.jpg",
+            "whatsapp/headers/",
+            "whatsapp/headers/.",
+            "whatsapp/headers/..",
+            "whatsapp/headersx/x.jpg",
+            "whatsapp/headersx.jpg",
+            "/whatsapp/headers/x.jpg",
+            "whatsapp/headers\\x.jpg",
+            "modules/verifactu/cert.p12",
+            "whatsapp/headers/a\nb.jpg",
+            &format!("whatsapp/headers/{}.jpg", "a".repeat(252)),
+        ] {
+            let err = transport(&cloud.base_url, Some("machine-tok"))
+                .send(
+                    &intent(
+                        Channel::Whatsapp,
+                        "+34600111222",
+                        "autumn_promo",
+                        json!({ "header_image": stray }),
+                    ),
+                    Routing::Tenant,
+                )
+                .await
+                .expect_err(stray);
+            assert!(format!("{err}").contains("header_image"), "{stray}: {err}");
+        }
+        assert!(cloud.calls().is_empty(), "{:?}", cloud.calls());
+    }
+
+    /// The file was deleted from Archivos after the step was saved: the send fails where the
+    /// dead-letter shows it, instead of reaching Meta with no picture.
+    #[tokio::test]
+    async fn a_header_file_that_is_gone_is_not_sent_without_its_picture() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.10"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": "whatsapp/headers/missing.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("no file, no send");
+        assert!(
+            format!("{err}").contains("whatsapp/headers/missing.jpg"),
+            "{err}"
+        );
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
+        assert_eq!(calls[0].0, "/api/v1/hub/device/media/raw/");
+    }
+
+    /// The SaaS refused to sign — whatever its body says, there is no link to send.
+    #[tokio::test]
+    async fn a_refused_signature_is_never_taken_as_a_link() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.11"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": "whatsapp/headers/refused.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("a refusal is not a link");
+        assert!(format!("{err}").contains("403"), "{err}");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
+    }
+
+    /// A signed answer that is not a web link is not handed to Meta either.
+    #[tokio::test]
+    async fn a_signed_answer_that_is_not_a_web_link_is_not_sent() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.12"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_image": "whatsapp/headers/odd.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("file:// is not a link Meta can fetch");
+        assert!(format!("{err}").contains("header_image"), "{err}");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "signed, never sent: {calls:?}");
+    }
+
+    /// Only the IMAGE header takes an uploaded file (the door stores JPEG/PNG only; video and PDF
+    /// are hub#2347). A title that happens to read like a stored file is the title's text, and a
+    /// video header naming a stored photo is refused as the not-a-link it is — neither is signed.
+    #[tokio::test]
+    async fn only_the_image_header_is_signed() {
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.13"})).await;
+        transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_text": "whatsapp/headers/0b8e.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect("a title is sent as written");
+        let calls = cloud.calls();
+        assert_eq!(calls.len(), 1, "nothing signed for a title: {calls:?}");
+        assert_eq!(
+            calls[0].2["template"]["components"][0]["parameters"][0]["text"],
+            "whatsapp/headers/0b8e.jpg"
+        );
+
+        let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.14"})).await;
+        let err = transport(&cloud.base_url, Some("machine-tok"))
+            .send(
+                &intent(
+                    Channel::Whatsapp,
+                    "+34600111222",
+                    "autumn_promo",
+                    json!({"header_video": "whatsapp/headers/0b8e.jpg"}),
+                ),
+                Routing::Tenant,
+            )
+            .await
+            .expect_err("a stored photo is not a video link");
+        assert!(format!("{err}").contains("header_video"), "{err}");
+        assert!(cloud.calls().is_empty(), "{:?}", cloud.calls());
     }
 
     /// A template has ONE header. Two media keys is a flow that does not know which one it meant,
