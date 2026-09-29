@@ -362,7 +362,9 @@
 
       </template>
 
-      <!-- ── Tab: Tickets ── -->
+      <!-- ── Tab: Printing (hub#2243) ── the menu's way to the printers: side menu › Settings ›
+           Printing, where every POS keeps them. Its id stays `tickets` so /settings#tickets still lands
+           here. -->
       <template v-else-if="tab === 'tickets'">
         <ion-card>
           <ion-card-content class="p-0">
@@ -517,8 +519,8 @@
             <ion-label>{{ t('settings.tabBusiness') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="tickets" data-testid="settings-tab-tickets">
-            <HubIcon name="ticket-outline" />
-            <ion-label>{{ t('settings.tabTickets') }}</ion-label>
+            <HubIcon name="print-outline" />
+            <ion-label>{{ t('settings.tabPrinting') }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="permissions" data-testid="settings-tab-permissions">
             <HubIcon name="shield-checkmark-outline" />
