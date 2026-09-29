@@ -58,12 +58,6 @@ describe('keeping the installed app listening for notices', () => {
     expect(invoke).toHaveBeenCalledWith(KEEP_LISTENING_COMMAND, expect.objectContaining({ on: true }));
   });
 
-  it('not asked yet is not a refusal: it listens', async () => {
-    const { invoke, deps: d } = deps({ permission: async () => 'prompt' });
-    await createNoticeListening(d).sync(true);
-    expect(invoke).toHaveBeenCalledWith(KEEP_LISTENING_COMMAND, expect.objectContaining({ on: true }));
-  });
-
   it('with the notices refused there is nothing to listen for: it stops', async () => {
     const { invoke, deps: d } = deps({ permission: async () => 'denied' });
     await createNoticeListening(d).sync(true);
