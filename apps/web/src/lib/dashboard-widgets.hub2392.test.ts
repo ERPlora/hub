@@ -142,6 +142,23 @@ describe('hub#2392 — a chart panel honours the format it declares', () => {
     expect(plain(chart.axis)).toEqual(['1 mil', '950', '900', '850', '800']);
   });
 
+  it('an area chart grows from 0 like the bars, not from the lowest value', async () => {
+    const chart = await renderChart({ format: 'number', chartType: 'area' }, [
+      { day: 'Mon', total: 820 },
+      { day: 'Tue', total: 960 },
+    ]);
+    expect(chart.min).toBe(0);
+    expect(chart.max).toBe(1000);
+  });
+
+  it('a chart that is not money keeps the divisor it declares (quantities at scale 10^6)', async () => {
+    const chart = await renderChart({ format: 'number', valueDivisor: 1_000_000 }, [
+      { day: 'Mon', total: 2_500_000 },
+      { day: 'Tue', total: 5_000_000 },
+    ]);
+    expect(chart.series?.[0]?.data).toEqual([2.5, 5]);
+  });
+
   it('a chart without format keeps its raw values but still gets a readable axis', async () => {
     const chart = await renderChart({}, [
       { day: 'Mon', total: 1000 },
@@ -208,7 +225,9 @@ describe('hub#2392 — the days of a chart are written in the language of the UI
       const chart = await renderChart({}, [{ day: '2026-09-29', total: 1 }]);
       expect(chart.labels).toEqual(['29 sept']);
     } finally {
-      process.env.TZ = saved;
+      // Assigning `undefined` to process.env stores the string "undefined", not an unset zone.
+      if (saved === undefined) delete process.env.TZ;
+      else process.env.TZ = saved;
     }
   });
 
