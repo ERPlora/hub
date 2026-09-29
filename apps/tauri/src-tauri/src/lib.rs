@@ -1941,7 +1941,8 @@ fn erplora_nfc_read(
 fn erplora_notify(app: tauri::AppHandle, title: String, body: String, id: Option<i64>, path: Option<String>) {
     // The notification plugin shows a desktop notice and drops its handle: no click would come back.
     #[cfg(desktop)]
-    notice_tap::show(app, title, body, desktop_tap(id, path));
+    // The thread is left to run on its own: it lasts as long as the notice does.
+    let _ = notify_on_desktop(app, title, body, id, path, notice_tap::deliver);
     #[cfg(mobile)]
     if let Err(e) = notice_builder(&app, &title, &body, id, path.as_deref()).show() {
         eprintln!("notify: the platform could not show «{title}» ({e}) — carrying on");
@@ -1977,10 +1978,18 @@ fn erplora_take_notice_tap(app: tauri::AppHandle) -> Option<serde_json::Value> {
     take_notice_tap(&app)
 }
 
-/// The tap a desktop notice carries back: its id, when it has one the platform can hold, and its screen.
+/// `erplora_notify` on the computer, with the platform's delivery handed in: the notice carries
+/// back its id, when it has one the platform can hold, and its screen.
 #[cfg(desktop)]
-fn desktop_tap(id: Option<i64>, path: Option<String>) -> Option<notice_tap::NoticeTap> {
-    notice_id(id).map(|id| notice_tap::NoticeTap { id, path })
+fn notify_on_desktop<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    title: String,
+    body: String,
+    id: Option<i64>,
+    path: Option<String>,
+    deliver: notice_tap::Deliver<R>,
+) -> Option<std::thread::JoinHandle<()>> {
+    notice_tap::show(app, title, body, notice_id(id).map(|id| notice_tap::NoticeTap { id, path }), deliver)
 }
 
 /// Kotlin's answer to «which tap started the app», in the shape the page reads every tap in.
@@ -2228,17 +2237,28 @@ mod tests {
         assert_eq!(take_notice_tap(app.handle()), None);
     }
 
+    /// What the page keeps after `erplora_notify` shows a notice on the computer and the person
+    /// clicks it: the notice goes through the same path as the command, with a clicking platform.
+    #[cfg(desktop)]
+    fn clicked_desktop_notice(id: Option<i64>, path: Option<&str>) -> Option<notice_tap::NoticeTap> {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        let shown = notify_on_desktop(app.handle().clone(), "New booking".into(), "Ana".into(), id, path.map(Into::into), |_, _, _| Ok(true));
+        shown.expect("no thread for the notice").join().expect("the notice thread panicked");
+        app.state::<notice_tap::KeptNoticeTap>().take()
+    }
+
     #[cfg(desktop)]
     #[test]
     fn a_desktop_notice_carries_its_id_and_screen_back() {
         assert_eq!(
-            desktop_tap(Some(7), Some("/m/kds".into())),
+            clicked_desktop_notice(Some(7), Some("/m/kds")),
             Some(notice_tap::NoticeTap { id: 7, path: Some("/m/kds".into()) })
         );
-        assert_eq!(desktop_tap(Some(7), None), Some(notice_tap::NoticeTap { id: 7, path: None }));
+        assert_eq!(clicked_desktop_notice(Some(7), None), Some(notice_tap::NoticeTap { id: 7, path: None }));
         // No id the platform can hold, nothing to open: the click only brings the window up.
-        assert_eq!(desktop_tap(None, Some("/m/kds".into())), None);
-        assert_eq!(desktop_tap(Some(i64::from(i32::MAX) + 1), Some("/m/kds".into())), None);
+        assert_eq!(clicked_desktop_notice(None, Some("/m/kds")), None);
+        assert_eq!(clicked_desktop_notice(Some(i64::from(i32::MAX) + 1), Some("/m/kds")), None);
     }
 
     #[test]

@@ -93,23 +93,19 @@ pub fn on_click<R: Runtime>(app: &AppHandle<R>, tap: Option<NoticeTap>) {
     }
 }
 
-/// Shows a notice on the computer and waits for its click on a thread of its own — the wait lasts
-/// as long as the notice is on screen. Never fails upwards: a notice that does not go out is logged
-/// and the order behind it carries on.
+/// The computer's notification centre: shows a notice and waits for its click.
 #[cfg(desktop)]
-pub fn show<R: Runtime>(app: AppHandle<R>, title: String, body: String, tap: Option<NoticeTap>) {
-    // The thread is left to run on its own: it lasts as long as the notice does.
-    let _ = show_with(app, title, body, tap, desktop::deliver::<R>);
-}
+pub use desktop::deliver;
 
 /// Where a notice is delivered: `Ok(true)` when the person clicked it, `Ok(false)` when it went by.
 #[cfg(desktop)]
 pub type Deliver<R> = fn(&AppHandle<R>, &str, &str) -> Result<bool, String>;
 
-/// [`show`] with the platform's delivery handed in, and the thread handed back, so a test can wait
-/// for the answer.
+/// Shows a notice on the computer and waits for its click on a thread of its own — the wait lasts
+/// as long as the notice is on screen. The thread is handed back so a test can wait for the answer.
+/// Never fails upwards: a notice that does not go out is logged and the order behind it carries on.
 #[cfg(desktop)]
-pub fn show_with<R: Runtime>(
+pub fn show<R: Runtime>(
     app: AppHandle<R>,
     title: String,
     body: String,
@@ -307,7 +303,7 @@ mod tests {
         let counter = heard.clone();
         app.listen_any(NOTICE_TAPPED_EVENT, move |_| *counter.lock().unwrap() += 1);
         let tap = Some(NoticeTap { id: 6, path: Some("/m/appointments".into()) });
-        if let Some(thread) = show_with(app.handle().clone(), "New booking".into(), "Ana · 10:00".into(), tap, delivered) {
+        if let Some(thread) = show(app.handle().clone(), "New booking".into(), "Ana · 10:00".into(), tap, delivered) {
             thread.join().expect("the notice thread panicked");
         }
         let kept = app.state::<KeptNoticeTap>().take();

@@ -78,7 +78,7 @@ fn the_page_and_the_shell_name_the_same_event_and_argument() {
     );
     // On the computer the plugin reports no click (hub#2360): the shell shows the notice itself.
     assert!(
-        shell.contains("notice_tap::show(app, title, body, desktop_tap(id, path));"),
+        shell.contains("notify_on_desktop(app, title, body, id, path, notice_tap::deliver);"),
         "`erplora_notify` no longer shows the desktop notice itself: a click opens nothing"
     );
 }
