@@ -2,6 +2,7 @@ package com.erplora.android
 
 import android.app.Service
 import android.content.pm.ServiceInfo
+import android.view.View
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -54,5 +55,19 @@ class NoticeListeningTest {
     fun `the notification does not reuse an id the notices of the shell could take`() {
         // The shell's notices use ids from the clock (hub#2305), always positive and under 1e9.
         assertEquals(true, NoticeListening.NOTIFICATION_ID < 0)
+    }
+
+    @Test
+    fun `while listening the page is shown again as soon as Android hides it`() {
+        // Hidden, Chromium freezes the page after a minute (measured: the `freeze` event at 60 s, with
+        // the foreground service running), and the socket, the bell and the diary freeze with it.
+        assertEquals(true, NoticeListening.keepsPageShown(listening = true, windowVisibility = View.GONE))
+        assertEquals(true, NoticeListening.keepsPageShown(listening = true, windowVisibility = View.INVISIBLE))
+    }
+
+    @Test
+    fun `the page is left alone when it is on screen or nobody asked to listen`() {
+        assertEquals(false, NoticeListening.keepsPageShown(listening = true, windowVisibility = View.VISIBLE))
+        assertEquals(false, NoticeListening.keepsPageShown(listening = false, windowVisibility = View.GONE))
     }
 }

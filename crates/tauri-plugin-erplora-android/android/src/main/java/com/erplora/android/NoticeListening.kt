@@ -9,6 +9,11 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -58,12 +63,72 @@ object NoticeListening {
     fun serviceType(sdk: Int): Int =
         if (sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
 
+    /**
+     * Whether the page has to be shown again to Chromium: only while listening, and only once Android
+     * has hidden it. A hidden page is frozen by Chromium after a minute of network silence — measured
+     * on API 37: the `freeze` event at 60 s with the foreground service running and the process alive,
+     * and the socket, the bell's polling and the diary's timers frozen with it. Keeping the process is
+     * not enough; the page has to stay "on screen" for its listeners to keep running.
+     */
+    fun keepsPageShown(listening: Boolean, windowVisibility: Int): Boolean =
+        listening && windowVisibility != View.VISIBLE
+
     data class Texts(val title: String, val body: String, val channel: String)
 
     /** The words of the notification, or `null` when any is missing: never an empty notification. */
     fun textsOf(title: String?, body: String?, channel: String?): Texts? {
         if (title.isNullOrBlank() || body.isNullOrBlank() || channel.isNullOrBlank()) return null
         return Texts(title, body, channel)
+    }
+}
+
+/**
+ * Android glue around [NoticeListening.keepsPageShown]: while listening, undoes the two ways the app
+ * hides its page when it leaves the screen — the activity pausing the WebView (`WryActivity.onPause`)
+ * and the window going away (`onWindowVisibilityChanged`). Nothing is drawn: the window has no
+ * surface, only the page's timers and sockets keep running.
+ */
+class PageKeeper(private val webView: WebView) : DefaultLifecycleObserver {
+    @Volatile
+    var listening = false
+        private set
+
+    /**
+     * A view that is never laid out, only there to hear the window's visibility: the WebView is built
+     * by the runtime and cannot be subclassed, and `OnWindowVisibilityChangeListener` needs API 34.
+     */
+    private val sentinel = object : View(webView.context) {
+        override fun onWindowVisibilityChanged(visibility: Int) {
+            super.onWindowVisibilityChanged(visibility)
+            if (NoticeListening.keepsPageShown(listening, visibility)) {
+                // Posted: the WebView hears the same change in this pass, after or before this view.
+                webView.post { showPage() }
+            }
+        }
+    }.apply { visibility = View.GONE }
+
+    fun install(root: ViewGroup, owner: LifecycleOwner) {
+        if (sentinel.parent == null) root.addView(sentinel, 0, 0)
+        owner.lifecycle.addObserver(this)
+    }
+
+    fun setListening(on: Boolean) {
+        listening = on
+    }
+
+    override fun onPause(owner: LifecycleOwner) = keepShownAfterLifecycle()
+
+    override fun onStop(owner: LifecycleOwner) = keepShownAfterLifecycle()
+
+    /** The observer runs before the activity's own `onPause`, which is what pauses the WebView. */
+    private fun keepShownAfterLifecycle() {
+        if (listening) webView.post { if (listening) showPage() }
+    }
+
+    private fun showPage() {
+        if (!listening) return
+        webView.onResume()
+        webView.dispatchWindowVisibilityChanged(View.VISIBLE)
     }
 }
 

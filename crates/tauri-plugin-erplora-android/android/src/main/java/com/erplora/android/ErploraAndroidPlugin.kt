@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.view.ViewGroup
+import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
@@ -52,6 +54,19 @@ import java.io.File
     ]
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
+
+    /** Keeps the page running while listening for notices (hub#2307); `null` until the WebView loads. */
+    private var pageKeeper: PageKeeper? = null
+
+    override fun load(webView: WebView) {
+        val keeper = PageKeeper(webView)
+        val owner = activity as? AppCompatActivity
+        val root = activity.window?.decorView as? ViewGroup
+        if (owner != null && root != null) {
+            keeper.install(root, owner)
+            pageKeeper = keeper
+        }
+    }
 
     /**
      * `leave_app` (hub#1906) — the app goes to the background, which is what the system Back does
@@ -102,6 +117,7 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     fun keepListening(invoke: Invoke) {
         val args = invoke.getArgs()
         if (!args.optBoolean("on", false)) {
+            pageKeeper?.setListening(false)
             NoticeListeningService.stop(activity)
             invoke.resolve()
             return
@@ -117,6 +133,7 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         }
         try {
             NoticeListeningService.start(activity, texts)
+            pageKeeper?.setListening(true)
             invoke.resolve()
         } catch (e: IllegalStateException) {
             // `ForegroundServiceStartNotAllowedException` (API 31+) is one of these.
@@ -132,6 +149,7 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
      * asks again on its boot.
      */
     override fun onDestroy(activity: AppCompatActivity) {
+        pageKeeper?.setListening(false)
         NoticeListeningService.stop(activity)
     }
 
