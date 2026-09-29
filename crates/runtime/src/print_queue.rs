@@ -568,6 +568,11 @@ pub fn status_view(
     put("attempts", json!(job.attempts));
     put("createdAt", json!(job.created_at));
     put("lastError", json!(job.last_error));
+    // hub#2368 (printing#52): the ONE fact of the document a person recognises a job by — the
+    // number printed on it. Absent when there is no usable one, never an empty label.
+    if let Some(reference) = document_ref(&job.document) {
+        put("documentRef", json!(reference));
+    }
     if audience == QueueAudience::Admin {
         // Only when the gesture actually HAPPENED. A `pending` job carries empty stamp columns,
         // and answering `discardedBy: ""` on it would have every screen render "retired by —" on a
@@ -587,6 +592,22 @@ pub fn status_view(
         }
     }
     serde_json::Value::Object(view)
+}
+
+/// **The number printed on the document** (`receipt_id`), trimmed — or `None` when there is no
+/// usable one (hub#2368).
+///
+/// `receipt_id` is the field every producer already fills and the ESC/POS renderer prints: the
+/// ticket or invoice number from sales/invoice, the `order_number` from kitchen. It is the only
+/// part of the document the status view lets out, and it is safe to: it is on the paper, which
+/// anyone standing at the printer sees — unlike the names, lines and totals hub#343 keeps behind
+/// the drain.
+fn document_ref(document: &serde_json::Value) -> Option<&str> {
+    document
+        .get("receipt_id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|reference| !reference.is_empty())
 }
 
 /// **Who is asking the queue what it is doing**, and therefore how much of a job's history comes
