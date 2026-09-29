@@ -75,6 +75,44 @@ test.describe('bench boot and the requests of a replaced document (hub#2315)', (
     await page.unrouteAll({ behavior: 'ignoreErrors' });
   });
 
+  test('a request the old document left in flight is dropped when the reload itself died on the wire', async ({
+    page,
+  }) => {
+    // The storm reaches the reload's own document: Chromium commits its error page over the old
+    // document, which replaces it as much as a document that answered — so the old document's
+    // orphan is not the bench's business either, and waiting for it would age the storm past its
+    // budget exactly like in the trace.
+    await page.route('**/src/views/LoginPage.vue*', async (route) => {
+      if (bootReloadsOf(page).length >= 2) return route.continue();
+      return route.abort('internetdisconnected');
+    });
+    let documents = 0;
+    await page.route('**/login', async (route) => {
+      if (route.request().resourceType() !== 'document') return route.continue();
+      documents += 1;
+      if (documents === 2) return route.abort('internetdisconnected');
+      return route.continue();
+    });
+    let orphans = 0;
+    await page.route('**/src/__bench_orphan__.ts', () => {
+      orphans += 1;
+      return new Promise<never>(() => undefined);
+    });
+    await page.addInitScript(() => {
+      addEventListener('beforeunload', () => {
+        void import(/* @vite-ignore */ `${location.origin}/src/__bench_orphan__.ts`);
+      });
+    });
+
+    const warnings = await warningsDuring(() => page.goto('/login'));
+
+    expect(gaveUp(warnings), 'a recovered storm was reported as given up').toEqual([]);
+    expect(orphans, 'no replaced document left a request in flight').toBeGreaterThan(0);
+    expect(documents, 'the reload of the storm never asked for its document').toBeGreaterThan(2);
+    await expect(page.getByTestId('login-box')).toBeVisible();
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  });
+
   test('a bench that gives up on a storm says so instead of handing the page over in silence', async ({
     page,
   }) => {

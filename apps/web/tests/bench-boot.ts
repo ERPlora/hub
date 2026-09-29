@@ -400,9 +400,11 @@ export const test = base.extend({
     // `requestfailed`. Waiting for it spent the whole `BOOT_SETTLE_MS`, which aged the storm past
     // its budget and handed the spec a dead shell. The commit is the moment it stops being ours.
     page.on('framenavigated', (frame) => {
-      // No document commits before its response is in: until then this is the router moving the
-      // URL of the live one, which can happen while the next document is still on its way.
-      if (frame !== page.mainFrame() || !pendingDocument?.existingResponse()) return;
+      // No document commits before its response is in — or, for one that died on the wire, before
+      // Chromium's error page takes its place: until then this is the router moving the URL of the
+      // live one, which can happen while the next document is still on its way.
+      if (frame !== page.mainFrame() || pendingDocument === undefined) return;
+      if (!pendingDocument.existingResponse() && pendingDocument.failure() === null) return;
       for (const req of inFlight) if (req !== pendingDocument) inFlight.delete(req);
       pendingDocument = undefined;
       lastActivity = Date.now();
