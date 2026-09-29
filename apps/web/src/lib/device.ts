@@ -146,13 +146,22 @@ interface TauriCore {
   ) => Promise<{ unregister: () => Promise<void> }>;
 }
 
+/** The event API of the same global (`@tauri-apps/api/event` → `listen`). */
+interface TauriEvent {
+  listen?: (event: string, handler: (event: unknown) => void) => Promise<() => void>;
+}
+
+function tauriGlobal(): { core?: TauriCore; event?: TauriEvent } | null {
+  const w = (globalThis as { window?: { __TAURI__?: { core?: TauriCore; event?: TauriEvent } } }).window;
+  return w?.__TAURI__ ?? null;
+}
+
 function tauriCore(): TauriCore | null {
   // Se llega a `window` a través de `globalThis` a propósito: la referencia pelada LANZA un
   // `ReferenceError` donde no hay DOM (un test en node, un worker), y este es el predicado con el
   // que otros deciden si hay hardware — que reviente en vez de contestar «no» convierte una
   // pregunta en una excepción para todos sus llamadores.
-  const w = (globalThis as { window?: { __TAURI__?: { core?: TauriCore } } }).window;
-  const g = w?.__TAURI__;
+  const g = tauriGlobal();
   return g?.core?.invoke ? g.core : null;
 }
 
@@ -190,6 +199,21 @@ export async function listenTauriPlugin(
   return () => {
     void listener.unregister().catch((e) => console.warn('[device] unregister', e));
   };
+}
+
+/**
+ * Listen to an event the SHELL itself emits (hub#2360: «a tap on a notice is waiting», from a click
+ * on the computer), through the same `window.__TAURI__` global. The payload is not handed on: the
+ * event only says something is waiting, and what it is is claimed through a command.
+ *
+ * `null` when there is nothing to listen to — a browser, or a global without the event API. A
+ * refused subscription rejects: the caller decides.
+ */
+export async function listenTauriEvent(event: string, cb: () => void): Promise<(() => void) | null> {
+  const listen = tauriCore() ? tauriGlobal()?.event?.listen : undefined;
+  if (!listen) return null;
+  const unlisten = await listen(event, () => cb());
+  return () => unlisten();
 }
 
 /** The device identity of the Tauri shell, or `null` in a plain browser. */

@@ -210,8 +210,11 @@ export function makeBridgeTransport(): BridgeTransport {
  * Same rules as `IpcBridgeTransport.notify`: the notifications permission and only it asked first
  * (hub#758), best-effort all the way, and nothing in a browser — there is no system notice there.
  * An installed app older than this shell ignores the `id` and shows the notice all the same.
+ *
+ * `path` is the screen the notice leads to (hub#2360): the shell hands it back with a tap the page
+ * did not see being sent — a click on the computer, a tap that had to start the app on Android.
  */
-export async function sendSystemNotice(title: string, body: string, id: number): Promise<void> {
+export async function sendSystemNotice(title: string, body: string, id: number, path: string | null): Promise<void> {
   if (!isTauri()) return;
   try {
     await invokeTauri(REQUEST_PERMISSIONS, { permissions: [ANDROID_NOTIFICATIONS_PERMISSION] });
@@ -219,7 +222,7 @@ export async function sendSystemNotice(title: string, body: string, id: number):
     // On desktop there is nothing to ask; on Android, the user said no. Carry on.
   }
   try {
-    await invokeTauri('erplora_notify', { title, body, id });
+    await invokeTauri('erplora_notify', { title, body, id, path });
   } catch (e) {
     console.warn('[notify] the platform could not show the notice', e);
   }

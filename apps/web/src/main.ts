@@ -42,9 +42,9 @@ import {
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
 import { isAuthed, logout } from './lib/session';
-import { invokeTauri, listenTauriPlugin } from './lib/device';
+import { invokeTauri, listenTauriEvent, listenTauriPlugin } from './lib/device';
 import { sendSystemNotice } from './lib/bridge-transport';
-import { createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
+import { claimNoticeTaps, createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
@@ -321,8 +321,7 @@ void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[
 // Tapping a system notice opens the screen it is about (hub#2305) — the conversation waiting, the
 // diary, the kitchen — instead of the app wherever it was left. Every notice below goes through
 // this door, which sends it with an id of its own and remembers where that id leads; the tap comes
-// back from the notification plugin with the id (Android and iOS). The desktop plugin reports no
-// taps: there the notice still goes out and a click brings the app to the front, as before.
+// back from the notification plugin with the id (Android and iOS alike).
 // Ids start from the clock so a new session never reuses one still sitting in the tray.
 const notices = createNoticeDoor({
   send: sendSystemNotice,
@@ -330,6 +329,13 @@ const notices = createNoticeDoor({
   firstId: Math.floor(Date.now() / 1000) % 1_000_000_000,
 });
 void listenForNoticeTaps(notices, (cb) => listenTauriPlugin('notification', 'actionPerformed', cb));
+// The taps no plugin event brings (hub#2360): a click on the computer, and on Android a tap that had
+// to start the app — fired before this page could listen. The shell keeps each one with the screen
+// it was sent with; it is claimed here at boot and again every time the shell says one is waiting.
+void claimNoticeTaps(notices, {
+  take: () => invokeTauri('erplora_take_notice_tap'),
+  onPoke: (cb) => listenTauriEvent('erplora://notice-tapped', cb),
+});
 
 // Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
 // `kitchen` because it has to print always, not only with the KDS mounted: a hot kitchen is often
