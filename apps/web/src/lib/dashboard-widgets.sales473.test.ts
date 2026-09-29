@@ -87,9 +87,7 @@ describe('sales#473 — the legend and the category of a panel follow the UI lan
 
   it('without a translation the legend is the canonical English of the manifest', async () => {
     expect(await legendOf(manifests())).toBe('Sales');
-    expect(await legendOf(manifests({ widgets: { 'sales.last_7_days': { title: 'Ventas' } } }))).toBe(
-      'Sales',
-    );
+    expect(await legendOf(manifests({ widgets: { 'sales.last_7_days': { title: 'Ventas' } } }))).toBe('Sales');
   });
 
   it('🔴 the category the picker groups by is translated from `locale.widgets.<id>.category`', () => {

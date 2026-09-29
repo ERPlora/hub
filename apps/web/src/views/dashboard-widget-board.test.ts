@@ -286,9 +286,7 @@ describe('the board follows the language the user picks (hub#768)', () => {
 // ── sales#473 · The «Recommended» preset the shell builds speaks the language of the UI ─────────
 describe('the preset the shell names follows the language the user picks (sales#473)', () => {
   const recommendedAsked = (): unknown[] =>
-    collectDashboardWidgets.mock.calls.map(
-      (c) => (c[0] as { labels?: { recommended?: string } }).labels?.recommended,
-    );
+    collectDashboardWidgets.mock.calls.map((c) => (c[0] as { labels?: { recommended?: string } }).labels?.recommended);
 
   it('🔴 asks the collector for the preset name in English on an English hub', async () => {
     mountDashboard('en');
