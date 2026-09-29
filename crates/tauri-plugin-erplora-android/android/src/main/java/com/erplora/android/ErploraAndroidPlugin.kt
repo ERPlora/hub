@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -86,6 +87,52 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         } catch (e: ActivityNotFoundException) {
             invoke.reject("app_settings_unavailable")
         }
+    }
+
+    /**
+     * `keep_listening` (hub#2307) — keeps the app running with the screen off so the notices born in
+     * the page still arrive (`on: true`, with the words of the ongoing notification), or lets Android
+     * reclaim it again (`on: false`). See [NoticeListening].
+     *
+     * Android refuses to start a foreground service from the background (12+); the page only asks
+     * while somebody is using it, and a refusal is REJECTED so the page can log it — the notices keep
+     * working with the app on screen, as before.
+     */
+    @Command
+    fun keepListening(invoke: Invoke) {
+        val args = invoke.getArgs()
+        if (!args.optBoolean("on", false)) {
+            NoticeListeningService.stop(activity)
+            invoke.resolve()
+            return
+        }
+        val texts = NoticeListening.textsOf(
+            args.getString("title", null),
+            args.getString("body", null),
+            args.getString("channel", null),
+        )
+        if (texts == null) {
+            invoke.reject(NoticeListening.TEXT_MISSING)
+            return
+        }
+        try {
+            NoticeListeningService.start(activity, texts)
+            invoke.resolve()
+        } catch (e: IllegalStateException) {
+            // `ForegroundServiceStartNotAllowedException` (API 31+) is one of these.
+            invoke.reject(NoticeListening.START_REFUSED)
+        } catch (e: SecurityException) {
+            invoke.reject(NoticeListening.START_REFUSED)
+        }
+    }
+
+    /**
+     * The page is what listens; with its activity gone, the service would only keep a notification
+     * saying «listening» over nothing (hub#2307). A configuration change recreates the page, which
+     * asks again on its boot.
+     */
+    override fun onDestroy(activity: AppCompatActivity) {
+        NoticeListeningService.stop(activity)
     }
 
     /**

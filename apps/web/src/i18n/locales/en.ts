@@ -1548,6 +1548,11 @@ export default {
       blockedInSettings:
         "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
       turnedOn: 'Done — this device will warn you when something needs your attention.',
+      // hub#2307 — the ongoing notification Android shows while the app keeps listening with the
+      // screen off, and the name of its channel in the device's settings. Words for any business.
+      listeningTitle: 'ERPlora is listening',
+      listeningBody: "You'll be warned when something needs your attention, even with the screen off.",
+      listeningChannel: 'Notices with the screen off',
     },
   },
   planLimits: {
