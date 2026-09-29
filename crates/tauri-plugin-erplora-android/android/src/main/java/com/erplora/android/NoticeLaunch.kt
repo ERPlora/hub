@@ -42,7 +42,7 @@ object NoticeLaunch {
     }
 }
 
-/** Where the last kept tap is remembered, outside the process that kept it. */
+/** Where the tap the task was born from is remembered, outside the process that kept it. */
 interface KeptTapMemory {
     fun last(): String?
     fun remember(key: String)
@@ -57,17 +57,28 @@ class NoticeTapBox(private val memory: KeptTapMemory) {
     private var kept: NoticeLaunch.Tap? = null
     private var claimed = false
 
-    /** A new page is loading, with the intent the activity was (re)created with. */
+    /**
+     * A new page is loading, with the intent the activity was (re)created with. Android hands that
+     * intent back every time the process returns, so its tap counts once: it is the one remembered.
+     * A tap that reached this process before the plugin loaded is the later one, and stays.
+     */
     @Synchronized
     fun pageLoading(launch: NoticeLaunch.Launch) {
         claimed = false
-        keep(launch)
+        val born = NoticeLaunch.tapOf(launch, memory.last()) ?: return
+        memory.remember(born.key)
+        if (kept == null) kept = born
     }
 
-    /** A tap delivered to a live activity — also when the system had killed its process. */
+    /**
+     * A tap delivered to a live activity — also when the system had killed its process. Android
+     * delivers it once (rv-2411, measured), so it needs no memory; remembering it would forget the
+     * tap the task was born from, which would then open again.
+     */
     @Synchronized
     fun newIntent(launch: NoticeLaunch.Launch) {
-        if (!claimed) keep(launch)
+        if (claimed) return
+        kept = NoticeLaunch.tapOf(launch, lastKept = null) ?: return
     }
 
     /** Hands the tap over, once; from now on the page is listening. */
@@ -75,11 +86,5 @@ class NoticeTapBox(private val memory: KeptTapMemory) {
     fun take(): NoticeLaunch.Tap? {
         claimed = true
         return kept.also { kept = null }
-    }
-
-    private fun keep(launch: NoticeLaunch.Launch) {
-        val tap = NoticeLaunch.tapOf(launch, memory.last()) ?: return
-        memory.remember(tap.key)
-        kept = tap
     }
 }

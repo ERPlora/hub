@@ -5,8 +5,9 @@ import android.content.Intent
 
 /**
  * The process's one [NoticeTapBox] (hub#2360), fed from the two places a tap reaches the app before
- * the page listens — the plugin's `load` and `MainActivity.onNewIntent` — and remembered in the
- * app's preferences so a process the system brings back does not keep the same tap again.
+ * the page listens — the plugin's `load` and `MainActivity.onNewIntent`. The tap the task was born
+ * from is remembered in the app's preferences, so a process the system brings back does not keep
+ * it again.
  */
 object NoticeTaps {
     private const val PREFS = "com.erplora.notice_taps"
