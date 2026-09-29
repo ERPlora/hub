@@ -195,6 +195,7 @@ import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects'
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
 import { chromeControlsFor, installChrome } from '../lib/immersive';
 import { isOfflineError, isOnline, reportNetworkFailure } from '../lib/offline';
+import { getLocale } from '../i18n';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -364,9 +365,13 @@ async function mount(): Promise<void> {
   chromeControls.value = [];
   clearProtectsSubscription();
   try {
+    const lang = getLocale();
     const menu = await loadMenu();
     if (generation !== mountGeneration) return;
     tabs.value = menu.filter((m) => m.moduleId === moduleId);
+    // hub#2353 — the language changed while this answer was on its way: its labels are the old
+    // language's, and the refresh the change triggered may already have landed before them.
+    if (lang !== getLocale()) void refreshTabLabels();
     // El bloque `billing` del manifest decide si auto-inyectamos la pestaña "Plan" (sin tocar el
     // module.json de cada módulo). El manifest se sirve completo desde `/modules/<id>/module.json`.
     const manifest = await loadManifest(moduleId);
@@ -553,11 +558,47 @@ async function revealActiveTab(): Promise<void> {
   });
 }
 
+/**
+ * Asks the runtime for this module's tabs again when the effective language changes (hub#2353).
+ *
+ * The labels come translated BY THE RUNTIME (`/api/navigation?locale=`, ADR-0055), so the language
+ * is baked into the answer. The shell boots in its default `es` and applies the user's language
+ * when `/api/profile` answers: a module opened on a cold start kept «Todos» in its tabbar while the
+ * rest of the screen was in English. The sidebar already asks again on this event (hub#781).
+ *
+ * Only the tabs and the heading are refreshed. The module's Web Component repaints itself on the
+ * same event, and remounting it would throw away what is on screen (an open ticket, a half-typed
+ * form). A copy off screen skips it: it was released on the way out and remounts on the way back,
+ * already in the new language (hub#1099 — no fetch per hidden copy).
+ */
+async function refreshTabLabels(): Promise<void> {
+  if (!onScreen) return;
+  const { moduleId } = params();
+  const lang = getLocale();
+  const generation = mountGeneration;
+  let menu: MenuEntry[];
+  try {
+    menu = await loadMenu();
+  } catch {
+    // The labels stay as they were; the next change of language asks again.
+    return;
+  }
+  // A newer mount (another tab or app) or a newer language owns the answer now.
+  if (generation !== mountGeneration || lang !== getLocale()) return;
+  const fresh = menu.filter((m) => m.moduleId === moduleId);
+  if (fresh.length === 0) return;
+  tabs.value = fresh;
+  // With tabs, every branch of `mount()` heads the screen with the module's name (`shellTabHeading`).
+  moduleName.value = fresh[0].moduleName;
+}
+const onLocaleChanged = (): void => void refreshTabLabels();
+
 /** Limpieza del canal de chrome con el WC (ADR-0048); también devuelve el chrome al desmontar. */
 let stopChrome: (() => void) | null = null;
 
 onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
+  window.addEventListener('erplora:locale-changed', onLocaleChanged);
   if (outlet.value) stopChrome = installChrome(outlet.value, chromeControls);
   void mount().then(revealActiveTab);
 });
@@ -625,6 +666,7 @@ onIonViewWillEnter(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', recheckEntitlement);
+  window.removeEventListener('erplora:locale-changed', onLocaleChanged);
   // Antes que nada: salir del modo inmersivo. Irse del módulo con el chrome escondido dejaría la
   // pantalla siguiente sin menú y sin el ⋮ del TPV, que era lo único que sabía devolverlo.
   stopChrome?.();
