@@ -17,6 +17,7 @@ pub mod activity_log;
 pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
+pub mod column_kinds_cache;
 pub mod commands;
 pub mod core_version;
 pub mod device_mode;
