@@ -2326,11 +2326,11 @@ gaps = []
 for event in ("push", "pull_request"):
     paths = paths_of(event)
     if paths is None:
-        gaps.append("NO-PUDE-LEER-on.%s.paths" % event)
+        gaps.append("cannot-read-on.%s.paths" % event)
     elif need not in paths:
         gaps.append("on.%s.paths" % event)
 if gaps:
-    print("test-web.yml-no-dispara-el-gate: " + " ".join(gaps))
+    print("test-web.yml-does-not-trigger-the-gate: " + " ".join(gaps))
 PY
 )
 [ -z "$gate_wf_gap" ] \
