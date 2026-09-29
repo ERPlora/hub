@@ -1,4 +1,5 @@
-//! **The photo of a WhatsApp header, uploaded from a flow step** (hub#2335).
+//! **The photo, video or PDF of a WhatsApp header, uploaded from a flow step** (hub#2335,
+//! hub#2347).
 //!
 //! A template approved with a photo header sends a photo every time: Meta takes it as a link it
 //! downloads. The owner of a salon has no public link to her salon's picture — she has the file.
@@ -11,7 +12,9 @@
 //! be (a JPEG or a PNG read from its BYTES, never from its name; at most 5 MB — Meta's own cap for a
 //! header image), where it lands (folder `whatsapp/headers`, a name the hub chose, the bytes
 //! untouched, the machine credential on the wire) and a store that fails reaching the editor with
-//! its own code.
+//! its own code. For a video and a PDF (hub#2347): the file must be the kind its header is, under
+//! Meta's cap for it; the name is the fingerprint of EVERY byte; and a store that stumbles once
+//! gets the whole file again.
 use axum::body::Body;
 use axum::extract::Multipart;
 use axum::http::{HeaderMap, Request, StatusCode};
@@ -46,6 +49,9 @@ const GIF: &[u8] = b"GIF89a\x01\x00\x01\x00the salon";
 const MP4: &[u8] = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isomthe promo";
 /// A QuickTime `.mov` is also an `ftyp` box, but Meta takes only MP4 (and 3GPP) as a header video.
 const MOV: &[u8] = b"\x00\x00\x00\x14ftypqt  \x00\x00\x00\x00qt  the promo";
+/// An iPhone photo (HEIC) and an MPEG-4 audio (M4A) are `ftyp` files too, and neither is a video.
+const HEIC: &[u8] = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heicthe salon";
+const M4A: &[u8] = b"\x00\x00\x00\x18ftypM4A \x00\x00\x00\x00M4A mp42the jingle";
 /// Meta's cap for a header video (16 MB) and for a header document (100 MB).
 const MAX_VIDEO: usize = 16 * 1024 * 1024;
 const MAX_DOCUMENT: usize = 100 * 1024 * 1024;
@@ -97,7 +103,8 @@ fn module_dir(root: &FsPath, id: &str, extra: Value) -> PathBuf {
 
 /// The SaaS media manager (`POST …/media/`, multipart `folder` + `files`): `201 {success, saved}`,
 /// or `502 {error, saved: 0, failed: 1}` for a file carrying the `refuse-502` marker — the answer
-/// of a store that failed.
+/// of a store that failed — and `503` the FIRST time it sees a file carrying `retry-503`, the
+/// answer of a store that stumbled and is fine a moment later.
 async fn fake_saas(seen: Seen) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -121,8 +128,11 @@ async fn fake_saas(seen: Seen) -> String {
                     }
                 }
                 let mut refuse = false;
+                let mut stumble = false;
                 for (file_name, content_type, bytes) in files {
                     refuse |= bytes.windows(10).any(|w| w == b"refuse-502");
+                    stumble |= bytes.windows(9).any(|w| w == b"retry-503")
+                        && !seen.lock().unwrap().iter().any(|s| s.bytes == bytes);
                     seen.lock().unwrap().push(Stored {
                         headers: headers
                             .iter()
@@ -135,6 +145,13 @@ async fn fake_saas(seen: Seen) -> String {
                         content_type,
                         bytes,
                     });
+                }
+                if stumble {
+                    return (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        Json(json!({"error": "try again"})),
+                    )
+                        .into_response();
                 }
                 if refuse {
                     return (
@@ -672,6 +689,9 @@ async fn a_file_that_is_not_the_kind_of_its_header_is_refused_before_it_is_store
     for (kind, bytes, kind_first) in [
         ("video", JPEG, true),
         ("video", MOV, true),
+        ("video", HEIC, true),
+        ("video", M4A, false),
+        ("image", HEIC, true),
         ("video", PDF, true),
         ("video", b"".as_slice(), true),
         ("document", MP4, true),
@@ -841,4 +861,129 @@ async fn a_missing_video_and_a_pdf_that_fails_to_store_answer_with_their_own_cod
     let body = body_json(response).await;
     assert_eq!(body["error"]["code"], "whatsapp.header_document_not_saved");
     assert!(body.get("data").is_none(), "{body}");
+}
+
+/// **The name is the fingerprint of EVERY byte of the file.** A header file is stored under the
+/// SHA-256 of its content: the same file twice is one file, and two files never share a name — the
+/// second promotion's video must not overwrite the first because both open with the same frames.
+/// Files of megabytes, read in many chunks, and the photo of hub#2335 (no `kind`) the same.
+#[tokio::test]
+async fn the_reference_is_the_fingerprint_of_every_byte_of_the_file() {
+    use sha2::{Digest, Sha256};
+
+    let fingerprint = |bytes: &[u8]| -> String {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    };
+    let f = fixture("fingerprint").await;
+    let mut first = MP4.to_vec();
+    first.resize(3 * 1024 * 1024, 7);
+    let mut second = first.clone();
+    *second.last_mut().expect("bytes") = 8;
+    let mut refs = Vec::new();
+    for bytes in [&first, &second, &first] {
+        let response = f
+            .router
+            .clone()
+            .oneshot(upload(
+                media("video", bytes, true),
+                Some(&f.admin),
+                Some(EDITOR),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = body_json(response).await;
+        assert_eq!(
+            body["data"]["ref"],
+            format!("whatsapp/headers/{}.mp4", fingerprint(bytes)),
+            "{body}"
+        );
+        refs.push(body["data"]["ref"].clone());
+    }
+    assert_ne!(refs[0], refs[1], "they differ in their last byte");
+    assert_eq!(refs[0], refs[2], "the same video twice is one file");
+
+    let response = f
+        .router
+        .clone()
+        .oneshot(upload(
+            photo("salon.jpg", JPEG),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        body_json(response).await["data"]["ref"],
+        format!("whatsapp/headers/{}.jpg", fingerprint(JPEG))
+    );
+}
+
+/// **A store that stumbles once is asked again, with the whole file again.** The file goes up as
+/// a stream read from disk, and a stream already sent cannot be sent twice: every attempt reads
+/// the file from its first byte and declares its length.
+#[tokio::test]
+async fn a_store_that_stumbles_once_gets_the_whole_file_again() {
+    let f = fixture("stumbles").await;
+    let mut bytes = PDF.to_vec();
+    bytes.extend_from_slice(b"retry-503");
+    bytes.resize(200 * 1024, b' ');
+    let response = f
+        .router
+        .clone()
+        .oneshot(upload(
+            media("document", &bytes, true),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let body = body_json(response).await;
+    let name = stored_name(body["data"]["ref"].as_str().expect("a ref"), "pdf");
+
+    let seen = f.seen.lock().unwrap().clone();
+    assert_eq!(seen.len(), 2, "refused once, stored at the second attempt");
+    for attempt in &seen {
+        assert_eq!(attempt.file_name, name);
+        assert_eq!(attempt.bytes, bytes, "every attempt carries the whole file");
+        assert_eq!(
+            attempt.header("content-length").is_some(),
+            attempt.header("transfer-encoding").is_none(),
+            "{:?}",
+            attempt.headers
+        );
+        assert!(attempt.header("content-length").is_some());
+    }
+}
+
+/// A body bigger than the route takes at all — past the largest cap, the document's — is refused
+/// as too large in the envelope the SDK reads, never as a broken form, and nothing is stored.
+#[tokio::test]
+async fn a_body_bigger_than_the_largest_header_is_refused_as_too_large() {
+    let f = fixture("over-the-route").await;
+    let mut bytes = PDF.to_vec();
+    bytes.resize(MAX_DOCUMENT + 128 * 1024, 0);
+    let response = f
+        .router
+        .clone()
+        .oneshot(upload(
+            media("document", &bytes, true),
+            Some(&f.admin),
+            Some(EDITOR),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    let body = body_json(response).await;
+    assert_eq!(body["ok"], false, "{body}");
+    let code = body["error"]["code"].as_str().expect("a code");
+    assert!(
+        code.starts_with("whatsapp.header_") && code.ends_with("_too_large"),
+        "{code}"
+    );
+    assert!(f.seen.lock().unwrap().is_empty());
 }

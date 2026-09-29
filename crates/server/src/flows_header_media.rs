@@ -125,14 +125,21 @@ pub(crate) enum HeaderMedia {
     Pdf,
 }
 
+/// The `ftyp` brands that are NOT a video Meta plays as an MP4, by their first letters: QuickTime
+/// (`qt  `) and 3GPP (`3gp…`, `3g2…`), the stills an iPhone or a camera shoots (HEIF `heic`/`heix`/
+/// `hevc`…, `mif1`/`msf1`, AVIF `avif`/`avis`) and MPEG-4 audio (`M4A `, `M4B `, `M4P `). They open
+/// with the same box as an MP4; stored as one, they would fail at every send.
+const NOT_AN_MP4_VIDEO: &[&[u8]] = &[
+    b"qt", b"3g", b"hei", b"hev", b"mif1", b"msf1", b"avif", b"avis", b"M4A", b"M4B", b"M4P",
+];
+
 impl HeaderMedia {
     /// The bytes [`Self::sniff`] needs to decide (an MP4's brand ends at byte 12).
     const SNIFF_LEN: usize = 12;
 
     /// What the bytes ARE: a JPEG starts `FF D8 FF`, a PNG with its eight-byte signature, a PDF
-    /// with `%PDF-`, an MP4 with an `ftyp` box whose brand is not QuickTime's (`qt  `) nor 3GPP's
-    /// (`3g…`) — Meta plays neither as an MP4. A name or a declared type says nothing — a PDF renamed
-    /// `.jpg` is still a PDF, and Meta refuses it.
+    /// with `%PDF-`, an MP4 with an `ftyp` box whose brand is none of [`NOT_AN_MP4_VIDEO`]. A name
+    /// or a declared type says nothing — a PDF renamed `.jpg` is still a PDF, and Meta refuses it.
     pub(crate) fn sniff(bytes: &[u8]) -> Option<Self> {
         if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
             Some(Self::Jpeg)
@@ -142,8 +149,9 @@ impl HeaderMedia {
             Some(Self::Pdf)
         } else if bytes.len() >= Self::SNIFF_LEN
             && &bytes[4..8] == b"ftyp"
-            && !bytes[8..12].starts_with(b"qt")
-            && !bytes[8..12].starts_with(b"3g")
+            && !NOT_AN_MP4_VIDEO
+                .iter()
+                .any(|brand| bytes[8..12].starts_with(brand))
         {
             Some(Self::Mp4)
         } else {
@@ -511,6 +519,17 @@ mod tests {
             b"\0\0\0\x14ftypqt  ",
             b"\0\0\0\x14ftyp3gp5",
             b"\0\0\0\x14ftyp3g2a",
+            // stills and audio are `ftyp` files too: an iPhone photo, an AVIF, an M4A
+            b"\0\0\0\x18ftypheic",
+            b"\0\0\0\x18ftypheix",
+            b"\0\0\0\x18ftyphevc",
+            b"\0\0\0\x18ftypmif1",
+            b"\0\0\0\x18ftypmsf1",
+            b"\0\0\0\x1cftypavif",
+            b"\0\0\0\x1cftypavis",
+            b"\0\0\0\x18ftypM4A ",
+            b"\0\0\0\x18ftypM4B ",
+            b"\0\0\0\x18ftypM4P ",
             b"\0\0\0\x14ftypmp4",
             b"\0\0\0\x14moovmp42",
         ] {
