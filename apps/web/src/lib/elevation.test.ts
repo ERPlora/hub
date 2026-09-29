@@ -16,7 +16,7 @@ import {
   askForApproval,
   pendingElevation,
   resolveElevation,
-  elevationRefusalKey,
+  elevationRefusal,
 } from './elevation';
 
 function ask(payload: Record<string, unknown> = { sale_id: 's1' }): ElevationAsk {
@@ -107,13 +107,19 @@ describe('what a refused approval is told', () => {
   const refusal = (code: string): ErploraError => new ErploraError(code, 'whatever');
 
   it('gives each runtime refusal its own sentence', () => {
-    expect(elevationRefusalKey(refusal('hub.elevation.rejected'))).toBe('elevation.rejected');
-    expect(elevationRefusalKey(refusal('hub.elevation.approver_cannot'))).toBe(
+    expect(elevationRefusal(refusal('hub.elevation.rejected')).key).toBe('elevation.rejected');
+    expect(elevationRefusal(refusal('hub.elevation.approver_cannot')).key).toBe(
       'elevation.approverCannot',
     );
-    expect(elevationRefusalKey(refusal('hub.elevation.not_elevable'))).toBe('elevation.notElevable');
-    expect(elevationRefusalKey(refusal('hub.elevation.not_required'))).toBe('elevation.notRequired');
-    expect(elevationRefusalKey(refusal('too_many_attempts'))).toBe('elevation.tooManyAttempts');
+    expect(elevationRefusal(refusal('hub.elevation.not_elevable')).key).toBe('elevation.notElevable');
+    expect(elevationRefusal(refusal('hub.elevation.not_required')).key).toBe('elevation.notRequired');
+    // hub#2285: the lock is the login pinpad's lock, and says the pinpad's sentence — with the
+    // minutes when the refusal carries the wait.
+    expect(elevationRefusal(refusal('too_many_attempts'))).toEqual({ key: 'login.pinTooManyAttemptsNoWait' });
+    expect(elevationRefusal(Object.assign(refusal('too_many_attempts'), { retryAfterSecs: 61 }))).toEqual({
+      key: 'login.pinTooManyAttempts',
+      minutes: 2,
+    });
   });
 
   it('falls back to «could not be done», never to «wrong PIN»', () => {
@@ -121,16 +127,16 @@ describe('what a refused approval is told', () => {
     // digits. Here it is not: a dropped connection, a command that vanished with an app, a code
     // this build has never seen. Telling somebody their PIN is wrong when it is right is how the
     // shop ends up sharing the manager's credential — the exact outcome elevation exists to avoid.
-    expect(elevationRefusalKey(new Error('network down'))).toBe('elevation.failed');
-    expect(elevationRefusalKey(refusal('hub.elevation.something_new'))).toBe('elevation.failed');
-    expect(elevationRefusalKey(refusal('command_not_found'))).toBe('elevation.failed');
-    expect(elevationRefusalKey(null)).toBe('elevation.failed');
+    expect(elevationRefusal(new Error('network down')).key).toBe('elevation.failed');
+    expect(elevationRefusal(refusal('hub.elevation.something_new')).key).toBe('elevation.failed');
+    expect(elevationRefusal(refusal('command_not_found')).key).toBe('elevation.failed');
+    expect(elevationRefusal(null).key).toBe('elevation.failed');
   });
 
   it('does not read a code out of anything but the code', () => {
     // A message is prose: it gets rewritten, translated and reworded. Matching on it is how a
     // refusal silently starts landing on the wrong sentence.
     const worded = new ErploraError('too_many_attempts', 'those details do not approve this action');
-    expect(elevationRefusalKey(worded)).toBe('elevation.tooManyAttempts');
+    expect(elevationRefusal(worded)).toEqual({ key: 'login.pinTooManyAttemptsNoWait' });
   });
 });

@@ -44,6 +44,7 @@ import { getHubSession, isAuthed, setHubSession, setUser } from './session';
 import { getUserProfile, resetUserProfile } from './user-profile';
 import { resetUserThemePreferences } from './theme';
 import { resetUserLocale } from '../i18n';
+import { lockRefusal, type Refusal } from './lock-refusal';
 
 /**
  * Does this device get the hand-over gesture at all?
@@ -96,7 +97,7 @@ export function closeUserSwitch(): void {
 /**
  * Hand the till over to `name`, verified by `pin`.
  *
- * Throws whatever the runtime refused with (see {@link userSwitchRefusalKey}) and, when it does,
+ * Throws whatever the runtime refused with (see {@link userSwitchRefusal}) and, when it does,
  * **nothing has changed**: the person who was signed in still is, with their session token intact.
  *
  * The order is the contract. Mint → adopt → revoke the old one → forget erplora.com → re-read the
@@ -162,7 +163,7 @@ export async function switchUser(name: string, pin: string): Promise<void> {
 }
 
 /**
- * i18n key for a refused hand-over, read off the stable `code` and nothing else.
+ * The sentence for a refused hand-over, read off the stable `code` and nothing else.
  *
  * Matching on the message would be matching on prose that gets reworded and translated. The codes
  * are the runtime's contract (`crates/server/src/lib.rs`, `auth_pin`): a device that never did an
@@ -172,10 +173,11 @@ export async function switchUser(name: string, pin: string): Promise<void> {
  * ordinary wrong-PIN case: the runtime sends that one bare. Merely unhelpful, where an instruction
  * invented for a code this build has never seen would be actively wrong.
  */
-export function userSwitchRefusalKey(err: unknown): string {
+export function userSwitchRefusal(err: unknown): Refusal {
   const code = (err as { code?: unknown } | null)?.code;
-  if (code === 'device_untrusted') return 'userSwitch.deviceNotEnrolled';
-  if (code === 'device_unidentified') return 'userSwitch.deviceUnidentified';
-  if (code === 'too_many_attempts') return 'userSwitch.tooManyAttempts';
-  return 'userSwitch.rejected';
+  if (code === 'device_untrusted') return { key: 'userSwitch.deviceNotEnrolled' };
+  if (code === 'device_unidentified') return { key: 'userSwitch.deviceUnidentified' };
+  // hub#2285: the same lock as the login pinpad, so the same sentence — with the minutes.
+  if (code === 'too_many_attempts') return lockRefusal(err);
+  return { key: 'userSwitch.rejected' };
 }
