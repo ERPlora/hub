@@ -95,3 +95,63 @@ export function defaultVersion(versions: readonly string[]): string {
 export function shouldPickVersion(versions: readonly string[]): boolean {
   return versions.length > 1;
 }
+
+/** An app that enters «Update all» (hub#2331). */
+export interface UpdateAllTarget {
+  id: string;
+  name: string;
+}
+
+/** What happened to one app of the batch — one line of the result the owner reads. */
+export type UpdateAllResult =
+  | { id: string; name: string; status: 'updated'; from: string; to: string }
+  | { id: string; name: string; status: 'up_to_date' }
+  | { id: string; name: string; status: 'failed'; error: unknown };
+
+/**
+ * The apps «Update all» updates (hub#2331): exactly those whose row offers «Update» — a pending
+ * update ({@link pendingUpdate}) this hub is not too old for ({@link updateNeedsNewerHub}) — in the
+ * order of the list.
+ */
+export function updateAllTargets(
+  installed: readonly UpdateAllTarget[],
+  updates: readonly ModuleUpdateInfo[],
+  hubVersion: string | null | undefined,
+): UpdateAllTarget[] {
+  return installed
+    .filter((m) => {
+      const update = pendingUpdate(m.id, updates);
+      return update !== null && !updateNeedsNewerHub(update, hubVersion);
+    })
+    .map((m) => ({ id: m.id, name: m.name }));
+}
+
+/**
+ * Updates every target ONE AFTER ANOTHER through the same per-app update the row button uses, and
+ * reports each one (hub#2331).
+ *
+ * Serial on purpose: the runtime already serialises installs, and one at a time is what lets the
+ * screen say «Updating Sales (2 of 5)». A failure is recorded and the batch goes on — one app the
+ * marketplace refuses must not leave the other eight behind. It never throws.
+ */
+export async function updateAll(
+  targets: readonly UpdateAllTarget[],
+  update: (moduleId: string) => Promise<{ updated: boolean; from: string; to: string }>,
+  onStep?: (index: number, target: UpdateAllTarget) => void,
+): Promise<UpdateAllResult[]> {
+  const results: UpdateAllResult[] = [];
+  for (const [index, target] of targets.entries()) {
+    onStep?.(index, target);
+    try {
+      const outcome = await update(target.id);
+      results.push(
+        outcome.updated
+          ? { id: target.id, name: target.name, status: 'updated', from: outcome.from, to: outcome.to }
+          : { id: target.id, name: target.name, status: 'up_to_date' },
+      );
+    } catch (error) {
+      results.push({ id: target.id, name: target.name, status: 'failed', error });
+    }
+  }
+  return results;
+}
