@@ -91,6 +91,14 @@ invoice/tests/from_sale.hub.test.py
 # kernel (invoice#109). New coverage, not moved.
 # pending-publication: invoice#123 until 2026-10-27
 invoice/tests/mark_paid.hub.test.py
+# invoice: an invoice the hub cannot read the tax rules (or, from a sale, the sale) for is NOT
+# issued — `invoice.create`, `invoice.create_from_sale` and `invoice.substitute` stop with
+# `read_unavailable`, write nothing and consume no number, and an existing sale is never reported
+# as `invoice.sale_not_found`; issuing recovers once the reads answer again. The tables are made
+# unreachable through `ERPLORA_HUB_PSQL`, against the real kernel (invoice#133). New coverage,
+# not moved.
+# pending-publication: invoice#137 until 2026-10-29
+invoice/tests/issuing_refuses_without_reads.hub.test.py
 
 # ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
 services/tests/package_redeem.hub.test.py
@@ -244,3 +252,9 @@ payment_gateways/tests/deleted_gateway_frees_its_code.hub.test.py
 # not moved.
 # pending-publication: taxes#83 until 2026-10-29
 taxes/tests/calculate_refuses_without_rules.hub.test.py
+# appointments: a series can only be CREATED with what it can be BOOKED with — `recurring.create`
+# without the professional, the customer or the service (absent, empty or null) is refused at the
+# door as `invalid_payload` naming the field, and the complete series is still created and booked,
+# against the real kernel (appointments#246). New coverage, not moved.
+# pending-publication: appointments#249 until 2026-10-29
+appointments/tests/recurring_create_links.hub.test.py
