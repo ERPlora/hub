@@ -910,6 +910,7 @@ export default {
     updateAllSummary: '{updated} de {total} app actualizada. | {updated} de {total} apps actualizadas.',
     updateAllUpToDate: 'Ya estaba en la última versión',
     updateAllRetry: 'Reintentar',
+    updatesCheckFailed: 'No se ha podido comprobar si hay versiones nuevas de tus apps. Puede que no estén al día.',
     updateAllReload: 'Recargar ahora',
     updateAllDoneReloading: '{n} app actualizada. Recargando para usar la versión nueva… | {n} apps actualizadas. Recargando para usar las versiones nuevas…',
     updateAllNothingNew: 'Tus apps ya estaban en la última versión.',
