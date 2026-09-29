@@ -61,6 +61,21 @@ export interface MediaFetchOptions {
 }
 
 /**
+ * Per-call options of {@link ErploraClient.command} and {@link ErploraClient.commandOptional}.
+ */
+export interface CommandOptions {
+  /**
+   * The calling screen resolves an unknown outcome ITSELF (hub#2375) — it probes the hub once it is
+   * back (an idempotency key, a status read) and tells the person what happened. Then the shell's
+   * default net (the red «we can't tell — check before trying again» toast of hub#906) would say
+   * the opposite of the screen at the same time, so it is skipped for THIS call. The caller still
+   * gets the same {@link UnknownOutcomeError}: it is what tells the screen to probe. Default
+   * `false`: a module that says nothing keeps the net.
+   */
+  resolvesOutcome?: boolean;
+}
+
+/**
  * Convierte la referencia portable guardada en BD/blueprint en la única ruta REST que un módulo
  * puede pedir. No es un proxy: rechaza orígenes, endpoints distintos, parámetros extra y
  * traversal antes de que `fetch` vea la cadena.
@@ -3437,12 +3452,15 @@ export class ErploraClient {
    * hub answered, the outcome is known, and the module orients by the code as always. Queries are
    * NOT captured (see {@link query}): a read that failed did nothing, and toasting every failed
    * dashboard poll would bury the one toast that matters.
+   *
+   * A screen that resolves the doubt itself passes `{ resolvesOutcome: true }` (hub#2375): the
+   * verdict is thrown all the same, only the toast is skipped for that call.
    */
-  command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
+  command<T = unknown>(name: string, payload?: Record<string, unknown>, opts: CommandOptions = {}): Promise<T> {
     return (this.transport.command(name, payload) as Promise<T>).catch((e: unknown) => {
       if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) throw e;
       const verdict = new UnknownOutcomeError(commandVerdictMessage(this.locale), e);
-      this.opts.notifier?.({ type: 'error', message: verdict.message });
+      if (opts.resolvesOutcome !== true) this.opts.notifier?.({ type: 'error', message: verdict.message });
       throw verdict;
     });
   }
@@ -3470,10 +3488,14 @@ export class ErploraClient {
    * siquiera se dispara. El namespace del core `hub.*` nunca se corta en corto (nunca está
    * ausente, ver {@link isKnownAbsent}).
    */
-  async commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T | undefined> {
+  async commandOptional<T = unknown>(
+    name: string,
+    payload?: Record<string, unknown>,
+    opts: CommandOptions = {},
+  ): Promise<T | undefined> {
     if (this.isKnownAbsent(name)) return undefined;
     try {
-      return await this.command<T>(name, payload);
+      return await this.command<T>(name, payload, opts);
     } catch (e) {
       // `module_inactive` (cascada ADR-0128) equivale a ausencia: un módulo desactivado no está
       // disponible, y el consumidor OBLIGATORIO nunca pregunta (la cascada lo apagó con su dep).
