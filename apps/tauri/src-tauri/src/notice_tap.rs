@@ -18,10 +18,12 @@
 
 use std::sync::Mutex;
 
+#[cfg(desktop)]
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// The event that tells the page a tap is waiting to be claimed. It carries nothing: the tap itself
 /// is handed over once, by `erplora_take_notice_tap`, so two listeners never open a screen twice.
+#[cfg(desktop)]
 pub const NOTICE_TAPPED_EVENT: &str = "erplora://notice-tapped";
 
 /// A tap on a notice: its id and the screen it was sent with, when it names one.
@@ -53,6 +55,7 @@ impl NoticeTap {
 pub struct KeptNoticeTap(Mutex<Option<NoticeTap>>);
 
 impl KeptNoticeTap {
+    #[cfg_attr(mobile, allow(dead_code))] // on the phone Kotlin keeps the tap
     pub fn keep(&self, tap: NoticeTap) {
         // A poisoned lock only means another thread panicked holding a plain value: still usable.
         *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(tap);
@@ -66,6 +69,7 @@ impl KeptNoticeTap {
 
 /// A click on a notice on the computer: keep the tap, bring the window to the front and tell the
 /// page a tap is waiting. A notice without an id still brings the window up — it just leads nowhere.
+#[cfg(desktop)]
 pub fn on_click<R: Runtime>(app: &AppHandle<R>, tap: Option<NoticeTap>) {
     if let Some(tap) = tap {
         app.state::<KeptNoticeTap>().keep(tap);
@@ -94,7 +98,9 @@ pub fn on_click<R: Runtime>(app: &AppHandle<R>, tap: Option<NoticeTap>) {
 /// and the order behind it carries on.
 #[cfg(desktop)]
 pub fn show<R: Runtime>(app: AppHandle<R>, title: String, body: String, tap: Option<NoticeTap>) {
-    let spawned = std::thread::Builder::new().name("notice".into()).spawn(move || {
+    // One parked thread per notice still on screen or in the notification centre: a small stack
+    // keeps a busy kitchen's afternoon of notices cheap.
+    let spawned = std::thread::Builder::new().name("notice".into()).stack_size(256 * 1024).spawn(move || {
         match desktop::deliver(&app, &title, &body) {
             Ok(true) => on_click(&app, tap),
             Ok(false) => {}
@@ -235,6 +241,7 @@ mod tests {
         assert_eq!(kept.take(), Some(NoticeTap { id: 2, path: Some("/m/appointments".into()) }));
     }
 
+    #[cfg(desktop)]
     fn mock_app() -> tauri::App<tauri::test::MockRuntime> {
         // `mock_context(noop_assets())` and NOT `generate_context!()` (see `connectivity.rs`).
         let app = tauri::test::mock_builder()
@@ -247,6 +254,7 @@ mod tests {
         app
     }
 
+    #[cfg(desktop)]
     #[test]
     fn a_click_keeps_the_tap_and_tells_the_page() {
         let app = mock_app();
@@ -263,6 +271,7 @@ mod tests {
         );
     }
 
+    #[cfg(desktop)]
     #[test]
     fn a_click_on_a_notice_without_an_id_keeps_nothing() {
         let app = mock_app();
