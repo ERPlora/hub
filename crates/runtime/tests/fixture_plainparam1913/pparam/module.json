@@ -1,0 +1,24 @@
+{
+  "id": "pparam",
+  "name": "Plain Query Param Guard",
+  "version": "1.0.0",
+  "permissions": [
+    "pparam.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "pparam.items.get": {
+      "permission": "pparam.read",
+      "sql": "queries/item_get.sql"
+    },
+    "pparam.items.tagged": {
+      "permission": "pparam.read",
+      "sql": "queries/item_get.sql",
+      "schema": "schemas/tagged.json"
+    }
+  }
+}
