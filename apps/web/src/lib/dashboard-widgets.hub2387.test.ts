@@ -196,6 +196,34 @@ describe('hub#2387 — the home page paints money in the currency of the hub', (
     expect(barList(cell)?.locale).toBe('en');
   });
 
+  it('a locale the panel sets is still honoured, in the kpi and in the bar-list', async () => {
+    hubIn('USD', 2);
+    i18n.global.locale.value = 'es';
+    const k = await renderOne(kpi({ locale: 'en-US' }), [{ expected: 150 }]);
+    expect(kpiValue(k)).toBe('$1.50');
+
+    const b = await renderOne(barListDef({ locale: 'en-US' }), [{ session_number: 'S-1', difference: -40 }]);
+    expect(barList(b)?.locale).toBe('en-US');
+  });
+
+  it('a currency the bar-list sets is still honoured', async () => {
+    hubIn('USD', 2);
+    const cell = await renderOne(barListDef({ currency: 'EUR' }), [{ session_number: 'S-1', difference: -40 }]);
+    expect(barList(cell)?.currency).toBe('EUR');
+  });
+
+  it('a bar-list without valueFormat is not money: its value is not scaled', async () => {
+    hubIn('EUR', 2);
+    const def: WidgetManifestDef = {
+      title: 'Top staff',
+      kind: 'bar-list',
+      query: 'staff.top',
+      map: { label: 'name', value: 'services' },
+    };
+    const cell = await renderOne(def, [{ name: 'Ana', services: 7 }]);
+    expect(barList(cell)?.items?.[0]?.value).toBe(7);
+  });
+
   it('a bar-list that is not money keeps its declared divisor (stock at scale 10^6)', async () => {
     hubIn('JPY', 0);
     const def: WidgetManifestDef = {
