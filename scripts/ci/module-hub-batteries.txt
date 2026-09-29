@@ -237,3 +237,9 @@ cash_register/tests/widget_params.hub.test.py
 # not moved.
 # pending-publication: payment_gateways#57 until 2026-10-28
 payment_gateways/tests/deleted_gateway_frees_its_code.hub.test.py
+# appointments: a series can only be CREATED with what it can be BOOKED with — `recurring.create`
+# without the professional, the customer or the service (absent, empty or null) is refused at the
+# door as `invalid_payload` naming the field, and the complete series is still created and booked,
+# against the real kernel (appointments#246). New coverage, not moved.
+# pending-publication: appointments#249 until 2026-10-29
+appointments/tests/recurring_create_links.hub.test.py
