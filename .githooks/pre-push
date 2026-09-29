@@ -181,6 +181,21 @@ fi
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
+# hub#2323: every battery this gate runs gets a git env WITHOUT the pusher's local variables.
+# git exports GIT_DIR to a hook run from a linked worktree (the fleet's shape), and an inherited
+# GIT_DIR beats `git -C`: on 28/09 merge-check-tree.test.sh, run by the web light stage, committed
+# its fixtures onto the pusher's branch, created shared `pr`/`clash` branches and pushed them to the
+# real origin (#1387/#1388 was the same class). Fixing each test only covers the ones we know about;
+# stripping the env here covers the next one. Safe for the batteries' own git calls: cwd is the
+# top level (above), so git finds this same repo by discovery.
+run_battery() {   # $1 = the command line, eval'd like before, in a subshell
+    (
+        # shellcheck disable=SC2046  # the variable NAMES, one per word
+        unset $(git rev-parse --local-env-vars 2>/dev/null)
+        eval "$1"
+    )
+}
+
 # ── hub#1207: what does this push actually CHANGE? ───────────────────────────
 # Everything below — which packages to test, whether to resync the hook — hangs
 # off this diff, so failing to resolve it is never silent: the gate degrades to
@@ -752,7 +767,7 @@ run_web_stage() {
                     && bash scripts/tests/web-format.test.sh'
             fi
             echo "🧪 pre-push: el diff toca la tubería web (guardia/contrato/YAML) → sus comprobaciones…" >&2
-            if ! eval "$light_cmd"; then
+            if ! run_battery "$light_cmd"; then
                 echo "" >&2
                 echo "❌ pre-push: la guardia de la tubería web está ROJA → push ABORTADO." >&2
                 return 1
@@ -803,7 +818,7 @@ run_web_stage() {
         save_outfitkit_pin || { drop_e2e_databases; return 1; }
     fi
     # The pin comes back in the EXIT trap (above): green, red or killed, one mechanism.
-    eval "$web_cmd" || web_rc=$?
+    run_battery "$web_cmd" || web_rc=$?
     drop_e2e_databases
     if [ "$web_rc" != 0 ]; then
         echo "" >&2
@@ -1506,7 +1521,7 @@ if [ "${HUB_GATE_DEPTH:-fast}" = fast ]; then
         fast_cmd="$fast_cmd && cargo clippy --workspace --all-targets --no-deps --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
     fi
     echo "⚡ pre-push: gate RÁPIDO (check + clippy) — la suite pesada corre en la PR (test-hub.yml, hub#1466)…" >&2
-    if ! eval "$fast_cmd"; then
+    if ! run_battery "$fast_cmd"; then
         echo "" >&2
         echo "❌ pre-push: el gate rápido es ROJO → push ABORTADO." >&2
         echo "   Compila y pasa clippy (mismos flags que la CI) y reintenta. Para correr además la suite entera aquí:" >&2
@@ -1524,7 +1539,7 @@ if [ "$SCOPE_MODE" = packages ]; then
 else
     echo "🧪 pre-push: running the whole Hub suite locally ($SCOPE_REASON)…" >&2
 fi
-if ! eval "$test_cmd"; then
+if ! run_battery "$test_cmd"; then
     echo "" >&2
     echo "❌ pre-push: the Hub suite is RED → push ABORTED." >&2
     echo "   Fix it and retry, or bypass with 'SKIP_HUB_TESTS=1 git push'." >&2

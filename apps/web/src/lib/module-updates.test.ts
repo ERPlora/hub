@@ -10,6 +10,8 @@ import {
   defaultVersion,
   pendingUpdate,
   shouldPickVersion,
+  updateAll,
+  updateAllTargets,
   updateLabel,
   type ModuleUpdateInfo,
 } from './module-updates';
@@ -90,5 +92,96 @@ describe('shouldPickVersion', () => {
 
   it('does NOT ask when there is nothing to choose', () => {
     expect(shouldPickVersion([])).toBe(false);
+  });
+});
+
+// hub#2331 — «Update all» in «My apps». It rides the SAME per-app update the row button uses
+// (`POST /api/modules/{id}/update`); what lives here is which apps enter the batch and how the batch
+// reports. The screen wiring is pinned by `views/AppsPage.update-all.hub2331.test.ts`.
+describe('updateAllTargets', () => {
+  const installed = [
+    { id: 'sales', name: 'Sales' },
+    { id: 'inventory', name: 'Inventory' },
+    { id: 'pinned', name: 'Pinned' },
+    { id: 'current', name: 'Current' },
+    { id: 'future', name: 'Future' },
+  ];
+  const updates = [
+    info({ module_id: 'inventory' }),
+    info({ module_id: 'sales' }),
+    // Pinned by support: the runtime reports no update → nothing offered.
+    info({ module_id: 'pinned', update_available: false, pinned: '1.1.1' }),
+    info({ module_id: 'current', update_available: false, latest: '1.1.1' }),
+    // Needs a newer ERPlora than this hub runs (hub#2082): the owner cannot apply it.
+    info({ module_id: 'future', latest_min_erplora_version: '9.0.0' }),
+  ];
+
+  it('takes every app the row would offer «Update» for, in the order of the list', () => {
+    expect(updateAllTargets(installed, updates, '1.4.0')).toEqual([
+      { id: 'sales', name: 'Sales' },
+      { id: 'inventory', name: 'Inventory' },
+    ]);
+  });
+
+  it('leaves out an update this hub is too old for', () => {
+    expect(updateAllTargets(installed, updates, '1.4.0').map((t) => t.id)).not.toContain('future');
+    // With a hub that meets the floor, it goes in.
+    expect(updateAllTargets(installed, updates, '9.0.0').map((t) => t.id)).toContain('future');
+  });
+
+  it('is empty when nothing has a new version', () => {
+    expect(updateAllTargets(installed, [], '1.4.0')).toEqual([]);
+  });
+});
+
+describe('updateAll', () => {
+  it('update_all_applies_every_offered_update_and_reports_each_result_hub1172', async () => {
+    const calls: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const boom = new Error('marketplace down');
+    const update = async (id: string) => {
+      calls.push(id);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 1));
+      inFlight -= 1;
+      if (id === 'inventory') throw boom;
+      if (id === 'kitchen') return { updated: false, from: '2.0.0', to: '2.0.0' };
+      return { updated: true, from: '1.0.0', to: '1.1.0' };
+    };
+    const steps: Array<[number, string]> = [];
+
+    const results = await updateAll(
+      [
+        { id: 'sales', name: 'Sales' },
+        { id: 'inventory', name: 'Inventory' },
+        { id: 'kitchen', name: 'Kitchen' },
+        { id: 'tables', name: 'Tables' },
+      ],
+      update,
+      (index, target) => steps.push([index, target.id]),
+    );
+
+    // Every one, one after another — a failure in the middle does not stop the rest.
+    expect(calls).toEqual(['sales', 'inventory', 'kitchen', 'tables']);
+    expect(maxInFlight).toBe(1);
+    expect(steps).toEqual([[0, 'sales'], [1, 'inventory'], [2, 'kitchen'], [3, 'tables']]);
+    expect(results).toEqual([
+      { id: 'sales', name: 'Sales', status: 'updated', from: '1.0.0', to: '1.1.0' },
+      { id: 'inventory', name: 'Inventory', status: 'failed', error: boom },
+      { id: 'kitchen', name: 'Kitchen', status: 'up_to_date' },
+      { id: 'tables', name: 'Tables', status: 'updated', from: '1.0.0', to: '1.1.0' },
+    ]);
+  });
+
+  it('with nothing to update, asks nothing', async () => {
+    let asked = 0;
+    const results = await updateAll([], async () => {
+      asked += 1;
+      return { updated: true, from: '1', to: '2' };
+    });
+    expect(results).toEqual([]);
+    expect(asked).toBe(0);
   });
 });

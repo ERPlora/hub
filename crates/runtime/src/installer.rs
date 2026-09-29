@@ -218,6 +218,10 @@ async fn register_module(
         }
     }
 
+    // hub#2359: the lists remember their column types per installed version, and from here on
+    // the schema may change under ANY of them (a list may read another module's table). Forgotten
+    // before migrating: nothing can ask again until this `&mut Registry` is released.
+    registry.list_column_kinds.forget_all();
     migrations::apply(db, dir, &manifest).await?;
 
     // Datos de REFERENCIA del módulo (ADR-0147): unidades de medida, categorías fiscales… lo que

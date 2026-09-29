@@ -17,6 +17,9 @@ export interface ErploraTransport {
 export interface MediaFetchOptions {
     signal?: AbortSignal;
 }
+export interface CommandOptions {
+    resolvesOutcome?: boolean;
+}
 export interface Notification {
     type: 'success' | 'error' | 'info' | 'warning';
     message: string;
@@ -27,6 +30,7 @@ export interface FormatMoneyOptions {
     maximumFractionDigits?: number;
 }
 export declare function dataTableLabels(locale?: string): Record<string, string>;
+export declare function dataTableShowsLoadError(): boolean;
 export interface RangeFilter {
     from?: unknown;
     to?: unknown;
@@ -193,6 +197,12 @@ export interface TauriBridge {
     }) => void): Promise<() => void>;
 }
 export declare const FLOWS_BASE_PATH = "/api/hub/flows";
+export declare const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = "/api/hub/flows/whatsapp-header-images";
+export interface WhatsappHeaderImage {
+    ref: string;
+    mime_type: 'image/jpeg' | 'image/png';
+    size: number;
+}
 export declare const EVENTS_BASE_PATH = "/api/hub/events";
 export declare const RELEASE_REVOKED = "flow.release_revoked";
 export declare const MODULE_HEADER = "X-Erplora-Module";
@@ -255,6 +265,7 @@ export declare class FlowsApi {
     putSecret(name: string, value: string): Promise<unknown>;
     deleteSecret(name: string): Promise<unknown>;
     schema(): Promise<FlowSchema>;
+    uploadWhatsappHeaderImage(file: Blob): Promise<WhatsappHeaderImage>;
     templates(): Promise<ModuleFlowTemplate[]>;
     templateDiscards(): Promise<FlowTemplateDiscard[]>;
     activateTemplate(family: string): Promise<Flow>;
@@ -501,8 +512,8 @@ export declare class ErploraClient {
     queryPage<T = unknown>(name: string, params?: ListParams): Promise<Page<T>>;
     queryAll<T = unknown>(name: string, params?: ListParams): Promise<T[]>;
     queryAllOptional<T = unknown>(name: string, params?: ListParams): Promise<T[] | undefined>;
-    command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
-    commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T | undefined>;
+    command<T = unknown>(name: string, payload?: Record<string, unknown>, opts?: CommandOptions): Promise<T>;
+    commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>, opts?: CommandOptions): Promise<T | undefined>;
     on(event: string, cb: (payload: unknown) => void): () => void;
     onEvent(event: string, cb: (payload: unknown, meta: EventMeta) => void): () => void;
     hasPermission(perm: string): boolean;

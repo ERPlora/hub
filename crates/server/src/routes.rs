@@ -429,6 +429,15 @@ pub fn app(state: AppState) -> Router {
             get(flows_api::list_flows).post(flows_api::create_flow),
         )
         .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        // The photo of a WhatsApp header, uploaded from a template step (hub#2335): a static
+        // segment like `runs`, so matchit resolves it ahead of `:id`. Same door as the flows; the
+        // image is read and vetted here (JPEG/PNG by its bytes, 5 MB), so the body limit is that
+        // cap plus the form around it.
+        .route(
+            "/api/hub/flows/whatsapp-header-images",
+            post(flows_header_media::upload_whatsapp_header_image)
+                .layer(flows_header_media::body_limit()),
+        )
         // `schema` is a static segment too (hub#716): the contract the editor builds its UI from,
         // served by the hub instead of copied into every module's bundle. It goes here for the
         // same reason as `runs` — matchit resolves the static segment ahead of `:id`, and

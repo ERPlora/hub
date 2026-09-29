@@ -7,3 +7,20 @@ body,
 #app {
   height: 100%;
 }
+
+/* In ios Ionic lays a title out `position: absolute` across the WHOLE toolbar and keeps it off the
+   buttons with a fixed `padding: 0 90px`. Tailwind's preflight (`padding: 0` on `*`, a document rule
+   that always beats a shadow `:host` rule) wipes that padding, so a long sheet title ran under the
+   «Cancel»/«Close» button (hub#2344, combos#29); and Ionic's 90px is no cure, it leaves an ordinary
+   title 164px on a 360px phone. So a sheet's title goes back into the toolbar's flex row, BETWEEN
+   the start and end buttons: centred in the room they leave and cut with «…» when it does not fit,
+   like native iOS sheets. 4px on top of the toolbar's own 12px lines a long title up with the
+   16px body.
+   Sheets only (`ion-modal`, where the modules' inline sheets land too): the shell's topbar keeps
+   Ionic's centring and deals with its own buttons (AppTopbar.vue). */
+@layer base {
+  ion-modal ion-title.ios {
+    position: relative;
+    padding-inline: 4px;
+  }
+}

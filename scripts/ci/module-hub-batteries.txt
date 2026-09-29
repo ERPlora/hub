@@ -86,6 +86,11 @@ inventory/tests/units.hub.test.py
 # ← invoice_e2e.rs (hub#1345)
 invoice/tests/create.hub.test.py
 invoice/tests/from_sale.hub.test.py
+# invoice: «Mark as paid» moves an issued invoice once; paid again, cancelled or unknown → the
+# translated refusal `invoice.cannot_mark_paid` (the command's `expect_rows`), against the real
+# kernel (invoice#109). New coverage, not moved.
+# pending-publication: invoice#123 until 2026-10-27
+invoice/tests/mark_paid.hub.test.py
 
 # ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
 services/tests/package_redeem.hub.test.py
@@ -213,3 +218,22 @@ services/tests/grant_race.hub.test.py
 # still wins, against the real kernel (cart_checkout#34). New coverage, not moved.
 # pending-publication: cart_checkout#35 until 2026-10-28
 cart_checkout/tests/cart_currency.hub.test.py
+# verifactu: the Events screen's search box narrows the audit log to the words typed — the message,
+# the type's code and the type's name as the screen paints it, in Spanish and in English — and the
+# list opens on the newest event, through the list engine of the real kernel (verifactu#140,
+# verifactu#144). New coverage, not moved.
+# pending-publication: verifactu#148 until 2026-10-28
+verifactu/tests/events_list.hub.test.py
+# cash_register: every home-screen widget, called the way the shell calls it (its `params`
+# verbatim), is answered by the real kernel — «Recent discrepancies» asked `sessions.list` for
+# `status` instead of `f_status` and got 422 `unknown_filter` on every load — and that panel lists
+# the last 8 CLOSED sessions, newest close first (cash_register#119). New coverage, not moved.
+# pending-publication: cash_register#120 until 2026-10-28
+cash_register/tests/widget_params.hub.test.py
+# payment_gateways: a deleted gateway frees its code — a new gateway is created under it, the list
+# shows only the new one, and a second LIVE gateway under that code is refused with
+# `payment_gateways.gateway_code_taken` through the manifest's `on_unique` without writing anything,
+# against the real kernel (payment_gateways#55, behaviour from payment_gateways#44). New coverage,
+# not moved.
+# pending-publication: payment_gateways#57 until 2026-10-28
+payment_gateways/tests/deleted_gateway_frees_its_code.hub.test.py
