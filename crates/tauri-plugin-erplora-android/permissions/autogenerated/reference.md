@@ -1,6 +1,6 @@
 ## Default Permission
 
-Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás y abrir la ficha de la app en los ajustes del sistema.
+Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás, abrir la ficha de la app en los ajustes del sistema y seguir a la escucha de avisos con la pantalla apagada.
 
 #### This default permission set includes the following:
 
@@ -8,6 +8,7 @@ Consultar y solicitar los permisos de runtime que el TPV necesita en Android, sa
 - `allow-request-permissions`
 - `allow-leave-app`
 - `allow-open-app-settings`
+- `allow-keep-listening`
 
 ## Permission Table
 
@@ -40,6 +41,32 @@ Enables the check_permissions command without any pre-configured scope.
 <td>
 
 Denies the check_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`erplora-android:allow-keep-listening`
+
+</td>
+<td>
+
+Enables the keep_listening command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`erplora-android:deny-keep-listening`
+
+</td>
+<td>
+
+Denies the keep_listening command without any pre-configured scope.
 
 </td>
 </tr>

@@ -78,4 +78,29 @@
         android:name="android.hardware.nfc"
         android:required="false" />
 
+    <!-- Hearing the next notice with the screen off (hub#2307). Android freezes a backgrounded
+         app within minutes (cached-app freezer, Doze), and the page that listens for new orders
+         and appointments freezes with it: the notice arrives when somebody wakes the tablet.
+         A foreground service is what keeps the process out of that state, the same way the
+         restaurant apps of the delivery platforms stay «online». Both permissions are install-time
+         `normal`: no dialog, so they stay OUT of `PermissionPolicy`; missing either one,
+         `startForeground` throws a SecurityException on Android 14+ (API 34). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application>
+        <!-- `specialUse` because none of the typed foreground services (dataSync, mediaPlayback,
+             …) describes «stay reachable for incoming orders»; Google Play asks for the subtype
+             below in the store declaration, and reviews it against what the notification says.
+             Not exported: no other app may start or stop it. -->
+        <service
+            android:name="com.erplora.android.NoticeListeningService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Point of sale that must hear new orders, bookings and messages while the screen is off; stops when the user signs out or closes the app." />
+        </service>
+    </application>
+
 </manifest>
