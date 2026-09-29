@@ -597,7 +597,7 @@ WEB_FILES="package.json pnpm-lock.yaml pnpm-workspace.yaml"
 # Disparan, sí, pero por el camino BARATO: lo que cambió es la guardia, no el navegador.
 # Meterlos en la lista de arriba haría que un comentario del YAML se llevara
 # `cargo build` + `vite build` + playwright, ~20-40 min por nada.
-WEB_LIGHT_FILES="scripts/tests/no-dead-packages.test.mjs scripts/tests/test-web-workflow.test.sh .github/workflows/test-web.yml scripts/tests/web-format.test.sh scripts/ci/merge-check-tree.sh scripts/tests/merge-check-tree.test.sh"
+WEB_LIGHT_FILES="scripts/tests/no-dead-packages.test.mjs scripts/tests/test-web-workflow.test.sh .github/workflows/test-web.yml scripts/tests/web-format.test.sh scripts/ci/merge-check-tree.sh scripts/tests/merge-check-tree.test.sh scripts/ci/install-published-outfitkit.sh scripts/tests/install-published-outfitkit.test.sh"
 # Si no hay base contra la que diffear no se sabe qué toca el cambio. Para Rust el gate ya se
 # ensancha al workspace; aquí igual —pero solo si este repo TIENE web: ensanchar en un repo sin
 # `apps/web` no protegería nada y rompería cualquier push (no hay `package.json` que instalar).
@@ -763,6 +763,7 @@ run_web_stage() {
                 light_cmd='node --test scripts/tests/no-dead-packages.test.mjs \
                     && bash scripts/tests/test-web-workflow.test.sh \
                     && bash scripts/tests/merge-check-tree.test.sh \
+                    && bash scripts/tests/install-published-outfitkit.test.sh \
                     && pnpm install --frozen-lockfile \
                     && bash scripts/tests/web-format.test.sh'
             fi
