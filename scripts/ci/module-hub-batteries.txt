@@ -237,6 +237,13 @@ cash_register/tests/widget_params.hub.test.py
 # not moved.
 # pending-publication: payment_gateways#57 until 2026-10-28
 payment_gateways/tests/deleted_gateway_frees_its_code.hub.test.py
+# taxes: a tax calculation the hub cannot read the rules for STOPS with `read_unavailable` — it never
+# answers `no_rate`, never charges 0 % with `allow_missing_rate` and never takes the rules the
+# caller sent in the payload — and recovers once the rules are readable again; the rules table is
+# made unreachable through `ERPLORA_HUB_PSQL`, against the real kernel (taxes#82). New coverage,
+# not moved.
+# pending-publication: taxes#83 until 2026-10-29
+taxes/tests/calculate_refuses_without_rules.hub.test.py
 # appointments: a series can only be CREATED with what it can be BOOKED with — `recurring.create`
 # without the professional, the customer or the service (absent, empty or null) is refused at the
 # door as `invalid_payload` naming the field, and the complete series is still created and booked,
