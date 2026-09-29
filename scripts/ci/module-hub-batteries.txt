@@ -129,6 +129,12 @@ verifactu/tests/desglose.hub.test.py
 # combos × sales × inventory: que un menú mueva el stock de sus COMPONENTES no lo afirmaba
 # ningún e2e del hub (inventory#73). Cobertura nueva, no mudada (inventory#77, v1.2.44).
 inventory/tests/combo_stock.hub.test.py
+# inventory: a stock decrease the hub cannot read the product's unit for STOPS with
+# `read_unavailable` — half a can sold by the whole unit is never let through and the stock is
+# not touched — and recovers once the unit is readable again; the unit table is made unreachable
+# through `ERPLORA_HUB_PSQL`, against the real kernel (inventory#125). New coverage, not moved.
+# pending-publication: inventory#128 until 2026-10-30
+inventory/tests/decrease_refuses_without_unit.hub.test.py
 
 # staff: un usuario del Hub cuelga de UNA sola ficha viva — el rechazo `staff.user_already_linked`,
 # el id que devuelve el alta y la guarda de rol tras pasar alta/edición a handler WASM, contra el
