@@ -38,6 +38,9 @@ fn main() {
             "erplora_remove_device",
             // Notificación del SO: el aviso cuando NADIE mira la pantalla (comanda a cocina).
             "erplora_notify",
+            // The tap the page was not there to hear (hub#2360): a click on the computer, or the
+            // tap that started the app on Android. The page claims it once.
+            "erplora_take_notice_tap",
             // La placa por el lector NFC del propio aparato (hub#988): el segundo origen de la
             // MISMA puerta que el lector-teclado.
             "erplora_nfc_read",

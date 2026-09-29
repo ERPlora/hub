@@ -22,6 +22,7 @@ use serde::Serialize;
 mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
 mod navigation;
+mod notice_tap;
 pub use navigation::{NavigationVerdict, navigation_verdict};
 mod native_print;
 pub use native_print::{
@@ -1930,28 +1931,65 @@ fn erplora_nfc_read(
 /// the notice on Android and iOS alike, and the page remembers which screen that id leads to. A
 /// page older than this shell sends none and the notice goes out under the plugin's own id.
 ///
+/// `path` is the screen itself (hub#2360), for the taps that do not reach the page that sent the
+/// notice: on the computer the shell shows the notice itself and keeps the click, and on Android it
+/// travels in `extra`, which comes back with a tap that has to start the app.
+///
 /// **Never fails upwards.** If the user denied the permission or the platform cannot show it, it is
 /// logged and life goes on: a notice that does not go out cannot bring down the order behind it.
 #[tauri::command]
-fn erplora_notify(app: tauri::AppHandle, title: String, body: String, id: Option<i64>) {
-    if let Err(e) = notice_builder(&app, &title, &body, id).show() {
+fn erplora_notify(app: tauri::AppHandle, title: String, body: String, id: Option<i64>, path: Option<String>) {
+    // The notification plugin shows a desktop notice and drops its handle: no click would come back.
+    #[cfg(desktop)]
+    notice_tap::show(app, title, body, notice_id(id).map(|id| notice_tap::NoticeTap { id, path }));
+    #[cfg(mobile)]
+    if let Err(e) = notice_builder(&app, &title, &body, id, path.as_deref()).show() {
         eprintln!("notify: the platform could not show «{title}» ({e}) — carrying on");
     }
 }
 
-/// The notice `erplora_notify` shows, under the page's id when the plugin can hold it.
+/// The notice `erplora_notify` shows, under the page's id when the plugin can hold it and with the
+/// screen it leads to when it names one.
+#[cfg_attr(desktop, allow(dead_code))]
 fn notice_builder<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     title: &str,
     body: &str,
     id: Option<i64>,
+    path: Option<&str>,
 ) -> tauri_plugin_notification::NotificationBuilder<R> {
     use tauri_plugin_notification::NotificationExt;
 
-    let builder = app.notification().builder().title(title).body(body);
-    match notice_id(id) {
-        Some(id) => builder.id(id),
-        None => builder,
+    let mut builder = app.notification().builder().title(title).body(body);
+    if let Some(id) = notice_id(id) {
+        builder = builder.id(id);
+    }
+    if let Some(path) = path {
+        builder = builder.extra("path", path);
+    }
+    builder
+}
+
+/// `erplora_take_notice_tap` — the tap the page was not there to hear (hub#2360), handed over once:
+/// a click on the computer, or the tap that started the app on Android. `null` when there is none.
+#[tauri::command]
+fn erplora_take_notice_tap(app: tauri::AppHandle) -> Option<serde_json::Value> {
+    take_notice_tap(&app)
+}
+
+fn take_notice_tap<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<serde_json::Value> {
+    use tauri::Manager;
+    use tauri_plugin_erplora_android::ErploraAndroidExt as _;
+
+    if let Some(tap) = app.state::<notice_tap::KeptNoticeTap>().take() {
+        return Some(tap.payload());
+    }
+    match app.erplora_android().take_notice_tap() {
+        Ok(tap) => tap.map(|tap| notice_tap::NoticeTap::from_launch(tap.id, tap.notification.as_deref()).payload()),
+        Err(e) => {
+            log::warn!("notice: the tap that started the app could not be read ({e})");
+            None
+        }
     }
 }
 
@@ -2054,6 +2092,8 @@ pub fn run() {
                 .unwrap_or_else(|| PathBuf::from(DEVICES_FILE));
             app.manage(build_peripherals_state(devices_path));
             app.manage(PrintDocuments::default());
+            // The notice tap the page was not there to hear, until it claims it (hub#2360).
+            app.manage(notice_tap::KeptNoticeTap::default());
             // Ventana única: onboarding del SaaS o el hub capturado (modo app).
             if let Err(e) = open_main_window(app, cache_dir) {
                 eprintln!("no se pudo crear la ventana principal: {e}");
@@ -2082,6 +2122,8 @@ pub fn run() {
             erplora_set_device_name,
             erplora_remove_device,
             erplora_notify,
+            // The tap the page was not there to hear (hub#2360).
+            erplora_take_notice_tap,
             // La placa por NFC (hub#988): la segunda vía de la MISMA puerta que el lector-teclado.
             erplora_nfc_read,
             // «Start on login» (hub#389): desktop-only in effect — on mobile they answer an
@@ -2120,11 +2162,63 @@ mod tests {
 
     /// The builder only shows its fields through `Debug`; that is what the tap is matched on.
     fn built_notice(id: Option<i64>) -> String {
+        built_notice_to(id, None)
+    }
+
+    fn built_notice_to(id: Option<i64>, path: Option<&str>) -> String {
         let app = tauri::test::mock_builder()
             .plugin(tauri_plugin_notification::init())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .expect("mock app");
-        format!("{:?}", notice_builder(app.handle(), "New booking", "Ana · 10:00", id))
+        format!("{:?}", notice_builder(app.handle(), "New booking", "Ana · 10:00", id, path))
+    }
+
+    // ── hub#2360: the screen travels with the notice ─────────────────────────────────────────────
+    //
+    // A tap that STARTS the app on Android reaches a page that never saw the notice go out, so its
+    // memory of ids is empty. The notice carries its screen in `extra`, which Android hands back
+    // with the tap.
+
+    #[test]
+    fn the_notice_carries_the_screen_its_tap_opens() {
+        let built = built_notice_to(Some(7), Some("/m/appointments"));
+        // On `extra` itself: the mock app's Debug also lists Tauri's own `path` plugin.
+        assert!(built.contains(r#"extra: {"path": String("/m/appointments")}"#), "{built}");
+    }
+
+    #[test]
+    fn a_notice_that_leads_nowhere_carries_no_screen() {
+        let built = built_notice_to(Some(7), None);
+        assert!(built.contains("extra: {}"), "{built}");
+    }
+
+    fn app_with_kept_tap() -> tauri::App<tauri::test::MockRuntime> {
+        use tauri::Manager;
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_erplora_android::init())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        app.manage(notice_tap::KeptNoticeTap::default());
+        app
+    }
+
+    #[test]
+    fn the_page_claims_the_kept_tap_once() {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        app.state::<notice_tap::KeptNoticeTap>()
+            .keep(notice_tap::NoticeTap { id: 5, path: Some("/m/kds".into()) });
+        assert_eq!(
+            take_notice_tap(app.handle()),
+            Some(serde_json::json!({ "notification": { "id": 5, "extra": { "path": "/m/kds" } } }))
+        );
+        assert_eq!(take_notice_tap(app.handle()), None);
+    }
+
+    #[test]
+    fn nothing_kept_is_nothing_to_claim() {
+        let app = app_with_kept_tap();
+        assert_eq!(take_notice_tap(app.handle()), None);
     }
 
     #[test]

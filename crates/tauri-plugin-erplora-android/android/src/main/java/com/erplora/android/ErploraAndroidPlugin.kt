@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.WebView
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -51,6 +52,47 @@ import java.io.File
     ]
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
+
+    /** The tap on a notice that started the app, until the page claims it (hub#2360). */
+    private var launchTap: NoticeLaunch.Tap? = null
+
+    /**
+     * hub#2360 — keeps the tap on a notice that STARTED the app. The notification plugin reports it
+     * as `actionPerformed` from its own `load`, before the page listens, and Tauri drops an event
+     * nobody is listening to: the tap opened the app on its first screen instead of the notice's.
+     * The intent is marked once kept, so a recreated activity does not keep the same tap again.
+     */
+    override fun load(webView: WebView) {
+        super.load(webView)
+        val intent = activity.intent ?: return
+        val tap = NoticeLaunch.tapOf(
+            intent.action,
+            intent.flags,
+            intent.getIntExtra(NoticeLaunch.ID_KEY, NoticeLaunch.NO_ID),
+            intent.getStringExtra(NoticeLaunch.USER_ACTION_KEY),
+            intent.getStringExtra(NoticeLaunch.NOTIFICATION_KEY),
+            intent.getBooleanExtra(NoticeLaunch.CLAIMED_KEY, false),
+        ) ?: return
+        launchTap = tap
+        intent.putExtra(NoticeLaunch.CLAIMED_KEY, true)
+    }
+
+    /** `take_notice_tap` (hub#2360) — hands the kept launch tap over, once: `{ tap: {id, notification} | null }`. */
+    @Command
+    fun takeNoticeTap(invoke: Invoke) {
+        val tap = launchTap
+        launchTap = null
+        val answer = JSObject()
+        if (tap == null) {
+            answer.put("tap", null as Any?)
+        } else {
+            val kept = JSObject()
+            kept.put("id", tap.id)
+            kept.put("notification", tap.notification)
+            answer.put("tap", kept)
+        }
+        invoke.resolve(answer)
+    }
 
     /**
      * `leave_app` (hub#1906) — the app goes to the background, which is what the system Back does
