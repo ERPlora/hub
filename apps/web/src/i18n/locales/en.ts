@@ -1041,6 +1041,8 @@ export default {
     updateAllSummary: '{updated} of {total} app updated. | {updated} of {total} apps updated.',
     updateAllUpToDate: 'Already on the latest version',
     updateAllRetry: 'Retry',
+    // hub#2366 — the check for new versions failed: not the same as «everything is up to date».
+    updatesCheckFailed: 'We could not check whether your apps have new versions. They may not be up to date.',
     // Some apps were updated: the page has to reload to run them (hub#935), once the owner has read
     // what failed.
     updateAllReload: 'Reload now',
