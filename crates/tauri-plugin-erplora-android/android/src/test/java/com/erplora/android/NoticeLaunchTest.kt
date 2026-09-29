@@ -17,45 +17,59 @@ class NoticeLaunchTest {
 
     private val json = """{"id":7,"title":"New booking","extra":{"path":"/m/appointments"}}"""
 
+    private fun launch(
+        action: String? = Intent.ACTION_MAIN,
+        flags: Int = 0,
+        id: Int = 7,
+        userAction: String? = "tap",
+        notification: String? = json,
+    ) = NoticeLaunch.Launch(action, flags, id, userAction, notification)
+
     @Test
     fun `a tap on a notice that starts the app is kept with its notice`() {
-        assertEquals(
-            NoticeLaunch.Tap(7, json),
-            NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, 7, "tap", json, claimed = false),
-        )
+        assertEquals(NoticeLaunch.Tap(7, json), NoticeLaunch.tapOf(launch(), lastKept = null))
     }
 
     @Test
     fun `a tap whose notice was not stored still opens the app`() {
-        assertEquals(NoticeLaunch.Tap(7, null), NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, 7, "tap", null, claimed = false))
+        assertEquals(NoticeLaunch.Tap(7, null), NoticeLaunch.tapOf(launch(notification = null), lastKept = null))
     }
 
     @Test
     fun `an ordinary launch is no tap`() {
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, NoticeLaunch.NO_ID, null, null, claimed = false))
+        assertNull(NoticeLaunch.tapOf(launch(id = NoticeLaunch.NO_ID, userAction = null, notification = null), lastKept = null))
         // No notice id, no notice to open — whatever else the intent carries.
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, NoticeLaunch.NO_ID, "tap", json, claimed = false))
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_VIEW, 0, 7, "tap", json, claimed = false))
+        assertNull(NoticeLaunch.tapOf(launch(id = NoticeLaunch.NO_ID), lastKept = null))
+        assertNull(NoticeLaunch.tapOf(launch(action = Intent.ACTION_VIEW), lastKept = null))
     }
 
     @Test
     fun `a button or a swipe is not a tap on the notice`() {
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, 7, "dismiss", json, claimed = false))
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, 7, "reply", json, claimed = false))
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, 7, null, json, claimed = false))
+        assertNull(NoticeLaunch.tapOf(launch(userAction = "dismiss"), lastKept = null))
+        assertNull(NoticeLaunch.tapOf(launch(userAction = "reply"), lastKept = null))
+        assertNull(NoticeLaunch.tapOf(launch(userAction = null), lastKept = null))
     }
 
     @Test
     fun `reopening the app from recents does not replay an old tap`() {
         // Android hands the ORIGINAL intent back when the app is relaunched from the recents list,
         // extras and all: without this the booking of this morning would open again every time.
-        assertNull(
-            NoticeLaunch.tapOf(Intent.ACTION_MAIN, Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY, 7, "tap", json, claimed = false),
-        )
+        assertNull(NoticeLaunch.tapOf(launch(flags = Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY), lastKept = null))
     }
 
     @Test
-    fun `a tap already kept is not kept again when the activity is recreated`() {
-        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, 7, "tap", json, claimed = true))
+    fun `the tap the task was born from is not kept again when the process comes back`() {
+        // The system killed the process and the person came back through the icon: the activity is
+        // restored with the intent the task started with — the old tap, extras and all, and none of
+        // the flags that say «from history». Only what was remembered outside the process stops it.
+        val first = NoticeLaunch.tapOf(launch(), lastKept = null)!!
+        assertNull(NoticeLaunch.tapOf(launch(flags = 0x34000000), lastKept = first.key))
+    }
+
+    @Test
+    fun `another notice that happens to reuse the id is still a tap`() {
+        // Ids restart from the clock at every boot, so two notices of two sessions may share one.
+        val old = NoticeLaunch.Tap(7, """{"id":7,"title":"Old order"}""")
+        assertEquals(NoticeLaunch.Tap(7, json), NoticeLaunch.tapOf(launch(), lastKept = old.key))
     }
 }

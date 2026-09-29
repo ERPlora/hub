@@ -16,9 +16,6 @@ object NoticeLaunch {
     const val USER_ACTION_KEY = "NotificationUserAction"
     const val NOTIFICATION_KEY = "LocalNotficationObject" // sic — the plugin's own spelling
 
-    /** Our mark on an intent whose tap was already kept, so a recreated activity keeps it once. */
-    const val CLAIMED_KEY = "com.erplora.noticeTapClaimed"
-
     /** The plugin's «no id on this intent». */
     const val NO_ID = Int.MIN_VALUE
 
@@ -26,12 +23,63 @@ object NoticeLaunch {
     private const val TAP = "tap"
 
     /** The notice's id and the JSON the plugin stored it as, whose `extra.path` is the screen. */
-    data class Tap(val id: Int, val notification: String?)
+    data class Tap(val id: Int, val notification: String?) {
+        /** What is remembered outside the process: the id alone is not enough, ids restart at every boot. */
+        val key: String get() = "$id:${notification?.hashCode() ?: 0}"
+    }
 
-    fun tapOf(action: String?, flags: Int, id: Int, userAction: String?, notification: String?, claimed: Boolean): Tap? {
-        if (action != Intent.ACTION_MAIN || id == NO_ID || userAction != TAP || claimed) return null
+    /** What an intent says about a notice, read off it once so the decision needs no device. */
+    data class Launch(val action: String?, val flags: Int, val id: Int, val userAction: String?, val notification: String?)
+
+    fun tapOf(launch: Launch, lastKept: String?): Tap? {
+        if (launch.action != Intent.ACTION_MAIN || launch.id == NO_ID || launch.userAction != TAP) return null
         // Relaunched from recents: Android hands back the ORIGINAL intent, extras and all.
-        if (flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
-        return Tap(id, notification)
+        if (launch.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
+        val tap = Tap(launch.id, launch.notification)
+        // Back through the icon after the system killed the process, the task's intent is still the
+        // tap it was born from, with none of the flags above: only what was remembered stops it.
+        return if (tap.key == lastKept) null else tap
+    }
+}
+
+/** Where the last kept tap is remembered, outside the process that kept it. */
+interface KeptTapMemory {
+    fun last(): String?
+    fun remember(key: String)
+}
+
+/**
+ * The tap the page was not there to hear (hub#2360), until it claims it. Once the page has claimed,
+ * it is listening: a tap is the notification plugin's to deliver (hub#2305) and is not kept, or the
+ * next boot of the page would open that screen a second time. A new page resets that.
+ */
+class NoticeTapBox(private val memory: KeptTapMemory) {
+    private var kept: NoticeLaunch.Tap? = null
+    private var claimed = false
+
+    /** A new page is loading, with the intent the activity was (re)created with. */
+    @Synchronized
+    fun pageLoading(launch: NoticeLaunch.Launch) {
+        claimed = false
+        keep(launch)
+    }
+
+    /** A tap delivered to a live activity — also when the system had killed its process. */
+    @Synchronized
+    fun newIntent(launch: NoticeLaunch.Launch) {
+        if (!claimed) keep(launch)
+    }
+
+    /** Hands the tap over, once; from now on the page is listening. */
+    @Synchronized
+    fun take(): NoticeLaunch.Tap? {
+        claimed = true
+        return kept.also { kept = null }
+    }
+
+    private fun keep(launch: NoticeLaunch.Launch) {
+        val tap = NoticeLaunch.tapOf(launch, memory.last()) ?: return
+        memory.remember(tap.key)
+        kept = tap
     }
 }

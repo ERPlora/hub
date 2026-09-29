@@ -78,7 +78,7 @@ fn the_page_and_the_shell_name_the_same_event_and_argument() {
     );
     // On the computer the plugin reports no click (hub#2360): the shell shows the notice itself.
     assert!(
-        shell.contains("notice_tap::show(app, title, body, "),
+        shell.contains("notice_tap::show(app, title, body, desktop_tap(id, path));"),
         "`erplora_notify` no longer shows the desktop notice itself: a click opens nothing"
     );
 }
@@ -111,6 +111,10 @@ fn the_page_claims_the_tap_the_shell_kept() {
 fn the_hub_pwa_may_claim_a_kept_tap() {
     let lib = read("src/lib.rs");
     assert!(lib.contains("fn erplora_take_notice_tap("), "the claim command is gone");
+    assert!(
+        lib.contains("launch_tap_payload(app.erplora_android().take_notice_tap())"),
+        "the claim no longer asks Kotlin for the tap that started the app"
+    );
     let handler = &lib[lib.find("generate_handler![").expect("generate_handler!")..];
     assert!(handler.contains("erplora_take_notice_tap"), "the claim command is not registered");
     assert!(
@@ -127,4 +131,19 @@ fn the_hub_pwa_may_claim_a_kept_tap() {
             "{other} may claim a notice tap it never sent"
         );
     }
+}
+
+#[test]
+fn a_tap_that_reaches_a_dead_process_is_kept_by_the_activity() {
+    // The system killed the process but kept the task: the activity is restored with its old
+    // launcher intent and the tap arrives through `onNewIntent` before the WebView — and so before
+    // any plugin — exists (rv-2411, measured on the emulator). Only the activity sees it.
+    let activity = read("gen/android/app/src/main/java/com/erplora/app/MainActivity.kt");
+    let hook = activity
+        .split("override fun onNewIntent(intent: Intent)")
+        .nth(1)
+        .expect("MainActivity does not hear a tap delivered to a restored activity");
+    let hook = hook.split("\n  }").next().unwrap_or_default();
+    assert!(hook.contains("super.onNewIntent(intent)"), "the plugins no longer get the new intent");
+    assert!(hook.contains("NoticeTaps.newIntent(this, intent)"), "the tap is not kept for the page");
 }

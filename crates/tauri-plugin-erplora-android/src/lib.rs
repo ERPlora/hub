@@ -1300,6 +1300,7 @@ mod tests {
 
     #[test]
     fn kotlin_keeps_the_launch_tap_and_hands_it_over_once_hub2360() {
+        const NOTICE_TAPS_KT: &str = include_str!("../android/src/main/java/com/erplora/android/NoticeTaps.kt");
         let production = LIB_RS.split("#[cfg(test)]").next().unwrap_or_default();
         assert!(
             production.contains("run_mobile_plugin::<NoticeTapAnswer>(\"takeNoticeTap\", Empty {})"),
@@ -1309,12 +1310,23 @@ mod tests {
         assert!(before.trim_end().ends_with("@Command"), "Kotlin takeNoticeTap is not a @Command");
         let command = PLUGIN_KT.split("fun takeNoticeTap(invoke: Invoke)").nth(1).expect("no Kotlin takeNoticeTap");
         let body = command.split("\n    }").next().unwrap_or_default();
-        assert!(body.contains("launchTap = null"), "takeNoticeTap hands the tap over but keeps it: it would open twice");
+        assert!(body.contains("NoticeTaps.take()"), "takeNoticeTap does not hand over the tap the box kept");
         let load = PLUGIN_KT.split("override fun load(webView: WebView)").nth(1).expect("Kotlin does not look at the launch");
         let load = load.split("\n    }").next().unwrap_or_default();
-        assert!(load.contains("activity.intent"), "load does not read the intent that started the app");
-        assert!(load.contains("NoticeLaunch.tapOf("), "load does not decide the tap through NoticeLaunch");
-        assert!(load.contains("NoticeLaunch.CLAIMED_KEY, true"), "load does not mark the tap kept: a recreated activity keeps it again");
+        assert!(
+            load.contains("NoticeTaps.pageLoading(activity, activity.intent)"),
+            "load does not hand the box the intent that started the app"
+        );
+        // The memory has to outlive the process: back through the icon after the system killed it,
+        // the task's intent is the old tap again (rv-2411).
+        assert!(
+            NOTICE_TAPS_KT.contains("NoticeTapBox(PreferencesMemory(context.applicationContext))"),
+            "the box no longer remembers the kept tap outside the process"
+        );
+        assert!(
+            NOTICE_TAPS_KT.contains("prefs.edit().putString(LAST_KEPT, key).apply()"),
+            "the kept tap is not written to the app's preferences"
+        );
     }
 }
 

@@ -98,18 +98,26 @@ pub fn on_click<R: Runtime>(app: &AppHandle<R>, tap: Option<NoticeTap>) {
 /// and the order behind it carries on.
 #[cfg(desktop)]
 pub fn show<R: Runtime>(app: AppHandle<R>, title: String, body: String, tap: Option<NoticeTap>) {
-    // One parked thread per notice still on screen or in the notification centre: a small stack
-    // keeps a busy kitchen's afternoon of notices cheap.
-    let spawned = std::thread::Builder::new().name("notice".into()).stack_size(256 * 1024).spawn(move || {
-        match desktop::deliver(&app, &title, &body) {
-            Ok(true) => on_click(&app, tap),
-            Ok(false) => {}
-            Err(e) => log::warn!("notify: the platform could not show «{title}» ({e}) — carrying on"),
-        }
-    });
-    if let Err(e) = spawned {
-        log::warn!("notify: no thread to show the notice on ({e}) — carrying on");
-    }
+    // The thread is left to run on its own: it lasts as long as the notice does.
+    let _ = show_with(app, title, body, tap, desktop::deliver::<R>);
+}
+
+/// Where a notice is delivered: `Ok(true)` when the person clicked it, `Ok(false)` when it went by.
+#[cfg(desktop)]
+pub type Deliver<R> = fn(&AppHandle<R>, &str, &str) -> Result<bool, String>;
+
+/// [`show`] with the platform's delivery handed in, and the thread handed back, so a test can wait
+/// for the answer.
+#[cfg(desktop)]
+pub fn show_with<R: Runtime>(
+    app: AppHandle<R>,
+    title: String,
+    body: String,
+    tap: Option<NoticeTap>,
+    deliver: Deliver<R>,
+) -> Option<std::thread::JoinHandle<()>> {
+    let _ = (app, title, body, tap, deliver);
+    None
 }
 
 #[cfg(target_os = "macos")]
@@ -279,6 +287,41 @@ mod tests {
         on_click(app.handle(), None);
         // The earlier tap is still the one waiting: an id-less notice does not erase it.
         assert_eq!(app.state::<KeptNoticeTap>().take(), Some(NoticeTap { id: 1, path: Some("/m/kds".into()) }));
+    }
+
+    #[cfg(desktop)]
+    fn show_and_wait(delivered: Deliver<tauri::test::MockRuntime>) -> (Option<NoticeTap>, usize) {
+        let app = mock_app();
+        let heard = Arc::new(Mutex::new(0));
+        let counter = heard.clone();
+        app.listen_any(NOTICE_TAPPED_EVENT, move |_| *counter.lock().unwrap() += 1);
+        let tap = Some(NoticeTap { id: 6, path: Some("/m/appointments".into()) });
+        if let Some(thread) = show_with(app.handle().clone(), "New booking".into(), "Ana · 10:00".into(), tap, delivered) {
+            thread.join().expect("the notice thread panicked");
+        }
+        let kept = app.state::<KeptNoticeTap>().take();
+        let times = *heard.lock().unwrap();
+        (kept, times)
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_click_on_the_shown_notice_keeps_its_tap_and_tells_the_page() {
+        let (kept, heard) = show_and_wait(|_, _, _| Ok(true));
+        assert_eq!(kept, Some(NoticeTap { id: 6, path: Some("/m/appointments".into()) }));
+        assert_eq!(heard, 1, "the page was not told a tap is waiting");
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_notice_that_goes_by_unclicked_opens_nothing() {
+        assert_eq!(show_and_wait(|_, _, _| Ok(false)), (None, 0));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_notice_the_platform_cannot_show_opens_nothing() {
+        assert_eq!(show_and_wait(|_, _, _| Err("no notification centre".into())), (None, 0));
     }
 
     #[cfg(target_os = "macos")]

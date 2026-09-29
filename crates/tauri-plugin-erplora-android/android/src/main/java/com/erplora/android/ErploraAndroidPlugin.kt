@@ -53,35 +53,22 @@ import java.io.File
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
 
-    /** The tap on a notice that started the app, until the page claims it (hub#2360). */
-    private var launchTap: NoticeLaunch.Tap? = null
-
     /**
-     * hub#2360 — keeps the tap on a notice that STARTED the app. The notification plugin reports it
-     * as `actionPerformed` from its own `load`, before the page listens, and Tauri drops an event
-     * nobody is listening to: the tap opened the app on its first screen instead of the notice's.
-     * The intent is marked once kept, so a recreated activity does not keep the same tap again.
+     * hub#2360 — a new page is loading: the tap that STARTED the app waits for it. The notification
+     * plugin reports that tap as `actionPerformed` from its own `load`, before the page listens, and
+     * Tauri drops an event nobody is listening to: the tap opened the app on its first screen
+     * instead of the notice's. A tap that reaches a dead process through `onNewIntent` is kept by
+     * `MainActivity` into the same box.
      */
     override fun load(webView: WebView) {
         super.load(webView)
-        val intent = activity.intent ?: return
-        val tap = NoticeLaunch.tapOf(
-            intent.action,
-            intent.flags,
-            intent.getIntExtra(NoticeLaunch.ID_KEY, NoticeLaunch.NO_ID),
-            intent.getStringExtra(NoticeLaunch.USER_ACTION_KEY),
-            intent.getStringExtra(NoticeLaunch.NOTIFICATION_KEY),
-            intent.getBooleanExtra(NoticeLaunch.CLAIMED_KEY, false),
-        ) ?: return
-        launchTap = tap
-        intent.putExtra(NoticeLaunch.CLAIMED_KEY, true)
+        NoticeTaps.pageLoading(activity, activity.intent)
     }
 
-    /** `take_notice_tap` (hub#2360) — hands the kept launch tap over, once: `{ tap: {id, notification} | null }`. */
+    /** `take_notice_tap` (hub#2360) — hands the kept tap over, once: `{ tap: {id, notification} | null }`. */
     @Command
     fun takeNoticeTap(invoke: Invoke) {
-        val tap = launchTap
-        launchTap = null
+        val tap = NoticeTaps.take()
         val answer = JSObject()
         if (tap == null) {
             answer.put("tap", null as Any?)

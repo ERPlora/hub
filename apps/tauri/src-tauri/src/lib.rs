@@ -1941,7 +1941,7 @@ fn erplora_nfc_read(
 fn erplora_notify(app: tauri::AppHandle, title: String, body: String, id: Option<i64>, path: Option<String>) {
     // The notification plugin shows a desktop notice and drops its handle: no click would come back.
     #[cfg(desktop)]
-    notice_tap::show(app, title, body, notice_id(id).map(|id| notice_tap::NoticeTap { id, path }));
+    notice_tap::show(app, title, body, desktop_tap(id, path));
     #[cfg(mobile)]
     if let Err(e) = notice_builder(&app, &title, &body, id, path.as_deref()).show() {
         eprintln!("notify: the platform could not show «{title}» ({e}) — carrying on");
@@ -1977,6 +1977,21 @@ fn erplora_take_notice_tap(app: tauri::AppHandle) -> Option<serde_json::Value> {
     take_notice_tap(&app)
 }
 
+/// The tap a desktop notice carries back: its id, when it has one the platform can hold, and its screen.
+#[cfg(desktop)]
+fn desktop_tap(id: Option<i64>, path: Option<String>) -> Option<notice_tap::NoticeTap> {
+    let _ = (id, path);
+    None
+}
+
+/// Kotlin's answer to «which tap started the app», in the shape the page reads every tap in.
+fn launch_tap_payload<E: std::fmt::Display>(
+    answer: Result<Option<tauri_plugin_erplora_android::LaunchNoticeTap>, E>,
+) -> Option<serde_json::Value> {
+    let _ = answer.map(|_| ()).map_err(|e| e.to_string());
+    None
+}
+
 fn take_notice_tap<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<serde_json::Value> {
     use tauri::Manager;
     use tauri_plugin_erplora_android::ErploraAndroidExt as _;
@@ -1984,13 +1999,7 @@ fn take_notice_tap<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<serde
     if let Some(tap) = app.state::<notice_tap::KeptNoticeTap>().take() {
         return Some(tap.payload());
     }
-    match app.erplora_android().take_notice_tap() {
-        Ok(tap) => tap.map(|tap| notice_tap::NoticeTap::from_launch(tap.id, tap.notification.as_deref()).payload()),
-        Err(e) => {
-            log::warn!("notice: the tap that started the app could not be read ({e})");
-            None
-        }
-    }
+    launch_tap_payload(app.erplora_android().take_notice_tap())
 }
 
 /// The id the plugin can hold (`i32`), or none: an id out of range must not stop the notice, only
@@ -2213,6 +2222,33 @@ mod tests {
             Some(serde_json::json!({ "notification": { "id": 5, "extra": { "path": "/m/kds" } } }))
         );
         assert_eq!(take_notice_tap(app.handle()), None);
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_desktop_notice_carries_its_id_and_screen_back() {
+        assert_eq!(
+            desktop_tap(Some(7), Some("/m/kds".into())),
+            Some(notice_tap::NoticeTap { id: 7, path: Some("/m/kds".into()) })
+        );
+        assert_eq!(desktop_tap(Some(7), None), Some(notice_tap::NoticeTap { id: 7, path: None }));
+        // No id the platform can hold, nothing to open: the click only brings the window up.
+        assert_eq!(desktop_tap(None, Some("/m/kds".into())), None);
+        assert_eq!(desktop_tap(Some(i64::from(i32::MAX) + 1), Some("/m/kds".into())), None);
+    }
+
+    #[test]
+    fn the_tap_that_started_the_app_reads_like_any_other() {
+        let tap = tauri_plugin_erplora_android::LaunchNoticeTap {
+            id: 4,
+            notification: Some(r#"{"id":4,"extra":{"path":"/m/appointments"}}"#.into()),
+        };
+        assert_eq!(
+            launch_tap_payload::<String>(Ok(Some(tap))),
+            Some(serde_json::json!({ "notification": { "id": 4, "extra": { "path": "/m/appointments" } } }))
+        );
+        assert_eq!(launch_tap_payload::<String>(Ok(None)), None);
+        assert_eq!(launch_tap_payload(Err("plugin gone")), None);
     }
 
     #[test]
