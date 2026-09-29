@@ -6,7 +6,7 @@
 // stable id it owns names the *hub*, and a header saying that would make every browser one device.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loginHeaders, setRuntimeClientKind } from './device';
+import { listenTauriPlugin, loginHeaders, setRuntimeClientKind } from './device';
 
 /** A browser profile with nothing written down yet: the identity is minted on first use. */
 function emptySiteStorage() {
@@ -71,5 +71,41 @@ describe('machine login headers', () => {
     vi.stubGlobal('localStorage', emptySiteStorage());
 
     await expect(loginHeaders()).resolves.toEqual({ 'X-Client-Type': 'hub' });
+  });
+});
+
+// hub#2305 — the tap on a system notice comes back as a PLUGIN event (`actionPerformed` of the
+// notification plugin), which `invoke` cannot hear. `withGlobalTauri` exposes the plugin listener
+// next to `invoke`, so the shell keeps its rule of no `@tauri-apps/api` dependency.
+describe('listening to a plugin event of the installed app', () => {
+  it('subscribes through the Tauri global and stops through the listener it got back', async () => {
+    const unregister = vi.fn(async () => {});
+    const addPluginListener = vi.fn(async () => ({ unregister }));
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn(), addPluginListener } } });
+    const cb = vi.fn();
+
+    const stop = await listenTauriPlugin('notification', 'actionPerformed', cb);
+
+    expect(addPluginListener).toHaveBeenCalledWith('notification', 'actionPerformed', cb);
+    expect(stop).toBeTypeOf('function');
+    stop!();
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('is null in a browser, and in a shell whose global has no plugin listener', async () => {
+    vi.stubGlobal('window', {});
+    await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).resolves.toBeNull();
+
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
+    await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).resolves.toBeNull();
+  });
+
+  it('a refused subscription reaches the caller, who decides what it means', async () => {
+    const addPluginListener = vi.fn(async () => {
+      throw new Error('notification.register_listener not allowed');
+    });
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn(), addPluginListener } } });
+
+    await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).rejects.toThrow('not allowed');
   });
 });

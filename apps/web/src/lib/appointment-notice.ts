@@ -19,9 +19,18 @@ export type AppointmentNoticeKind = 'created' | 'cancelled';
  */
 export const APPOINTMENT_NOTICE_MODULE = 'appointments';
 
+/**
+ * Where a tap on the notice leads (hub#2305): the module itself, which opens on its diary. Not a
+ * tab by name, so a module that renames its tabs still lands somewhere real.
+ */
+export const APPOINTMENT_NOTICE_PATH = `/m/${APPOINTMENT_NOTICE_MODULE}`;
+
 export interface AppointmentNoticeDeps {
-  /** Notification of the SYSTEM, the same door as the kitchen order's (`peripherals.notify`). */
-  notify: (title: string, body: string) => Promise<void>;
+  /**
+   * Notification of the SYSTEM, the same door as the kitchen order's. `path` is the screen a tap
+   * opens (hub#2305).
+   */
+  notify: (title: string, body: string, path?: string) => Promise<void>;
   /** The caller owns i18n (ADR-0055): this file only picks the key and its params. */
   t: (key: string, params?: Record<string, unknown>) => string;
 }
@@ -84,7 +93,7 @@ export async function onAppointmentEvent(
 
   // Best-effort, like the kitchen order's: a notice that cannot be shown must not break the
   // listener, and the booking or cancellation already happened either way.
-  await deps.notify(title, body).catch(() => {});
+  await deps.notify(title, body, APPOINTMENT_NOTICE_PATH).catch(() => {});
 }
 
 function appointmentIdOf(payload: unknown): string | undefined {

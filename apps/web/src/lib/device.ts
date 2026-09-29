@@ -138,6 +138,12 @@ export function browserDeviceId(): string | null {
 
 interface TauriCore {
   invoke?: (cmd: string, args?: unknown) => Promise<unknown>;
+  /** A mobile plugin's event (`@tauri-apps/api/core` → `addPluginListener`), same global. */
+  addPluginListener?: (
+    plugin: string,
+    event: string,
+    cb: (payload: unknown) => void,
+  ) => Promise<{ unregister: () => Promise<void> }>;
 }
 
 function tauriCore(): TauriCore | null {
@@ -164,6 +170,26 @@ export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>
   const core = tauriCore();
   if (!core?.invoke) return null;
   return (await core.invoke(cmd, args)) as T;
+}
+
+/**
+ * Listen to an event a PLUGIN of the installed app reports (hub#2305: the tap on a notice is the
+ * notification plugin's `actionPerformed`), through the same `window.__TAURI__` global.
+ *
+ * `null` when there is nothing to listen to — a browser, or a global without plugin listeners. A
+ * refused subscription (an app whose capabilities do not grant it) rejects: the caller decides.
+ */
+export async function listenTauriPlugin(
+  plugin: string,
+  event: string,
+  cb: (payload: unknown) => void,
+): Promise<(() => void) | null> {
+  const listen = tauriCore()?.addPluginListener;
+  if (!listen) return null;
+  const listener = await listen(plugin, event, cb);
+  return () => {
+    void listener.unregister().catch((e) => console.warn('[device] unregister', e));
+  };
 }
 
 /** The device identity of the Tauri shell, or `null` in a plain browser. */

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { bootPrintComanda, buildComandaGroups, comandaRoute, onKitchenOrderCreated } from './print-comanda';
+import {
+  bootPrintComanda,
+  buildComandaGroups,
+  comandaRoute,
+  KITCHEN_NOTICE_PATH,
+  onKitchenOrderCreated,
+} from './print-comanda';
+import { isNoticeTarget } from './notice-tap';
 import { CLIENT_INSTANCE } from './client-instance';
 import type { PrintRequest, PrintResult } from './print';
 import { createI18n } from 'vue-i18n';
@@ -200,6 +207,20 @@ describe('aviso al entrar una comanda', () => {
     const [titulo, cuerpo] = notify.mock.calls[0]!;
     expect(titulo).toContain('Mesa 4');
     expect(cuerpo).toContain('C-018');
+  });
+
+  // hub#2305: tapping «Kitchen order — Table 4» opens the kitchen (its first tab is the display),
+  // not the screen the tablet had been left on.
+  it('leads to the kitchen, on the device that prints it and on the one that does not', async () => {
+    const print = vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+    const notify = vi.fn<(t: string, b: string, path?: string) => Promise<void>>(async () => {});
+
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify, t });
+    await onKitchenOrderCreated(fakeClient(), { order_id: 'k-1' }, { print, notify, t }, 'elsewhere');
+
+    expect(KITCHEN_NOTICE_PATH).toBe('/m/kitchen');
+    expect(isNoticeTarget(KITCHEN_NOTICE_PATH)).toBe(true);
+    expect(notify.mock.calls.map((c) => c[2])).toEqual([KITCHEN_NOTICE_PATH, KITCHEN_NOTICE_PATH]);
   });
 
   it('AVISA aunque la comanda sea solo de pantalla — que es justo cuando más falta hace', async () => {

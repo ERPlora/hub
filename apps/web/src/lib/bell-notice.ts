@@ -14,8 +14,11 @@
 import { onBellCounterRise, type BellCounterRise } from './bell-counters';
 
 export interface BellNoticeDeps {
-  /** Notification of the SYSTEM, the same door as the kitchen order's (`peripherals.notify`). */
-  notify: (title: string, body: string) => Promise<void>;
+  /**
+   * Notification of the SYSTEM, the same door as the kitchen order's. `path` is the screen a tap
+   * opens (hub#2305).
+   */
+  notify: (title: string, body: string, path?: string) => Promise<void>;
   /** The caller owns i18n (ADR-0055): this file only picks the key and its params. */
   t: (key: string, params?: Record<string, unknown>) => string;
   /** Modules whose events the shell already turns into their own notice. */
@@ -33,8 +36,9 @@ export function bellNoticeFor(rise: BellCounterRise, t: BellNoticeDeps['t']): { 
 export async function onBellRise(rise: BellCounterRise, deps: BellNoticeDeps): Promise<void> {
   if (deps.ownNotice.has(rise.moduleId)) return;
   const { title, body } = bellNoticeFor(rise, deps.t);
-  // Best-effort, like the kitchen order's: the bell already shows it either way.
-  await deps.notify(title, body).catch(() => {});
+  // Best-effort, like the kitchen order's: the bell already shows it either way. A tap opens the
+  // same tab as the bell's row (hub#2305).
+  await deps.notify(title, body, rise.path).catch(() => {});
 }
 
 /** Starts the notices at shell boot. Returns the function that stops them. */

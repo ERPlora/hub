@@ -1917,27 +1917,48 @@ fn erplora_nfc_read(
         .map_err(nfc_shell_error)
 }
 
-/// `erplora_notify` — notificación del SISTEMA (la del SO, no un toast dentro de la app).
+/// `erplora_notify` — a SYSTEM notice (the OS one, not a toast inside the app).
 ///
-/// Para eso existe: avisar cuando **nadie está mirando la pantalla**. El caso que la motiva es la
-/// comanda — entra un pedido y cocina tiene que enterarse aunque la tablet esté en otra vista o
-/// bloqueada. Un toast de la app no sirve ahí.
+/// That is what it is for: warning when **nobody is looking at the screen**. The case behind it is
+/// the kitchen order — an order comes in and the kitchen has to find out even with the tablet on
+/// another view or locked. A toast inside the app does not reach anyone there.
 ///
-/// Lo expone el SHELL porque en Tauri el shell **es** el bridge (ADR-0050 §2.7); el binario suelto
-/// (retirado en hub#340) lo hacía con `notify_rust` para el caso «PWA en Chrome». El protocolo lo
-/// declaraba desde el principio (`Command::SendNotification`) y este era el lado que faltaba: sin
-/// él, ningún módulo podía avisar de nada desde la app.
+/// The SHELL exposes it because in Tauri the shell **is** the bridge (ADR-0050 §2.7); the
+/// standalone binary (retired in hub#340) did it with `notify_rust` for the «PWA in Chrome» case.
 ///
-/// **Nunca falla hacia arriba.** Si el usuario denegó el permiso o la plataforma no puede
-/// mostrarla, se registra y se sigue: una notificación que no sale no puede tumbar la comanda que
-/// la provocó.
+/// `id` is the handle of the tap (hub#2305): the notification plugin reports a tap with the id of
+/// the notice on Android and iOS alike, and the page remembers which screen that id leads to. A
+/// page older than this shell sends none and the notice goes out under the plugin's own id.
+///
+/// **Never fails upwards.** If the user denied the permission or the platform cannot show it, it is
+/// logged and life goes on: a notice that does not go out cannot bring down the order behind it.
 #[tauri::command]
-fn erplora_notify(app: tauri::AppHandle, title: String, body: String) {
+fn erplora_notify(app: tauri::AppHandle, title: String, body: String, id: Option<i64>) {
+    if let Err(e) = notice_builder(&app, &title, &body, id).show() {
+        eprintln!("notify: the platform could not show «{title}» ({e}) — carrying on");
+    }
+}
+
+/// The notice `erplora_notify` shows, under the page's id when the plugin can hold it.
+fn notice_builder<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    title: &str,
+    body: &str,
+    id: Option<i64>,
+) -> tauri_plugin_notification::NotificationBuilder<R> {
     use tauri_plugin_notification::NotificationExt;
 
-    if let Err(e) = app.notification().builder().title(&title).body(&body).show() {
-        eprintln!("notify: la plataforma no pudo mostrar «{title}» ({e}) — se sigue igualmente");
+    let builder = app.notification().builder().title(title).body(body);
+    match notice_id(id) {
+        Some(id) => builder.id(id),
+        None => builder,
     }
+}
+
+/// The id the plugin can hold (`i32`), or none: an id out of range must not stop the notice, only
+/// lose its tap's destination (hub#2305).
+fn notice_id(id: Option<i64>) -> Option<i32> {
+    id.and_then(|id| i32::try_from(id).ok())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2078,6 +2099,47 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#2305: the id a tap on a notice comes back with ───────────────────────────────────────
+    //
+    // The plugin takes an `i32`. An id the page sends out of that range must not stop the notice:
+    // it goes out under the plugin's own id, and only the tap loses its destination.
+
+    #[test]
+    fn a_notice_keeps_the_id_the_page_gave_it() {
+        assert_eq!(notice_id(Some(1_727_000_000)), Some(1_727_000_000));
+        assert_eq!(notice_id(Some(i64::from(i32::MIN))), Some(i32::MIN));
+        assert_eq!(notice_id(None), None);
+    }
+
+    #[test]
+    fn an_id_the_plugin_cannot_hold_still_lets_the_notice_out() {
+        assert_eq!(notice_id(Some(i64::from(i32::MAX) + 1)), None);
+        assert_eq!(notice_id(Some(i64::MIN)), None);
+    }
+
+    /// The builder only shows its fields through `Debug`; that is what the tap is matched on.
+    fn built_notice(id: Option<i64>) -> String {
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_notification::init())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        format!("{:?}", notice_builder(app.handle(), "New booking", "Ana · 10:00", id))
+    }
+
+    #[test]
+    fn the_notice_goes_out_under_the_id_its_tap_comes_back_with() {
+        let built = built_notice(Some(1_727_000_042));
+        assert!(built.contains("id: 1727000042"), "{built}");
+        assert!(built.contains("New booking") && built.contains("Ana · 10:00"), "{built}");
+    }
+
+    #[test]
+    fn a_notice_without_an_id_still_goes_out_with_its_words() {
+        let built = built_notice(None);
+        assert!(!built.contains("id: 1727000042"), "{built}");
+        assert!(built.contains("New booking") && built.contains("Ana · 10:00"), "{built}");
+    }
 
     // ── hub#1924: adding a printer by typing its address ─────────────────────────────────────────
     //
