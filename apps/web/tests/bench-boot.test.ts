@@ -14,6 +14,7 @@ import {
   BOOT_RELOAD_LIMIT,
   declaredTestDir,
   declaresTestMatch,
+  howToFetchAgain,
   isBootTransportFailure,
   listE2eSpecs,
   NETWORK_CHANGE_BUDGET_MS,
@@ -180,6 +181,24 @@ describe('nextBootStep', () => {
 // includes the rule that stops it reappearing in ANY new file). The recovery only reaches a spec
 // that takes `test` from the bench, so a spec that imports it straight from Playwright opts out of
 // it in silence — which is how this would come back a third time in a spec nobody has written yet.
+describe('howToFetchAgain', () => {
+  // hub#2296: Playwright rejects the `goto` of a document that died BEFORE Chromium commits
+  // `chrome-error://chromewebdata/`. Deciding by the URL alone picked a reload there, and the
+  // error page committing mid-reload detached it ("Not attached to an active page").
+  it('sends a document that died back to its URL even before the error page shows', () => {
+    expect(howToFetchAgain({ documentDied: true, onErrorPage: false })).toBe('navigate');
+  });
+
+  it('sends a page already on the error page back to its URL', () => {
+    expect(howToFetchAgain({ documentDied: false, onErrorPage: true })).toBe('navigate');
+    expect(howToFetchAgain({ documentDied: true, onErrorPage: true })).toBe('navigate');
+  });
+
+  it('reloads when only the modules died and the document stands', () => {
+    expect(howToFetchAgain({ documentDied: false, onErrorPage: false })).toBe('reload');
+  });
+});
+
 describe('every e2e spec takes its `test` from the bench', () => {
   // hub#1835: the directory is READ from the Playwright config, never retyped here. A copy is true
   // only while nobody moves the original, and moving it is one line two files away.

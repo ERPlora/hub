@@ -381,9 +381,34 @@ fi
 # library that breaks a hub screen went through with everything green. So both
 # jobs that verify the shell run the image's own resolution command, taken from the
 # Dockerfile (not retyped here), between the install and what they verify.
+#
+# hub#2304 — except the e2e of a PULL REQUEST. Its screenshots are compared with
+# baselines drawn with ONE OutfitKit, and `latest` there turned every web PR red
+# on each release that moved a pixel (0.1.80 on 24/09, 0.1.109 on 28/09) until
+# someone redrew the photo. A PR's e2e installs the version the baselines were
+# drawn with (`apps/web/tests/e2e/baselines-outfitkit.txt`), so it only measures
+# the PR's own diff; `verify` and every non-PR e2e (push to develop/main, the
+# nightly cron) keep the image's `latest`, and THOSE are the runs a release turns
+# red — with the develop alert issue, not on somebody else's PR.
 dockerfile="$repo_root/docker/Dockerfile"
+baselines_outfitkit="$repo_root/apps/web/tests/e2e/baselines-outfitkit.txt"
+baselines_outfitkit_rel="apps/web/tests/e2e/baselines-outfitkit.txt"
 # awk reads the FILE and stops at the first match: no pipe into a reader that cuts (hub#1534).
 image_resolution=$(awk 'match($0, /pnpm --filter @erplora\/web add @erplora\/outfitkit@[^[:space:]"]+/) { print substr($0, RSTART, RLENGTH); exit }' "$dockerfile")
+pin_resolution='pnpm --filter @erplora/web add "@erplora/outfitkit@${HUB_BENCH_OUTFITKIT}"'
+
+# The step of a job block (from its `- name:` to the next one) whose non-comment lines contain $2.
+step_with() { # $1 = job block, $2 = fixed string
+    awk -v needle="$2" '
+        /^      - / { if (found) exit; buf = $0; if (index($0, needle)) found = 1; next }
+        { buf = buf "\n" $0; if (index($0, needle) && !/^[[:space:]]*#/) found = 1 }
+        END { if (found) print buf }
+    ' <<<"$1"
+}
+line_of() { # $1 = block, $2 = fixed string → first non-comment line number
+    awk -v cmd="$2" 'index($0, cmd) && !/^[[:space:]]*#/ {print NR; exit}' <<<"$1"
+}
+
 if [ -z "$image_resolution" ]; then
     bad "la imagen resuelve OutfitKit con un comando reconocible (hub#1793)" \
         "no encuentro \`pnpm --filter @erplora/web add @erplora/outfitkit@…\` en docker/Dockerfile: si la imagen cambió de forma de resolverla, este control y los jobs de test-web.yml tienen que seguirla"
@@ -393,7 +418,7 @@ else
         verifies=${pair#*:}
         block=$(job_block "$job")
         install_at=$(awk '/pnpm install --frozen-lockfile/ {print NR; exit}' <<<"$block")
-        resolve_at=$(awk -v cmd="$image_resolution" 'index($0, cmd) && !/^[[:space:]]*#/ {print NR; exit}' <<<"$block")
+        resolve_at=$(line_of "$block" "$image_resolution")
         verify_at=$(awk -v cmd="$verifies" 'index($0, "run:") && index($0, cmd) {print NR; exit}' <<<"$block")
         if [ -z "$resolve_at" ]; then
             bad "el job \`$job\` verifica la OutfitKit que publica la imagen (hub#1793)" \
@@ -405,6 +430,77 @@ else
             ok "el job \`$job\` verifica la OutfitKit que publica la imagen (hub#1793)"
         fi
     done
+
+    verify_step=$(step_with "$(job_block verify)" "$image_resolution")
+    if grep -qF 'if:' <<<"$verify_step"; then
+        bad "\`verify\` resuelve la OutfitKit de la imagen en TODOS los eventos (hub#2304)" \
+            "el paso lleva un \`if:\`: vue-tsc y vitest de una PR comprobarían otra OutfitKit que la que sale en la imagen"
+    else
+        ok "\`verify\` resuelve la OutfitKit de la imagen en TODOS los eventos (hub#2304)"
+    fi
+
+    e2e_block=$(job_block e2e)
+    image_step=$(step_with "$e2e_block" "$image_resolution")
+    pin_step=$(step_with "$e2e_block" "$pin_resolution")
+    if ! grep -qF "if: \${{ github.event_name != 'pull_request' }}" <<<"$image_step"; then
+        bad "el e2e resuelve \`latest\` solo FUERA de las PRs (hub#2304)" \
+            "el paso de \`$image_resolution\` del job e2e no lleva \`if: \${{ github.event_name != 'pull_request' }}\`: cada release de OutfitKit que mueve un píxel vuelve a tumbar las PRs ajenas"
+    else
+        ok "el e2e resuelve \`latest\` solo FUERA de las PRs (hub#2304)"
+    fi
+    if [ -z "$pin_step" ]; then
+        bad "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)" \
+            "falta un paso con \`$pin_resolution\` en el job e2e"
+    elif ! grep -qF "if: \${{ github.event_name == 'pull_request' }}" <<<"$pin_step"; then
+        bad "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)" \
+            "el paso fijado no lleva \`if: \${{ github.event_name == 'pull_request' }}\`: develop y el cron dejarían de probar lo que publica la imagen"
+    elif ! grep -qF "$baselines_outfitkit_rel" <<<"$pin_step" || ! grep -qF 'HUB_BENCH_OUTFITKIT=' <<<"$pin_step" || ! grep -qF 'GITHUB_ENV' <<<"$pin_step"; then
+        bad "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)" \
+            "el paso fijado tiene que leer \`$baselines_outfitkit_rel\` y exportar HUB_BENCH_OUTFITKIT a \$GITHUB_ENV (la guarda del banco lo necesita para no exigir \`latest\`)"
+    else
+        ok "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)"
+    fi
+    install_at=$(awk '/pnpm install --frozen-lockfile/ {print NR; exit}' <<<"$e2e_block")
+    pin_at=$(line_of "$e2e_block" "$pin_resolution")
+    build_at=$(line_of "$e2e_block" 'vite build')
+    if [ -z "$pin_at" ] || [ -z "$install_at" ] || [ -z "$build_at" ] || [ "$pin_at" -le "$install_at" ] || [ "$pin_at" -ge "$build_at" ]; then
+        bad "la OutfitKit de las capturas se instala ENTRE el install y el build del shell (hub#2304)" \
+            "orden encontrado — install: ${install_at:-?}, fijada: ${pin_at:-?}, vite build: ${build_at:-?}"
+    else
+        ok "la OutfitKit de las capturas se instala ENTRE el install y el build del shell (hub#2304)"
+    fi
+fi
+
+# The pin itself: one exact published-looking version, nothing a `pnpm add` could widen.
+pinned_version=""
+[ -f "$baselines_outfitkit" ] && pinned_version=$(<"$baselines_outfitkit")
+if [[ "$pinned_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    ok "\`$baselines_outfitkit_rel\` fija una versión exacta ($pinned_version) (hub#2304)"
+else
+    bad "\`$baselines_outfitkit_rel\` fija una versión exacta (hub#2304)" \
+        "contenido: '${pinned_version}' — tiene que ser X.Y.Z, la OutfitKit con la que se dibujaron las capturas"
+fi
+
+# Redrawing the baselines by the book must also move the pin, or the next PR compares new photos
+# with the old OutfitKit. The dispatch path writes the version it drew with and uploads it with them.
+record_step=$(step_with "$(job_block e2e)" "> $baselines_outfitkit_rel")
+upload_step=$(step_with "$(job_block e2e)" 'name: playwright-baselines')
+if ! grep -qF "update_baselines == 'true'" <<<"$record_step"; then
+    bad "regenerar capturas reescribe \`$baselines_outfitkit_rel\` (hub#2304)" \
+        "no hay un paso de la vía update_baselines que escriba la OutfitKit instalada en el fichero"
+elif ! grep -qF "$baselines_outfitkit_rel" <<<"$upload_step"; then
+    bad "regenerar capturas reescribe \`$baselines_outfitkit_rel\` (hub#2304)" \
+        "el artefacto \`playwright-baselines\` no lleva el fichero: se commitearían PNG nuevos con la versión vieja"
+else
+    ok "regenerar capturas reescribe \`$baselines_outfitkit_rel\` y lo sube con los PNG (hub#2304)"
+fi
+
+# The develop alert is where a release that moves pixels now lands: it has to say how to fix it.
+if grep -qF "$baselines_outfitkit_rel" <<<"$(job_block alert-develop)"; then
+    ok "la alerta de develop explica el rojo de una release de OutfitKit (hub#2304)"
+else
+    bad "la alerta de develop explica el rojo de una release de OutfitKit (hub#2304)" \
+        "el cuerpo de la issue no nombra \`$baselines_outfitkit_rel\`: quien la lea no sabe que hay que redibujar y mover el fichero"
 fi
 
 # ── 13. The merge-time check of the MERGED tree (ERPlora/pm#331) ─────────────

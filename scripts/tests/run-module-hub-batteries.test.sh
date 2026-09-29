@@ -78,6 +78,7 @@ make_module() { # $1=catalogue, $2=id, rest=battery relative paths
             printf 'import os, sys\n'
             printf 'print("battery %s of %s at", os.environ.get("ERPLORA_HUB_BASE_URL"))\n' "$rel" "$id"
             printf 'open(os.environ["BATTERY_LOG"], "a").write("%s/%s %%s\\n" %% os.environ.get("ERPLORA_HUB_BASE_URL"))\n' "$id" "$rel"
+            printf 'open(os.environ["PSQL_LOG"], "a").write("%s/%s\\t%%s\\n" %% os.environ.get("ERPLORA_HUB_PSQL", "<unset>"))\n' "$id" "$rel"
             printf 'sys.exit(int(os.environ.get("BATTERY_EXIT_%s", "0")))\n' "$(printf '%s' "$id" | tr '[:lower:]-' '[:upper:]_')"
         } > "$catalogue/$id/$rel"
     done
@@ -158,6 +159,7 @@ run_runner() { # rest=extra args; env: INSTALLED, BATTERY_EXIT_*
     : > "$tmp_dir/boot.log"
     : > "$tmp_dir/db.log"
     : > "$tmp_dir/battery.log"
+    : > "$tmp_dir/psql.log"
     local stdout_file="$tmp_dir/stdout" stderr_file="$tmp_dir/stderr"
     # Under a watchdog when one is available, and with stdin CLOSED. Case 9 hands the runner a
     # database admin that reads stdin the way `docker exec -i` does: a runner that lets it reach
@@ -165,6 +167,7 @@ run_runner() { # rest=extra args; env: INSTALLED, BATTERY_EXIT_*
     BOOT_LOG="$tmp_dir/boot.log" \
     DB_LOG="$tmp_dir/db.log" \
     BATTERY_LOG="$tmp_dir/battery.log" \
+    PSQL_LOG="$tmp_dir/psql.log" \
         $watchdog "${RUNNER_BASH:-bash}" "$script" \
             --catalogue "$catalogue" \
             --manifest "$manifest" \
@@ -332,6 +335,47 @@ $(grep -n -m3 'unbound variable' <<<"$err")"
 ok
 ran=$(grep -c . "$tmp_dir/battery.log")
 [ "$ran" -eq 3 ] || fail "10: $ran of 3 batteries ran under $strict_bash"
+ok
+
+# ── 11 · Every battery is handed the SQL session of ITS hub's database (module-toolkit#405) ─
+# A battery that has to hold a transaction open in the hub's database (the voucher race of
+# `services/tests/grant_race.hub.test.py`) used to find it with `docker ps` — the container that
+# publishes the hub's port. That exists under `erplora test --against-hub` and NOT here, where the
+# hub is a native server on a scratch database of the job's container: `found []`, and a hub
+# release went red for a module with no fault (services#130). The contract is ONE variable,
+# `ERPLORA_HUB_PSQL`, set by both harnesses with the same shape: the admin psql command plus
+# `-d <the database THIS module's hub was booted on>`.
+INSTALLED=alpha,beta run_runner
+[ "$rc" -eq 0 ] || fail "11: the happy path must stay green, got $rc"
+ok
+while IFS=$'\t' read -r battery psql; do
+    module=${battery%%/*}
+    booted_db=$(awk -v m="_${module}_" '{ n = split($1, p, "/"); if (index(p[n], m)) print p[n] }' "$tmp_dir/boot.log")
+    [ -n "$booted_db" ] || fail "11: no hub of $module booted on a database of its own"
+    [ "$psql" = "$db_admin -d $booted_db" ] \
+        || fail "11: $battery got ERPLORA_HUB_PSQL='$psql', expected '$db_admin -d $booted_db' (the database its hub writes to)"
+done < "$tmp_dir/psql.log"
+[ "$(grep -c . "$tmp_dir/psql.log")" -eq 3 ] || fail "11: not every battery reported its ERPLORA_HUB_PSQL"
+ok
+
+# 11b · With `--pg-container` (what the hub's CI passes) the session is word for word the shape the
+# toolkit's `hubPsqlCommand` builds under `--against-hub`:
+# `docker exec -i <container> psql -U <user> -v ON_ERROR_STOP=1 -d <database>`. A fake `docker`
+# on PATH records the admin calls instead of reaching a daemon.
+fake_bin="$tmp_dir/bin"
+mkdir -p "$fake_bin"
+cat > "$fake_bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DB_LOG"
+DOCKER
+chmod +x "$fake_bin/docker"
+PATH="$fake_bin:$PATH" INSTALLED=alpha,beta run_runner --db-admin-cmd '' --pg-container ci-pg --pg-user erplora
+[ "$rc" -eq 0 ] || fail "11b: the happy path with --pg-container must be green, got $rc"
+ok
+beta_db=$(awk '{ n = split($1, p, "/"); if (index(p[n], "_beta_")) print p[n] }' "$tmp_dir/boot.log")
+got=$(awk -F'\t' '$1 == "beta/tests/only.hub.test.py" { print $2 }' "$tmp_dir/psql.log")
+[ "$got" = "docker exec -i ci-pg psql -U erplora -v ON_ERROR_STOP=1 -d $beta_db" ] \
+    || fail "11b: ERPLORA_HUB_PSQL is '$got', not the toolkit's shape for ci-pg/$beta_db"
 ok
 
 printf 'run-module-hub-batteries.test.sh: %s checks passed\n' "$passed"

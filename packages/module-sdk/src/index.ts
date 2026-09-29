@@ -61,6 +61,21 @@ export interface MediaFetchOptions {
 }
 
 /**
+ * Per-call options of {@link ErploraClient.command} and {@link ErploraClient.commandOptional}.
+ */
+export interface CommandOptions {
+  /**
+   * The calling screen resolves an unknown outcome ITSELF (hub#2375) — it probes the hub once it is
+   * back (an idempotency key, a status read) and tells the person what happened. Then the shell's
+   * default net (the red «we can't tell — check before trying again» toast of hub#906) would say
+   * the opposite of the screen at the same time, so it is skipped for THIS call. The caller still
+   * gets the same {@link UnknownOutcomeError}: it is what tells the screen to probe. Default
+   * `false`: a module that says nothing keeps the net.
+   */
+  resolvesOutcome?: boolean;
+}
+
+/**
  * Convierte la referencia portable guardada en BD/blueprint en la única ruta REST que un módulo
  * puede pedir. No es un proxy: rechaza orígenes, endpoints distintos, parámetros extra y
  * traversal antes de que `fetch` vea la cadena.
@@ -133,6 +148,7 @@ const DATA_TABLE_LABELS_ES = {
   noValues: 'Sin valores', selectAll: 'Seleccionar todo', selectRow: 'Seleccionar fila',
   select: 'Seleccionar', showing: 'Mostrando {from}–{to} de',
   recordSingular: 'registro', recordPlural: 'registros',
+  loadError: 'No se han podido cargar los datos', retry: 'Reintentar',
 } as const;
 
 const DATA_TABLE_LABELS_EN = {
@@ -147,10 +163,24 @@ const DATA_TABLE_LABELS_EN = {
   noValues: 'No values', selectAll: 'Select all', selectRow: 'Select row',
   select: 'Select', showing: 'Showing {from}–{to} of',
   recordSingular: 'record', recordPlural: 'records',
+  loadError: "Couldn't load the data", retry: 'Retry',
 } as const;
 
 export function dataTableLabels(locale = 'es'): Record<string, string> {
   return locale.toLowerCase().startsWith('en') ? DATA_TABLE_LABELS_EN : DATA_TABLE_LABELS_ES;
+}
+
+/**
+ * Whether the shell's `<ok-data-table>` paints a failed load itself (`error` + Retry, OutfitKit ≥
+ * 0.1.113, pm#530). A module paints with the SHELL's OutfitKit (ADR-0451), and a hub on an older
+ * image has a table without that state: there the module keeps its own banner, or the reason of
+ * the failure would be shown nowhere. Where the table does paint it, the banner is a duplicate.
+ */
+export function dataTableShowsLoadError(): boolean {
+  const registry = (globalThis as { customElements?: { get(tag: string): { prototype: object } | undefined } })
+    .customElements;
+  const table = registry?.get('ok-data-table');
+  return !!table && 'error' in table.prototype;
 }
 
 // ── Queries de lista (paginadas) — contrato del motor de listas del runtime (§4, §8.2) ──────
@@ -358,7 +388,10 @@ export class ListController<T = Record<string, unknown>> {
       if (mySeq !== this.seq) return;
       this.rows = [];
       this.total = 0;
-      this.error = e instanceof Error ? e.message : 'Error cargando datos';
+      // Never blank: a blank `error` is «no error» for the table, which would go back to
+      // «No customers» + «0 records» over a hub that did not answer (pm#530).
+      const reason = e instanceof Error ? e.message.trim() : '';
+      this.error = reason || listLoadFailedMessage(activeLocale());
     } finally {
       if (mySeq === this.seq) {
         this.loading = false;
@@ -446,6 +479,14 @@ function scaleFilterValue(value: unknown, scale: (n: number) => number): unknown
     );
   }
   return scaleFilterEdge(value, scale);
+}
+
+const LIST_LOAD_FAILED_EN = 'The hub did not return the data.';
+const LIST_LOAD_FAILED_ES = 'El hub no ha devuelto los datos.';
+
+/** The reason of a failed load that came without one (same locale rule as {@link dataTableLabels}). */
+function listLoadFailedMessage(locale: string): string {
+  return locale.toLowerCase().startsWith('en') ? LIST_LOAD_FAILED_EN : LIST_LOAD_FAILED_ES;
 }
 
 /** Fábrica del controlador de lista (azúcar sobre `new ListController`). */
@@ -578,15 +619,71 @@ export const SERVER_UNAVAILABLE = 'server_unavailable';
  * The honest sentence, per locale (en is the source, es the translation — ADR-0055). Localized
  * HERE, like `dataTableLabels`, because this error's `message` is what modules and the shell's
  * toast show verbatim; a technical English line in front of a cashier is the failure being fixed.
+ *
+ * It says only what holds for ANY command (hub#2342): the same sentence answers saving a flow, a
+ * template or the certificate, so a tail about charges and Sales would mislead there. The charge
+ * guidance lives in the charge flow itself — the POS of `sales` renders its own «we can't tell
+ * whether it charged» panel with a link to Sales (sales#91).
  */
-const COMMAND_VERDICT_EN =
-  "We can't tell whether the operation completed. Check the result before trying again — for a charge, check Sales before charging again.";
-const COMMAND_VERDICT_ES =
-  'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar — si era un cobro, comprueba en Ventas antes de volver a cobrar.';
+const COMMAND_VERDICT_EN = "We can't tell whether the operation completed. Check the result before trying again.";
+const COMMAND_VERDICT_ES = 'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar.';
 
 /** The unknown-outcome sentence for `locale` (same resolution rule as {@link dataTableLabels}). */
 export function commandVerdictMessage(locale = 'es'): string {
   return locale.toLowerCase().startsWith('en') ? COMMAND_VERDICT_EN : COMMAND_VERDICT_ES;
+}
+
+// ── hub#2288: a READ the hub never answered ──────────────────────────────────────────────────
+//
+// A query that failed did nothing, so there is no verdict to give — only what happened and what
+// to do: the screen could not load its data, and trying again is safe. Localized here for the same
+// reason as the command verdict: modules and the list controller paint `message` verbatim.
+const READ_UNREACHABLE_EN =
+  'The data could not be loaded because the hub is not responding. Check the connection and try again.';
+const READ_UNREACHABLE_ES =
+  'No se han podido cargar los datos porque el hub no responde. Comprueba la conexión e inténtalo de nuevo.';
+
+/**
+ * The error a read gets when its transport failed: {@link SERVER_UNAVAILABLE} as before (hub#782),
+ * the sentence a person may read as `message`, and the transport's technical line on `cause`.
+ * Anything else — a domain refusal, `module_not_installed` — passes through untouched.
+ */
+function unreachableRead(e: unknown, locale: string): unknown {
+  if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) return e;
+  const sentence = locale.toLowerCase().startsWith('en') ? READ_UNREACHABLE_EN : READ_UNREACHABLE_ES;
+  const read = new ErploraError(SERVER_UNAVAILABLE, sentence);
+  read.cause = e;
+  return read;
+}
+
+/**
+ * The error a command gets when its transport failed (hub#906): the unknown-outcome verdict, with
+ * the transport's technical line on `cause`, and the shell's notifier told once as the default net.
+ * Anything else — a domain refusal, `module_not_installed` — passes through untouched.
+ */
+function unknownOutcome(e: unknown, locale: string, notifier?: (n: Notification) => void): unknown {
+  if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) return e;
+  const verdict = new UnknownOutcomeError(commandVerdictMessage(locale), e);
+  notifier?.({ type: 'error', message: verdict.message });
+  return verdict;
+}
+
+/**
+ * A call on the core's REST surface the hub never answered. A `GET` is a read like any query — the
+ * flow gallery and the templates tab load through it — so it gets the read sentence (hub#2288). A
+ * write (saving a flow, registering a template, uploading the certificate, retrying a print job)
+ * may have committed before the answer was lost, exactly like a command, so it gets the command
+ * verdict (hub#2320): «could not be loaded» would be a lie there.
+ */
+function coreCall<R>(
+  request: Promise<R>,
+  method: string,
+  locale: string,
+  notifier?: (n: Notification) => void,
+): Promise<R> {
+  return request.catch((e: unknown) => {
+    throw method === 'GET' ? unreachableRead(e, locale) : unknownOutcome(e, locale, notifier);
+  });
 }
 
 /**
@@ -1569,6 +1666,22 @@ export interface TauriBridge {
 /** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
 export const FLOWS_BASE_PATH = '/api/hub/flows';
 
+/** Where the photo a WhatsApp template step sends in its header goes up — the one path
+ *  {@link FlowsApi.uploadWhatsappHeaderImage} posts to (`crates/server/src/flows_header_media.rs`,
+ *  hub#2335). */
+export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header-images';
+
+/**
+ * What {@link FlowsApi.uploadWhatsappHeaderImage} answers. `ref` is what the step stores in
+ * `vars.header_image`; the hub signs a fresh link to it on every send. `mime_type` is decided by
+ * the photo's BYTES, never by its name.
+ */
+export interface WhatsappHeaderImage {
+  ref: string;
+  mime_type: 'image/jpeg' | 'image/png';
+  size: number;
+}
+
 /** Where the hub's event catalogue lives. Every path {@link EventsApi} can build starts here. */
 export const EVENTS_BASE_PATH = '/api/hub/events';
 
@@ -1851,6 +1964,34 @@ export class FlowsApi {
    */
   async schema(): Promise<FlowSchema> {
     return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/schema` }) as Promise<FlowSchema>;
+  }
+
+  /**
+   * `POST /api/hub/flows/whatsapp-header-images` — **the photo a WhatsApp template step sends in
+   * its header** (hub#2335).
+   *
+   * A template approved with a photo header sends a photo on every message, and Meta downloads it
+   * from a link; the owner has the file, not a public link. The hub keeps it in its own files and
+   * answers a `ref` for the step's `vars.header_image`; every send signs a fresh link to it, so the
+   * file never has to be public and the link never expires in the queue. The same photo twice is
+   * the same `ref`.
+   *
+   * Only a JPEG or a PNG of up to 5 MB (Meta's cap), told by its bytes. A refusal arrives as an
+   * {@link ErploraError} with its code: `whatsapp.header_image_unsupported`,
+   * `whatsapp.header_image_too_large`, `whatsapp.header_image_missing`,
+   * `whatsapp.invalid_header_image_upload`, `whatsapp.header_image_not_saved`.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * {@link templates}: `typeof flows.uploadWhatsappHeaderImage` is the probe.
+   */
+  async uploadWhatsappHeaderImage(file: Blob): Promise<WhatsappHeaderImage> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
+      body: form,
+    }) as Promise<WhatsappHeaderImage>;
   }
 
   /**
@@ -3039,7 +3180,7 @@ export class ErploraClient {
       );
     }
     return (this.flowsApi ??= new FlowsApi(
-      (req) => transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      (req) => coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
       moduleId,
     ));
   }
@@ -3071,7 +3212,7 @@ export class ErploraClient {
       );
     }
     return (this.eventsApi ??= new EventsApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3118,7 +3259,7 @@ export class ErploraClient {
       );
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3146,7 +3287,7 @@ export class ErploraClient {
     const transport = this.transport as Partial<CoreBlobTransport>;
     return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
       typeof transport.coreBlobRequest === 'function'
-        ? transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId })
+        ? coreCall(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
         : Promise.reject(
             new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
           ),
@@ -3179,7 +3320,7 @@ export class ErploraClient {
       );
     }
     return (this.certificateApi ??= new CertificateApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3205,7 +3346,7 @@ export class ErploraClient {
       );
     }
     return (this.printApi ??= new PrintApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3215,7 +3356,11 @@ export class ErploraClient {
    * `list` a su query. Para paginar de verdad (total/página) usa `queryPage`.
    */
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T> {
-    return this.transport.query(name, params).then(unwrapPage) as Promise<T>;
+    return this.transport.query(name, params).then(unwrapPage, (e: unknown) => {
+      // hub#2288: a read the hub never answered is told in the user's language, not the
+      // transport's technical line.
+      throw unreachableRead(e, this.locale);
+    }) as Promise<T>;
   }
   /**
    * Query a una integración **OPCIONAL** (ADR-0127): el módulo dueño puede no estar instalado en
@@ -3250,8 +3395,13 @@ export class ErploraClient {
    * `{rows,total,limit,offset}`. Úsala con `createListController` para el `<data-table>`.
    */
   async queryPage<T = unknown>(name: string, params: ListParams = {}): Promise<Page<T>> {
-    const data = (await this.transport.query(name, buildListParams(params))) as Page<T>;
-    return data;
+    try {
+      return (await this.transport.query(name, buildListParams(params))) as Page<T>;
+    } catch (e) {
+      // hub#2288: same sentence as `query()`. `queryAll`/`queryAllOptional` and the list
+      // controller read through here, so they get it without a wrap of their own.
+      throw unreachableRead(e, this.locale);
+    }
   }
   /**
    * Trae **TODAS** las filas de una query de lista. Sin tope, salvo que el llamador pase un `limit`.
@@ -3323,13 +3473,14 @@ export class ErploraClient {
    * hub answered, the outcome is known, and the module orients by the code as always. Queries are
    * NOT captured (see {@link query}): a read that failed did nothing, and toasting every failed
    * dashboard poll would bury the one toast that matters.
+   *
+   * A screen that resolves the doubt itself passes `{ resolvesOutcome: true }` (hub#2375): the
+   * verdict is thrown all the same, only the toast is skipped for that call.
    */
-  command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
+  command<T = unknown>(name: string, payload?: Record<string, unknown>, opts: CommandOptions = {}): Promise<T> {
     return (this.transport.command(name, payload) as Promise<T>).catch((e: unknown) => {
-      if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) throw e;
-      const verdict = new UnknownOutcomeError(commandVerdictMessage(this.locale), e);
-      this.opts.notifier?.({ type: 'error', message: verdict.message });
-      throw verdict;
+      // The verdict is hub#2320's shared one; `resolvesOutcome` (hub#2375) only withholds the toast.
+      throw unknownOutcome(e, this.locale, opts.resolvesOutcome === true ? undefined : this.opts.notifier);
     });
   }
   /**
@@ -3356,10 +3507,14 @@ export class ErploraClient {
    * siquiera se dispara. El namespace del core `hub.*` nunca se corta en corto (nunca está
    * ausente, ver {@link isKnownAbsent}).
    */
-  async commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T | undefined> {
+  async commandOptional<T = unknown>(
+    name: string,
+    payload?: Record<string, unknown>,
+    opts: CommandOptions = {},
+  ): Promise<T | undefined> {
     if (this.isKnownAbsent(name)) return undefined;
     try {
-      return await this.command<T>(name, payload);
+      return await this.command<T>(name, payload, opts);
     } catch (e) {
       // `module_inactive` (cascada ADR-0128) equivale a ausencia: un módulo desactivado no está
       // disponible, y el consumidor OBLIGATORIO nunca pregunta (la cascada lo apagó con su dep).

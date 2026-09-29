@@ -80,7 +80,7 @@ import {
   switchUser,
   userSwitchOffered,
   userSwitchOpen,
-  userSwitchRefusalKey,
+  userSwitchRefusal,
 } from './user-switch';
 import { deviceMode, deviceTrusted } from './device-mode';
 import { pinPolicy } from './pin-policy';
@@ -402,8 +402,8 @@ describe('the hand-over itself', () => {
 
 describe('what a refusal is allowed to say', () => {
   it('names the gesture that fixes an unenrolled device', () => {
-    expect(userSwitchRefusalKey(refusal('device_untrusted'))).toBe('userSwitch.deviceNotEnrolled');
-    expect(userSwitchRefusalKey(refusal('device_unidentified'))).toBe(
+    expect(userSwitchRefusal(refusal('device_untrusted')).key).toBe('userSwitch.deviceNotEnrolled');
+    expect(userSwitchRefusal(refusal('device_unidentified')).key).toBe(
       'userSwitch.deviceUnidentified',
     );
   });
@@ -411,14 +411,19 @@ describe('what a refusal is allowed to say', () => {
   it('says «wait», not «wrong PIN», when the brute-force guard closes the door', () => {
     // Two guards, two sentences (hub#329). Telling somebody whose PIN is right to check it sends
     // them round the loop that earned the lock.
-    expect(userSwitchRefusalKey(refusal('too_many_attempts'))).toBe('userSwitch.tooManyAttempts');
+    // hub#2285: and it says the minutes the hub named, with the pinpad's own sentence.
+    expect(userSwitchRefusal(refusal('too_many_attempts'))).toEqual({ key: 'login.pinTooManyAttemptsNoWait' });
+    expect(userSwitchRefusal(Object.assign(refusal('too_many_attempts'), { retryAfterSecs: 240 }))).toEqual({
+      key: 'login.pinTooManyAttempts',
+      minutes: 4,
+    });
   });
 
   it('falls back to «incorrect PIN» for anything it has never seen', () => {
     // Merely unhelpful, where an instruction invented for an unknown code would be actively wrong.
     // A plain wrong PIN carries no code at all — that IS the fallback's main case.
-    expect(userSwitchRefusalKey(refusal())).toBe('userSwitch.rejected');
-    expect(userSwitchRefusalKey(refusal('something_new'))).toBe('userSwitch.rejected');
-    expect(userSwitchRefusalKey(null)).toBe('userSwitch.rejected');
+    expect(userSwitchRefusal(refusal()).key).toBe('userSwitch.rejected');
+    expect(userSwitchRefusal(refusal('something_new')).key).toBe('userSwitch.rejected');
+    expect(userSwitchRefusal(null).key).toBe('userSwitch.rejected');
   });
 });

@@ -26,7 +26,7 @@ import { ref, watch, type WatchStopHandle } from 'vue';
 import type { BellManifestDef, ModuleManifest } from '@erplora/module-types';
 
 import { normalizeRows } from './dashboard-widgets';
-import { loadInstalledManifests } from './module-loader';
+import { loadInstalledManifests, type InstalledManifest } from './module-loader';
 import { getClient } from './runtime';
 import { hasPermission, isAuthed, user } from './session';
 import { setNotificationCount } from './shell';
@@ -87,6 +87,41 @@ let lastCounts = new Map<string, number>();
  */
 let generation = 0;
 
+/**
+ * A counter the bell will run: it has words to paint and a query of its own. A module counts ITS
+ * data — another module's query would let one app surface (and point the bell at) what belongs to
+ * another.
+ */
+function isRunnableCounter(moduleId: string, def: BellManifestDef | undefined): def is BellManifestDef {
+  return Boolean(def?.label && def.query && def.query.startsWith(`${moduleId}.`));
+}
+
+/**
+ * The modules that put at least one counter on the bell (hub#2306), by the same rule the poll uses
+ * to run them. Whatever the session may see: this answers «does this DEVICE have anything that
+ * would ever send a notice», which is asked before knowing who will be standing at it.
+ */
+export function bellCounterModuleIds(mods: readonly InstalledManifest[]): Set<string> {
+  const ids = new Set<string>();
+  for (const mod of mods) {
+    const block = (mod.manifest as ModuleManifest).bell;
+    if (!block) continue;
+    if (Object.values(block).some((def) => isRunnableCounter(mod.moduleId, def as BellManifestDef))) {
+      ids.add(mod.moduleId);
+    }
+  }
+  return ids;
+}
+
+/** {@link bellCounterModuleIds} of what is installed now. **Never throws**: unread is «none». */
+export async function loadBellCounterModuleIds(): Promise<Set<string>> {
+  try {
+    return bellCounterModuleIds(await loadInstalledManifests());
+  } catch {
+    return new Set();
+  }
+}
+
 function countOf(result: unknown): number {
   const raw = normalizeRows(result)[0]?.count;
   const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
@@ -127,10 +162,7 @@ export async function refreshBellCounters(): Promise<void> {
     const block = (mod.manifest as ModuleManifest).bell;
     if (!block) continue;
     for (const [key, def] of Object.entries(block) as [string, BellManifestDef][]) {
-      if (!def?.label || !def.query) continue;
-      // A module counts ITS data. Another module's query would let one app surface (and point
-      // the bell at) what belongs to another.
-      if (!def.query.startsWith(`${mod.moduleId}.`)) continue;
+      if (!isRunnableCounter(mod.moduleId, def)) continue;
       if (def.permission && !hasPermission(def.permission)) continue;
 
       const previous = lastCounts.get(key);

@@ -3011,6 +3011,98 @@ kill "$live_pid" 2>/dev/null; wait "$live_pid" 2>/dev/null
     || bad "hub#1998: each web pass runs on fresh bench databases of its own (stale/dead dropped, live neighbour kept)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 400)"
 
 
+# ── 71. The batteries never inherit the pusher's local git env (hub#2323) ─────
+#    git exports GIT_DIR to a hook run from a linked worktree (the fleet's shape), and an
+#    inherited GIT_DIR beats `git -C`: on 28/09 merge-check-tree.test.sh, run by the web
+#    light stage, committed «base/pr/later» onto the pusher's branch, created `pr`/`clash`
+#    and pushed them to the real origin. That test is fixed on its own (hub#2329); this
+#    case pins the hook side, so the NEXT battery that forgets to isolate itself cannot do
+#    it again. Each stage runs a probe that works on a scratch repo of its own, the way
+#    those batteries do, under GIT_DIR + GIT_WORK_TREE + GIT_INDEX_FILE (more than GIT_DIR:
+#    `unset GIT_DIR` alone must not pass). The probe leaks through any of them: GIT_DIR
+#    lands the commit on the pusher, GIT_WORK_TREE/GIT_INDEX_FILE put the pusher's files
+#    into the scratch commit.
+leak_probe() {   # $1 = scratch repo, $2 = tag → a battery-shaped command line
+    printf '%s' "git -C $1 add -A && git -C $1 commit -q --allow-empty -m $2 && git -C $1 branch clash-$2"
+}
+make_scratch() {
+    local dir
+    dir=$(mktemp -d)
+    git -C "$dir" init -q
+    git -C "$dir" config user.email scratch@test
+    git -C "$dir" config user.name scratch
+    echo scratch > "$dir/scratch-only"
+    git -C "$dir" add scratch-only
+    git -C "$dir" commit -qm seed
+    echo "$dir"
+}
+# $1 repo · $2 pushed sha · $3 scratch · $4 scratch tree before · $5.. tags that must have run
+leak_errs() {
+    local repo=$1 sha=$2 scratch=$3 tree=$4 tag errs=""
+    shift 4
+    [ "$(git -C "$repo" rev-parse HEAD)" = "$sha" ] || errs="$errs pusher-HEAD-moved:$(git -C "$repo" log -1 --format=%s)"
+    [ -z "$(git -C "$repo" branch --list 'clash-*')" ] || errs="$errs pusher-got-branches:[$(git -C "$repo" branch --list 'clash-*' | tr -d ' \n')]"
+    # GIT_INDEX_FILE alone leaks too: the probe's `add -A` rewrites the pusher's index with the
+    # scratch's files while HEAD, branches and the scratch commit all look right.
+    git -C "$repo" diff --cached --quiet HEAD \
+        || errs="$errs pusher-index-rewritten:[$(head -5 <<<"$(git -C "$repo" ls-files)" | tr '\n' ' ')]"
+    for tag in "$@"; do
+        # Control positive: the probe really ran and landed where it aimed.
+        git -C "$scratch" rev-parse -q --verify "refs/heads/clash-$tag" >/dev/null \
+            || { errs="$errs CONTROL-probe-$tag-never-landed-in-scratch"; continue; }
+        [ "$(git -C "$scratch" rev-parse "clash-$tag^{tree}")" = "$tree" ] \
+            || errs="$errs scratch-commit-$tag-carries-the-pushers-tree:[$(git -C "$scratch" ls-tree --name-only "clash-$tag" | tr '\n' ' ')]"
+    done
+    printf '%s' "$errs"
+}
+pusher_env() { printf '%s\n' "GIT_DIR=$1/.git" "GIT_WORK_TREE=$1" "GIT_INDEX_FILE=$1/.git/index"; }
+
+# (a) the full suite and (b) the fast gate
+for depth in full fast; do
+    repo=$(make_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    sha=$(git -C "$repo" rev-parse HEAD)
+    scratch=$(make_scratch)
+    tree=$(git -C "$scratch" rev-parse 'HEAD^{tree}')
+    probe=$(leak_probe "$scratch" "$depth")
+    if [ "$depth" = full ]; then
+        stage_cmd=(HUB_GATE_TEST_CMD="$probe")
+    else
+        stage_cmd=(HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="$probe" HUB_GATE_TEST_CMD="true")
+    fi
+    # shellcheck disable=SC2046  # one VAR=value per line, none with spaces
+    code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+        $(pusher_env "$repo") \
+        HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        "${stage_cmd[@]}")
+    errs=$(leak_errs "$repo" "$sha" "$scratch" "$tree" "$depth")
+    [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+    [ -z "$errs" ] \
+        && ok "hub#2323: the $depth suite runs without the pusher's GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE" \
+        || bad "hub#2323: the $depth suite runs without the pusher's GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+done
+
+# (c) the web light stage (where merge-check-tree.test.sh lives) and (d) the full web stage
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+touch_and_commit "$repo" scripts/tests/no-dead-packages.test.mjs >/dev/null
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+scratch=$(make_scratch)
+tree=$(git -C "$scratch" rev-parse 'HEAD^{tree}')
+# shellcheck disable=SC2046
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    $(pusher_env "$repo") \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_LIGHT_CMD="$(leak_probe "$scratch" weblight)" \
+    HUB_GATE_WEB_CMD="$(leak_probe "$scratch" web)")
+errs=$(leak_errs "$repo" "$sha" "$scratch" "$tree" weblight web)
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+[ -z "$errs" ] \
+    && ok "hub#2323: the web light stage and the web stage run without the pusher's local git env" \
+    || bad "hub#2323: the web light stage and the web stage run without the pusher's local git env" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

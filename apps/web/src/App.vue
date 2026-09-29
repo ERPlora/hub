@@ -232,11 +232,12 @@ import { openUserSwitch, userSwitchOffered } from './lib/user-switch';
 import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
-import { refreshSetupStatus } from './lib/setup-status';
+import { refreshSetupStatus, refreshSetupStatusOnLocaleChange } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
 import { bootUndrainedPrintingWatch } from './lib/print-alert';
 import { bootBellCountersWatch } from './lib/bell-counters';
+import { bootModuleUpdateNoticeWatch } from './lib/module-update-notice';
 
 registerWhatsAppConnectElement();
 
@@ -362,6 +363,10 @@ async function gateAndRefresh(): Promise<void> {
   // What the installed modules raise through their `bell` block (hub#1678): an appointment to
   // confirm, say. Not filtered by role here — each counter carries its own permission.
   bootBellCountersWatch();
+  // Installed apps with a newer version (hub#1172): one row on the bell leading to «My apps». The
+  // watcher filters itself to admins and checks hours apart — each check asks the marketplace once
+  // per installed app.
+  bootModuleUpdateNoticeWatch();
 
   // La nav de módulos se refresca GLOBALMENTE al instalarse un módulo. El único oyente de
   // `module.installed` vivía en AppsPage (montada solo en /apps): instalar desde el DRAWER del
@@ -463,6 +468,10 @@ watch(
     if (isAuthed.value) void refreshSetupStatus(getClient());
   },
 );
+// …and when the language changes (hub#2356): the runtime answers the apps' items in the viewer's
+// language, and without this the strip on the Profile screen kept them in the old one next to the
+// shell's labels already switched. App.vue never unmounts, so the subscription is never undone.
+refreshSetupStatusOnLocaleChange(getClient, () => isAuthed.value);
 // Si el entitlement resulta `needs_activation` (Tauri offline sin token cacheado, hub sin
 // derecho…), saca al usuario del negocio → pantalla de activación.
 watch(needsActivation, (needs) => {

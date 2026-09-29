@@ -84,9 +84,11 @@ test('hub#906: the shell notifier (global toast net) is told once, with the hone
   assert.equal(notes.length, 1, 'exactly one toast per failed command');
   assert.equal(notes[0].type, 'error');
   assert.ok(notes[0].message.includes('No sabemos si la operación se completó'));
+  // hub#2342: the net is the verdict of EVERY command, so it no longer carries the charge tail;
+  // the «check Sales before charging again» guidance is the POS's own panel (sales#91).
   assert.ok(
-    notes[0].message.includes('Ventas'),
-    'the charge guidance (check Sales before charging again) must be part of the net',
+    notes[0].message.includes('Comprueba el resultado antes de reintentar'),
+    'the net must tell the user to check before retrying',
   );
 });
 

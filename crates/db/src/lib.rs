@@ -733,31 +733,36 @@ impl DatabaseAdapter for PgAdapter {
     /// One `Parse`+`Describe` of the SELECT with the parameter types left for the server to
     /// infer, read back off the prepared statement.
     ///
-    /// It goes through sqlx's per-connection statement cache (unlike the queries themselves, which
-    /// opt out of it — see `build_query!`), so the SHAPE of a static SELECT is resolved once per
-    /// connection; what still travels on every call is the connection check of `acquire`.
-    /// Measured in the review of hub#1567 (Postgres 18 in Docker, loopback, one connection):
-    /// 0.33 ms warm, 0.49 ms cold, against 0.58 ms for the simplest `query()`.
+    /// The answer is ALWAYS the server's, never sqlx's per-connection statement cache (hub#2359).
+    /// `prepare_with` stores what it prepares in that cache, keyed on the text, and answers the
+    /// next call from it without asking the server — so after a module migration added a column
+    /// behind the same `SELECT *`, the connection that described the old shape kept answering it.
+    /// The runtime remembers the answer per installed version (`ColumnKindsCache`) and forgets it
+    /// when a module migrates, which only works if asking again really asks. So the statement is
+    /// dropped from the connection right after its columns are read: one extra round trip per
+    /// describe, and a describe now happens once per list per installed version, not per request.
     ///
-    /// That cache is the one hub#1348 keeps `query()` out of, and it bites here too: sqlx keys it
-    /// on the TEXT and `get_or_prepare` reads it BEFORE it honours `.persistent(false)`, so a text
-    /// described here must never be one `query()` executes — the cached statement would pin the
-    /// server-inferred parameter types onto that execution (a FLOAT8 bound decoded as INT8: the
-    /// row vanishes, silently). The marker below makes the described text unique to this door;
-    /// Postgres ignores the comment.
+    /// The cache is also the one hub#1348 keeps `query()` out of: sqlx keys it on the TEXT and
+    /// `get_or_prepare` reads it BEFORE it honours `.persistent(false)`, so a text described here
+    /// must never be one `query()` executes — the cached statement would pin the server-inferred
+    /// parameter types onto that execution (a FLOAT8 bound decoded as INT8: the row vanishes,
+    /// silently). Clearing covers that too; the marker below stays as the second lock, making the
+    /// described text unique to this door. Postgres ignores the comment.
     async fn column_kinds(&self, sql: &str) -> Result<BTreeMap<String, ColumnKind>, DbError> {
-        use sqlx::{SqlSafeStr, Statement};
+        use sqlx::{Connection, SqlSafeStr, Statement};
         let (tsql, _names) = translate(sql);
         let described = format!("{tsql}\n/* column_kinds: described, never executed (hub#1348) */");
         let mut conn = self.pool.acquire().await?;
         let stmt = (&mut *conn)
             .prepare_with(sqlx::AssertSqlSafe(described).into_sql_str(), &[])
             .await?;
-        Ok(stmt
+        let kinds = stmt
             .columns()
             .iter()
             .map(|c| (c.name().to_string(), ColumnKind::of(c.type_info().name())))
-            .collect())
+            .collect();
+        conn.clear_cached_statements().await?;
+        Ok(kinds)
     }
 
     async fn migration_lock(
@@ -1807,6 +1812,36 @@ mod tests {
             1,
             "the row a fresh connection answers must not vanish after a describe: {:?}",
             q.rows
+        );
+    }
+
+    /// hub#2359 — a describe answers the schema as it is NOW, not as it was the last time this
+    /// connection described the same text. sqlx keeps every prepared statement in a per-connection
+    /// cache keyed on the text, and `prepare_with` answers from it without asking the server: after
+    /// a module migration added a column behind the same `SELECT *`, the connection that described
+    /// the old shape kept answering it and the list failed (`integer >= text`) on the new column.
+    /// One connection on purpose: a pool is what would otherwise hide it.
+    #[tokio::test]
+    async fn a_describe_after_a_migration_answers_the_new_shape() {
+        let test_db = crate::testutil::TestDb::new().await;
+        let db = test_db.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE erplora_shape (id TEXT NOT NULL);")
+            .await
+            .unwrap();
+        let sql = "SELECT * FROM erplora_shape WHERE id <> :skip";
+
+        let before = db.column_kinds(sql).await.unwrap();
+        assert_eq!(before.keys().collect::<Vec<_>>(), vec!["id"]);
+
+        db.execute_batch("ALTER TABLE erplora_shape ADD COLUMN score INTEGER NOT NULL DEFAULT 0;")
+            .await
+            .unwrap();
+
+        let after = db.column_kinds(sql).await.unwrap();
+        assert_eq!(
+            after.get("score"),
+            Some(&ColumnKind::Numeric),
+            "the column the migration added must be described: {after:?}"
         );
     }
 

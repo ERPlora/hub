@@ -30,7 +30,10 @@ vi.mock('../lib/runtime', async () => {
 });
 
 const refreshSetupStatus = vi.fn();
-vi.mock('../lib/setup-status', () => ({ refreshSetupStatus: (...a: unknown[]) => refreshSetupStatus(...a) }));
+vi.mock('../lib/setup-status', () => ({
+  refreshSetupStatus: (...a: unknown[]) => refreshSetupStatus(...a),
+  refreshSetupStatusOnLocaleChange: () => () => {},
+}));
 
 const appNames = vi.hoisted(() => new Map<string, string>());
 vi.mock('../lib/app-names', async () => {

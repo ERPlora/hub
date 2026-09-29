@@ -390,8 +390,14 @@ $(grep -m1 -F "✗ módulo" "$server_log" 2> /dev/null | sed 's/^/      /')"
             continue
         fi
         case "$rel" in *.sh) interpreter=bash ;; *) interpreter=python3 ;; esac
+        # `ERPLORA_HUB_PSQL` (module-toolkit#405): a psql session on the database THIS hub writes
+        # to, so a battery that needs SQL under the API (an open transaction racing a command,
+        # services#130) never guesses it with `docker ps` — nothing here publishes the hub's port.
+        # Same name and same shape as `erplora test --against-hub` (`hubPsqlCommand`): the admin
+        # command plus `-d <scratch db>`, whitespace-separated words a battery splits and extends.
         output=$(cd "$catalogue/$module" && env \
             ERPLORA_HUB_BASE_URL="$base_url" \
+            ERPLORA_HUB_PSQL="${db_admin[*]} -d $scratch_db" \
             "${upper}_HUB_BASE_URL=$base_url" \
             ERPLORA_HUB_ID="$hub_id" \
             ERPLORA_MODULE_ID="$module" \

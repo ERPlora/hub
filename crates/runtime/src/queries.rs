@@ -6,11 +6,11 @@
 //!   subconsulta y compone, de forma genérica, búsqueda global + filtro por columna +
 //!   orden por whitelist (anti-inyección) + `LIMIT/OFFSET`, y devuelve `{rows,total,limit,
 //!   offset}` (§8.2). El módulo no escribe nada de esto a mano: lo declara en `module.json`.
-use std::collections::BTreeMap;
 
 use erplora_db::{ColumnKind, DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
+use crate::column_kinds_cache::{ColumnKinds, ColumnKindsCache};
 use crate::errors::{Result, RuntimeError};
 use crate::manifest::{FilterOp, ListSpec};
 use crate::permissions;
@@ -251,7 +251,16 @@ pub async fn execute_page(
                 q.schema.as_ref().map(|s| s.raw.as_ref()),
                 params,
             )?;
-            run_list(db, name, &q.sql, spec, &bound).await
+            run_list(
+                db,
+                &registry.list_column_kinds,
+                &ctx.hub_id,
+                name,
+                &q.sql,
+                spec,
+                &bound,
+            )
+            .await
         }
     }
 }
@@ -411,8 +420,12 @@ fn all_binds(sql: &str) -> Vec<String> {
 /// Compone y ejecuta el SQL paginado a partir del SELECT base y el `ListSpec`.
 /// `pub(crate)`: el core lo reutiliza para `hub.approvals.list` (hub#884) — mismo motor, mismo
 /// contrato, sin un segundo paginador.
+/// `shapes` remembers the column types of `base_sql` for `hub_id` between requests (hub#2359); it is
+/// the registry's, so it lives and dies with the installed version of the module.
 pub(crate) async fn run_list(
     db: &dyn DatabaseAdapter,
+    shapes: &ColumnKindsCache,
+    hub_id: &str,
     query: &str,
     base_sql: &str,
     spec: &ListSpec,
@@ -500,30 +513,37 @@ pub(crate) async fn run_list(
         }
     }
 
-    // El tipo REAL de las columnas del SELECT base, y solo cuando hace falta: lo pide el extremo
-    // de un `range` escrito como TEXTO (hub#1542). Es una pregunta al servidor, así que no se
-    // hace por costumbre — sin extremos de texto no hay nada que resolver y no se pregunta.
-    // Si el servidor no sabe responder, se sigue exactamente como antes: no saber tiene que
-    // dejar el extremo tal cual lo escribió quien llama, nunca inventarse una conversión.
-    let column_kinds = if needs_column_kinds(spec, &p) {
-        match db.column_kinds(base_sql).await {
-            Ok(kinds) => kinds,
-            Err(e) => {
-                // Degradar en silencio sería el mismo fallo mudo que este cambio viene a quitar:
-                // la página sigue respondiendo lo que respondía ayer (el extremo de texto sobre
-                // columna numérica vuelve a fallar con el `db` genérico), y sin esta línea nadie
-                // sabría por qué. `eprintln!` y no `tracing`: este crate no tiene logging propio
-                // por diseño (ver `retention.rs`), lo tiene el host de `crates/server`.
-                eprintln!(
-                    "queries: no se pudo resolver el tipo de las columnas de `{query}` ({e}): los \
-                     extremos de `range` se comparan sin convertir, como antes de hub#1542"
-                );
-                BTreeMap::new()
+    // The REAL type of the base SELECT's columns, and only when needed. A `range` bound written
+    // as TEXT asks for it (hub#1542), and so does a list sorted by a column other than `id`: the
+    // same answer says whether the SELECT projects an `id` to break sort ties with (hub#2352).
+    // It is a question to the server (a describe, ~0.3 ms), so it is not asked by habit — a list
+    // with neither has nothing to resolve — and since hub#2359 it is asked once per installed
+    // version, not per request (`shapes`). If the server cannot answer, everything carries on
+    // exactly as before: not knowing must leave the bound as the caller wrote it and the order
+    // without a tiebreak, never invent a conversion or a column — and nothing is remembered, so
+    // the next request asks again.
+    let column_kinds: ColumnKinds =
+        if needs_column_kinds(spec, &p) || needs_tiebreak(sort_col.as_deref()) {
+            match shapes.get_or_describe(db, hub_id, base_sql).await {
+                Ok(kinds) => kinds,
+                Err(e) => {
+                    // Degrading silently would be the same mute failure these changes remove: the page
+                    // keeps answering what it answered before (a text bound over a numeric column
+                    // fails again with the generic `db` error; ties come back in scan order), and
+                    // without this line nobody would know why. `eprintln!` and not `tracing`: this
+                    // crate has no logging of its own by design (see `retention.rs`), the
+                    // `crates/server` host does.
+                    eprintln!(
+                        "queries: could not resolve the column types of `{query}` ({e}): `range` \
+                     bounds are compared unconverted (as before hub#1542) and sort ties are not \
+                     broken by `id` (as before hub#2352)"
+                    );
+                    ColumnKinds::default()
+                }
             }
-        }
-    } else {
-        BTreeMap::new()
-    };
+        } else {
+            ColumnKinds::default()
+        };
 
     for (col, f) in &spec.filters {
         if !is_ident(col) {
@@ -593,7 +613,17 @@ pub(crate) async fn run_list(
     };
     // Rows without a value go last in BOTH directions (hub#2099): Postgres sorts NULL as the
     // largest value, so a bare `DESC` put every row without a date at the top of a newest-first list.
+    //
+    // Ties are broken by the row id, in the list's own direction (hub#2352). Without it Postgres
+    // returns tied rows in scan order, and an `UPDATE` moves the row to the end of the heap: the
+    // task you just started dropped to the bottom of its status group, and `LIMIT/OFFSET` over an
+    // order that is not total let two pages share a row or skip one. Only when the SELECT
+    // projects an `id` — a report or an aggregate without one keeps the bare order rather than
+    // failing on a column it does not have.
     let order_clause = match &sort_col {
+        Some(c) if needs_tiebreak(Some(c)) && column_kinds.contains_key("id") => {
+            format!(" ORDER BY sub.{c} {dir} NULLS LAST, sub.id {dir}")
+        }
         Some(c) => format!(" ORDER BY sub.{c} {dir} NULLS LAST"),
         None => String::new(),
     };
@@ -854,6 +884,13 @@ fn is_ident(s: &str) -> bool {
 /// Sigue sin hacerse por costumbre: una lista sin filtro `range` —o con los extremos ausentes—
 /// no gasta el viaje. Un extremo que no es ni texto ni número (un booleano, un array) tampoco
 /// tiene conversión que elegir y se liga tal cual, como antes.
+/// Whether a list sorted by `sort_col` needs the row id after it to be a total order (hub#2352).
+/// Sorting by `id` itself already is one; a list with no sort column keeps the order its own SQL
+/// wrote, which an appended `ORDER BY sub.id` would override.
+fn needs_tiebreak(sort_col: Option<&str>) -> bool {
+    sort_col.is_some_and(|c| c != "id")
+}
+
 fn needs_column_kinds(spec: &ListSpec, p: &Params) -> bool {
     spec.filters
         .iter()
