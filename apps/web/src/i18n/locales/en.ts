@@ -765,7 +765,7 @@ export default {
     receiptTemplateMissing: 'Install the Printing app to add your printer and set up your receipt',
     tabHub: 'General',
     tabBusiness: 'Business',
-    tabTickets: 'Receipts',
+    tabPrinting: 'Printing',
     tabPermissions: 'Permissions',
     tabData: 'Data & backups',
     dataImport: 'Import',

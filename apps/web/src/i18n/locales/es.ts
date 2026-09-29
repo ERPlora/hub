@@ -692,7 +692,7 @@ export default {
     receiptTemplateMissing: 'Instala la app Impresión para dar de alta tu impresora y configurar el tique',
     tabHub: 'General',
     tabBusiness: 'Negocio',
-    tabTickets: 'Tiques',
+    tabPrinting: 'Impresión',
     tabPermissions: 'Permisos',
     tabData: 'Datos y copias',
     dataImport: 'Importar',
