@@ -595,5 +595,108 @@ else
         "no step executes it: the builder's contract would never run"
 fi
 
+# ── 14. An OutfitKit release runs this file at once (hub#2321) ───────────────
+# A release that moves a pixel of the shell reached customers (the image
+# re-resolves `latest`) and was only seen at the next web push to develop or at
+# the 03:08 cron. ERPlora/outfitkit's `publish.yml` now sends
+# `repository_dispatch: outfitkit-published` with the version, the same trigger
+# modules use for `test-hub-modules.yml` (hub#1239). It must be handled like the
+# cron: test DEVELOP (the event fires the file on `main`), install the announced
+# version exactly, and a red opens the develop alert.
+dispatch_block=$(on_sub_block repository_dispatch)
+if ! grep -qE '^ +types: .*outfitkit-published' <<<"$dispatch_block"; then
+    bad "test-web.yml listens to \`repository_dispatch: outfitkit-published\` (hub#2321)" \
+        "no such type under \`on.repository_dispatch\`: a new OutfitKit is only tested at the next develop push or the nightly cron"
+else
+    ok "test-web.yml listens to \`repository_dispatch: outfitkit-published\` (hub#2321)"
+fi
+
+published_script="scripts/ci/install-published-outfitkit.sh"
+for job in verify e2e; do
+    block=$(job_block "$job")
+    ref_line=$(awk '/^ +ref: / {print; exit}' <<<"$block")
+    resolve_at=$(awk 'index($0, "@erplora/outfitkit@latest") && !/^[[:space:]]*#/ {print NR; exit}' <<<"$block")
+    published_at=$(awk -v s="$published_script" 'index($0, "run:") && index($0, s) {print NR; exit}' <<<"$block")
+    if [ "$job" = verify ]; then
+        verify_at=$(awk 'index($0, "run:") && index($0, "pnpm verify") {print NR; exit}' <<<"$block")
+    else
+        verify_at=$(awk 'index($0, "run:") && index($0, "test:e2e") {print NR; exit}' <<<"$block")
+    fi
+    # The step's own `if:` and `env:` — from its `- name:` to the next step.
+    step=$(awk -v s="$published_script" '
+        /^      - / {buf = ""}
+        {buf = buf $0 "\n"}
+        index($0, "run:") && index($0, s) {printf "%s", buf; exit}
+    ' <<<"$block")
+    if ! grep -qE "event_name == 'repository_dispatch'" <<<"$ref_line"; then
+        bad "\`$job\` checks out develop on an OutfitKit notice (hub#2321)" \
+            "ref: '${ref_line## }' — \`repository_dispatch\` fires the file on \`main\` and would test main, not develop"
+    elif [ -z "$published_at" ]; then
+        bad "\`$job\` installs the announced OutfitKit (\`bash ./$published_script\`) (hub#2321)" \
+            "no step runs it: the notice would test whatever \`latest\` the registry cache still serves"
+    elif [ -z "$resolve_at" ] || [ -z "$verify_at" ] || [ "$published_at" -le "$resolve_at" ] || [ "$published_at" -ge "$verify_at" ]; then
+        bad "\`$job\` installs the announced OutfitKit AFTER \`latest\` and BEFORE what it verifies (hub#2321)" \
+            "order — latest: ${resolve_at:-?}, announced: $published_at, verification: ${verify_at:-?}"
+    elif ! grep -qE "^ +if: .*event_name == 'repository_dispatch'" <<<"$step"; then
+        bad "the announced-OutfitKit step of \`$job\` runs only on the notice (hub#2321)" \
+            "no \`if:\` on \`repository_dispatch\`: every push and PR would fail for lack of a version"
+    elif ! grep -qE '^ +OUTFITKIT_PUBLISHED: \$\{\{ github\.event\.client_payload\.version \}\}' <<<"$step"; then
+        bad "the announced-OutfitKit step of \`$job\` reads the payload through \`env:\` (hub#2321)" \
+            "no \`OUTFITKIT_PUBLISHED: \${{ github.event.client_payload.version }}\` in its env"
+    else
+        ok "\`$job\` checks out develop and installs the announced OutfitKit on the notice (hub#2321)"
+    fi
+done
+
+# Another repository's payload never goes straight into a shell line: interpolated
+# inside `run:`, `${{ … }}` is pasted into the script before bash reads it.
+if grep -nE 'client_payload' "$workflow" | grep -vE '^[0-9]+:[[:space:]]*(#|[A-Z_]+: |run-name: |group: )' >/dev/null; then
+    bad "the dispatch payload only reaches steps through \`env:\` (hub#2321)" \
+        "$(grep -nE 'client_payload' "$workflow" | grep -vE '^[0-9]+:[[:space:]]*(#|[A-Z_]+: |run-name: |group: )')"
+else
+    ok "the dispatch payload only reaches steps through \`env:\` (hub#2321)"
+fi
+
+# The notice lands on `refs/heads/main`: sharing `test-web-refs/heads/main` with the
+# push to main would let one cancel the other; two notices in a row keep the newest.
+concurrency_group=$(awk '/^concurrency:/ {f=1; next} f && /^  group:/ {print; exit} f && /^[A-Za-z]/ {exit}' "$workflow")
+if ! grep -qF 'outfitkit-published' <<<"$concurrency_group"; then
+    bad "an OutfitKit notice has its own concurrency group (hub#2321)" \
+        "'$concurrency_group': it would share \`refs/heads/main\` with the push to main and cancel it (or be cancelled)"
+else
+    ok "an OutfitKit notice has its own concurrency group (hub#2321)"
+fi
+
+alert_job=$(job_block alert-develop)
+alert_if=$(awk '/^    if: >-/ {f=1; next} f && /^    [a-z-]+:/ {exit} f {print}' <<<"$alert_job")
+if ! grep -qF "event_name == 'repository_dispatch'" <<<"$alert_if"; then
+    bad "a red OutfitKit notice opens the develop alert (hub#2321)" \
+        "\`alert-develop\`'s \`if:\` ignores \`repository_dispatch\`: the red would be seen by nobody"
+elif ! grep -qE '^ +if \[ "\$TRIGGER" = "schedule" \] \|\| \[ "\$TRIGGER" = "repository_dispatch" \]; then' <<<"$alert_job"; then
+    bad "the alert names develop's HEAD, not main's, on an OutfitKit notice (hub#2321)" \
+        "\`github.sha\` of a \`repository_dispatch\` is main's HEAD; the alert must resolve develop by API as the cron does"
+elif ! grep -qE '^ +OUTFITKIT_PUBLISHED: \$\{\{ github\.event\.client_payload\.version \}\}' <<<"$alert_job"; then
+    bad "the alert names the OutfitKit version that turned develop red (hub#2321)" \
+        "no \`OUTFITKIT_PUBLISHED\` in the alert step's env"
+else
+    ok "a red OutfitKit notice opens the develop alert with develop's HEAD and the version (hub#2321)"
+fi
+
+# The script's own contract runs here, and a change to either file triggers the gate.
+if grep -qE '^[[:space:]]*(run:[[:space:]]*)?bash (\./)?scripts/tests/install-published-outfitkit\.test\.sh[[:space:]]*$' "$workflow"; then
+    ok "test-web.yml runs \`scripts/tests/install-published-outfitkit.test.sh\` (hub#2321)"
+else
+    bad "test-web.yml runs \`scripts/tests/install-published-outfitkit.test.sh\` (hub#2321)" \
+        "no step executes it: the script's contract would never run"
+fi
+for p in "$published_script" scripts/tests/install-published-outfitkit.test.sh; do
+    if grep -qF "$p" <<<"$push_block" && grep -qF "$p" <<<"$(on_sub_block pull_request)"; then
+        ok "\`$p\` is in the push and pull_request \`paths\` (hub#2321)"
+    else
+        bad "\`$p\` is in the push and pull_request \`paths\` (hub#2321)" \
+            "a change to it alone would trigger no check"
+    fi
+done
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

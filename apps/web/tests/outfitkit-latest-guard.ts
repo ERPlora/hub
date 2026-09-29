@@ -22,6 +22,10 @@
 // baselines drawn with ONE OutfitKit (apps/web/tests/e2e/baselines-outfitkit.txt), so it installs
 // that version and exports it as HUB_BENCH_OUTFITKIT. With a pin the guard checks the install IS the
 // pinned version (OUTFITKIT_NOT_PINNED_VERSION otherwise) and does not ask the registry.
+//
+// hub#2321 — the run an OutfitKit release triggers pins too: it tests the version the notice
+// ANNOUNCED (scripts/ci/install-published-outfitkit.sh exports it), so a second release minutes
+// later does not turn the run of the first one red for being behind.
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
