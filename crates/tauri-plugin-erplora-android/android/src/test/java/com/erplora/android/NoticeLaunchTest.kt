@@ -33,6 +33,8 @@ class NoticeLaunchTest {
     @Test
     fun `an ordinary launch is no tap`() {
         assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, NoticeLaunch.NO_ID, null, null, claimed = false))
+        // No notice id, no notice to open — whatever else the intent carries.
+        assertNull(NoticeLaunch.tapOf(Intent.ACTION_MAIN, 0, NoticeLaunch.NO_ID, "tap", json, claimed = false))
         assertNull(NoticeLaunch.tapOf(Intent.ACTION_VIEW, 0, 7, "tap", json, claimed = false))
     }
 
