@@ -55,7 +55,8 @@ SH
 chmod +x "$TMP/bin/pnpm"
 
 # run <case> [VAR=value ...] — runs the script in a clean web dir; sets $rc,
-# $out (stdout+stderr), $calls (number of pnpm invocations) and $log.
+# $out (stdout+stderr), $calls (number of pnpm invocations), $log, $summary and
+# $job_env (what the script appended to $GITHUB_ENV for the steps that follow).
 run() {
     local case_dir="$TMP/$1"
     shift
@@ -64,11 +65,13 @@ run() {
     out=$(env PATH="$TMP/bin:$PATH" \
         OUTFITKIT_WEB_DIR="$case_dir/web" FAKE_PNPM_LOG="$case_dir/pnpm.log" \
         OUTFITKIT_PUBLISH_WAIT=0 GITHUB_STEP_SUMMARY="$case_dir/summary.md" \
+        GITHUB_ENV="$case_dir/github.env" \
         "$@" bash "$script" 2>&1)
     rc=$?
     log=$(cat "$case_dir/pnpm.log")
     calls=$(wc -l < "$case_dir/pnpm.log" | tr -d ' ')
     summary=$(cat "$case_dir/summary.md" 2>/dev/null || true)
+    job_env=$(cat "$case_dir/github.env" 2>/dev/null || true)
 }
 
 echo "install-published-outfitkit.sh — la OutfitKit que anuncia el aviso (hub#2321)"
@@ -132,6 +135,34 @@ if [ "$rc" -ne 0 ] && grep -qF 'outfitkit_published_version_mismatch' <<<"$out";
     ok "si node_modules no tiene la versión anunciada, falla (outfitkit_published_version_mismatch)"
 else
     bad "si node_modules no tiene la versión anunciada, falla" "rc=$rc out: $out"
+fi
+
+# 7. The bench guard (apps/web/tests/outfitkit-latest-guard.ts, hub#2259) fails a run whose
+#    install was already behind `latest`. With two releases minutes apart, the run of the FIRST
+#    notice installs a version that is behind by the time pnpm writes node_modules — a red that
+#    says nothing about that release. The announced version is deliberate, so the script says so
+#    the way the pull_request step does (hub#2304): HUB_BENCH_OUTFITKIT in $GITHUB_ENV.
+run pins-the-guard OUTFITKIT_PUBLISHED=0.1.112
+if [ "$rc" -eq 0 ] && [ "$job_env" = "HUB_BENCH_OUTFITKIT=0.1.112" ]; then
+    ok "tells the bench guard the announced version is deliberate (HUB_BENCH_OUTFITKIT in \$GITHUB_ENV)"
+else
+    bad "tells the bench guard the announced version is deliberate" "rc=$rc GITHUB_ENV: '$job_env'"
+fi
+
+# 8. …and only once the install is proven: a refused run pins nothing for later steps.
+run pins-nothing-on-mismatch OUTFITKIT_PUBLISHED=0.1.112 FAKE_PNPM_INSTALLS=0.1.111
+if [ "$rc" -ne 0 ] && [ -z "$job_env" ]; then
+    ok "a refused install exports no HUB_BENCH_OUTFITKIT"
+else
+    bad "a refused install exports no HUB_BENCH_OUTFITKIT" "rc=$rc GITHUB_ENV: '$job_env'"
+fi
+
+# 9. Outside Actions there is no \$GITHUB_ENV: the script still installs and does not fail.
+run no-github-env OUTFITKIT_PUBLISHED=0.1.112 GITHUB_ENV=
+if [ "$rc" -eq 0 ] && [ "$calls" -eq 1 ]; then
+    ok "runs without \$GITHUB_ENV (outside Actions)"
+else
+    bad "runs without \$GITHUB_ENV (outside Actions)" "rc=$rc calls=$calls out: $out"
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"

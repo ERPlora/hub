@@ -16,6 +16,8 @@
 #   OUTFITKIT_PUBLISH_WAIT       seconds between attempts (default 30)
 #   OUTFITKIT_WEB_DIR            the web app (default apps/web; tests override it)
 #
+# Output: HUB_BENCH_OUTFITKIT=<version> appended to $GITHUB_ENV (when set), for the bench guard.
+#
 # Refusals, by code: outfitkit_published_version_missing,
 # outfitkit_published_version_invalid, outfitkit_published_not_installable,
 # outfitkit_published_version_mismatch.
@@ -58,6 +60,13 @@ if [ "$installed" != "$version" ]; then
 fi
 
 echo "OutfitKit ${version} installed (announced by ERPlora/outfitkit)"
+# The bench guard (apps/web/tests/outfitkit-latest-guard.ts) fails an install that was already
+# behind `latest`. Two releases minutes apart would turn the run of the first notice red for
+# being the first, so the announced version is declared deliberate, as the pull_request step
+# does with the baselines' one (hub#2304). Only here, once the install is proven.
+if [ -n "${GITHUB_ENV:-}" ]; then
+    echo "HUB_BENCH_OUTFITKIT=${version}" >> "$GITHUB_ENV"
+fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     printf '### OutfitKit %s publicada\n\nEste run prueba `develop` contra `@erplora/outfitkit@%s`, la versión que acaba de anunciar ERPlora/outfitkit (hub#2321).\n' \
         "$version" "$version" >> "$GITHUB_STEP_SUMMARY"
