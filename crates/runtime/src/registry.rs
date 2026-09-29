@@ -458,6 +458,13 @@ pub struct Registry {
     /// el módulo declara así que planta un objeto completo y solo mientras el hub no tenga nada
     /// suyo. El import lo lee para retirar el marcador cuando llegan los datos del negocio.
     pub(crate) seed_placeholder_tables: HashMap<String, Vec<String>>,
+    /// **The column types of every list's base SELECT**, asked of the database once per installed
+    /// version instead of on every request (hub#2359). It lives here, and not in a `static`, for
+    /// the same reason as [`Self::wasm_cache`]: its life IS the installed modules', and one
+    /// registry serves exactly one database. Forgotten whole by `installer::register_module` before
+    /// it migrates, the one door every schema change comes through — see
+    /// [`crate::column_kinds_cache`].
+    pub(crate) list_column_kinds: crate::column_kinds_cache::ColumnKindsCache,
 }
 
 impl Registry {

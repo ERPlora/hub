@@ -1,0 +1,63 @@
+{
+  "id": "tiebreak",
+  "name": "List Tiebreak Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "tiebreak.write",
+    "tiebreak.read"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "tiebreak.tasks.list": {
+      "permission": "tiebreak.read",
+      "sql": "queries/tasks_list.sql",
+      "list": {
+        "sort": [
+          "status",
+          "title"
+        ],
+        "default_sort": "status",
+        "default_dir": "asc",
+        "page_size": 3
+      }
+    },
+    "tiebreak.labels.list": {
+      "permission": "tiebreak.read",
+      "sql": "queries/labels_list.sql",
+      "list": {
+        "sort": [
+          "status",
+          "title"
+        ],
+        "default_sort": "status",
+        "default_dir": "asc",
+        "page_size": 3
+      }
+    }
+  },
+  "commands": {
+    "tiebreak.tasks.create": {
+      "permission": "tiebreak.write",
+      "transaction": true,
+      "sql": [
+        "commands/tasks_create.sql"
+      ]
+    },
+    "tiebreak.tasks.touch": {
+      "permission": "tiebreak.write",
+      "transaction": true,
+      "sql": [
+        "commands/tasks_touch.sql"
+      ]
+    }
+  }
+}

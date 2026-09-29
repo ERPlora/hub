@@ -35,6 +35,7 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
 pub mod activity;
+pub mod address_guard;
 /// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
 /// outside the runtime's global lock. It lives here and not in the runtime because it needs
 /// `cloud-client` — the runtime has no network by design.
@@ -63,6 +64,7 @@ pub mod export_import;
 /// The I/O half of a flow step (hub#662): the call itself, outside the runtime's global lock.
 pub mod flow_io;
 pub mod flows_api;
+pub mod flows_header_media;
 pub mod gateway_enrolment;
 pub mod hub_users;
 pub mod inbound_poll;

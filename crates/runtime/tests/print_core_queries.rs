@@ -188,6 +188,67 @@ async fn the_document_never_leaves_through_the_status_view() {
     );
 }
 
+/// hub#2368 (printing#52) — **the one fact of the document a person recognises a job by**: the
+/// number printed on it (`receipt_id`: the ticket, the invoice, the kitchen order). Without it the
+/// queue screen could only title a row with the producer's idempotency key (`sale-018f…`), and
+/// eleven «Discard» buttons were eleven guesses.
+///
+/// It is the number and NOTHING else: the rest of the document (names, lines, totals, the QR) stays
+/// behind the drain (hub#343), and a document without a usable number simply has no `documentRef`.
+#[tokio::test]
+async fn the_status_view_names_the_document_by_its_printed_number_and_nothing_more() {
+    let rt = runtime("hub-ref").await;
+    for (job_id, document) in [
+        (
+            "sale-018f",
+            json!({ "receipt_id": "  T-000123 ", "customer_name": "Ana Pérez", "total": 42.5 }),
+        ),
+        ("no-number", json!({ "lines": [] })),
+        ("blank-number", json!({ "receipt_id": "   " })),
+        ("not-a-string", json!({ "receipt_id": { "number": 7 } })),
+    ] {
+        let job: NewPrintJob = serde_json::from_value(json!({
+            "jobId": job_id,
+            "role": "receipt",
+            "documentType": "receipt",
+            "document": document,
+        }))
+        .unwrap();
+        rt.enqueue_print_job(&job).await.unwrap();
+    }
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-ref", &[SESSION]),
+    )
+    .await;
+    let by_id = |id: &str| {
+        rows.iter()
+            .find(|r| r["jobId"] == id)
+            .unwrap_or_else(|| panic!("{id} is listed: {rows:?}"))
+    };
+
+    assert_eq!(
+        by_id("sale-018f")["documentRef"],
+        "T-000123",
+        "the printed number, trimmed: {rows:?}"
+    );
+    assert!(
+        !serde_json::to_string(by_id("sale-018f"))
+            .unwrap()
+            .contains("Ana Pérez"),
+        "the number travels, the rest of the document does not: {rows:?}"
+    );
+    for id in ["no-number", "blank-number", "not-a-string"] {
+        assert!(
+            by_id(id).get("documentRef").is_none(),
+            "{id}: no usable number is no field, never an empty label: {rows:?}"
+        );
+    }
+}
+
 /// `role` and `status` filter, which is what turns the screen from a dump into "what is stuck".
 #[tokio::test]
 async fn the_queue_filters_by_station_and_by_status() {

@@ -589,6 +589,41 @@ export function commandVerdictMessage(locale = 'es'): string {
   return locale.toLowerCase().startsWith('en') ? COMMAND_VERDICT_EN : COMMAND_VERDICT_ES;
 }
 
+// ── hub#2288: a READ the hub never answered ──────────────────────────────────────────────────
+//
+// A query that failed did nothing, so there is no verdict to give — only what happened and what
+// to do: the screen could not load its data, and trying again is safe. Localized here for the same
+// reason as the command verdict: modules and the list controller paint `message` verbatim.
+const READ_UNREACHABLE_EN =
+  'The data could not be loaded because the hub is not responding. Check the connection and try again.';
+const READ_UNREACHABLE_ES =
+  'No se han podido cargar los datos porque el hub no responde. Comprueba la conexión e inténtalo de nuevo.';
+
+/**
+ * The error a read gets when its transport failed: {@link SERVER_UNAVAILABLE} as before (hub#782),
+ * the sentence a person may read as `message`, and the transport's technical line on `cause`.
+ * Anything else — a domain refusal, `module_not_installed` — passes through untouched.
+ */
+function unreachableRead(e: unknown, locale: string): unknown {
+  if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) return e;
+  const sentence = locale.toLowerCase().startsWith('en') ? READ_UNREACHABLE_EN : READ_UNREACHABLE_ES;
+  const read = new ErploraError(SERVER_UNAVAILABLE, sentence);
+  read.cause = e;
+  return read;
+}
+
+/**
+ * A `GET` on the core's REST surface is a read like any query — the flow gallery and the templates
+ * tab load through it — so a hub that never answered it gets the same sentence. A write is left as
+ * it arrives: it may have committed, and «could not be loaded» would be a lie.
+ */
+function coreRead<R>(request: Promise<R>, method: string, locale: string): Promise<R> {
+  if (method !== 'GET') return request;
+  return request.catch((e: unknown) => {
+    throw unreachableRead(e, locale);
+  });
+}
+
 /**
  * A command the hub never answered (hub#906). `code` stays {@link SERVER_UNAVAILABLE} — the
  * contract modules already key on since hub#782 — and the verdict travels as the **data field**
@@ -664,6 +699,23 @@ function appOf(failure: PlatformFailure): string {
 const PLUMBING: Bilingual = {
   en: 'The operation could not be completed. Try again, and tell an administrator if it keeps happening.',
   es: 'No se pudo completar la operación. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+};
+
+/**
+ * The stable code the runtime gives a refusal that means «sign in again» (`AuthError::code`,
+ * `crates/server/src/auth.rs`, hub#1241). The two busiest doors, `/api/query` and `/api/command`,
+ * answer a dead session with a bare-string error and no code at all (`dispatch_api::unauthorized`),
+ * so {@link unwrap} names it for them from the 401 (hub#2281).
+ */
+const SESSION_REFUSED = 'unauthorized';
+
+/**
+ * «Your session is over: sign in again.» The same sentence the shell toasts when it closes the
+ * session (`auth.sessionEnded`), so the banner of a module and the toast above it agree.
+ */
+const SESSION_ENDED: Bilingual = {
+  en: 'Your session has ended: it expired or was opened on another device. Please sign in again.',
+  es: 'Tu sesión ha terminado: caducó o se abrió en otro dispositivo. Vuelve a entrar.',
 };
 
 /**
@@ -901,9 +953,25 @@ function refusalText(code: string, locale: string, serverMessage: string): strin
   return text.includes('{message}') ? text.replaceAll('{message}', serverMessage) : text;
 }
 
-function unwrap(env: Envelope): unknown {
+/**
+ * The envelope's `error` as the object this SDK reads, or `undefined` when it carries none.
+ *
+ * hub#2281: some doors still send `error` as a bare STRING of log prose — `/api/query` and
+ * `/api/command` among them, for a dead session (`dispatch_api::unauthorized`). A string has no
+ * code to branch on and nothing a person should read, so it counts as an empty refusal. A 401 that
+ * names no code of its own is the session being refused, and gets the runtime's code for it; a 401
+ * WITH a code (`hub_not_enrolled`: this hub has no machine credential) is about something else, and
+ * signing in again would not fix it.
+ */
+function refusalOf(error: unknown, status?: number): Envelope['error'] | undefined {
+  const e = error !== null && typeof error === 'object' ? (error as NonNullable<Envelope['error']>) : undefined;
+  if (status === 401 && !e?.code) return { ...e, code: SESSION_REFUSED, message: e?.message ?? '' };
+  return e;
+}
+
+function unwrap(env: Envelope, status?: number): unknown {
   if (!env.ok) {
-    const e = env.error;
+    const e = refusalOf(env.error, status);
     // hub#1102: a platform failure is told in the user's language and in business words; a module's
     // own refusal (and any code we do not know) keeps the sentence it arrived with.
     //
@@ -912,13 +980,23 @@ function unwrap(env: Envelope): unknown {
     // order is load-bearing: a platform code is never a module's to rewrite, and a code nobody
     // translated still keeps what arrived.
     const locale = activeLocale();
+    // hub#2281: a refusal of the SESSION is said here, in the transport, and NOT in the public
+    // platform table: the shell's own screens (Settings › Roles, hub#1705) run that table over their
+    // refusals and answer `unauthorized` from their own catalogue when it stays silent.
+    const sessionEnded = e?.code === SESSION_REFUSED;
     const spoken = e
-      ? (platformFailureMessage(e, locale) ??
-        (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
+      ? sessionEnded
+        ? (locale.toLowerCase().startsWith('en') ? SESSION_ENDED.en : SESSION_ENDED.es)
+        : (platformFailureMessage(e, locale) ??
+          (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
       : null;
+    // hub#2281: the last resort is a sentence a person can act on, in their language — never
+    // «unknown error». It is the plumbing one: from the counter, a refusal nobody explained is the
+    // same event as a failure the runtime redacted.
+    const lastResort = locale.toLowerCase().startsWith('en') ? PLUMBING.en : PLUMBING.es;
     throw new ErploraError(
       e?.code ?? 'error',
-      spoken ?? (e?.message || 'unknown error'),
+      spoken ?? (e?.message?.trim() || lastResort),
       e?.permission,
       // hub#1094: absent stays absent. An empty array would read as «the runtime looked and found
       // no bad field», which is a different statement from «this refusal is not about fields».
@@ -1170,7 +1248,7 @@ export class HttpWsTransport implements ErploraTransport {
     }
     // A refusal throws here with its own code; an `ok` envelope on a non-2xx status is nothing
     // the runtime writes, so it is not taken for a file.
-    if (!env.ok) unwrap(env);
+    if (!env.ok) unwrap(env, res.status);
     throw new ErploraError(SERVER_UNAVAILABLE, `unexpected response from ${path}: HTTP ${res.status}`);
   }
 
@@ -1243,7 +1321,7 @@ export class HttpWsTransport implements ErploraTransport {
         `request to ${path} returned an invalid JSON body`,
       );
     }
-    const data = unwrap(env);
+    const data = unwrap(env, res.status);
     return envelope ? env : data;
   }
 
@@ -1525,6 +1603,22 @@ export interface TauriBridge {
 
 /** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
 export const FLOWS_BASE_PATH = '/api/hub/flows';
+
+/** Where the photo a WhatsApp template step sends in its header goes up — the one path
+ *  {@link FlowsApi.uploadWhatsappHeaderImage} posts to (`crates/server/src/flows_header_media.rs`,
+ *  hub#2335). */
+export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header-images';
+
+/**
+ * What {@link FlowsApi.uploadWhatsappHeaderImage} answers. `ref` is what the step stores in
+ * `vars.header_image`; the hub signs a fresh link to it on every send. `mime_type` is decided by
+ * the photo's BYTES, never by its name.
+ */
+export interface WhatsappHeaderImage {
+  ref: string;
+  mime_type: 'image/jpeg' | 'image/png';
+  size: number;
+}
 
 /** Where the hub's event catalogue lives. Every path {@link EventsApi} can build starts here. */
 export const EVENTS_BASE_PATH = '/api/hub/events';
@@ -1808,6 +1902,34 @@ export class FlowsApi {
    */
   async schema(): Promise<FlowSchema> {
     return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/schema` }) as Promise<FlowSchema>;
+  }
+
+  /**
+   * `POST /api/hub/flows/whatsapp-header-images` — **the photo a WhatsApp template step sends in
+   * its header** (hub#2335).
+   *
+   * A template approved with a photo header sends a photo on every message, and Meta downloads it
+   * from a link; the owner has the file, not a public link. The hub keeps it in its own files and
+   * answers a `ref` for the step's `vars.header_image`; every send signs a fresh link to it, so the
+   * file never has to be public and the link never expires in the queue. The same photo twice is
+   * the same `ref`.
+   *
+   * Only a JPEG or a PNG of up to 5 MB (Meta's cap), told by its bytes. A refusal arrives as an
+   * {@link ErploraError} with its code: `whatsapp.header_image_unsupported`,
+   * `whatsapp.header_image_too_large`, `whatsapp.header_image_missing`,
+   * `whatsapp.invalid_header_image_upload`, `whatsapp.header_image_not_saved`.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * {@link templates}: `typeof flows.uploadWhatsappHeaderImage` is the probe.
+   */
+  async uploadWhatsappHeaderImage(file: Blob): Promise<WhatsappHeaderImage> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
+      body: form,
+    }) as Promise<WhatsappHeaderImage>;
   }
 
   /**
@@ -2996,7 +3118,7 @@ export class ErploraClient {
       );
     }
     return (this.flowsApi ??= new FlowsApi(
-      (req) => transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      (req) => coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
       moduleId,
     ));
   }
@@ -3028,7 +3150,7 @@ export class ErploraClient {
       );
     }
     return (this.eventsApi ??= new EventsApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3075,7 +3197,7 @@ export class ErploraClient {
       );
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3103,7 +3225,7 @@ export class ErploraClient {
     const transport = this.transport as Partial<CoreBlobTransport>;
     return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
       typeof transport.coreBlobRequest === 'function'
-        ? transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId })
+        ? coreRead(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
         : Promise.reject(
             new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
           ),
@@ -3136,7 +3258,7 @@ export class ErploraClient {
       );
     }
     return (this.certificateApi ??= new CertificateApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3162,7 +3284,7 @@ export class ErploraClient {
       );
     }
     return (this.printApi ??= new PrintApi((req) =>
-      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
     ));
   }
 
@@ -3172,7 +3294,11 @@ export class ErploraClient {
    * `list` a su query. Para paginar de verdad (total/página) usa `queryPage`.
    */
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T> {
-    return this.transport.query(name, params).then(unwrapPage) as Promise<T>;
+    return this.transport.query(name, params).then(unwrapPage, (e: unknown) => {
+      // hub#2288: a read the hub never answered is told in the user's language, not the
+      // transport's technical line.
+      throw unreachableRead(e, this.locale);
+    }) as Promise<T>;
   }
   /**
    * Query a una integración **OPCIONAL** (ADR-0127): el módulo dueño puede no estar instalado en
@@ -3207,8 +3333,13 @@ export class ErploraClient {
    * `{rows,total,limit,offset}`. Úsala con `createListController` para el `<data-table>`.
    */
   async queryPage<T = unknown>(name: string, params: ListParams = {}): Promise<Page<T>> {
-    const data = (await this.transport.query(name, buildListParams(params))) as Page<T>;
-    return data;
+    try {
+      return (await this.transport.query(name, buildListParams(params))) as Page<T>;
+    } catch (e) {
+      // hub#2288: same sentence as `query()`. `queryAll`/`queryAllOptional` and the list
+      // controller read through here, so they get it without a wrap of their own.
+      throw unreachableRead(e, this.locale);
+    }
   }
   /**
    * Trae **TODAS** las filas de una query de lista. Sin tope, salvo que el llamador pase un `limit`.

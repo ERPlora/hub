@@ -86,6 +86,11 @@ inventory/tests/units.hub.test.py
 # ← invoice_e2e.rs (hub#1345)
 invoice/tests/create.hub.test.py
 invoice/tests/from_sale.hub.test.py
+# invoice: «Mark as paid» moves an issued invoice once; paid again, cancelled or unknown → the
+# translated refusal `invoice.cannot_mark_paid` (the command's `expect_rows`), against the real
+# kernel (invoice#109). New coverage, not moved.
+# pending-publication: invoice#123 until 2026-10-27
+invoice/tests/mark_paid.hub.test.py
 
 # ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
 services/tests/package_redeem.hub.test.py
@@ -177,9 +182,45 @@ appointments/tests/history_trail.hub.test.py
 # (pricing#46). Cobertura nueva, no mudada.
 # pending-publication: pricing#46 until 2026-10-26
 pricing/tests/duplicate_list_code.hub.test.py
+# payments: a payment the assistant or an API integration creates WITHOUT a currency is stored in
+# the HUB's currency — the setting `PUT /api/settings` writes reaches the WASM handler through the
+# required `payments.hub_currency` read — `null` counts as absent and an explicit currency still
+# wins, against the real kernel (payments#38). New coverage, not moved.
+# pending-publication: payments#39 until 2026-10-28
+payments/tests/payment_currency.hub.test.py
 # services: a second live category with the same name in the hub is refused with
 # `services.category_name_taken` — whatever the case and spacing — through the manifest's
 # `on_unique`, and a deleted one frees its name, against the real kernel (services#107).
 # New coverage, not moved.
 # pending-publication: services#112 until 2026-10-26
 services/tests/category_name_taken.hub.test.py
+# cash_register: the till count adds its notes and coins with the scale of the HUB currency — the
+# setting `PUT /api/settings` writes reaches the WASM handler through the `cash_register.currency_scale`
+# read, so yen count 5003 (not 500300), Kuwaiti dinars 515 fils and euros 10015 cents, against the
+# real kernel (cash_register#111). New coverage, not moved.
+# pending-publication: cash_register#111 until 2026-10-27
+cash_register/tests/count_currency.hub.test.py
+# services: a courtesy on a SOLD voucher — one more session revives a used-up one, days revive an
+# expired one — is refused by name (unlimited, never expires, adds nothing, not in this hub,
+# voided) with nothing written, and is announced and listed in the voucher's movements, against
+# the real kernel (services#118). New coverage, not moved.
+# pending-publication: services#125 until 2026-10-28
+services/tests/grant_adjust.hub.test.py
+# services: a void or a balance correction of a SOLD voucher waits for a till that is holding or
+# spending a session of the SAME voucher and is then refused by name (`services.grant_not_voidable`,
+# `services.grant_not_adjustable`), and a till that arrives after a void spends nothing — the doors
+# queue on the voucher's row lock, against the real kernel (services#120). New coverage, not moved.
+# pending-publication: services#129 until 2026-10-28
+services/tests/grant_race.hub.test.py
+# cart_checkout: a cart the assistant or an API integration creates WITHOUT a currency is born in the
+# HUB's currency — the setting `PUT /api/settings` writes is the one `cart_checkout.carts.create`
+# reads once the runtime has applied the schema — `null` counts as absent and an explicit currency
+# still wins, against the real kernel (cart_checkout#34). New coverage, not moved.
+# pending-publication: cart_checkout#35 until 2026-10-28
+cart_checkout/tests/cart_currency.hub.test.py
+# verifactu: the Events screen's search box narrows the audit log to the words typed — the message,
+# the type's code and the type's name as the screen paints it, in Spanish and in English — and the
+# list opens on the newest event, through the list engine of the real kernel (verifactu#140,
+# verifactu#144). New coverage, not moved.
+# pending-publication: verifactu#148 until 2026-10-28
+verifactu/tests/events_list.hub.test.py

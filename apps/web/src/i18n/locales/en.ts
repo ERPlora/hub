@@ -61,6 +61,11 @@ export default {
     printingStalledTitle: 'Nothing is printing “{station}”',
     printingStalledBody:
       '{count} document waiting for {minutes} min. Check the till that prints there is on. | {count} documents waiting for {minutes} min. Check the till that prints there is on.',
+    // Installed apps with a newer version the owner can apply (hub#1172). The row leads to Apps →
+    // «My apps», where each update is one tap.
+    moduleUpdatesTitle: 'App updates available',
+    moduleUpdatesBody:
+      '{n} app has a new version. Update it from My apps. | {n} apps have a new version. Update them from My apps.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',
@@ -887,6 +892,11 @@ export default {
     cancelledFor: 'Booking cancelled · {customer}',
     when: '{date} at {time}',
   },
+  // hub#2303 — system notice when a bell counter goes up; {label} is the module's own counter label.
+  bellNotice: {
+    title: '{label} ({count})',
+    body: 'Check the bell to deal with it.',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
@@ -1625,6 +1635,11 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
+    // hub#2283. Shown INSTEAD of «Incorrect PIN» while the hub refuses PINs after too many failures:
+    // the PIN may be right, so the sentence says to wait, and how long when the hub names it.
+    pinTooManyAttempts:
+      'Too many failed attempts. Wait {minutes} minute and try again. | Too many failed attempts. Wait {minutes} minutes and try again.',
+    pinTooManyAttemptsNoWait: 'Too many failed attempts. Wait a few minutes and try again.',
     // hub#658 — one sentence for every way a badge can be refused, on purpose: the login door must
     // not become the way to find out which cards this business has issued.
     orSwipeBadge: '…or swipe your badge — no need to tap your name first.',

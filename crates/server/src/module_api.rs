@@ -362,9 +362,9 @@ pub(crate) async fn update_module(
 }
 
 /// `GET /api/modules/updates` — qué versión ofrece hoy el marketplace para cada módulo instalado
-/// (hub#516). **Bajo demanda**, no en bucle: lo pregunta la pantalla de Apps cuando alguien la
-/// abre. Un sondeo periódico costaría una llamada por módulo (24) contra el Cloud sin que nadie
-/// esté mirando, y la vía desatendida ya la cubre el arranque, que resuelve la última versión.
+/// (hub#516). **On demand, never a fast poll**: each call costs one Cloud call per module (24). The
+/// Apps screen asks when it opens, and the shell's bell notice (hub#1172) asks when an admin session
+/// starts and then hours apart; the unattended path is still the boot, which resolves the latest.
 ///
 /// Usa **el mismo resolutor** que el arranque, así que lo que el botón ofrece es exactamente lo que
 /// la actualización automática haría sola: nunca una versión en cuarentena, nunca hacia atrás, y el

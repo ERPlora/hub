@@ -353,7 +353,7 @@
                   </div>
 
                   <ion-note v-if="pinError" color="danger" class="error-note" data-testid="login-pin-error">
-                    {{ t(pinErrorKey) }}
+                    {{ pinErrorText }}
                   </ion-note>
                   <ion-button
                     v-if="!showTabs"
@@ -881,8 +881,12 @@ const pinUser = ref<TrustedUser | null>(
 );
 const pinValue = ref<string>('');
 const pinError = ref<boolean>(false);
-/** i18n key of the sentence under the pinpad when [`pinError`] is up. See [`pinRefusalKey`]. */
-const pinErrorKey = ref<string>('login.pinIncorrect');
+/** The sentence under the pinpad when [`pinError`] is up. See [`pinRefusal`]. */
+const pinErrorRefusal = ref<PinRefusal>({ key: 'login.pinIncorrect' });
+const pinErrorText = computed(() => {
+  const { key, minutes } = pinErrorRefusal.value;
+  return minutes === undefined ? t(key) : t(key, { minutes }, minutes);
+});
 const pinLoading = ref(false);
 // Referencia al <ok-pinpad> del paso PIN (para limpiar su valor tras error / cambiar usuario).
 const mainPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
@@ -917,6 +921,12 @@ function onPinToEmail(): void {
   pinError.value = false;
 }
 
+interface PinRefusal {
+  key: string;
+  /** Whole minutes to wait, for the keys that name them. */
+  minutes?: number;
+}
+
 /**
  * Which sentence a refused PIN gets (hub#330).
  *
@@ -928,11 +938,20 @@ function onPinToEmail(): void {
  * **An unknown code falls back to «Incorrect PIN»**, on purpose: that sentence is merely unhelpful,
  * while an instruction invented for a code this build has never seen would be actively wrong.
  */
-function pinRefusalKey(err: unknown): string {
+function pinRefusal(err: unknown): PinRefusal {
   const code = (err as { code?: unknown } | null)?.code;
-  if (code === 'device_untrusted') return 'login.deviceNotEnrolled';
-  if (code === 'device_unidentified') return 'login.deviceUnidentified';
-  return 'login.pinIncorrect';
+  if (code === 'device_untrusted') return { key: 'login.deviceNotEnrolled' };
+  if (code === 'device_unidentified') return { key: 'login.deviceUnidentified' };
+  // hub#2283: the brute-force lock (per name, per badge, per address) is not a wrong PIN — the PIN
+  // may be right. Say how long to wait, rounded UP so nobody retries into a lock that is still on.
+  if (code === 'too_many_attempts') return lockRefusal(err);
+  return { key: 'login.pinIncorrect' };
+}
+
+function lockRefusal(err: unknown): PinRefusal {
+  const secs = (err as { retryAfterSecs?: unknown } | null)?.retryAfterSecs;
+  if (typeof secs !== 'number') return { key: 'login.pinTooManyAttemptsNoWait' };
+  return { key: 'login.pinTooManyAttempts', minutes: Math.max(1, Math.ceil(secs / 60)) };
 }
 
 async function checkPin(pin: string): Promise<void> {
@@ -956,7 +975,7 @@ async function checkPin(pin: string): Promise<void> {
     });
     await router.replace(redirectTarget());
   } catch (err) {
-    pinErrorKey.value = pinRefusalKey(err);
+    pinErrorRefusal.value = pinRefusal(err);
     pinError.value = true;
     pinValue.value = '';
     // Limpia los círculos del ok-pinpad para reintentar.
@@ -999,7 +1018,7 @@ async function signInWithBadge(badge: string): Promise<void> {
     });
     await router.replace(redirectTarget());
   } catch (err) {
-    pinErrorKey.value = badgeRefusalKey(err);
+    pinErrorRefusal.value = { key: badgeRefusalKey(err) };
     pinError.value = true;
     if (mainPinpadRef.value) mainPinpadRef.value.value = '';
   } finally {

@@ -36,7 +36,19 @@ pub(crate) struct CloudLoginReq {
 /// cuenta aquí»). Lo que sí se mantiene indistinguible es *desconocido* de *revocado*: los dos son
 /// `device_untrusted`, con el mismo texto, para que la puerta no confirme si alguien cortó un
 /// dispositivo perdido (ADR-0258).
-pub(crate) async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
+pub(crate) async fn auth_pin(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<PinReq>,
+) -> Response {
+    // Per-address guard (hub#2282): first and cheapest, before the device gate and the database.
+    let client = crate::address_guard::client_address(&headers);
+    if let Some(retry_after_secs) = client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
+    {
+        return too_many_attempts(retry_after_secs);
+    }
     let rt = st.runtime.read().await;
     // Qué dispositivo dice ser este cliente. **Se normaliza una sola vez** y de aquí sale todo lo
     // demás: una cabecera de espacios es un cliente que no se identificó, y tiene que caer en la
@@ -72,6 +84,11 @@ pub(crate) async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>
         }
         Ok(None) => {
             st.login_throttle.record_failure(&req.name);
+            crate::address_guard::record_guess(
+                &st,
+                client.as_deref(),
+                crate::address_guard::Failure::Pin,
+            );
             (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
@@ -189,7 +206,18 @@ pub(crate) struct BadgeReq {
 /// plan. La guarda se cuenta contra el **índice** de la tarjeta y no contra un nombre —aquí no hay
 /// nombre que teclear— y eso además la hace más precisa: bloquea la tarjeta que se está probando,
 /// sin que nadie pueda dejar fuera a un compañero pasando cinco veces una tarjeta rota a su nombre.
-pub(crate) async fn auth_badge(State(st): State<AppState>, Json(req): Json<BadgeReq>) -> Response {
+pub(crate) async fn auth_badge(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<BadgeReq>,
+) -> Response {
+    let client = crate::address_guard::client_address(&headers);
+    if let Some(retry_after_secs) = client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
+    {
+        return too_many_attempts(retry_after_secs);
+    }
     let rt = st.runtime.read().await;
     let device_id = req
         .device_id
@@ -227,6 +255,11 @@ pub(crate) async fn auth_badge(State(st): State<AppState>, Json(req): Json<Badge
         }
         Ok(None) => {
             st.login_throttle.record_failure(&throttle_key);
+            crate::address_guard::record_guess(
+                &st,
+                client.as_deref(),
+                crate::address_guard::Failure::Badge,
+            );
             (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({ "ok": false, "error": "placa no reconocida", "code": "badge_rejected" })),
@@ -248,7 +281,11 @@ pub(crate) async fn auth_cloud(
     let Some(token) = auth::bearer(&headers) else {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "ok": false, "error": "falta Authorization: Bearer" })),
+            Json(json!({
+                "ok": false,
+                "error": "missing Authorization: Bearer",
+                "code": "cloud_token_missing",
+            })),
         )
             .into_response();
     };
@@ -273,18 +310,34 @@ pub(crate) async fn open_cloud_session(
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "ok": false, "error": "login cloud no disponible (sin clave pública)" })),
+            Json(json!({
+                "ok": false,
+                "error": "cloud login unavailable: the hub has no SaaS public key",
+                "code": "cloud_login_not_configured",
+            })),
         )
             .into_response();
     };
     let claims = match cloud_client::verify_user_jwt(&token, pem) {
         Ok(c) => c,
-        Err(e) => {
+        Err(error) => {
+            // The detail goes to the log, never to the answer (hub#2310): `jsonwebtoken` repeats an
+            // unknown `alg` verbatim, so the body echoed the caller's own text and gave the screen
+            // no code to read. `?` over the text, never `%` or `{e}` (hub#2300), keeps a raw `\n`
+            // in that `alg` from ending this line and forging the next one.
+            tracing::warn!(
+                error = ?error.to_string(),
+                "cloud login refused: the user token does not verify"
+            );
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({ "ok": false, "error": format!("token inválido: {e}") })),
+                Json(json!({
+                    "ok": false,
+                    "error": "the user token does not verify",
+                    "code": "cloud_token_invalid",
+                })),
             )
-                .into_response()
+                .into_response();
         }
     };
     let hub_id = st.hub_id();
@@ -760,7 +813,7 @@ pub(crate) async fn auth_handoff(
             }
             Ok(None) => return refuse(StatusCode::UNAUTHORIZED, "handoff_session_required"),
             Err(e) => {
-                eprintln!("[handoff] could not resolve the session: {e}");
+                tracing::error!(error = ?e.to_string(), "handoff: could not resolve the session");
                 return refuse(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "handoff_session_unreadable",
@@ -787,13 +840,20 @@ pub(crate) async fn auth_handoff(
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
         // Without the public key the hub cannot check who the token names, and this door exists
         // precisely to check it. It says so; it does not open halfway.
-        eprintln!("[handoff] the hub has no SaaS public key: the door stays shut");
+        tracing::error!("handoff: the hub has no SaaS public key, the door stays shut");
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "handoff_not_configured");
     };
     let claims = match cloud_client::verify_user_jwt(&access, pem) {
         Ok(claims) => claims,
-        Err(e) => {
-            eprintln!("[handoff] invalid user JWT: {e}");
+        Err(error) => {
+            // `?` over the text and never `%` or `{e}` (hub#2300): `jsonwebtoken` repeats an
+            // unknown `alg` verbatim, so a raw `\n` in the caller's token used to end this line and
+            // start one that read as `event=auth_failed … client=<another shop>`. `Debug` of the
+            // string quotes it and escapes every control character, so it stays one field.
+            tracing::warn!(
+                error = ?error.to_string(),
+                "handoff refused: the user token does not verify"
+            );
             return refuse(StatusCode::UNAUTHORIZED, "handoff_user_token_invalid");
         }
     };
@@ -816,21 +876,24 @@ pub(crate) async fn auth_handoff(
             Ok(body) => match body.get("code").and_then(Value::as_str) {
                 Some(code) if !code.is_empty() => code.to_string(),
                 _ => {
-                    eprintln!("[handoff] the SaaS answered without a one-time code");
+                    tracing::warn!("handoff: the SaaS answered without a one-time code");
                     return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
                 }
             },
             Err(e) => {
-                eprintln!("[handoff] unreadable answer from the SaaS: {e}");
+                tracing::warn!(error = ?e.to_string(), "handoff: unreadable answer from the SaaS");
                 return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
             }
         },
         Ok(response) => {
-            eprintln!("[handoff] the SaaS refused the pass: {}", response.status());
+            tracing::warn!(
+                status = response.status().as_u16(),
+                "handoff: the SaaS refused the pass"
+            );
             return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
         }
         Err(e) => {
-            eprintln!("[handoff] could not ask the SaaS for the pass: {e}");
+            tracing::warn!(error = ?e.to_string(), "handoff: could not ask the SaaS for the pass");
             return refuse(crate::cloud_proxy::CLOUD_FAILED, "handoff_unavailable");
         }
     };
@@ -917,5 +980,242 @@ pub(crate) async fn mint_session_with_extra(
             Json(payload).into_response()
         }
         Err(e) => err_response(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Public half of a throwaway pair: the forged token is refused while its header is parsed,
+    /// so the key only has to be a valid RSA PEM.
+    const HANDOFF_PUB: &str = "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8xsyMiSRgmfQusugZuaw
+0g+qMj5urzS2z9VxNybCHbWcfMkQaX6Jo7ILZeQTYsVYKhQMbbOZu6HSdQN4tqCn
+QarFStcBfo6VWhH/DuvrbPvLN47vAGQslEjYwqkVDm1AvY4zgluVUlkp1LGXRjV1
+O1E1jrW7zsasviHRRNAznmsx/otkkkPlleLt+65YnRodBh2ErJ20Hh0cl2eIsmMQ
+n0A5ahgGAj6dxgrxHa2vk4mV5iXyJe2rPP3E6gWN8DrrHMAou6Rixjg0Mh/EGsDU
+oac71BzarU6Of6OA1U1n949C1CQwpZbMJDCETF/ZvTPQ4b6q+qg/XXovo7kfFsMh
+nQIDAQAB
+-----END PUBLIC KEY-----
+";
+
+    /// The line the address guard writes when a PIN fails — the one the edge ban and the
+    /// `erp-hub-auth-failed-burst` alert count — pointing at somebody else's shop.
+    const FORGED: &str =
+        "WARN erplora_server::address_guard: event=auth_failed reason=pin client=203.0.113.7 hub=h";
+
+    /// Asks for the pass to erplora.com through the real door, as an owner signed in with their
+    /// password, presenting a user token whose JWT header names the algorithm `alg`.
+    /// `jsonwebtoken` refuses an unknown `alg` with a serde error that repeats the value
+    /// verbatim — text the caller controls. Returns the status plus what reached the log.
+    async fn logged_handoff(alg: &str) -> (StatusCode, String) {
+        use base64::Engine as _;
+        let db = erplora_db::testutil::fresh_db().await;
+        let rt = erplora_runtime::Runtime::with_hub_id(Box::new(db), "hub-handoff-log");
+        rt.ensure_system_tables().await.unwrap();
+        let owner = rt
+            .create_user("Ana", "4729", "owner", Some("77"))
+            .await
+            .unwrap();
+        let session = rt
+            .create_session_with_credential(
+                &owner,
+                3600,
+                Some("till-1"),
+                &erplora_runtime::identity::Credential::cloud(),
+            )
+            .await
+            .unwrap();
+        let temp = std::env::temp_dir().join(format!("erplora-handoff-log-{}", std::process::id()));
+        let cfg = crate::HubConfig {
+            demo: false,
+            hub_id: "hub-handoff-log".into(),
+            cloud_base_url: "http://127.0.0.1:1".into(),
+            module_cache: temp.join("modules-cache"),
+            auth_mode: crate::state::AuthMode::Session,
+            jwt_public_key: Some(HANDOFF_PUB.into()),
+            cloud_api_token: None,
+            device_trust_enforce: false,
+            media_dir: temp,
+            sector: None,
+            dev_mode: false,
+            dev_modules_dir: None,
+            module_trusted_keys: Vec::new(),
+        };
+        let st = crate::AppState::with_config(rt, cfg);
+
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let header = b64.encode(json!({ "alg": alg, "typ": "JWT" }).to_string());
+        let token = format!("{header}.{}.{}", b64.encode("{}"), b64.encode("sig"));
+        let mut headers = HeaderMap::new();
+        headers.insert("x-hub-session", session.parse().unwrap());
+        headers.insert("authorization", format!("Bearer {token}").parse().unwrap());
+
+        let (sink, guard) = crate::log_capture::capture_scope();
+        let response = auth_handoff(State(st), headers, None).await;
+        drop(guard);
+        // The session lookup inside the door leaves its own `sqlx` DEBUG lines; they are not the
+        // refusal and a forged line cannot pass for one (it would carry no timestamp).
+        let log = sink
+            .text()
+            .lines()
+            .filter(|line| !line.contains(" DEBUG sqlx::"))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        (response.status(), log)
+    }
+
+    #[tokio::test]
+    async fn hub2300_a_newline_in_the_user_token_cannot_forge_a_log_line() {
+        // A signed-in employee used to end the refusal's line with a raw `\n` smuggled in the
+        // token's `alg`, and start a second one that read exactly like a failed PIN elsewhere.
+        let (status, log) = logged_handoff(&format!("x\n{FORGED}")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "one refused handoff must be one line, got {log:?}"
+        );
+        assert!(
+            lines[0].contains("handoff refused: the user token does not verify"),
+            "the only line is not the refusal's: {log:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2300_a_forged_event_stays_quoted_inside_the_error_field() {
+        // Without a newline the fake text rode as bare `event=… client=…` pairs, which a
+        // key=value reader cannot tell from the hub's own. Quoted, it is one value.
+        let (_, log) = logged_handoff(&format!("x {FORGED}")).await;
+        let line = log.lines().next().unwrap_or_default();
+        let (_, error) = line
+            .split_once(" error=\"")
+            .unwrap_or_else(|| panic!("the error is not a quoted field: {log:?}"));
+        assert!(
+            error.ends_with('"') && error.contains(FORGED),
+            "the forged text is not enclosed in the error field: {log:?}"
+        );
+    }
+
+    /// A hub with (or without) the SaaS public key, for the ordinary sign-in with an erplora.com
+    /// account. Nothing reaches the network: every case here is refused before the SaaS is asked.
+    async fn cloud_login_state(jwt_public_key: Option<&str>) -> crate::AppState {
+        let db = erplora_db::testutil::fresh_db().await;
+        let rt = erplora_runtime::Runtime::with_hub_id(Box::new(db), "hub-cloud-login");
+        rt.ensure_system_tables().await.unwrap();
+        let temp = std::env::temp_dir().join(format!("erplora-cloud-login-{}", std::process::id()));
+        let cfg = crate::HubConfig {
+            demo: false,
+            hub_id: "hub-cloud-login".into(),
+            cloud_base_url: "http://127.0.0.1:1".into(),
+            module_cache: temp.join("modules-cache"),
+            auth_mode: crate::state::AuthMode::Session,
+            jwt_public_key: jwt_public_key.map(str::to_string),
+            cloud_api_token: None,
+            device_trust_enforce: false,
+            media_dir: temp,
+            sector: None,
+            dev_mode: false,
+            dev_modules_dir: None,
+            module_trusted_keys: Vec::new(),
+        };
+        crate::AppState::with_config(rt, cfg)
+    }
+
+    /// Signs in through `POST /api/auth/cloud` with a user token whose JWT header names the
+    /// algorithm `alg` — the text `jsonwebtoken` repeats verbatim when it refuses it. Returns the
+    /// status, the JSON body and what reached the log.
+    async fn cloud_login_with_alg(alg: &str) -> (StatusCode, Value, String) {
+        use base64::Engine as _;
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let header = b64.encode(json!({ "alg": alg, "typ": "JWT" }).to_string());
+        let token = format!("{header}.{}.{}", b64.encode("{}"), b64.encode("sig"));
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", format!("Bearer {token}").parse().unwrap());
+        let st = cloud_login_state(Some(HANDOFF_PUB)).await;
+        let (sink, guard) = crate::log_capture::capture_scope();
+        let response = auth_cloud(State(st), headers, None).await;
+        drop(guard);
+        let log = sink
+            .text()
+            .lines()
+            .filter(|line| !line.contains(" DEBUG sqlx::"))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        let status = response.status();
+        (status, body_json(response).await, log)
+    }
+
+    async fn body_json(response: Response) -> Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn hub2310_a_refused_cloud_token_answers_a_stable_code_and_not_the_callers_text() {
+        // The body used to be `token inválido: <jsonwebtoken error>`: no code for the screen to
+        // read, and the caller's own `alg` echoed back inside it.
+        let (status, body, _) = cloud_login_with_alg(&format!("x {FORGED}")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["ok"], json!(false));
+        assert_eq!(body["code"], json!("cloud_token_invalid"), "{body}");
+        assert!(
+            !body.to_string().contains("event=auth_failed"),
+            "the caller's text came back in the answer: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2310_the_refused_cloud_token_is_logged_once_with_its_detail_quoted() {
+        // The detail leaves the answer but not the hub: it goes to the log, as one quoted field
+        // that a raw `\n` in the caller's `alg` cannot split into a second, forged line.
+        let (_, _, log) = cloud_login_with_alg(&format!("x\n{FORGED}")).await;
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "one refused sign-in must be one line: {log:?}"
+        );
+        assert!(
+            lines[0].contains("cloud login refused: the user token does not verify"),
+            "the only line is not the refusal's: {log:?}"
+        );
+        // A refused sign-in is something an operator looks for; below the production filter it
+        // would never be written at all.
+        assert!(
+            lines[0].contains(" WARN erplora_server::auth_api:"),
+            "the refusal is not logged as a warning: {log:?}"
+        );
+        let (_, error) = lines[0]
+            .split_once(" error=\"")
+            .unwrap_or_else(|| panic!("the error is not a quoted field: {log:?}"));
+        assert!(
+            error.ends_with('"') && error.contains(FORGED),
+            "the detail is not enclosed in the error field: {log:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2310_a_hub_without_the_saas_key_answers_a_stable_code() {
+        let st = cloud_login_state(None).await;
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer a.b.c".parse().unwrap());
+        let response = auth_cloud(State(st), headers, None).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = body_json(response).await;
+        assert_eq!(body["code"], json!("cloud_login_not_configured"), "{body}");
+    }
+
+    #[tokio::test]
+    async fn hub2310_a_cloud_sign_in_without_a_token_answers_a_stable_code() {
+        let st = cloud_login_state(Some(HANDOFF_PUB)).await;
+        let response = auth_cloud(State(st), HeaderMap::new(), None).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = body_json(response).await;
+        assert_eq!(body["code"], json!("cloud_token_missing"), "{body}");
     }
 }

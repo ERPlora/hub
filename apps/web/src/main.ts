@@ -49,7 +49,8 @@ import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
 import { comandaFailureNotice } from './lib/print-comanda-notice';
-import { bootAppointmentNotices } from './lib/appointment-notice';
+import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './lib/appointment-notice';
+import { bootBellNotices } from './lib/bell-notice';
 import {
   ensureNotificationPermission,
   primerLabelsFrom,
@@ -351,6 +352,18 @@ bootPrintComanda(getClient(), {
 // refusal stops here instead of falling through to `peripherals.notify()`, which would pop
 // Android's bare dialog with no sentence of ours in front of it.
 bootAppointmentNotices(getClient(), {
+  t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
+  notify: async (title, body) => {
+    if (!shouldSendNotice(await askToWarn())) return;
+    await getClient().peripherals.notify(title, body);
+  },
+});
+
+// And any module's bell counter that goes UP (hub#2303): a WhatsApp customer handed over to a
+// person rang nowhere but on the bell, which only helps whoever is looking at it. Same gate and
+// same door as the two above; the appointments are left out because their booking already rang.
+bootBellNotices({
+  ownNotice: new Set([APPOINTMENT_NOTICE_MODULE]),
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
   notify: async (title, body) => {
     if (!shouldSendNotice(await askToWarn())) return;

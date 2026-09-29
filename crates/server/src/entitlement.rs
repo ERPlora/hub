@@ -322,7 +322,14 @@ pub(crate) async fn push_refresh(
     let claims = match cloud_client::verify_entitlement(&token, &public_key, now) {
         Ok(claims) => claims,
         Err(error) => {
-            tracing::warn!(%error, "entitlement push refused: token does not verify");
+            // `?` over the text and never `%` (hub#2297): the door is open and `jsonwebtoken`
+            // repeats an unknown `alg` verbatim, so a raw `\n` used to end this line and start
+            // one that read as `event=auth_failed … client=<another shop>`. `Debug` of the
+            // string quotes it and escapes every control character, so it stays one field.
+            tracing::warn!(
+                error = ?error.to_string(),
+                "entitlement push refused: token does not verify"
+            );
             st.login_throttle.record_failure(&key);
             return push_refused(StatusCode::UNAUTHORIZED, "entitlement_token_invalid");
         }
@@ -1078,6 +1085,101 @@ mod tests {
         assert_eq!(interval_secs(Some("no-numero")), DEFAULT_REVALIDATE_SECS);
         assert_eq!(interval_secs(Some("0")), DEFAULT_REVALIDATE_SECS);
         assert_eq!(interval_secs(Some("")), DEFAULT_REVALIDATE_SECS);
+    }
+
+    /// Public half of the throwaway pair the push tests sign with: the forged token is refused
+    /// while its header is parsed, so the key only has to be a valid RSA PEM.
+    const PUSH_PUB: &str = "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8xsyMiSRgmfQusugZuaw
+0g+qMj5urzS2z9VxNybCHbWcfMkQaX6Jo7ILZeQTYsVYKhQMbbOZu6HSdQN4tqCn
+QarFStcBfo6VWhH/DuvrbPvLN47vAGQslEjYwqkVDm1AvY4zgluVUlkp1LGXRjV1
+O1E1jrW7zsasviHRRNAznmsx/otkkkPlleLt+65YnRodBh2ErJ20Hh0cl2eIsmMQ
+n0A5ahgGAj6dxgrxHa2vk4mV5iXyJe2rPP3E6gWN8DrrHMAou6Rixjg0Mh/EGsDU
+oac71BzarU6Of6OA1U1n949C1CQwpZbMJDCETF/ZvTPQ4b6q+qg/XXovo7kfFsMh
+nQIDAQAB
+-----END PUBLIC KEY-----
+";
+
+    /// The line the address guard writes when a PIN fails — the one the edge ban and the
+    /// `erp-hub-auth-failed-burst` alert count — pointing at somebody else's shop.
+    const FORGED: &str =
+        "WARN erplora_server::address_guard: event=auth_failed reason=pin client=203.0.113.7 hub=h";
+
+    async fn push_state() -> crate::AppState {
+        let db = erplora_db::testutil::fresh_db().await;
+        let rt = erplora_runtime::Runtime::with_hub_id(Box::new(db), "hub-push-log");
+        rt.ensure_system_tables().await.unwrap();
+        let temp = std::env::temp_dir().join(format!("erplora-ent-log-{}", std::process::id()));
+        let cfg = crate::HubConfig {
+            demo: false,
+            hub_id: "hub-push-log".into(),
+            cloud_base_url: "https://example.invalid".into(),
+            module_cache: temp.join("modules-cache"),
+            auth_mode: crate::state::AuthMode::Session,
+            jwt_public_key: Some(PUSH_PUB.into()),
+            cloud_api_token: None,
+            device_trust_enforce: false,
+            media_dir: temp,
+            sector: None,
+            dev_mode: false,
+            dev_modules_dir: None,
+            module_trusted_keys: Vec::new(),
+        };
+        crate::AppState::with_config(rt, cfg)
+    }
+
+    /// POSTs a token whose JWT header names the algorithm `alg` through the real door and
+    /// returns the status plus what reached the log. `jsonwebtoken` refuses an unknown `alg`
+    /// with a serde error that repeats the value verbatim — the text a stranger controls.
+    async fn logged_push(alg: &str) -> (axum::http::StatusCode, String) {
+        use base64::Engine as _;
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let header = b64.encode(serde_json::json!({ "alg": alg, "typ": "JWT" }).to_string());
+        let token = format!("{header}.{}.{}", b64.encode("{}"), b64.encode("sig"));
+        let body = serde_json::json!({ "token": token }).to_string();
+        let st = push_state().await;
+        let (sink, guard) = crate::log_capture::capture_scope();
+        let response = push_refresh(
+            axum::extract::State(st),
+            axum::http::HeaderMap::new(),
+            axum::body::Bytes::from(body),
+        )
+        .await;
+        drop(guard);
+        (response.status(), sink.text())
+    }
+
+    #[tokio::test]
+    async fn hub2297_a_newline_in_a_pushed_token_cannot_forge_a_log_line() {
+        // The door has no session and no key, and tracing escapes ESC but not `\n`: the refusal
+        // used to end its line and start a second one that read exactly like a failed PIN.
+        let (status, log) = logged_push(&format!("x\n{FORGED}")).await;
+        assert_eq!(status, axum::http::StatusCode::UNAUTHORIZED);
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "one refused push must be one line, got {log:?}"
+        );
+        assert!(
+            lines[0].contains("entitlement push refused: token does not verify"),
+            "the only line is not the refusal's: {log:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub2297_a_forged_event_stays_quoted_inside_the_error_field() {
+        // Without a newline the fake text rode inside the refusal as bare `event=… client=…`
+        // pairs, which a key=value reader cannot tell from the hub's own. Quoted, it is one value.
+        let (_, log) = logged_push(&format!("x {FORGED}")).await;
+        let line = log.lines().next().unwrap_or_default();
+        let (_, error) = line
+            .split_once(" error=\"")
+            .unwrap_or_else(|| panic!("the error is not a quoted field: {log:?}"));
+        assert!(
+            error.ends_with('"') && error.contains(FORGED),
+            "the forged text is not enclosed in the error field: {log:?}"
+        );
     }
 
     #[test]

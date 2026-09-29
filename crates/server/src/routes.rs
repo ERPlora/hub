@@ -6,6 +6,7 @@ use crate::*;
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
     let activity_state = state.activity.clone();
+    let rejection_state = state.clone();
     // hub#1401: liveness/readiness viven en SU router, FUERA del presupuesto de peticiones en vuelo
     // que lleva la superficie de negocio (más abajo). Un chequeo de salud que reciba un `503` bajo
     // sobrecarga lo lee Swarm como «contenedor no sano» y reprograma el contenedor en plena punta
@@ -428,6 +429,15 @@ pub fn app(state: AppState) -> Router {
             get(flows_api::list_flows).post(flows_api::create_flow),
         )
         .route("/api/hub/flows/runs/:run_id", get(flows_api::get_run))
+        // The photo of a WhatsApp header, uploaded from a template step (hub#2335): a static
+        // segment like `runs`, so matchit resolves it ahead of `:id`. Same door as the flows; the
+        // image is read and vetted here (JPEG/PNG by its bytes, 5 MB), so the body limit is that
+        // cap plus the form around it.
+        .route(
+            "/api/hub/flows/whatsapp-header-images",
+            post(flows_header_media::upload_whatsapp_header_image)
+                .layer(flows_header_media::body_limit()),
+        )
         // `schema` is a static segment too (hub#716): the contract the editor builds its UI from,
         // served by the hub instead of copied into every module's bundle. It goes here for the
         // same reason as `runs` — matchit resolves the static segment ahead of `:id`, and
@@ -615,6 +625,11 @@ pub fn app(state: AppState) -> Router {
             activity_state,
             track_user_activity,
         ))
+        // hub#2282: a session credential that did not resolve counts against its address.
+        .layer(axum::middleware::from_fn_with_state(
+            rejection_state,
+            track_rejected_credentials,
+        ))
         // Primera barrera del runtime: una máquina real sin UUID+credencial Cloud solo puede
         // consultar salud/contexto para pintar el login. Demo es la única excepción.
         .layer(axum::middleware::from_fn_with_state(
@@ -671,6 +686,79 @@ pub(crate) async fn track_user_activity(
         activity.touch(entitlement::now_unix());
     }
     response
+}
+
+/// Counts a session credential that came back `401` against the client's address (hub#2282).
+///
+/// Read from the OUTSIDE of every handler on purpose: more than thirty doors resolve a session,
+/// and the only thing they all agree on is the `401`. The three credentials are the ones that take
+/// a request past the edge bouncer (infra#335): `X-Hub-Session`, the `erplora_media` cookie on the
+/// media read door, and the `ticket` of the event stream. A session that still resolves is never
+/// counted: some doors answer `401` to a valid session whose role falls short (the admin metrics,
+/// export/import, reset), and that cashier invented nothing.
+pub(crate) async fn track_rejected_credentials(
+    State(st): State<AppState>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let presented = presented_credential(&request);
+    let client = crate::address_guard::client_address(request.headers());
+    let response = next.run(request).await;
+    if response.status() == StatusCode::UNAUTHORIZED {
+        if let Some((reason, token)) = presented {
+            if reason == crate::address_guard::Failure::SessionInvalid
+                && session_resolves(&st, &token).await
+            {
+                return response;
+            }
+            crate::address_guard::record_rejected_credential(
+                &st,
+                client.as_deref(),
+                reason,
+                &token,
+            );
+        }
+    }
+    response
+}
+
+/// Whether `token` is a live session of this hub. Asked on the `401` path only. A database error
+/// answers `true`: an outage must not lock shops out of their PIN door.
+async fn session_resolves(st: &AppState, token: &str) -> bool {
+    let rt = st.runtime.read().await;
+    !matches!(rt.resolve_session(token).await, Ok(None))
+}
+
+/// The session credential this request presents, if any — in the order the doors read them.
+fn presented_credential(
+    request: &axum::extract::Request,
+) -> Option<(crate::address_guard::Failure, String)> {
+    use crate::address_guard::Failure;
+    let headers = request.headers();
+    if let Some(token) = auth::session_token(headers) {
+        return Some((Failure::SessionInvalid, token));
+    }
+    let path = request.uri().path();
+    if path == "/api/media/raw" {
+        if let Some(token) = auth::cookie(headers, crate::media::MEDIA_COOKIE) {
+            return Some((Failure::SessionInvalid, token));
+        }
+    }
+    if path == "/api/events" && auth::api_key_token(headers).is_none() {
+        let ticket = request
+            .uri()
+            .query()
+            .into_iter()
+            .flat_map(|q| q.split('&'))
+            .filter_map(|pair| pair.split_once('='))
+            .find(|(k, _)| *k == "ticket")
+            .map(|(_, v)| v.to_string())
+            .filter(|v| !v.is_empty());
+        if let Some(ticket) = ticket {
+            return Some((Failure::TicketInvalid, ticket));
+        }
+    }
+    None
 }
 
 /// Bloquea toda la superficie de negocio hasta completar el registro de la máquina. El login

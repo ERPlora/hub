@@ -58,6 +58,9 @@ export default {
     printingStalledTitle: 'Nadie está imprimiendo «{station}»',
     printingStalledBody:
       'Hay {count} documento esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida. | Hay {count} documentos esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
+    moduleUpdatesTitle: 'Actualizaciones de apps',
+    moduleUpdatesBody:
+      '{n} app tiene una versión nueva. Actualízala desde Mis apps. | {n} apps tienen una versión nueva. Actualízalas desde Mis apps.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
@@ -781,6 +784,11 @@ export default {
     cancelledFor: 'Cita cancelada · {customer}',
     when: '{date} a las {time}',
   },
+  // hub#2303 — system notice when a bell counter goes up; {label} is the module's own counter label.
+  bellNotice: {
+    title: '{label} ({count})',
+    body: 'Míralo en la campana para atenderlo.',
+  },
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
@@ -1416,6 +1424,9 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    pinTooManyAttempts:
+      'Demasiados intentos fallidos. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     orSwipeBadge: '…o pasa tu placa: no hace falta elegir tu nombre antes.',
     badgeRejected: 'Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.',
     badgeTooManyAttempts: 'Demasiados intentos fallidos con esta placa. Espera unos minutos o entra con tu PIN.',
