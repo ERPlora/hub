@@ -181,15 +181,11 @@ describe('hub#2387 — the home page paints money in the currency of the hub', (
     // cash_register declares `valueDivisor: 100` for its discrepancies (cash_register#120): the
     // scale of money is a property of the currency, not of the module.
     hubIn('EUR', 2);
-    const eur = await renderOne(barListDef({ valueDivisor: 100 }), [
-      { session_number: 'S-1', difference: -550 },
-    ]);
+    const eur = await renderOne(barListDef({ valueDivisor: 100 }), [{ session_number: 'S-1', difference: -550 }]);
     expect(barList(eur)?.items?.[0]?.value).toBe(-5.5);
 
     hubIn('JPY', 0);
-    const yen = await renderOne(barListDef({ valueDivisor: 100 }), [
-      { session_number: 'S-1', difference: -500 },
-    ]);
+    const yen = await renderOne(barListDef({ valueDivisor: 100 }), [{ session_number: 'S-1', difference: -500 }]);
     expect(barList(yen)?.items?.[0]?.value).toBe(-500);
   });
 
