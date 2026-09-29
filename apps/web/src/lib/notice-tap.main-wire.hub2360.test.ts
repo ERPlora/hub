@@ -20,6 +20,8 @@ describe('main.ts claims the tap the shell kept (hub#2360)', () => {
   });
 
   it('claims AFTER the door exists, so a claimed tap has somewhere to go', () => {
-    expect(MAIN.indexOf('void claimNoticeTaps(notices, {')).toBeGreaterThan(MAIN.indexOf('const notices = createNoticeDoor({'));
+    expect(MAIN.indexOf('void claimNoticeTaps(notices, {')).toBeGreaterThan(
+      MAIN.indexOf('const notices = createNoticeDoor({'),
+    );
   });
 });

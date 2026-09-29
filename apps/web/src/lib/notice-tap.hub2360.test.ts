@@ -66,7 +66,14 @@ describe('a tap the page did not see being sent still opens its screen (hub#2360
     expect(navigate.mock.calls).toEqual([['/m/kitchen']]);
   });
 
-  for (const hostile of ['https://evil.example/m/kitchen', '//evil.example/m/kitchen', 'javascript:alert(1)', '/m/../settings', 42, '']) {
+  for (const hostile of [
+    'https://evil.example/m/kitchen',
+    '//evil.example/m/kitchen',
+    'javascript:alert(1)',
+    '/m/../settings',
+    42,
+    '',
+  ]) {
     it(`a path brought back that is not a screen of the shell is never followed: ${JSON.stringify(hostile)}`, () => {
       const { navigate, notices } = door();
 
