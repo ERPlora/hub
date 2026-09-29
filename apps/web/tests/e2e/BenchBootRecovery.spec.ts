@@ -82,6 +82,11 @@ test.describe('bench boot recovery (hub#1806)', () => {
       reloads.filter((reload) => !reload.storm).length,
       'the bench spent more than its reload budget',
     ).toBeLessThanOrEqual(BOOT_RELOAD_LIMIT);
+    // Only a module died here, so the page it stands on is reloaded — nothing waits for an error
+    // page that never comes (hub#2296).
+    const injected = reloads.filter((reload) => reload.codes.join() === 'net::ERR_CONNECTION_RESET');
+    expect(injected.length).toBeGreaterThanOrEqual(1);
+    expect(injected.every((reload) => !reload.documentDied)).toBe(true);
 
     // And the shell is on screen. `#app` with children IS the mount: while it was empty every
     // `getByTestId` in the suite reported "element(s) not found", which is the red that landed on
@@ -210,10 +215,31 @@ test.describe('bench boot recovery (hub#1806)', () => {
 // `route.abort('internetdisconnected')` is the injectable twin of a network change: Chromium
 // derives both from the machine's network moving, and `NETWORK_CHANGE_ERRORS` holds both.
 test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
-  /** Resolves on the next `load` event of the page, i.e. once the current document has loaded. */
+  /**
+   * Resolves once the current document has loaded — at once if it already has. Not
+   * `page.once('load')`: that waits for the NEXT document, and a request that arrives after the
+   * load of its own document hangs there (hub#2296).
+   */
   function nextLoad(page: Page): Promise<void> {
-    return new Promise((resolve) => page.once('load', () => resolve()));
+    return page.waitForLoadState('load');
   }
+
+  test('the post-load wait of these specs does not wait for a load that already happened', async ({
+    page,
+  }) => {
+    // hub#2296, run 36402437763 attempt 1: on a slow runner the reloaded document fired `load`
+    // BEFORE the router asked for the screen again, and a wait for the NEXT `load` hung that
+    // request forever — no reload was coming, so the spec went red on its own injection.
+    await page.goto('/login');
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+
+    const waited = await Promise.race([
+      nextLoad(page).then(() => 'resolved' as const),
+      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 2_000)),
+    ]);
+
+    expect(waited).toBe('resolved');
+  });
 
   test('a screen that dies after the load event is still recovered by the bench', async ({
     page,
@@ -324,6 +350,43 @@ test.describe('bench boot recovery of network-change storms (hub#2270)', () => {
     expect(reloads.length).toBeGreaterThanOrEqual(1);
     expect(reloads.every((reload) => reload.storm)).toBe(true);
     expect(documents).toBe(1 + reloads.length);
+    // The bench knew it was the DOCUMENT that died, not merely that the page ended on the error
+    // page: under load Playwright rejects the `goto` before `chrome-error://` commits, and a reload
+    // chosen by the URL in that gap was detached by the error page ("Not attached", hub#2296).
+    expect(reloads[0].documentDied).toBe(true);
+    await expect(page.locator('#app[data-v-app]')).toBeAttached();
+  });
+
+  test('a module that dies after a dead document is not taken for another dead document', async ({
+    page,
+  }) => {
+    // The mark is per round: once the document came back, a bootstrap lost in the next round is a
+    // module of a standing page, reloaded as such (hub#2296).
+    let documents = 0;
+    await page.route(
+      (url) => url.pathname === '/login',
+      async (route) => {
+        if (route.request().resourceType() !== 'document') return route.continue();
+        documents += 1;
+        if (documents === 1) return route.abort('internetdisconnected');
+        return route.continue();
+      },
+    );
+    let mainRequests = 0;
+    await page.route('**/src/main.ts', async (route) => {
+      mainRequests += 1;
+      if (mainRequests === 1) return route.abort('connectionreset');
+      return route.continue();
+    });
+
+    await page.goto('/login');
+
+    const reloads = bootReloadsOf(page);
+    expect(reloads[0].documentDied).toBe(true);
+    const moduleRound = reloads.find(
+      (reload) => reload.codes.join() === 'net::ERR_CONNECTION_RESET',
+    );
+    expect(moduleRound?.documentDied).toBe(false);
     await expect(page.locator('#app[data-v-app]')).toBeAttached();
   });
 
