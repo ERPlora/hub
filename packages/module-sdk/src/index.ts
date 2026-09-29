@@ -654,14 +654,32 @@ function unreachableRead(e: unknown, locale: string): unknown {
 }
 
 /**
- * A `GET` on the core's REST surface is a read like any query — the flow gallery and the templates
- * tab load through it — so a hub that never answered it gets the same sentence. A write is left as
- * it arrives: it may have committed, and «could not be loaded» would be a lie.
+ * The error a command gets when its transport failed (hub#906): the unknown-outcome verdict, with
+ * the transport's technical line on `cause`, and the shell's notifier told once as the default net.
+ * Anything else — a domain refusal, `module_not_installed` — passes through untouched.
  */
-function coreRead<R>(request: Promise<R>, method: string, locale: string): Promise<R> {
-  if (method !== 'GET') return request;
+function unknownOutcome(e: unknown, locale: string, notifier?: (n: Notification) => void): unknown {
+  if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) return e;
+  const verdict = new UnknownOutcomeError(commandVerdictMessage(locale), e);
+  notifier?.({ type: 'error', message: verdict.message });
+  return verdict;
+}
+
+/**
+ * A call on the core's REST surface the hub never answered. A `GET` is a read like any query — the
+ * flow gallery and the templates tab load through it — so it gets the read sentence (hub#2288). A
+ * write (saving a flow, registering a template, uploading the certificate, retrying a print job)
+ * may have committed before the answer was lost, exactly like a command, so it gets the command
+ * verdict (hub#2320): «could not be loaded» would be a lie there.
+ */
+function coreCall<R>(
+  request: Promise<R>,
+  method: string,
+  locale: string,
+  notifier?: (n: Notification) => void,
+): Promise<R> {
   return request.catch((e: unknown) => {
-    throw unreachableRead(e, locale);
+    throw method === 'GET' ? unreachableRead(e, locale) : unknownOutcome(e, locale, notifier);
   });
 }
 
@@ -3159,7 +3177,7 @@ export class ErploraClient {
       );
     }
     return (this.flowsApi ??= new FlowsApi(
-      (req) => coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      (req) => coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
       moduleId,
     ));
   }
@@ -3191,7 +3209,7 @@ export class ErploraClient {
       );
     }
     return (this.eventsApi ??= new EventsApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3238,7 +3256,7 @@ export class ErploraClient {
       );
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3266,7 +3284,7 @@ export class ErploraClient {
     const transport = this.transport as Partial<CoreBlobTransport>;
     return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
       typeof transport.coreBlobRequest === 'function'
-        ? coreRead(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
+        ? coreCall(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
         : Promise.reject(
             new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
           ),
@@ -3299,7 +3317,7 @@ export class ErploraClient {
       );
     }
     return (this.certificateApi ??= new CertificateApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3325,7 +3343,7 @@ export class ErploraClient {
       );
     }
     return (this.printApi ??= new PrintApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3458,10 +3476,8 @@ export class ErploraClient {
    */
   command<T = unknown>(name: string, payload?: Record<string, unknown>, opts: CommandOptions = {}): Promise<T> {
     return (this.transport.command(name, payload) as Promise<T>).catch((e: unknown) => {
-      if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) throw e;
-      const verdict = new UnknownOutcomeError(commandVerdictMessage(this.locale), e);
-      if (opts.resolvesOutcome !== true) this.opts.notifier?.({ type: 'error', message: verdict.message });
-      throw verdict;
+      // The verdict is hub#2320's shared one; `resolvesOutcome` (hub#2375) only withholds the toast.
+      throw unknownOutcome(e, this.locale, opts.resolvesOutcome === true ? undefined : this.opts.notifier);
     });
   }
   /**
