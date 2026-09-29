@@ -1275,7 +1275,7 @@ pub async fn core_query(
         // The PIN approval record (hub#362 writes, hub#512 reads, hub#884 pages). Double
         // attribution: who asked for the elevation and who approved it. The ids resolve to names
         // against `hub_user`, or the screen shows UUIDs and nobody uses it.
-        "approvals.list" => list_approvals(db, hub_id, params).await,
+        "approvals.list" => list_approvals(db, &registry.list_column_kinds, hub_id, params).await,
         // The print queue, readable by a MODULE at last (hub#1107). The runtime has known both
         // facts since hub#341/hub#800 and served them over HTTP; what was missing was a door the
         // contract WC → SDK → dispatcher allows. The core only packages here — the shapes are the
@@ -1386,6 +1386,7 @@ pub fn is_core_list_query(name: &str) -> bool {
 /// trail was in memory, which was the bug).
 async fn list_approvals(
     db: &dyn DatabaseAdapter,
+    shapes: &crate::column_kinds_cache::ColumnKindsCache,
     hub_id: &str,
     params: &erplora_db::Params,
 ) -> Result<crate::queries::QueryPage> {
@@ -1442,7 +1443,16 @@ async fn list_approvals(
     // can override the tenant.
     let mut bound = params.clone();
     bound.insert("hub_id".into(), json!(hub_id));
-    crate::queries::run_list(db, "hub.approvals.list", BASE_SQL, &spec, &bound).await
+    crate::queries::run_list(
+        db,
+        shapes,
+        hub_id,
+        "hub.approvals.list",
+        BASE_SQL,
+        &spec,
+        &bound,
+    )
+    .await
 }
 
 #[cfg(test)]

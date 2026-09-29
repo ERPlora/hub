@@ -29,8 +29,15 @@ import { pinUsers } from '../lib/runtime';
 import { askForApproval, pendingElevation, resolveElevation } from '../lib/elevation';
 import { installBadgeScanner, onBadgeScan } from '../lib/badge-scanner';
 import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
-const i18n = createI18n({ legacy: false, locale: 'en', missingWarn: false, fallbackWarn: false, messages: { en } });
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  missingWarn: false,
+  fallbackWarn: false,
+  messages: { en, es },
+});
 
 /** Todo lo montado por el test en curso, para desmontarlo al terminar.
  *
@@ -113,6 +120,7 @@ beforeEach(() => {
   pinUsers.value = [];
   approves.mockClear();
   toast.mockClear();
+  i18n.global.locale.value = 'en';
 });
 
 describe('what the cashier is shown', () => {
@@ -233,8 +241,35 @@ describe('the PIN', () => {
     await flushPromises();
     await approveAs(w, 'Sofía', '0000');
 
-    expect(w.find('[data-testid="elevation-error"]').text()).toBe(en.elevation.tooManyAttempts);
+    // hub#2285: the SDK's refusal names no wait today, so this is the pinpad's own «wait a few
+    // minutes» — one sentence for the one lock, at every door.
+    expect(w.find('[data-testid="elevation-error"]').text()).toBe(en.login.pinTooManyAttemptsNoWait);
     expect(w.find('[data-testid="elevation-error"]').text()).not.toBe(en.elevation.rejected);
+  });
+
+  // hub#2285: the approval spends tries against the same lock as the login pinpad (per name, and
+  // per address with hub#2282), so when the refusal carries the wait it says the same minutes.
+  it.each([
+    ['en', 240, 4],
+    ['es', 240, 4],
+    ['en', 20, 1],
+    ['es', 20, 1],
+  ] as const)('says how many minutes a lock lasts (%s, %is → %i)', async (locale, secs, minutes) => {
+    i18n.global.locale.value = locale;
+    const say = (n: number): string => i18n.global.t('login.pinTooManyAttempts', { minutes: n }, n);
+    seedPeople();
+    const throttled = vi.fn(async () => {
+      throw Object.assign(new ErploraError('too_many_attempts', 'too many failed attempts'), {
+        retryAfterSecs: secs,
+      });
+    });
+    void askForApproval(ask(throttled));
+    const w = mountDialog();
+    await flushPromises();
+    await approveAs(w, 'Sofía', '0000');
+
+    expect(w.find('[data-testid="elevation-error"]').text()).toBe(say(minutes));
+    expect(say(1)).not.toBe(say(2).replace('2', '1'));
   });
 
   it('is never sent twice for one tap', async () => {

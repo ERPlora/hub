@@ -93,7 +93,7 @@
             data-testid="user-switch-pinpad"
             dots
             :length="hubPinLength"
-            :error="errorKey !== ''"
+            :error="refusal !== null"
             :aria-busy="sending"
             secondary-icon="arrow-back-outline"
             :secondary-label="t('userSwitch.someoneElse')"
@@ -105,12 +105,12 @@
       </template>
 
       <ion-note
-        v-if="errorKey"
+        v-if="refusal"
         data-testid="user-switch-error"
         color="danger"
         class="user-switch-error"
       >
-        {{ t(errorKey) }}
+        {{ sayRefusal(t, refusal) }}
       </ion-note>
 
       <div class="user-switch-actions">
@@ -129,7 +129,8 @@ import { useI18n } from 'vue-i18n';
 import { IonModal, IonButton, IonCard, IonCardContent, IonInput, IonNote } from '@ionic/vue';
 
 import { pinUsers } from '../lib/runtime';
-import { closeUserSwitch, switchUser, userSwitchOpen, userSwitchRefusalKey } from '../lib/user-switch';
+import { closeUserSwitch, switchUser, userSwitchOpen, userSwitchRefusal } from '../lib/user-switch';
+import { sayRefusal, type Refusal } from '../lib/lock-refusal';
 import { toast } from '../lib/toast';
 
 const { t } = useI18n();
@@ -143,7 +144,8 @@ const people = computed(() => pinUsers.value);
 
 const chosen = ref<string>('');
 const typedName = ref<string>('');
-const errorKey = ref<string>('');
+/** The sentence the last refusal earned, or `null` while there is none. */
+const refusal = ref<Refusal | null>(null);
 const sending = ref<boolean>(false);
 const pinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
@@ -154,7 +156,7 @@ watch(userSwitchOpen, (open) => {
   if (!open) return;
   chosen.value = '';
   typedName.value = '';
-  errorKey.value = '';
+  refusal.value = null;
   sending.value = false;
   clearPinpad();
 });
@@ -167,18 +169,18 @@ function choose(name: string): void {
   const trimmed = name.trim();
   if (!trimmed) return;
   chosen.value = trimmed;
-  errorKey.value = '';
+  refusal.value = null;
 }
 
 function backToPeople(): void {
   chosen.value = '';
-  errorKey.value = '';
+  refusal.value = null;
   clearPinpad();
 }
 
 function onPinInput(): void {
   // Typing again clears the last refusal: the sentence described the previous attempt.
-  errorKey.value = '';
+  refusal.value = null;
 }
 
 function onPinComplete(ev: Event): void {
@@ -195,7 +197,7 @@ function onPinComplete(ev: Event): void {
 async function submit(pin: string): Promise<void> {
   if (pin.length < 4 || !chosen.value || sending.value) return;
   sending.value = true;
-  errorKey.value = '';
+  refusal.value = null;
   try {
     const name = chosen.value;
     await switchUser(name, pin);
@@ -207,7 +209,7 @@ async function submit(pin: string): Promise<void> {
     // The overlay STAYS OPEN and the previous session is untouched (`switchUser` changes nothing
     // when the runtime refuses). Closing on a typo would drop the person back onto a till that is
     // still not theirs, with nothing said.
-    errorKey.value = userSwitchRefusalKey(e);
+    refusal.value = userSwitchRefusal(e);
     clearPinpad();
   } finally {
     sending.value = false;

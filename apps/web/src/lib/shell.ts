@@ -113,6 +113,8 @@ export async function trackRequest<T>(p: Promise<T>): Promise<T> {
 //   - `printing`    (hub#987) — una estación con trabajo esperando y nadie drenándola.
 //   - `modules`     (hub#1678) — what the installed modules declare in their `bell` block (an
 //                   appointment to confirm…), summed by `lib/bell-counters.ts`.
+//   - `moduleUpdates` (hub#1172) — installed apps with a newer version the owner can apply,
+//                   counted by `lib/module-update-notice.ts`.
 //
 // Por fuente y no un total que cada watcher recalcula: los dos pollers corren a su ritmo y sin
 // saber el uno del otro, así que el que refrescara segundo borraría al primero. Un hub con un
@@ -121,12 +123,13 @@ export async function trackRequest<T>(p: Promise<T>): Promise<T> {
 // Son ESTADO derivado, no eventos con acuse: se curan solos al arreglar la causa y por eso no
 // llevan leído/descartado (ADR-0067 — un ítem que no se puede descartar, en un feed hecho para
 // descartar, enseña a ignorar la campana).
-export type NotificationSource = 'deadLetters' | 'printing' | 'modules';
+export type NotificationSource = 'deadLetters' | 'printing' | 'modules' | 'moduleUpdates';
 
 const _notificationCounts = ref<Record<NotificationSource, number>>({
   deadLetters: 0,
   printing: 0,
   modules: 0,
+  moduleUpdates: 0,
 });
 
 /** Lo que pinta el badge: el total de todas las fuentes. */

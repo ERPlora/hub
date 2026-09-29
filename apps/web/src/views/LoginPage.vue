@@ -441,6 +441,7 @@ import { saasDoor } from '../lib/saas-door';
 import { openExternal } from '../lib/open-external';
 import { getDeviceContext } from '../lib/device';
 import { takeCourierFailure } from '../lib/courier';
+import { lockRefusal, sayRefusal, type Refusal } from '../lib/lock-refusal';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -882,11 +883,8 @@ const pinUser = ref<TrustedUser | null>(
 const pinValue = ref<string>('');
 const pinError = ref<boolean>(false);
 /** The sentence under the pinpad when [`pinError`] is up. See [`pinRefusal`]. */
-const pinErrorRefusal = ref<PinRefusal>({ key: 'login.pinIncorrect' });
-const pinErrorText = computed(() => {
-  const { key, minutes } = pinErrorRefusal.value;
-  return minutes === undefined ? t(key) : t(key, { minutes }, minutes);
-});
+const pinErrorRefusal = ref<Refusal>({ key: 'login.pinIncorrect' });
+const pinErrorText = computed(() => sayRefusal(t, pinErrorRefusal.value));
 const pinLoading = ref(false);
 // Referencia al <ok-pinpad> del paso PIN (para limpiar su valor tras error / cambiar usuario).
 const mainPinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
@@ -921,12 +919,6 @@ function onPinToEmail(): void {
   pinError.value = false;
 }
 
-interface PinRefusal {
-  key: string;
-  /** Whole minutes to wait, for the keys that name them. */
-  minutes?: number;
-}
-
 /**
  * Which sentence a refused PIN gets (hub#330).
  *
@@ -938,7 +930,7 @@ interface PinRefusal {
  * **An unknown code falls back to «Incorrect PIN»**, on purpose: that sentence is merely unhelpful,
  * while an instruction invented for a code this build has never seen would be actively wrong.
  */
-function pinRefusal(err: unknown): PinRefusal {
+function pinRefusal(err: unknown): Refusal {
   const code = (err as { code?: unknown } | null)?.code;
   if (code === 'device_untrusted') return { key: 'login.deviceNotEnrolled' };
   if (code === 'device_unidentified') return { key: 'login.deviceUnidentified' };
@@ -946,12 +938,6 @@ function pinRefusal(err: unknown): PinRefusal {
   // may be right. Say how long to wait, rounded UP so nobody retries into a lock that is still on.
   if (code === 'too_many_attempts') return lockRefusal(err);
   return { key: 'login.pinIncorrect' };
-}
-
-function lockRefusal(err: unknown): PinRefusal {
-  const secs = (err as { retryAfterSecs?: unknown } | null)?.retryAfterSecs;
-  if (typeof secs !== 'number') return { key: 'login.pinTooManyAttemptsNoWait' };
-  return { key: 'login.pinTooManyAttempts', minutes: Math.max(1, Math.ceil(secs / 60)) };
 }
 
 async function checkPin(pin: string): Promise<void> {
@@ -1018,7 +1004,7 @@ async function signInWithBadge(badge: string): Promise<void> {
     });
     await router.replace(redirectTarget());
   } catch (err) {
-    pinErrorRefusal.value = { key: badgeRefusalKey(err) };
+    pinErrorRefusal.value = badgeRefusal(err);
     pinError.value = true;
     if (mainPinpadRef.value) mainPinpadRef.value.value = '';
   } finally {
@@ -1027,19 +1013,22 @@ async function signInWithBadge(badge: string): Promise<void> {
 }
 
 /**
- * Qué frase se lleva una placa rechazada.
+ * Which sentence a refused badge gets.
  *
- * Los dos códigos del device-trust se reutilizan tal cual —son del dispositivo, no de la
- * credencial— y todo lo demás cae en «esa tarjeta no abre nada aquí». No hay una frase para «esa
- * placa no existe» y otra para «su dueño está de baja», por lo mismo que en el PIN: la puerta de
- * login no puede convertirse en la forma de averiguar qué tarjetas ha emitido este negocio.
+ * The two device-trust codes are reused as they are —they are about the device, not the
+ * credential— and everything else falls into «that card opens nothing here». There is no sentence
+ * for «that badge does not exist» and another for «its owner is inactive», for the same reason as
+ * with the PIN: the login door must not become the way to find out which cards this business has
+ * issued.
  */
-function badgeRefusalKey(err: unknown): string {
+function badgeRefusal(err: unknown): Refusal {
   const code = (err as { code?: unknown } | null)?.code;
-  if (code === 'device_untrusted') return 'login.deviceNotEnrolled';
-  if (code === 'device_unidentified') return 'login.deviceUnidentified';
-  if (code === 'too_many_attempts') return 'login.badgeTooManyAttempts';
-  return 'login.badgeRejected';
+  if (code === 'device_untrusted') return { key: 'login.deviceNotEnrolled' };
+  if (code === 'device_unidentified') return { key: 'login.deviceUnidentified' };
+  // hub#2285: the card's lock is the pinpad's lock, with the pinpad's sentence — and no «or use
+  // your PIN»: when the lock is on the address (hub#2282) the PIN is locked too.
+  if (code === 'too_many_attempts') return lockRefusal(err);
+  return { key: 'login.badgeRejected' };
 }
 
 // ---------------------------------------------------------------------------

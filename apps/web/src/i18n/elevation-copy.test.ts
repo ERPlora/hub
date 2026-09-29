@@ -99,10 +99,13 @@ describe('what a refused PIN is told, and what it must never reveal', () => {
     // Two guards, two sentences. If both said the same thing, a manager locked out by the
     // brute-force guard would keep retyping a PIN that is correct, and nothing on screen would name
     // the one thing that fixes it: waiting.
-    expect(EN.tooManyAttempts).not.toBe(EN.rejected);
-    expect(ES.tooManyAttempts).not.toBe(ES.rejected);
-    expect(EN.tooManyAttempts).toMatch(/wait/i);
-    expect(ES.tooManyAttempts).toMatch(/espera/i);
+    //
+    // hub#2285: the throttle is the login pinpad's lock, so the dialog says the pinpad's sentence.
+    for (const [lang, locale, copy] of [['en', en, EN.rejected], ['es', es, ES.rejected]] as const) {
+      const lock = [locale.login.pinTooManyAttempts, locale.login.pinTooManyAttemptsNoWait];
+      for (const sentence of lock) expect(sentence, lang).not.toBe(copy);
+      for (const sentence of lock) expect(sentence, lang).toMatch(lang === 'en' ? /wait/i : /espera/i);
+    }
   });
 
   it('sends «not approved with a PIN» to an account, not to another PIN', () => {

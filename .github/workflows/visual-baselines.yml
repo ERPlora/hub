@@ -34,7 +34,8 @@
 # Procedimiento (issue hub#1250):
 #   1. Actions → «Regenerar baselines visuales (Linux)» → Run workflow → confirm: true.
 #   2. Descargar el artefacto `playwright-baselines`.
-#   3. Commitear los PNG en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/`.
+#   3. Commitear los PNG en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/` JUNTO con
+#      `apps/web/tests/e2e/baselines-outfitkit.txt` (hub#2304): el e2e de las PRs instala esa versión.
 #   4. Confirmar que el siguiente run de `test-web.yml` los usa (los casos dejan de saltarse).
 # ==============================================================================
 
@@ -179,11 +180,19 @@ jobs:
       - name: Regenerar SOLO las capturas visuales (--update-snapshots=all)
         run: pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts --update-snapshots=all Visual
 
+      # hub#2304 — the photos travel with the OutfitKit that drew them: a PR's e2e installs the
+      # version in this file (test-web.yml), so new PNGs committed without it would be compared with
+      # the old library and every web PR would go red again.
+      - name: Anotar la OutfitKit con la que se dibujaron (hub#2304)
+        run: node -p "require('./apps/web/node_modules/@erplora/outfitkit/package.json').version" > apps/web/tests/e2e/baselines-outfitkit.txt
+
       - name: Subir las capturas regeneradas
         uses: actions/upload-artifact@v4
         with:
           name: playwright-baselines
-          path: apps/web/tests/e2e/**/*-snapshots/**
+          path: |
+            apps/web/tests/e2e/**/*-snapshots/**
+            apps/web/tests/e2e/baselines-outfitkit.txt
           if-no-files-found: error
 
       # La traza de un fallo, igual que en `test-web.yml`: sin esto un rojo aquí solo deja el

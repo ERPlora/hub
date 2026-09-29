@@ -280,6 +280,23 @@
                   </p>
                 </ion-label>
               </ion-item>
+              <!-- Installed apps with a newer version the owner can apply (hub#1172): ONE row for all
+                   of them, leading to «My apps», where each update is one tap. Only an admin is
+                   ever counted (`lib/module-update-notice.ts`). -->
+              <ion-item
+                v-if="moduleUpdateCount > 0"
+                lines="none"
+                button
+                detail
+                data-testid="topbar-module-updates"
+                @click="goToModuleUpdates"
+              >
+                <HubIcon slot="start" name="cloud-download-outline" color="primary" />
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ t('topbar.moduleUpdatesTitle') }}</h3>
+                  <p>{{ t('topbar.moduleUpdatesBody', { n: moduleUpdateCount }) }}</p>
+                </ion-label>
+              </ion-item>
               <!-- What the installed modules raise through their `bell` block (hub#1678): an
                    appointment to confirm, say. The label and the destination come from the
                    module, so the shell never learns what an appointment is. -->
@@ -335,6 +352,7 @@ import {
 } from '../lib/shell';
 import { undrainedStations } from '../lib/print-alert';
 import { bellCounters } from '../lib/bell-counters';
+import { MODULE_UPDATES_ROUTE } from '../lib/module-update-notice';
 import { canOpenManagement, openManagement } from '../lib/management-link';
 import { canChangeHub, requestChangeHub } from '../lib/change-hub';
 import { isCompactViewport } from '../lib/viewport';
@@ -472,6 +490,13 @@ const deadLetterCount = computed(() => notificationCountOf('deadLetters'));
 // landed on General (hub#2016) — `settings-tab-links.hub2016.test.ts` keeps every such link honest.
 function goToPrinting(): void {
   void router.push({ path: '/settings', hash: '#tickets' });
+}
+
+// Apps with a new version lead to «My apps» (hub#1172), where each one has its «Update».
+const moduleUpdateCount = computed(() => notificationCountOf('moduleUpdates'));
+function goToModuleUpdates(): void {
+  notifOpen.value = false;
+  void router.push(MODULE_UPDATES_ROUTE);
 }
 
 // A module counter leads to the module tab it declared (hub#1678). `lib/bell-counters.ts` builds
