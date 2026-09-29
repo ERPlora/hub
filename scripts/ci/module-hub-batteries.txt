@@ -224,3 +224,9 @@ cart_checkout/tests/cart_currency.hub.test.py
 # verifactu#144). New coverage, not moved.
 # pending-publication: verifactu#148 until 2026-10-28
 verifactu/tests/events_list.hub.test.py
+# cash_register: every home-screen widget, called the way the shell calls it (its `params`
+# verbatim), is answered by the real kernel — «Recent discrepancies» asked `sessions.list` for
+# `status` instead of `f_status` and got 422 `unknown_filter` on every load — and that panel lists
+# the last 8 CLOSED sessions, newest close first (cash_register#119). New coverage, not moved.
+# pending-publication: cash_register#120 until 2026-10-28
+cash_register/tests/widget_params.hub.test.py

@@ -2230,6 +2230,44 @@
           "response": []
         },
         {
+          "name": "Upload the photo a flow step sends in a WhatsApp template header",
+          "request": {
+            "body": {
+              "formdata": [
+                {
+                  "key": "file",
+                  "src": "",
+                  "type": "file"
+                }
+              ],
+              "mode": "formdata"
+            },
+            "description": "A WhatsApp template approved with a photo header sends a photo on every message, and Meta downloads it from a link. Send the photo as the multipart field `file`: the hub keeps it in its own files (`whatsapp/headers/`, named by the SHA-256 of its bytes) and answers `201 {ref, mime_type, size}`. Put that `ref` in the step's `vars.header_image`; every send asks erplora.com for a freshly signed link to it, so the file never has to be public and the link never expires in the queue. Only a JPEG or a PNG (told by its bytes, never by its name) of up to 5 MB, Meta's cap for a header image. Refusals come back as a code: `whatsapp.invalid_header_image_upload` (not a multipart form), `whatsapp.header_image_missing` (no `file` field), `whatsapp.header_image_unsupported` (415), `whatsapp.header_image_too_large` (413), `whatsapp.header_image_not_saved` (502, erplora.com could not store it). A module reaching this door through `@erplora/module-sdk` (`erplora.forModule(id).flows.uploadWhatsappHeaderImage(file)`) also needs the `manage_flows` capability, declared and granted by the owner; without it the answer is `403 capability_denied`. The shell names no module and is unaffected.\n\n(auth: admin+capability)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "whatsapp-header-images"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/whatsapp-header-images"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /api/hub/flows/:id",
           "request": {
             "description": "auth: admin+capability",

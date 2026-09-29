@@ -46,6 +46,67 @@
         {{ t('apps.retiredNotice', { apps: retiredAppNames }) }}
       </ok-inline-feedback>
 
+      <!-- hub#2331 — «Update all»: the offer, then which app is running, then what happened to each
+           one. It rides the row's own update (`updateModule`), one app after another. -->
+      <ok-inline-feedback
+        v-if="tab === 'mine' && isAdmin && (updateAllRunning || updateAllResults.length > 0 || offeredUpdates.length > 0)"
+        data-testid="apps-update-all"
+        :tone="updateAllTone"
+        class="mb-3"
+      >
+        <div v-if="updateAllRunning && updateAllStep" class="update-all">
+          <span>{{ t('apps.updateAllProgress', updateAllStep) }}</span>
+          <ion-progress-bar :value="(updateAllStep.current - 1) / updateAllStep.total" />
+        </div>
+        <div v-else-if="updateAllResults.length > 0" class="update-all">
+          <strong>{{ t('apps.updateAllSummary', { updated: updateAllUpdatedCount, total: updateAllResults.length }, updateAllResults.length) }}</strong>
+          <ul class="update-all__results">
+            <li
+              v-for="r in updateAllResults"
+              :key="r.id"
+              data-testid="apps-update-all-result"
+              :data-id="r.id"
+              :data-status="r.status"
+            >
+              <HubIcon
+                :name="UPDATE_ALL_RESULT_ICON[r.status].icon"
+                :class="r.status === 'failed' ? 'update-all__icon--failed' : 'update-all__icon--ok'"
+              />
+              <span class="update-all__line">
+                <strong>{{ r.name }}</strong>:
+                <template v-if="r.status === 'updated'">{{ r.from }} → {{ r.to }}</template>
+                <template v-else-if="r.status === 'up_to_date'">{{ t('apps.updateAllUpToDate') }}</template>
+                <template v-else>{{ updateFailureMessage(r.error, r.name) }}</template>
+              </span>
+              <ion-button
+                v-if="r.status === 'failed'"
+                size="small"
+                fill="clear"
+                data-testid="apps-update-all-retry"
+                :data-id="r.id"
+                @click="retryUpdateAll(r)"
+              >
+                {{ t('apps.updateAllRetry') }}
+              </ion-button>
+            </li>
+          </ul>
+          <ion-button size="small" data-testid="apps-update-all-finish" @click="finishUpdateAll">
+            {{ updateAllUpdatedCount > 0 ? t('apps.updateAllReload') : t('apps.noticeClose') }}
+          </ion-button>
+        </div>
+        <div v-else class="update-all update-all--offer">
+          <span>{{ t('apps.updateAllOffer', { n: offeredUpdates.length }, offeredUpdates.length) }}</span>
+          <ion-button
+            size="small"
+            data-testid="apps-update-all-button"
+            :disabled="updatingIds.size > 0"
+            @click="startUpdateAll"
+          >
+            {{ t('apps.updateAllAction') }}
+          </ion-button>
+        </div>
+      </ok-inline-feedback>
+
       <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
       <ok-data-table
         v-show="tab === 'mine'"
@@ -161,7 +222,7 @@ import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
-  IonToast,
+  IonToast, IonProgressBar,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
   IonList, IonItem, alertController, toastController, onIonViewWillEnter, onIonViewWillLeave,
 } from '@ionic/vue';
@@ -194,8 +255,8 @@ import { columnsForScreen, TABLE_PHONE_QUERY, type TableView } from '../lib/apps
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
-  defaultVersion, pendingUpdate, shouldPickVersion, updateLabel, updateNeedsNewerHub,
-  type ModuleUpdateInfo,
+  defaultVersion, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
+  type ModuleUpdateInfo, type UpdateAllResult, type UpdateAllTarget,
 } from '../lib/module-updates';
 import { publishModuleUpdates } from '../lib/module-update-notice';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
@@ -695,6 +756,7 @@ const mineActions = computed<DataTableAction[]>(() => {
   // and okdt re-renders its buttons. Read lazily inside the closure, the list would be right and
   // the screen would still show the old one until something else happened to change a row.
   const nav = moduleNav.value;
+  const batchRunning = updateAllRunning.value;
   return [
       {
         // FIRST, and on purpose (hub#773): what a person opens this card for is the app itself.
@@ -721,7 +783,8 @@ const mineActions = computed<DataTableAction[]>(() => {
         // No new version, no button (hub#2015). While one runs it stays, with the spinner instead
         // of the icon, and a second press cannot start it again.
         hidden: (row) => hidesUpdateAction(row),
-        disabled: (row) => row.updating === true,
+        // hub#2331: «Update all» owns the updates while it runs (read above, in the computed body).
+        disabled: (row) => row.updating === true || batchRunning,
         loading: (row) => row.updating === true,
       },
       {
@@ -931,7 +994,8 @@ async function chooseVersion(moduleId: string, name: string): Promise<string | n
  */
 async function updateInstalledModule(id: string, name: string): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  if (updatingIds.value.has(id)) return;
+  // hub#2331: while «Update all» runs, it owns the updates (and the reload at the end).
+  if (updatingIds.value.has(id) || updateAllRunning.value) return;
   // Antes de tocar nada: si hay varias versiones, que elija. Cancelar aquí no deja rastro.
   const version = await chooseVersion(id, name);
   if (version === null) return;
@@ -968,6 +1032,108 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
   } finally {
     setUpdating(id, false);
     await loadModuleUpdates();
+  }
+}
+
+/** Why updating `name` failed, in the same words the row's «Update» uses above (hub#2331). */
+function updateFailureMessage(e: unknown, name: string): string {
+  if (e instanceof InstallBlockedError) {
+    // ADR-0060: nothing changed and nothing was charged; the app keeps the version it had.
+    return t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') });
+  }
+  // What the RUNTIME said, and only if it said anything (hub#673).
+  return moduleFailureMessage(e, t('apps.updateError', { name }), { t, te });
+}
+
+// --- «Update all» (hub#2331) ---
+// The apps whose row offers «Update» — the same rule, so the batch never tries one the row hides.
+const offeredUpdates = computed(() =>
+  updateAllTargets(installedModules.value, moduleUpdates.value, hubVersion.value));
+const updateAllRunning = ref(false);
+const updateAllStep = ref<{ name: string; current: number; total: number } | null>(null);
+// What happened to each app of the last batch, in its order. Emptied when the owner closes it.
+// The icon of each result line. Kept as `icon:` entries (not a literal ternary in the template) so
+// the icon registry test sees the names and does not read the status `'failed'` as an icon.
+const UPDATE_ALL_RESULT_ICON: Record<UpdateAllResult['status'], { icon: string }> = {
+  updated: { icon: 'checkmark-circle-outline' },
+  up_to_date: { icon: 'checkmark-circle-outline' },
+  failed: { icon: 'alert-circle-outline' },
+};
+const updateAllResults = ref<UpdateAllResult[]>([]);
+const updateAllUpdatedCount = computed(() => updateAllResults.value.filter((r) => r.status === 'updated').length);
+const updateAllTone = computed(() => {
+  if (updateAllRunning.value || updateAllResults.value.length === 0) return 'info';
+  return updateAllResults.value.some((r) => r.status === 'failed') ? 'warning' : 'success';
+});
+
+/**
+ * Runs `targets` through the row's own update, one after another, and folds the outcome into the
+ * results on screen (a retry replaces its app's line in place).
+ *
+ * No version picker: like the start-up updater, each app goes to the version the runtime resolves
+ * (never quarantined, never backwards, the support pin wins).
+ */
+async function runUpdateAll(targets: UpdateAllTarget[]): Promise<void> {
+  if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
+  if (updateAllRunning.value || targets.length === 0) return;
+  updateAllRunning.value = true;
+  let fresh: UpdateAllResult[];
+  try {
+    fresh = await updateAll(
+      targets,
+      async (id) => {
+        setUpdating(id, true);
+        try {
+          return await updateModule(id, '');
+        } finally {
+          setUpdating(id, false);
+        }
+      },
+      (index, target) => {
+        updateAllStep.value = { name: target.name, current: index + 1, total: targets.length };
+      },
+    );
+  } finally {
+    updateAllRunning.value = false;
+    updateAllStep.value = null;
+  }
+  const byId = new Map(fresh.map((r) => [r.id, r]));
+  const kept = updateAllResults.value.map((r) => byId.get(r.id) ?? r);
+  updateAllResults.value = [...kept, ...fresh.filter((r) => !kept.some((k) => k.id === r.id))];
+  // Unlike a single update, the page may not reload now (a failure stays on screen to be read), so
+  // «My apps» has to show the versions the updated apps run already.
+  await Promise.all([loadInstalled(), loadModuleUpdates()]);
+
+  const results = updateAllResults.value;
+  // Something failed: the reasons stay on screen, each with «Retry». Reloading now would wipe them.
+  if (results.some((r) => r.status === 'failed')) return;
+  const updated = updateAllUpdatedCount.value;
+  if (updated > 0) {
+    // hub#935 — the new builds only run after a reload; say it, then reload once for all of them.
+    notify(t('apps.updateAllDoneReloading', { n: updated }, updated), 'success', 0);
+    reloadForModuleUpdate();
+    return;
+  }
+  updateAllResults.value = [];
+  notify(t('apps.updateAllNothingNew'), 'primary');
+}
+
+function startUpdateAll(): void {
+  updateAllResults.value = [];
+  void runUpdateAll(offeredUpdates.value);
+}
+
+function retryUpdateAll(result: UpdateAllResult): void {
+  void runUpdateAll([{ id: result.id, name: result.name }]);
+}
+
+/** Closes the result. With apps updated, that is the reload that puts their new builds to work. */
+function finishUpdateAll(): void {
+  const updated = updateAllUpdatedCount.value;
+  updateAllResults.value = [];
+  if (updated > 0) {
+    notify(t('apps.updateAllDoneReloading', { n: updated }, updated), 'success', 0);
+    reloadForModuleUpdate();
   }
 }
 
@@ -1543,5 +1709,52 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
+}
+/* hub#2331 — «Update all». The offer is one line with its button (wrapping on a phone); the result
+   lists every app of the batch, and with nine of them it scrolls inside itself instead of pushing
+   «My apps» off the screen. */
+.update-all {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.update-all--offer {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.update-all > ion-button {
+  align-self: flex-start;
+}
+.update-all ion-progress-bar {
+  min-width: 160px;
+}
+.update-all__results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.update-all__results li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.update-all__line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.update-all__icon--ok {
+  color: var(--ion-color-success);
+  flex: none;
+}
+.update-all__icon--failed {
+  color: var(--ion-color-danger);
+  flex: none;
 }
 </style>

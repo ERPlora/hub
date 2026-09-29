@@ -1117,10 +1117,15 @@ fn validate_limite_f2(
     if total > techo {
         return Err(named(
             "schema_simplified_over_ceiling",
+            // The amounts as integer cents (ADR-0123), which the module paints with the hub's
+            // money formatter (hub#2269); the decimal strings stay for a module older than that.
             json!({
                 "total": format!("{:.2}", total as f64 / 100.0),
                 "ceiling": format!("{:.2}", MAX_F2_CENTS as f64 / 100.0),
                 "tolerance": format!("{:.2}", F2_TOLERANCE_CENTS as f64 / 100.0),
+                "total_cents": total,
+                "ceiling_cents": MAX_F2_CENTS,
+                "tolerance_cents": F2_TOLERANCE_CENTS,
             }),
             format!(
                 "una factura simplificada F2 no puede pasar de 3.000,00 € (más los 10,00 € de \
@@ -1737,7 +1742,17 @@ mod tests {
                     "<sum1:CuotaRepercutida>840.00</sum1:CuotaRepercutida>",
                 ),
                 "schema_simplified_over_ceiling",
-                json!({ "total": "4840.00", "ceiling": "3000.00", "tolerance": "10.00" }),
+                // hub#2269: the three amounts travel as integer cents (ADR-0123), so the module
+                // paints them with the hub's money formatter; the decimal strings stay for a
+                // module older than that change.
+                json!({
+                    "total": "4840.00",
+                    "ceiling": "3000.00",
+                    "tolerance": "10.00",
+                    "total_cents": 484_000,
+                    "ceiling_cents": 300_000,
+                    "tolerance_cents": 1_000,
+                }),
             ),
         ]
     }
