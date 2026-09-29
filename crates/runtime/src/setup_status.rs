@@ -308,19 +308,14 @@ pub async fn status(
             .to_string()
     };
     let country = setting("country_code").to_uppercase();
-    // The locale of the checklist answers (ADR-0055, hub#762). Module items carry their English
-    // title in the payload; without this read, the dashboard showed the shell items in Spanish and
-    // the module items in English in the same list. `language` defaults to `es` and is validated to
-    // a code the registry knows, so an empty value falls back to the canonical English of the
-    // manifest (a third-party module with no `locales/` still renders, just untranslated).
-    let locale = {
-        let lang = setting("language");
-        if lang.is_empty() {
-            "en".to_string()
-        } else {
-            lang
-        }
-    };
+    // The locale of the checklist answers (ADR-0055, hub#762) is the VIEWER's, not the hub's
+    // (hub#2356): the shell translates the core items with the language of the person's profile, so
+    // the module items must follow the same precedence (`hub_user_pref.language` → hub setting →
+    // core default), or a person with the app in English reads app items in Spanish in the same
+    // list. Same resolver as `:caller_lang` (hub#1098) — the core path answers before the
+    // dispatcher fills `ctx.caller_lang`, so it is read here. A module with no catalogue for that
+    // language still falls back to its English manifest (`locale → en → manifest`).
+    let locale = crate::effective_caller_lang(db, &settings, hub_id, &ctx.user_id).await;
     // The second arm of ADR-0203, resolved against THIS hub. Read here for the same reason the
     // settings are: the reserved `hub.` path answers before the dispatcher enriches the context,
     // so `ctx.has_certificate` is not populated yet. Degrading to "absent" matches the gate, which

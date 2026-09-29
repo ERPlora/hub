@@ -1,0 +1,23 @@
+{
+  "id": "e2e_setup_locale",
+  "name": "E2E Setup Locale",
+  "version": "1.0.0",
+  "permissions": ["e2e_setup_locale.configure"],
+  "role_permissions": { "admin": ["e2e_setup_locale.configure"] },
+  "queries": {
+    "e2e_setup_locale.config.get": {
+      "permission": "e2e_setup_locale.configure",
+      "sql": "queries/config_get.sql"
+    }
+  },
+  "setup": {
+    "query": "e2e_setup_locale.config.get",
+    "configured_when": [{ "field": "ready", "truthy": true }],
+    "title": "Your invoice numbering",
+    "description": "Choose how your invoices are numbered.",
+    "icon": "settings-outline",
+    "route": "/m/e2e_setup_locale/settings",
+    "permission": "e2e_setup_locale.configure",
+    "order": 1
+  }
+}

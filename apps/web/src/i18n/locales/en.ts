@@ -324,7 +324,8 @@ export default {
   },
   // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
   // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
-  // title travels in English inside its manifest and is used as-is (setup-status.md §7).
+  // title arrives already translated by the runtime into the viewer's language (setup-status.md §7,
+  // hub#2356) and is used as-is.
   // hub#1743 — the shell-wide band for «there is no network right now». Says the CONSEQUENCE, not
   // the state: «offline» on its own reads as a setting somebody turned on. Nothing here names a
   // module or a screen, because the outage is not about any of them.
