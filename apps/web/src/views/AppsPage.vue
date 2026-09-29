@@ -46,6 +46,26 @@
         {{ t('apps.retiredNotice', { apps: retiredAppNames }) }}
       </ok-inline-feedback>
 
+      <!-- hub#2366 — the check for new versions failed (offline, marketplace down or slow). Without
+           this the screen looks exactly like «everything is up to date». For whoever can update. -->
+      <ok-inline-feedback
+        v-if="tab === 'mine' && isAdmin && moduleUpdatesCheckFailed"
+        data-testid="apps-updates-check-failed"
+        tone="warning"
+        class="mb-3"
+      >
+        <span>{{ t('apps.updatesCheckFailed') }}</span>
+        <ion-button
+          size="small"
+          fill="clear"
+          data-testid="apps-updates-check-retry"
+          :disabled="moduleUpdatesChecking"
+          @click="retryModuleUpdatesCheck"
+        >
+          {{ t('apps.retryCatalog') }}
+        </ion-button>
+      </ok-inline-feedback>
+
       <!-- hub#2331 — «Update all»: the offer, then which app is running, then what happened to each
            one. It rides the row's own update (`updateModule`), one app after another. -->
       <ok-inline-feedback
@@ -1304,14 +1324,30 @@ async function loadInstalled(): Promise<void> {
  * respuesta **no se ofrece nada** — «no lo sé» no se pinta como «hay novedad».
  */
 async function loadModuleUpdates(): Promise<void> {
+  moduleUpdatesChecking.value = true;
   try {
     moduleUpdates.value = await listModuleUpdates();
     moduleUpdatesKnown.value = true;
+    moduleUpdatesCheckFailed.value = false;
   } catch {
     // Unknown again: the watch below must not publish the emptiness a failure leaves behind.
     moduleUpdatesKnown.value = false;
     moduleUpdates.value = [];
+    // …and the screen must not pass it off as «up to date» either (hub#2366).
+    moduleUpdatesCheckFailed.value = true;
+  } finally {
+    moduleUpdatesChecking.value = false;
   }
+}
+
+// hub#2366: «could not check» is not «nothing new». `moduleUpdatesKnown` cannot tell it apart
+// from «not answered yet», so the failure has its own flag; `checking` turns «Retry» off while
+// the question is out.
+const moduleUpdatesCheckFailed = ref(false);
+const moduleUpdatesChecking = ref(false);
+function retryModuleUpdatesCheck(): void {
+  if (moduleUpdatesChecking.value) return;
+  void loadModuleUpdates();
 }
 
 // What this screen learns replaces the bell's «N apps have a new version» at once (hub#1172):

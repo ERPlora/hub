@@ -101,7 +101,7 @@
             data-testid="elevation-pinpad"
             dots
             :length="hubPinLength"
-            :error="errorKey !== ''"
+            :error="refusal !== null"
             :aria-busy="sending"
             secondary-icon="arrow-back-outline"
             :secondary-label="t('elevation.changeApprover')"
@@ -112,8 +112,8 @@
         </div>
       </template>
 
-      <ion-note v-if="errorKey" data-testid="elevation-error" color="danger" class="elevation-error">
-        {{ t(errorKey) }}
+      <ion-note v-if="refusal" data-testid="elevation-error" color="danger" class="elevation-error">
+        {{ sayRefusal(t, refusal) }}
       </ion-note>
 
       <div class="elevation-actions">
@@ -131,7 +131,8 @@ import { hubPinLength } from '../lib/pin-length';
 import { useI18n } from 'vue-i18n';
 import { IonModal, IonButton, IonCard, IonCardContent, IonInput, IonNote } from '@ionic/vue';
 
-import { pendingElevation, resolveElevation, elevationRefusalKey } from '../lib/elevation';
+import { pendingElevation, resolveElevation, elevationRefusal } from '../lib/elevation';
+import { sayRefusal, type Refusal } from '../lib/lock-refusal';
 import {
   describeElevation,
   elevationCatalogue,
@@ -168,7 +169,8 @@ const people = computed(() => pinUsers.value);
 
 const approver = ref<string>('');
 const typedName = ref<string>('');
-const errorKey = ref<string>('');
+/** The sentence the last refusal earned, or `null` while there is none. */
+const refusal = ref<Refusal | null>(null);
 const sending = ref<boolean>(false);
 const pinpadRef = ref<(HTMLElement & { value: string }) | null>(null);
 
@@ -201,7 +203,7 @@ watch(pendingElevation, (ask) => {
   // sentence a refusal left on screen.
   approver.value = '';
   typedName.value = '';
-  errorKey.value = '';
+  refusal.value = null;
   sending.value = false;
   // `immediate` porque este componente puede montarse con una petición ya en curso (así lo hace el
   // arranque del shell, y así lo montan los tests). Sin él, la primera aprobación de la sesión sería
@@ -216,18 +218,18 @@ function choose(name: string): void {
   const trimmed = name.trim();
   if (!trimmed) return;
   approver.value = trimmed;
-  errorKey.value = '';
+  refusal.value = null;
 }
 
 function backToPeople(): void {
   approver.value = '';
-  errorKey.value = '';
+  refusal.value = null;
   clearPinpad();
 }
 
 function onPinInput(): void {
   // Typing again clears the last refusal: the sentence described the previous attempt.
-  errorKey.value = '';
+  refusal.value = null;
 }
 
 function onPinComplete(ev: Event): void {
@@ -246,7 +248,7 @@ async function submit(pin: string): Promise<void> {
   const ask = pendingElevation.value;
   if (!ask || pin.length < 4 || sending.value) return;
   sending.value = true;
-  errorKey.value = '';
+  refusal.value = null;
   try {
     const approval = await ask.approve(approver.value, pin);
     // Say who allowed it. The action is about to be recorded under two names, and the cashier
@@ -257,7 +259,7 @@ async function submit(pin: string): Promise<void> {
     // The dialog STAYS OPEN. A refusal is usually a typo, and closing here would send the manager
     // back to the till for it — which is exactly how a shop decides to share one credential and
     // stop using the dialog at all.
-    errorKey.value = elevationRefusalKey(e);
+    refusal.value = elevationRefusal(e);
     clearPinpad();
   } finally {
     sending.value = false;
@@ -275,7 +277,7 @@ async function submitBadge(badge: string): Promise<void> {
   const ask = pendingElevation.value;
   if (!ask || sending.value) return;
   sending.value = true;
-  errorKey.value = '';
+  refusal.value = null;
   try {
     const approval = await ask.approveWithBadge(badge);
     void toast(t('elevation.approvedBy', { name: approval.approverName }), 'success');
@@ -283,7 +285,7 @@ async function submitBadge(badge: string): Promise<void> {
   } catch (e) {
     // El diálogo SIGUE ABIERTO, igual que con un PIN rechazado: la tarjeta puede no ser de quien
     // puede aprobar, y cerrar aquí mandaría al encargado de vuelta al mostrador por ello.
-    errorKey.value = elevationRefusalKey(e);
+    refusal.value = elevationRefusal(e);
     clearPinpad();
   } finally {
     sending.value = false;

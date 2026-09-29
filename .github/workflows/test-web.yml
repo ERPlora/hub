@@ -358,9 +358,28 @@ jobs:
       # hub#1793 — verify the OutfitKit the image SHIPS, not the lockfile's. `docker/Dockerfile`
       # re-resolves it to `@latest` on every build; without the same step here the shell was
       # type-checked and tested against an older library than the one customers get.
+      #
+      # hub#2304 — except on a pull request. Its screenshots are compared with baselines drawn with
+      # ONE OutfitKit, and `latest` here turned EVERY web PR red each time a release moved a pixel
+      # (0.1.80 on 24/09, 0.1.109 on 28/09) until somebody redrew the photo. A PR installs the
+      # version the baselines were drawn with, so its bench only measures the PR's own diff. Push to
+      # develop/main and the nightly cron keep `latest`: a release that moves a pixel turns THEM red
+      # and opens the develop alert below, whose fix is to redraw (visual-baselines.yml), which also
+      # moves `baselines-outfitkit.txt`. `verify` keeps `latest` on every event.
       # Contract: scripts/tests/test-web-workflow.test.sh.
       - name: OutfitKit as the image resolves it (docker/Dockerfile)
+        if: ${{ github.event_name != 'pull_request' }}
         run: pnpm --filter @erplora/web add @erplora/outfitkit@latest
+
+      # HUB_BENCH_OUTFITKIT tells the bench guard (tests/outfitkit-latest-guard.ts) this version is
+      # deliberate, so it checks the install IS it instead of demanding `latest`.
+      - name: OutfitKit the visual baselines were drawn with (hub#2304)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          HUB_BENCH_OUTFITKIT=$(cat apps/web/tests/e2e/baselines-outfitkit.txt)
+          echo "HUB_BENCH_OUTFITKIT=${HUB_BENCH_OUTFITKIT}" >> "$GITHUB_ENV"
+          pnpm --filter @erplora/web add "@erplora/outfitkit@${HUB_BENCH_OUTFITKIT}"
 
       # hub#2321 — an OutfitKit notice tests the version it ANNOUNCES, not the `latest` the
       # registry cache may still serve. The payload reaches the script through `env:` only.
@@ -448,12 +467,20 @@ jobs:
         # ya existe, y una baseline desfasada seguiría desfasada tras el run que la iba a arreglar.
         run: pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts --update-snapshots=all
 
+      # hub#2304 — the photos travel with the OutfitKit that drew them: a PR's e2e installs this
+      # version, so committing new PNGs without it would compare them with the old library.
+      - name: Anotar la OutfitKit con la que se dibujaron (hub#2304)
+        if: ${{ github.event.inputs.update_baselines == 'true' }}
+        run: node -p "require('./apps/web/node_modules/@erplora/outfitkit/package.json').version" > apps/web/tests/e2e/baselines-outfitkit.txt
+
       - name: Subir las capturas regeneradas
         if: ${{ github.event.inputs.update_baselines == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-baselines
-          path: apps/web/tests/e2e/**/*-snapshots/**
+          path: |
+            apps/web/tests/e2e/**/*-snapshots/**
+            apps/web/tests/e2e/baselines-outfitkit.txt
           if-no-files-found: error
 
       # La traza de un fallo (el config guarda `trace: retain-on-failure`): sin esto, un rojo de
@@ -541,6 +568,8 @@ jobs:
           Hasta hub#1240 este workflow solo corría en \`main\`, y por eso hub#1200 (un test web rojo) aguantó en develop sin que lo viera nadie. Desde hub#1253 este run también puede venir de la pasada nocturna (\`schedule\`): sin ella, un merge SOLO-Rust en develop no dispara nunca este fichero y una regresión del runtime que rompa el shell no salía hasta la siguiente PR del web.
 
           Ojo: el rojo puede ser del diff o del ENTORNO (disco, contenedor de servicio, navegador). El run enlazado lo dice; si es entorno, se cierra esta issue y ya está.
+
+          Si lo rojo son capturas (\`*Visual\`) y el diff no toca el shell, casi seguro es una release de OutfitKit (hub#2304): develop prueba la \`latest\` y las PRs la versión de \`apps/web/tests/e2e/baselines-outfitkit.txt\`, así que las PRs siguen verdes. Arreglo: lanzar «Regenerar baselines visuales (Linux)», revisar las capturas y commitear en una PR los PNG y ese fichero juntos, tal como salen del artefacto.
 
           Esta issue se REUTILIZA (un comentario por detección) mientras develop siga rojo; ciérrala cuando vuelva a verde."
 

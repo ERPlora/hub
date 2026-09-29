@@ -1041,6 +1041,8 @@ export default {
     updateAllSummary: '{updated} of {total} app updated. | {updated} of {total} apps updated.',
     updateAllUpToDate: 'Already on the latest version',
     updateAllRetry: 'Retry',
+    // hub#2366 — the check for new versions failed: not the same as «everything is up to date».
+    updatesCheckFailed: 'We could not check whether your apps have new versions. They may not be up to date.',
     // Some apps were updated: the page has to reload to run them (hub#935), once the owner has read
     // what failed.
     updateAllReload: 'Reload now',
@@ -1649,6 +1651,8 @@ export default {
     pinIncorrect: 'Incorrect PIN',
     // hub#2283. Shown INSTEAD of «Incorrect PIN» while the hub refuses PINs after too many failures:
     // the PIN may be right, so the sentence says to wait, and how long when the hub names it.
+    // hub#2285: the badge, the hand-over and the manager's approval hit the same lock and say these
+    // same two sentences — with no «use your PIN», since a lock on the address locks the PIN too.
     pinTooManyAttempts:
       'Too many failed attempts. Wait {minutes} minute and try again. | Too many failed attempts. Wait {minutes} minutes and try again.',
     pinTooManyAttemptsNoWait: 'Too many failed attempts. Wait a few minutes and try again.',
@@ -1656,7 +1660,6 @@ export default {
     // not become the way to find out which cards this business has issued.
     orSwipeBadge: '…or swipe your badge — no need to tap your name first.',
     badgeRejected: 'That badge does not open anything here. Use your PIN, or ask an administrator.',
-    badgeTooManyAttempts: 'Too many failed attempts with this badge. Wait a few minutes, or use your PIN.',
     // hub#330. Shown INSTEAD of «Incorrect PIN» when the refusal was about the device, not the
     // digits. Saying "incorrect PIN" to somebody whose PIN is correct is the worst answer available:
     // they retype it, and nothing on the screen names the one gesture that fixes it.
@@ -1735,7 +1738,6 @@ export default {
     notElevable:
       'This one is not approved with a PIN. Whoever runs your business has to sign in with their own account to do it.',
     notRequired: 'This no longer needs approval. Close this and try again.',
-    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
     failed: 'The approval could not be sent. Check the connection and try again.',
   },
   // hub#456 — the shift changes in the middle of a ticket. Every line here is read by somebody with
@@ -1759,7 +1761,6 @@ export default {
     deviceNotEnrolled:
       'This device is not set up for PINs yet. Sign in once with an ERPlora account on it, and the PIN will work from then on.',
     deviceUnidentified: 'This device could not identify itself. Reload the page and try again.',
-    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
   },
   activation: {
     title: 'Activation required',

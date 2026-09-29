@@ -78,13 +78,14 @@ import { hubContextReady, machineRegistrationRequired, pinUsers } from '../lib/r
 import { deviceMode, deviceTrusted } from '../lib/device-mode';
 import { installBadgeScanner } from '../lib/badge-scanner';
 import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: { en },
+  messages: { en, es },
 });
 
 const ANA_BADGE = '0009171456';
@@ -132,6 +133,7 @@ beforeEach(() => {
   deviceTrusted.value = false;
   deviceMode.value = 'shared';
   uninstall = installBadgeScanner();
+  i18n.global.locale.value = 'en';
 });
 
 afterEach(() => uninstall());
@@ -192,5 +194,43 @@ describe('signing in with a badge', () => {
     expect(setHubSession).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain(en.login.badgeRejected);
+  });
+
+  // hub#2285: the card spends tries against the same lock as the pinpad — and when the lock is on
+  // the whole address (hub#2282) the PIN is locked too, so the sentence is the pinpad's: how many
+  // minutes to wait, and no «or use your PIN» that sends the person straight into the same lock.
+  it.each([
+    ['en', 240, 4],
+    ['es', 240, 4],
+    ['en', 20, 1],
+    ['es', 20, 1],
+  ] as const)(
+    'says how many minutes a lock lasts, and not «use your PIN» (%s, %is → %i)',
+    async (locale, secs, minutes) => {
+      i18n.global.locale.value = locale;
+      const say = (n: number): string => i18n.global.t('login.pinTooManyAttempts', { minutes: n }, n);
+      seedCounterTill();
+      runtimeBadgeLogin.mockRejectedValue(
+        Object.assign(new Error('nope'), { code: 'too_many_attempts', retryAfterSecs: secs }),
+      );
+      const wrapper = await mountLogin();
+
+      swipe(ANA_BADGE);
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="login-pin-error"]').text()).toBe(say(minutes));
+      expect(say(1)).not.toBe(say(2).replace('2', '1'));
+    },
+  );
+
+  it('still says «wait», without «use your PIN», when the hub named no wait', async () => {
+    seedCounterTill();
+    runtimeBadgeLogin.mockRejectedValue(Object.assign(new Error('nope'), { code: 'too_many_attempts' }));
+    const wrapper = await mountLogin();
+
+    swipe(ANA_BADGE);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="login-pin-error"]').text()).toBe(en.login.pinTooManyAttemptsNoWait);
   });
 });

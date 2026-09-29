@@ -17,6 +17,11 @@
 // pnpm wrote node_modules. A newer release after the install is OUTFITKIT_LATEST_NEWER_THAN_INSTALL,
 // a warning. Offline, the latest version cannot be known: the bench runs and prints
 // OUTFITKIT_LATEST_UNKNOWN instead of blocking someone without network.
+//
+// hub#2304 — the one deliberate exception: a pull request's CI bench compares screenshots with
+// baselines drawn with ONE OutfitKit (apps/web/tests/e2e/baselines-outfitkit.txt), so it installs
+// that version and exports it as HUB_BENCH_OUTFITKIT. With a pin the guard checks the install IS the
+// pinned version (OUTFITKIT_NOT_PINNED_VERSION otherwise) and does not ask the registry.
 import { statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +35,7 @@ const FIX_COMMAND = 'pnpm -F @erplora/web add @erplora/outfitkit@latest';
 const REGISTRY_TIMEOUT_MS = 10_000;
 
 export type OutfitkitVersionState = 'behind' | 'current' | 'ahead' | 'unknown';
-export type OutfitkitGuardResult = Exclude<OutfitkitVersionState, 'behind'> | 'newer-than-install';
+export type OutfitkitGuardResult = Exclude<OutfitkitVersionState, 'behind'> | 'newer-than-install' | 'pinned';
 
 export interface OutfitkitRegistry {
   latest: string;
@@ -103,15 +108,40 @@ export class OutfitkitBehindLatestError extends Error {
   }
 }
 
+export class OutfitkitNotPinnedError extends Error {
+  readonly code = 'OUTFITKIT_NOT_PINNED_VERSION';
+  constructor(
+    readonly installed: string,
+    readonly pinned: string,
+  ) {
+    super(
+      `OUTFITKIT_NOT_PINNED_VERSION: HUB_BENCH_OUTFITKIT pins @erplora/outfitkit ${pinned} but the ` +
+        `bench has ${installed}. Run \`pnpm -F @erplora/web add @erplora/outfitkit@${pinned}\` (hub#2304).`,
+    );
+    this.name = 'OutfitkitNotPinnedError';
+  }
+}
+
 export interface OutfitkitGuardDeps {
   readInstalled: () => string;
   readInstalledAt: () => Date | null;
   fetchRegistry: () => Promise<OutfitkitRegistry>;
   warn: (message: string) => void;
+  /** HUB_BENCH_OUTFITKIT: the version this bench runs on purpose (hub#2304); empty = latest. */
+  pinned?: string;
 }
 
 export async function assertOutfitkitIsLatest(deps: OutfitkitGuardDeps): Promise<OutfitkitGuardResult> {
   const installed = deps.readInstalled();
+  const pinned = deps.pinned?.trim() ?? '';
+  if (pinned) {
+    if (installed !== pinned) throw new OutfitkitNotPinnedError(installed, pinned);
+    deps.warn(
+      `OUTFITKIT_PINNED: the bench runs @erplora/outfitkit ${pinned} on purpose (HUB_BENCH_OUTFITKIT, ` +
+        `the version the visual baselines were drawn with), not the published latest (hub#2304).`,
+    );
+    return 'pinned';
+  }
   let registry: OutfitkitRegistry;
   try {
     registry = await deps.fetchRegistry();
@@ -152,5 +182,6 @@ export default function outfitkitLatestGuard(): Promise<OutfitkitGuardResult> {
     readInstalledAt: () => readInstallTime(WORKSPACE_DIR),
     fetchRegistry: () => fetchOutfitkitRegistry(),
     warn: (message) => console.warn(message),
+    pinned: process.env.HUB_BENCH_OUTFITKIT,
   });
 }
