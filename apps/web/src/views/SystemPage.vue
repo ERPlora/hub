@@ -72,69 +72,65 @@
              The series comes from the SaaS (proxied by the runtime, machine token stays server-side,
              ADR-0003); the instant reading of `/api/system` remains the `current` fallback, because
              a value we DID measure locally is still a measurement even when the history is not. -->
-        <ion-grid class="ion-no-padding resources-grid">
-          <ion-row>
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-card__content--panel">
-                  <ok-resource-usage
-                    label="CPU"
-                    :unit="cpuUnit"
-                    :range-label="usageRangeLabel"
-                    :unreadable-label="t('system.health.notMeasured')"
-                    :metric.prop="cpuPanel"
-                    :thresholds.prop="panelThresholds"
-                  ></ok-resource-usage>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
+        <!-- hub#2418 — the columns follow the room the cards really get (a container query), not
+             the window: a usage panel needs ~260 px for its heading and its gauge + trend side by
+             side. One column on a phone, 2×2 on a tablet or a laptop beside the menu, four across
+             only when four fit. -->
+        <div class="resources">
+          <div class="resources-grid">
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-card__content--panel">
+                <ok-resource-usage
+                  label="CPU"
+                  :unit="cpuUnit"
+                  :range-label="usageRangeLabel"
+                  :unreadable-label="t('system.health.notMeasured')"
+                  :metric.prop="cpuPanel"
+                  :thresholds.prop="panelThresholds"
+                ></ok-resource-usage>
+              </ion-card-content>
+            </ion-card>
 
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-card__content--panel">
-                  <ok-resource-usage
-                    :label="t('system.memory')"
-                    :unit="ramUnit"
-                    :range-label="usageRangeLabel"
-                    :unreadable-label="t('system.health.notMeasured')"
-                    :metric.prop="memPanel"
-                    :thresholds.prop="panelThresholds"
-                  ></ok-resource-usage>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-card__content--panel">
+                <ok-resource-usage
+                  :label="t('system.memory')"
+                  :unit="ramUnit"
+                  :range-label="usageRangeLabel"
+                  :unreadable-label="t('system.health.notMeasured')"
+                  :metric.prop="memPanel"
+                  :thresholds.prop="panelThresholds"
+                ></ok-resource-usage>
+              </ion-card-content>
+            </ion-card>
 
-            <!-- Base de datos: Postgres compartida por organización (ADR-0154) → sin "tamaño local":
-                 N/A. El motor (PostgreSQL) va en la subetiqueta. -->
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-stat">
-                  <HubIcon name="cube-outline" class="metric-stat__icon" />
-                  <div class="metric-stat__label">{{ t('system.database') }}</div>
-                  <div class="metric-stat__value">{{ dbValue }}</div>
-                  <div class="metric-stat__sub">{{ dbSub }}</div>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
+            <!-- Database: a shared Postgres (ADR-0154), so there is no "local size": N/A. The
+                 engine (PostgreSQL) goes in the sub-label. -->
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-stat">
+                <HubIcon name="cube-outline" class="metric-stat__icon" />
+                <div class="metric-stat__label">{{ t('system.database') }}</div>
+                <div class="metric-stat__value">{{ dbValue }}</div>
+                <div class="metric-stat__sub">{{ dbSub }}</div>
+              </ion-card-content>
+            </ion-card>
 
-            <!-- Conexiones BD reales (pool / pg_stat_activity). Un hub mínimo en reposo ≈ 0 — pero
-                 un cero REAL y un cero por no haber podido preguntar no son el mismo cero. -->
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-card__content--panel">
-                  <ok-resource-usage
-                    :label="t('system.connections')"
-                    :unit="connectionsUnit"
-                    :range-label="usageRangeLabel"
-                    :unreadable-label="t('system.health.notMeasured')"
-                    :metric.prop="connectionsPanel"
-                    :thresholds.prop="panelThresholds"
-                  ></ok-resource-usage>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
-          </ion-row>
-        </ion-grid>
+            <!-- Real DB connections (pool / pg_stat_activity). A minimal idle hub is ≈ 0 — but a REAL
+                 zero and a zero because we could not ask are not the same zero. -->
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-card__content--panel">
+                <ok-resource-usage
+                  :label="t('system.connections')"
+                  :unit="connectionsUnit"
+                  :range-label="usageRangeLabel"
+                  :unreadable-label="t('system.health.notMeasured')"
+                  :metric.prop="connectionsPanel"
+                  :thresholds.prop="panelThresholds"
+                ></ok-resource-usage>
+              </ion-card-content>
+            </ion-card>
+          </div>
+        </div>
 
         <!-- ── Your printer ──────────────────────────────────────────────────────────
              Same sentence as the panel badge (hub#375), from the same `printerLine`: the headline
@@ -496,7 +492,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
-  IonGrid, IonRow, IonCol, IonBadge, IonButton, IonToast, IonSpinner
+  IonBadge, IonButton, IonToast, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -1255,9 +1251,27 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-/* Rejilla de métricas de Recursos: respiración inferior antes del bloque Bridge. */
-.resources-grid {
+/* Resources cards (hub#2418): the columns follow the width the block really gets, not the window
+   — beside the side menu a 1024 px laptop leaves ~750 px, as little as a tablet. A usage panel
+   needs ~260 px (heading + pill on one line, gauge + trend side by side), so: one column, 2×2 from
+   540 px, four across from 1100 px. Bottom breathing room before the printer block. */
+.resources {
+  container-type: inline-size;
   margin-bottom: 16px;
+}
+.resources-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container (min-width: 540px) {
+  .resources-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 1100px) {
+  .resources-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* Selector de rango de las series de uso (3h/24h/3d): compacto, alineado a la izquierda. */
