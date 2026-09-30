@@ -60,6 +60,11 @@ const REQUIRED: &[&str] = &[
     // permission — no dialog, so it is not in `PermissionPolicy` — but the same "declared or
     // nothing" rule applies: without it `enableReaderMode` throws and a tablet cannot enrol a card.
     "android.permission.NFC",
+    // Staying alive to hear the next notice with the screen off (hub#2307). Both are install-time
+    // `normal` permissions, so there is no dialog either; but without them `startForeground`
+    // throws a SecurityException and Android freezes the page the moment the screen goes dark.
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
 ];
 
 /// The hardware feature the NFC permission drags in behind it (hub#988).

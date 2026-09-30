@@ -1340,6 +1340,9 @@ export default {
       blockedInSettings:
         'Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.',
       turnedOn: 'Listo: este dispositivo te avisará cuando algo necesite tu atención.',
+      listeningTitle: 'ERPlora está a la escucha',
+      listeningBody: 'Te avisará cuando algo necesite tu atención, aunque la pantalla esté apagada.',
+      listeningChannel: 'Avisos con la pantalla apagada',
     },
   },
   planLimits: {

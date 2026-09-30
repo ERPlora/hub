@@ -517,7 +517,9 @@ jobs:
                    android.permission.ACCESS_LOCAL_NETWORK \
                    android.permission.POST_NOTIFICATIONS \
                    android.permission.BLUETOOTH_CONNECT \
-                   android.permission.NFC; do
+                   android.permission.NFC \
+                   android.permission.FOREGROUND_SERVICE \
+                   android.permission.FOREGROUND_SERVICE_SPECIAL_USE; do
             echo "$PERMISOS" | grep -q "name='$P'" \
               || { echo "::error::el APK NO declara $P — el hardware moriría EN SILENCIO (hub#337)"; exit 1; }
           done

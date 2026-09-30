@@ -39,6 +39,9 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    // `AppCompatActivity` in `Plugin.onDestroy(activity)` (hub#2307). The same version the Tauri SDK
+    // already puts in the app, so the APK carries nothing new.
+    implementation("androidx.appcompat:appcompat:1.6.0")
     // El SDK del plugin de Tauri: `Plugin`, `@TauriPlugin`, `@Command`, `Invoke`.
     implementation(project(":tauri-android"))
 

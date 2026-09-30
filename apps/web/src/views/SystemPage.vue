@@ -557,6 +557,7 @@ import {
   primerLabelsFrom,
   type NotificationPermission,
 } from '../lib/notification-permission';
+import { resyncNoticeListening } from '../lib/notice-listening';
 import {
   ensureLocalNetworkPermission,
   localNetworkPermissionState,
@@ -1043,6 +1044,8 @@ async function turnOnNotices(): Promise<void> {
   try {
     await ensureNotificationPermission({ labels: primerLabelsFrom(t), force: true });
     notices.value = await notificationPermissionState();
+    // Listen with the screen off from now on, not from the next sign-in (hub#2307).
+    await resyncNoticeListening();
     void toast(
       notices.value === 'denied'
         ? t('system.notices.blockedInSettings')
