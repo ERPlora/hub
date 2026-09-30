@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const loader = readFileSync(new URL('./module-loader.ts', import.meta.url), 'utf8');
 const host = readFileSync(new URL('../views/ModuleView.vue', import.meta.url), 'utf8');
+const polish = readFileSync(new URL('../theme/polish.css', import.meta.url), 'utf8');
 
 describe('module host', () => {
   it('authenticates internal navigation requests', () => {
@@ -68,6 +69,7 @@ describe('module host', () => {
     expect(host).toContain('scrollable');
     expect(host).toContain(':aria-label="tb.label"');
     expect(host).toContain('--ok-tabbar-min: 116px');
-    expect(host).toContain('white-space: normal');
+    // Every footer strip of the shell wraps its labels, the module's included (hub#2422).
+    expect(polish).toMatch(/ion-footer \.ok-tabbar ion-label \{[^}]*white-space: normal;/);
   });
 });
