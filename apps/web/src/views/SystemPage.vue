@@ -1201,9 +1201,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Tarjetas de métrica: misma altura, contenido centrado (gauge o stat). */
+/* Metric cards: same height, centred content (gauge or stat). No margin: the grid's `gap` spaces
+   them — a margin on a `height: 100%` grid item spills out of its row and glues the stacked cards. */
 .metric-card {
-  margin: 4px;
   height: 100%;
 }
 .metric-card__content {
@@ -1262,6 +1262,8 @@ onBeforeUnmount(() => {
 .resources-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px;
 }
 @container (min-width: 540px) {
   .resources-grid {
