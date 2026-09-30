@@ -265,3 +265,8 @@ taxes/tests/calculate_refuses_without_rules.hub.test.py
 # against the real kernel (appointments#246). New coverage, not moved.
 # pending-publication: appointments#249 until 2026-10-29
 appointments/tests/recurring_create_links.hub.test.py
+# appointments: «this and following» on a series at its LARGEST — a daily series booked to the
+# 400-day horizon, with a full agenda of the same professional ahead — moves whole inside the
+# handler's WASM instruction budget, against the real kernel (appointments#251). New coverage, not moved.
+# pending-publication: appointments#262 until 2026-10-30
+appointments/tests/series_edit_at_horizon.hub.test.py
