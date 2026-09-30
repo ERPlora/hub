@@ -2308,7 +2308,11 @@ mod tests {
         let claim = setup.find("notice_tap::answer_link(app.handle(), std::env::args())");
         let kept = setup.find("app.manage(notice_tap::KeptNoticeTap::default())");
         let window = setup.find("open_main_window(app, cache_dir)");
-        assert!(claim.is_some(), "setup does not answer the link the app was launched with");
+        // Each one found, or `None < Some(_)` would pass the order check below without a place to keep
+        // the tap (on_click would panic on the unmanaged state).
+        let (Some(claim), Some(kept), Some(window)) = (claim, kept, window) else {
+            panic!("setup lost one of: the claim {claim:?}, the kept tap {kept:?}, the window {window:?}");
+        };
         assert!(kept < claim && window < claim, "the link is answered before there is somewhere to keep it");
     }
 
