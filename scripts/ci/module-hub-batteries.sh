@@ -106,6 +106,11 @@ day_number() { # $1=YYYY-MM-DD
 # How far ahead a marker may promise publication. Long enough for a module PR to go through
 # review and its gate; short enough that "pending" can never quietly mean "never" (hub#1994).
 max_pending_days=30
+# The 30 days count from the WRITER's today, not from this run's UTC one (hub#2416): a marker
+# written at 01:00 in Madrid carries a date one day ahead of UTC's, and the window closed on it.
+# No clock on Earth is more than one calendar day ahead of UTC (UTC+14), so the window is
+# measured from UTC's tomorrow. Expiry below still compares against UTC's today.
+writer_lead_days=1
 
 if ! today_n=$(day_number "$today"); then
     printf 'module-hub-batteries: --today must be a calendar date YYYY-MM-DD, got: %s\n' "$today" >&2
@@ -259,10 +264,10 @@ while IFS= read -r line || [ -n "$line" ]; do
     \`<repo>#<n> until <YYYY-MM-DD>\` — a pending line with no end is a pending-forever
     (hub#1994), got: '$marker_body'"
                 marker_issue=""
-            elif [ $((until_n - today_n)) -gt "$max_pending_days" ]; then
+            elif [ $((until_n - today_n - writer_lead_days)) -gt "$max_pending_days" ]; then
                 failures="$failures
   - a \`# pending-publication:\` marker may promise at most $max_pending_days days ahead of today
-    ($today), got: '$marker_body'"
+    ($today in UTC, one day more for a writer already on UTC's tomorrow), got: '$marker_body'"
                 marker_issue=""
             fi
             ;;

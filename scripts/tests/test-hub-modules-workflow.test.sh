@@ -573,6 +573,33 @@ if len(runner_step) == 1:
         "a runner pointed at the working tree measures something nobody ships",
     )
 
+    # hub#2416: the runner step is `!cancelled()` so a red `cargo test` does not hide it — but a red
+    # pairing guard SKIPS the step that starts Postgres and exports `DATABASE_URL`, and the runner
+    # then died on `DATABASE_URL: unbound variable`: a false cause in the log, and a false «the
+    # batteries do not pass» alert on `develop` (hub#2187, commit 6c4401af). So the runner, and the
+    # build that only exists for it, run only once that step has succeeded; otherwise they are
+    # skipped and the red is the step that really failed.
+    pg_step = [s_ for s_ in steps if 'echo "DATABASE_URL=' in code_of(s_)]
+    check(
+        "exactly one step exports DATABASE_URL for the runner",
+        len(pg_step) == 1,
+        f"{len(pg_step)} steps do",
+    )
+    pg_id = pg_step[0].get("id") if len(pg_step) == 1 else None
+    check("the step that exports DATABASE_URL carries an `id`", bool(pg_id), "the runner gates on it")
+    if pg_id:
+        gate = f"steps.{pg_id}.outcome == 'success'"
+        builds = [s_ for s_ in steps if code_of(s_).strip() == "cargo build -p erplora-server"]
+        check("one step only builds `erplora-server`", len(builds) == 1, f"{len(builds)} steps do")
+        gated = [runner_step[0]] + builds
+        for s_ in gated:
+            cond = str(s_.get("if", ""))
+            check(
+                f"step «{s_.get('name')}» runs only after `{pg_id}` succeeded",
+                gate in cond and "!cancelled()" in cond,
+                f"if: {cond!r} — without Postgres it dies on an unbound DATABASE_URL and blames the batteries",
+            )
+
 check(
     f"`{RUNNER}` really exists in this checkout",
     os.path.isfile(os.path.join(os.environ["REPO_ROOT"], RUNNER)),
