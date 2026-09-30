@@ -146,6 +146,7 @@ test.describe('System → Resources cards fit their box (hub#2418)', () => {
           if (state.measured && card.trendWidth !== null)
             expect(card.trendWidth, `${who}: the trend chart is squeezed`).toBeGreaterThanOrEqual(MIN_TREND_PX);
         }
+        // Regression test for ERPlora/hub#2418 (the reviewer's fix that hub#2426 landed without).
         // Neighbouring cards never touch: the stacked ones (a phone's single column, the second row
         // of a 2×2) keep the same gap as the ones side by side, not a shared border.
         for (const card of cards) {
