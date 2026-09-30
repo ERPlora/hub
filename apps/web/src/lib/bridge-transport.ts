@@ -12,6 +12,7 @@
 // and since hub#524 the shell's own SCREENS ask at that same door ({@link detectPeripherals}).
 import {
   ANDROID_LOCAL_NETWORK_PERMISSION,
+  ANDROID_NOTIFICATIONS_PERMISSION,
   IpcBridgeTransport,
   LocalNetworkPermissionDeniedError,
   UnavailableBridgeTransport,
@@ -197,4 +198,32 @@ export function makeBridgeTransport(): BridgeTransport {
         // es quien tiene i18n) pone las palabras en el idioma activo del hub.
         new UnavailableBridgeTransport(hardwareUnavailableMessage()),
   );
+}
+
+/**
+ * A system notice the shell can follow when it is tapped (hub#2305): `peripherals.notify` plus the
+ * `id` the notification plugin hands back with the tap (`lib/notice-tap.ts` keeps where each id
+ * leads). The shell's own door on purpose: the notices that lead somewhere are the shell's
+ * (kitchen order, appointments, the bell's counters), and the module SDK's `notify` stays the
+ * frozen kernel contract it is.
+ *
+ * Same rules as `IpcBridgeTransport.notify`: the notifications permission and only it asked first
+ * (hub#758), best-effort all the way, and nothing in a browser — there is no system notice there.
+ * An installed app older than this shell ignores the `id` and shows the notice all the same.
+ *
+ * `path` is the screen the notice leads to (hub#2360): the shell hands it back with a tap the page
+ * did not see being sent — a click on the computer, a tap that had to start the app on Android.
+ */
+export async function sendSystemNotice(title: string, body: string, id: number, path: string | null): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    await invokeTauri(REQUEST_PERMISSIONS, { permissions: [ANDROID_NOTIFICATIONS_PERMISSION] });
+  } catch {
+    // On desktop there is nothing to ask; on Android, the user said no. Carry on.
+  }
+  try {
+    await invokeTauri('erplora_notify', { title, body, id, path });
+  } catch (e) {
+    console.warn('[notify] the platform could not show the notice', e);
+  }
 }

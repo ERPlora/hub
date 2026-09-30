@@ -195,26 +195,23 @@ pub enum RuntimeError {
     /// declarado por el propio módulo y sigue llegando como NULL a propósito.
     #[error("la query `{query}` requiere el parámetro `:{param}` (su SQL lo referencia) y llegó ausente o null: se rehúsa a ligarlo como NULL porque respondería una página vacía como si no existiera nada")]
     MissingRequiredParam { query: String, param: String },
-    /// Un parámetro que la query de LISTA no declara llegó en los params (hub#1173). Antes se
-    /// ignoraba en silencio y la página respondía `200 ok` **con la lista entera**: quien llamó
-    /// —un módulo, el asistente, una integración, un flujo— se cree que ha filtrado y trabaja
-    /// sobre 280 filas pensando que tiene 12, sin nada que lo distinga de un filtro que sí corrió
-    /// y no encontró coincidencias. Es el gemelo mudo de [`Self::MissingRequiredParam`], y cierra
-    /// la asimetría que señala la issue: el payload de un command se valida estricto
-    /// (`invalid_payload`) y el de una query no se validaba en absoluto.
+    /// A parameter the query does not declare arrived in the params (hub#1173 for lists,
+    /// hub#1913 for plain queries). It used to be dropped in silence: a LIST answered `200 ok` with
+    /// the WHOLE list, and a plain read (`*.get`) bound NULL in its place and answered ZERO rows —
+    /// "Charge" from an appointment opened an empty ticket for weeks (sales#316). Whoever called —
+    /// a module, the assistant, an integration, a flow — could not tell it from a filter that ran
+    /// and matched nothing, or from a record that does not exist. It is the silent twin of
+    /// [`Self::MissingRequiredParam`], and closes the asymmetry with commands, whose payload is
+    /// validated strictly (`invalid_payload`).
     ///
-    /// El vocabulario de una lista es lo que ella declara, ni más ni menos: los binds del propio
-    /// motor (`limit`/`offset`/`search`/`sort`/`dir`), un `f_<col>` (o `f_<col>_from`/`_to`) por
-    /// cada filtro del bloque `list`, cualquier bind que su SQL base referencia —que es donde una
-    /// lista declara sus params de contexto— y las `properties` de su JSON Schema si lo declara.
-    ///
-    /// **Solo se defiende el espacio SIN prefijo.** `f_*` es el namespace del propio motor y un
-    /// filtro no casado ahí se sigue descartando: hay 5 pantallas del catálogo cuya tabla declara
-    /// `filterable` una columna que su manifest no declara como filtro, y rechazarlas cambiaría
-    /// «el filtro no hace nada» por «la tabla revienta». Se cierra cuando esos manifests declaren
-    /// el filtro que les falta (hub#1182).
+    /// A LIST's vocabulary is what it declares: the engine's own binds
+    /// (`limit`/`offset`/`search`/`sort`/`dir`), one `f_<col>` (or `f_<col>_from`/`_to`) per filter
+    /// of the `list` block — the `f_*` namespace included since hub#1182 —, every bind its base SQL
+    /// references and the `properties` of its JSON Schema. A PLAIN query's vocabulary is its SQL
+    /// binds and its schema `properties`, plus the kernel's system params, which the runtime
+    /// injects and overwrites anyway. One error and one code (`unknown_filter`) for both engines.
     #[error(
-        "la query `{query}` no declara el parámetro `{param}`: se rehúsa a ignorarlo porque devolvería la lista ENTERA como si hubiera filtrado; acepta {accepted:?}"
+        "query `{query}` does not declare the parameter `{param}`: refusing to ignore it, since the answer would look like a real one; accepts {accepted:?}"
     )]
     UnknownFilter {
         query: String,
@@ -283,7 +280,8 @@ pub enum RuntimeError {
         detail: String,
     },
     /// A read marked `required` (ADR-0069, hub#701) could not be resolved — the module that owns
-    /// it is absent, inactive, or the query itself failed. Distinct from the GRACEFUL default
+    /// it is absent, inactive, or the query itself failed; `reason` says which (hub#2410), because
+    /// «install the app» is only the remedy of the first. Distinct from the GRACEFUL default
     /// (regla 3 de ADR-0069): a `required` read aborts the command instead of letting the handler
     /// degrade with a silent empty catalog. The canonical case is the tax catalog: without it a
     /// handler cannot tell «this category has no rule» from «the catalog never arrived», and
@@ -292,7 +290,10 @@ pub enum RuntimeError {
     /// translates the stable code `read_unavailable` and reads `query` as a field (hub#1102) —
     /// this text is the fallback a log keeps, not what a cashier is shown.
     #[error("a required read (`{query}`) could not be resolved, so the command was aborted")]
-    ReadUnavailable { query: String },
+    ReadUnavailable {
+        query: String,
+        reason: ReadUnavailableReason,
+    },
     /// A `protects` guard declared by one module over another refused the command (hub#775).
     ///
     /// The canonical case is `cash_register` blocking every `sales.*` command while
@@ -433,6 +434,40 @@ impl std::fmt::Display for DemoLock {
             }
         };
         f.write_str(human)
+    }
+}
+
+/// Why a `required` read did not resolve (hub#2410) — what [`RuntimeError::ReadUnavailable`]
+/// travels with, so the screen can tell «the app is missing» from «the read failed».
+///
+/// The two absences reuse the codes the runtime already gives them on their own
+/// (`module_not_installed`, `module_inactive`): same event, same word. Everything else the query
+/// can answer — a database fault, a table it cannot reach, a query an older version of the app
+/// does not ship — is `query_failed`: the app is there, and «install it» is the wrong remedy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadUnavailableReason {
+    ModuleNotInstalled,
+    ModuleInactive,
+    QueryFailed,
+}
+
+impl ReadUnavailableReason {
+    /// Stable machine code, sent as `reason` beside `code: "read_unavailable"`.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::ModuleNotInstalled => "module_not_installed",
+            Self::ModuleInactive => "module_inactive",
+            Self::QueryFailed => "query_failed",
+        }
+    }
+
+    /// The reason a failed read reports, from the error the query answered with.
+    pub fn of(e: &RuntimeError) -> Self {
+        match e {
+            RuntimeError::ModuleNotInstalled { .. } => Self::ModuleNotInstalled,
+            RuntimeError::ModuleInactive { .. } => Self::ModuleInactive,
+            _ => Self::QueryFailed,
+        }
     }
 }
 

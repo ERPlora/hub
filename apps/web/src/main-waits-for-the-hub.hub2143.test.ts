@@ -10,8 +10,12 @@ const MAIN = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 
 
 describe('main.ts waits for the hub before mounting (hub#2143)', () => {
   it('asks for the context through bootUntilReachable, with the boot screen', () => {
-    expect(MAIN).toMatch(/bootUntilReachable\(\{\s*loadContext:\s*bootHubContext,/);
-    expect(MAIN).toMatch(/showUnreachable:\s*\(retry\)\s*=>\s*bootScreen\?\.showUnreachable\(retry\)/);
+    // hub#2255: the check says WHY it failed, and the notice is told, so a refusal is not painted
+    // as a lost connection.
+    expect(MAIN).toMatch(/bootUntilReachable\(\{\s*loadContext:\s*bootContextOutcome,/);
+    expect(MAIN).toMatch(
+      /showUnreachable:\s*\(retry, failure\)\s*=>\s*bootScreen\?\.showUnreachable\(retry, failure\)/,
+    );
     expect(MAIN).toMatch(/showProgress:\s*\(\)\s*=>\s*bootScreen\?\.showProgress\(\)/);
   });
 

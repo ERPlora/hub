@@ -88,15 +88,27 @@
 # on it; `e2e` is skipped (the door is waiting on this run). The door finds its run by
 # the `run-name` below — change the title and `merge_check_title` in merge-pr.sh together.
 #
+# ── An OutfitKit release runs this file at once (hub#2321) ───────────────────
+# The image re-resolves `@erplora/outfitkit@latest` on every build (hub#1793), so a release
+# that moves a pixel of the shell reaches customers with no hub commit at all — and it was
+# only seen at the next web push to develop or at the 03:08 cron, hours later. ERPlora/
+# outfitkit's `publish.yml` now sends `repository_dispatch: outfitkit-published` with the
+# version it just published — the same trigger `test-hub-modules.yml` takes from module
+# releases (hub#1239). That run is treated like the cron: it tests DEVELOP (the event fires
+# the file living on `main`, see the cron caveat above), installs EXACTLY the announced
+# version (`scripts/ci/install-published-outfitkit.sh`: the registry cache can still serve
+# the previous one as `latest` for minutes) and a red opens the develop alert, naming the
+# version. Same caveat as the cron: it only fires once this file reaches `main`.
+#
 # Contrato de este fichero: `scripts/tests/test-web-workflow.test.sh`, que corre
 # como un paso del job `verify` (un test de la guarda que no corre en ningún
 # sitio es la lista de la compra, no una guarda).
 # ==============================================================================
 
 name: Web tests (typecheck · vitest · e2e)
-# Only a merge-check gets a title of its own (pm#331); every other event evaluates to ''
-# and keeps GitHub's default (the commit or PR title).
-run-name: ${{ inputs.pr && format('merge-check hub#{0} {1} onto {2}', inputs.pr, inputs.head_sha, inputs.base_sha) || '' }}
+# A merge-check (pm#331) and an OutfitKit notice (hub#2321) get a title of their own; every
+# other event evaluates to '' and keeps GitHub's default (the commit or PR title).
+run-name: ${{ inputs.pr && format('merge-check hub#{0} {1} onto {2}', inputs.pr, inputs.head_sha, inputs.base_sha) || github.event_name == 'repository_dispatch' && format('OutfitKit publicada — v{0} contra develop', github.event.client_payload.version) || '' }}
 
 on:
   push:
@@ -114,6 +126,8 @@ on:
       - "scripts/tests/web-format.test.sh"
       - "scripts/ci/merge-check-tree.sh"
       - "scripts/tests/merge-check-tree.test.sh"
+      - "scripts/ci/install-published-outfitkit.sh"
+      - "scripts/tests/install-published-outfitkit.test.sh"
       - ".github/workflows/test-web.yml"
   # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Fuera del 29/08 al 03/09 (pm#197): la suite
   # corría en el gate pre-push local. Medido en la tanda R2 del 02/09: ese gate es UN lock para
@@ -136,9 +150,15 @@ on:
       - "scripts/tests/web-format.test.sh"
       - "scripts/ci/merge-check-tree.sh"
       - "scripts/tests/merge-check-tree.test.sh"
+      - "scripts/ci/install-published-outfitkit.sh"
+      - "scripts/tests/install-published-outfitkit.test.sh"
       - ".github/workflows/test-web.yml"
   schedule:
     - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
+  # Sent by ERPlora/outfitkit's `publish.yml` after `npm publish` (hub#2321), with
+  # `client_payload.version`. Lands on the DEFAULT branch (`main`), like the cron.
+  repository_dispatch:
+    types: [outfitkit-published]
   workflow_dispatch:
     inputs:
       update_baselines:
@@ -162,7 +182,9 @@ on:
 concurrency:
   # A merge-check carries its PR (pm#331): every dispatch runs on `refs/heads/develop`, and
   # sharing that group would let one merge cancel another's check — and the develop push run.
-  group: test-web-${{ github.ref }}${{ inputs.pr && format('-merge-check-{0}', inputs.pr) || '' }}
+  # An OutfitKit notice (hub#2321) lands on `refs/heads/main`: its own group keeps it from
+  # cancelling the push to main, and a newer release cancels the run of the older one.
+  group: test-web-${{ github.ref }}${{ inputs.pr && format('-merge-check-{0}', inputs.pr) || '' }}${{ github.event_name == 'repository_dispatch' && '-outfitkit-published' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -194,7 +216,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.base_sha || (github.event_name == 'schedule' && 'develop' || github.ref) }}
+          ref: ${{ inputs.base_sha || ((github.event_name == 'schedule' || github.event_name == 'repository_dispatch') && 'develop' || github.ref) }}
           fetch-depth: ${{ inputs.pr && '0' || '1' }}
 
       - name: Merge-check — build the merged tree of the PR (pm#331)
@@ -225,6 +247,14 @@ jobs:
       - name: OutfitKit as the image resolves it (docker/Dockerfile)
         run: pnpm --filter @erplora/web add @erplora/outfitkit@latest
 
+      # hub#2321 — an OutfitKit notice tests the version it ANNOUNCES, not the `latest` the
+      # registry cache may still serve. The payload reaches the script through `env:` only.
+      - name: OutfitKit just published (hub#2321)
+        if: ${{ github.event_name == 'repository_dispatch' }}
+        env:
+          OUTFITKIT_PUBLISHED: ${{ github.event.client_payload.version }}
+        run: bash ./scripts/ci/install-published-outfitkit.sh
+
       # `pnpm verify` = vue-tsc --noEmit + vitest run (@erplora/web) + node:test (@erplora/module-sdk).
       # The SDK suite is what pins the `.ts` specifiers of its ESM barrel: its runner
       # (`node --experimental-transform-types --test`) demands fully specified relative paths, so
@@ -246,6 +276,9 @@ jobs:
 
       - name: Contrato del árbol fusionado del merge-check (scripts/tests/merge-check-tree.test.sh)
         run: bash scripts/tests/merge-check-tree.test.sh
+
+      - name: Contrato de la OutfitKit anunciada (scripts/tests/install-published-outfitkit.test.sh)
+        run: bash ./scripts/tests/install-published-outfitkit.test.sh
 
   e2e:
     name: playwright (test:e2e, runtime real)
@@ -287,11 +320,11 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
-      # Same conditional `ref` as the `verify` job (hub#1253) — see the comment there.
+      # Same conditional `ref` as the `verify` job (hub#1253, hub#2321) — see the comment there.
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
+          ref: ${{ (github.event_name == 'schedule' || github.event_name == 'repository_dispatch') && 'develop' || github.ref }}
 
       # 🔴 Misma defensa que `test-hub.yml`: el resolutor de módulos del shell mira al hermano
       # `modules-workspace/` del checkout, que cae FUERA del workspace y PERSISTE entre jobs. Si
@@ -325,9 +358,36 @@ jobs:
       # hub#1793 — verify the OutfitKit the image SHIPS, not the lockfile's. `docker/Dockerfile`
       # re-resolves it to `@latest` on every build; without the same step here the shell was
       # type-checked and tested against an older library than the one customers get.
+      #
+      # hub#2304 — except on a pull request. Its screenshots are compared with baselines drawn with
+      # ONE OutfitKit, and `latest` here turned EVERY web PR red each time a release moved a pixel
+      # (0.1.80 on 24/09, 0.1.109 on 28/09) until somebody redrew the photo. A PR installs the
+      # version the baselines were drawn with, so its bench only measures the PR's own diff. Push to
+      # develop/main and the nightly cron keep `latest`: a release that moves a pixel turns THEM red
+      # and opens the develop alert below, whose fix is to redraw (visual-baselines.yml), which also
+      # moves `baselines-outfitkit.txt`. `verify` keeps `latest` on every event.
       # Contract: scripts/tests/test-web-workflow.test.sh.
       - name: OutfitKit as the image resolves it (docker/Dockerfile)
+        if: ${{ github.event_name != 'pull_request' }}
         run: pnpm --filter @erplora/web add @erplora/outfitkit@latest
+
+      # HUB_BENCH_OUTFITKIT tells the bench guard (tests/outfitkit-latest-guard.ts) this version is
+      # deliberate, so it checks the install IS it instead of demanding `latest`.
+      - name: OutfitKit the visual baselines were drawn with (hub#2304)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          HUB_BENCH_OUTFITKIT=$(cat apps/web/tests/e2e/baselines-outfitkit.txt)
+          echo "HUB_BENCH_OUTFITKIT=${HUB_BENCH_OUTFITKIT}" >> "$GITHUB_ENV"
+          pnpm --filter @erplora/web add "@erplora/outfitkit@${HUB_BENCH_OUTFITKIT}"
+
+      # hub#2321 — an OutfitKit notice tests the version it ANNOUNCES, not the `latest` the
+      # registry cache may still serve. The payload reaches the script through `env:` only.
+      - name: OutfitKit just published (hub#2321)
+        if: ${{ github.event_name == 'repository_dispatch' }}
+        env:
+          OUTFITKIT_PUBLISHED: ${{ github.event.client_payload.version }}
+        run: bash ./scripts/ci/install-published-outfitkit.sh
 
       - name: Toolchain (rust-toolchain.toml)
         run: |
@@ -407,12 +467,20 @@ jobs:
         # ya existe, y una baseline desfasada seguiría desfasada tras el run que la iba a arreglar.
         run: pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts --update-snapshots=all
 
+      # hub#2304 — the photos travel with the OutfitKit that drew them: a PR's e2e installs this
+      # version, so committing new PNGs without it would compare them with the old library.
+      - name: Anotar la OutfitKit con la que se dibujaron (hub#2304)
+        if: ${{ github.event.inputs.update_baselines == 'true' }}
+        run: node -p "require('./apps/web/node_modules/@erplora/outfitkit/package.json').version" > apps/web/tests/e2e/baselines-outfitkit.txt
+
       - name: Subir las capturas regeneradas
         if: ${{ github.event.inputs.update_baselines == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-baselines
-          path: apps/web/tests/e2e/**/*-snapshots/**
+          path: |
+            apps/web/tests/e2e/**/*-snapshots/**
+            apps/web/tests/e2e/baselines-outfitkit.txt
           if-no-files-found: error
 
       # La traza de un fallo (el config guarda `trace: retain-on-failure`): sin esto, un rojo de
@@ -444,7 +512,7 @@ jobs:
     if: >-
       always() &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
-       github.event_name == 'schedule') &&
+       github.event_name == 'schedule' || github.event_name == 'repository_dispatch') &&
       (needs.verify.result == 'failure' || needs.e2e.result == 'failure')
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
@@ -462,6 +530,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRIGGER: ${{ github.event_name }}
+          OUTFITKIT_PUBLISHED: ${{ github.event.client_payload.version }}
           SHA: ${{ github.sha }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -475,7 +544,8 @@ jobs:
           # NOT the `develop` the jobs above actually tested (conditional `ref:`,
           # hub#1253). The real develop HEAD is resolved via the API on that path
           # instead of trusting a context that points at the wrong branch.
-          if [ "$TRIGGER" = "schedule" ]; then
+          # An OutfitKit notice (hub#2321) also lands on `main` and also tested develop.
+          if [ "$TRIGGER" = "schedule" ] || [ "$TRIGGER" = "repository_dispatch" ]; then
             sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/develop" --jq '.sha')
             subject=$(gh api "repos/${GITHUB_REPOSITORY}/commits/develop" --jq '.commit.message' | head -n 1)
           else
@@ -484,15 +554,22 @@ jobs:
           fi
 
           title="el web de develop esta roto tras un merge"
+          outfitkit_line=""
+          if [ "$TRIGGER" = "repository_dispatch" ]; then
+            outfitkit_line="
+          - disparado al publicarse OutfitKit \`${OUTFITKIT_PUBLISHED}\` (hub#2321): develop no ha cambiado, lo que cambia es la librería que la imagen instala como \`latest\`. Si lo rojo son capturas (\`*Visual\`), el arreglo es regenerarlas con esa versión; si es otra cosa, la release rompe el shell y el arreglo va en ERPlora/outfitkit."
+          fi
           body="Detectado por la suite del web sobre develop (hub#1240 · disparo \`${TRIGGER}\`).
 
           - develop HEAD: \`${sha}\` — '${subject}'
           - run fallido: ${RUN_URL}
-          - verify (vue-tsc + vitest): ${VERIFY_RESULT} · e2e (playwright): ${E2E_RESULT}
+          - verify (vue-tsc + vitest): ${VERIFY_RESULT} · e2e (playwright): ${E2E_RESULT}${outfitkit_line}
 
           Hasta hub#1240 este workflow solo corría en \`main\`, y por eso hub#1200 (un test web rojo) aguantó en develop sin que lo viera nadie. Desde hub#1253 este run también puede venir de la pasada nocturna (\`schedule\`): sin ella, un merge SOLO-Rust en develop no dispara nunca este fichero y una regresión del runtime que rompa el shell no salía hasta la siguiente PR del web.
 
           Ojo: el rojo puede ser del diff o del ENTORNO (disco, contenedor de servicio, navegador). El run enlazado lo dice; si es entorno, se cierra esta issue y ya está.
+
+          Si lo rojo son capturas (\`*Visual\`) y el diff no toca el shell, casi seguro es una release de OutfitKit (hub#2304): develop prueba la \`latest\` y las PRs la versión de \`apps/web/tests/e2e/baselines-outfitkit.txt\`, así que las PRs siguen verdes. Arreglo: lanzar «Regenerar baselines visuales (Linux)», revisar las capturas y commitear en una PR los PNG y ese fichero juntos, tal como salen del artefacto.
 
           Esta issue se REUTILIZA (un comentario por detección) mientras develop siga rojo; ciérrala cuando vuelva a verde."
 

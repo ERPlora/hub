@@ -586,17 +586,38 @@ ok
 today=2026-09-23
 
 # A deadline further than 30 days out is refused: `until 2099-01-01` would be "never" in disguise.
-# 2026-10-23 is exactly 30 days after 2026-09-23 and is the last one allowed.
+# The 30 days count from the WRITER's today, and the writer's calendar may already be on the day
+# after UTC's (hub#2416): at 01:00 in Madrid on 2026-09-30 it is still 2026-09-29 in UTC, and the
+# fleet wrote `until 2026-10-30` — its today plus 30 — which the CI, checking in UTC, read as 31
+# days and turned `develop` red for an hour. No clock on Earth runs more than one calendar day
+# ahead of UTC (UTC+14), so the last day allowed is UTC's today + 31.
 write_pending 'kitchen#84 until 2026-10-23'
 run_guard "$catalogue" "$manifest"
 [ "$rc" -eq 0 ] || fail "a marker exactly 30 days ahead must be allowed, got $rc"
 ok
-for far in 2026-10-24 2099-01-01; do
+write_pending 'kitchen#84 until 2026-10-24'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "a marker 30 days ahead of a writer already on UTC's tomorrow must be allowed, got $rc"
+ok
+for far in 2026-10-25 2099-01-01; do
     write_pending "kitchen#84 until $far"
     run_guard "$catalogue" "$manifest"
-    [ "$rc" -eq 1 ] || fail "a marker more than 30 days ahead (until $far) must exit 1, got $rc"
+    [ "$rc" -eq 1 ] || fail "a marker more than 30 days ahead of any writer (until $far) must exit 1, got $rc"
     ok
 done
+
+# The exact red of run 36642817538: `inventory#128 until 2026-10-30`, written at 01:00 CEST on
+# 2026-09-30 and checked at 23:22Z on 2026-09-29.
+today=2026-09-29
+write_pending 'inventory#128 until 2026-10-30'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 0 ] || fail "'until 2026-10-30' written in Madrid on 2026-09-30 and checked on UTC's 2026-09-29 must pass, got $rc: $err"
+ok
+write_pending 'inventory#128 until 2026-10-31'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "'until 2026-10-31' is 31 days past the Madrid writer's 2026-09-30 and must exit 1, got $rc"
+ok
+today=2026-09-23
 
 # A marker with no deadline, or one that is not a real calendar date, is refused: an undated
 # marker is exactly the pending-forever this case exists to end.
@@ -626,17 +647,18 @@ for pair in '2028-02-20 2028-02-29' '2000-02-20 2000-02-29'; do
     [ "$rc" -eq 0 ] || fail "'until ${pair##* }' is a real leap day (checked on $today), must pass, got $rc"
     ok
 done
-# The 30-day window across February of a century year that is NOT a leap year: 2100-02-20 to
-# 2100-03-22 is exactly 30 days (February 2100 has 28), so it is the last day allowed and the next
-# one is refused. A day count that treated 2100 as a leap year would get both wrong.
+# The window across February of a century year that is NOT a leap year: 2100-02-20 to 2100-03-23
+# is exactly 31 days (February 2100 has 28) — 30 from a writer already on UTC's tomorrow — so it is
+# the last day allowed and the next one is refused. A day count that treated 2100 as a leap year
+# would get both wrong.
 today=2100-02-20
-write_pending 'kitchen#84 until 2100-03-22'
-run_guard "$catalogue" "$manifest"
-[ "$rc" -eq 0 ] || fail "2100-02-20 → 2100-03-22 is exactly 30 days and must pass, got $rc"
-ok
 write_pending 'kitchen#84 until 2100-03-23'
 run_guard "$catalogue" "$manifest"
-[ "$rc" -eq 1 ] || fail "2100-02-20 → 2100-03-23 is 31 days and must exit 1, got $rc"
+[ "$rc" -eq 0 ] || fail "2100-02-20 → 2100-03-23 is 31 days (30 from UTC's tomorrow) and must pass, got $rc"
+ok
+write_pending 'kitchen#84 until 2100-03-24'
+run_guard "$catalogue" "$manifest"
+[ "$rc" -eq 1 ] || fail "2100-02-20 → 2100-03-24 is 32 days and must exit 1, got $rc"
 ok
 today=2026-09-23
 

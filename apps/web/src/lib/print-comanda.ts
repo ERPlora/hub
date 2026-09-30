@@ -93,6 +93,12 @@ export interface ComandaPrintFailure {
   awaitingHost?: boolean;
 }
 
+/**
+ * Where a tap on the kitchen order's notice leads (hub#2305): the kitchen module, which opens on
+ * its display. Not a tab by name, so a module that renames its tabs still lands somewhere real.
+ */
+export const KITCHEN_NOTICE_PATH = '/m/kitchen';
+
 /** The notice and its words travel together: a notice without the catalogue would speak one language. */
 type NoticeDeps =
   | {
@@ -101,9 +107,10 @@ type NoticeDeps =
        *
        * The paper is a copy and the KDS is the source of truth — but a screen nobody looks at warns
        * nobody. In a hot kitchen the tablet is propped up, on another view or locked, and the OS
-       * notification is the only thing that gets through.
+       * notification is the only thing that gets through. `path` is the screen a tap opens
+       * (hub#2305).
        */
-      notify: (title: string, body: string) => Promise<void>;
+      notify: (title: string, body: string, path?: string) => Promise<void>;
       /** The caller owns i18n (ADR-0055, hub#2171): this file only picks the key and its params. */
       t: (key: string, params?: Record<string, unknown>) => string;
     }
@@ -217,7 +224,7 @@ export async function onKitchenOrderCreated(
     const body = [orderNumber, total ? deps.t('print.comandaNoticeLines', { n: total }) : '']
       .filter(Boolean)
       .join(' · ');
-    await deps.notify(title, body).catch(() => {});
+    await deps.notify(title, body, KITCHEN_NOTICE_PATH).catch(() => {});
   }
 
   if (!groups.length) return; // todo era de pantalla, o la comanda venía vacía

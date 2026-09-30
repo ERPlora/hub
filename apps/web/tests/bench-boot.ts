@@ -33,7 +33,7 @@
 
 import { readdirSync } from 'node:fs';
 
-import { test as base, expect, request } from '@playwright/test';
+import { test as base, expect, request, type Request } from '@playwright/test';
 
 // Re-exported so a spec needs ONE import line, not one for the bench and one for Playwright.
 export { expect, request };
@@ -109,6 +109,27 @@ export function nextBootStep(
     return elapsedMs < NETWORK_CHANGE_BUDGET_MS ? 'reload-storm' : 'hand-over';
   }
   return countedReloads < BOOT_RELOAD_LIMIT ? 'reload' : 'hand-over';
+}
+
+/** How the bench fetches a navigation again: back to its own URL, or a reload of the page. */
+export type FetchAgain = 'navigate' | 'reload';
+
+/**
+ * How to fetch a navigation again once something of ours died on the wire during its load.
+ *
+ * A document that died leaves the page on Chromium's error page, where a reload would reload the
+ * error; going back to the navigation's own URL is what fetches it again. The URL alone cannot tell:
+ * Playwright rejects the load before Chromium commits `chrome-error://`, and a reload started in that
+ * gap is detached by the error page committing under it (hub#2296).
+ */
+export function howToFetchAgain({
+  documentDied,
+  onErrorPage,
+}: {
+  documentDied: boolean;
+  onErrorPage: boolean;
+}): FetchAgain {
+  return documentDied || onErrorPage ? 'navigate' : 'reload';
 }
 
 function originOf(url: string | undefined): string | undefined {
@@ -318,6 +339,11 @@ export interface BootReload {
   codes: string[];
   /** Paid from the network-change time budget rather than from `BOOT_RELOAD_LIMIT` (hub#2270). */
   storm: boolean;
+  /**
+   * The main frame's own document was among the dead, so the page ends on Chromium's error page
+   * (hub#2296).
+   */
+  documentDied: boolean;
 }
 
 /**
@@ -372,11 +398,24 @@ export const test = base.extend({
     // When the first request of ours died on the wire in the current navigation: the storm's age
     // is counted from here, not from the navigation's start (hub#2270).
     let firstLossAt: number | undefined;
+    // Whether the main frame's own document died on the wire in the current navigation (hub#2296).
+    let documentDied = false;
     const inFlight = new Set<object>();
     let ownFailures = 0;
     let lastActivity = Date.now();
+    // The main frame's document request that has not committed yet. Only the commit of THIS
+    // request replaces the document: `framenavigated` also fires for a `pushState` of the router,
+    // which replaces nothing.
+    let pendingDocument: Request | undefined;
 
     page.on('request', (req) => {
+      if (
+        req.isNavigationRequest() &&
+        req.serviceWorker() === null &&
+        req.frame() === page.mainFrame()
+      ) {
+        pendingDocument = req;
+      }
       if (!isOwn(req.url()) || !BOOT_RESOURCE_TYPES.has(req.resourceType())) return;
       inFlight.add(req);
       lastActivity = Date.now();
@@ -384,12 +423,30 @@ export const test = base.extend({
     page.on('requestfinished', (req) => {
       if (inFlight.delete(req)) lastActivity = Date.now();
     });
+    // hub#2315: a request the OLD document had in flight when the new one committed gets a
+    // `request` event from Playwright and then nothing, ever — no `requestfinished`, no
+    // `requestfailed`. Waiting for it spent the whole `BOOT_SETTLE_MS`, which aged the storm past
+    // its budget and handed the spec a dead shell. The commit is the moment it stops being ours.
+    page.on('framenavigated', (frame) => {
+      // No document commits before its response is in — or, for one that died on the wire, before
+      // Chromium's error page takes its place: until then this is the router moving the URL of the
+      // live one, which can happen while the next document is still on its way.
+      if (frame !== page.mainFrame() || pendingDocument === undefined) return;
+      if (!pendingDocument.existingResponse() && pendingDocument.failure() === null) return;
+      for (const req of inFlight) if (req !== pendingDocument) inFlight.delete(req);
+      pendingDocument = undefined;
+      lastActivity = Date.now();
+    });
     page.on('requestfailed', (req) => {
       if (inFlight.delete(req)) lastActivity = Date.now();
       const errorText = req.failure()?.errorText;
+      // A document request aborted after its response (a download) never commits; any other
+      // failure of it still commits Chromium's error page, which is a new document all the same.
+      if (req === pendingDocument && errorText === 'net::ERR_ABORTED') pendingDocument = undefined;
       if (isBootTransportFailure(req.url(), errorText, baseURL)) {
         firstLossAt ??= Date.now();
         lost.push(errorText as string);
+        if (req.isNavigationRequest() && req.frame() === page.mainFrame()) documentDied = true;
       } else if (isOwn(req.url()) && errorText !== 'net::ERR_ABORTED') {
         // A failure of ours that is not the network's: the load is over, and it is the spec's red.
         ownFailures += 1;
@@ -455,6 +512,7 @@ export const test = base.extend({
       lost.length = 0;
       ownFailures = 0;
       firstLossAt = undefined;
+      documentDied = false;
       const books: BootReload[] = [];
       booksByPage.set(page, books);
       let counted = 0;
@@ -468,7 +526,19 @@ export const test = base.extend({
         // died.
         const stormAge = firstLossAt === undefined ? 0 : Date.now() - firstLossAt;
         const step = nextBootStep(codes, counted, stormAge);
-        if (step === 'hand-over') break;
+        if (step === 'hand-over') {
+          // Giving up with losses on the page hands the spec a shell that may never mount; the red
+          // that follows has to point here, not at the screen the spec was looking for (hub#2315).
+          if (codes.length > 0) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[bench] BENCH_GAVE_UP ${lost.length} request(s) for the app's own code died on the ` +
+                `wire (${codes.join(', ')}) while loading ${url}, after ${books.length} reload(s) ` +
+                `and a storm ${stormAge} ms old — handing the page over as it is. See hub#2315.`,
+            );
+          }
+          break;
+        }
         const storm = step === 'reload-storm';
         if (!storm) counted += 1;
         // Said out loud, never swallowed: a bench that heals itself in silence is a bench whose
@@ -482,13 +552,22 @@ export const test = base.extend({
               ? `(network change, outside the budget; see hub#2270).`
               : `(${counted}/${BOOT_RELOAD_LIMIT}). See hub#1806.`),
         );
-        books.push({ url, codes, storm });
+        books.push({ url, codes, storm, documentDied });
+        const again = howToFetchAgain({
+          documentDied,
+          onErrorPage: page.url().startsWith('chrome-error://'),
+        });
+        if (documentDied) {
+          // Let the error page commit first: committing it under our `goto` would interrupt it.
+          await page
+            .waitForURL((u) => u.protocol === 'chrome-error:', { timeout: BOOT_SETTLE_MS })
+            .catch(() => undefined);
+        }
         lost.length = 0;
         ownFailures = 0;
-        // A document that died leaves the page on Chromium's error page, where a reload would
-        // reload the error; going back to the navigation's own URL is what fetches it again.
+        documentDied = false;
         response = await attempt(() =>
-          page.url().startsWith('chrome-error://') ? navigate(url, options) : reloadPage(options),
+          again === 'navigate' ? navigate(url, options) : reloadPage(options),
         );
       }
 

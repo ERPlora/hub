@@ -61,6 +61,21 @@ export interface MediaFetchOptions {
 }
 
 /**
+ * Per-call options of {@link ErploraClient.command} and {@link ErploraClient.commandOptional}.
+ */
+export interface CommandOptions {
+  /**
+   * The calling screen resolves an unknown outcome ITSELF (hub#2375) — it probes the hub once it is
+   * back (an idempotency key, a status read) and tells the person what happened. Then the shell's
+   * default net (the red «we can't tell — check before trying again» toast of hub#906) would say
+   * the opposite of the screen at the same time, so it is skipped for THIS call. The caller still
+   * gets the same {@link UnknownOutcomeError}: it is what tells the screen to probe. Default
+   * `false`: a module that says nothing keeps the net.
+   */
+  resolvesOutcome?: boolean;
+}
+
+/**
  * Convierte la referencia portable guardada en BD/blueprint en la única ruta REST que un módulo
  * puede pedir. No es un proxy: rechaza orígenes, endpoints distintos, parámetros extra y
  * traversal antes de que `fetch` vea la cadena.
@@ -133,6 +148,7 @@ const DATA_TABLE_LABELS_ES = {
   noValues: 'Sin valores', selectAll: 'Seleccionar todo', selectRow: 'Seleccionar fila',
   select: 'Seleccionar', showing: 'Mostrando {from}–{to} de',
   recordSingular: 'registro', recordPlural: 'registros',
+  loadError: 'No se han podido cargar los datos', retry: 'Reintentar',
 } as const;
 
 const DATA_TABLE_LABELS_EN = {
@@ -147,10 +163,24 @@ const DATA_TABLE_LABELS_EN = {
   noValues: 'No values', selectAll: 'Select all', selectRow: 'Select row',
   select: 'Select', showing: 'Showing {from}–{to} of',
   recordSingular: 'record', recordPlural: 'records',
+  loadError: "Couldn't load the data", retry: 'Retry',
 } as const;
 
 export function dataTableLabels(locale = 'es'): Record<string, string> {
   return locale.toLowerCase().startsWith('en') ? DATA_TABLE_LABELS_EN : DATA_TABLE_LABELS_ES;
+}
+
+/**
+ * Whether the shell's `<ok-data-table>` paints a failed load itself (`error` + Retry, OutfitKit ≥
+ * 0.1.113, pm#530). A module paints with the SHELL's OutfitKit (ADR-0451), and a hub on an older
+ * image has a table without that state: there the module keeps its own banner, or the reason of
+ * the failure would be shown nowhere. Where the table does paint it, the banner is a duplicate.
+ */
+export function dataTableShowsLoadError(): boolean {
+  const registry = (globalThis as { customElements?: { get(tag: string): { prototype: object } | undefined } })
+    .customElements;
+  const table = registry?.get('ok-data-table');
+  return !!table && 'error' in table.prototype;
 }
 
 // ── Queries de lista (paginadas) — contrato del motor de listas del runtime (§4, §8.2) ──────
@@ -334,17 +364,22 @@ export class ListController<T = Record<string, unknown>> {
     return Math.max(1, Math.ceil(this.total / this.state.pageSize));
   }
 
-  /** (Re)carga la página actual desde el servidor. */
+  /**
+   * (Re)loads the current page from the server. On a phone, after «Load more» (hub#2365), the
+   * current page is everything shown so far: a refresh brings back pages 0..page in one request.
+   */
   async load(): Promise<void> {
     const s = this.state;
     const mySeq = ++this.seq;
+    const paging = mobilePagingOf(this);
+    const window = nextListWindow(paging, s);
     this.loading = true;
     this.error = '';
     this.onChange();
     try {
       const page = await this.client.queryPage<T>(this.queryName, {
-        limit: s.pageSize,
-        offset: s.page * s.pageSize,
+        limit: window.limit,
+        offset: window.offset,
         search: s.search,
         sort: s.sort,
         dir: s.dir,
@@ -352,13 +387,21 @@ export class ListController<T = Record<string, unknown>> {
         params: s.context,
       });
       if (mySeq !== this.seq) return; // llegó una carga más reciente
-      this.rows = page.rows ?? [];
+      const rows = page.rows ?? [];
+      this.rows = window.append ? [...this.rows, ...rows] : rows;
       this.total = page.total ?? this.rows.length;
+      if (window.growsTo !== undefined) {
+        s.page = window.growsTo;
+        keepAccumulating(paging, () => void this.load());
+      }
     } catch (e) {
       if (mySeq !== this.seq) return;
       this.rows = [];
       this.total = 0;
-      this.error = e instanceof Error ? e.message : 'Error cargando datos';
+      // Never blank: a blank `error` is «no error» for the table, which would go back to
+      // «No customers» + «0 records» over a hub that did not answer (pm#530).
+      const reason = e instanceof Error ? e.message.trim() : '';
+      this.error = reason || listLoadFailedMessage(activeLocale());
     } finally {
       if (mySeq === this.seq) {
         this.loading = false;
@@ -367,8 +410,19 @@ export class ListController<T = Record<string, unknown>> {
     }
   }
 
+  /**
+   * Goes to `page`. On a phone `<ok-data-table>` has no pager, only «Load more», which asks for
+   * `page + 1`: that one is ADDED under the rows already shown (hub#2365). Any other jump replaces.
+   */
   setPage(page: number): void {
-    this.state.page = Math.max(0, page);
+    const next = Math.max(0, page);
+    const paging = mobilePagingOf(this);
+    if (next === this.state.page + 1 && phoneViewport()?.matches) {
+      paging.growNext = true;
+    } else {
+      stopAccumulating(paging);
+      this.state.page = next;
+    }
     void this.load();
   }
 
@@ -426,6 +480,95 @@ export class ListController<T = Record<string, unknown>> {
   }
 }
 
+// ── «Load more» on a phone (hub#2365) ────────────────────────────────────────────────────────
+// Kept outside the class on purpose: it is private state, and a private field would still land in
+// the frozen kernel surface (`contracts/kernel/sdk.d.ts`) that the declarations are checked against.
+
+/** `<ok-data-table>`'s phone edge (OutfitKit `MOBILE_BREAKPOINT`): no pager there, only «Load more». */
+const PHONE_MEDIA = '(max-width: 640px)';
+
+interface ViewportQuery {
+  readonly matches: boolean;
+  addEventListener?(type: 'change', listener: (e: { matches: boolean }) => void): void;
+  removeEventListener?(type: 'change', listener: (e: { matches: boolean }) => void): void;
+}
+
+/** The phone media query, or `null` where there is no window (tests, workers). */
+function phoneViewport(): ViewportQuery | null {
+  const matchMedia = (globalThis as { matchMedia?: (query: string) => ViewportQuery }).matchMedia;
+  return typeof matchMedia === 'function' ? matchMedia(PHONE_MEDIA) : null;
+}
+
+interface MobilePaging {
+  /** `rows` hold pages 0..state.page (a phone asked for more at least once). */
+  accumulated: boolean;
+  /** The next `load()` grows the list by one page instead of reloading (set by `setPage`). */
+  growNext: boolean;
+  /** Stops watching the phone edge (watched only while `accumulated`). */
+  unwatch?: () => void;
+}
+
+const mobilePaging = new WeakMap<object, MobilePaging>();
+
+function mobilePagingOf(ctrl: object): MobilePaging {
+  let paging = mobilePaging.get(ctrl);
+  if (!paging) {
+    paging = { accumulated: false, growNext: false };
+    mobilePaging.set(ctrl, paging);
+  }
+  return paging;
+}
+
+interface ListWindow {
+  offset: number;
+  limit: number;
+  /** Glue the answer under the current rows instead of replacing them. */
+  append: boolean;
+  /** The page the list reaches when the answer lands (only when growing). */
+  growsTo?: number;
+}
+
+/** What the next `load()` asks for. Consumes a pending «Load more». */
+function nextListWindow(paging: MobilePaging, s: ListControllerState): ListWindow {
+  const size = s.pageSize;
+  const grow = paging.growNext;
+  paging.growNext = false;
+  if (grow) {
+    const target = s.page + 1;
+    // The rows cover 0..page (page 0, or already accumulated): only the next page is missing.
+    if (paging.accumulated || s.page === 0) {
+      return { offset: target * size, limit: size, append: true, growsTo: target };
+    }
+    // A page reached with a desktop pager (then turned into a phone): fill everything up to target.
+    return { offset: 0, limit: (target + 1) * size, append: false, growsTo: target };
+  }
+  if (s.page === 0) stopAccumulating(paging); // a new result set (search, filter, sort…) starts over
+  if (paging.accumulated) return { offset: 0, limit: (s.page + 1) * size, append: false };
+  return { offset: s.page * size, limit: size, append: false };
+}
+
+/** Marks the rows as accumulated and, once, watches for the phone turning into a desktop pager. */
+function keepAccumulating(paging: MobilePaging, reload: () => void): void {
+  paging.accumulated = true;
+  if (paging.unwatch) return;
+  const viewport = phoneViewport();
+  if (!viewport?.addEventListener) return;
+  const onChange = (e: { matches: boolean }): void => {
+    if (e.matches) return;
+    // The pager is back and says «page N»: show page N on its own, not everything up to it.
+    stopAccumulating(paging);
+    reload();
+  };
+  viewport.addEventListener('change', onChange);
+  paging.unwatch = () => viewport.removeEventListener?.('change', onChange);
+}
+
+function stopAccumulating(paging: MobilePaging): void {
+  paging.accumulated = false;
+  paging.unwatch?.();
+  paging.unwatch = undefined;
+}
+
 /**
  * One typed edge (major units) → the stored integer. The table emits a Number from the panel and
  * text from the inline control («12,5» included). Empty or not a number → `''`, which
@@ -446,6 +589,14 @@ function scaleFilterValue(value: unknown, scale: (n: number) => number): unknown
     );
   }
   return scaleFilterEdge(value, scale);
+}
+
+const LIST_LOAD_FAILED_EN = 'The hub did not return the data.';
+const LIST_LOAD_FAILED_ES = 'El hub no ha devuelto los datos.';
+
+/** The reason of a failed load that came without one (same locale rule as {@link dataTableLabels}). */
+function listLoadFailedMessage(locale: string): string {
+  return locale.toLowerCase().startsWith('en') ? LIST_LOAD_FAILED_EN : LIST_LOAD_FAILED_ES;
 }
 
 /** Fábrica del controlador de lista (azúcar sobre `new ListController`). */
@@ -578,11 +729,14 @@ export const SERVER_UNAVAILABLE = 'server_unavailable';
  * The honest sentence, per locale (en is the source, es the translation — ADR-0055). Localized
  * HERE, like `dataTableLabels`, because this error's `message` is what modules and the shell's
  * toast show verbatim; a technical English line in front of a cashier is the failure being fixed.
+ *
+ * It says only what holds for ANY command (hub#2342): the same sentence answers saving a flow, a
+ * template or the certificate, so a tail about charges and Sales would mislead there. The charge
+ * guidance lives in the charge flow itself — the POS of `sales` renders its own «we can't tell
+ * whether it charged» panel with a link to Sales (sales#91).
  */
-const COMMAND_VERDICT_EN =
-  "We can't tell whether the operation completed. Check the result before trying again — for a charge, check Sales before charging again.";
-const COMMAND_VERDICT_ES =
-  'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar — si era un cobro, comprueba en Ventas antes de volver a cobrar.';
+const COMMAND_VERDICT_EN = "We can't tell whether the operation completed. Check the result before trying again.";
+const COMMAND_VERDICT_ES = 'No sabemos si la operación se completó. Comprueba el resultado antes de reintentar.';
 
 /** The unknown-outcome sentence for `locale` (same resolution rule as {@link dataTableLabels}). */
 export function commandVerdictMessage(locale = 'es'): string {
@@ -613,14 +767,32 @@ function unreachableRead(e: unknown, locale: string): unknown {
 }
 
 /**
- * A `GET` on the core's REST surface is a read like any query — the flow gallery and the templates
- * tab load through it — so a hub that never answered it gets the same sentence. A write is left as
- * it arrives: it may have committed, and «could not be loaded» would be a lie.
+ * The error a command gets when its transport failed (hub#906): the unknown-outcome verdict, with
+ * the transport's technical line on `cause`, and the shell's notifier told once as the default net.
+ * Anything else — a domain refusal, `module_not_installed` — passes through untouched.
  */
-function coreRead<R>(request: Promise<R>, method: string, locale: string): Promise<R> {
-  if (method !== 'GET') return request;
+function unknownOutcome(e: unknown, locale: string, notifier?: (n: Notification) => void): unknown {
+  if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) return e;
+  const verdict = new UnknownOutcomeError(commandVerdictMessage(locale), e);
+  notifier?.({ type: 'error', message: verdict.message });
+  return verdict;
+}
+
+/**
+ * A call on the core's REST surface the hub never answered. A `GET` is a read like any query — the
+ * flow gallery and the templates tab load through it — so it gets the read sentence (hub#2288). A
+ * write (saving a flow, registering a template, uploading the certificate, retrying a print job)
+ * may have committed before the answer was lost, exactly like a command, so it gets the command
+ * verdict (hub#2320): «could not be loaded» would be a lie there.
+ */
+function coreCall<R>(
+  request: Promise<R>,
+  method: string,
+  locale: string,
+  notifier?: (n: Notification) => void,
+): Promise<R> {
   return request.catch((e: unknown) => {
-    throw unreachableRead(e, locale);
+    throw method === 'GET' ? unreachableRead(e, locale) : unknownOutcome(e, locale, notifier);
   });
 }
 
@@ -675,7 +847,9 @@ export interface PlatformFailure {
   /** The refused field of an `invalid_field` (hub#1070/#1185): `name`, `role_key`, `language`… */
   field?: string;
   /** WHY it was refused: `required` · `too_long` · `format` · `length` · `unknown` · `immutable`
-   *  · `inactive`. A small closed set, so a screen branches on it instead of reading the prose. */
+   *  · `inactive` on an `invalid_field`; on a `read_unavailable` (hub#2410),
+   *  `module_not_installed` · `module_inactive` · `query_failed`. A small closed set, so a screen
+   *  branches on it instead of reading the prose. */
   reason?: string;
 }
 
@@ -732,17 +906,18 @@ const PLATFORM_FAILURES: Record<
   // answers it today, and only when the runtime let an authored sentence through.
   (app: string, failure: PlatformFailure) => Bilingual | null
 > = {
-  read_unavailable: (app) => missingApp(app),
+  // hub#2410: the kernel says WHY the read did not resolve, and only one of the three causes is
+  // fixed from Apps. A runtime that sends no `reason` (or one this SDK does not know) keeps the
+  // sentence every screen showed before it.
+  read_unavailable: (app, failure) =>
+    failure.reason === 'query_failed'
+      ? READ_FAILED
+      : failure.reason === 'module_inactive'
+        ? switchedOffApp(app)
+        : missingApp(app),
   module_not_installed: (app) => missingApp(app),
   missing_dependency: (app) => missingApp(app),
-  module_inactive: (app) => ({
-    en: app
-      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
-      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
-    es: app
-      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
-      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
-  }),
+  module_inactive: (app) => switchedOffApp(app),
   db: () => PLUMBING,
   io: () => PLUMBING,
   wasm: () => PLUMBING,
@@ -813,6 +988,27 @@ function authoredSentenceOf(failure: PlatformFailure): string | undefined {
 // What this SDK does do is carry `field` and `reason` on {@link PlatformFailure}, so a screen that
 // wants to translate them branches on data instead of parsing prose. Translating them into the
 // user's language belongs to the shell that owns those forms — see hub#1190.
+
+/**
+ * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`
+ * read of an installed, active app failed — a passing fault, not something Apps can fix. The app is
+ * deliberately NOT named: naming it is what sent the owner to Apps to look for it.
+ */
+const READ_FAILED: Bilingual = {
+  en: 'Some information this action needs could not be read, so nothing was done. Try again, and tell an administrator if it keeps happening.',
+  es: 'No se pudo leer un dato que esta acción necesita, así que no se ha hecho nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+};
+
+function switchedOffApp(app: string): Bilingual {
+  return {
+    en: app
+      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
+      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
+    es: app
+      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
+      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
+  };
+}
 
 function missingApp(app: string): Bilingual {
   return {
@@ -1604,9 +1800,9 @@ export interface TauriBridge {
 /** Where the kernel's REST surface lives. **Every** path this surface can build starts here. */
 export const FLOWS_BASE_PATH = '/api/hub/flows';
 
-/** Where the photo a WhatsApp template step sends in its header goes up — the one path
- *  {@link FlowsApi.uploadWhatsappHeaderImage} posts to (`crates/server/src/flows_header_media.rs`,
- *  hub#2335). */
+/** Where the photo, video or PDF a WhatsApp template step sends in its header goes up — the one
+ *  path {@link FlowsApi.uploadWhatsappHeaderImage} and {@link FlowsApi.uploadWhatsappHeaderMedia}
+ *  post to (`crates/server/src/flows_header_media.rs`, hub#2335 and hub#2347). */
 export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header-images';
 
 /**
@@ -1617,6 +1813,21 @@ export const FLOWS_WHATSAPP_HEADER_IMAGES_PATH = '/api/hub/flows/whatsapp-header
 export interface WhatsappHeaderImage {
   ref: string;
   mime_type: 'image/jpeg' | 'image/png';
+  size: number;
+}
+
+/** The header a file is uploaded for: the media kinds of a WhatsApp template header (hub#2347). */
+export type WhatsappHeaderMediaKind = 'image' | 'video' | 'document';
+
+/**
+ * What {@link FlowsApi.uploadWhatsappHeaderMedia} answers. `ref` is what the step stores in
+ * `vars.header_image`, `vars.header_video` or `vars.header_document`; the hub signs a fresh link to
+ * it on every send, and only for the header of its own kind. `mime_type` is decided by the file's
+ * BYTES, never by its name.
+ */
+export interface WhatsappHeaderMedia {
+  ref: string;
+  mime_type: 'image/jpeg' | 'image/png' | 'video/mp4' | 'application/pdf';
   size: number;
 }
 
@@ -1930,6 +2141,38 @@ export class FlowsApi {
       path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
       body: form,
     }) as Promise<WhatsappHeaderImage>;
+  }
+
+  /**
+   * `POST /api/hub/flows/whatsapp-header-images` with a `kind` — **the photo, the VIDEO or the PDF
+   * a WhatsApp template step sends in its header** (hub#2347).
+   *
+   * The same door as {@link uploadWhatsappHeaderImage}, for the header the approved template
+   * has: `image` (a JPEG or a PNG of up to 5 MB), `video` (an MP4 of up to 16 MB) or `document` (a
+   * PDF of up to 100 MB) — Meta's caps, the file told by its bytes and refused when it is not the
+   * kind asked for. The answer's `ref` goes in `vars.header_<kind>`.
+   *
+   * A refusal arrives as an {@link ErploraError} with the code of the kind asked for:
+   * `whatsapp.header_<kind>_unsupported`, `whatsapp.header_<kind>_too_large`,
+   * `whatsapp.header_<kind>_missing`, `whatsapp.header_<kind>_not_saved`, and
+   * `whatsapp.header_media_kind_unknown` or `whatsapp.invalid_header_image_upload`.
+   *
+   * A hub older than hub#2347 leaves the method **absent** (its door takes photos only):
+   * `typeof flows.uploadWhatsappHeaderMedia` is the probe.
+   */
+  async uploadWhatsappHeaderMedia(
+    file: Blob,
+    kind: WhatsappHeaderMediaKind,
+  ): Promise<WhatsappHeaderMedia> {
+    const form = new FormData();
+    // The kind first: the runtime refuses a file of another kind before reading the rest of it.
+    form.append('kind', kind);
+    form.append('file', file);
+    return this.send({
+      method: 'POST',
+      path: FLOWS_WHATSAPP_HEADER_IMAGES_PATH,
+      body: form,
+    }) as Promise<WhatsappHeaderMedia>;
   }
 
   /**
@@ -3118,7 +3361,7 @@ export class ErploraClient {
       );
     }
     return (this.flowsApi ??= new FlowsApi(
-      (req) => coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      (req) => coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
       moduleId,
     ));
   }
@@ -3150,7 +3393,7 @@ export class ErploraClient {
       );
     }
     return (this.eventsApi ??= new EventsApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3197,7 +3440,7 @@ export class ErploraClient {
       );
     }
     return (this.whatsappTemplatesApi ??= new WhatsappTemplatesApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3225,7 +3468,7 @@ export class ErploraClient {
     const transport = this.transport as Partial<CoreBlobTransport>;
     return (this.whatsappMediaApi ??= new WhatsappMediaApi((path) =>
       typeof transport.coreBlobRequest === 'function'
-        ? coreRead(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
+        ? coreCall(transport.coreBlobRequest(path, { [MODULE_HEADER]: moduleId }), 'GET', this.locale)
         : Promise.reject(
             new ErploraError(SERVER_UNAVAILABLE, 'this transport cannot fetch bytes from the hub'),
           ),
@@ -3258,7 +3501,7 @@ export class ErploraClient {
       );
     }
     return (this.certificateApi ??= new CertificateApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3284,7 +3527,7 @@ export class ErploraClient {
       );
     }
     return (this.printApi ??= new PrintApi((req) =>
-      coreRead(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale),
+      coreCall(transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }), req.method, this.locale, this.opts.notifier),
     ));
   }
 
@@ -3411,13 +3654,14 @@ export class ErploraClient {
    * hub answered, the outcome is known, and the module orients by the code as always. Queries are
    * NOT captured (see {@link query}): a read that failed did nothing, and toasting every failed
    * dashboard poll would bury the one toast that matters.
+   *
+   * A screen that resolves the doubt itself passes `{ resolvesOutcome: true }` (hub#2375): the
+   * verdict is thrown all the same, only the toast is skipped for that call.
    */
-  command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T> {
+  command<T = unknown>(name: string, payload?: Record<string, unknown>, opts: CommandOptions = {}): Promise<T> {
     return (this.transport.command(name, payload) as Promise<T>).catch((e: unknown) => {
-      if (!(e instanceof ErploraError) || e.code !== SERVER_UNAVAILABLE) throw e;
-      const verdict = new UnknownOutcomeError(commandVerdictMessage(this.locale), e);
-      this.opts.notifier?.({ type: 'error', message: verdict.message });
-      throw verdict;
+      // The verdict is hub#2320's shared one; `resolvesOutcome` (hub#2375) only withholds the toast.
+      throw unknownOutcome(e, this.locale, opts.resolvesOutcome === true ? undefined : this.opts.notifier);
     });
   }
   /**
@@ -3444,10 +3688,14 @@ export class ErploraClient {
    * siquiera se dispara. El namespace del core `hub.*` nunca se corta en corto (nunca está
    * ausente, ver {@link isKnownAbsent}).
    */
-  async commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T | undefined> {
+  async commandOptional<T = unknown>(
+    name: string,
+    payload?: Record<string, unknown>,
+    opts: CommandOptions = {},
+  ): Promise<T | undefined> {
     if (this.isKnownAbsent(name)) return undefined;
     try {
-      return await this.command<T>(name, payload);
+      return await this.command<T>(name, payload, opts);
     } catch (e) {
       // `module_inactive` (cascada ADR-0128) equivale a ausencia: un módulo desactivado no está
       // disponible, y el consumidor OBLIGATORIO nunca pregunta (la cascada lo apagó con su dep).

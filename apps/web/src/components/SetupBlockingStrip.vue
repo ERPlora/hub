@@ -117,8 +117,8 @@ const folded = computed(() => isShortViewport.value && !expanded.value);
 const detailId = `setup-strip-detail-${useId()}`;
 
 /**
- * The item's title. A CORE item's key is also its i18n key; a module's `title` travels in English
- * inside its manifest and the runtime does not localize it yet (`setup-status.md` §7), so that is
+ * The item's title. A CORE item's key is also its i18n key; a module's `title` arrives already
+ * translated by the runtime into the viewer's language (`setup-status.md` §7, hub#2356), so that is
  * what gets painted. A raw key never reaches the screen.
  */
 function titleOf(item: SetupItem): string {

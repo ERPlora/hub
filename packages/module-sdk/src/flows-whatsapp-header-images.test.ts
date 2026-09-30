@@ -105,3 +105,44 @@ test('hub#2335: the upload path is a route the runtime actually serves', () => {
     `crates/server/src/routes.rs does not route ${FLOWS_WHATSAPP_HEADER_IMAGES_PATH}`,
   );
 });
+
+// hub#2347 — the VIDEO or the PDF of a header goes up the same way, naming its kind. The kind goes
+// BEFORE the file, so the runtime refuses a file of another kind before reading the rest of it.
+test('hub#2347: a video or a PDF goes up with its `kind` before the `file`', async () => {
+  const PDF = new TextEncoder().encode('%PDF-1.7\n');
+  for (const kind of ['video', 'document', 'image'] as const) {
+    const stored = {
+      ref: `whatsapp/headers/${'b'.repeat(64)}.pdf`,
+      mime_type: 'application/pdf',
+      size: PDF.byteLength,
+    };
+    const { client, calls } = scoped(201, { ok: true, data: stored });
+
+    const result = await client.flows.uploadWhatsappHeaderMedia(new File([PDF], 'carta.pdf'), kind);
+
+    assert.deepEqual(result, stored);
+    const call = calls[0]!;
+    assert.equal(call.url, `http://hub${FLOWS_WHATSAPP_HEADER_IMAGES_PATH}`);
+    assert.equal(call.method, 'POST');
+    assert.equal(call.headers[MODULE_HEADER], EDITOR);
+    assert.equal(
+      Object.keys(call.headers).find((h) => h.toLowerCase() === 'content-type'),
+      undefined,
+    );
+    const form = call.body as FormData;
+    assert.deepEqual([...form.keys()], ['kind', 'file'], 'the kind travels first');
+    assert.equal(form.get('kind'), kind);
+    assert.deepEqual(new Uint8Array(await (form.get('file') as Blob).arrayBuffer()), PDF);
+  }
+});
+
+test('hub#2347: a refused video arrives with the code of its kind', async () => {
+  const { client } = scoped(413, {
+    ok: false,
+    error: { code: 'whatsapp.header_video_too_large', message: '16 MB at most' },
+  });
+  await assert.rejects(
+    () => client.flows.uploadWhatsappHeaderMedia(new Blob([new Uint8Array(12)]), 'video'),
+    (e: unknown) => e instanceof ErploraError && e.code === 'whatsapp.header_video_too_large',
+  );
+});

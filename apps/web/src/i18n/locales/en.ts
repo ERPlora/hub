@@ -324,7 +324,8 @@ export default {
   },
   // The configuration checklist — the dashboard surface of `hub.setup.status` (hub#372).
   // `items.<key>` covers the CORE items only: a core item's key IS its i18n key, while a module's
-  // title travels in English inside its manifest and is used as-is (setup-status.md §7).
+  // title arrives already translated by the runtime into the viewer's language (setup-status.md §7,
+  // hub#2356) and is used as-is.
   // hub#1743 — the shell-wide band for «there is no network right now». Says the CONSEQUENCE, not
   // the state: «offline» on its own reads as a setting somebody turned on. Nothing here names a
   // module or a screen, because the outage is not about any of them.
@@ -334,6 +335,11 @@ export default {
       title: 'We cannot connect to your business',
       body: 'ERPlora is not answering. Check that this device is connected to the internet and try again. If it keeps happening, the problem may be on our side.',
       retry: 'Try again',
+    },
+    refused: {
+      title: 'Your business is not available right now',
+      body: 'ERPlora answered, but it cannot open your business at the moment. This device and its connection are fine: there is nothing to check here. We will try again on our own every {seconds} seconds.',
+      retry: 'Try again now',
     },
   },
   offline: {
@@ -759,7 +765,7 @@ export default {
     receiptTemplateMissing: 'Install the Printing app to add your printer and set up your receipt',
     tabHub: 'General',
     tabBusiness: 'Business',
-    tabTickets: 'Receipts',
+    tabPrinting: 'Printing',
     tabPermissions: 'Permissions',
     tabData: 'Data & backups',
     dataImport: 'Import',
@@ -1034,6 +1040,20 @@ export default {
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
+    // hub#2331 — «Update all» in «My apps». Same per-app update as the row button, one after another.
+    updateAllOffer: '{n} app has a new version. | {n} apps have a new version.',
+    updateAllAction: 'Update all',
+    updateAllProgress: 'Updating {name} ({current} of {total})…',
+    updateAllSummary: '{updated} of {total} app updated. | {updated} of {total} apps updated.',
+    updateAllUpToDate: 'Already on the latest version',
+    updateAllRetry: 'Retry',
+    // hub#2366 — the check for new versions failed: not the same as «everything is up to date».
+    updatesCheckFailed: 'We could not check whether your apps have new versions. They may not be up to date.',
+    // Some apps were updated: the page has to reload to run them (hub#935), once the owner has read
+    // what failed.
+    updateAllReload: 'Reload now',
+    updateAllDoneReloading: '{n} app updated. Reloading to use the new version… | {n} apps updated. Reloading to use the new versions…',
+    updateAllNothingNew: 'Your apps were already on the latest version.',
     // Version picker (hub#675). Only shown when there is more than one option; the latest comes
     // first and preselected, so choosing another one is deliberate.
     versionPickTitle: 'Choose a version',
@@ -1637,6 +1657,8 @@ export default {
     pinIncorrect: 'Incorrect PIN',
     // hub#2283. Shown INSTEAD of «Incorrect PIN» while the hub refuses PINs after too many failures:
     // the PIN may be right, so the sentence says to wait, and how long when the hub names it.
+    // hub#2285: the badge, the hand-over and the manager's approval hit the same lock and say these
+    // same two sentences — with no «use your PIN», since a lock on the address locks the PIN too.
     pinTooManyAttempts:
       'Too many failed attempts. Wait {minutes} minute and try again. | Too many failed attempts. Wait {minutes} minutes and try again.',
     pinTooManyAttemptsNoWait: 'Too many failed attempts. Wait a few minutes and try again.',
@@ -1644,7 +1666,6 @@ export default {
     // not become the way to find out which cards this business has issued.
     orSwipeBadge: '…or swipe your badge — no need to tap your name first.',
     badgeRejected: 'That badge does not open anything here. Use your PIN, or ask an administrator.',
-    badgeTooManyAttempts: 'Too many failed attempts with this badge. Wait a few minutes, or use your PIN.',
     // hub#330. Shown INSTEAD of «Incorrect PIN» when the refusal was about the device, not the
     // digits. Saying "incorrect PIN" to somebody whose PIN is correct is the worst answer available:
     // they retype it, and nothing on the screen names the one gesture that fixes it.
@@ -1723,7 +1744,6 @@ export default {
     notElevable:
       'This one is not approved with a PIN. Whoever runs your business has to sign in with their own account to do it.',
     notRequired: 'This no longer needs approval. Close this and try again.',
-    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
     failed: 'The approval could not be sent. Check the connection and try again.',
   },
   // hub#456 — the shift changes in the middle of a ticket. Every line here is read by somebody with
@@ -1747,7 +1767,6 @@ export default {
     deviceNotEnrolled:
       'This device is not set up for PINs yet. Sign in once with an ERPlora account on it, and the PIN will work from then on.',
     deviceUnidentified: 'This device could not identify itself. Reload the page and try again.',
-    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
   },
   activation: {
     title: 'Activation required',

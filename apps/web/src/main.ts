@@ -32,7 +32,7 @@ import { i18n } from './i18n';
 import {
   getClient,
   clientInjectionKey,
-  bootHubContext,
+  bootContextOutcome,
   ensureMediaCookie,
   setOnRuntimeSessionExpired,
   RUNTIME_URL,
@@ -41,8 +41,10 @@ import {
 } from './lib/runtime';
 import { SESSION_EVICTED_DEVICE_LIMIT } from './lib/session-end-reason';
 import { setOnSessionExpired, setOnHubGone } from './lib/cloud';
-import { logout } from './lib/session';
-import { invokeTauri } from './lib/device';
+import { isAuthed, logout } from './lib/session';
+import { invokeTauri, listenTauriEvent, listenTauriPlugin } from './lib/device';
+import { sendSystemNotice } from './lib/bridge-transport';
+import { claimNoticeTaps, createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
 import { bootPrintOnSale } from './lib/print-on-sale';
 import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
@@ -51,7 +53,9 @@ import { bootPrintComanda } from './lib/print-comanda';
 import { comandaFailureNotice } from './lib/print-comanda-notice';
 import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './lib/appointment-notice';
 import { bootBellNotices } from './lib/bell-notice';
+import { loadBellCounterModuleIds } from './lib/bell-counters';
 import {
+  askWhenSomeoneSignsIn,
   ensureNotificationPermission,
   primerLabelsFrom,
   shouldSendNotice,
@@ -302,14 +306,35 @@ bootPrintOnSale(getClient(), {
 // every hub regardless of what it runs asked one for a permission that would never fire.
 // `warnIfThereIsSomethingToTell` refreshes what is installed and only asks when an active module
 // the shell sends notices for is there — the kitchen order and appointment notices below keep
-// being the fallback trigger.
+// being the fallback trigger. A module with a bell counter counts as one too (hub#2306): since
+// hub#2303 its counter going up is a notice, and a WhatsApp-only hub has nothing else.
 void bootPrintHost(erploraClient as unknown as Parameters<typeof bootPrintHost>[0], {
   onRegistered: () =>
     void warnIfThereIsSomethingToTell({
       refresh: refreshActiveModuleIds,
       activeModules: activeModuleIds,
+      bellModules: loadBellCounterModuleIds,
       ask: () => askToWarn(),
     }),
+});
+
+// Tapping a system notice opens the screen it is about (hub#2305) — the conversation waiting, the
+// diary, the kitchen — instead of the app wherever it was left. Every notice below goes through
+// this door, which sends it with an id of its own and remembers where that id leads; the tap comes
+// back from the notification plugin with the id (Android and iOS alike).
+// Ids start from the clock so a new session never reuses one still sitting in the tray.
+const notices = createNoticeDoor({
+  send: sendSystemNotice,
+  navigate: (path) => router.push(path),
+  firstId: Math.floor(Date.now() / 1000) % 1_000_000_000,
+});
+void listenForNoticeTaps(notices, (cb) => listenTauriPlugin('notification', 'actionPerformed', cb));
+// The taps no plugin event brings (hub#2360): a click on the computer, and on Android a tap that had
+// to start the app — fired before this page could listen. The shell keeps each one with the screen
+// it was sent with; it is claimed here at boot and again every time the shell says one is waiting.
+void claimNoticeTaps(notices, {
+  take: () => invokeTauri('erplora_take_notice_tap'),
+  onPoke: (cb) => listenTauriEvent('erplora://notice-tapped', cb),
 });
 
 // Kitchen docket when the order is FIRED (ADR-0144), not when it is charged. Here and not in
@@ -324,24 +349,24 @@ bootPrintComanda(getClient(), {
     const n = comandaFailureNotice(f, i18n.global);
     void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
   },
-  // Aviso del SISTEMA, no un toast: el toast solo se ve si alguien está mirando ESTA pantalla, y
-  // en cocina la tablet suele estar apoyada, en otra vista o bloqueada. Va por el bridge (el shell
-  // en Tauri, el binario/WS en navegador), así que sale igual en escritorio y en Android.
+  // A SYSTEM notice, not a toast: a toast is only seen by whoever is looking at THIS screen, and in
+  // a kitchen the tablet is usually propped up, on another view or locked. It goes through the
+  // installed app (desktop and Android alike); a browser has no system notice.
   //
   // The permission first (hub#1732), and this is the FALLBACK trigger: a KDS screen with no
   // printer never registers as a print host, so the alta above never reaches it. Idempotent —
   // after the first answer this is one storage read.
   //
-  // And a refusal STOPS here instead of falling through to `peripherals.notify()`: that call asks
-  // for the permission itself, with no sentence of ours in front of it (hub#758's scope), so
+  // And a refusal STOPS here instead of falling through to the notice (`sendSystemNotice`): that
+  // call asks for the permission itself, with no sentence of ours in front of it (hub#758's scope), so
   // letting it through would pop Android's bare dialog in the middle of a service. Android drops
   // the notice either way; what the user gets instead is the row on System › your printer, which
   // says the notices are off and offers to ask again.
   // The notice's words come from the catalogue, in the app's language (hub#2171).
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
-  notify: async (title, body) => {
+  notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
-    await getClient().peripherals.notify(title, body);
+    await notices.notify(title, body, path);
   },
 });
 
@@ -349,13 +374,13 @@ bootPrintComanda(getClient(), {
 // not come from a till (WhatsApp, the web, a flow, the customer) gets a system notice too.
 //
 // Same permission gate as the kitchen notice — `askToWarn` asks for it at most once, and a
-// refusal stops here instead of falling through to `peripherals.notify()`, which would pop
-// Android's bare dialog with no sentence of ours in front of it.
+// refusal stops here instead of falling through to the notice (`sendSystemNotice`), which would
+// pop Android's bare dialog with no sentence of ours in front of it.
 bootAppointmentNotices(getClient(), {
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
-  notify: async (title, body) => {
+  notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
-    await getClient().peripherals.notify(title, body);
+    await notices.notify(title, body, path);
   },
 });
 
@@ -365,9 +390,9 @@ bootAppointmentNotices(getClient(), {
 bootBellNotices({
   ownNotice: new Set([APPOINTMENT_NOTICE_MODULE]),
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
-  notify: async (title, body) => {
+  notify: async (title, body, path) => {
     if (!shouldSendNotice(await askToWarn())) return;
-    await getClient().peripherals.notify(title, body);
+    await notices.notify(title, body, path);
   },
 });
 
@@ -421,8 +446,8 @@ setOnHubGone(() => {
 const mountPoint = document.getElementById('app');
 const bootScreen = mountPoint ? createBootScreen(mountPoint) : null;
 void bootUntilReachable({
-  loadContext: bootHubContext,
-  showUnreachable: (retry) => bootScreen?.showUnreachable(retry),
+  loadContext: bootContextOutcome,
+  showUnreachable: (retry, failure) => bootScreen?.showUnreachable(retry, failure),
   showProgress: () => bootScreen?.showProgress(),
 }).then(async () => {
   // ADR-0159: if the SaaS sent a one-time shell courier, consume it before router mount so the
@@ -431,5 +456,22 @@ void bootUntilReachable({
   // client-error channel (the runtime's code, never the pass) and falls through to the ordinary
   // login page, which explains it (hub#2152).
   await redeemShellCourier(shellCourierCode);
-  router.isReady().then(() => app.mount('#app'));
+  router.isReady().then(() => {
+    app.mount('#app');
+    // The ask for a device that never becomes a print host (hub#2306): a WhatsApp tablet has no
+    // printer, so the alta above never reaches it and its first ask came with the first customer
+    // left waiting. A sign-in — or this boot, with a session already open — means somebody is in
+    // front of it. After the mount on purpose: the sheet needs the app, and the active set needs
+    // the hub context resolved above.
+    askWhenSomeoneSignsIn(
+      () => isAuthed.value,
+      () =>
+        warnIfThereIsSomethingToTell({
+          refresh: refreshActiveModuleIds,
+          activeModules: activeModuleIds,
+          bellModules: loadBellCounterModuleIds,
+          ask: () => askToWarn(),
+        }),
+    );
+  });
 });

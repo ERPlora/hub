@@ -2,7 +2,7 @@
 //
 // The trigger (a counter rising between two polls) is pinned in `bell-counters.rise.hub2303.test.ts`.
 // This pins what the device is told: the module's own label with the new total, through the same
-// door as the kitchen order and the appointments (`peripherals.notify`, behind the permission gate
+// door as the kitchen order and the appointments (`notices.notify` since hub#2305, behind the permission gate
 // the caller owns), words by key (ADR-0055) — and NOT for a module the shell already announces on
 // its own, or a WhatsApp booking would ring twice: once as «New booking», once as «Appointments to
 // confirm».
@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BellCounterRise } from './bell-counters';
 import { bellNoticeFor, bootBellNotices, onBellRise } from './bell-notice';
 import { APPOINTMENT_NOTICE_MODULE, bootAppointmentNotices } from './appointment-notice';
+import { isNoticeTarget } from './notice-tap';
 import en from '../i18n/locales/en';
 import es from '../i18n/locales/es';
 
@@ -40,7 +41,17 @@ describe('the system notice of a bell counter (hub#2303)', () => {
     await onBellRise(RISE, { t, notify, ownNotice: new Set() });
 
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith(bellNoticeFor(RISE, t).title, bellNoticeFor(RISE, t).body);
+    expect(notify).toHaveBeenCalledWith(bellNoticeFor(RISE, t).title, bellNoticeFor(RISE, t).body, RISE.path);
+  });
+
+  // hub#2305: tapping the notice opens the counter's own tab — the conversation waiting, not the
+  // screen the app happened to be on.
+  it('leads to the tab the counter belongs to, the same one the bell’s row opens', async () => {
+    const notify = vi.fn(async (_title: string, _body: string, _path?: string) => {});
+    await onBellRise({ ...RISE, path: '/m/reservations/requests' }, { t, notify, ownNotice: new Set() });
+
+    expect(notify.mock.calls[0]![2]).toBe('/m/reservations/requests');
+    expect(isNoticeTarget(notify.mock.calls[0]![2])).toBe(true);
   });
 
   // appointments already sends «New booking» for every booking that did not come from a till

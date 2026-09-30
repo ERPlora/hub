@@ -6,7 +6,8 @@
 // cacheamos el cascarón estático (navegaciones + assets con hash de Vite).
 //
 // Estrategia:
-//   - Navegaciones (modo navigate): network-first con fallback al index cacheado (SPA offline).
+//   - Page loads (navigate mode): network-first; the cached index when the network fails or
+//     refuses (403/5xx), and only an OK page is ever cached as the shell (hub#2256).
 //   - Assets estáticos same-origin (GET): stale-while-revalidate.
 //   - API / WS / cross-origin: passthrough (nunca se cachean — los gestiona el runtime).
 //
@@ -53,24 +54,48 @@ function isUnversionedAsset(url) {
   return url.pathname.startsWith('/modules/');
 }
 
+// The ticket page (`/p/:locator`, hub#963) is a page the hub renders for the diner, not the app:
+// its 403/404/410/429 pages are the answer itself, and an OK one is not the shell. Left to the
+// browser, like /api.
+function isServerPage(url) {
+  return url.pathname.startsWith('/p/');
+}
+
+// The cached shell, only if it is a good one: a worker from before hub#2256 may have stored a
+// refusal (an empty 403) under it, and serving that back is the blank page all over again.
+function cachedShell() {
+  return caches.match(APP_SHELL).then((res) => (res && res.ok ? res : undefined));
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  // Cross-origin, API/WS/health o assets sin hash (/modules/): lo gestiona la red/runtime, nunca el SW.
-  if (url.origin !== self.location.origin || isApiRequest(url) || isUnversionedAsset(url)) return;
+  // Cross-origin, API/WS/health, unhashed assets (/modules/) and the ticket page (/p/): the network
+  // and the runtime handle them, never the SW.
+  if (
+    url.origin !== self.location.origin ||
+    isApiRequest(url) ||
+    isUnversionedAsset(url) ||
+    isServerPage(url)
+  )
+    return;
 
-  // Navegaciones (SPA): red primero, fallback al index cacheado si no hay red.
+  // Page loads (SPA): network first; the cached shell when the network fails OR refuses.
+  // hub#2256/hub#2255: an edge ban answered every page load with an empty 403 — an answer, not a
+  // failure — and handing it over left a blank page with no word and no button (and stored it as
+  // the shell). With the cached shell the app boots and its own boot check says what is going on.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((res) => {
+          if (!res.ok) return cachedShell().then((shell) => shell || res);
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(APP_SHELL, copy)).catch(() => {});
           return res;
         })
-        .catch(() => caches.match(APP_SHELL).then((r) => r || Response.error())),
+        .catch(() => cachedShell().then((shell) => shell || Response.error())),
     );
     return;
   }

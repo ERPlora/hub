@@ -19,7 +19,7 @@ import { platformFailureMessage as sdkPlatformFailureMessage, type PlatformFailu
 import { HubUsersError, RoleActivationError } from './hub-users';
 
 /**
- * The `(code, module, query, message)` of a PLATFORM refusal, or `undefined` when this is not one.
+ * The `(code, module, query, reason, message)` of a PLATFORM refusal, or `undefined` when this is not one.
  *
  * `instanceof`, not structural (unlike `fieldRefusalOf` in `invalid-field.ts`): the SDK's table
  * answers ANY object carrying one of its codes — it has to, a module's own deserialised envelope
@@ -38,7 +38,15 @@ function platformRejectionOf(
   error: unknown,
 ): (PlatformFailure & { message: string }) | undefined {
   if (!(error instanceof HubUsersError) && !(error instanceof RoleActivationError)) return undefined;
-  return { code: error.code, module: error.module, query: error.query, message: error.message };
+  // hub#2410: `reason` too — on a `read_unavailable` it is what tells «the app is missing» from
+  // «the read failed», and the SDK picks the sentence by it.
+  return {
+    code: error.code,
+    module: error.module,
+    query: error.query,
+    reason: error.reason,
+    message: error.message,
+  };
 }
 
 /**

@@ -39,7 +39,7 @@ import {
   LocalNetworkPermissionDeniedError,
 } from '@erplora/module-sdk';
 
-import { makeBridgeTransport } from './bridge-transport';
+import { makeBridgeTransport, sendSystemNotice } from './bridge-transport';
 import { hardwareUnavailableMessage, printerDiscoveryMessage } from './printer-discovery';
 
 describe('ADR-0196 §3: selección del transporte de hardware', () => {
@@ -278,5 +278,63 @@ describe('el escaneo bloqueado llega al usuario como una frase, no como una list
   it('envolver el transporte no cambia cuál es (sigue siendo el de Tauri)', async () => {
     // El contrato de ADR-0159 se decide por `instanceof`; ponerle copy no puede romperlo.
     expect(makeBridgeTransport()).toBeInstanceOf(IpcBridgeTransport);
+  });
+});
+
+// hub#2305 — the notice a tap can follow. Same door as `peripherals.notify` (the notifications
+// permission, and only it, asked first; best-effort), plus the id the tap comes back with.
+describe('a system notice with an id (hub#2305)', () => {
+  it('in the installed app, asks for the notifications permission and sends the notice with its id', async () => {
+    tauriMode.value = true;
+    invokeSpy.mockReset();
+    invokeSpy.mockImplementation(async () => ({}));
+
+    await sendSystemNotice('New booking', 'Cut · 10:00', 7001, null);
+
+    const calls = invokeSpy.mock.calls.map((c) => c[0]);
+    expect(calls.indexOf('plugin:erplora-android|request_permissions')).toBeGreaterThan(-1);
+    expect(calls.indexOf('plugin:erplora-android|request_permissions')).toBeLessThan(calls.indexOf('erplora_notify'));
+    expect(invokeSpy.mock.calls.find((c) => c[0] === 'plugin:erplora-android|request_permissions')?.[1]).toEqual({
+      permissions: ['android.permission.POST_NOTIFICATIONS'],
+    });
+    expect(invokeSpy).toHaveBeenCalledWith('erplora_notify', { title: 'New booking', body: 'Cut · 10:00', id: 7001, path: null });
+  });
+
+  // hub#2360 — the notice carries its destination, so the shell can hand it back with a tap the
+  // page did not see being sent: a click on the computer, a tap that had to start the app.
+  it('sends the screen the notice leads to along with its id (hub#2360)', async () => {
+    tauriMode.value = true;
+    invokeSpy.mockReset();
+    invokeSpy.mockImplementation(async () => ({}));
+
+    await sendSystemNotice('New booking', 'Cut · 10:00', 7002, '/m/appointments');
+    await sendSystemNotice('Printer', 'Out of paper', 7003, null);
+
+    expect(invokeSpy).toHaveBeenCalledWith('erplora_notify', {
+      title: 'New booking',
+      body: 'Cut · 10:00',
+      id: 7002,
+      path: '/m/appointments',
+    });
+    expect(invokeSpy).toHaveBeenCalledWith('erplora_notify', { title: 'Printer', body: 'Out of paper', id: 7003, path: null });
+  });
+
+  it('a refused permission or a notice the platform cannot show never escapes', async () => {
+    tauriMode.value = true;
+    invokeSpy.mockReset();
+    invokeSpy.mockImplementation(async () => {
+      throw new Error('denied');
+    });
+
+    await expect(sendSystemNotice('t', 'b', 1, null)).resolves.toBeUndefined();
+    expect(invokeSpy.mock.calls.map((c) => c[0])).toContain('erplora_notify');
+  });
+
+  it('a browser has no system notice: nothing is invoked', async () => {
+    tauriMode.value = false;
+    invokeSpy.mockReset();
+
+    await expect(sendSystemNotice('t', 'b', 1, null)).resolves.toBeUndefined();
+    expect(invokeSpy).not.toHaveBeenCalled();
   });
 });

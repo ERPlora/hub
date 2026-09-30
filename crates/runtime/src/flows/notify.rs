@@ -619,11 +619,15 @@ mod tests {
     }
 
     fn step(channel: &str, query: &str, field: &str) -> StepDef {
+        step_with_params(channel, query, field, json!({ "id": "input.customer_id" }))
+    }
+
+    fn step_with_params(channel: &str, query: &str, field: &str, params: Json) -> StepDef {
         FlowDefinition::parse(&json!({
             "schema_version": 1,
             "steps": [{
                 "id": "remind", "kind": "notify", "channel": channel,
-                "to": { "query": query, "params": { "id": "input.customer_id" }, "field": field },
+                "to": { "query": query, "params": params, "field": field },
                 "template": "appointment_reminder",
                 "vars": { "text": "Hola {{input.name}}" }
             }]
@@ -855,13 +859,9 @@ mod tests {
         customer(&db, "c-1", "marta@example.com", "+34600111222").await;
         customer(&db, "c-2", "otro@example.com", "+34600333444").await;
         let authority = allow(&db, &both("crm.customer.list", "phone", "whatsapp")).await;
-        let err = prepare_step(
-            &db,
-            &step("whatsapp", "crm.customer.list", "phone"),
-            &authority,
-        )
-        .await
-        .unwrap_err();
+        // `crm.customer.list` binds no `:id` (refused since hub#1913): ask it for nothing.
+        let several = step_with_params("whatsapp", "crm.customer.list", "phone", json!({}));
+        let err = prepare_step(&db, &several, &authority).await.unwrap_err();
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_AMBIGUOUS),
             "{err}"

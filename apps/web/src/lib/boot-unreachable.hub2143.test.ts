@@ -63,7 +63,8 @@ describe('the boot waits for the hub, and offers a retry when it is not there (h
       retry: () => retry?.(),
       loadContext: vi.fn(async () => {
         calls.push('load');
-        return answers.shift() ?? null;
+        // hub#2255: the check answers with an outcome; `null` here stands for «no answer».
+        return answers.shift() ? ('answered' as const) : ('unreachable' as const);
       }),
       showUnreachable: vi.fn((r: () => void) => {
         calls.push('unreachable');

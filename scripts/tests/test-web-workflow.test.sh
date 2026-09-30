@@ -381,9 +381,34 @@ fi
 # library that breaks a hub screen went through with everything green. So both
 # jobs that verify the shell run the image's own resolution command, taken from the
 # Dockerfile (not retyped here), between the install and what they verify.
+#
+# hub#2304 — except the e2e of a PULL REQUEST. Its screenshots are compared with
+# baselines drawn with ONE OutfitKit, and `latest` there turned every web PR red
+# on each release that moved a pixel (0.1.80 on 24/09, 0.1.109 on 28/09) until
+# someone redrew the photo. A PR's e2e installs the version the baselines were
+# drawn with (`apps/web/tests/e2e/baselines-outfitkit.txt`), so it only measures
+# the PR's own diff; `verify` and every non-PR e2e (push to develop/main, the
+# nightly cron) keep the image's `latest`, and THOSE are the runs a release turns
+# red — with the develop alert issue, not on somebody else's PR.
 dockerfile="$repo_root/docker/Dockerfile"
+baselines_outfitkit="$repo_root/apps/web/tests/e2e/baselines-outfitkit.txt"
+baselines_outfitkit_rel="apps/web/tests/e2e/baselines-outfitkit.txt"
 # awk reads the FILE and stops at the first match: no pipe into a reader that cuts (hub#1534).
 image_resolution=$(awk 'match($0, /pnpm --filter @erplora\/web add @erplora\/outfitkit@[^[:space:]"]+/) { print substr($0, RSTART, RLENGTH); exit }' "$dockerfile")
+pin_resolution='pnpm --filter @erplora/web add "@erplora/outfitkit@${HUB_BENCH_OUTFITKIT}"'
+
+# The step of a job block (from its `- name:` to the next one) whose non-comment lines contain $2.
+step_with() { # $1 = job block, $2 = fixed string
+    awk -v needle="$2" '
+        /^      - / { if (found) exit; buf = $0; if (index($0, needle)) found = 1; next }
+        { buf = buf "\n" $0; if (index($0, needle) && !/^[[:space:]]*#/) found = 1 }
+        END { if (found) print buf }
+    ' <<<"$1"
+}
+line_of() { # $1 = block, $2 = fixed string → first non-comment line number
+    awk -v cmd="$2" 'index($0, cmd) && !/^[[:space:]]*#/ {print NR; exit}' <<<"$1"
+}
+
 if [ -z "$image_resolution" ]; then
     bad "la imagen resuelve OutfitKit con un comando reconocible (hub#1793)" \
         "no encuentro \`pnpm --filter @erplora/web add @erplora/outfitkit@…\` en docker/Dockerfile: si la imagen cambió de forma de resolverla, este control y los jobs de test-web.yml tienen que seguirla"
@@ -393,7 +418,7 @@ else
         verifies=${pair#*:}
         block=$(job_block "$job")
         install_at=$(awk '/pnpm install --frozen-lockfile/ {print NR; exit}' <<<"$block")
-        resolve_at=$(awk -v cmd="$image_resolution" 'index($0, cmd) && !/^[[:space:]]*#/ {print NR; exit}' <<<"$block")
+        resolve_at=$(line_of "$block" "$image_resolution")
         verify_at=$(awk -v cmd="$verifies" 'index($0, "run:") && index($0, cmd) {print NR; exit}' <<<"$block")
         if [ -z "$resolve_at" ]; then
             bad "el job \`$job\` verifica la OutfitKit que publica la imagen (hub#1793)" \
@@ -405,6 +430,77 @@ else
             ok "el job \`$job\` verifica la OutfitKit que publica la imagen (hub#1793)"
         fi
     done
+
+    verify_step=$(step_with "$(job_block verify)" "$image_resolution")
+    if grep -qF 'if:' <<<"$verify_step"; then
+        bad "\`verify\` resuelve la OutfitKit de la imagen en TODOS los eventos (hub#2304)" \
+            "el paso lleva un \`if:\`: vue-tsc y vitest de una PR comprobarían otra OutfitKit que la que sale en la imagen"
+    else
+        ok "\`verify\` resuelve la OutfitKit de la imagen en TODOS los eventos (hub#2304)"
+    fi
+
+    e2e_block=$(job_block e2e)
+    image_step=$(step_with "$e2e_block" "$image_resolution")
+    pin_step=$(step_with "$e2e_block" "$pin_resolution")
+    if ! grep -qF "if: \${{ github.event_name != 'pull_request' }}" <<<"$image_step"; then
+        bad "el e2e resuelve \`latest\` solo FUERA de las PRs (hub#2304)" \
+            "el paso de \`$image_resolution\` del job e2e no lleva \`if: \${{ github.event_name != 'pull_request' }}\`: cada release de OutfitKit que mueve un píxel vuelve a tumbar las PRs ajenas"
+    else
+        ok "el e2e resuelve \`latest\` solo FUERA de las PRs (hub#2304)"
+    fi
+    if [ -z "$pin_step" ]; then
+        bad "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)" \
+            "falta un paso con \`$pin_resolution\` en el job e2e"
+    elif ! grep -qF "if: \${{ github.event_name == 'pull_request' }}" <<<"$pin_step"; then
+        bad "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)" \
+            "el paso fijado no lleva \`if: \${{ github.event_name == 'pull_request' }}\`: develop y el cron dejarían de probar lo que publica la imagen"
+    elif ! grep -qF "$baselines_outfitkit_rel" <<<"$pin_step" || ! grep -qF 'HUB_BENCH_OUTFITKIT=' <<<"$pin_step" || ! grep -qF 'GITHUB_ENV' <<<"$pin_step"; then
+        bad "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)" \
+            "el paso fijado tiene que leer \`$baselines_outfitkit_rel\` y exportar HUB_BENCH_OUTFITKIT a \$GITHUB_ENV (la guarda del banco lo necesita para no exigir \`latest\`)"
+    else
+        ok "el e2e de una PR instala la OutfitKit de las capturas (hub#2304)"
+    fi
+    install_at=$(awk '/pnpm install --frozen-lockfile/ {print NR; exit}' <<<"$e2e_block")
+    pin_at=$(line_of "$e2e_block" "$pin_resolution")
+    build_at=$(line_of "$e2e_block" 'vite build')
+    if [ -z "$pin_at" ] || [ -z "$install_at" ] || [ -z "$build_at" ] || [ "$pin_at" -le "$install_at" ] || [ "$pin_at" -ge "$build_at" ]; then
+        bad "la OutfitKit de las capturas se instala ENTRE el install y el build del shell (hub#2304)" \
+            "orden encontrado — install: ${install_at:-?}, fijada: ${pin_at:-?}, vite build: ${build_at:-?}"
+    else
+        ok "la OutfitKit de las capturas se instala ENTRE el install y el build del shell (hub#2304)"
+    fi
+fi
+
+# The pin itself: one exact published-looking version, nothing a `pnpm add` could widen.
+pinned_version=""
+[ -f "$baselines_outfitkit" ] && pinned_version=$(<"$baselines_outfitkit")
+if [[ "$pinned_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    ok "\`$baselines_outfitkit_rel\` fija una versión exacta ($pinned_version) (hub#2304)"
+else
+    bad "\`$baselines_outfitkit_rel\` fija una versión exacta (hub#2304)" \
+        "contenido: '${pinned_version}' — tiene que ser X.Y.Z, la OutfitKit con la que se dibujaron las capturas"
+fi
+
+# Redrawing the baselines by the book must also move the pin, or the next PR compares new photos
+# with the old OutfitKit. The dispatch path writes the version it drew with and uploads it with them.
+record_step=$(step_with "$(job_block e2e)" "> $baselines_outfitkit_rel")
+upload_step=$(step_with "$(job_block e2e)" 'name: playwright-baselines')
+if ! grep -qF "update_baselines == 'true'" <<<"$record_step"; then
+    bad "regenerar capturas reescribe \`$baselines_outfitkit_rel\` (hub#2304)" \
+        "no hay un paso de la vía update_baselines que escriba la OutfitKit instalada en el fichero"
+elif ! grep -qF "$baselines_outfitkit_rel" <<<"$upload_step"; then
+    bad "regenerar capturas reescribe \`$baselines_outfitkit_rel\` (hub#2304)" \
+        "el artefacto \`playwright-baselines\` no lleva el fichero: se commitearían PNG nuevos con la versión vieja"
+else
+    ok "regenerar capturas reescribe \`$baselines_outfitkit_rel\` y lo sube con los PNG (hub#2304)"
+fi
+
+# The develop alert is where a release that moves pixels now lands: it has to say how to fix it.
+if grep -qF "$baselines_outfitkit_rel" <<<"$(job_block alert-develop)"; then
+    ok "la alerta de develop explica el rojo de una release de OutfitKit (hub#2304)"
+else
+    bad "la alerta de develop explica el rojo de una release de OutfitKit (hub#2304)" \
+        "el cuerpo de la issue no nombra \`$baselines_outfitkit_rel\`: quien la lea no sabe que hay que redibujar y mover el fichero"
 fi
 
 # ── 13. The merge-time check of the MERGED tree (ERPlora/pm#331) ─────────────
@@ -498,6 +594,109 @@ else
     bad "test-web.yml runs \`scripts/tests/merge-check-tree.test.sh\` (pm#331)" \
         "no step executes it: the builder's contract would never run"
 fi
+
+# ── 14. An OutfitKit release runs this file at once (hub#2321) ───────────────
+# A release that moves a pixel of the shell reached customers (the image
+# re-resolves `latest`) and was only seen at the next web push to develop or at
+# the 03:08 cron. ERPlora/outfitkit's `publish.yml` now sends
+# `repository_dispatch: outfitkit-published` with the version, the same trigger
+# modules use for `test-hub-modules.yml` (hub#1239). It must be handled like the
+# cron: test DEVELOP (the event fires the file on `main`), install the announced
+# version exactly, and a red opens the develop alert.
+dispatch_block=$(on_sub_block repository_dispatch)
+if ! grep -qE '^ +types: .*outfitkit-published' <<<"$dispatch_block"; then
+    bad "test-web.yml listens to \`repository_dispatch: outfitkit-published\` (hub#2321)" \
+        "no such type under \`on.repository_dispatch\`: a new OutfitKit is only tested at the next develop push or the nightly cron"
+else
+    ok "test-web.yml listens to \`repository_dispatch: outfitkit-published\` (hub#2321)"
+fi
+
+published_script="scripts/ci/install-published-outfitkit.sh"
+for job in verify e2e; do
+    block=$(job_block "$job")
+    ref_line=$(awk '/^ +ref: / {print; exit}' <<<"$block")
+    resolve_at=$(awk 'index($0, "@erplora/outfitkit@latest") && !/^[[:space:]]*#/ {print NR; exit}' <<<"$block")
+    published_at=$(awk -v s="$published_script" 'index($0, "run:") && index($0, s) {print NR; exit}' <<<"$block")
+    if [ "$job" = verify ]; then
+        verify_at=$(awk 'index($0, "run:") && index($0, "pnpm verify") {print NR; exit}' <<<"$block")
+    else
+        verify_at=$(awk 'index($0, "run:") && index($0, "test:e2e") {print NR; exit}' <<<"$block")
+    fi
+    # The step's own `if:` and `env:` — from its `- name:` to the next step.
+    step=$(awk -v s="$published_script" '
+        /^      - / {buf = ""}
+        {buf = buf $0 "\n"}
+        index($0, "run:") && index($0, s) {printf "%s", buf; exit}
+    ' <<<"$block")
+    if ! grep -qE "event_name == 'repository_dispatch'" <<<"$ref_line"; then
+        bad "\`$job\` checks out develop on an OutfitKit notice (hub#2321)" \
+            "ref: '${ref_line## }' — \`repository_dispatch\` fires the file on \`main\` and would test main, not develop"
+    elif [ -z "$published_at" ]; then
+        bad "\`$job\` installs the announced OutfitKit (\`bash ./$published_script\`) (hub#2321)" \
+            "no step runs it: the notice would test whatever \`latest\` the registry cache still serves"
+    elif [ -z "$resolve_at" ] || [ -z "$verify_at" ] || [ "$published_at" -le "$resolve_at" ] || [ "$published_at" -ge "$verify_at" ]; then
+        bad "\`$job\` installs the announced OutfitKit AFTER \`latest\` and BEFORE what it verifies (hub#2321)" \
+            "order — latest: ${resolve_at:-?}, announced: $published_at, verification: ${verify_at:-?}"
+    elif ! grep -qE "^ +if: .*event_name == 'repository_dispatch'" <<<"$step"; then
+        bad "the announced-OutfitKit step of \`$job\` runs only on the notice (hub#2321)" \
+            "no \`if:\` on \`repository_dispatch\`: every push and PR would fail for lack of a version"
+    elif ! grep -qE '^ +OUTFITKIT_PUBLISHED: \$\{\{ github\.event\.client_payload\.version \}\}' <<<"$step"; then
+        bad "the announced-OutfitKit step of \`$job\` reads the payload through \`env:\` (hub#2321)" \
+            "no \`OUTFITKIT_PUBLISHED: \${{ github.event.client_payload.version }}\` in its env"
+    else
+        ok "\`$job\` checks out develop and installs the announced OutfitKit on the notice (hub#2321)"
+    fi
+done
+
+# Another repository's payload never goes straight into a shell line: interpolated
+# inside `run:`, `${{ … }}` is pasted into the script before bash reads it.
+if grep -nE 'client_payload' "$workflow" | grep -vE '^[0-9]+:[[:space:]]*(#|[A-Z_]+: |run-name: |group: )' >/dev/null; then
+    bad "the dispatch payload only reaches steps through \`env:\` (hub#2321)" \
+        "$(grep -nE 'client_payload' "$workflow" | grep -vE '^[0-9]+:[[:space:]]*(#|[A-Z_]+: |run-name: |group: )')"
+else
+    ok "the dispatch payload only reaches steps through \`env:\` (hub#2321)"
+fi
+
+# The notice lands on `refs/heads/main`: sharing `test-web-refs/heads/main` with the
+# push to main would let one cancel the other; two notices in a row keep the newest.
+concurrency_group=$(awk '/^concurrency:/ {f=1; next} f && /^  group:/ {print; exit} f && /^[A-Za-z]/ {exit}' "$workflow")
+if ! grep -qF 'outfitkit-published' <<<"$concurrency_group"; then
+    bad "an OutfitKit notice has its own concurrency group (hub#2321)" \
+        "'$concurrency_group': it would share \`refs/heads/main\` with the push to main and cancel it (or be cancelled)"
+else
+    ok "an OutfitKit notice has its own concurrency group (hub#2321)"
+fi
+
+alert_job=$(job_block alert-develop)
+alert_if=$(awk '/^    if: >-/ {f=1; next} f && /^    [a-z-]+:/ {exit} f {print}' <<<"$alert_job")
+if ! grep -qF "event_name == 'repository_dispatch'" <<<"$alert_if"; then
+    bad "a red OutfitKit notice opens the develop alert (hub#2321)" \
+        "\`alert-develop\`'s \`if:\` ignores \`repository_dispatch\`: the red would be seen by nobody"
+elif ! grep -qE '^ +if \[ "\$TRIGGER" = "schedule" \] \|\| \[ "\$TRIGGER" = "repository_dispatch" \]; then' <<<"$alert_job"; then
+    bad "the alert names develop's HEAD, not main's, on an OutfitKit notice (hub#2321)" \
+        "\`github.sha\` of a \`repository_dispatch\` is main's HEAD; the alert must resolve develop by API as the cron does"
+elif ! grep -qE '^ +OUTFITKIT_PUBLISHED: \$\{\{ github\.event\.client_payload\.version \}\}' <<<"$alert_job"; then
+    bad "the alert names the OutfitKit version that turned develop red (hub#2321)" \
+        "no \`OUTFITKIT_PUBLISHED\` in the alert step's env"
+else
+    ok "a red OutfitKit notice opens the develop alert with develop's HEAD and the version (hub#2321)"
+fi
+
+# The script's own contract runs here, and a change to either file triggers the gate.
+if grep -qE '^[[:space:]]*(run:[[:space:]]*)?bash (\./)?scripts/tests/install-published-outfitkit\.test\.sh[[:space:]]*$' "$workflow"; then
+    ok "test-web.yml runs \`scripts/tests/install-published-outfitkit.test.sh\` (hub#2321)"
+else
+    bad "test-web.yml runs \`scripts/tests/install-published-outfitkit.test.sh\` (hub#2321)" \
+        "no step executes it: the script's contract would never run"
+fi
+for p in "$published_script" scripts/tests/install-published-outfitkit.test.sh; do
+    if grep -qF "$p" <<<"$push_block" && grep -qF "$p" <<<"$(on_sub_block pull_request)"; then
+        ok "\`$p\` is in the push and pull_request \`paths\` (hub#2321)"
+    else
+        bad "\`$p\` is in the push and pull_request \`paths\` (hub#2321)" \
+            "a change to it alone would trigger no check"
+    fi
+done
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

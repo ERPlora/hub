@@ -36,13 +36,14 @@ import UserSwitchOverlay from './UserSwitchOverlay.vue';
 import { pinUsers } from '../lib/runtime';
 import { closeUserSwitch, userSwitchOpen } from '../lib/user-switch';
 import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: { en },
+  messages: { en, es },
 });
 
 function mountOverlay() {
@@ -92,6 +93,7 @@ beforeEach(() => {
   switchUser.mockReset();
   switchUser.mockResolvedValue(undefined);
   toast.mockClear();
+  i18n.global.locale.value = 'en';
 });
 
 describe('what is on screen', () => {
@@ -185,6 +187,33 @@ describe('handing over', () => {
     await takeOverAs(w, 'Sofía', '8317');
 
     expect(w.find('[data-testid="user-switch-error"]').text()).toBe(en.userSwitch.deviceNotEnrolled);
+  });
+
+  // hub#2285: the lock the pinpad names since hub#2283 is the same lock here — per name, and per
+  // address with hub#2282 — so the overlay says the same thing: how many minutes to wait.
+  it.each(['en', 'es'] as const)('says how many minutes a lock lasts, singular included (%s)', async (locale) => {
+    i18n.global.locale.value = locale;
+    const say = (minutes: number): string => i18n.global.t('login.pinTooManyAttempts', { minutes }, minutes);
+    seedPeople();
+    switchUser.mockRejectedValue(
+      Object.assign(new Error('nope'), { code: 'too_many_attempts', retryAfterSecs: 240 }),
+    );
+    userSwitchOpen.value = true;
+    const w = mountOverlay();
+    await flushPromises();
+    await takeOverAs(w, 'Sofía', '0000');
+    expect(w.find('[data-testid="user-switch-error"]').text()).toBe(say(4));
+
+    switchUser.mockRejectedValue(
+      Object.assign(new Error('nope'), { code: 'too_many_attempts', retryAfterSecs: 20 }),
+    );
+    // Same person, typing again: the overlay stays on her pinpad after a refusal.
+    w.find('[data-testid="user-switch-pinpad"]').element.dispatchEvent(
+      new CustomEvent('ok-complete', { detail: { value: '0000' } }),
+    );
+    await flushPromises();
+    expect(w.find('[data-testid="user-switch-error"]').text()).toBe(say(1));
+    expect(say(1)).not.toBe(say(2).replace('2', '1'));
   });
 
   it('is never sent twice for one tap', async () => {

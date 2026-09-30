@@ -138,6 +138,22 @@ export function browserDeviceId(): string | null {
 
 interface TauriCore {
   invoke?: (cmd: string, args?: unknown) => Promise<unknown>;
+  /** A mobile plugin's event (`@tauri-apps/api/core` → `addPluginListener`), same global. */
+  addPluginListener?: (
+    plugin: string,
+    event: string,
+    cb: (payload: unknown) => void,
+  ) => Promise<{ unregister: () => Promise<void> }>;
+}
+
+/** The event API of the same global (`@tauri-apps/api/event` → `listen`). */
+interface TauriEvent {
+  listen?: (event: string, handler: (event: unknown) => void) => Promise<() => void>;
+}
+
+function tauriGlobal(): { core?: TauriCore; event?: TauriEvent } | null {
+  const w = (globalThis as { window?: { __TAURI__?: { core?: TauriCore; event?: TauriEvent } } }).window;
+  return w?.__TAURI__ ?? null;
 }
 
 function tauriCore(): TauriCore | null {
@@ -145,8 +161,7 @@ function tauriCore(): TauriCore | null {
   // `ReferenceError` donde no hay DOM (un test en node, un worker), y este es el predicado con el
   // que otros deciden si hay hardware — que reviente en vez de contestar «no» convierte una
   // pregunta en una excepción para todos sus llamadores.
-  const w = (globalThis as { window?: { __TAURI__?: { core?: TauriCore } } }).window;
-  const g = w?.__TAURI__;
+  const g = tauriGlobal();
   return g?.core?.invoke ? g.core : null;
 }
 
@@ -164,6 +179,41 @@ export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>
   const core = tauriCore();
   if (!core?.invoke) return null;
   return (await core.invoke(cmd, args)) as T;
+}
+
+/**
+ * Listen to an event a PLUGIN of the installed app reports (hub#2305: the tap on a notice is the
+ * notification plugin's `actionPerformed`), through the same `window.__TAURI__` global.
+ *
+ * `null` when there is nothing to listen to — a browser, or a global without plugin listeners. A
+ * refused subscription (an app whose capabilities do not grant it) rejects: the caller decides.
+ */
+export async function listenTauriPlugin(
+  plugin: string,
+  event: string,
+  cb: (payload: unknown) => void,
+): Promise<(() => void) | null> {
+  const listen = tauriCore()?.addPluginListener;
+  if (!listen) return null;
+  const listener = await listen(plugin, event, cb);
+  return () => {
+    void listener.unregister().catch((e) => console.warn('[device] unregister', e));
+  };
+}
+
+/**
+ * Listen to an event the SHELL itself emits (hub#2360: «a tap on a notice is waiting», from a click
+ * on the computer), through the same `window.__TAURI__` global. The payload is not handed on: the
+ * event only says something is waiting, and what it is is claimed through a command.
+ *
+ * `null` when there is nothing to listen to — a browser, or a global without the event API. A
+ * refused subscription rejects: the caller decides.
+ */
+export async function listenTauriEvent(event: string, cb: () => void): Promise<(() => void) | null> {
+  const listen = tauriCore() ? tauriGlobal()?.event?.listen : undefined;
+  if (!listen) return null;
+  const unlisten = await listen(event, () => cb());
+  return () => unlisten();
 }
 
 /** The device identity of the Tauri shell, or `null` in a plain browser. */

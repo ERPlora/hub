@@ -31,6 +31,7 @@ import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 import { sessionEndReason } from './session-end-reason';
 import { CLIENT_INSTANCE } from './client-instance';
+import type { BootFailure, BootOutcome } from './boot';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -1534,18 +1535,34 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
 }
 
 /**
- * Obtiene el hub_id del runtime (`GET /api/hub/context`) y lo fija en `config.hubId`.
- * Se llama una vez en el boot (main.ts). Si el runtime no responde, deja el fallback
- * (VITE_HUB_ID) que ya trae `config`. No lanza: el boot del shell no debe romperse aquí.
- */
-/**
  * How long the boot waits for `/api/hub/context` before «the hub is not answering» is the verdict
  * (hub#2143). Without it a request that never finishes kept the boot spinner turning for ever; the
  * browser's own timeout is over a minute. Same bound as the hub probe (`HUB_PROBE_TIMEOUT_MS`).
  */
 export const BOOT_CONTEXT_TIMEOUT_MS = 10_000;
 
+/**
+ * Reads the hub's context (`GET /api/hub/context`) and publishes what it says (hub id, PIN users,
+ * currency, language, timezone…). Called once at boot, from `main.ts`. Never throws: the shell's
+ * boot must not break here. Resolves with the context, or `null` when there is none — use
+ * [`bootContextOutcome`] to know WHY.
+ */
 export async function bootHubContext(): Promise<HubContext | null> {
+  const read = await readBootContext();
+  return typeof read === 'string' ? null : read;
+}
+
+/**
+ * The boot check of `main.ts` (hub#2143): did the hub answer its context, and if not, was there no
+ * answer at all (`unreachable`) or an answer that refused (`refused`, hub#2255)? The notice says
+ * different things for each: only the first is about this device's connection.
+ */
+export async function bootContextOutcome(): Promise<BootOutcome> {
+  const read = await readBootContext();
+  return typeof read === 'string' ? read : 'answered';
+}
+
+async function readBootContext(): Promise<HubContext | BootFailure> {
   // Cloud callers wait for this answer (hub#1164): a login that raced ahead would hit the
   // build-time URL and be blocked by the hub's own CSP.
   markCloudApiUrlPending();
@@ -1553,11 +1570,19 @@ export async function bootHubContext(): Promise<HubContext | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), BOOT_CONTEXT_TIMEOUT_MS);
   try {
-    const res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
+    let res: Response;
+    try {
+      res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+    } catch {
+      // Nothing came back (no network, DNS, a connection that died, or the bounded wait ran out).
+      return 'unreachable';
+    }
+    // Something answered, and it was not the context: an edge ban's empty 403, a 5xx while the hub
+    // restarts, a proxy's HTML page. The device reached somebody — it is not its connection.
+    if (!res.ok) return 'refused';
     const ctx = (await res.json()) as HubContext;
     cloudBaseUrl = typeof ctx.cloud_base_url === 'string' ? ctx.cloud_base_url : null;
     hubContextReady.value = true;
@@ -1591,7 +1616,9 @@ export async function bootHubContext(): Promise<HubContext | null> {
     publishHubTimezone(ctx.timezone ?? null);
     return ctx;
   } catch {
-    return null;
+    // The answer could not be read as the context (not JSON, or the body was cut): a refusal —
+    // unless it was the bounded wait that cut it, which is no answer at all.
+    return controller.signal.aborted ? 'unreachable' : 'refused';
   } finally {
     clearTimeout(timer);
     // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.

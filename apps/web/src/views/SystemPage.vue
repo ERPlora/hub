@@ -549,6 +549,7 @@ import {
 import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
 import { toast, toastSuccess, toastError } from '../lib/toast';
+import { loadBellCounterModuleIds } from '../lib/bell-counters';
 import {
   ensureNotificationPermission,
   hasNoticeSource,
@@ -641,14 +642,17 @@ const hardware = ref<BridgeStatus>({ online: false });
 // below stays on the probe on purpose: the install steps ask about THIS device, not about cover.
 const printerCoverage = ref<PrintRoleCoverage[] | null>(null);
 const installedModules = ref<InstalledModule[] | null>(null);
+// The modules that put a counter on the bell (hub#2306): since hub#2303 a counter going up is a
+// system notice, so they count as something to warn about. Empty until read, and on a failed read.
+const bellModules = ref<ReadonlySet<string>>(new Set());
 // Can this device warn anybody? (hub#1732) `unsupported` is the answer everywhere except an
 // Android 13+ inside the installed app, and it is the reason the card below has to key on the
 // state and never on «is this Android».
 const notices = ref<NotificationPermission>('unsupported');
 const askingForNotices = ref(false);
-// hub#2046: a hub with no ACTIVE notice-source module (today `kitchen` and, since hub#2168,
-// `appointments`) has nothing that would ever use this permission, so the card stays hidden even
-// with the notices refused.
+// hub#2046: a hub with no ACTIVE notice-source module (`kitchen`, `appointments` since hub#2168,
+// and any module with a bell counter since hub#2306) has nothing that would ever use this
+// permission, so the card stays hidden even with the notices refused.
 const noticesBlocked = computed(
   () =>
     notices.value === 'denied' &&
@@ -658,6 +662,7 @@ const noticesBlocked = computed(
           .filter((module) => module.status === 'active')
           .map((module) => module.id),
       ),
+      bellModules.value,
     ),
 );
 // Can this device look for a printer at all? (hub#1773) Same reading and the same reason as the
@@ -956,6 +961,7 @@ async function refreshHardware(): Promise<void> {
   } catch {
     installedModules.value = null; // we do not know what is installed → the card stays quiet
   }
+  bellModules.value = await loadBellCounterModuleIds(); // never throws: unread is «none»
   // Never throws: `notificationPermissionState` answers `unsupported` when it cannot ask, which
   // keeps the card away rather than warning about a state we failed to read.
   notices.value = await notificationPermissionState();

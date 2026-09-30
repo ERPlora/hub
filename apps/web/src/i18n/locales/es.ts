@@ -308,6 +308,11 @@ export default {
       body: 'ERPlora no responde. Comprueba que este dispositivo tiene conexión a Internet y vuelve a intentarlo. Si sigue pasando, el problema puede ser nuestro.',
       retry: 'Reintentar',
     },
+    refused: {
+      title: 'Tu negocio no está disponible ahora mismo',
+      body: 'ERPlora responde, pero ahora mismo no puede abrir tu negocio. Este dispositivo y su conexión están bien: no tienes que revisar nada. Lo volvemos a intentar solos cada {seconds} segundos.',
+      retry: 'Reintentar ahora',
+    },
   },
   offline: {
     title: 'Sin conexión a Internet',
@@ -687,7 +692,7 @@ export default {
     receiptTemplateMissing: 'Instala la app Impresión para dar de alta tu impresora y configurar el tique',
     tabHub: 'General',
     tabBusiness: 'Negocio',
-    tabTickets: 'Tiques',
+    tabPrinting: 'Impresión',
     tabPermissions: 'Permisos',
     tabData: 'Datos y copias',
     dataImport: 'Importar',
@@ -904,6 +909,16 @@ export default {
     updateUpToDate: '{name} ya está en la última versión.',
     updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
     updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
+    updateAllOffer: '{n} app tiene una versión nueva. | {n} apps tienen una versión nueva.',
+    updateAllAction: 'Actualizar todas',
+    updateAllProgress: 'Actualizando {name} ({current} de {total})…',
+    updateAllSummary: '{updated} de {total} app actualizada. | {updated} de {total} apps actualizadas.',
+    updateAllUpToDate: 'Ya estaba en la última versión',
+    updateAllRetry: 'Reintentar',
+    updatesCheckFailed: 'No se ha podido comprobar si hay versiones nuevas de tus apps. Puede que no estén al día.',
+    updateAllReload: 'Recargar ahora',
+    updateAllDoneReloading: '{n} app actualizada. Recargando para usar la versión nueva… | {n} apps actualizadas. Recargando para usar las versiones nuevas…',
+    updateAllNothingNew: 'Tus apps ya estaban en la última versión.',
     versionPickTitle: 'Elige una versión',
     versionPickBody: 'Está seleccionada la última. Elige otra solo si te lo ha pedido soporte.',
     versionPickConfirm: 'Continuar',
@@ -1429,7 +1444,6 @@ export default {
     pinTooManyAttemptsNoWait: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     orSwipeBadge: '…o pasa tu placa: no hace falta elegir tu nombre antes.',
     badgeRejected: 'Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.',
-    badgeTooManyAttempts: 'Demasiados intentos fallidos con esta placa. Espera unos minutos o entra con tu PIN.',
     // hub#330. Sustituye a «PIN incorrecto» cuando lo que se rechazó fue el dispositivo, no los
     // dígitos. Decirle «PIN incorrecto» a quien lo ha escrito bien es la peor respuesta posible: lo
     // vuelve a teclear, y nada en pantalla nombra el gesto que lo arregla.
@@ -1507,7 +1521,6 @@ export default {
     notElevable:
       'Esto no se aprueba con un PIN. Tiene que hacerlo quien dirige tu negocio, entrando con su propia cuenta.',
     notRequired: 'Esto ya no necesita aprobación. Cierra esta ventana y vuelve a intentarlo.',
-    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     failed: 'No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.',
   },
   // hub#456 — el turno cambia en mitad de un ticket. Cada frase la lee alguien con una cola
@@ -1531,7 +1544,6 @@ export default {
     deviceNotEnrolled:
       'Este dispositivo todavía no está dado de alta para el PIN. Entra una vez con una cuenta de ERPlora en él y el PIN funcionará a partir de entonces.',
     deviceUnidentified: 'Este dispositivo no ha podido identificarse. Recarga la página y vuelve a intentarlo.',
-    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
   },
   activation: {
     title: 'Activación requerida',

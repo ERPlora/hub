@@ -494,7 +494,11 @@ async fn no_recipient_and_several_recipients_both_stop_the_step_instead_of_guess
         )
         .await
         .unwrap();
-    let many = create_flow(&rt, reminder("whatsapp", "crm.customer.list", "phone")).await;
+    // `crm.customer.list` binds no `:id` — asking it by `id` is refused since hub#1913, so the
+    // step asks it for nothing, which is what it really reads.
+    let mut several = reminder("whatsapp", "crm.customer.list", "phone");
+    several["steps"][0]["to"]["params"] = json!({});
+    let many = create_flow(&rt, several).await;
     set_grants(
         &rt,
         &many,

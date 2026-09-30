@@ -46,6 +46,8 @@ money_columns_inventory                          # pese al nombre: el inventario
 pagination_e2e
 protects_guard_e2e
 published_migrations_stay_installable
+read_unavailable_reason_hub2410                  # por qué no resolvió una read `required`
+                                                 # (hub#2410): `taxes` + `sales` son el banco
 reads_e2e
 reset_test
 reset_undo_test

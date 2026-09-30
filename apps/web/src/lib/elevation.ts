@@ -13,6 +13,7 @@
 // owns is only which words appear and when.
 import { ref } from 'vue';
 import type { ElevationApprover, ElevationAsk } from '@erplora/module-sdk';
+import { lockRefusal, type Refusal } from './lock-refusal';
 
 /**
  * The approval currently on screen, or `null` when there is none. `ElevationDialog` renders it and
@@ -54,7 +55,7 @@ export function resolveElevation(token: string | null): void {
 }
 
 /**
- * i18n key for a refusal of `POST /api/elevation/approve`.
+ * The sentence for a refusal of `POST /api/elevation/approve`.
  *
  * Read off the stable `code` and **nothing else**. Matching on the message would be matching on
  * prose that gets reworded and translated, and the day it is, the refusal silently starts landing
@@ -71,20 +72,22 @@ export function resolveElevation(token: string | null): void {
  * not, and telling a manager their PIN is wrong when it is right is how a shop ends up sharing one
  * credential — the exact outcome this whole chain exists to avoid.
  */
-export function elevationRefusalKey(err: unknown): string {
+export function elevationRefusal(err: unknown): Refusal {
   const code = (err as { code?: unknown } | null)?.code;
   switch (code) {
     case 'hub.elevation.rejected':
-      return 'elevation.rejected';
+      return { key: 'elevation.rejected' };
     case 'hub.elevation.approver_cannot':
-      return 'elevation.approverCannot';
+      return { key: 'elevation.approverCannot' };
     case 'hub.elevation.not_elevable':
-      return 'elevation.notElevable';
+      return { key: 'elevation.notElevable' };
     case 'hub.elevation.not_required':
-      return 'elevation.notRequired';
+      return { key: 'elevation.notRequired' };
     case 'too_many_attempts':
-      return 'elevation.tooManyAttempts';
+      // hub#2285: the login pinpad's lock, and its sentence. The minutes appear once the refusal
+      // carries `retryAfterSecs`; the SDK's `ErploraError` does not keep it yet (hub#2290).
+      return lockRefusal(err);
     default:
-      return 'elevation.failed';
+      return { key: 'elevation.failed' };
   }
 }

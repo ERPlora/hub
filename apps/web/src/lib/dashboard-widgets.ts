@@ -26,6 +26,8 @@ import type {
 } from '@erplora/module-types';
 import type { WidgetDef, WidgetPreset } from '@erplora/outfitkit';
 
+import { getLocale } from '../i18n';
+import { formatMoney, hubCurrency, hubCurrencyDecimals } from './money';
 import {
   loadInstalledManifests,
   loadModuleComponent,
@@ -130,9 +132,6 @@ export function normalizeRows(result: unknown): Row[] {
 
 type ValueFormat = 'currency' | 'number' | 'percent' | 'compact';
 
-/** Locale por defecto de los importes/números del dashboard (Hub es-ES). */
-const DEFAULT_LOCALE = 'es-ES';
-
 function formatValue(
   value: unknown,
   format: ValueFormat | undefined,
@@ -145,18 +144,15 @@ function formatValue(
     // Sin formato (o no numérico): muestra el valor crudo como texto.
     return String(value);
   }
-  const loc = locale ?? DEFAULT_LOCALE;
+  // Without a declared locale, the language of the UI — the same rule as `lib/money.ts` and as
+  // `ok-bar-list` (which follows `<html lang>`), not a fixed es-ES (hub#2387).
+  const loc = locale ?? getLocale();
   switch (format) {
     case 'currency':
-      // El dinero en ERPlora se almacena en CÉNTIMOS (INTEGER, ADR-0007): las queries de los
-      // widgets devuelven céntimos, así que para mostrarlos como divisa hay que pasar a la unidad
-      // mayor (÷100) y mostrar 2 decimales. Sin esta división el importe sale 100× inflado.
-      return new Intl.NumberFormat(loc, {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(num / 100);
+      // Money travels in MINOR units of the hub currency (ADR-0007, ADR-0123 §7): `formatMoney`
+      // scales by the decimals of that currency (EUR ÷100, JPY ÷1, KWD ÷1000), not a fixed ÷100
+      // that paints 1999 ¥ as 19,99 (hub#2387).
+      return formatMoney(num, { currency, locale: loc });
     case 'percent':
       return new Intl.NumberFormat(loc, { style: 'percent', maximumFractionDigits: 1 }).format(num);
     case 'compact':
@@ -322,7 +318,7 @@ function renderKpi(
   if (!row) return false;
   const rawValue = mapped(row, map, 'value');
   if (rawValue == null) return false;
-  const currency = str(opts, 'currency') ?? 'EUR';
+  const currency = str(opts, 'currency') ?? hubCurrency();
   const locale = str(opts, 'locale');
   const format = str(opts, 'format') as ValueFormat | undefined;
 
@@ -360,7 +356,7 @@ function renderStat(
   if (!row) return false;
   const rawValue = mapped(row, map, 'value');
   if (rawValue == null) return false;
-  const currency = str(opts, 'currency') ?? 'EUR';
+  const currency = str(opts, 'currency') ?? hubCurrency();
   const format = str(opts, 'format') as ValueFormat | undefined;
 
   const el = document.createElement('ok-stat') as HTMLElement & {
@@ -407,7 +403,7 @@ function renderSparkline(
 
   if (valueCol) {
     const last = rows[rows.length - 1];
-    const currency = str(opts, 'currency') ?? 'EUR';
+    const currency = str(opts, 'currency') ?? hubCurrency();
     const format = str(opts, 'format') as ValueFormat | undefined;
     const kpi = document.createElement('ok-kpi') as HTMLElement & {
       label?: string; value?: string; delta?: string; trend?: string; icon?: string;
@@ -446,10 +442,8 @@ function renderBarList(
   const valueCol = map?.value;
   if (!labelCol || !valueCol) return false;
   const colorCol = map?.color;
-  // Algunas magnitudes viajan en punto fijo entero (cantidades ADR-0147 = escala 10⁶). El módulo
-  // declara la frontera; el shell sigue siendo genérico y entrega al componente el valor lógico.
-  const declaredDivisor = Number(opts.valueDivisor ?? 1);
-  const valueDivisor = Number.isFinite(declaredDivisor) && declaredDivisor > 0 ? declaredDivisor : 1;
+  const valueFormat = (str(opts, 'valueFormat') as string | undefined) ?? 'number';
+  const valueDivisor = logicalDivisor(valueFormat, opts);
   const items = rows
     .map((r) => ({
       label: String(r[labelCol] ?? ''),
@@ -463,10 +457,9 @@ function renderBarList(
     items?: typeof items; valueFormat?: string; currency?: string; locale?: string; max?: number;
   };
   el.items = items;
-  el.valueFormat = (str(opts, 'valueFormat') as string | undefined) ?? 'number';
-  el.currency = str(opts, 'currency') ?? 'EUR';
-  const locale = str(opts, 'locale');
-  if (locale) el.locale = locale;
+  el.valueFormat = valueFormat;
+  el.currency = str(opts, 'currency') ?? hubCurrency();
+  el.locale = str(opts, 'locale') ?? getLocale();
   const max = opts.max != null ? Number(opts.max) : undefined;
   if (max != null && !Number.isNaN(max)) el.max = max;
   cell.appendChild(el);
@@ -510,6 +503,85 @@ function renderTimeline(
   return true;
 }
 
+/**
+ * The divisor that turns the stored value into the logical one the widget paints.
+ *
+ * Some magnitudes travel as fixed-point integers (quantities, ADR-0147 = scale 10⁶): the module
+ * declares that boundary with `valueDivisor` and the shell stays generic. Money is the exception:
+ * its scale belongs to the hub CURRENCY, not to the module (hub#2387) — the same ÷10^decimals as the
+ * kpi, so a declared `valueDivisor: 100` neither divides twice nor turns 500 ¥ into 5 ¥.
+ */
+function logicalDivisor(format: string | undefined, opts: Opts): number {
+  if (format === 'currency') return 10 ** hubCurrencyDecimals();
+  const declared = Number(opts.valueDivisor ?? 1);
+  return Number.isFinite(declared) && declared > 0 ? declared : 1;
+}
+
+/** Rounds away the binary noise of `k × step` (0.1 × 3 = 0.30000000000000004). */
+const tidy = (n: number): number => Number(n.toPrecision(12));
+
+/**
+ * A round value scale (0, 500, 1.000…) that covers every value: `ok-chart` spaces its axis labels
+ * evenly between `max` (top) and `min` (bottom), so the shell pins both to the ticks it labels.
+ * Bars and areas grow from 0; a line starts at the lowest round value below its data.
+ */
+function niceScale(
+  data: number[],
+  fromZero: boolean,
+  minStep: number,
+): { min: number; max: number; ticks: number[] } {
+  let lo = Math.min(...data);
+  let hi = Math.max(...data);
+  if (fromZero) {
+    lo = Math.min(lo, 0);
+    hi = Math.max(hi, 0);
+  }
+  if (hi === lo) hi = lo + Math.max(minStep, 1);
+  // About four intervals, with a step of 1, 2, 2.5 or 5 × 10ⁿ.
+  const rough = (hi - lo) / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(rough));
+  const norm = rough / magnitude;
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+  const step = Math.max(nice * magnitude, minStep);
+  const min = tidy(Math.floor(tidy(lo / step)) * step);
+  const max = tidy(Math.ceil(tidy(hi / step)) * step);
+  const ticks: number[] = [];
+  for (let k = Math.round((max - min) / step); k >= 0; k--) ticks.push(tidy(min + k * step));
+  return { min, max, ticks };
+}
+
+/** An axis tick: short (compact) so it fits the gutter of the chart, in the panel's format. */
+function formatAxisTick(
+  value: number,
+  format: ValueFormat | undefined,
+  currency: string,
+  locale: string,
+): string {
+  if (format === 'percent') {
+    return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(value);
+  }
+  return new Intl.NumberFormat(locale, {
+    ...(format === 'currency' ? { style: 'currency', currency } : {}),
+    notation: 'compact',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A category label: an ISO day (`2026-09-29`, what a query returns for a `date`) is written in the
+ * language of the UI («29 sept», «Sep 29»); anything else is left as the module sends it. The day
+ * is built on the LOCAL calendar: the query already returns the business day (sales#323), and
+ * `new Date('2026-09-29')` is midnight UTC — the 28th west of Greenwich.
+ */
+function formatCategory(label: string, days: Intl.DateTimeFormat): string {
+  const m = ISO_DAY.exec(label);
+  if (!m) return label;
+  return days.format(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+}
+
 function renderChart(
   cell: HTMLElement,
   rows: Row[],
@@ -519,21 +591,34 @@ function renderChart(
   const labelCol = map?.label;
   const valueCol = map?.value;
   if (!labelCol || !valueCol) return false;
+  // The panel's format (hub#2392): money in the hub currency with its decimals, the language of
+  // the UI unless the panel sets a locale — the same rule as the kpi and the bar-list (hub#2387).
+  const format = str(opts, 'format') as ValueFormat | undefined;
+  const currency = str(opts, 'currency') ?? hubCurrency();
+  const locale = str(opts, 'locale') ?? getLocale();
+  const divisor = logicalDivisor(format, opts);
+  const days = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' });
   const labels: string[] = [];
   const data: number[] = [];
   for (const r of rows) {
-    labels.push(String(r[labelCol] ?? ''));
-    data.push(Number(r[valueCol]) || 0);
+    labels.push(formatCategory(String(r[labelCol] ?? ''), days));
+    data.push((Number(r[valueCol]) || 0) / divisor);
   }
   if (!data.length) return false;
 
   const el = document.createElement('ok-chart') as HTMLElement & {
     type?: string; series?: Array<{ name?: string; data: number[] }>; labels?: string[];
-    gridlines?: boolean; height?: number;
+    gridlines?: boolean; height?: number; axis?: string[]; min?: number; max?: number;
   };
-  el.type = (str(opts, 'chartType') as 'bar' | 'line' | 'area' | undefined) ?? 'line';
+  const type = (str(opts, 'chartType') as 'bar' | 'line' | 'area' | undefined) ?? 'line';
+  el.type = type;
   el.series = [{ name: str(opts, 'seriesName'), data }];
   el.labels = labels;
+  // Never a tick finer than the minor unit of the currency (no «0,5 ¥»).
+  const scale = niceScale(data, type !== 'line', format === 'currency' ? 1 / divisor : 0);
+  el.min = scale.min;
+  el.max = scale.max;
+  el.axis = scale.ticks.map((t) => formatAxisTick(t, format, currency, locale));
   el.gridlines = opts.gridlines == null ? true : bool(opts, 'gridlines');
   const height = opts.height != null ? Number(opts.height) : undefined;
   if (height != null && !Number.isNaN(height)) el.height = height;

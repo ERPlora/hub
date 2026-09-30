@@ -6,7 +6,7 @@
 // stable id it owns names the *hub*, and a header saying that would make every browser one device.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loginHeaders, setRuntimeClientKind } from './device';
+import { listenTauriEvent, listenTauriPlugin, loginHeaders, setRuntimeClientKind } from './device';
 
 /** A browser profile with nothing written down yet: the identity is minted on first use. */
 function emptySiteStorage() {
@@ -71,5 +71,69 @@ describe('machine login headers', () => {
     vi.stubGlobal('localStorage', emptySiteStorage());
 
     await expect(loginHeaders()).resolves.toEqual({ 'X-Client-Type': 'hub' });
+  });
+});
+
+// hub#2305 — the tap on a system notice comes back as a PLUGIN event (`actionPerformed` of the
+// notification plugin), which `invoke` cannot hear. `withGlobalTauri` exposes the plugin listener
+// next to `invoke`, so the shell keeps its rule of no `@tauri-apps/api` dependency.
+describe('listening to a plugin event of the installed app', () => {
+  it('subscribes through the Tauri global and stops through the listener it got back', async () => {
+    const unregister = vi.fn(async () => {});
+    const addPluginListener = vi.fn(async () => ({ unregister }));
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn(), addPluginListener } } });
+    const cb = vi.fn();
+
+    const stop = await listenTauriPlugin('notification', 'actionPerformed', cb);
+
+    expect(addPluginListener).toHaveBeenCalledWith('notification', 'actionPerformed', cb);
+    expect(stop).toBeTypeOf('function');
+    stop!();
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it('is null in a browser, and in a shell whose global has no plugin listener', async () => {
+    vi.stubGlobal('window', {});
+    await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).resolves.toBeNull();
+
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
+    await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).resolves.toBeNull();
+  });
+
+  it('a refused subscription reaches the caller, who decides what it means', async () => {
+    const addPluginListener = vi.fn(async () => {
+      throw new Error('notification.register_listener not allowed');
+    });
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn(), addPluginListener } } });
+
+    await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).rejects.toThrow('not allowed');
+  });
+});
+
+// hub#2360 — the shell's own event, not a plugin's: on the computer the shell says «a tap is
+// waiting» when a notice is clicked. `withGlobalTauri` exposes the event API next to `invoke`.
+describe('listening to an event of the installed app (hub#2360)', () => {
+  it('subscribes through the Tauri global and stops through the function it got back', async () => {
+    const unlisten = vi.fn();
+    const listen = vi.fn(async () => unlisten);
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() }, event: { listen } } });
+    const cb = vi.fn();
+
+    const stop = await listenTauriEvent('erplora://notice-tapped', cb);
+
+    expect(listen).toHaveBeenCalledWith('erplora://notice-tapped', expect.any(Function));
+    const handler = (listen.mock.calls[0] as unknown as [string, (e: unknown) => void])[1];
+    handler({ event: 'erplora://notice-tapped', payload: null });
+    expect(cb).toHaveBeenCalledTimes(1);
+    stop!();
+    expect(unlisten).toHaveBeenCalledTimes(1);
+  });
+
+  it('is null in a browser, and in a shell whose global has no event API', async () => {
+    vi.stubGlobal('window', {});
+    await expect(listenTauriEvent('erplora://notice-tapped', () => {})).resolves.toBeNull();
+
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
+    await expect(listenTauriEvent('erplora://notice-tapped', () => {})).resolves.toBeNull();
   });
 });
