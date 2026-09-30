@@ -42,15 +42,18 @@ type Row = Record<string, unknown>;
 /** Resolución del permiso de la sesión: `true`/`false` decide; `null` = desconocido (no filtra). */
 export type PermissionResolver = (permission: string) => boolean | null;
 
-/** Texto opcional para los estados (vacío/error) del render. Default español. */
+/** Texts the shell owns: the empty/error states of a cell and the name of the preset it builds. */
 export interface WidgetRenderLabels {
   empty: string;
   error: string;
+  /** Name of the «Recommended» preset offered in the picker (sales#473). */
+  recommended: string;
 }
 
 const DEFAULT_RENDER_LABELS: WidgetRenderLabels = {
   empty: 'Sin datos',
   error: 'No disponible',
+  recommended: 'Recomendado',
 };
 
 /** Dependencias inyectadas a la recolección (cliente del Hub + sector + permiso + textos). */
@@ -874,21 +877,27 @@ export function buildWidgetsFromManifests(
       const size: WidgetSize = def.size && VALID_SIZES.has(def.size) ? def.size : 'md';
       // i18n (ADR-0055): el título canónico (inglés) del manifest se traduce con el locale del
       // módulo para el idioma activo (`locale.widgets.<id>.title`/`.label`); sin entrada, se queda
-      // el canónico. El `label` (caption dentro de kpi/stat) va en `options.label`.
+      // el canónico. El `label` (caption dentro de kpi/stat) va en `options.label`; the chart
+      // legend (`options.seriesName`) and the picker `category` translate the same way (sales#473).
       const tr = mod.locale?.widgets?.[id];
       const title = tr?.title ?? def.title;
-      const label = tr?.label;
+      const category = tr?.category ?? def.category;
+      const translatedOptions: Record<string, unknown> = {};
+      if (tr?.label != null) translatedOptions.label = tr.label;
+      if (tr?.seriesName != null) translatedOptions.seriesName = tr.seriesName;
       let localizedDef: WidgetManifestDef = def;
-      if (title !== def.title || label != null) {
+      if (title !== def.title || Object.keys(translatedOptions).length > 0) {
         localizedDef = { ...def, title };
-        if (label != null) localizedDef.options = { ...def.options, label };
+        if (Object.keys(translatedOptions).length > 0) {
+          localizedDef.options = { ...def.options, ...translatedOptions };
+        }
       }
       const render =
         def.kind != null
           ? buildKindRender(deps.client, localizedDef, labels, gate)
           : buildComponentRender(deps.client, mod, localizedDef, labels);
 
-      widgets.push({ id, title, icon: def.icon, category: def.category, size, render });
+      widgets.push({ id, title, icon: def.icon, category, size, render });
 
       // Preset "Recomendado": widgets con default===true cuyo sectors incluye el sector del hub
       // (o sin sectors = todos). Sin sector conocido → no se recomienda nada (preset vacío).
@@ -907,7 +916,7 @@ export function buildWidgetsFromManifests(
 
   const presets: WidgetPreset[] =
     recommended.length > 0
-      ? [{ id: 'recommended', label: 'Recomendado', widgets: recommended }]
+      ? [{ id: 'recommended', label: labels.recommended, widgets: recommended }]
       : [];
 
   // Qué arranca ACTIVO (hub#1100). Con sector manda la elección informada del autor del módulo

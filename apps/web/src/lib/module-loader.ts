@@ -383,7 +383,9 @@ export function reloadForModuleUpdate(delayMs = MODULE_UPDATE_RELOAD_DELAY_MS): 
  * espejando `navigation.<id>.label`. Inglés canónico en el manifest; ES aquí.
  */
 export interface ModuleLocaleFile {
-  widgets?: Record<string, { title?: string; label?: string }>;
+  /** Per widget id: its `title`, `options.label`, chart legend (`options.seriesName`) and picker
+   *  `category` in this language (sales#473 added the last two). */
+  widgets?: Record<string, { title?: string; label?: string; seriesName?: string; category?: string }>;
   /** The label of each `bell` counter (hub#1678), by full id (`appointments.to_confirm`). */
   bell?: Record<string, { label?: string }>;
   /** Nombre del módulo traducido (el runtime ya lo resuelve para la nav; aquí sirve al diálogo de
