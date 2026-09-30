@@ -27,19 +27,24 @@
       </template>
     </AppTopbar>
 
-    <!-- Franja bloqueante (hub#374): la tercera superficie de `hub.setup.status`. Va AQUÍ —entre la
-         topbar y el scroller, no dentro del ion-content— porque un aviso que se va con el scroll no
-         es un aviso; y va en AppPage y no en cada vista porque este es el layout ÚNICO del shell,
-         así que la heredan las 12 pantallas, incluida la del TPV (ModuleView). Las pantallas sin
-         sesión (LoginPage/ActivationPage) no usan AppPage, así que no la heredan: correcto, antes de
-         entrar no hay nada que configurar. -->
-    <SetupBlockingStrip :status="setupStatus" :checklist-on-screen="setupChecklistOnScreen" />
+    <!-- The page's strips, measured as one block (hub#2413): whatever height they take is taken
+         from the viewport's box, so it is also taken from the work-surface floor below — see
+         `followStrips`. -->
+    <div ref="strips" class="page-strips">
+      <!-- Blocking strip (hub#374): the third surface of `hub.setup.status`. It goes HERE —between
+           the topbar and the scroller, not inside ion-content— because a warning that scrolls away
+           is not a warning; and in AppPage rather than in each view because this is the shell's
+           ONLY layout, so all 12 screens inherit it, the till's (ModuleView) included. Screens
+           without a session (LoginPage/ActivationPage) do not use AppPage and do not get it: right,
+           before signing in there is nothing to configure. -->
+      <SetupBlockingStrip :status="setupStatus" :checklist-on-screen="setupChecklistOnScreen" />
 
-    <!-- Sin red (hub#1743). Va aquí por lo mismo que la franja de arriba —fuera del scroller, en el
-         layout único— y por una razón propia: la caída de red no la provoca ninguna pantalla, así
-         que no puede vivir en ninguna. Se pinta sola cuando el navegador dice que no hay conexión y
-         se va sola cuando vuelve; no se puede cerrar porque no hay nada que decidir. -->
-    <OfflineStrip />
+      <!-- No network (hub#1743). Here for the same reason as the strip above —outside the
+           scroller, in the single layout— and for one of its own: no screen causes a network drop,
+           so none can own it. It paints itself when the browser says there is no connection and
+           goes away when it comes back; it cannot be closed because there is nothing to decide. -->
+      <OfflineStrip />
+    </div>
 
     <!-- fullscreen=false: el ion-content se asienta ESTRICTAMENTE entre la topbar y el tabbar
          (no scrollea por detrás de ellos). Necesario para la tarjeta redondeada del shell
@@ -153,9 +158,42 @@ function sincronizarTabbar() {
 // lo que impide cablear dos veces la misma barra.
 let observador: MutationObserver | null = null;
 
+// ── Work-surface floor, net of the strips (hub#2413) ───────────────────────────────────────────
+// The shell's work surfaces (a module's outlet, Staff, Apps…) are pinned to the scroller's height
+// with a floor under it, `--ok-work-surface-min` (hub#1745): where the box is shorter than that, the
+// surface overflows on purpose and the shell scrolls. The floor was sized against the box the
+// VIEWPORT leaves — but the strips above sit between the topbar and the scroller, so they eat that
+// box too. On a 375×667 phone the blocking strip took it from 535px to 402px, under the 480px floor:
+// the floor switched on because of the warning alone, and every full-height list ended under the
+// tabbar, its footer («1 record», the pager, «Retry») out of sight.
+//
+// So the page lowers the floor by exactly what the strips take. The strips never decide whether a
+// surface overflows: where it fitted without them it still fits (and ends right above the tabbar),
+// where the floor bites it bites by the same amount. Set on this page only, and inherited by its
+// surfaces; the number itself stays in the theme's `:root`, read here and never repeated.
+// A ResizeObserver and not a measurement at mount: the strips come and go (the setup document
+// arrives by network, the network drops) and grow (the folded strip opens what is missing).
+const strips = ref<HTMLElement | null>(null);
+let stripsObserver: ResizeObserver | null = null;
+
+function followStrips() {
+  const root = page.value?.$el as HTMLElement | undefined;
+  if (!root || !strips.value) return;
+  const floor = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue('--ok-work-surface-min'),
+  );
+  if (!Number.isFinite(floor)) return;
+  const taken = strips.value.getBoundingClientRect().height;
+  root.style.setProperty('--ok-work-surface-min', `${floor - taken}px`);
+}
+
 onMounted(async () => {
   await nextTick();
   sincronizarTabbar();
+  if (strips.value && typeof ResizeObserver !== 'undefined') {
+    stripsObserver = new ResizeObserver(followStrips);
+    stripsObserver.observe(strips.value);
+  }
   const raiz = page.value?.$el as HTMLElement | undefined;
   if (!raiz) return;
   observador = new MutationObserver(sincronizarTabbar);
@@ -163,6 +201,8 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  stripsObserver?.disconnect();
+  stripsObserver = null;
   observador?.disconnect();
   observador = null;
   desatar?.();
@@ -170,3 +210,10 @@ onBeforeUnmount(() => {
   cableado = null;
 });
 </script>
+
+<style scoped>
+/* Page chrome between the topbar and the scroller: it keeps its own height, the scroller flexes. */
+.page-strips {
+  flex: none;
+}
+</style>
