@@ -58,14 +58,45 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     /** Keeps the page running while listening for notices (hub#2307); `null` until the WebView loads. */
     private var pageKeeper: PageKeeper? = null
 
+    /**
+     * hub#2360 — a new page is loading: the tap that STARTED the app waits for it. The notification
+     * plugin reports that tap as `actionPerformed` from its own `load`, before the page listens, and
+     * Tauri drops an event nobody is listening to: the tap opened the app on its first screen
+     * instead of the notice's. A tap that reaches a dead process through `onNewIntent` is kept by
+     * `MainActivity` into the same box.
+     */
     override fun load(webView: WebView) {
-        val keeper = PageKeeper(webView)
+        super.load(webView)
+        NoticeTaps.pageLoading(activity, activity.intent)
+        installPageKeeper(webView)
+    }
+
+    /** hub#2307 — once per WebView: a second observer and sentinel would only repeat the same work. */
+    private fun installPageKeeper(webView: WebView) {
+        if (pageKeeper != null) return
         val owner = activity as? AppCompatActivity
         val root = activity.window?.decorView as? ViewGroup
         if (owner != null && root != null) {
+            val keeper = PageKeeper(webView)
             keeper.install(root, owner)
             pageKeeper = keeper
         }
+    }
+
+    /** `take_notice_tap` (hub#2360) — hands the kept tap over, once: `{ tap: {id, notification} | null }`. */
+    @Command
+    fun takeNoticeTap(invoke: Invoke) {
+        val tap = NoticeTaps.take()
+        val answer = JSObject()
+        if (tap == null) {
+            answer.put("tap", null as Any?)
+        } else {
+            val kept = JSObject()
+            kept.put("id", tap.id)
+            kept.put("notification", tap.notification)
+            answer.put("tap", kept)
+        }
+        invoke.resolve(answer)
     }
 
     /**

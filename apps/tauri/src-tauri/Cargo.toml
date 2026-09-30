@@ -91,6 +91,16 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 # registry / autostart dir); the shell only exposes enable/disable/is_enabled over `invoke`.
 tauri-plugin-autostart = "2"
 
+# A click on a notice on the computer (hub#2360). The notification plugin shows a desktop notice and
+# drops its handle, so no click ever comes back; the shell shows it itself and waits for the click.
+# macOS talks to `mac-notification-sys` directly: `notify-rust` only waits there when the notice has
+# buttons. Both are already in the tree through the plugin, at these versions.
+[target.'cfg(target_os = "macos")'.dependencies]
+mac-notification-sys = "0.6"
+
+[target.'cfg(any(windows, target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))'.dependencies]
+notify-rust = "4.18"
+
 # Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
 # queda EXENTO del gate de clippy en silencio; `scripts/tests/clippy-lints.test.sh` lo vigila.
 [lints]

@@ -26,7 +26,7 @@ function tapOf(id: unknown, actionId = 'tap') {
 }
 
 function door(firstId = 700) {
-  const send = vi.fn(async (_title: string, _body: string, _id: number) => {});
+  const send = vi.fn(async (_title: string, _body: string, _id: number, _path: string | null) => {});
   const navigate = vi.fn((_path: string) => undefined);
   return { send, navigate, notices: createNoticeDoor({ send, navigate, firstId }) };
 }
@@ -37,7 +37,8 @@ describe('a system notice opens the screen it is about (hub#2305)', () => {
 
     await notices.notify('WhatsApp (2)', 'Tap to open it', '/m/whatsapp_inbox/inbox');
 
-    expect(send).toHaveBeenCalledWith('WhatsApp (2)', 'Tap to open it', 700);
+    // The screen travels too since hub#2360, for the taps the shell keeps (notice-tap.hub2360.test.ts).
+    expect(send).toHaveBeenCalledWith('WhatsApp (2)', 'Tap to open it', 700, '/m/whatsapp_inbox/inbox');
     notices.tapped(tapOf(700));
     expect(navigate).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith('/m/whatsapp_inbox/inbox');
