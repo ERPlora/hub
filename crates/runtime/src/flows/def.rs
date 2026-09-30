@@ -2776,6 +2776,20 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     }
 
+    // **The name the customer sees on the header's PDF** (hub#2405) names the document next to it;
+    // on its own or next to a photo it names a file the message does not carry. Where the document
+    // itself may travel is already settled above.
+    let filename = crate::host_notify::HEADER_DOCUMENT_FILENAME_VAR;
+    if vars.contains_key(filename) && headers.as_slice() != ["header_document"] {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `vars.{filename}` is the name of the header's PDF and needs \
+                 `vars.header_document` next to it"
+            ),
+        ));
+    }
+
     // **A template's link button** (hub#2110): `vars.button_url_<n>` is the end the transport
     // appends to the URL button at position `<n>`. Like the header, it only travels with a
     // whatsapp template; a near miss of the key would otherwise go out as a body variable Meta
@@ -3458,6 +3472,40 @@ mod tests {
             assert!(
                 format!("{err}").contains("header_"),
                 "{err} for {channel} {vars}"
+            );
+        }
+    }
+
+    /// **The name the customer sees on the header's PDF** (hub#2405) travels with the document it
+    /// names. Next to `vars.header_document` it parses; on its own, or next to a photo or a video,
+    /// it names a file the message does not carry and is refused where it was typed.
+    #[test]
+    fn the_document_name_travels_only_with_a_document_header() {
+        let parse = |vars: serde_json::Value| {
+            FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "r", "kind": "notify", "channel": "whatsapp",
+                    "to": { "query": "q.x", "field": "phone" },
+                    "template": "menu", "vars": vars
+                }]
+            }))
+        };
+        parse(json!({
+            "header_document": "whatsapp/headers/0b8e.pdf",
+            "header_document_filename": "Autumn menu.pdf"
+        }))
+        .expect("a PDF header with the name the customer sees");
+
+        for vars in [
+            json!({ "header_document_filename": "Autumn menu.pdf" }),
+            json!({ "header_image": "https://a/x.jpg", "header_document_filename": "Menu.pdf" }),
+            json!({ "header_video": "https://a/x.mp4", "header_document_filename": "Menu.pdf" }),
+        ] {
+            let err = parse(vars.clone()).expect_err("a name for a document that is not there");
+            assert!(
+                format!("{err}").contains("header_document_filename"),
+                "{err} for {vars}"
             );
         }
     }

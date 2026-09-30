@@ -46,7 +46,7 @@ use cloud_client::{Auth, CloudClient, PreparedRequest};
 use erplora_runtime::errors::{Result, RuntimeError};
 use erplora_runtime::host_notify::{
     button_url_index, Channel, MockTransport, NotifyIntent, NotifyTransport, Routing, SendOutcome,
-    BUTTON_URL_VAR_PREFIX, HEADER_VARS,
+    BUTTON_URL_VAR_PREFIX, HEADER_DOCUMENT_FILENAME_VAR, HEADER_VARS,
 };
 use serde_json::{json, Value};
 
@@ -68,6 +68,10 @@ const RESERVED_VARS: &[&str] = &[
     "phone_number_id",
     "components",
 ];
+
+/// The longest name of a header's PDF the transport sends (hub#2405), in characters. A chat
+/// shows far less; the cut only keeps a runaway mapped value from travelling whole.
+const MAX_DOCUMENT_NAME_CHARS: usize = 200;
 
 /// How much of the proxy's answer is worth carrying into the error (and thus into the
 /// dead-letter row). Enough for `{"error": "..."}`; not a whole HTML error page.
@@ -225,6 +229,17 @@ impl CloudNotifyTransport {
         if Some(*kind) != header_media_kind(file) {
             return Ok(None);
         }
+        // The file is stored under its fingerprint, and a signed link ends in it: without a name
+        // the customer's chat would show that fingerprint (hub#2405). The owner's name, or — for a
+        // step saved before the field existed — the template's, always with the `.pdf` a phone
+        // needs to open it. Settled before the network: a name that is not text is refused
+        // without spending the signing call.
+        let document = match *kind {
+            "document" => Some(with_pdf_extension(
+                document_name(intent)?.unwrap_or_else(|| intent.template.trim().to_string()),
+            )),
+            _ => None,
+        };
         let request = self.cloud.media_signed_link(auth, file);
         let mut builder = self.http.get(&request.url);
         for (name, value) in &request.headers {
@@ -258,6 +273,9 @@ impl CloudNotifyTransport {
         };
         let mut signed = intent.clone();
         signed.vars[*key] = json!(link);
+        if let Some(name) = document {
+            signed.vars[HEADER_DOCUMENT_FILENAME_VAR] = json!(name);
+        }
         Ok(Some(signed))
     }
 }
@@ -483,6 +501,7 @@ fn template_components(
         .flatten()
         .filter(|(key, _)| !RESERVED_VARS.contains(&key.as_str()))
         .filter(|(key, _)| !HEADER_VARS.iter().any(|(header, _)| header == key))
+        .filter(|(key, _)| key.as_str() != HEADER_DOCUMENT_FILENAME_VAR)
         .filter(|(key, _)| !key.starts_with(BUTTON_URL_VAR_PREFIX))
         .collect();
     named.sort_by(|a, b| a.0.cmp(b.0));
@@ -556,6 +575,14 @@ fn template_header(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)
         .iter()
         .filter_map(|(key, kind)| intent.vars.get(*key).map(|value| (*key, *kind, value)))
         .collect();
+    let document_named = intent.vars.get(HEADER_DOCUMENT_FILENAME_VAR).is_some();
+    if document_named && !matches!(present.as_slice(), [("header_document", _, _)]) {
+        return Err(RuntimeError::Notify(format!(
+            "whatsapp notification with `vars.{HEADER_DOCUMENT_FILENAME_VAR}` and no \
+             `vars.header_document`: it is the name of the header's PDF, and there is no PDF to \
+             name"
+        )));
+    }
     let (key, kind, value) = match present.as_slice() {
         [] => return Ok(None),
         [one] => *one,
@@ -592,7 +619,51 @@ fn template_header(intent: &NotifyIntent) -> Result<Option<(&'static str, Value)
                  the header media itself, so it has to be a public address it can fetch"
             ))
         })?;
-    Ok(Some((key, json!({ "type": kind, kind: { "link": link } }))))
+    let mut media = json!({ "link": link });
+    if let Some(name) = document_name(intent)? {
+        media["filename"] = json!(name);
+    }
+    Ok(Some((key, json!({ "type": kind, kind: media }))))
+}
+
+/// `vars.header_document_filename` as a name a chat can print (hub#2405), or `None` when there is
+/// nothing to print. What a file name cannot carry — a folder separator, a line break — does not
+/// travel; a runaway value is cut on a character at [`MAX_DOCUMENT_NAME_CHARS`]. A value that is
+/// not text (an object, a list) is refused: the flow mapped the wrong thing, and printing its
+/// JSON as the name of the customer's PDF would hide it.
+fn document_name(intent: &NotifyIntent) -> Result<Option<String>> {
+    let raw = match intent.vars.get(HEADER_DOCUMENT_FILENAME_VAR) {
+        None | Some(Value::Null) => return Ok(None),
+        Some(Value::String(text)) => text.clone(),
+        Some(Value::Number(number)) => number.to_string(),
+        Some(_) => {
+            return Err(RuntimeError::Notify(format!(
+                "whatsapp notification whose `vars.{HEADER_DOCUMENT_FILENAME_VAR}` is not text: it \
+                 is the name the customer sees on the header's PDF"
+            )))
+        }
+    };
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| !c.is_control())
+        .map(|c| if matches!(c, '/' | '\\') { '-' } else { c })
+        .collect();
+    let cleaned = cleaned.trim();
+    Ok((!cleaned.is_empty()).then(|| cleaned.chars().take(MAX_DOCUMENT_NAME_CHARS).collect()))
+}
+
+/// The name of a PDF the hub stores, ending in `.pdf` so the phone that downloads it knows how to
+/// open it — cut first when needed, so the extension survives [`MAX_DOCUMENT_NAME_CHARS`].
+fn with_pdf_extension(name: String) -> String {
+    const EXTENSION: &str = ".pdf";
+    if name.to_ascii_lowercase().ends_with(EXTENSION) {
+        return name;
+    }
+    let stem: String = name
+        .chars()
+        .take(MAX_DOCUMENT_NAME_CHARS - EXTENSION.len())
+        .collect();
+    format!("{stem}{EXTENSION}")
 }
 
 /// A template variable as the text Meta will print. A string goes through unquoted; anything else
@@ -1429,12 +1500,18 @@ mod tests {
 
     /// **The video or the PDF the owner UPLOADED from the flow step** (hub#2347): the promotion's
     /// video and the restaurant's menu go out exactly like the photo — a fresh link signed on every
-    /// send, in the header parameter of their own kind.
+    /// send, in the header parameter of their own kind. The PDF also carries a name the customer
+    /// can read (hub#2405: here the template's, as no name was written).
     #[tokio::test]
     async fn a_header_video_or_document_uploaded_to_the_hub_goes_out_as_a_freshly_signed_link() {
-        for (key, file, kind) in [
-            ("header_video", "whatsapp/headers/0b8e.mp4", "video"),
-            ("header_document", "whatsapp/headers/0b8e.pdf", "document"),
+        for (key, file, kind, named) in [
+            ("header_video", "whatsapp/headers/0b8e.mp4", "video", None),
+            (
+                "header_document",
+                "whatsapp/headers/0b8e.pdf",
+                "document",
+                Some("autumn_promo.pdf"),
+            ),
         ] {
             let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.15"})).await;
             transport(&cloud.base_url, Some("machine-tok"))
@@ -1453,12 +1530,164 @@ mod tests {
             assert_eq!(calls.len(), 2, "{key}: sign, then send: {calls:?}");
             assert_eq!(calls[0].0, "/api/v1/hub/device/media/raw/");
             assert_eq!(calls[0].2["path"], file, "{key}");
+            let mut media = json!({
+                "link": format!("https://objects.example/{file}?X-Amz-Signature=s1")
+            });
+            if let Some(name) = named {
+                media["filename"] = json!(name);
+            }
             assert_eq!(
                 calls[1].2["template"]["components"][0],
-                json!({ "type": "header", "parameters": [{ "type": kind, kind: {
-                    "link": format!("https://objects.example/{file}?X-Amz-Signature=s1")
-                }}]}),
+                json!({ "type": "header", "parameters": [{ "type": kind, kind: media }]}),
                 "{key}"
+            );
+        }
+    }
+
+    /// **The name the customer sees on the header's PDF** (hub#2405). Without Meta's
+    /// `document.filename` the chat shows the end of the link — a fingerprint of letters and
+    /// numbers that reads like spam. `vars.header_document_filename` is that name, sent as
+    /// written, and never a body variable of the template.
+    #[test]
+    fn a_header_document_goes_out_with_the_name_the_customer_sees() {
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "autumn_menu",
+            json!({
+                "header_document": "https://cdn.example.com/menu.pdf",
+                "header_document_filename": "  Carta de otoño.pdf ",
+                "who": "Ana"
+            }),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"],
+            json!([
+                { "type": "header", "parameters": [{ "type": "document", "document": {
+                    "link": "https://cdn.example.com/menu.pdf",
+                    "filename": "Carta de otoño.pdf"
+                }}]},
+                { "type": "body", "parameters": [
+                    {"type": "text", "parameter_name": "who", "text": "Ana"}
+                ]}
+            ])
+        );
+    }
+
+    /// A name is ONE file name the chat can print: what a file name cannot carry (a folder
+    /// separator, a line break) is not sent, and a name longer than a chat shows is cut on a
+    /// character, never inside one.
+    #[test]
+    fn the_document_name_is_cleaned_of_what_a_file_name_cannot_carry() {
+        let name = |raw: Value| {
+            let body = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "autumn_menu",
+                json!({
+                    "header_document": "https://cdn.example.com/menu.pdf",
+                    "header_document_filename": raw
+                }),
+            ))
+            .unwrap();
+            body["template"]["components"][0]["parameters"][0]["document"]["filename"].clone()
+        };
+        assert_eq!(
+            name(json!("Menu/2026\\autumn\r\nlist.pdf")),
+            json!("Menu-2026-autumnlist.pdf")
+        );
+        assert_eq!(name(json!(2026)), json!("2026"));
+        let long = "ñ".repeat(MAX_DOCUMENT_NAME_CHARS + 20);
+        assert_eq!(
+            name(json!(long)),
+            json!("ñ".repeat(MAX_DOCUMENT_NAME_CHARS)),
+            "cut on a character"
+        );
+        // Nothing left to print = no name: Meta falls back to the link, as before.
+        let body = whatsapp_body(&intent(
+            Channel::Whatsapp,
+            "+34600999888",
+            "autumn_menu",
+            json!({
+                "header_document": "https://cdn.example.com/menu.pdf",
+                "header_document_filename": " \n\t "
+            }),
+        ))
+        .unwrap();
+        assert_eq!(
+            body["template"]["components"][0]["parameters"][0]["document"],
+            json!({ "link": "https://cdn.example.com/menu.pdf" })
+        );
+    }
+
+    /// A name for a document the message does not carry is a flow that does not know what it
+    /// sends: refused before the network, naming the key — on its own, next to a photo, or when
+    /// it is not something a chat can print.
+    #[test]
+    fn a_document_name_without_a_document_header_is_refused_before_the_network() {
+        for vars in [
+            json!({ "header_document_filename": "Menu.pdf" }),
+            json!({ "header_image": "https://a/x.jpg", "header_document_filename": "Menu.pdf" }),
+            json!({ "header_text": "Hi", "header_document_filename": "Menu.pdf" }),
+            json!({ "header_document": "https://a/x.pdf", "header_document_filename": {"a": 1} }),
+            json!({ "header_document": "https://a/x.pdf", "header_document_filename": ["Menu"] }),
+        ] {
+            let err = whatsapp_body(&intent(
+                Channel::Whatsapp,
+                "+34600999888",
+                "autumn_menu",
+                vars.clone(),
+            ))
+            .expect_err("no document to name");
+            assert!(
+                format!("{err}").contains("header_document_filename"),
+                "{err} for {vars}"
+            );
+        }
+    }
+
+    /// **The PDF the owner UPLOADED is sent with a name she recognises** (hub#2405). The hub keeps
+    /// the file under its fingerprint, so the name travels next to it: hers when the step has one
+    /// (with the `.pdf` a phone needs to open it), and the template's own name when a step saved
+    /// before the field existed has none — never the fingerprint of the signed link.
+    #[tokio::test]
+    async fn an_uploaded_pdf_goes_out_named_as_the_owner_wrote_it_or_after_its_template() {
+        let long = "ñ".repeat(MAX_DOCUMENT_NAME_CHARS);
+        let long_sent = format!("{}.pdf", "ñ".repeat(MAX_DOCUMENT_NAME_CHARS - 4));
+        for (written, sent) in [
+            (Some(json!("Carta de otoño.pdf")), "Carta de otoño.pdf"),
+            (Some(json!("Carta de otoño")), "Carta de otoño.pdf"),
+            (Some(json!("Tarifa.PDF")), "Tarifa.PDF"),
+            // Cut to make room: the extension is what lets the phone open it.
+            (Some(json!(long)), long_sent.as_str()),
+            (Some(json!("   ")), "autumn_menu.pdf"),
+            // A mapped value that came back empty.
+            (Some(Value::Null), "autumn_menu.pdf"),
+            (None, "autumn_menu.pdf"),
+        ] {
+            let mut vars = json!({ "header_document": "whatsapp/headers/0b8e.pdf" });
+            if let Some(written) = &written {
+                vars["header_document_filename"] = written.clone();
+            }
+            let written = format!("{written:?}");
+            let cloud = fake_cloud(StatusCode::OK, json!({"message_id": "wamid.16"})).await;
+            transport(&cloud.base_url, Some("machine-tok"))
+                .send(
+                    &intent(Channel::Whatsapp, "+34600111222", " autumn_menu ", vars),
+                    Routing::Tenant,
+                )
+                .await
+                .unwrap_or_else(|e| panic!("{written}: an uploaded PDF is sent: {e}"));
+            let calls = cloud.calls();
+            assert_eq!(calls.len(), 2, "{written}: sign, then send: {calls:?}");
+            assert_eq!(
+                calls[1].2["template"]["components"],
+                json!([{ "type": "header", "parameters": [{ "type": "document", "document": {
+                    "link": "https://objects.example/whatsapp/headers/0b8e.pdf?X-Amz-Signature=s1",
+                    "filename": sent
+                }}]}]),
+                "{written}"
             );
         }
     }
