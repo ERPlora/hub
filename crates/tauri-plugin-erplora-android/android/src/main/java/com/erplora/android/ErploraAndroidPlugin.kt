@@ -64,20 +64,16 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
      * Tauri drops an event nobody is listening to: the tap opened the app on its first screen
      * instead of the notice's. A tap that reaches a dead process through `onNewIntent` is kept by
      * `MainActivity` into the same box.
+     *
+     * hub#2307 — the same WebView gets its `PageKeeper`, which the listening commands switch on/off.
      */
     override fun load(webView: WebView) {
         super.load(webView)
         NoticeTaps.pageLoading(activity, activity.intent)
-        installPageKeeper(webView)
-    }
-
-    /** hub#2307 — once per WebView: a second observer and sentinel would only repeat the same work. */
-    private fun installPageKeeper(webView: WebView) {
-        if (pageKeeper != null) return
+        val keeper = PageKeeper(webView)
         val owner = activity as? AppCompatActivity
         val root = activity.window?.decorView as? ViewGroup
         if (owner != null && root != null) {
-            val keeper = PageKeeper(webView)
             keeper.install(root, owner)
             pageKeeper = keeper
         }
