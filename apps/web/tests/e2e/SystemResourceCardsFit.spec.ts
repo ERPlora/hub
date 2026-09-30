@@ -34,6 +34,9 @@ const SIZES = [
 /** The narrowest trend chart that still reads as a history, not as a line of pixels. */
 const MIN_TREND_PX = 80;
 
+/** The breathing room between two neighbouring cards, across a row AND down a column. */
+const MIN_GAP_PX = 8;
+
 /** A series the SaaS measured, with the connections under pressure (their sentence is the longest). */
 function measuredSeries(): unknown {
   const now = Math.floor(Date.now() / 1000);
@@ -62,6 +65,7 @@ interface CardReading {
   scrollWidth: number;
   clientWidth: number;
   top: number;
+  bottom: number;
   left: number;
   right: number;
   labelLines: number;
@@ -90,6 +94,7 @@ async function readCards(page: Page): Promise<CardReading[]> {
         scrollWidth: card.scrollWidth,
         clientWidth: card.clientWidth,
         top: Math.round(box.top),
+        bottom: Math.round(box.bottom),
         left: Math.round(box.left),
         right: Math.round(box.right),
         labelLines: panel ? lines(panel.querySelector('.label')) : 1,
@@ -140,6 +145,24 @@ test.describe('System → Resources cards fit their box (hub#2418)', () => {
             expect(card.unreadableLines, `${who}: «could not read it» breaks word by word`).toBeLessThanOrEqual(2);
           if (state.measured && card.trendWidth !== null)
             expect(card.trendWidth, `${who}: the trend chart is squeezed`).toBeGreaterThanOrEqual(MIN_TREND_PX);
+        }
+        // Neighbouring cards never touch: the stacked ones (a phone's single column, the second row
+        // of a 2×2) keep the same gap as the ones side by side, not a shared border.
+        for (const card of cards) {
+          const below = cards.filter((c) => c.left === card.left && c.top > card.top).sort((a, b) => a.top - b.top)[0];
+          if (below)
+            expect(
+              below.top - card.bottom,
+              `«${card.label}» touches the card below at ${size.width}px`,
+            ).toBeGreaterThanOrEqual(MIN_GAP_PX);
+          const beside = cards
+            .filter((c) => c.top === card.top && c.left > card.left)
+            .sort((a, b) => a.left - b.left)[0];
+          if (beside)
+            expect(
+              beside.left - card.right,
+              `«${card.label}» touches the card beside at ${size.width}px`,
+            ).toBeGreaterThanOrEqual(MIN_GAP_PX);
         }
         if (state.measured)
           expect(
