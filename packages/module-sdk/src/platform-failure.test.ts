@@ -124,6 +124,38 @@ test('hub#2428: an action over the hub budget is told apart from a crash, in bot
   );
 });
 
+// hub#2431: the sibling of hub#2428 — an action that takes longer than the hub's clock allows (a
+// huge batch on a slow machine) is cut and rolled back whole. The screen used to say «could not
+// complete the operation, try again», and trying again repeated the same click and the same cut. Its
+// own code gets its own sentence: not a crash, nothing changed, and asking for less is what helps.
+test('hub#2431: an action over the hub time limit is told apart from a crash, in both languages', async () => {
+  const transport = transportWith({ code: 'wasm_timeout', message: RUNTIME_REDACTED_LINE_2428 });
+
+  await assert.rejects(
+    () => transport.command('appointments.recurring.update', {}),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.equal(e.code, 'wasm_timeout', 'the code is what a module branches on');
+      assert.notEqual(e.message, RUNTIME_REDACTED_LINE_2428, 'never the English line aimed at the log');
+      return true;
+    },
+  );
+
+  for (const locale of ['es', 'en'] as const) {
+    const timeout = platformFailureMessage({ code: 'wasm_timeout' }, locale);
+    const crash = platformFailureMessage({ code: 'wasm' }, locale);
+    const budget = platformFailureMessage({ code: 'wasm_budget_exceeded' }, locale);
+    assert.ok(timeout, `no ${locale} sentence for wasm_timeout`);
+    assert.notEqual(timeout, crash, `${locale}: «took too long, nothing changed» is not «it broke, try again»`);
+    assert.notEqual(timeout, budget, `${locale}: «took too long» is not «too big» — the person reads what happened`);
+  }
+  assert.notEqual(
+    platformFailureMessage({ code: 'wasm_timeout' }, 'en'),
+    platformFailureMessage({ code: 'wasm_timeout' }, 'es'),
+    'en is the source and es the translation (ADR-0055), not one string',
+  );
+});
+
 /** The redacted line the runtime sends beside the code (`REDACTED_MESSAGE`, pinned further down). */
 const RUNTIME_REDACTED_LINE_2428 = 'the request could not be completed — the hub recorded the details';
 
@@ -195,6 +227,8 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
     'db', 'io', 'wasm', 'native', 'schema', 'manifest',
     // hub#2428: a handler out of its instruction budget, redacted like `wasm` but with its own code.
     'wasm_budget_exceeded',
+    // hub#2431: a handler over its time limit, redacted like `wasm` but with its own code.
+    'wasm_timeout',
     'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
   ] as const;
 
@@ -456,7 +490,7 @@ test('hub#2428: every code the authenticated door redacts has a sentence here, i
     read('../../../crates/runtime/src/error_registry.rs'),
   );
   // The finder must see the positives it exists for, or a green here means nothing.
-  for (const known of ['db', 'wasm', 'wasm_budget_exceeded']) {
+  for (const known of ['db', 'wasm', 'wasm_budget_exceeded', 'wasm_timeout']) {
     assert.ok(codes.includes(known), `the finder no longer sees "${known}" (found: ${codes.join(', ')})`);
   }
   for (const code of codes.filter((c) => !REDACTED_BUT_NEVER_ON_A_REQUEST.has(c))) {

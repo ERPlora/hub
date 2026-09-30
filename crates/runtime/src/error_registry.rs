@@ -409,6 +409,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // hub#2428: its own code — «too big to do at once, nothing changed» is something the user
         // acts on (fewer items, a shorter range); a crashed handler is not.
         E::WasmBudgetExceeded { .. } => "wasm_budget_exceeded",
+        // hub#2431: its own code — «took too long, nothing changed» is something the user acts on
+        // (fewer items, a shorter range); a crashed handler is not.
+        E::WasmTimeout { .. } => "wasm_timeout",
         E::Native(_) => "native",
         E::InvalidPayload { .. } => "invalid_payload",
         E::InvalidField { .. } => "invalid_field",

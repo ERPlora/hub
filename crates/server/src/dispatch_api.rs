@@ -185,6 +185,9 @@ pub(crate) fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         // (`wasm_budget_exceeded`), which the SDK turns into «too big to do at once, nothing
         // changed».
         E::WasmBudgetExceeded { .. } => false,
+        // hub#2431: the same for a handler interrupted by the clock — the function name and the
+        // limit are for the log; the SDK turns `wasm_timeout` into «took too long, nothing changed».
+        E::WasmTimeout { .. } => false,
         // hub#1209: the half-migrated hub the money backfill refuses to guess about. It is raised
         // by an ops subcommand and by the boot path, never inside a request, so it does not travel
         // through this door at all — and if it ever did, its sentence is an inventory of this
@@ -832,6 +835,20 @@ mod error_redaction_tests {
         });
         assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
         assert_eq!(body["error"]["code"], "wasm_budget_exceeded", "{body}");
+        assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
+    }
+
+    /// hub#2431: a handler the clock interrupted answers its OWN code, so the screen can say «took
+    /// too long, nothing changed» instead of the crash line. The function name and the limit stay
+    /// in the log.
+    #[test]
+    fn a_handler_over_its_time_limit_has_its_own_code_and_keeps_its_detail_in_the_log() {
+        let (status, body) = error_payload(&RuntimeError::WasmTimeout {
+            function: "update_series".into(),
+            timeout_ms: 5_000,
+        });
+        assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"]["code"], "wasm_timeout", "{body}");
         assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
     }
 
