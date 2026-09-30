@@ -270,3 +270,9 @@ appointments/tests/recurring_create_links.hub.test.py
 # handler's WASM instruction budget, against the real kernel (appointments#251). New coverage, not moved.
 # pending-publication: appointments#262 until 2026-10-30
 appointments/tests/series_edit_at_horizon.hub.test.py
+# appointments: a batch of 50 and a daily series materialized to the 400-day horizon, for a
+# professional with a FULL agenda ahead (3,200 other live bookings), book inside the handler's WASM
+# instruction budget — a clash is refused by its code, not by `wasm` — against the real kernel
+# (appointments#265). New coverage, not moved.
+# pending-publication: appointments#268 until 2026-10-30
+appointments/tests/busy_agenda_booking.hub.test.py
