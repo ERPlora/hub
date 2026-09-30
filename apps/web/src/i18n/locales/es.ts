@@ -61,6 +61,10 @@ export default {
     moduleUpdatesTitle: 'Actualizaciones de apps',
     moduleUpdatesBody:
       '{n} app tiene una versión nueva. Actualízala desde Mis apps. | {n} apps tienen una versión nueva. Actualízalas desde Mis apps.',
+    moduleUpdatesUnknownTitle: 'No se ha podido comprobar si hay actualizaciones',
+    moduleUpdatesUnknownBody: 'No hemos podido saber si tus apps tienen versiones nuevas. Revisa la conexión y vuelve a intentarlo.',
+    moduleUpdatesRetry: 'Comprobar de nuevo',
+    moduleUpdatesChecking: 'Comprobando…',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
