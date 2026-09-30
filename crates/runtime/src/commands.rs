@@ -887,6 +887,7 @@ async fn preload_reads(
                     eprintln!("⚠ reads: required `{name}` failed ({e}) → the command is aborted");
                     return Err(RuntimeError::ReadUnavailable {
                         query: name.to_string(),
+                        reason: crate::errors::ReadUnavailableReason::of(&e),
                     });
                 }
                 // Regla 3 — graceful: si la query falla (no existe, SQL roto, tabla ausente),

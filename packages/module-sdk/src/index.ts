@@ -847,7 +847,9 @@ export interface PlatformFailure {
   /** The refused field of an `invalid_field` (hub#1070/#1185): `name`, `role_key`, `language`… */
   field?: string;
   /** WHY it was refused: `required` · `too_long` · `format` · `length` · `unknown` · `immutable`
-   *  · `inactive`. A small closed set, so a screen branches on it instead of reading the prose. */
+   *  · `inactive` on an `invalid_field`; on a `read_unavailable` (hub#2410),
+   *  `module_not_installed` · `module_inactive` · `query_failed`. A small closed set, so a screen
+   *  branches on it instead of reading the prose. */
   reason?: string;
 }
 
@@ -904,17 +906,18 @@ const PLATFORM_FAILURES: Record<
   // answers it today, and only when the runtime let an authored sentence through.
   (app: string, failure: PlatformFailure) => Bilingual | null
 > = {
-  read_unavailable: (app) => missingApp(app),
+  // hub#2410: the kernel says WHY the read did not resolve, and only one of the three causes is
+  // fixed from Apps. A runtime that sends no `reason` (or one this SDK does not know) keeps the
+  // sentence every screen showed before it.
+  read_unavailable: (app, failure) =>
+    failure.reason === 'query_failed'
+      ? READ_FAILED
+      : failure.reason === 'module_inactive'
+        ? switchedOffApp(app)
+        : missingApp(app),
   module_not_installed: (app) => missingApp(app),
   missing_dependency: (app) => missingApp(app),
-  module_inactive: (app) => ({
-    en: app
-      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
-      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
-    es: app
-      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
-      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
-  }),
+  module_inactive: (app) => switchedOffApp(app),
   db: () => PLUMBING,
   io: () => PLUMBING,
   wasm: () => PLUMBING,
@@ -985,6 +988,27 @@ function authoredSentenceOf(failure: PlatformFailure): string | undefined {
 // What this SDK does do is carry `field` and `reason` on {@link PlatformFailure}, so a screen that
 // wants to translate them branches on data instead of parsing prose. Translating them into the
 // user's language belongs to the shell that owns those forms — see hub#1190.
+
+/**
+ * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`
+ * read of an installed, active app failed — a passing fault, not something Apps can fix. The app is
+ * deliberately NOT named: naming it is what sent the owner to Apps to look for it.
+ */
+const READ_FAILED: Bilingual = {
+  en: 'Some information this action needs could not be read, so nothing was done. Try again, and tell an administrator if it keeps happening.',
+  es: 'No se pudo leer un dato que esta acción necesita, así que no se ha hecho nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+};
+
+function switchedOffApp(app: string): Bilingual {
+  return {
+    en: app
+      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
+      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
+    es: app
+      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
+      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
+  };
+}
 
 function missingApp(app: string): Bilingual {
   return {

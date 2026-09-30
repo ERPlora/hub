@@ -299,8 +299,13 @@ pub(crate) fn error_payload(e: &erplora_runtime::RuntimeError) -> (StatusCode, V
     // shell translates the CODE (`read_unavailable`) and names the missing app from this field;
     // before it, the only place that query lived was inside an English sentence the till printed
     // verbatim on the Charge dialog.
-    if let E::ReadUnavailable { query } = e {
+    //
+    // hub#2410: and WHY it did not resolve. «Install the app» is the remedy of only one of the
+    // three causes; with the app installed and the read failing, the till sent the owner to Apps
+    // for nothing. Additive: a client that does not read `reason` keeps the sentence it had.
+    if let E::ReadUnavailable { query, reason } = e {
         error["query"] = json!(query);
+        error["reason"] = json!(reason.code());
     }
     // hub#1102: the APP a refusal is about, for the refusals whose remedy names one — install it,
     // switch it back on, grant it a permission. Same rule as the fields above: the sentence that
@@ -765,6 +770,7 @@ mod error_redaction_tests {
     fn an_unavailable_required_read_carries_a_code_and_the_query_as_a_field() {
         let error = error_of(RuntimeError::ReadUnavailable {
             query: "taxes.rules.list".into(),
+            reason: erplora_runtime::errors::ReadUnavailableReason::ModuleNotInstalled,
         });
 
         assert_eq!(error["code"], "read_unavailable");
@@ -776,6 +782,27 @@ mod error_redaction_tests {
                 .contains("hub#"),
             "an issue number is not something a cashier can act on: {error}"
         );
+    }
+
+    /// hub#2410: the envelope says WHY the read did not resolve, because «install the app» is
+    /// only the remedy of one of the three causes. With `taxes` installed and active and the read
+    /// failing, the till told the cashier the app was missing.
+    #[test]
+    fn an_unavailable_required_read_carries_why_it_did_not_resolve() {
+        use erplora_runtime::errors::ReadUnavailableReason as R;
+        for (reason, code) in [
+            (R::ModuleNotInstalled, "module_not_installed"),
+            (R::ModuleInactive, "module_inactive"),
+            (R::QueryFailed, "query_failed"),
+        ] {
+            let error = error_of(RuntimeError::ReadUnavailable {
+                query: "sales.get".into(),
+                reason,
+            });
+            assert_eq!(error["code"], "read_unavailable");
+            assert_eq!(error["query"], "sales.get");
+            assert_eq!(error["reason"], code, "{error}");
+        }
     }
 
     /// A WASM trap is the hub's plumbing, not the module talking: a handler that wants to say
