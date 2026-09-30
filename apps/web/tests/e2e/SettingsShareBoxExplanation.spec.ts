@@ -134,6 +134,13 @@ for (const locale of ['en', 'es'] as const) {
           // ~250 characters never fit in one line of the Business card: seeing it whole means wrapped.
           expect(m.lines, `${at}: the explanation wraps onto several lines`).toBeGreaterThan(1);
           expect(m.right, `${at}: the explanation stays inside its row`).toBeLessThanOrEqual(m.itemRight + 1);
+          if (process.env.HUB2436_SHOTS) {
+            const row = page.getByTestId('settings-share-with-erplora');
+            await row.scrollIntoViewIfNeeded();
+            await page.screenshot({
+              path: `${process.env.HUB2436_SHOTS}/share-box-${mode}-${locale}-${viewport.width}x${viewport.height}.png`,
+            });
+          }
         }
       });
     }
