@@ -604,6 +604,10 @@ test('hub#2434: the till reads what is missing in its language, never the log li
   assert.match(es, /razón social/i);
   assert.match(es, /NIF/);
   assert.match(es, /Ajustes › Negocio/);
+  // rv-2437: the two halves are joined in the reader's language too — «la razón social y el NIF»,
+  // never «la razón social and el NIF». A mixed sentence reads as untranslated.
+  assert.match(es, /la razón social y el NIF/);
+  assert.match(en, /legal name and tax ID/);
 });
 
 test('hub#2434: each missing requirement is named — the sentence follows `missing`', () => {
