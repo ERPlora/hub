@@ -502,6 +502,8 @@ export default {
     noWidgets: 'No installed app offers widgets yet.',
     widgetEmpty: 'No data',
     widgetError: 'Unavailable',
+    // Name of the preset the picker offers from the business sector (sales#473).
+    recommendedPreset: 'Recommended',
     // «My apps» card (hub#367): the launcher of the panel. Its title reuses `topbar.apps` — same
     // name for the same thing on both surfaces.
     appsAdd: 'Add apps',

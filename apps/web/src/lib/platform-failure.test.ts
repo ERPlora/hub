@@ -51,6 +51,19 @@ describe('platformFailureMessage (hub#1258, hub#1315)', () => {
     expect(message).not.toMatch(/could not be completed/);
   });
 
+  // hub#2410: `reason` says why a `required` read did not resolve, and the SDK picks the sentence
+  // by it. Dropping it on the way to the SDK told a screen «the app is missing» when the app was
+  // installed and only the read had failed.
+  it.each(['query_failed', 'module_inactive', 'module_not_installed'])(
+    'passes the `reason` of a `read_unavailable` (%s) through to the SDK',
+    (reason) => {
+      const error = new HubUsersError('x', 'read_unavailable', undefined, reason, undefined, 'sales.get');
+      expect(platformFailureMessage(error, 'es')).toBe(
+        sdkPlatformFailureMessage({ code: 'read_unavailable', query: 'sales.get', reason }, 'es'),
+      );
+    },
+  );
+
   it('names the missing app for `module_not_installed`', () => {
     const error = new HubUsersError('módulo no instalado', 'module_not_installed', undefined, undefined, 'taxes');
     expect(platformFailureMessage(error, 'es')).toBe(

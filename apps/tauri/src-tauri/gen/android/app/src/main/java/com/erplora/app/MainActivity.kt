@@ -1,8 +1,10 @@
 package com.erplora.app
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.activity.enableEdgeToEdge
+import com.erplora.android.NoticeTaps
 import com.erplora.android.SystemBarInsets
 
 class MainActivity : TauriActivity() {
@@ -24,5 +26,16 @@ class MainActivity : TauriActivity() {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     SystemBarInsets.applyTopSystemBarPadding(findViewById<View>(android.R.id.content))
+  }
+
+  /**
+   * A tap on a notice while the task is alive (hub#2360). When the system had killed the process,
+   * the activity comes back with its old launcher intent and the tap arrives here — before the
+   * WebView, and so before any plugin, exists: nobody else would hear it. The box keeps it until the
+   * page claims it; once the page listens, the notification plugin delivers the taps itself.
+   */
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    NoticeTaps.newIntent(this, intent)
   }
 }

@@ -8,9 +8,14 @@
 // How: every notice that names a screen is sent with an id of its own, and this door remembers
 // which screen that id leads to. The notification plugin reports a tap with the notice's id — on
 // Android and on iOS alike; iOS drops any extra payload on the way back — so the id is the only
-// handle that works on both. The map lives in memory: a tap is always on a notice this app sent,
-// and when Android has killed the app in between, the plugin fires the tap before the shell can
-// listen anyway.
+// handle that works on both.
+//
+// hub#2360 — and the notice carries its screen too (`path`), because not every tap reaches the page
+// that sent it. On the computer the notification plugin reports no click, and on Android a tap that
+// has to START the app fires before any page listens: in both the shell keeps the tap, with the
+// screen it was sent with, until the page claims it (`claimNoticeTaps`). The page that claims it may
+// be a new one whose memory of ids is empty, so a tap that brings its screen back is followed on its
+// own — through the same screen rule, since what comes back is not trusted blindly.
 //
 // A destination is followed only when it is a screen of the shell, by the same ANCHORED rule the
 // assistant's links use (hub#2204) — a path buried in an external address is not one.
@@ -27,8 +32,11 @@ export function isNoticeTarget(path: unknown): path is string {
 }
 
 export interface NoticeDoorDeps {
-  /** Shows the system notice under this id — `erplora_notify` in the installed app. */
-  send: (title: string, body: string, id: number) => Promise<void>;
+  /**
+   * Shows the system notice under this id — `erplora_notify` in the installed app — with the
+   * screen it leads to, or `null` when it leads to none (hub#2360).
+   */
+  send: (title: string, body: string, id: number, path: string | null) => Promise<void>;
   /** The shell's router. */
   navigate: (path: string) => unknown;
   /** The first id handed out. The shell seeds it so a new session does not reuse a live one. */
@@ -38,7 +46,7 @@ export interface NoticeDoorDeps {
 export interface NoticeDoor {
   /** Sends a notice; tapping it opens `path` when it is a screen of the shell. Never rejects. */
   notify: (title: string, body: string, path?: string) => Promise<void>;
-  /** What the plugin reports when a notice is tapped. */
+  /** What the plugin reports when a notice is tapped, or the tap the shell kept (hub#2360). */
   tapped: (payload: unknown) => void;
 }
 
@@ -50,20 +58,25 @@ export function createNoticeDoor(deps: NoticeDoorDeps): NoticeDoor {
     async notify(title, body, path) {
       const id = next;
       next += 1;
+      const target = isNoticeTarget(path) ? path : null;
       try {
-        await deps.send(title, body, id);
+        await deps.send(title, body, id, target);
       } catch {
         // Best-effort, like every notice: what it warns about already happened either way.
         return;
       }
-      if (!isNoticeTarget(path)) return;
-      targets.set(id, path);
+      if (target === null) return;
+      targets.set(id, target);
       if (targets.size > REMEMBERED_NOTICES) targets.delete(targets.keys().next().value as number);
     },
     tapped(payload) {
-      const id = (payload as { notification?: { id?: unknown } } | null)?.notification?.id;
+      const notification = (payload as { notification?: { id?: unknown; extra?: { path?: unknown } | null } } | null)
+        ?.notification;
+      const id = notification?.id;
       if (typeof id !== 'number') return;
-      const path = targets.get(id);
+      // What this page remembers wins; a tap it did not see being sent brings its own screen back.
+      const brought = notification?.extra?.path;
+      const path = targets.get(id) ?? (isNoticeTarget(brought) ? brought : undefined);
       if (!path) return;
       try {
         void Promise.resolve(deps.navigate(path)).catch((e) => console.warn('[notice-tap]', e));
@@ -80,8 +93,9 @@ export type NoticeTapListen = (cb: (payload: unknown) => void) => Promise<(() =>
 /**
  * Hands every tap to the door. Returns the function that stops listening.
  *
- * Never rejects: a browser has no plugin, the desktop plugin reports no taps and an installed app
- * older than this shell has no permission to listen — the notices still go out in all three.
+ * Never rejects: a browser has no plugin, the desktop plugin reports no taps (the shell keeps those,
+ * `claimNoticeTaps`) and an installed app older than this shell has no permission to listen — the
+ * notices still go out in all three.
  */
 export async function listenForNoticeTaps(door: NoticeDoor, listen: NoticeTapListen): Promise<() => void> {
   try {
@@ -91,4 +105,41 @@ export async function listenForNoticeTaps(door: NoticeDoor, listen: NoticeTapLis
     console.warn('[notice-tap] taps cannot be heard here', e);
     return () => {};
   }
+}
+
+/** Subscribes to the shell's «a tap is waiting»; `null` when there is no such event here. */
+export type NoticeTapPoke = (cb: () => void) => Promise<(() => void) | null>;
+
+export interface KeptTapDeps {
+  /** Hands over the tap the shell kept, once — `erplora_take_notice_tap` in the installed app. */
+  take: () => Promise<unknown>;
+  /** The shell's event that says a tap is waiting to be claimed. */
+  onPoke: NoticeTapPoke;
+}
+
+/**
+ * Claims the tap the shell kept for the page (hub#2360) — at boot, for the tap that started the app,
+ * and again every time the shell says one is waiting, for a click on the computer. The shell hands
+ * each tap over once, so claiming twice never opens a screen twice.
+ *
+ * Never rejects: a browser has no shell, and an installed app older than this page has no such
+ * command — the notices still go out and a click still brings the app to the front.
+ */
+export async function claimNoticeTaps(door: NoticeDoor, deps: KeptTapDeps): Promise<() => void> {
+  const claim = async (): Promise<void> => {
+    try {
+      const kept = await deps.take();
+      if (kept) door.tapped(kept);
+    } catch (e) {
+      console.warn('[notice-tap] the kept tap cannot be claimed here', e);
+    }
+  };
+  let stop: (() => void) | null = null;
+  try {
+    stop = await deps.onPoke(() => void claim());
+  } catch (e) {
+    console.warn('[notice-tap] the shell cannot say a tap is waiting here', e);
+  }
+  await claim();
+  return stop ?? (() => {});
 }

@@ -20,7 +20,7 @@ use erplora_runtime::flows::def::{
     SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::{
-    button_url_index, Channel, BUTTON_URL_VAR_PATTERN, HEADER_VARS,
+    button_url_index, Channel, BUTTON_URL_VAR_PATTERN, HEADER_DOCUMENT_FILENAME_VAR, HEADER_VARS,
 };
 
 fn schema() -> serde_json::Value {
@@ -632,7 +632,12 @@ fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides()
 #[test]
 fn the_header_media_vars_are_the_same_on_both_sides() {
     let declared = keys_at(&schema(), "/$defs/step/properties/vars/properties");
-    let runtime: BTreeSet<String> = HEADER_VARS.iter().map(|(key, _)| key.to_string()).collect();
+    let mut runtime: BTreeSet<String> =
+        HEADER_VARS.iter().map(|(key, _)| key.to_string()).collect();
+    // …plus the name the customer sees on the header's PDF (hub#2405): the editor offers the field
+    // only when THIS hub declares it, and a hub that declared it without sending it would show a
+    // name that never reaches the chat.
+    runtime.insert(HEADER_DOCUMENT_FILENAME_VAR.to_string());
     assert_eq!(declared, runtime);
     // The text header (hub#2111) is one of them: the editor asks for its value only when the hub
     // declares it.

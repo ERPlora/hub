@@ -6,7 +6,7 @@
 // stable id it owns names the *hub*, and a header saying that would make every browser one device.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { listenTauriPlugin, loginHeaders, setRuntimeClientKind } from './device';
+import { listenTauriEvent, listenTauriPlugin, loginHeaders, setRuntimeClientKind } from './device';
 
 /** A browser profile with nothing written down yet: the identity is minted on first use. */
 function emptySiteStorage() {
@@ -107,5 +107,33 @@ describe('listening to a plugin event of the installed app', () => {
     vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn(), addPluginListener } } });
 
     await expect(listenTauriPlugin('notification', 'actionPerformed', () => {})).rejects.toThrow('not allowed');
+  });
+});
+
+// hub#2360 — the shell's own event, not a plugin's: on the computer the shell says «a tap is
+// waiting» when a notice is clicked. `withGlobalTauri` exposes the event API next to `invoke`.
+describe('listening to an event of the installed app (hub#2360)', () => {
+  it('subscribes through the Tauri global and stops through the function it got back', async () => {
+    const unlisten = vi.fn();
+    const listen = vi.fn(async () => unlisten);
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() }, event: { listen } } });
+    const cb = vi.fn();
+
+    const stop = await listenTauriEvent('erplora://notice-tapped', cb);
+
+    expect(listen).toHaveBeenCalledWith('erplora://notice-tapped', expect.any(Function));
+    const handler = (listen.mock.calls[0] as unknown as [string, (e: unknown) => void])[1];
+    handler({ event: 'erplora://notice-tapped', payload: null });
+    expect(cb).toHaveBeenCalledTimes(1);
+    stop!();
+    expect(unlisten).toHaveBeenCalledTimes(1);
+  });
+
+  it('is null in a browser, and in a shell whose global has no event API', async () => {
+    vi.stubGlobal('window', {});
+    await expect(listenTauriEvent('erplora://notice-tapped', () => {})).resolves.toBeNull();
+
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke: vi.fn() } } });
+    await expect(listenTauriEvent('erplora://notice-tapped', () => {})).resolves.toBeNull();
   });
 });
