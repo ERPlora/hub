@@ -10,6 +10,8 @@
 // `locale.widgets.<id>.seriesName` / `.category` for the active language, exactly like `title` and
 // `label`; with no entry the canonical text stays. The «Recommended» preset the shell builds speaks
 // the language it is handed, not a hardcoded Spanish word.
+//
+// The shell side of the fix is tracked in ERPlora/hub#2401; the module side in ERPlora/sales#473.
 import { describe, it, expect, vi } from 'vitest';
 
 // Same isolation as dashboard-widgets.test.ts: `module-loader` drags the `~icons/…?raw` chain that
