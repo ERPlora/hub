@@ -100,12 +100,17 @@ class PageKeeper(private val webView: WebView) : DefaultLifecycleObserver {
     private val sentinel = object : View(webView.context) {
         override fun onWindowVisibilityChanged(visibility: Int) {
             super.onWindowVisibilityChanged(visibility)
-            if (NoticeListening.keepsPageShown(listening, visibility)) {
-                // Posted: the WebView hears the same change in this pass, after or before this view.
-                webView.post { showPage() }
-            }
+            onWindowVisibility(visibility)
         }
     }.apply { visibility = View.GONE }
+
+    /** What the sentinel heard from the window. Apart from it so a test can say it too. */
+    internal fun onWindowVisibility(visibility: Int) {
+        if (NoticeListening.keepsPageShown(listening, visibility)) {
+            // Posted: the WebView hears the same change in this pass, after or before this view.
+            webView.post { showPage() }
+        }
+    }
 
     fun install(root: ViewGroup, owner: LifecycleOwner) {
         if (sentinel.parent == null) root.addView(sentinel, 0, 0)

@@ -762,6 +762,51 @@ mod tests {
     }
 
     #[test]
+    fn the_page_is_kept_running_exactly_while_the_app_listens_hub2307() {
+        // The service keeps the process, `PageKeeper` keeps the page: without it Chromium freezes
+        // the hidden page at 60 s and no notice is born, with the service and its notification in
+        // place (measured on the device). What it does has its own test in Kotlin
+        // (`PageKeeperTest`); what only lives in the plugin is WHEN it is told — installed with the
+        // WebView, on once the service started, off with every way the listening ends.
+        let kotlin_fn = |signature: &str| {
+            PLUGIN_KT
+                .split(signature)
+                .nth(1)
+                .and_then(|rest| rest.split("\n    }").next())
+                .unwrap_or_else(|| panic!("the plugin has no `{signature}`"))
+        };
+        let load = kotlin_fn("override fun load(webView: WebView)");
+        assert!(load.contains("PageKeeper(webView)"), "no keeper is built for the WebView");
+        assert!(load.contains("keeper.install(root, owner)"), "the keeper never hears the app leave the screen");
+        assert!(load.contains("pageKeeper = keeper"), "the commands cannot reach the keeper");
+
+        let command = kotlin_fn("fun keepListening(invoke: Invoke)");
+        let (off, on) = command
+            .split_once("NoticeListening.textsOf(")
+            .expect("keepListening does not read the words of the notification");
+        assert!(off.contains("pageKeeper?.setListening(false)"), "told to stop, the page is still kept running");
+        let started = on
+            .split_once("NoticeListeningService.start(")
+            .map(|(_, after)| after)
+            .and_then(|after| after.split("catch").next())
+            .expect("keepListening never starts the service");
+        assert!(
+            started.contains("pageKeeper?.setListening(true)"),
+            "the service starts and the page still freezes: the keeper is never told to listen"
+        );
+        assert!(
+            !on.split("NoticeListeningService.start(").next().unwrap_or_default().contains("setListening(true)"),
+            "the page is kept running before the service is known to have started"
+        );
+
+        let on_destroy = kotlin_fn("override fun onDestroy(activity: AppCompatActivity)");
+        assert!(
+            on_destroy.contains("pageKeeper?.setListening(false)"),
+            "the activity is gone and its page is still kept running"
+        );
+    }
+
+    #[test]
     fn the_listening_service_is_declared_where_no_generator_can_drop_it_hub2307() {
         let manifest = without_comments(PLUGIN_MANIFEST);
         let declared = declared_permissions(PLUGIN_MANIFEST);

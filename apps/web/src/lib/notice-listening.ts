@@ -60,9 +60,15 @@ export function createNoticeListening(deps: NoticeListeningDeps): NoticeListenin
     }
   }
 
+  // Deciding waits for the hub, and the session can close meanwhile: only the last request is
+  // carried out, so a slow «start» never lands after the «stop» of the sign-out that followed it.
+  let latest = 0;
+
   return {
     async sync(signedIn) {
+      const request = ++latest;
       const on = signedIn && (await shouldListen());
+      if (request !== latest) return;
       const args: Record<string, unknown> = on
         ? {
             on: true,

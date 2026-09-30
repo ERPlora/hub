@@ -92,6 +92,36 @@ describe('keeping the installed app listening for notices', () => {
     expect(noPermission.invoke).toHaveBeenCalledWith(KEEP_LISTENING_COMMAND, { on: false });
   });
 
+  it('a session closed while the decision was on its way stays closed: nothing starts after it', async () => {
+    // Deciding asks the hub what it runs, and that can take as long as the network wants. Somebody
+    // signing out in the meantime must not find the device listening for nobody a moment later.
+    const waiting: Array<(has: boolean) => void> = [];
+    const { invoke, deps: d } = deps({
+      hasSomethingToTell: () => new Promise<boolean>((resolve) => waiting.push(resolve)),
+    });
+    const listening = createNoticeListening(d);
+    const starting = listening.sync(true);
+    const stopping = listening.sync(false);
+    waiting.forEach((answer) => answer(true));
+    await Promise.all([starting, stopping]);
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith(KEEP_LISTENING_COMMAND, { on: false });
+  });
+
+  it('and the other way round: the session that opened last is the one that listens', async () => {
+    const waiting: Array<(has: boolean) => void> = [];
+    const { invoke, deps: d } = deps({
+      hasSomethingToTell: () => new Promise<boolean>((resolve) => waiting.push(resolve)),
+    });
+    const listening = createNoticeListening(d);
+    const stopping = listening.sync(false);
+    const starting = listening.sync(true);
+    waiting.forEach((answer) => answer(true));
+    await Promise.all([stopping, starting]);
+    // Stopping decides nothing, so it is carried out at once; the start that follows it stands.
+    expect(invoke.mock.calls.map(([, args]) => args.on)).toEqual([false, true]);
+  });
+
   it('stops when the session closes, and only then', async () => {
     const signedIn = ref(true);
     const sync = vi.fn(async () => {});
