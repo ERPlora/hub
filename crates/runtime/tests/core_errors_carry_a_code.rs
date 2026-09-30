@@ -81,6 +81,7 @@ fn variant_of(e: &RuntimeError) -> &'static str {
         E::EventNotDeclared { .. } => "EventNotDeclared",
         E::NotImplemented(_) => "NotImplemented",
         E::Wasm(_) => "Wasm",
+        E::WasmBudgetExceeded { .. } => "WasmBudgetExceeded",
         E::Native(_) => "Native",
         E::InvalidPayload { .. } => "InvalidPayload",
         E::Schema { .. } => "Schema",
@@ -191,6 +192,10 @@ fn census(db: RuntimeError) -> Vec<RuntimeError> {
         },
         E::NotImplemented("the drawer"),
         E::Wasm(s("trap")),
+        E::WasmBudgetExceeded {
+            function: s("update_series"),
+            fuel: 200_000_000,
+        },
         E::Native(s("plugin failed")),
         E::InvalidPayload {
             name: s("sales.create"),

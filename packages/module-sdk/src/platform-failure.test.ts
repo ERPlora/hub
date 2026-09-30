@@ -94,6 +94,39 @@ test('hub#1074/#1102: the redacted plumbing gets the one sentence there is to sa
   );
 });
 
+// hub#2428: a module action too big for the hub's instruction budget (moving a very long series of
+// appointments, say) is rolled back whole. The receptionist used to read the same line as for a
+// crash — «could not complete the operation, try again» — and repeated the same click. Its own code
+// gets its own sentence: it is not a crash, nothing changed, and trying again as-is will not help.
+test('hub#2428: an action over the hub budget is told apart from a crash, in both languages', async () => {
+  const transport = transportWith({ code: 'wasm_budget_exceeded', message: RUNTIME_REDACTED_LINE_2428 });
+
+  await assert.rejects(
+    () => transport.command('appointments.recurring.update', {}),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.equal(e.code, 'wasm_budget_exceeded', 'the code is what a module branches on');
+      assert.notEqual(e.message, RUNTIME_REDACTED_LINE_2428, 'never the English line aimed at the log');
+      return true;
+    },
+  );
+
+  for (const locale of ['es', 'en'] as const) {
+    const budget = platformFailureMessage({ code: 'wasm_budget_exceeded' }, locale);
+    const crash = platformFailureMessage({ code: 'wasm' }, locale);
+    assert.ok(budget, `no ${locale} sentence for wasm_budget_exceeded`);
+    assert.notEqual(budget, crash, `${locale}: «too big, nothing changed» is not «it broke, try again»`);
+  }
+  assert.notEqual(
+    platformFailureMessage({ code: 'wasm_budget_exceeded' }, 'en'),
+    platformFailureMessage({ code: 'wasm_budget_exceeded' }, 'es'),
+    'en is the source and es the translation (ADR-0055), not one string',
+  );
+});
+
+/** The redacted line the runtime sends beside the code (`REDACTED_MESSAGE`, pinned further down). */
+const RUNTIME_REDACTED_LINE_2428 = 'the request could not be completed — the hub recorded the details';
+
 test('hub#139: a module domain refusal is NEVER rewritten — it is the module talking', async () => {
   const sentence = 'No quedan unidades de este producto';
   const transport = transportWith({ code: 'inventory.insufficient_stock', message: sentence });
@@ -160,6 +193,8 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
   // app (`error_code_of`, `crates/runtime/src/error_registry.rs`).
   const codes = [
     'db', 'io', 'wasm', 'native', 'schema', 'manifest',
+    // hub#2428: a handler out of its instruction budget, redacted like `wasm` but with its own code.
+    'wasm_budget_exceeded',
     'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
   ] as const;
 
@@ -338,6 +373,101 @@ test('hub#1337: the redaction line this table recognises is the one `crates/serv
     'the runtime changed its redaction line and `PLATFORM_FAILURES.other` would start showing it ' +
       'raw, in English, on a Spanish till',
   );
+});
+
+// ── hub#2428: every code the door REDACTS has a sentence here — read from the Rust, not listed ──
+//
+// A code the door redacts arrives with nothing but the English line aimed at the log. If this table
+// has no entry for it, `unwrap` keeps that line and a Spanish till reads it raw — hub#1102's bug,
+// again. hub#2428 added such a code (`wasm_budget_exceeded`); the hand-kept list above only catches
+// it if whoever adds the code also remembers the list. This one reads the two Rust tables instead:
+// the variants `may_reach_the_client` sends to the `false` side, and the code `error_code_of` gives
+// each of them.
+
+/** Body of the Rust `fn <name>` in `source`, with line comments stripped, or `''` when absent. */
+function rustFnBody(source: string, name: string): string {
+  const start = source.search(new RegExp(String.raw`fn\s+${name}\s*\(`));
+  if (start < 0) return '';
+  const end = source.indexOf('\n}\n', start);
+  return source.slice(start, end < 0 ? undefined : end).replace(/\/\/[^\n]*/g, '');
+}
+
+/** The stable codes of the variants `may_reach_the_client` redacts (its `=> false` arms). */
+function redactedCodesIn(doorSource: string, registrySource: string): string[] {
+  const door = rustFnBody(doorSource, 'may_reach_the_client');
+  const registry = rustFnBody(registrySource, 'error_code_of');
+  const codeOf = new Map<string, string>();
+  for (const [, variant, code] of registry.matchAll(/E::(\w+)\b[^\n]*?=>\s*"([a-z_]+)"/g)) {
+    codeOf.set(variant!, code!);
+  }
+  const redacted: string[] = [];
+  for (const [, arm, side] of door.matchAll(
+    /((?:\s*\|?\s*E::\w+(?:\s*\{\s*\.\.\s*\}|\s*\([^)]*\))?)+)\s*=>\s*\{?\s*(true|false)/g,
+  )) {
+    if (side !== 'false') continue;
+    for (const [, variant] of arm!.matchAll(/E::(\w+)/g)) {
+      redacted.push(codeOf.get(variant!) ?? `<no literal code for ${variant}>`);
+    }
+  }
+  return redacted;
+}
+
+/**
+ * Redacted variants that never travel through a request, so no screen can ever receive them.
+ * `money_unit_ambiguous` (hub#1209) is raised by an ops subcommand and by the boot path only.
+ */
+const REDACTED_BUT_NEVER_ON_A_REQUEST = new Set(['money_unit_ambiguous']);
+
+test('hub#2428: the redacted-code finder reads the Rust shape, and catches a code with no sentence', () => {
+  const door = [
+    'pub(crate) fn may_reach_the_client(e: &E) -> bool {',
+    '    match e {',
+    '        // E::Commented(_) => false',
+    '        E::Io(_) | E::Wasm(_) | E::Schema { .. } => {',
+    '            false',
+    '        }',
+    '        E::BrandNew { .. } => false,',
+    '        E::Domain { .. } | E::Other(_) => true,',
+    '    }',
+    '}',
+    '',
+  ].join('\n');
+  const registry = [
+    'pub fn error_code_of(err: &E) -> Cow<str> {',
+    '    Cow::Borrowed(match err {',
+    '        E::Io(_) => "io",',
+    '        E::Wasm(_) => "wasm",',
+    '        E::Schema { .. } => "schema",',
+    '        E::BrandNew { .. } => "brand_new",',
+    '        E::Other(_) => "other",',
+    '    })',
+    '}',
+    '',
+  ].join('\n');
+  assert.deepEqual(redactedCodesIn(door, registry), ['io', 'wasm', 'schema', 'brand_new']);
+  // POSITIVE CONTROL: the new code the finder surfaces is exactly what the table misses.
+  assert.equal(platformFailureMessage({ code: 'brand_new' }, 'es'), null);
+});
+
+test('hub#2428: every code the authenticated door redacts has a sentence here, in both languages', () => {
+  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const codes = redactedCodesIn(
+    read('../../../crates/server/src/dispatch_api.rs'),
+    read('../../../crates/runtime/src/error_registry.rs'),
+  );
+  // The finder must see the positives it exists for, or a green here means nothing.
+  for (const known of ['db', 'wasm', 'wasm_budget_exceeded']) {
+    assert.ok(codes.includes(known), `the finder no longer sees "${known}" (found: ${codes.join(', ')})`);
+  }
+  for (const code of codes.filter((c) => !REDACTED_BUT_NEVER_ON_A_REQUEST.has(c))) {
+    for (const locale of ['es', 'en'] as const) {
+      assert.ok(
+        platformFailureMessage({ code }, locale),
+        `the door redacts "${code}" but PLATFORM_FAILURES has no ${locale} sentence for it: the ` +
+          'screen would show the English line written for the log',
+      );
+    }
+  }
 });
 
 // ── hub#2410: `read_unavailable` says WHY, and the sentence follows it ──────────────────────────
