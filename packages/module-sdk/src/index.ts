@@ -924,6 +924,9 @@ const PLATFORM_FAILURES: Record<
   // hub#2428: redacted like `wasm`, but it is not a crash — the action was too big for the hub's
   // instruction budget and was rolled back whole. «Try again» would repeat the same click.
   wasm_budget_exceeded: () => TOO_BIG_AT_ONCE,
+  // hub#2434: not plumbing and not the request — the business has not filled in what an invoice
+  // needs. The runtime lists it in `missing`; the sentence names it and says where it is done.
+  fiscal_precondition_failed: (_app, failure) => fiscalSetupMissing(missingOf(failure)),
   native: () => PLUMBING,
   schema: () => PLUMBING,
   // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
@@ -1001,6 +1004,70 @@ const TOO_BIG_AT_ONCE: Bilingual = {
   en: 'This action is too big to do in one go. Nothing was changed: try with fewer items or a shorter range.',
   es: 'Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.',
 };
+
+/**
+ * What the fiscal precondition is missing, as the runtime sent it (hub#2434), or `[]`.
+ *
+ * Read off the envelope like {@link authoredSentenceOf} reads `message`, and NOT declared on the
+ * public {@link PlatformFailure} for the same reason: that interface is frozen kernel surface.
+ */
+function missingOf(failure: PlatformFailure): string[] {
+  const missing = (failure as { missing?: unknown }).missing;
+  return Array.isArray(missing) ? missing.filter((m): m is string => typeof m === 'string') : [];
+}
+
+/**
+ * The half of the business identity the Settings form holds (`Ajustes › Negocio`), in the words of
+ * that form, with the article Spanish needs in front of each. The keys are the setting names
+ * `enforce_fiscal_precondition` pushes into `missing` (`crates/runtime/src/commands.rs`).
+ */
+const FISCAL_IDENTITY_NAMES: Record<string, Bilingual> = {
+  business_legal_name: { en: 'legal name', es: 'la razón social' },
+  business_tax_id: { en: 'tax ID', es: 'el NIF' },
+};
+
+/** «… (an administrator can do it)» — the till user usually cannot open Settings. */
+const WHO_CAN: Bilingual = {
+  en: 'an administrator can do it',
+  es: 'lo puede hacer un administrador',
+};
+
+/**
+ * «To issue invoices, first complete …» (hub#2434): what the fiscal precondition (ADR-0203) is
+ * missing, named in business words, and where each piece is filled in — the legal name and the tax
+ * ID in Settings › Business, the digital certificate from the setup checklist on Home, where the
+ * app that files with the tax agency asks for it. A requirement this SDK does not know (a newer
+ * runtime) is left out rather than shown raw; with nothing known, the sentence points at the
+ * checklist, which lists every piece.
+ */
+function fiscalSetupMissing(missing: string[]): Bilingual {
+  const identity = missing.filter((m) => m in FISCAL_IDENTITY_NAMES).map((m) => FISCAL_IDENTITY_NAMES[m]!);
+  const certificate = missing.includes('certificate');
+  const identityEn = identity.map((n) => n.en).join(' and ');
+  const identityEs = identity.map((n) => n.es).join(' y ');
+  if (identity.length && certificate) {
+    return {
+      en: `To issue invoices, first complete the business's ${identityEn} in Settings › Business, and upload its digital certificate from «Finish setting up your business» on Home (${WHO_CAN.en}).`,
+      es: `Para emitir facturas, completa primero ${identityEs} del negocio en Ajustes › Negocio, y sube su certificado digital desde «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
+    };
+  }
+  if (identity.length) {
+    return {
+      en: `To issue invoices, first complete the business's ${identityEn} in Settings › Business (${WHO_CAN.en}).`,
+      es: `Para emitir facturas, completa primero ${identityEs} del negocio en Ajustes › Negocio (${WHO_CAN.es}).`,
+    };
+  }
+  if (certificate) {
+    return {
+      en: `To issue invoices, the business needs its digital certificate. Upload it from «Finish setting up your business» on Home (${WHO_CAN.en}).`,
+      es: `Para emitir facturas, el negocio necesita su certificado digital. Súbelo desde «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
+    };
+  }
+  return {
+    en: `To issue invoices, first complete the business's fiscal details: you will find them in «Finish setting up your business» on Home (${WHO_CAN.en}).`,
+    es: `Para emitir facturas, completa primero los datos fiscales del negocio: los tienes en «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
+  };
+}
 
 /**
  * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`

@@ -300,6 +300,12 @@ pub(crate) fn error_payload(e: &erplora_runtime::RuntimeError) -> (StatusCode, V
     if let E::ManifestRejected { at, .. } = e {
         error["at"] = json!(at);
     }
+    // hub#2434: what the fiscal precondition is missing (`business_legal_name`, `business_tax_id`,
+    // `certificate`) travels as data, so the screen names it in the reader's language and says
+    // where it is filled in. The `Display` it arrived in is a log line with the setting keys in it.
+    if let E::FiscalPrecondition { missing } = e {
+        error["missing"] = json!(missing);
+    }
     // hub#1102: and the same rule again for the read a `required` preload could not resolve. The
     // shell translates the CODE (`read_unavailable`) and names the missing app from this field;
     // before it, the only place that query lived was inside an English sentence the till printed
@@ -833,6 +839,29 @@ mod error_redaction_tests {
         assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
         assert_eq!(body["error"]["code"], "wasm_budget_exceeded", "{body}");
         assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
+    }
+
+    /// hub#2434: what the fiscal precondition is missing travels as DATA, so the screen can say
+    /// «complete the legal name and the tax id in Settings › Business» in the reader's language
+    /// instead of painting the log line with `business_legal_name` in it. Same rule as
+    /// `dependents` (hub#1101): the list is what the sentence enumerates, never parsed out of prose.
+    #[test]
+    fn a_fiscal_precondition_refusal_carries_what_is_missing_as_data() {
+        let (status, body) = error_payload(&RuntimeError::FiscalPrecondition {
+            missing: vec!["business_legal_name", "business_tax_id"],
+        });
+        assert_eq!(status, axum::http::StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], "fiscal_precondition_failed", "{body}");
+        assert_eq!(
+            body["error"]["missing"],
+            serde_json::json!(["business_legal_name", "business_tax_id"]),
+            "{body}"
+        );
+
+        let certificate = error_of(RuntimeError::FiscalPrecondition {
+            missing: vec!["certificate"],
+        });
+        assert_eq!(certificate["missing"], serde_json::json!(["certificate"]));
     }
 
     /// The variants #1185 added while this branch was open (`InvalidField`, `ManifestRejected`;
