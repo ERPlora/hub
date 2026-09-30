@@ -1,0 +1,11 @@
+{
+  "id": "e2e_tabs",
+  "name": "E2E Tabs",
+  "version": "1.0.0",
+  "ui": { "entry": "dist/e2e_tabs.esm.js" },
+  "navigation": [
+    { "id": "list", "label": "Reservas", "icon": "calendar-outline", "component": "erp-e2e-tabs-list" },
+    { "id": "waitlist", "label": "Lista de espera", "icon": "people-outline", "component": "erp-e2e-tabs-waitlist" },
+    { "id": "availability", "label": "Disponibilidad", "icon": "time-outline", "component": "erp-e2e-tabs-availability" }
+  ]
+}
