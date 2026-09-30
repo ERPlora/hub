@@ -339,3 +339,87 @@ test('hub#1337: the redaction line this table recognises is the one `crates/serv
       'raw, in English, on a Spanish till',
   );
 });
+
+// ── hub#2410: `read_unavailable` says WHY, and the sentence follows it ──────────────────────────
+//
+// The kernel aborts a command with `read_unavailable` when the app that owns a `required` read is
+// not installed, is switched off, or is there and the read itself failed. The envelope only
+// carried the query, so every screen said «the app “taxes” is missing, ask an administrator to
+// install it from Apps» — also with `taxes` installed and running and the read failing for a
+// moment. The runtime now sends `reason` beside the code; these pin the sentence each one gets.
+
+/** The sentence the same app gets under its OWN code — the reference each reason must match. */
+function sentenceFor(code: string, module: string, locale: string): string | null {
+  return platformFailureMessage({ code, module }, locale);
+}
+
+test('hub#2410: a failed read of an installed app is NOT told as a missing app', async () => {
+  const transport = transportWith({
+    code: 'read_unavailable',
+    message: 'a required read (`sales.get`) could not be resolved, so the command was aborted',
+    query: 'sales.get',
+    reason: 'query_failed',
+  });
+
+  await assert.rejects(
+    () => transport.command('invoice.create_from_sale', {}),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.equal(e.code, 'read_unavailable', 'the code a module branches on is untouched');
+      assert.notEqual(e.message, sentenceFor('module_not_installed', 'sales', 'es'));
+      assert.doesNotMatch(e.message, /Apps/, 'the app is installed: sending the owner to Apps is the bug');
+      return true;
+    },
+  );
+  for (const locale of ['es', 'en']) {
+    const said = platformFailureMessage(
+      { code: 'read_unavailable', query: 'sales.get', reason: 'query_failed' },
+      locale,
+    );
+    assert.ok(said, `a sentence in ${locale}`);
+    assert.notEqual(said, sentenceFor('module_not_installed', 'sales', locale));
+    assert.notEqual(said, sentenceFor('module_inactive', 'sales', locale));
+    assert.doesNotMatch(said!, /Apps|`|undefined/);
+  }
+  assert.notEqual(
+    platformFailureMessage({ code: 'read_unavailable', reason: 'query_failed' }, 'es'),
+    platformFailureMessage({ code: 'read_unavailable', reason: 'query_failed' }, 'en'),
+    'es is a translation, not the English source again',
+  );
+});
+
+test('hub#2410: an owner that is switched off gets the «switch it back on» sentence, not «install it»', () => {
+  for (const locale of ['es', 'en']) {
+    assert.equal(
+      platformFailureMessage(
+        { code: 'read_unavailable', query: 'taxes.rules.list', reason: 'module_inactive' },
+        locale,
+      ),
+      sentenceFor('module_inactive', 'taxes', locale),
+    );
+  }
+});
+
+test('hub#2410: an owner that is not installed keeps the «install it» sentence', () => {
+  for (const locale of ['es', 'en']) {
+    assert.equal(
+      platformFailureMessage(
+        { code: 'read_unavailable', query: 'taxes.rules.list', reason: 'module_not_installed' },
+        locale,
+      ),
+      sentenceFor('module_not_installed', 'taxes', locale),
+    );
+  }
+});
+
+test('hub#2410: a runtime that sends no reason (or one this SDK does not know) keeps today’s sentence', () => {
+  for (const reason of [undefined, 'something_newer']) {
+    for (const locale of ['es', 'en']) {
+      assert.equal(
+        platformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list', reason }, locale),
+        sentenceFor('module_not_installed', 'taxes', locale),
+        `reason ${String(reason)} (${locale})`,
+      );
+    }
+  }
+});
