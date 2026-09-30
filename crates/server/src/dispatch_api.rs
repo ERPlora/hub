@@ -841,29 +841,6 @@ mod error_redaction_tests {
         assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
     }
 
-    /// hub#2434: what the fiscal precondition is missing travels as DATA, so the screen can say
-    /// «complete the legal name and the tax id in Settings › Business» in the reader's language
-    /// instead of painting the log line with `business_legal_name` in it. Same rule as
-    /// `dependents` (hub#1101): the list is what the sentence enumerates, never parsed out of prose.
-    #[test]
-    fn a_fiscal_precondition_refusal_carries_what_is_missing_as_data() {
-        let (status, body) = error_payload(&RuntimeError::FiscalPrecondition {
-            missing: vec!["business_legal_name", "business_tax_id"],
-        });
-        assert_eq!(status, axum::http::StatusCode::CONFLICT);
-        assert_eq!(body["error"]["code"], "fiscal_precondition_failed", "{body}");
-        assert_eq!(
-            body["error"]["missing"],
-            serde_json::json!(["business_legal_name", "business_tax_id"]),
-            "{body}"
-        );
-
-        let certificate = error_of(RuntimeError::FiscalPrecondition {
-            missing: vec!["certificate"],
-        });
-        assert_eq!(certificate["missing"], serde_json::json!(["certificate"]));
-    }
-
     /// The variants #1185 added while this branch was open (`InvalidField`, `ManifestRejected`;
     /// the third, `CertificateTypeMismatch`, was retired with its door in hub#1490). The
     /// exhaustive `match` of `may_reach_the_client` made the compiler ask which side of the door
@@ -940,6 +917,29 @@ mod error_redaction_tests {
                 .contains("sales"),
             "{dependents}"
         );
+    }
+
+    /// hub#2434: what the fiscal precondition is missing travels as DATA, so the screen can say
+    /// «complete the legal name and the tax id in Settings › Business» in the reader's language
+    /// instead of painting the log line with `business_legal_name` in it. Same rule as
+    /// `dependents` (hub#1101): the list is what the sentence enumerates, never parsed out of prose.
+    #[test]
+    fn a_fiscal_precondition_refusal_carries_what_is_missing_as_data() {
+        let (status, body) = error_payload(&RuntimeError::FiscalPrecondition {
+            missing: vec!["business_legal_name", "business_tax_id"],
+        });
+        assert_eq!(status, axum::http::StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], "fiscal_precondition_failed", "{body}");
+        assert_eq!(
+            body["error"]["missing"],
+            serde_json::json!(["business_legal_name", "business_tax_id"]),
+            "{body}"
+        );
+
+        let certificate = error_of(RuntimeError::FiscalPrecondition {
+            missing: vec!["certificate"],
+        });
+        assert_eq!(certificate["missing"], serde_json::json!(["certificate"]));
     }
 }
 

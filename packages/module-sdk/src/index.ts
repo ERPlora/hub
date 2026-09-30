@@ -918,15 +918,15 @@ const PLATFORM_FAILURES: Record<
   module_not_installed: (app) => missingApp(app),
   missing_dependency: (app) => missingApp(app),
   module_inactive: (app) => switchedOffApp(app),
+  // hub#2434: not plumbing and not the request — the business has not filled in what an invoice
+  // needs. The runtime lists it in `missing`; the sentence names it and says where it is done.
+  fiscal_precondition_failed: (_app, failure) => fiscalSetupMissing(missingOf(failure)),
   db: () => PLUMBING,
   io: () => PLUMBING,
   wasm: () => PLUMBING,
   // hub#2428: redacted like `wasm`, but it is not a crash — the action was too big for the hub's
   // instruction budget and was rolled back whole. «Try again» would repeat the same click.
   wasm_budget_exceeded: () => TOO_BIG_AT_ONCE,
-  // hub#2434: not plumbing and not the request — the business has not filled in what an invoice
-  // needs. The runtime lists it in `missing`; the sentence names it and says where it is done.
-  fiscal_precondition_failed: (_app, failure) => fiscalSetupMissing(missingOf(failure)),
   native: () => PLUMBING,
   schema: () => PLUMBING,
   // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
@@ -1006,6 +1006,38 @@ const TOO_BIG_AT_ONCE: Bilingual = {
 };
 
 /**
+ * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`
+ * read of an installed, active app failed — a passing fault, not something Apps can fix. The app is
+ * deliberately NOT named: naming it is what sent the owner to Apps to look for it.
+ */
+const READ_FAILED: Bilingual = {
+  en: 'Some information this action needs could not be read, so nothing was done. Try again, and tell an administrator if it keeps happening.',
+  es: 'No se pudo leer un dato que esta acción necesita, así que no se ha hecho nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+};
+
+function switchedOffApp(app: string): Bilingual {
+  return {
+    en: app
+      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
+      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
+    es: app
+      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
+      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
+  };
+}
+
+function missingApp(app: string): Bilingual {
+  return {
+    en: app
+      ? `The app “${app}” is missing and this action needs it. Ask an administrator to install it from Apps.`
+      : 'An app this action needs is not installed. Ask an administrator to install it from Apps.',
+    es: app
+      ? `Falta la app «${app}» y esta acción la necesita. Pide a un administrador que la instale desde Apps.`
+      : 'Falta una app que esta acción necesita. Pide a un administrador que la instale desde Apps.',
+  };
+}
+
+/**
  * What the fiscal precondition is missing, as the runtime sent it (hub#2434), or `[]`.
  *
  * Read off the envelope like {@link authoredSentenceOf} reads `message`, and NOT declared on the
@@ -1066,38 +1098,6 @@ function fiscalSetupMissing(missing: string[]): Bilingual {
   return {
     en: `To issue invoices, first complete the business's fiscal details: you will find them in «Finish setting up your business» on Home (${WHO_CAN.en}).`,
     es: `Para emitir facturas, completa primero los datos fiscales del negocio: los tienes en «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
-  };
-}
-
-/**
- * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`
- * read of an installed, active app failed — a passing fault, not something Apps can fix. The app is
- * deliberately NOT named: naming it is what sent the owner to Apps to look for it.
- */
-const READ_FAILED: Bilingual = {
-  en: 'Some information this action needs could not be read, so nothing was done. Try again, and tell an administrator if it keeps happening.',
-  es: 'No se pudo leer un dato que esta acción necesita, así que no se ha hecho nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
-};
-
-function switchedOffApp(app: string): Bilingual {
-  return {
-    en: app
-      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
-      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
-    es: app
-      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
-      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
-  };
-}
-
-function missingApp(app: string): Bilingual {
-  return {
-    en: app
-      ? `The app “${app}” is missing and this action needs it. Ask an administrator to install it from Apps.`
-      : 'An app this action needs is not installed. Ask an administrator to install it from Apps.',
-    es: app
-      ? `Falta la app «${app}» y esta acción la necesita. Pide a un administrador que la instale desde Apps.`
-      : 'Falta una app que esta acción necesita. Pide a un administrador que la instale desde Apps.',
   };
 }
 
