@@ -103,6 +103,34 @@ describe('sales#473 — the legend and the category of a panel follow the UI lan
     expect(widgets.map((w) => w.category)).toEqual(['Sales', 'Sales']);
   });
 
+  // Review of hub#2417: the options were only localized when the title changed too. A panel whose
+  // title reads the same in both languages («Tickets») but whose legend or caption does not would
+  // have kept the English legend on a Spanish hub.
+  it('translates the legend even when the title has no entry of its own', async () => {
+    expect(await legendOf(manifests({ widgets: { 'sales.last_7_days': { seriesName: 'Ventas' } } }))).toBe('Ventas');
+  });
+
+  // On a `stat`: since hub#1105 a `kpi` no longer paints `options.label`, so `stat` is where the
+  // translated caption can be observed (same as dashboard-widgets.test.ts).
+  it('translates the caption (options.label) even when the title has no entry of its own', async () => {
+    const statDef: WidgetManifestDef = { ...kpiDef, kind: 'stat', options: { label: 'Today' } };
+    const mods = [
+      {
+        id: 'sales',
+        moduleId: 'sales',
+        manifest: { id: 'sales', widgets: { 'sales.today': statDef } },
+        locale: { widgets: { 'sales.today': { label: 'Hoy' } } },
+      },
+    ] as unknown as InstalledManifest[];
+    const { widgets } = buildWidgetsFromManifests(mods, { client, sector: null });
+    const cell = document.createElement('div');
+    document.body.appendChild(cell);
+    widgets[0]!.render(cell);
+    await flush();
+    expect((cell.querySelector('ok-stat') as (HTMLElement & { label?: string }) | null)?.label).toBe('Hoy');
+    document.body.replaceChildren();
+  });
+
   it('translating the legend keeps the rest of the chart options (format, chart type)', async () => {
     const mods = manifests(spanish);
     const { widgets } = buildWidgetsFromManifests(mods, { client, sector: null });
