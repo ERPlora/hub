@@ -32,6 +32,8 @@ enum Answer {
     Down,
     /// 200 with something that is not the list.
     Garbage,
+    /// 500 whose body happens to parse as a list: an error status is never the answer.
+    ErrorWithList,
 }
 
 async fn spawn_mock_cloud(answer: Answer) -> String {
@@ -50,6 +52,9 @@ async fn spawn_mock_cloud(answer: Answer) -> String {
                 .into_response(),
             Answer::Down => (StatusCode::SERVICE_UNAVAILABLE, "<html>503</html>").into_response(),
             Answer::Garbage => (StatusCode::OK, "<html>maintenance</html>").into_response(),
+            Answer::ErrorWithList => {
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!([]))).into_response()
+            }
         }
     }
     let router = Router::new()
@@ -221,6 +226,12 @@ async fn an_answer_that_is_not_the_list_is_not_up_to_date() {
     assert_eq!(row["checked"], json!(false), "{row}");
 }
 
+#[tokio::test]
+async fn an_error_status_is_not_an_answer_whatever_its_body() {
+    let row = answered(Answer::ErrorWithList, "error-list").await;
+    assert_eq!(row["checked"], json!(false), "{row}");
+}
+
 /// Without a marketplace credential (a local development hub with no signed-in account) nothing
 /// can be asked: one row per app saying so, not an empty list the screen reads as «nothing new».
 #[tokio::test]
@@ -265,6 +276,20 @@ async fn a_pinned_app_is_checked_even_with_the_marketplace_down() {
         unreachable_cloud().await,
         "pinned",
         Some("machine-secret"),
+        Some("1.0.0"),
+    )
+    .await;
+    assert_eq!(row["checked"], json!(true), "{row}");
+    assert_eq!(row["update_available"], json!(false), "{row}");
+}
+
+/// A pinned app is a known answer even where nothing can be asked.
+#[tokio::test]
+async fn a_pinned_app_is_checked_without_a_marketplace_credential() {
+    let row = parts_row(
+        spawn_mock_cloud(Answer::Newer).await,
+        "no-cred-pinned",
+        None,
         Some("1.0.0"),
     )
     .await;

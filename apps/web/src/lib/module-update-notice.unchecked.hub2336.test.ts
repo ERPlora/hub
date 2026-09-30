@@ -225,6 +225,30 @@ describe('the bell when the marketplace could not be asked (hub#2336)', () => {
     expect(moduleUpdatesUnknown.value).toBe(false);
   });
 
+  it('what the Apps screen learns is not said to a non-admin', async () => {
+    listModuleUpdates.mockResolvedValue([unchecked('sales')]);
+    await refreshModuleUpdateNotice();
+    expect(moduleUpdatesUnknown.value).toBe(true);
+
+    isAdmin.value = false;
+    publishModuleUpdates([unchecked('sales')], 'v1.4.0');
+
+    expect(moduleUpdatesUnknown.value).toBe(false);
+  });
+
+  // The Apps screen's failure is newer than a background check still waiting on the runtime.
+  it('a failed check on the Apps screen wins over a background check still in flight', async () => {
+    const pending = deferred<ModuleUpdateInfo[]>();
+    listModuleUpdates.mockReturnValueOnce(pending.promise);
+    const inFlight = refreshModuleUpdateNotice();
+
+    markModuleUpdatesUnknown();
+    pending.resolve([upd('sales', { update_available: false })]);
+    await inFlight;
+
+    expect(moduleUpdatesUnknown.value).toBe(true);
+  });
+
   // ── Retry from the bell ────────────────────────────────────────────────────────────────────
 
   it('🔴 «Check again» asks the marketplace again and an answer clears it', async () => {
