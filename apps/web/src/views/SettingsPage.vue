@@ -335,6 +335,7 @@
             <ion-item lines="none" class="mt-2">
               <ion-checkbox
                 v-model="shareWithErplora"
+                class="share-with-erplora"
                 data-testid="settings-share-with-erplora"
                 justify="space-between"
                 label-placement="start"
@@ -1091,6 +1092,13 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 </script>
 
 <style scoped>
+/* hub#2436: Ionic paints the checkbox label box (`.label-text-wrapper`, inside its shadow DOM) with
+   `white-space: nowrap` + ellipsis, and `ion-text-wrap` on the slotted ion-label does not beat it:
+   the explanation of the ERPlora-invoice box was cut at every width. The `label` shadow part is the
+   only way in from outside (same as ExportPanel/ImportPanel). */
+.share-with-erplora::part(label) {
+  white-space: normal;
+}
 /* hub#1174: el aviso de «qué se rompe» de un permiso denegado. Mismo patrón que la nota fiscal de
    ExportPanel: icono + frase, dentro de la propia tarjeta del permiso. */
 .cap-breaks {
