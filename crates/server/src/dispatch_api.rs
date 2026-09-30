@@ -180,6 +180,11 @@ pub(crate) fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         E::Io(_) | E::Manifest { .. } | E::Db(_) | E::Wasm(_) | E::Native(_) | E::Schema { .. } => {
             false
         }
+        // hub#2428: a handler out of its instruction budget. Its sentence names an internal
+        // function and a fuel figure — for the log. What the screen needs is the CODE
+        // (`wasm_budget_exceeded`), which the SDK turns into «too big to do at once, nothing
+        // changed».
+        E::WasmBudgetExceeded { .. } => false,
         // hub#1209: the half-migrated hub the money backfill refuses to guess about. It is raised
         // by an ops subcommand and by the boot path, never inside a request, so it does not travel
         // through this door at all — and if it ever did, its sentence is an inventory of this
@@ -813,6 +818,21 @@ mod error_redaction_tests {
             error_of(RuntimeError::Wasm("unreachable executed at 0x4f2".into()))["message"],
             REDACTED_MESSAGE
         );
+    }
+
+    /// hub#2428: a handler that ran out of its instruction budget answers its OWN code, so the
+    /// screen can say «too big to do at once, nothing changed» instead of the crash line. What
+    /// travels is the code; the handler's function name and the budget stay in the log, like any
+    /// other plumbing of the guest.
+    #[test]
+    fn a_handler_out_of_budget_has_its_own_code_and_keeps_its_detail_in_the_log() {
+        let (status, body) = error_payload(&RuntimeError::WasmBudgetExceeded {
+            function: "update_series".into(),
+            fuel: 200_000_000,
+        });
+        assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"]["code"], "wasm_budget_exceeded", "{body}");
+        assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
     }
 
     /// The variants #1185 added while this branch was open (`InvalidField`, `ManifestRejected`;

@@ -29,6 +29,8 @@ import { platformFailureMessage } from './platform-failure';
 const PLATFORM_FAILURE_CODES = [
   'db', 'io', 'wasm', 'native', 'schema', 'manifest',
   'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
+  // hub#2428: an action over the hub's instruction budget — redacted, with its own sentence.
+  'wasm_budget_exceeded',
 ] as const;
 
 describe('platformFailureMessage (hub#1258, hub#1315)', () => {

@@ -921,6 +921,9 @@ const PLATFORM_FAILURES: Record<
   db: () => PLUMBING,
   io: () => PLUMBING,
   wasm: () => PLUMBING,
+  // hub#2428: redacted like `wasm`, but it is not a crash — the action was too big for the hub's
+  // instruction budget and was rolled back whole. «Try again» would repeat the same click.
+  wasm_budget_exceeded: () => TOO_BIG_AT_ONCE,
   native: () => PLUMBING,
   schema: () => PLUMBING,
   // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
@@ -988,6 +991,16 @@ function authoredSentenceOf(failure: PlatformFailure): string | undefined {
 // What this SDK does do is carry `field` and `reason` on {@link PlatformFailure}, so a screen that
 // wants to translate them branches on data instead of parsing prose. Translating them into the
 // user's language belongs to the shell that owns those forms — see hub#1190.
+
+/**
+ * «Too big to do in one go, and nothing changed» (hub#2428): a module handler ran out of the hub's
+ * instruction budget and the whole command was rolled back. The remedy is asking for less at once,
+ * not trying again.
+ */
+const TOO_BIG_AT_ONCE: Bilingual = {
+  en: 'This action is too big to do in one go. Nothing was changed: try with fewer items or a shorter range.',
+  es: 'Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.',
+};
 
 /**
  * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`

@@ -262,3 +262,67 @@ async fn every_refusal_of_the_authenticated_door_carries_a_code_hub1241() {
         );
     }
 }
+
+// ── hub#2428: an action too big for the hub's instruction budget ─────────────────────────────
+
+/// A module whose only command is a WASM handler that never finishes, so it always spends the
+/// hub's whole instruction budget (the DEFAULT one, the same a real hub applies).
+fn spinning_module() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("temp module dir");
+    let manifest = json!({
+        "id": "spinner",
+        "name": "Spinner",
+        "version": "1.0.0",
+        "permissions": ["spinner.run"],
+        "commands": {
+            "spinner.run": {
+                "permission": "spinner.run",
+                "handler": { "type": "wasm", "file": "handler.wasm", "function": "handle" }
+            }
+        }
+    });
+    std::fs::write(dir.path().join("module.json"), manifest.to_string()).unwrap();
+    let wasm = wat::parse_str(
+        r#"(module
+             (memory 1)
+             (func (export "handle") (result i32)
+               (loop $forever (br $forever))
+               (i32.const 0)))"#,
+    )
+    .expect("compile the spinning guest");
+    std::fs::write(dir.path().join("handler.wasm"), wasm).unwrap();
+    dir
+}
+
+/// 🔴 hub#2428. A command whose handler runs out of fuel used to answer `wasm` — the code of a
+/// handler that crashed — so the screen could not say «too big to do at once, nothing changed».
+/// Now it answers its own code over the real door, and the handler's name and the fuel figure stay
+/// in the log.
+#[tokio::test]
+async fn a_command_over_the_instruction_budget_answers_its_own_code() {
+    let module = spinning_module();
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(module.path()).await.unwrap();
+    let router = app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ));
+
+    let resp = router
+        .oneshot(post("/api/command", json!({ "name": "spinner.run" })))
+        .await
+        .unwrap();
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let body: Value = serde_json::from_slice(&bytes).unwrap();
+
+    assert_eq!(body["ok"], json!(false), "{body}");
+    assert_eq!(body["error"]["code"], "wasm_budget_exceeded", "{body}");
+    let raw = body.to_string();
+    for needle in ["fuel", "handle", "instruction budget"] {
+        assert!(
+            !raw.contains(needle),
+            "the detail `{needle}` belongs in the log, not in the response: {raw}"
+        );
+    }
+}

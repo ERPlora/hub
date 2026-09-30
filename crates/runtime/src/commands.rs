@@ -1257,7 +1257,7 @@ async fn call_wasm_off_thread(
         std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
     match tokio::time::timeout(wait, join).await {
         Ok(Ok(Ok(output))) => Ok(output),
-        Ok(Ok(Err(e))) => Err(RuntimeError::Wasm(e.to_string())),
+        Ok(Ok(Err(e))) => Err(from_wasm_call_error(e)),
         // El hilo bloqueante murió (panic del guest host-side): no se propaga el panic al server.
         Ok(Err(join_err)) => Err(RuntimeError::Wasm(format!(
             "el handler `{function}` abortó: {join_err}"
@@ -1268,6 +1268,19 @@ async fn call_wasm_off_thread(
             "el handler `{function}` no respondió en {} ms: se aborta el command",
             wait.as_millis()
         ))),
+    }
+}
+
+/// Maps a failed guest call to the runtime error the doors publish (hub#2428).
+///
+/// Running out of fuel is the one guest failure the user can do something about (ask for less at
+/// once), so it keeps its own variant; every other failure stays the generic `Wasm`.
+fn from_wasm_call_error(err: erplora_wasm_host::WasmError) -> RuntimeError {
+    match err {
+        erplora_wasm_host::WasmError::OutOfFuel { function, fuel } => {
+            RuntimeError::WasmBudgetExceeded { function, fuel }
+        }
+        other => RuntimeError::Wasm(other.to_string()),
     }
 }
 
@@ -4832,6 +4845,78 @@ mod tests {
             fiscal_environment_pin(false),
             None,
             "a real hub has no pin YET: hub#485 turns this arm into a one-way switch"
+        );
+    }
+
+    // ── hub#2428: a handler that runs out of its instruction budget ─────────────────────────
+
+    /// A guest that never finishes: an empty loop. The fuel budget is what stops it.
+    const SPINNING_GUEST_WAT: &str = r#"
+        (module
+          (memory 1)
+          (func (export "handle") (result i32)
+            (loop $forever (br $forever))
+            (i32.const 0)))
+    "#;
+
+    /// A guest that traps straight away: an ordinary broken handler, not a budget problem.
+    const TRAPPING_GUEST_WAT: &str = r#"
+        (module
+          (memory 1)
+          (func (export "handle") (result i32)
+            unreachable))
+    "#;
+
+    fn compiled_guest(
+        wat_src: &str,
+        fuel: u64,
+    ) -> std::sync::Arc<erplora_wasm_host::CompiledModule> {
+        let wasm = wat::parse_str(wat_src).expect("compile the test WAT");
+        let limits = erplora_wasm_host::WasmLimits {
+            memory_max_mb: 32,
+            fuel,
+            // A huge clock so the one that cuts is the fuel, never the timeout.
+            timeout_ms: 60_000,
+        };
+        std::sync::Arc::new(
+            erplora_wasm_host::CompiledModule::compile(&wasm, limits).expect("compile the guest"),
+        )
+    }
+
+    /// hub#2428: an action too big for the hub's instruction budget used to fail as `wasm` — the
+    /// same code as a handler that panics — so the screen could only say «something went wrong».
+    /// It has its own stable code, so the screen can say «too big to do at once, nothing changed».
+    #[tokio::test]
+    async fn a_handler_out_of_fuel_fails_with_its_own_budget_code() {
+        let err = call_wasm_off_thread(
+            compiled_guest(SPINNING_GUEST_WAT, 1_000_000),
+            "handle",
+            json!({}),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            crate::error_registry::error_code_of(&err),
+            "wasm_budget_exceeded",
+            "got {err:?}"
+        );
+    }
+
+    /// hub#2428: the budget code is ONLY for the budget. A handler that simply breaks keeps the
+    /// generic `wasm` code — telling the user «try fewer items» for a crash would be a lie.
+    #[tokio::test]
+    async fn a_handler_that_traps_keeps_the_generic_wasm_code() {
+        let err = call_wasm_off_thread(
+            compiled_guest(TRAPPING_GUEST_WAT, 1_000_000),
+            "handle",
+            json!({}),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            crate::error_registry::error_code_of(&err),
+            "wasm",
+            "got {err:?}"
         );
     }
 }

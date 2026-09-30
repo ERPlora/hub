@@ -177,6 +177,13 @@ pub enum RuntimeError {
     NotImplemented(&'static str),
     #[error("error de handler WASM: {0}")]
     Wasm(String),
+    /// hub#2428: a module handler ran out of its instruction budget (`WasmError::OutOfFuel`,
+    /// hub#241). Its own code, not a flavour of `Wasm`: the command is rolled back whole, and the
+    /// screen has to be able to say «too big to do at once, nothing changed — try fewer items»
+    /// instead of the line it shows for a handler that crashed. The function and the budget are
+    /// for the log; the door redacts them like any other plumbing.
+    #[error("wasm handler `{function}` exceeded its instruction budget ({fuel} fuel)")]
+    WasmBudgetExceeded { function: String, fuel: u64 },
     #[error("error de plugin nativo: {0}")]
     Native(String),
     /// El payload del llamador no cumple el JSON Schema declarado por la query/command.
