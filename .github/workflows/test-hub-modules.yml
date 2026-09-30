@@ -312,6 +312,7 @@ jobs:
           echo "módulos con batería \`*.hub.test.py|sh\`: $(grep -c . "$RUNNER_TEMP/module-batteries.out")"
 
       - name: Raise Postgres lock limits (hub#526) + export dynamic port (hub#898)
+        id: postgres
         run: |
           set -euo pipefail
           # La suite crea un ESQUEMA EFÍMERO POR TEST, así que el techo global de
@@ -443,13 +444,18 @@ jobs:
       # que darse IGUAL. Lo contrario esconde media señal detrás de la otra, y son cosas distintas
       # —el kernel contra sus e2e, y el kernel contra los módulos publicados—. Lo único que las
       # salta es una cancelación.
+      #
+      # hub#2416: or a `postgres` step that never ran. A red pairing guard skips it, and the runner
+      # then died on `DATABASE_URL: unbound variable` — a false cause in the log and a false
+      # «the batteries do not pass» alert on develop (hub#2187). Skipped, the red is the step that
+      # really failed.
       - name: Compilar erplora-server para las baterías (hub#1381)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.postgres.outcome == 'success' }}
         run: cargo build -p erplora-server
 
       - name: Las baterías de módulo pasan contra ESTE kernel (hub#1381)
         id: run-batteries
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.postgres.outcome == 'success' }}
         run: |
           set -uo pipefail
           # stdout es el detalle por batería y stderr el veredicto: separados para que la issue de

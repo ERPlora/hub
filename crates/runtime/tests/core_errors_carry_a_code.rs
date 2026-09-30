@@ -232,6 +232,7 @@ fn census(db: RuntimeError) -> Vec<RuntimeError> {
         },
         E::ReadUnavailable {
             query: s("taxes.rules.list"),
+            reason: erplora_runtime::errors::ReadUnavailableReason::QueryFailed,
         },
         E::ProtectsGuard {
             declaring_module: s("cash_register"),

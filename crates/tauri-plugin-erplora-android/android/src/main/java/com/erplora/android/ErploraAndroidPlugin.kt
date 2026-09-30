@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.WebView
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -51,6 +52,34 @@ import java.io.File
     ]
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
+
+    /**
+     * hub#2360 — a new page is loading: the tap that STARTED the app waits for it. The notification
+     * plugin reports that tap as `actionPerformed` from its own `load`, before the page listens, and
+     * Tauri drops an event nobody is listening to: the tap opened the app on its first screen
+     * instead of the notice's. A tap that reaches a dead process through `onNewIntent` is kept by
+     * `MainActivity` into the same box.
+     */
+    override fun load(webView: WebView) {
+        super.load(webView)
+        NoticeTaps.pageLoading(activity, activity.intent)
+    }
+
+    /** `take_notice_tap` (hub#2360) — hands the kept tap over, once: `{ tap: {id, notification} | null }`. */
+    @Command
+    fun takeNoticeTap(invoke: Invoke) {
+        val tap = NoticeTaps.take()
+        val answer = JSObject()
+        if (tap == null) {
+            answer.put("tap", null as Any?)
+        } else {
+            val kept = JSObject()
+            kept.put("id", tap.id)
+            kept.put("notification", tap.notification)
+            answer.put("tap", kept)
+        }
+        invoke.resolve(answer)
+    }
 
     /**
      * `leave_app` (hub#1906) — the app goes to the background, which is what the system Back does
