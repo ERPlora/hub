@@ -244,6 +244,23 @@ fn classify_publish_error(message: &str) -> Error {
     }
 }
 
+/// The tap on a notice that STARTED the app (hub#2360): the notice's id and the JSON the
+/// notification plugin stored it as, whose `extra.path` is the screen it leads to.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct LaunchNoticeTap {
+    pub id: i32,
+    #[serde(default)]
+    pub notification: Option<String>,
+}
+
+/// The wire shape of `takeNoticeTap`: `tap` absent or `null` when the app was not started by one.
+#[derive(Debug, Default, Deserialize)]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+struct NoticeTapAnswer {
+    #[serde(default)]
+    tap: Option<LaunchNoticeTap>,
+}
+
 #[cfg(target_os = "android")]
 const PLUGIN_IDENTIFIER: &str = "com.erplora.android";
 
@@ -393,6 +410,23 @@ impl<R: Runtime> ErploraAndroid<R> {
             let _ = timeout_ms;
             Err(Error::NfcUnavailable)
         }
+    }
+
+    /// hub#2360 — the tap on a notice that started the app, handed over once.
+    ///
+    /// The notification plugin reports that tap while it is still loading, before the page has a
+    /// listener, and the event is lost; Kotlin keeps it instead. Off Android there is no such launch.
+    pub fn take_notice_tap(&self) -> Result<Option<LaunchNoticeTap>, Error> {
+        #[cfg(target_os = "android")]
+        {
+            return self
+                .0
+                .run_mobile_plugin::<NoticeTapAnswer>("takeNoticeTap", Empty {})
+                .map(|answer| answer.tap)
+                .map_err(|e| Error::PluginInvoke(e.to_string()));
+        }
+        #[cfg(not(target_os = "android"))]
+        Ok(None)
     }
 
     /// Publishes the file at `source_path` into Android's **public** Downloads collection under
@@ -1242,4 +1276,57 @@ mod tests {
             );
         }
     }
+
+    // ── hub#2360: the tap that started the app ───────────────────────────────────────────────────
+    //
+    // The notification plugin reports it while it is still loading, before the page listens, and the
+    // event is lost. Kotlin keeps it and the shell asks for it once — three places that have to agree
+    // on one command name and one answer shape, none of which the compiler sees.
+
+    #[test]
+    fn the_kept_launch_tap_reads_with_and_without_a_tap() {
+        let kept: NoticeTapAnswer =
+            serde_json::from_str(r#"{"tap":{"id":7,"notification":"{\"extra\":{\"path\":\"/m/kds\"}}"}}"#)
+                .expect("a kept tap reads");
+        assert_eq!(
+            kept.tap,
+            Some(LaunchNoticeTap { id: 7, notification: Some(r#"{"extra":{"path":"/m/kds"}}"#.into()) })
+        );
+        let none: NoticeTapAnswer = serde_json::from_str(r#"{"tap":null}"#).expect("no tap reads");
+        assert_eq!(none.tap, None);
+        let bare: NoticeTapAnswer = serde_json::from_str("{}").expect("an empty answer reads");
+        assert_eq!(bare.tap, None);
+    }
+
+    #[test]
+    fn kotlin_keeps_the_launch_tap_and_hands_it_over_once_hub2360() {
+        const NOTICE_TAPS_KT: &str = include_str!("../android/src/main/java/com/erplora/android/NoticeTaps.kt");
+        let production = LIB_RS.split("#[cfg(test)]").next().unwrap_or_default();
+        assert!(
+            production.contains("run_mobile_plugin::<NoticeTapAnswer>(\"takeNoticeTap\", Empty {})"),
+            "Rust no longer asks Kotlin for the kept tap by the name Kotlin answers to"
+        );
+        let before = PLUGIN_KT.split("fun takeNoticeTap(invoke: Invoke)").next().unwrap_or_default();
+        assert!(before.trim_end().ends_with("@Command"), "Kotlin takeNoticeTap is not a @Command");
+        let command = PLUGIN_KT.split("fun takeNoticeTap(invoke: Invoke)").nth(1).expect("no Kotlin takeNoticeTap");
+        let body = command.split("\n    }").next().unwrap_or_default();
+        assert!(body.contains("NoticeTaps.take()"), "takeNoticeTap does not hand over the tap the box kept");
+        let load = PLUGIN_KT.split("override fun load(webView: WebView)").nth(1).expect("Kotlin does not look at the launch");
+        let load = load.split("\n    }").next().unwrap_or_default();
+        assert!(
+            load.contains("NoticeTaps.pageLoading(activity, activity.intent)"),
+            "load does not hand the box the intent that started the app"
+        );
+        // The memory has to outlive the process: back through the icon after the system killed it,
+        // the task's intent is the old tap again (rv-2411).
+        assert!(
+            NOTICE_TAPS_KT.contains("NoticeTapBox(PreferencesMemory(context.applicationContext))"),
+            "the box no longer remembers the kept tap outside the process"
+        );
+        assert!(
+            NOTICE_TAPS_KT.contains("prefs.edit().putString(LAST_KEPT, key).apply()"),
+            "the kept tap is not written to the app's preferences"
+        );
+    }
 }
+
