@@ -121,6 +121,13 @@ pub const HEADER_VARS: &[(&str, &str)] = &[
     ("header_document", "document"),
 ];
 
+/// **The name the customer sees on the PDF of a template's header** (hub#2405): Meta's
+/// `document.filename`. Without it the chat shows the end of the link — for a file uploaded to the
+/// hub, a fingerprint that reads like spam. It only travels next to `header_document`;
+/// `flows::def` refuses it anywhere else at save time and the transport before the network.
+/// `schemas/flow.schema.json` declares the same key under `vars.properties`.
+pub const HEADER_DOCUMENT_FILENAME_VAR: &str = "header_document_filename";
+
 /// **The variable part of a WhatsApp template's link button** (hub#2110): `vars.button_url_<n>`
 /// is the text Meta appends to the `{{1}}` of the URL button at position `<n>` (0-based, as Meta
 /// counts the template's buttons). `flows::def` refuses at save time what the transport would
