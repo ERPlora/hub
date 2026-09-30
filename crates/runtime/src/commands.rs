@@ -1271,15 +1271,22 @@ async fn call_wasm_off_thread(
     }
 }
 
-/// Maps a failed guest call to the runtime error the doors publish (hub#2428).
+/// Maps a failed guest call to the runtime error the doors publish (hub#2428, hub#2431).
 ///
-/// Running out of fuel is the one guest failure the user can do something about (ask for less at
-/// once), so it keeps its own variant; every other failure stays the generic `Wasm`.
+/// Running out of fuel or of time are the guest failures the user can do something about (ask for
+/// less at once), so each keeps its own variant; every other failure stays the generic `Wasm`.
 fn from_wasm_call_error(err: erplora_wasm_host::WasmError) -> RuntimeError {
     match err {
         erplora_wasm_host::WasmError::OutOfFuel { function, fuel } => {
             RuntimeError::WasmBudgetExceeded { function, fuel }
         }
+        erplora_wasm_host::WasmError::Timeout {
+            function,
+            timeout_ms,
+        } => RuntimeError::WasmTimeout {
+            function,
+            timeout_ms,
+        },
         other => RuntimeError::Wasm(other.to_string()),
     }
 }
@@ -4871,13 +4878,22 @@ mod tests {
         wat_src: &str,
         fuel: u64,
     ) -> std::sync::Arc<erplora_wasm_host::CompiledModule> {
+        compiled_guest_with_limits(
+            wat_src,
+            erplora_wasm_host::WasmLimits {
+                memory_max_mb: 32,
+                fuel,
+                // A huge clock so the one that cuts is the fuel, never the timeout.
+                timeout_ms: 60_000,
+            },
+        )
+    }
+
+    fn compiled_guest_with_limits(
+        wat_src: &str,
+        limits: erplora_wasm_host::WasmLimits,
+    ) -> std::sync::Arc<erplora_wasm_host::CompiledModule> {
         let wasm = wat::parse_str(wat_src).expect("compile the test WAT");
-        let limits = erplora_wasm_host::WasmLimits {
-            memory_max_mb: 32,
-            fuel,
-            // A huge clock so the one that cuts is the fuel, never the timeout.
-            timeout_ms: 60_000,
-        };
         std::sync::Arc::new(
             erplora_wasm_host::CompiledModule::compile(&wasm, limits).expect("compile the guest"),
         )
@@ -4916,6 +4932,34 @@ mod tests {
         assert_eq!(
             crate::error_registry::error_code_of(&err),
             "wasm",
+            "got {err:?}"
+        );
+    }
+
+    // ── hub#2431: a handler that runs out of its wall-clock time ────────────────────────────
+
+    /// hub#2431: an action that takes longer than the hub's clock allows (a huge batch on a slow
+    /// machine) used to fail as `wasm` — the code of a handler that crashed — so the screen said
+    /// «try again», which repeats the same click and the same cut. It has its own stable code, so
+    /// the screen can say «took too long, nothing changed».
+    #[tokio::test]
+    async fn a_handler_over_its_time_limit_fails_with_its_own_timeout_code() {
+        let limits = erplora_wasm_host::WasmLimits {
+            memory_max_mb: 32,
+            // Fuel to spare, so the one that cuts is the clock, never the instruction budget.
+            fuel: u64::MAX / 2,
+            timeout_ms: 200,
+        };
+        let err = call_wasm_off_thread(
+            compiled_guest_with_limits(SPINNING_GUEST_WAT, limits),
+            "handle",
+            json!({}),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            crate::error_registry::error_code_of(&err),
+            "wasm_timeout",
             "got {err:?}"
         );
     }

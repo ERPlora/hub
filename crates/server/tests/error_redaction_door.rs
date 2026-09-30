@@ -265,6 +265,11 @@ async fn every_refusal_of_the_authenticated_door_carries_a_code_hub1241() {
 
 // ── hub#2428: an action too big for the hub's instruction budget ─────────────────────────────
 
+/// The WASM limits are read from the environment on every command, and the tests of this binary
+/// run in parallel: the one that shrinks the clock (hub#2431) must not overlap the one that relies
+/// on the DEFAULT budget (hub#2428), or the budget test would be cut by the clock instead.
+static WASM_LIMITS_ENV: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// A module whose only command is a WASM handler that never finishes, so it always spends the
 /// hub's whole instruction budget (the DEFAULT one, the same a real hub applies).
 fn spinning_module() -> tempfile::TempDir {
@@ -300,6 +305,7 @@ fn spinning_module() -> tempfile::TempDir {
 /// in the log.
 #[tokio::test]
 async fn a_command_over_the_instruction_budget_answers_its_own_code() {
+    let _env = WASM_LIMITS_ENV.lock().await;
     let module = spinning_module();
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
@@ -320,6 +326,75 @@ async fn a_command_over_the_instruction_budget_answers_its_own_code() {
     assert_eq!(body["error"]["code"], "wasm_budget_exceeded", "{body}");
     let raw = body.to_string();
     for needle in ["fuel", "handle", "instruction budget"] {
+        assert!(
+            !raw.contains(needle),
+            "the detail `{needle}` belongs in the log, not in the response: {raw}"
+        );
+    }
+}
+
+// ── hub#2431: an action that takes longer than the hub's clock allows ─────────────────────────
+
+/// Sets the WASM clock and budget for one test and puts the previous values back when dropped.
+struct WasmLimitsEnv(Vec<(&'static str, Option<String>)>);
+
+impl WasmLimitsEnv {
+    fn set(vars: &[(&'static str, &str)]) -> Self {
+        let saved = vars
+            .iter()
+            .map(|(name, value)| {
+                let before = std::env::var(name).ok();
+                std::env::set_var(name, value);
+                (*name, before)
+            })
+            .collect();
+        WasmLimitsEnv(saved)
+    }
+}
+
+impl Drop for WasmLimitsEnv {
+    fn drop(&mut self) {
+        for (name, before) in &self.0 {
+            match before {
+                Some(v) => std::env::set_var(name, v),
+                None => std::env::remove_var(name),
+            }
+        }
+    }
+}
+
+/// 🔴 hub#2431. A command whose handler outlives the hub's clock used to answer `wasm` — the code
+/// of a handler that crashed — so the screen said «try again» and the person repeated the same
+/// click and the same cut. Now it answers its own code over the real door, and the handler's name
+/// and the time limit stay in the log.
+#[tokio::test]
+async fn a_command_over_the_time_limit_answers_its_own_code() {
+    let _env = WASM_LIMITS_ENV.lock().await;
+    // Fuel to spare, so the one that cuts is the clock, never the instruction budget.
+    let _limits = WasmLimitsEnv::set(&[
+        ("HUB_WASM_FUEL", "100000000000000"),
+        ("HUB_WASM_TIMEOUT_MS", "300"),
+    ]);
+    let module = spinning_module();
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(module.path()).await.unwrap();
+    let router = app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ));
+
+    let resp = router
+        .oneshot(post("/api/command", json!({ "name": "spinner.run" })))
+        .await
+        .unwrap();
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let body: Value = serde_json::from_slice(&bytes).unwrap();
+
+    assert_eq!(body["ok"], json!(false), "{body}");
+    assert_eq!(body["error"]["code"], "wasm_timeout", "{body}");
+    let raw = body.to_string();
+    for needle in ["timed out", "handle", "300 ms"] {
         assert!(
             !raw.contains(needle),
             "the detail `{needle}` belongs in the log, not in the response: {raw}"

@@ -924,6 +924,8 @@ const PLATFORM_FAILURES: Record<
   // hub#2428: redacted like `wasm`, but it is not a crash — the action was too big for the hub's
   // instruction budget and was rolled back whole. «Try again» would repeat the same click.
   wasm_budget_exceeded: () => TOO_BIG_AT_ONCE,
+  // hub#2431: the same for a handler the hub's clock interrupted — rolled back whole, not a crash.
+  wasm_timeout: () => TOO_LONG_AT_ONCE,
   native: () => PLUMBING,
   schema: () => PLUMBING,
   // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
@@ -1000,6 +1002,15 @@ function authoredSentenceOf(failure: PlatformFailure): string | undefined {
 const TOO_BIG_AT_ONCE: Bilingual = {
   en: 'This action is too big to do in one go. Nothing was changed: try with fewer items or a shorter range.',
   es: 'Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.',
+};
+
+/**
+ * «It took too long, and nothing changed» (hub#2431): a module handler ran past the hub's time limit
+ * and the whole command was rolled back. The remedy is asking for less at once, not trying again.
+ */
+const TOO_LONG_AT_ONCE: Bilingual = {
+  en: 'This action took too long to finish. Nothing was changed: try with fewer items or a shorter range.',
+  es: 'Esta acción ha tardado demasiado en terminar. No se ha cambiado nada: prueba con menos elementos o un rango más corto.',
 };
 
 /**
