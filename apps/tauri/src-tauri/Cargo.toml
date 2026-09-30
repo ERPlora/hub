@@ -94,11 +94,16 @@ tauri-plugin-autostart = "2"
 # A click on a notice on the computer (hub#2360). The notification plugin shows a desktop notice and
 # drops its handle, so no click ever comes back; the shell shows it itself and waits for the click.
 # macOS talks to `mac-notification-sys` directly: `notify-rust` only waits there when the notice has
-# buttons. Both are already in the tree through the plugin, at these versions.
+# buttons. Windows shows the notice through WinRT itself, so the notice can carry the link a click
+# in the Action Center launches the app with (hub#2409); `notify-rust` cannot set it. All three are
+# already in the tree through the plugin, at these versions.
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6"
 
-[target.'cfg(any(windows, target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))'.dependencies]
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Data_Xml_Dom", "UI_Notifications"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))'.dependencies]
 notify-rust = "4.18"
 
 # Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
