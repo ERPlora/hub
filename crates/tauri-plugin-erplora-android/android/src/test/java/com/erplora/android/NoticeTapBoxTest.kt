@@ -81,11 +81,57 @@ class NoticeTapBoxTest {
     }
 
     @Test
-    fun `a tap kept through onNewIntent is remembered too`() {
+    fun `a tap through onNewIntent does not take the place of the tap the task was born from`() {
+        // Android delivers a new intent once, and hands the intent the task was born from back at
+        // every return of the process (rv-2411, measured): only the latter has to be remembered.
         val memory = Memory()
-        NoticeTapBox(memory).newIntent(tap(7, "/m/appointments"))
+        NoticeTapBox(memory).pageLoading(tap(7, "/m/appointments"))
+        NoticeTapBox(memory).newIntent(tap(8, "/m/kitchen"))
+        assertEquals(NoticeLaunch.Tap(7, """{"id":7,"extra":{"path":"/m/appointments"}}""").key, memory.last)
+    }
+
+    @Test
+    fun `a tap that reaches a dead process is not lost to the tap the task was born from`() {
+        val memory = Memory()
+        // The task was born from a tap on notice 7; that process kept it.
+        NoticeTapBox(memory).pageLoading(tap(7, "/m/appointments"))
+        // The system killed the process and the person taps notice 8, still in the tray.
+        val next = NoticeTapBox(memory)
+        next.newIntent(tap(8, "/m/kitchen"))
+        // The plugin loads after it, with the intent the task started with: the old tap.
+        next.pageLoading(tap(7, "/m/appointments"))
+        assertEquals(8, next.take()?.id)
+    }
+
+    @Test
+    fun `a tap that came in before the plugin loaded is the later one and wins`() {
+        val box = NoticeTapBox(Memory())
+        box.newIntent(tap(8, "/m/kitchen"))
+        box.pageLoading(tap(7, "/m/appointments"))
+        assertEquals(8, box.take()?.id)
+    }
+
+    @Test
+    fun `a notice still in the tray opens its screen when it is tapped again`() {
+        val memory = Memory()
+        NoticeTapBox(memory).pageLoading(tap(7, "/m/appointments"))
         val next = NoticeTapBox(memory)
         next.newIntent(tap(7, "/m/appointments"))
-        assertNull(next.take())
+        next.pageLoading(tap(7, "/m/appointments"))
+        assertEquals(7, next.take()?.id)
+    }
+
+    @Test
+    fun `the tap the task was born from stays old after later taps were kept`() {
+        val memory = Memory()
+        NoticeTapBox(memory).pageLoading(tap(7, "/m/appointments"))
+        val second = NoticeTapBox(memory)
+        second.newIntent(tap(8, "/m/kitchen"))
+        second.pageLoading(tap(7, "/m/appointments"))
+        second.take()
+        // Killed again, back through the icon: the task's intent is still the tap on notice 7.
+        val third = NoticeTapBox(memory)
+        third.pageLoading(tap(7, "/m/appointments"))
+        assertNull(third.take())
     }
 }

@@ -12,8 +12,9 @@
 //!   Android plugin keeps that tap (`take_notice_tap`) and the page claims it once it is up. When the
 //!   system had killed the process but the task is still in recents, the activity comes back with
 //!   its old launcher intent and the tap arrives through `MainActivity.onNewIntent`, which feeds the
-//!   same box. The last kept tap (id and content) is remembered in the app's preferences, so coming
-//!   back later to a task born from a tap does not open that screen again.
+//!   same box. Android hands the intent a task was born from back at every return of the process,
+//!   so the tap on it (id and content) is remembered in the app's preferences and counts once; a
+//!   tap through `onNewIntent` is delivered once and is never lost to that older one.
 //!
 //! In both, the tap lands in [`KeptNoticeTap`] with the screen the notice was sent with, and the page
 //! claims it through `erplora_take_notice_tap` — at boot, and every time [`NOTICE_TAPPED_EVENT`]
