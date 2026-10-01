@@ -141,6 +141,7 @@ import chevronExpandOutline from '~icons/ion/chevron-expand-outline?raw';
 import close from '~icons/ion/close?raw';
 import cloudDownloadOutline from '~icons/ion/cloud-download-outline?raw';
 import cloudOfflineOutline from '~icons/ion/cloud-offline-outline?raw';
+import syncOutline from '~icons/ion/sync-outline?raw';
 import attachOutline from '~icons/ion/attach-outline?raw';
 import contractOutline from '~icons/ion/contract-outline?raw';
 import createOutline from '~icons/ion/create-outline?raw';
@@ -314,6 +315,7 @@ const SVGS: Record<string, string> = {
   close,
   'cloud-download-outline': cloudDownloadOutline,
   'cloud-offline-outline': cloudOfflineOutline,
+  'sync-outline': syncOutline,
   'attach-outline': attachOutline,
   'contract-outline': contractOutline,
   'create-outline': createOutline,
