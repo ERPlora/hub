@@ -1443,6 +1443,16 @@ export default {
     stepPair: 'Pair',
     stepConfigure: 'Configure',
     updatesCloudHint: 'This web Hub is updated automatically as part of service deployments.',
+    // The apps' side of «updates» (hub#2332): the same count as the bell (hub#1172) — only updates
+    // this hub can apply — with the way to «My apps», where each update is one tap. A failed check
+    // reuses the bell's «Could not check» sentence: it is never «all up to date».
+    appUpdates: {
+      title: 'Your apps',
+      available: '{n} app has a new version. | {n} apps have a new version.',
+      allUpToDate: 'All your apps are up to date.',
+      checking: 'Checking whether your apps have new versions…',
+      goToMyApps: 'Go to My apps',
+    },
     // What we changed on this hub, and from which version (hub#564, ADR-0269 §3.5). We update
     // without asking, so the least we owe is that the owner can find out WHAT changed. Every
     // sentence below names an app the way they know it and a version they can compare — never a

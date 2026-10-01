@@ -308,6 +308,41 @@
             </div>
             <p class="muted-note updates-hint">{{ t('system.updatesCloudHint') }}</p>
 
+            <!-- hub#2332 — the apps' side of «updates». The hub updates itself; the apps are
+                 updated by whoever runs the business, from «My apps». Same count as the bell
+                 (hub#1172: only what this hub can apply, only for an admin), and a failed check
+                 says so — never «all up to date». -->
+            <ok-inline-feedback
+              v-if="isAdmin"
+              data-testid="system-app-updates"
+              class="app-updates"
+              :tone="appUpdates.tone"
+              :icon="appUpdates.icon"
+              :heading="t('system.appUpdates.title')"
+            >
+              {{ appUpdates.sentence }}
+              <ion-button
+                v-if="appUpdateCount > 0"
+                slot="actions"
+                data-testid="system-app-updates-go"
+                size="small"
+                @click="goToModuleUpdates"
+              >
+                {{ t('system.appUpdates.goToMyApps') }}
+              </ion-button>
+              <ion-button
+                v-else-if="moduleUpdatesUnknown"
+                slot="actions"
+                data-testid="system-app-updates-retry"
+                size="small"
+                fill="outline"
+                :disabled="moduleUpdatesChecking"
+                @click="retryModuleUpdateNotice"
+              >
+                {{ moduleUpdatesChecking ? t('topbar.moduleUpdatesChecking') : t('topbar.moduleUpdatesRetry') }}
+              </ion-button>
+            </ok-inline-feedback>
+
             <!-- Un hub al que no le hemos cambiado nada dice justo eso, y no una lista de 24
                  módulos «sin cambios»: el ruido se deja de leer. -->
             <ok-empty-state
@@ -544,6 +579,13 @@ import {
 } from '../lib/dead-letter';
 import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
+import {
+  MODULE_UPDATES_ROUTE,
+  moduleUpdatesChecking,
+  moduleUpdatesUnknown,
+  retryModuleUpdateNotice,
+} from '../lib/module-update-notice';
+import { notificationCountOf } from '../lib/shell';
 import { toast, toastSuccess, toastError } from '../lib/toast';
 import { loadBellCounterModuleIds } from '../lib/bell-counters';
 import {
@@ -611,7 +653,12 @@ const tab = ref<Tab>(resolveSystemTab(route.hash));
 watch(tab, (value) => {
   if (value !== (route.hash.slice(1) || 'resources')) void router.replace({ hash: `#${value}` });
 });
-watch(() => route.hash, (h) => {
+// Ionic keeps this page mounted after leaving it, and `route` is the app's one route: only an
+// address on /system speaks for these tabs. Otherwise «Go to My apps» (`/apps#mine`) read as an
+// unknown System tab and got `#resources` written onto the Apps URL (hub#2332). The path is watched
+// too: coming back to a plain /system re-reads its (unchanged) hash instead of keeping the last tab.
+watch([() => route.path, () => route.hash], ([path, h]) => {
+  if (path !== '/system') return;
   if (isLegacyBackupsHash(h)) {
     void router.replace({ path: '/settings', hash: '#data' });
     return;
@@ -673,6 +720,31 @@ const localNetworkBlocked = computed(() => localNetwork.value === 'denied');
 // mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
 const updateHistory = ref<UpdateHistoryEntry[]>([]);
 const historyGroups = computed(() => groupByDay(updateHistory.value, new Date(), locale.value));
+
+// The apps' side of «updates» (hub#2332): what the bell already knows (hub#1172), read here — this
+// tab never asks the marketplace itself (one request per installed app). A count wins over «could
+// not check» (the count is real, and «My apps» re-checks on opening); a first check still out is
+// «checking», never «all up to date».
+const appUpdateCount = computed(() => notificationCountOf('moduleUpdates'));
+const appUpdates = computed(() => {
+  if (appUpdateCount.value > 0) {
+    return {
+      tone: 'info',
+      icon: 'cloud-download-outline',
+      sentence: t('system.appUpdates.available', { n: appUpdateCount.value }),
+    } as const;
+  }
+  if (moduleUpdatesUnknown.value) {
+    return { tone: 'warning', icon: 'alert-circle-outline', sentence: t('topbar.moduleUpdatesUnknownBody') } as const;
+  }
+  if (moduleUpdatesChecking.value) {
+    return { tone: 'neutral', icon: 'sync-outline', sentence: t('system.appUpdates.checking') } as const;
+  }
+  return { tone: 'success', icon: 'checkmark-circle-outline', sentence: t('system.appUpdates.allUpToDate') } as const;
+});
+function goToModuleUpdates(): void {
+  void router.push(MODULE_UPDATES_ROUTE);
+}
 
 // Are we inside `com.erplora.app`? It changes what there is left to do about a printer, and what
 // this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
