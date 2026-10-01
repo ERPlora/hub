@@ -66,6 +66,12 @@ export default {
     moduleUpdatesTitle: 'App updates available',
     moduleUpdatesBody:
       '{n} app has a new version. Update it from My apps. | {n} apps have a new version. Update them from My apps.',
+    // The check for new app versions could not be made (hub#2336): the marketplace or the network
+    // did not answer. It is NOT «All caught up», so the bell says it and offers to ask again.
+    moduleUpdatesUnknownTitle: 'Could not check for app updates',
+    moduleUpdatesUnknownBody: 'We could not find out whether your apps have new versions. Check the connection and try again.',
+    moduleUpdatesRetry: 'Check again',
+    moduleUpdatesChecking: 'Checking…',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',

@@ -392,14 +392,22 @@ pub(crate) async fn list_module_updates(
     };
 
     let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
-        // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y
-        // «no lo sé» nunca se pinta como «hay actualización».
-        return Json(json!({ "ok": true, "data": [] })).into_response();
+        // Without a credential the marketplace cannot be asked: every app is «I don't know»
+        // (hub#2336), never an empty list the screen would read as «nothing to update». A pinned
+        // app is the exception: it never moves, so its answer is known without asking.
+        let out: Vec<Value> = installed
+            .into_iter()
+            .map(|(module_id, version, pinned)| {
+                let checked = pinned.is_some();
+                update_row(&module_id, &version, pinned, &version, false, None, checked)
+            })
+            .collect();
+        return Json(json!({ "ok": true, "data": out })).into_response();
     };
 
     let mut out = Vec::with_capacity(installed.len());
     for (module_id, version, pinned) in installed {
-        let (target, floor) = install::resolve_offer(
+        let offer = install::resolve_offer(
             &st.marketplace_http,
             &st.config.cloud_base_url,
             &auth,
@@ -408,18 +416,42 @@ pub(crate) async fn list_module_updates(
             pinned.as_deref(),
         )
         .await;
-        out.push(json!({
-            "module_id": module_id,
-            "installed": version,
-            "latest": target.version(),
-            "update_available": target.is_update(),
-            "pinned": pinned,
-            // hub#2082: the ERPlora the offered version needs (`null` = none declared), so the
-            // Apps page says «needs ERPlora X» instead of an «Update» the runtime would refuse.
-            "latest_min_erplora_version": floor,
-        }));
+        out.push(update_row(
+            &module_id,
+            &version,
+            pinned,
+            offer.target.version(),
+            offer.target.is_update(),
+            offer.floor,
+            offer.checked,
+        ));
     }
     Json(json!({ "ok": true, "data": out })).into_response()
+}
+
+/// One row of `GET /api/modules/updates`.
+fn update_row(
+    module_id: &str,
+    installed: &str,
+    pinned: Option<String>,
+    latest: &str,
+    update_available: bool,
+    floor: Option<String>,
+    checked: bool,
+) -> Value {
+    json!({
+        "module_id": module_id,
+        "installed": installed,
+        "latest": latest,
+        "update_available": update_available,
+        "pinned": pinned,
+        // hub#2082: the ERPlora the offered version needs (`null` = none declared), so the
+        // Apps page says «needs ERPlora X» instead of an «Update» the runtime would refuse.
+        "latest_min_erplora_version": floor,
+        // hub#2336: `false` = the marketplace could not be asked about this app. «I don't know»
+        // is neither an update nor «up to date»: the screen and the bell say so.
+        "checked": checked,
+    })
 }
 
 /// `GET /api/modules/:id/versions` — entre qué versiones puede elegir este hub (hub#675).

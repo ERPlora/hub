@@ -230,6 +230,8 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
     // hub#2431: a handler over its time limit, redacted like `wasm` but with its own code.
     'wasm_timeout',
     'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
+    // hub#2434: the fiscal precondition — its `Display` is a log line with the setting keys in it.
+    'fiscal_precondition_failed',
   ] as const;
 
   for (const code of codes) {
@@ -583,6 +585,143 @@ test('hub#2410: a runtime that sends no reason (or one this SDK does not know) k
         platformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list', reason }, locale),
         sentenceFor('module_not_installed', 'taxes', locale),
         `reason ${String(reason)} (${locale})`,
+      );
+    }
+  }
+});
+
+// ── hub#2434: the fiscal precondition says WHAT is missing and WHERE it is filled in ────────────
+//
+// A business without its legal name and tax id tried to issue an invoice. Refusing is right
+// (ADR-0203), but the screen, in Spanish, painted the runtime's log line verbatim: «fiscal
+// precondition failed: configure business_legal_name, business_tax_id before issuing fiscal
+// documents». The runtime now sends WHAT is missing as data (`missing`, beside the code) and this
+// table turns it into the business words and the place to fix it, in the reader's language.
+
+/** The log line the runtime keeps sending as `message` (its `Display`), for older SDKs. */
+const FISCAL_LOG_LINE =
+  'fiscal precondition failed: configure business_legal_name, business_tax_id before issuing fiscal documents';
+
+/** A precondition refusal as the wire carries it: `missing` is data on the envelope. */
+const fiscalRefusal = (missing?: string[]): PlatformFailure =>
+  ({ code: 'fiscal_precondition_failed', message: FISCAL_LOG_LINE, ...(missing ? { missing } : {}) }) as PlatformFailure;
+
+/** What an internal name looks like on a screen: never acceptable in front of a person. The
+ *  bare key `certificate` is not listed: in English it is also the word a person reads. */
+const INTERNAL_WORDS = /business_|fiscal precondition|fiscal documents/;
+
+test('hub#2434: the till reads what is missing in its language, never the log line', async () => {
+  const transport = transportWith({
+    code: 'fiscal_precondition_failed',
+    message: FISCAL_LOG_LINE,
+    missing: ['business_legal_name', 'business_tax_id'],
+  });
+
+  await assert.rejects(
+    () => transport.command('invoice.invoice.create', {}),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.equal(e.code, 'fiscal_precondition_failed', 'the code is what a module branches on');
+      assert.notEqual(e.message, FISCAL_LOG_LINE, 'never the English line written for the log');
+      assert.doesNotMatch(e.message, INTERNAL_WORDS);
+      return true;
+    },
+  );
+
+  const es = platformFailureMessage(fiscalRefusal(['business_legal_name', 'business_tax_id']), 'es');
+  const en = platformFailureMessage(fiscalRefusal(['business_legal_name', 'business_tax_id']), 'en');
+  assert.ok(es && en, 'fiscal_precondition_failed has no sentence');
+  assert.notEqual(es, en, 'en is the source and es the translation (ADR-0055), not one string');
+  for (const sentence of [es, en]) assert.doesNotMatch(sentence, INTERNAL_WORDS);
+  // The acceptance of the issue: the Spanish reader learns WHAT is missing, in the words of the
+  // Settings form, and WHERE it is filled in.
+  assert.match(es, /razón social/i);
+  assert.match(es, /NIF/);
+  assert.match(es, /Ajustes › Negocio/);
+  // rv-2437: the two halves are joined in the reader's language too — «la razón social y el NIF»,
+  // never «la razón social and el NIF». A mixed sentence reads as untranslated.
+  assert.match(es, /la razón social y el NIF/);
+  assert.match(en, /legal name and tax ID/);
+});
+
+test('hub#2434: each missing requirement is named — the sentence follows `missing`', () => {
+  const cases = [
+    ['business_legal_name'],
+    ['business_tax_id'],
+    ['certificate'],
+    ['business_legal_name', 'business_tax_id'],
+    ['business_legal_name', 'business_tax_id', 'certificate'],
+  ];
+  for (const locale of ['es', 'en'] as const) {
+    const sentences = cases.map((missing) => platformFailureMessage(fiscalRefusal(missing), locale));
+    for (const sentence of sentences) {
+      assert.ok(sentence, `${locale}: no sentence`);
+      assert.doesNotMatch(sentence, INTERNAL_WORDS);
+      if (locale === 'es') assert.doesNotMatch(sentence, /certificate/, 'the key, not the Spanish word');
+    }
+    assert.equal(new Set(sentences).size, cases.length, `${locale}: two different gaps read the same: ${sentences.join(' | ')}`);
+  }
+});
+
+test('hub#2434: an older runtime that sends no `missing` still gets a sentence a person can act on', () => {
+  for (const missing of [undefined, [], ['something_newer']]) {
+    for (const locale of ['es', 'en'] as const) {
+      const sentence = platformFailureMessage(fiscalRefusal(missing), locale);
+      assert.ok(sentence, `${locale}: no sentence for missing=${JSON.stringify(missing)}`);
+      assert.doesNotMatch(sentence, INTERNAL_WORDS);
+      assert.doesNotMatch(sentence, /something_newer/);
+    }
+  }
+});
+
+/** The requirements `enforce_fiscal_precondition` can push, read out of the Rust. */
+function fiscalRequirementsIn(commandsSource: string): string[] {
+  // Not `rustFnBody`: the gate is generic over a lifetime (`fn enforce_fiscal_precondition<'a>(`).
+  const start = commandsSource.search(/fn\s+enforce_fiscal_precondition\s*(<[^>]*>)?\s*\(/);
+  if (start < 0) return [];
+  const end = commandsSource.indexOf('\n}\n', start);
+  const gate = commandsSource.slice(start, end < 0 ? undefined : end)
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n');
+  return [...gate.matchAll(/missing\.push\(\s*"([a-z_]+)"\s*,?\s*\)/g)].map(([, name]) => name!);
+}
+
+test('hub#2434: the requirement finder reads the Rust shape, and catches one with no name', () => {
+  const source = [
+    'fn enforce_fiscal_precondition<\'a>(registry: &Registry) -> Result<()> {',
+    '    let mut missing: Vec<&\'static str> = Vec::new();',
+    '    if a {',
+    '        missing.push("business_tax_id");',
+    '    }',
+    '    // missing.push("commented")',
+    '    missing.push(',
+    '        "brand_new",',
+    '    );',
+    '    Ok(())',
+    '}',
+    '',
+  ].join('\n');
+  assert.deepEqual(fiscalRequirementsIn(source), ['business_tax_id', 'brand_new']);
+  // POSITIVE CONTROL: a requirement nobody named reads exactly like «the runtime said nothing».
+  assert.equal(
+    platformFailureMessage(fiscalRefusal(['brand_new']), 'es'),
+    platformFailureMessage(fiscalRefusal([]), 'es'),
+  );
+});
+
+test('hub#2434: every requirement the fiscal gate can refuse on is named here, in both languages', () => {
+  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+  const requirements = fiscalRequirementsIn(read('../../../crates/runtime/src/commands.rs'));
+  for (const known of ['business_legal_name', 'business_tax_id', 'certificate']) {
+    assert.ok(requirements.includes(known), `the finder no longer sees "${known}" (found: ${requirements.join(', ')})`);
+  }
+  for (const requirement of requirements) {
+    for (const locale of ['es', 'en'] as const) {
+      assert.notEqual(
+        platformFailureMessage(fiscalRefusal([requirement]), locale),
+        platformFailureMessage(fiscalRefusal([]), locale),
+        `the fiscal gate refuses on "${requirement}" but the ${locale} sentence does not name it`,
       );
     }
   }
