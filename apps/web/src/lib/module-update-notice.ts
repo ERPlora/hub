@@ -11,6 +11,9 @@
  *  - **only what can be acted on**: only an admin can update an app, so only an admin sees it, and
  *    an update that needs a newer ERPlora (hub#2082) is not counted — the owner could never clear it;
  *  - **a failed check keeps the last known count**: «I don't know» is neither news nor all-clear.
+ *    A check the runtime answered with apps it could not ask the marketplace about (`checked:
+ *    false`, hub#2336) is a failed check too, and the bell says so ({@link moduleUpdatesUnknown})
+ *    with a «Check again» ({@link retryModuleUpdateNotice}).
  *
  * **Hours apart, never a fast poll.** `GET /api/modules/updates` asks the marketplace once per
  * installed app (hub#516). It is checked when the admin session starts, on a PIN hand-over, and
@@ -18,12 +21,12 @@
  * screen publishes what it learns through {@link publishModuleUpdates}, so updating there clears
  * the notice at once instead of at the next check.
  */
-import { watch, type WatchStopHandle } from 'vue';
+import { readonly, ref, watch, type WatchStopHandle } from 'vue';
 
-import { updateNeedsNewerHub, type ModuleUpdateInfo } from './module-updates';
+import { hasUncheckedUpdates, updateNeedsNewerHub, type ModuleUpdateInfo } from './module-updates';
 import { listModuleUpdates } from './runtime';
 import { isAdmin, isAuthed, user } from './session';
-import { setNotificationCount } from './shell';
+import { notificationCountOf, setNotificationCount } from './shell';
 import { fetchSystemInfo } from './system';
 
 /** Where the notice leads: the «My apps» tab of the Apps screen. */
@@ -50,6 +53,36 @@ function publish(n: number): void {
   setNotificationCount(n, 'moduleUpdates');
 }
 
+const unknown = ref(false);
+const checking = ref(false);
+/** Checks still out. An overtaken check still gives «Check again» back when it lands. */
+let inFlight = 0;
+
+/**
+ * The last check could not say whether the apps are up to date (hub#2336): the runtime or the
+ * marketplace did not answer. The bell says so instead of «All caught up». Only ever `true` for an
+ * admin — the only one who could act on it.
+ */
+export const moduleUpdatesUnknown = readonly(unknown);
+
+/** A check is out: «Check again» is off and reads «Checking…». */
+export const moduleUpdatesChecking = readonly(checking);
+
+/**
+ * Paint one answer. A fully answered check replaces the count; one with apps the marketplace was
+ * not asked about keeps the last known count — raised, never lowered, by the updates it did find.
+ */
+function paint(updates: readonly ModuleUpdateInfo[], hubVersion: string | null | undefined): void {
+  const known = actionableUpdateCount(updates, hubVersion);
+  if (hasUncheckedUpdates(updates)) {
+    unknown.value = true;
+    publish(Math.max(known, notificationCountOf('moduleUpdates')));
+    return;
+  }
+  unknown.value = false;
+  publish(known);
+}
+
 /**
  * What the Apps screen just learnt from `GET /api/modules/updates`. It replaces the notice at once,
  * so an update applied there clears the bell without waiting for the next check.
@@ -59,32 +92,60 @@ export function publishModuleUpdates(
   hubVersion: string | null | undefined,
 ): void {
   if (!isAdmin.value) {
+    unknown.value = false;
     publish(0);
     return;
   }
   generation++;
-  publish(actionableUpdateCount(updates, hubVersion));
+  paint(updates, hubVersion);
+}
+
+/**
+ * The Apps screen's own check failed outright (hub#2336): the bell keeps its count and says it
+ * could not check. Overtakes a background check still in flight, like {@link publishModuleUpdates}.
+ */
+export function markModuleUpdatesUnknown(): void {
+  if (!isAdmin.value) {
+    unknown.value = false;
+    return;
+  }
+  generation++;
+  unknown.value = true;
 }
 
 /** Ask the runtime which installed apps are behind and feed the bell. **Never throws.** */
 export async function refreshModuleUpdateNotice(): Promise<void> {
   const pass = ++generation;
   if (!isAuthed.value || !isAdmin.value) {
+    unknown.value = false;
     publish(0);
     return;
   }
   let updates: ModuleUpdateInfo[];
   let hubVersion: string | null | undefined;
+  inFlight++;
+  checking.value = true;
   try {
     [updates, hubVersion] = await Promise.all([
       listModuleUpdates(),
       fetchSystemInfo().then((info) => info?.hubVersion),
     ]);
   } catch {
-    return; // a runtime that did not answer is not «all up to date»: keep the last count
+    // A runtime that did not answer is not «all up to date»: keep the last count, and say it.
+    if (pass === generation) unknown.value = true;
+    return;
+  } finally {
+    inFlight = Math.max(0, inFlight - 1);
+    checking.value = inFlight > 0;
   }
   if (pass !== generation || !isAuthed.value || !isAdmin.value) return;
-  publish(actionableUpdateCount(updates, hubVersion));
+  paint(updates, hubVersion);
+}
+
+/** «Check again» on the bell (hub#2336). A check already out is not asked twice. */
+export function retryModuleUpdateNotice(): void {
+  if (checking.value) return;
+  checkNow();
 }
 
 let watching = false;
@@ -132,5 +193,6 @@ export function stopModuleUpdateNoticeWatch(): void {
   watching = false;
   generation++;
   lastCheck = 0;
+  unknown.value = false;
   publish(0);
 }

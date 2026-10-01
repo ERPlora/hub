@@ -297,6 +297,29 @@
                   <p>{{ t('topbar.moduleUpdatesBody', { n: moduleUpdateCount }) }}</p>
                 </ion-label>
               </ion-item>
+              <!-- The check for new app versions could not be made (hub#2336): «I don't know» is
+                   not «All caught up». Not a button itself: its action is «Check again». -->
+              <ion-item
+                v-if="moduleUpdatesUnknown"
+                lines="none"
+                data-testid="topbar-module-updates-unknown"
+              >
+                <HubIcon slot="start" name="cloud-offline-outline" color="warning" />
+                <ion-label class="ion-text-wrap">
+                  <h3>{{ t('topbar.moduleUpdatesUnknownTitle') }}</h3>
+                  <p>{{ t('topbar.moduleUpdatesUnknownBody') }}</p>
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    class="ion-no-margin"
+                    data-testid="topbar-module-updates-retry"
+                    :disabled="moduleUpdatesChecking"
+                    @click="retryModuleUpdateNotice"
+                  >
+                    {{ moduleUpdatesChecking ? t('topbar.moduleUpdatesChecking') : t('topbar.moduleUpdatesRetry') }}
+                  </ion-button>
+                </ion-label>
+              </ion-item>
               <!-- What the installed modules raise through their `bell` block (hub#1678): an
                    appointment to confirm, say. The label and the destination come from the
                    module, so the shell never learns what an appointment is. -->
@@ -315,7 +338,7 @@
                 </ion-label>
                 <ion-badge slot="end" color="warning">{{ counter.count }}</ion-badge>
               </ion-item>
-              <ion-item v-if="notificationCount === 0" lines="none">
+              <ion-item v-if="notificationCount === 0 && !moduleUpdatesUnknown" lines="none">
                 <ion-label class="ion-text-wrap" style="opacity:.6">{{ t('topbar.noNotifications') }}</ion-label>
               </ion-item>
             </ion-list>
@@ -352,7 +375,12 @@ import {
 } from '../lib/shell';
 import { undrainedStations } from '../lib/print-alert';
 import { bellCounters } from '../lib/bell-counters';
-import { MODULE_UPDATES_ROUTE } from '../lib/module-update-notice';
+import {
+  MODULE_UPDATES_ROUTE,
+  moduleUpdatesChecking,
+  moduleUpdatesUnknown,
+  retryModuleUpdateNotice,
+} from '../lib/module-update-notice';
 import { canOpenManagement, openManagement } from '../lib/management-link';
 import { canChangeHub, requestChangeHub } from '../lib/change-hub';
 import { isCompactViewport } from '../lib/viewport';

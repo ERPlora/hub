@@ -275,10 +275,10 @@ import { columnsForScreen, TABLE_PHONE_QUERY, type TableView } from '../lib/apps
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
-  defaultVersion, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
+  defaultVersion, hasUncheckedUpdates, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo, type UpdateAllResult, type UpdateAllTarget,
 } from '../lib/module-updates';
-import { publishModuleUpdates } from '../lib/module-update-notice';
+import { markModuleUpdatesUnknown, publishModuleUpdates } from '../lib/module-update-notice';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
 import { isAdmin } from '../lib/session';
 
@@ -1318,23 +1318,27 @@ async function loadInstalled(): Promise<void> {
 }
 
 /**
- * Pregunta al runtime qué versión ofrece hoy el marketplace por módulo instalado (hub#516).
+ * Asks the runtime which version the marketplace offers today for each installed app (hub#516).
  *
- * Bajo demanda, al abrir la pantalla y tras instalar/actualizar. Un fallo deja la lista vacía: sin
- * respuesta **no se ofrece nada** — «no lo sé» no se pinta como «hay novedad».
+ * On demand, when the screen opens and after an install/update. A failure leaves the list empty:
+ * without an answer **nothing is offered** — «I don't know» is never painted as «there is news».
+ * An answer with apps the marketplace could not be asked about (`checked: false`, hub#2336) is a
+ * failed check too: its known updates are offered, and the screen still says it could not check.
  */
 async function loadModuleUpdates(): Promise<void> {
   moduleUpdatesChecking.value = true;
   try {
-    moduleUpdates.value = await listModuleUpdates();
+    const updates = await listModuleUpdates();
+    moduleUpdates.value = updates;
     moduleUpdatesKnown.value = true;
-    moduleUpdatesCheckFailed.value = false;
+    moduleUpdatesCheckFailed.value = hasUncheckedUpdates(updates);
   } catch {
     // Unknown again: the watch below must not publish the emptiness a failure leaves behind.
     moduleUpdatesKnown.value = false;
     moduleUpdates.value = [];
-    // …and the screen must not pass it off as «up to date» either (hub#2366).
+    // …and the screen must not pass it off as «up to date» either (hub#2366), nor the bell.
     moduleUpdatesCheckFailed.value = true;
+    markModuleUpdatesUnknown();
   } finally {
     moduleUpdatesChecking.value = false;
   }

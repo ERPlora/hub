@@ -870,15 +870,27 @@ pub async fn resolve_target(
 ) -> erplora_runtime::module_update::Target {
     resolve_offer(http, cloud_base_url, auth, module_id, installed, pinned)
         .await
-        .0
+        .target
 }
 
-/// [`resolve_target`] plus the ERPlora floor of the version it offers (hub#2082).
+/// What the resolver offers one installed module (hub#2082, hub#2336).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Offer {
+    pub target: erplora_runtime::module_update::Target,
+    /// The ERPlora floor of the version offered: `Some` only for an UPDATE and only when that very
+    /// version declares one.
+    pub floor: Option<String>,
+    /// Whether the answer is KNOWN (hub#2336): `false` when the marketplace could not be read, so
+    /// «stay put» means «I don't know», never «up to date». A pin is a known answer.
+    pub checked: bool,
+}
+
+/// [`resolve_target`] plus the ERPlora floor of the version it offers (hub#2082) and whether the
+/// marketplace was actually read (hub#2336).
 ///
-/// The floor is `Some` only for an UPDATE and only when that very version declares one: it is read
-/// off the same `versions/` answer the resolver chose from, so a newer version the resolver skipped
-/// (quarantine) never lends its floor to the one offered. The pin short-circuits exactly as in
-/// [`resolve_target`] — nothing is offered, nothing is asked.
+/// The floor is read off the same `versions/` answer the resolver chose from, so a newer version
+/// the resolver skipped (quarantine) never lends its floor to the one offered. The pin
+/// short-circuits exactly as in [`resolve_target`] — nothing is offered, nothing is asked.
 pub async fn resolve_offer(
     http: &reqwest::Client,
     cloud_base_url: &str,
@@ -886,14 +898,20 @@ pub async fn resolve_offer(
     module_id: &str,
     installed: &str,
     pinned: Option<&str>,
-) -> (erplora_runtime::module_update::Target, Option<String>) {
+) -> Offer {
     use erplora_runtime::module_update::{resolve, Target};
 
     if let Some(pin) = pinned {
-        return (Target::StayPut(pin.to_string()), None);
+        return Offer {
+            target: Target::StayPut(pin.to_string()),
+            floor: None,
+            checked: true,
+        };
     }
 
-    let published = versions_as_published(http, cloud_base_url, auth, module_id).await;
+    let answer = versions_as_published(http, cloud_base_url, auth, module_id).await;
+    let checked = answer.is_some();
+    let published = answer.unwrap_or_default();
     let target = resolve(installed, None, &as_available(&published));
     let floor = if target.is_update() {
         published
@@ -903,7 +921,11 @@ pub async fn resolve_offer(
     } else {
         None
     };
-    (target, floor)
+    Offer {
+        target,
+        floor,
+        checked,
+    }
 }
 
 /// Lo que el marketplace publica hoy para un módulo (`versions/`), tal cual.
@@ -917,7 +939,11 @@ pub async fn available_versions(
     auth: &Auth,
     module_id: &str,
 ) -> Vec<erplora_runtime::module_update::Available> {
-    as_available(&versions_as_published(http, cloud_base_url, auth, module_id).await)
+    as_available(
+        &versions_as_published(http, cloud_base_url, auth, module_id)
+            .await
+            .unwrap_or_default(),
+    )
 }
 
 /// What the resolver needs from each published version.
@@ -931,31 +957,55 @@ fn as_available(published: &[ModuleVersion]) -> Vec<erplora_runtime::module_upda
         .collect()
 }
 
-/// The marketplace's `versions/` answer as published, or empty when it could not be read — the
-/// same «I don't know» [`available_versions`] documents.
+/// The marketplace's `versions/` answer as published, or `None` when it could not be read — the
+/// «I don't know» [`available_versions`] documents (hub#2336: no answer, an error status, or a body
+/// that is not the list).
+///
+/// A 404 IS an answer: the marketplace does not publish this module (a private or local one), so
+/// there is nothing to offer — `Some(empty)`, not «could not check» forever.
 async fn versions_as_published(
     http: &reqwest::Client,
     cloud_base_url: &str,
     auth: &Auth,
     module_id: &str,
-) -> Vec<ModuleVersion> {
+) -> Option<Vec<ModuleVersion>> {
     let request = CloudClient::new(cloud_base_url).versions(auth, module_id);
     let mut call = http.get(&request.url);
     for (name, value) in &request.headers {
         call = call.header(*name, value);
     }
-    match call.send().await {
-        Ok(response) => response
-            .json::<Vec<ModuleVersion>>()
-            .await
-            .unwrap_or_default(),
+    let response = match call.send().await {
+        Ok(response) => response,
         Err(error) => {
             tracing::warn!(
                 module_id = %module_id,
                 error = %error,
-                "no se pudo leer versions/: se mantiene la versión instalada"
+                "versions/ unreadable: the installed version stays"
             );
-            Vec::new()
+            return None;
+        }
+    };
+    let status = response.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Some(Vec::new());
+    }
+    if !status.is_success() {
+        tracing::warn!(
+            module_id = %module_id,
+            status = %status,
+            "versions/ answered an error: the installed version stays"
+        );
+        return None;
+    }
+    match response.json::<Vec<ModuleVersion>>().await {
+        Ok(published) => Some(published),
+        Err(error) => {
+            tracing::warn!(
+                module_id = %module_id,
+                error = %error,
+                "versions/ answered something that is not the list: the installed version stays"
+            );
+            None
         }
     }
 }
