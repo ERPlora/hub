@@ -138,10 +138,10 @@ export interface TabLabelNeed {
  * («Disponibilida» / «d», hub#2414). The 116px floor is a guess at the longest label; this is the
  * measured answer, so it holds for any language, font, and Android's larger system text.
  *
- * Labels that never wrap (the shell's own strips) are left out: Ionic ends those in an ellipsis,
- * the fallback Material and iOS both use, and a width taken from their whole label would widen
- * every tab of the screen. Capped at the strip's width: a tab wider than the strip cannot show
- * more of a word, it only hides the tab behind the scroll.
+ * Every footer strip of the shell wraps its labels (`polish.css`, hub#2422); a label that never
+ * wraps is left out all the same, because a width taken from its WHOLE label would widen every tab
+ * of the screen. Capped at the strip's width: a tab wider than the strip cannot show more of a
+ * word, it only hides the tab behind the scroll.
  */
 export function wholeWordTabWidth(labels: readonly TabLabelNeed[], visibleWidth: number): number | null {
   const needs = labels.filter((label) => label.wraps && label.wordWidth > 0);

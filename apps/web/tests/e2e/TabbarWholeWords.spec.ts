@@ -333,40 +333,6 @@ test.describe('a footer tab never splits a word (hub#2414)', () => {
     });
   }
 
-  test('a shell strip whose labels never wrap is not widened to its whole labels', async ({ page }) => {
-    // Staff, Settings and System keep Ionic's single-line label, which ends in an ellipsis when it
-    // does not fit — the fallback Material and iOS use. Widening their tabs to the WHOLE label is a
-    // different decision (every tab of those screens would grow), not this fix.
-    await page.setViewportSize(PHONE);
-    await page.addInitScript(
-      ([token, user]) => {
-        localStorage.setItem('erplora.hub_session', token as string);
-        localStorage.setItem('erplora.session', JSON.stringify(user));
-      },
-      [session.token, session.user] as const,
-    );
-    await page.goto('/employees');
-    await expect(page.locator('.ok-tabbar')).toBeVisible();
-    await page.waitForTimeout(1_600);
-    const tabs = await page.evaluate(() => {
-      const strip = Array.from(document.querySelectorAll<HTMLElement>('ion-footer ion-segment')).find(
-        (candidate) => candidate.offsetParent !== null,
-      );
-      return Array.from(strip?.querySelectorAll<HTMLElement>('ion-segment-button') ?? []).map((tab) => {
-        const label = tab.querySelector<HTMLElement>('ion-label');
-        return {
-          whiteSpace: label ? getComputedStyle(label).whiteSpace : '',
-          fullLabel: label?.scrollWidth ?? 0,
-          room: label?.clientWidth ?? 0,
-        };
-      });
-    });
-    expect(tabs.length).toBeGreaterThan(1);
-    expect(tabs.every((tab) => tab.whiteSpace === 'nowrap')).toBe(true);
-    // The bench has to hold a label longer than its tab («Aprobaciones»), or this proves nothing.
-    expect(tabs.some((tab) => tab.fullLabel > tab.room + 1)).toBe(true);
-  });
-
   for (const viewport of VIEWPORTS) {
     for (const material of [false, true]) {
       test(`${material ? 'md' : 'ios'} at ${viewport.width}px: every label reads whole`, async ({ page }) => {
@@ -376,6 +342,206 @@ test.describe('a footer tab never splits a word (hub#2414)', () => {
         expect(mode).toBe(material ? 'md' : 'ios');
         expectWholeWords(labels);
       });
+    }
+  }
+});
+
+// Regression test for ERPlora/hub#2422 — the shell's own strips (Settings, Staff, System) cut their
+// labels with an ellipsis on a phone: «Aproba…», «Actualiza…», «Plan y lí…». The market's answer
+// to a strip that does not fit is to scroll it, not to truncate (Material's scrollable tabs, the
+// iOS tab bar); the module strips already did that since hub#2414, and the shell's now do the same:
+// the label wraps between words and the tab grows to its longest word.
+//
+// Measured against the box, not asked of a style: every character of a label has to be painted
+// inside its tab's content box, and the label must not hold more than it shows (`scrollWidth`).
+// An ellipsis leaves the hidden characters laid out past the box, which is what this catches.
+const SHELL_SCREENS = [
+  { path: '/settings', ready: '[data-testid="settings-tabs"]' },
+  { path: '/employees', ready: 'ion-footer .ok-tabbar' },
+  { path: '/system', ready: 'ion-footer .ok-tabbar' },
+] as const;
+
+/** The widths of the UI contract, with the phone of the issue. */
+const SHELL_VIEWPORTS = [{ width: 1440, height: 900 }, { width: 820, height: 1180 }, PHONE] as const;
+
+interface ShellTab {
+  text: string;
+  /** A character is painted outside the tab's content box (cut by the ellipsis or spilt). */
+  cut: boolean;
+  /** The label holds more than it shows. */
+  truncated: boolean;
+  /** Some word has characters on two different lines. */
+  splitWord: boolean;
+}
+
+async function openShell(page: Page, path: string, ready: string, viewport: { width: number; height: number }) {
+  await page.setViewportSize(viewport);
+  await page.addInitScript(
+    ([token, user]) => {
+      localStorage.setItem('erplora.hub_session', token as string);
+      localStorage.setItem('erplora.session', JSON.stringify(user));
+    },
+    [session.token, session.user] as const,
+  );
+  await page.goto(path);
+  await expect(page.locator(ready).first()).toBeVisible();
+  await page.waitForTimeout(1_600);
+}
+
+async function measureShellTabs(
+  page: Page,
+): Promise<{ mode: string | null; tabs: ShellTab[]; geometry: TabbarGeometry }> {
+  return page.evaluate(() => {
+    const strip = Array.from(document.querySelectorAll<HTMLElement>('ion-footer ion-segment')).find(
+      (candidate) => candidate.offsetParent !== null,
+    );
+    if (!strip) throw new Error('no visible footer tab strip');
+    const buttons = Array.from(strip.querySelectorAll<HTMLElement>('ion-segment-button'));
+    const tabs = buttons.map((tab) => {
+      const label = tab.querySelector<HTMLElement>('ion-label');
+      if (!label) throw new Error('a tab without its label');
+      const box = tab.getBoundingClientRect();
+      const native = getComputedStyle(tab.shadowRoot?.querySelector('.button-native') ?? tab);
+      const left = box.left + parseFloat(native.paddingLeft) + parseFloat(native.borderLeftWidth);
+      const right = box.right - parseFloat(native.paddingRight) - parseFloat(native.borderRightWidth);
+      const labelBox = label.getBoundingClientRect();
+      const lineTops: number[] = [];
+      let previousLine: number | null = null;
+      let splitWord = false;
+      let cut = false;
+      const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+        for (let index = 0; index < node.data.length; index += 1) {
+          if (/\s/.test(node.data[index])) {
+            previousLine = null;
+            continue;
+          }
+          const range = document.createRange();
+          range.setStart(node, index);
+          range.setEnd(node, index + 1);
+          const rect = range.getClientRects()[0];
+          if (!rect) {
+            cut = true;
+            continue;
+          }
+          const middle = rect.top + rect.height / 2;
+          let line = lineTops.findIndex((top) => Math.abs(top - middle) < rect.height / 2);
+          if (line < 0) line = lineTops.push(middle) - 1;
+          if (previousLine !== null && previousLine !== line) splitWord = true;
+          previousLine = line;
+          const inTab = rect.left >= left - 0.5 && rect.right <= right + 0.5;
+          const inLabel = rect.left >= labelBox.left - 0.5 && rect.right <= labelBox.right + 0.5;
+          if (!inTab || !inLabel) cut = true;
+        }
+      }
+      return {
+        text: label.textContent?.trim() ?? '',
+        cut,
+        truncated: label.scrollWidth > label.clientWidth + 1,
+        splitWord,
+      };
+    });
+    return {
+      mode: document.documentElement.getAttribute('mode'),
+      tabs,
+      geometry: {
+        visibleWidth: strip.clientWidth,
+        contentWidth: strip.scrollWidth,
+        firstTabLeft: buttons[0].offsetLeft,
+        tabWidth: buttons[0].offsetWidth,
+        tabPitch: buttons[1].offsetLeft - buttons[0].offsetLeft,
+        tabCount: buttons.length,
+      },
+    };
+  });
+}
+
+/** Saves the viewer's own language, as the Profile screen does (`PUT /api/profile`). */
+async function setProfileLanguage(language: string | null): Promise<void> {
+  const api = await pwRequest.newContext();
+  const headers = { 'X-Hub-Session': session.token };
+  const read = await api.get(`${RUNTIME}/api/profile`, { headers });
+  expect(read.ok(), `GET /api/profile: ${read.status()}`).toBeTruthy();
+  const profile = (await read.json()) as { first_name: string; last_name: string; email: string };
+  const res = await api.put(`${RUNTIME}/api/profile`, {
+    headers,
+    data: {
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      email: profile.email,
+      preferences: { language, theme_mode: null, theme_palette: null },
+    },
+  });
+  expect(res.ok(), `PUT /api/profile: ${res.status()} ${await res.text()}`).toBeTruthy();
+  await api.dispose();
+}
+
+/**
+ * No label loses ink to its own box: a wrapped label sits on a tight line-height (1.1), so the
+ * accents of «límites» and the tail of «y» reach past it, and a label that clipped its overflow
+ * would shave them off. Each tab is photographed as painted and again with its label's overflow
+ * forced visible; any pixel that differs is ink the box was cutting.
+ */
+async function expectInkNotClipped(page: Page): Promise<void> {
+  const tabs = page.locator('ion-footer ion-segment:visible ion-segment-button');
+  const count = await tabs.count();
+  for (let index = 0; index < count; index += 1) {
+    const tab = tabs.nth(index);
+    await tab.scrollIntoViewIfNeeded();
+    const painted = await tab.screenshot({ animations: 'disabled' });
+    const label = tab.locator('ion-label');
+    await label.evaluate((element: HTMLElement) => {
+      element.style.setProperty('overflow', 'visible', 'important');
+      element.style.setProperty('text-overflow', 'clip', 'important');
+    });
+    const unclipped = await tab.screenshot({ animations: 'disabled' });
+    await label.evaluate((element: HTMLElement) => {
+      element.style.removeProperty('overflow');
+      element.style.removeProperty('text-overflow');
+    });
+    const text = (await label.textContent())?.trim();
+    expect(painted.equals(unclipped), `«${text}» has ink clipped by its own box`).toBe(true);
+  }
+}
+
+test.describe("the shell's own tabs read whole (hub#2422)", () => {
+  // The language is the profile's, shared by the whole bench: one test at a time, and put back.
+  test.describe.configure({ mode: 'serial' });
+  test.afterAll(async () => {
+    await setProfileLanguage(null);
+  });
+
+  // Spanish at the three widths (the longest labels); English on the phone, where it can still cut.
+  const runs = [
+    ...SHELL_VIEWPORTS.map((viewport) => ({ lang: 'es' as const, viewport })),
+    { lang: 'en' as const, viewport: PHONE },
+  ];
+  for (const screen of SHELL_SCREENS) {
+    for (const { lang, viewport } of runs) {
+      for (const material of [false, true]) {
+        test(`${screen.path} ${lang} ${material ? 'md' : 'ios'} at ${viewport.width}x${viewport.height}: no label is cut`, async ({
+          page,
+        }) => {
+          await setProfileLanguage(lang);
+          if (material) await forceMaterialMode(page);
+          await openShell(page, screen.path, screen.ready, viewport);
+          await expect(page.locator('html')).toHaveAttribute('lang', lang);
+          const { mode, tabs, geometry } = await measureShellTabs(page);
+          expect(mode).toBe(material ? 'md' : 'ios');
+          expect(tabs.length, 'the screen has a tab strip').toBeGreaterThan(1);
+          for (const tab of tabs) {
+            const context = JSON.stringify(tab);
+            expect(tab.cut, `«${tab.text}» is cut: ${context}`).toBe(false);
+            expect(tab.truncated, `«${tab.text}» holds more than it shows: ${context}`).toBe(false);
+            expect(tab.splitWord, `«${tab.text}» splits a word: ${context}`).toBe(false);
+          }
+          expect(
+            hidesTabsSilently(geometry),
+            `the strip hides tabs without showing it: ${JSON.stringify(geometry)}`,
+          ).toBe(false);
+          await expectInkNotClipped(page);
+        });
+      }
     }
   }
 });

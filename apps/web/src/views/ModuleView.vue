@@ -714,18 +714,8 @@ onBeforeUnmount(() => {
   min-width: var(--ok-tabbar-min);
 }
 
-/* The label wraps between words, never inside one (hub#2414): Ionic's buttons inherit
-   `overflow-wrap: break-word`, which split «Disponibilidad» into «Disponibilida» / «d». The tab is
-   widened to its longest word by `bindTabbarPeek` (tabbar-peek.ts); this keeps the word whole
-   even before that pass has measured it. */
-.module-tabbar ion-label {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: normal;
-  word-break: normal;
-  line-height: 1.1;
-}
+/* The label wraps between words, never inside one: the rule is the shell's, for every footer strip
+   (`polish.css`, hub#2414/hub#2422). */
 
 /* Skeleton de carga del módulo (hub#1169). Bloque, no fila: ocupa el ANCHO del área de contenido
    —que es lo que va a ocupar la pantalla que está bajando— en vez de colapsar en una línea corta
