@@ -476,6 +476,34 @@ async function setProfileLanguage(language: string | null): Promise<void> {
   await api.dispose();
 }
 
+/**
+ * No label loses ink to its own box: a wrapped label sits on a tight line-height (1.1), so the
+ * accents of «límites» and the tail of «y» reach past it, and a label that clipped its overflow
+ * would shave them off. Each tab is photographed as painted and again with its label's overflow
+ * forced visible; any pixel that differs is ink the box was cutting.
+ */
+async function expectInkNotClipped(page: Page): Promise<void> {
+  const tabs = page.locator('ion-footer ion-segment:visible ion-segment-button');
+  const count = await tabs.count();
+  for (let index = 0; index < count; index += 1) {
+    const tab = tabs.nth(index);
+    await tab.scrollIntoViewIfNeeded();
+    const painted = await tab.screenshot({ animations: 'disabled' });
+    const label = tab.locator('ion-label');
+    await label.evaluate((element: HTMLElement) => {
+      element.style.setProperty('overflow', 'visible', 'important');
+      element.style.setProperty('text-overflow', 'clip', 'important');
+    });
+    const unclipped = await tab.screenshot({ animations: 'disabled' });
+    await label.evaluate((element: HTMLElement) => {
+      element.style.removeProperty('overflow');
+      element.style.removeProperty('text-overflow');
+    });
+    const text = (await label.textContent())?.trim();
+    expect(painted.equals(unclipped), `«${text}» has ink clipped by its own box`).toBe(true);
+  }
+}
+
 test.describe("the shell's own tabs read whole (hub#2422)", () => {
   // The language is the profile's, shared by the whole bench: one test at a time, and put back.
   test.describe.configure({ mode: 'serial' });
@@ -511,6 +539,7 @@ test.describe("the shell's own tabs read whole (hub#2422)", () => {
             hidesTabsSilently(geometry),
             `the strip hides tabs without showing it: ${JSON.stringify(geometry)}`,
           ).toBe(false);
+          await expectInkNotClipped(page);
         });
       }
     }
