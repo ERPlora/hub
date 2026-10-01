@@ -1244,6 +1244,13 @@ export default {
     stepPair: 'Vincular',
     stepConfigure: 'Configurar',
     updatesCloudHint: 'Este Hub web se actualiza automáticamente durante los despliegues del servicio.',
+    appUpdates: {
+      title: 'Tus apps',
+      available: '{n} app tiene una versión nueva. | {n} apps tienen una versión nueva.',
+      allUpToDate: 'Todas tus apps están al día.',
+      checking: 'Comprobando si tus apps tienen versiones nuevas…',
+      goToMyApps: 'Ir a Mis apps',
+    },
     // Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5). Actualizamos
     // sin preguntar, así que lo mínimo que le debemos es que pueda SABER qué le cambió. Cada frase
     // nombra una app como él la conoce y una versión que puede comparar — nunca un digest, nunca
