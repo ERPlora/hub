@@ -147,6 +147,7 @@ describe('System → Updates says whether the apps have a new version', () => {
     expect(block.exists()).toBe(true);
     expect(block.text()).toContain(plural(en.system.appUpdates.available, 2));
     expect(block.text()).toContain(en.system.appUpdates.goToMyApps);
+    expect(block.attributes('tone')).toBe('info');
 
     await wrapper.find(GO).trigger('click');
     expect(push).toHaveBeenCalledWith('/apps#mine');
@@ -163,6 +164,7 @@ describe('System → Updates says whether the apps have a new version', () => {
     const wrapper = await mountSystem();
     const block = wrapper.find(BLOCK);
     expect(block.text()).toContain(en.system.appUpdates.allUpToDate);
+    expect(block.attributes('tone')).toBe('success');
     expect(wrapper.find(GO).exists()).toBe(false);
     expect(wrapper.find(RETRY).exists()).toBe(false);
   });
@@ -183,6 +185,9 @@ describe('System → Updates says whether the apps have a new version', () => {
     const block = wrapper.find(BLOCK);
     expect(block.text()).toContain(en.topbar.moduleUpdatesUnknownBody);
     expect(block.text()).not.toContain(en.system.appUpdates.allUpToDate);
+    // A failed check is a warning, never the green tick of «all up to date».
+    expect(block.attributes('tone')).toBe('warning');
+    expect(block.attributes('icon')).not.toBe('checkmark-circle-outline');
 
     await wrapper.find(RETRY).trigger('click');
     await flushPromises();
@@ -202,6 +207,8 @@ describe('System → Updates says whether the apps have a new version', () => {
     const wrapper = await mountSystem();
     expect(wrapper.find(BLOCK).text()).toContain(plural(en.system.appUpdates.available, 2));
     expect(wrapper.find(GO).exists()).toBe(true);
+    // The count wins: one way out, not «Go to My apps» and «Check again» side by side.
+    expect(wrapper.find(RETRY).exists()).toBe(false);
   });
 
   it('says it is checking while the first check is out, not «up to date»', async () => {
@@ -212,6 +219,8 @@ describe('System → Updates says whether the apps have a new version', () => {
     const block = wrapper.find(BLOCK);
     expect(block.text()).toContain(en.system.appUpdates.checking);
     expect(block.text()).not.toContain(en.system.appUpdates.allUpToDate);
+    expect(block.attributes('tone')).toBe('neutral');
+    expect(block.attributes('icon')).not.toBe('checkmark-circle-outline');
 
     answer([upToDate('sales')]);
     await flushPromises();
@@ -246,6 +255,20 @@ describe('leaving System for «My apps»', () => {
     await flushPromises();
     expect(replace).not.toHaveBeenCalled();
     expect(wrapper.find(BLOCK).exists()).toBe(true);
+  });
+
+  // The guard above must not turn into «remember the last tab»: back on a plain /system the address
+  // says Resources, as it did before the guard (develop re-read the hash on the way out).
+  it('coming back to a plain /system opens the tab its address names', async () => {
+    const wrapper = await mountSystem();
+    expect(wrapper.find(BLOCK).exists()).toBe(true);
+    route.path = '/home';
+    route.hash = '';
+    await flushPromises();
+    route.path = '/system';
+    await flushPromises();
+    expect(wrapper.find(BLOCK).exists()).toBe(false);
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it('still follows its own address: a link to another System tab opens it', async () => {

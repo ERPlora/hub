@@ -655,9 +655,10 @@ watch(tab, (value) => {
 });
 // Ionic keeps this page mounted after leaving it, and `route` is the app's one route: only an
 // address on /system speaks for these tabs. Otherwise «Go to My apps» (`/apps#mine`) read as an
-// unknown System tab and got `#resources` written onto the Apps URL (hub#2332).
-watch(() => route.hash, (h) => {
-  if (route.path !== '/system') return;
+// unknown System tab and got `#resources` written onto the Apps URL (hub#2332). The path is watched
+// too: coming back to a plain /system re-reads its (unchanged) hash instead of keeping the last tab.
+watch([() => route.path, () => route.hash], ([path, h]) => {
+  if (path !== '/system') return;
   if (isLegacyBackupsHash(h)) {
     void router.replace({ path: '/settings', hash: '#data' });
     return;
