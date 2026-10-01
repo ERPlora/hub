@@ -401,7 +401,7 @@ export class ListController<T = Record<string, unknown>> {
       // Never blank: a blank `error` is «no error» for the table, which would go back to
       // «No customers» + «0 records» over a hub that did not answer (pm#530).
       const reason = e instanceof Error ? e.message.trim() : '';
-      this.error = reason || listLoadFailedMessage(activeLocale());
+      this.error = tableReadReason(e, activeLocale()) || reason || listLoadFailedMessage(activeLocale());
     } finally {
       if (mySeq === this.seq) {
         this.loading = false;
@@ -752,6 +752,22 @@ const READ_UNREACHABLE_EN =
   'The data could not be loaded because the hub is not responding. Check the connection and try again.';
 const READ_UNREACHABLE_ES =
   'No se han podido cargar los datos porque el hub no responde. Comprueba la conexión e inténtalo de nuevo.';
+
+// hub#2404: the shell's table already paints «Couldn't load the data» as the heading of its error
+// state, so under it the reason gives only the why and what to do. The full sentence above stays
+// for every place that shows the reason alone: toasts, banners, and an older table without that state.
+const READ_UNREACHABLE_UNDER_HEADING_EN = 'The hub is not responding. Check the connection and try again.';
+const READ_UNREACHABLE_UNDER_HEADING_ES = 'El hub no responde. Comprueba la conexión e inténtalo de nuevo.';
+
+/**
+ * The list reason for a read the hub never answered, when the table paints it under its heading.
+ * By `code`, not `instanceof`: the list controller is baked into each module's bundle, while the
+ * error comes from the shell's client, whose ErploraError is another bundle's class.
+ */
+function tableReadReason(e: unknown, locale: string): string {
+  if ((e as { code?: unknown } | null)?.code !== SERVER_UNAVAILABLE || !dataTableShowsLoadError()) return '';
+  return locale.toLowerCase().startsWith('en') ? READ_UNREACHABLE_UNDER_HEADING_EN : READ_UNREACHABLE_UNDER_HEADING_ES;
+}
 
 /**
  * The error a read gets when its transport failed: {@link SERVER_UNAVAILABLE} as before (hub#782),
