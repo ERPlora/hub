@@ -84,8 +84,8 @@ export function elevationRefusal(err: unknown): Refusal {
     case 'hub.elevation.not_required':
       return { key: 'elevation.notRequired' };
     case 'too_many_attempts':
-      // hub#2285: the login pinpad's lock, and its sentence. The minutes appear once the refusal
-      // carries `retryAfterSecs`; the SDK's `ErploraError` does not keep it yet (hub#2290).
+      // hub#2285: the login pinpad's lock, and its sentence, with the minutes the SDK's
+      // `ErploraError` carries as `retryAfterSecs` (hub#2290).
       return lockRefusal(err);
     default:
       return { key: 'elevation.failed' };

@@ -116,7 +116,9 @@ describe('what a refused approval is told', () => {
     // hub#2285: the lock is the login pinpad's lock, and says the pinpad's sentence — with the
     // minutes when the refusal carries the wait.
     expect(elevationRefusal(refusal('too_many_attempts'))).toEqual({ key: 'login.pinTooManyAttemptsNoWait' });
-    expect(elevationRefusal(Object.assign(refusal('too_many_attempts'), { retryAfterSecs: 61 }))).toEqual({
+    expect(
+      elevationRefusal(new ErploraError('too_many_attempts', 'whatever', undefined, undefined, 61)),
+    ).toEqual({
       key: 'login.pinTooManyAttempts',
       minutes: 2,
     });
