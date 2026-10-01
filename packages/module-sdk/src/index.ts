@@ -630,6 +630,13 @@ export class ErploraError extends Error {
      * too, as a one-element list.
      */
     public readonly fields?: readonly string[],
+    /**
+     * How many seconds a lock has left, present only when the refusal names a usable wait — today
+     * `too_many_attempts` at the manager's approval, `error.retry_after_secs` (hub#2290). The shell
+     * says «Wait N minutes» from it instead of a vague «a few». `undefined` when the runtime named
+     * none or something that is not a non-negative number — never a made-up wait.
+     */
+    public readonly retryAfterSecs?: number,
   ) {
     super(message);
     this.name = 'ErploraError';
@@ -833,7 +840,13 @@ export class UnknownOutcomeError extends ErploraError {
 interface Envelope {
   ok: boolean;
   data?: unknown;
-  error?: PlatformFailure & { message: string; permission?: string; fields?: string[]; field?: string };
+  error?: PlatformFailure & {
+    message: string;
+    permission?: string;
+    fields?: string[];
+    field?: string;
+    retry_after_secs?: unknown;
+  };
 }
 
 // ── hub#1102: a PLATFORM failure is not a sentence a module wrote ────────────────────────────
@@ -1306,9 +1319,15 @@ function unwrap(env: Envelope, status?: number): unknown {
       // The core's typed refusals (`invalid_field`, hub#1070/#1185) name ONE field in the singular:
       // it folds in here so there is a single reader for «which fields were refused».
       e?.fields?.length ? e.fields : e?.field ? [e.field] : undefined,
+      retryAfterOf(e?.retry_after_secs),
     );
   }
   return env.data;
+}
+
+/** `retry_after_secs` of a refusal, only when it is a usable wait (a non-negative number). */
+function retryAfterOf(value: unknown): number | undefined {
+  return typeof value === 'number' && value >= 0 ? value : undefined;
 }
 
 /**
