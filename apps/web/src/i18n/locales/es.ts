@@ -522,6 +522,7 @@ export default {
     manageLocal:
       'Esta identidad pertenece solo a este negocio. Aquí no se conocen ni se muestran otros negocios.',
     manageInSaas: 'Gestionar cuenta en erplora.com',
+    deleteAccount: 'Borrar mi cuenta',
     pinTitle: 'PIN',
     pinDesc: 'El PIN con el que entras en la caja. Cámbialo cuando quieras — no hace falta que lo haga nadie más.',
     pinSetupDesc: 'Todavía no tienes un PIN. Establece uno para poder entrar también desde la caja.',

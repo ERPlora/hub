@@ -739,7 +739,11 @@ fn handoff_destination(next: Option<&str>) -> Option<String> {
 /// and their own second factor. It is not administration — it is theirs by definition — and until
 /// this list existed the door asked them for `hub.administer` all the same, so an assistant manager
 /// who had typed her email and her password was sent to a login form to reach her own account.
-const HANDOFF_OWN_ACCOUNT: &[&str] = &["/dashboard/profile/"];
+///
+/// Deleting that account is just as much hers (hub#2451): «Mi perfil → Borrar mi cuenta» lands on
+/// the SaaS's deletion confirmation, the in-app path Google Play demands from an app that lets
+/// people sign up.
+const HANDOFF_OWN_ACCOUNT: &[&str] = &["/dashboard/profile/", "/dashboard/profile/delete/"];
 
 /// Whether `next` lands on the asker's own account.
 ///

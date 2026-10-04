@@ -572,6 +572,7 @@ export default {
     manageLocal:
       'This identity belongs to this business only. Other businesses are neither known nor shown here.',
     manageInSaas: 'Manage account at erplora.com',
+    deleteAccount: 'Delete my account',
     pinTitle: 'PIN',
     pinDesc: 'The PIN you use at the till. Change it whenever you want — nobody else needs to.',
     pinSetupDesc: 'You do not have a PIN yet. Set one to be able to sign in at the till too.',
