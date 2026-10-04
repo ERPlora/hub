@@ -237,7 +237,8 @@
 
 <script setup lang="ts">
 import { inject, ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
+import { useHashTab } from '../lib/hash-tab';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
@@ -303,18 +304,9 @@ interface Mod {
 type AppsTab = 'mine' | 'all' | 'paid';
 const TABS: readonly AppsTab[] = ['mine', 'all', 'paid'];
 
-const route = useRoute();
 const router = useRouter();
-// Deep-link por HASH (/apps#paid) — la ruta base no cambia, así Ionic no la trata como página
-// secundaria (mismo patrón que Settings/System/etc.). Sincroniza tab ↔ hash.
-const tab = ref<AppsTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'mine');
-watch(tab, (value) => {
-  if (value !== (route.hash.slice(1) || 'mine')) void router.replace({ hash: `#${value}` });
-});
-watch(() => route.hash, (h) => {
-  const next = TABS.find((v) => v === h.slice(1)) ?? 'mine';
-  if (next !== tab.value) tab.value = next;
-});
+// Deep link by HASH (/apps#paid), synced only while the address is /apps (hub#2444).
+const tab = useHashTab<AppsTab>('/apps', (h) => TABS.find((v) => v === h.slice(1)) ?? 'mine');
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
