@@ -874,4 +874,145 @@ mod tests {
             "delivered"
         );
     }
+
+    /// A failed erasure is never swallowed: the relay keeps `customer.anonymized` undelivered, names
+    /// the erasure as what failed, and the retry finishes the job. Delivering the row anyway would
+    /// be a GDPR erasure that silently did not happen.
+    #[tokio::test]
+    async fn a_failed_erasure_defers_the_event_and_the_retry_completes_it() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        event(
+            &db,
+            Ev {
+                id: "ev-anon",
+                hub: HUB,
+                status: "pending",
+                name: "customer.anonymized",
+                payload: json!({"customer_id": ANA, "reason": "gdpr request"}),
+                run_id: "",
+            },
+        )
+        .await;
+        // The statement cannot run while one of the tables it writes is away.
+        db.execute(
+            "ALTER TABLE _flow_approvals RENAME TO _flow_approvals_away",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+
+        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+
+        assert_eq!(
+            cell(
+                &db,
+                "SELECT status AS v FROM _event_outbox WHERE id = :id",
+                "ev-anon"
+            )
+            .await,
+            "pending"
+        );
+        // The label of WHAT failed (like `host.notify:`), not the prose of the database error.
+        assert!(cell(
+            &db,
+            "SELECT last_error AS v FROM _event_outbox WHERE id = :id",
+            "ev-anon"
+        )
+        .await
+        .starts_with("erasure:"));
+        // One statement: a failed erasure leaves nothing half-emptied.
+        assert!(event_payload(&db, "ev-upd").await.contains("Ana Pérez"));
+
+        db.execute(
+            "ALTER TABLE _flow_approvals_away RENAME TO _flow_approvals",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+        db.execute(
+            "UPDATE _event_outbox SET next_attempt_at = '2020-01-01T00:00:00+00:00', \
+             claim_expires_at = NULL WHERE id = 'ev-anon'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+
+        assert_eq!(
+            cell(
+                &db,
+                "SELECT status AS v FROM _event_outbox WHERE id = :id",
+                "ev-anon"
+            )
+            .await,
+            "delivered"
+        );
+        assert_eq!(event_payload(&db, "ev-upd").await, EMPTY);
+        assert_eq!(approval_payload(&db, "appr").await, EMPTY);
+    }
+
+    /// A run whose ONLY link to her is what a step RECEIVED (a command called with her id that
+    /// answered without repeating it) is still her history.
+    #[tokio::test]
+    async fn a_run_linked_only_by_a_steps_input_is_emptied() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        run(&db, "run-in", HUB, "done", "", json!({"x": 1}), json!({})).await;
+        step(
+            &db,
+            "run-in-s",
+            HUB,
+            "run-in",
+            0,
+            json!({"customer_id": ANA}),
+            json!({"ok": true}),
+        )
+        .await;
+
+        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
+            .await
+            .unwrap();
+
+        assert_eq!(run_memory(&db, "run-in").await, EMPTY_RUN);
+        assert_eq!(step_memory(&db, "run-in-s").await, EMPTY_RUN);
+        assert_eq!(
+            report,
+            ErasureReport {
+                runs: 1,
+                run_steps: 1,
+                ..ErasureReport::default()
+            }
+        );
+    }
+
+    /// The subject is the LAST segment of the event name: a module-prefixed erasure
+    /// (`whatsapp_inbox.conversation.anonymized`) names `conversation_id`, and only that key. A
+    /// name with no subject right before the suffix is not an erasure.
+    #[test]
+    fn the_subject_is_the_last_segment_of_the_event_name() {
+        let mut payload = Params::new();
+        payload.insert("conversation_id".into(), json!("c-1"));
+
+        assert_eq!(
+            subject_id("whatsapp_inbox.conversation.anonymized", &payload),
+            Some("c-1".to_string())
+        );
+        assert_eq!(
+            subject_id(
+                "whatsapp_inbox.conversation.anonymized",
+                &anonymized(json!(ANA))
+            ),
+            None
+        );
+        for name in [
+            ".anonymized",
+            "anonymized",
+            "conversation..anonymized",
+            "conversation.anonymized.done",
+        ] {
+            assert_eq!(subject_id(name, &payload), None, "{name}");
+        }
+    }
 }
