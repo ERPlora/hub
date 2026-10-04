@@ -28,98 +28,113 @@
     :is-open="pendingElevation !== null"
     @didDismiss="onDismiss"
   >
-    <div class="elevation-body ion-padding">
-      <h2>{{ t('elevation.title') }}</h2>
-      <!-- QUÉ se aprueba (hub#579). Sin esto el encargado teclea su PIN a ciegas y el recibo
-           (`approved_by`) es un sello de goma: nombra una decisión que nadie vio. -->
-      <p data-testid="elevation-what" class="elevation-what">{{ whatIsBeingApproved }}</p>
-      <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
-      <!-- **Swiping the badge IS the approval** (hub#658): it is what Toast, Aloha and Square do,
-           and making the manager type their PIN in front of the customer when they are already
-           holding the card is friction the market dropped twenty years ago. Said in both steps of
-           the dialog because the badge needs nobody chosen first: it resolves the whole person by
-           itself. No field to focus — the shell's global listener catches the swipe. -->
-      <p data-testid="elevation-badge-hint" class="elevation-badge-hint">
-        {{ t('elevation.orSwipeBadge') }}
-      </p>
+    <!-- Three bands, so the dialog fits any screen (hub#2445): the heading and the action row stay
+         put and only the middle scrolls, like the PIN dialog of any till. On a small phone the
+         whole thing used to overflow the screen with nothing to scroll — the title cut off at the
+         top, «Cancel» below the bottom edge. -->
+    <div class="elevation-body">
+      <div class="elevation-head">
+        <h2 data-testid="elevation-title">{{ t('elevation.title') }}</h2>
+        <!-- WHAT is being approved (hub#579). Without it the manager types their PIN blind and the
+             receipt (`approved_by`) is a rubber stamp: it names a decision nobody saw. In the fixed
+             heading, so no amount of scrolling hides it while the PIN is being typed. -->
+        <p data-testid="elevation-what" class="elevation-what">{{ whatIsBeingApproved }}</p>
+      </div>
 
-      <!-- Step 1 — who is approving. A tap, not a spelling test: the queue is still there, and a
-           mistyped name spends one of the five tries the brute-force guard allows. -->
-      <template v-if="!approver">
-        <p class="elevation-choose">{{ t('elevation.chooseApprover') }}</p>
-        <div v-if="people.length" class="elevation-people">
-          <ion-card
-            v-for="p in people"
-            :key="p.id"
-            button
-            data-testid="elevation-person"
-            class="elevation-person"
-            @click="choose(p.name)"
-          >
-            <ion-card-content class="ion-text-center">
-              <ok-avatar :name="p.name" size="lg"></ok-avatar>
-              <p class="elevation-person-name">{{ p.name }}</p>
-            </ion-card-content>
-          </ion-card>
-        </div>
-        <!-- The hub named nobody (a till that has not loaded its people yet, a personal device).
-             Slower, but a dead end here would leave the cashier with no way through at all. -->
-        <template v-else>
-          <ion-input
-            data-testid="elevation-name"
-            mode="md"
-            fill="outline"
-            label-placement="floating"
-            :label="t('elevation.approverName')"
-            :placeholder="t('elevation.approverNamePlaceholder')"
-            :value="typedName"
-            @ionInput="onTypeName"
-          />
-          <ion-button
-            data-testid="elevation-continue"
-            expand="block"
-            class="mt-2"
-            :disabled="!typedName.trim()"
-            @click="choose(typedName)"
-          >
-            {{ t('elevation.continue') }}
-          </ion-button>
+      <div data-testid="elevation-scroll" class="elevation-scroll">
+        <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
+        <!-- **Swiping the badge IS the approval** (hub#658): it is what Toast, Aloha and Square do,
+             and making the manager type their PIN in front of the customer when they are already
+             holding the card is friction the market dropped twenty years ago. Said in both steps of
+             the dialog because the badge needs nobody chosen first: it resolves the whole person by
+             itself. No field to focus — the shell's global listener catches the swipe. -->
+        <p data-testid="elevation-badge-hint" class="elevation-badge-hint">
+          {{ t('elevation.orSwipeBadge') }}
+        </p>
+
+        <!-- Step 1 — who is approving. A tap, not a spelling test: the queue is still there, and a
+             mistyped name spends one of the five tries the brute-force guard allows. -->
+        <template v-if="!approver">
+          <p class="elevation-choose">{{ t('elevation.chooseApprover') }}</p>
+          <div v-if="people.length" class="elevation-people">
+            <ion-card
+              v-for="p in people"
+              :key="p.id"
+              button
+              data-testid="elevation-person"
+              class="elevation-person"
+              @click="choose(p.name)"
+            >
+              <ion-card-content class="ion-text-center">
+                <ok-avatar :name="p.name" size="lg"></ok-avatar>
+                <p class="elevation-person-name">{{ p.name }}</p>
+              </ion-card-content>
+            </ion-card>
+          </div>
+          <!-- The hub named nobody (a till that has not loaded its people yet, a personal device).
+               Slower, but a dead end here would leave the cashier with no way through at all. -->
+          <template v-else>
+            <ion-input
+              data-testid="elevation-name"
+              mode="md"
+              fill="outline"
+              label-placement="floating"
+              :label="t('elevation.approverName')"
+              :placeholder="t('elevation.approverNamePlaceholder')"
+              :value="typedName"
+              @ionInput="onTypeName"
+            />
+            <ion-button
+              data-testid="elevation-continue"
+              expand="block"
+              class="mt-2"
+              :disabled="!typedName.trim()"
+              @click="choose(typedName)"
+            >
+              {{ t('elevation.continue') }}
+            </ion-button>
+          </template>
         </template>
-      </template>
 
-      <!-- Step 2 — the PIN. Same `ok-pinpad` as the login screen, sized to THIS hub's PIN length
-           (`hubPinLength`, hub#1302): the manager types the credential they already know, in the
-           shape they already know it. -->
-      <template v-else>
-        <div class="elevation-approver">
-          <ok-avatar :name="approver" size="lg"></ok-avatar>
-          <p class="elevation-person-name">{{ approver }}</p>
-        </div>
-        <div class="elevation-pinpad-wrap">
-          <ok-pinpad
-            ref="pinpadRef"
-            data-testid="elevation-pinpad"
-            dots
-            :length="hubPinLength"
-            :error="refusal !== null"
-            :aria-busy="sending"
-            secondary-icon="arrow-back-outline"
-            :secondary-label="t('elevation.changeApprover')"
-            @ok-input="onPinInput"
-            @ok-complete="onPinComplete"
-            @ok-secondary="backToPeople"
-          ></ok-pinpad>
-        </div>
-      </template>
+        <!-- Step 2 — the PIN. Same `ok-pinpad` as the login screen, sized to THIS hub's PIN length
+             (`hubPinLength`, hub#1302): the manager types the credential they already know, in the
+             shape they already know it. -->
+        <template v-else>
+          <div class="elevation-approver">
+            <ok-avatar :name="approver" size="lg"></ok-avatar>
+            <p class="elevation-person-name">{{ approver }}</p>
+          </div>
+          <div class="elevation-pinpad-wrap">
+            <ok-pinpad
+              ref="pinpadRef"
+              data-testid="elevation-pinpad"
+              dots
+              :length="hubPinLength"
+              :error="refusal !== null"
+              :aria-busy="sending"
+              secondary-icon="arrow-back-outline"
+              :secondary-label="t('elevation.changeApprover')"
+              @ok-input="onPinInput"
+              @ok-complete="onPinComplete"
+              @ok-secondary="backToPeople"
+            ></ok-pinpad>
+          </div>
+        </template>
 
-      <ion-note v-if="refusal" data-testid="elevation-error" color="danger" class="elevation-error">
-        {{ sayRefusal(t, refusal) }}
-      </ion-note>
+      </div>
 
-      <div class="elevation-actions">
+      <!-- The refusal sits in the fixed band, next to Cancel, not at the foot of the scroller: on a
+           small phone the foot of the scroller is below the fold, and a manager who just typed a
+           wrong PIN must read «locked for five minutes» where they are looking (hub#2445). -->
+      <div class="elevation-foot">
+        <ion-note v-if="refusal" data-testid="elevation-error" color="danger" class="elevation-error">
+          {{ sayRefusal(t, refusal) }}
+        </ion-note>
+        <div class="elevation-actions">
         <ion-button data-testid="elevation-cancel" fill="clear" color="medium" @click="cancel">
           {{ t('elevation.cancel') }}
-        </ion-button>
+          </ion-button>
+        </div>
       </div>
     </div>
   </ion-modal>
@@ -313,6 +328,28 @@ function onDismiss(): void {
   --height: auto;
   --border-radius: 14px;
 }
+/* The tallest the dialog may get: the screen, minus a margin and the notch/home bar. Ionic's wrapper
+   is `auto` high and simply wraps this, so this cap is the one that makes the middle band scroll. */
+.elevation-body {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(
+    100dvh - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+}
+.elevation-head {
+  flex: none;
+  padding: var(--ion-padding, 16px) var(--ion-padding, 16px) 0.6rem;
+}
+.elevation-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--ion-padding, 16px);
+}
+.elevation-what {
+  margin: 0;
+}
 .elevation-body h2 {
   margin: 0 0 0.35rem;
   font-size: 1.1rem;
@@ -336,8 +373,6 @@ function onDismiss(): void {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
   gap: 0.5rem;
-  max-height: 40vh;
-  overflow-y: auto;
 }
 .elevation-person {
   margin: 0;
@@ -356,14 +391,17 @@ function onDismiss(): void {
   display: flex;
   justify-content: center;
 }
+.elevation-foot {
+  flex: none;
+  padding: 0.4rem var(--ion-padding, 16px) 0.5rem;
+}
 .elevation-error {
   display: block;
-  margin-top: 0.6rem;
+  margin-bottom: 0.2rem;
   text-align: center;
 }
 .elevation-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.4rem;
 }
 </style>
