@@ -368,6 +368,32 @@ mod tests {
             json!({"to": "+34600111222", "text": "Hola Ana"}),
         )
         .await;
+        // A step that never held anything: emptying it again is not counted.
+        step(db, &format!("{prefix}step-empty"), hub, &format!("{prefix}run"), 1, json!({}), json!({})).await;
+        // Four more runs, each linked to her by ONE thing only, so each link is proven on its own.
+        run(db, &format!("{prefix}run-input"), hub, "failed", "", json!({"customer_id": ANA}), json!({})).await;
+        run(db, &format!("{prefix}run-vars"), hub, "done", "", json!({"x": 1}), json!({"who": ANA})).await;
+        run(db, &format!("{prefix}run-step"), hub, "cancelled", "", json!({"x": 1}), json!({})).await;
+        step(
+            db,
+            &format!("{prefix}run-step-s"),
+            hub,
+            &format!("{prefix}run-step"),
+            0,
+            json!({}),
+            json!({"customer_id": ANA}),
+        )
+        .await;
+        run(db, &format!("{prefix}run-appr"), hub, "done", "", json!({"x": 1}), json!({})).await;
+        approval(
+            db,
+            &format!("{prefix}run-appr-a"),
+            hub,
+            &format!("{prefix}run-appr"),
+            "rejected",
+            json!({"customer_id": ANA}),
+        )
+        .await;
         event(db, Ev {
             id: &format!("{prefix}ev-reminder"),
             hub,
@@ -402,9 +428,14 @@ mod tests {
             EMPTY,
             "what that run queued carries her phone without her id"
         );
+        for id in ["run-input", "run-vars", "run-step", "run-appr"] {
+            assert_eq!(run_memory(&db, id).await, EMPTY_RUN, "{id}");
+        }
+        assert_eq!(step_memory(&db, "run-step-s").await, EMPTY_RUN);
+        assert_eq!(approval_payload(&db, "run-appr-a").await, EMPTY);
         assert_eq!(
             report,
-            ErasureReport { events: 3, runs: 1, run_steps: 1, approvals: 1 }
+            ErasureReport { events: 3, runs: 5, run_steps: 2, approvals: 2 }
         );
     }
 
@@ -427,6 +458,12 @@ mod tests {
         assert!(run_memory(&db, "b-run").await.contains("Ana Pérez"));
         assert!(step_memory(&db, "b-step").await.contains("+34600111222"));
         assert!(approval_payload(&db, "b-appr").await.contains("Hola Ana"));
+        assert!(run_memory(&db, "b-run-input").await.contains(ANA));
+        assert!(run_memory(&db, "b-run-vars").await.contains(ANA));
+        assert!(run_memory(&db, "b-run-step").await.contains("\"x\""));
+        assert!(step_memory(&db, "b-run-step-s").await.contains(ANA));
+        assert!(run_memory(&db, "b-run-appr").await.contains("\"x\""));
+        assert!(approval_payload(&db, "b-run-appr-a").await.contains(ANA));
         // …and hub A was erased in the same database, so the filter is what saved B.
         assert_eq!(event_payload(&db, "ev-upd").await, EMPTY);
     }
@@ -447,6 +484,17 @@ mod tests {
         .await;
         run(&db, "run-bea", HUB, "done", "ev-bea", json!({"customer_id": BEA}), json!({})).await;
         step(&db, "step-bea", HUB, "run-bea", 0, json!({}), json!({"name": "Bea"})).await;
+        // An id that merely STARTS with hers is somebody else.
+        let longer = format!("{ANA}0");
+        event(&db, Ev {
+            id: "ev-longer",
+            hub: HUB,
+            status: "delivered",
+            name: "customer.updated",
+            payload: json!({"id": longer, "name": "Dora"}),
+            run_id: "",
+        })
+        .await;
 
         on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
             .await
@@ -455,6 +503,7 @@ mod tests {
         assert!(event_payload(&db, "ev-bea").await.contains("Bea"));
         assert!(run_memory(&db, "run-bea").await.contains(BEA));
         assert!(step_memory(&db, "step-bea").await.contains("Bea"));
+        assert!(event_payload(&db, "ev-longer").await.contains("Dora"));
     }
 
     /// Live work keeps its data: a pending event has not been delivered yet, a dead one waits for
