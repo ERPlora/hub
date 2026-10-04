@@ -97,6 +97,18 @@ async fn an_explicit_null_is_the_same_omission() {
     assert_missing(err, "pbind.items.get", "item_id");
 }
 
+/// The paged door is the same door: a flow's `query` step reads a plain query through
+/// `execute_query_page`, and it refuses the same omission instead of answering an empty page.
+#[tokio::test]
+async fn the_paged_door_refuses_the_same_omission() {
+    let rt = hub().await;
+    let err = rt
+        .execute_query_page("pbind.items.get", &Params::new(), &ctx("h1"))
+        .await
+        .expect_err("an absent :item_id must not come back as an empty page");
+    assert_missing(err, "pbind.items.get", "item_id");
+}
+
 /// No regression, and tenancy: with the bind the read answers its record, and only in its hub.
 #[tokio::test]
 async fn with_the_bind_the_read_answers_its_record_and_only_in_its_hub() {
@@ -220,5 +232,44 @@ async fn a_command_read_with_an_absent_mapped_param_still_preloads() {
         )
         .await
         .expect("a required read with an absent optional param is preloaded, never aborts");
+    assert_eq!(out["operations"], json!(1));
+}
+
+/// The same read when the author's mapping also carries a page size: a numeric `limit` sends
+/// `queries::execute` down its single-trip branch, and that branch still reads as the command's
+/// own read — the absent `item_id` binds NULL and the command runs.
+#[tokio::test]
+async fn a_command_read_with_a_mapped_limit_still_preloads() {
+    let package = kernel_fixture::broken_copy("read-optional-param-limit-2383", |m| {
+        m["queries"]["kfx.items.one"] = json!({
+            "permission": "kfx.read",
+            "sql": "queries/item_one.sql"
+        });
+        m["commands"]["kfx.items.bulk"]["reads"] = json!([{
+            "query": "kfx.items.one",
+            "params": { "item_id": "payload.item_id", "limit": "payload.take" },
+            "required": true
+        }]);
+    });
+    std::fs::write(
+        package.path().join("queries").join("item_one.sql"),
+        "SELECT id, name FROM kfx_item WHERE hub_id = :hub_id AND id = :item_id\n",
+    )
+    .expect("write the read's SQL");
+
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(package.path())
+        .await
+        .expect("install the fixture with the extra read");
+
+    let out = rt
+        .execute_command(
+            "kfx.items.bulk",
+            &params(json!({ "names": ["a"], "take": 5 })),
+            &kernel_fixture::admin(),
+        )
+        .await
+        .expect("a required read with a page size and an absent optional param still preloads");
     assert_eq!(out["operations"], json!(1));
 }
