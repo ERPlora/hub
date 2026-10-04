@@ -3804,8 +3804,8 @@ mod tests {
     /// A text that already fits prints exactly as it did: one line, as written.
     #[test]
     fn a_short_footer_prints_exactly_as_today() {
-        let bytes = render_document(DocumentType::Receipt, &ticket_with("receipt_footer", "Vuelva pronto"))
-            .expect("a valid ticket");
+        let data = ticket_with("receipt_footer", "Vuelva pronto");
+        let bytes = render_document(DocumentType::Receipt, &data).expect("a valid ticket");
         let lines = roll_lines(&bytes);
         assert_eq!(
             lines.iter().filter(|l| l.contains("Vuelva")).collect::<Vec<_>>(),
