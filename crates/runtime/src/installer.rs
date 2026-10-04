@@ -2065,19 +2065,32 @@ mod tests {
         };
         assert_eq!(row_level("UPDATE _deprecated_x_r SET data = NULL;"), [true]);
         assert_eq!(row_level("UPDATE ONLY x_r SET data = NULL;"), [true]);
-        assert_eq!(row_level("DELETE FROM _deprecated_x_r WHERE id = :id;"), [true]);
-        assert_eq!(row_level("INSERT INTO _deprecated_x_r (id) VALUES (:id);"), [false]);
         assert_eq!(
-            row_level(
-                "INSERT INTO x_r (k) VALUES (:k) ON CONFLICT (k) DO UPDATE SET k = :k;"
-            ),
+            row_level("DELETE FROM _deprecated_x_r WHERE id = :id;"),
+            [true]
+        );
+        assert_eq!(
+            row_level("INSERT INTO _deprecated_x_r (id) VALUES (:id);"),
+            [false]
+        );
+        assert_eq!(
+            row_level("INSERT INTO x_r (k) VALUES (:k) ON CONFLICT (k) DO UPDATE SET k = :k;"),
             [false],
             "the DO UPDATE clause belongs to the INSERT"
         );
         assert_eq!(row_level("DROP TABLE _deprecated_x_r;"), [false]);
-        assert_eq!(row_level("ALTER TABLE _deprecated_x_r ADD COLUMN y TEXT;"), [false]);
-        assert_eq!(row_level("CREATE TABLE _deprecated_x_r (id TEXT);"), [false]);
-        assert_eq!(row_level("CREATE INDEX i ON _deprecated_x_r (id);"), [false]);
+        assert_eq!(
+            row_level("ALTER TABLE _deprecated_x_r ADD COLUMN y TEXT;"),
+            [false]
+        );
+        assert_eq!(
+            row_level("CREATE TABLE _deprecated_x_r (id TEXT);"),
+            [false]
+        );
+        assert_eq!(
+            row_level("CREATE INDEX i ON _deprecated_x_r (id);"),
+            [false]
+        );
         assert_eq!(row_level("TRUNCATE _deprecated_x_r;"), [false]);
 
         // The shape whatsapp_inbox#264 ships: the subselect is a READ, the one target is the

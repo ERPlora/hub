@@ -93,7 +93,10 @@ async fn seed_request(rt: &Runtime, hub: &str, id: &str, customer: &str) {
     p.insert("hub_id".into(), json!(hub));
     p.insert("id".into(), json!(id));
     p.insert("customer_id".into(), json!(customer));
-    p.insert("data".into(), json!(format!("{customer} asked for a haircut")));
+    p.insert(
+        "data".into(),
+        json!(format!("{customer} asked for a haircut")),
+    );
     rt.db_for_test()
         .execute(
             "INSERT INTO set_aside_request (hub_id, id, customer_id, data) \
@@ -153,12 +156,31 @@ async fn a_module_erases_its_own_set_aside_rows_in_the_callers_hub_only() {
         .expect("the module erases from its own set-aside table");
 
     let rows = set_aside_rows(&rt).await;
-    assert_eq!(rows.len(), 3, "an erasure blanks, it does not lose rows: {rows:?}");
+    assert_eq!(
+        rows.len(),
+        3,
+        "an erasure blanks, it does not lose rows: {rows:?}"
+    );
     let (h1_ana, h1_bea, h2_ana) = (&rows[0], &rows[1], &rows[2]);
-    assert_eq!((h1_ana["hub_id"].clone(), h1_ana["id"].clone()), (json!("h1"), json!("r1")));
-    assert_eq!(h1_ana["data"], json!(null), "her request is blanked: {rows:?}");
-    assert_ne!(h1_ana["deleted_at"], json!(null), "and marked deleted: {rows:?}");
-    assert_eq!(h1_bea["data"], json!("bea asked for a haircut"), "another customer stays: {rows:?}");
+    assert_eq!(
+        (h1_ana["hub_id"].clone(), h1_ana["id"].clone()),
+        (json!("h1"), json!("r1"))
+    );
+    assert_eq!(
+        h1_ana["data"],
+        json!(null),
+        "her request is blanked: {rows:?}"
+    );
+    assert_ne!(
+        h1_ana["deleted_at"],
+        json!(null),
+        "and marked deleted: {rows:?}"
+    );
+    assert_eq!(
+        h1_bea["data"],
+        json!("bea asked for a haircut"),
+        "another customer stays: {rows:?}"
+    );
     assert_eq!(h1_bea["deleted_at"], json!(null), "{rows:?}");
     assert_eq!(h2_ana["hub_id"], json!("h2"));
     assert_eq!(
@@ -200,7 +222,9 @@ async fn another_modules_set_aside_table_stays_out_of_reach() {
     let err = rt
         .install_from_dir(&fixture("set_aside_foreign"))
         .await
-        .expect_err("`UPDATE _deprecated_inventory_product` from `set_aside_foreign` must not install");
+        .expect_err(
+            "`UPDATE _deprecated_inventory_product` from `set_aside_foreign` must not install",
+        );
     assert!(
         matches!(
             &err,
@@ -218,7 +242,10 @@ async fn another_modules_set_aside_table_stays_out_of_reach() {
 async fn dropping_or_truncating_an_own_set_aside_table_is_refused() {
     for (fixture_name, table) in [
         ("set_aside_drop", "_deprecated_set_aside_drop_request"),
-        ("set_aside_truncate", "_deprecated_set_aside_truncate_request"),
+        (
+            "set_aside_truncate",
+            "_deprecated_set_aside_truncate_request",
+        ),
     ] {
         let db = fresh_db().await;
         let mut rt = Runtime::new(Box::new(db));
