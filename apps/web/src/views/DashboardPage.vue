@@ -160,7 +160,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
+import { useHashTab } from '../lib/hash-tab';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -213,7 +214,6 @@ import { formatDate, formatDateTime } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 const router = useRouter();
-const route = useRoute();
 
 // Solo dos pestañas: la rejilla de apps (antes "Instaladas") vive en el launcher de la topbar
 // (acceso rápido) y en /apps (gestión completa), sin duplicar en el Inicio.
@@ -233,19 +233,8 @@ interface DataTableColumn {
   render?: (row: Row) => Node | string;
 }
 
-// Deep-link por HASH (#actividad) — la ruta base (/dashboard) NO cambia, así Ionic no la trata
-// como página secundaria (no se desmonta el tabbar ni aparece el botón back). Sincroniza tab ↔ hash.
-const tab = ref<Tab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'resumen');
-watch(tab, (value) => {
-  if (value !== (route.hash.slice(1) || 'resumen')) void router.replace({ hash: `#${value}` });
-});
-watch(
-  () => route.hash,
-  (h) => {
-    const next = TABS.find((v) => v === h.slice(1)) ?? 'resumen';
-    if (next !== tab.value) tab.value = next;
-  },
-);
+// Deep link by HASH (/dashboard#actividad), synced only while the address is /dashboard (hub#2444).
+const tab = useHashTab<Tab>('/dashboard', (h) => TABS.find((v) => v === h.slice(1)) ?? 'resumen');
 
 const client = getClient();
 

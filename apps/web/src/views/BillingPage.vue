@@ -132,7 +132,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router';
+import { useHashTab } from '../lib/hash-tab';
 import {
   IonToolbar, IonCard, IonCardContent, IonButton,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonSpinner
@@ -156,18 +156,8 @@ type BillingTab = 'invoices' | 'subscriptions' | 'payments';
 type BillingLoadState = 'loading' | 'ready' | 'auth-required' | 'error';
 const TABS: readonly BillingTab[] = ['invoices', 'subscriptions', 'payments'];
 
-const route = useRoute();
-const router = useRouter();
-// Deep-link por HASH (/billing#pagos) — la ruta base no cambia, así Ionic no la trata como
-// página secundaria. Sincroniza tab ↔ hash.
-const tab = ref<BillingTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'invoices');
-watch(tab, (value) => {
-  if (value !== (route.hash.slice(1) || 'invoices')) void router.replace({ hash: `#${value}` });
-});
-watch(() => route.hash, (h) => {
-  const next = TABS.find((v) => v === h.slice(1)) ?? 'invoices';
-  if (next !== tab.value) tab.value = next;
-});
+// Deep link by HASH (/billing#payments), synced only while the address is /billing (hub#2444).
+const tab = useHashTab<BillingTab>('/billing', (h) => TABS.find((v) => v === h.slice(1)) ?? 'invoices');
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
