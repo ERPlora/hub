@@ -58,6 +58,13 @@ sales/tests/order_discount_cap.hub.test.py
 # pending-publication: sales#278 until 2026-10-24
 sales/tests/service_sale.hub.test.py
 
+# sales: in a Spanish hub a sale of 1.000 € or more cannot take cash, mixed payments included —
+# 999,99 € in cash closes, 1.000 € in cash and 999 € cash + 1 € card are refused with
+# `sales.cash_limit_exceeded` and write no sale, and the preview publishes `cash_limit`, against
+# the real kernel (sales#498, Ley 7/2012 art. 7). New coverage, not moved.
+# pending-publication: sales#498 until 2026-11-03
+sales/tests/cash_limit.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
