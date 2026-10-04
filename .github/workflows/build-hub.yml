@@ -93,6 +93,23 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # hub#2449: the slots of ci-runner-1 run as one user and share ONE `~/.docker/config.json`,
+      # and the post step of `docker/login-action` in any concurrent job (N-1, saas, the gateway)
+      # runs `docker logout ghcr.io` on it — this push then dies with `unauthorized`. A config of
+      # our own under `$RUNNER_TEMP` (per slot, wiped per job), exported through `$GITHUB_ENV`
+      # because the `runner` context is not available in a job-level `env:`. The shared
+      # `cli-plugins` is linked in because the runner installs buildx there. Contract:
+      # scripts/tests/docker-config-isolation.test.sh.
+      - name: Isolate this job's Docker config
+        run: |
+          set -euo pipefail
+          config="${RUNNER_TEMP}/docker-config"
+          mkdir -p "${config}"
+          if [ -d "${HOME}/.docker/cli-plugins" ]; then
+            ln -sfn "${HOME}/.docker/cli-plugins" "${config}/cli-plugins"
+          fi
+          echo "DOCKER_CONFIG=${config}" >> "${GITHUB_ENV}"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
