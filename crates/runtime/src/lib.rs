@@ -24,6 +24,7 @@ pub mod device_mode;
 pub mod devices;
 pub mod e2e_support;
 pub mod elevation;
+pub mod erasure;
 pub mod error_registry;
 pub mod errors;
 pub mod event_shape;
