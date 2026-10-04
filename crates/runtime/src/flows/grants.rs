@@ -121,6 +121,12 @@ pub struct Grant {
     /// grant that really says «may cancel appointments as the customer» would describe a wider
     /// permission than the one that was given.
     pub payload: Json,
+    /// flows#88 — the stored pin of a kind that carries one cannot be read, so [`authority`] drops
+    /// the row and it authorises NOTHING (hub#1636). `payload` reads `{}` for it exactly like a
+    /// grant that fixes nothing, which is why this is a field of its own: it is what lets the
+    /// permissions screen paint the row as broken and tell the owner to revoke and grant it again
+    /// — the only way back, since nothing in the product can write a readable pin over it.
+    pub payload_unreadable: bool,
     pub granted_by: String,
     pub created_at: String,
 }
@@ -1297,6 +1303,11 @@ pub async fn revoke_all(
 
 fn grant_row(row: &Json) -> Grant {
     let text = |k: &str| row[k].as_str().unwrap_or_default().to_string();
+    let pin = parse_pin(&row["payload"]);
+    // The same judgement `authority()` makes, so the screen and the gate cannot disagree: only a
+    // kind that CAN be pinned is broken by an unreadable column; any other kind never consults it.
+    let payload_unreadable = pin.is_none()
+        && GrantKind::parse(row["kind"].as_str().unwrap_or_default()).is_some_and(GrantKind::can_pin);
     Grant {
         id: text("id"),
         kind: text("kind"),
@@ -1304,7 +1315,8 @@ fn grant_row(row: &Json) -> Grant {
         // hub#1623 — as an OBJECT, never the raw TEXT: a screen that got `"{\"channel\":…}"` as a
         // string would print the quotes, and the grants screen is the one place this has to read
         // like the sentence it is.
-        payload: Json::Object(parse_pin(&row["payload"]).unwrap_or_default()),
+        payload: Json::Object(pin.unwrap_or_default()),
+        payload_unreadable,
         granted_by: text("granted_by"),
         created_at: text("created_at"),
     }
@@ -1904,6 +1916,150 @@ mod tests {
         .await
         .expect_err("a pin nobody can read authorises nothing, on a read as on a write");
         assert_eq!(code_of(&err), ERR_GRANT_DENIED);
+    }
+
+    // ── The SCREEN learns which row is broken (ERPlora/flows#88) ────────────────────────────────
+
+    /// The listing row of `value`, as `GET …/grants` hands it to the permissions screen.
+    async fn listed(db: &dyn DatabaseAdapter, value: &str) -> Grant {
+        list(db, HUB, FLOW)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|g| g.value == value)
+            .unwrap_or_else(|| panic!("`{value}` is still listed as a live grant"))
+    }
+
+    /// flows#88 — hub#1636 made an unreadable pin authorise NOTHING, but the listing still handed the
+    /// screen `payload: {}`, the very shape of a grant that fixes nothing: the owner read «granted»
+    /// on the row that was denying every run. The listing now SAYS which row cannot be read, as its
+    /// own field — `payload: null` would not do, the module collapses it to `{}` just the same.
+    #[tokio::test]
+    async fn the_listing_marks_a_grant_whose_pin_cannot_be_read() {
+        for raw in ["garbage", "", "null", "[]", "7", "\"channel=customer\""] {
+            let db = db_with_schema().await;
+            replace(
+                &db,
+                HUB,
+                FLOW,
+                &registry(),
+                &[
+                    GrantSpec::pinned("sales.sale.void", pin("channel", "customer")),
+                    GrantSpec::pair(GrantKind::Command, "sales.sale.create"),
+                ],
+                "hub_user:1",
+            )
+            .await
+            .unwrap();
+            corrupt_the_stored_pin(&db, "sales.sale.void", raw).await;
+
+            let broken = listed(&db, "sales.sale.void").await;
+            assert!(broken.payload_unreadable, "payload `{raw}` is listed as readable");
+            assert_eq!(broken.payload, json!({}), "payload `{raw}`: garbage never reaches the screen");
+            // One broken row marks ONE row: the readable neighbour still reads as granted.
+            assert!(
+                !listed(&db, "sales.sale.create").await.payload_unreadable,
+                "payload `{raw}`: the readable grant next to it was marked too"
+            );
+        }
+    }
+
+    /// The control: a readable pin — the empty one and a real one — is never marked. Without this, a
+    /// listing that marked every `command` row would pass the guard above and paint every permission
+    /// of the hub as broken.
+    #[tokio::test]
+    async fn a_readable_pin_is_never_marked_unreadable() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[
+                GrantSpec::pinned("sales.sale.void", pin("channel", "customer")),
+                GrantSpec::pair(GrantKind::Command, "sales.sale.create"),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let pinned = listed(&db, "sales.sale.void").await;
+        assert!(!pinned.payload_unreadable);
+        assert_eq!(pinned.payload, json!({ "channel": "customer" }));
+
+        corrupt_the_stored_pin(&db, "sales.sale.create", "{}").await;
+        assert!(!listed(&db, "sales.sale.create").await.payload_unreadable);
+    }
+
+    /// A kind that carries no pin is not marked whatever its column holds: `authority()` never
+    /// consults that column for it and keeps authorising, so a «broken» mark there would send the
+    /// owner to revoke a permission that works.
+    #[tokio::test]
+    async fn an_unpinnable_kind_is_not_marked_whatever_its_column_holds() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pair(GrantKind::Notify, "email")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        db.execute(
+            "UPDATE _flow_grants SET payload = 'garbage' WHERE hub_id = :hub_id AND kind = 'notify'",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        assert!(!listed(&db, "email").await.payload_unreadable);
+        assert!(authority(&db, HUB, FLOW)
+            .await
+            .unwrap()
+            .allows_notify(Channel::parse("email").unwrap()));
+    }
+
+    /// flows#88 — **the way back is the one the screen offers: revoke, then grant again.** And the
+    /// way NOT back: a screen that saves something else re-sends the broken row the only way it can,
+    /// as a bare pair, and that must keep it broken — re-granting it unpinned would turn an
+    /// unreadable restriction into a wider authorisation (hub#1636) without anybody choosing to.
+    #[tokio::test]
+    async fn revoking_and_granting_again_repairs_the_row_and_a_bare_resend_does_not_widen_it() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        corrupt_the_stored_pin(&db, "sales.sale.void", "garbage").await;
+
+        let bare = [GrantSpec::pair(GrantKind::Command, "sales.sale.void")];
+        replace(&db, HUB, FLOW, &reg, &bare, "hub_user:1").await.unwrap();
+        assert!(
+            listed(&db, "sales.sale.void").await.payload_unreadable,
+            "an unrelated save quietly re-granted the broken row"
+        );
+        let err = check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &Params::new())
+            .await
+            .expect_err("still broken, still denied");
+        assert_eq!(code_of(&err), ERR_GRANT_DENIED);
+
+        replace(&db, HUB, FLOW, &reg, &[], "hub_user:1").await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &bare, "hub_user:1").await.unwrap();
+        assert!(!listed(&db, "sales.sale.void").await.payload_unreadable);
+        check_command_grant(&db, HUB, FLOW, RUN, "sales.sale.void", &Params::new())
+            .await
+            .expect("revoked and granted again, the row authorises");
     }
 
     // ── A READ may be pinned too (hub#1662) ───────────────────────────────────────────────────
