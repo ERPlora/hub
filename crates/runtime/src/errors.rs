@@ -200,14 +200,14 @@ pub enum RuntimeError {
     /// El JSON Schema declarado por una query/command no compila (se detecta al instalar).
     #[error("schema inválido en `{name}`: {detail}")]
     Schema { name: String, detail: String },
-    /// Un bind que el SQL base de una query de LISTA referencia quedó AUSENTE (o a null) en los
-    /// params (hub#1086). Ligarlo como NULL convierte `col = :param` en un filtro que no casa
-    /// NADA, y la página responde `total: 0` con credibility plena: el listado miente sin
-    /// levantar sospechas (el movimiento de caja ESTABA escrito; la query decía que no había
-    /// nada). Es la mitad ruidosa del contrato: lo que el SQL referencia FUERA de un
-    /// `COALESCE(:p, …)` no puede ser opcional — un bind COALESCE-guardado es un default
-    /// declarado por el propio módulo y sigue llegando como NULL a propósito.
-    #[error("la query `{query}` requiere el parámetro `:{param}` (su SQL lo referencia) y llegó ausente o null: se rehúsa a ligarlo como NULL porque respondería una página vacía como si no existiera nada")]
+    /// A bind the query's SQL needs arrived ABSENT (or null) in the params — a LIST (hub#1086) or,
+    /// since hub#2383, a plain read. Binding it as NULL turns `col = :param` into a filter that
+    /// matches NOTHING, and the answer is an empty page (or `[]`) with full credibility: the cash
+    /// movement WAS written, the record DOES exist, and the query said there was nothing. This is
+    /// the loud half of the contract. What stays optional is what the module wrote as optional: a
+    /// bind inside a `COALESCE(:p, …)`, and on a plain read also one tested with `IS [NOT] NULL` or
+    /// left out of its JSON Schema's `required` (see `queries::plain_required_binds`).
+    #[error("query `{query}` needs the parameter `:{param}` (its SQL references it) and it arrived absent or null: it is not bound as NULL, because the answer would be empty as if nothing existed")]
     MissingRequiredParam { query: String, param: String },
     /// A parameter the query does not declare arrived in the params (hub#1173 for lists,
     /// hub#1913 for plain queries). It used to be dropped in silence: a LIST answered `200 ok` with
