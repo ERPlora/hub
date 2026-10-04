@@ -39,7 +39,9 @@ function routedViews(): Map<string, string> {
 
 describe('tabbed pages own their address (hub#2444)', () => {
   it('no view watches the hash alone', () => {
-    const offenders = views().filter((v) => RAW_HASH_WATCH.test(v.source)).map((v) => v.file);
+    const offenders = views()
+      .filter((v) => RAW_HASH_WATCH.test(v.source))
+      .map((v) => v.file);
     expect(offenders).toEqual([]);
   });
 
@@ -59,7 +61,7 @@ describe('tabbed pages own their address (hub#2444)', () => {
   });
 
   it('catches the raw watcher it is meant to catch', () => {
-    expect(RAW_HASH_WATCH.test("watch(() => route.hash, (h) => {")).toBe(true);
+    expect(RAW_HASH_WATCH.test('watch(() => route.hash, (h) => {')).toBe(true);
     expect(RAW_HASH_WATCH.test('watch(\n  () => route.hash,\n  (h) => {')).toBe(true);
     expect(RAW_HASH_WATCH.test('watch([() => route.path, () => route.hash], ([path, h]) => {')).toBe(false);
   });

@@ -17,9 +17,11 @@ interface ShellRouter {
 
 function currentRoute(page: Page): Promise<{ fullPath: string; path: string }> {
   return page.evaluate(() => {
-    const { fullPath, path } = (document.querySelector('#app') as unknown as {
-      __vue_app__: { config: { globalProperties: { $router: ShellRouter } } };
-    }).__vue_app__.config.globalProperties.$router.currentRoute.value;
+    const { fullPath, path } = (
+      document.querySelector('#app') as unknown as {
+        __vue_app__: { config: { globalProperties: { $router: ShellRouter } } };
+      }
+    ).__vue_app__.config.globalProperties.$router.currentRoute.value;
     return { fullPath, path };
   });
 }
@@ -34,9 +36,11 @@ async function settled(page: Page): Promise<void> {
 async function go(page: Page, to: string): Promise<void> {
   const path = to.split('#')[0];
   await page.evaluate((target) => {
-    void (document.querySelector('#app') as unknown as {
-      __vue_app__: { config: { globalProperties: { $router: ShellRouter } } };
-    }).__vue_app__.config.globalProperties.$router.push(target);
+    void (
+      document.querySelector('#app') as unknown as {
+        __vue_app__: { config: { globalProperties: { $router: ShellRouter } } };
+      }
+    ).__vue_app__.config.globalProperties.$router.push(target);
   }, to);
   await expect.poll(async () => (await currentRoute(page)).path).toBe(path);
   await settled(page);
@@ -62,7 +66,13 @@ test.describe('a link to a System tab opens that tab, from any tabbed page (hub#
     await loggedInSession(page);
   });
 
-  for (const from of ['/settings#tickets', '/employees#roles', '/billing#payments', '/dashboard#actividad', '/apps#all']) {
+  for (const from of [
+    '/settings#tickets',
+    '/employees#roles',
+    '/billing#payments',
+    '/dashboard#actividad',
+    '/apps#all',
+  ]) {
     test(`from ${from}`, async ({ page }) => {
       await page.goto(from);
       await settled(page);
