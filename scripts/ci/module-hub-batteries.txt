@@ -65,6 +65,14 @@ sales/tests/service_sale.hub.test.py
 # pending-publication: sales#498 until 2026-11-03
 sales/tests/cash_limit.hub.test.py
 
+# sales: refunds of the SAME ticket fired at once never hand back more than was charged — two
+# full refunds of 15,00 € (one goes through, the other `sales.refund_requires_completed`), five
+# partials of 10,00 € on 15,00 € (one goes through, four `sales.refund_exceeds_tender`) and two
+# partials of 7,50 € (both go through and the sale ends `refunded`), threads released by one
+# barrier against the real kernel (sales#506). New coverage, not moved.
+# pending-publication: sales#506 until 2026-11-03
+sales/tests/refund_race.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
