@@ -557,8 +557,11 @@ fn write_targets(sql: &str) -> WriteTargets {
             }
             Some("update") => {
                 let prev = i.checked_sub(1).and_then(w);
-                // A statement names its table before `SET`; `UPDATE SET` is the action of a MERGE.
-                let statement = w(i + 1) != Some("set")
+                // `THEN UPDATE SET` is the action of a MERGE. Both neighbours are required: `set`
+                // is a legal table name (`UPDATE set SET …` is a statement), and a PL/pgSQL
+                // `THEN UPDATE t SET …` names its table.
+                let merge_action = prev == Some("then") && w(i + 1) == Some("set");
+                let statement = !merge_action
                     && !matches!(
                         prev,
                         Some("do")
@@ -2088,6 +2091,18 @@ mod tests {
                  WHEN NOT MATCHED THEN INSERT (hub_id, status) VALUES (s.hub_id, 'X');"
             ),
             ["_hub_fiscal_profile"]
+        );
+        // Only a MERGE's `THEN UPDATE SET` is that action. `set` is a legal table name, so an
+        // UPDATE statement on it still names its target: skipping every `UPDATE SET` would let
+        // a write the gate used to refuse install with zero targets.
+        assert_eq!(targets("UPDATE \"set\" SET x = 1;"), ["set"]);
+        assert_eq!(targets("UPDATE set SET x = 1;"), ["set"]);
+        assert_eq!(
+            targets(
+                "DO $$ BEGIN IF true THEN UPDATE inventory_product SET price = 0; END IF; END $$;"
+            ),
+            ["inventory_product"],
+            "a PL/pgSQL `THEN UPDATE t SET` is a statement, not a MERGE action"
         );
     }
 
