@@ -15,6 +15,7 @@ import {
   clearViewLoadRecovery,
   recoverFromViewLoadError,
   sameHubHref,
+  sectionsFailedInApp,
 } from './view-load-recovery';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
@@ -197,10 +198,6 @@ router.beforeEach(authGate);
  * no ladder (a reload lands on the identical code) but it does get the message, because a person
  * staring at nothing is the defect, not the reason behind it.
  */
-// hub#2312 — sections whose file failed to arrive in this document (see rung 4 in
-// `./view-load-recovery`). Module scope = document scope, exactly like the browser's failed mark.
-const sectionsFailedInApp = new Set<string>();
-
 router.onError((error, to, from) => {
   // An empty `matched` is START_LOCATION: the document has not painted any route yet, which is the
   // only case where aborting the navigation leaves the person looking at nothing.
