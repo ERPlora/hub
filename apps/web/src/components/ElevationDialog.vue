@@ -41,7 +41,7 @@
         <p data-testid="elevation-what" class="elevation-what">{{ whatIsBeingApproved }}</p>
       </div>
 
-      <div class="elevation-scroll">
+      <div data-testid="elevation-scroll" class="elevation-scroll">
         <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
         <!-- **Swiping the badge IS the approval** (hub#658): it is what Toast, Aloha and Square do,
              and making the manager type their PIN in front of the customer when they are already
@@ -120,7 +120,6 @@
             ></ok-pinpad>
           </div>
         </template>
-
       </div>
 
       <!-- The refusal sits in the fixed band, next to Cancel, not at the foot of the scroller: on a
@@ -131,8 +130,8 @@
           {{ sayRefusal(t, refusal) }}
         </ion-note>
         <div class="elevation-actions">
-        <ion-button data-testid="elevation-cancel" fill="clear" color="medium" @click="cancel">
-          {{ t('elevation.cancel') }}
+          <ion-button data-testid="elevation-cancel" fill="clear" color="medium" @click="cancel">
+            {{ t('elevation.cancel') }}
           </ion-button>
         </div>
       </div>
@@ -345,7 +344,9 @@ function onDismiss(): void {
   flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 var(--ion-padding, 16px);
+  /* Room at the foot, so the last key's border is not flush on the clip edge: scrolled to the end
+     at 375×667 the sub-pixel offset ate the bottom line of the «0» key. */
+  padding: 0 var(--ion-padding, 16px) 0.5rem;
 }
 .elevation-what {
   margin: 0;

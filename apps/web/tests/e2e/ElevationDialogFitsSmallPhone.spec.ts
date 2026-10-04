@@ -85,8 +85,12 @@ async function expectHeadingAndCancelOnScreen(page: Page, height: number, also: 
  * be brought on screen, and none of it hides under the heading or the actions. */
 async function expectReachable(page: Page, testId: string) {
   for (const block of ['start', 'end'] as const) {
-    await page.getByTestId(testId).evaluate((el, b) => el.scrollIntoView({ block: b }), block);
-    const box = await boxOf(page, testId);
+    // The bench names however many people earlier specs left behind, not exactly one: the top edge
+    // that matters is the first one's, the bottom edge the last one's.
+    const edge = block === 'start' ? page.getByTestId(testId).first() : page.getByTestId(testId).last();
+    await edge.evaluate((el, b) => el.scrollIntoView({ block: b }), block);
+    const box = await edge.boundingBox();
+    if (!box) throw new Error(`${testId} has no box`);
     const what = await boxOf(page, 'elevation-what');
     const cancel = await boxOf(page, 'elevation-cancel');
     if (block === 'start') {
@@ -101,6 +105,19 @@ async function expectReachable(page: Page, testId: string) {
       expect(box.y + box.height, `${testId}: its bottom scrolls below the heading`).toBeGreaterThan(
         what.y + what.height,
       );
+      // Scrolled all the way down, the last thing in the band must not sit flush on the edge where
+      // the band clips it: at 375×667 the pinpad's «0» key lost its bottom border that way, with
+      // its box 0.3 px inside the scroller and the sub-pixel scroll offset eating the line.
+      await page.getByTestId('elevation-scroll').evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      const last = await edge.boundingBox();
+      if (!last) throw new Error(`${testId} has no box`);
+      const scroller = await boxOf(page, 'elevation-scroll');
+      expect(
+        scroller.y + scroller.height - (last.y + last.height),
+        `${testId}: its bottom edge clears the clip edge of the scroller`,
+      ).toBeGreaterThanOrEqual(4);
     }
   }
 }
