@@ -31,7 +31,7 @@
 //! - **By id, not by guesswork.** The event brings the id and nothing else; the sheet it names is
 //!   already pseudonymised when this runs. A copy that holds her number but neither her id nor a
 //!   link to a run that touched her (a raw inbound WhatsApp message, before any sheet is linked) is
-//!   NOT reachable from here: that needs the module to say what identified her (hub#2475).
+//!   NOT reachable from here: that needs the module to say what identified her (hub#2477).
 //! - **The kernel does not know the customers module.** The trigger is the naming convention
 //!   (`<subject>.anonymized` + `<subject>_id`), the same kind of contract as `.reminder.due` and
 //!   `.print.due`. Today only `customer.anonymized` follows it.
@@ -82,6 +82,9 @@ pub fn subject_id(event_name: &str, payload: &Params) -> Option<String> {
 /// Everything named in the module header, in ONE statement so the erasure is atomic and every
 /// sub-statement sees the same snapshot (each table is written exactly once).
 ///
+/// `hit` is every event that names her, live or not: a run is history even when the event that
+/// triggered it is still `dead`. Whether an EVENT may be emptied is decided once, at its write.
+///
 /// `:needle` is the id JSON-encoded (`"<id>"`, quotes included), so it matches the id as a string
 /// VALUE and never as a fragment of a longer one. `hub_id` filters every read and every write:
 /// the same id in another hub belongs to another hub. The `<> '{}'` guards make the counts say
@@ -89,8 +92,7 @@ pub fn subject_id(event_name: &str, payload: &Params) -> Option<String> {
 const ERASE: &str = "\
 WITH hit AS (\
   SELECT id FROM _event_outbox \
-   WHERE hub_id = :hub_id AND status IN ('delivered', 'discarded') \
-     AND strpos(payload, :needle) > 0\
+   WHERE hub_id = :hub_id AND strpos(payload, :needle) > 0\
 ), touched AS (\
   SELECT r.id FROM _flow_runs r \
    WHERE r.hub_id = :hub_id AND r.status IN ('done', 'failed', 'cancelled') \
@@ -202,8 +204,16 @@ mod tests {
         p.insert("payload".into(), json!(e.payload.to_string()));
         p.insert("run_id".into(), json!(e.run_id));
         p.insert("at".into(), json!(now()));
-        let delivered = if e.status == "delivered" { ":at" } else { "NULL" };
-        let discarded = if e.status == "discarded" { ":at" } else { "NULL" };
+        let delivered = if e.status == "delivered" {
+            ":at"
+        } else {
+            "NULL"
+        };
+        let discarded = if e.status == "discarded" {
+            ":at"
+        } else {
+            "NULL"
+        };
         db.execute(
             &format!(
                 "INSERT INTO _event_outbox \
@@ -245,7 +255,15 @@ mod tests {
         .unwrap();
     }
 
-    async fn step(db: &PgAdapter, id: &str, hub: &str, run_id: &str, idx: i64, input: Json, output: Json) {
+    async fn step(
+        db: &PgAdapter,
+        id: &str,
+        hub: &str,
+        run_id: &str,
+        idx: i64,
+        input: Json,
+        output: Json,
+    ) {
         let mut p = Params::new();
         p.insert("id".into(), json!(id));
         p.insert("hub_id".into(), json!(hub));
@@ -264,7 +282,14 @@ mod tests {
         .unwrap();
     }
 
-    async fn approval(db: &PgAdapter, id: &str, hub: &str, run_id: &str, status: &str, payload: Json) {
+    async fn approval(
+        db: &PgAdapter,
+        id: &str,
+        hub: &str,
+        run_id: &str,
+        status: &str,
+        payload: Json,
+    ) {
         let mut p = Params::new();
         p.insert("id".into(), json!(id));
         p.insert("hub_id".into(), json!(hub));
@@ -291,19 +316,39 @@ mod tests {
     }
 
     async fn event_payload(db: &PgAdapter, id: &str) -> String {
-        cell(db, "SELECT payload AS v FROM _event_outbox WHERE id = :id", id).await
+        cell(
+            db,
+            "SELECT payload AS v FROM _event_outbox WHERE id = :id",
+            id,
+        )
+        .await
     }
 
     async fn run_memory(db: &PgAdapter, id: &str) -> String {
-        cell(db, "SELECT input || '|' || vars AS v FROM _flow_runs WHERE id = :id", id).await
+        cell(
+            db,
+            "SELECT input || '|' || vars AS v FROM _flow_runs WHERE id = :id",
+            id,
+        )
+        .await
     }
 
     async fn step_memory(db: &PgAdapter, id: &str) -> String {
-        cell(db, "SELECT input || '|' || output AS v FROM _flow_run_steps WHERE id = :id", id).await
+        cell(
+            db,
+            "SELECT input || '|' || output AS v FROM _flow_run_steps WHERE id = :id",
+            id,
+        )
+        .await
     }
 
     async fn approval_payload(db: &PgAdapter, id: &str) -> String {
-        cell(db, "SELECT payload AS v FROM _flow_approvals WHERE id = :id", id).await
+        cell(
+            db,
+            "SELECT payload AS v FROM _flow_approvals WHERE id = :id",
+            id,
+        )
+        .await
     }
 
     fn anonymized(customer_id: Json) -> Params {
@@ -321,23 +366,29 @@ mod tests {
     /// and wrote the phone into its output, an approval proposed a message to her, and the run
     /// queued a reminder whose payload has the phone but NOT her id.
     async fn ana_history(db: &PgAdapter, hub: &str, prefix: &str) {
-        event(db, Ev {
-            id: &format!("{prefix}ev-upd"),
-            hub,
-            status: "delivered",
-            name: "customer.updated",
-            payload: json!({"id": ANA, "name": "Ana Pérez", "phone": "+34600111222"}),
-            run_id: "",
-        })
+        event(
+            db,
+            Ev {
+                id: &format!("{prefix}ev-upd"),
+                hub,
+                status: "delivered",
+                name: "customer.updated",
+                payload: json!({"id": ANA, "name": "Ana Pérez", "phone": "+34600111222"}),
+                run_id: "",
+            },
+        )
         .await;
-        event(db, Ev {
-            id: &format!("{prefix}ev-sale"),
-            hub,
-            status: "discarded",
-            name: "sale.completed",
-            payload: json!({"sale_id": "s1", "customer_id": ANA, "total": 1200}),
-            run_id: "",
-        })
+        event(
+            db,
+            Ev {
+                id: &format!("{prefix}ev-sale"),
+                hub,
+                status: "discarded",
+                name: "sale.completed",
+                payload: json!({"sale_id": "s1", "customer_id": ANA, "total": 1200}),
+                run_id: "",
+            },
+        )
         .await;
         run(
             db,
@@ -369,11 +420,47 @@ mod tests {
         )
         .await;
         // A step that never held anything: emptying it again is not counted.
-        step(db, &format!("{prefix}step-empty"), hub, &format!("{prefix}run"), 1, json!({}), json!({})).await;
+        step(
+            db,
+            &format!("{prefix}step-empty"),
+            hub,
+            &format!("{prefix}run"),
+            1,
+            json!({}),
+            json!({}),
+        )
+        .await;
         // Four more runs, each linked to her by ONE thing only, so each link is proven on its own.
-        run(db, &format!("{prefix}run-input"), hub, "failed", "", json!({"customer_id": ANA}), json!({})).await;
-        run(db, &format!("{prefix}run-vars"), hub, "done", "", json!({"x": 1}), json!({"who": ANA})).await;
-        run(db, &format!("{prefix}run-step"), hub, "cancelled", "", json!({"x": 1}), json!({})).await;
+        run(
+            db,
+            &format!("{prefix}run-input"),
+            hub,
+            "failed",
+            "",
+            json!({"customer_id": ANA}),
+            json!({}),
+        )
+        .await;
+        run(
+            db,
+            &format!("{prefix}run-vars"),
+            hub,
+            "done",
+            "",
+            json!({"x": 1}),
+            json!({"who": ANA}),
+        )
+        .await;
+        run(
+            db,
+            &format!("{prefix}run-step"),
+            hub,
+            "cancelled",
+            "",
+            json!({"x": 1}),
+            json!({}),
+        )
+        .await;
         step(
             db,
             &format!("{prefix}run-step-s"),
@@ -384,7 +471,17 @@ mod tests {
             json!({"customer_id": ANA}),
         )
         .await;
-        run(db, &format!("{prefix}run-appr"), hub, "done", "", json!({"x": 1}), json!({})).await;
+        // Its own memory is already empty: emptying it again is not counted.
+        run(
+            db,
+            &format!("{prefix}run-appr"),
+            hub,
+            "done",
+            "",
+            json!({}),
+            json!({}),
+        )
+        .await;
         approval(
             db,
             &format!("{prefix}run-appr-a"),
@@ -394,14 +491,17 @@ mod tests {
             json!({"customer_id": ANA}),
         )
         .await;
-        event(db, Ev {
-            id: &format!("{prefix}ev-reminder"),
-            hub,
-            status: "delivered",
-            name: "flows.reminder.due",
-            payload: json!({"channel": "whatsapp", "to": "+34600111222"}),
-            run_id: &format!("{prefix}run"),
-        })
+        event(
+            db,
+            Ev {
+                id: &format!("{prefix}ev-reminder"),
+                hub,
+                status: "delivered",
+                name: "flows.reminder.due",
+                payload: json!({"channel": "whatsapp", "to": "+34600111222"}),
+                run_id: &format!("{prefix}run"),
+            },
+        )
         .await;
     }
 
@@ -418,11 +518,31 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(event_payload(&db, "ev-upd").await, EMPTY, "the event that names her");
-        assert_eq!(event_payload(&db, "ev-sale").await, EMPTY, "a discarded event that links her");
-        assert_eq!(run_memory(&db, "run").await, EMPTY_RUN, "the run it triggered");
-        assert_eq!(step_memory(&db, "step").await, EMPTY_RUN, "a step of that run");
-        assert_eq!(approval_payload(&db, "appr").await, EMPTY, "the proposal of that run");
+        assert_eq!(
+            event_payload(&db, "ev-upd").await,
+            EMPTY,
+            "the event that names her"
+        );
+        assert_eq!(
+            event_payload(&db, "ev-sale").await,
+            EMPTY,
+            "a discarded event that links her"
+        );
+        assert_eq!(
+            run_memory(&db, "run").await,
+            EMPTY_RUN,
+            "the run it triggered"
+        );
+        assert_eq!(
+            step_memory(&db, "step").await,
+            EMPTY_RUN,
+            "a step of that run"
+        );
+        assert_eq!(
+            approval_payload(&db, "appr").await,
+            EMPTY,
+            "the proposal of that run"
+        );
         assert_eq!(
             event_payload(&db, "ev-reminder").await,
             EMPTY,
@@ -435,7 +555,12 @@ mod tests {
         assert_eq!(approval_payload(&db, "run-appr-a").await, EMPTY);
         assert_eq!(
             report,
-            ErasureReport { events: 3, runs: 5, run_steps: 2, approvals: 2 }
+            ErasureReport {
+                events: 3,
+                runs: 4,
+                run_steps: 2,
+                approvals: 2
+            }
         );
     }
 
@@ -454,7 +579,9 @@ mod tests {
 
         assert!(event_payload(&db, "b-ev-upd").await.contains("Ana Pérez"));
         assert!(event_payload(&db, "b-ev-sale").await.contains(ANA));
-        assert!(event_payload(&db, "b-ev-reminder").await.contains("+34600111222"));
+        assert!(event_payload(&db, "b-ev-reminder")
+            .await
+            .contains("+34600111222"));
         assert!(run_memory(&db, "b-run").await.contains("Ana Pérez"));
         assert!(step_memory(&db, "b-step").await.contains("+34600111222"));
         assert!(approval_payload(&db, "b-appr").await.contains("Hola Ana"));
@@ -462,7 +589,6 @@ mod tests {
         assert!(run_memory(&db, "b-run-vars").await.contains(ANA));
         assert!(run_memory(&db, "b-run-step").await.contains("\"x\""));
         assert!(step_memory(&db, "b-run-step-s").await.contains(ANA));
-        assert!(run_memory(&db, "b-run-appr").await.contains("\"x\""));
         assert!(approval_payload(&db, "b-run-appr-a").await.contains(ANA));
         // …and hub A was erased in the same database, so the filter is what saved B.
         assert_eq!(event_payload(&db, "ev-upd").await, EMPTY);
@@ -473,27 +599,51 @@ mod tests {
     async fn another_customers_history_is_untouched() {
         let db = fresh_db().await;
         system_schema(&db).await;
-        event(&db, Ev {
-            id: "ev-bea",
-            hub: HUB,
-            status: "delivered",
-            name: "customer.updated",
-            payload: json!({"id": BEA, "name": "Bea"}),
-            run_id: "",
-        })
+        event(
+            &db,
+            Ev {
+                id: "ev-bea",
+                hub: HUB,
+                status: "delivered",
+                name: "customer.updated",
+                payload: json!({"id": BEA, "name": "Bea"}),
+                run_id: "",
+            },
+        )
         .await;
-        run(&db, "run-bea", HUB, "done", "ev-bea", json!({"customer_id": BEA}), json!({})).await;
-        step(&db, "step-bea", HUB, "run-bea", 0, json!({}), json!({"name": "Bea"})).await;
+        run(
+            &db,
+            "run-bea",
+            HUB,
+            "done",
+            "ev-bea",
+            json!({"customer_id": BEA}),
+            json!({}),
+        )
+        .await;
+        step(
+            &db,
+            "step-bea",
+            HUB,
+            "run-bea",
+            0,
+            json!({}),
+            json!({"name": "Bea"}),
+        )
+        .await;
         // An id that merely STARTS with hers is somebody else.
         let longer = format!("{ANA}0");
-        event(&db, Ev {
-            id: "ev-longer",
-            hub: HUB,
-            status: "delivered",
-            name: "customer.updated",
-            payload: json!({"id": longer, "name": "Dora"}),
-            run_id: "",
-        })
+        event(
+            &db,
+            Ev {
+                id: "ev-longer",
+                hub: HUB,
+                status: "delivered",
+                name: "customer.updated",
+                payload: json!({"id": longer, "name": "Dora"}),
+                run_id: "",
+            },
+        )
         .await;
 
         on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
@@ -515,34 +665,105 @@ mod tests {
         let db = fresh_db().await;
         system_schema(&db).await;
         for (id, status) in [("ev-pending", "pending"), ("ev-dead", "dead")] {
-            event(&db, Ev {
-                id,
-                hub: HUB,
-                status,
-                name: "sale.completed",
-                payload: json!({"customer_id": ANA}),
-                run_id: "",
-            })
+            event(
+                &db,
+                Ev {
+                    id,
+                    hub: HUB,
+                    status,
+                    name: "sale.completed",
+                    payload: json!({"customer_id": ANA}),
+                    run_id: "",
+                },
+            )
             .await;
         }
         for status in ["running", "sleeping", "waiting_approval"] {
             let id = format!("run-{status}");
-            run(&db, &id, HUB, status, "", json!({"customer_id": ANA}), json!({})).await;
-            step(&db, &format!("{id}-s"), HUB, &id, 0, json!({"customer_id": ANA}), json!({})).await;
-        }
-        approval(&db, "appr-pending", HUB, "run-waiting_approval", "pending", json!({"customer_id": ANA}))
+            run(
+                &db,
+                &id,
+                HUB,
+                status,
+                "",
+                json!({"customer_id": ANA}),
+                json!({}),
+            )
             .await;
+            step(
+                &db,
+                &format!("{id}-s"),
+                HUB,
+                &id,
+                0,
+                json!({"customer_id": ANA}),
+                json!({}),
+            )
+            .await;
+        }
+        approval(
+            &db,
+            "appr-pending",
+            HUB,
+            "run-waiting_approval",
+            "pending",
+            json!({"customer_id": ANA}),
+        )
+        .await;
+        // A FINISHED run that touched her is emptied, but the reminder it queued has not gone out
+        // yet: it keeps the phone it is about to be sent to.
+        run(
+            &db,
+            "run-finished",
+            HUB,
+            "done",
+            "",
+            json!({"customer_id": ANA}),
+            json!({}),
+        )
+        .await;
+        event(
+            &db,
+            Ev {
+                id: "ev-queued",
+                hub: HUB,
+                status: "pending",
+                name: "flows.reminder.due",
+                payload: json!({"channel": "whatsapp", "to": "+34600111222"}),
+                run_id: "run-finished",
+            },
+        )
+        .await;
 
         let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
             .await
             .unwrap();
 
-        assert_eq!(report, ErasureReport::default());
+        assert_eq!(
+            report,
+            ErasureReport {
+                runs: 1,
+                ..ErasureReport::default()
+            }
+        );
+        assert!(event_payload(&db, "ev-queued")
+            .await
+            .contains("+34600111222"));
         assert!(event_payload(&db, "ev-pending").await.contains(ANA));
         assert!(event_payload(&db, "ev-dead").await.contains(ANA));
         for status in ["running", "sleeping", "waiting_approval"] {
-            assert!(run_memory(&db, &format!("run-{status}")).await.contains(ANA), "{status}");
-            assert!(step_memory(&db, &format!("run-{status}-s")).await.contains(ANA), "{status}");
+            assert!(
+                run_memory(&db, &format!("run-{status}"))
+                    .await
+                    .contains(ANA),
+                "{status}"
+            );
+            assert!(
+                step_memory(&db, &format!("run-{status}-s"))
+                    .await
+                    .contains(ANA),
+                "{status}"
+            );
         }
         assert!(approval_payload(&db, "appr-pending").await.contains(ANA));
     }
@@ -553,20 +774,30 @@ mod tests {
     async fn an_event_without_a_usable_subject_id_erases_nothing() {
         let db = fresh_db().await;
         system_schema(&db).await;
-        event(&db, Ev {
-            id: "ev-blank",
-            hub: HUB,
-            status: "delivered",
-            name: "customer.updated",
-            payload: json!({"id": "", "name": "Carla", "customer_id": 42}),
-            run_id: "",
-        })
+        event(
+            &db,
+            Ev {
+                id: "ev-blank",
+                hub: HUB,
+                status: "delivered",
+                name: "customer.updated",
+                payload: json!({"id": "", "name": "Carla", "customer_id": 42}),
+                run_id: "",
+            },
+        )
         .await;
 
         let mut missing = Params::new();
         missing.insert("reason".into(), json!("x"));
-        for payload in [anonymized(json!("")), anonymized(json!(42)), anonymized(Json::Null), missing] {
-            let report = on_event(&db, HUB, "customer.anonymized", &payload).await.unwrap();
+        for payload in [
+            anonymized(json!("")),
+            anonymized(json!(42)),
+            anonymized(Json::Null),
+            missing,
+        ] {
+            let report = on_event(&db, HUB, "customer.anonymized", &payload)
+                .await
+                .unwrap();
             assert_eq!(report, ErasureReport::default(), "{payload:?}");
         }
         assert!(event_payload(&db, "ev-blank").await.contains("Carla"));
@@ -581,7 +812,9 @@ mod tests {
         ana_history(&db, HUB, "").await;
 
         for name in ["customer.updated", "sale.completed", "customer.deleted"] {
-            let report = on_event(&db, HUB, name, &anonymized(json!(ANA))).await.unwrap();
+            let report = on_event(&db, HUB, name, &anonymized(json!(ANA)))
+                .await
+                .unwrap();
             assert_eq!(report, ErasureReport::default(), "{name}");
         }
         assert!(event_payload(&db, "ev-upd").await.contains("Ana Pérez"));
@@ -613,14 +846,17 @@ mod tests {
         let db = fresh_db().await;
         system_schema(&db).await;
         ana_history(&db, HUB, "").await;
-        event(&db, Ev {
-            id: "ev-anon",
-            hub: HUB,
-            status: "pending",
-            name: "customer.anonymized",
-            payload: json!({"customer_id": ANA, "reason": "gdpr request"}),
-            run_id: "",
-        })
+        event(
+            &db,
+            Ev {
+                id: "ev-anon",
+                hub: HUB,
+                status: "pending",
+                name: "customer.anonymized",
+                payload: json!({"customer_id": ANA, "reason": "gdpr request"}),
+                run_id: "",
+            },
+        )
         .await;
 
         crate::outbox::drain(&db, &Registry::new()).await.unwrap();
@@ -629,7 +865,12 @@ mod tests {
         assert_eq!(run_memory(&db, "run").await, EMPTY_RUN);
         assert_eq!(step_memory(&db, "step").await, EMPTY_RUN);
         assert_eq!(
-            cell(&db, "SELECT status AS v FROM _event_outbox WHERE id = :id", "ev-anon").await,
+            cell(
+                &db,
+                "SELECT status AS v FROM _event_outbox WHERE id = :id",
+                "ev-anon"
+            )
+            .await,
             "delivered"
         );
     }
