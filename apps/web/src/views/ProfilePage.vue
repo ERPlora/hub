@@ -538,25 +538,38 @@ const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';
 // runtime counts it as the person's own account (`HANDOFF_OWN_ACCOUNT`), so it needs no admin role.
 const CLOUD_ACCOUNT_DELETE_PATH = '/dashboard/profile/delete/?surface=account';
 
-async function openOwnCloudAccount(path: string, door: string): Promise<void> {
+async function manageCloudAccount(): Promise<void> {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
-  const plain = `${base}${path}`;
+  const plain = `${base}${CLOUD_ACCOUNT_PATH}`;
   // The pass is asked for only when it CAN be minted. A shift session is refused by design
   // (hub#1400), and asking anyway would report a failure every time somebody on a PIN pressed
   // this — noise that teaches everyone to ignore the report, for a link that opens either way.
   try {
-    await openExternal(openedWithCloudLogin.value ? await saasDoor(path, plain, door) : plain);
+    await openExternal(
+      openedWithCloudLogin.value
+        ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'cloud-account')
+        : plain,
+    );
   } catch {
     await toast(t('profile.cloudAccountError'), 'danger');
   }
 }
 
-async function manageCloudAccount(): Promise<void> {
-  await openOwnCloudAccount(CLOUD_ACCOUNT_PATH, 'cloud-account');
-}
-
+// Spelled out next to `manageCloudAccount` rather than shared through a helper that takes the path:
+// the anti-steering guard (`no-purchase-steering.test.ts`) follows each way out to the constant it
+// opens, and a parameter would hide where this one goes.
 async function deleteCloudAccount(): Promise<void> {
-  await openOwnCloudAccount(CLOUD_ACCOUNT_DELETE_PATH, 'cloud-account-delete');
+  const base = config.cloudApiUrl.replace(/\/+$/, '');
+  const plain = `${base}${CLOUD_ACCOUNT_DELETE_PATH}`;
+  try {
+    await openExternal(
+      openedWithCloudLogin.value
+        ? await saasDoor(CLOUD_ACCOUNT_DELETE_PATH, plain, 'cloud-account-delete')
+        : plain,
+    );
+  } catch {
+    await toast(t('profile.cloudAccountError'), 'danger');
+  }
 }
 
 onMounted(async () => {
