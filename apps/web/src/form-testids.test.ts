@@ -206,6 +206,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'profile-change-photo',
       'profile-confirm-pin',
       'profile-current-pin',
+      'profile-delete-account',
       'profile-email',
       'profile-first-name',
       'profile-language',

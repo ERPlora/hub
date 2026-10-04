@@ -40,23 +40,24 @@ const BUTTON = '[data-testid="profile-delete-account"]';
 function stubRuntime(): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          id: 'u-1',
-          name: 'Nora Vega',
-          first_name: 'Nora',
-          last_name: 'Vega',
-          email: 'nora@example.com',
-          role: 'employee',
-          permissions: [],
-          cloud_user_id: '77',
-          avatar_url: null,
-          has_pin: true,
-          preferences: { language: null, theme_mode: null, theme_palette: null },
-        }),
-        { status: 200 },
-      ),
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: 'u-1',
+            name: 'Nora Vega',
+            first_name: 'Nora',
+            last_name: 'Vega',
+            email: 'nora@example.com',
+            role: 'employee',
+            permissions: [],
+            cloud_user_id: '77',
+            avatar_url: null,
+            has_pin: true,
+            preferences: { language: null, theme_mode: null, theme_palette: null },
+          }),
+          { status: 200 },
+        ),
     ),
   );
 }
