@@ -21,7 +21,9 @@
 import {
   bootReloadsOf,
   expect,
+  NETWORK_CHANGE_BUDGET_MS,
   request as pwRequest,
+  RESEND_WAIT_MS,
   resendsOf,
   sendThroughNetworkChanges,
   test,
@@ -355,9 +357,31 @@ test('a turn that dies of anything else is NOT asked again (hub#2442)', async ({
   await expect(drawer).not.toContainText('no hay módulos instalados');
 });
 
-test("a network change during this spec's own boot is recovered by the bench (hub#2442)", async ({
-  page,
-}) => {
+test('a network that stays down still ends red, inside the storm budget (hub#2442)', async ({ page }) => {
+  // The budget's wiring, not just its arithmetic: without the storm clock in
+  // `sendThroughNetworkChanges` every resend is "young" and an outage re-asks until the test times out.
+  test.setTimeout(60_000);
+  cannedTokens = ['Según tu hub: ', 'no hay módulos instalados todavía.'];
+  let turns = 0;
+  await page.route('**/api/assistant/chat/stream', async (route) => {
+    turns += 1;
+    return route.abort('internetdisconnected');
+  });
+
+  const input = await openAssistant(page);
+  const startedAt = Date.now();
+  await ask(page, input, '¿qué necesito configurar para poder empezar a vender?');
+  const askedFor = Date.now() - startedAt;
+
+  await expect(page.locator('.assistant-drawer')).toContainText(es.assistant.error, { timeout: 15_000 });
+  expect(resendsOf(page).length, 'the bench never re-sent the lost turn').toBeGreaterThan(0);
+  expect(turns).toBe(resendsOf(page).length + 1);
+  expect(askedFor, 'the bench kept re-sending past its storm budget').toBeLessThan(
+    NETWORK_CHANGE_BUDGET_MS + RESEND_WAIT_MS,
+  );
+});
+
+test("a network change during this spec's own boot is recovered by the bench (hub#2442)", async ({ page }) => {
   // The second hole of the same issue. This spec boots the shell from ITS runtime, not from the
   // bench's dev server, and the boot recovery only treats the `baseURL` origin as the app's own: a
   // storm during this `goto` left a blank shell and the spec failed waiting for the ✨ button.
