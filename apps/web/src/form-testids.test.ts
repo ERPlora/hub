@@ -336,6 +336,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'elevation-name',
       'elevation-person',
       'elevation-pinpad',
+      'elevation-title',
       'elevation-what',
     ],
   },

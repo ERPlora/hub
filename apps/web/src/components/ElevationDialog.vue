@@ -41,7 +41,7 @@
         <p data-testid="elevation-what" class="elevation-what">{{ whatIsBeingApproved }}</p>
       </div>
 
-      <div data-testid="elevation-scroll" class="elevation-scroll">
+      <div class="elevation-scroll">
         <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
         <!-- **Swiping the badge IS the approval** (hub#658): it is what Toast, Aloha and Square do,
              and making the manager type their PIN in front of the customer when they are already
