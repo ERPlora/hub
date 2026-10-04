@@ -149,6 +149,13 @@ inventory/tests/decrease_refuses_without_unit.hub.test.py
 # Landed pending publication (staff#62); the module has published it: now a normal entry.
 staff/tests/user_link.hub.test.py
 
+# staff: two people link the same Hub user to two records AT ONCE — the loser of the race, refused
+# by `uq_staff_member_hub_user`, reads `staff.user_already_linked` through `on_unique` (hub#2081),
+# not `db`; the first link is held uncommitted in the hub's database (`ERPLORA_HUB_PSQL`) against
+# the real kernel (staff#63). New coverage, not moved.
+# pending-publication: staff#104 until 2026-11-01
+staff/tests/user_link_race.hub.test.py
+
 # ── Cómo entra una batería NUEVA: `# pending-publication: <repo>#<n> until <fecha>` (kitchen#84) ─
 # Una batería nueva no podía aterrizar: el gate del módulo (module-toolkit#163) la rechaza hasta
 # que esta lista en `develop` la declara, y el guard de aquí rechaza la declaración hasta que el
