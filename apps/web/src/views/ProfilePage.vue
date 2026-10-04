@@ -238,10 +238,16 @@
           <h2>{{ t('profile.manageTitle') }}</h2>
           <p>{{ t(cloudLinked ? 'profile.manageCloud' : 'profile.manageLocal') }}</p>
         </div>
-        <ion-button v-if="cloudLinked" fill="outline" data-testid="profile-manage-account" @click="manageCloudAccount">
-          {{ t('profile.manageInSaas') }}
-          <HubIcon slot="end" name="open-outline" />
-        </ion-button>
+        <div v-if="cloudLinked" class="management-actions">
+          <ion-button fill="outline" data-testid="profile-manage-account" @click="manageCloudAccount">
+            {{ t('profile.manageInSaas') }}
+            <HubIcon slot="end" name="open-outline" />
+          </ion-button>
+          <ion-button fill="clear" color="danger" data-testid="profile-delete-account" @click="deleteCloudAccount">
+            {{ t('profile.deleteAccount') }}
+            <HubIcon slot="end" name="open-outline" />
+          </ion-button>
+        </div>
       </section>
     </main>
   </AppPage>
@@ -526,21 +532,31 @@ async function removeAvatar(): Promise<void> {
 // this is the person's own account, so the one-time pass is unaffected.
 const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';
 
-async function manageCloudAccount(): Promise<void> {
+// hub#2451 — the deletion had to be FOUND, not guessed: Google Play wants an app that lets people
+// sign up to offer «delete my account» where they look for it. It lands on the SaaS's own
+// confirmation, on the same account surface and through the same door as the account itself; the
+// runtime counts it as the person's own account (`HANDOFF_OWN_ACCOUNT`), so it needs no admin role.
+const CLOUD_ACCOUNT_DELETE_PATH = '/dashboard/profile/delete/?surface=account';
+
+async function openOwnCloudAccount(path: string, door: string): Promise<void> {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
-  const plain = `${base}${CLOUD_ACCOUNT_PATH}`;
+  const plain = `${base}${path}`;
   // The pass is asked for only when it CAN be minted. A shift session is refused by design
   // (hub#1400), and asking anyway would report a failure every time somebody on a PIN pressed
   // this — noise that teaches everyone to ignore the report, for a link that opens either way.
   try {
-    await openExternal(
-      openedWithCloudLogin.value
-        ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'cloud-account')
-        : plain,
-    );
+    await openExternal(openedWithCloudLogin.value ? await saasDoor(path, plain, door) : plain);
   } catch {
     await toast(t('profile.cloudAccountError'), 'danger');
   }
+}
+
+async function manageCloudAccount(): Promise<void> {
+  await openOwnCloudAccount(CLOUD_ACCOUNT_PATH, 'cloud-account');
+}
+
+async function deleteCloudAccount(): Promise<void> {
+  await openOwnCloudAccount(CLOUD_ACCOUNT_DELETE_PATH, 'cloud-account-delete');
 }
 
 onMounted(async () => {
@@ -797,8 +813,15 @@ onMounted(async () => {
   flex: 1;
 }
 
-.management-panel ion-button {
+.management-actions {
+  display: flex;
   flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.management-panel ion-button {
   margin: 0;
 }
 
@@ -881,6 +904,7 @@ onMounted(async () => {
     flex-wrap: wrap;
   }
 
+  .management-actions,
   .management-panel ion-button {
     width: 100%;
   }
