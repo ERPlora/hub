@@ -27,7 +27,7 @@ import type {
 import type { WidgetDef, WidgetPreset } from '@erplora/outfitkit';
 
 import { getLocale } from '../i18n';
-import { formatMoney, hubCurrency, hubCurrencyDecimals } from './money';
+import { currencyDecimals, formatMoney, hubCurrency } from './money';
 import {
   loadInstalledManifests,
   loadModuleComponent,
@@ -152,9 +152,10 @@ function formatValue(
   const loc = locale ?? getLocale();
   switch (format) {
     case 'currency':
-      // Money travels in MINOR units of the hub currency (ADR-0007, ADR-0123 §7): `formatMoney`
-      // scales by the decimals of that currency (EUR ÷100, JPY ÷1, KWD ÷1000), not a fixed ÷100
-      // that paints 1999 ¥ as 19,99 (hub#2387).
+      // Money travels in MINOR units of the currency it is painted in (ADR-0007, ADR-0123 §7):
+      // `formatMoney` scales by the decimals of that currency (EUR ÷100, JPY ÷1, KWD ÷1000), not a
+      // fixed ÷100 that paints 1999 ¥ as 19,99 (hub#2387), nor the hub's when the panel sets
+      // another currency (hub#2391).
       return formatMoney(num, { currency, locale: loc });
     case 'percent':
       return new Intl.NumberFormat(loc, { style: 'percent', maximumFractionDigits: 1 }).format(num);
@@ -511,11 +512,12 @@ function renderTimeline(
  *
  * Some magnitudes travel as fixed-point integers (quantities, ADR-0147 = scale 10⁶): the module
  * declares that boundary with `valueDivisor` and the shell stays generic. Money is the exception:
- * its scale belongs to the hub CURRENCY, not to the module (hub#2387) — the same ÷10^decimals as the
- * kpi, so a declared `valueDivisor: 100` neither divides twice nor turns 500 ¥ into 5 ¥.
+ * its scale belongs to the CURRENCY the panel paints, not to the module (hub#2387) — the panel's
+ * own currency if it sets one, the hub's otherwise (hub#2391) — the same ÷10^decimals as the kpi,
+ * so a declared `valueDivisor: 100` neither divides twice nor turns 500 ¥ into 5 ¥.
  */
 function logicalDivisor(format: string | undefined, opts: Opts): number {
-  if (format === 'currency') return 10 ** hubCurrencyDecimals();
+  if (format === 'currency') return 10 ** currencyDecimals(str(opts, 'currency') ?? hubCurrency());
   const declared = Number(opts.valueDivisor ?? 1);
   return Number.isFinite(declared) && declared > 0 ? declared : 1;
 }
