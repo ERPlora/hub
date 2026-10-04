@@ -655,6 +655,18 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         }
     }
 
+    // ── GDPR erasure of the kernel's history (hub#2467) ────────────────────────────────────
+    // A `<subject>.anonymized` event empties, in this hub, the terminal history that names its
+    // subject (`crate::erasure`). No module can do it: these tables are the kernel's (ADR-0127).
+    // Idempotent by construction (an emptied payload no longer holds the id), so it needs no
+    // `_event_delivery` marker; a failure here defers the row like any listener's.
+    if let Err(e) = crate::erasure::on_event(db, &ctx.hub_id, &event_name, &payload).await {
+        failures += 1;
+        if first_err.is_none() {
+            first_err = Some(format!("erasure: {e}"));
+        }
+    }
+
     // ── ESPERAS de flujo (hub#951) ──────────────────────────────────────────────────────────
     // El hermano del bloque de abajo, y la única pieza del kernel que puede mover un run que YA
     // está vivo: `triggers::on_event` solo sabe INSERTAR uno. Una espera (`delay`) tenía hasta

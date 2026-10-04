@@ -1008,7 +1008,7 @@ fn spawn_hub_liveness_check(app: tauri::AppHandle, cache_dir: PathBuf, origin: S
 
 /// Lleva la ventana principal a `url`. Best-effort a propósito: sin ventana (o con una URL que no
 /// parsea) no hay nada que dirigir, y un enlace no puede tumbar la app.
-fn navigate_main_window(app: &tauri::AppHandle, url: &str) {
+fn navigate_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>, url: &str) {
     use tauri::Manager;
     let Some(window) = app.get_webview_window("main") else {
         log::warn!("shell: llega un enlace pero aún no hay ventana que dirigir ({url})");
@@ -2021,6 +2021,18 @@ fn notice_id(id: Option<i64>) -> Option<i32> {
     id.and_then(|id| i32::try_from(id).ok())
 }
 
+/// Another launch of the app, handed over by single-instance: a click on a notice (hub#2409), or a
+/// link to a hub.
+#[cfg(desktop)]
+fn on_second_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, argv: Vec<String>) {
+    if notice_tap::answer_link(app, argv.iter().cloned()) {
+        return;
+    }
+    if let Some(target) = deep_link_from_args(argv) {
+        navigate_main_window(app, &target);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
@@ -2030,11 +2042,7 @@ pub fn run() {
     // ventanas, dos colas de impresión, dos watchdogs). Con esto, la segunda instancia muere al
     // nacer y le pasa sus argumentos a la que ya está viva, que es la que navega.
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-        if let Some(target) = deep_link_from_args(argv) {
-            navigate_main_window(app, &target);
-        }
-    }));
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| on_second_launch(app, argv)));
 
     // «Start on login» (ADR-0204 §7, hub#389): `init` WITHOUT calling `enable()` — the plugin
     // registers the commands and nothing else, so a fresh install stays OFF until the user opts
@@ -2078,7 +2086,11 @@ pub fn run() {
             app.deep_link().on_open_url(move |event| {
                 // Mismo filtro que el arranque en frío: un solo enlace por gesto y, si llegaran
                 // varios, manda el primero que resuelva.
-                let urls = event.urls().into_iter().map(String::from);
+                let urls: Vec<String> = event.urls().into_iter().map(String::from).collect();
+                // A notice link is a click on a notice: single-instance hands it over (hub#2409).
+                if notice_tap::click_from_args(urls.iter().cloned()).is_some() {
+                    return;
+                }
                 match deep_link_from_args(urls) {
                     Some(target) => navigate_main_window(&handle, &target),
                     None => log::warn!("shell: enlace ignorado, no apunta a un hub nuestro"),
@@ -2120,6 +2132,10 @@ pub fn run() {
             if let Err(e) = open_main_window(app, cache_dir) {
                 eprintln!("no se pudo crear la ventana principal: {e}");
             }
+            // Started by a click on a notice with the app closed (Windows, hub#2409): the tap waits
+            // for the page, which claims it at boot.
+            #[cfg(desktop)]
+            notice_tap::answer_link(app.handle(), std::env::args());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -2243,7 +2259,7 @@ mod tests {
     fn clicked_desktop_notice(id: Option<i64>, path: Option<&str>) -> Option<notice_tap::NoticeTap> {
         use tauri::Manager;
         let app = app_with_kept_tap();
-        let shown = notify_on_desktop(app.handle().clone(), "New booking".into(), "Ana".into(), id, path.map(Into::into), |_, _, _| Ok(true));
+        let shown = notify_on_desktop(app.handle().clone(), "New booking".into(), "Ana".into(), id, path.map(Into::into), |_, _, _, _| Ok(true));
         shown.expect("no thread for the notice").join().expect("the notice thread panicked");
         app.state::<notice_tap::KeptNoticeTap>().take()
     }
@@ -2259,6 +2275,55 @@ mod tests {
         // No id the platform can hold, nothing to open: the click only brings the window up.
         assert_eq!(clicked_desktop_notice(None, Some("/m/kds")), None);
         assert_eq!(clicked_desktop_notice(Some(i64::from(i32::MAX) + 1), Some("/m/kds")), None);
+    }
+
+    // hub#2409: on Windows a click on a notice — on screen or later in the Action Center, with the
+    // app open or closed — comes back as a launch of the app with the notice's link.
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_second_launch_by_a_notice_link_keeps_its_tap() {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        let tap = notice_tap::NoticeTap { id: 9, path: Some("/m/kds".into()) };
+        on_second_launch(app.handle(), vec!["ERPlora.exe".into(), notice_tap::notice_link(Some(&tap))]);
+        assert_eq!(app.state::<notice_tap::KeptNoticeTap>().take(), Some(tap));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn a_second_launch_by_a_hub_link_keeps_no_tap() {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        on_second_launch(app.handle(), vec!["ERPlora.exe".into(), "erplora://hub/demo.a.erplora.com".into()]);
+        assert_eq!(app.state::<notice_tap::KeptNoticeTap>().take(), None);
+    }
+
+    #[test]
+    fn a_cold_launch_by_a_notice_link_keeps_its_tap_for_the_page() {
+        // The app was closed: Windows starts it with the link, and the page claims the tap at boot.
+        let source = include_str!("lib.rs");
+        let shell = source.split("\n#[cfg(test)]\nmod tests").next().unwrap_or_default();
+        let setup = shell.split(".setup(|app| {").nth(1).unwrap_or_default();
+        let claim = setup.find("notice_tap::answer_link(app.handle(), std::env::args())");
+        let kept = setup.find("app.manage(notice_tap::KeptNoticeTap::default())");
+        let window = setup.find("open_main_window(app, cache_dir)");
+        // Each one found, or `None < Some(_)` would pass the order check below without a place to keep
+        // the tap (on_click would panic on the unmanaged state).
+        let (Some(claim), Some(kept), Some(window)) = (claim, kept, window) else {
+            panic!("setup lost one of: the claim {claim:?}, the kept tap {kept:?}, the window {window:?}");
+        };
+        assert!(kept < claim && window < claim, "the link is answered before there is somewhere to keep it");
+    }
+
+    #[test]
+    fn the_store_copy_answers_the_app_s_links() {
+        // The `.exe`/`.msi` register the scheme at install; the Store copy only has what its manifest
+        // declares. Without it a click on a notice, or any `erplora://` link, reaches nobody there.
+        let manifest = include_str!("../msix/Package.appxmanifest");
+        let protocol = format!(r#"<uap:Protocol Name="{DEEP_LINK_SCHEME}""#);
+        assert!(manifest.contains(r#"<uap:Extension Category="windows.protocol">"#), "no protocol extension");
+        assert!(manifest.contains(&protocol), "the Store copy does not declare {DEEP_LINK_SCHEME}://");
     }
 
     #[test]

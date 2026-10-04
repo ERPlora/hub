@@ -105,6 +105,12 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
    */
   const ACCOUNT_SURFACE = '/dashboard/profile/?surface=account';
 
+  /**
+   * Deleting that same account, on the same surface (hub#2451): the in-app deletion path Play
+   * demands, opened straight on the SaaS's confirmation instead of one page past «Manage account».
+   */
+  const ACCOUNT_DELETION_SURFACE = '/dashboard/profile/delete/?surface=account';
+
   // 🪤 The CALL is required, not the bare name: a gate written in prose that explains the rule
   // satisfies an `includes` and lets the file through (measured by mutation in hub#1897).
   const PLAN_GATE = /\bplanUpgradeIsOfferable\(/;
@@ -131,6 +137,7 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     { what: "the assistant's checkout (hub#1910)", reaches: /\bstartAssistantCheckout\(/, gate: PLAN_GATE },
     // Places that cannot take money.
     { what: "the person's own account, without the panel (hub#1900)", reaches: /(['"`])\/dashboard\/profile\/\?surface=account\1/ },
+    { what: "deleting the person's own account, without the panel (hub#2451)", reaches: /(['"`])\/dashboard\/profile\/delete\/\?surface=account\1/ },
     { what: 'the app installer and its update channel (hub#400, hub#480)', reaches: /\bappDownloadUrl\(|\bappUpdateDestination\b/ },
     { what: "the SaaS's Google sign-in, which hands straight back to this hub (ADR-0157 §8)", reaches: /\bgoogleLoginUrl\(/ },
     { what: 'another hub, validated as one before leaving (deep links)', reaches: /\brequireHubUrl\(|\bhubDeepLink\(/ },
@@ -142,7 +149,8 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
 
   /**
    * An address of the SaaS written out by hand. Whatever else a way out reaches, it may not ALSO
-   * carry one of these — the account surface is the only panel address a door may spell.
+   * carry one of these — the account surface (and its deletion page) is the only panel address a
+   * door may spell.
    */
   const RAW_SAAS_ADDRESS = /\/(?:dashboard|pricing|marketplace|billing|checkout|plans)\b|erplora\.com\//;
 
@@ -316,7 +324,9 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
           offences.push(`${where} → opens ${d.what} from a shared module: declare it in SHARED_PAID_DOORS, with the predicate its callers must read`);
         }
       }
-      const raw = RAW_SAAS_ADDRESS.exec(seen.split(ACCOUNT_SURFACE).join(''));
+      const raw = RAW_SAAS_ADDRESS.exec(
+        seen.split(ACCOUNT_SURFACE).join('').split(ACCOUNT_DELETION_SURFACE).join(''),
+      );
       if (raw) offences.push(`${where} → spells a SaaS address by hand (${raw[0]})`);
     }
     return offences;
@@ -346,6 +356,7 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
     ['R6 · a declared door that also opens pricing', 'views/SystemPage.vue', 'await openExternal(appDownloadUrl(p));\nawait openExternal(`${config.cloudApiUrl}/pricing/`);'],
     ['R7 · the panel without its trailing slash', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';\nawait openExternal(`${config.cloudApiUrl}/dashboard`);"],
     ['the account door back on the bare panel page', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/';\nawait openExternal(await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a'));"],
+    ['the deletion door without the account surface (hub#2451)', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_DELETE_PATH = '/dashboard/profile/delete/';\nawait openExternal(await saasDoor(CLOUD_ACCOUNT_DELETE_PATH, plain, 'a'));"],
     ['a checkout nobody gates (hub#1910)', 'components/X.vue', 'const url = await startAssistantCheckout(t);\nif (url) window.location.assign(url);'],
     [
       'the router asked to build a SaaS address (hub#2312)',
@@ -387,6 +398,7 @@ describe('anti-steering: the Hub carries no route to a page that can take money'
       'const href = sameHubHref(router.resolve(toPath).href, window.location.href);\nif (href) window.location.assign(href);',
     ],
     ['the account surface', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_PATH = '/dashboard/profile/?surface=account';\nconst plain = `${base}${CLOUD_ACCOUNT_PATH}`;\nawait openExternal(ok ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'a') : plain);"],
+    ['the account deletion, on the account surface (hub#2451)', 'views/ProfilePage.vue', "const CLOUD_ACCOUNT_DELETE_PATH = '/dashboard/profile/delete/?surface=account';\nconst plain = `${base}${CLOUD_ACCOUNT_DELETE_PATH}`;\nawait openExternal(ok ? await saasDoor(CLOUD_ACCOUNT_DELETE_PATH, plain, 'a') : plain);"],
     ['the installer', 'views/SystemPage.vue', 'await openExternal(appDownloadUrl(os.platform));'],
     ['a gated plan door', 'App.vue', "x = planUpgradeIsOfferable(d);\nawait openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'p'));"],
     [

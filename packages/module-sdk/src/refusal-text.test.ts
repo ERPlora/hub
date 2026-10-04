@@ -279,6 +279,8 @@ test('hub#1570: no PLATFORM code is domain-shaped — which is WHY a module can 
     'db',
     'io',
     'wasm',
+    'wasm_budget_exceeded',
+    'wasm_timeout',
     'native',
     'schema',
     'manifest',

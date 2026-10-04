@@ -58,6 +58,21 @@ sales/tests/order_discount_cap.hub.test.py
 # pending-publication: sales#278 until 2026-10-24
 sales/tests/service_sale.hub.test.py
 
+# sales: in a Spanish hub a sale of 1.000 € or more cannot take cash, mixed payments included —
+# 999,99 € in cash closes, 1.000 € in cash and 999 € cash + 1 € card are refused with
+# `sales.cash_limit_exceeded` and write no sale, and the preview publishes `cash_limit`, against
+# the real kernel (sales#498, Ley 7/2012 art. 7). New coverage, not moved.
+# pending-publication: sales#498 until 2026-11-03
+sales/tests/cash_limit.hub.test.py
+
+# sales: refunds of the SAME ticket fired at once never hand back more than was charged — two
+# full refunds of 15,00 € (one goes through, the other `sales.refund_requires_completed`), five
+# partials of 10,00 € on 15,00 € (one goes through, four `sales.refund_exceeds_tender`) and two
+# partials of 7,50 € (both go through and the sale ends `refunded`), threads released by one
+# barrier against the real kernel (sales#506). New coverage, not moved.
+# pending-publication: sales#506 until 2026-11-03
+sales/tests/refund_race.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
@@ -141,6 +156,13 @@ inventory/tests/decrease_refuses_without_unit.hub.test.py
 # kernel real (staff#55). Cobertura nueva, no mudada.
 # Landed pending publication (staff#62); the module has published it: now a normal entry.
 staff/tests/user_link.hub.test.py
+
+# staff: two people link the same Hub user to two records AT ONCE — the loser of the race, refused
+# by `uq_staff_member_hub_user`, reads `staff.user_already_linked` through `on_unique` (hub#2081),
+# not `db`; the first link is held uncommitted in the hub's database (`ERPLORA_HUB_PSQL`) against
+# the real kernel (staff#63). New coverage, not moved.
+# pending-publication: staff#104 until 2026-11-01
+staff/tests/user_link_race.hub.test.py
 
 # ── Cómo entra una batería NUEVA: `# pending-publication: <repo>#<n> until <fecha>` (kitchen#84) ─
 # Una batería nueva no podía aterrizar: el gate del módulo (module-toolkit#163) la rechaza hasta
@@ -245,6 +267,12 @@ verifactu/tests/events_list.hub.test.py
 # the last 8 CLOSED sessions, newest close first (cash_register#119). New coverage, not moved.
 # pending-publication: cash_register#120 until 2026-10-28
 cash_register/tests/widget_params.hub.test.py
+# cash_register: the Cash grid and a session's counts come back newest first — sessions by
+# `opened_at`, counts by `counted_at`, both descending — through the list engine of the real
+# kernel; the order was by the UUID `id` and today's open shift could land last (cash_register#127).
+# New coverage, not moved.
+# pending-publication: cash_register#130 until 2026-10-29
+cash_register/tests/list_order.hub.test.py
 # payment_gateways: a deleted gateway frees its code — a new gateway is created under it, the list
 # shows only the new one, and a second LIVE gateway under that code is refused with
 # `payment_gateways.gateway_code_taken` through the manifest's `on_unique` without writing anything,
@@ -265,3 +293,21 @@ taxes/tests/calculate_refuses_without_rules.hub.test.py
 # against the real kernel (appointments#246). New coverage, not moved.
 # pending-publication: appointments#249 until 2026-10-29
 appointments/tests/recurring_create_links.hub.test.py
+# appointments: «this and following» on a series at its LARGEST — a daily series booked to the
+# 400-day horizon, with a full agenda of the same professional ahead — moves whole inside the
+# handler's WASM instruction budget, against the real kernel (appointments#251). New coverage, not moved.
+# pending-publication: appointments#262 until 2026-10-30
+appointments/tests/series_edit_at_horizon.hub.test.py
+# appointments: a batch of 50 and a daily series materialized to the 400-day horizon, for a
+# professional with a FULL agenda ahead (3,200 other live bookings), book inside the handler's WASM
+# instruction budget — a clash is refused by its code, not by `wasm` — against the real kernel
+# (appointments#265). New coverage, not moved.
+# pending-publication: appointments#268 until 2026-10-30
+appointments/tests/busy_agenda_booking.hub.test.py
+# appointments: a series is only CREATED with a professional who performs its service —
+# `recurring.create` with someone outside the service is refused at the door as
+# `staff_not_eligible` and nothing is saved, the eligible one is created and booked, and a service
+# assigned to nobody is open to the whole team, against the real kernel (appointments#283). New
+# coverage, not moved.
+# pending-publication: appointments#288 until 2026-11-02
+appointments/tests/recurring_create_eligibility.hub.test.py

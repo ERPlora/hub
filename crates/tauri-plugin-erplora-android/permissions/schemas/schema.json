@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the check_permissions command without any pre-configured scope."
         },
         {
+          "description": "Enables the keep_listening command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-keep-listening",
+          "markdownDescription": "Enables the keep_listening command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the keep_listening command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-keep-listening",
+          "markdownDescription": "Denies the keep_listening command without any pre-configured scope."
+        },
+        {
           "description": "Enables the leave_app command without any pre-configured scope.",
           "type": "string",
           "const": "allow-leave-app",
@@ -343,10 +355,10 @@
           "markdownDescription": "Denies the request_permissions command without any pre-configured scope."
         },
         {
-          "description": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás y abrir la ficha de la app en los ajustes del sistema.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-leave-app`\n- `allow-open-app-settings`",
+          "description": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás, abrir la ficha de la app en los ajustes del sistema y seguir a la escucha de avisos con la pantalla apagada.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-leave-app`\n- `allow-open-app-settings`\n- `allow-keep-listening`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás y abrir la ficha de la app en los ajustes del sistema.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-leave-app`\n- `allow-open-app-settings`"
+          "markdownDescription": "Consultar y solicitar los permisos de runtime que el TPV necesita en Android, salir de la app con el botón Atrás, abrir la ficha de la app en los ajustes del sistema y seguir a la escucha de avisos con la pantalla apagada.\n#### This default permission set includes:\n\n- `allow-check-permissions`\n- `allow-request-permissions`\n- `allow-leave-app`\n- `allow-open-app-settings`\n- `allow-keep-listening`"
         }
       ]
     }

@@ -180,6 +180,14 @@ pub(crate) fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         E::Io(_) | E::Manifest { .. } | E::Db(_) | E::Wasm(_) | E::Native(_) | E::Schema { .. } => {
             false
         }
+        // hub#2428: a handler out of its instruction budget. Its sentence names an internal
+        // function and a fuel figure — for the log. What the screen needs is the CODE
+        // (`wasm_budget_exceeded`), which the SDK turns into «too big to do at once, nothing
+        // changed».
+        E::WasmBudgetExceeded { .. } => false,
+        // hub#2431: the same for a handler interrupted by the clock — the function name and the
+        // limit are for the log; the SDK turns `wasm_timeout` into «took too long, nothing changed».
+        E::WasmTimeout { .. } => false,
         // hub#1209: the half-migrated hub the money backfill refuses to guess about. It is raised
         // by an ops subcommand and by the boot path, never inside a request, so it does not travel
         // through this door at all — and if it ever did, its sentence is an inventory of this
@@ -294,6 +302,12 @@ pub(crate) fn error_payload(e: &erplora_runtime::RuntimeError) -> (StatusCode, V
     }
     if let E::ManifestRejected { at, .. } = e {
         error["at"] = json!(at);
+    }
+    // hub#2434: what the fiscal precondition is missing (`business_legal_name`, `business_tax_id`,
+    // `certificate`) travels as data, so the screen names it in the reader's language and says
+    // where it is filled in. The `Display` it arrived in is a log line with the setting keys in it.
+    if let E::FiscalPrecondition { missing } = e {
+        error["missing"] = json!(missing);
     }
     // hub#1102: and the same rule again for the read a `required` preload could not resolve. The
     // shell translates the CODE (`read_unavailable`) and names the missing app from this field;
@@ -815,6 +829,35 @@ mod error_redaction_tests {
         );
     }
 
+    /// hub#2428: a handler that ran out of its instruction budget answers its OWN code, so the
+    /// screen can say «too big to do at once, nothing changed» instead of the crash line. What
+    /// travels is the code; the handler's function name and the budget stay in the log, like any
+    /// other plumbing of the guest.
+    #[test]
+    fn a_handler_out_of_budget_has_its_own_code_and_keeps_its_detail_in_the_log() {
+        let (status, body) = error_payload(&RuntimeError::WasmBudgetExceeded {
+            function: "update_series".into(),
+            fuel: 200_000_000,
+        });
+        assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"]["code"], "wasm_budget_exceeded", "{body}");
+        assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
+    }
+
+    /// hub#2431: a handler the clock interrupted answers its OWN code, so the screen can say «took
+    /// too long, nothing changed» instead of the crash line. The function name and the limit stay
+    /// in the log.
+    #[test]
+    fn a_handler_over_its_time_limit_has_its_own_code_and_keeps_its_detail_in_the_log() {
+        let (status, body) = error_payload(&RuntimeError::WasmTimeout {
+            function: "update_series".into(),
+            timeout_ms: 5_000,
+        });
+        assert_eq!(status, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"]["code"], "wasm_timeout", "{body}");
+        assert_eq!(body["error"]["message"], REDACTED_MESSAGE, "{body}");
+    }
+
     /// The variants #1185 added while this branch was open (`InvalidField`, `ManifestRejected`;
     /// the third, `CertificateTypeMismatch`, was retired with its door in hub#1490). The
     /// exhaustive `match` of `may_reach_the_client` made the compiler ask which side of the door
@@ -891,6 +934,29 @@ mod error_redaction_tests {
                 .contains("sales"),
             "{dependents}"
         );
+    }
+
+    /// hub#2434: what the fiscal precondition is missing travels as DATA, so the screen can say
+    /// «complete the legal name and the tax id in Settings › Business» in the reader's language
+    /// instead of painting the log line with `business_legal_name` in it. Same rule as
+    /// `dependents` (hub#1101): the list is what the sentence enumerates, never parsed out of prose.
+    #[test]
+    fn a_fiscal_precondition_refusal_carries_what_is_missing_as_data() {
+        let (status, body) = error_payload(&RuntimeError::FiscalPrecondition {
+            missing: vec!["business_legal_name", "business_tax_id"],
+        });
+        assert_eq!(status, axum::http::StatusCode::CONFLICT);
+        assert_eq!(body["error"]["code"], "fiscal_precondition_failed", "{body}");
+        assert_eq!(
+            body["error"]["missing"],
+            serde_json::json!(["business_legal_name", "business_tax_id"]),
+            "{body}"
+        );
+
+        let certificate = error_of(RuntimeError::FiscalPrecondition {
+            missing: vec!["certificate"],
+        });
+        assert_eq!(certificate["missing"], serde_json::json!(["certificate"]));
     }
 }
 

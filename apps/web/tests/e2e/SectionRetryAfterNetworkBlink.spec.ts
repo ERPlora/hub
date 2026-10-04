@@ -11,6 +11,10 @@
 // This is the only layer that can prove it: the "remembered as failed" part is the browser's
 // module map, which the unit tests (`src/router/*hub2312*`) can only stand in for.
 //
+// The screen is an employee's card, opened from the Employees list, and not Settings any more: since
+// hub#2325 the side menu's screens (Settings among them) are downloaded while the app is idle, so a
+// blink no longer reaches the tap on them. A screen the menu does not paint is still fetched on tap.
+//
 // The injected failure is `net::ERR_CONNECTION_RESET`, the same one `BenchBootRecovery.spec.ts`
 // uses, and deliberately not a network-change code: a bench retry that excuses network changes
 // (hub#2324) can never retry a regression of this spec away.
@@ -52,33 +56,33 @@ test.describe('a section that failed on a network blink (hub#2312)', () => {
   test('opens on the next tap once the network is back', async ({ page }) => {
     await withSession(page, await loginByPin());
 
-    // The module of the Settings screen itself — not its `?vue&type=style` halves, which the
+    // The module of the employee card itself — not its `?vue&type=style` halves, which the
     // browser only asks for once the module arrives. Killed ONCE: the network blinks, then is fine.
-    let settingsModuleRequests = 0;
+    let formModuleRequests = 0;
     await page.route(
-      (url) => url.pathname.endsWith('/src/views/SettingsPage.vue') && !url.searchParams.has('vue'),
+      (url) => url.pathname.endsWith('/src/views/EmployeeFormPage.vue') && !url.searchParams.has('vue'),
       async (route) => {
-        settingsModuleRequests += 1;
-        if (settingsModuleRequests === 1) return route.abort('connectionreset');
+        formModuleRequests += 1;
+        if (formModuleRequests === 1) return route.abort('connectionreset');
         return route.continue();
       },
     );
 
-    await page.goto('/dashboard');
-    const toSettings = page.locator('ok-widget-board').getByTestId('dashboard-blueprint-cta');
-    await expect(toSettings).toBeVisible();
+    await page.goto('/employees');
+    const toCard = page.locator('ok-data-table').first().getByRole('button', { name: 'Editar' }).first();
+    await expect(toCard).toBeVisible();
 
-    // 1 · The blink. The person stays on the dashboard and is told the section did not open.
-    await toSettings.click();
+    // 1 · The blink. The person stays on the list and is told the card did not open.
+    await toCard.click();
     await expect(page.locator('ion-toast:not(.overlay-hidden)')).toHaveCount(1);
-    await expect(page).toHaveURL(/\/dashboard$/);
-    expect(settingsModuleRequests).toBe(1);
+    await expect(page).toHaveURL(/\/employees$/);
+    expect(formModuleRequests).toBe(1);
 
     // 2 · They try again, as the toast says. Before the fix this made NO request and failed again.
-    await toSettings.click();
+    await toCard.click();
 
-    await expect(page).toHaveURL(/\/settings#data$/);
-    await expect(page.getByTestId('import-lead')).toBeVisible();
-    expect(settingsModuleRequests, 'the retry never went back to the network for the section').toBe(2);
+    await expect(page).toHaveURL(/\/employees\/[^/]+$/);
+    await expect(page.getByTestId('employee-form')).toBeVisible();
+    expect(formModuleRequests, 'the retry never went back to the network for the section').toBe(2);
   });
 });

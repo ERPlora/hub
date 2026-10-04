@@ -137,6 +137,7 @@ const messages = {
       availableWidgets: 'Available',
       emptyPanel: 'Empty panel. Tap ⋮ to add widgets.',
       blueprintTitle: 'Data',
+      recommendedPreset: 'Recommended',
     },
   },
   es: {
@@ -148,6 +149,7 @@ const messages = {
       availableWidgets: 'Disponibles',
       emptyPanel: 'Panel vacío. Pulsa ⋮ para añadir widgets.',
       blueprintTitle: 'Datos',
+      recommendedPreset: 'Recomendado',
     },
   },
 };
@@ -278,6 +280,27 @@ describe('the board follows the language the user picks (hub#768)', () => {
 
     expect(boardOf(wrapper).labels?.customize).toBe('Personalizar panel');
     expect(boardOf(wrapper).labels?.empty).toBe('Panel vacío. Pulsa ⋮ para añadir widgets.');
+  });
+});
+
+// ── sales#473 · The «Recommended» preset the shell builds speaks the language of the UI ─────────
+describe('the preset the shell names follows the language the user picks (sales#473)', () => {
+  const recommendedAsked = (): unknown[] =>
+    collectDashboardWidgets.mock.calls.map((c) => (c[0] as { labels?: { recommended?: string } }).labels?.recommended);
+
+  it('🔴 asks the collector for the preset name in English on an English hub', async () => {
+    mountDashboard('en');
+    await flushPromises();
+    expect(recommendedAsked().at(-1)).toBe('Recommended');
+  });
+
+  it('🔴 asks for it again, in Spanish, when the user switches to Spanish', async () => {
+    const { i18n } = mountDashboard('en');
+    await flushPromises();
+    i18n.global.locale.value = 'es';
+    await nextTick();
+    await flushPromises();
+    expect(recommendedAsked().at(-1)).toBe('Recomendado');
   });
 });
 

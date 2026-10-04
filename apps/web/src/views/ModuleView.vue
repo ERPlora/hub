@@ -714,12 +714,8 @@ onBeforeUnmount(() => {
   min-width: var(--ok-tabbar-min);
 }
 
-.module-tabbar ion-label {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  line-height: 1.1;
-}
+/* The label wraps between words, never inside one: the rule is the shell's, for every footer strip
+   (`polish.css`, hub#2414/hub#2422). */
 
 /* Skeleton de carga del módulo (hub#1169). Bloque, no fila: ocupa el ANCHO del área de contenido
    —que es lo que va a ocupar la pantalla que está bajando— en vez de colapsar en una línea corta

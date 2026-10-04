@@ -57,10 +57,17 @@ import { loadBellCounterModuleIds } from './lib/bell-counters';
 import {
   askWhenSomeoneSignsIn,
   ensureNotificationPermission,
+  hasNoticeSource,
+  notificationPermissionState,
   primerLabelsFrom,
   shouldSendNotice,
   warnIfThereIsSomethingToTell,
 } from './lib/notification-permission';
+import {
+  createNoticeListening,
+  registerNoticeListening,
+  stopListeningWhenSignedOut,
+} from './lib/notice-listening';
 import { createPrintService } from './lib/print';
 import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
@@ -396,6 +403,22 @@ bootBellNotices({
   },
 });
 
+// All of the notices above are born in this page, so on Android they only arrived while the app
+// was on screen (hub#2307): with the screen off or the app in the background neither the bell's
+// poll nor the event socket kept running. The installed app keeps listening through a foreground
+// service while somebody is signed in, the hub has something that would ever send a notice and the
+// notices are not refused — the decision is in lib/notice-listening, with its test. It starts after
+// the sign-in ask below (so the answer to that very dialog counts) and stops with the session.
+const noticeListening = createNoticeListening({
+  hasSomethingToTell: async () =>
+    hasNoticeSource(activeModuleIds(), await loadBellCounterModuleIds()),
+  permission: () => notificationPermissionState(),
+  t: (key) => i18n.global.t(key),
+  invoke: (cmd, args) => invokeTauri(cmd, args),
+});
+registerNoticeListening(noticeListening);
+stopListeningWhenSignedOut(() => isAuthed.value, noticeListening);
+
 // Si un refresh falla (sesión expirada de verdad), cloud.ts ya limpió los tokens; aquí
 // limpiamos el estado reactivo del usuario y mandamos a /login vía el router del shell.
 setOnSessionExpired(() => {
@@ -471,7 +494,7 @@ void bootUntilReachable({
           activeModules: activeModuleIds,
           bellModules: loadBellCounterModuleIds,
           ask: () => askToWarn(),
-        }),
+        }).then(() => noticeListening.sync(true)),
     );
   });
 });

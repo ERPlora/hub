@@ -237,7 +237,8 @@
 
 <script setup lang="ts">
 import { inject, ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
+import { useHashTab } from '../lib/hash-tab';
 import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
@@ -275,10 +276,10 @@ import { columnsForScreen, TABLE_PHONE_QUERY, type TableView } from '../lib/apps
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
 import {
-  defaultVersion, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
+  defaultVersion, hasUncheckedUpdates, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo, type UpdateAllResult, type UpdateAllTarget,
 } from '../lib/module-updates';
-import { publishModuleUpdates } from '../lib/module-update-notice';
+import { markModuleUpdatesUnknown, publishModuleUpdates } from '../lib/module-update-notice';
 import { isModuleEntitled, entitlementStatus, resolveEntitlement } from '../lib/entitlement';
 import { isAdmin } from '../lib/session';
 
@@ -303,18 +304,9 @@ interface Mod {
 type AppsTab = 'mine' | 'all' | 'paid';
 const TABS: readonly AppsTab[] = ['mine', 'all', 'paid'];
 
-const route = useRoute();
 const router = useRouter();
-// Deep-link por HASH (/apps#paid) — la ruta base no cambia, así Ionic no la trata como página
-// secundaria (mismo patrón que Settings/System/etc.). Sincroniza tab ↔ hash.
-const tab = ref<AppsTab>(TABS.find((v) => v === route.hash.slice(1)) ?? 'mine');
-watch(tab, (value) => {
-  if (value !== (route.hash.slice(1) || 'mine')) void router.replace({ hash: `#${value}` });
-});
-watch(() => route.hash, (h) => {
-  const next = TABS.find((v) => v === h.slice(1)) ?? 'mine';
-  if (next !== tab.value) tab.value = next;
-});
+// Deep link by HASH (/apps#paid), synced only while the address is /apps (hub#2444).
+const tab = useHashTab<AppsTab>('/apps', (h) => TABS.find((v) => v === h.slice(1)) ?? 'mine');
 
 // ok-data-table (OutfitKit) está registrado en main.ts. Tipos locales: OutfitKit no emite .d.ts.
 type Row = Record<string, unknown>;
@@ -1318,23 +1310,27 @@ async function loadInstalled(): Promise<void> {
 }
 
 /**
- * Pregunta al runtime qué versión ofrece hoy el marketplace por módulo instalado (hub#516).
+ * Asks the runtime which version the marketplace offers today for each installed app (hub#516).
  *
- * Bajo demanda, al abrir la pantalla y tras instalar/actualizar. Un fallo deja la lista vacía: sin
- * respuesta **no se ofrece nada** — «no lo sé» no se pinta como «hay novedad».
+ * On demand, when the screen opens and after an install/update. A failure leaves the list empty:
+ * without an answer **nothing is offered** — «I don't know» is never painted as «there is news».
+ * An answer with apps the marketplace could not be asked about (`checked: false`, hub#2336) is a
+ * failed check too: its known updates are offered, and the screen still says it could not check.
  */
 async function loadModuleUpdates(): Promise<void> {
   moduleUpdatesChecking.value = true;
   try {
-    moduleUpdates.value = await listModuleUpdates();
+    const updates = await listModuleUpdates();
+    moduleUpdates.value = updates;
     moduleUpdatesKnown.value = true;
-    moduleUpdatesCheckFailed.value = false;
+    moduleUpdatesCheckFailed.value = hasUncheckedUpdates(updates);
   } catch {
     // Unknown again: the watch below must not publish the emptiness a failure leaves behind.
     moduleUpdatesKnown.value = false;
     moduleUpdates.value = [];
-    // …and the screen must not pass it off as «up to date» either (hub#2366).
+    // …and the screen must not pass it off as «up to date» either (hub#2366), nor the bell.
     moduleUpdatesCheckFailed.value = true;
+    markModuleUpdatesUnknown();
   } finally {
     moduleUpdatesChecking.value = false;
   }

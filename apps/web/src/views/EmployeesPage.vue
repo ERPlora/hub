@@ -191,7 +191,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
+import { useHashTab } from '../lib/hash-tab';
 import { useI18n } from 'vue-i18n';
 import {
   IonButton,
@@ -266,17 +267,9 @@ const TABS: readonly EmployeeTab[] = ['staff', 'roles', 'apikeys', 'approvals'];
  * offered or not, and a session that stops being one is taken off them.
  */
 const ADMIN_ONLY_TABS: readonly EmployeeTab[] = ['apikeys', 'approvals'];
-const route = useRoute();
 const router = useRouter();
-const tab = ref<EmployeeTab>(TABS.find((value) => value === route.hash.slice(1)) ?? 'staff');
-
-watch(tab, (value) => {
-  if (value !== (route.hash.slice(1) || 'staff')) void router.replace({ hash: `#${value}` });
-});
-watch(() => route.hash, (hash) => {
-  const next = TABS.find((value) => value === hash.slice(1)) ?? 'staff';
-  if (next !== tab.value) tab.value = next;
-});
+// Deep link by HASH (/employees#roles), synced only while the address is /employees (hub#2444).
+const tab = useHashTab<EmployeeTab>('/employees', (hash) => TABS.find((value) => value === hash.slice(1)) ?? 'staff');
 watch(isAdmin, (admin) => {
   if (!admin && ADMIN_ONLY_TABS.includes(tab.value)) tab.value = 'staff';
 });

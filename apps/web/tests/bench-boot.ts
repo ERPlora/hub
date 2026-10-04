@@ -33,11 +33,11 @@
 
 import { readdirSync } from 'node:fs';
 
-import { test as base, expect, request, type Request } from '@playwright/test';
+import { test as base, expect, request, type Page, type Request } from '@playwright/test';
 
 // Re-exported so a spec needs ONE import line, not one for the bench and one for Playwright.
 export { expect, request };
-export type { Page, TestInfo } from '@playwright/test';
+export type { Page, Request, TestInfo } from '@playwright/test';
 
 /**
  * Chromium errors that mean "the connection died under this request", as opposed to "the request
@@ -109,6 +109,111 @@ export function nextBootStep(
     return elapsedMs < NETWORK_CHANGE_BUDGET_MS ? 'reload-storm' : 'hand-over';
   }
   return countedReloads < BOOT_RELOAD_LIMIT ? 'reload' : 'hand-over';
+}
+
+/** What the bench does once a request the spec made has ended (ERPlora/hub#2442). */
+export type ResendStep = 'hand-over' | 'resend';
+
+/**
+ * The bench's decision once a request the SPEC made has ended — `errorText` is the browser's error
+ * for it, `undefined` when it was answered — and how old the network-change storm it died in is.
+ *
+ * Narrower than `nextBootStep` on purpose. A boot fetches the app's own static code, and a server
+ * that resets the connection cannot hide a defect behind a reload of it. A spec's request is the
+ * thing under test: a turn the runtime reset or never answered IS the defect, so only the two codes
+ * Chromium derives from the machine's network changing earn a resend, and nothing else ever does.
+ */
+export function nextResendStep(errorText: string | undefined, stormAgeMs: number): ResendStep {
+  if (errorText === undefined || !NETWORK_CHANGE_ERRORS.includes(errorText)) return 'hand-over';
+  return stormAgeMs < NETWORK_CHANGE_BUDGET_MS ? 'resend' : 'hand-over';
+}
+
+/**
+ * How long the bench waits for the request a send makes to end before handing the page over. A
+ * send that makes no request at all is the spec's to fail, on its own assertions.
+ */
+export const RESEND_WAIT_MS = 15_000;
+
+const resendsByPage = new WeakMap<object, string[]>();
+
+/**
+ * The network-change codes the bench re-sent the spec's last `sendThroughNetworkChanges` for, in
+ * order (ERPlora/hub#2442) — the same facts as its warning line, readable from the spec.
+ */
+export function resendsOf(page: object): readonly string[] {
+  return resendsByPage.get(page) ?? [];
+}
+
+/** Resolves with the browser's error for the next request `isTarget` picks, `undefined` if answered. */
+function endOfNextRequest(
+  page: Page,
+  isTarget: (req: Request) => boolean,
+): Promise<{ url?: string; errorText?: string }> {
+  return new Promise((resolve) => {
+    const done = (outcome: { url?: string; errorText?: string }): void => {
+      clearTimeout(timer);
+      page.off('requestfinished', onFinished);
+      page.off('requestfailed', onFailed);
+      resolve(outcome);
+    };
+    const onFinished = (req: Request): void => {
+      if (isTarget(req)) done({ url: req.url() });
+    };
+    const onFailed = (req: Request): void => {
+      if (isTarget(req)) done({ url: req.url(), errorText: req.failure()?.errorText ?? 'net::ERR_FAILED' });
+    };
+    const timer = setTimeout(() => done({}), RESEND_WAIT_MS);
+    page.on('requestfinished', onFinished);
+    page.on('requestfailed', onFailed);
+  });
+}
+
+/**
+ * Runs `send` — a spec action that makes ONE request, the one `isTarget` picks — and runs it again
+ * only when the browser says that request died because the machine's network changed
+ * (ERPlora/hub#2442).
+ *
+ * The boot recovery above stops at the app's own code: XHR and fetch are the spec's business. But
+ * the same storm that blanks a boot kills a request a spec makes after it, and on `ci-runner-1` it
+ * killed the assistant's turn twice — the drawer said «No se pudo contactar con el asistente» and
+ * a PR that never touched the assistant went red. Any other ending — answered, a 500, a reset, a
+ * refused connection, a request that never leaves — is handed to the spec as it is, first time.
+ */
+export async function sendThroughNetworkChanges(
+  page: Page,
+  isTarget: (req: Request) => boolean,
+  send: () => Promise<void>,
+): Promise<void> {
+  const resends: string[] = [];
+  resendsByPage.set(page, resends);
+  let firstLossAt: number | undefined;
+
+  for (;;) {
+    const ended = endOfNextRequest(page, isTarget);
+    await send();
+    const { url, errorText } = await ended;
+    const networkChanged = errorText !== undefined && NETWORK_CHANGE_ERRORS.includes(errorText);
+    if (networkChanged) firstLossAt ??= Date.now();
+    const stormAge = firstLossAt === undefined ? 0 : Date.now() - firstLossAt;
+    if (nextResendStep(errorText, stormAge) === 'hand-over') {
+      if (networkChanged) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[bench] BENCH_GAVE_UP the spec's request ${url} died on the wire (${errorText}) after ` +
+            `${resends.length} resend(s) and a storm ${stormAge} ms old — handing it over. See hub#2442.`,
+        );
+      }
+      return;
+    }
+    // Said out loud for the reason the boot recovery gives (hub#1806): a bench that heals in
+    // silence is a bench whose flake rate nobody can measure.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[bench] the spec's request ${url} died on the wire (${errorText}) — sending it again ` +
+        `(network change; see hub#2442).`,
+    );
+    resends.push(errorText as string);
+  }
 }
 
 /** How the bench fetches a navigation again: back to its own URL, or a reload of the page. */

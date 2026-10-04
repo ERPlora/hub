@@ -23,6 +23,20 @@ export interface ModuleUpdateInfo {
    * runtime older than the field — read the same as `null`: nothing to warn about.
    */
   latest_min_erplora_version?: string | null;
+  /**
+   * Whether the marketplace was actually asked about this app (hub#2336). `false` = it did not
+   * answer, so `update_available: false` means «I don't know», not «up to date». Absent from a
+   * runtime older than the field — read as `true`, which is what that runtime meant.
+   */
+  checked?: boolean;
+}
+
+/**
+ * Whether any app could not be checked (hub#2336): the answer cannot vouch for «up to date».
+ * Its known updates are still real; what it cannot say is that there are no others.
+ */
+export function hasUncheckedUpdates(updates: readonly ModuleUpdateInfo[]): boolean {
+  return updates.some((u) => u.checked === false);
 }
 
 /**

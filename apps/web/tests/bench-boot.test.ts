@@ -20,6 +20,7 @@ import {
   NETWORK_CHANGE_BUDGET_MS,
   NETWORK_CHANGE_ERRORS,
   nextBootStep,
+  nextResendStep,
   specTakesTestFromPlaywright,
   TRANSIENT_TRANSPORT_ERRORS,
 } from './bench-boot';
@@ -174,6 +175,39 @@ describe('nextBootStep', () => {
     // lasted 1.4 s; a network that keeps changing for five is an outage of the runner, and has to
     // end as a red test.
     expect(NETWORK_CHANGE_BUDGET_MS).toBe(5_000);
+  });
+});
+
+// Regression test for ERPlora/hub#2442 — a network change that killed one of the SPEC's own
+// requests, after the shell had booted. Measured on run 36798035754 (attempt 1) and on develop's
+// run 37203596535: in both traces `POST /api/assistant/chat/stream` died with
+// `net::ERR_NETWORK_CHANGED` 0.3–0.7 s into a storm, together with every other request in flight,
+// and the drawer said «No se pudo contactar con el asistente». The boot recovery never looks at
+// XHR or fetch — they are the spec's business — so nothing stood between the runner's network and
+// the spec's red.
+describe('nextResendStep', () => {
+  it('hands the request over when it was answered', () => {
+    expect(nextResendStep(undefined, 0)).toBe('hand-over');
+  });
+
+  it('sends again a request the network changed under, while the storm is young', () => {
+    expect(nextResendStep('net::ERR_NETWORK_CHANGED', 0)).toBe('resend');
+    expect(nextResendStep('net::ERR_INTERNET_DISCONNECTED', NETWORK_CHANGE_BUDGET_MS - 1)).toBe('resend');
+  });
+
+  it('stops sending again once the storm outlives its budget, so an outage still ends red', () => {
+    expect(nextResendStep('net::ERR_NETWORK_CHANGED', NETWORK_CHANGE_BUDGET_MS)).toBe('hand-over');
+  });
+
+  it('never sends again a request that died of anything a server of ours can also cause', () => {
+    // Unlike a boot, a spec's request has NO budget for these: re-sending a turn the runtime reset
+    // or left unanswered would re-roll exactly the defect the spec exists to catch.
+    for (const code of TRANSIENT_TRANSPORT_ERRORS.filter((c) => !NETWORK_CHANGE_ERRORS.includes(c))) {
+      expect(nextResendStep(code, 0), code).toBe('hand-over');
+    }
+    expect(nextResendStep('net::ERR_CONNECTION_REFUSED', 0)).toBe('hand-over');
+    expect(nextResendStep('net::ERR_ABORTED', 0)).toBe('hand-over');
+    expect(nextResendStep('net::ERR_FAILED', 0)).toBe('hand-over');
   });
 });
 

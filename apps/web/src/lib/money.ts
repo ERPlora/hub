@@ -9,8 +9,8 @@
 // Dos entradas:
 //   - formatMoney(cents, opts?)  → importe en CÉNTIMOS (enteros del runtime; evita errores float).
 //   - formatAmount(units, opts?) → importe ya en UNIDADES mayores (lo que hoy usan Dashboard/Billing).
-// Ambas usan por defecto la moneda del hub; `opts.currency` la sobreescribe (p.ej. facturas Cloud
-// que traen su propia divisa).
+// Both default to the hub currency; `opts.currency` overrides it (e.g. Cloud invoices that carry
+// their own currency) — and with it the scale of the minor units (hub#2391).
 import { getLocale } from '../i18n';
 import { hubSettings } from './hub-settings';
 
@@ -32,6 +32,20 @@ export function hubCurrency(): string {
 export function hubCurrencyDecimals(): number {
   const d = hubSettings.value?.currency_decimals;
   return typeof d === 'number' ? d : decimalsForCurrency(hubCurrency());
+}
+
+/**
+ * The decimals of a GIVEN currency — the scale of an amount painted in it (hub#2391).
+ *
+ * Minor units belong to the currency they are painted in (the ISO-4217 and Stripe convention): a
+ * panel in euros on a hub in yen divides by 100, not by 1. The hub currency keeps the scale the
+ * runtime resolved for it (`hubCurrencyDecimals`, which may be declared by hand); any other
+ * currency, the ISO registry.
+ */
+export function currencyDecimals(code: string): number {
+  return code.trim().toUpperCase() === hubCurrency().trim().toUpperCase()
+    ? hubCurrencyDecimals()
+    : decimalsForCurrency(code);
 }
 
 /** Espejo del registro de Rust (`erplora_guest_sdk::currency`), como último recurso. */
@@ -92,14 +106,15 @@ function intl(opts?: FormatMoneyOptions): Intl.NumberFormat {
 }
 
 /**
- * Formatea un importe en **UNIDADES MÍNIMAS** (entero) con la moneda del hub (o `opts.currency`).
- * Es la entrada canónica: el runtime guarda dinero en enteros para no arrastrar error binario.
+ * Formats an amount in **MINOR UNITS** (integer) in the hub currency (or `opts.currency`).
+ * It is the canonical entry: the runtime stores money as integers so no binary error builds up.
  *
- * **Ya no divide entre 100 a ciegas**: divide entre `10^decimales-de-la-moneda`. En **JPY no divide**
- * (`1999` son 1999 ¥, no 19,99). Ver `hubCurrencyDecimals`.
+ * It divides by `10^decimals` of the currency that is PAINTED, never a blind ÷100: in **JPY it
+ * does not divide** (`1999` is 1999 ¥, not 19,99), and a panel in EUR on a yen hub still divides by
+ * 100 (hub#2391). See `currencyDecimals`.
  */
 export function formatMoney(minor: number, opts?: FormatMoneyOptions): string {
-  return intl(opts).format((minor || 0) / 10 ** hubCurrencyDecimals());
+  return intl(opts).format((minor || 0) / 10 ** currencyDecimals(opts?.currency ?? hubCurrency()));
 }
 
 /**

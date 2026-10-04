@@ -66,6 +66,12 @@ export default {
     moduleUpdatesTitle: 'App updates available',
     moduleUpdatesBody:
       '{n} app has a new version. Update it from My apps. | {n} apps have a new version. Update them from My apps.',
+    // The check for new app versions could not be made (hub#2336): the marketplace or the network
+    // did not answer. It is NOT «All caught up», so the bell says it and offers to ask again.
+    moduleUpdatesUnknownTitle: 'Could not check for app updates',
+    moduleUpdatesUnknownBody: 'We could not find out whether your apps have new versions. Check the connection and try again.',
+    moduleUpdatesRetry: 'Check again',
+    moduleUpdatesChecking: 'Checking…',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',
@@ -502,6 +508,8 @@ export default {
     noWidgets: 'No installed app offers widgets yet.',
     widgetEmpty: 'No data',
     widgetError: 'Unavailable',
+    // Name of the preset the picker offers from the business sector (sales#473).
+    recommendedPreset: 'Recommended',
     // «My apps» card (hub#367): the launcher of the panel. Its title reuses `topbar.apps` — same
     // name for the same thing on both surfaces.
     appsAdd: 'Add apps',
@@ -564,6 +572,7 @@ export default {
     manageLocal:
       'This identity belongs to this business only. Other businesses are neither known nor shown here.',
     manageInSaas: 'Manage account at erplora.com',
+    deleteAccount: 'Delete my account',
     pinTitle: 'PIN',
     pinDesc: 'The PIN you use at the till. Change it whenever you want — nobody else needs to.',
     pinSetupDesc: 'You do not have a PIN yet. Set one to be able to sign in at the till too.',
@@ -1435,6 +1444,16 @@ export default {
     stepPair: 'Pair',
     stepConfigure: 'Configure',
     updatesCloudHint: 'This web Hub is updated automatically as part of service deployments.',
+    // The apps' side of «updates» (hub#2332): the same count as the bell (hub#1172) — only updates
+    // this hub can apply — with the way to «My apps», where each update is one tap. A failed check
+    // reuses the bell's «Could not check» sentence: it is never «all up to date».
+    appUpdates: {
+      title: 'Your apps',
+      available: '{n} app has a new version. | {n} apps have a new version.',
+      allUpToDate: 'All your apps are up to date.',
+      checking: 'Checking whether your apps have new versions…',
+      goToMyApps: 'Go to My apps',
+    },
     // What we changed on this hub, and from which version (hub#564, ADR-0269 §3.5). We update
     // without asking, so the least we owe is that the owner can find out WHAT changed. Every
     // sentence below names an app the way they know it and a version they can compare — never a
@@ -1548,6 +1567,11 @@ export default {
       blockedInSettings:
         "Your device didn't ask again. Open its settings, find ERPlora and turn its notifications on.",
       turnedOn: 'Done — this device will warn you when something needs your attention.',
+      // hub#2307 — the ongoing notification Android shows while the app keeps listening with the
+      // screen off, and the name of its channel in the device's settings. Words for any business.
+      listeningTitle: 'ERPlora is listening',
+      listeningBody: "You'll be warned when something needs your attention, even with the screen off.",
+      listeningChannel: 'Notices with the screen off',
     },
   },
   planLimits: {

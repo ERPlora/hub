@@ -61,6 +61,10 @@ export default {
     moduleUpdatesTitle: 'Actualizaciones de apps',
     moduleUpdatesBody:
       '{n} app tiene una versión nueva. Actualízala desde Mis apps. | {n} apps tienen una versión nueva. Actualízalas desde Mis apps.',
+    moduleUpdatesUnknownTitle: 'No se ha podido comprobar si hay actualizaciones',
+    moduleUpdatesUnknownBody: 'No hemos podido saber si tus apps tienen versiones nuevas. Revisa la conexión y vuelve a intentarlo.',
+    moduleUpdatesRetry: 'Comprobar de nuevo',
+    moduleUpdatesChecking: 'Comprobando…',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
@@ -453,6 +457,8 @@ export default {
     noWidgets: 'Ninguna app instalada ofrece widgets todavía.',
     widgetEmpty: 'Sin datos',
     widgetError: 'No disponible',
+    // Name of the preset the picker offers from the business sector (sales#473).
+    recommendedPreset: 'Recomendado',
     // Tarjeta «Mis apps» (hub#367): el lanzador del panel. El título reutiliza `topbar.apps` — el
     // mismo nombre para lo mismo en las dos superficies.
     appsAdd: 'Añadir apps',
@@ -516,6 +522,7 @@ export default {
     manageLocal:
       'Esta identidad pertenece solo a este negocio. Aquí no se conocen ni se muestran otros negocios.',
     manageInSaas: 'Gestionar cuenta en erplora.com',
+    deleteAccount: 'Borrar mi cuenta',
     pinTitle: 'PIN',
     pinDesc: 'El PIN con el que entras en la caja. Cámbialo cuando quieras — no hace falta que lo haga nadie más.',
     pinSetupDesc: 'Todavía no tienes un PIN. Establece uno para poder entrar también desde la caja.',
@@ -1238,6 +1245,13 @@ export default {
     stepPair: 'Vincular',
     stepConfigure: 'Configurar',
     updatesCloudHint: 'Este Hub web se actualiza automáticamente durante los despliegues del servicio.',
+    appUpdates: {
+      title: 'Tus apps',
+      available: '{n} app tiene una versión nueva. | {n} apps tienen una versión nueva.',
+      allUpToDate: 'Todas tus apps están al día.',
+      checking: 'Comprobando si tus apps tienen versiones nuevas…',
+      goToMyApps: 'Ir a Mis apps',
+    },
     // Qué le hemos cambiado a este hub y desde qué versión (hub#564, ADR-0269 §3.5). Actualizamos
     // sin preguntar, así que lo mínimo que le debemos es que pueda SABER qué le cambió. Cada frase
     // nombra una app como él la conoce y una versión que puede comparar — nunca un digest, nunca
@@ -1338,6 +1352,9 @@ export default {
       blockedInSettings:
         'Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.',
       turnedOn: 'Listo: este dispositivo te avisará cuando algo necesite tu atención.',
+      listeningTitle: 'ERPlora está a la escucha',
+      listeningBody: 'Te avisará cuando algo necesite tu atención, aunque la pantalla esté apagada.',
+      listeningChannel: 'Avisos con la pantalla apagada',
     },
   },
   planLimits: {

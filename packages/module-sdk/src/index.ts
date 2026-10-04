@@ -401,7 +401,7 @@ export class ListController<T = Record<string, unknown>> {
       // Never blank: a blank `error` is «no error» for the table, which would go back to
       // «No customers» + «0 records» over a hub that did not answer (pm#530).
       const reason = e instanceof Error ? e.message.trim() : '';
-      this.error = reason || listLoadFailedMessage(activeLocale());
+      this.error = tableReadReason(e, activeLocale()) || reason || listLoadFailedMessage(activeLocale());
     } finally {
       if (mySeq === this.seq) {
         this.loading = false;
@@ -630,6 +630,13 @@ export class ErploraError extends Error {
      * too, as a one-element list.
      */
     public readonly fields?: readonly string[],
+    /**
+     * How many seconds a lock has left, present only when the refusal names a usable wait — today
+     * `too_many_attempts` at the manager's approval, `error.retry_after_secs` (hub#2290). The shell
+     * says «Wait N minutes» from it instead of a vague «a few». `undefined` when the runtime named
+     * none or something that is not a non-negative number — never a made-up wait.
+     */
+    public readonly retryAfterSecs?: number,
   ) {
     super(message);
     this.name = 'ErploraError';
@@ -753,6 +760,22 @@ const READ_UNREACHABLE_EN =
 const READ_UNREACHABLE_ES =
   'No se han podido cargar los datos porque el hub no responde. Comprueba la conexión e inténtalo de nuevo.';
 
+// hub#2404: the shell's table already paints «Couldn't load the data» as the heading of its error
+// state, so under it the reason gives only the why and what to do. The full sentence above stays
+// for every place that shows the reason alone: toasts, banners, and an older table without that state.
+const READ_UNREACHABLE_UNDER_HEADING_EN = 'The hub is not responding. Check the connection and try again.';
+const READ_UNREACHABLE_UNDER_HEADING_ES = 'El hub no responde. Comprueba la conexión e inténtalo de nuevo.';
+
+/**
+ * The list reason for a read the hub never answered, when the table paints it under its heading.
+ * By `code`, not `instanceof`: the list controller is baked into each module's bundle, while the
+ * error comes from the shell's client, whose ErploraError is another bundle's class.
+ */
+function tableReadReason(e: unknown, locale: string): string {
+  if ((e as { code?: unknown } | null)?.code !== SERVER_UNAVAILABLE || !dataTableShowsLoadError()) return '';
+  return locale.toLowerCase().startsWith('en') ? READ_UNREACHABLE_UNDER_HEADING_EN : READ_UNREACHABLE_UNDER_HEADING_ES;
+}
+
 /**
  * The error a read gets when its transport failed: {@link SERVER_UNAVAILABLE} as before (hub#782),
  * the sentence a person may read as `message`, and the transport's technical line on `cause`.
@@ -817,7 +840,13 @@ export class UnknownOutcomeError extends ErploraError {
 interface Envelope {
   ok: boolean;
   data?: unknown;
-  error?: PlatformFailure & { message: string; permission?: string; fields?: string[]; field?: string };
+  error?: PlatformFailure & {
+    message: string;
+    permission?: string;
+    fields?: string[];
+    field?: string;
+    retry_after_secs?: unknown;
+  };
 }
 
 // ── hub#1102: a PLATFORM failure is not a sentence a module wrote ────────────────────────────
@@ -918,9 +947,17 @@ const PLATFORM_FAILURES: Record<
   module_not_installed: (app) => missingApp(app),
   missing_dependency: (app) => missingApp(app),
   module_inactive: (app) => switchedOffApp(app),
+  // hub#2434: not plumbing and not the request — the business has not filled in what an invoice
+  // needs. The runtime lists it in `missing`; the sentence names it and says where it is done.
+  fiscal_precondition_failed: (_app, failure) => fiscalSetupMissing(missingOf(failure)),
   db: () => PLUMBING,
   io: () => PLUMBING,
   wasm: () => PLUMBING,
+  // hub#2428: redacted like `wasm`, but it is not a crash — the action was too big for the hub's
+  // instruction budget and was rolled back whole. «Try again» would repeat the same click.
+  wasm_budget_exceeded: () => TOO_BIG_AT_ONCE,
+  // hub#2431: the same for a handler the hub's clock interrupted — rolled back whole, not a crash.
+  wasm_timeout: () => TOO_LONG_AT_ONCE,
   native: () => PLUMBING,
   schema: () => PLUMBING,
   // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
@@ -990,6 +1027,25 @@ function authoredSentenceOf(failure: PlatformFailure): string | undefined {
 // user's language belongs to the shell that owns those forms — see hub#1190.
 
 /**
+ * «Too big to do in one go, and nothing changed» (hub#2428): a module handler ran out of the hub's
+ * instruction budget and the whole command was rolled back. The remedy is asking for less at once,
+ * not trying again.
+ */
+const TOO_BIG_AT_ONCE: Bilingual = {
+  en: 'This action is too big to do in one go. Nothing was changed: try with fewer items or a shorter range.',
+  es: 'Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.',
+};
+
+/**
+ * «It took too long, and nothing changed» (hub#2431): a module handler ran past the hub's time limit
+ * and the whole command was rolled back. The remedy is asking for less at once, not trying again.
+ */
+const TOO_LONG_AT_ONCE: Bilingual = {
+  en: 'This action took too long to finish. Nothing was changed: try with fewer items or a shorter range.',
+  es: 'Esta acción ha tardado demasiado en terminar. No se ha cambiado nada: prueba con menos elementos o un rango más corto.',
+};
+
+/**
  * «The app is there, but a piece of what this needs could not be read» (hub#2410): a `required`
  * read of an installed, active app failed — a passing fault, not something Apps can fix. The app is
  * deliberately NOT named: naming it is what sent the owner to Apps to look for it.
@@ -1018,6 +1074,70 @@ function missingApp(app: string): Bilingual {
     es: app
       ? `Falta la app «${app}» y esta acción la necesita. Pide a un administrador que la instale desde Apps.`
       : 'Falta una app que esta acción necesita. Pide a un administrador que la instale desde Apps.',
+  };
+}
+
+/**
+ * What the fiscal precondition is missing, as the runtime sent it (hub#2434), or `[]`.
+ *
+ * Read off the envelope like {@link authoredSentenceOf} reads `message`, and NOT declared on the
+ * public {@link PlatformFailure} for the same reason: that interface is frozen kernel surface.
+ */
+function missingOf(failure: PlatformFailure): string[] {
+  const missing = (failure as { missing?: unknown }).missing;
+  return Array.isArray(missing) ? missing.filter((m): m is string => typeof m === 'string') : [];
+}
+
+/**
+ * The half of the business identity the Settings form holds (`Ajustes › Negocio`), in the words of
+ * that form, with the article Spanish needs in front of each. The keys are the setting names
+ * `enforce_fiscal_precondition` pushes into `missing` (`crates/runtime/src/commands.rs`).
+ */
+const FISCAL_IDENTITY_NAMES: Record<string, Bilingual> = {
+  business_legal_name: { en: 'legal name', es: 'la razón social' },
+  business_tax_id: { en: 'tax ID', es: 'el NIF' },
+};
+
+/** «… (an administrator can do it)» — the till user usually cannot open Settings. */
+const WHO_CAN: Bilingual = {
+  en: 'an administrator can do it',
+  es: 'lo puede hacer un administrador',
+};
+
+/**
+ * «To issue invoices, first complete …» (hub#2434): what the fiscal precondition (ADR-0203) is
+ * missing, named in business words, and where each piece is filled in — the legal name and the tax
+ * ID in Settings › Business, the digital certificate from the setup checklist on Home, where the
+ * app that files with the tax agency asks for it. A requirement this SDK does not know (a newer
+ * runtime) is left out rather than shown raw; with nothing known, the sentence points at the
+ * checklist, which lists every piece.
+ */
+function fiscalSetupMissing(missing: string[]): Bilingual {
+  const identity = missing.filter((m) => m in FISCAL_IDENTITY_NAMES).map((m) => FISCAL_IDENTITY_NAMES[m]!);
+  const certificate = missing.includes('certificate');
+  const identityEn = identity.map((n) => n.en).join(' and ');
+  const identityEs = identity.map((n) => n.es).join(' y ');
+  if (identity.length && certificate) {
+    return {
+      en: `To issue invoices, first complete the business's ${identityEn} in Settings › Business, and upload its digital certificate from «Finish setting up your business» on Home (${WHO_CAN.en}).`,
+      es: `Para emitir facturas, completa primero ${identityEs} del negocio en Ajustes › Negocio, y sube su certificado digital desde «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
+    };
+  }
+  if (identity.length) {
+    return {
+      en: `To issue invoices, first complete the business's ${identityEn} in Settings › Business (${WHO_CAN.en}).`,
+      es: `Para emitir facturas, completa primero ${identityEs} del negocio en Ajustes › Negocio (${WHO_CAN.es}).`,
+    };
+  }
+  if (certificate) {
+    return {
+      en: `To issue invoices, the business needs its digital certificate. Upload it from «Finish setting up your business» on Home (${WHO_CAN.en}).`,
+      es: `Para emitir facturas, el negocio necesita su certificado digital. Súbelo desde «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
+    };
+  }
+  return {
+    en: `To issue invoices, first complete the business's fiscal details: you will find them in «Finish setting up your business» on Home (${WHO_CAN.en}).`,
+    es: `Para emitir facturas, completa primero los datos fiscales del negocio: los tienes en «Termina de configurar tu negocio», en Inicio (${WHO_CAN.es}).`,
   };
 }
 
@@ -1199,9 +1319,15 @@ function unwrap(env: Envelope, status?: number): unknown {
       // The core's typed refusals (`invalid_field`, hub#1070/#1185) name ONE field in the singular:
       // it folds in here so there is a single reader for «which fields were refused».
       e?.fields?.length ? e.fields : e?.field ? [e.field] : undefined,
+      retryAfterOf(e?.retry_after_secs),
     );
   }
   return env.data;
+}
+
+/** `retry_after_secs` of a refusal, only when it is a usable wait (a non-negative number). */
+function retryAfterOf(value: unknown): number | undefined {
+  return typeof value === 'number' && value >= 0 ? value : undefined;
 }
 
 /**

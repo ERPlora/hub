@@ -2,9 +2,11 @@
 // (`packages/module-sdk/src/index.ts`, `platformFailureMessage`, hub#1102), which already answers
 // every code the runtime's authenticated door can produce in this family: the six codes
 // `error_payload` (`crates/server/src/lib.rs`, `may_reach_the_client`) redacts to one fixed
-// ENGLISH line — `db`, `io`, `wasm`, `native`, `schema`, `manifest` — plus the four whose remedy
-// names an app — `module_not_installed`, `module_inactive`, `missing_dependency`,
-// `read_unavailable`.
+// ENGLISH line — `db`, `io`, `wasm`, `native`, `schema`, `manifest`, `wasm_budget_exceeded`
+// (hub#2428: an action too big for the hub's instruction budget, told apart from a crash) and
+// `wasm_timeout` (hub#2431: the same, cut by the hub's clock) — plus
+// the four whose remedy names an app — `module_not_installed`, `module_inactive`,
+// `missing_dependency`, `read_unavailable`.
 //
 // hub#1258 fixed this for `EmployeesPage`/`EmployeeFormPage`/`RolesPanel` by growing a SECOND,
 // byte-identical copy of the SDK's two sentences here, keyed through vue-i18n instead of the SDK's

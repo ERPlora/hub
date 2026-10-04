@@ -7,7 +7,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.view.ViewGroup
 import android.webkit.WebView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -53,16 +55,28 @@ import java.io.File
 )
 class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
 
+    /** Keeps the page running while listening for notices (hub#2307); `null` until the WebView loads. */
+    private var pageKeeper: PageKeeper? = null
+
     /**
      * hub#2360 — a new page is loading: the tap that STARTED the app waits for it. The notification
      * plugin reports that tap as `actionPerformed` from its own `load`, before the page listens, and
      * Tauri drops an event nobody is listening to: the tap opened the app on its first screen
      * instead of the notice's. A tap that reaches a dead process through `onNewIntent` is kept by
      * `MainActivity` into the same box.
+     *
+     * hub#2307 — the same WebView gets its `PageKeeper`, which the listening commands switch on/off.
      */
     override fun load(webView: WebView) {
         super.load(webView)
         NoticeTaps.pageLoading(activity, activity.intent)
+        val keeper = PageKeeper(webView)
+        val owner = activity as? AppCompatActivity
+        val root = activity.window?.decorView as? ViewGroup
+        if (owner != null && root != null) {
+            keeper.install(root, owner)
+            pageKeeper = keeper
+        }
     }
 
     /** `take_notice_tap` (hub#2360) — hands the kept tap over, once: `{ tap: {id, notification} | null }`. */
@@ -115,6 +129,55 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         } catch (e: ActivityNotFoundException) {
             invoke.reject("app_settings_unavailable")
         }
+    }
+
+    /**
+     * `keep_listening` (hub#2307) — keeps the app running with the screen off so the notices born in
+     * the page still arrive (`on: true`, with the words of the ongoing notification), or lets Android
+     * reclaim it again (`on: false`). See [NoticeListening].
+     *
+     * Android refuses to start a foreground service from the background (12+); the page only asks
+     * while somebody is using it, and a refusal is REJECTED so the page can log it — the notices keep
+     * working with the app on screen, as before.
+     */
+    @Command
+    fun keepListening(invoke: Invoke) {
+        val args = invoke.getArgs()
+        if (!args.optBoolean("on", false)) {
+            pageKeeper?.setListening(false)
+            NoticeListeningService.stop(activity)
+            invoke.resolve()
+            return
+        }
+        val texts = NoticeListening.textsOf(
+            args.getString("title", null),
+            args.getString("body", null),
+            args.getString("channel", null),
+        )
+        if (texts == null) {
+            invoke.reject(NoticeListening.TEXT_MISSING)
+            return
+        }
+        try {
+            NoticeListeningService.start(activity, texts)
+            pageKeeper?.setListening(true)
+            invoke.resolve()
+        } catch (e: IllegalStateException) {
+            // `ForegroundServiceStartNotAllowedException` (API 31+) is one of these.
+            invoke.reject(NoticeListening.START_REFUSED)
+        } catch (e: SecurityException) {
+            invoke.reject(NoticeListening.START_REFUSED)
+        }
+    }
+
+    /**
+     * The page is what listens; with its activity gone, the service would only keep a notification
+     * saying «listening» over nothing (hub#2307). A configuration change recreates the page, which
+     * asks again on its boot.
+     */
+    override fun onDestroy(activity: AppCompatActivity) {
+        pageKeeper?.setListening(false)
+        NoticeListeningService.stop(activity)
     }
 
     /**

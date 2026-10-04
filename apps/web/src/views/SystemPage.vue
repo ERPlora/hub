@@ -72,69 +72,65 @@
              The series comes from the SaaS (proxied by the runtime, machine token stays server-side,
              ADR-0003); the instant reading of `/api/system` remains the `current` fallback, because
              a value we DID measure locally is still a measurement even when the history is not. -->
-        <ion-grid class="ion-no-padding resources-grid">
-          <ion-row>
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-card__content--panel">
-                  <ok-resource-usage
-                    label="CPU"
-                    :unit="cpuUnit"
-                    :range-label="usageRangeLabel"
-                    :unreadable-label="t('system.health.notMeasured')"
-                    :metric.prop="cpuPanel"
-                    :thresholds.prop="panelThresholds"
-                  ></ok-resource-usage>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
+        <!-- hub#2418 — the columns follow the room the cards really get (a container query), not
+             the window: a usage panel needs ~260 px for its heading and its gauge + trend side by
+             side. One column on a phone, 2×2 on a tablet or a laptop beside the menu, four across
+             only when four fit. -->
+        <div class="resources">
+          <div class="resources-grid">
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-card__content--panel">
+                <ok-resource-usage
+                  label="CPU"
+                  :unit="cpuUnit"
+                  :range-label="usageRangeLabel"
+                  :unreadable-label="t('system.health.notMeasured')"
+                  :metric.prop="cpuPanel"
+                  :thresholds.prop="panelThresholds"
+                ></ok-resource-usage>
+              </ion-card-content>
+            </ion-card>
 
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-card__content--panel">
-                  <ok-resource-usage
-                    :label="t('system.memory')"
-                    :unit="ramUnit"
-                    :range-label="usageRangeLabel"
-                    :unreadable-label="t('system.health.notMeasured')"
-                    :metric.prop="memPanel"
-                    :thresholds.prop="panelThresholds"
-                  ></ok-resource-usage>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-card__content--panel">
+                <ok-resource-usage
+                  :label="t('system.memory')"
+                  :unit="ramUnit"
+                  :range-label="usageRangeLabel"
+                  :unreadable-label="t('system.health.notMeasured')"
+                  :metric.prop="memPanel"
+                  :thresholds.prop="panelThresholds"
+                ></ok-resource-usage>
+              </ion-card-content>
+            </ion-card>
 
-            <!-- Base de datos: Postgres compartida por organización (ADR-0154) → sin "tamaño local":
-                 N/A. El motor (PostgreSQL) va en la subetiqueta. -->
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-stat">
-                  <HubIcon name="cube-outline" class="metric-stat__icon" />
-                  <div class="metric-stat__label">{{ t('system.database') }}</div>
-                  <div class="metric-stat__value">{{ dbValue }}</div>
-                  <div class="metric-stat__sub">{{ dbSub }}</div>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
+            <!-- Database: a shared Postgres (ADR-0154), so there is no "local size": N/A. The
+                 engine (PostgreSQL) goes in the sub-label. -->
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-stat">
+                <HubIcon name="cube-outline" class="metric-stat__icon" />
+                <div class="metric-stat__label">{{ t('system.database') }}</div>
+                <div class="metric-stat__value">{{ dbValue }}</div>
+                <div class="metric-stat__sub">{{ dbSub }}</div>
+              </ion-card-content>
+            </ion-card>
 
-            <!-- Conexiones BD reales (pool / pg_stat_activity). Un hub mínimo en reposo ≈ 0 — pero
-                 un cero REAL y un cero por no haber podido preguntar no son el mismo cero. -->
-            <ion-col size="6" size-md="3">
-              <ion-card class="ion-no-margin metric-card">
-                <ion-card-content class="metric-card__content metric-card__content--panel">
-                  <ok-resource-usage
-                    :label="t('system.connections')"
-                    :unit="connectionsUnit"
-                    :range-label="usageRangeLabel"
-                    :unreadable-label="t('system.health.notMeasured')"
-                    :metric.prop="connectionsPanel"
-                    :thresholds.prop="panelThresholds"
-                  ></ok-resource-usage>
-                </ion-card-content>
-              </ion-card>
-            </ion-col>
-          </ion-row>
-        </ion-grid>
+            <!-- Real DB connections (pool / pg_stat_activity). A minimal idle hub is ≈ 0 — but a REAL
+                 zero and a zero because we could not ask are not the same zero. -->
+            <ion-card class="ion-no-margin metric-card">
+              <ion-card-content class="metric-card__content metric-card__content--panel">
+                <ok-resource-usage
+                  :label="t('system.connections')"
+                  :unit="connectionsUnit"
+                  :range-label="usageRangeLabel"
+                  :unreadable-label="t('system.health.notMeasured')"
+                  :metric.prop="connectionsPanel"
+                  :thresholds.prop="panelThresholds"
+                ></ok-resource-usage>
+              </ion-card-content>
+            </ion-card>
+          </div>
+        </div>
 
         <!-- ── Your printer ──────────────────────────────────────────────────────────
              Same sentence as the panel badge (hub#375), from the same `printerLine`: the headline
@@ -311,6 +307,41 @@
               <ok-status-pill tone="info">{{ t('system.updatesRunning', { version: info?.hubVersion ?? '—' }) }}</ok-status-pill>
             </div>
             <p class="muted-note updates-hint">{{ t('system.updatesCloudHint') }}</p>
+
+            <!-- hub#2332 — the apps' side of «updates». The hub updates itself; the apps are
+                 updated by whoever runs the business, from «My apps». Same count as the bell
+                 (hub#1172: only what this hub can apply, only for an admin), and a failed check
+                 says so — never «all up to date». -->
+            <ok-inline-feedback
+              v-if="isAdmin"
+              data-testid="system-app-updates"
+              class="app-updates"
+              :tone="appUpdates.tone"
+              :icon="appUpdates.icon"
+              :heading="t('system.appUpdates.title')"
+            >
+              {{ appUpdates.sentence }}
+              <ion-button
+                v-if="appUpdateCount > 0"
+                slot="actions"
+                data-testid="system-app-updates-go"
+                size="small"
+                @click="goToModuleUpdates"
+              >
+                {{ t('system.appUpdates.goToMyApps') }}
+              </ion-button>
+              <ion-button
+                v-else-if="moduleUpdatesUnknown"
+                slot="actions"
+                data-testid="system-app-updates-retry"
+                size="small"
+                fill="outline"
+                :disabled="moduleUpdatesChecking"
+                @click="retryModuleUpdateNotice"
+              >
+                {{ moduleUpdatesChecking ? t('topbar.moduleUpdatesChecking') : t('topbar.moduleUpdatesRetry') }}
+              </ion-button>
+            </ok-inline-feedback>
 
             <!-- Un hub al que no le hemos cambiado nada dice justo eso, y no una lista de 24
                  módulos «sin cambios»: el ruido se deja de leer. -->
@@ -496,7 +527,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
-  IonGrid, IonRow, IonCol, IonBadge, IonButton, IonToast, IonSpinner
+  IonBadge, IonButton, IonToast, IonSpinner
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -548,6 +579,13 @@ import {
 } from '../lib/dead-letter';
 import { localDoorSentence } from '../lib/runtime-error-sentence';
 import { isAdmin } from '../lib/session';
+import {
+  MODULE_UPDATES_ROUTE,
+  moduleUpdatesChecking,
+  moduleUpdatesUnknown,
+  retryModuleUpdateNotice,
+} from '../lib/module-update-notice';
+import { notificationCountOf } from '../lib/shell';
 import { toast, toastSuccess, toastError } from '../lib/toast';
 import { loadBellCounterModuleIds } from '../lib/bell-counters';
 import {
@@ -557,6 +595,7 @@ import {
   primerLabelsFrom,
   type NotificationPermission,
 } from '../lib/notification-permission';
+import { resyncNoticeListening } from '../lib/notice-listening';
 import {
   ensureLocalNetworkPermission,
   localNetworkPermissionState,
@@ -614,7 +653,12 @@ const tab = ref<Tab>(resolveSystemTab(route.hash));
 watch(tab, (value) => {
   if (value !== (route.hash.slice(1) || 'resources')) void router.replace({ hash: `#${value}` });
 });
-watch(() => route.hash, (h) => {
+// Ionic keeps this page mounted after leaving it, and `route` is the app's one route: only an
+// address on /system speaks for these tabs. Otherwise «Go to My apps» (`/apps#mine`) read as an
+// unknown System tab and got `#resources` written onto the Apps URL (hub#2332). The path is watched
+// too: coming back to a plain /system re-reads its (unchanged) hash instead of keeping the last tab.
+watch([() => route.path, () => route.hash], ([path, h]) => {
+  if (path !== '/system') return;
   if (isLegacyBackupsHash(h)) {
     void router.replace({ path: '/settings', hash: '#data' });
     return;
@@ -676,6 +720,31 @@ const localNetworkBlocked = computed(() => localNetwork.value === 'denied');
 // mayoría de los hubs, la mayoría de los días, no han cambiado de versión.
 const updateHistory = ref<UpdateHistoryEntry[]>([]);
 const historyGroups = computed(() => groupByDay(updateHistory.value, new Date(), locale.value));
+
+// The apps' side of «updates» (hub#2332): what the bell already knows (hub#1172), read here — this
+// tab never asks the marketplace itself (one request per installed app). A count wins over «could
+// not check» (the count is real, and «My apps» re-checks on opening); a first check still out is
+// «checking», never «all up to date».
+const appUpdateCount = computed(() => notificationCountOf('moduleUpdates'));
+const appUpdates = computed(() => {
+  if (appUpdateCount.value > 0) {
+    return {
+      tone: 'info',
+      icon: 'cloud-download-outline',
+      sentence: t('system.appUpdates.available', { n: appUpdateCount.value }),
+    } as const;
+  }
+  if (moduleUpdatesUnknown.value) {
+    return { tone: 'warning', icon: 'alert-circle-outline', sentence: t('topbar.moduleUpdatesUnknownBody') } as const;
+  }
+  if (moduleUpdatesChecking.value) {
+    return { tone: 'neutral', icon: 'sync-outline', sentence: t('system.appUpdates.checking') } as const;
+  }
+  return { tone: 'success', icon: 'checkmark-circle-outline', sentence: t('system.appUpdates.allUpToDate') } as const;
+});
+function goToModuleUpdates(): void {
+  void router.push(MODULE_UPDATES_ROUTE);
+}
 
 // Are we inside `com.erplora.app`? It changes what there is left to do about a printer, and what
 // this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
@@ -1043,6 +1112,8 @@ async function turnOnNotices(): Promise<void> {
   try {
     await ensureNotificationPermission({ labels: primerLabelsFrom(t), force: true });
     notices.value = await notificationPermissionState();
+    // Listen with the screen off from now on, not from the next sign-in (hub#2307).
+    await resyncNoticeListening();
     void toast(
       notices.value === 'denied'
         ? t('system.notices.blockedInSettings')
@@ -1202,9 +1273,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Tarjetas de métrica: misma altura, contenido centrado (gauge o stat). */
+/* Metric cards: same height, centred content (gauge or stat). No margin: the grid's `gap` spaces
+   them — a margin on a `height: 100%` grid item spills out of its row and glues the stacked cards. */
 .metric-card {
-  margin: 4px;
   height: 100%;
 }
 .metric-card__content {
@@ -1252,9 +1323,29 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-/* Rejilla de métricas de Recursos: respiración inferior antes del bloque Bridge. */
-.resources-grid {
+/* Resources cards (hub#2418): the columns follow the width the block really gets, not the window
+   — beside the side menu a 1024 px laptop leaves ~750 px, as little as a tablet. A usage panel
+   needs ~260 px (heading + pill on one line, gauge + trend side by side), so: one column, 2×2 from
+   540 px, four across from 1100 px. Bottom breathing room before the printer block. */
+.resources {
+  container-type: inline-size;
   margin-bottom: 16px;
+}
+.resources-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px;
+}
+@container (min-width: 540px) {
+  .resources-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 1100px) {
+  .resources-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* Selector de rango de las series de uso (3h/24h/3d): compacto, alineado a la izquierda. */

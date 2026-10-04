@@ -1795,6 +1795,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "wat",
  "zip",
 ]
 
@@ -1845,6 +1846,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "uuid",
+ "windows 0.61.3",
 ]
 
 [[package]]

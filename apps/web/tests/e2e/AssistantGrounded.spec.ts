@@ -18,7 +18,19 @@
 // El runtime se arranca AQUÍ (no el de `pnpm dev`): necesita HUB_CLOUD_API_URL apuntando al
 // fixture. Hub VACÍO a propósito — es exactamente el estado del cliente nuevo del caso real.
 
-import { test, expect, request as pwRequest } from '../bench-boot';
+import {
+  bootReloadsOf,
+  expect,
+  NETWORK_CHANGE_BUDGET_MS,
+  request as pwRequest,
+  RESEND_WAIT_MS,
+  resendsOf,
+  sendThroughNetworkChanges,
+  test,
+  type Page,
+  type Request,
+} from '../bench-boot';
+import es from '../../src/i18n/locales/es';
 import { createServer, type Server } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
@@ -34,6 +46,11 @@ const HUB_ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..
 const RUNTIME_PORT = Number(process.env.HUB_E2E_ASSISTANT_PORT) || 8791;
 const RUNTIME = `http://127.0.0.1:${RUNTIME_PORT}`;
 const PG = process.env.E2E_DATABASE_URL ?? 'postgres://postgres:test@localhost:5434/hub_e2e_assistant';
+
+// The spec's runtime is the page's origin, so the bench's boot recovery (hub#1806/#2270) reads
+// ITS requests as the app's own. With the bench's default `baseURL` (the Vite dev server) a
+// network change during this spec's `goto` was nobody's to recover (hub#2442).
+test.use({ baseURL: RUNTIME });
 
 /** Lo que el fixture-cloud capturó del runtime, para las aserciones del contrato. */
 let capturedBody: Record<string, unknown> | null = null;
@@ -63,6 +80,60 @@ function startFixtureCloud(): Promise<number> {
     res.writeHead(404).end();
   });
   return new Promise((ok) => cloud.listen(0, '127.0.0.1', () => ok((cloud.address() as AddressInfo).port)));
+}
+
+/** The assistant's turn: the one request a send in the drawer makes. */
+const isTurn = (req: Request): boolean =>
+  req.method() === 'POST' && new URL(req.url()).pathname === '/api/assistant/chat/stream';
+
+/**
+ * Real PIN session (demo seed) — the same door as a cashier — and the drawer open on its input.
+ * Returns the input the turns are typed into.
+ */
+async function openAssistant(page: Page) {
+  const api = await pwRequest.newContext();
+  const login = await api.post(`${RUNTIME}/api/auth/pin`, {
+    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
+  });
+  expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
+  const session = await login.json();
+  await api.dispose();
+
+  // Same keys as lib/session.ts (and DashboardPage.spec.ts): opaque token + user.
+  await page.addInitScript(
+    ([token, user]) => {
+      localStorage.setItem('erplora.hub_session', token as string);
+      localStorage.setItem('erplora.session', JSON.stringify(user));
+    },
+    [session.token, session.user],
+  );
+
+  await page.goto('/');
+
+  // The topbar's sparkles. Ionic MOVES aria-label to the inner button of its shadow DOM and drops
+  // it from the host — the stable selector is the `title`, which stays (AppTopbar.vue).
+  const sparkles = page.locator('ion-button[title*="sistant" i], ion-button[title*="sistente" i]').first();
+  await sparkles.waitFor({ timeout: 15_000 });
+  // dispatchEvent and not click(): some first-boot overlay (toast/scrim) takes the hit-test; the
+  // Vue handler is the same, and what this spec validates is the CHAIN of the turn.
+  await sparkles.dispatchEvent('click');
+  const input = page.locator('ion-textarea textarea').last();
+  await input.waitFor({ timeout: 10_000 });
+  return input;
+}
+
+/**
+ * Asks `question` in the drawer. A turn the runner's network change killed on the wire is asked
+ * again — what the person would do — and nothing else is (hub#2442): a turn the runtime refused,
+ * reset or never answered reaches the assertions as it came.
+ */
+async function ask(page: Page, input: ReturnType<Page['locator']>, question: string): Promise<void> {
+  await sendThroughNetworkChanges(page, isTurn, async () => {
+    // `fill` waits for the textarea to be editable again: the drawer disables it while a turn is
+    // streaming, the one that just died included.
+    await input.fill(question);
+    await input.press('Enter');
+  });
 }
 
 test.beforeAll(async () => {
@@ -126,38 +197,9 @@ test.afterAll(async () => {
 
 test('la pregunta de configuración viaja ANCLADA: identidad, fecha y hub.setup.status', async ({ page }) => {
   test.setTimeout(90_000); // arranque real + SSE: el default de 30 s se queda corto
-  // Sesión real por PIN (seed demo) — la misma puerta que una cajera.
-  const api = await pwRequest.newContext();
-  const login = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
-  });
-  expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
-  const session = await login.json();
-  await api.dispose();
-
-  // Mismas claves que lib/session.ts (y que DashboardPage.spec.ts): token opaco + usuario.
-  await page.addInitScript(
-    ([token, user]) => {
-      localStorage.setItem('erplora.hub_session', token as string);
-      localStorage.setItem('erplora.session', JSON.stringify(user));
-    },
-    [session.token, session.user],
-  );
-
-  await page.goto(RUNTIME);
-
-  // Abre el drawer del asistente (✨ del topbar) y pregunta LO MISMO que el caso real.
-  // El sparkles de la topbar. OJO: Ionic HEREDA aria-label al botón interno del shadow DOM y lo
-  // retira del host — el selector estable es el `title`, que sí se queda (AppTopbar.vue).
-  const sparkles = page.locator('ion-button[title*="sistant" i], ion-button[title*="sistente" i]').first();
-  await sparkles.waitFor({ timeout: 15_000 });
-  // dispatchEvent y no click(): algún overlay del primer arranque (toast/scrim) intercepta el
-  // hit-test; el handler de Vue es el mismo, y lo que valida este spec es la CADENA del turno.
-  await sparkles.dispatchEvent('click');
-  const input = page.locator('ion-textarea textarea').last();
-  await input.waitFor({ timeout: 10_000 });
-  await input.fill('¿qué necesito configurar para poder empezar a vender?');
-  await input.press('Enter');
+  // Pregunta LO MISMO que el caso real, con el drawer abierto desde el ✨ del topbar.
+  const input = await openAssistant(page);
+  await ask(page, input, '¿qué necesito configurar para poder empezar a vender?');
 
   // 1) La respuesta enlatada del fixture llega PINTADA a la burbuja → la cadena SSE completa
   //    (runtime → translate_sse_line → drawer) funciona de navegador a navegador.
@@ -213,30 +255,8 @@ test('un turno que dice haber creado algo SIN ejecutar nada sale marcado (hub#10
   test.setTimeout(90_000);
   cannedTokens = ['✅ Categoría creada con éxito.\n', '- ID asignado: `cat_9b4e7c1a`\n', '- Estado: `active`'];
 
-  const api = await pwRequest.newContext();
-  const login = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
-  });
-  expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
-  const session = await login.json();
-  await api.dispose();
-
-  await page.addInitScript(
-    ([token, user]) => {
-      localStorage.setItem('erplora.hub_session', token as string);
-      localStorage.setItem('erplora.session', JSON.stringify(user));
-    },
-    [session.token, session.user],
-  );
-  await page.goto(RUNTIME);
-
-  const sparkles = page.locator('ion-button[title*="sistant" i], ion-button[title*="sistente" i]').first();
-  await sparkles.waitFor({ timeout: 15_000 });
-  await sparkles.dispatchEvent('click');
-  const input = page.locator('ion-textarea textarea').last();
-  await input.waitFor({ timeout: 10_000 });
-  await input.fill('Crea una categoría de servicios llamada Barbería QA');
-  await input.press('Enter');
+  const input = await openAssistant(page);
+  await ask(page, input, 'Crea una categoría de servicios llamada Barbería QA');
 
   const drawer = page.locator('.assistant-drawer');
   // La respuesta se pinta (la cadena SSE sigue funcionando)…
@@ -266,30 +286,8 @@ test('una respuesta con tabla y negrita llega PINTADA, no en crudo (hub#1043)', 
     '| `taxes` | Impuestos | /m/taxes/categories |\n',
   ];
 
-  const api = await pwRequest.newContext();
-  const login = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '000000', device_id: 'demo-trusted-device' },
-  });
-  expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
-  const session = await login.json();
-  await api.dispose();
-
-  await page.addInitScript(
-    ([token, user]) => {
-      localStorage.setItem('erplora.hub_session', token as string);
-      localStorage.setItem('erplora.session', JSON.stringify(user));
-    },
-    [session.token, session.user],
-  );
-  await page.goto(RUNTIME);
-
-  const sparkles = page.locator('ion-button[title*="sistant" i], ion-button[title*="sistente" i]').first();
-  await sparkles.waitFor({ timeout: 15_000 });
-  await sparkles.dispatchEvent('click');
-  const input = page.locator('ion-textarea textarea').last();
-  await input.waitFor({ timeout: 10_000 });
-  await input.fill('¿Qué módulos tengo instalados?');
-  await input.press('Enter');
+  const input = await openAssistant(page);
+  await ask(page, input, '¿Qué módulos tengo instalados?');
 
   const drawer = page.locator('.assistant-drawer');
   // Una tabla DE VERDAD, con sus filas.
@@ -303,4 +301,100 @@ test('una respuesta con tabla y negrita llega PINTADA, no en crudo (hub#1043)', 
   expect(painted).not.toContain('**');
   expect(painted).not.toContain('|---|');
   expect(painted).toContain('módulos');
+});
+
+// Regression tests for ERPlora/hub#2442 — the turn that died under a network change of the runner.
+//
+// Measured on run 36798035754 (attempt 1, PR hub#2441, which only touches the footer tabs) and on
+// develop's run 37203596535: in both traces `POST /api/assistant/chat/stream` died with
+// `net::ERR_NETWORK_CHANGED` inside a storm that killed every request in flight at once, and the
+// drawer said «No se pudo contactar con el asistente». Neither the runtime nor the fixture-cloud was
+// involved, and the rerun of the same commit was green. `route.abort('internetdisconnected')` is
+// the injectable twin of that code (`route.abort()` has none for a network change; Chromium derives
+// both from the machine's network moving, and the bench's `NETWORK_CHANGE_ERRORS` holds both).
+test('a network change that kills the turn costs a resend, not a red build (hub#2442)', async ({ page }) => {
+  test.setTimeout(90_000);
+  cannedTokens = ['Según tu hub: ', 'no hay módulos instalados todavía.'];
+  let turns = 0;
+  // Killed ONCE: a network that stays down is an outage, and has to end red.
+  await page.route('**/api/assistant/chat/stream', async (route) => {
+    turns += 1;
+    if (turns === 1) return route.abort('internetdisconnected');
+    return route.continue();
+  });
+
+  const input = await openAssistant(page);
+  await ask(page, input, '¿qué necesito configurar para poder empezar a vender?');
+
+  // Before the fix this is where it went red, with the CI's very text: the error bubble instead of
+  // the canned answer.
+  await expect(page.locator('.assistant-drawer')).toContainText('no hay módulos instalados', {
+    timeout: 15_000,
+  });
+  expect(turns, 'the bench did not ask the turn again').toBe(2);
+  expect(resendsOf(page)).toEqual(['net::ERR_INTERNET_DISCONNECTED']);
+});
+
+test('a turn that dies of anything else is NOT asked again (hub#2442)', async ({ page }) => {
+  // The other half, and the reason this is not a retry: a reset is something a crashing runtime
+  // causes too, so re-asking would re-roll the very defect this spec exists to catch.
+  test.setTimeout(90_000);
+  cannedTokens = ['Según tu hub: ', 'no hay módulos instalados todavía.'];
+  let turns = 0;
+  await page.route('**/api/assistant/chat/stream', async (route) => {
+    turns += 1;
+    if (turns === 1) return route.abort('connectionreset');
+    return route.continue();
+  });
+
+  const input = await openAssistant(page);
+  await ask(page, input, '¿qué necesito configurar para poder empezar a vender?');
+
+  const drawer = page.locator('.assistant-drawer');
+  await expect(drawer).toContainText(es.assistant.error, { timeout: 15_000 });
+  expect(turns, 'the bench asked again a turn the network did not kill').toBe(1);
+  expect(resendsOf(page)).toEqual([]);
+  await expect(drawer).not.toContainText('no hay módulos instalados');
+});
+
+test('a network that stays down still ends red, inside the storm budget (hub#2442)', async ({ page }) => {
+  // The budget's wiring, not just its arithmetic: without the storm clock in
+  // `sendThroughNetworkChanges` every resend is "young" and an outage re-asks until the test times out.
+  test.setTimeout(60_000);
+  cannedTokens = ['Según tu hub: ', 'no hay módulos instalados todavía.'];
+  let turns = 0;
+  await page.route('**/api/assistant/chat/stream', async (route) => {
+    turns += 1;
+    return route.abort('internetdisconnected');
+  });
+
+  const input = await openAssistant(page);
+  const startedAt = Date.now();
+  await ask(page, input, '¿qué necesito configurar para poder empezar a vender?');
+  const askedFor = Date.now() - startedAt;
+
+  await expect(page.locator('.assistant-drawer')).toContainText(es.assistant.error, { timeout: 15_000 });
+  expect(resendsOf(page).length, 'the bench never re-sent the lost turn').toBeGreaterThan(0);
+  expect(turns).toBe(resendsOf(page).length + 1);
+  expect(askedFor, 'the bench kept re-sending past its storm budget').toBeLessThan(
+    NETWORK_CHANGE_BUDGET_MS + RESEND_WAIT_MS,
+  );
+});
+
+test("a network change during this spec's own boot is recovered by the bench (hub#2442)", async ({ page }) => {
+  // The second hole of the same issue. This spec boots the shell from ITS runtime, not from the
+  // bench's dev server, and the boot recovery only treats the `baseURL` origin as the app's own: a
+  // storm during this `goto` left a blank shell and the spec failed waiting for the ✨ button.
+  test.setTimeout(90_000);
+  let entries = 0;
+  await page.route('**/assets/index-*.js', async (route) => {
+    entries += 1;
+    if (entries === 1) return route.abort('internetdisconnected');
+    return route.continue();
+  });
+
+  await openAssistant(page);
+
+  expect(entries, 'the bench did not fetch the lost entry module again').toBeGreaterThan(1);
+  expect(bootReloadsOf(page).length).toBeGreaterThan(0);
 });

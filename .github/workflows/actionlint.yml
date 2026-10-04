@@ -94,6 +94,8 @@ on:
       # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
       # toque ÚNICAMENTE el guardia ejecute sus propios casos.
       - 'scripts/tests/service-container-ports.test.sh'
+      # Same for the per-job Docker config guard (hub#2449).
+      - 'scripts/tests/docker-config-isolation.test.sh'
       # La prosa de CI contra el `on:` real (hub#1438). Las DOS rutas hacen falta y por motivos
       # distintos: el guardia mismo, para que una PR que solo lo toque corra sus casos; y
       # `.githooks/pre-push`, porque es el ÚNICO fichero vigilado que no vive bajo
@@ -390,6 +392,17 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/service-container-ports.test.sh
+
+      # ── One Docker config per job on the shared runner (hub#2449) ─────────────────────────
+      # The slots of `ci-runner-1` share one `~/.docker/config.json`, and the post step of
+      # `docker/login-action` logs out of ghcr.io on it: a job finishing next to a release took
+      # the release's credential with it (`unauthorized` mid-push). This sweeps EVERY workflow
+      # and requires each job that logs in to do it on a config of its own under `$RUNNER_TEMP`,
+      # executing that step against a scratch HOME — a new workflow cannot opt out by omission.
+      - name: One Docker config per job (hub#2449)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/docker-config-isolation.test.sh
 
       # ── Waiting out the shared runner's apt lock (infra#313) ──────────────────────────────
       # The slots of `ci-runner-1` share one `/var/lib/apt`: a job that runs `apt-get` (or

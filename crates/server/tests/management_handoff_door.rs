@@ -585,6 +585,41 @@ async fn the_account_page_is_still_the_account_page_when_it_carries_a_marker() {
     serving.abort();
 }
 
+/// hub#2451 — «Mi perfil → Borrar mi cuenta» lands straight on the SaaS's deletion confirmation.
+/// Google Play demands an account deletion path that is easy to find inside any app that lets
+/// people sign up, and deleting one's own account is as much hers as changing her password.
+const OWN_ACCOUNT_DELETION: &str = "/dashboard/profile/delete/?surface=account";
+
+#[tokio::test]
+async fn a_cloud_session_that_does_not_administer_is_handed_a_pass_to_delete_its_own_account() {
+    let (cloud, serving) = mock_saas();
+    let (router, rt, ana) = fixture("employee", cloud.clone()).await;
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::cloud())
+        .await
+        .unwrap();
+
+    let response = router
+        .oneshot(ask(
+            Some(&session),
+            Some(&sign_user_jwt(77)),
+            json!({ "next": OWN_ACCOUNT_DELETION }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let url = body_json(response).await["url"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        url.contains("next=%2Fdashboard%2Fprofile%2Fdelete%2F"),
+        "expected to land on her own account's deletion page, got {url}"
+    );
+    serving.abort();
+}
+
 #[tokio::test]
 async fn the_same_session_is_still_refused_a_pass_for_management() {
     // The negative half of the decision, and the reason this is not simply "drop the permission
@@ -627,6 +662,8 @@ async fn an_address_that_only_looks_like_the_account_page_opens_nothing() {
         "/dashboard/profile/../../dashboard/",
         "/dashboard/profilex/",
         "/dashboard/profile-of-somebody-else/",
+        "/dashboard/profile/delete/../../billing/",
+        "/dashboard/profile/deletex/",
         "/dashboard/?next=/dashboard/profile/",
         "/dashboard/billing/#/dashboard/profile/",
     ] {

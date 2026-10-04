@@ -121,6 +121,23 @@ jobs:
           cache-bin: false
           save-if: ${{ runner.environment != 'self-hosted' }}
 
+      # hub#2449: the slots of ci-runner-1 run as one user and share ONE `~/.docker/config.json`,
+      # and the post step of `docker/login-action` in any concurrent job (build-hub, saas, the
+      # gateway) runs `docker logout ghcr.io` on it — the N-1 pull then dies with `unauthorized`,
+      # and our own logout did the same to them. A config of our own under `$RUNNER_TEMP` (per
+      # slot, wiped per job), exported through `$GITHUB_ENV` because the `runner` context is not
+      # available in a job-level `env:`; `cli-plugins` linked in for whatever lives there.
+      # Contract: scripts/tests/docker-config-isolation.test.sh.
+      - name: Isolate this job's Docker config
+        run: |
+          set -euo pipefail
+          config="${RUNNER_TEMP}/docker-config"
+          mkdir -p "${config}"
+          if [ -d "${HOME}/.docker/cli-plugins" ]; then
+            ln -sfn "${HOME}/.docker/cli-plugins" "${config}/cli-plugins"
+          fi
+          echo "DOCKER_CONFIG=${config}" >> "${GITHUB_ENV}"
+
       - name: Log in to GHCR (read N-1's image)
         uses: docker/login-action@v3
         with:

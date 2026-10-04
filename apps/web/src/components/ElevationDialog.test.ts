@@ -15,7 +15,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
-import { ErploraError, type ElevationAsk } from '@erplora/module-sdk';
+import { ErploraError, HttpWsTransport, type ElevationAsk } from '@erplora/module-sdk';
 
 vi.mock('../lib/runtime', async () => {
   const { ref } = await import('vue');
@@ -241,8 +241,8 @@ describe('the PIN', () => {
     await flushPromises();
     await approveAs(w, 'Sofía', '0000');
 
-    // hub#2285: the SDK's refusal names no wait today, so this is the pinpad's own «wait a few
-    // minutes» — one sentence for the one lock, at every door.
+    // hub#2285: a refusal that names no wait is the pinpad's own «wait a few minutes» — one
+    // sentence for the one lock, at every door.
     expect(w.find('[data-testid="elevation-error"]').text()).toBe(en.login.pinTooManyAttemptsNoWait);
     expect(w.find('[data-testid="elevation-error"]').text()).not.toBe(en.elevation.rejected);
   });
@@ -259,9 +259,7 @@ describe('the PIN', () => {
     const say = (n: number): string => i18n.global.t('login.pinTooManyAttempts', { minutes: n }, n);
     seedPeople();
     const throttled = vi.fn(async () => {
-      throw Object.assign(new ErploraError('too_many_attempts', 'too many failed attempts'), {
-        retryAfterSecs: secs,
-      });
+      throw new ErploraError('too_many_attempts', 'too many failed attempts', undefined, undefined, secs);
     });
     void askForApproval(ask(throttled));
     const w = mountDialog();
@@ -270,6 +268,46 @@ describe('the PIN', () => {
 
     expect(w.find('[data-testid="elevation-error"]').text()).toBe(say(minutes));
     expect(say(1)).not.toBe(say(2).replace('2', '1'));
+  });
+
+  // hub#2290: the case above, but with the wait coming off the WIRE. The approval travels through
+  // the SDK's transport, and that is where it was lost: the hub answered 429 with
+  // `error.retry_after_secs` and the dialog still said «a few minutes». Wired as `runtime.ts` wires
+  // it (`elevationApprover: askForApproval`), with only `fetch` scripted.
+  it.each([
+    ['en', 240, 4],
+    ['es', 240, 4],
+  ] as const)('says the minutes the hub named on the wire (%s, %is → %i)', async (locale, secs, minutes) => {
+    i18n.global.locale.value = locale;
+    seedPeople();
+    const replies = [
+      { ok: false, error: { code: 'requires_elevation', message: 'needs a manager', permission: 'till.void_sale' } },
+      {
+        ok: false,
+        error: {
+          code: 'too_many_attempts',
+          message: 'too many failed attempts: wait a few minutes before approving again',
+          retry_after_secs: secs,
+        },
+      },
+    ];
+    let n = 0;
+    const fetchImpl = (async () => {
+      const body = replies[n++];
+      return { status: n === 2 ? 429 : 403, json: async () => body };
+    }) as unknown as typeof fetch;
+    const transport = new HttpWsTransport({ fetchImpl, elevationApprover: askForApproval });
+    void transport.command('till.sale.void', { sale_id: 's1' }).catch(() => {});
+    await flushPromises();
+    const w = mountDialog();
+    await flushPromises();
+    await approveAs(w, 'Sofía', '0000');
+
+    expect(n, 'the PIN went to the approval door').toBe(2);
+    expect(w.find('[data-testid="elevation-error"]').text()).toBe(
+      i18n.global.t('login.pinTooManyAttempts', { minutes }, minutes),
+    );
+    resolveElevation(null);
   });
 
   it('is never sent twice for one tap', async () => {

@@ -1,0 +1,13 @@
+{
+  "id": "set_aside_merge",
+  "name": "Set-aside MERGE fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "set_aside_merge.wipe": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/wipe.sql"]
+    }
+  }
+}

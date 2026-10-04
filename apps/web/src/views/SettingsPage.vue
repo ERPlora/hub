@@ -335,6 +335,7 @@
             <ion-item lines="none" class="mt-2">
               <ion-checkbox
                 v-model="shareWithErplora"
+                class="share-with-erplora"
                 data-testid="settings-share-with-erplora"
                 justify="space-between"
                 label-placement="start"
@@ -540,6 +541,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useHashTab } from '../lib/hash-tab';
 import { isTauri } from '../lib/device';
 // hub#761: la plantilla del tique la configura el módulo `printing`; el shell solo resuelve a
 // dónde llevar, y si la app falta lo dice en vez de enseñar un botón mudo.
@@ -621,21 +623,9 @@ const router = useRouter();
 // `moduleNav` se rellena cuando el runtime contesta `/api/navigation` y cambia al instalar la app
 // desde otra pestaña — la fila deja de mandar a la tienda en cuanto está instalada, sin recargar.
 const receiptTemplate = computed(() => receiptTemplateTarget(moduleNav.value));
-const initialTab = resolveSettingsTab(route.hash);
-const tab = ref<Tab>(initialTab);
-if (route.hash && route.hash !== `#${initialTab}`) {
-  void router.replace({ hash: `#${initialTab}` });
-}
-// Al cambiar de pestaña, sincroniza el hash (replace = no apila historial; "atrás" sale de Ajustes).
-watch(tab, (value) => {
-  if (value !== (route.hash.slice(1) || 'hub')) void router.replace({ hash: `#${value}` });
-});
-// Back/forward y deep-links: si el hash cambia, actualiza el tab local.
-watch(() => route.hash, (h) => {
-  const next = resolveSettingsTab(h);
-  if (next !== tab.value) tab.value = next;
-  if (h && h !== `#${next}`) void router.replace({ hash: `#${next}` });
-});
+// Synced only while the address is /settings (hub#2444); a retired hash (#store) is rewritten to
+// the tab it opens.
+const tab = useHashTab<Tab>('/settings', resolveSettingsTab, { canonicalize: true });
 
 // Vista inicial del sub-segment de Datos: importar por defecto (lo habitual); ?data=export permite
 // aterrizar en exportar desde un deep-link.
@@ -1091,6 +1081,13 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 </script>
 
 <style scoped>
+/* hub#2436: Ionic paints the checkbox label box (`.label-text-wrapper`, inside its shadow DOM) with
+   `white-space: nowrap` + ellipsis, and `ion-text-wrap` on the slotted ion-label does not beat it:
+   the explanation of the ERPlora-invoice box was cut at every width. The `label` shadow part is the
+   only way in from outside (same as ExportPanel/ImportPanel). */
+.share-with-erplora::part(label) {
+  white-space: normal;
+}
 /* hub#1174: el aviso de «qué se rompe» de un permiso denegado. Mismo patrón que la nota fiscal de
    ExportPanel: icono + frase, dentro de la propia tarjeta del permiso. */
 .cap-breaks {

@@ -48,6 +48,16 @@
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
         BackgroundColor="transparent" />
+      <Extensions>
+        <!-- erplora:// (ADR-0196 §7): los enlaces a un hub y el clic en un aviso desde el Centro de
+             actividades (hub#2409). El .exe/.msi lo registran al instalar; la copia de la Store
+             solo tiene lo que declara aquí. Windows lanza ERPlora.exe con el enlace como argumento. -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="erplora">
+            <uap:DisplayName>ERPlora</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

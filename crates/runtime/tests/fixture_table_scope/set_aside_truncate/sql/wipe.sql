@@ -1,0 +1,1 @@
+TRUNCATE _deprecated_set_aside_truncate_request;

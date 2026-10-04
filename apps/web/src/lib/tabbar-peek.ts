@@ -119,6 +119,93 @@ export function peekTabWidth(geometry: TabbarGeometry): number | null {
   return Number.isFinite(width) && width > 0 ? width : null;
 }
 
+/** What one tab's label needs so that none of its words breaks in two (hub#2414). */
+export interface TabLabelNeed {
+  /** The label may break a line (`white-space` other than `nowrap`/`pre`). */
+  wraps: boolean;
+  /** `min-content` width of the label: its widest word, laid out with its own font. */
+  wordWidth: number;
+  /** What the tab spends around the label: its horizontal padding, borders and the label's margins. */
+  chromeWidth: number;
+}
+
+/**
+ * The narrowest tab that keeps every word of every wrapping label whole, or `null` when there is
+ * nothing to hold.
+ *
+ * A module's labels wrap BETWEEN words («Lista de / espera»), which is what lets them fit a narrow
+ * tab — but a word longer than the tab has nowhere to go and the engine breaks it by a letter
+ * («Disponibilida» / «d», hub#2414). The 116px floor is a guess at the longest label; this is the
+ * measured answer, so it holds for any language, font, and Android's larger system text.
+ *
+ * Every footer strip of the shell wraps its labels (`polish.css`, hub#2422); a label that never
+ * wraps is left out all the same, because a width taken from its WHOLE label would widen every tab
+ * of the screen. Capped at the strip's width: a tab wider than the strip cannot show more of a
+ * word, it only hides the tab behind the scroll.
+ */
+export function wholeWordTabWidth(labels: readonly TabLabelNeed[], visibleWidth: number): number | null {
+  const needs = labels.filter((label) => label.wraps && label.wordWidth > 0);
+  if (needs.length === 0) return null;
+  const widest = Math.max(...needs.map((label) => label.wordWidth + label.chromeWidth));
+  return Math.min(Math.ceil(widest), visibleWidth);
+}
+
+/** Sum of the given pixel lengths of a computed style (`'16px'` → 16; anything else counts as 0). */
+function pixels(style: CSSStyleDeclaration, ...properties: string[]): number {
+  return properties.reduce((sum, property) => sum + (Number.parseFloat(style.getPropertyValue(property)) || 0), 0);
+}
+
+/**
+ * Measures what each tab's label needs, in the strip as it is painted right now.
+ *
+ * The widest word is the label's `min-content` width, read by laying the label out at that width
+ * for an instant and putting its inline style back. The padding lives on the button's shadow part
+ * (`.button-native`: 16px a side in `md`, 13px in `ios`); without a shadow root the host's own
+ * padding stands in.
+ */
+function readLabelNeeds(segment: HTMLElement): TabLabelNeed[] {
+  const needs: TabLabelNeed[] = [];
+  for (const tab of Array.from(segment.querySelectorAll<HTMLElement>('ion-segment-button'))) {
+    const label = tab.querySelector<HTMLElement>('ion-label');
+    if (!label) continue;
+    const labelStyle = getComputedStyle(label);
+    const wraps = labelStyle.whiteSpace !== 'nowrap' && labelStyle.whiteSpace !== 'pre';
+
+    const width = label.style.getPropertyValue('width');
+    const maxWidth = label.style.getPropertyValue('max-width');
+    label.style.setProperty('width', 'min-content');
+    label.style.setProperty('max-width', 'none');
+    const wordWidth = label.getBoundingClientRect().width;
+    if (width) label.style.setProperty('width', width);
+    else label.style.removeProperty('width');
+    if (maxWidth) label.style.setProperty('max-width', maxWidth);
+    else label.style.removeProperty('max-width');
+
+    const native = tab.shadowRoot?.querySelector<HTMLElement>('.button-native') ?? tab;
+    const chromeWidth =
+      pixels(getComputedStyle(native), 'padding-left', 'padding-right', 'border-left-width', 'border-right-width') +
+      pixels(labelStyle, 'margin-left', 'margin-right');
+    needs.push({ wraps, wordWidth, chromeWidth });
+  }
+  return needs;
+}
+
+/**
+ * Scrolls the strip the least it takes to show its selected tab whole.
+ *
+ * Ionic brings the chosen tab into view when it is chosen, measured on the widths of that moment;
+ * when a pass here changes those widths afterwards (the chosen label is painted heavier in `ios` and
+ * its word grows), the tab it placed at the edge can end half off the screen (hub#2414).
+ */
+function keepSelectedTabInView(segment: HTMLElement): void {
+  const selected = segment.querySelector<HTMLElement>('ion-segment-button.segment-button-checked');
+  if (!selected) return;
+  const strip = segment.getBoundingClientRect();
+  const tab = selected.getBoundingClientRect();
+  if (tab.right > strip.right) segment.scrollLeft += tab.right - strip.right;
+  else if (tab.left < strip.left) segment.scrollLeft -= strip.left - tab.left;
+}
+
 /** Reads the live geometry of a strip. `null` when there is not enough of it to measure a pitch. */
 function readTabbarGeometry(segment: HTMLElement): TabbarGeometry | null {
   const tabs = segment.querySelectorAll<HTMLElement>('ion-segment-button');
@@ -137,10 +224,12 @@ function readTabbarGeometry(segment: HTMLElement): TabbarGeometry | null {
 }
 
 /**
- * Keeps a strip's tabs sized so the overflow stays visible. Returns its cleanup.
+ * Keeps a strip's tabs sized so the overflow stays visible and no word of a label breaks in two.
+ * Returns its cleanup.
  *
- * Recomputes when the strip changes width (rotating the phone, folding the menu) and when the
- * number of tabs changes without it (a module whose `navigation[]` arrives over the network).
+ * Recomputes when the strip changes width (rotating the phone, folding the menu), when a label
+ * changes size (its font, its text) and when the number of tabs changes without either (a module
+ * whose `navigation[]` arrives over the network).
  * Every pass starts by dropping the width it published last time: the floor it has to respect is
  * the one the STYLESHEET declares. Measuring its own previous answer instead would make the floor
  * a ratchet — it could only ever climb, and a higher floor fits fewer whole tabs, so each round
@@ -150,28 +239,57 @@ function readTabbarGeometry(segment: HTMLElement): TabbarGeometry | null {
 export function bindTabbarPeek(segment: HTMLElement | null): () => void {
   if (!segment) return () => {};
 
+  // A resize is answered on the next frame, not inside the observer: `apply` resizes the labels it
+  // watches, and doing that inside the callback is what the engine reports as a ResizeObserver loop.
+  let frame = 0;
+  const applyNextFrame = (): void => {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      apply();
+    });
+  };
+  const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(applyNextFrame) : null;
+
   const apply = (): void => {
+    const published = segment.style.getPropertyValue(PEEK_PROPERTY);
+    const scrolled = segment.scrollLeft;
     segment.style.removeProperty(PEEK_PROPERTY);
+
+    // hub#2414: before the peek, the floor a wrapping label needs to keep its words whole. It only
+    // ever RAISES the width the stylesheet gives the tabs, and the peek below starts from it.
+    const firstTab = segment.querySelector<HTMLElement>('ion-segment-button');
+    const wholeWords = wholeWordTabWidth(readLabelNeeds(segment), segment.clientWidth);
+    const widened = firstTab !== null && wholeWords !== null && wholeWords > firstTab.offsetWidth;
+    if (widened) segment.style.setProperty(PEEK_PROPERTY, `${wholeWords}px`);
+
+    // The label's size follows its font (a web font landing, Android's system text size, another
+    // language), and none of that resizes the strip: each label is watched on its own.
+    for (const label of Array.from(segment.querySelectorAll('ion-segment-button ion-label'))) resize?.observe(label);
+
     const geometry = readTabbarGeometry(segment);
-    if (!geometry) return;
-
-    const width = peekTabWidth(geometry);
-    if (width === null) return;
-
-    segment.style.setProperty(PEEK_PROPERTY, `${width}px`);
+    const width = geometry ? peekTabWidth(geometry) : null;
+    if (width !== null) segment.style.setProperty(PEEK_PROPERTY, `${width}px`);
     // The tabs just changed width, so `scrollWidth` did too: re-derive which edges hide something.
-    syncTabbarOverflow(segment);
+    if (widened || width !== null) syncTabbarOverflow(segment);
+    // Measuring with the width dropped lays the strip out narrower for an instant, and the engine
+    // clamps the scroll to it: a pass that leaves the width as it was must leave the strip where the
+    // person (or Ionic, bringing a chosen tab into view) had put it. A pass that moves the width
+    // re-places the chosen tab instead.
+    if (segment.style.getPropertyValue(PEEK_PROPERTY) !== published) keepSelectedTabInView(segment);
+    else if (segment.scrollLeft !== scrolled) segment.scrollLeft = scrolled;
   };
 
   apply();
 
-  const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null;
   resize?.observe(segment);
   // `childList` only: `apply` writes a style attribute on the strip itself, which this never sees.
+  // A label whose text changes in place changes size, and that reaches `resize` above.
   const tabs = typeof MutationObserver !== 'undefined' ? new MutationObserver(apply) : null;
   tabs?.observe(segment, { childList: true });
 
   return () => {
+    if (frame) cancelAnimationFrame(frame);
     resize?.disconnect();
     tabs?.disconnect();
     segment.style.removeProperty(PEEK_PROPERTY);
