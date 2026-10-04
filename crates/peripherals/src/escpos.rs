@@ -3717,9 +3717,8 @@ mod tests {
             }
         }
         for own_line in to_printable(text).lines() {
-            let first = own_line.split_whitespace().next().expect("no blank source lines");
             assert!(
-                lines.iter().any(|l| l.trim_start().starts_with(first)),
+                lines.iter().any(|l| !l.trim().is_empty() && own_line.starts_with(l.trim())),
                 "{field}: «{own_line}» starts a printed line of its own:\n{lines:#?}"
             );
         }
