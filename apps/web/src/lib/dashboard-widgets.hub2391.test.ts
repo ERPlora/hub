@@ -125,8 +125,7 @@ describe('hub#2391 — a panel that sets its currency is scaled by that currency
     };
     const cell = await renderOne(def, [{ session_number: 'S-1', difference: -550 }]);
     const list = cell.querySelector('ok-bar-list') as
-      | (HTMLElement & { items?: Array<{ value: number }>; currency?: string })
-      | null;
+      (HTMLElement & { items?: Array<{ value: number }>; currency?: string }) | null;
     expect(list?.currency).toBe('EUR');
     expect(list?.items?.[0]?.value).toBe(-5.5);
   });
@@ -142,8 +141,7 @@ describe('hub#2391 — a panel that sets its currency is scaled by that currency
     };
     const cell = await renderOne(def, [{ day: '2026-09-29', total: 1500 }]);
     const chart = cell.querySelector('ok-chart') as
-      | (HTMLElement & { series?: Array<{ data: number[] }>; axis?: string[]; max?: number })
-      | null;
+      (HTMLElement & { series?: Array<{ data: number[] }>; axis?: string[]; max?: number }) | null;
     expect(chart?.series?.[0]?.data).toEqual([1.5]);
     expect(chart?.max).toBe(1.5);
     expect(chart?.axis?.map((s) => plain(s))).toEqual(['KWD 1.5', 'KWD 1', 'KWD 0.5', 'KWD 0']);
