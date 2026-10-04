@@ -8,7 +8,8 @@
 // Contract: when the panel does not set a currency, the home page uses the HUB's currency, scaled
 // by the minor unit of that currency (EUR 2, JPY 0, KWD 3 — ADR-0123 §7), and formatted in the
 // language of the UI when the panel does not set a locale (the same rule as `lib/money.ts` and as
-// `ok-bar-list`, which follows `<html lang>`). A currency the panel does set is still painted.
+// `ok-bar-list`, which follows `<html lang>`). A currency the panel does set is still painted
+// (and scaled by its own decimals, hub#2391).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Same isolation as dashboard-widgets.test.ts: `module-loader` drags the `~icons/…?raw` chain that
@@ -115,8 +116,7 @@ describe('hub#2387 — the home page paints money in the currency of the hub', (
   });
 
   it('a currency the panel sets is still honoured', async () => {
-    // Same rule as `formatMoney`: the scale is the hub's (the amounts are minor units of the hub
-    // currency), the panel only chooses the currency that is PAINTED.
+    // The panel chooses the currency that is PAINTED, and with it the scale (hub#2391).
     hubIn('USD', 2);
     const cell = await renderOne(kpi({ currency: 'EUR', locale: 'es-ES' }), [{ expected: 150 }]);
     expect(kpiValue(cell)).toBe('1,50 €');

@@ -112,7 +112,7 @@ describe('hub#2392 — a chart panel honours the format it declares', () => {
 
   it('a currency and a locale the panel sets are still honoured', async () => {
     // Declared values that differ from the defaults (hub in USD, UI in es): the panel wins on what
-    // is PAINTED; the scale stays the hub's, like `formatMoney` (hub#2387).
+    // is PAINTED, and with it the scale (hub#2391) — EUR and USD share 2 decimals here.
     hubIn('USD', 2);
     const chart = await renderChart({ format: 'currency', currency: 'EUR', locale: 'en-US' }, [
       { day: '2026-09-29', total: 184050 },

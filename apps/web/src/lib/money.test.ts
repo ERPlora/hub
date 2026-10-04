@@ -38,10 +38,26 @@ describe('formatMoney — el separador de millares (hub#1090)', () => {
   });
 
   it('la moneda cero-decimales no pinta decimales y también agrupa (JPY)', () => {
-    // La escala de división es SIEMPRE la de la moneda del hub (EUR→2 aquí, ver money.ts);
-    // `currency` sobreescribe la divisa PINTADA. 12345000 céntimos → 123450 → sin decimales JPY.
-    expect(formatMoney(12345000, { currency: 'JPY', locale: 'es' })).toContain('123.450');
-    expect(formatMoney(12345000, { currency: 'JPY', locale: 'es' })).not.toContain(',');
+    // hub#2391: the scale is the one of the PAINTED currency (JPY → 0 decimals), not the hub's
+    // (EUR here). The previous version of this case pinned 12345000 → 123450 ¥, i.e. ÷100 on a
+    // currency without cents — the very bug of hub#2391.
+    expect(formatMoney(123450, { currency: 'JPY', locale: 'es' })).toContain('123.450');
+    expect(formatMoney(123450, { currency: 'JPY', locale: 'es' })).not.toContain(',');
+  });
+});
+
+describe('formatMoney — the minor units belong to the painted currency (hub#2391)', () => {
+  // No hub settings → the hub works in EUR (2 decimals).
+  it('JPY on a euro hub is not divided by 100', () => {
+    expect(formatMoney(1999, { currency: 'JPY', locale: 'en' })).toBe('¥1,999');
+  });
+
+  it('KWD on a euro hub keeps its three decimals', () => {
+    expect(formatMoney(12345, { currency: 'KWD', locale: 'en' })).toBe(`KWD${NBSP}12.345`);
+  });
+
+  it('without currency, the hub currency and its scale', () => {
+    expect(formatMoney(1999, { locale: 'en' })).toBe('€19.99');
   });
 });
 
