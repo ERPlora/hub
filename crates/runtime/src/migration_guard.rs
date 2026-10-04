@@ -386,6 +386,10 @@ pub fn check(module_id: &str, filename: &str, sql: &str, kind: Kind) -> Result<P
     }
 }
 
+/// The name a retired table or column is set aside under. The install gate of commands
+/// (`installer::validate_table_scope`) recognises a module's own set-aside tables by it (hub#2461).
+pub const SET_ASIDE_PREFIX: &str = "_deprecated_";
+
 /// `DROP COLUMN x` → `RENAME COLUMN x TO _deprecated_x`; `DROP TABLE t` → `RENAME TO _deprecated_t`.
 ///
 /// 🔴 **Decide sobre el SQL, nunca sobre el texto de la sentencia** (hub#1137). [`split_statements`]
@@ -468,7 +472,7 @@ fn set_aside_instead_of_dropping(statement: &str) -> Result<String, GuardError> 
             .unwrap_or(table)
             .trim_end_matches(';');
         return Ok(format!(
-            "{prose}ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}"
+            "{prose}ALTER TABLE {guard}{table} RENAME TO {SET_ASIDE_PREFIX}{table}"
         ));
     }
 

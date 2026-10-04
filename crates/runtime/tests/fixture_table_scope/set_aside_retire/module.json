@@ -1,0 +1,24 @@
+{
+  "id": "set_aside",
+  "name": "Set-aside fixture",
+  "version": "1.1.0",
+  "permissions": [],
+  "migrations": {
+    "postgres": [
+      { "file": "migrations/postgres/001_init.sql", "kind": "expand", "since": "1.0.0" },
+      { "file": "migrations/postgres/002_retire_request.sql", "kind": "contract", "since": "1.1.0" }
+    ]
+  },
+  "commands": {
+    "set_aside.erase_customer": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/erase_customer.sql"]
+    },
+    "set_aside.purge_customer": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/purge_customer.sql"]
+    }
+  }
+}
