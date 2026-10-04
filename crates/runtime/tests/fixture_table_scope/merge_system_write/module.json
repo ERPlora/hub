@@ -1,0 +1,13 @@
+{
+  "id": "merge_system_write",
+  "name": "System MERGE fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "merge_system_write.claim": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/claim.sql"]
+    }
+  }
+}

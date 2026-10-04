@@ -81,6 +81,97 @@ async fn a_command_writing_a_system_table_is_refused() {
     );
 }
 
+// ── hub#2475: `MERGE INTO` is a write like the others ───────────────────────────────────────────
+//
+// The scanner had arms for INSERT/UPDATE/DELETE/DDL/TRUNCATE and none for `MERGE INTO`
+// (Postgres ≥ 15; the hub pins 18): a MERGE that deleted another module's rows, or inserted into
+// `_hub_*`, produced ZERO write targets and installed. Its `THEN UPDATE SET` action, meanwhile,
+// read as an UPDATE of a table called `set`, refusing a legitimate MERGE on the module's own table.
+
+/// A MERGE whose target is another module's table is refused like any foreign write.
+#[tokio::test]
+async fn a_merge_into_a_foreign_table_is_refused() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    let err = rt
+        .install_from_dir(&fixture("merge_foreign_write"))
+        .await
+        .expect_err("`MERGE INTO inventory_product … THEN DELETE` must not install");
+    assert!(
+        matches!(
+            &err,
+            RuntimeError::ManifestRejected { code, at, .. }
+                if code == "foreign_table_write"
+                    && at.contains("inventory_product")
+                    && at.contains("raid.sql")
+        ),
+        "got: {err}"
+    );
+}
+
+/// A MERGE into `_hub_*` meets the same floor as an INSERT (ADR-0273 D8).
+#[tokio::test]
+async fn a_merge_into_a_system_table_is_refused() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    let err = rt
+        .install_from_dir(&fixture("merge_system_write"))
+        .await
+        .expect_err("`MERGE INTO ONLY _hub_fiscal_profile` must not install");
+    assert!(
+        matches!(
+            &err,
+            RuntimeError::ManifestRejected { code, at, .. }
+                if code == "system_table_write" && at.contains("_hub_fiscal_profile")
+        ),
+        "got: {err}"
+    );
+}
+
+/// A MERGE on the module's OWN table installs and runs through the dispatcher — all three
+/// actions, in the caller's hub only (the payload's `hub_id` is overridden by the injected one).
+#[tokio::test]
+async fn a_merge_into_an_own_table_installs_and_runs_in_the_callers_hub() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    rt.install_from_dir(&fixture("merge_scoped_ok"))
+        .await
+        .expect("a MERGE on the module's own table, with an UPDATE SET action, is legitimate");
+
+    let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+    let mut p = Params::new();
+    p.insert("item_id".into(), json!("a"));
+    p.insert("hub_id".into(), json!("h2"));
+    let n = |rows: Vec<serde_json::Value>| -> Vec<(serde_json::Value, serde_json::Value)> {
+        rows.iter()
+            .map(|r| (r["hub_id"].clone(), r["n"].clone()))
+            .collect()
+    };
+    let rows = || async {
+        rt.db_for_test()
+            .query(
+                "SELECT hub_id, n FROM merge_scoped_ok_item ORDER BY hub_id",
+                &Params::new(),
+            )
+            .await
+            .expect("read the module's table")
+            .rows
+    };
+
+    rt.execute_command("merge_scoped_ok.bump", &p, &ctx)
+        .await
+        .expect("NOT MATCHED → INSERT");
+    assert_eq!(n(rows().await), vec![(json!("h1"), json!(1))]);
+    rt.execute_command("merge_scoped_ok.bump", &p, &ctx)
+        .await
+        .expect("MATCHED → UPDATE");
+    assert_eq!(n(rows().await), vec![(json!("h1"), json!(2))]);
+    rt.execute_command("merge_scoped_ok.bump", &p, &ctx)
+        .await
+        .expect("MATCHED AND n >= 2 → DELETE");
+    assert!(rows().await.is_empty());
+}
+
 // ── hub#2461: the module's OWN set-aside tables ─────────────────────────────────────────────────
 //
 // A `contract` that retires a table does not drop it: the runtime renames it to
@@ -246,6 +337,8 @@ async fn dropping_or_truncating_an_own_set_aside_table_is_refused() {
             "set_aside_truncate",
             "_deprecated_set_aside_truncate_request",
         ),
+        // hub#2475: a MERGE can INSERT into the table every hub shares — not a row erasure.
+        ("set_aside_merge", "_deprecated_set_aside_merge_request"),
     ] {
         let db = fresh_db().await;
         let mut rt = Runtime::new(Box::new(db));

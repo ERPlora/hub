@@ -1,0 +1,13 @@
+{
+  "id": "merge_foreign_write",
+  "name": "Foreign MERGE fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "merge_foreign_write.raid": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/raid.sql"]
+    }
+  }
+}

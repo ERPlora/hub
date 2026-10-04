@@ -425,8 +425,8 @@ async fn register_module(
 /// 25/25 real manifests pass, so the gate is born a **hard error** — fail closed on the hostile
 /// border, like the sibling validations above it.
 ///
-/// What it scans: the write targets (`INSERT INTO` / `UPDATE` / `DELETE FROM` / `CREATE|ALTER|
-/// DROP TABLE` / `CREATE INDEX … ON` / `TRUNCATE`) of every SQL file the manifest declares under
+/// What it scans: the write targets (`INSERT INTO` / `UPDATE` / `DELETE FROM` / `MERGE INTO` /
+/// `CREATE|ALTER|DROP TABLE` / `CREATE INDEX … ON` / `TRUNCATE`) of every SQL file the manifest declares under
 /// `commands` and `seed.postgres`, lexically (literals and comments stripped — the same class of
 /// validation as `import_sql`, on the same hostile border).
 ///
@@ -435,7 +435,7 @@ async fn register_module(
 /// are still this module's data — for a table that held personal data, still what a GDPR erasure
 /// must reach — so a command may write `_deprecated_<id>` / `_deprecated_<id>_*` with a ROW write
 /// (`UPDATE`/`DELETE`, which the module filters by the injected `:hub_id` like any other). Not
-/// `INSERT`, DDL or `TRUNCATE`: the table holds every hub's rows and is what the `contract` rolls
+/// `INSERT`, `MERGE` (it can insert), DDL or `TRUNCATE`: the table holds every hub's rows and is what the `contract` rolls
 /// back to. Another module's set-aside table stays foreign.
 ///
 /// Two deliberate exclusions:
@@ -518,7 +518,7 @@ struct WriteTargets {
 struct WriteTarget {
     table: String,
     /// `UPDATE` / `DELETE FROM`: the statement changes rows and can be filtered by tenant. Every
-    /// other write (`INSERT`, DDL, `TRUNCATE`) is not — the distinction a module's own set-aside
+    /// other write (`INSERT`, `MERGE`, DDL, `TRUNCATE`) is not — the distinction a module's own set-aside
     /// table needs (hub#2461).
     row_level: bool,
 }
@@ -534,8 +534,8 @@ impl WriteTargets {
 
 /// Lexical write-target extraction. Works over the word stream with literals and comments
 /// stripped, so `'a; DROP TABLE x'` is data and `-- UPDATE t` is a comment. The `UPDATE` arm
-/// skips the non-statement uses: `ON CONFLICT … DO UPDATE SET`, the `FOR [NO KEY] UPDATE` lock
-/// clause and trigger timing (`BEFORE|AFTER UPDATE`).
+/// skips the non-statement uses: `ON CONFLICT … DO UPDATE SET`, a MERGE's `THEN UPDATE SET`, the
+/// `FOR [NO KEY] UPDATE` lock clause and trigger timing (`BEFORE|AFTER UPDATE`).
 fn write_targets(sql: &str) -> WriteTargets {
     let words = sql_words(sql);
     let w = |i: usize| words.get(i).map(String::as_str);
@@ -557,16 +557,21 @@ fn write_targets(sql: &str) -> WriteTargets {
             }
             Some("update") => {
                 let prev = i.checked_sub(1).and_then(w);
-                let statement = !matches!(
-                    prev,
-                    Some("do")
-                        | Some("for")
-                        | Some("key")
-                        | Some("before")
-                        | Some("after")
-                        | Some("or")
-                        | Some("of")
-                );
+                // `THEN UPDATE SET` is the action of a MERGE. Both neighbours are required: `set`
+                // is a legal table name (`UPDATE set SET …` is a statement), and a PL/pgSQL
+                // `THEN UPDATE t SET …` names its table.
+                let merge_action = prev == Some("then") && w(i + 1) == Some("set");
+                let statement = !merge_action
+                    && !matches!(
+                        prev,
+                        Some("do")
+                            | Some("for")
+                            | Some("key")
+                            | Some("before")
+                            | Some("after")
+                            | Some("or")
+                            | Some("of")
+                    );
                 if statement {
                     let at = skip_modifiers(i + 1, &["only"]);
                     if let Some(t) = w(at) {
@@ -574,6 +579,16 @@ fn write_targets(sql: &str) -> WriteTargets {
                     }
                 }
                 i += 1;
+            }
+            Some("merge") if w(i + 1) == Some("into") => {
+                // Its `THEN INSERT`/`THEN DELETE` actions do not match the INSERT INTO/DELETE
+                // FROM arms, and `THEN UPDATE SET` is skipped above. A MERGE can insert, so it is
+                // not a row write (hub#2475).
+                let at = skip_modifiers(i + 2, &["only"]);
+                if let Some(t) = w(at) {
+                    out.push(t, false);
+                }
+                i += 3;
             }
             Some("delete") if w(i + 1) == Some("from") => {
                 let at = skip_modifiers(i + 2, &["only"]);
@@ -2049,6 +2064,46 @@ mod tests {
         );
         // Literals and comments are data, not statements.
         assert!(targets("-- UPDATE hub_user\nSELECT 'DELETE FROM hub_user';").is_empty());
+
+        // hub#2475: `MERGE INTO` writes its target with any of its three actions. The actions
+        // (`THEN UPDATE SET` / `THEN DELETE` / `THEN INSERT`) are clauses of the MERGE, not
+        // statements of their own: the one target is the table after `INTO`.
+        assert_eq!(
+            targets(
+                "MERGE INTO inventory_product p USING x_src s ON p.id = s.id \
+                 WHEN MATCHED THEN DELETE;"
+            ),
+            ["inventory_product"]
+        );
+        assert_eq!(
+            targets(
+                "MERGE INTO inventory_product p USING x_src s ON p.id = s.id \
+                 WHEN MATCHED THEN UPDATE SET price = 0;"
+            ),
+            ["inventory_product"],
+            "`THEN UPDATE SET` is the MERGE's action, not an UPDATE of a table called `set`"
+        );
+        assert_eq!(
+            targets(
+                "WITH s AS (SELECT :hub_id AS hub_id) \
+                 MERGE INTO ONLY \"_Hub_Fiscal_Profile\" AS f USING s ON f.hub_id = s.hub_id \
+                 WHEN MATCHED AND f.status <> 'X' THEN UPDATE SET status = 'X' \
+                 WHEN NOT MATCHED THEN INSERT (hub_id, status) VALUES (s.hub_id, 'X');"
+            ),
+            ["_hub_fiscal_profile"]
+        );
+        // Only a MERGE's `THEN UPDATE SET` is that action. `set` is a legal table name, so an
+        // UPDATE statement on it still names its target: skipping every `UPDATE SET` would let
+        // a write the gate used to refuse install with zero targets.
+        assert_eq!(targets("UPDATE \"set\" SET x = 1;"), ["set"]);
+        assert_eq!(targets("UPDATE set SET x = 1;"), ["set"]);
+        assert_eq!(
+            targets(
+                "DO $$ BEGIN IF true THEN UPDATE inventory_product SET price = 0; END IF; END $$;"
+            ),
+            ["inventory_product"],
+            "a PL/pgSQL `THEN UPDATE t SET` is a statement, not a MERGE action"
+        );
     }
 
     /// hub#2461: the gate tells a ROW write (`UPDATE`/`DELETE FROM` — what an erasure is) from
@@ -2092,6 +2147,14 @@ mod tests {
             [false]
         );
         assert_eq!(row_level("TRUNCATE _deprecated_x_r;"), [false]);
+        // hub#2475: a MERGE can INSERT, so it is not the row write a set-aside table accepts.
+        assert_eq!(
+            row_level(
+                "MERGE INTO _deprecated_x_r r USING x_src s ON r.id = s.id \
+                 WHEN MATCHED THEN UPDATE SET data = NULL;"
+            ),
+            [false]
+        );
 
         // The shape whatsapp_inbox#264 ships: the subselect is a READ, the one target is the
         // set-aside table, and it is a row write.

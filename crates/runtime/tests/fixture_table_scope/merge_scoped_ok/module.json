@@ -1,0 +1,14 @@
+{
+  "id": "merge_scoped_ok",
+  "name": "Scoped MERGE fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "merge_scoped_ok.bump": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/bump.sql"]
+    }
+  }
+}
