@@ -282,3 +282,10 @@ appointments/tests/series_edit_at_horizon.hub.test.py
 # (appointments#265). New coverage, not moved.
 # pending-publication: appointments#268 until 2026-10-30
 appointments/tests/busy_agenda_booking.hub.test.py
+# appointments: a series is only CREATED with a professional who performs its service —
+# `recurring.create` with someone outside the service is refused at the door as
+# `staff_not_eligible` and nothing is saved, the eligible one is created and booked, and a service
+# assigned to nobody is open to the whole team, against the real kernel (appointments#283). New
+# coverage, not moved.
+# pending-publication: appointments#288 until 2026-11-02
+appointments/tests/recurring_create_eligibility.hub.test.py
