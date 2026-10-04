@@ -222,6 +222,7 @@ import { getDeviceContext } from './lib/device';
 import { railCollapsed } from './lib/shell';
 import { SHELL_MENU_ID, runAfterShellMenuCloses } from './lib/shell-menu';
 import { PROFILE_ROUTE } from './lib/routes';
+import { prefetchSectionViews } from './router/prefetch-sections';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { installIdleLogout } from './lib/idle-logout';
@@ -307,6 +308,17 @@ async function onUpgradePlan(): Promise<void> {
     await toastError(t('nav.upgradePlanError'));
   }
 }
+
+// hub#2325 — the screens this menu opens are downloaded once the app is idle, so a tap on it no
+// longer depends on the network at that very instant (a blink, a busy till). Profile counts: it
+// hangs off the user card at the top of this same menu. Only with a session, like the menu itself.
+watch(
+  () => (isAuthed.value ? [...nav.value.flatMap((section) => section.items.map((it) => it.path)), PROFILE_ROUTE] : []),
+  (paths) => {
+    if (paths.length) void prefetchSectionViews(router, paths);
+  },
+  { immediate: true },
+);
 
 const isActive = (path: string): boolean =>
   route.path === path || route.path.startsWith(`${path}/`);

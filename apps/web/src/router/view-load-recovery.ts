@@ -93,8 +93,15 @@ function markPersisted(storage: RecoveryStorage, path: string): boolean {
   }
 }
 
+/**
+ * hub#2312 — sections whose file failed to arrive in this document (rung 4). Module scope =
+ * document scope, exactly like the browser's failed mark. Shared by `router.onError` and the
+ * side menu's download ahead of time (hub#2325, `./prefetch-sections`).
+ */
+export const sectionsFailedInApp = new Set<string>();
+
 /** `/settings?tab=1#data` → `/settings`: every way of reaching a section needs the same file. */
-function sectionOf(path: string): string {
+export function sectionOf(path: string): string {
   return path.split(/[?#]/, 1)[0];
 }
 
