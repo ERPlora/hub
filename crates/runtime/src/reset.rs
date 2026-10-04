@@ -3,7 +3,8 @@
 //! **Espejo del export**: reutiliza su mismo inventario de tablas (`list_tables`, `table_owner`
 //! por prefijo más largo, `foreign_keys` del catálogo) recorrido al revés. Así lo que el hub sabe
 //! exportar es exactamente lo que sabe borrar, y un módulo nuevo no hay que darlo de alta en dos
-//! sitios.
+//! sitios. One deliberate exception: a module's set-aside tables (`_deprecated_<id>*`) are wiped
+//! but not exported — see [`reset_owner`] (hub#2476, export half in hub#2482).
 //!
 //! Reglas duras (fijadas por los e2e `tests/reset_test.rs`):
 //!   - `DELETE ... WHERE hub_id = :hub_id` SIEMPRE. Nunca `TRUNCATE`, nunca `DROP`: la BD es
