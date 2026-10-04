@@ -1,0 +1,13 @@
+{
+  "id": "set_aside_foreign",
+  "name": "Foreign set-aside write fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "set_aside_foreign.raid": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/raid.sql"]
+    }
+  }
+}

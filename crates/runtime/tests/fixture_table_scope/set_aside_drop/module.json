@@ -1,0 +1,13 @@
+{
+  "id": "set_aside_drop",
+  "name": "Set-aside drop fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "set_aside_drop.wipe": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/wipe.sql"]
+    }
+  }
+}

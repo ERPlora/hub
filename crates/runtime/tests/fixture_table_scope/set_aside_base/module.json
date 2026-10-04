@@ -1,0 +1,9 @@
+{
+  "id": "set_aside",
+  "name": "Set-aside fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": {
+    "postgres": [{ "file": "migrations/postgres/001_init.sql", "kind": "expand", "since": "1.0.0" }]
+  }
+}

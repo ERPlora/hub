@@ -1,0 +1,13 @@
+{
+  "id": "set_aside_truncate",
+  "name": "Set-aside truncate fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "commands": {
+    "set_aside_truncate.wipe": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/wipe.sql"]
+    }
+  }
+}
