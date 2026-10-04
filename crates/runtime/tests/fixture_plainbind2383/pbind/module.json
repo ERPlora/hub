@@ -1,0 +1,36 @@
+{
+  "id": "pbind",
+  "name": "Plain Query Required Bind",
+  "version": "1.0.0",
+  "permissions": [
+    "pbind.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "pbind.items.get": {
+      "permission": "pbind.read",
+      "sql": "queries/item_get.sql"
+    },
+    "pbind.items.by_status": {
+      "permission": "pbind.read",
+      "sql": "queries/items_by_status.sql"
+    },
+    "pbind.items.tagged": {
+      "permission": "pbind.read",
+      "sql": "queries/items_tagged.sql"
+    },
+    "pbind.items.due": {
+      "permission": "pbind.read",
+      "sql": "queries/items_due.sql",
+      "schema": "schemas/items_due.json"
+    },
+    "pbind.items.all": {
+      "permission": "pbind.read",
+      "sql": "queries/items_all.sql"
+    }
+  }
+}

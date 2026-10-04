@@ -873,7 +873,7 @@ async fn preload_reads(
         // contra la fila concreta se quedaba sin sitio donde vivir.
         let params = read.resolve_params_from_map(payload);
 
-        match crate::queries::execute(db, registry, name, &params, &sys).await {
+        match crate::queries::execute_declared_read(db, registry, name, &params, &sys).await {
             Ok(rows) => {
                 out.insert(name.to_string(), Json::Array(rows));
             }
@@ -945,7 +945,7 @@ pub(crate) async fn enforce_protects(
             let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
 
             // (1) the settings row. Degrade open on any failure — see "Why it degrades OPEN".
-            let settings = match crate::queries::execute(
+            let settings = match crate::queries::execute_declared_read(
                 db,
                 registry,
                 &guard.settings_query,
@@ -993,7 +993,7 @@ pub(crate) async fn enforce_protects(
 
             // (4) is the precondition met? Degrade open on a query failure — the alternative is a
             // till that refuses every sale because a read broke.
-            let rows = match crate::queries::execute(
+            let rows = match crate::queries::execute_declared_read(
                 db,
                 registry,
                 &guard.guard_query,
@@ -1074,16 +1074,19 @@ async fn merge_patch_read(
     let mut read_params = Params::new();
     read_params.insert(patch.key.clone(), key_value.clone());
     let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
-    let row = match crate::queries::execute(db, registry, &patch.read, &read_params, &sys).await {
-        Ok(rows) => rows.into_iter().next(),
-        Err(e) => {
-            eprintln!(
-                "⚠ patch: `{}` read `{}` failed ({e}) → payload validated as sent",
-                cmd.module_id, patch.read
-            );
-            None
-        }
-    };
+    let row =
+        match crate::queries::execute_declared_read(db, registry, &patch.read, &read_params, &sys)
+            .await
+        {
+            Ok(rows) => rows.into_iter().next(),
+            Err(e) => {
+                eprintln!(
+                    "⚠ patch: `{}` read `{}` failed ({e}) → payload validated as sent",
+                    cmd.module_id, patch.read
+                );
+                None
+            }
+        };
     let Some(Json::Object(row)) = row else {
         return payload.clone();
     };

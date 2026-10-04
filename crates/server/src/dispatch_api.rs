@@ -321,6 +321,12 @@ pub(crate) fn error_payload(e: &erplora_runtime::RuntimeError) -> (StatusCode, V
         error["query"] = json!(query);
         error["reason"] = json!(reason.code());
     }
+    // hub#2383: the query and the bind it did not get travel as data, like `read_unavailable`'s
+    // query above: a caller fixes the call from the fields, never by parsing the sentence.
+    if let E::MissingRequiredParam { query, param } = e {
+        error["query"] = json!(query);
+        error["param"] = json!(param);
+    }
     // hub#1102: the APP a refusal is about, for the refusals whose remedy names one — install it,
     // switch it back on, grant it a permission. Same rule as the fields above: the sentence that
     // names it («Falta la app Impuestos») must not be built by pulling backticks out of
@@ -817,6 +823,19 @@ mod error_redaction_tests {
             assert_eq!(error["query"], "sales.get");
             assert_eq!(error["reason"], code, "{error}");
         }
+    }
+
+    /// hub#2383: a query asked without a bind its SQL needs names WHICH query and WHICH param as
+    /// fields, so the shell, the assistant or an integration fixes the call without parsing prose.
+    #[test]
+    fn a_missing_required_param_carries_the_query_and_the_param() {
+        let error = error_of(RuntimeError::MissingRequiredParam {
+            query: "appointments.appointments.get".into(),
+            param: "appointment_id".into(),
+        });
+        assert_eq!(error["code"], "missing_required_param");
+        assert_eq!(error["query"], "appointments.appointments.get", "{error}");
+        assert_eq!(error["param"], "appointment_id", "{error}");
     }
 
     /// A WASM trap is the hub's plumbing, not the module talking: a handler that wants to say
