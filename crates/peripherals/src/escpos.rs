@@ -780,7 +780,7 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
 
     if is_truthy(data, "business_address") {
         b.set(Align::Center, false, false, false);
-        b.text(&format!("{}\n", str_field(data, "business_address", "")));
+        print_wrapped(b, str_field(data, "business_address", ""));
     }
 
     if is_truthy(data, "vat_number") {
@@ -954,7 +954,7 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
     if is_truthy(data, "claim_qr_data") {
         b.set(Align::Center, false, false, false);
         if is_truthy(data, "claim_note") {
-            b.text(&format!("{}\n", str_field(data, "claim_note", "")));
+            print_wrapped(b, str_field(data, "claim_note", ""));
         }
         b.qr(str_field(data, "claim_qr_data", ""));
         if is_truthy(data, "claim_locator") {
@@ -965,12 +965,12 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
     b.text("\n");
     if is_truthy(data, "receipt_header") {
         b.set(Align::Center, false, false, false);
-        b.text(&format!("{}\n", str_field(data, "receipt_header", "")));
+        print_wrapped(b, str_field(data, "receipt_header", ""));
     }
 
     if is_truthy(data, "receipt_footer") {
         b.set(Align::Center, false, false, false);
-        b.text(&format!("{}\n", str_field(data, "receipt_footer", "")));
+        print_wrapped(b, str_field(data, "receipt_footer", ""));
     }
 
     b.set(Align::Center, false, false, false);
@@ -982,7 +982,7 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value, kind: Fiscal)
     // nothing. Only on the ticket — the full invoice is formal, like the A4.
     if kind == Fiscal::Ticket && is_truthy(data, "promo_qr") {
         if is_truthy(data, "promo_note") {
-            b.text(&format!("{}\n", str_field(data, "promo_note", "")));
+            print_wrapped(b, str_field(data, "promo_note", ""));
         }
         b.qr_sized(str_field(data, "promo_qr", ""), PROMO_QR_MODULE_DOTS);
         b.text("\n");
@@ -1021,7 +1021,7 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
 
     if is_truthy(data, "business_address") {
         b.set(Align::Center, false, false, false);
-        b.text(&format!("{}\n", str_field(data, "business_address", "")));
+        print_wrapped(b, str_field(data, "business_address", ""));
     }
 
     b.text("================================\n");
@@ -3652,6 +3652,168 @@ mod tests {
             "an explicit 2 is today's paper"
         );
     }
+
+    // ── hub#2462 · the business's own text wraps by words on the roll ───────────────────────────
+    //
+    // The header, the footer and the notes of the ticket are prose the business (or the producer)
+    // writes, of any length. Printed as one line, the printer folds them at its column count
+    // without looking where — «…de 2,00 E» / «UR, ya aplicado…» on a 58 mm roll, «ya apl» /
+    // «icado…» on an 80 mm one at 42 columns. Wrapped by words at the paper's 32 columns, no roll
+    // the hub drives ever has to fold them.
+
+    /// Columns a roll prints per line: 58 mm (32) and 80 mm (42 or 48, depending on its font).
+    const ROLL_COLUMNS: [usize; 3] = [32, 42, 48];
+
+    /// The paper as the printer receives it, one entry per line, decoded from cp437 so accented
+    /// text reads as written. Unlike [`strip_escpos`] it steps over the QR commands
+    /// (`GS ( k pL pH …`), which the ticket carries around its notes.
+    fn roll_lines(bytes: &[u8]) -> Vec<String> {
+        use oem_cp::StringExt;
+        let (mut out, mut cur) = (Vec::new(), Vec::new());
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                0x1d if bytes.get(i + 1) == Some(&0x28) => {
+                    let len = bytes[i + 3] as usize + ((bytes[i + 4] as usize) << 8);
+                    i += 5 + len;
+                }
+                0x1b | 0x1d => i += 3,
+                b'\n' => {
+                    out.push(String::from_cp_lossy::<Cp437>(&cur));
+                    cur.clear();
+                    i += 1;
+                }
+                b => {
+                    cur.push(b);
+                    i += 1;
+                }
+            }
+        }
+        out
+    }
+
+    /// What a printer with `columns` columns does to a line longer than that: it folds it there.
+    fn folded(line: &str, columns: usize) -> Vec<String> {
+        let chars: Vec<char> = line.chars().collect();
+        chars.chunks(columns).map(|c| c.iter().collect()).collect()
+    }
+
+    /// Every line of the roll fits the paper, and on every roll width each word of `text` reaches
+    /// the paper whole, each of its own lines starting a printed line of its own.
+    fn assert_wrapped_by_words(lines: &[String], field: &str, text: &str) {
+        for l in lines {
+            assert!(
+                l.chars().count() <= LINE_WIDTH,
+                "{field}: every line fits the paper ({LINE_WIDTH} columns): {l:?}\n{lines:#?}"
+            );
+        }
+        for columns in ROLL_COLUMNS {
+            let pieces: Vec<String> = lines.iter().flat_map(|l| folded(l, columns)).collect();
+            for word in to_printable(text).split_whitespace() {
+                assert!(
+                    pieces.iter().any(|p| p.split_whitespace().any(|w| w == word)),
+                    "{field}: «{word}» is cut on a {columns}-column roll:\n{pieces:#?}"
+                );
+            }
+        }
+        for own_line in to_printable(text).lines() {
+            let first = own_line.split_whitespace().next().expect("no blank source lines");
+            assert!(
+                lines.iter().any(|l| l.trim_start().starts_with(first)),
+                "{field}: «{own_line}» starts a printed line of its own:\n{lines:#?}"
+            );
+        }
+    }
+
+    /// The business's text on the ticket, long enough not to fit one line, with accents, `€`
+    /// (printed `EUR`, three columns for one character) and the line break Ventas puts between
+    /// the discount note and the business's footer (sales#505).
+    const LONG_TEXTS: [(&str, &str); 5] = [
+        ("receipt_header", "Vale de 5 € para tu próxima cita en el salón"),
+        (
+            "receipt_footer",
+            "Descuento en el ticket de 2,00 €, ya aplicado en los importes de arriba.\n\
+             Gracias por su visita a Peluquería Begoña, ¡hasta pronto!",
+        ),
+        ("business_address", "Calle de la Constitución 125, bajo izquierda, 29001 Málaga"),
+        ("claim_note", "Pide tu factura completa escaneando este código con el móvil"),
+        ("promo_note", "Escanea y déjanos una reseña en Google: nos ayudas muchísimo"),
+    ];
+
+    fn ticket_with(field: &str, text: &str) -> serde_json::Value {
+        let mut data = json!({
+            "business_name": "Bar Manolo",
+            "receipt_id": "T-45",
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            "qr_data": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B1",
+            "claim_qr_data": "https://bar.erplora.com/p/ABCD1234ABCD1234",
+            "promo_qr": PROMO_URL,
+        });
+        data[field] = json!(text);
+        data
+    }
+
+    /// **The point of the issue**: the business's text reaches the ticket cut between words, never
+    /// inside one, on a 58 mm roll and on an 80 mm one.
+    #[test]
+    fn the_business_text_on_the_ticket_wraps_by_words_on_every_roll() {
+        for (field, text) in LONG_TEXTS {
+            let bytes = render_document(DocumentType::Receipt, &ticket_with(field, text))
+                .expect("a valid ticket");
+            assert_wrapped_by_words(&roll_lines(&bytes), field, text);
+        }
+    }
+
+    /// The full invoice prints the same header, footer and address, so it wraps them the same way.
+    #[test]
+    fn the_business_text_on_the_full_invoice_wraps_by_words_too() {
+        for (field, text) in LONG_TEXTS.iter().filter(|(f, _)| !f.ends_with("_note")) {
+            let mut data = full_invoice();
+            data[*field] = json!(text);
+            let bytes = render_document(DocumentType::Invoice, &data).expect("a valid invoice");
+            assert_wrapped_by_words(&roll_lines(&bytes), field, text);
+        }
+    }
+
+    /// The bill taken to the table prints the business's address too, wrapped the same way.
+    #[test]
+    fn the_address_on_the_bill_wraps_by_words_too() {
+        let (field, text) = LONG_TEXTS[2];
+        let data = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.2 }],
+            "total": 1.2,
+            field: text,
+        });
+        let bytes = render_document(DocumentType::Prebill, &data).expect("a valid bill");
+        assert_wrapped_by_words(&roll_lines(&bytes), field, text);
+    }
+
+    /// A blank line the business typed between two paragraphs of its footer stays on the paper.
+    #[test]
+    fn a_blank_line_in_the_footer_stays_on_the_paper() {
+        let bytes = render_document(
+            DocumentType::Receipt,
+            &ticket_with("receipt_footer", "Gracias por su visita\n\nVuelva pronto"),
+        )
+        .expect("a valid ticket");
+        let lines = roll_lines(&bytes);
+        let at = lines.iter().position(|l| l == "Gracias por su visita").expect("the footer prints");
+        assert_eq!(lines[at + 1..at + 3], ["", "Vuelva pronto"], "{lines:#?}");
+    }
+
+    /// A text that already fits prints exactly as it did: one line, as written.
+    #[test]
+    fn a_short_footer_prints_exactly_as_today() {
+        let bytes = render_document(DocumentType::Receipt, &ticket_with("receipt_footer", "Vuelva pronto"))
+            .expect("a valid ticket");
+        let lines = roll_lines(&bytes);
+        assert_eq!(
+            lines.iter().filter(|l| l.contains("Vuelva")).collect::<Vec<_>>(),
+            vec!["Vuelva pronto"],
+            "{lines:#?}"
+        );
+    }
 }
 
 /// **Typographic punctuation → what a cp437 printer can actually produce.**
@@ -3685,10 +3847,13 @@ fn to_printable(txt: &str) -> String {
 /// La impresora corta por columna sin mirar dónde: sin esto, el aviso de la cuenta salía partido a
 /// mitad de palabra. Una palabra más larga que el ancho se deja tal cual — partirla la haría
 /// ilegible y es preferible que la impresora la doble.
+///
+/// It measures the text as it reaches the paper ([`to_printable`]): `€` prints as `EUR`, three
+/// columns for one character, and counting it as one let a line overflow by two (hub#2462).
 fn wrap_to_width(txt: &str, width: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     let mut current = String::new();
-    for word in txt.split_whitespace() {
+    for word in to_printable(txt).split_whitespace() {
         if current.is_empty() {
             current.push_str(word);
         } else if current.chars().count() + 1 + word.chars().count() <= width {
@@ -3703,6 +3868,23 @@ fn wrap_to_width(txt: &str, width: usize) -> Vec<String> {
         lines.push(current);
     }
     lines
+}
+
+/// Prints prose the business or the producer writes (a header, a footer, an address, a note)
+/// wrapped by words to the paper, keeping the line breaks it already has (hub#2462).
+///
+/// Printed as one line, the printer folds it at its own column count without looking where, and
+/// the customer gets words cut in two on a 58 mm roll and on an 80 mm one alike.
+fn print_wrapped(b: &mut EscposBuilder, txt: &str) {
+    for own_line in txt.lines() {
+        let wrapped = wrap_to_width(own_line, LINE_WIDTH);
+        if wrapped.is_empty() {
+            b.text("\n");
+        }
+        for line in wrapped {
+            b.text(&format!("{line}\n"));
+        }
+    }
 }
 
 /// Formatea la cantidad como lo hace `f"{qty}x …"` en Python: si el JSON trae un entero
