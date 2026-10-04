@@ -645,3 +645,88 @@ async fn reset_without_the_print_queue_section_leaves_the_queue_intact() {
         "sin la sección marcada la cola no se toca (el reset nunca hace de más)"
     );
 }
+
+// ── hub#2476: what a module retired is still its data ───────────────────────────────────────
+
+/// The set-aside fixture of hub#2461: 1.0.0 creates `set_aside_request`; 1.1.0's `contract`
+/// retires it, and the runtime keeps it as `_deprecated_set_aside_request` (hub#542).
+fn set_aside_fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixture_table_scope")
+        .join(name)
+}
+
+/// Installs 1.0.0, seeds two requests in h1 and one in h2 on the LIVE table, then upgrades to
+/// 1.1.0 so the table — with every hub's rows — is set aside.
+async fn hub_with_a_set_aside_table() -> Runtime {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    rt.install_from_dir(&set_aside_fixture("set_aside_base"))
+        .await
+        .expect("install 1.0.0");
+    for (hub, id, customer) in [
+        ("h1", "r1", "ana"),
+        ("h1", "r2", "bea"),
+        ("h2", "r1", "ana"),
+    ] {
+        rt.db()
+            .execute(
+                "INSERT INTO set_aside_request (hub_id, id, customer_id, data) \
+                 VALUES (:hub_id, :id, :customer_id, 'asked for a haircut')",
+                &params(json!({ "hub_id": hub, "id": id, "customer_id": customer })),
+            )
+            .await
+            .expect("seed a request on the live table");
+    }
+    rt.install_from_dir(&set_aside_fixture("set_aside_retire"))
+        .await
+        .expect("upgrade to 1.1.0, which sets the table aside");
+    rt
+}
+
+/// **hub#2476** — wiping a module's data also wipes what it kept in tables an upgrade retired.
+/// A retired table is set aside, not dropped (so the `down` can bring it back), and its rows are
+/// still that business's data — customer names and phones in `_deprecated_whatsapp_inbox_request`.
+/// The dry-run announces them and the reset deletes them, in THIS hub only: the set-aside table
+/// holds every hub's rows, and it stays (DELETE, never DROP — it is what the `down` returns to).
+#[tokio::test]
+async fn reset_of_a_module_also_wipes_its_set_aside_tables_in_this_hub_only() {
+    let rt = hub_with_a_set_aside_table().await;
+    let table = "_deprecated_set_aside_request";
+    assert_eq!(count(&rt, table, "h1").await, 2, "precondition: set aside");
+
+    let plan = plan_reset(&rt, "h1").await.expect("plan");
+    let section = plan
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/set_aside")
+        .expect("the module has its section");
+    assert_eq!(
+        section.rows, 2,
+        "the dry-run announces the set-aside rows of this hub, and only those"
+    );
+
+    let sel = ResetSelection {
+        modules: vec!["set_aside".into()],
+        ..Default::default()
+    };
+    let report = execute_reset(&rt, "h1", &sel, ACTOR).await.expect("reset");
+
+    assert_eq!(
+        count(&rt, table, "h1").await,
+        0,
+        "🔴 the reset left this hub's rows in the module's set-aside table"
+    );
+    assert_eq!(
+        count(&rt, table, "h2").await,
+        1,
+        "🔴 the reset reached another hub's rows in the shared set-aside table"
+    );
+    let deleted = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/set_aside")
+        .map(|s| s.rows_deleted);
+    assert_eq!(deleted, Some(2), "the report counts them: {report:?}");
+}

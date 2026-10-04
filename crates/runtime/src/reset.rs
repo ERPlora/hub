@@ -3,7 +3,8 @@
 //! **Espejo del export**: reutiliza su mismo inventario de tablas (`list_tables`, `table_owner`
 //! por prefijo más largo, `foreign_keys` del catálogo) recorrido al revés. Así lo que el hub sabe
 //! exportar es exactamente lo que sabe borrar, y un módulo nuevo no hay que darlo de alta en dos
-//! sitios.
+//! sitios. One deliberate exception: a module's set-aside tables (`_deprecated_<id>*`) are wiped
+//! but not exported — see [`reset_owner`] (hub#2476, export half in hub#2482).
 //!
 //! Reglas duras (fijadas por los e2e `tests/reset_test.rs`):
 //!   - `DELETE ... WHERE hub_id = :hub_id` SIEMPRE. Nunca `TRUNCATE`, nunca `DROP`: la BD es
@@ -425,6 +426,18 @@ fn module_ids(rt: &Runtime) -> Vec<String> {
         .collect()
 }
 
+/// The module whose data `table` holds, for the reset: the export's owner (longest prefix), plus
+/// the tables an upgrade retired. A `contract` sets a table aside as `_deprecated_<table>` instead
+/// of dropping it (hub#542), so its rows are still that module's — and that business's — data,
+/// and wiping the module has to reach them too (hub#2476). Only the reset reads it this way: the
+/// export keeps its own inventory.
+fn reset_owner(table: &str, installed: &[String]) -> Option<String> {
+    let live = table
+        .strip_prefix(crate::migration_guard::SET_ASIDE_PREFIX)
+        .unwrap_or(table);
+    table_owner(live, installed)
+}
+
 /// Tablas propiedad de `module_id` (prefijo más largo, igual que el export), cada una con su
 /// acotación de tenant y su predicado de datos de usuario ya resueltos contra el catálogo.
 async fn module_tables(
@@ -436,7 +449,7 @@ async fn module_tables(
     let all = list_tables(db).await.unwrap_or_default();
     let mut out = Vec::new();
     for name in all {
-        if table_owner(&name, &installed).as_deref() != Some(module_id) || !safe_ident(&name) {
+        if reset_owner(&name, &installed).as_deref() != Some(module_id) || !safe_ident(&name) {
             continue;
         }
         let user_rows = user_rows_predicate(db, &name, "").await;
@@ -601,6 +614,24 @@ async fn count_where(rt: &Runtime, table: &str, extra: &str, hub_id: &str) -> i6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub#2476: a set-aside table belongs to the module that owned it live — by the same longest
+    /// prefix, so `whatsapp` never claims `whatsapp_inbox`'s — and a system table stays nobody's.
+    #[test]
+    fn a_set_aside_table_belongs_to_the_module_that_owned_it_live() {
+        let installed = vec!["whatsapp".to_string(), "whatsapp_inbox".to_string()];
+        assert_eq!(
+            reset_owner("_deprecated_whatsapp_inbox_request", &installed).as_deref(),
+            Some("whatsapp_inbox")
+        );
+        assert_eq!(
+            reset_owner("whatsapp_inbox_request", &installed).as_deref(),
+            Some("whatsapp_inbox")
+        );
+        assert_eq!(reset_owner("_deprecated_other_request", &installed), None);
+        let hub = vec!["_hub".to_string()];
+        assert_eq!(reset_owner("_deprecated__hub_settings", &hub), None);
+    }
 
     /// El plan y el informe son el contrato JSON que la UI pinta: round-trip sin perder campos.
     #[test]
