@@ -7,7 +7,7 @@ Prefijo: HUB
 > herramientas se ofrecen, con qué instrucciones) y la reenvía al proxy del SaaS, que es quien
 > llama al proveedor y mide el gasto. El bucle que ejecuta las herramientas corre en el navegador
 > con la sesión de quien pregunta, salvo en una automatización, donde lo corre el servidor
-> (HUB-F280). Escrito contra `origin/develop` del hub (05/10/2026). Código:
+> (HUB-F279). Escrito contra `origin/develop` del hub (05/10/2026). Código:
 > `crates/server/src/{assistant,assistant_api,assistant_report,router,embed,agent_runner}.rs`,
 > `crates/server/src/ingest.rs` (`collect_chunks`) y el crate `vector`.
 
@@ -112,10 +112,7 @@ Pendiente de enlazar: hub — HUB_SHELL, botón de denuncia bajo cada respuesta
 Pendiente de enlazar: saas — registro de errores del hub (`POST /api/v1/hub/device/error-report/`) donde se revisan las denuncias de contenido
 QA: qa-hub-assistant §R5
 
-### HUB-F279 [retirado] Guardar el historial del asistente en el hub
-Implicados: ninguno
-
-### HUB-F280 Pedirle un paso al asistente dentro de una automatización
+### HUB-F279 Pedirle un paso al asistente dentro de una automatización
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: flows: Editor de automatización
