@@ -22,7 +22,16 @@
 #   4. every live flow has a well-formed `Estado:` and an `Implicados:` line;
 #   5. the index table and the area files list exactly the same flows, and each row points at the
 #      file that really holds the flow;
-#   6. the status in the index row is the status of the flow.
+#   6. the status in the index row is the status of the flow;
+#   7. an `Implicados:` line that names a flow of this repository names one that exists and is not
+#      retired, and the link is written on BOTH flows (ERPlora/hub#2514);
+#   8. `Implicados: ninguno` carries no `Pendiente de enlazar:` line and `Implicados: pendiente`
+#      carries at least one — a flow cannot both depend on nobody and wait for somebody.
+#
+# 7 and 8 came with the links towards erplora.com (ERPlora/hub#2514): the hub's flows were
+# linked to the SaaS by a machine, on both sides at once, and what a machine writes a later hand
+# edit undoes on one side only. Links to OTHER repositories cannot be checked from here (that is
+# `workflow-index.sh check`, in pm); links between the hub's own five documents can.
 #
 # Run:  bash scripts/tests/workflow-doc-truth.test.sh [repo_root]
 set -uo pipefail
@@ -51,6 +60,8 @@ COMPONENTS = {
 HEAD = re.compile(r'^### ([A-Z][A-Z0-9_]*-F[0-9]{2,})\b(.*)$')
 ROW = re.compile(r'^\|\s*([A-Z][A-Z0-9_]*-F[0-9]{2,})\s*\|(.*)\|\s*$')
 LINK = re.compile(r'\]\(([^)]+)\)')
+FLOW_ID = re.compile(r'\b([A-Z][A-Z0-9_]*-F[0-9]{2,})\b')
+PENDING = 'Pendiente de enlazar:'
 STATES = ('hecho', 'parcial', 'no hecho')
 
 fails = []
@@ -92,7 +103,8 @@ def flows_in(path):
         m = HEAD.match(line)
         if m:
             cur = {'id': m.group(1), 'retired': '[retirado]' in line, 'state': None,
-                   'raw_state': None, 'impl': False, 'line': n}
+                   'raw_state': None, 'impl': False, 'line': n, 'links': [], 'impl_value': '',
+                   'pending': 0}
             out.append(cur)
             continue
         if line.startswith('## '):
@@ -104,6 +116,10 @@ def flows_in(path):
             cur['state'] = state_of(cur['raw_state'])
         elif line.startswith('Implicados:'):
             cur['impl'] = True
+            cur['impl_value'] = line[len('Implicados:'):].strip()
+            cur['links'] = FLOW_ID.findall(line)
+        elif line.startswith(PENDING):
+            cur['pending'] += 1
     return out
 
 
@@ -133,6 +149,7 @@ def index_rows(path):
 
 
 seen = {}          # id -> file, repo-wide
+every = {}         # id -> (file, flow), repo-wide
 for comp, prefix in COMPONENTS.items():
     base = os.path.join(ROOT, comp)
     index = os.path.join(base, 'WORKFLOW.md')
@@ -173,6 +190,7 @@ for comp, prefix in COMPONENTS.items():
                 seen[fid] = rel
                 ok()
             where[fid] = (os.path.relpath(p, base), f)
+            every.setdefault(fid, (rel, f))
             if f['retired']:
                 continue
             if f['raw_state'] is None:
@@ -207,6 +225,35 @@ for comp, prefix in COMPONENTS.items():
     for fid in sorted(rows):
         if fid not in where:
             bad(f'{label}: the index table lists {fid} and no file of the component defines it')
+
+OWN = set(COMPONENTS.values())
+
+
+def prefix(fid):
+    return fid.rsplit('-F', 1)[0]
+
+
+for fid, (rel, f) in sorted(every.items()):
+    if f['retired']:
+        continue
+    at = f'{rel}:{f["line"]}'
+    for other in f['links']:
+        if prefix(other) not in OWN:
+            continue          # another repository: `workflow-index.sh check` owns that
+        if other not in every:
+            bad(f'{at}: {fid} names {other} in `Implicados:` and no document of the hub defines it')
+        elif every[other][1]['retired']:
+            bad(f'{at}: {fid} names {other} in `Implicados:` and that flow is retired')
+        elif fid not in every[other][1]['links']:
+            bad(f'{at}: {fid} names {other} in `Implicados:` and {other} does not name it back')
+        else:
+            ok()
+    if f['impl_value'] == 'ninguno' and f['pending']:
+        bad(f'{at}: {fid} says `Implicados: ninguno` and still carries a `Pendiente de enlazar:` line')
+    elif f['impl_value'] == 'pendiente' and not f['pending']:
+        bad(f'{at}: {fid} says `Implicados: pendiente` and no `Pendiente de enlazar:` line says for what')
+    else:
+        ok()
 
 for f in fails:
     print('  FAIL ' + f)

@@ -24,8 +24,7 @@ Sale: la aplicación `com.erplora.app` con su versión (la de `tauri.conf.json`,
 Si falla: Windows muestra su aviso de editor desconocido; macOS, el de desarrollador no verificado;
 Android sin Play no hay camino de instalación del cliente. En Linux solo hay `.deb` y AppImage de
 QA, sin canal anunciado.
-Implicados: HUB_SHELL-F138
-Pendiente de enlazar: saas — descarga `/app/download/<plataforma>/` y su redirección a la tienda
+Implicados: HUB_SHELL-F138, REC_ALTA-F16, SAAS_PUBLIC-F33
 QA: qa-hub-android Fase 0
 
 ### HUB_APP-F02 Primer arranque: entrar y abrir el negocio
@@ -35,7 +34,7 @@ Pantalla: Ventana de ERPlora
 Pasos:
 1. Abre la aplicación recién instalada: no recuerda ningún negocio, así que carga la página de entrada
    de erplora.com (`/shell/`).
-2. Inicia sesión o crea la cuenta (el negocio gratuito se crea al registrarse).
+2. Inicia sesión o crea la cuenta. Registrarse no crea el negocio: hace falta un paso más en erplora.com, «¿Cómo se llama tu negocio?» o, desde «Abre tu hub» sin ninguno, «Crear hub gratuito» → «Crea tu hub» con su nombre.
 3. Con un solo negocio listo, entra solo; con varios, elige uno en «Abre tu hub» (cada tarjeta enseña
    su rol y, si aún se despliega, «Preparando tu hub… esta página se refresca sola»).
 4. El SaaS lleva la ventana al negocio con la marca `?shell=1`. La aplicación recuerda **el origen** de
@@ -51,8 +50,7 @@ Si falla: un destino que no es de la plataforma (el marcador viene de un enlace 
 recuerda** y no queda rastro (la aplicación no instala ningún destino para sus registros); un `hub.url` editado a mano o de una versión sin el
 filtro se revalida al leerlo y, si no vale, se arranca en el SaaS. Sin red, HUB_APP-F11. Un negocio con
 dominio propio no tiene hardware en la aplicación (ver «Qué puede hacer cada página»).
-Implicados: HUB_SHELL-F02
-Pendiente de enlazar: saas — pantalla «Abre tu hub» (`/shell/`, `/shell/open/<id>/`, `?choose=1`) y alta del negocio gratuito
+Implicados: HUB_SHELL-F02, REC_ALTA-F16, SAAS_AUTH-F19, SAAS_DASHBOARD-F02, SAAS_DASHBOARD-F07, SAAS_PUBLIC-F78
 QA: qa-hub-android Fase 0, qa-hub-android Fase 1
 
 ### HUB_APP-F03 Abrir un negocio desde un enlace
@@ -76,8 +74,7 @@ hace nada, en silencio y a propósito: el que decide qué mostrar es el navegado
 negocio inexistente sí se acepta (se valida la forma, no la existencia). **Cualquier página o correo puede mandar este enlace y cambiar el negocio recordado del mostrador sin
 preguntar** (`lib.rs:2086-2098`, `1118-1127`). Un enlace `erplora://notice` no es una navegación: es el
 clic en un aviso (HUB_APP-F25).
-Implicados: HUB_SHELL-F19
-Pendiente de enlazar: saas — lanzadera «Abrir terminal» y su enlace visible de reserva
+Implicados: HUB_SHELL-F19, SAAS_DASHBOARD-F06
 QA: ninguno
 
 ### HUB_APP-F04 Cambiar de negocio
@@ -99,8 +96,7 @@ dispositivo): reasignar una caja a otro local no obliga a desinstalar (en Androi
 destruiría).
 Si falla: sin ventana no falla, simplemente no navega. Defecto de seguridad `[SEG]`: ver «Dudas abiertas» y los huecos. Con un solo negocio, sin `?choose=1` el SaaS lo
 volvería a abrir al instante; por eso este camino lo lleva.
-Implicados: HUB_SHELL-F16
-Pendiente de enlazar: saas — lista de negocios `?choose=1`
+Implicados: HUB_SHELL-F16, SAAS_DASHBOARD-F07
 QA: qa-hub-android Fase 1
 
 ### HUB_APP-F05 Olvidar un negocio que ya no existe
@@ -118,11 +114,10 @@ Pasos:
 Entra: el `hub.url` y la respuesta del negocio.
 Sale: el fichero borrado y la ventana en el SaaS. La asimetría es a propósito: olvidar de más obliga a
 rehacer el alta; olvidar de menos deja una pantalla fea que se arregla sola.
-Si falla: sin red no olvida nada (HUB_APP-F11). Con un enlace de apertura (HUB_APP-F03) no corre el
+Si falla: sin red no olvida nada (HUB_APP-F11). Sin confirmar: qué contesta hoy la dirección de un negocio pausado (servicio a cero réplicas) desde que el borde dejó Cloudflare; si fuera un 404, la aplicación lo olvidaría como si se hubiera borrado. Con un enlace de apertura (HUB_APP-F03) no corre el
 chequeo, para no llevarse por delante lo que se acaba de pedir. Se ve el 404 un instante antes del
 SaaS.
-Implicados: pendiente
-Pendiente de enlazar: saas — borrado de un negocio (purga) que provoca el 404/410
+Implicados: SAAS_DASHBOARD-F23, SAAS_DASHBOARD-F24
 QA: qa-hub-android Fase 1
 
 ### HUB_APP-F06 Saber qué equipo es este
@@ -187,7 +182,7 @@ Sale: la ventana en la pantalla de espera o de vuelta; sin datos guardados.
 Si falla: si no puede construir la comprobación se queda en la pantalla de espera sin dejar rastro del motivo. Con red pero con el servidor del negocio caído y el borde contestando, no hay pantalla
 de espera (es lo que el borde sirva). No es la franja «sin conexión» de dentro del hub (eso lo pinta el
 hub, `HUB_SHELL`).
-Implicados: HUB_SHELL-F13, HUB_SHELL-F14
+Implicados: HUB_SHELL-F13, HUB_SHELL-F14, REC_ALTA-F16
 QA: qa-hub-android Fase 4
 
 ### HUB_APP-F12 En la copia de Google Play, solo páginas del SaaS que no cobran
@@ -207,6 +202,5 @@ registro).
 Si falla: el aviso va en español o inglés según el dispositivo. El aviso **no nombra otro sitio al que
 ir** (hacerlo sería lo que Play prohíbe). Los negocios, la pantalla de impresión y el resto de copias
 (Store, instalador) siguen todo como antes.
-Implicados: pendiente
-Pendiente de enlazar: saas — páginas del SaaS dentro de la aplicación (marca «en la aplicación», sin puertas web)
+Implicados: SAAS_DASHBOARD-F209, SAAS_PUBLIC-F74
 QA: qa-hub-android Fase 4

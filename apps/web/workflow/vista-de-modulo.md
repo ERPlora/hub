@@ -130,20 +130,19 @@ Implicados: ninguno
 QA: ninguno
 
 ### HUB_SHELL-F46 Ver el plan de una app de pago en su pestaña «Plan»
-Estado: parcial — si erplora.com no contesta, la pestaña no lo dice: pinta el plan gratuito como «Activo» (o «Sin plan» en una app sin plan gratuito); y la consulta va directa a erplora.com con la cuenta de la persona, así que con una sesión de PIN (que no lleva cuenta de erplora.com) erplora.com la rechaza y cae siempre en ese mismo caso
+Estado: parcial — una suscripción cancelada que sigue dentro del periodo pagado sale como «Activo» con «Se renueva el …», porque erplora.com la contesta `active`; para una app sin listar o retirada, «se gestionan desde tu cuenta de ERPlora» manda a una página que contesta 404; si erplora.com no contesta, la pestaña no lo dice: pinta el plan gratuito como «Activo» (o «Sin plan» en una app sin plan gratuito); y la consulta va directa a erplora.com con la cuenta de la persona, así que con una sesión de PIN (que no lleva cuenta de erplora.com) erplora.com la rechaza y cae siempre en ese mismo caso
 Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo › Plan
 Pasos:
 1. En una app que declara planes, la persona toca «Plan».
-2. Arriba, «Tu plan» con «Comprobando tu suscripción…» y después el estado: «Activo», «En prueba», «Pago pendiente», «Cancelado», «Caducado» o «Sin plan», con su línea: «Se renueva el …», «Prueba hasta el …», «Se cancela el …», «Estás en {plan}, el plan con el que entra todo el mundo.», «Incluido en tu plan {plan}.» o «Tu suscripción ha caducado. Sigues en {plan}.».
-3. Siempre: «Los planes de este módulo se gestionan desde tu cuenta de ERPlora, en erplora.com.».
+2. Arriba, «Tu plan» con «Comprobando tu suscripción…» y después el estado: «Activo», «En prueba», «Pago pendiente», «Cancelado», «Caducado» o «Sin plan», con su línea: «Se renueva el …», «Prueba hasta el …», «Se cancela el …» (que no se ve nunca con una fecha por venir: erplora.com contesta `active` a una suscripción cancelada mientras dura el periodo pagado, y `expired` cuando acaba), «Estás en {plan}, el plan con el que entra todo el mundo.», «Incluido en tu plan {plan}.» o «Tu suscripción ha caducado. Sigues en {plan}.».
+3. Siempre: «Los planes de este módulo se gestionan desde tu cuenta de ERPlora, en erplora.com.». Para una app sin listar o retirada es falso: la página de la cuenta y la ficha de erplora.com contestan 404 a una app fuera del catálogo; solo queda cancelarla por la API del hub mientras siga publicada.
 4. Debajo, una tarjeta por plan de la app con su nombre traducido, su precio («Gratis», «/mes», «/año») y lo que incluye («Incluye …», «{n} días de prueba», «… por unidad extra»); la del plan actual va destacada con «Tu plan». Si el nivel lo da el plan del hub, las tarjetas no llevan precio.
 5. Una app sin planes: «Este módulo no ofrece planes de pago.».
 Entra: los planes del `billing` del `module.json` y sus traducciones; el estado de la suscripción de esa app para este hub, pedido a erplora.com con la cuenta de la persona y el hub (`/api/v1/hub/device/module-subscription/`).
 Sale: nada.
 Si falla: ver el estado. Al volver a la ventana (o recuperar el foco) se vuelve a preguntar. Un plan que erplora.com nombra y esta versión de la app no conoce no se marca en ninguna tarjeta.
-Implicados: HUB-F162, HUB-F272, WHATSAPP_INBOX-F13
-Pendiente de enlazar: saas — estado de la suscripción de una app para un hub (`module-subscription`)
+Implicados: HUB-F162, HUB-F272, WHATSAPP_INBOX-F13, SAAS-F01, SAAS_DASHBOARD-F62, SAAS_DASHBOARD-F112, SAAS_DASHBOARD-F116
 QA: ninguno
 
 ### HUB_SHELL-F47 Ver lo consumido este mes de lo que incluye el plan
@@ -171,7 +170,7 @@ Pasos:
 Entra: el hub y la app; un pase de un solo uso para entrar en erplora.com.
 Sale: nada en el hub. El hub no vende: no hay botón de comprar ni de cancelar en la app.
 Si falla: «No se pudo abrir la gestión del plan. Inténtalo de nuevo.». En la app de Google Play los dos botones no aparecen (la línea «se gestionan desde tu cuenta…» sí).
-Implicados: HUB-F142, HUB_APP-F29
+Implicados: HUB-F142, HUB_APP-F29, SAAS_AUTH-F21, SAAS_DASHBOARD-F108
 QA: ninguno
 
 ### HUB_SHELL-F49 Ver una app de pago bloqueada
@@ -186,7 +185,7 @@ Pasos:
 Entra: la lista de apps bloqueadas del plan del hub (HUB-F162), que el shell solo pide si la sesión trae cuenta de erplora.com; sin ella (PIN, o tras un relevo con PIN) el shell no bloquea nada.
 Sale: nada; los datos de la app no se tocan.
 Si falla: el hub rechaza igualmente cada lectura y orden de la app (402), aunque la pantalla no lo sepa; con sesión de PIN eso es lo que ve la persona, con la frase interna del hub «el módulo `x` no está incluido en el entitlement vigente del hub», sin traducir.
-Implicados: HUB-F162
+Implicados: HUB-F162, SAAS_DASHBOARD-F116
 QA: ninguno
 
 ### HUB_SHELL-F50 Ver una pantalla bloqueada hasta que otra app cumpla su condición

@@ -98,7 +98,7 @@ resultados no se sabe si la impresora está apagada, en otra red o tras un corta
 con la dirección que sale en la hoja de la impresora (HUB_PERIPHERALS-F02). Si el mDNS no arranca,
 queda el barrido. Una impresora que solo se anuncia por IPP aparece con el puerto del anuncio (631),
 no el 9100.
-Implicados: HUB_APP-F07, HUB_APP-F09, HUB_APP-F13, HUB_SHELL-F140, PRINTING-F02
+Implicados: HUB_APP-F07, HUB_APP-F09, HUB_APP-F13, HUB_SHELL-F140, PRINTING-F02, REC_ALTA-F17
 QA: qa-hub §8, qa-hub-android §15
 
 ### HUB_PERIPHERALS-F02 Añadir una impresora de red por su IP
@@ -119,7 +119,7 @@ Si falla: dirección que no es IPv4 o puerto 0, se rechaza sin llamar a nadie (�
 válida…» en la pantalla de Impresión); si nadie contesta en 3 s, «Ninguna impresora ha respondido en
 {dirección}…» y no se guarda. Contestar en el 9100 no prueba que sea una térmica: una láser de oficina
 también contesta, y la impresora se guarda como «sin clasificar».
-Implicados: HUB_APP-F14, PRINTING-F03
+Implicados: HUB_APP-F14, PRINTING-F03, REC_ALTA-F17
 QA: qa-hub-android §15
 
 ### HUB_PERIPHERALS-F03 Encontrar las impresoras USB del ordenador
@@ -222,7 +222,7 @@ sin los datos que exige (emisor, número, cliente, NIF del cliente, desglose de 
 impresora apagada, sin papel o fuera de la red, tras los 3 intentos solo se anota; la comanda o el
 tique no salen y ni el cajero ni la cocina reciben aviso. Es lo que el guion de QA (§10, «impresora
 sin papel/offline: el trabajo queda pendiente y la pantalla informa») no consigue hoy.
-Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12
+Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_ALTA-F17
 
 QA: qa-hub-restaurant §16, qa-hub §8
 

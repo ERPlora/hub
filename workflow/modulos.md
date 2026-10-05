@@ -76,9 +76,9 @@ Pasos:
 Entra: el nombre de la orden y su contenido (`POST /api/command` desde el hub; `POST /api/v1/{módulo}/c/{orden}` con llave si el módulo la marca `expose_api`); la aprobación del responsable, si la hay, en la cabecera `X-Elevation-Token`, nunca dentro del contenido.
 Sale: lo que la orden escribe en las tablas del módulo; una fila por aviso emitido en la cola de avisos, en la misma transacción (los entrega después la cola a las apps que escuchan, cada una en su propia transacción; si una falla, la orden sigue hecha y el aviso acaba en avisos caídos); el aviso en vivo, solo si se guardó; la marca de quién aprobó (`approved_by`) junto a quién pidió. Las órdenes públicas que cuentan como actividad del negocio se anotan en el registro de actividad. Repetir una orden la ejecuta otra vez: lo único que no se repite es un aviso declarado con clave de duplicado y la entrega a cada app que escucha. **Sello del primer registro en producción**: solo lo pone una orden SQL que declara en su `emit` el aviso que abre la cadena fiscal; una orden con manejador no sella nunca, y la factura normal (`invoice.created`) la devuelve un manejador, así que hoy una venta no sella (defecto, leído en el código sin ejecutar).
 En este mismo documento se apoya en: HUB-F50 (Dejar un aviso en la cola al guardar una orden), HUB-F51 (Entregar un aviso a los módulos que lo escuchan), HUB-F52 (Reintentar un aviso que un módulo no pudo procesar), HUB-F53 (Mandar a «Eventos caídos» al momento lo que reintentar no arregla), HUB-F89 (Paso «Hacer algo»: ejecutar la acción de un módulo), HUB-F98 (Conceder, limitar y retirar los permisos de una automatización), HUB-F154 (Escribir una norma propia del negocio), HUB-F254 (Registrar la actividad del negocio para el SaaS), HUB-F308 (Volver a pruebas mientras no se haya declarado nada en producción), HUB-F313 (En producción, sin vía no se cobra), HUB-F314 (Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena), HUB-F315 (Clavar a pruebas un hub de demostración), HUB-F317 (No emitir un documento fiscal sin la identidad del negocio).
+En este mismo documento se apoya en: HUB-F313 (En producción, sin vía no se cobra), HUB-F315 (Clavar a pruebas un hub de demostración), HUB-F317 (No emitir un documento fiscal sin la identidad del negocio).
 Si falla: cada puerta contesta con su código estable (HUB-F14) y nada queda escrito. Una cascada de avisos de más de 16 niveles se corta (`event_loop`). Un fallo de base de datos sale como «the request could not be completed — the hub recorded the details» y el detalle queda en el registro del servidor.
 Implicados: HUB_SHELL-F190
-Pendiente de enlazar: hub — HUB, perfil fiscal: los candados fiscales (identidad, certificado, vía hasta la AEAT, periodo cerrado, demo en pruebas)
 QA: qa-hub §11, BD-09
 
 ### HUB-F04 Comprobar el contenido de una orden contra su esquema y rellenar lo que falta
@@ -186,7 +186,7 @@ Pasos:
 Entra: el código del manejador del paquete instalado; topes ajustables por despliegue (`HUB_WASM_MEMORY_MAX_MB`, `HUB_WASM_FUEL`, `HUB_WASM_TIMEOUT_MS`).
 Sale: lo mismo que HUB-F03. Un aviso que la orden declara y el manejador también emite sale una sola vez, con el contenido del manejador.
 Si falla: un rechazo de negocio sale con el código del módulo (409), si es de su espacio y está en su catálogo; si no, es un fallo del módulo. Pasarse de instrucciones da `wasm_budget_exceeded` y del tiempo `wasm_timeout`: nada cambia y la pantalla dice «Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.» o «Esta acción ha tardado demasiado en terminar. No se ha cambiado nada: prueba con menos elementos o un rango más corto.». Si se agota el margen del hub (el tiempo del manejador más 2 s), sale un fallo genérico redactado, no `wasm_timeout`. Una respuesta de más de 64 KiB, una operación de otro módulo o un aviso rechazado (paso 5) tumban la orden entera sin escribir nada. El código WASM se compila una vez por versión instalada y se precalienta al arrancar.
-Implicados: ninguno
+Implicados: CART_CHECKOUT-F02, CART_CHECKOUT-F08
 QA: ninguno
 
 ### HUB-F11 Darle al manejador los datos de otros módulos antes de ejecutar
@@ -201,7 +201,7 @@ Pasos:
 Entra: las consultas declaradas y el contenido de la orden.
 Sale: las filas de cada lectura dentro del contexto del manejador.
 Si falla: una lectura obligatoria que no se resuelve aborta con `read_unavailable` y el motivo (app no instalada, apagada o consulta fallida); la pantalla dice, según el motivo, «Falta la app «…» y esta acción la necesita. Pide a un administrador que la instale desde Apps.», «La app «…» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.» o «No se pudo leer un dato que esta acción necesita, así que no se ha hecho nada. Inténtalo de nuevo y avisa a un administrador si sigue pasando.». Una lectura obligatoria fuera de las dependencias declaradas se omite con un aviso en el registro.
-Implicados: SALES-F01, TAXES-F19
+Implicados: SALES-F01, TAXES-F19, CART_CHECKOUT-F03
 QA: ninguno
 
 ### HUB-F12 Ejecutar el motor propio de un módulo de confianza
@@ -306,7 +306,7 @@ Pasos:
 Entra: importes, tasas y cantidades de cada manejador. El hub no le inyecta la moneda ni sus decimales: cada módulo trabaja en unidades mínimas sin saber cuáles son.
 Sale: los importes que cada módulo guarda y declara.
 Si falla: un decimal que llegue donde se espera un importe se redondea, nunca se trunca. Cambiar el redondeo en el hub no llega a un módulo hasta que ese módulo se vuelve a compilar y publicar (lo enlaza al compilarse); el motor de VeriFactu formatea sus importes por su cuenta (HUB_VERIFACTU).
-Implicados: INVOICE-F01, SALES-F01, TAXES-F18
+Implicados: INVOICE-F01, SALES-F01, TAXES-F18, CART_CHECKOUT-F02
 QA: L-08
 
 ## Cobertura contra la referencia

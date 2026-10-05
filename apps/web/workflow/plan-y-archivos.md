@@ -42,8 +42,7 @@ Pasos:
 Entra: las facturas del usuario que da erplora.com con la sesión de la cuenta (el hub no pide filtrar por negocio; los estados de erplora.com son borrador, pendiente, pagada, fallida y devuelta, y la pantalla solo conoce cinco de otro vocabulario); el PDF se pide al descargar. Cualquiera que haya entrado con su cuenta ve las suyas.
 Sale: nada guardado en el hub. El hub no emite ni cobra: es información del plan.
 Si falla: «No pudimos cargar la facturación» con «Comprueba la conexión e inténtalo de nuevo. Puedes seguir utilizando el Hub.» y «Reintentar»; si falla la descarga, un aviso (con la frase propia de la app instalada cuando no puede guardar archivos).
-Implicados: HUB_APP-F30
-Pendiente de enlazar: saas — facturas y suscripciones del negocio en el panel de erplora.com
+Implicados: HUB_APP-F30, REC_ALTA-F20, SAAS-F01, SAAS_DASHBOARD-F119, SAAS_DASHBOARD-F135
 QA: ninguno
 
 ### HUB_SHELL-F127 Ver las suscripciones y dónde se gestionan los pagos
@@ -55,11 +54,10 @@ Pasos:
 2. Lee arriba «Los cambios de plan se gestionan desde tu cuenta de ERPlora, en erplora.com.» y la tabla: «Suscripción», «Precio» (importe y ciclo, por ejemplo «/mes»), «Renueva» y «Estado». Sin ninguna: «No hay suscripciones activas».
 3. Al volver a la ventana o a la pestaña del navegador, se recargan solas: contratar o cancelar en erplora.com se ve al volver.
 4. En **Pagos** solo hay un aviso: «Los métodos de pago se gestionan desde tu cuenta de ERPlora, en erplora.com.».
-Entra: las suscripciones de apps de la persona que da erplora.com (importe, periodo, estado, fin de periodo); la pantalla busca otros nombres (`plan_name`, `plan_price`, `billing_cycle`, `cancel_at_period_end`) y los estados de erplora.com (`active`, `past_due`, `cancelled`, `unpaid`) no son de factura.
+Entra: las suscripciones de apps de la persona que da erplora.com (importe, periodo, estado, fin de periodo); la pantalla busca otros nombres (`plan_name`, `plan_price`, `billing_cycle`, `cancel_at_period_end`) y los estados de erplora.com (`active`, `past_due`, `cancelled`, `unpaid`) no son de factura. erplora.com manda además `currency`, sacada de la moneda de la persona (con «USD» si no tiene), que la pantalla no lee: pinta siempre euros.
 Sale: nada guardado. No hay botón para comprar, cambiar o cancelar: se hace fuera.
 Si falla: lo mismo que HUB_SHELL-F126 (cuenta no iniciada, o error con «Reintentar»).
-Implicados: pendiente
-Pendiente de enlazar: saas — facturas y suscripciones del negocio en el panel de erplora.com
+Implicados: SAAS_DASHBOARD-F119
 QA: ninguno
 
 ### HUB_SHELL-F128 Ver cuánto de los límites del plan se está usando
@@ -91,8 +89,7 @@ Pasos:
 Entra: la distribución de la copia, la sesión (cuenta o PIN) y el identificador del negocio.
 Sale: nada guardado en el hub; el pase lo pide el hub a erplora.com (HUB-F142).
 Si falla: lo dicho en el paso 4; nunca un botón que no hace nada.
-Implicados: HUB-F142, HUB_APP-F29
-Pendiente de enlazar: saas — emitir y canjear el pase de un solo uso hacia el panel
+Implicados: HUB-F142, HUB_APP-F29, REC_ALTA-F20, SAAS_AUTH-F21, SAAS_DASHBOARD-F96, SAAS_DASHBOARD-F201
 QA: L-17
 
 ### HUB_SHELL-F130 Ver los archivos del negocio

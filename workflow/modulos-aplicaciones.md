@@ -51,11 +51,10 @@ Pasos:
 5. Guarda una copia del paquete en la base del propio hub, avisa a ERPlora de que está instalada e indexa sus textos para el asistente.
 6. Las pantallas reciben `module.installed` y refrescan el menú; la respuesta dice qué dependencias se instalaron de paso.
 Entra: `POST /api/modules/request-install` con sesión de administrador y la credencial de máquina del hub; el catálogo y los paquetes de ERPlora. También instalan por aquí la importación de una plantilla (Ajustes › Datos y copias) y la reposición del arranque (HUB-F25).
-Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Durante todo el proceso el hub mantiene su candado de escritura: cada petición (consultas, órdenes, menú, autenticación, `/readyz`) espera; cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando retiene el hub sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`).
+Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Durante todo el proceso el hub mantiene su candado de escritura: cada petición (consultas, órdenes, menú, autenticación, `/readyz`) espera; cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando retiene el hub sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`); y por esa vía la descarga de erplora.com no mira el interruptor de corte de la app (solo la retirada y el derecho de uso): una app cortada se instala, y la bloquea después el permiso firmado (HUB-F162).
 En este mismo documento se apoya en: HUB-F62 (Ejecutar las tareas programadas de los módulos), HUB-F104 (Servir las recetas de fábrica de los módulos), HUB-F235 (Importar un fichero o una plantilla).
 Si falla: dependencia de pago sin contratar, `install_blocked` (409) con lo que hay que comprar; versión inexistente o app fuera del catálogo del hub, 404; firma rechazada, `install_bad_signature` (403); un paquete que no pasa la validación o una migración que falla, `install_runtime_failed` (422) —el motivo concreto se pierde en el código—, y lo que ya se aplicó (migraciones, filas de semilla, dependencias instaladas de paso, declaración del régimen fiscal) se queda; la app necesita un hub más nuevo, `core_version_too_old` (422): «Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.»; ERPlora no contesta a tiempo, «ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.» (424). El sobre de error es `{ok: false, error: "<frase>", code}`, con el código en la raíz. Sin sesión de administrador, 401 (también con sesión que no es de administrador). Ningún fallo de instalación sale como 5xx. Fallar al guardar la copia, al avisar a ERPlora o al indexar no deshace la instalación.
-Implicados: HUB_SHELL-F109, HUB_SHELL-F110, HUB_SHELL-F111, HUB_SHELL-F112, HUB_SHELL-F113, HUB_SHELL-F115
-Pendiente de enlazar: saas — marketplace: el plan de instalación, las versiones, la descarga y el registro de la instalación
+Implicados: HUB_SHELL-F109, HUB_SHELL-F110, HUB_SHELL-F111, HUB_SHELL-F112, HUB_SHELL-F113, HUB_SHELL-F115, REC_ALTA-F08, SAAS_DASHBOARD-F192, SAAS_PUBLIC-F03, SAAS_PUBLIC-F05, SAAS_PUBLIC-F16, SAAS_PUBLIC-F17, SAAS_PUBLIC-F18, SAAS_PUBLIC-F19
 QA: BD-03
 
 ### HUB-F20 Rechazar un paquete que rompe las reglas del hub
@@ -70,7 +69,7 @@ Pasos:
 Entra: el paquete ya descargado y verificado.
 Sale: si se rechaza en los pasos 1–3, nada salvo la declaración del régimen fiscal, que se escribe antes de comprobar el nombre `hub` y las dependencias; si se rechaza en el paso 4, quedan las migraciones y la semilla ya aplicadas. Si pasa, sigue la instalación. Los avisos del manifiesto quedan en el registro y en la lista de apps (`manifest_warnings`).
 Si falla: por la puerta de desarrollo (HUB-F30), el motivo con su código estable (`role_grants_admin`, `fiscal.provider_not_free`, `missing_dependency`, `dependency_too_old`…); desde el catálogo y al actualizar, todos se aplanan a `install_runtime_failed` salvo `core_version_too_old`. Si era una actualización, el hub sigue sirviendo la versión anterior.
-Implicados: HUB_SHELL-F91, HUB_SHELL-F114
+Implicados: HUB_SHELL-F91, HUB_SHELL-F114, SAAS_PUBLIC-F02
 QA: ninguno
 
 ### HUB-F21 Aplicar las migraciones de un módulo con su guarda
@@ -119,7 +118,7 @@ Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial 
 Sale: la app en la versión nueva (o en la de antes), la línea del historial y los avisos en vivo.
 En este mismo documento se apoya en: HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
 Si falla: app no instalada, `update_not_installed` (404); dependencia de pago, `install_blocked` (409); la nueva falla y vuelve la anterior: respuesta correcta con el aviso `module.update_failed_kept_previous`; fallan las dos (en la práctica, solo si alguien quita la app entre los dos intentos): `module.update_lost` (424), con la versión en lugar del nombre de la app en `error`, y la pantalla dice «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.». Las migraciones que la versión nueva ya aplicó se quedan.
-Implicados: HUB_SHELL-F116, HUB_SHELL-F117, HUB_SHELL-F142
+Implicados: HUB_SHELL-F116, HUB_SHELL-F117, HUB_SHELL-F142, SAAS_PUBLIC-F08, SAAS_PUBLIC-F16
 QA: BD-03
 
 ### HUB-F24 Consultar qué actualizaciones y versiones hay
@@ -133,7 +132,7 @@ Pasos:
 Entra: `GET /api/modules/updates` (cualquier sesión) y `GET /api/modules/:id/versions` (sesión de administrador).
 Sale: nada guardado.
 Si falla: sin credencial de máquina o con ERPlora sin contestar, cada app sale como «no lo sé» (`checked: false`), nunca como «al día»; la lista de versiones sale vacía. Si falla la lectura de la base, `/api/modules/updates` contesta 500. Solo se consultan las apps activas.
-Implicados: HUB_SHELL-F60, HUB_SHELL-F116, HUB_SHELL-F118, HUB_SHELL-F119, HUB_SHELL-F120, HUB_SHELL-F143
+Implicados: HUB_SHELL-F60, HUB_SHELL-F116, HUB_SHELL-F118, HUB_SHELL-F119, HUB_SHELL-F120, HUB_SHELL-F143, SAAS_DASHBOARD-F176, SAAS_DASHBOARD-F183, SAAS_DASHBOARD-F184, SAAS_PUBLIC-F09, SAAS_PUBLIC-F17
 QA: BD-03
 
 ### HUB-F25 Reponer las aplicaciones al arrancar y actualizarlas solas
@@ -148,8 +147,8 @@ Pasos:
 Entra: `hub_module`, la carpeta de descargas, el catálogo y `hub_module_package`.
 Sale: el hub sirviendo las mismas apps (o versiones más nuevas), las líneas del historial de actualizaciones y, si falta alguna, el aviso de arranque incompleto.
 En este mismo documento se apoya en: HUB-F161 (Decir si el hub está listo para servir), HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
-Si falla: un hub sin credencial de máquina no puede volver a descargar y depende de la copia local; una app instalada antes de que existiera la copia y sin catálogo queda fuera y la salud del hub lo dice.
-Implicados: HUB_SHELL-F142
+Si falla: un hub sin credencial de máquina no puede volver a descargar y depende de la copia local; si la versión que tenía ya no se sirve en erplora.com (podada, SAAS_PUBLIC-F07, o en cuarentena, SAAS_PUBLIC-F09: la descarga contesta 404), la re-descarga y la vuelta atrás fallan y también depende de la copia guardada en la base; una app instalada antes de que existiera la copia y sin catálogo queda fuera y la salud del hub lo dice.
+Implicados: HUB_SHELL-F142, SAAS_DASHBOARD-F31, SAAS_PUBLIC-F01, SAAS_PUBLIC-F07, SAAS_PUBLIC-F08, SAAS_PUBLIC-F16, SAAS_PUBLIC-F18, SAAS_PUBLIC-F36
 QA: ninguno
 
 ### HUB-F26 Seguir lo que otra copia del hub instaló, actualizó, apagó o quitó
@@ -165,7 +164,7 @@ Pasos:
 Entra: `hub_module` y `HUB_MODULE_RECONCILE_SECS`.
 Sale: el registro de esta copia igual que la base.
 Si falla: una versión que no se puede cargar no se reintenta hasta que la base anote otra; la app sigue con lo que tenía.
-Implicados: ninguno
+Implicados: SAAS_PUBLIC-F16
 QA: ninguno
 
 ### HUB-F27 Activar una aplicación
@@ -213,7 +212,7 @@ Pasos:
 Entra: `POST /api/modules/:id/uninstall` con sesión de administrador y, opcionalmente, `{"force": true}`.
 Sale: la app fuera del hub. **Sus tablas y sus datos se quedan** en la base, y también su carpeta en la caché de descargas, sus permisos de host concedidos y su declaración fiscal. ERPlora no recibe aviso de la desinstalación.
 Si falla: dependientes, `has_dependents` (409) con la lista en `dependents`; motor con trabajo pendiente o último proveedor fiscal, su código (409); nada cambia.
-Implicados: HUB_SHELL-F124, HUB_SHELL-F125, VERIFACTU-F32
+Implicados: HUB_SHELL-F124, HUB_SHELL-F125, VERIFACTU-F32, SAAS_PUBLIC-F19
 QA: L-14
 
 ### HUB-F30 Instalar un módulo desde una carpeta en modo desarrollo
@@ -257,7 +256,7 @@ Entra: `GET /api/modules/:id/capabilities` (cualquier sesión) y `PUT` del mismo
 Sale: `_module_capability_grants`. Sin el permiso, el motor propio de la app no corre (HUB-F12), sus recordatorios no salen y su paso de puesta en marcha sigue pendiente (HUB-F35). Una copia de seguridad del mismo hub los vuelve a conceder al restaurarse; una plantilla, no.
 En este mismo documento se apoya en: HUB-F58 (Reenviar solo lo que un permiso había rechazado, al concederlo).
 Si falla: un permiso desconocido o no declarado, error. Varios cambios en un mismo guardado no son atómicos: si uno falla, los anteriores ya quedaron; un valor que no sea verdadero o falso se toma como «retirar». Si los avisos no se pueden volver a encolar, se quedan en avisos caídos y se dice en el registro. Al restaurar una copia, quién concedió queda como `blueprint`.
-Implicados: FLOWS-F01, HUB_SHELL-F29, HUB_SHELL-F109, HUB_SHELL-F115, HUB_SHELL-F167, HUB_SHELL-F168, HUB_SHELL-F169
+Implicados: FLOWS-F01, HUB_SHELL-F29, HUB_SHELL-F109, HUB_SHELL-F115, HUB_SHELL-F167, HUB_SHELL-F168, HUB_SHELL-F169, REC_ALTA-F10
 QA: BD-03
 
 ### HUB-F33 Leer y guardar los ajustes de un módulo

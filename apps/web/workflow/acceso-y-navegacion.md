@@ -41,20 +41,19 @@ propio de esta área:
 ## Flujos
 
 ### HUB_SHELL-F01 Entrar con la cuenta de erplora.com
-Estado: parcial — la pantalla no distingue «ya no eres miembro de este negocio» ni «un administrador te dio de baja» de unas credenciales erróneas: las tres dicen «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.»; la casilla «Confiar en este dispositivo» no cambia nada en el hub (todo acceso con cuenta vuelve de confianza el dispositivo): desmarcarla solo evita el paso «Crea tu PIN» y que este navegador recuerde a la persona, y su ⓘ promete lo contrario; [SEG] si el acceso falla después de que erplora.com acepte la contraseña, sus tokens se quedan en el navegador y los usa la sesión siguiente
+Estado: parcial — la verificación en dos pasos dice «Hemos enviado un código de un solo uso a tu email», pero erplora.com no manda nada: el código está en la app autenticadora de la persona (o es uno de recuperación); la pantalla no distingue «ya no eres miembro de este negocio» ni «un administrador te dio de baja» de unas credenciales erróneas: las tres dicen «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.»; la casilla «Confiar en este dispositivo» no cambia nada en el hub (todo acceso con cuenta vuelve de confianza el dispositivo): desmarcarla solo evita el paso «Crea tu PIN» y que este navegador recuerde a la persona, y su ⓘ promete lo contrario; [SEG] si el acceso falla después de que erplora.com acepte la contraseña, sus tokens se quedan en el navegador y los usa la sesión siguiente
 Actor: administrador, responsable, empleado
 Pantalla: Acceso
 Pasos:
 1. Abre el hub sin sesión: sale **Acceso** con el logo del negocio y «Entra en tu negocio». Si el dispositivo ofrece PIN, arriba hay dos pestañas, «PIN» y «Email»; si no, solo el formulario.
 2. Escribe «Email» y «Contraseña» (el ojo muestra la contraseña). En un dispositivo compartido sale marcada la casilla «Confiar en este dispositivo», con un botón ⓘ que explica «Acceso por PIN»; en uno marcado como personal, en su lugar, «Este dispositivo está configurado como personal: la sesión se queda abierta y nunca pide PIN. Un administrador puede cambiarlo en Ajustes › General.».
 3. Pulsa «Entrar» (un círculo gira mientras trabaja). O pulsa «Continuar con Google»: el navegador va a erplora.com, que pide la cuenta de Google y vuelve al hub ya identificado.
-4. Si la cuenta pide verificación, la tarjeta cambia a «Verifica que eres tú»: «Hemos enviado un código de un solo uso a tu email. Introdúcelo para continuar.». Escribe el «Código de verificación» y pulsa «Verificar»; «Volver» regresa al formulario.
+4. Si la cuenta pide verificación, la tarjeta cambia a «Verifica que eres tú»: «Hemos enviado un código de un solo uso a tu email. Introdúcelo para continuar.». Es falso: erplora.com contesta `method: "totp"` y `delivered: false` y no manda nada; el código es el de la app autenticadora de la persona o uno de sus códigos de recuperación, y la pantalla no lee esos dos campos. Escribe el «Código de verificación» y pulsa «Verificar»; «Volver» regresa al formulario.
 5. Si confiaste el dispositivo y aún no tienes PIN, la pantalla te pide uno (HUB_SHELL-F03). Si no, entras en la pantalla que habías pedido o en **Inicio**.
 Entra: el correo y la contraseña (o el código de Google), que comprueba erplora.com; el identificador del dispositivo; si el hub ofrece PIN aquí (modo del dispositivo, confianza y dial del negocio, los tres leídos del hub sin sesión).
 Sale: pide a erplora.com la credencial y al hub la sesión local (`/api/auth/cloud`, con el identificador de este navegador pero sin la casilla): el hub vuelve de confianza el dispositivo siempre. Guarda en este navegador la sesión, el nombre, el correo, el rol y los permisos de la persona, y los tokens de erplora.com (se guardan **antes** de pedir la sesión al hub). Salvo que se desmarque la casilla (marcada por defecto, también donde no se ve), apunta a la persona —con su correo— en la lista de caras de este navegador, que no se borra al cerrar sesión.
-Si falla: campos vacíos o correo sin «@»: «Introduce un email válido y tu contraseña.». Credenciales erróneas, persona dada de baja o que ya no es miembro: «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Código vacío: «Introduce el código que enviamos a tu email.»; erróneo o caducado: «Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.» (no vuelve a pedir la contraseña); otro fallo del código: «No se pudo verificar el código. Inténtalo de nuevo.». Google que no termina: «No se pudo iniciar sesión con Google. Inténtalo de nuevo.». Hub sin registrar: HUB_SHELL-F12. [SEG] Cuando erplora.com acepta la contraseña y el hub rechaza después (baja, ya no miembro, hub que no contesta), los tokens de erplora.com se quedan en el navegador: entrar después con PIN no los borra y la sesión de la persona siguiente los manda al hub, resuelve con ellos el plan y la facturación, y Mi perfil le ofrece «Gestionar cuenta en erplora.com».
-Implicados: HUB-F130, HUB-F144
-Pendiente de enlazar: saas — inicio de sesión, código de verificación por correo y vuelta de Google al hub
+Si falla: campos vacíos o correo sin «@»: «Introduce un email válido y tu contraseña.». Credenciales erróneas, persona dada de baja o que ya no es miembro: «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Código vacío: «Introduce el código que enviamos a tu email.»; erróneo o caducado: «Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.» (no vuelve a pedir la contraseña; tampoco se envía ningún código nuevo); otro fallo del código: «No se pudo verificar el código. Inténtalo de nuevo.». Google que no termina: «No se pudo iniciar sesión con Google. Inténtalo de nuevo.». Hub sin registrar: HUB_SHELL-F12. [SEG] Cuando erplora.com acepta la contraseña y el hub rechaza después (baja, ya no miembro, hub que no contesta), los tokens de erplora.com se quedan en el navegador: entrar después con PIN no los borra y la sesión de la persona siguiente los manda al hub, resuelve con ellos el plan y la facturación, y Mi perfil le ofrece «Gestionar cuenta en erplora.com».
+Implicados: HUB-F130, HUB-F144, REC_ALTA-F07, SAAS_AUTH-F04, SAAS_AUTH-F16, SAAS_AUTH-F17, SAAS_AUTH-F20, SAAS_AUTH-F29
 QA: qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F02 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
@@ -68,8 +67,7 @@ Pasos:
 Entra: el pase de un solo uso (como mucho 128 caracteres; si es más largo se descarta sin canjear) y el identificador del dispositivo.
 Sale: la sesión y los mismos datos guardados que HUB_SHELL-F01, sin pasar por el formulario y sin tocar la lista de caras. El identificador del dispositivo solo viaja desde la app instalada; desde un navegador el hub no apunta el dispositivo ni le aplica el límite de dispositivos del plan. Un fallo se apunta en el registro de errores del hub con el código, nunca con el pase.
 Si falla: el acceso normal sale con el aviso «No se pudo entrar desde el panel de ERPlora» — «Inicia sesión aquí para continuar.», una sola vez. ERPlora no se termina de abrir hasta que el canje acaba, sin tope de tiempo; a los 10 segundos solo deja de esperarlo la decisión de qué pantalla enseñar (sin confirmar qué ve la persona si el canje acaba bien después de ese plazo).
-Implicados: HUB-F131, HUB_APP-F02
-Pendiente de enlazar: saas — puertas de entrada al hub con pase de un solo uso
+Implicados: HUB-F131, HUB_APP-F02, REC_ALTA-F07, SAAS_AUTH-F19, SAAS_DASHBOARD-F06, SAAS_DASHBOARD-F202
 QA: ninguno
 
 ### HUB_SHELL-F03 Elegir el PIN la primera vez que se entra en una caja
@@ -84,7 +82,7 @@ Pasos:
 Entra: la sesión recién abierta; la longitud del PIN del negocio.
 Sale: pide al hub fijar el PIN de quien tiene la sesión (`/api/auth/set-pin`). Si la persona ya tenía PIN, no se le pide otro y se conserva el suyo.
 Si falla: repetición distinta: «Los PIN no coinciden, inténtalo de nuevo» y vuelve al primer paso. Dígitos repetidos o seguidos (1111, 1234): «Ese PIN es demasiado fácil de adivinar: evita dígitos repetidos (1111) y secuencias (1234).». Cualquier rechazo del hub: «No se pudo guardar el PIN. Vuelve a intentarlo.».
-Implicados: HUB-F132
+Implicados: HUB-F132, REC_ALTA-F16
 QA: qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F04 Entrar con PIN
@@ -99,7 +97,7 @@ Pasos:
 Entra: la lista de personas con PIN y la longitud del PIN, que el hub sirve sin sesión en su contexto, leída una vez, al abrir ERPlora; el nombre elegido y los dígitos. Si el navegador recuerda a alguien de esa lista (HUB_SHELL-F01), su tarjeta enseña además su correo.
 Sale: pide al hub la sesión por PIN (`/api/auth/pin`) y guarda la sesión, el rol y los permisos. Funciona aunque erplora.com no responda.
 Si falla: PIN erróneo: los círculos se vacían y debajo «PIN incorrecto». Dispositivo que nunca entró con una cuenta o que un administrador quitó: «En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Navegador que no guarda datos (ventana privada): «Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.». Demasiados intentos: «Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.» (los minutos redondeados hacia arriba; sin dato, «Espera unos minutos»). Siempre queda «Email» para entrar con la cuenta.
-Implicados: HUB-F133, HUB-F135
+Implicados: HUB-F133, HUB-F135, REC_ALTA-F16
 QA: qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F05 Entrar pasando la placa
@@ -201,7 +199,7 @@ Pasos:
 Entra: el dispositivo que hace la petición (nunca otro); la sesión de administrador.
 Sale: pide al hub guardar el modo (`PUT /api/device/mode`); el acceso, el relevo y el vigilante de inactividad leen el modo confirmado.
 Si falla: sin ser administrador las opciones salen desactivadas con «Solo un administrador puede cambiar cómo entra la gente en este dispositivo.». Error sin motivo: «No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.»; con motivo, el texto del hub tal cual. El caso típico es un navegador que solo ha entrado por el pase del panel (HUB_SHELL-F02): el hub no lo conoce y la tarjeta enseña en inglés «this hub does not know the device `…`: sign in online on it once…»; se arregla entrando una vez con la cuenta en ese navegador.
-Implicados: HUB-F139
+Implicados: HUB-F139, REC_ALTA-F16
 QA: qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F12 Abrir un hub que todavía no está dado de alta
@@ -215,7 +213,7 @@ Pasos:
 Entra: el contexto público del hub (`registration_required`).
 Sale: nada guardado.
 Si falla: es el propio caso de fallo; el hub de demostración y el hub en la nube, que llegan dados de alta, no pasan por aquí.
-Implicados: HUB-F160
+Implicados: HUB-F160, REC_ALTA-F16
 QA: ninguno
 
 ### HUB_SHELL-F13 Abrir ERPlora cuando el hub no contesta
@@ -275,7 +273,7 @@ Pasos:
 Entra: la sesión (con cuenta), el permiso de administrar y la distribución de la app.
 Sale: pide siempre al hub un pase de un solo uso hacia erplora.com; el hub solo lo da a una sesión abierta con la cuenta, y si no lo da la pantalla abre el enlace normal, que pide la contraseña.
 Si falla: «No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.» o, para el plan, «…para gestionar tu plan.». En la copia de Google Play no salen ni «erplora.com» ni «Actualizar plan».
-Implicados: HUB-F142, HUB_APP-F04, HUB_APP-F29
+Implicados: HUB-F142, HUB_APP-F04, HUB_APP-F29, SAAS_AUTH-F21
 QA: L-17
 
 ### HUB_SHELL-F17 Abrir una dirección que el hub no tiene
@@ -317,7 +315,7 @@ Pasos:
 Entra: la dirección del hub.
 Sale: en un navegador se registra el trabajador que guarda la portada para abrir sin red; la app instalada y el modo desarrollo no lo usan.
 Si falla: ERPlora nunca interrumpe para pedir que se instale. Una versión nueva del hub se aplica sola la próxima vez que se carga la página, sin aviso.
-Implicados: HUB_APP-F03
+Implicados: HUB_APP-F03, REC_ALTA-F16
 QA: ninguno
 
 ### HUB_SHELL-F20 Actualizar la aplicación instalada cuando hay versión nueva
@@ -361,22 +359,21 @@ Pasos:
 Entra: la sesión; la longitud del PIN del negocio.
 Sale: pide al hub fijar el PIN propio (`/api/auth/set-pin`), con el actual si lo había.
 Si falla: longitud distinta: «El PIN debe tener {n} dígitos.»; los dos no coinciden: «Los dos PIN no coinciden.»; fácil de adivinar: «Ese PIN se adivina a la primera…»; ya lo usa otra persona: «Ese PIN ya lo tiene otro usuario activo…»; actual erróneo: «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.». Otro fallo: «No se pudo guardar el perfil».
-Implicados: HUB-F132
+Implicados: HUB-F132, REC_ALTA-F16
 QA: ninguno
 
 ### HUB_SHELL-F23 Gestionar o borrar mi cuenta de erplora.com
-Estado: hecho
+Estado: parcial — erplora.com pide la contraseña para borrar, así que una cuenta sin contraseña usable (la que solo entra con Google) no puede borrarse; y borrar la cuenta no cancela el plan del negocio ni deja otro propietario
 Actor: administrador, responsable, empleado
 Pantalla: Mi perfil
 Pasos:
 1. Al pie de **Mi perfil**, «Gestión de la cuenta»: con cuenta de erplora.com, «Puedes editar aquí tus propios datos. Sigue siendo tu cuenta de erplora.com.» y los botones «Gestionar cuenta en erplora.com» y «Borrar mi cuenta»; sin ella, «Esta identidad pertenece solo a este negocio…» y ningún botón.
 2. Pulsa uno: erplora.com se abre en el navegador, en la página de la cuenta o en la confirmación de borrado, sin el resto del panel.
-3. El borrado lo confirma erplora.com, no el hub.
+3. El borrado lo confirma erplora.com, no el hub, pidiendo la contraseña de la cuenta: una cuenta sin contraseña usable (la que solo entra con Google) no puede borrarse. Borrar la cuenta no cancela el plan del negocio ni deja otro propietario: el negocio se queda sin dueño y su plan sigue cobrándose.
 Entra: los tokens de erplora.com de la sesión.
 Sale: con sesión abierta con la cuenta, un pase de un solo uso para entrar ya identificado; con PIN, el enlace normal, que pide la contraseña.
 Si falla: «No se pudo abrir la página de tu cuenta en el navegador. Entra en erplora.com para gestionarla.».
-Implicados: HUB-F142
-Pendiente de enlazar: saas — página de la cuenta y borrado de la cuenta
+Implicados: HUB-F142, SAAS_AUTH-F13, SAAS_AUTH-F21, SAAS_DASHBOARD-F204, SAAS_DASHBOARD-F207, SAAS_DASHBOARD-F208, SAAS_DASHBOARD-F209, SAAS_DASHBOARD-F210
 QA: L-17
 
 ## Cobertura contra la referencia

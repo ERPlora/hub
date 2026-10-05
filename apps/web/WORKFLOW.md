@@ -286,7 +286,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F20 | Actualizar la aplicación instalada cuando hay versión nueva | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F21 | Cambiar mis datos, foto, idioma y apariencia | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F22 | Cambiar mi PIN desde Mi perfil | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
-| HUB_SHELL-F23 | Gestionar o borrar mi cuenta de erplora.com | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
+| HUB_SHELL-F23 | Gestionar o borrar mi cuenta de erplora.com | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F25 | Ver el negocio de un vistazo al entrar | hecho | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F26 | Empezar con una plantilla de un negocio como el tuyo | parcial | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F27 | Seguir la lista «Termina de configurar tu negocio» | hecho | [workflow/inicio.md](workflow/inicio.md) |

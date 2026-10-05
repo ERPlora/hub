@@ -72,7 +72,7 @@ Pasos:
 Entra: `business_tax_id`, `business_legal_name`, `business_street`, `business_street_number`, `business_postal_code`, `business_city`.
 Sale: el identificador se acepta como DNI, NIE o CIF con su control oficial, o como identificador extranjero con prefijo de país (no `ES`); los puntos y guiones se quitan. Cada fallo tiene su código (`invalid_tax_id_type`, `tax_id_too_long`, `invalid_tax_id_format`, `invalid_tax_id_control`). Los textos admiten hasta 500 caracteres. `business_address` se compone como «vía número, CP municipio» solo cuando el lote trae alguna parte; las partes que faltan salen de lo guardado, y un guardado de otra cosa no la borra. Vacío es válido: que la identidad esté completa lo decide la puerta fiscal. Esas tres claves llegan a todo módulo en cada orden como `:business_tax_id`, `:business_legal_name` y `:business_address`.
 Si falla: 422 con el código del identificador o del campo; no se guarda nada. En una demo el administrador la escribe igual que en un hub real.
-Implicados: VERIFACTU-F01
+Implicados: VERIFACTU-F01, REC_ALTA-F09
 QA: BD-02
 
 ### HUB-F223 Congelar el NIF y el país, y casar la región con el país
@@ -87,7 +87,7 @@ Entra: `business_tax_id` o `country_code` en un guardado de ajustes.
 Sale: nada guardado. El NIF se congela con el primer registro enviado; el país, al pasar el perfil a activo o cerrado. Repetir el mismo valor no es un cambio. Si el lote trae región, debe empezar por el país del lote o, si no viene, por el guardado; vaciarla siempre vale. Cambiar solo el país no revisa la región guardada. Si el perfil no se puede leer, no se congela nada.
 En este mismo documento se apoya en: HUB-F300 (Resolver el perfil fiscal del hub al arrancar), HUB-F307 (Pasar a producción).
 Si falla: `business_tax_id_frozen` o `hub_country_frozen`, con el valor al que está anclado y desde cuándo; o 422 `settings.region_code`.
-Implicados: ninguno
+Implicados: REC_ALTA-F09
 QA: BD-02
 
 ### HUB-F224 Publicar la identidad del negocio en el SaaS
@@ -101,8 +101,7 @@ Pasos:
 Entra: la identidad guardada y `business_identity_for_erplora_billing`.
 Sale: el SaaS refleja el NIF para la autorización de representación; solo con la casilla marcada toca el perfil que paga el hub. La casilla viaja siempre, también apagada, y no viaja en una plantilla. Publican los cambios de NIF, razón social, `business_address`, país o la casilla; un guardado de otra clave no publica nada, tampoco uno que solo traiga partes del domicilio (sin NIF): recompone la línea pero no la publica. También existe `POST /api/business/fiscal-identity`, que reenvía lo guardado.
 Si falla: el guardado queda escrito y la respuesta lleva `fiscal_identity_publish_error` (`cloud_rejected` o `cloud_unreachable`). Sin NIF o sin credencial de máquina no se avisa.
-Implicados: pendiente
-Pendiente de enlazar: saas — alta de la identidad fiscal y perfil de facturación del hub
+Implicados: REC_ALTA-F09, SAAS_DASHBOARD-F90
 QA: BD-02
 
 ### HUB-F225 Sembrar el país y la identidad de una demo al arrancar
@@ -112,12 +111,11 @@ Pantalla: ninguna
 Pasos:
 1. Al arrancar, el hub lee `HUB_COUNTRY`.
 2. Si es un país ISO y no hay país guardado, lo guarda.
-3. Si es una demo, rellena NIF, razón social y domicilio vacíos con los de ERPlora Demo.
+3. Si es una demo, rellena NIF, razón social y domicilio vacíos con los de ERPlora Demo. A una demo erplora.com le manda `HUB_COUNTRY` vacío, así que la demo no recibe país y el paso 2 no guarda ninguno.
 Entra: `HUB_COUNTRY` del despliegue y la marca de demo.
 Sale: `country_code` con autor `system:provisioning`; en la demo, las tres claves con autor `system:demo`. Nunca pisa un valor ya guardado ni una corrección del administrador.
 Si falla: se escribe una línea en el log y el arranque sigue.
-Implicados: pendiente
-Pendiente de enlazar: saas — alta del hub (el país elegido que viaja como `HUB_COUNTRY`)
+Implicados: REC_ALTA-F09, SAAS_DASHBOARD-F01, SAAS_DASHBOARD-F02, SAAS_DASHBOARD-F28, SAAS_PUBLIC-F90
 QA: BD-02
 
 ### HUB-F226 Moneda, decimales e idioma del negocio
@@ -188,7 +186,7 @@ Pasos:
 Entra: nombre, idioma y selección, con sesión de administrador.
 Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Se dejan fuera, a propósito, las filas borradas y las que la app siembra al instalarse (salvo las tablas cuya semilla es dato del negocio, como `taxes_rule`). Una plantilla no lleva personas, permisos ni automatizaciones, ni las tablas y la sección fiscales (`verifactu_config`, certificado en el motor) ni la numeración; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
 Si falla: nombre inválido (letras, números, `-`, `_` y `.`), 422; sin sesión de administrador, 401. Una parte que no se puede leer falta del zip sin aviso.
-Implicados: HUB_SHELL-F173, HUB_SHELL-F174
+Implicados: HUB_SHELL-F173, HUB_SHELL-F174, REC_ALTA-F23, SAAS_PUBLIC-F40
 QA: ninguno
 
 ### HUB-F231 Meter los archivos y el certificado en el zip
@@ -201,7 +199,7 @@ Pasos:
 Entra: la selección del export.
 Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero del almacenamiento bajo `media/`, incluidas las carpetas de las apps, menos las de primer nivel que empiezan por `_` (registros y sistema). No se filtra por finalidad. El sha256 de cada uno entra en el manifiesto.
 Si falla: un fichero que no se descarga, o pasa de 25 MiB, falta del zip y solo queda en el log.
-Implicados: HUB_SHELL-F173
+Implicados: HUB_SHELL-F173, REC_ALTA-F23, SAAS_PUBLIC-F41
 QA: ninguno
 
 ### HUB-F232 Ver qué tablas y cuántas filas lleva cada app
@@ -242,8 +240,7 @@ Pasos:
 Entra: el identificador de la plantilla (y el idioma si hay dos).
 Sale: el zip, entregado solo si su sha256 coincide con el que anunció el SaaS; la credencial de máquina no sale del hub. Lista y descarga piden sesión de usuario de cualquier perfil; aplicarla pide administrador.
 Si falla: sin credencial, 424; hash distinto, error y ningún byte; un identificador en dos idiomas, el SaaS contesta 400.
-Implicados: HUB_SHELL-F26, HUB_SHELL-F175, INVENTORY-F12
-Pendiente de enlazar: saas — catálogo de plantillas y descarga firmada
+Implicados: HUB_SHELL-F26, HUB_SHELL-F175, INVENTORY-F12, REC_ALTA-F08, SAAS_DASHBOARD-F193, SAAS_PUBLIC-F45, SAAS_PUBLIC-F46
 QA: BD-01
 
 ### HUB-F235 Importar un fichero o una plantilla
@@ -257,7 +254,7 @@ Pasos:
 Entra: el identificador de subida y la selección (personas, ajustes, fiscal, archivos, apps con datos).
 Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps): solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino; la única excepción es el `UPDATE` de la retirada de marcadores de abajo. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos, en la carpeta que nombre cada ruta: solo se comprueba que no se salga de `media/`, sin política de carpetas ni filtro por finalidad. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. En una tabla que la app declara como objeto único (su semilla se guarda por el hub entero, p. ej. la semana de Horarios), lo que hubiera antes —sembrado, escrito por el negocio o traído por otra plantilla— se marca como borrado (apuntado en el lote) en cuanto entra al menos una fila del fichero, también en la copia propia; el informe de la sección no lo dice. El arranque de un hub nuevo ya no importa ninguna plantilla.
 Si falla: una sección fallida se anota y el resto sigue; una app que no se instala deja `failed` su sección («módulo no instalado»).
-Implicados: INVENTORY-F12, SCHEDULES-F12, HUB_SHELL-F26, HUB_SHELL-F177
+Implicados: INVENTORY-F12, SCHEDULES-F12, HUB_SHELL-F26, HUB_SHELL-F177, REC_ALTA-F08, SAAS_PUBLIC-F16
 Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la semana de Horarios
 QA: BD-01, qa-hub §4
 
@@ -272,7 +269,7 @@ Entra: el manifiesto y la selección.
 Sale: nunca entran los datos de sistema (`_*`). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla. El sha256 se comprueba contra el propio manifiesto (prueba que el zip no se corrompió, no de dónde viene), se exige sesión de administrador y el servidor no pide otra confirmación. En la copia propia los ajustes se escriben sin pasar por la validación ni las congelaciones de HUB-F221 y HUB-F223 (solo las claves sin fila).
 En este mismo documento se apoya en: HUB-F300 (Resolver el perfil fiscal del hub al arrancar), HUB-F314 (Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena).
 Si falla: la sección descartada sale `Ignored` con su código y el número de filas.
-Implicados: HUB_SHELL-F177
+Implicados: HUB_SHELL-F177, SAAS_PUBLIC-F41
 QA: BD-01
 
 ### HUB-F237 Permisos, roles y automatizaciones que trae el fichero
@@ -288,7 +285,7 @@ Entra: `active_roles`, `capability_grants` y `flows` del manifiesto.
 Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa: `flow_grants_not_portable` si el fichero no es la copia propia, `flows_paused_without_grants` si lo es y algún permiso no volvió. Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). El mismo nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
 En este mismo documento se apoya en: HUB-F80 (Crear una automatización), HUB-F98 (Conceder, limitar y retirar los permisos de una automatización).
 Si falla: un fallo de base de datos sale `Failed`, no como descarte.
-Implicados: HUB_SHELL-F169, HUB_SHELL-F177
+Implicados: HUB_SHELL-F169, HUB_SHELL-F177, REC_ALTA-F08
 QA: BD-01
 
 ### HUB-F238 Volver a importar lo mismo
@@ -315,7 +312,7 @@ Pasos:
 Entra: el resultado de la importación.
 Sale: una fila por sección con su estado, el motivo estable y las filas descartadas; más apps instaladas (`installed`, `already_installed`, `failed`, `blocked`, versión pedida si se sustituyó), archivos copiados y fallidos, estado del certificado y el origen (plantilla y versión, o fichero local). Se guarda por lote y se borra al deshacerlo.
 Si falla: si no se puede guardar, la importación vale y solo se pierde esta vista.
-Implicados: INVENTORY-F12, HUB_SHELL-F26, HUB_SHELL-F39, HUB_SHELL-F178, HUB_SHELL-F179
+Implicados: INVENTORY-F12, HUB_SHELL-F26, HUB_SHELL-F39, HUB_SHELL-F178, HUB_SHELL-F179, REC_ALTA-F08
 QA: BD-01
 
 ### HUB-F240 Reintentar lo que falló en una importación
@@ -329,7 +326,7 @@ Pasos:
 Entra: el lote del informe.
 Sale: reaplica solo secciones `Failed`, apps `failed` o `blocked` y archivos que fallaron. Se niega si el catálogo ya sirve otra versión. Si no queda nada, responde que no hay nada que reintentar.
 Si falla: `import_origin_not_retryable`, `import_retry_version_unavailable`, `import_retry_batch_not_found`.
-Implicados: HUB_SHELL-F179
+Implicados: HUB_SHELL-F179, REC_ALTA-F08
 QA: ninguno
 
 ### HUB-F241 Deshacer una importación

@@ -60,7 +60,7 @@ Pasos:
 Entra: lo que la persona escribe; toda la conversación de la sesión viaja en cada pregunta (HUB_SHELL-F195).
 Sale: pide la respuesta al servidor (HUB-F273), que la reenvía y la mide; el panel no guarda nada fuera del navegador.
 Si falla: sin conexión, servicio caído o sin mensajes: HUB_SHELL-F199 y HUB_SHELL-F197. Pulsar «Detener» no deshace una orden que ya estaba ejecutándose.
-Implicados: HUB-F273
+Implicados: HUB-F273, SAAS_ASSISTANT-F02
 QA: qa-hub-assistant §1 (el banco), qa-hub-assistant §R0
 
 ### HUB_SHELL-F187 Adjuntar un archivo o dictar por voz
@@ -74,9 +74,8 @@ Pasos:
 4. Al parar, un indicador gira mientras se transcribe y el texto cae en el cuadro (detrás de lo que ya hubiera). **No se envía solo**: la persona lo revisa y pulsa «Enviar».
 Entra: el archivo elegido (el panel deja 8 MB, pero toda la conversación tiene que caber en 2 MB al enviarse) o el audio grabado (máximo 2 MB).
 Sale: el archivo viaja con la pregunta y lo lee el servicio del asistente (HUB-F273); el audio sale del navegador directo a la transcripción de erplora.com, sin pasar por el hub, con el pase de erplora.com de quien está en la caja (nunca a un modelo desde el hub).
-Si falla: un archivo de más de 8 MB: «El archivo es demasiado grande.» durante 4 segundos y no se adjunta. Micrófono denegado: «El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.»; aparato sin grabación: «Este navegador no puede grabar audio.»; audio de más de 2 MB o transcripción rota: «No se ha podido transcribir el audio.» (el mismo texto para las dos causas).
-Implicados: pendiente
-Pendiente de enlazar: saas — asistente: lectura de documentos adjuntos y transcripción de voz (`apps/speech`)
+Si falla: un archivo de más de 8 MB: «El archivo es demasiado grande.» durante 4 segundos y no se adjunta. Micrófono denegado: «El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.»; aparato sin grabación: «Este navegador no puede grabar audio.»; audio de más de 2 MB o transcripción rota: «No se ha podido transcribir el audio.» (el mismo texto para las dos causas). Cada intento de dictado gasta del tope de 120 por hora y negocio que erplora.com comparte entre el dictado y la lectura en voz alta, y lo gasta antes de mirar la credencial: también los intentos con una sesión de PIN, que siempre fallan; con el tope agotado, la misma frase.
+Implicados: SAAS_ASSISTANT-F18, SAAS_ASSISTANT-F19
 QA: qa-hub-assistant §R5
 
 ### HUB_SHELL-F188 Leer la respuesta: texto, listas, tablas y enlaces
@@ -206,7 +205,7 @@ Pasos:
 Entra: los mensajes del panel; los cierres de sesión y los relevos de usuario.
 Sale: la clave del navegador; en cada pregunta, el hilo entero va al servidor (HUB-F273) y se olvida al acabar el turno.
 Si falla: un almacenamiento lleno o bloqueado (modo privado) se ignora en silencio. Un hilo guardado ilegible arranca vacío.
-Implicados: HUB-F136, HUB-F138, HUB-F273
+Implicados: HUB-F136, HUB-F138, HUB-F273, SAAS_ASSISTANT-F09
 QA: qa-hub-assistant §Pendiente (fase C) (cambio de usuario por PIN), qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F196 El asistente en la puesta en marcha
@@ -241,8 +240,7 @@ Pasos:
 Entra: nivel, mensajes usados, límite y fecha de renovación que da el SaaS; planes contratables.
 Sale: la dirección de pago o de la página de plan se abre en el navegador (HUB-F277); al volver a la caja se relee el plan cada vez que la ventana recupera el foco. Si el corte fuera por sesiones, la frase sigue diciendo «mensajes este mes» con un número de sesiones; el panel no cobra nada ni lleva contador propio.
 Si falla: sin planes contratables, «Ahora mismo no hay planes a los que ampliar.»; sin dirección de pago, «No se pudo contactar con el asistente.» (texto que no corresponde); si el navegador no abre: «No se pudo abrir la página de pago en el navegador. Inténtalo de nuevo y, si sigue fallando, actualiza la app de ERPlora.» o, para el plan, «No se pudo abrir la página de tu plan en el navegador. Inténtalo de nuevo.»
-Implicados: HUB-F277
-Pendiente de enlazar: saas — asistente: nivel y consumo, y planes contratables
+Implicados: HUB-F277, SAAS_ASSISTANT-F07, SAAS_ASSISTANT-F10, SAAS_ASSISTANT-F11, SAAS_ASSISTANT-F12, SAAS_ASSISTANT-F13, SAAS_DASHBOARD-F220
 QA: qa-hub-assistant §R4 (el 429), qa-hub-assistant §0 (la cuota del banco)
 
 ### HUB_SHELL-F198 Informar de una respuesta mala
@@ -257,7 +255,7 @@ Pasos:
 Entra: el texto de la respuesta, la pregunta anterior y el comentario.
 Sale: la denuncia al hub, que la deja en su registro de errores para revisión (HUB-F278). Cualquier perfil puede denunciar. El panel no pide motivo, aunque el servidor lo admita, ni ofrece 👍 o 👎.
 Si falla: «No se pudo enviar la denuncia. Inténtalo de nuevo.» y el botón sigue ahí. El botón sale también bajo los mensajes que escribe el propio panel («No se pudo contactar…», «(sin respuesta)»), que no son de ningún modelo.
-Implicados: HUB-F278
+Implicados: HUB-F278, SAAS_ASSISTANT-F21
 QA: qa-hub-assistant §Pendiente (fase C) («Report an issue»)
 
 ### HUB_SHELL-F199 El asistente sin conexión, con el servicio caído o sin plan
@@ -273,7 +271,7 @@ Pasos:
 Entra: el desenlace de la petición del panel al hub.
 Sale: solo texto en el hilo (también queda guardado, y viaja al asistente en la siguiente pregunta como si lo hubiera dicho él).
 Si falla: un hub que no responde lo cuenta el aviso general de la barra (área de acceso y navegación), no este panel. El botón de HUB_SHELL-F198 aparece también bajo estos mensajes aunque no sean del modelo.
-Implicados: HUB-F273, HUB-F277
+Implicados: HUB-F273, HUB-F277, SAAS_ASSISTANT-F07
 QA: qa-hub-assistant §R4 (negativos de cadena), qa-hub-assistant §R6
 
 ## Cobertura contra la referencia

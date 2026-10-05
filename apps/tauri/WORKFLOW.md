@@ -51,11 +51,13 @@ que citan los comentarios del código; **no se han vuelto a contrastar con el me
 
 ## Antes de empezar
 
-- Una **cuenta de ERPlora** y un negocio (el gratuito se crea al registrarse) y **conexión a internet**:
+- Una **cuenta de ERPlora** y un negocio (el gratuito se crea en erplora.com con un paso después de registrarse: registrarse solo no lo crea) y **conexión a internet**:
   la aplicación no funciona sin red; con la red caída solo enseña una pantalla de espera (HUB_APP-F11).
 - **Sistemas**: Windows 10 1809 o posterior, 64 bits, con WebView2 (Windows 10/11 al día lo traen);
-  Android 7 (API 24) o posterior, compilada para Android 16 (API 36); macOS en Apple Silicon.
-  También se construyen para Linux (`.deb`, AppImage) pero no es un sistema anunciado (Dudas abiertas).
+  Android 7 (API 24) o posterior, compilada para Android 16 (API 36); macOS en Apple Silicon, que se
+  construye pero erplora.com no reparte (no hay descarga de macOS). También se construyen para Linux
+  (`.deb`, AppImage): no es un sistema anunciado, pero la descarga web de erplora.com sí reparte la
+  AppImage (Dudas abiertas).
   iOS está en el código pero no se construye ni se publica. El manifiesto de Android declara también el
   lanzador de Android TV (`LEANBACK_LAUNCHER`); no es un dispositivo probado.
 - Para imprimir: una **impresora térmica ESC/POS** encendida, en la misma red (puerto 9100), por USB
@@ -310,8 +312,8 @@ Se resuelven con `market-decision`; no las decide el worker.
 
 1. **Báscula**: no existe en la aplicación (ni orden, ni permiso, ni evento `erplora:scale-weight`);
    ERPlora/hub#1217 sigue abierta (P1, hardware). ¿Entra en el MVP o después del primer cliente?
-2. **¿Se sigue anunciando Linux?** Se construyen `.deb` y AppImage («canal de QA») pero ningún documento
-   de producto los ofrece. ¿Se retira de la matriz o se declara?
+2. **¿Se sigue anunciando Linux?** Se construyen `.deb` y AppImage («canal de QA») y ningún documento
+   de producto los ofrece, pero la descarga web de erplora.com sí reparte la AppImage. ¿Se retira de la matriz o se declara?
 3. **macOS**: el `.dmg` sale sin notarizar y `downloadPlatform` no tiene destino para él. ¿Se publica una
    descarga o se declara fuera del MVP?
 4. **Aviso al administrador cuando una impresora de red no saca el papel** (ERPlora/hub#2494): ¿consultar

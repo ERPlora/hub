@@ -180,7 +180,7 @@ Pasos:
 Entra: el XML comprobado; el certificado del núcleo (identidad, tipo y titular).
 Sale: la respuesta de la AEAT, o un fallo de conexión o de certificado.
 Si falla: un certificado caducado o revocado se ve como rechazo de la conexión, no antes; un fallo de red o un 5xx van a la cola (HUB_VERIFACTU-F08).
-Implicados: HUB-F302, HUB-F304
+Implicados: HUB-F302, HUB-F304, REC_ALTA-F12
 QA: qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB_VERIFACTU-F07 Presentar por la vía de ERPlora, a través de la celda fiscal
@@ -195,9 +195,8 @@ Pasos:
 5. Pasa la respuesta a HUB_VERIFACTU-F08.
 Entra: el XML comprobado; la conexión segura del hub, si la hay; el permiso de envío de la nube.
 Sale: la respuesta de la AEAT tal como la devuelve la celda.
-Si falla: si la nube niega el permiso, o la celda no responde, el registro va a la cola con su motivo; en producción sin autorización aprobada la celda lo rechaza (y el núcleo ya habría negado la venta: HUB-F313). Si la nube contesta que este hub debe ir por su propio certificado, no hay vía por la celda.
-Implicados: HUB-F305, HUB-F306, VFGW-F01, VFGW-F02, VFGW-F06, VFGW-F08, VFGW-F10, VFGW-F12, VFGW-F18
-Pendiente de enlazar: saas — acuñar el permiso de envío de la celda para cada hub (`/api/v1/hub/device/fiscal/gateway-token/`), también sin autorización para el carril de pruebas
+Si falla: si la nube niega el permiso, o la celda no responde, el registro va a la cola con su motivo; en producción sin autorización aprobada la celda lo rechaza (y el núcleo ya habría negado la venta: HUB-F313), salvo si el NIF del negocio es el de ERPlora (el de la identidad de demostración: la celda lo trata como «nombre propio») o si el hub declaró a erplora.com el NIF de otro negocio con otorgamiento vigente, que viaja en el permiso (VFGW-F08). Si la nube contesta que este hub debe ir por su propio certificado, no hay vía por la celda.
+Implicados: HUB-F305, HUB-F306, VFGW-F01, VFGW-F02, VFGW-F06, VFGW-F08, VFGW-F10, VFGW-F12, VFGW-F18, REC_ALTA-F13, SAAS_DASHBOARD-F146
 QA: qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB_VERIFACTU-F08 Clasificar la respuesta de la AEAT
@@ -329,7 +328,7 @@ Pasos:
 Entra: el tipo de prueba; la vía y el entorno del hub; la configuración guardada del módulo.
 Sale: un solo evento «Prueba de conexión» con el resultado (vía, entorno, huella y QR de la muestra, respuesta de la celda) (avisa: `verifactu.diagnostic.run`). Ningún registro, ningún cambio en la cadena.
 Si falla: sin configuración guardada del módulo se niega («VeriFactu sin configurar»); sin el permiso del certificado, se niega.
-Implicados: VERIFACTU-F10, VFGW-F13
+Implicados: VERIFACTU-F10, VFGW-F13, REC_ALTA-F14
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F17 Prueba en vivo con el certificado propio
@@ -345,7 +344,7 @@ Pasos:
 Entra: el tipo de prueba; el certificado del núcleo; el entorno del perfil fiscal.
 Sale: un evento «Prueba de conexión» con el resultado (avisa: `verifactu.diagnostic.run`) y ningún registro local. Hoy, además, un alta en la AEAT que el hub no tiene: en producción queda en la AEAT real y una recuperación posterior (HUB_VERIFACTU-F14) puede anclar la cadena sobre ella.
 Si falla: un certificado caducado o revocado se ve como rechazo de la conexión («…revisa que no esté caducado ni revocado»); sin red, «inténtalo en unos minutos». Sin configuración guardada no se niega: con certificado propio el motor arma una configuración con lo que dice el núcleo y se para en el NIF del emisor («Configura el NIF…»); «VeriFactu sin configurar» solo lo ve un hub sin certificado propio (HUB_VERIFACTU-F16). La prueba decide «aceptado» con su propia regla (registro correcto o aceptado con errores, o envío correcto), no con la clasificación de HUB_VERIFACTU-F08.
-Implicados: REC_FISCAL-F14, VERIFACTU-F10
+Implicados: REC_FISCAL-F14, VERIFACTU-F10, REC_ALTA-F12
 QA: qa-hub §7
 
 ## Cobertura contra la referencia
