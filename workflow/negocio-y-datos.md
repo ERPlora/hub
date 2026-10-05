@@ -264,7 +264,7 @@ Pasos:
 3. Guarda las automatizaciones por la misma puerta que la pantalla de automatizaciones.
 4. Al terminar, la pantalla pregunta por los permisos que una plantilla no puede conceder.
 Entra: `active_roles`, `capability_grants` y `flows` del manifiesto.
-Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa (`flows_paused_without_grants`). Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). Misma nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
+Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa (`flows_paused_without_grants`). Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). El mismo nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
 Si falla: un fallo de base de datos sale `Failed`, no como descarte.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, automatizaciones (guardar una automatización y sus permisos)
@@ -411,7 +411,8 @@ Pasos:
 Entra: carpeta (minúsculas, dígitos, `_`, `-`, hasta 64) y ruta relativa sin `..`, sin `/` inicial, sin `\`.
 Sale: el fichero queda en `modules/<carpeta>/<ruta>` y el hub devuelve esa ruta; en producción por el almacenamiento de erplora.com, en desarrollo en disco, con la misma ruta lógica. Una app solo escribe en su carpeta; la persona la ve en Archivos según HUB-F246.
 Si falla: carpeta o ruta inválida, error de almacenamiento antes de tocar la red; sin credencial de máquina, la instalación de una app con `static_files` falla.
-Implicados: VERIFACTU-F13
+Implicados: pendiente
+Pendiente de enlazar: verifactu — la copia de cada XML en el almacenamiento de ficheros del módulo
 QA: ninguno
 
 ### HUB-F248 Borrar los datos de una persona: el aviso único
@@ -452,7 +453,7 @@ Pasos:
 Entra: `customer.anonymized` y su identificador.
 Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Servicios marca sus bonos; Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
 Si falla: el aviso de esa app se reintenta como cualquier otro.
-Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11, VERIFACTU-F15
+Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11
 QA: L-10, WA-06 (discrepa)
 
 ### HUB-F251 Borrar los datos de un número sin ficha
