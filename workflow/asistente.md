@@ -24,7 +24,7 @@ Pasos:
 4. El panel ejecuta las herramientas con la sesión de la persona, pidiendo confirmación antes de cambiar nada (HUB_SHELL), y sigue la conversación.
 Entra: los mensajes de la sesión (`messages`, con sus adjuntos); la sesión local, que da los permisos y el usuario que viaja como dato de gasto, nunca como permiso.
 Sale: un flujo de eventos `token`, `function_call` (anotado con `kind`, `read_only`, `risk` y `money_fields`), `usage` y `done`. **El hub no guarda la conversación**: vive en el navegador durante la sesión (ADR-0149) y el SaaS no la conserva.
-Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta o el flujo se corta a mitad, el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor); si el SaaS rechaza el turno (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
+Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta, el flujo se corta a mitad, **o el SaaS rechaza la petición antes de abrir el flujo** (credencial, petición inválida, freno de tasa por hub), el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor; en el último caso dice «no se pudo contactar» cuando en realidad hubo un rechazo, hueco); si el SaaS rechaza el turno dentro del flujo (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, panel del asistente (bucle de herramientas, tarjeta de confirmación, historial de sesión, recibos del turno)
 Pendiente de enlazar: saas — asistente: `POST /api/v1/hub/device/assistant/chat/stream/` con `{input, messages, tools, instructions, user}` que inserta `instructions` como mensaje de sistema, ofrece las `tools` al modelo y devuelve SSE con `function_call` (argumentos completos, uno por llamada), `usage` al cerrar y `error` con `code` y `retriable`, terminado en `[DONE]`; mide un turno solo si se completa
@@ -43,7 +43,8 @@ Pasos:
 Entra: el registro de módulos activos (el bloque `ai` de cada consulta u orden, su permiso y su esquema); los permisos de la sesión.
 Sale: la lista de herramientas del turno, ordenada siempre igual. Así llega al asistente, por ejemplo, la orden de Automatizaciones que deja un borrador (FLOWS-F26): se ofrece solo a quien puede gestionar automatizaciones y la ejecuta el panel con su sesión.
 Si falla: una operación sin descripción para el asistente no existe para él (la persona la hace en su pantalla); un `risk` que el núcleo no conoce se trata como destructivo; una orden que el módulo publica como orden pero solo contesta (comprobar un hueco libre) se marca como lectura solo si pide un permiso que el módulo también exige a sus consultas (hub#1594); ante la duda, cuenta como escritura y lleva tarjeta.
-Implicados: FLOWS-F26
+Implicados: pendiente
+Pendiente de enlazar: flows — FLOWS-F26 (Pedirle al asistente una automatización)
 Pendiente de enlazar: hub — HUB_SHELL, panel del asistente (confirmación según el riesgo: un clic, escribir, o negarse a ejecutar desde el chat)
 Pendiente de enlazar: hub — HUB, módulos y órdenes (la misma puerta de consultas y órdenes que usa la pantalla, con su permiso)
 QA: qa-hub-assistant §R1, qa-hub-assistant §R3
@@ -63,7 +64,7 @@ Implicados: ninguno
 QA: qa-hub-assistant §R6
 
 ### HUB-F276 Anclar al asistente a lo que este hub tiene instalado
-Estado: parcial — el asistente se ancla a la versión del hub, a los módulos activos y a la descripción que cada módulo instalado da de sí mismo, pero no lee la documentación (`docs/`) de los módulos: no hay índice de documentación, solo de descripciones para elegir herramientas (ADR-0282 lo dejó fuera)
+Estado: parcial — el asistente se ancla a la versión del hub, a los módulos activos y a la descripción que cada módulo instalado da de sí mismo, pero no lee la documentación (`docs/`) de los módulos: no hay índice de documentación, solo de descripciones para elegir herramientas (ADR-0282 lo aplazó sin decidirlo: «el corpus hay que escribirlo antes de indexarlo»)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -73,7 +74,7 @@ Pasos:
 4. En cada turno, las instrucciones nombran la versión del hub (la misma que enseñan el menú lateral y el estado del sistema), los módulos activos con sus pantallas y, de cada registro que un módulo declara que no se edita, por qué y con qué orden se corrige.
 Entra: los módulos instalados y activos; su descripción para el asistente; los registros inmutables que declaran (`records` con `mutable: false`, `reason`, `correct_with`).
 Sale: el índice del hub (una fila por trozo, con módulo, versión e idioma inglés) y las instrucciones de cada turno. Las respuestas «¿qué versión tengo?», «¿qué módulos tengo?» o «¿cómo corrijo una factura?» salen de aquí, no de la memoria del modelo (hub#1044, ADR-0331).
-Si falla: si la base de datos del hub no tiene la extensión de vectores, no hay índice y el asistente ofrece todas las herramientas (HUB-F275); el hub arranca igual. Un indexado que falla no deshace la instalación. Una actualización que entra al arrancar o desde otra instancia del hub no vuelve a indexar, y el arranque no reindexa un módulo que ya estaba: su entrada se queda con el texto de la versión anterior hasta la siguiente actualización desde el hub (hueco leído, sin ejecutar).
+Si falla: si la base de datos del hub no tiene la extensión de vectores, no hay índice y el asistente ofrece todas las herramientas (HUB-F275); el hub arranca igual. Un indexado que falla no deshace la instalación. Una actualización aplicada al arrancar no vuelve a indexar, y el arranque no reindexa un módulo que ya estaba: su entrada se queda con el texto de la versión anterior hasta la siguiente actualización desde el hub. Lo que se instala desde una copia, una plantilla de sector o la reconciliación entre tareas no se indexa hasta el siguiente arranque. Y actualizar no borra la entrada de una operación que la versión nueva quitó (huecos leídos, sin ejecutar).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, módulos y órdenes (instalar, actualizar y desinstalar un módulo, que disparan el indexado)
 Pendiente de enlazar: saas — asistente: `POST /api/v1/hub/device/assistant/embeddings/` con `{texts}` → `{embeddings, model}`, un vector por texto y en el mismo orden, medido por hub
@@ -105,8 +106,8 @@ Pasos:
 2. El hub exige una sesión (cualquier perfil: quien se siente ofendido es quien está delante) y que vengan el identificador de la respuesta y su texto.
 3. Lo deja en el registro único de errores del hub como algo a revisar, con quién lo denunció, y el registro lo manda al SaaS.
 Entra: el identificador de la respuesta, su texto, y opcionalmente la pregunta que la provocó, el motivo y el comentario.
-Sale: una entrada `assistant_content_report` en el registro de errores, que llega al SaaS para revisión. Los textos se recortan (respuesta y pregunta a 4.000 caracteres, comentario a 1.000, motivo a 100) para no guardar más de lo necesario; cada denuncia es distinta aunque el texto se repita.
-Si falla: sin sesión, `401`; sin identificador o sin texto, rechazo con el campo que falta. El hub contesta `{ok: true}` en cuanto lo apunta; que llegue al SaaS es asunto del registro de errores, que lo reintenta.
+Sale: una entrada `assistant_content_report` en el registro de errores, que la manda al SaaS para revisión. Los textos se recortan (respuesta y pregunta a 4.000 caracteres, comentario a 1.000, motivo a 100) para no guardar más de lo necesario. Dos denuncias de respuestas distintas nunca se funden; la misma respuesta denunciada dos veces en 30 s cuenta como una.
+Si falla: sin sesión, `401`; sin identificador o sin texto, rechazo con el campo que falta. El hub contesta `{ok: true}` en cuanto lo apunta; el envío al SaaS es de mejor esfuerzo y sin reintento: si la red falla en ese momento o el hub no está enrolado, la denuncia se pierde sin aviso (hueco).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, botón de denuncia bajo cada respuesta
 Pendiente de enlazar: saas — registro de errores del hub (`POST /api/v1/hub/device/error-report/`) donde se revisan las denuncias de contenido
@@ -120,12 +121,13 @@ Pasos:
 1. Una automatización llega a un paso «Pedírselo al asistente». El servidor lo atiende fuera del ciclo que reparte los avisos, sin bloquear la caja mientras espera al modelo.
 2. Le ofrece al modelo solo las herramientas que cumplen tres cosas a la vez: las puede usar la automatización con sus permisos, el paso las nombra y la automatización las tiene concedidas. Las del núcleo (instalar un módulo, configurar) no se ofrecen nunca aquí.
 3. A las instrucciones de siempre añade que nadie está mirando: que no pregunte, que decida con las herramientas y, según el paso, que lo que cambie tiene efecto inmediato o que se queda esperando a una persona.
-4. Las consultas, y las órdenes que solo contestan, se ejecutan en el acto. Una orden que cambia algo, con «Que me lo pregunte» (lo de fábrica), se comprueba contra su esquema y se deja en la bandeja de aprobaciones; el turno termina ahí. Con «Que lo haga por su cuenta», se ejecuta con los permisos de la automatización.
+4. Las consultas, y las órdenes que solo contestan, se ejecutan en el acto. Una orden que cambia algo, con «Que me lo pregunte» (lo de fábrica), se comprueba contra su esquema y se deja en la bandeja de aprobaciones; el turno termina ahí, salvo que el paso pida datos (`output`): entonces no puede proponer y se le dice al modelo que termine con lo que ha encontrado. Con «Que lo haga por su cuenta», se ejecuta con los permisos de la automatización, sin persona y sin mirar el riesgo que declara el módulo (el riesgo solo lo usa la tarjeta del panel).
 5. Si el paso pidió datos concretos (un texto, un número, una lista de opciones para tocar), el modelo tiene que entregarlos al final con una herramienta propia del paso, y el servidor comprueba su forma.
 Entra: lo que el paso pide (`prompt`, herramientas, `policy`, vueltas como mucho, `output`); los permisos concedidos a la automatización.
 Sale: la respuesta del paso (`text`, las herramientas usadas con su resultado y los datos pedidos) para los pasos siguientes; o la propuesta en la bandeja, con la tarea como motivo. Cada vuelta es una llamada al proxy del SaaS que gasta del cupo del asistente.
 Si falla: el paso falla con el motivo escrito en el historial de la ejecución: sin credencial de máquina (`flow.agent_no_cloud_credential`), más de 60 s en total (`flow.agent_timeout`), más vueltas de las permitidas (`flow.agent_max_iters`), sin los datos pedidos o con otra forma (`flow.agent_no_output`, `flow.agent_bad_output`), o el proxy rechaza (`flow.agent_upstream`). Una llamada que falla por un momento (red, 5xx, 429) se repite dos veces con 1 s y 3 s de espera sin volver a ejecutar nada del negocio; el cupo agotado o una petición rechazada no se repiten. Una herramienta que el modelo no tenía, o que el permiso o el esquema rechazan, vuelve al modelo como error para que lo diga, sin tumbar el paso.
-Implicados: FLOWS-F17
+Implicados: pendiente
+Pendiente de enlazar: flows — FLOWS-F17 (Pedirle un paso al asistente)
 Pendiente de enlazar: hub — HUB, automatizaciones (ejecución del paso, bandeja de aprobaciones, caducidad y decisión de una propuesta)
 Pendiente de enlazar: saas — asistente: el mismo `…/assistant/chat/stream/` de HUB-F273 llamado con la credencial de máquina, sin usuario, y `retriable: false` en los errores que no pasan esperando
 QA: qa-hub-flows R6
