@@ -40,7 +40,7 @@ Pasos:
 1. Cada segundo el hub repasa la cola de salida y toma, de la más antigua a la más nueva, hasta 50 avisos que ya tocan.
 2. Para cada aviso busca los módulos **activos** que lo escuchan en ese momento y le pasa el aviso a cada uno. Cada módulo reacciona con su propia autoridad, no con la de la persona que causó el aviso: una venta que cobra un empleado baja el stock y manda la factura igual que si la cobrara el dueño.
 3. Lo que hace cada módulo queda guardado junto con la marca de «ya entregado a este módulo». Si el hub se reinicia a mitad, al volver no repite a quien ya lo recibió.
-4. Además, en la misma pasada: si es un mensaje para fuera, lo manda (HUB-F61); si es un trabajo de impresión, lo deja en la cola de impresión; si es el borrado de los datos de un cliente, vacía el historial que lo nombra; despierta o cancela las esperas de las automatizaciones que dependen de ese aviso; y arranca las automatizaciones que se disparan con él (HUB-F81).
+4. Además, en la misma pasada: si es un mensaje para fuera, lo manda (HUB-F61); si es un trabajo de impresión, lo deja en la cola de impresión; si es el borrado de los datos de un cliente, vacía el historial que lo nombra; despierta o cancela las esperas de las automatizaciones que dependen de ese aviso; y arranca las automatizaciones que se disparan con él (HUB-F82).
 5. Si todo fue bien, el aviso queda como entregado. Si algo falló, solo se repite lo que falló (HUB-F52).
 Entra: los avisos pendientes de la cola y la lista de módulos activos con lo que escucha cada uno (`events.listen`).
 Sale: los efectos de cada módulo que escucha, en el hub del aviso y atribuidos a la persona que lo causó (el `created_by` de un movimiento de stock dice quién cobró); la marca de entrega por módulo (`_event_delivery`); los avisos que esos módulos emiten a su vez, con un nivel más de cadena; y el aviso marcado como entregado. Las reacciones en cadena también llegan a las pantallas en vivo.
@@ -198,7 +198,7 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Un módulo (o un paso «Enviar un mensaje» de una automatización, HUB-F92) deja un aviso de mensaje pendiente: por qué canal, a quién, con qué plantilla y qué texto.
+1. Un módulo (o un paso «Enviar un mensaje» de una automatización, HUB-F93) deja un aviso de mensaje pendiente: por qué canal, a quién, con qué plantilla y qué texto.
 2. El hub comprueba, antes de que salga nada, que quien lo pide puede: un módulo necesita el permiso de mensajes concedido, haber declarado ese canal y que el destinatario sea del propio hub (la lista de destinatarios permitidos de los ajustes, o el correo de un usuario activo); una automatización necesita sus dos permisos vivos, canal y de dónde sale el destinatario, que se vuelven a leer en ese momento.
 3. Lo manda por ERPlora: el correo sale con el remitente verificado de ERPlora y la respuesta va al negocio; el WhatsApp sale con el número del negocio, descontando su cuota.
 4. Lo apunta como enviado, con el identificador que le dio WhatsApp, para no repetirlo y para saber qué automatización preguntó si el cliente contesta tocando un botón.
