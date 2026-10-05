@@ -11,6 +11,21 @@ Prefijo: HUB
 > `architecture/hub/runtime-dispatcher.md` y `architecture/hub/module-system.md`; aquí se escribe lo
 > que se observa.
 
+## Referencia adoptada
+
+Para las consultas y las órdenes (la de instalar y quitar apps está en
+[modulos-aplicaciones.md](modulos-aplicaciones.md)):
+
+- Toast y Square: la aprobación del responsable con su código en el momento, para una sola acción
+  (HUB-F05; referencia contrastada en el módulo de Venta, SALES-F14).
+- Cuiner *QuieroFactura* y Ágora *Crear factura*: el tique lleva un código para pedir la factura
+  completa desde casa (HUB-F16, HUB-F17); plazo:
+  [RD 1619/2012, art. 11.2](https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696).
+- [JSON Schema](https://json-schema.org/): el contenido de cada orden y consulta se valida contra el
+  esquema que declara su módulo, con sus valores por defecto (HUB-F04).
+- [Ley 46/1998, art. 11](https://www.boe.es/buscar/act.php?id=BOE-A-1998-29550): la mitad exacta se
+  redondea hacia arriba; es el redondeo común del dinero (HUB-F18).
+
 ## Flujos
 
 ### HUB-F01 Leer datos de un módulo
@@ -91,7 +106,7 @@ QA: ninguno
 ### HUB-F05 Pedir la aprobación de un responsable cuando falta el permiso
 Estado: hecho
 Actor: empleado, responsable
-Pantalla: HUB_SHELL: diálogo del PIN del responsable
+Pantalla: HUB_SHELL: Aprobación de un responsable
 Pasos:
 1. Un empleado pide una orden cuyo permiso no tiene; si ese permiso lo tiene el perfil responsable en la app dueña (y la app está activa), el hub no la rechaza sin más: contesta `requires_elevation` con el permiso que falta.
 2. La pantalla pide el PIN de un responsable, que el hub comprueba, y devuelve un pase de un solo uso para esa acción.
@@ -217,7 +232,7 @@ QA: qa-hub §7
 ### HUB-F13 Bloquear las órdenes de un módulo mientras otro no cumpla su condición
 Estado: parcial — el rechazo no tiene frase propia: la pantalla, el asistente y la API reciben `protects_guard` con una frase en inglés del hub; y si la lectura de la condición falla, el bloqueo cede
 Actor: sistema
-Pantalla: HUB_SHELL: vista de un módulo
+Pantalla: HUB_SHELL: Vista de un módulo
 Pasos:
 1. Una app declara que protege la ruta de otra (`protects`): Caja protege la de Venta mientras «Activar caja» está guardado y no hay sesión abierta.
 2. Ante cualquier orden de la app protegida, venga de donde venga (pantalla, asistente, automatización, API), el hub lee como sistema los ajustes de la app que protege: si el bloqueo está armado y su ruta apunta a la app de la orden, comprueba la condición.
@@ -313,3 +328,84 @@ Pendiente de enlazar: taxes — TAXES-F18 (calcular el impuesto de un importe co
 Pendiente de enlazar: sales — SALES-F01 (el tique se cierra por tipo con el mismo redondeo)
 Pendiente de enlazar: invoice — INVOICE-F01 (la cuota de cada tipo cuadra al céntimo)
 QA: L-08
+
+## Cobertura contra la referencia
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Aprobación del responsable con PIN para una acción | hecho | HUB-F05 |
+| Validar lo que llega antes de ejecutar | hecho | HUB-F04 |
+| Errores traducibles sin filtrar detalles internos | hecho | HUB-F14 |
+| Factura completa pedida por el cliente desde el tique | parcial: sin referencia de la factura, errores del hub contados como «revisa el NIF», frases en inglés, localizadores para órdenes internas | HUB-F16, HUB-F17 |
+| Un solo redondeo del dinero en todo el producto | hecho en los módulos con manejador (las tasas viajan en coma flotante); el motor de VeriFactu va aparte | HUB-F18 |
+| Una orden repetida no se ejecuta dos veces | no hecho en el hub: solo los avisos con clave de duplicado y la entrega a cada app que escucha; lo resuelve cada módulo | HUB-F03 |
+
+## Datos: de quién es cada dato
+
+Para todo el área de módulos (lo común a todo el servidor, como lo que el hub pone en cada orden,
+está en el índice):
+
+- **De cada app**: sus tablas (con el prefijo de la app), sus ajustes y sus datos de partida. El hub
+  las crea y migra, pero no las lee salvo por las consultas de la propia app (lecturas previas,
+  bloqueos, ajustes, pasos de puesta en marcha, paneles). Desinstalar no las borra.
+- **De esta parte del área**: los localizadores de la página pública (`_public_claim`: la huella
+  SHA-256 del localizador, nunca el localizador, y el contenido sellado en claro) y su clave
+  (`_public_claim_key`, un secreto guardado en claro en una tabla sin puerta HTTP); y los recibos de
+  las aprobaciones del responsable que produce HUB-F05 (`_elevation_audit`, tabla del área de acceso).
+  Las tablas del ciclo de vida de las apps están en [modulos-aplicaciones.md](modulos-aplicaciones.md).
+- **Datos personales**, recorridas las migraciones de sistema:
+  - `_public_claim`: quién emitió el localizador (`created_by`), el contenido sellado que decide la
+    app que lo emite (hoy, líneas del tique; si incluye datos del cliente, sin confirmar) y la
+    referencia del resultado (hoy siempre vacía, HUB-F17). Los datos fiscales que escribe el cliente
+    **no** se guardan en el localizador: van a la orden (y de ahí a la factura de Facturación). No lo
+    purga la retención ni lo vacía el borrado de una persona (HUB-F249).
+  - `_elevation_audit`: quién pidió (`created_by`), quién aprobó (`approved_by`), la orden, el
+    permiso, la huella del contenido y, si se aprobó con tarjeta, su tipo y referencia
+    (`credential_kind`, `credential_ref`).
+  - `_public_claim_key`: sin datos personales, pero es un secreto.
+  - Los avisos de una orden llevan quién la pidió y quién la aprobó, y la identidad fiscal del
+    negocio (que para un autónomo es su nombre y su NIF).
+  - El registro de errores guarda las **claves** del contenido de una orden fallida, nunca sus
+    valores.
+
+## Reglas que no se rompen
+
+Las del embudo de una orden (cada fila de un negocio, una app solo escribe en sus tablas, primero se
+comprueba, una orden es una transacción, el permiso en el servidor, el orden de las puertas, el plan,
+las órdenes internas, el dinero, nada fiscal se simula, errores sin detalles internos) valen para todo
+el servidor y están en el índice. Las propias de esta parte:
+
+- **El cliente de la página pública solo rellena los campos que el localizador permite**; lo sellado
+  en el mostrador gana siempre, y un localizador produce como mucho un documento.
+
+## Lo que NO hace, a propósito
+
+- No pide PIN para leer: un informe no se desbloquea con el código del responsable.
+- No deja que un manejador WASM toque la base de datos, la red ni otra app: propone, y el hub valida.
+  El motor nativo de confianza (hoy VeriFactu) sí lee cualquier tabla con `SELECT`, usa la red y el
+  certificado, llama a la nube y escribe ficheros en su carpeta, con sus permisos de host concedidos
+  (HUB-F12); para escribir en la base también propone.
+- No ejecuta código en la página pública salvo un único fichero propio que pone nombre a los países.
+
+## Dudas abiertas
+
+1. Cuando una orden aprobada con PIN falla después de la puerta, ¿se debe devolver la aprobación?
+   (HUB-F05)
+2. ¿Qué frase ve la cajera cuando una orden de Venta se rechaza porque la caja está cerrada? Hoy el
+   código `protects_guard` no tiene traducción (HUB-F13, CASH_REGISTER-F04).
+
+## Fuentes contrastadas
+
+- `crates/runtime/src/wasm.rs` dice que ejecutar un manejador WASM «aún no está soportado»: es un
+  resto; los manejadores corren por `wasm_cache` y `erplora-wasm-host` (HUB-F10).
+- TAXES-F18 dice que el motor de VeriFactu usa el mismo redondeo común; el motor no enlaza
+  `guest-sdk` y formatea sus importes por su cuenta (`chain.rs`, `format_amount`) — a contrastar en
+  `HUB_VERIFACTU`.
+- `guest-sdk/src/money.rs` llama «HALF_UP» al modo de redondeo; lo que aplica es la mitad
+  alejándose de cero, que coincide con «hacia arriba» en importes positivos y redondea −0,5 a −1 en
+  devoluciones (HUB-F18).
+- INVOICE-F04 y REC_FISCAL-F10 deben apuntar su «Pendiente de enlazar hub» a HUB-F17; INVOICE-F04,
+  además, que la frase del descuadre (`invoice.tax_quota_mismatch`) sale en inglés y en céntimos.
+- `architecture/hub/runtime-dispatcher.md` §2.0 no tiene la puerta de reglas del dueño ni el cambio
+  parcial, y sus números de línea ya no casan (HUB-F03).
+- `crates/runtime/src/public_claim.rs:34` dice migración v51; es la v52 (HUB-F16).

@@ -2,6 +2,17 @@
 
 Prefijo: HUB
 
+> **Para qué sirve el área «WhatsApp y asistente».** El servidor del hub es el único que puede hablar
+> con la plataforma en nombre del negocio: conecta el número de WhatsApp, recoge cada cinco segundos
+> los mensajes que la plataforma guarda para el hub y los convierte en un aviso del núcleo, saca los
+> WhatsApp que mandan las automatizaciones, sirve los adjuntos y lleva a Meta las plantillas del
+> negocio, siempre con la credencial de máquina del hub, que nunca llega al navegador. Y prepara cada
+> turno del asistente (qué herramientas puede usar la persona, con qué instrucciones) antes de pasarlo
+> al proxy de IA del SaaS; en una automatización, además, ejecuta él mismo el paso del asistente
+> ([asistente.md](asistente.md)). Lo usan el **administrador** (conectar el número, plantillas, plan) y
+> todos los perfiles (asistente, ver adjuntos de la bandeja); el resto lo hace el **sistema** solo. Lo
+> que vale para toda el área está al final de este fichero.
+>
 > Área «WhatsApp y asistente», primera mitad. El hub **no habla con Meta**: todo pasa por la
 > pasarela de WhatsApp del SaaS, firmado con la credencial de máquina del hub, que nunca sale al
 > navegador (ADR-0012, ADR-0452, ADR-0470). Lo que la persona ve está en `whatsapp_inbox`
@@ -11,12 +22,41 @@ Prefijo: HUB
 > whatsapp_header_samples,whatsapp_quota}.rs`, la salida por `notify_transport.rs` y las puertas
 > de `crates/cloud-client`.
 
+## Referencia adoptada
+
+Para WhatsApp (la del asistente está en [asistente.md](asistente.md)):
+
+- **Meta, WhatsApp Cloud API — webhooks**: entrega al menos una vez, sin orden garantizado; se
+  deduplica por el id del mensaje (`wamid`) —
+  <https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components>. Se adopta:
+  identificador de Meta como clave única y confirmación después de escribir.
+- **Meta, Embedded Signup y coexistencia** (mismo número en la app y en la API, 180 días de
+  historial, ecos de lo que contesta el dueño) —
+  <https://developers.facebook.com/docs/whatsapp/embedded-signup/>. Manda sobre todo lo demás.
+- **Meta, ventana de atención de 24 h y plantillas** —
+  <https://developers.facebook.com/docs/whatsapp/pricing#customer-service-windows>,
+  <https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates>.
+- **Meta, medios** (tipos y tamaños: imagen 5 MB, vídeo 16 MB, documento 100 MB) —
+  <https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media>.
+
+## Antes de empezar
+
+- El hub **enrolado** (con credencial de máquina): sin ella no hay recogida de WhatsApp, ni envío, ni
+  asistente en producción.
+- La **Bandeja de WhatsApp** instalada, activa y cubierta por el plan; el número conectado desde sus
+  Ajustes (HUB-F260); y, para que el módulo vea adjuntos y plantillas, el permiso de host
+  **Notificaciones** concedido al módulo. No se concede solo (se niega por defecto): lo concede el
+  diálogo de permisos al instalar desde **Apps** (la pantalla lo pide justo después de
+  instalar, por la puerta de HUB-F32), Ajustes › Permisos o restaurar una copia del propio hub. Si la
+  Bandeja se instaló por el asistente, por una plantilla de sector o por la reconciliación, queda sin
+  él y adjuntos y plantillas contestan `capability_denied`.
+
 ## Flujos
 
 ### HUB-F260 Conectar el número de WhatsApp del negocio
 Estado: parcial — la puerta del hub está entera, pero hoy Meta solo deja terminar la conexión con números del portfolio de ERPlora (verificación del negocio pendiente, pm#277), y el canje del código ocurre en la plataforma, fuera de este código
 Actor: administrador
-Pantalla: whatsapp_inbox: Ajustes
+Pantalla: HUB_SHELL: Tu número
 Pasos:
 1. El administrador abre **Bandeja de WhatsApp → Ajustes**. Para pintar el bloque «Tu número», la pantalla pregunta al hub qué necesita la ventana de Meta; el hub se lo pregunta a la plataforma y devuelve su respuesta sin tocarla. Si la plataforma dice que WhatsApp no está configurado, la pantalla no enseña el bloque «Tu número» en absoluto (ni conectar, ni los números ya conectados, ni desconectar).
 2. Pulsa **Conectar WhatsApp**, inicia sesión en Facebook, elige el número y escanea el QR con la app de WhatsApp Business del móvil.
@@ -34,7 +74,7 @@ QA: WA-01, WA-07
 ### HUB-F261 Saber qué número está conectado y si hay que reconectarlo
 Estado: parcial — la etiqueta «App de WhatsApp Business» no aparece nunca: la plataforma no manda `is_on_biz_app` en la lista de números
 Actor: administrador
-Pantalla: whatsapp_inbox: Ajustes
+Pantalla: HUB_SHELL: Tu número
 Pasos:
 1. Al abrir el bloque «Tu número», la pantalla pide al hub los números de este negocio.
 2. El hub los pide a la plataforma y devuelve la lista tal cual: número visible, si está activo (la pantalla no enseña los inactivos) y si Meta retiró el permiso.
@@ -52,7 +92,7 @@ QA: WA-01, WA-09
 ### HUB-F262 Desconectar o volver a conectar el número
 Estado: hecho
 Actor: administrador
-Pantalla: whatsapp_inbox: Ajustes
+Pantalla: HUB_SHELL: Tu número
 Pasos:
 1. En «Tu número», el administrador pulsa **Desconectar** y confirma «¿Desconectar este número? Los mensajes dejarán de llegar aquí.».
 2. El hub comprueba que el identificador del número son solo cifras (como mucho 32) y pide a la plataforma que deje de enviar ese número a este hub.
@@ -164,7 +204,7 @@ QA: WA-04, WA-07, qa-hub-flows R7
 ### HUB-F267 Ver una foto, una nota de voz o un documento de la clienta
 Estado: hecho
 Actor: empleado, responsable, administrador
-Pantalla: whatsapp_inbox: Bandeja de entrada
+Pantalla: WHATSAPP_INBOX: Bandeja de entrada
 Pasos:
 1. En un hilo de la bandeja, la persona abre una foto o pulsa **Reproducir** o **Descargar**.
 2. La bandeja pide el adjunto al hub por el identificador que Meta le dio (solo cifras, hasta 32).
@@ -181,7 +221,7 @@ QA: WA-10
 ### HUB-F268 Ver las plantillas del negocio con lo que dice Meta de cada una
 Estado: hecho
 Actor: administrador
-Pantalla: whatsapp_inbox: Plantillas de Meta
+Pantalla: WHATSAPP_INBOX: Plantillas de Meta
 Pasos:
 1. Al abrir **Ajustes** de la bandeja, el módulo pide al hub las plantillas.
 2. El hub exige una sesión de administrador y, como la pide un módulo, que ese módulo tenga concedidas las notificaciones y declarado WhatsApp.
@@ -198,7 +238,7 @@ QA: WA-04
 ### HUB-F269 Mandar una plantilla a revisión de Meta, nueva o editada
 Estado: parcial — cuando Meta rechaza la plantilla (`meta_template_failed`) o no contesta (`meta_unreachable`), el módulo recibe `cloud_rejected` sin el motivo de Meta
 Actor: administrador
-Pantalla: whatsapp_inbox: Plantillas de Meta
+Pantalla: WHATSAPP_INBOX: Plantillas de Meta
 Pasos:
 1. El administrador pulsa **Añadir** o **Guardar** en el panel de la plantilla.
 2. El módulo entrega al hub la plantilla tal como se escribió (nombre, idioma, categoría, cabecera, cuerpo, pie, ejemplos, botones).
@@ -216,7 +256,7 @@ QA: WA-04
 ### HUB-F270 Subir a Meta la muestra de la cabecera de una plantilla
 Estado: hecho
 Actor: administrador
-Pantalla: whatsapp_inbox: Plantillas de Meta
+Pantalla: WHATSAPP_INBOX: Plantillas de Meta
 Pasos:
 1. En una plantilla con cabecera de imagen, vídeo o PDF, el administrador elige **Elegir archivo de ejemplo**.
 2. El módulo manda el archivo al hub en un formulario; el hub comprueba la puerta de HUB-F268, que el formulario declara su tamaño y que no pasa de lo que Meta acepta para un PDF (100 MB más un margen para el formulario).
@@ -250,7 +290,7 @@ QA: ninguno
 ### HUB-F272 Reflejar en el hub el cupo y el consumo de WhatsApp del mes
 Estado: parcial — el consumo que enseña la pestaña Plan solo se refresca al arrancar el hub y una vez cada 24 h, así que puede ir hasta un día por detrás de lo que cobra la plataforma; un cambio de plan tampoco llega al medidor hasta esa vuelta; y al instalar la Bandeja con el hub ya encendido, el tope no llega hasta la siguiente vuelta diaria (el medidor queda en 0, que en el módulo es «sin tope»)
 Actor: sistema
-Pantalla: HUB_SHELL: Plan del módulo
+Pantalla: HUB_SHELL: Vista de un módulo › Plan
 Pasos:
 1. Al arrancar y después una vez al día, si la Bandeja de WhatsApp está instalada y activa, el hub pregunta a la plataforma el plan del canal y lo gastado este mes.
 2. Si la plataforma da un tope mayor que cero, el hub lo escribe en el medidor del módulo por una orden interna que nadie más puede llamar; si además da lo gastado y el módulo instalado sabe recibirlo, lo escribe al lado.
@@ -265,3 +305,115 @@ Pendiente de enlazar: architecture — REC_WA_MESA-F02 (El comensal escribe y el
 Pendiente de enlazar: hub — HUB_SHELL, pestaña Plan del módulo
 Pendiente de enlazar: saas — facturación de WhatsApp: `GET /api/v1/hub/device/whatsapp/plan/` → `{tier: {max_billable_messages, max_conversations, …} | null, usage: {billable_messages, month}, available_tiers}`, el mismo contador que hace cumplir al enviar
 QA: WA-03
+
+## Cobertura contra la referencia
+
+**1 · Plantillas de Meta: elemento × traer / crear / editar / enviar, visto desde el hub.** El hub
+no interpreta el contenido de una plantilla: transporta. La columna dice qué hace el hub, qué
+delega y qué no existe.
+
+| Elemento | Traer (HUB-F268) | Crear (HUB-F269) | Editar (HUB-F269) | Enviar (HUB-F266) |
+|---|---|---|---|---|
+| Nombre, idioma, categoría | transporta; valida y consulta a Meta el SaaS | transporta tal cual; valida el SaaS | igual | el nombre e idioma viajan en el objeto de plantilla; una plantilla no aprobada (`409 template_not_approved`) gasta los 8 intentos (≈4 min) antes de caer |
+| Cuerpo y variables `{{1}}` / `{{nombre}}` | transporta | transporta | transporta | con nombre: desde `vars`; posicionales (`{{1}}`): solo si la intención trae `vars.components` ya en la forma de Meta |
+| Cabecera de texto con variable | transporta | transporta (el panel del módulo no tiene campo) | transporta | hecho (`header_text`) |
+| Cabecera imagen / vídeo / PDF | transporta | muestra subida por HUB-F270 (límite declarado 101 MiB; tipo y tamaño por tipo, el SaaS) | igual, muestra en cada guardado | hecho: archivo subido al hub firmado en cada intento, o enlace; PDF con nombre |
+| Pie | transporta | transporta | transporta | — (fijo en Meta) |
+| Botones respuesta rápida, enlace, llamada | transporta | transporta | transporta | enlace con variable `button_url_<n>`: hecho; respuesta rápida: el toque vuelve nombrado (HUB-F265) |
+| Estado y motivo de rechazo | transporta; `stale` si Meta no contestó | parcial: un 4xx llega con su código; el rechazo de Meta (`502 meta_template_failed`) y «Meta no contesta» (`503`) llegan como `cloud_rejected` sin motivo (HUB-F269) | igual | — |
+| Borrar en Meta | — | — | — | puerta hecha (HUB-F271), ningún módulo la usa |
+| Aviso de Meta cuando cambia el estado | no existe: solo al abrir (lo pide el módulo) | — | — | — |
+| Ventana de 24 h | — | — | — | no la vigila el hub; la impone Meta. Rechazo en el acto: `502 meta_send_failed`, 8 intentos y «Eventos caídos»; fallo posterior por webhook: la plataforma lo descarta y el hub lo da por enviado |
+
+**2 · Canal de WhatsApp.**
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Conexión por Embedded Signup con coexistencia | parcial (Meta solo deja números del portfolio de ERPlora, pm#277) | HUB-F260 |
+| Estado del número y aviso de reconectar | parcial: «App de WhatsApp Business» nunca sale (la lista no trae `is_on_biz_app`) | HUB-F261 |
+| Desconectar / reconectar | hecho | HUB-F262 |
+| Entrada al menos una vez, deduplicada por `wamid` | hecho | HUB-F263 |
+| Confirmar después de escribir (nada se pierde) | hecho | HUB-F263 |
+| Ecos del dueño e historial de 180 días etiquetados | hecho | HUB-F264 |
+| Adjunto del historial completado después | hecho | HUB-F264 |
+| Saber a qué pregunta contesta un toque | hecho | HUB-F265 |
+| No contestar automáticamente lo que llegó hace días (tras un apagón) | no hecho: el hub no mira la antigüedad | HUB-F263 |
+| Envío por plantilla, texto libre u opciones | hecho | HUB-F266 |
+| Cupo agotado: no se reintenta, cae a Eventos caídos | hecho, pero cualquier 429 (también el freno de tasa) se toma por cupo agotado | HUB-F266 |
+| Motivos de Meta al conectar y al registrar plantilla | parcial: los 5xx con código llegan como `cloud_rejected` | HUB-F260, HUB-F269 |
+| Ventana de 24 h conocida por el hub | no hecho | HUB-F266 |
+| Adjuntos en streaming, sin guardar | hecho | HUB-F267 |
+| Cupo y consumo reflejados al momento | parcial: cada 24 h y al arrancar; tras instalar la Bandeja, nada hasta la vuelta diaria | HUB-F272 |
+
+## Datos: de quién es cada dato
+
+Ninguna migración de sistema del área crea tablas: lo de WhatsApp vive en tablas de avisos y
+automatizaciones, o fuera del hub. Lo del asistente está en [asistente.md](asistente.md).
+
+| Dato | Dónde vive | Dueño | Cómo se borra hoy |
+|---|---|---|---|
+| Número de la clienta, texto, mensaje de Meta tal cual (`hub.whatsapp.message_received`) | `_event_outbox.payload` | hub (historial de avisos) | poda de 90 días de lo terminado; el borrado RGPD de una ficha **no** lo alcanza (hub#2477, hub#2474) |
+| Id de Meta de cada WhatsApp enviado, con automatización y paso | `_event_delivery` (`provider_message_id`, `flow_id`, `step_id`) | hub | poda de 90 días |
+| Destinatario y variables de un envío | `_event_outbox.payload` del aviso de envío | hub | poda de 90 días; el borrado RGPD solo si el payload lleva el id de la ficha (hub#2467) |
+| Teléfono de un envío rechazado por destinatario | `_event_outbox.last_error` | hub | poda de 90 días |
+| Historial de ejecuciones de las recetas de WhatsApp: entrada con `from`, `text` y `received_at` del mensaje; salida con el texto que el asistente escribe a la clienta y los resultados de las herramientas (fichas, citas) | `_flow_runs`, `_flow_run_steps` | hub (automatizaciones) | poda de 90 días; el borrado RGPD solo si el texto lleva el id de la ficha |
+| Número de WhatsApp del negocio, token de Meta, mensajes no recogidos, adjuntos | plataforma (SaaS) | SaaS | sin caducidad de lo no recogido (saas#1930) |
+| Adjunto que se ve en la bandeja | en tránsito por el hub, no se guarda | — | — |
+| Muestra de cabecera de plantilla | Meta | Meta | no pasa a disco en el hub |
+
+## Reglas que no se rompen
+
+- **Ninguna credencial de Meta en el hub.** Todo sale por la plataforma con la credencial de máquina;
+  el `Debug` del recogedor la oculta.
+- **Escribir antes de confirmar.** Un mensaje solo se confirma a la plataforma cuando su aviso ya
+  está escrito; la clave `wa-<wamid>` hace que un duplicado no escriba otro aviso, y un mensaje en
+  vivo nunca se vuelve a emitir.
+- **Sin el módulo activo o sin enrolar no sale ni una petición de recogida ni de cupo**; la recogida
+  además se para si el plan conocido bloquea el módulo (sin plan conocido, recoge).
+- **Un identificador que acaba dentro de una ruta de la plataforma se valida antes** (número de
+  Meta y adjunto: solo cifras, hasta 32; plantilla: `[a-z0-9_]`, hasta 512).
+- **Conectar el número: solo sesión de administrador. Plantillas y muestras: sesión de administrador
+  y, si la petición nombra un módulo, ese módulo con `notify` concedida y WhatsApp declarado.
+  Adjuntos: cualquier sesión con permiso de leer la bandeja, con la misma condición de módulo.** Quien
+  no manda la cabecera del módulo (el shell, una llamada con sesión de administrador) no pasa por esa
+  mitad (regla común del índice). Una llave de API no pasa por ninguna de estas puertas.
+- **Un cupo de WhatsApp desconocido no se escribe como cero** (cero es «sin tope»).
+
+## Lo que NO hace, a propósito
+
+- No guarda el número, el token de Meta, los adjuntos ni las muestras de plantilla.
+- No decide qué se pinta ni a qué se contesta: entrega todo etiquetado (vivo/historial,
+  cliente/dueño) y deciden el módulo y las recetas.
+- No valida plantillas: las reglas de Meta las aplica la plataforma.
+
+## Dudas abiertas
+
+1. **Mensajes viejos tras un apagón.** Un hub apagado o en pausa recibe al volver los mensajes en
+   vivo de hace horas o días, y las recetas los contestan como si fueran de ahora. ¿Se marca como
+   historial lo que supere cierta antigüedad (WhatsApp Business y Square Messages no responden
+   automáticamente a lo atrasado)?
+2. **Ventana de 24 h.** ¿Debe saber el hub cuándo escribió la clienta por última vez y no mandar
+   texto libre fuera de la ventana, o basta con que lo rechace Meta y caiga a «Eventos caídos»?
+3. **Refrescar el cupo de WhatsApp al cambiar de plan y al instalar la Bandeja** (hoy solo cada 24 h
+   y al arrancar).
+4. **Freno de tasa compartido** (5.000 llamadas por hora y hub en la plataforma, 720 de ellas la
+   recogida): ¿se separa el cupo de mensajes del freno de tasa en la respuesta, para que el hub
+   reintente uno y no el otro?
+
+## Fuentes contrastadas
+
+- `crates/server/src/whatsapp_connect.rs` (cabecera): «a SaaS that does not answer is a 502» — el
+  hub responde `424` (`CLOUD_FAILED`) con `cloud_unreachable`.
+- `.claude/agents/qa-module.md` WA-03 cita `billable_messages_per_month`; el campo que lee el hub es
+  `usage.billable_messages` (y el tope `tier.max_billable_messages`).
+- `whatsapp_inbox` WORKFLOW F13: «los dos números los pone la plataforma» — cierto, pero el hub los
+  baja una vez al día: el consumo de la pestaña Plan puede ir hasta 24 h por detrás.
+- `crates/server/src/cloud_proxy.rs:305-307` dice que `meta_template_failed` se conserva: solo en la
+  puerta de muestras (`cloud_envelope_named_refusal`); la de registrar plantilla lo pierde.
+- `whatsapp_inbox` WORKFLOW F01: la etiqueta «App de WhatsApp Business» y «el bloque dice el motivo»
+  — la etiqueta no sale y los motivos 5xx llegan genéricos. F03 y REC_WA_*-F02: con el cupo agotado
+  la receta corre igual. F13: tras instalar el módulo, nada hasta la vuelta diaria; un 429 por tasa
+  se confunde con cupo agotado. F29: «Meta no ha contestado…» y el motivo de Meta no llegan.
+- `apps/web/src/i18n/locales/es.ts:829-841`: las frases de `whatsappConnect.errors.{not_configured,
+  no_business_account, no_access_token, meta_unreachable, meta_api_error}` no se ven nunca a
+  través del hub (llegan como `cloud_rejected`).

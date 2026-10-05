@@ -9,6 +9,26 @@ Prefijo: HUB
 > servidor. El módulo Personal (`staff`) es otra cosa: su ficha de profesional se **vincula** a estas
 > cuentas, no las crea. Técnico: `architecture/hub/auth.md`, `policies.md`, `public-api.md`.
 
+## Referencia adoptada
+
+Para esta parte del área (la de entrar y las sesiones está en [acceso.md](acceso.md)):
+
+- **Aprobación de un responsable por acción, con su PIN o su placa, sin cerrar la sesión del cajero**:
+  Toast (manager approval), Square; registro de quién pidió y quién aprobó (ADR-0238/0265).
+- **Ficha del dueño en solo lectura para los demás administradores**: Shopify, Square, Toast,
+  Lightspeed, Vagaro, Business Central (hub#1429).
+- **Dar de baja, nunca borrar, a un empleado**: 11 de 11 referencias (ADR-0352).
+- **Normas del dueño con nombre y parámetros sobre puntos de control del desarrollador** (límite +
+  bloquear/aprobación): Shopify Validation Functions, Lightspeed X-Series Workflows; modo prueba como
+  Stripe Radar «Review» (ADR-0476, `architecture/hub/policies.md`).
+- **Llaves de API con secreto mostrado una vez, rotar y revocar, permisos por módulo y
+  lectura/escritura** (`architecture/hub/public-api.md`, ADR-0057); documentación OpenAPI 3.1.
+
+## Antes de empezar
+
+- Da de alta al personal: locales con PIN o con cuenta (HUB-F145, HUB-F146), dentro de las plazas
+  del plan (HUB-F147); enciende los roles que traen las apps (HUB-F150).
+
 ## Flujos
 
 ### HUB-F145 Dar de alta a una persona que entra solo con PIN
@@ -54,7 +74,7 @@ Pantalla: HUB_SHELL: Empleados
 Pasos:
 1. El plan del negocio admite un número de personas activas (3 en el gratuito).
 2. El administrador intenta dar de alta, invitar o reincorporar a alguien con todas las plazas ocupadas.
-3. El hub lo rechaza sin escribir nada y la pantalla ofrece «Actualizar plan».
+3. El hub lo rechaza sin escribir nada. La pantalla ofrece «Actualizar plan» solo en la ficha de la persona, así que en la práctica solo se ve al reincorporar a alguien.
 4. Dar de baja a alguien libera su plaza al momento.
 Entra: el tope de personas del último plan verificado (HUB-F162); sin plan verificado no hay tope. Se cuentan solo las personas activas de este negocio.
 Sale: nada escrito en el hub; el rechazo `hub.users.user_limit_reached` (409). Salvo al **reincorporar** a una persona con cuenta: el hub avisa antes a erplora.com (que recrea la membresía y la invitación) y solo después pide la plaza, así que con el plan lleno erplora.com ya la ha readmitido cuando el hub contesta 409. Dos altas a la vez no pueden coger la misma plaza: la plaza se pide en el mismo paso que se escribe. Cambiar el rol de quien ya está dentro no gasta plaza. Quien entra con su cuenta por primera vez no pasa por este tope: esa plaza la controla erplora.com.
@@ -103,7 +123,7 @@ Estado: parcial — el dueño no puede crear un rol propio ni cambiar qué permi
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
-1. En **Empleados → Roles** se ven los roles del negocio: los tres de fábrica (administrador, responsable y empleado), los que declaran los módulos instalados y cualquiera que ya tenga alguien, con sus permisos y sus miembros.
+1. En **Empleados → Roles** se ven los roles del negocio: los tres de fábrica (administrador, responsable —en pantalla, «Encargado»— y empleado; el catálogo puede traer además «Propietario», un rol antiguo que sale como «App desinstalada»), los que declaran los módulos instalados y cualquiera que ya tenga alguien, con sus permisos y sus miembros.
 2. Un rol que trae un módulo (camarero, cocina…) se enciende para poder asignarlo.
 3. Desde entonces aparece entre los roles al dar de alta o editar a una persona.
 Entra: la sesión (leer, cualquiera; encender o apagar, administrador); los roles y permisos que declaran los módulos activos.
@@ -134,7 +154,7 @@ QA: qa-hub-restaurant §6
 ### HUB-F152 Aprobar una acción con el PIN de un responsable
 Estado: hecho
 Actor: administrador, responsable, empleado
-Pantalla: HUB_SHELL: Aprobación
+Pantalla: HUB_SHELL: Aprobación de un responsable
 Pasos:
 1. El cajero intenta algo que su rol no permite pero un responsable sí (un descuento por encima del límite, borrar una cuenta abierta): sale «Hace falta una aprobación» con «Se aprueba: {acción}». Solo se puede aprobar lo que el módulo concede expresamente al rol de responsable.
 2. Un responsable o un administrador elige su nombre y teclea su PIN, o pasa su placa, sin cerrar la sesión del cajero.
@@ -155,7 +175,7 @@ Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
 1. El administrador abre **Empleados → Aprobaciones**.
-2. Ve cada acción que necesitó el PIN de un responsable: cuándo, quién la pidió, quién la autorizó, qué acción y una referencia.
+2. Ve cada acción que necesitó el PIN de un responsable: cuándo, quién la pidió, quién la autorizó y el código de la orden y del permiso.
 3. Busca por persona o acción; las personas dadas de baja siguen saliendo con su nombre.
 Entra: la sesión de administrador (permiso de administrar el hub).
 Sale: nada; es una lectura paginada del registro de aprobaciones (`hub.approvals.list`). Nadie puede editar ni borrar una fila; el hub las poda solo a los cuatro años.
@@ -245,3 +265,85 @@ Implicados: pendiente
 Pendiente de enlazar: kitchen — KITCHEN-F10 (nombrar a quien envió la comanda)
 Pendiente de enlazar: staff — STAFF-F03 (las cuentas activas que se ofrecen para vincular la ficha)
 QA: ninguno
+
+## Cobertura contra la referencia
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Personas locales con PIN | hecho | HUB-F145 |
+| Personas con cuenta e invitación | parcial (no se puede reenviar una invitación fallida) | HUB-F146 |
+| Tope de plazas del plan | parcial (la reincorporación avisa a erplora.com antes del tope) | HUB-F147 |
+| Ficha del dueño protegida | hecho | HUB-F148 |
+| Baja sin borrado y reincorporación | hecho | HUB-F149 |
+| Último administrador protegido | hecho | HUB-F148, HUB-F149 |
+| Roles de fábrica | hecho | HUB-F150 |
+| Roles propios del dueño y editar permisos por rol | no hecho | HUB-F150 |
+| Rechazo sin permiso con oferta de aprobación | hecho | HUB-F151 |
+| Aprobación del responsable por acción (PIN o placa) | hecho | HUB-F152 |
+| Registro de aprobaciones | hecho | HUB-F153 |
+| Normas del dueño: bloquear | parcial (sin pantalla) | HUB-F154 |
+| Normas del dueño: «lo aprueba el encargado» | no hecho (hub#1710) | HUB-F154 |
+| Llaves de API con permisos por módulo, límite por minuto | hecho | HUB-F155, HUB-F156 |
+| Caducidad de una llave | no hecho | — |
+| Documentación OpenAPI | hecho | HUB-F157 |
+
+## Datos: de quién es cada dato
+
+Las tablas de toda el área están en [acceso.md](acceso.md). Inventario de datos personales de
+cuentas, roles, aprobaciones, normas y llaves (sacado de las migraciones de sistema):
+
+| Dónde | Qué |
+|---|---|
+| `hub_role_activation` | `activated_by` |
+| `_elevation_audit` | quién pidió y quién aprobó (ids), huella de los datos, índice de la placa; se conserva 4 años y no se borra a petición |
+| `hub_api_key` | `created_by` |
+| `_policy` | `created_by`, `updated_by`, `deleted_by` |
+
+No hay borrado RGPD de empleados: la baja desactiva y conserva (HUB-F149; ver la duda común del
+índice y HUB-F252).
+
+## Reglas que no se rompen
+
+- El **alta** de un usuario local no admite rol de administrador (la edición sí lo deja: hueco D1).
+  Las puertas de administración del hub miran el **rol**, nunca la credencial: un administrador con
+  PIN entra por el pinpad con sesión de administrador; solo el pase a erplora.com exige la cuenta.
+  Un rol declarado por un módulo no abre esas puertas (salvo un `*` en el manifiesto, hueco D10).
+- Nadie se da de baja a sí mismo; Personal rechaza dejar el negocio sin un administrador activo (no
+  lo impiden la revocación desde erplora.com ni dos cambios simultáneos: D11); la ficha del dueño
+  solo la toca el dueño; nadie da de alta su propia placa (salvo el dueño); nadie reparte un rol
+  por encima del suyo.
+- Personal nunca borra a una persona: la desactiva y borra sus sesiones. El restablecimiento del hub
+  (HUB-F242, negocio y datos) sí borra las fichas, sin avisar a erplora.com (D12).
+- La aprobación con PIN vale para una sola ejecución de esa orden con esos datos, 120 s como mucho,
+  solo la da quien podría hacerlo, vive en la memoria de un proceso y su recibo se escribe (y el pase
+  se gasta) en el control de permisos, antes de ejecutar.
+- Una norma del dueño solo restringe, y si no puede evaluarse deniega.
+- Las plazas del plan se piden en la misma escritura que da de alta.
+
+## Lo que NO hace, a propósito
+
+- No manda la invitación: el correo lo manda erplora.com.
+- No deja que el dueño cree roles ni cambie lo que permite cada uno: eso lo declaran las apps.
+- No persiste una aprobación en base de datos.
+
+## Dudas abiertas
+
+- **¿Puede un usuario solo-PIN ser administrador?** El alta lo prohíbe y la edición lo permite (D1):
+  hay que decidir cuál de las dos es la regla y aplicarla en las dos puertas.
+- **Revocar una llave «no se puede deshacer»** según la pantalla, pero «Rotar» la vuelve a activar.
+- **Aprobación durante un despliegue**: el pase vive en un proceso; con dos copias del hub (o tras
+  un reinicio) hay que volver a pedirlo.
+- El borrado RGPD de un empleado está en las dudas comunes del índice.
+
+## Fuentes contrastadas
+
+- `architecture/hub/public-api.md` §4 dice que la documentación no devuelve 404 cuando está apagada y
+  que el interruptor es local; hoy es un ajuste del servidor (`api_docs_enabled`, apagado de fábrica)
+  y apagado responde 404 (HUB-F157).
+- `crates/runtime/src/hub_users.rs` (comentario cerca de la l. 1420) dice «no soft-delete»; la baja sí
+  es desactivación (HUB-F149).
+- `crates/server/src/members.rs` (`census_id_by_access_email`, comentario) dice que el correo del
+  perfil no decide; la lista de Personal (`COALESCE`, `crates/runtime/src/hub_users.rs:741-747`) sí lo
+  usa para hablar con erplora.com cuando no hay correo de acceso.
+- El aviso de Personal ante una invitación fallida dice «vuelve a guardar»; guardar sin cambios no
+  reenvía nada (`crates/server/src/hub_users.rs:448-459`) (HUB-F146).
