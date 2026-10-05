@@ -99,7 +99,7 @@ Implicados: HUB_SHELL-F44, HUB_SHELL-F53
 QA: ninguno
 
 ### HUB-F05 Pedir la aprobación de un responsable cuando falta el permiso
-Estado: hecho
+Estado: parcial — el pase se gasta aunque la orden falle después, vive en la memoria de un solo proceso (no sirve en la otra copia del hub durante un despliegue ni tras un reinicio) y no cubre las operaciones del manejador, que se rechazan con el pase ya gastado
 Actor: empleado, responsable
 Pantalla: HUB_SHELL: Aprobación de un responsable
 Pasos:
@@ -115,7 +115,7 @@ Implicados: HUB_SHELL-F51, HUB_SHELL-F193, SALES-F14
 QA: ninguno
 
 ### HUB-F06 Comprobar que la orden cambió algo
-Estado: hecho
+Estado: parcial — en una orden con manejador la comprobación de filas de la propia orden se ignora y el instalador lo acepta: contesta bien y avisa aunque no haya cambiado nada
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -159,7 +159,7 @@ Implicados: ninguno
 QA: ninguno
 
 ### HUB-F09 Avisar de un duplicado con el código del módulo
-Estado: hecho
+Estado: parcial — en una orden con manejador solo cuenta el aviso de duplicado de la orden pedida, nunca el de sus sub-órdenes
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -173,7 +173,7 @@ Implicados: ninguno
 QA: ninguno
 
 ### HUB-F10 Ejecutar el manejador de un módulo y validar lo que propone
-Estado: hecho
+Estado: parcial — las operaciones del manejador no pasan por el esquema de su sub-orden ni reciben sus valores por defecto, el aviso de la sub-orden no sale, y un aviso no declarado solo tumba la orden si el módulo declara cuáles emite
 Actor: sistema
 Pantalla: ninguna
 Pasos:

@@ -47,7 +47,7 @@ Implicados: HUB_SHELL-F12
 QA: ninguno
 
 ### HUB-F161 Decir si el hub está listo para servir
-Estado: hecho
+Estado: parcial — la respuesta, sin sesión, lleva la versión y los errores internos tal como salen (ERPlora/hub#2510), y queda retenida mientras se instala o actualiza una aplicación (ERPlora/hub#2508)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -93,7 +93,7 @@ Pendiente de enlazar: saas — avisar al hub del cambio de plan con el permiso n
 QA: ninguno
 
 ### HUB-F164 Mandar el latido diario de uso a erplora.com
-Estado: hecho
+Estado: parcial — la llamada no tiene tiempo límite: si erplora.com deja la conexión colgada, el hub deja de mandar el latido hasta que se reinicia (ERPlora/hub#2509)
 Actor: sistema
 Pantalla: ninguna
 Pasos:

@@ -175,12 +175,12 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F02 | Pedir una lista con búsqueda, filtros, orden y páginas | hecho | [modulos.md](workflow/modulos.md) |
 | HUB-F03 | Ejecutar una orden de un módulo | hecho | [modulos.md](workflow/modulos.md) |
 | HUB-F04 | Comprobar el contenido de una orden contra su esquema y rellenar lo que falta | hecho | [modulos.md](workflow/modulos.md) |
-| HUB-F05 | Pedir la aprobación de un responsable cuando falta el permiso | hecho | [modulos.md](workflow/modulos.md) |
-| HUB-F06 | Comprobar que la orden cambió algo | hecho | [modulos.md](workflow/modulos.md) |
+| HUB-F05 | Pedir la aprobación de un responsable cuando falta el permiso | parcial | [modulos.md](workflow/modulos.md) |
+| HUB-F06 | Comprobar que la orden cambió algo | parcial | [modulos.md](workflow/modulos.md) |
 | HUB-F07 | Cambiar solo algunos campos de una ficha | hecho | [modulos.md](workflow/modulos.md) |
 | HUB-F08 | Rechazar desde fuera las órdenes internas de un módulo | hecho | [modulos.md](workflow/modulos.md) |
-| HUB-F09 | Avisar de un duplicado con el código del módulo | hecho | [modulos.md](workflow/modulos.md) |
-| HUB-F10 | Ejecutar el manejador de un módulo y validar lo que propone | hecho | [modulos.md](workflow/modulos.md) |
+| HUB-F09 | Avisar de un duplicado con el código del módulo | parcial | [modulos.md](workflow/modulos.md) |
+| HUB-F10 | Ejecutar el manejador de un módulo y validar lo que propone | parcial | [modulos.md](workflow/modulos.md) |
 | HUB-F11 | Darle al manejador los datos de otros módulos antes de ejecutar | hecho | [modulos.md](workflow/modulos.md) |
 | HUB-F12 | Ejecutar el motor propio de un módulo de confianza | hecho | [modulos.md](workflow/modulos.md) |
 | HUB-F13 | Bloquear las órdenes de un módulo mientras otro no cumpla su condición | parcial | [modulos.md](workflow/modulos.md) |
@@ -256,8 +256,8 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F112 | Subir la foto, el vídeo o el PDF de la cabecera de un WhatsApp | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F130 | Entrar con la cuenta de erplora.com | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F131 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho | [acceso.md](workflow/acceso.md) |
-| HUB-F132 | Elegir o cambiar el propio PIN | hecho | [acceso.md](workflow/acceso.md) |
-| HUB-F133 | Entrar con PIN | hecho | [acceso.md](workflow/acceso.md) |
+| HUB-F132 | Elegir o cambiar el propio PIN | parcial | [acceso.md](workflow/acceso.md) |
+| HUB-F133 | Entrar con PIN | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F134 | Entrar pasando la placa | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F135 | Frenar a quien prueba PIN o sesiones | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F136 | Mantener la sesión abierta y cerrarla | parcial | [acceso.md](workflow/acceso.md) |
@@ -280,15 +280,15 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F153 | Consultar quién aprobó qué | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F154 | Escribir una norma propia del negocio | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F155 | Crear, rotar y revocar llaves de API | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
-| HUB-F156 | Leer y escribir datos del negocio con una llave de API | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB-F156 | Leer y escribir datos del negocio con una llave de API | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F157 | Consultar la documentación de la API | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F158 | Dar la lista de personas del negocio a los módulos | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F159 | Arrancar el hub y avisar a erplora.com de que ya atiende | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F160 | No abrir nada hasta que el hub esté registrado | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
-| HUB-F161 | Decir si el hub está listo para servir | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
+| HUB-F161 | Decir si el hub está listo para servir | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F162 | Comprobar el plan y qué apps puede usar el negocio | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F163 | Aplicar un cambio de plan al momento | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
-| HUB-F164 | Mandar el latido diario de uso a erplora.com | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
+| HUB-F164 | Mandar el latido diario de uso a erplora.com | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F165 | Ver el uso de recursos frente a los límites del plan | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F166 | Ver el estado del sistema, sus registros y documentos | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F167 | Saber qué versión corre y qué se le ha actualizado | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |

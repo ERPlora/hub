@@ -136,6 +136,12 @@ on:
       - 'apps/web/src/lib/print.ts'
       - 'crates/peripherals/**'
       - 'crates/runtime/src/print_*.rs'
+      # Los documentos WORKFLOW del hub (hub#2491). El guardia entra por el glob
+      # `scripts/tests/*.test.sh`; estas rutas son sus SUJETOS: la PR que añade un flujo a un fichero
+      # de área y no lo lista en el índice, reutiliza un ID o cambia un estado en un solo sitio tiene
+      # que encontrar el rojo aquí, y esa PR puede no tocar nada más.
+      - '**/WORKFLOW.md'
+      - '**/workflow/*.md'
       # El SUJETO del guardia de lote aplastado (hub#1878). Su test ya entra por el glob
       # `scripts/tests/*.test.sh` de arriba, y el workflow que lo lleva por
       # `.github/workflows/**`; esta ruta es para el script en sí, que vive en `scripts/` y no
@@ -466,6 +472,18 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/print-chain-doc-truth.test.sh
+
+      # ── Los WORKFLOW del hub siguen siendo un mapa que se puede seguir (hub#2491) ──────
+      # El hub tiene escrito qué debe hacer cada flujo (`WORKFLOW.md` + `workflow/<área>.md` por
+      # componente), y quien toca código lee el índice y el fichero de su área. Ese mapa se pudre
+      # en silencio: un flujo que no llega al índice, un ID reutilizado —lo citan 19 módulos y los
+      # recorridos—, un estado cambiado en el fichero y no en la tabla. Todo eso se decide desde
+      # este repo, así que se ancla en vez de fiarse. NO comprueba que un flujo diga la verdad
+      # sobre el código: eso lo contrasta el verificador independiente del contrato.
+      - name: "Contrato: los WORKFLOW del hub se sostienen (hub#2491)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/workflow-doc-truth.test.sh
 
       # ── Un lote develop → main que entra APLASTADO se caza (hub#1878) ─────────────────
       # `develop-main-drift.yml` solo se dispara por cron, por push a `main` y a mano, así que

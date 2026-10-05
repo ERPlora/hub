@@ -86,7 +86,7 @@ Pendiente de enlazar: saas — puertas de entrada al hub con pase de un solo uso
 QA: ninguno
 
 ### HUB-F132 Elegir o cambiar el propio PIN
-Estado: hecho
+Estado: parcial — al cambiar el PIN el hub dice si el número «ya lo usa otra persona», sin freno por intentos: se puede averiguar el PIN de otro (ERPlora/hub#2499)
 Actor: administrador, responsable, empleado
 Pantalla: HUB_SHELL: Mi perfil
 Pasos:
@@ -101,7 +101,7 @@ Implicados: HUB_SHELL-F03, HUB_SHELL-F22, HUB_SHELL-F85
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F133 Entrar con PIN
-Estado: hecho
+Estado: parcial — sin haber entrado se ven el nombre y el rol de cada persona con PIN (ERPlora/hub#2510), y las bajas siguen saliendo en la rejilla hasta recargar
 Actor: responsable, empleado
 Pantalla: HUB_SHELL: Acceso
 Pasos:

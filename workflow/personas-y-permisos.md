@@ -202,7 +202,7 @@ Implicados: HUB_SHELL-F94, HUB_SHELL-F95, HUB_SHELL-F96, HUB_SHELL-F97
 QA: ninguno
 
 ### HUB-F156 Leer y escribir datos del negocio con una llave de API
-Estado: hecho
+Estado: parcial — la operación se comprueba antes que la llave, así que sin llave se puede averiguar qué operaciones hay publicadas (ERPlora/hub#2510), y esta puerta no comprueba el plan contratado
 Actor: sistema
 Pantalla: ninguna
 Pasos:
