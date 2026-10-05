@@ -9,6 +9,12 @@ Prefijo: HUB
 > copias, la importación y restablecer están en [negocio-y-datos.md](negocio-y-datos.md), donde
 > está también lo que vale para toda el área.
 
+## Referencia adoptada
+
+Para el borrado de una persona, el patrón de las plataformas de referencia: un
+único aviso de borrado al que responde toda app (Shopify `customers/redact`, Odoo). RGPD arts. 5.1.c,
+5.1.e y 17; retención de 4 años por LGT art. 66 para los recibos de autorización.
+
 ## Flujos
 
 ### HUB-F245 Ver y descargar archivos
@@ -58,7 +64,7 @@ QA: ninguno
 ### HUB-F248 Borrar los datos de una persona: el aviso único
 Estado: parcial — el aviso lo emite Clientes y solo lo escuchan WhatsApp, Servicios y el hub; Citas, Reservas y Reservas online no; el motivo escrito por el administrador queda en el propio aviso durante 90 días
 Actor: administrador, sistema
-Pantalla: CUSTOMERS: ficha del cliente
+Pantalla: CUSTOMERS: Ficha de cliente
 Pasos:
 1. El administrador pulsa **Borrar datos personales** en la ficha (flujo de Clientes).
 2. Clientes sustituye los datos de la ficha y publica `customer.anonymized`.
@@ -99,7 +105,7 @@ QA: L-10, WA-06 (discrepa)
 ### HUB-F251 Borrar los datos de un número sin ficha
 Estado: no hecho — la bandeja de WhatsApp borra sus conversaciones pero no emite ningún aviso `.anonymized` con un identificador que el hub pueda buscar: los mensajes y su número siguen 90 días en el historial del hub (hub#2474, hub#2477)
 Actor: administrador
-Pantalla: HUB_SHELL: WhatsApp › Bandeja de entrada
+Pantalla: WHATSAPP_INBOX: Bandeja de entrada
 Pasos:
 1. El administrador pulsa **Borrar datos de este número** en una conversación.
 2. La app borra lo suyo.
@@ -169,10 +175,6 @@ Pendiente de enlazar: infra — cómo el despliegue compone y pasa la semilla
 QA: ninguno
 
 ## Cobertura contra la referencia
-
-Referencia adoptada para el borrado de una persona: el patrón de las plataformas de referencia, un
-único aviso de borrado al que responde toda app (Shopify `customers/redact`, Odoo). RGPD arts. 5.1.c,
-5.1.e y 17; retención de 4 años por LGT art. 66 para los recibos de autorización.
 
 | Elemento | Estado | Flujo |
 |---|---|---|

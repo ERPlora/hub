@@ -11,6 +11,16 @@ Prefijo: HUB
 > `crates/server/src/{assistant,assistant_api,assistant_report,router,embed,agent_runner}.rs`,
 > `crates/server/src/ingest.rs` (`collect_chunks`) y el crate `vector`.
 
+## Referencia adoptada
+
+- **Asistentes que operan un ERP** (contrastado en `.claude/agents/qa-hub-assistant.md` §«El
+  mercado decide»): Business Central Copilot, Shopify Sidekick, Odoo AI, Intercom Fin. Se adopta su
+  flujo: herramientas filtradas por el permiso de quien pregunta, previsualizar y confirmar antes de
+  escribir, anclar las respuestas a los datos del propio negocio, y decir «eso no lo puedo hacer,
+  hazlo aquí».
+- **Pasos de IA en automatizaciones** (n8n AI Agent, Zapier AI, Make): herramientas acotadas por
+  paso, salida estructurada por una función forzada, y aprobación humana de lo que cambia datos.
+
 ## Antes de empezar
 
 - Nada que configurar. El nivel lo da el plan del hub (ADR-0474). En producción hace falta el hub
@@ -31,7 +41,7 @@ Pasos:
 4. El panel ejecuta las herramientas con la sesión de la persona, pidiendo confirmación antes de cambiar nada (HUB_SHELL), y sigue la conversación.
 Entra: los mensajes de la sesión (`messages`, con sus adjuntos); la sesión local, que da los permisos y el usuario que viaja como dato de gasto, nunca como permiso.
 Sale: un flujo de eventos `token`, `function_call` (anotado con `kind`, `read_only`, `risk` y `money_fields`), `usage` y `done`. **El hub no guarda la conversación**: vive en el navegador durante la sesión (ADR-0149) y el SaaS no la conserva.
-Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; una conversación de más de 2 MB la corta el propio hub con `413` antes de llegar al asistente; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta, el flujo se corta a mitad, **o el SaaS rechaza la petición antes de abrir el flujo** (credencial, petición inválida, freno de tasa por hub), el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor; en el último caso dice «no se pudo contactar» cuando en realidad hubo un rechazo, hueco); si el SaaS rechaza el turno dentro del flujo (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
+Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; una conversación de más de 2 MB la corta el propio hub con `413` antes de llegar al asistente, y el panel lo pinta como «no se pudo contactar»; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta, el flujo se corta a mitad, **o el SaaS rechaza la petición antes de abrir el flujo** (credencial, petición inválida, freno de tasa por hub), el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor; en el último caso dice «no se pudo contactar» cuando en realidad hubo un rechazo, hueco); si el SaaS rechaza el turno dentro del flujo (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, panel del asistente (bucle de herramientas, tarjeta de confirmación, historial de sesión, recibos del turno)
 Pendiente de enlazar: saas — asistente: `POST /api/v1/hub/device/assistant/chat/stream/` con `{input, messages, tools, instructions, user}` que inserta `instructions` como mensaje de sistema, ofrece las `tools` al modelo y devuelve SSE con `function_call` (argumentos completos, uno por llamada), `usage` al cerrar y `error` con `code` y `retriable`, terminado en `[DONE]`; mide un turno solo si se completa
@@ -98,7 +108,7 @@ Pasos:
 4. Para ampliar, quien administra pide al hub abrir el pago; el hub pide al SaaS la dirección del pago y la devuelve.
 Entra: la sesión; para ampliar, una sesión de administrador.
 Sale: el plan y el consumo para el panel; la dirección del pago en Stripe. El hub no lleva ningún contador del asistente: el nivel lo da el plan del hub (ADR-0474) y lo cuenta el SaaS.
-Si falla: sin sesión, `401` (antes de hub#1254 cualquiera que alcanzara el hub podía preguntar o abrir pagos); ampliar sin ser administrador, `403`; un `402`/`429` del SaaS llega tal cual para que el panel diga que el cupo se agotó; SaaS caído, `424` con `cloud_unreachable`.
+Si falla: sin sesión, `401` (antes de hub#1254 cualquiera que alcanzara el hub podía preguntar o abrir pagos); ampliar sin ser administrador, `403`; un `402`/`429` del SaaS llega tal cual, pero el panel descarta al leer el plan todo lo que no sea 2xx: el cupo agotado lo cuenta el evento de error del chat (HUB-F273); SaaS caído, `424` con `cloud_unreachable`.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, panel del asistente (plan, consumo y «ver planes»)
 Pendiente de enlazar: saas — asistente: `GET /api/v1/hub/device/assistant/config/` (nivel, uso del mes, planes) y `POST …/assistant/subscription/checkout/` → `{checkout_url}`, con el nivel resuelto desde el plan del hub
@@ -112,7 +122,7 @@ Pasos:
 1. Bajo una respuesta terminada, la persona pulsa denunciarla y, si quiere, escribe un comentario. El panel no manda motivo: el servidor acepta uno, pero hoy solo llega por la API.
 2. El hub exige una sesión (cualquier perfil: quien se siente ofendido es quien está delante) y que vengan el identificador de la respuesta y su texto.
 3. Lo deja en el registro único de errores del hub como algo a revisar, con quién lo denunció, y el registro lo manda al SaaS.
-Entra: el identificador de la respuesta, su texto, y opcionalmente la pregunta que la provocó, el motivo y el comentario.
+Entra: el identificador de la respuesta, su texto, y opcionalmente la pregunta que la provocó, el motivo (solo por la API: ninguna pantalla lo envía) y el comentario.
 Sale: una entrada `assistant_content_report` en el registro de errores, que la manda al SaaS para revisión. Los textos se recortan (respuesta y pregunta a 4.000 caracteres, comentario a 1.000, motivo a 100) para no guardar más de lo necesario. Dos denuncias de respuestas distintas nunca se funden; la misma respuesta denunciada dos veces en 30 s cuenta como una.
 Si falla: sin sesión, `401`; sin identificador o sin texto, rechazo con el campo que falta. El hub contesta `{ok: true}` en cuanto lo apunta; el envío al SaaS es de mejor esfuerzo y sin reintento: si la red falla en ese momento o el hub no está enrolado, la denuncia se pierde sin aviso (hueco).
 Implicados: pendiente
@@ -123,7 +133,7 @@ QA: qa-hub-assistant §R5
 ### HUB-F279 Pedirle un paso al asistente dentro de una automatización
 Estado: hecho
 Actor: sistema, asistente
-Pantalla: flows: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. Una automatización llega a un paso «Pedírselo al asistente». El servidor lo atiende fuera del ciclo que reparte los avisos, sin bloquear la caja mientras espera al modelo.
 2. Le ofrece al modelo solo las herramientas que cumplen tres cosas a la vez: las puede usar la automatización con sus permisos, el paso las nombra y la automatización las tiene concedidas. Las del núcleo (instalar un módulo, configurar) no se ofrecen nunca aquí.
@@ -140,16 +150,6 @@ Pendiente de enlazar: saas — asistente: el mismo `…/assistant/chat/stream/` 
 QA: qa-hub-flows R6
 
 ## Cobertura contra la referencia
-
-Referencia adoptada:
-
-- **Asistentes que operan un ERP** (contrastado en `.claude/agents/qa-hub-assistant.md` §«El
-  mercado decide»): Business Central Copilot, Shopify Sidekick, Odoo AI, Intercom Fin. Se adopta su
-  flujo: herramientas filtradas por el permiso de quien pregunta, previsualizar y confirmar antes de
-  escribir, anclar las respuestas a los datos del propio negocio, y decir «eso no lo puedo hacer,
-  hazlo aquí».
-- **Pasos de IA en automatizaciones** (n8n AI Agent, Zapier AI, Make): herramientas acotadas por
-  paso, salida estructurada por una función forzada, y aprobación humana de lo que cambia datos.
 
 | Elemento | Estado | Flujo |
 |---|---|---|

@@ -10,8 +10,9 @@ Alcance MVP: transversal
 > [apps/web/WORKFLOW.md](apps/web/WORKFLOW.md) (`HUB_SHELL`).
 >
 > **Cómo se lee.** Este índice tiene solo lo **común** a todo el servidor. Antes de tocar código,
-> abre también el fichero del área que lo gobierna (tabla de abajo): delante de sus flujos está lo
-> que hay que preparar (`## Antes de empezar`) y, al final, todo lo demás propio del área
+> abre también el fichero del área que lo gobierna (tabla de abajo): delante de sus flujos están su
+> referencia adoptada y lo que hay que preparar (`## Antes de empezar`) y, al final, todo lo demás
+> propio del área
 > —cobertura contra la referencia, datos, reglas, lo que no hace, dudas abiertas y fuentes
 > contrastadas—. Si el área está partida en varios ficheros, lo que vale para toda el área está en
 > el primero.
@@ -79,8 +80,7 @@ Lo común a todo el servidor (se adopta esto, no más):
   Shopify Flow), reutilizando la ya contrastada en los guiones de QA. En lo fiscal manda la norma
   (RD 1007/2023, Orden HAC/1177/2024), no un competidor.
 
-Lo de cada área, con sus enlaces, está al principio de `## Cobertura contra la referencia` de su
-fichero:
+Lo de cada área, con sus enlaces, está en `## Referencia adoptada` de su fichero:
 
 - Módulos y órdenes: Odoo y Business Central (instalar y quitar apps), Shopify (permisos de la app),
   Toast y Square (aprobación del responsable), Cuiner y Ágora (factura pedida desde el tique), JSON
@@ -142,23 +142,26 @@ motivo encima del formulario, con lo escrito; código desconocido, caducado o de
 un mensaje sin formulario (HUB-F17). No se indexa en buscadores.
 
 ### Pantallas de otros componentes que usan los flujos del servidor
-- Módulos: `HUB_SHELL` Apps, menú lateral, vista de un módulo (pestaña «Ajustes»), Inicio (paneles y
-  «Termina de configurar tu negocio») y Ajustes › Permisos.
-- Avisos y automatizaciones: `HUB_SHELL` Sistema › Eventos caídos, la campana y Ajustes › Permisos;
-  del módulo `flows`, Automatizaciones y su editor; de la Bandeja de WhatsApp, sus Ajustes (recetas).
-  Sin pantalla, solo por la API: la traza de un aviso (HUB-F63) y lanzar a mano (HUB-F85).
-- Acceso, personas y plan: `HUB_SHELL` Acceso, Cambiar de usuario, el diálogo de aprobación, Mi
+Con los nombres canónicos de la sección «Pantallas» de [apps/web/WORKFLOW.md](apps/web/WORKFLOW.md)
+y de la de cada módulo:
+- Módulos: `HUB_SHELL` Apps, Menú lateral, Vista de un módulo, Vista de un módulo › Ajustes, Paneles
+  de Inicio, Termina de configurar tu negocio y Ajustes › Permisos.
+- Avisos y automatizaciones: `HUB_SHELL` Sistema › Eventos caídos, Campana de notificaciones y
+  Ajustes › Permisos; `FLOWS` Automatizaciones y Editor de automatización; `WHATSAPP_INBOX` Ajustes
+  (recetas). Sin pantalla, solo por la API: la traza de un aviso (HUB-F63) y lanzar a mano (HUB-F85).
+- Acceso, personas y plan: `HUB_SHELL` Acceso, Cambiar de usuario, Aprobación de un responsable, Mi
   perfil, Ajustes › General (Este dispositivo, Pinpad, Dispositivos), Empleados (Personal, Roles, API
-  keys, Aprobaciones), la documentación de la API y Sistema (Recursos, Plan y límites,
-  Actualizaciones, Registros). HUB-F154 solo tiene API.
-- Impresión: la pantalla «Impresoras» del módulo Impresión y, en `HUB_SHELL`, la campana y la tarjeta
-  «Estado de impresión» de Ajustes.
-- Negocio y datos: `HUB_SHELL` Ajustes › General, Ajustes › Negocio, Ajustes › Datos y copias
-  (Exportar, Importar, Restablecer) y Archivos; la ficha del cliente del módulo Clientes.
-- WhatsApp y asistente: de la Bandeja de WhatsApp, Ajustes («Tu número»), Bandeja de entrada y
-  Plantillas de Meta; `HUB_SHELL` Plan del módulo y Asistente; del módulo `flows`, el editor.
-- Perfil fiscal: del módulo VeriFactu, Configuración, Ajustes y Contingencia; de Ventas, Vender; de
-  `HUB_SHELL`, Apps y Ajustes › Negocio.
+  keys, Aprobaciones), Documentación de la API, Sistema, Sistema › Plan y límites y
+  Sistema › Actualizaciones. HUB-F154 solo tiene API.
+- Impresión: `PRINTING` Impresoras; `HUB_SHELL` Ajustes › Impresión (tarjeta «Estado de impresión»)
+  y Campana de notificaciones.
+- Negocio y datos: `HUB_SHELL` Ajustes › General, Ajustes › Negocio, Ajustes › Datos y copias ›
+  Exportar, Importar y Restablecer, y Archivos; `CUSTOMERS` Ficha de cliente; `WHATSAPP_INBOX` Bandeja
+  de entrada.
+- WhatsApp y asistente: `HUB_SHELL` Tu número, Vista de un módulo › Plan y Asistente; `WHATSAPP_INBOX`
+  Bandeja de entrada y Plantillas de Meta; `FLOWS` Editor de automatización.
+- Perfil fiscal: `VERIFACTU` Configuración, Ajustes y Contingencia; `SALES` Vender; `HUB_SHELL` Apps y
+  Ajustes › Negocio.
 
 ## Flujos
 
@@ -394,7 +397,7 @@ comprueba que siguen siendo ciertos. Lo que solo comparten los flujos de una mis
 
 | Pieza compartida | Flujos que la usan | Si cambia, revisa |
 |---|---|---|
-| El embudo de una orden, con sus puertas siempre en el mismo orden: interna → bloqueo de otra app → permiso o PIN → edición parcial → esquema → reglas del dueño → permisos de host (motor nativo) → candados fiscales → transacción | Toda orden de cualquier módulo: F03–F13, F17, F33; F151, F152, F154; F89, F98; F274; F313, F314, F317 | La regla «El orden de las puertas…» de abajo; el diálogo del PIN de `HUB_SHELL` y SALES-F14 |
+| El embudo de una orden, con sus puertas siempre en el mismo orden: interna → bloqueo de otra app → permiso o PIN → edición parcial → esquema → reglas del dueño → permisos de host (motor nativo) → candados fiscales → transacción | Toda orden de cualquier módulo: F03–F13, F17, F33; F151, F152, F154; F89, F98; F274; F313, F314, F317 | La regla «El orden de las puertas…» de abajo; la Aprobación de un responsable de `HUB_SHELL` y SALES-F14 |
 | Los datos que pone el hub en cada orden y nadie puede mandar (negocio, quién, hora, identidad fiscal, zona, idioma, demo, permisos concedidos, quién aprobó) | F01, F03, F10, F12; F222, F228; viajan dentro de cada aviso (F50) | Los manejadores y el SQL de los módulos que leen `:business_*`, `:timezone`, `:caller_lang` |
 | La cola de avisos (`_event_outbox`) y su repartidor | F50–F63; F82, F93, F96; F191; F263, F266; F248, F249, F253; F03 (se guarda en la transacción de la orden) | Entrega al menos una vez, reintentos, «Eventos caídos», retención de 90 días y borrado de una persona |
 | Los permisos de host concedidos a cada app (`_module_capability_grants`) | F12, F32, F35; F53, F58, F61; F111; F204, F205; F267–F270; F302 | Que el motor nativo, los avisos, la impresión, WhatsApp y el certificado sigan negando sin permiso; el reencolado de F58 |
@@ -504,7 +507,7 @@ API, otra app). Las de cada área están en `## Reglas que no se rompen` de su f
   (si el esquema pasara delante, los PIN ya aprobados no casarían); las reglas del dueño tienen que ir
   después del permiso y del esquema (acceso); el permiso de una automatización fija parte del
   contenido antes del esquema (automatizaciones); `validate_payload`, que usan las aprobaciones
-  manuales de los flujos, es la misma comprobación; el diálogo del PIN de `HUB_SHELL` y SALES-F14
+  manuales de los flujos, es la misma comprobación; la Aprobación de un responsable de `HUB_SHELL` y SALES-F14
   cuentan con que un cajero sin permiso vea `requires_elevation` antes que `invalid_payload`; y lo
   fijan `architecture/hub/runtime-dispatcher.md` §2.0 y las pruebas `kernel_conformance_permissions`,
   `command_elevation*` y `policy_gate_e2e`.

@@ -25,6 +25,22 @@ Prefijo: HUB
 > `workflow/personas-y-permisos.md` y `workflow/plan-y-sistema.md`. Lo técnico vive en
 > `architecture/hub/auth.md` (§2.3, §2.9 y siguientes) y no se repite.
 
+## Referencia adoptada
+
+La de toda el área está contrastada en `architecture/hub/auth.md` (decisiones de
+mercado ya tomadas con referencias) y en `.claude/agents/qa-hub-restaurant.md` §2/§6. La de cuentas,
+aprobaciones, normas y llaves está en [personas-y-permisos.md](personas-y-permisos.md); la del plan,
+en [plan-y-sistema.md](plan-y-sistema.md). Para entrar y las sesiones se adopta esto:
+
+- **Acceso con PIN en dispositivo compartido, rejilla de caras y relevo sin cerrar la venta**:
+  Square (Team passcodes), Toast (employee passcodes, «switch user» como capa sobre la app). PIN de
+  longitud **fija por negocio, 4 o 6**, que entra solo al último dígito: modelo de Clover (hub#974).
+- **Placa (RFID/NFC/banda) como presentación de la misma identidad, nunca sustituta del PIN**:
+  Toast, Aloha/NCR, Square, Lightspeed (ADR-0347, 15 referencias). Nadie da de alta su propia placa
+  (Toast).
+- **Lista de dispositivos con «quitar este dispositivo» y limpieza de los no usados en 30 días**:
+  pantallas de cuenta de Google, Apple, Microsoft y Shopify (ADR-0258, hub#2215).
+
 ## Antes de empezar
 
 - La primera persona entra con su cuenta de erplora.com (HUB-F130) desde la aplicación instalada:
@@ -44,11 +60,11 @@ Pasos:
 1. En la pantalla de acceso, la persona escribe su correo y su contraseña (o pulsa «Continuar con Google») y, si su cuenta lo pide, el código de verificación que le llega por correo. Ese paso lo resuelve erplora.com; el hub no ve nunca la contraseña.
 2. Con la cuenta ya comprobada, el hub mira si esa persona es miembro de **este** negocio en erplora.com. Si lo es, la busca entre sus usuarios (primero por su cuenta de erplora.com, después por su correo de acceso, comparado **letra a letra, mayúsculas incluidas**) y, si no la encuentra, la da de alta con el rol por defecto del despliegue (`HUB_DEFAULT_ROLE`; empleado si no se dice).
 3. Si en erplora.com es dueña o administradora del negocio, el hub le garantiza como mínimo el rol de administrador; nunca le baja el rol que ya tuviera.
-4. Si la persona entró desde un dispositivo identificado, el hub lo apunta como dispositivo de confianza (a partir de ahí el PIN funciona en él) y le pone de nombre el del navegador («Chrome · Android») si aún no tenía.
+4. Si la persona entró desde un dispositivo identificado, el hub lo apunta como dispositivo de confianza (a partir de ahí el PIN funciona en él) y le pone de nombre el del navegador («Chrome · Android») si aún no tenía. La casilla «Confiar en este dispositivo» de la pantalla no interviene: el hub lo marca siempre que llega el identificador del dispositivo.
 5. Se abre la sesión y la persona entra en Inicio.
 Entra: la credencial firmada que entrega erplora.com (JWT con la lista de negocios de los que es miembro y su rol en cada uno), comprobada sin conexión con la clave pública de erplora.com que el hub carga al arrancar (`HUB_JWT_PUBLIC_KEY` o `/api/v1/auth/public-key/`); el `device_id` del navegador o de la app.
 Sale: la sesión (`hub_session`, credencial `cloud`), la persona enlazada o creada (`hub_user`), su correo en el perfil si estaba vacío, la fila de confianza del dispositivo (`hub_trusted_device`) y una línea de actividad de inicio de sesión. Esta entrada no gasta plaza del plan: la plaza de un miembro la controla erplora.com. Si el correo del token difiere solo en mayúsculas del que se escribió al invitar, el hub crea una **segunda** ficha (sin pasar por el tope de plazas) y la invitada queda sin enlazar (ver huecos).
-Si falla: sin credencial, `cloud_token_missing`; credencial caducada o no firmada por erplora.com, `cloud_token_invalid`; el hub no pudo cargar la clave pública al arrancar, `cloud_login_not_configured` (503) y solo funciona el PIN; quien ya no es miembro, `not_a_member` (y el hub le cierra la puerta, HUB-F144); a quien el administrador dio de baja en el hub, `user_deactivated`. La pantalla no tiene frase propia para estos dos últimos: dice «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.».
+Si falla: sin credencial, `cloud_token_missing`; credencial caducada o no firmada por erplora.com, `cloud_token_invalid`; el hub no pudo cargar la clave pública al arrancar, `cloud_login_not_configured` (503) y solo funciona el PIN; quien ya no es miembro, `not_a_member` (y el hub le cierra la puerta, HUB-F144); a quien el administrador dio de baja en el hub, `user_deactivated`. La pantalla no tiene frase propia para estos dos últimos: dice «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Hueco de seguridad: si erplora.com acepta la contraseña y el hub rechaza la entrada, los tokens de erplora.com se quedan guardados en el navegador (`LoginPage.vue`).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Acceso (formulario de correo, Google y código de verificación)
 Pendiente de enlazar: saas — inicio de sesión, segundo factor y emisión del JWT con la membresía por negocio
@@ -76,10 +92,10 @@ Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: HUB_SHELL: Mi perfil
 Pasos:
-1. Tras entrar por primera vez con la cuenta en un dispositivo compartido, la pantalla pide «Elige un PIN de {n} dígitos» y «Confirma tu PIN»; desde **Mi perfil → PIN** se cambia cuando se quiera.
+1. Tras entrar por primera vez con la cuenta en un dispositivo compartido, la pantalla pide «Elige un PIN de {n} dígitos» y «Confirma tu PIN» solo si la persona no tenía PIN, marcó «Confiar en este dispositivo» y el negocio pregunta por el PIN; nunca tras entrar desde el panel de erplora.com. Desde **Mi perfil → PIN** se cambia cuando se quiera.
 2. Si la persona ya tenía PIN, escribe primero el actual.
 3. Escribe el nuevo dos veces y lo guarda.
-4. Desde ese momento el pinpad de los dispositivos de confianza le deja entrar con él.
+4. Desde ese momento el hub le deja entrar con él en los dispositivos de confianza; la rejilla del pinpad no la enseña hasta que se recarga la pantalla.
 Entra: la sesión de la persona (solo puede tocar su propio PIN); el número de dígitos del negocio (4 o 6).
 Sale: el PIN guardado como huella (argon2id) en su ficha; el anterior deja de valer. No se avisa a erplora.com. Esta puerta no tiene freno por intentos (ni por nombre ni por dirección), y su rechazo «ya lo tiene otro usuario activo» dice si un PIN es de alguien: es un hueco de seguridad (ver huecos).
 Si falla: PIN actual que no coincide, «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; dígitos repetidos o seguidos (1111, 1234), «Ese PIN se adivina a la primera…»; PIN que ya usa otra persona activa, «Ese PIN ya lo tiene otro usuario activo…»; longitud distinta de la del negocio, el aviso de dígitos. La ficha del dueño de la cuenta solo la cambia él (HUB-F148), pero esta puerta es la suya.
@@ -180,6 +196,7 @@ Pasos:
 4. La venta sigue en pantalla y lo siguiente queda a nombre de quien entró («Ahora atiende {name}»).
 Entra: el nombre y el PIN de quien entra; el token de quien sale.
 Sale: una sesión nueva y la anterior borrada. Cuando el PIN nuevo se acepta, la pantalla además olvida las credenciales de erplora.com y la conversación con el asistente de quien se fue (hub#1538, hub#1544, cerrada). El servidor no guarda ninguna conversación del asistente que haya que borrar.
+Hueco de la pantalla (no del servidor): tras el relevo, el lanzador, «Mis apps» y la lista siguen siendo los de quien se fue hasta que se navega.
 Si falla: un PIN rechazado no cambia nada (quien estaba dentro sigue dentro, con su conversación): «Esos datos no han funcionado…». Dispositivo sin confianza: «Este dispositivo todavía no está dado de alta para el PIN…».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Cambiar de usuario (la rejilla sobre la venta, el relevo de credenciales y el borrado de la conversación del asistente)
@@ -188,7 +205,7 @@ QA: qa-hub-restaurant §7.02, L-13
 ### HUB-F139 Marcar un dispositivo como compartido o personal
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. Desde el propio dispositivo, el administrador abre **Ajustes → General → Este dispositivo**.
 2. Elige «Compartido — una caja o tablet que usan varias personas» o «Personal — un dispositivo que solo usas tú»; cada opción dice debajo su consecuencia.
@@ -204,11 +221,11 @@ QA: qa-hub-restaurant §7.02
 ### HUB-F140 Decidir si el negocio pide PIN y cuántos dígitos tiene
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. El administrador abre **Ajustes → General → Pinpad**.
 2. Enciende o apaga «Mostrar pinpad» y elige «Volver a preguntar tras inactividad» (1, 5, 10, 15 o 30 minutos, o «Hasta cerrar sesión»); en «Dígitos del PIN», 4 o 6.
-3. Guarda.
+3. Cada control se guarda al moverlo, sin botón de guardar.
 4. Vale para todo el negocio y se combina con el modo de cada dispositivo: gana siempre lo más estricto.
 Entra: la sesión de administrador.
 Sale: los ajustes del negocio `pin_policy` (`always`, `per_shift` o `never`), `pin_inactivity_minutes` y `pin_length`, con quién los cambió. «No mostrar pinpad» nunca alarga la sesión de un dispositivo compartido: renuncia a saber quién vende, no al candado. Los PIN de la otra longitud siguen funcionando hasta que su dueño los cambia. Como la duración se fija al abrir, pasar a «pedir siempre» no acorta las sesiones ya abiertas (hasta 30 días en un dispositivo personal).
@@ -221,7 +238,7 @@ QA: ninguno
 ### HUB-F141 Ver, nombrar y quitar los dispositivos del negocio
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. El administrador abre **Ajustes → General → Dispositivos**: cada dispositivo en el que alguien entró con su cuenta, con su nombre, quién entró la última vez, cuándo se usó y si su sesión sigue abierta.
 2. Para reconocerlo, le pone nombre («Barra», «Portátil del despacho», hasta 60 caracteres).
@@ -284,20 +301,6 @@ Pendiente de enlazar: saas — quitar a un miembro del negocio
 QA: ninguno
 
 ## Cobertura contra la referencia
-
-Referencia adoptada por toda el área, contrastada en `architecture/hub/auth.md` (decisiones de
-mercado ya tomadas con referencias) y en `.claude/agents/qa-hub-restaurant.md` §2/§6. La de cuentas,
-aprobaciones, normas y llaves está en [personas-y-permisos.md](personas-y-permisos.md); la del plan,
-en [plan-y-sistema.md](plan-y-sistema.md). Para entrar y las sesiones se adopta esto:
-
-- **Acceso con PIN en dispositivo compartido, rejilla de caras y relevo sin cerrar la venta**:
-  Square (Team passcodes), Toast (employee passcodes, «switch user» como capa sobre la app). PIN de
-  longitud **fija por negocio, 4 o 6**, que entra solo al último dígito: modelo de Clover (hub#974).
-- **Placa (RFID/NFC/banda) como presentación de la misma identidad, nunca sustituta del PIN**:
-  Toast, Aloha/NCR, Square, Lightspeed (ADR-0347, 15 referencias). Nadie da de alta su propia placa
-  (Toast).
-- **Lista de dispositivos con «quitar este dispositivo» y limpieza de los no usados en 30 días**:
-  pantallas de cuenta de Google, Apple, Microsoft y Shopify (ADR-0258, hub#2215).
 
 | Elemento | Estado | Flujo |
 |---|---|---|

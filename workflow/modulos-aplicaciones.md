@@ -10,6 +10,20 @@ Prefijo: HUB
 > `HUB_SHELL`; aquí se escribe la mitad del servidor. Las consultas y órdenes de un módulo ya
 > instalado están en [modulos.md](modulos.md).
 
+## Referencia adoptada
+
+Para la plataforma de aplicaciones se adopta esto, no más:
+
+- [Odoo — aplicaciones y módulos](https://www.odoo.com/documentation/17.0/applications/general/apps_modules.html):
+  instalar arrastra las dependencias; actualizar sin reinstalar; quitar una app avisa antes de lo
+  que arrastra. Odoo borra los datos al desinstalar; ERPlora no (como Business Central).
+- [Business Central — instalar y desinstalar extensiones](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-extensions-install-uninstall):
+  desinstalar conserva los datos por defecto; una app con dependientes solo se quita junto con
+  ellos, tras enseñarlos; tras instalar, la app puede pedir su configuración obligatoria (la lista
+  de puesta en marcha, HUB-F35).
+- Shopify (apps): la app declara al instalarse los permisos que pide y el dueño los concede; una app
+  sin permiso no ejecuta lo que lo necesita (Ajustes › Permisos, HUB-F32).
+
 ## Antes de empezar
 
 - Las apps se instalan desde **Apps** (HUB-F19) o importando la plantilla del sector en
@@ -227,7 +241,7 @@ QA: ninguno
 ### HUB-F31 Servir el menú, las pantallas y los ficheros de las aplicaciones
 Estado: hecho
 Actor: empleado, responsable, administrador
-Pantalla: HUB_SHELL: menú lateral
+Pantalla: HUB_SHELL: Menú lateral
 Pasos:
 1. Al entrar, la pantalla pide el menú: el hub devuelve las pestañas de las apps activas, con su nombre en el idioma pedido y la versión instalada, y quita las que piden un permiso que la persona no tiene.
 2. También dice cuántas apps activas hay, para que un menú vacío no se confunda con un hub sin apps.
@@ -246,7 +260,7 @@ Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › Permisos
 Pasos:
 1. Una app declara qué necesita del hub (red, certificado, impresora, avisar a clientes, administrar automatizaciones); al instalarla no tiene ninguno concedido.
-2. Un administrador, en **Ajustes › Permisos**, concede o retira cada uno.
+2. Un administrador los concede en el diálogo de instalación de **Apps** (la pantalla llama a esta puerta justo después de instalar) o, en cualquier momento, en **Ajustes › Permisos**, donde también los retira. Una app instalada por el asistente o por una plantilla queda sin ninguno concedido.
 3. El hub solo acepta permisos que existen y que esa app declara, y anota quién y cuándo.
 4. Al conceder, vuelve a poner en la cola **todos** los avisos del hub que murieron por falta de un permiso de host, no solo los de esa app (los que siguen sin permiso vuelven a morir).
 Entra: `GET /api/modules/:id/capabilities` (cualquier sesión) y `PUT` del mismo con sesión de administrador.
@@ -260,7 +274,7 @@ QA: BD-03
 ### HUB-F33 Leer y guardar los ajustes de un módulo
 Estado: parcial — la pantalla solo deja guardar al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Venta, Inventario y Cocina y lo hace por el asistente); y si la lectura de los ajustes falla (por ejemplo, sin permiso), la pantalla enseña los valores de fábrica del esquema como si fueran los guardados
 Actor: administrador, responsable, asistente
-Pantalla: HUB_SHELL: vista de un módulo › Ajustes
+Pantalla: HUB_SHELL: Vista de un módulo › Ajustes
 Pasos:
 1. Si el módulo declara un bloque de ajustes, la pantalla le añade la pestaña «Ajustes»: pinta un formulario a partir del esquema del módulo (o el componente propio que el módulo indique).
 2. Para cargarlo, ejecuta la consulta de lectura del módulo, con su permiso.
@@ -280,7 +294,7 @@ QA: qa-hub-restaurant §7.03 (discrepa)
 ### HUB-F34 Servir los datos de los paneles de Inicio
 Estado: parcial — la pantalla no oculta un panel por el permiso que declara: quien no lo tiene ve el panel con «No disponible»; los paneles con componente propio no se refrescan con avisos
 Actor: empleado, responsable, administrador
-Pantalla: HUB_SHELL: Inicio
+Pantalla: HUB_SHELL: Paneles de Inicio
 Pasos:
 1. Cada app declara sus paneles de Inicio en su `module.json`: título, tamaño, a qué negocios aplica, si salen de fábrica, qué permiso piden, qué consulta los alimenta y con qué avisos se refrescan.
 2. La pantalla lee esos manifiestos y pide al hub, por la puerta de consultas normal, la consulta de cada panel visible.
@@ -300,7 +314,7 @@ QA: R-01, qa-hub-restaurant §7.12
 ### HUB-F35 Calcular la lista de puesta en marcha
 Estado: hecho
 Actor: sistema
-Pantalla: HUB_SHELL: Inicio
+Pantalla: HUB_SHELL: Termina de configurar tu negocio
 Pasos:
 1. Cuando la pantalla o el asistente piden la lista («Termina de configurar tu negocio»), el hub la calcula en ese momento: nadie marca un paso a mano.
 2. Pone sus cuatro pasos propios, por este orden: «Tus apps» (hecho con una app activa), los datos del negocio (hecho con razón social y NIF válidos), la impresora (hecho con al menos un dispositivo dado de alta como host de impresión de la estación de tiques, esté conectado o no; no hace falta una impresora ni una ruta) y el equipo (hecho con más de una persona activa).
@@ -320,18 +334,6 @@ Pendiente de enlazar: cash_register — CASH_REGISTER-F01 (los primeros pasos de
 QA: BD-01, BD-02
 
 ## Cobertura contra la referencia
-
-Referencia adoptada para la plataforma de aplicaciones (se adopta esto, no más):
-
-- [Odoo — aplicaciones y módulos](https://www.odoo.com/documentation/17.0/applications/general/apps_modules.html):
-  instalar arrastra las dependencias; actualizar sin reinstalar; quitar una app avisa antes de lo
-  que arrastra. Odoo borra los datos al desinstalar; ERPlora no (como Business Central).
-- [Business Central — instalar y desinstalar extensiones](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-extensions-install-uninstall):
-  desinstalar conserva los datos por defecto; una app con dependientes solo se quita junto con
-  ellos, tras enseñarlos; tras instalar, la app puede pedir su configuración obligatoria (la lista
-  de puesta en marcha, HUB-F35).
-- Shopify (apps): la app declara al instalarse los permisos que pide y el dueño los concede; una app
-  sin permiso no ejecuta lo que lo necesita (Ajustes › Permisos, HUB-F32).
 
 | Elemento | Estado | Flujo |
 |---|---|---|

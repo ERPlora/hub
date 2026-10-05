@@ -22,6 +22,23 @@ Prefijo: HUB
 > whatsapp_header_samples,whatsapp_quota}.rs`, la salida por `notify_transport.rs` y las puertas
 > de `crates/cloud-client`.
 
+## Referencia adoptada
+
+Para WhatsApp (la del asistente está en [asistente.md](asistente.md)):
+
+- **Meta, WhatsApp Cloud API — webhooks**: entrega al menos una vez, sin orden garantizado; se
+  deduplica por el id del mensaje (`wamid`) —
+  <https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components>. Se adopta:
+  identificador de Meta como clave única y confirmación después de escribir.
+- **Meta, Embedded Signup y coexistencia** (mismo número en la app y en la API, 180 días de
+  historial, ecos de lo que contesta el dueño) —
+  <https://developers.facebook.com/docs/whatsapp/embedded-signup/>. Manda sobre todo lo demás.
+- **Meta, ventana de atención de 24 h y plantillas** —
+  <https://developers.facebook.com/docs/whatsapp/pricing#customer-service-windows>,
+  <https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates>.
+- **Meta, medios** (tipos y tamaños: imagen 5 MB, vídeo 16 MB, documento 100 MB) —
+  <https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media>.
+
 ## Antes de empezar
 
 - El hub **enrolado** (con credencial de máquina): sin ella no hay recogida de WhatsApp, ni envío, ni
@@ -29,7 +46,7 @@ Prefijo: HUB
 - La **Bandeja de WhatsApp** instalada, activa y cubierta por el plan; el número conectado desde sus
   Ajustes (HUB-F260); y, para que el módulo vea adjuntos y plantillas, el permiso de host
   **Notificaciones** concedido al módulo. No se concede solo (se niega por defecto): lo concede el
-  diálogo de permisos al instalar desde **Aplicaciones** (la pantalla lo pide justo después de
+  diálogo de permisos al instalar desde **Apps** (la pantalla lo pide justo después de
   instalar, por la puerta de HUB-F32), Ajustes › Permisos o restaurar una copia del propio hub. Si la
   Bandeja se instaló por el asistente, por una plantilla de sector o por la reconciliación, queda sin
   él y adjuntos y plantillas contestan `capability_denied`.
@@ -39,7 +56,7 @@ Prefijo: HUB
 ### HUB-F260 Conectar el número de WhatsApp del negocio
 Estado: parcial — la puerta del hub está entera, pero hoy Meta solo deja terminar la conexión con números del portfolio de ERPlora (verificación del negocio pendiente, pm#277), y el canje del código ocurre en la plataforma, fuera de este código
 Actor: administrador
-Pantalla: whatsapp_inbox: Ajustes
+Pantalla: HUB_SHELL: Tu número
 Pasos:
 1. El administrador abre **Bandeja de WhatsApp → Ajustes**. Para pintar el bloque «Tu número», la pantalla pregunta al hub qué necesita la ventana de Meta; el hub se lo pregunta a la plataforma y devuelve su respuesta sin tocarla. Si la plataforma dice que WhatsApp no está configurado, la pantalla no enseña el bloque «Tu número» en absoluto (ni conectar, ni los números ya conectados, ni desconectar).
 2. Pulsa **Conectar WhatsApp**, inicia sesión en Facebook, elige el número y escanea el QR con la app de WhatsApp Business del móvil.
@@ -57,7 +74,7 @@ QA: WA-01, WA-07
 ### HUB-F261 Saber qué número está conectado y si hay que reconectarlo
 Estado: parcial — la etiqueta «App de WhatsApp Business» no aparece nunca: la plataforma no manda `is_on_biz_app` en la lista de números
 Actor: administrador
-Pantalla: whatsapp_inbox: Ajustes
+Pantalla: HUB_SHELL: Tu número
 Pasos:
 1. Al abrir el bloque «Tu número», la pantalla pide al hub los números de este negocio.
 2. El hub los pide a la plataforma y devuelve la lista tal cual: número visible, si está activo (la pantalla no enseña los inactivos) y si Meta retiró el permiso.
@@ -75,7 +92,7 @@ QA: WA-01, WA-09
 ### HUB-F262 Desconectar o volver a conectar el número
 Estado: hecho
 Actor: administrador
-Pantalla: whatsapp_inbox: Ajustes
+Pantalla: HUB_SHELL: Tu número
 Pasos:
 1. En «Tu número», el administrador pulsa **Desconectar** y confirma «¿Desconectar este número? Los mensajes dejarán de llegar aquí.».
 2. El hub comprueba que el identificador del número son solo cifras (como mucho 32) y pide a la plataforma que deje de enviar ese número a este hub.
@@ -187,7 +204,7 @@ QA: WA-04, WA-07, qa-hub-flows R7
 ### HUB-F267 Ver una foto, una nota de voz o un documento de la clienta
 Estado: hecho
 Actor: empleado, responsable, administrador
-Pantalla: whatsapp_inbox: Bandeja de entrada
+Pantalla: WHATSAPP_INBOX: Bandeja de entrada
 Pasos:
 1. En un hilo de la bandeja, la persona abre una foto o pulsa **Reproducir** o **Descargar**.
 2. La bandeja pide el adjunto al hub por el identificador que Meta le dio (solo cifras, hasta 32).
@@ -204,7 +221,7 @@ QA: WA-10
 ### HUB-F268 Ver las plantillas del negocio con lo que dice Meta de cada una
 Estado: hecho
 Actor: administrador
-Pantalla: whatsapp_inbox: Plantillas de Meta
+Pantalla: WHATSAPP_INBOX: Plantillas de Meta
 Pasos:
 1. Al abrir **Ajustes** de la bandeja, el módulo pide al hub las plantillas.
 2. El hub exige una sesión de administrador y, como la pide un módulo, que ese módulo tenga concedidas las notificaciones y declarado WhatsApp.
@@ -221,7 +238,7 @@ QA: WA-04
 ### HUB-F269 Mandar una plantilla a revisión de Meta, nueva o editada
 Estado: parcial — cuando Meta rechaza la plantilla (`meta_template_failed`) o no contesta (`meta_unreachable`), el módulo recibe `cloud_rejected` sin el motivo de Meta
 Actor: administrador
-Pantalla: whatsapp_inbox: Plantillas de Meta
+Pantalla: WHATSAPP_INBOX: Plantillas de Meta
 Pasos:
 1. El administrador pulsa **Añadir** o **Guardar** en el panel de la plantilla.
 2. El módulo entrega al hub la plantilla tal como se escribió (nombre, idioma, categoría, cabecera, cuerpo, pie, ejemplos, botones).
@@ -239,7 +256,7 @@ QA: WA-04
 ### HUB-F270 Subir a Meta la muestra de la cabecera de una plantilla
 Estado: hecho
 Actor: administrador
-Pantalla: whatsapp_inbox: Plantillas de Meta
+Pantalla: WHATSAPP_INBOX: Plantillas de Meta
 Pasos:
 1. En una plantilla con cabecera de imagen, vídeo o PDF, el administrador elige **Elegir archivo de ejemplo**.
 2. El módulo manda el archivo al hub en un formulario; el hub comprueba la puerta de HUB-F268, que el formulario declara su tamaño y que no pasa de lo que Meta acepta para un PDF (100 MB más un margen para el formulario).
@@ -273,7 +290,7 @@ QA: ninguno
 ### HUB-F272 Reflejar en el hub el cupo y el consumo de WhatsApp del mes
 Estado: parcial — el consumo que enseña la pestaña Plan solo se refresca al arrancar el hub y una vez cada 24 h, así que puede ir hasta un día por detrás de lo que cobra la plataforma; un cambio de plan tampoco llega al medidor hasta esa vuelta; y al instalar la Bandeja con el hub ya encendido, el tope no llega hasta la siguiente vuelta diaria (el medidor queda en 0, que en el módulo es «sin tope»)
 Actor: sistema
-Pantalla: HUB_SHELL: Plan del módulo
+Pantalla: HUB_SHELL: Vista de un módulo › Plan
 Pasos:
 1. Al arrancar y después una vez al día, si la Bandeja de WhatsApp está instalada y activa, el hub pregunta a la plataforma el plan del canal y lo gastado este mes.
 2. Si la plataforma da un tope mayor que cero, el hub lo escribe en el medidor del módulo por una orden interna que nadie más puede llamar; si además da lo gastado y el módulo instalado sabe recibirlo, lo escribe al lado.
@@ -290,21 +307,6 @@ Pendiente de enlazar: saas — facturación de WhatsApp: `GET /api/v1/hub/device
 QA: WA-03
 
 ## Cobertura contra la referencia
-
-Referencia adoptada (la del asistente está en [asistente.md](asistente.md)):
-
-- **Meta, WhatsApp Cloud API — webhooks**: entrega al menos una vez, sin orden garantizado; se
-  deduplica por el id del mensaje (`wamid`) —
-  <https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components>. Se adopta:
-  identificador de Meta como clave única y confirmación después de escribir.
-- **Meta, Embedded Signup y coexistencia** (mismo número en la app y en la API, 180 días de
-  historial, ecos de lo que contesta el dueño) —
-  <https://developers.facebook.com/docs/whatsapp/embedded-signup/>. Manda sobre todo lo demás.
-- **Meta, ventana de atención de 24 h y plantillas** —
-  <https://developers.facebook.com/docs/whatsapp/pricing#customer-service-windows>,
-  <https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates>.
-- **Meta, medios** (tipos y tamaños: imagen 5 MB, vídeo 16 MB, documento 100 MB) —
-  <https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media>.
 
 **1 · Plantillas de Meta: elemento × traer / crear / editar / enviar, visto desde el hub.** El hub
 no interpreta el contenido de una plantilla: transporta. La columna dice qué hace el hub, qué

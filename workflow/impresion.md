@@ -10,6 +10,14 @@ Prefijo: HUB
 > dispositivo (descubrir, ESC/POS, USB, cajón) está en `crates/peripherals/WORKFLOW.md`
 > (HUB_PERIPHERALS-F01 a F16).
 
+## Referencia adoptada
+
+Estaciones como filas, mapa tipo de documento → estación y cola con clave por
+trabajo (Toast, Square, Lightspeed K, Odoo, Oracle Simphony, Epson ePOS, Star CloudPRNT; contrastado
+en hub#457/#987, `qa-hub-restaurant` §2). Se adopta: la impresora es un destino y la función dice
+para qué sirve; el trabajo espera si no hay nadie (tarde, no perdido); el mapa falla abierto a
+Recibo.
+
 ## Antes de empezar
 
 - Una aplicación instalada abierta en el puesto que tiene la impresora, dada de alta como quien
@@ -225,7 +233,9 @@ vivo; `DELETE /api/print/hosts?role=&deviceId=`.
 Sale: la marca de última señal. Estar vivo no se guarda: se calcula al leer, porque un dispositivo apagado no
 puede escribir. Retirar borra la fila (a diferencia de apagarse, que la deja «no viva»).
 Si falla: sin `X-Device-Id`, 422; retirar a otro sin ser administrador, 403. «Refrescadas: 0» es una
-respuesta correcta, no un error: significa «no imprimes nada aquí, regístrate».
+respuesta correcta, no un error: significa «no imprimes nada aquí, regístrate». Un dispositivo cuyo canal en vivo murió por un
+código fatal (`unauthenticated`, `print.host_not_registered`, `print.not_ready`) sigue dando señales por HTTP y cuenta
+como vivo: «sin atender» no salta y la cobertura dice que la función se imprime (HUB-F201, HUB-F202).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL y HUB_APP, el alta del dispositivo al arrancar y su retirada (ninguna pantalla retira ni da de baja una función quitada)
 QA: ninguno
@@ -262,7 +272,7 @@ Pasos:
 1. El dispositivo pide el siguiente trabajo de su función. El hub le entrega el más antiguo que esté
    pendiente y lo reserva 90 s; dos dispositivos de la misma función se llevan trabajos distintos.
 2. El dispositivo lo imprime y confirma «salió»: el trabajo pasa a «hecho».
-3. Si no pudo imprimir, dice «falló» con el motivo: el trabajo vuelve a «pendiente» para otro intento.
+3. Si no pudo imprimir, dice «falló» con el motivo: el trabajo vuelve a «pendiente» para otro intento, pero sin aviso en vivo: solo se vuelve a repartir con el siguiente trabajo de esa función o cuando un dispositivo se reconecta.
 4. Si el dispositivo se cae sin contestar, a los 90 s el trabajo se devuelve a «pendiente» (sin proceso en
    segundo plano: se hace en el siguiente reparto).
 Entra: los mensajes del canal en vivo (HUB-F198), de un dispositivo dado de alta para esa función.
@@ -280,7 +290,7 @@ QA: qa-hub-restaurant §16
 ### HUB-F200 Un trabajo que no sale acaba «muerto»
 Estado: hecho
 Actor: sistema
-Pantalla: printing: Impresoras
+Pantalla: PRINTING: Impresoras
 Pasos:
 1. Un trabajo lleva cinco entregas como mucho. Cada vez que un dispositivo lo reclama gasta una.
 2. Si falla cinco veces, o si el dispositivo se cae cinco veces sin contestar, el trabajo pasa a «muerto» y
@@ -293,7 +303,7 @@ Si falla: un trabajo solo muere por fallos **antes** del envío (la aplicación 
 función —también si se la quitaron sin retirarlo del hub, HUB-F197—, o una Bluetooth no contestó) o por
 desconexiones; una USB nunca recibe trabajos de la cola; una impresora de red apagada no lo mata,
 porque el dispositivo ya lo dio por hecho (HUB-F199). Un dispositivo que falla deja de pedir esa función
-hasta que le llegue un aviso o se reconecte, para no gastar las cinco entregas en milisegundos.
+hasta que le llegue un aviso o se reconecte, para no gastar las cinco entregas en milisegundos; y el trabajo devuelto no despierta a nadie (HUB-F199).
 Implicados: pendiente
 Pendiente de enlazar: printing — PRINTING-F14 (sacar del atasco un trabajo de impresión)
 QA: qa-hub-restaurant §16
@@ -301,7 +311,7 @@ QA: qa-hub-restaurant §16
 ### HUB-F201 Trabajo en cola y nadie conectado para sacarlo
 Estado: hecho
 Actor: sistema
-Pantalla: HUB_SHELL: campana y Ajustes › Impresoras y tique (tarjeta «Estado de impresión»)
+Pantalla: HUB_SHELL: Ajustes › Impresión
 Pasos:
 1. Se cobra o se dispara una ronda y no hay ningún dispositivo vivo para esa función.
 2. El trabajo se guarda y **espera**: tarde, no perdido. El hub no se niega a cobrar porque no haya
@@ -309,13 +319,14 @@ Pasos:
 3. La respuesta de la petición dice `liveHosts: 0`, y el TPV avisa («El tique está en espera: aún no hay
    ninguna impresora dada de alta…»).
 4. Si pasa 1 minuto con trabajo esperando y nadie vivo, la función se marca «sin atender» y la campana de
-   cada pantalla lo cuenta.
+   cada pantalla lo cuenta, igual que la tarjeta «Estado de impresión» de Ajustes › Impresión.
 Entra: el trabajo y el registro de dispositivos.
 Sale: `liveHosts: 0`, un aviso en el registro del hub por cada tique nuevo (no por los duplicados) y, al
 minuto, la función en la lista de «sin atender». «Vivo» es la misma definición en las tres puertas
 (HUB-F202): un dispositivo que se apagó hace menos de 90 s aún cuenta como vivo y el aviso no sale.
 Si falla: con un dispositivo caído menos de 90 s no se avisa; la espera la ve quien mire la cola, no
-quien cobra. Al conectarse un dispositivo de esa función, vacía lo que esperaba, en orden.
+quien cobra. Al conectarse un dispositivo de esa función, vacía lo que esperaba, en orden. Un dispositivo
+con el canal en vivo muerto que sigue dando señales por HTTP cuenta como vivo, y la alarma no salta (HUB-F197).
 Implicados: pendiente
 Pendiente de enlazar: printing — PRINTING-F01 (ver cómo va la impresión)
 Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
@@ -327,13 +338,14 @@ QA: qa-hub §8, qa-hub-restaurant §16
 ### HUB-F202 Saber qué funciones tienen quién las imprima
 Estado: hecho
 Actor: empleado, responsable, administrador, sistema
-Pantalla: printing: Impresoras
+Pantalla: PRINTING: Impresoras
 Pasos:
 1. Quien está en el puesto abre la pantalla de Impresión, o una pantalla del hub la consulta sola.
 2. Por cada función que tenga algún dispositivo dado de alta o trabajos esperando, el hub dice cuántos
    trabajos esperan, cuántos dispositivos están vivos, cuáles (por su nombre), cuánto lleva esperando el
    más antiguo y si está «sin atender».
-3. «Sin atender» = trabajo esperando, ningún dispositivo vivo y al menos 60 s de espera.
+3. «Sin atender» = trabajo esperando, ningún dispositivo vivo y al menos 60 s de espera. Un dispositivo con el canal
+   en vivo muerto que sigue dando señales por HTTP cuenta como vivo (HUB-F197).
 Entra: la consulta `hub.print.coverage` (módulos), `GET /api/print/hosts` (shell) o
 `GET /api/print/undrained` (solo las atascadas, para la campana). Vale cualquier sesión local, **no**
 hace falta ser administrador y no vale una clave de API.
@@ -350,7 +362,7 @@ QA: qa-hub §8
 ### HUB-F203 Leer la cola de trabajos
 Estado: hecho
 Actor: empleado, responsable, administrador
-Pantalla: printing: Impresoras
+Pantalla: PRINTING: Impresoras
 Pasos:
 1. En Impresión → Impresoras, la cola lista lo que espera, lo que se imprime, lo muerto y lo retirado.
 2. Cada trabajo dice qué documento es (con su número impreso, «Recibo T-000123»), la función, el estado, los
@@ -371,7 +383,7 @@ QA: qa-hub §8
 ### HUB-F204 Reintentar un trabajo muerto
 Estado: hecho
 Actor: administrador
-Pantalla: printing: Impresoras
+Pantalla: PRINTING: Impresoras
 Pasos:
 1. Arregla la causa (impresora, papel, función sin dispositivo).
 2. En el trabajo «Muerto» pulsa «Reintentar».
@@ -390,7 +402,7 @@ QA: qa-hub-restaurant §16, qa-hub §8
 ### HUB-F205 Descartar un trabajo que no debe salir
 Estado: hecho
 Actor: administrador
-Pantalla: printing: Impresoras
+Pantalla: PRINTING: Impresoras
 Pasos:
 1. En un trabajo «Pendiente» o «Muerto», pulsa «Descartar».
 2. Escribe un motivo (opcional) y confirma.
@@ -447,12 +459,6 @@ Pendiente de enlazar: hub — HUB_SHELL, abrir el cajón al cobrar en el disposi
 QA: qa-hub §8
 
 ## Cobertura contra la referencia
-
-Referencia adoptada: estaciones como filas, mapa tipo de documento → estación y cola con clave por
-trabajo (Toast, Square, Lightspeed K, Odoo, Oracle Simphony, Epson ePOS, Star CloudPRNT; contrastado
-en hub#457/#987, `qa-hub-restaurant` §2). Se adopta: la impresora es un destino y la función dice
-para qué sirve; el trabajo espera si no hay nadie (tarde, no perdido); el mapa falla abierto a
-Recibo.
 
 | Elemento | Estado | Flujo |
 |---|---|---|

@@ -8,6 +8,11 @@ Prefijo: HUB
 > pestañas de **Sistema** y la pantalla **Mi plan** son de `HUB_SHELL`. Técnico:
 > `architecture/hub/auth.md` §2.3 y §2.10, `system-info.md`, `versioning.md`, `tenancy.md`.
 
+## Referencia adoptada
+
+**Plan firmado verificable sin conexión con gracia**, el patrón de licencia
+offline (ADR-0154, `architecture/hub/auth.md` §2.10).
+
 ## Flujos
 
 ### HUB-F159 Arrancar el hub y avisar a erplora.com de que ya atiende
@@ -108,7 +113,7 @@ QA: ninguno
 ### HUB-F165 Ver el uso de recursos frente a los límites del plan
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Sistema
+Pantalla: HUB_SHELL: Sistema › Plan y límites
 Pasos:
 1. El administrador abre **Sistema → Plan y límites** (o **Recursos**).
 2. Ve el plan actual y, para memoria, CPU, base de datos, dispositivos y personas, lo usado frente al límite («{used} de {limit}», «Ilimitado», «n/d»).
@@ -128,7 +133,7 @@ Actor: administrador, responsable, empleado
 Pantalla: HUB_SHELL: Sistema
 Pasos:
 1. Cualquiera con sesión abre **Sistema**.
-2. Ve el uso de CPU y memoria, la base de datos y sus conexiones, los últimos 50 avisos entre apps como **Registros** (error, aviso o información) y los documentos guardados en la nube.
+2. Ve el uso de CPU y memoria, la base de datos y sus conexiones, los últimos 50 avisos entre apps como **Registros** (error, aviso o información). La pantalla ya no enseña los documentos guardados en la nube, aunque el servidor los sigue pidiendo.
 Entra: la sesión (cualquier rol; no una llave); los documentos y el espacio usado los pide el hub a erplora.com con su credencial.
 Sale: nada guardado.
 Si falla: «No se pudo consultar el sistema» con «Reintentar»; si erplora.com no da los documentos, la lista sale vacía.
@@ -140,7 +145,7 @@ QA: ninguno
 ### HUB-F167 Saber qué versión corre y qué se le ha actualizado
 Estado: parcial — el historial no guarda quién pulsó «Actualizar», y la versión no tiene puerta propia (va en la salud, en Sistema y en el latido)
 Actor: administrador, responsable, empleado
-Pantalla: HUB_SHELL: Sistema
+Pantalla: HUB_SHELL: Sistema › Actualizaciones
 Pasos:
 1. Cada arranque, el hub compara su versión con la última apuntada: si cambió, apunta el salto (o la vuelta atrás); si es la misma, nada.
 2. Cada actualización de una app (sola al arrancar o con el botón «Actualizar» de un administrador) apunta de qué versión a cuál, o que volvió a la anterior porque la nueva no arrancó, o, si fallaron la nueva y la vuelta atrás, que la app quedó sin funcionar.
@@ -214,9 +219,6 @@ Implicados: ninguno
 QA: qa-hub-restaurant §6
 
 ## Cobertura contra la referencia
-
-Referencia adoptada: **plan firmado verificable sin conexión con gracia**, el patrón de licencia
-offline (ADR-0154, `architecture/hub/auth.md` §2.10).
 
 | Elemento | Estado | Flujo |
 |---|---|---|

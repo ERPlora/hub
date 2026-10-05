@@ -18,6 +18,16 @@ Prefijo: HUB
 > autenticación**: un módulo que no se declara pasa solo con la sesión del administrador. Las
 > excepciones (las recetas de fábrica) se dicen en su flujo.
 
+## Referencia adoptada
+
+La ya contrastada en `.claude/agents/qa-hub-flows.md` (recorridos R0–R10,
+scorecard contra Zapier, Make, Power Automate, Shopify Flow, Odoo y Business Central) y en el
+`WORKFLOW.md` de `flows`. Se adopta: disparador elegido de una lista (aviso, horario en la hora del
+negocio, fecha, a mano), columna lineal sin bifurcaciones (ADR-0461), permisos explícitos por
+automatización (ADR-0283 D2), pregunta a una persona con plazo y qué pasa con el silencio (Power
+Automate, Odoo «Allowed Group»), secretos de solo escritura, y recetas de fábrica que se encienden
+en un toque desde su módulo (ADR-0470; Square y Vagaro: un interruptor).
+
 ## Antes de empezar
 
 - Para automatizar: instalar Automatizaciones, concederle «Administrar automatizaciones» y entrar
@@ -32,7 +42,7 @@ Prefijo: HUB
 ### HUB-F80 Crear una automatización
 Estado: hecho
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. Desde Automatizaciones (desde cero, una tarjeta de la galería, una copia o un borrador del asistente) se manda al hub el nombre, si nace encendida y el documento entero: cuándo arranca y sus pasos.
 2. El hub lee el documento entero antes de guardar nada: la versión del documento, cada disparador, cada paso y cada dato que nombra.
@@ -47,7 +57,7 @@ QA: qa-hub-flows R1, BD-10
 ### HUB-F81 Ver las automatizaciones del negocio
 Estado: hecho
 Actor: administrador
-Pantalla: Automatizaciones: Automatizaciones
+Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. Al abrir Automatizaciones, la pantalla pide al hub todas las automatizaciones del negocio.
 2. El hub las devuelve de una vez, con su documento, si están encendidas y de qué receta de fábrica salen si es el caso.
@@ -121,7 +131,7 @@ QA: qa-hub-flows R2 (discrepa)
 ### HUB-F86 Guardar los cambios de una automatización
 Estado: parcial — no hay control de versiones: dos personas que guardan a la vez se pisan sin aviso; y una ejecución a medias sigue con el documento nuevo por número de paso, así que añadir o quitar pasos la mueve a otro paso (leído, sin ejecutar)
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. Desde el editor, la lista o el arreglo de una automatización de WhatsApp se manda al hub el documento entero otra vez, con el nombre y el interruptor.
 2. El hub lo vuelve a leer entero, igual que al crear (HUB-F80).
@@ -135,7 +145,7 @@ QA: qa-hub-flows R10
 ### HUB-F87 Pausar una automatización y volver a encenderla
 Estado: parcial — pausar no frena todo: una propuesta que esperaba se puede aprobar y su acción se ejecuta, los mensajes que ya estaban en cola salen, una llamada a otro sistema en vuelo se hace, y un turno del asistente en curso puede ejecutar su acción o dejar una propuesta nueva aunque ya esté en pausa; y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
 Actor: administrador
-Pantalla: Automatizaciones: Automatizaciones
+Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. Se guarda la automatización con el interruptor apagado (HUB-F86).
 2. Desde ese momento no arranca con ningún aviso ni horario.
@@ -150,7 +160,7 @@ QA: qa-hub-flows R10
 ### HUB-F88 Borrar una automatización
 Estado: parcial — las preguntas y propuestas que esperaban respuesta no se cancelan: siguen en la bandeja hasta que alguien contesta o caducan
 Actor: administrador
-Pantalla: Automatizaciones: Automatizaciones
+Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. Se pide al hub que borre la automatización.
 2. Deja de arrancar al momento; lo que esperaba un plazo se cancela al momento; sus permisos se retiran; los mensajes que tenía en cola ya no saldrán.
@@ -294,7 +304,7 @@ QA: qa-hub-flows R8
 ### HUB-F98 Conceder, limitar y retirar los permisos de una automatización
 Estado: parcial — guardar la lista no es todo-o-nada al escribir: dos permisos iguales en la lista chocan después de haber retirado y concedido una parte; y un límite ilegible sobrevive a volver a conceder el mismo permiso sin límite (leído, sin ejecutar)
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. La pantalla manda la **lista entera** de permisos que debe tener la automatización: acciones, consultas, canales de mensaje, de dónde sale el destinatario y direcciones externas.
 2. El hub comprueba toda la lista antes de tocar nada: que cada acción y consulta existe, que no es interna, que cada patrón de dirección, canal y destinatario está bien escrito, y que cada límite tiene sentido.
@@ -309,7 +319,7 @@ QA: qa-hub-flows R3, BD-10
 ### HUB-F99 Guardar secretos que no se pueden volver a leer
 Estado: hecho
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. Se guarda un secreto con su nombre (en mayúsculas, hasta 64 caracteres) y su valor.
 2. El hub lo cifra y solo vuelve a enseñar el nombre: no hay pantalla ni puerta que devuelva el valor. Pero quien puede crear automatizaciones puede enviarlo con un paso «Llamar a otro sistema» a una dirección que él mismo conceda.
@@ -324,7 +334,7 @@ QA: qa-hub-flows R5
 ### HUB-F100 Decidir una pregunta o una propuesta que espera
 Estado: parcial — dos aprobaciones a la vez de la misma propuesta pueden ejecutar la acción dos veces, y una aprobación que coincide con el barrido de caducadas la ejecuta aunque la fila acabe «caducada» y la ejecución cancelada (leído, sin ejecutar); y aprobar ejecuta aunque la automatización esté en pausa
 Actor: administrador
-Pantalla: Automatizaciones: Automatizaciones
+Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. La bandeja lista lo que espera respuesta (hasta 100), con lo que se preguntó ya rellenado.
 2. Un administrador aprueba o rechaza, con una nota si quiere.
@@ -353,7 +363,7 @@ QA: qa-hub-flows R6
 ### HUB-F102 Guardar el historial de ejecuciones
 Estado: hecho
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. Cada ejecución queda guardada con su estado (pendiente, en marcha, esperando, esperando respuesta, terminada, fallida, cancelada), cuándo empezó y terminó, y su último error.
 2. Cada paso hecho guarda lo que entró, lo que salió y su error, con los secretos y la dirección del destinatario de los mensajes ocultos; un paso saltado por su «solo si» no deja fila.
@@ -369,7 +379,7 @@ QA: qa-hub-flows R1, qa-hub-flows R8, BD-10
 ### HUB-F103 Reanudar una ejecución desde el paso que falló
 Estado: no hecho — no existe ninguna forma de reintentar ni reanudar una ejecución fallida (hub#952): hay que arreglar la causa y esperar al siguiente disparo o lanzarla de nuevo entera
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. En una ejecución que se paró por un error, tras arreglar la causa, se pide reanudarla.
 2. El hub la retoma en el paso que falló, sin repetir los pasos que ya hicieron efecto.
@@ -382,7 +392,7 @@ QA: qa-hub-flows R8
 ### HUB-F104 Servir las recetas de fábrica de los módulos
 Estado: hecho
 Actor: sistema
-Pantalla: Automatizaciones: Automatizaciones
+Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. Un módulo trae sus automatizaciones de fábrica en su carpeta de recetas (hoy, la Bandeja de WhatsApp trae tres: cita por WhatsApp, aviso de cita confirmada y mesa por WhatsApp).
 2. Al instalarlo o arrancar el hub, el hub las lee y aparta las que no puede ofrecer, con su motivo: le falta un idioma, el documento no se lee, no trae permisos, o falta, está en pausa o es vieja una aplicación que la receta necesita.
@@ -396,7 +406,7 @@ QA: qa-hub-flows R7
 ### HUB-F105 Encender una receta de fábrica con exactamente sus permisos
 Estado: parcial — conceder los permisos no es todo-o-nada: un fallo de base de datos a mitad deja permisos a medias, y la siguiente activación la enciende así; y dos activaciones a la vez pueden crear dos automatizaciones (leído, sin ejecutar)
 Actor: administrador
-Pantalla: Bandeja de WhatsApp: Ajustes
+Pantalla: WHATSAPP_INBOX: Ajustes
 Pasos:
 1. Desde la pantalla del módulo que la trae (por ejemplo, «Reservar citas» en la Bandeja de WhatsApp), el administrador la activa.
 2. La primera vez, el hub la crea en el idioma del hub, en pausa; le concede **exactamente** los permisos que declara la receta, con sus límites; y solo entonces la enciende.
@@ -411,7 +421,7 @@ QA: WR-01, WA-01
 ### HUB-F106 Apagar una receta de fábrica sin borrarla
 Estado: hecho
 Actor: administrador
-Pantalla: Bandeja de WhatsApp: Ajustes
+Pantalla: WHATSAPP_INBOX: Ajustes
 Pasos:
 1. Desde la pantalla del módulo, el administrador la apaga.
 2. El hub la pone en pausa con su propio documento: no la borra, no le quita permisos y no toca su historial.
@@ -425,7 +435,7 @@ QA: ninguno
 ### HUB-F107 Restaurar una receta a la versión actual de su módulo
 Estado: parcial — mientras se restaura una receta encendida, queda en pausa un instante, y una ejecución que el motor tome justo entonces se cancela (leído, sin ejecutar)
 Actor: administrador
-Pantalla: Bandeja de WhatsApp: Ajustes
+Pantalla: WHATSAPP_INBOX: Ajustes
 Pasos:
 1. El hub avisa de que el módulo trae una versión distinta de la que se encendió (o el dueño quiere deshacer sus retoques).
 2. El administrador la restaura desde la pantalla del módulo o desde Automatizaciones.
@@ -439,7 +449,7 @@ QA: ninguno
 ### HUB-F108 Ofrecer el catálogo de avisos del negocio
 Estado: hecho
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. Al elegir «Pasa algo», el editor pide al hub qué avisos existen en este negocio.
 2. El hub junta los que declaran los módulos instalados y los que ha visto pasar de verdad (lo que queda en su historial: los entregados de los últimos 90 días y los pendientes o caídos de cualquier antigüedad), con quién los declara y cuándo se vio el último.
@@ -452,7 +462,7 @@ QA: qa-hub-flows R0
 ### HUB-F109 Enseñar ejemplos reales de un aviso con los datos de personas ocultos
 Estado: parcial — el texto que escribe un cliente en un WhatsApp entrante sale como ejemplo (hasta 64 caracteres): su clave `text` no está entre las de texto libre y el aviso no cuenta como «de una persona»; y un teléfono de 9 dígitos sin prefijo bajo una clave neutra no se detecta (leído, sin ejecutar)
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. El editor pide qué datos trae un aviso («Total de la venta — 42,50 €»).
 2. El hub mira los últimos avisos de ese nombre en este negocio (5, hasta 20) y devuelve cada dato con su tipo, en cuántos aparece y un ejemplo.
@@ -481,7 +491,7 @@ QA: qa-hub-flows R8, qa-hub-flows R9
 ### HUB-F111 Decir qué versión de automatizaciones entiende el hub
 Estado: hecho
 Actor: sistema
-Pantalla: Automatizaciones: Automatizaciones
+Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. Al abrir Automatizaciones, la pantalla pregunta al hub qué versión del documento entiende y qué versión del hub es.
 2. Con eso decide si puede trabajar o enseña el aviso de versión (FLOWS-F01).
@@ -495,7 +505,7 @@ QA: qa-hub-flows R0, qa-hub-flows R3
 ### HUB-F112 Subir la foto, el vídeo o el PDF de la cabecera de un WhatsApp
 Estado: hecho
 Actor: administrador
-Pantalla: Automatizaciones: Editor de automatización
+Pantalla: FLOWS: Editor de automatización
 Pasos:
 1. En un paso «Enviar un mensaje» con una plantilla que lleva cabecera, se sube el archivo.
 2. El hub mira el archivo por dentro (no por su nombre): tiene que ser JPEG o PNG, MP4 o PDF, del tipo que pide la cabecera (sin tipo, se toma «imagen») y como mucho 5, 16 o 100 MiB.
@@ -508,14 +518,6 @@ Implicados: FLOWS-F15
 QA: qa-hub-flows R7
 
 ## Cobertura contra la referencia
-
-Referencia adoptada: la ya contrastada en `.claude/agents/qa-hub-flows.md` (recorridos R0–R10,
-scorecard contra Zapier, Make, Power Automate, Shopify Flow, Odoo y Business Central) y en el
-`WORKFLOW.md` de `flows`. Se adopta: disparador elegido de una lista (aviso, horario en la hora del
-negocio, fecha, a mano), columna lineal sin bifurcaciones (ADR-0461), permisos explícitos por
-automatización (ADR-0283 D2), pregunta a una persona con plazo y qué pasa con el silencio (Power
-Automate, Odoo «Allowed Group»), secretos de solo escritura, y recetas de fábrica que se encienden
-en un toque desde su módulo (ADR-0470; Square y Vagaro: un interruptor).
 
 | Elemento | Estado | Flujo |
 |---|---|---|

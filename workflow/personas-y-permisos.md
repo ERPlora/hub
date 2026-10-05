@@ -9,6 +9,21 @@ Prefijo: HUB
 > servidor. El módulo Personal (`staff`) es otra cosa: su ficha de profesional se **vincula** a estas
 > cuentas, no las crea. Técnico: `architecture/hub/auth.md`, `policies.md`, `public-api.md`.
 
+## Referencia adoptada
+
+Para esta parte del área (la de entrar y las sesiones está en [acceso.md](acceso.md)):
+
+- **Aprobación de un responsable por acción, con su PIN o su placa, sin cerrar la sesión del cajero**:
+  Toast (manager approval), Square; registro de quién pidió y quién aprobó (ADR-0238/0265).
+- **Ficha del dueño en solo lectura para los demás administradores**: Shopify, Square, Toast,
+  Lightspeed, Vagaro, Business Central (hub#1429).
+- **Dar de baja, nunca borrar, a un empleado**: 11 de 11 referencias (ADR-0352).
+- **Normas del dueño con nombre y parámetros sobre puntos de control del desarrollador** (límite +
+  bloquear/aprobación): Shopify Validation Functions, Lightspeed X-Series Workflows; modo prueba como
+  Stripe Radar «Review» (ADR-0476, `architecture/hub/policies.md`).
+- **Llaves de API con secreto mostrado una vez, rotar y revocar, permisos por módulo y
+  lectura/escritura** (`architecture/hub/public-api.md`, ADR-0057); documentación OpenAPI 3.1.
+
 ## Antes de empezar
 
 - Da de alta al personal: locales con PIN o con cuenta (HUB-F145, HUB-F146), dentro de las plazas
@@ -108,7 +123,7 @@ Estado: parcial — el dueño no puede crear un rol propio ni cambiar qué permi
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
-1. En **Empleados → Roles** se ven los roles del negocio: los tres de fábrica (administrador, responsable y empleado), los que declaran los módulos instalados y cualquiera que ya tenga alguien, con sus permisos y sus miembros.
+1. En **Empleados → Roles** se ven los roles del negocio: los tres de fábrica (administrador, responsable —en pantalla, «Encargado»— y empleado; el catálogo puede traer además «Propietario», un rol antiguo que sale como «App desinstalada»), los que declaran los módulos instalados y cualquiera que ya tenga alguien, con sus permisos y sus miembros.
 2. Un rol que trae un módulo (camarero, cocina…) se enciende para poder asignarlo.
 3. Desde entonces aparece entre los roles al dar de alta o editar a una persona.
 Entra: la sesión (leer, cualquiera; encender o apagar, administrador); los roles y permisos que declaran los módulos activos.
@@ -139,7 +154,7 @@ QA: qa-hub-restaurant §6
 ### HUB-F152 Aprobar una acción con el PIN de un responsable
 Estado: hecho
 Actor: administrador, responsable, empleado
-Pantalla: HUB_SHELL: Aprobación
+Pantalla: HUB_SHELL: Aprobación de un responsable
 Pasos:
 1. El cajero intenta algo que su rol no permite pero un responsable sí (un descuento por encima del límite, borrar una cuenta abierta): sale «Hace falta una aprobación» con «Se aprueba: {acción}». Solo se puede aprobar lo que el módulo concede expresamente al rol de responsable.
 2. Un responsable o un administrador elige su nombre y teclea su PIN, o pasa su placa, sin cerrar la sesión del cajero.
@@ -160,7 +175,7 @@ Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
 1. El administrador abre **Empleados → Aprobaciones**.
-2. Ve cada acción que necesitó el PIN de un responsable: cuándo, quién la pidió, quién la autorizó, qué acción y una referencia.
+2. Ve cada acción que necesitó el PIN de un responsable: cuándo, quién la pidió, quién la autorizó y el código de la orden y del permiso.
 3. Busca por persona o acción; las personas dadas de baja siguen saliendo con su nombre.
 Entra: la sesión de administrador (permiso de administrar el hub).
 Sale: nada; es una lectura paginada del registro de aprobaciones (`hub.approvals.list`). Nadie puede editar ni borrar una fila; el hub las poda solo a los cuatro años.
@@ -252,19 +267,6 @@ Pendiente de enlazar: staff — STAFF-F03 (las cuentas activas que se ofrecen pa
 QA: ninguno
 
 ## Cobertura contra la referencia
-
-Referencia adoptada (la de entrar y las sesiones está en [acceso.md](acceso.md)):
-
-- **Aprobación de un responsable por acción, con su PIN o su placa, sin cerrar la sesión del cajero**:
-  Toast (manager approval), Square; registro de quién pidió y quién aprobó (ADR-0238/0265).
-- **Ficha del dueño en solo lectura para los demás administradores**: Shopify, Square, Toast,
-  Lightspeed, Vagaro, Business Central (hub#1429).
-- **Dar de baja, nunca borrar, a un empleado**: 11 de 11 referencias (ADR-0352).
-- **Normas del dueño con nombre y parámetros sobre puntos de control del desarrollador** (límite +
-  bloquear/aprobación): Shopify Validation Functions, Lightspeed X-Series Workflows; modo prueba como
-  Stripe Radar «Review» (ADR-0476, `architecture/hub/policies.md`).
-- **Llaves de API con secreto mostrado una vez, rotar y revocar, permisos por módulo y
-  lectura/escritura** (`architecture/hub/public-api.md`, ADR-0057); documentación OpenAPI 3.1.
 
 | Elemento | Estado | Flujo |
 |---|---|---|

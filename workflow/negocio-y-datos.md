@@ -11,6 +11,18 @@ Prefijo: HUB
 > [archivos-y-privacidad.md](archivos-y-privacidad.md). Lo que vale para toda el área está al final
 > de este fichero. Las pantallas (Ajustes › General, Negocio y Datos y copias) son de `HUB_SHELL`.
 
+## Referencia adoptada
+
+Para esta área (la del borrado de una persona está en
+[archivos-y-privacidad.md](archivos-y-privacidad.md)):
+
+- Ajustes del negocio, zona horaria por nombre IANA y moneda con decimales por ISO-4217: Odoo
+  (compañía), Square y Shopify (ajustes de tienda), Business Central (compañía y moneda). Contraste de
+  mercado reutilizado de ADR-0273/ADR-0195 y de hub#731.
+- Exportar/importar como copia de seguridad frente a plantilla, con mecánica de `migrate`: Odoo
+  (módulos con datos de demo), Shopify (importación de CSV y temas), Toast y Square (menú de
+  plantilla). Ver `architecture/hub/export-import.md`.
+
 ## Antes de empezar
 
 - El país y la zona horaria deben estar bien antes de crear automatizaciones con hora y antes de
@@ -68,9 +80,9 @@ QA: BD-02
 ### HUB-F223 Congelar el NIF y el país, y casar la región con el país
 Estado: parcial — cambiar solo el país no revalida la región guardada (queda p. ej. `ES-CN` con país `PT`, y la zona deducida pasa a Atlantic/Canary); la región tampoco se congela al salir a producción
 Actor: administrador, sistema
-Pantalla: HUB_SHELL: Ajustes › Negocio (NIF) y Ajustes › General (país y región)
+Pantalla: HUB_SHELL: Ajustes › Negocio
 Pasos:
-1. Un hub que ya emitió su primer registro fiscal intenta cambiar el identificador fiscal, o uno que ya salió a producción intenta cambiar el país.
+1. Un hub que ya emitió su primer registro fiscal intenta cambiar el identificador fiscal (en Ajustes › Negocio), o uno que ya salió a producción intenta cambiar el país (en Ajustes › General, donde están también país y región).
 2. El hub compara el valor normalizado con el guardado y con el ancla del perfil fiscal.
 3. Si cambia, lo rechaza.
 Entra: `business_tax_id` o `country_code` en un guardado de ajustes.
@@ -388,16 +400,6 @@ Implicados: ninguno
 QA: ninguno
 
 ## Cobertura contra la referencia
-
-Referencia adoptada (la del borrado de una persona está en
-[archivos-y-privacidad.md](archivos-y-privacidad.md)):
-
-- Ajustes del negocio, zona horaria por nombre IANA y moneda con decimales por ISO-4217: Odoo
-  (compañía), Square y Shopify (ajustes de tienda), Business Central (compañía y moneda). Contraste de
-  mercado reutilizado de ADR-0273/ADR-0195 y de hub#731.
-- Exportar/importar como copia de seguridad frente a plantilla, con mecánica de `migrate`: Odoo
-  (módulos con datos de demo), Shopify (importación de CSV y temas), Toast y Square (menú de
-  plantilla). Ver `architecture/hub/export-import.md`.
 
 | Elemento | Estado | Flujo |
 |---|---|---|

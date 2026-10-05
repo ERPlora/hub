@@ -11,6 +11,21 @@ Prefijo: HUB
 > `architecture/hub/runtime-dispatcher.md` y `architecture/hub/module-system.md`; aquí se escribe lo
 > que se observa.
 
+## Referencia adoptada
+
+Para las consultas y las órdenes (la de instalar y quitar apps está en
+[modulos-aplicaciones.md](modulos-aplicaciones.md)):
+
+- Toast y Square: la aprobación del responsable con su código en el momento, para una sola acción
+  (HUB-F05; referencia contrastada en el módulo de Venta, SALES-F14).
+- Cuiner *QuieroFactura* y Ágora *Crear factura*: el tique lleva un código para pedir la factura
+  completa desde casa (HUB-F16, HUB-F17); plazo:
+  [RD 1619/2012, art. 11.2](https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696).
+- [JSON Schema](https://json-schema.org/): el contenido de cada orden y consulta se valida contra el
+  esquema que declara su módulo, con sus valores por defecto (HUB-F04).
+- [Ley 46/1998, art. 11](https://www.boe.es/buscar/act.php?id=BOE-A-1998-29550): la mitad exacta se
+  redondea hacia arriba; es el redondeo común del dinero (HUB-F18).
+
 ## Flujos
 
 ### HUB-F01 Leer datos de un módulo
@@ -91,7 +106,7 @@ QA: ninguno
 ### HUB-F05 Pedir la aprobación de un responsable cuando falta el permiso
 Estado: hecho
 Actor: empleado, responsable
-Pantalla: HUB_SHELL: diálogo del PIN del responsable
+Pantalla: HUB_SHELL: Aprobación de un responsable
 Pasos:
 1. Un empleado pide una orden cuyo permiso no tiene; si ese permiso lo tiene el perfil responsable en la app dueña (y la app está activa), el hub no la rechaza sin más: contesta `requires_elevation` con el permiso que falta.
 2. La pantalla pide el PIN de un responsable, que el hub comprueba, y devuelve un pase de un solo uso para esa acción.
@@ -217,7 +232,7 @@ QA: qa-hub §7
 ### HUB-F13 Bloquear las órdenes de un módulo mientras otro no cumpla su condición
 Estado: parcial — el rechazo no tiene frase propia: la pantalla, el asistente y la API reciben `protects_guard` con una frase en inglés del hub; y si la lectura de la condición falla, el bloqueo cede
 Actor: sistema
-Pantalla: HUB_SHELL: vista de un módulo
+Pantalla: HUB_SHELL: Vista de un módulo
 Pasos:
 1. Una app declara que protege la ruta de otra (`protects`): Caja protege la de Venta mientras «Activar caja» está guardado y no hay sesión abierta.
 2. Ante cualquier orden de la app protegida, venga de donde venga (pantalla, asistente, automatización, API), el hub lee como sistema los ajustes de la app que protege: si el bloqueo está armado y su ruta apunta a la app de la orden, comprueba la condición.
@@ -315,19 +330,6 @@ Pendiente de enlazar: invoice — INVOICE-F01 (la cuota de cada tipo cuadra al c
 QA: L-08
 
 ## Cobertura contra la referencia
-
-Referencia adoptada por esta parte del área (la de instalar y quitar apps está en
-[modulos-aplicaciones.md](modulos-aplicaciones.md)):
-
-- Toast y Square: la aprobación del responsable con su código en el momento, para una sola acción
-  (HUB-F05; referencia contrastada en el módulo de Venta, SALES-F14).
-- Cuiner *QuieroFactura* y Ágora *Crear factura*: el tique lleva un código para pedir la factura
-  completa desde casa (HUB-F16, HUB-F17); plazo:
-  [RD 1619/2012, art. 11.2](https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696).
-- [JSON Schema](https://json-schema.org/): el contenido de cada orden y consulta se valida contra el
-  esquema que declara su módulo, con sus valores por defecto (HUB-F04).
-- [Ley 46/1998, art. 11](https://www.boe.es/buscar/act.php?id=BOE-A-1998-29550): la mitad exacta se
-  redondea hacia arriba; es el redondeo común del dinero (HUB-F18).
 
 | Elemento | Estado | Flujo |
 |---|---|---|

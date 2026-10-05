@@ -25,6 +25,17 @@ Prefijo: HUB
 > aviso espera hasta que todos los que lo escuchan lo han recibido; los **avisos caídos** son los
 > que no se pudieron entregar y esperan a que una persona decida (pantalla «Eventos caídos»).
 
+## Referencia adoptada
+
+- **Transactional Outbox** (`architecture/hub/event-outbox.md`, decisión del 2026-06-09): el aviso se
+  guarda en la misma transacción que la orden; entrega al menos una vez, sin repetir por módulo.
+- [Business Central — Job Queue Entries](https://learn.microsoft.com/en-us/dynamics365/business-central/admin-job-queues-schedule-tasks):
+  número máximo de intentos con espera entre ellos, estado «Error» que espera a una persona,
+  reiniciar, y aviso cuando una tarea falla. Se adopta la escalera de reintentos y la cola de errores
+  operable; no se adopta el aviso dirigido a quien lanzó la tarea (hueco, HUB-F52).
+- [Odoo OCA `queue_job`](https://github.com/OCA/queue/tree/16.0/queue_job): reintentos con patrón de
+  espera, estado fallido, «Requeue» y «Set to done». Se adopta reenviar y cerrar (aquí con motivo).
+
 ## Antes de empezar
 
 - Nada que preparar para el reparto de avisos ni las tareas programadas: corren solos desde el
@@ -185,7 +196,7 @@ QA: ninguno
 ### HUB-F59 Contar los avisos caídos para la campana
 Estado: hecho
 Actor: sistema, administrador
-Pantalla: HUB_SHELL: campana de Notificaciones
+Pantalla: HUB_SHELL: Campana de notificaciones
 Pasos:
 1. Con la sesión de un administrador, la campana pregunta al hub cuántos avisos caídos hay ahora.
 2. El hub contesta solo con el número: los caídos que esperan decisión, sin contar los pendientes, los entregados ni los cerrados.
@@ -280,17 +291,6 @@ Pendiente de enlazar: saas — ciclo de vida del hub gratuito: apagar a los 60 d
 QA: ninguno
 
 ## Cobertura contra la referencia
-
-Referencia adoptada:
-
-- **Transactional Outbox** (`architecture/hub/event-outbox.md`, decisión del 2026-06-09): el aviso se
-  guarda en la misma transacción que la orden; entrega al menos una vez, sin repetir por módulo.
-- [Business Central — Job Queue Entries](https://learn.microsoft.com/en-us/dynamics365/business-central/admin-job-queues-schedule-tasks):
-  número máximo de intentos con espera entre ellos, estado «Error» que espera a una persona,
-  reiniciar, y aviso cuando una tarea falla. Se adopta la escalera de reintentos y la cola de errores
-  operable; no se adopta el aviso dirigido a quien lanzó la tarea (hueco, HUB-F52).
-- [Odoo OCA `queue_job`](https://github.com/OCA/queue/tree/16.0/queue_job): reintentos con patrón de
-  espera, estado fallido, «Requeue» y «Set to done». Se adopta reenviar y cerrar (aquí con motivo).
 
 | Elemento | Estado | Flujo |
 |---|---|---|
