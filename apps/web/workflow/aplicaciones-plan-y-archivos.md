@@ -80,7 +80,7 @@ Pendiente de enlazar: saas — marketplace: precio, ciclo y plan de cada app
 QA: ninguno
 
 ### HUB_SHELL-F109 Instalar una app
-Estado: parcial — mientras dura la instalación el hub retiene todas las consultas y órdenes, también las de la caja, y ninguna pantalla se lo dice a quien está cobrando (solo la persona que instala ve «Instalando…»); y el aviso de éxito de la propia pantalla y el que llega del hub por el canal en vivo pueden pisarse entre sí (leído en el código, sin ejecutar)
+Estado: parcial — mientras dura, el hub retiene todas las consultas y órdenes (también la caja), sin tope de tiempo ni en el hub ni en la pantalla, y nadie más que quien instala ve por qué; las apps que entran de paso no pasan por la pregunta de permisos y quedan con todos denegados, sin aviso; y el aviso de éxito de la pantalla y el del canal en vivo pueden pisarse (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -89,8 +89,8 @@ Pasos:
 3. Si la app declara permisos, aparece «Permisos solicitados»: «Esta app solicita estos permisos. Podrás revisarlos después en Ajustes → Permisos.», con cada permiso y su descripción y los botones «Instalar y conceder» y «Cancelar». No se puede conceder solo una parte. Sin permisos, se instala directamente.
 4. La fila pasa a «Instalando…» y va diciendo la fase: «Resolviendo versión…», «Descargando…», «Verificando integridad…», «Aplicando migraciones…»; si instala una dependencia, «Dependencia {name} — {phase}». Un aviso fijo dice «Instalando {name}…».
 5. Al terminar sale «{name} instalado correctamente.» (se va solo), la fila pasa a «Instalado» y la app aparece en el menú y en Mis apps sin recargar.
-Entra: la app y la versión elegidas; los permisos que declara (del hub si ya la conoce, y si no del catálogo).
-Sale: pide al servidor la instalación (HUB-F19) y concede los permisos aceptados (HUB-F32); sigue las fases por el canal en vivo. Una instalación empezada desde otro dispositivo se ve igual en esta pantalla. Si se sale de Apps mientras instala, el aviso y su resultado pasan a un aviso global y no se pierden.
+Entra: la app y la versión elegidas; los permisos que declara (del hub si ya la conoce, y si no del catálogo). No se confirma el precio ni qué otras apps entrarán: solo la versión (si hay varias) y los permisos de la app pedida.
+Sale: pide al servidor la instalación (HUB-F19) y concede los permisos aceptados (HUB-F32); sigue las fases por el canal en vivo. Una instalación empezada desde otro dispositivo se ve igual en esta pantalla, y el aviso «{name} instalado.» sale en todos los dispositivos que tengan Apps abierta. Las apps instaladas de paso no pasan por la pregunta de permisos ni los reciben: una dependencia con permisos de host queda con todo denegado y ningún aviso lo dice (el de HUB_SHELL-F115 es solo de la app pedida). Si se sale de Apps mientras instala, el aviso y su resultado pasan a un aviso global y no se pierden.
 Si falla: HUB_SHELL-F110 a F115 según la causa. Si no es administrador: «Puedes ver las apps, pero solo un administrador puede instalarlas, activarlas o desinstalarlas.».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo)
@@ -104,8 +104,8 @@ Actor: administrador
 Pantalla: Apps
 Pasos:
 1. El administrador instala una app que necesita otras (por ejemplo, Facturación necesita Impuestos).
-2. El hub instala primero lo que falta; la fila enseña «Dependencia {name} — {phase}» mientras tanto.
-3. Al terminar, el mismo aviso de éxito nombra todo: «{name} instalado correctamente. También se instaló: {names}.», con los nombres como los conoce el catálogo.
+2. El hub instala primero lo que falta; la fila enseña «Dependencia {name} — {phase}» mientras tanto, con el identificador de la dependencia (por ejemplo `taxes`).
+3. Al terminar, el mismo aviso de éxito nombra todo: «{name} instalado correctamente. También se instaló: {names}.», con los nombres como los conoce el catálogo cuando los tiene y, si no, con el identificador.
 4. Las apps instaladas de paso aparecen en Mis apps como cualquier otra.
 Entra: la lista de apps que el hub instaló de paso.
 Sale: nada guardado en la pantalla. Es el reverso del aviso de desinstalar, que nombra lo que dejaría de funcionar (HUB_SHELL-F124). Una app sin dependencias nuevas recibe el aviso simple, sin «También se instaló».
@@ -122,7 +122,7 @@ Pasos:
 1. El administrador pulsa «Instalar» en una app de pago que este negocio no tiene contratada.
 2. La pantalla no intenta instalar: dice «{name} necesita una suscripción. Contrátala desde tu cuenta de ERPlora, en erplora.com, y se instalará aquí.». No hay botón que lleve a pagar.
 3. El administrador contrata en erplora.com (en el navegador, en el móvil o en otro equipo) y vuelve a la ventana: el catálogo se recarga solo y la app ya se puede instalar.
-4. Si la app (de pago o no) necesita otras de pago que faltan, la rechaza el hub y el aviso es otro y fijo: «{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.», con «Cerrar» y sin «Reintentar»; no cambia nada hasta contratar.
+4. Si la app (de pago o no) necesita otras de pago que faltan, la rechaza el hub y el aviso es otro y fijo: «{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.» (con los identificadores de las apps que faltan), con «Cerrar» y sin «Reintentar»; no cambia nada hasta contratar.
 Entra: qué apps tiene permitidas el negocio, que manda erplora.com (si aún no se ha podido saber, se deja intentar y el hub decide).
 Sale: nada guardado ni cobrado. La pantalla nunca lleva a una página de pago desde dentro (las tiendas de Google y Microsoft lo rechazan).
 Si falla: sin conexión con erplora.com no se puede saber si hay suscripción: se deja pasar y el hub la comprueba al instalar.
@@ -156,8 +156,8 @@ Pasos:
 2. El aviso «Instalando {name}…» sigue a la vista como aviso global; cuando termina, el resultado (éxito o error con «Reintentar») sale donde esté, no en la pantalla de Apps que ya no existe.
 3. Al volver a Apps, la fila vuelve a mostrar la fase en cuanto llega el siguiente aviso de progreso.
 Entra: los avisos de progreso por fases que manda el hub por el canal en vivo.
-Sale: nada guardado. La retención de consultas y órdenes durante la instalación es del servidor (HUB-F19): la pantalla de Apps no la nombra y quien cobra en otro dispositivo solo nota que sus pantallas tardan.
-Si falla: si el canal en vivo se cae, la fila se queda en «Instalando…» hasta que la orden contesta o se recarga la pantalla.
+Sale: nada guardado. La retención de consultas y órdenes durante la instalación es del servidor (HUB-F19): la pantalla de Apps no la nombra y quien cobra en otro dispositivo solo nota que sus pantallas tardan; la barra de espera de arriba solo se ve en el dispositivo que instala.
+Si falla: si el canal en vivo se cae, la fila se queda en «Instalando…» hasta que la orden contesta o se recarga la pantalla. Si la instalación falla después de salir de Apps y volver, el resultado sale en el aviso global pero la fila de la pantalla nueva sigue en «Instalando…», porque solo la limpia el aviso de instalada (leído en el código, sin ejecutar). La orden de instalar no tiene tiempo máximo en el cliente.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo: el hub retiene todas las órdenes mientras dura)
 QA: ninguno
@@ -194,7 +194,7 @@ Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos (la pantalla donde
 QA: ninguno
 
 ### HUB_SHELL-F116 Actualizar una app
-Estado: parcial — la pantalla solo ofrece versiones hacia delante (bajar de versión existe en el hub por la API con una versión explícita, pero no tiene botón); y los avisos de error y de «ya está al día» desaparecen a los 2,5 s (leído en el código, sin ejecutar)
+Estado: parcial — la pantalla solo ofrece versiones hacia delante (bajar de versión existe en el hub por la API con una versión explícita, pero no tiene botón); y los avisos de error (salvo el de apps de pago sin contratar, que es fijo) y el de «ya está al día» desaparecen a los 2,5 s (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -308,7 +308,7 @@ Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar 
 QA: L-14
 
 ### HUB_SHELL-F123 Activar una app
-Estado: hecho
+Estado: parcial — si falta una dependencia, el hub responde con error pero deja la app activa, y la fila sigue «Inactivo» hasta recargar (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -317,13 +317,13 @@ Pasos:
 3. Confirma con «Activar». Sale «{name} activado.», vuelve al menú y las arrastradas por una dependencia que se apagó vuelven solas.
 Entra: las dependencias declaradas.
 Sale: pide al servidor encenderla (HUB-F27).
-Si falla: «No se pudo cambiar el estado de {name}.» o la frase del hub.
+Si falla: «No se pudo cambiar el estado de {name}.» o la frase del hub; la pantalla solo recarga la lista si todo va bien, así que ese error no muestra la app ya activa.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F27 (activar una aplicación)
 QA: ninguno
 
 ### HUB_SHELL-F124 Desinstalar una app
-Estado: parcial — «quitarla igualmente» no es un botón aparte: confirmar la pregunta ya fuerza la desinstalación aunque otras apps la necesiten, y qué pasa con esas apps en el siguiente arranque no se ha confirmado (HUB-F29)
+Estado: parcial — confirmar ya fuerza la desinstalación aunque otras apps la necesiten (no hay opción aparte); esas apps siguen «Activo» y en el siguiente arranque el hub vuelve a instalar sola la app quitada (o arranca con la salud en rojo), y la pregunta no lo dice
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -332,8 +332,8 @@ Pasos:
 3. Debajo, siempre: «La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.».
 4. Confirma con «Desinstalar». Sale «{name} desinstalado.», desaparece de Mis apps y del menú, y el catálogo vuelve a ofrecerla.
 Entra: las apps instaladas y sus dependencias, para nombrar lo que se rompe.
-Sale: pide al servidor desinstalar (HUB-F29), forzando solo si la pregunta ya nombró dependientes. Los datos y archivos se quedan en la base y en Archivos.
-Si falla: «No se pudo desinstalar {name}.»; si la lista con la que se preguntó se había quedado vieja y el hub encuentra dependientes: «{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.» (con los nombres que mandó el hub y la lista recargada); o la negativa de un motor (HUB_SHELL-F125).
+Sale: pide al servidor desinstalar (HUB-F29), forzando solo si la pregunta ya nombró dependientes (los nombres de esa lista son identificadores). Las dependientes quedan «Activo» en Mis apps y fallan en el siguiente arranque con una dependencia que falta. Los datos y archivos se quedan en la base y en Archivos.
+Si falla: «No se pudo desinstalar {name}.»; si la lista con la que se preguntó se había quedado vieja y el hub encuentra dependientes: «{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.» (con los identificadores que mandó el hub y la lista recargada); o la negativa de un motor (HUB_SHELL-F125).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F29 (desinstalar una aplicación)
 Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar con registros sin enviar)
@@ -344,9 +344,9 @@ Estado: parcial — la negativa de un motor sale con la frase en inglés tal com
 Actor: administrador
 Pantalla: Apps
 Pasos:
-1. El administrador intenta desactivar o desinstalar VeriFactu (o una app de la que depende, como Facturación), o la última app que cumple el régimen fiscal del negocio, con registros sin aceptar por la AEAT.
+1. El administrador intenta desactivar VeriFactu o una app cuya desactivación lo arrastra (Facturación), o desinstalar VeriFactu, con registros sin aceptar por la AEAT; o desactivar o desinstalar la última app que cumple el régimen fiscal del negocio. Desinstalar Facturación no pasa por la negativa del motor: se fuerza desde la pregunta (HUB_SHELL-F124).
 2. El hub se niega y no cambia nada: ni la pedida ni las arrastradas.
-3. La pantalla enseña el motivo en un aviso rojo; en el caso de VeriFactu: «{n} VeriFactu record(s) have not reached the AEAT yet: send them before disabling or removing the module.».
+3. La pantalla enseña el motivo en un aviso rojo; en el caso de VeriFactu: «{n} VeriFactu record(s) have not reached the AEAT yet: send them before disabling or removing the module».
 4. La app sigue «Activo» en la fila.
 Entra: el rechazo del hub con el código del motor y la frase que mandó.
 Sale: nada guardado. La pantalla solo conoce códigos genéricos de plataforma; la frase de un motor la pinta tal cual, porque el hub dice más que cualquier genérico.
@@ -358,15 +358,15 @@ Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar 
 QA: L-14
 
 ### HUB_SHELL-F126 Ver las facturas del plan y descargarlas
-Estado: parcial — el estado de una suscripción se pinta con el vocabulario de las facturas y cualquier valor que la pantalla no conoce sale como «Abierta» (leído en el código, sin ejecutar)
-Actor: administrador
+Estado: parcial — las facturas pendientes, fallidas o devueltas salen «Abierta», y la lista trae las facturas de la persona en todos sus negocios, no solo las de este hub (leído en el código y en el servicio de erplora.com, sin ejecutar)
+Actor: administrador, responsable, empleado
 Pantalla: Mi plan
 Pasos:
 1. La persona pulsa **Mi plan** en el menú lateral. Se abre en **Facturas**.
 2. Con la sesión de su cuenta de erplora.com ve una tabla: «Factura», «Fecha», «Vencimiento», «Importe» (en la moneda de la factura) y «Estado» («Borrador», «Abierta», «Pagada», «Anulada» o «Incobrable»). Sin facturas: «No hay facturas».
 3. Pulsa «Descargar» en una fila. La factura se guarda como `factura-<número>.pdf`; sale «Guardado en {path}» si la app instalada dice dónde.
 4. Quien entró solo con un PIN ve en su lugar «Consulta la facturación en tu cuenta de ERPlora»: «Tu sesión local sigue activa. Las facturas y suscripciones requieren la sesión de tu cuenta online en erplora.com.».
-Entra: las facturas que da erplora.com con la sesión de la cuenta; el PDF se pide al descargar.
+Entra: las facturas del usuario que da erplora.com con la sesión de la cuenta (el hub no pide filtrar por negocio; los estados de erplora.com son borrador, pendiente, pagada, fallida y devuelta, y la pantalla solo conoce cinco de otro vocabulario); el PDF se pide al descargar. Cualquiera que haya entrado con su cuenta ve las suyas.
 Sale: nada guardado en el hub. El hub no emite ni cobra: es información del plan.
 Si falla: «No pudimos cargar la facturación» con «Comprueba la conexión e inténtalo de nuevo. Puedes seguir utilizando el Hub.» y «Reintentar»; si falla la descarga, un aviso (con la frase propia de la app instalada cuando no puede guardar archivos).
 Implicados: pendiente
@@ -374,7 +374,7 @@ Pendiente de enlazar: saas — facturas y suscripciones del negocio en el panel 
 QA: ninguno
 
 ### HUB_SHELL-F127 Ver las suscripciones y dónde se gestionan los pagos
-Estado: parcial — «Renueva» enseña la fecha aunque la suscripción esté marcada para cancelarse al final del periodo, y eso no se dice en la pantalla (leído en el código, sin ejecutar)
+Estado: no hecho — la tabla no enseña nada cierto: la pantalla lee campos que erplora.com no manda (cada fila sale sin nombre, a «0,00 €/mes» y «Abierta»), la cancelación al final del periodo no se pinta, y lo que lista son las suscripciones de apps de la persona, no el plan de este hub (leído en el código y en el servicio de erplora.com, sin ejecutar)
 Actor: administrador
 Pantalla: Mi plan
 Pasos:
@@ -382,7 +382,7 @@ Pasos:
 2. Lee arriba «Los cambios de plan se gestionan desde tu cuenta de ERPlora, en erplora.com.» y la tabla: «Suscripción», «Precio» (importe y ciclo, por ejemplo «/mes»), «Renueva» y «Estado». Sin ninguna: «No hay suscripciones activas».
 3. Al volver a la ventana o a la pestaña del navegador, se recargan solas: contratar o cancelar en erplora.com se ve al volver.
 4. En **Pagos** solo hay un aviso: «Los métodos de pago se gestionan desde tu cuenta de ERPlora, en erplora.com.».
-Entra: las suscripciones que da erplora.com.
+Entra: las suscripciones de apps de la persona que da erplora.com (importe, periodo, estado, fin de periodo); la pantalla busca otros nombres (`plan_name`, `plan_price`, `billing_cycle`, `cancel_at_period_end`) y los estados de erplora.com (`active`, `past_due`, `cancelled`, `unpaid`) no son de factura.
 Sale: nada guardado. No hay botón para comprar, cambiar o cancelar: se hace fuera.
 Si falla: lo mismo que HUB_SHELL-F126 (cuenta no iniciada, o error con «Reintentar»).
 Implicados: pendiente
@@ -395,10 +395,10 @@ Actor: administrador
 Pantalla: Sistema
 Pasos:
 1. El administrador abre **Sistema › Plan y límites**.
-2. Ve el «Plan actual» con una etiqueta «Dentro del límite» o «Cerca del límite» y cinco tarjetas: «Memoria (RAM)», «CPU», «Base de datos», «Dispositivos» y «Personas». Memoria, CPU y base de datos llevan porcentaje y barra (verde, amarilla desde el 80 %, roja desde el 90 %); Dispositivos y Personas dicen «{n} / {tope}» y «Límite del plan» (o «Ilimitado»).
+2. Ve el «Plan actual» (el nombre de la clave del plan con la inicial en mayúscula, sin traducir) con una etiqueta «Dentro del límite» o «Cerca del límite» y cinco tarjetas: «Memoria (RAM)», «CPU», «Base de datos», «Dispositivos» y «Personas». Memoria, CPU y base de datos llevan porcentaje y barra (verde, amarilla desde el 80 %, roja desde el 90 %); Dispositivos y Personas dicen «{n} / {tope}» y «Límite del plan» (o «Ilimitado»).
 3. Lo que no se pudo medir sale como «n/d» («No disponible en este equipo»), nunca como cero. La base de datos sin cuota dice «Sin cuota de plan».
 4. Se actualiza cada cinco segundos mientras la pestaña está abierta y visible («En vivo — se actualiza cada pocos segundos mientras esta página está abierta.»).
-5. En el plan gratuito, si algún límite está al 80 % o todas las plazas de personas o dispositivos están ocupadas, arriba sale «Te estás quedando sin margen en tu plan» con la frase de la causa y «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.», sin botón.
+5. En el plan gratuito, si la memoria o la base de datos pasan del 80 %, o están ocupadas todas las plazas de personas o dispositivos (la CPU no cuenta), arriba sale «Te estás quedando sin margen en tu plan» con la frase de la causa y «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.», sin botón.
 Entra: el uso del hub y los topes del último plan verificado (HUB-F165).
 Sale: nada guardado.
 Si falla: «Las métricas de recursos no están disponibles» con «El Hub no ha podido informar de su uso de recursos ahora mismo. Puedes reintentarlo.» y «Reintentar».
@@ -434,7 +434,7 @@ Pasos:
 2. Mientras carga, el gestor muestra el indicador. Después ve el árbol de carpetas a la izquierda (en una pantalla estrecha se pliega en un selector), la ruta de la carpeta abierta, los archivos en vista de cuadrícula o de lista y el espacio usado («Espacio», o «Sin límite»).
 3. Navega pulsando carpetas, busca en «Buscar archivos…» (solo dentro de la carpeta abierta) y, sin archivos, lee «Sin archivos».
 4. En la raíz están las carpetas de las apps (adjuntos de cada una), los registros del sistema y la actividad. Algunas son de solo lectura.
-Entra: el listado de la carpeta con qué se puede hacer en ella; cualquier perfil con sesión puede leerlas todas, incluidos los registros.
+Entra: el listado de la carpeta con qué se puede hacer en ella. La pantalla enseña a cualquier sesión, cajero incluido, lo mismo que sirve la API: la carpeta de registros, la de actividad del sistema y los XML de VeriFactu (ERPlora/hub#2495); no oculta nada.
 Sale: nada guardado.
 Si falla: «No se pudieron cargar los archivos» con el motivo («Esta carpeta es de una app que no permite cambiar sus archivos.», el de erplora.com sin contestar o, si no llegó a salir, «Comprueba la conexión y vuelve a intentarlo.») y «Reintentar»; el gestor queda vacío sin inventar datos.
 Implicados: pendiente
@@ -464,12 +464,12 @@ Actor: administrador, responsable, empleado, cajero
 Pantalla: Archivos
 Pasos:
 1. La persona pulsa «Abrir» en un archivo. Se abre un visor grande dentro del hub, con el nombre como título, «Descargar» y «Cerrar» (y «Ampliar»/«Reducir» donde se puede).
-2. El visor entiende imágenes, PDF (dibujado en pantalla; si es muy largo, «Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.»), hojas de cálculo (xlsx, xlsm, csv, tsv), Word moderno (docx), texto, registros y código, JSON plegable, vídeo y audio.
+2. El visor entiende imágenes, PDF (dibujado en pantalla; las primeras 30 páginas y, si es más largo, «Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.»; ampliar y reducir solo en imágenes y PDF), hojas de cálculo (xlsx, xlsm, csv, tsv), Word moderno (docx), texto, registros y código, JSON plegable, vídeo y audio.
 3. Para cualquier otro tipo (por ejemplo `.xls` o `.doc` antiguos) sale «Sin vista previa»: «Este tipo de archivo no se puede mostrar aquí. Descárgalo para abrirlo con una aplicación de tu dispositivo.».
 4. «Descargar» (en el visor o en la fila) guarda el archivo; sale «Guardado en {path}» si la app dice dónde.
 Entra: los bytes del archivo, que pide el hub al almacenamiento; el navegador nunca toca el almacenamiento.
 Sale: nada guardado. Abrir un `.log` no descarga el lector de PDF.
-Si falla: «No se pudo abrir el archivo»: «No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo.»; «Ese archivo es demasiado grande para abrirlo aquí. Descárgalo.»; si la app instalada no puede guardar archivos (por ejemplo en una tableta), una frase propia que lo dice.
+Si falla: cualquier fallo al traer o al dibujar sale como «No se pudo abrir el archivo»: «No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo.» (el visor no distingue un archivo demasiado grande del resto; el tope de 25 MiB es del hub, HUB-F245, y su frase «Ese archivo es demasiado grande para abrirlo aquí. Descárgalo.» no llega a salir en el visor); si la app instalada no puede guardar archivos (por ejemplo en una tableta), una frase propia que lo dice.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F245 (ver y descargar archivos)
 QA: ninguno
@@ -482,7 +482,7 @@ Pasos:
 1. Para mover, el administrador arrastra el archivo o la carpeta a otra carpeta del árbol, o elige «Mover a…». Sale «Movido a «{folder}».» (si va a la raíz, «Movido a «Archivos».»).
 2. Para renombrar, elige «Renombrar» (o «Renombrar carpeta»): un diálogo con el nombre actual ya escrito (hasta 255 caracteres). Confirma y sale «Renombrado.».
 3. Si renombra o mueve la carpeta en la que está, la pantalla sigue a su nueva ruta o sube a la de arriba.
-4. Las carpetas de solo lectura no se pueden arrastrar, renombrar ni recibir archivos.
+4. Las carpetas de solo lectura no se pueden arrastrar, renombrar ni recibir archivos. A quien no administra, el menú del gestor le sigue ofreciendo «Mover a…» y «Renombrar», que contestan «Solo un administrador puede modificar los archivos.».
 Entra: el origen y el destino, o el nombre nuevo.
 Sale: pide al servidor el cambio (HUB-F246). Mover exige poder borrar en el origen y subir en el destino.
 Si falla: «No se pudo mover. Puede que la carpeta de destino sea de solo lectura.» / «No se pudo renombrar. Puede que esta carpeta sea de solo lectura.» o la causa exacta: «El archivo ya está en esa carpeta.», «Una carpeta no se puede mover dentro de sí misma.», «Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.», «Esta carpeta es de una app que no permite cambiar sus archivos.».

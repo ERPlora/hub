@@ -17,7 +17,7 @@ Prefijo: HUB_SHELL
 ## Flujos
 
 ### HUB_SHELL-F80 Ver la lista de personas del negocio
-Estado: parcial — con la lista caída, bajo el aviso de error la tabla sigue diciendo «Aún no hay nadie más en este Hub.», que parece un hecho sobre el negocio (leído en el código, sin ejecutar)
+Estado: parcial — con la lista caída, bajo el aviso de error la tabla sigue diciendo «Aún no hay nadie más en este Hub.», que parece un hecho sobre el negocio; y la columna «Rol» enseña el identificador (por ejemplo `kitchen`) de los roles que trae una app, no su nombre (leído en el código, sin ejecutar)
 Actor: administrador, responsable, empleado
 Pantalla: Empleados
 Pasos:
@@ -26,7 +26,7 @@ Pasos:
 3. Puede buscar en «Buscar usuario…», filtrar por rol, estado y fecha de alta, elegir columnas y exportar la tabla a un CSV llamado `personal`.
 4. Un administrador ve además el botón de añadir (HUB_SHELL-F81) y, en cada fila, «Editar» y «Dar de baja». El resto lo ve en solo lectura.
 Entra: la lista de personas y la de roles, pedidas a la vez al hub; la sesión.
-Sale: nada guardado. Esa misma lista (identificador, nombre, rol y si está activa) es la que los módulos piden para nombrar a quien atiende o a quien envió una comanda; el correo y la forma de entrar no viajan a ellos (HUB-F158).
+Sale: nada guardado. El correo de la columna «Email» es el de acceso o, si no lo hay, el que la persona escribió en su Mi perfil; con ese correo se da y se quita el acceso en erplora.com (ERPlora/hub#2500). Esa misma lista (identificador, nombre, rol y si está activa) es la que los módulos piden para nombrar a quien atiende o a quien envió una comanda; el correo y la forma de entrar no viajan a ellos (HUB-F158).
 Si falla: si falla cualquiera de las dos lecturas, sale «No se pudo cargar el personal» con «El Hub no respondió con la lista de usuarios. Vuelve a intentarlo.» y el botón «Reintentar»; el botón de añadir desaparece hasta que cargue. Una lista realmente vacía dice «Aún no hay nadie más en este Hub.».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F158 (dar la lista de personas del negocio a los módulos)
@@ -40,8 +40,8 @@ Actor: administrador
 Pantalla: Empleados
 Pasos:
 1. En **Empleados › Personal**, el administrador pulsa el botón de añadir de la tabla: se abre un panel «Nuevo» con el formulario.
-2. Escribe «Nombre y apellidos» (hasta 150 caracteres) y activa «Usuario local». El campo de email desaparece y el texto del interruptor lo explica: trabaja en este hub solo con un PIN, sin email y sin cuenta de ERPlora.
-3. Elige el «Rol» entre los que se pueden asignar hoy (los de fábrica y los de las apps cuyo rol está encendido, HUB_SHELL-F91) y teclea el «PIN local»: solo dígitos, tantos como pida el negocio (4 o 6), enmascarado y con un ojo para verlo. Bajo el campo: «{n} dígitos. Obligatorio: es cómo entra esta persona.».
+2. Escribe «Nombre y apellidos» (hasta 150 caracteres) y activa «Usuario local» (el panel no lleva texto de ayuda; solo la ficha de alta lo tiene y no se alcanza desde ninguna pantalla). El campo de email desaparece.
+3. Elige el «Rol» entre los que se pueden asignar hoy (los de fábrica y los de las apps cuyo rol está encendido, HUB_SHELL-F91; los de una app salen con su identificador) y teclea el «PIN local»: solo dígitos, tantos como pida el negocio (4 o 6), enmascarado y con un ojo para verlo. Bajo el campo: «{n} dígitos. Obligatorio: es cómo entra esta persona.».
 4. Pulsa «Crear» (se apaga mientras falte el nombre o haya un fallo evidente, y mientras guarda dice «Guardando…»).
 5. El panel se cierra, la lista se recarga con la persona nueva y sale el aviso «Usuario creado.». La casilla «Usuario local» se queda como estaba para dar de alta a la siguiente.
 Entra: nombre, rol y PIN (más la casilla); la lista de personas ya cargada, para adelantar los fallos evidentes.
@@ -53,7 +53,7 @@ Pendiente de enlazar: staff — STAFF-F01 (la ficha de profesional que luego se 
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F82 Invitar a una persona con su cuenta de erplora.com
-Estado: parcial — «Crear» se queda apagado mientras falte un email válido sin decir por qué (el aviso de email que falta espera a pulsar «Crear», y apagado no se pulsa); y si la invitación no sale (erplora.com no contesta, la rechaza o frena), el servidor ya ha guardado la ficha pero el panel se queda abierto, no recarga la lista y el aviso manda a «volver a guardar»: un segundo guardado se rechaza con «Este hub ya conoce ese email» (leído en el código, sin ejecutar)
+Estado: parcial — «Crear» se queda apagado mientras falte un email válido sin decir por qué; la persona invitada sale «Sin acceso» en rojo hasta su primer acceso; y si la invitación no sale, la ficha ya está guardada pero la lista no se recarga y «volver a guardar» no reenvía nada (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
@@ -61,23 +61,23 @@ Pasos:
 2. Escribe el nombre y el «Email». Bajo el email: «Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.».
 3. Elige el «Rol». A una cuenta solo se la puede invitar como administrador, encargado o empleado; un rol que trae una app es del personal local.
 4. Si trabaja en una caja compartida, teclea además un PIN: «Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.».
-5. Pulsa «Crear». El panel se cierra, la lista se recarga y sale «Usuario creado.»; en la columna «Acceso» la persona sale como «Cuenta online» (o «PIN local» si tiene PIN).
+5. Pulsa «Crear». El panel se cierra, la lista se recarga y sale «Usuario creado.». En la columna «Acceso» sale «Sin acceso», en rojo, hasta que entre por primera vez con su cuenta (con PIN, «PIN local»).
 Entra: nombre, email, rol y PIN opcional; la lista ya cargada (para adelantar «email repetido» antes de enviar).
 Sale: pide al servidor el alta de la ficha y que erplora.com mande la invitación (HUB-F146). La pantalla adelanta el email repetido y el rol que una cuenta no admite mientras se teclea.
-Si falla: «Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.», «Introduce un email válido.», «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.», «Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.», «No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.». Si falla la invitación: «No hemos podido conectar con ERPlora para enviar la invitación. El usuario queda guardado aquí: vuelve a guardar dentro de un momento.», «No se ha podido crear la invitación para ese email. Revisa la dirección y vuelve a intentarlo; si sigue fallando, avisa a soporte.», «Demasiados cambios en poco tiempo: la invitación todavía no ha salido. Espera unos minutos y vuelve a guardar — no se ha perdido nada más.» o «Este hub todavía no puede enviar invitaciones. El usuario queda guardado aquí; avisa a soporte para que termine de configurarlo.».
+Si falla: «Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.», «Introduce un email válido.», «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.», «Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.», «No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.». Si la invitación no sale, el panel sigue abierto con el motivo y la lista no se actualiza: la persona ya está guardada pero no se ve hasta volver a entrar en Empleados. «Volver a guardar» no reenvía: un segundo «Crear» se rechaza con «Este hub ya conoce ese email…». Hoy la única forma de reenviar la invitación desde la pantalla es recargar y cambiarle el rol, el correo o el estado en su ficha (o darla de baja y reincorporarla). Los avisos: «No hemos podido conectar con ERPlora para enviar la invitación. El usuario queda guardado aquí: vuelve a guardar dentro de un momento.», «No se ha podido crear la invitación para ese email. Revisa la dirección y vuelve a intentarlo; si sigue fallando, avisa a soporte.», «Demasiados cambios en poco tiempo: la invitación todavía no ha salido. Espera unos minutos y vuelve a guardar — no se ha perdido nada más.» o «Este hub todavía no puede enviar invitaciones. El usuario queda guardado aquí; avisa a soporte para que termine de configurarlo.».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F146 (invitar a una persona con su cuenta de erplora.com)
 Pendiente de enlazar: staff — STAFF-F01 (la cuenta que luego se vincula a la ficha de profesional)
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F83 Llegar al tope de personas del plan
-Estado: parcial — la salida «Actualizar plan» solo sale en la ficha completa de la persona; el panel de alta rápida de la tabla (por donde se da de alta casi siempre) da la frase sin botón (leído en el código, sin ejecutar)
+Estado: parcial — el botón «Actualizar plan» solo sale en la ficha de la persona, es decir, al reincorporar a alguien (HUB_SHELL-F89); al dar de alta desde la tabla sale solo la frase (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
 1. El plan admite un número de personas activas. El administrador intenta dar de alta, invitar o reincorporar a alguien con todas las plazas ocupadas.
 2. El hub lo rechaza y la pantalla dice: «Tu plan tiene todas las plazas ocupadas. Da de baja a alguien que ya no trabaje aquí, o pasa a un plan con más plazas.».
-3. En la ficha completa de la persona, bajo la frase aparece el botón «Actualizar plan», que abre en el navegador la página de cambio de plan de este hub en erplora.com, ya identificado (HUB_SHELL-F129). No sale en una copia repartida por Google Play ni con un fallo que no sea el tope.
+3. Solo en la ficha de la persona (se llega a ella desde «Editar», es decir, al reincorporar; la ficha de alta no se alcanza desde ninguna pantalla), bajo la frase aparece el botón «Actualizar plan», que abre en el navegador la página de cambio de plan de este hub en erplora.com, ya identificado (HUB_SHELL-F129). No sale en una copia repartida por Google Play ni con un fallo que no sea el tope.
 4. Dar de baja a alguien libera su plaza al momento; el administrador vuelve a guardar.
 Entra: el rechazo del servidor por plazas (`user_limit_reached`); la distribución de la copia (Play o no) que da el dispositivo.
 Sale: nada guardado. El servidor decide el tope y lo aplica en el mismo paso que escribe (HUB-F147); la pantalla no cuenta plazas por su cuenta. Cuántas plazas hay usadas se ve en **Sistema › Plan y límites** (HUB_SHELL-F128), que avisa con «Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más.» sin botón.
@@ -87,17 +87,17 @@ Pendiente de enlazar: hub — HUB-F147 (llegar al tope de plazas del plan)
 QA: ninguno
 
 ### HUB_SHELL-F84 Cambiar el nombre, el correo, el rol o el estado de una persona
-Estado: parcial — la ficha completa ofrece en «Rol» todos los roles, también los de una app que está apagada; el servidor los rechaza y la frase manda a «Ajustes → Roles», que no existe (los roles se encienden en Empleados › Roles); y al dueño de la cuenta la baja desde la tabla le contesta «No puedes darte de baja a ti mismo…», que no es el motivo
+Estado: parcial — la ficha ofrece en «Rol» todos los roles, también los de una app apagada (el servidor los rechaza con una frase que manda a «Ajustes → Roles», que no existe: se encienden en Empleados › Roles); la ficha no impide dejar el negocio sin administradores (solo frena el servidor); y quien no administra puede abrir la ficha por su dirección y solo recibe el rechazo al guardar
 Actor: administrador
 Pantalla: Ficha de usuario
 Pasos:
 1. En **Empleados › Personal**, el administrador pulsa «Editar» en la fila: se abre la **Ficha de usuario** («Editar usuario»).
-2. Cambia lo que haga falta: «Nombre y apellidos», «Email» (solo en una persona con cuenta), «Rol» y la casilla «Usuario activo». Los cambios de PIN y de placa son HUB_SHELL-F85 a F87.
+2. Cambia lo que haga falta: «Nombre y apellidos», «Email» (en todas las fichas: ponérselo a una persona local la convierte en persona con cuenta e invita a ese correo; con un rol de app, erplora.com lo rechaza y el aviso habla de la dirección, no del rol), «Rol» y la casilla «Usuario activo». Los cambios de PIN y de placa son HUB_SHELL-F85 a F87.
 3. Pulsa «Guardar». Solo viaja lo que ha cambiado. Sale «Usuario actualizado.» y vuelve a la lista.
 4. Si hay cambios sin guardar y el administrador pulsa «Cancelar» o sale de la ficha, la pantalla pregunta «Cambios sin guardar» («Si sales ahora perderás los cambios realizados.») con «Seguir editando» y «Descartar cambios».
 Entra: la ficha cargada desde la lista de personas y de roles; los campos que cambian.
 Sale: pide al servidor la edición (HUB-F148). El rol nuevo vale desde la siguiente acción de esa persona.
-Si falla: sin la ficha, «No se pudo abrir el usuario» con «El registro no está disponible o no tienes permiso para consultarlo.» y «Reintentar»; «Usuario no encontrado.» si ya no está en la lista. La ficha del dueño de la cuenta solo la abre él: a otro administrador la tabla le avisa «La ficha del dueño de la cuenta solo la cambia él. Para traspasar el negocio, transfiere la cuenta en ERPlora.» y no abre el formulario (si llegara, «Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»). Un rechazo por campo sale bajo el campo que lo causó (nombre, email, PIN o placa) y cualquier otro en el banner de arriba. Sin conexión con erplora.com al cambiar rol o email: los avisos «cloud_*» de HUB_SHELL-F82.
+Si falla: sin la ficha, «No se pudo abrir el usuario» con «El registro no está disponible o no tienes permiso para consultarlo.» y «Reintentar»; una persona que ya no está en la lista da el mismo aviso que un fallo de carga (la frase «Usuario no encontrado.» se descarta). La ficha del dueño de la cuenta solo la abre él: a otro administrador la tabla le avisa «La ficha del dueño de la cuenta solo la cambia él. Para traspasar el negocio, transfiere la cuenta en ERPlora.» y no abre el formulario (si llegara, «Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»). Quitar el rol de administrador al último, o apagar «Usuario activo» a quien lo es, solo lo rechaza el servidor («No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.»), también cuando lo que se hizo fue degradarlo. Un rechazo por campo sale bajo el campo que lo causó (nombre, email, PIN o placa) y cualquier otro en el banner de arriba. Sin conexión con erplora.com al cambiar rol o email: los avisos «cloud_*» de HUB_SHELL-F82.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F148 (cambiar el nombre, el rol, el PIN, la placa o el correo de una persona)
 Pendiente de enlazar: staff — STAFF-F03 (el rol de permisos y el PIN son de la cuenta, no de la ficha de profesional)
@@ -113,8 +113,8 @@ Pasos:
 3. Pulsa «Guardar».
 4. En la lista, la columna «Acceso» de esa persona dice «PIN local» (o «PIN + placa»).
 Entra: el PIN nuevo; el número de dígitos del negocio, que sale del arranque de la pantalla.
-Sale: pide al servidor la edición con solo el PIN (HUB-F148); la pantalla comprueba la longitud y los PIN fáciles antes de enviar, pero que otro usuario activo ya lo tenga solo lo sabe el servidor. Cambiar la longitud del negocio (HUB_SHELL-F100) no toca los PIN ya puestos. El PIN de uno mismo se cambia en **Mi perfil** (acceso y navegación), no aquí.
-Si falla: «El PIN debe tener {n} dígitos.», «Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).», «Ese PIN ya lo tiene otro usuario activo…»; bajo el campo, no en un banner. El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
+Sale: pide al servidor la edición con solo el PIN (HUB-F148). La ficha no comprueba el PIN antes de guardar (solo limita los dígitos que caben): lo valida el hub. Cambiar la longitud del negocio (HUB_SHELL-F100) no toca los PIN ya puestos. El PIN de uno mismo se cambia en **Mi perfil** (acceso y navegación), no aquí.
+Si falla: un PIN de otra longitud sale bajo el campo («El PIN debe tener {n} dígitos.»); uno fácil («Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).») o ya usado («Ese PIN ya lo tiene otro usuario activo…») sale en el aviso rojo de arriba. Este último confirma a quien edita que ese número es el PIN de alguien (ERPlora/hub#2499). El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F148 (cambiar el nombre, el rol, el PIN, la placa o el correo de una persona)
 Pendiente de enlazar: hub — HUB-F132 (alta del PIN tras el primer acceso y cambio del PIN propio en Mi perfil, HUB_SHELL, Mi perfil)
@@ -129,7 +129,7 @@ Pasos:
 2. El administrador lo pulsa: el campo se vacía y el botón desaparece. No pide confirmación.
 3. Pulsa «Guardar». Sin PIN, una persona con cuenta sigue entrando con ella; una persona local queda en la lista como «Sin acceso».
 Entra: la ficha; nada más.
-Sale: pide al servidor la edición con el PIN vacío (HUB-F148). Un campo vacío sin tocar nunca borra el PIN de nadie: solo viaja el vacío si se pulsó «Retirar el PIN».
+Sale: pide al servidor la edición con el PIN vacío (HUB-F148). A quien ya tiene PIN, un campo vacío no se lo quita: solo «Retirar el PIN» lo hace. A quien no lo tiene, cada guardado manda el vacío, sin efecto.
 Si falla: «La placa no puede ser su única vía de entrada: si pierde la tarjeta se queda fuera. Consérvale el PIN, dale una cuenta, o retira también la placa.» si la persona tiene placa y se queda sin PIN ni cuenta.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F148 (cambiar el nombre, el rol, el PIN, la placa o el correo de una persona)
@@ -145,7 +145,7 @@ Pasos:
 3. Pulsa «Guardar». En la lista, la persona sale con «PIN + placa» o «Placa».
 4. Para retirarla, en una ficha que ya tiene placa pulsa «Retirar la placa» y guarda. Retirar la placa no toca el PIN, y perder la tarjeta nunca deja a nadie fuera.
 Entra: el número de la tarjeta, de la ráfaga del lector o del toque NFC (el mismo camino para las dos).
-Sale: pide al servidor la edición con la placa (HUB-F148). La placa solo viaja si se ha tocado: guardar otro cambio no revoca la tarjeta. La captura de la ráfaga es global del shell y a la ficha le llega la última pantalla que escucha (acceso y navegación, HUB_SHELL, Acceso).
+Sale: pide al servidor la edición con la placa (HUB-F148). A quien ya tiene placa, un campo vacío no se la quita: solo «Retirar la placa» lo hace. A quien no la tiene, cada guardado manda el vacío, sin efecto. La captura de la ráfaga es global del shell y a la ficha le llega la última pantalla que escucha (acceso y navegación, HUB_SHELL, Acceso).
 Si falla: «Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».» (se avisa mientras se teclea y bloquea «Guardar»), «Esa placa ya la lleva otro usuario activo. La placa dice quién está en la caja, así que no la pueden compartir dos personas.», «Nadie da de alta su propia placa. Pídeselo a otro administrador.», «La placa no puede ser su única vía de entrada…».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F148 (cambiar el nombre, el rol, el PIN, la placa o el correo de una persona)
@@ -153,23 +153,23 @@ Pendiente de enlazar: hub — HUB-F134 (captura de la ráfaga del lector y lecto
 QA: ninguno
 
 ### HUB_SHELL-F88 Dar de baja a una persona
-Estado: parcial — desde la ficha, apagar «Usuario activo» y guardar da de baja sin la pregunta ni los avisos de la tabla; el servidor sigue rechazando lo que no debe (leído en el código, sin ejecutar)
+Estado: parcial — «Dar de baja» sale también en las filas ya de baja y en la del dueño, con un motivo falso; si erplora.com falla la fila sigue «Activo» aunque la baja ya esté aplicada; desde la ficha, apagar «Usuario activo» da de baja sin la pregunta ni los espejos de la tabla (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
 1. En **Empleados › Personal**, el administrador pulsa «Dar de baja» en la fila de la persona.
-2. La pantalla pregunta «Dar de baja»: «Vas a dar de baja a «{name}». Perderá el acceso al Hub, pero su historial se conserva.», con «Cancelar» y «Dar de baja».
+2. La pantalla pregunta «Dar de baja»: «Vas a dar de baja a «{name}». Perderá el acceso al Hub, pero su historial se conserva.», con «Cancelar» y «Dar de baja». La pregunta no dice que en erplora.com se quita el acceso del correo que enseña la columna «Email», aunque sea el que la persona escribió en su Mi perfil (ERPlora/hub#2500).
 3. Confirma. Sale «Usuario dado de baja.» y la fila pasa a «De baja».
 Entra: la persona; la sesión de administrador.
 Sale: pide al servidor la baja (HUB-F149): se desactiva, nunca se borra, y sus sesiones se cierran. Antes de preguntar, la pantalla se niega si el servidor lo rechazaría, con el aviso «No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.»; el servidor revalida.
-Si falla: «No se pudo dar de baja al usuario.» o la frase del servidor traducida: «No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.», «No puedes darte de baja a ti mismo. Pídeselo a otro administrador.»; si erplora.com no contesta al quitar la membresía, la baja local se queda y la pantalla enseña el aviso «cloud_*» de HUB_SHELL-F82.
+Si falla: «No se pudo dar de baja al usuario.» o la frase del servidor traducida: «No puedes dar de baja al último administrador. Nombra antes a otro dueño o administrador.», «No puedes darte de baja a ti mismo. Pídeselo a otro administrador.». En una fila ya de baja o en la del dueño, la tabla contesta «No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.», que no es el motivo. Si erplora.com no contesta, la baja se queda en el hub pero la fila sigue diciendo «Activo» hasta recargar, y el aviso habla de una invitación. La tabla impide la baja propia, la del último administrador y la del dueño; la ficha no, y solo frena el servidor.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F149 (dar de baja y reincorporar a una persona)
 Pendiente de enlazar: staff — STAFF-F03 (dar de baja la cuenta no toca la ficha de profesional)
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F89 Reincorporar a una persona dada de baja
-Estado: hecho
+Estado: parcial — con el plan lleno, a una persona con cuenta erplora.com ya la ha readmitido cuando la pantalla dice que no hay plaza (ERPlora/hub#2500)
 Actor: administrador
 Pantalla: Ficha de usuario
 Pasos:
@@ -178,7 +178,7 @@ Pasos:
 3. Vuelve la misma persona, con su historial; en la lista sale «Activo». Una persona con cuenta recibe de nuevo su membresía.
 Entra: la ficha de la persona de baja.
 Sale: pide al servidor la edición con el estado activo (HUB-F149); reactivar ocupa una plaza del plan.
-Si falla: sin plazas, la frase y el botón «Actualizar plan» de HUB_SHELL-F83; si erplora.com no concede la membresía, los avisos «cloud_*» de HUB_SHELL-F82 y la persona sigue de baja.
+Si falla: sin plazas, la frase y el botón «Actualizar plan» de HUB_SHELL-F83 (aunque la membresía y la invitación en erplora.com ya estén rehechas); si erplora.com no concede la membresía, los avisos «cloud_*» de HUB_SHELL-F82 y la persona sigue de baja.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F149 (dar de baja y reincorporar a una persona)
 QA: ninguno
@@ -189,7 +189,7 @@ Actor: administrador, responsable, empleado
 Pantalla: Empleados
 Pasos:
 1. En la tabla de **Personal**, la columna «Acceso» dice por dónde puede entrar cada persona: «PIN local», «PIN + placa», «Placa», «Cuenta online» o «Sin acceso».
-2. «Sin acceso» sale en rojo: es alguien dado de alta como persona que no puede iniciar sesión en el hub (por ejemplo, un profesional que solo existe en la agenda). Cuando hay varias vías manda el PIN.
+2. «Sin acceso» sale en rojo: es alguien que hoy no puede iniciar sesión, una persona que solo existe en la agenda o una invitada que aún no ha entrado con su cuenta. Cuando hay varias vías manda el PIN.
 3. Junto al email puede salir una etiqueta roja «Hay que decidir»: esa dirección parece buena y no administra nada, así que dar de baja a esa persona no le quita el acceso. Al pasar el ratón se lee la causa: «Otra persona ya entra con esta dirección, así que dar de baja a esta no revoca nada. Cambia el email de una de las dos.» o «Dos personas tienen esta dirección y nada dice cuál es. Dar de baja a esta no revoca nada. Quita la duplicada, o dale a una su propia dirección.».
 4. El administrador arregla la causa desde la ficha de una de las dos (HUB_SHELL-F84).
 Entra: la lista de personas con su marca de conflicto de correo.
@@ -203,7 +203,7 @@ Estado: parcial — el dueño no puede crear un rol propio ni cambiar lo que per
 Actor: administrador, responsable, empleado
 Pantalla: Empleados
 Pasos:
-1. En **Empleados › Roles** aparece una explicación («Estos son los roles que este Hub puede repartir. Los básicos están siempre; los que trae una app los enciendes tú cuando tu negocio los necesita.») y una tabla con una fila por rol: «Rol», «Viene de» («Básico», el nombre de la app que lo trae o «App desinstalada»), «Disponible», «Miembros» y «Permisos» (solo los números).
+1. En **Empleados › Roles** aparece una explicación («Estos son los roles que este Hub puede repartir. Los básicos están siempre; los que trae una app los enciendes tú cuando tu negocio los necesita.») y una tabla con una fila por rol: «Rol», «Viene de» («Básico», el identificador del módulo —por ejemplo `kitchen`— o «App desinstalada»), «Disponible», «Miembros» y «Permisos» (solo los números). El nombre de un rol de app sale como lo escribió la app, en inglés.
 2. Los tres roles básicos (administrador, encargado y empleado) dicen «Siempre disponible» y su interruptor no se puede mover. Un rol que ya nadie declara pero alguien aún lleva sale como «App desinstalada» con «Ninguna app lo trae» y tampoco se puede mover: no hay nada que encender (un rol antiguo como «Propietario», si alguien lo lleva, sale así).
 3. El administrador enciende un rol de una app: sale «Ya puedes asignar «{role}».» y desde ese momento aparece al dar de alta o editar a una persona. Al apagarlo: «Ya no se puede asignar «{role}».» (quien ya lo lleva lo conserva).
 4. Quien no administra ve el interruptor apagado; si lo intentara: «Solo un administrador puede encender o apagar roles.».
@@ -216,36 +216,37 @@ Pendiente de enlazar: hub — HUB-F20 (la validación de los roles que declara u
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F92 Asignar un rol a una persona
-Estado: parcial — la ficha completa enseña los roles de una app con su identificador (por ejemplo `kitchen`) y no con el nombre que declara la app, que sí sale en la pestaña Roles (leído en el código, sin ejecutar)
+Estado: parcial — los roles de una app salen con su identificador (`kitchen`) en el alta, en la ficha y en la columna «Rol»; y al editar se puede hacer administradora a una persona que solo entra con PIN (ERPlora/hub#2500) (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
 1. Al dar de alta (HUB_SHELL-F81 y F82) o al editar (HUB_SHELL-F84), el administrador abre el desplegable «Rol».
 2. En el alta rápida solo salen los roles que se pueden asignar hoy; en la ficha completa salen todos. Los tres de fábrica salen con su nombre («Administrador», «Encargado», «Empleado»); el de cajero lo trae el módulo de Venta y es uno más de los de app.
-3. Para una persona con cuenta solo vale administrador, encargado o empleado; para el personal local vale cualquiera menos administrador (un PIN nunca administra el hub).
+3. Al dar de alta, una cuenta solo admite administrador, encargado o empleado y el personal local no puede ser administrador. Al editar, la ficha ofrece todos los roles, también «Administrador» para alguien que solo tiene PIN, y el hub lo acepta (ERPlora/hub#2500): desde ese momento su PIN administra el hub. A una persona con cuenta, la ficha le ofrece roles de app y erplora.com los rechaza, con un aviso que habla de la dirección.
 4. Guarda; el rol se ve en la columna «Rol» de la lista.
 Entra: el catálogo de roles (HUB_SHELL-F91).
-Sale: el rol en la ficha (HUB-F148). Repartir administración solo lo hace quien ya administra.
+Sale: el rol en la ficha (HUB-F148). Repartir administración solo lo hace quien ya administra. Las claves `admin`, `manager` y `employee` son un contrato con erplora.com, los módulos y las traducciones: no se renombran.
 Si falla: «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee…», «Un usuario local no puede administrar el hub…», «No puedes repartir un rol por encima del tuyo…»; el rol apagado, «Este rol está apagado en este hub. Enciéndelo en Ajustes → Roles antes de asignarlo.» (la ruta correcta es Empleados › Roles).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F148 (cambiar el nombre, el rol, el PIN, la placa o el correo de una persona)
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F93 Consultar quién aprobó qué
-Estado: parcial — las columnas «Acción» y «Nivel» enseñan los nombres técnicos de la orden y del permiso (por ejemplo `sales.void_line`), no una frase; y la explicación promete conservar el registro «mientras tu negocio esté en ERPlora» cuando el servidor lo poda a los cuatro años (HUB-F153, sin confirmar contra el código) (leído en el código, sin ejecutar)
+Estado: parcial — las columnas «Acción» y «Nivel» enseñan los nombres técnicos de la orden y del permiso (por ejemplo `sales.void_line`), no una frase; la explicación promete conservar el registro «mientras tu negocio esté en ERPlora» cuando el hub lo borra a los cuatro años (`retention.rs`); y quien no administra y llega con `#approvals` ve una página en blanco (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
-1. El administrador abre **Empleados › Aprobaciones** (la pestaña solo existe para administradores; sin esa sesión una dirección con `#approvals` vuelve a Personal).
+1. El administrador abre **Empleados › Aprobaciones** (la pestaña solo existe para administradores; quien no administra y llega con `#approvals` o `#apikeys` ve la página en blanco, sin pestaña marcada: la guarda solo salta si la sesión cambia).
 2. Lee la explicación («Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué se usó…») y la tabla: «Cuándo» (fecha y hora), «Autorizado por», «Lo pidió», «Acción» y «Nivel».
 3. Busca por persona o acción en «Buscar por persona o acción…», filtra por fechas, acción o nivel, y ordena por fecha. Cada cambio vuelve a pedir una sola página al hub.
 4. Si necesita demostrar cuál fue, abre el selector de columnas: «Referencia» (una huella de los datos) y los dos identificadores están ocultos y van en la exportación a CSV.
 Entra: el registro de aprobaciones, paginado en el servidor; la sesión de administrador.
-Sale: nada; es solo lectura y nadie puede editar ni borrar una fila. La pestaña no pide nada hasta que se abre. Aprobar o rechazar no se hace aquí: la aprobación se da en el momento, con el PIN de un responsable, en el diálogo que sale en la pantalla donde se intentó (vista de un módulo) y vale 120 s; este registro es solo el recibo.
+Sale: nada; es solo lectura y nadie puede editar ni borrar una fila. La pestaña no pide nada hasta que se abre. Aprobar o rechazar no se hace aquí: la aprobación se da en el momento, con el PIN de un responsable, en el diálogo que sale en la pantalla donde se intentó (vista de un módulo) y vale 120 s; este registro es solo el recibo. Las preguntas y propuestas del asistente y de las automatizaciones se deciden en Automatizaciones › «Pendiente de ti», no aquí.
 Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar» (un fallo no se confunde con un registro vacío); sin nada, «Todavía nadie ha tenido que autorizar nada en este Hub.»; quien ya no existe sale como «Usuario dado de baja».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F153 (consultar quién aprobó qué)
 Pendiente de enlazar: hub — HUB-F152 (aprobar una acción con el PIN de un responsable, HUB_SHELL vista de un módulo: diálogo de aprobación)
+Pendiente de enlazar: flows — FLOWS-F24 (las preguntas y propuestas se deciden en Automatizaciones › Pendiente de ti)
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F94 Crear una llave de API y copiar su token
@@ -260,7 +261,7 @@ Pasos:
 5. Sale «API key creada» con el aviso «Copia el token ahora»: «Este es el único momento en que se muestra el secreto completo. Guárdalo en un lugar seguro; no se volverá a mostrar.». Pulsa «Copiar» (el botón dice «Copiado» dos segundos) y «Hecho».
 Entra: nombre, límite y permisos; las apps instaladas con API pública.
 Sale: pide al servidor crear la llave (HUB-F155) y recibe el token entero una sola vez; la lista se recarga. Cerrar la ventana sin copiarlo lo pierde: solo queda rotar (HUB_SHELL-F95).
-Si falla: «No se pudo crear la API key.» (o la frase traducida del servidor); «No se pudo copiar al portapapeles.» si el navegador no deja copiar. Si no hay ninguna app con API: «Ningún módulo expone API todavía» y no se puede crear una llave «Por app». Si la lista de apps no se pudo leer, la ventana dice lo mismo, como si ninguna publicara API (leído en el código, sin ejecutar).
+Si falla: «No se pudo crear la API key.» (o la frase traducida del servidor); «No se pudo copiar al portapapeles.» si el navegador no deja copiar. Si no hay ninguna app con API: «Ningún módulo expone API todavía» y no se puede crear una llave «Por app». Si la lista de apps no se pudo leer, la ventana dice lo mismo, como si ninguna publicara API. La matriz se carga una vez: una app instalada con la pantalla abierta no aparece hasta recargar (leído en el código, sin ejecutar).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F155 (crear, rotar y revocar llaves de API)
 QA: ninguno
@@ -300,10 +301,10 @@ Estado: hecho
 Actor: administrador
 Pantalla: Empleados
 Pasos:
-1. Al abrir **Empleados › API keys**, la tabla lista cada llave: «Nombre», «Token» (solo el comienzo), «Permisos» (el modo, o las apps con L de lectura y E de escritura), «Estado» («Activa» o «Revocada»), «Creada», «Último uso» (o «Nunca»), «Límite» (por ejemplo «60/min») y «Acciones».
+1. Al abrir **Empleados › API keys**, la tabla lista cada llave: «Nombre», «Token» (solo el comienzo), «Permisos» (el modo, o el identificador de cada app con L de lectura y E de escritura), «Estado» («Activa» o «Revocada»), «Creada», «Último uso» (o «Nunca»), «Límite» (por ejemplo «60/min») y «Acciones».
 2. Se puede buscar en «Buscar API key…».
 Entra: la lista de llaves.
-Sale: nada guardado. El token entero no se vuelve a ver.
+Sale: nada guardado. El token entero no se vuelve a ver. Ninguna pantalla dice que una llave sigue viva aunque den de baja a quien la creó o le quiten la administración (HUB-F155), y la tabla no tiene columna «Creada por».
 Si falla: sin llaves: «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos del Hub.». Si la lectura se rechaza, el mensaje ocupa el lugar de esa frase y dice por qué («Solo el propietario o un administrador puede gestionar las claves de API.», «Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.» o «No se pudieron cargar tus claves de API. Vuelve a intentarlo en un momento.»): un fallo nunca se lee como «no hay llaves».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F155 (crear, rotar y revocar llaves de API)
@@ -321,7 +322,7 @@ Pasos:
 4. Para probarlas, pega una llave en «Authorize»; la documentación por sí sola no da acceso.
 Entra: el documento de la API que pide el hub con la sesión de la persona; la llave la pega la persona.
 Sale: nada guardado. Crece o mengua al instalar o quitar apps.
-Si falla: mientras llega, «Cargando documentación…». Si no llega: «No se pudo cargar la documentación» con «No se pudo obtener el spec de la API. Inicia sesión e inténtalo de nuevo.» y «Reintentar». Con el ajuste apagado la entrada no está y una dirección directa a `/api-docs` lleva a Inicio sin decir nada.
+Si falla: tras recargar en frío `/api-docs`, el ajuste puede no haber llegado aún y la guarda de la ruta llevar a Inicio aunque esté encendido (sin confirmar). Mientras llega, «Cargando documentación…». Si no llega: «No se pudo cargar la documentación» con «No se pudo obtener el spec de la API. Inicia sesión e inténtalo de nuevo.» y «Reintentar». Con el ajuste apagado la entrada no está y una dirección directa a `/api-docs` lleva a Inicio sin decir nada.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F157 (consultar la documentación de la API)
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes (el interruptor «Mostrar documentación de la API»)
