@@ -28,7 +28,7 @@ que seguir vendiendo. El NFC y el servicio en primer plano son permisos de insta
 Si falla: sin el permiso de red local el barrido y el envío a la red son tiempos de espera, no errores
 (Android los bloquea por debajo de la API): sin protección parecería «no hay impresoras» (HUB_APP-F13).
 Después de dos «no» Android deja de mostrar el diálogo para siempre: la salida es HUB_APP-F08.
-Implicados: HUB_PERIPHERALS-F01, HUB_SHELL-F68, HUB_SHELL-F139, PRINTING-F02
+Implicados: HUB_PERIPHERALS-F01, HUB_SHELL-F68, HUB_SHELL-F139, PRINTING-F02, REC_ALTA-F17
 QA: qa-hub-android Fase 2, qa-hub-android Fase 3
 
 ### HUB_APP-F08 Volver a activar un permiso negado
@@ -67,7 +67,7 @@ Sale: nada guardado por la aplicación; el sistema recuerda la respuesta.
 Si falla: negado en macOS, la búsqueda no encuentra nada y no hay señal que lo distinga de «no hay
 impresoras»; y **imprimir por red también contesta «correcto» y el papel se pierde** (`lib.rs:1370-1394`, la
 comprobación solo mira Android). Se arregla en Ajustes del sistema › Privacidad › Red local.
-Implicados: HUB_PERIPHERALS-F01
+Implicados: HUB_PERIPHERALS-F01, REC_ALTA-F17
 QA: ninguno
 
 ### HUB_APP-F24 Avisar con el sistema aunque nadie mire la pantalla

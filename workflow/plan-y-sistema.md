@@ -28,8 +28,7 @@ Entra: el identificador del negocio (`HUB_ID`), la base de datos (`HUB_DATABASE_
 Sale: el hub sirviendo; la fila de versión en el historial (HUB-F167); el dueño marcado en su ficha; el aviso de arranque (`POST /api/v1/hub/device/heartbeat/`) con la credencial de máquina (`X-Api-Key` si es una llave `erpk_…`, `X-Hub-Token` si es la antigua; siempre con `X-Hub-Id`).
 En este mismo documento se apoya en: HUB-F25 (Reponer las aplicaciones al arrancar y actualizarlas solas).
 Si falla: sin base de datos o sin poder migrar, el hub no arranca. Si erplora.com no da la clave, arranca igual: el acceso con cuenta queda no disponible y el PIN funciona. Si el aviso de arranque falla o el hub tarda más de 5 minutos en estar listo, no se reintenta: erplora.com se entera por su propio sondeo. Una app que no se puede cargar queda apuntada como arranque incompleto (HUB-F161).
-Implicados: pendiente
-Pendiente de enlazar: saas — aprovisionar el hub, inyectar su credencial de máquina y recibir el latido de arranque
+Implicados: REC_ALTA-F06, SAAS-F02, SAAS_AUTH-F26, SAAS_DASHBOARD-F27, SAAS_DASHBOARD-F28, SAAS_DASHBOARD-F29, SAAS_DASHBOARD-F55, SAAS_PUBLIC-F82, SAAS_PUBLIC-F90
 QA: qa-hub-restaurant §7.00
 
 ### HUB-F160 No abrir nada hasta que el hub esté registrado
@@ -43,7 +42,7 @@ Pasos:
 Entra: las dos mitades de la identidad de máquina; el hub de desarrollo está exento.
 Sale: `428 machine_registration_required` para todo lo demás; el contexto público dice `registration_required`, nunca el secreto.
 Si falla: la pantalla no tiene frase propia para este rechazo (sin confirmar qué pinta).
-Implicados: HUB_SHELL-F12
+Implicados: HUB_SHELL-F12, REC_ALTA-F06, SAAS_DASHBOARD-F28
 QA: ninguno
 
 ### HUB-F161 Decir si el hub está listo para servir
@@ -57,8 +56,7 @@ Pasos:
 Entra: nada; sin sesión.
 Sale: `/readyz` con el estado general, la versión y cada comprobación (la base de datos, las migraciones contadas, las apps que faltan o fallaron con su motivo): 200 solo si todo está bien, 503 en otro caso. `/healthz` solo dice que el proceso vive. Ninguna de las dos pregunta a erplora.com ni pasa por el freno de carga. Como `/readyz` no pide sesión, cualquiera lee la versión del hub y, si la base de datos falla, el texto crudo del error (ver huecos).
 Si falla: un 503 deja el hub sin tráfico hasta que se recupere; el motivo queda en el cuerpo.
-Implicados: HUB_SHELL-F13, HUB_SHELL-F14
-Pendiente de enlazar: infra — comprobación de salud del contenedor y vuelta atrás del despliegue
+Implicados: HUB_SHELL-F13, HUB_SHELL-F14, REC_ALTA-F06, SAAS_DASHBOARD-F04, SAAS_DASHBOARD-F29, SAAS_DASHBOARD-F32
 QA: ninguno
 
 ### HUB-F162 Comprobar el plan y qué apps puede usar el negocio
@@ -73,8 +71,7 @@ Pasos:
 Entra: el permiso firmado (`GET /api/v1/hub/device/entitlement/`) con la credencial de máquina; la clave pública (`/api/v1/auth/public-key/`).
 Sale: el plan verificado en memoria; las órdenes y consultas de una app bloqueada contestan `module_entitlement_blocked` (402) y la vista del módulo dice «Suscripción necesaria». Con una sesión de PIN (sin credencial de erplora.com) la pantalla no conoce el plan y no pinta el bloqueo: la app aparece normal y sus peticiones fallan con el 402. La pantalla recibe el plan por una puerta propia con 60 s de memoria, que ante un «demasiadas peticiones» de erplora.com sigue sirviendo el último bueno. En el mismo turno se recoge el cupo de mensajes de WhatsApp del mes.
 Si falla: sin ninguna comprobación buena todavía, no se bloquea nada (la autoridad es erplora.com). Una firma que no cuadra cuenta como fallo y se mantiene lo último bueno. Ante un fallo de red, la puerta de la pantalla contesta 424 y no sirve el último bueno (solo lo hace ante un «demasiadas peticiones»). Las llamadas no tienen tiempo máximo: si una se queda colgada, el turno diario se congela, no cuenta fallos (las apps de pago nunca se cortan) y no sale el latido.
-Implicados: HUB_SHELL-F41, HUB_SHELL-F46, HUB_SHELL-F49, HUB_SHELL-F128, WHATSAPP_INBOX-F13
-Pendiente de enlazar: saas — emitir el permiso firmado del plan (apps, niveles, topes y gracia)
+Implicados: HUB_SHELL-F41, HUB_SHELL-F46, HUB_SHELL-F49, HUB_SHELL-F128, WHATSAPP_INBOX-F13, REC_ALTA-F15, REC_ALTA-F21, REC_ALTA-F22, SAAS-F11, SAAS_DASHBOARD-F53, SAAS_DASHBOARD-F100, SAAS_DASHBOARD-F111, SAAS_DASHBOARD-F113, SAAS_DASHBOARD-F116, SAAS_DASHBOARD-F188, SAAS_DASHBOARD-F189, SAAS_PUBLIC-F20, SAAS_PUBLIC-F23, SAAS_PUBLIC-F35, SAAS_PUBLIC-F36
 QA: ninguno
 
 ### HUB-F163 Aplicar un cambio de plan al momento
@@ -88,8 +85,7 @@ Pasos:
 Entra: el permiso firmado; no hace falta sesión ni llave: la firma es la prueba. Pasa por la barrera de registro (HUB-F160) y por un freno de 5 rechazos por dirección (sin cabecera de proxy, todos comparten la misma clave).
 Sale: el plan nuevo en memoria; las apps y topes cambian desde la siguiente petición.
 Si falla: sin permiso, `entitlement_token_missing`; firma inválida, `entitlement_token_invalid`; de otro negocio, `entitlement_wrong_hub`; más viejo que el vigente, `entitlement_stale`; sin clave para comprobar, `entitlement_key_unavailable`; demasiados rechazos seguidos, `entitlement_push_throttled` (429); estado interno ilegible, `entitlement_state_unavailable` (500). En todos los casos queda el anterior y la comprobación diaria lo corrige.
-Implicados: pendiente
-Pendiente de enlazar: saas — avisar al hub del cambio de plan con el permiso nuevo
+Implicados: REC_ALTA-F05, SAAS_DASHBOARD-F40, SAAS_DASHBOARD-F54, SAAS_DASHBOARD-F95, SAAS_DASHBOARD-F96
 QA: ninguno
 
 ### HUB-F164 Mandar el latido diario de uso a erplora.com
@@ -103,8 +99,7 @@ Pasos:
 Entra: las ventas cobradas hoy y la última, los dispositivos con sesión, las personas activas, la última actividad, la versión del hub, lo que cada motor nativo debe aún a una autoridad (cuánto y desde cuándo), la vía de envío fiscal, la CPU y la memoria.
 Sale: el latido (`POST /api/v1/hub/device/heartbeat/`); la actividad del negocio (tipo, momento y el identificador interno de quien la hizo, nunca su nombre ni datos de clientes), como mucho 500 por latido y entregada al menos una vez mientras quepa en la cola: tras un corte largo la cola se recorta a 5000 y se pierde lo más viejo. El recuento de personas activas es el mismo que usa el tope de plazas.
 Si falla: un latido fallido queda en el registro y se repite en el siguiente turno; si la tabla de ventas no se puede leer, el dato se omite en vez de mandar un cero.
-Implicados: pendiente
-Pendiente de enlazar: saas — recibir el latido y guardar las personas activas y la actividad del hub
+Implicados: REC_ALTA-F21, SAAS_DASHBOARD-F34, SAAS_DASHBOARD-F36, SAAS_DASHBOARD-F55, SAAS_DASHBOARD-F57
 QA: ninguno
 
 ### HUB-F165 Ver el uso de recursos frente a los límites del plan
@@ -119,8 +114,7 @@ Pasos:
 Entra: la sesión de administrador para el uso en vivo; cualquier sesión para la evolución, que el hub pide a erplora.com con su credencial.
 Sale: nada guardado. El uso en vivo sale del contenedor y de la base de datos, con los límites del último plan verificado (sin plan, límites a 0 = ilimitado); la evolución la guarda erplora.com y el hub la pasa tal cual con 30 s de memoria.
 Si falla: la memoria, la CPU y la base de datos que no se pudieron medir salen como no medidas («No hemos podido leerlo», «n/d»); en cambio sesiones, dispositivos y personas salen a **0** si su consulta falla. Si erplora.com no da la evolución, el hub contesta 424 con «no sé» para cada medida; un intervalo que no sea 3 h, 24 h o 3 días, `invalid_range` (400). Sin ser administrador, el uso en vivo responde 401.
-Implicados: HUB_SHELL-F128, HUB_SHELL-F136
-Pendiente de enlazar: saas — series de uso de recursos por hub
+Implicados: HUB_SHELL-F128, HUB_SHELL-F136, SAAS_DASHBOARD-F26, SAAS_DASHBOARD-F65, SAAS_DASHBOARD-F66
 QA: ninguno
 
 ### HUB-F166 Ver el estado del sistema, sus registros y documentos
@@ -134,7 +128,7 @@ Entra: la sesión (cualquier rol; no una llave); los documentos y el espacio usa
 Sale: nada guardado.
 En este mismo documento se apoya en: HUB-F50 (Dejar un aviso en la cola al guardar una orden), HUB-F51 (Entregar un aviso a los módulos que lo escuchan), HUB-F52 (Reintentar un aviso que un módulo no pudo procesar).
 Si falla: «No se pudo consultar el sistema» con «Reintentar»; si erplora.com no da los documentos, la lista sale vacía.
-Implicados: HUB_SHELL-F135, HUB_SHELL-F136, HUB_SHELL-F144
+Implicados: HUB_SHELL-F135, HUB_SHELL-F136, HUB_SHELL-F144, SAAS_DASHBOARD-F69
 QA: ninguno
 
 ### HUB-F167 Saber qué versión corre y qué se le ha actualizado
@@ -149,7 +143,7 @@ Entra: la versión del hub, fijada al compilar; las actualizaciones de apps.
 Sale: el historial (`_update_history`), sin datos personales. La pantalla lee como mucho 20 entradas de los últimos 90 días, con el nombre de cada app en su idioma; el motivo técnico de un fallo viaja pero no se pinta.
 En este mismo documento se apoya en: HUB-F23 (Actualizar una aplicación), HUB-F25 (Reponer las aplicaciones al arrancar y actualizarlas solas).
 Si falla: sin cambios, «No te hemos cambiado nada»; una vuelta atrás, «Volvió a la {version}: la nueva no arrancó»; una app perdida, «Esta app no está funcionando: estamos en ello». Si no se puede apuntar la versión al arrancar, queda en el registro y el hub arranca igual.
-Implicados: HUB_SHELL-F20, HUB_SHELL-F142
+Implicados: HUB_SHELL-F20, HUB_SHELL-F142, SAAS_DASHBOARD-F31
 QA: qa-hub-restaurant §7.00
 
 ### HUB-F168 Hablar con erplora.com en nombre del negocio
@@ -165,8 +159,7 @@ Entra: la sesión de la persona (también para la versión publicada de la app, 
 Sale: la respuesta de erplora.com. La credencial del hub y la de la persona solo viajan a erplora.com y a los anfitriones de confianza declarados en el despliegue; a cualquier otro destino se llama sin ellas. Las facturas, suscripciones y el estado de suscripción de una app los pide la pantalla a erplora.com con la credencial de la persona, sin pasar por aquí.
 En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F24 (Consultar qué actualizaciones y versiones hay), HUB-F260 (Conectar el número de WhatsApp del negocio), HUB-F261 (Saber qué número está conectado y si hay que reconectarlo), HUB-F277 (Ver el plan del asistente y lo que queda del mes).
 Si falla: erplora.com no contesta, «Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.» (`cloud_unreachable`, 424); contesta con error, «ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.» (`cloud_rejected`); hub sin conectar, «Este hub todavía no está conectado con ERPlora.». El cuerpo de un error 5xx de erplora.com no llega al navegador, pero los 4xx se pasan tal cual, con su texto en inglés. Las llamadas no tienen tiempo máximo (tampoco el catálogo); solo instalar, actualizar, listar versiones y pedir una instalación cortan a los 30 s sin respuesta.
-Implicados: pendiente
-Pendiente de enlazar: saas — puertas de máquina del hub (catálogo, plantillas, asistente, WhatsApp, series, miembros)
+Implicados: SAAS-F02, SAAS_ASSISTANT-F01, SAAS_ASSISTANT-F19, SAAS_AUTH-F27, SAAS_DASHBOARD-F50, SAAS_PUBLIC-F12
 QA: ninguno
 
 ### HUB-F169 Dejar que un motor del hub llame a erplora.com con la identidad del negocio
@@ -181,7 +174,7 @@ Entra: la petición del motor; la credencial de máquina.
 Sale: la respuesta tal cual al motor. El contenido de la respuesta nunca se copia a un error ni al registro.
 En este mismo documento se apoya en: HUB-F305 (Enviar la autorización de representación y seguir su estado), HUB-F306 (Pedir, recoger y renovar la conexión segura con la celda fiscal).
 Si falla: una ruta que no es suya, `cloud_call.path_not_mine`; un fallo de red se devuelve al motor, que decide si reintenta.
-Implicados: ninguno
+Implicados: SAAS-F02
 QA: ninguno
 
 ### HUB-F170 Rechazar trabajo cuando el hub está saturado
@@ -209,7 +202,7 @@ Pasos:
 Entra: el identificador del despliegue (`HUB_ID`); la cabecera `X-Hub-Id` no decide nada salvo en el modo de desarrollo, aunque la que manda el navegador viaja tal cual a erplora.com en el pase de HUB-F142.
 Sale: nada nuevo; la garantía de que un token, un PIN o un dispositivo de un negocio no abre otro aunque compartieran base de datos.
 Si falla: sin `HUB_ID`, el hub toma el identificador de desarrollo y no se da por registrado (HUB-F160); con `HUB_ID` vacío y credencial, sí se da por registrado (ver huecos), y solo las filas de confianza de dispositivo se niegan a escribirse.
-Implicados: ninguno
+Implicados: SAAS_DASHBOARD-F50
 QA: qa-hub-restaurant §6
 
 ## Cobertura contra la referencia

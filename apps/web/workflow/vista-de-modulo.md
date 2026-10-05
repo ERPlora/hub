@@ -142,8 +142,7 @@ Pasos:
 Entra: los planes del `billing` del `module.json` y sus traducciones; el estado de la suscripción de esa app para este hub, pedido a erplora.com con la cuenta de la persona y el hub (`/api/v1/hub/device/module-subscription/`).
 Sale: nada.
 Si falla: ver el estado. Al volver a la ventana (o recuperar el foco) se vuelve a preguntar. Un plan que erplora.com nombra y esta versión de la app no conoce no se marca en ninguna tarjeta.
-Implicados: HUB-F162, HUB-F272, WHATSAPP_INBOX-F13
-Pendiente de enlazar: saas — estado de la suscripción de una app para un hub (`module-subscription`)
+Implicados: HUB-F162, HUB-F272, WHATSAPP_INBOX-F13, SAAS-F01, SAAS_DASHBOARD-F62, SAAS_DASHBOARD-F112, SAAS_DASHBOARD-F116
 QA: ninguno
 
 ### HUB_SHELL-F47 Ver lo consumido este mes de lo que incluye el plan
@@ -171,7 +170,7 @@ Pasos:
 Entra: el hub y la app; un pase de un solo uso para entrar en erplora.com.
 Sale: nada en el hub. El hub no vende: no hay botón de comprar ni de cancelar en la app.
 Si falla: «No se pudo abrir la gestión del plan. Inténtalo de nuevo.». En la app de Google Play los dos botones no aparecen (la línea «se gestionan desde tu cuenta…» sí).
-Implicados: HUB-F142, HUB_APP-F29
+Implicados: HUB-F142, HUB_APP-F29, SAAS_AUTH-F21, SAAS_DASHBOARD-F108
 QA: ninguno
 
 ### HUB_SHELL-F49 Ver una app de pago bloqueada
@@ -186,7 +185,7 @@ Pasos:
 Entra: la lista de apps bloqueadas del plan del hub (HUB-F162), que el shell solo pide si la sesión trae cuenta de erplora.com; sin ella (PIN, o tras un relevo con PIN) el shell no bloquea nada.
 Sale: nada; los datos de la app no se tocan.
 Si falla: el hub rechaza igualmente cada lectura y orden de la app (402), aunque la pantalla no lo sepa; con sesión de PIN eso es lo que ve la persona, con la frase interna del hub «el módulo `x` no está incluido en el entitlement vigente del hub», sin traducir.
-Implicados: HUB-F162
+Implicados: HUB-F162, SAAS_DASHBOARD-F116
 QA: ninguno
 
 ### HUB_SHELL-F50 Ver una pantalla bloqueada hasta que otra app cumpla su condición

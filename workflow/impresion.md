@@ -212,7 +212,6 @@ respuesta correcta, no un error: significa «no imprimes nada aquí, regístrate
 código fatal (`unauthenticated`, `print.host_not_registered`, `print.not_ready`) sigue dando señales por HTTP y cuenta
 como vivo: «sin atender» no salta y la cobertura dice que la función se imprime (HUB-F201, HUB-F202).
 Implicados: HUB_APP-F17, HUB_APP-F18, HUB_SHELL-F73
-Pendiente de enlazar: hub — HUB_SHELL y HUB_APP, el alta del dispositivo al arrancar y su retirada (ninguna pantalla retira ni da de baja una función quitada)
 QA: ninguno
 
 ### HUB-F198 Conectar el dispositivo a la cola en vivo

@@ -84,7 +84,7 @@ Entra: la plataforma elegida.
 Sale: nada guardado. La descarga es la de erplora.com (siempre la última publicada).
 En este mismo documento se apoya en: HUB_SHELL-F20 (Actualizar la aplicación instalada cuando hay versión nueva).
 Si falla: «No se ha podido descargar el archivo.». Dentro de la app instalada este bloque no existe (sería la app ofreciéndose instalarse); actualizar la app instalada es otro gesto, desde el menú lateral.
-Implicados: HUB_APP-F01
+Implicados: HUB_APP-F01, SAAS_PUBLIC-F33
 QA: ninguno
 
 ### HUB_SHELL-F139 Volver a activar los avisos de este dispositivo
@@ -238,7 +238,7 @@ Entra: el mensaje del error, su pila, la dirección de la pantalla, el component
 Sale: un informe al hub, que lo reenvía a erplora.com. No se guarda nada en el navegador.
 En este mismo documento se apoya en: HUB_SHELL-F198 (Informar de una respuesta mala).
 Si falla: no pasa nada visible: el envío es de mejor esfuerzo, no se reintenta y no genera otro informe.
-Implicados: HUB-F278
+Implicados: HUB-F278, SAAS-F05, SAAS_DASHBOARD-F71
 Pendiente de enlazar: hub — HUB, el embudo de errores del frontend (`/api/error-report`) hacia erplora.com
 QA: ninguno
 

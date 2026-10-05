@@ -37,7 +37,6 @@ Entra: la pulsación.
 Sale: la aplicación en segundo plano.
 Si falla: una aplicación más antigua que la orden devuelve el botón a Tauri, que sale por sí misma.
 Implicados: HUB_SHELL-F15
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (navegación y botón Atrás)
 QA: ninguno
 
 ### HUB_APP-F29 Abrir un enlace fuera de la aplicación
@@ -106,6 +105,5 @@ Si falla: sin red, versión ilegible o sin respuesta: silencio, ni alarma ni «e
 copias de Play y de Microsoft Store no hay destino y no se ofrece (Google prohíbe descargar un APK fuera de
 Play). macOS no tiene descarga. Una versión con sufijo (`1.2.3-beta`) se ignora. «No hemos podido abrir
 tu navegador…» si no se pudo abrir.
-Implicados: HUB_SHELL-F20
-Pendiente de enlazar: saas — publicación de versión y redirección a la tienda
+Implicados: HUB_SHELL-F20, SAAS_PUBLIC-F33, SAAS_PUBLIC-F34
 QA: qa-hub-android Fase 4

@@ -29,7 +29,7 @@ Pasos:
 Entra: la razón social de los ajustes del negocio; la fecha del dispositivo en el idioma de la aplicación.
 Sale: nada guardado. Cada zona pide lo suyo por separado y falla por separado.
 Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo (ver sus flujos). En el móvil las zonas se apilan y la cuadrícula de apps se pliega a dos filas.
-Implicados: ninguno
+Implicados: REC_ALTA-F07
 QA: BD-01, qa-hub-restaurant §7.00
 
 ### HUB_SHELL-F26 Empezar con una plantilla de un negocio como el tuyo
@@ -44,7 +44,7 @@ Pasos:
 Entra: el catálogo de plantillas de erplora.com (a través del hub), el país y el idioma del negocio, el permiso de administrar.
 Sale: pide al hub importar la plantilla (apps, ajustes del negocio, imágenes y datos de las apps; nunca personas ni datos fiscales). Después refresca el menú de apps, la lista de configuración, los paneles, la salud y la actividad, y, si la plantilla trae apps que piden permisos, abre la pregunta de permisos (HUB_SHELL, Ajustes y datos).
 Si falla: apps que hay que añadir al plan: «Estas hay que añadirlas antes a tu plan: {apps}». Algo que no entró: «Estas no han entrado: {apps}…», «Esto no ha entrado: {parts}…» o «Hay algo más que no ha entrado…», con «Ver el informe» (Ajustes › Datos y copias). No se pudo empezar: «No se ha podido abrir esa plantilla» — «No ha cambiado nada en tu negocio…» con el motivo y «Intentar otra vez». Cortado a medias: «La configuración no ha terminado» — «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.», sin reintento.
-Implicados: HUB-F234, HUB-F235, HUB-F239
+Implicados: HUB-F234, HUB-F235, HUB-F239, REC_ALTA-F08
 QA: BD-01, qa-hub-restaurant §7.00
 
 ### HUB_SHELL-F27 Seguir la lista «Termina de configurar tu negocio»
@@ -60,7 +60,7 @@ Pasos:
 Entra: la lista que calcula el hub para esta persona (`hub.setup.status`): solo los pasos que puede hacer, salvo los que bloquean la facturación, que ven todos.
 Sale: nada guardado; se relee al entrar, al cambiar de pantalla, al cambiar de idioma y al instalar, activar, desactivar o quitar una app.
 Si falla: si no llega respuesta, la tarjeta no sale (o se queda con la última que llegó); nunca dice «listo» sin respuesta. Cerrar sesión no borra la última lista leída: si la lectura de la persona siguiente falla, ve la de la anterior hasta que una lectura funcione. Un paso que no es de esta persona: «Esto lo tiene que configurar un administrador.» sin botón. Un paso «Todavía no disponible»: «Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.» sin botón. «Tus apps» no sale en Inicio porque ya lo ofrece «Mis apps»; con «Ver todo» sí.
-Implicados: HUB-F35
+Implicados: HUB-F35, REC_ALTA-F07
 QA: BD-01, BD-02
 
 ### HUB_SHELL-F28 Ver qué falta para poder facturar
@@ -75,7 +75,7 @@ Pasos:
 Entra: el contador de pasos que bloquean y esos pasos, de la misma lista de HUB_SHELL-F27.
 Sale: nada guardado; se relee en cada cambio de pantalla, así aparece también si a mitad de sesión se instala una app que pide certificado.
 Si falla: sin respuesta del hub no hay franja (una lectura rota no es una respuesta). La franja no sale en Acceso.
-Implicados: HUB-F35, HUB-F313, HUB-F317, VERIFACTU-F01
+Implicados: HUB-F35, HUB-F313, HUB-F317, VERIFACTU-F01, REC_ALTA-F07
 QA: BD-02
 
 ### HUB_SHELL-F29 Dar a una app el permiso que le falta desde la lista
@@ -89,7 +89,7 @@ Pasos:
 Entra: los permisos que pide la app y aún no tiene, que da el hub en el paso.
 Sale: nada desde aquí; el permiso se concede en Ajustes › Permisos.
 Si falla: sin ser administrador, la fila no tiene botón y dice quién puede hacerlo.
-Implicados: HUB-F32
+Implicados: HUB-F32, REC_ALTA-F10
 QA: BD-03
 
 ### HUB_SHELL-F30 Pedirle al asistente que repase la configuración

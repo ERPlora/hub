@@ -71,7 +71,7 @@ Pasos:
 Entra: nombre, rol y PIN (más la casilla); la lista de personas ya cargada, para adelantar los fallos evidentes.
 Sale: pide al servidor el alta (HUB-F145); el panel solo adelanta lo que ya puede saber (PIN vacío, de otra longitud, fácil, rol de administrador, nombre repetido). Una placa no se puede dar de alta desde este panel, solo desde la ficha (HUB_SHELL-F87).
 Si falla: el motivo sale dentro del panel, en rojo, y lo tecleado se conserva. «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.», «El PIN debe tener {n} dígitos.», «Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).», «Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.», «Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.» y, solo cuando responde el servidor, «Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.». Un rechazo que la pantalla no sabe traducir sale con la frase que mandó el servidor.
-Implicados: HUB-F145, STAFF-F01
+Implicados: HUB-F145, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F82 Invitar a una persona con su cuenta de erplora.com
@@ -87,7 +87,7 @@ Pasos:
 Entra: nombre, email, rol y PIN opcional; la lista ya cargada (para adelantar «email repetido» antes de enviar).
 Sale: pide al servidor el alta de la ficha y que erplora.com mande la invitación (HUB-F146). La pantalla adelanta el email repetido y el rol que una cuenta no admite mientras se teclea.
 Si falla: «Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.», «Introduce un email válido.», «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.», «Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.», «No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.». Si la invitación no sale, el panel sigue abierto con el motivo y la lista no se actualiza: la persona ya está guardada pero no se ve hasta volver a entrar en Empleados. «Volver a guardar» no reenvía: un segundo «Crear» se rechaza con «Este hub ya conoce ese email…». Hoy la única forma de reenviar la invitación desde la pantalla es recargar y cambiarle el rol, el correo o el estado en su ficha (o darla de baja y reincorporarla). Los avisos: «No hemos podido conectar con ERPlora para enviar la invitación. El usuario queda guardado aquí: vuelve a guardar dentro de un momento.», «No se ha podido crear la invitación para ese email. Revisa la dirección y vuelve a intentarlo; si sigue fallando, avisa a soporte.», «Demasiados cambios en poco tiempo: la invitación todavía no ha salido. Espera unos minutos y vuelve a guardar — no se ha perdido nada más.» o «Este hub todavía no puede enviar invitaciones. El usuario queda guardado aquí; avisa a soporte para que termine de configurarlo.».
-Implicados: HUB-F146, STAFF-F01
+Implicados: HUB-F146, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F83 Llegar al tope de personas del plan
@@ -102,7 +102,7 @@ Pasos:
 Entra: el rechazo del servidor por plazas (`user_limit_reached`); la distribución de la copia (Play o no) que da el dispositivo.
 Sale: nada guardado. El servidor decide el tope y lo aplica en el mismo paso que escribe (HUB-F147); la pantalla no cuenta plazas por su cuenta. Cuántas plazas hay usadas se ve en **Sistema › Plan y límites** (HUB_SHELL-F128), que avisa con «Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más.» sin botón.
 Si falla: si no se puede abrir el navegador, «No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu plan.».
-Implicados: HUB-F147
+Implicados: HUB-F147, REC_ALTA-F15
 QA: ninguno
 
 ### HUB_SHELL-F84 Cambiar el nombre, el correo, el rol o el estado de una persona
@@ -132,7 +132,7 @@ Pasos:
 Entra: el PIN nuevo; el número de dígitos del negocio, que sale del arranque de la pantalla.
 Sale: pide al servidor la edición con solo el PIN (HUB-F148). La ficha no comprueba el PIN antes de guardar (solo limita los dígitos que caben): lo valida el hub. Cambiar la longitud del negocio (HUB_SHELL-F100) no toca los PIN ya puestos. El PIN de uno mismo se cambia en **Mi perfil** (acceso y navegación), no aquí.
 Si falla: un PIN de otra longitud sale bajo el campo («El PIN debe tener {n} dígitos.»); uno fácil («Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).») o ya usado («Ese PIN ya lo tiene otro usuario activo…») sale en el aviso rojo de arriba. Este último confirma a quien edita que ese número es el PIN de alguien (ERPlora/hub#2499). El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
-Implicados: HUB-F132, HUB-F148, STAFF-F03
+Implicados: HUB-F132, HUB-F148, STAFF-F03, REC_ALTA-F15, REC_ALTA-F16
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F86 Retirar el PIN a una persona
@@ -219,7 +219,7 @@ Pasos:
 Entra: el catálogo de roles que da el hub: los básicos, los que declaran las apps instaladas y los que alguien aún lleva.
 Sale: pide al servidor encender o apagar el rol (HUB-F150) y pinta lo que este contesta, sin adelantarse. Un rol de una app nace apagado: instalar una app no le da a nadie un rol que no pidió.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; si el servidor rechaza el cambio, el motivo sale en un banner rojo (no en un aviso que desaparece) y se puede releer: «No se pudo cambiar «{role}».» si no dio motivo, o «Este rol viene con el hub: está siempre activo y no se puede apagar.» / «Ninguna app instalada declara este rol. Instala la app que lo trae o elige otro rol.». Sesión caducada: «Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.».
-Implicados: HUB-F20, HUB-F150
+Implicados: HUB-F20, HUB-F150, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F92 Asignar un rol a una persona
@@ -234,7 +234,7 @@ Pasos:
 Entra: el catálogo de roles (HUB_SHELL-F91).
 Sale: el rol en la ficha (HUB-F148). Repartir administración solo lo hace quien ya administra. Las claves `admin`, `manager` y `employee` son un contrato con erplora.com, los módulos y las traducciones: no se renombran.
 Si falla: «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee…», «Un usuario local no puede administrar el hub…», «No puedes repartir un rol por encima del tuyo…»; el rol apagado, «Este rol está apagado en este hub. Enciéndelo en Ajustes → Roles antes de asignarlo.» (la ruta correcta es Empleados › Roles).
-Implicados: HUB-F148
+Implicados: HUB-F148, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F93 Consultar quién aprobó qué
@@ -338,7 +338,7 @@ Entra: la sesión de administrador; la política actual, la misma que lee la pan
 Sale: pide al servidor guardar solo las claves del control (HUB-F140). Apagarlo y volver a encenderlo vuelve al valor de fábrica (pedir PIN por turno), no a los minutos de antes. Esta tarjeta nunca alarga la sesión de un dispositivo compartido.
 En este mismo documento se apoya en: HUB_SHELL-F04 (Entrar con PIN), HUB_SHELL-F08 (Cerrar la sesión de una caja que nadie toca).
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.» en un banner rojo. Quien no administra ve los controles apagados y «Solo un administrador puede cambiar si se pregunta.».
-Implicados: HUB-F140
+Implicados: HUB-F140, REC_ALTA-F15
 QA: ninguno
 
 ### HUB_SHELL-F100 Elegir cuántos dígitos tiene el PIN del negocio

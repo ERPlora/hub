@@ -230,8 +230,7 @@ Entra: el aviso de mensaje (`*.reminder.due`): canal, destinatario, plantilla y 
 Sale: el mensaje entregado al proveedor y la marca de envío con el identificador del proveedor, la automatización y su paso. Un archivo de cabecera subido al hub se firma en cada intento para que WhatsApp lo pueda descargar.
 En este mismo documento se apoya en: HUB-F266 (Mandar un WhatsApp desde el hub), HUB-F272 (Reflejar en el hub el cupo y el consumo de WhatsApp del mes).
 Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402/429) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, o falla apuntar la marca, el reintento lo vuelve a mandar: el cliente puede recibir el mismo WhatsApp o correo dos veces. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
-Implicados: FLOWS-F15
-Pendiente de enlazar: saas — proxy de notificaciones del dispositivo: enviar el correo y el WhatsApp del hub y cobrar la cuota
+Implicados: FLOWS-F15, SAAS-F05, SAAS-F06, SAAS_WHATSAPP_INBOX-F12, SAAS_WHATSAPP_INBOX-F13
 QA: qa-hub-flows R7
 
 ### HUB-F62 Ejecutar las tareas programadas de los módulos
@@ -277,8 +276,7 @@ Entra: las peticiones con cabecera de sesión (`X-Hub-Session`) o de API key (`B
 Sale: la hora de la última entrada (`_hub_activity`), que nunca retrocede, y la hora que ERPlora ya confirmó.
 En este mismo documento se apoya en: HUB-F164 (Mandar el latido diario de uso a erplora.com).
 Si falla: una petición rechazada con 401/403 no cuenta, ni las anónimas (sin cabecera), ni el pase del canal en vivo, ni el primer mensaje de `/ws`, ni la llave de máquina (`erpk_`). Si el hub muere de golpe, se puede perder como mucho el último minuto. Si el latido falla, se vuelve a mandar en el siguiente.
-Implicados: pendiente
-Pendiente de enlazar: saas — ciclo de vida del hub gratuito: apagar a los 60 días sin entradas y borrar a los 120
+Implicados: SAAS-F08, SAAS_DASHBOARD-F21, SAAS_DASHBOARD-F34, SAAS_DASHBOARD-F36
 QA: ninguno
 
 ## Cobertura contra la referencia

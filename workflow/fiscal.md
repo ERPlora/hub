@@ -60,7 +60,7 @@ Entra: el país y la identidad del negocio (Ajustes › Negocio), el certificado
 Sale: el perfil fiscal del hub en la tabla de sistema `_hub_fiscal_profile` (país, régimen, estado, entorno, NIF congelado, fechas). El modo «bloqueado» no se guarda: se deduce en cada lectura (HUB-F314).
 En este mismo documento se apoya en: HUB-F35 (Calcular la lista de puesta en marcha).
 Si falla: un fallo al resolverlo no impide arrancar; se apunta en el registro del servidor y la siguiente lectura lo vuelve a calcular. Un hub que ya emitió nunca vuelve a «no exigible»; si su país pide otro régimen, se marca para revisión y no se adivina.
-Implicados: VERIFACTU-F01
+Implicados: VERIFACTU-F01, REC_ALTA-F09, REC_ALTA-F10, REC_ALTA-F14
 QA: BD-02, qa-hub §7
 
 ### HUB-F301 Saber dónde y por qué vía declara el hub
@@ -89,8 +89,7 @@ Pasos:
 Entra: el fichero en base64 y la contraseña, del administrador.
 Sale: el certificado en la tabla de sistema `_hub_certificate`; el estado nuevo a la pantalla; un latido al SaaS con la vía (`announce_route_change`). Un hub de demostración también puede subir el suyo (lo separa de la AEAT real el entorno clavado a pruebas, HUB-F315).
 Si falla: sin fichero, «falta pkcs12_b64» con el código `invalid_field`; sin la clave maestra del despliegue no se guarda nada en claro y se niega; quien no es administrador recibe la negativa de sesión; un módulo sin el permiso del certificado, la negativa del permiso. Si el aviso al SaaS falla, se queda para el latido diario.
-Implicados: HUB_VERIFACTU-F06, VERIFACTU-F02, VERIFACTU-F34
-Pendiente de enlazar: saas — guardar la vía de envío que el hub anuncia en su latido
+Implicados: HUB_VERIFACTU-F06, VERIFACTU-F02, VERIFACTU-F34, REC_ALTA-F12, SAAS_DASHBOARD-F42, SAAS_DASHBOARD-F55, SAAS_DASHBOARD-F149, SAAS_PUBLIC-F91
 QA: qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB-F303 Borrar el certificado del negocio
@@ -104,7 +103,7 @@ Pasos:
 Entra: la orden del administrador.
 Sale: el certificado borrado; los registros siguientes salen por la celda de ERPlora; el latido al SaaS. Lo que ya estaba en la cola sigue en su cadena y en el siguiente intento sale por la celda, con el Sello como presentador, si la vía de ERPlora está lista; si es de producción y el hub no tiene conexión segura, el carril de pruebas lo niega y espera sin límite.
 Si falla: quien no es administrador o un módulo sin el permiso del certificado reciben la negativa. Un hub de demostración también puede borrarlo.
-Implicados: REC_FISCAL-F01, VERIFACTU-F03
+Implicados: REC_FISCAL-F01, VERIFACTU-F03, SAAS_DASHBOARD-F149
 QA: qa-hub §7
 
 ### HUB-F304 Elegir la vía de envío: mi certificado o ERPlora
@@ -119,7 +118,7 @@ Pasos:
 Entra: encendido o apagado, del administrador; el perfil, la autorización y la conexión segura, del núcleo.
 Sale: la vía cambiada (los registros siguientes salen por ella) y el latido al SaaS.
 Si falla: encender sin certificado: `fiscal.own_certificate_not_uploaded`; apagar en producción sin autorización: `fiscal.no_representation_grant`; sin conexión segura: `fiscal.gateway_not_enrolled`; en todos, no cambia nada. Apagar sin certificado subido no hace nada. Las frases las pone la pantalla de VeriFactu.
-Implicados: HUB_VERIFACTU-F06, VERIFACTU-F04
+Implicados: HUB_VERIFACTU-F06, VERIFACTU-F04, REC_ALTA-F12, SAAS_DASHBOARD-F149
 QA: qa-hub §7
 
 ### HUB-F305 Enviar la autorización de representación y seguir su estado
@@ -135,8 +134,7 @@ Pasos:
 Entra: los datos del negocio y de quien firma y los documentos, del administrador; el estado, del SaaS.
 Sale: la autorización en el SaaS para revisión; en el hub, solo el estado y su fecha (`_hub_fiscal_profile`); los documentos no se guardan en el hub ni salen en el registro del servidor.
 Si falla: lo que falta sale con su código (`obligado_nif_required`, `signer_required`, `document_type_invalid`, `signed_document_required`, `signed_document_not_pdf`, `dni_copy_required`, `signature_sample_required`, `representation_proof_required`, `document_too_large`). Sin credencial de máquina, `hub_not_enrolled`; sin respuesta o con negativa del SaaS, `cloud_unreachable` o `cloud_rejected`, y la copia guardada no cambia.
-Implicados: HUB_VERIFACTU-F07, VERIFACTU-F05, VERIFACTU-F06
-Pendiente de enlazar: saas — servir el modelo oficial, recibir los documentos, revisar y aprobar, devolver o revocar la autorización (Anexo I) y contestar su estado e historial
+Implicados: HUB_VERIFACTU-F07, VERIFACTU-F05, VERIFACTU-F06, REC_ALTA-F11, SAAS_DASHBOARD-F154, SAAS_DASHBOARD-F155, SAAS_DASHBOARD-F156, SAAS_DASHBOARD-F157, SAAS_DASHBOARD-F158
 QA: qa-hub §7
 
 ### HUB-F306 Pedir, recoger y renovar la conexión segura con la celda fiscal
@@ -152,8 +150,7 @@ Pasos:
 Entra: la orden del administrador; el certificado firmado, del SaaS.
 Sale: la identidad de máquina en la tabla de sistema `_hub_gateway_identity`; con ella, el hub tiene vía por la celda (carril mutuo) y lo nota el estado «listo» del perfil en el siguiente arranque (HUB-F300).
 Si falla: la respuesta dice el estado (`filed`, `awaiting_review` —también para una identidad revocada o sustituida—, `installed`, `rejected` con el motivo) o un código de rechazo (`enrolment.no_machine_credential`, `enrolment.cloud_unreachable`, `enrolment.cloud_refused`, `enrolment.install_refused`…). La puerta crea su presupuesto en cada petición, así que nunca contesta `out_of_budget`: el presupuesto de 30 pasadas por hora solo lo agota el servicio de fondo. Una solicitud rechazada no se vuelve a presentar sola. Sin la clave maestra del despliegue no se crea ninguna clave.
-Implicados: HUB_VERIFACTU-F07, VERIFACTU-F07, VFGW-F01, VFGW-F03, VFGW-F05
-Pendiente de enlazar: saas — recibir la solicitud de firma del hub en su expediente, firmarla o devolverla con motivo, y entregar el certificado con la autoridad de confianza
+Implicados: HUB_VERIFACTU-F07, VERIFACTU-F07, VFGW-F01, VFGW-F03, VFGW-F05, REC_ALTA-F13, SAAS_DASHBOARD-F150, SAAS_DASHBOARD-F151, SAAS_DASHBOARD-F153
 QA: qa-hub §7
 
 ### HUB-F307 Pasar a producción
@@ -168,7 +165,7 @@ Pasos:
 Entra: el perfil fiscal, la vía, la autorización y la caducidad del certificado, del núcleo.
 Sale: el perfil en producción (`POST /api/fiscal/go-live`). Desde ese momento el motor envía a la AEAT real y el NIF de Ajustes › Negocio no se puede cambiar una vez emitido.
 Si falla: `fiscal.hub_closed`, `fiscal.go_live_forbidden` (demostración), `fiscal.no_representation_grant`, `fiscal.not_ready` o `fiscal.own_certificate_expired`, y el hub sigue en pruebas. Esta no es la única forma de llegar a producción: el arranque adopta una sola vez, sin comprobaciones, el entorno que diga la configuración del módulo (HUB-F300, paso 0). Y no mira la conexión segura: con un «listo» viejo pasa un hub que ya no tiene vía. Solo el administrador; un módulo sin el permiso del certificado no puede pedirlo.
-Implicados: REC_FISCAL-F14, VERIFACTU-F08
+Implicados: REC_FISCAL-F14, VERIFACTU-F08, REC_ALTA-F14
 QA: L-04, BD-02, qa-hub §7
 
 ### HUB-F308 Volver a pruebas mientras no se haya declarado nada en producción
@@ -182,7 +179,7 @@ Pasos:
 Entra: el sello «primer registro en producción» del perfil.
 Sale: el perfil en pruebas (`DELETE /api/fiscal/go-live`); los registros que nacieron en producción siguen yendo a producción.
 Si falla: con el sello puesto, `fiscal.already_emitted` («…create another hub») y no cambia nada. Estando ya en pruebas no hace nada.
-Implicados: REC_FISCAL-F14, VERIFACTU-F09
+Implicados: REC_FISCAL-F14, VERIFACTU-F09, REC_ALTA-F14
 QA: L-04
 
 ### HUB-F309 Cerrar el perfil fiscal de un negocio que cesa
@@ -196,7 +193,7 @@ Pasos:
 Entra: quién lo decide.
 Sale: el perfil cerrado, con fecha y autor.
 Si falla: sin autor, `fiscal.close_needs_actor`.
-Implicados: VERIFACTU-F33
+Implicados: VERIFACTU-F33, REC_ALTA-F24
 QA: ninguno
 
 ### HUB-F310 Servir la declaración responsable y los datos del productor
@@ -210,8 +207,7 @@ Pasos:
 Entra: el bloque del productor y la referencia de la declaración, del SaaS.
 Sale: la declaración (`GET /api/system/declaration`) con los mismos datos que viajan en cada XML.
 Si falla: mientras no han llegado, el bloque sale vacío y no se inventa nada; sin referencia, el enlace apunta al archivo general de declaraciones. Los registros se sellan y esperan en la cola hasta que lleguen (HUB_VERIFACTU-F05).
-Implicados: VERIFACTU-F12
-Pendiente de enlazar: saas — publicar los datos del productor y la declaración vigente de cada versión en la respuesta del latido
+Implicados: VERIFACTU-F12, SAAS_DASHBOARD-F55, SAAS_DASHBOARD-F161
 QA: L-04, qa-hub-restaurant §7.00
 
 ### HUB-F311 Drenar la cola de contingencia por reloj
@@ -258,7 +254,7 @@ Pasos:
 Entra: el perfil fiscal, la vía, la autorización y la caducidad del certificado, del núcleo; los avisos que abren una cadena, aprendidos del módulo del régimen.
 Sale: la transacción negada, o nada.
 Si falla: la negativa lleva `fiscal.no_representation_grant`, `fiscal.gateway_not_enrolled` o `fiscal.own_certificate_expired`; la frase la pone el TPV. Si el perfil no se puede leer, no se niega por esto.
-Implicados: HUB_SHELL-F28, REC_FISCAL-F01, SALES-F07, VERIFACTU-F20, VERIFACTU-F34
+Implicados: HUB_SHELL-F28, REC_FISCAL-F01, SALES-F07, VERIFACTU-F20, VERIFACTU-F34, REC_ALTA-F10, REC_ALTA-F19
 QA: L-04, qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB-F314 Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena
@@ -287,7 +283,7 @@ Pasos:
 Entra: la marca de demostración del despliegue, leída una vez al arrancar.
 Sale: el perfil con «no puede pasar a producción»; la pantalla lo explica.
 Si falla: un intento de pasar a producción: `fiscal.go_live_forbidden`; uno de escribir otro entorno: la negativa de demostración (`demo_fiscal_environment_locked`).
-Implicados: VERIFACTU-F08
+Implicados: VERIFACTU-F08, REC_ALTA-F02, SAAS_PUBLIC-F91
 QA: BD-02, qa-hub §7
 
 ### HUB-F316 No dejar en producción a un hub sin ningún módulo que cumpla su régimen
@@ -317,7 +313,7 @@ Entra: la identidad del negocio y la vía, del núcleo.
 Sale: la transacción negada, o nada.
 En este mismo documento se apoya en: HUB-F222 (Guardar la identidad del negocio).
 Si falla: `fiscal_precondition_failed` con la lista de lo que falta; la frase («Para emitir facturas, completa primero … en Ajustes › Negocio…») la compone el kit de los módulos. Una venta sin identidad se cierra igual: lo que se niega es su factura, que acaba en «Eventos caídos».
-Implicados: HUB_SHELL-F28, REC_FISCAL-F09
+Implicados: HUB_SHELL-F28, REC_FISCAL-F09, REC_ALTA-F09
 QA: BD-02, qa-hub §7
 
 ## Cobertura contra la referencia

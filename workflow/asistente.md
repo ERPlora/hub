@@ -42,8 +42,7 @@ Pasos:
 Entra: los mensajes de la sesión (`messages`, con sus adjuntos); la sesión local, que da los permisos. El hub manda además quién pregunta en `user`, pero erplora.com no lo lee (solo `messages`, `input`, `instructions`, `tools` y `new_session`): no sirve ni de permiso ni de dato de gasto.
 Sale: un flujo de eventos `token`, `function_call` (anotado con `kind`, `read_only`, `risk` y `money_fields`), `usage` y `done`. **El hub no guarda la conversación**: vive en el navegador durante la sesión (ADR-0149) y el SaaS no la conserva.
 Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; una conversación de más de 2 MB la corta el propio hub con `413` antes de llegar al asistente, y el panel lo pinta como «no se pudo contactar»; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta, el flujo se corta a mitad, **o el SaaS rechaza la petición antes de abrir el flujo** (credencial, petición inválida, freno de tasa por hub), el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor; en el último caso dice «no se pudo contactar» cuando en realidad hubo un rechazo, y el `Retry-After` del freno de tasa se pierde, hueco); si el SaaS rechaza el turno dentro del flujo (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
-Implicados: FLOWS-F26, HUB_SHELL-F30, HUB_SHELL-F186, HUB_SHELL-F190, HUB_SHELL-F192, HUB_SHELL-F194, HUB_SHELL-F195, HUB_SHELL-F199
-Pendiente de enlazar: saas — asistente: `POST /api/v1/hub/device/assistant/chat/stream/` con `{input, messages, tools, instructions, user}` que inserta `instructions` como mensaje de sistema, ofrece las `tools` al modelo y devuelve SSE con `function_call` (argumentos completos, uno por llamada), `usage` al cerrar y `error` con `code` y `retriable`, terminado en `[DONE]`; mide un turno solo si se completa
+Implicados: FLOWS-F26, HUB_SHELL-F30, HUB_SHELL-F186, HUB_SHELL-F190, HUB_SHELL-F192, HUB_SHELL-F194, HUB_SHELL-F195, HUB_SHELL-F199, SAAS_ASSISTANT-F01, SAAS_ASSISTANT-F02, SAAS_ASSISTANT-F03, SAAS_ASSISTANT-F07, SAAS_ASSISTANT-F08, SAAS_ASSISTANT-F11
 QA: qa-hub-assistant §R0, qa-hub-assistant §R6
 
 ### HUB-F274 Ofrecer al asistente las consultas y órdenes de los módulos y del núcleo
@@ -60,7 +59,7 @@ Entra: el registro de módulos activos (el bloque `ai` de cada consulta u orden,
 Sale: la lista de herramientas del turno, ordenada siempre igual. Así llega al asistente, por ejemplo, la orden de Automatizaciones que deja un borrador (FLOWS-F26): se ofrece solo a quien puede gestionar automatizaciones y la ejecuta el panel con su sesión.
 En este mismo documento se apoya en: HUB-F01 (Leer datos de un módulo), HUB-F03 (Ejecutar una orden de un módulo), HUB-F151 (Rechazar una orden para la que no se tiene permiso).
 Si falla: una operación sin descripción para el asistente no existe para él (la persona la hace en su pantalla); un `risk` que el núcleo no conoce se trata como destructivo; una orden que el módulo publica como orden pero solo contesta (comprobar un hueco libre) se marca como lectura solo si pide un permiso que el módulo también exige a sus consultas (hub#1594); ante la duda, cuenta como escritura y lleva tarjeta.
-Implicados: FLOWS-F26, HUB_SHELL-F190, HUB_SHELL-F191, HUB_SHELL-F193
+Implicados: FLOWS-F26, HUB_SHELL-F190, HUB_SHELL-F191, HUB_SHELL-F193, SAAS_ASSISTANT-F06
 QA: qa-hub-assistant §R1, qa-hub-assistant §R3
 
 ### HUB-F275 Recortar las herramientas a los módulos que importan para la pregunta
@@ -74,7 +73,7 @@ Pasos:
 Entra: la última pregunta de la persona; el índice del hub.
 Sale: un catálogo más corto, que abarata cada turno. No es una puerta de seguridad: el permiso sigue siendo el de HUB-F274.
 Si falla: con menos de ocho módulos, sin índice, con el índice vacío, sin pregunta o si la huella no se puede pedir, se ofrecen **todas** las herramientas; el asistente nunca se queda sin contestar por esto. Un fallo deja una línea en el registro.
-Implicados: ninguno
+Implicados: SAAS_ASSISTANT-F17
 QA: qa-hub-assistant §R6
 
 ### HUB-F276 Anclar al asistente a lo que este hub tiene instalado
@@ -90,8 +89,7 @@ Entra: los módulos instalados y activos; su descripción para el asistente; los
 Sale: el índice del hub (una fila por trozo, con módulo, versión e idioma inglés) y las instrucciones de cada turno. Las respuestas «¿qué versión tengo?», «¿qué módulos tengo?» o «¿cómo corrijo una factura?» salen de aquí, no de la memoria del modelo (hub#1044, ADR-0331).
 En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F23 (Actualizar una aplicación), HUB-F25 (Reponer las aplicaciones al arrancar y actualizarlas solas), HUB-F29 (Desinstalar una aplicación).
 Si falla: si la base de datos del hub no tiene la extensión de vectores, no hay índice y el asistente ofrece todas las herramientas (HUB-F275); el hub arranca igual. Un indexado que falla no deshace la instalación. Una actualización aplicada al arrancar no vuelve a indexar, y el arranque no reindexa un módulo que ya estaba: su entrada se queda con el texto de la versión anterior hasta la siguiente actualización desde el hub. Lo que se instala desde una copia, una plantilla de sector o la reconciliación entre tareas no se indexa hasta el siguiente arranque. Y actualizar no borra la entrada de una operación que la versión nueva quitó (huecos leídos, sin ejecutar).
-Implicados: pendiente
-Pendiente de enlazar: saas — asistente: `POST /api/v1/hub/device/assistant/embeddings/` con `{texts}` → `{embeddings, model}`, un vector por texto y en el mismo orden, medido por hub
+Implicados: SAAS_ASSISTANT-F17
 QA: qa-hub-assistant §R0
 
 ### HUB-F277 Ver el plan del asistente y lo que queda del mes
@@ -106,8 +104,7 @@ Pasos:
 Entra: la sesión; para ampliar, una sesión de administrador.
 Sale: el plan y el consumo para el panel; la dirección del pago en Stripe. El hub no lleva ningún contador del asistente: el nivel lo da el plan del hub (ADR-0474) y lo cuenta el SaaS.
 Si falla: sin sesión, `401` (antes de hub#1254 cualquiera que alcanzara el hub podía preguntar o abrir pagos); ampliar sin ser administrador, `403`; un `429` del SaaS (solo el freno de tasa: erplora.com no devuelve nunca `402`, y con el cupo agotado contesta `200` y solo se ve en el consumo) llega tal cual, pero el panel descarta al leer el plan todo lo que no sea 2xx: el cupo agotado lo cuenta el evento de error del chat (HUB-F273); SaaS caído, `424` con `cloud_unreachable`.
-Implicados: HUB_SHELL-F197, HUB_SHELL-F199
-Pendiente de enlazar: saas — asistente: `GET /api/v1/hub/device/assistant/config/` (nivel, uso del mes, planes) y `POST …/assistant/subscription/checkout/` → `{checkout_url}`, con el nivel resuelto desde el plan del hub
+Implicados: HUB_SHELL-F197, HUB_SHELL-F199, SAAS_ASSISTANT-F12, SAAS_ASSISTANT-F13
 QA: qa-hub-assistant §R4
 
 ### HUB-F278 Denunciar una respuesta del asistente
@@ -121,8 +118,7 @@ Pasos:
 Entra: el identificador de la respuesta, su texto, y opcionalmente la pregunta que la provocó, el motivo (solo por la API: ninguna pantalla lo envía) y el comentario.
 Sale: una entrada `assistant_content_report` en el registro de errores, que la manda al SaaS para revisión. Los textos se recortan (respuesta y pregunta a 4.000 caracteres, comentario a 1.000, motivo a 100) para no guardar más de lo necesario. En el hub, dos denuncias de respuestas distintas no se funden (el identificador de la respuesta va en el texto); la misma respuesta denunciada dos veces en 30 s cuenta como una. En erplora.com sí se funden: el identificador es un UUID que erplora.com cambia por `<uuid>` al agrupar, y la huella no lleva el negocio, así que dos denuncias cuyas respuestas empiezan igual (120 caracteres, cifras aparte), también de negocios distintos, quedan en la fila de la primera y de la segunda solo sube el contador.
 Si falla: sin sesión, `401`; sin identificador o sin texto, rechazo con el campo que falta. El hub contesta `{ok: true}` en cuanto lo apunta; el envío al SaaS es de mejor esfuerzo y sin reintento: si la red falla en ese momento o el hub no está enrolado, la denuncia se pierde sin aviso (hueco).
-Implicados: HUB_SHELL-F149, HUB_SHELL-F198
-Pendiente de enlazar: saas — registro de errores del hub (`POST /api/v1/hub/device/error-report/`) donde se revisan las denuncias de contenido
+Implicados: HUB_SHELL-F149, HUB_SHELL-F198, SAAS-F05, SAAS_ASSISTANT-F21, SAAS_DASHBOARD-F71
 QA: qa-hub-assistant §R5
 
 ### HUB-F279 Pedirle un paso al asistente dentro de una automatización
@@ -139,7 +135,7 @@ Entra: lo que el paso pide (`prompt`, herramientas, `policy`, vueltas como mucho
 Sale: la respuesta del paso (`text`, las herramientas usadas con su resultado y los datos pedidos) para los pasos siguientes; o la propuesta en la bandeja, con la tarea como motivo. Cada vuelta es una llamada al proxy del SaaS, pero solo la primera (la del `prompt`) cuenta un mensaje del cupo del asistente; las vueltas que devuelven resultados de herramientas solo suman tokens.
 En este mismo documento se apoya en: HUB-F95 (Paso «Pedírselo al asistente»), HUB-F100 (Decidir una pregunta o una propuesta que espera), HUB-F101 (Cerrar lo que nadie contestó a tiempo), HUB-F273 (Conversar con el asistente).
 Si falla: el paso falla con el motivo escrito en el historial de la ejecución: sin credencial de máquina (`flow.agent_no_cloud_credential`), más de 60 s en total (`flow.agent_timeout`), más vueltas de las permitidas (`flow.agent_max_iters`), sin los datos pedidos o con otra forma (`flow.agent_no_output`, `flow.agent_bad_output`), o el proxy rechaza (`flow.agent_upstream`). Una llamada que falla por un momento (red, 5xx, 429) se repite dos veces con 1 s y 3 s de espera sin volver a ejecutar nada del negocio; el cupo agotado o una petición rechazada no se repiten. Las vueltas que devuelven resultados también pasan el control de cupo: con «Que lo haga por su cuenta», si la vuelta siguiente a una orden ya ejecutada choca con el cupo, la orden queda hecha y el paso falla con `flow.agent_upstream` sin repetirse (hueco). Una herramienta que el modelo no tenía, o que el permiso o el esquema rechazan, vuelve al modelo como error para que lo diga, sin tumbar el paso.
-Implicados: FLOWS-F17
+Implicados: FLOWS-F17, SAAS_ASSISTANT-F04
 QA: qa-hub-flows R6
 
 ## Cobertura contra la referencia

@@ -27,7 +27,7 @@ Pasos:
 Entra: la carpeta o la ruta; sesión de usuario de cualquier perfil. Una llave de API no entra.
 Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero: la política de carpetas de HUB-F246 solo regula escribir. El alcance es el negocio propio.
 Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401.
-Implicados: HUB_SHELL-F130, HUB_SHELL-F132, WHATSAPP_INBOX-F06
+Implicados: HUB_SHELL-F130, HUB_SHELL-F132, WHATSAPP_INBOX-F06, SAAS_DASHBOARD-F67, SAAS_DASHBOARD-F68
 QA: ninguno
 
 ### HUB-F246 Subir, organizar y borrar archivos
@@ -40,7 +40,7 @@ Pasos:
 Entra: ruta y acción, con sesión de propietario o administrador.
 Sale: la carpeta decide: `_logs` y `_system` y la raíz `modules` son solo lectura; bajo `modules/<carpeta>/` manda lo que la app declara en `static_files.user_actions` (sin declarar, solo lectura); cualquier otra carpeta, gestión completa. Renombrar solo cambia el nombre (no admite rutas). Mover exige poder borrar el origen y subir al destino, y no deja meter una carpeta en sí misma. Crear carpeta cuenta como subir. Todo se hace en el almacenamiento de erplora.com, que valida las rutas.
 Si falla: 403 `media.read_only_folder`, 400 `media.invalid_name`, `media.same_path`, `media.move_into_itself`; 424 con la nube.
-Implicados: HUB_SHELL-F131, HUB_SHELL-F133, HUB_SHELL-F134
+Implicados: HUB_SHELL-F131, HUB_SHELL-F133, HUB_SHELL-F134, SAAS_DASHBOARD-F67
 QA: ninguno
 
 ### HUB-F247 Guardar ficheros desde una app
@@ -152,8 +152,7 @@ Pasos:
 Entra: la orden pública (`complete_sale`, `refund`, apertura y cierre de caja) o el inicio y cierre de sesión.
 Sale: una fila `(id, tipo, usuario del hub, instante)`: nunca nombre, ni nada del cliente final. No se anota sin persona detrás (tareas, avisos). Se lee sin borrar, hasta 500 por latido, y solo se borra tras la confirmación del SaaS; el SaaS descarta duplicados por id. Sin conexión conserva 5.000 y descarta lo más antiguo. Anotar nunca falla la venta.
 Si falla: un fallo al anotar se escribe en el log y la operación sigue.
-Implicados: pendiente
-Pendiente de enlazar: saas — recepción de la actividad del hub
+Implicados: SAAS_DASHBOARD-F18, SAAS_DASHBOARD-F57
 QA: ninguno
 
 ### HUB-F255 Aplicar la semilla SQL del despliegue al arrancar
@@ -166,8 +165,7 @@ Pasos:
 Entra: el SQL del despliegue, con el identificador del hub.
 Sale: la configuración inicial escrita; la idempotencia la pone el propio SQL. Es configuración del despliegue, no una plantilla.
 Si falla: un seed roto aborta el arranque con un error claro.
-Implicados: pendiente
-Pendiente de enlazar: infra — cómo el despliegue compone y pasa la semilla
+Implicados: SAAS_PUBLIC-F90
 QA: ninguno
 
 ## Cobertura contra la referencia

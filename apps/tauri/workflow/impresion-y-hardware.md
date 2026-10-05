@@ -25,7 +25,7 @@ nada: el módulo Impresión dice «No se encontraron impresoras de red (puerto 9
 «No se ha encontrado ninguna impresora en esta red…» del hub no la llama nadie; lo dicho en HUB_APP-F09 para macOS). En el
 emulador de Android el barrido recorre la red del emulador y no encuentra nada: no es un defecto (QA).
 Desde un navegador: «Desde el navegador, este dispositivo no puede llegar a las impresoras…».
-Implicados: HUB-F196, HUB_PERIPHERALS-F01, HUB_PERIPHERALS-F04, PRINTING-F02
+Implicados: HUB-F196, HUB_PERIPHERALS-F01, HUB_PERIPHERALS-F04, PRINTING-F02, REC_ALTA-F17
 QA: qa-hub §8, qa-hub-android Fase 3
 
 ### HUB_APP-F14 Añadir una impresora por su IP
@@ -45,7 +45,7 @@ escribió mal (`invalid_printer_address`: «La dirección no es válida…») de
 (`printer_unreachable`: «Ninguna impresora ha respondido en {dirección}…»); una aplicación más antigua
 que la orden da «No se pudo añadir la impresora. Actualiza la app…». Contestar en el 9100 no prueba que
 sea térmica: una láser de oficina también contesta.
-Implicados: HUB_PERIPHERALS-F02, PRINTING-F03
+Implicados: HUB_PERIPHERALS-F02, PRINTING-F03, REC_ALTA-F17
 QA: qa-hub-android Fase 3
 
 ### HUB_APP-F15 Impresora Bluetooth (solo Android)
@@ -65,7 +65,7 @@ Si falla: Bluetooth apagado o sin permiso, o impresora fuera de alcance/apagada:
 motivo («impresora inalcanzable: …» o `bluetooth_permission_denied`) y la persona lo ve en la hoja de
 prueba y el hub marca el trabajo como fallido para reintentar. El conectar puede tardar segundos; la
 orden no deja la pantalla colgada porque corre fuera del hilo principal.
-Implicados: HUB_PERIPHERALS-F09, HUB_PERIPHERALS-F14, PRINTING-F02, PRINTING-F05
+Implicados: HUB_PERIPHERALS-F09, HUB_PERIPHERALS-F14, PRINTING-F02, PRINTING-F05, REC_ALTA-F17
 QA: qa-hub-android Pendiente (Bluetooth SPP, fase C)
 
 ### HUB_APP-F16 Impresora USB (solo ordenador)
@@ -86,7 +86,7 @@ Entra: el identificador `usb:<cola>`.
 Sale: solo la hoja de prueba y la orden directa; con las colas CUPS la aplicación comprueba el estado
 antes de enviar y cancela a los 15 s lo que no sale (`HUB_PERIPHERALS-F07`).
 Si falla: en Windows no se listan colas (no hay `lp`): una impresora USB de Windows se usa por red.
-Implicados: HUB_PERIPHERALS-F03, PRINTING-F02
+Implicados: HUB_PERIPHERALS-F03, PRINTING-F02, REC_ALTA-F17
 QA: qa-hub §8
 
 ### HUB_APP-F17 Dar nombre y función a una impresora, y quitarla
@@ -135,7 +135,7 @@ reconexión son del hub y de la página.
 Si falla: un navegador sin aplicación no es puesto. Una USB no cuenta como alcanzable (HUB_APP-F16). Lo
 que la aplicación no hace es avisar al hub de que una impresora se apagó: el vigilante marca en línea o fuera de
 línea cada 30 s en `devices.json` y sus eventos van a un `eprintln!` que nadie lee (HUB_PERIPHERALS-F05).
-Implicados: HUB-F196, HUB-F197, HUB-F198, HUB_PERIPHERALS-F04, HUB_SHELL-F73, HUB_SHELL-F74, HUB_SHELL-F162
+Implicados: HUB-F196, HUB-F197, HUB-F198, HUB_PERIPHERALS-F04, HUB_SHELL-F73, HUB_SHELL-F74, HUB_SHELL-F162, REC_ALTA-F17
 QA: qa-hub §8
 
 ### HUB_APP-F19 Imprimir un tique, una factura o una comanda

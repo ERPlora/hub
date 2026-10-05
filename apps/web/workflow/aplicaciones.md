@@ -70,8 +70,7 @@ Pasos:
 Entra: el catálogo de erplora.com que reenvía el hub; el hub pide el idioma del negocio (`?lang=`), pero esa puerta de erplora.com lo ignora: con la credencial de máquina sale en el idioma que manda la pantalla (`Accept-Language`, que el hub reenvía) y, si va con la cuenta de la persona, en el que tenga guardado en erplora.com (solo la puerta pública, la de un hub sin enrolar, respeta `?lang=`); cruzado con las apps instaladas en el hub, que es lo que manda para decir «Instalado» (el catálogo puede ir por detrás).
 Sale: nada guardado. Recupera el catálogo al volver el foco a la ventana, para ver al instante una suscripción contratada fuera.
 Si falla: «No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.» con «Reintentar»; las filas que ya había se conservan. Sin respuesta todavía, «Cargando el catálogo…»; con una búsqueda sin resultados, «No hay apps que coincidan con tu búsqueda.» (cada situación con su frase).
-Implicados: pendiente
-Pendiente de enlazar: saas — marketplace: el catálogo de apps que reenvía el hub
+Implicados: SAAS_PUBLIC-F12, SAAS_PUBLIC-F13, SAAS_PUBLIC-F14
 QA: BD-03
 
 ### HUB_SHELL-F108 Saber cuánto cuesta una app antes de instalarla
@@ -86,8 +85,7 @@ Pasos:
 Entra: el precio, el ciclo y si va en el plan, que manda erplora.com.
 Sale: nada guardado. El hub no cobra ni lleva a comprar: contratar es cosa de erplora.com (HUB_SHELL-F111).
 Si falla: sin catálogo, HUB_SHELL-F107.
-Implicados: pendiente
-Pendiente de enlazar: saas — marketplace: precio, ciclo y plan de cada app
+Implicados: REC_ALTA-F22, SAAS_PUBLIC-F12
 QA: ninguno
 
 ### HUB_SHELL-F109 Instalar una app
@@ -103,8 +101,7 @@ Pasos:
 Entra: la app y la versión elegidas; los permisos que declara (del hub si ya la conoce, y si no del catálogo). No se confirma el precio ni qué otras apps entrarán: solo la versión (si hay varias) y los permisos de la app pedida.
 Sale: pide al servidor la instalación (HUB-F19) y concede los permisos aceptados (HUB-F32); sigue las fases por el canal en vivo. Una instalación empezada desde otro dispositivo se ve igual en esta pantalla, y el aviso «{name} instalado.» sale en todos los dispositivos que tengan Apps abierta. Las apps instaladas de paso no pasan por la pregunta de permisos ni los reciben: una dependencia con permisos de host queda con todo denegado y ningún aviso lo dice (el de HUB_SHELL-F115 es solo de la app pedida). Si se sale de Apps mientras instala, el aviso y su resultado pasan a un aviso global y no se pierden.
 Si falla: HUB_SHELL-F110 a F115 según la causa. Si no es administrador: «Puedes ver las apps, pero solo un administrador puede instalarlas, activarlas o desinstalarlas.».
-Implicados: HUB-F19, HUB-F32
-Pendiente de enlazar: saas — marketplace: el plan de instalación, las versiones y la descarga
+Implicados: HUB-F19, HUB-F32, REC_ALTA-F08, REC_ALTA-F22, SAAS_PUBLIC-F16, SAAS_PUBLIC-F17, SAAS_PUBLIC-F18
 QA: BD-03
 
 ### HUB_SHELL-F110 Saber qué más se ha instalado de paso
@@ -119,7 +116,7 @@ Pasos:
 Entra: la lista de apps que el hub instaló de paso.
 Sale: nada guardado en la pantalla. Es el reverso del aviso de desinstalar, que nombra lo que dejaría de funcionar (HUB_SHELL-F124). Una app sin dependencias nuevas recibe el aviso simple, sin «También se instaló».
 Si falla: si no se puede instalar una dependencia, no se instala nada y sale el motivo (HUB_SHELL-F112).
-Implicados: HUB-F19
+Implicados: HUB-F19, SAAS_PUBLIC-F16
 QA: BD-03
 
 ### HUB_SHELL-F111 Intentar instalar una app que necesita suscripción
@@ -134,8 +131,7 @@ Pasos:
 Entra: qué apps tiene permitidas el negocio, que manda erplora.com (si aún no se ha podido saber, se deja intentar y el hub decide).
 Sale: nada guardado ni cobrado. La pantalla nunca lleva a una página de pago desde dentro (las tiendas de Google y Microsoft lo rechazan).
 Si falla: sin conexión con erplora.com no se puede saber si hay suscripción: se deja pasar y el hub la comprueba al instalar.
-Implicados: HUB-F19
-Pendiente de enlazar: saas — suscripción de las apps de pago
+Implicados: HUB-F19, REC_ALTA-F22, SAAS_DASHBOARD-F108, SAAS_PUBLIC-F16, SAAS_PUBLIC-F20, SAAS_PUBLIC-F21
 QA: BD-03
 
 ### HUB_SHELL-F112 Ver por qué ha fallado una instalación y reintentarla
@@ -178,7 +174,7 @@ Pasos:
 Entra: el mínimo que declara la app y la versión del hub.
 Sale: nada guardado.
 Si falla: sin la versión del hub, la comprobación se salta y se avisa en la consola del navegador, no a la persona.
-Implicados: HUB-F20
+Implicados: HUB-F20, SAAS_PUBLIC-F15
 QA: ninguno
 
 ### HUB_SHELL-F115 Saber que una app se instaló sin sus permisos
@@ -283,8 +279,7 @@ Pasos:
 Entra: para las apps que el catálogo no lista, el estado de publicación que pregunta el hub una a una. Con un hub sano no cuesta ninguna petición.
 Sale: nada guardado.
 Si falla: si no se puede preguntar, o el catálogo entero ha fallado, no se pinta nada: «no lo sé» no es «retirada». Una app solo «sin listar» (instalable por enlace directo) no lleva etiqueta.
-Implicados: pendiente
-Pendiente de enlazar: saas — marketplace: el estado de publicación de una app (listada, sin listar, retirada)
+Implicados: SAAS_DASHBOARD-F186, SAAS_DASHBOARD-F187, SAAS_PUBLIC-F22
 QA: ninguno
 
 ### HUB_SHELL-F122 Desactivar una app

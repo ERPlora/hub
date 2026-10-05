@@ -43,7 +43,7 @@ Pasos:
 Entra: la sesión de administrador; el nombre (hasta 150 caracteres), el rol, el PIN y la placa opcional; las plazas del plan (HUB-F147).
 Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148).
 Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: el **alta** de un usuario local no admite administrador (ojo: la edición de la ficha sí deja subirlo después a administrador, HUB-F148, y un administrador con PIN entra por el pinpad con todos sus permisos; solo el pase a erplora.com, HUB-F142, exige haber entrado con la cuenta); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147.
-Implicados: HUB_SHELL-F81, STAFF-F01
+Implicados: HUB_SHELL-F81, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F146 Invitar a una persona con su cuenta de erplora.com
@@ -58,8 +58,7 @@ Pasos:
 Entra: la sesión de administrador; nombre, correo, rol y PIN opcional; la credencial de máquina del hub hacia erplora.com.
 Sale: la ficha con el correo de acceso escrito en los dos sitios (acceso y perfil); la membresía y la invitación en erplora.com (`POST /api/v1/hub/device/members/`). El administrador nunca conoce la contraseña. Hay una segunda puerta (`/api/members`, que la pantalla no usa) que es alta-o-reinvitación por correo: si el correo ya existe, le cambia el rol, la reactiva y vuelve a avisar a erplora.com; no lleva nombre, PIN ni placa, y comparte con Personal solo las barandillas, el rol concedible y el tope de plazas.
 Si falla: sin correo, «account_needs_email»; un rol que no sea de los tres de fábrica, «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee…»; correo que el hub ya conoce, «Este hub ya conoce ese email…»; repartir administración sin ser administrador, «No puedes repartir un rol por encima del tuyo…». Si erplora.com no contesta, rechaza o frena, la ficha local queda escrita y la respuesta lo dice (`cloud_unreachable`, `cloud_rejected` o «Demasiados cambios en poco tiempo: la invitación todavía no ha salido…»). Volver a guardar **no** la reenvía: un alta nueva choca con «Este hub ya conoce ese email…» y guardar la ficha sin cambiar rol, correo ni estado no llama a erplora.com. Hoy solo la reenvía la puerta `/api/members`, y solo si cambia el rol o la persona no tenía membresía en erplora.com: con la credencial de máquina y el mismo rol, erplora.com contesta `invited: false` y no manda nada. Hub sin conectar con erplora.com: `not_enrolled`.
-Implicados: HUB_SHELL-F82, STAFF-F01, STAFF-F03
-Pendiente de enlazar: saas — dar de alta a un miembro del negocio y mandarle la invitación
+Implicados: HUB_SHELL-F82, STAFF-F01, STAFF-F03, REC_ALTA-F15, SAAS_DASHBOARD-F13, SAAS_DASHBOARD-F60, SAAS_DASHBOARD-F214
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F147 Llegar al tope de plazas del plan
@@ -74,8 +73,7 @@ Pasos:
 Entra: el tope de personas del último plan verificado (HUB-F162); sin plan verificado no hay tope. Se cuentan solo las personas activas de este negocio.
 Sale: nada escrito en el hub; el rechazo `hub.users.user_limit_reached` (409). Salvo al **reincorporar** a una persona con cuenta: el hub avisa antes a erplora.com (que recrea la membresía y la invitación) y solo después pide la plaza, así que con el plan lleno erplora.com ya la ha readmitido cuando el hub contesta 409. Dos altas a la vez no pueden coger la misma plaza: la plaza se pide en el mismo paso que se escribe. Cambiar el rol de quien ya está dentro no gasta plaza. Quien entra con su cuenta por primera vez no pasa por este tope: esa plaza la controla erplora.com.
 Si falla: «Tu plan tiene todas las plazas ocupadas. Da de baja a alguien que ya no trabaje aquí, o pasa a un plan con más plazas.».
-Implicados: HUB_SHELL-F83
-Pendiente de enlazar: saas — tope de plazas por plan en el permiso firmado y en la invitación
+Implicados: HUB_SHELL-F83, REC_ALTA-F15, SAAS_DASHBOARD-F13, SAAS_DASHBOARD-F53, SAAS_DASHBOARD-F58
 QA: ninguno
 
 ### HUB-F148 Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona
@@ -104,8 +102,7 @@ Pasos:
 Entra: la sesión de administrador; la persona.
 Sale: la ficha desactivada (nunca borrada: ventas, aprobaciones y auditoría siguen nombrándola), sus sesiones borradas, y fuera del pinpad y de la lista de personas activas; la membresía retirada en erplora.com. Cerrar la puerta va primero en local y no depende de que erplora.com conteste. Reactivar pide plaza (HUB-F147) y la membresía otra vez, y erplora.com le vuelve a mandar el correo de invitación. La baja no toca las llaves de máquina del negocio: si esa persona, siendo dueña o administradora, acuñó una con la puerta de alta de dispositivo de erplora.com (que el hub no usa), sigue valiendo. Si la persona no tiene correo de acceso, la baja quita en erplora.com la membresía del correo de su perfil (HUB-F143). La comprobación del último administrador se hace antes de llamar a erplora.com y la escritura después: dos bajas o degradaciones simultáneas pueden dejar el negocio sin administrador (ver huecos). La revocación desde erplora.com (HUB-F144) tampoco mira si es el último.
 Si falla: «No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.»; la ficha del dueño no la da de baja nadie más. Si erplora.com no contesta al quitar la membresía, la baja local se queda y la respuesta lo dice; esa persona no podrá entrar en el hub, pero sigue siendo miembro allí hasta que se repita.
-Implicados: HUB_SHELL-F88, HUB_SHELL-F89, STAFF-F03
-Pendiente de enlazar: saas — quitar a un miembro del negocio
+Implicados: HUB_SHELL-F88, HUB_SHELL-F89, STAFF-F03, SAAS_AUTH-F22, SAAS_DASHBOARD-F16, SAAS_DASHBOARD-F61
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F150 Ver los roles y encender los que trae un módulo
@@ -120,7 +117,7 @@ Entra: la sesión (leer, cualquiera; encender o apagar, administrador); los role
 Sale: el rol encendido o apagado, con quién lo hizo (`hub_role_activation`). Los permisos de un rol son la suma de lo que le conceden los módulos activos con esa misma clave (un rol que «deriva» de responsable o empleado no hereda sus permisos); el administrador además administra el hub y toda sesión puede ver al personal. Un rol de un módulo no abre las puertas de administración del hub (miran el rol), pero si un manifiesto le concede `*`, ese comodín pasa todos los permisos, también los del núcleo (hoy ningún módulo publicado lo hace; el instalador no lo impide). Una plantilla del negocio también puede encender roles al importarse, por la misma puerta.
 En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F20 (Rechazar un paquete que rompe las reglas del hub).
 Si falla: los roles de fábrica no se apagan («immutable»); no se puede encender un rol que ningún módulo declara («unknown»); sin ser administrador, el aviso de permiso de la pestaña.
-Implicados: HUB_SHELL-F91
+Implicados: HUB_SHELL-F91, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
 ### HUB-F151 Rechazar una orden para la que no se tiene permiso

@@ -65,8 +65,7 @@ Pasos:
 Entra: el código de un solo uso y los identificadores que Meta entrega a la ventana (`code`, `event`, `waba_id`, `phone_number_id`, `business_id`); la sesión de quien pulsa.
 Sale: el número queda ligado a este hub **en la plataforma**; el hub no guarda ni el número ni el permiso de Meta. Desde ese momento la recogida (HUB-F263) trae los mensajes nuevos y el historial que Meta entrega al conectar (HUB-F264).
 Si falla: sin sesión, `401`; con la sesión de un perfil que no administra, `403` y el bloque dice «Solo un dueño o un administrador puede conectar el número de WhatsApp.»; un cuerpo que no es un objeto se rechaza antes de salir (`whatsapp.invalid_body`); si la plataforma no contesta, el hub responde `424` con `cloud_unreachable` (nunca un «conectado» falso); un rechazo 4xx de la plataforma vuelve tal cual, con su status y su cuerpo: erplora.com contesta `{error: <frase en inglés>, code: <código>}` (`missing_code` con 400, `no_phone_number` con 404), el bloque lee `code` y lo traduce («No se añadió ningún número de teléfono…», «La ventana de Facebook se cerró antes de terminar…»); el `hub_not_found` con código no llega nunca: una credencial del hub que erplora.com no acepta vuelve como `401 {detail}` sin código (el bloque enseña la frase de «Solo un dueño o un administrador…») y un negocio inactivo como `410 {detail: "hub_not_found"}` (frase genérica); un fallo de Meta o de la plataforma (5xx: Meta no contesta, Meta rechaza, no hay cuenta de WhatsApp Business, WhatsApp sin configurar) llega como `424 cloud_rejected` sin su código, y el bloque solo dice una frase genérica: las frases traducidas de esos códigos no se ven nunca (hueco). Se reintenta pulsando otra vez.
-Implicados: HUB_SHELL-F170, WHATSAPP_INBOX-F01
-Pendiente de enlazar: saas — pasarela de WhatsApp: `GET /api/v1/hub/device/whatsapp/config/` → `{configured, app_id, config_id, graph_version}` con la credencial de máquina, y `POST …/whatsapp/connect/` que canjea el código, suscribe la cuenta de WhatsApp Business, registra o sincroniza el número y guarda el token; rechazos como `{error: <código>}` y `404` solo para «Meta no devolvió ningún número». Lo que el hub necesita y no hay: que los fallos de Meta (hoy 5xx con código) lleguen con un status que el hub reenvíe con su código, o que el hub los conserve
+Implicados: HUB_SHELL-F170, WHATSAPP_INBOX-F01, SAAS_WHATSAPP_INBOX-F01, SAAS_WHATSAPP_INBOX-F02
 QA: WA-01, WA-07
 
 ### HUB-F261 Saber qué número está conectado y si hay que reconectarlo
@@ -80,8 +79,7 @@ Pasos:
 Entra: la sesión del administrador.
 Sale: nada; solo lee. El hub no cachea la lista: cada apertura pregunta a la plataforma.
 Si falla: los mismos rechazos de sesión que HUB-F260; plataforma caída, `424` con `cloud_unreachable` y el bloque ofrece «Reintentar».
-Implicados: HUB_SHELL-F37, HUB_SHELL-F171, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02
-Pendiente de enlazar: saas — pasarela de WhatsApp: `GET …/whatsapp/numbers/` con `[{phone_number_id, display_phone, is_active, needs_reconnect, …}]` de ESTE hub (`needs_reconnect` lo marca la renovación del token de Meta cuando falla). Falta en la plataforma: `is_on_biz_app` en esta lista (hoy solo lo devuelve el canje del código)
+Implicados: HUB_SHELL-F37, HUB_SHELL-F171, WHATSAPP_INBOX-F01, WHATSAPP_INBOX-F02, SAAS_WHATSAPP_INBOX-F03, SAAS_WHATSAPP_INBOX-F05
 QA: WA-01, WA-09
 
 ### HUB-F262 Desconectar o volver a conectar el número
@@ -95,8 +93,7 @@ Pasos:
 Entra: el identificador de Meta del número elegido; la sesión del administrador.
 Sale: la plataforma deja de guardar mensajes de ese número para este hub. En el hub no se borra nada: las conversaciones de la bandeja siguen y lo ya recogido sigue en el historial interno.
 Si falla: un identificador que no son cifras se rechaza en el hub con `whatsapp.invalid_phone_number_id` antes de llamar a nadie (una `/` no puede desviar la llamada a otra ruta de la plataforma, hub#1134); el resto, como HUB-F260.
-Implicados: HUB_SHELL-F171, HUB_SHELL-F172, WHATSAPP_INBOX-F02
-Pendiente de enlazar: saas — pasarela de WhatsApp: `POST …/whatsapp/disconnect/<phone_number_id>/` que suelta el número de este hub, y la renovación del token de Meta que marca `needs_reconnect` si Meta la rechaza
+Implicados: HUB_SHELL-F171, HUB_SHELL-F172, WHATSAPP_INBOX-F02, SAAS_WHATSAPP_INBOX-F04, SAAS_WHATSAPP_INBOX-F05
 QA: WA-01, WA-09
 
 ### HUB-F263 Recoger los mensajes de WhatsApp que esperan en la plataforma
@@ -120,8 +117,7 @@ Si falla:
 - **Hub apagado, en pausa, módulo pausado o plan vencido**: los mensajes esperan en la plataforma, sin caducidad, y llegan al volver, 100 cada 5 s. El hub no mira su antigüedad: un mensaje en vivo de hace dos días se entrega como en vivo y arranca las recetas igual (hueco, ver «Dudas abiertas»).
 - **Orden**: se escriben en el orden en que la plataforma los sirve y el reparto los entrega por orden de escritura; un mensaje que tuvo que volver queda detrás de los que entraron después, y Meta tampoco garantiza el orden. Cada aviso lleva la hora de la plataforma.
 - Con el cupo del mes agotado el hub los recoge igual; es el módulo el que deja de guardar los entrantes en vivo (WHATSAPP_INBOX-F13). Las recetas se disparan igual, porque escuchan el aviso del núcleo y no el del módulo: la conversación no se guarda, la receta corre (gasta un turno del asistente y puede reservar) y solo su respuesta cae a «Eventos caídos» por cupo (HUB-F266).
-Implicados: REC_WA_CITA-F02, REC_WA_MESA-F02, WHATSAPP_INBOX-F03, WHATSAPP_INBOX-F13
-Pendiente de enlazar: saas — pasarela de WhatsApp: recibe el webhook de Meta, aparca por hub (`wa_message_id` único) y sirve `GET /api/v1/hub/device/whatsapp/inbox/?direction=all&source=all` (pendiente = no confirmado, del más antiguo al más reciente, máx. 100) y `POST …/inbox/ack/` con `{wa_message_ids}` (máx. 500, responde cuántas filas cambió)
+Implicados: REC_WA_CITA-F02, REC_WA_MESA-F02, WHATSAPP_INBOX-F03, WHATSAPP_INBOX-F13, SAAS_WHATSAPP_INBOX-F07, SAAS_WHATSAPP_INBOX-F10
 QA: WA-02, WA-08, BD-07
 
 ### HUB-F264 Distinguir lo que contesta el dueño desde el móvil y el historial al conectar
@@ -136,8 +132,7 @@ Pasos:
 Entra: los campos `direction` (`inbound`/`outbound`), `contact` (el número del otro lado) y `source` (`live`/`history`) que sirve la plataforma; si una plataforma antigua no los manda, valen `inbound`, el remitente y `live`.
 Sale: los mismos avisos de HUB-F263 con esas tres marcas; la copia completa de un mensaje del historial con identificador `wa-<id>~<huella del mensaje>`. El hub **no** filtra nada: dejar fuera de las respuestas automáticas el eco del dueño y el historial lo hacen las recetas en su disparador (WHATSAPP_INBOX-F21, F24), y una automatización montada a mano sin ese filtro contestaría encima (FLOWS-F11).
 Si falla: un valor de `direction` o `source` fuera de contrato no se reinterpreta: viaja tal cual al aviso y se nombra una vez en el registro, igual que un campo nuevo que este hub no conoce (que no viaja); un mensaje en vivo ya recogido nunca se vuelve a emitir aunque la plataforma lo sirva con otro contenido.
-Implicados: FLOWS-F11, REC_WA_CITA-F09, REC_WA_MESA-F09, WHATSAPP_INBOX-F03, WHATSAPP_INBOX-F08
-Pendiente de enlazar: saas — pasarela de WhatsApp: guarda el eco del dueño (`direction=outbound`, `contact` = la clienta) y el historial de coexistencia (`source=history`), y completa en su sitio la fila de un adjunto del historial volviendo a servirla con el mismo `wamid`
+Implicados: FLOWS-F11, REC_WA_CITA-F09, REC_WA_MESA-F09, WHATSAPP_INBOX-F03, WHATSAPP_INBOX-F08, SAAS_WHATSAPP_INBOX-F08
 QA: W-05, WA-02
 
 ### HUB-F265 Saber a qué pregunta contesta lo que toca la clienta
@@ -152,9 +147,8 @@ Pasos:
 Entra: `reply_id`, `reply_title` y `reply_to` de la plataforma o, si no los trae, leídos del mensaje de Meta.
 Sale: el aviso lleva además `reply_to_step` y `reply_to_flow`; vacíos (nunca ausentes) cuando el mensaje no contesta a nada que este hub mandara.
 Si falla: si la búsqueda no se puede hacer, el mensaje no se escribe ni se confirma y vuelve en la vuelta siguiente (no se entrega un toque sin saber a qué pregunta contesta); un identificador de otro hub o desconocido deja los dos campos vacíos.
-Implicados: FLOWS-F14, WHATSAPP_INBOX-F19
+Implicados: FLOWS-F14, WHATSAPP_INBOX-F19, SAAS_WHATSAPP_INBOX-F10, SAAS_WHATSAPP_INBOX-F12
 Pendiente de enlazar: hub — HUB, automatizaciones (el paso «esperar respuesta» que compara el toque con la pregunta)
-Pendiente de enlazar: saas — pasarela de WhatsApp: saca `reply_id`/`reply_title` del botón o fila tocados y `reply_to` del `context.id` de Meta, y devuelve el `message_id` (`wamid`) de cada envío
 QA: W-02, W-07
 
 ### HUB-F266 Mandar un WhatsApp desde el hub
@@ -175,8 +169,7 @@ Si falla:
 - **Plataforma caída, rechazo (Meta rechaza: `502 meta_send_failed`; plantilla no aprobada: `409 template_not_approved`), o el archivo de cabecera no se pudo firmar**: se reintenta con esperas de 2, 4, 8… 128 s y, tras 8 intentos (unos 4 minutos), cae a «Eventos caídos»: una caída de la plataforma de más de 4 minutos deja todos los envíos de ese rato para reintentar a mano.
 - **Hub sin enrolar**: falla y se reintenta, nunca se da por enviado.
 - **Una forma imposible** (dos cabeceras, opciones que no son un objeto, una variable fuera de plantilla, un teléfono sin `+`) no llega a la plataforma, pero se trata como cualquier fallo: los 8 intentos y después «Eventos caídos», con el motivo. Las automatizaciones la rechazan antes, al guardar el paso.
-Implicados: FLOWS-F15, FLOWS-F25, WHATSAPP_INBOX-F13
-Pendiente de enlazar: saas — pasarela de WhatsApp: `POST /api/v1/hub/device/notify/whatsapp/` con `{to, body | template{name, language, components}, interactive?, phone_number_id?}` → `{message_id}`; cobra del cupo antes de gastar y contesta `429 quota_exceeded` al agotarlo; cualquier fallo de Meta es hoy `502 meta_send_failed` y los estados `failed` que Meta manda luego por webhook se descartan. Lo que el hub necesita y no hay: un código distinguible para «ventana de 24 h cerrada», que el freno de tasa no use el mismo 429 que el cupo agotado (o un cuerpo que los distinga), y avisar al hub de un envío que Meta falla después
+Implicados: FLOWS-F15, FLOWS-F25, WHATSAPP_INBOX-F13, SAAS_WHATSAPP_INBOX-F09, SAAS_WHATSAPP_INBOX-F12, SAAS_WHATSAPP_INBOX-F13
 QA: WA-04, WA-07, qa-hub-flows R7
 
 ### HUB-F267 Ver una foto, una nota de voz o un documento de la clienta
@@ -191,8 +184,7 @@ Pasos:
 Entra: el identificador del adjunto; la sesión de quien mira.
 Sale: el archivo, marcado para que el navegador no lo guarde en caché compartida, no lo ejecute y lo descargue si se abre la dirección directamente. Nada queda en el hub.
 Si falla: sin sesión, `401`; sin permiso de leer la bandeja, rechazo de permiso; un identificador que no son cifras, `invalid_media_id` antes de llamar a nadie; la plataforma rechaza con su código y la bandeja distingue «ya no está disponible» (`media_not_found`), «inténtalo otra vez» (`media_unavailable`) y «vuelve a conectar WhatsApp» (`meta_permission_denied`); plataforma caída, `cloud_unreachable`. Una llave de API no es una persona y no pasa.
-Implicados: WHATSAPP_INBOX-F06
-Pendiente de enlazar: saas — pasarela de WhatsApp: `GET …/whatsapp/media/<media_id>/` que canjea el id de Meta por los bytes con el token del negocio y los sirve con el `Content-Type` de Meta; rechazos `{error, detail}` decididos antes del primer byte
+Implicados: WHATSAPP_INBOX-F06, SAAS_WHATSAPP_INBOX-F15
 QA: WA-10
 
 ### HUB-F268 Ver las plantillas del negocio con lo que dice Meta de cada una
@@ -206,8 +198,7 @@ Pasos:
 Entra: la sesión del administrador y el módulo que pregunta.
 Sale: nada en el hub. El módulo guarda los veredictos y trae las que el negocio creó en WhatsApp Manager (WHATSAPP_INBOX-F27, F28). Se pregunta al abrir, nunca con un temporizador: la plataforma consulta a Meta en cada llamada y no tiene freno propio.
 Si falla: sin sesión, `401`; cajero, `403`; módulo sin la capacidad concedida o sin WhatsApp declarado, `capability_denied`; Meta inalcanzable, la plataforma contesta con lo último que sabía y la marca `stale`; plataforma caída, `cloud_unreachable` en el sobre; un 5xx de la plataforma, aunque traiga código, llega como `424 cloud_rejected`.
-Implicados: WHATSAPP_INBOX-F27, WHATSAPP_INBOX-F28
-Pendiente de enlazar: saas — pasarela de WhatsApp: `GET …/whatsapp/templates/` → `{templates: [{name, language, category, status, rejected_reason, meta_id, …contenido}], stale}`, refrescando contra Meta en cada llamada
+Implicados: WHATSAPP_INBOX-F27, WHATSAPP_INBOX-F28, SAAS_WHATSAPP_INBOX-F16
 QA: WA-04
 
 ### HUB-F269 Mandar una plantilla a revisión de Meta, nueva o editada
@@ -222,8 +213,7 @@ Pasos:
 Entra: la plantilla escrita por el negocio; si lleva cabecera de archivo, el identificador de la muestra ya subida (HUB-F270).
 Sale: la plantilla registrada en Meta (`201` nueva, `200` editada); el módulo guarda el veredicto (WHATSAPP_INBOX-F29, F30).
 Si falla: los rechazos 4xx de la plataforma (`invalid_name`, `missing_example`, `meta_rate_limited`…) llegan con su status y su código intactos para que el módulo los diga en español, y uno sin código llega como `cloud_rejected`; el rechazo de Meta (`502 meta_template_failed`, con el motivo de Meta en el detalle) y «Meta no contesta» (`503 meta_unreachable`) llegan como `424 cloud_rejected` y su motivo se pierde (la puerta de muestras y la de adjuntos sí conservan el código de un 5xx; esta no); sin sesión, sin permiso o sin capacidad, como HUB-F268.
-Implicados: WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F30
-Pendiente de enlazar: saas — pasarela de WhatsApp: `POST …/whatsapp/templates/` que valida contra las reglas de Meta, registra o edita y responde `201`/`200` con el estado `PENDING`; rechazos `{error: <código>}`. Hoy `502 meta_template_failed` y `503 meta_unreachable` se pierden en el hub; o el hub los conserva, o la plataforma los da con un status 4xx
+Implicados: WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F30, SAAS_WHATSAPP_INBOX-F17
 QA: WA-04
 
 ### HUB-F270 Subir a Meta la muestra de la cabecera de una plantilla
@@ -238,8 +228,7 @@ Pasos:
 Entra: el archivo (`multipart/form-data`, campo `file`) con su tamaño declarado.
 Sale: `{header_handle, format, mime_type, size}` dentro del sobre. Nada se guarda en el hub ni en el módulo: la muestra vive en Meta.
 Si falla: sin formulario o sin su separador, `whatsapp.invalid_header_sample_upload`; sin tamaño declarado, `411`; más grande de lo que Meta acepta, `413` con `header_sample_too_large` (el mismo código que da la plataforma); tipo o tamaño por tipo no aceptados (JPEG/PNG hasta 5 MB, MP4 hasta 16 MB, PDF hasta 100 MB), lo rechaza la plataforma con su código.
-Implicados: WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F30
-Pendiente de enlazar: saas — pasarela de WhatsApp: `POST …/whatsapp/template-header-samples/` (campo `file`) que comprueba el tipo por los bytes y el tamaño por tipo y sube la muestra a Meta; `201` con `header_handle`, rechazos `missing_file`, `unsupported_header_sample`, `header_sample_too_large`, `no_whatsapp_number`, `meta_*`
+Implicados: WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F30, SAAS_WHATSAPP_INBOX-F18
 QA: WA-04
 
 ### HUB-F271 Borrar una plantilla en Meta
@@ -253,8 +242,7 @@ Pasos:
 Entra: el nombre de la plantilla; la sesión del administrador.
 Sale: la plantilla deja de existir en Meta; respuesta vacía si todo fue bien.
 Si falla: un nombre con otros caracteres se rechaza en el hub (`whatsapp.invalid_template_name`) antes de llamar a nadie; el resto, como HUB-F268 (un 5xx de la plataforma pierde su código). Borrar no se puede deshacer: una plantilla aprobada tarda días en volver a aprobarse.
-Implicados: WHATSAPP_INBOX-F31
-Pendiente de enlazar: saas — pasarela de WhatsApp: `DELETE …/whatsapp/templates/<name>/` que borra en Meta todos los idiomas de esa plantilla y responde vacío
+Implicados: WHATSAPP_INBOX-F31, SAAS_WHATSAPP_INBOX-F19
 QA: ninguno
 
 ### HUB-F272 Reflejar en el hub el cupo y el consumo de WhatsApp del mes
@@ -268,8 +256,7 @@ Pasos:
 Entra: `tier.max_billable_messages` (o su alias `max_conversations`) y `usage.billable_messages` de la plataforma.
 Sale: el tope y el consumo del mes en el medidor del módulo. El hub no cuenta nada por su cuenta: el único contador es el de la plataforma, que es también la que corta los envíos (HUB-F266).
 Si falla: sin respuesta de la plataforma, un plan sin tope o un tope de cero, **no se escribe** (en el medidor, cero significa «sin tope», y un silencio no es un plan); el fallo queda en el registro del hub y llega al SaaS. Un consumo de cero sí se escribe (es el día 1). Si el módulo instalado es anterior al campo de consumo, se escribe solo el tope.
-Implicados: HUB_SHELL-F46, HUB_SHELL-F47, REC_WA_CITA-F02, REC_WA_MESA-F02, WHATSAPP_INBOX-F13
-Pendiente de enlazar: saas — facturación de WhatsApp: `GET /api/v1/hub/device/whatsapp/plan/` → `{tier: {max_billable_messages, max_conversations, …} | null, usage: {billable_messages, month}, available_tiers}`, el mismo contador que hace cumplir al enviar
+Implicados: HUB_SHELL-F46, HUB_SHELL-F47, REC_WA_CITA-F02, REC_WA_MESA-F02, WHATSAPP_INBOX-F13, SAAS_WHATSAPP_INBOX-F13, SAAS_WHATSAPP_INBOX-F14
 QA: WA-03
 
 ## Cobertura contra la referencia

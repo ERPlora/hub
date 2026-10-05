@@ -47,7 +47,7 @@ Pasos:
 Entra: los ajustes del negocio que da el hub (HUB-F220); se leen al arrancar y otra vez al abrir la pantalla.
 Sale: nada guardado.
 Si falla: la lectura al abrir no avisa si falla; se queda lo que había en memoria, o los valores por defecto si no había nada. Lo que depende de los nombres y direcciones de las pestañas está listado en el índice (los módulos enlazan a `#hub` y, en versiones publicadas, a `#tax`).
-Implicados: HUB-F220, VERIFACTU-F01
+Implicados: HUB-F220, VERIFACTU-F01, REC_ALTA-F09
 QA: ninguno
 
 ### HUB_SHELL-F156 Cambiar el país del negocio
@@ -63,7 +63,7 @@ Entra: el país elegido.
 Sale: el país en los ajustes (HUB-F221); lo leen los impuestos y los módulos de cumplimiento de cada país.
 En este mismo documento se apoya en: HUB_SHELL-F27 (Seguir la lista «Termina de configurar tu negocio»).
 Si falla: el desplegable vuelve al valor anterior y sale el motivo si el hub lo dio: «El país ya no se puede cambiar: este negocio ya declara con sus normas fiscales. Escríbenos si el negocio se ha mudado de verdad.»; con otro motivo, «No se pudieron guardar los ajustes». Un perfil que no administra ve solo el código del país.
-Implicados: HUB-F221
+Implicados: HUB-F221, REC_ALTA-F09
 QA: ninguno
 
 ### HUB_SHELL-F157 Elegir la zona horaria del negocio
@@ -78,7 +78,7 @@ Pasos:
 Entra: la zona elegida (o «automática»).
 Sale: la zona declarada en los ajustes (vacía = deducida del país) y la zona en vigor republicada (HUB-F221, SCHEDULES-F09). El manual dice que la zona se edita sin más: lo que el hub hace es deducirla del país salvo que se declare, y por eso un negocio en Canarias con país España tiene que declararla.
 Si falla: el desplegable vuelve a lo que había, sale el motivo o «No se pudieron guardar los ajustes», y no se republica nada. Quien no administra ve la zona en vigor con su hora.
-Implicados: FLOWS-F13, HUB-F221, SCHEDULES-F09
+Implicados: FLOWS-F13, HUB-F221, SCHEDULES-F09, REC_ALTA-F09
 QA: ninguno
 
 ### HUB_SHELL-F158 Cambiar la moneda del negocio
@@ -91,7 +91,7 @@ Pasos:
 Entra: el código de moneda.
 Sale: la moneda en los ajustes (HUB-F221); la leen todos los importes. La pantalla ofrece diez; el hub acepta cualquier código de moneda reconocido.
 Si falla: la moneda vuelve a la anterior (también en las apps) y sale el motivo o «No se pudieron guardar los ajustes».
-Implicados: HUB-F221
+Implicados: HUB-F221, REC_ALTA-F09
 QA: ninguno
 
 ### HUB_SHELL-F159 Elegir el idioma del negocio
@@ -106,7 +106,7 @@ Entra: el idioma elegido.
 Sale: el idioma por defecto en los ajustes (HUB-F221); es el de quien no ha elegido el suyo.
 En este mismo documento se apoya en: HUB_SHELL-F21 (Cambiar mis datos, foto, idioma y apariencia).
 Si falla: el desplegable vuelve al valor anterior y sale el motivo o «No se pudieron guardar los ajustes».
-Implicados: HUB-F221
+Implicados: HUB-F221, REC_ALTA-F09
 QA: ninguno
 
 ### HUB_SHELL-F160 Elegir la paleta de colores del negocio
@@ -176,7 +176,7 @@ Entra: los seis campos y la casilla.
 Sale: los datos del negocio en los ajustes (HUB-F221); el hub los publica en erplora.com (nombra al obligado en el otorgamiento de representación). Los leen Facturas y los módulos fiscales como emisor. El hub normaliza el NIF.
 En este mismo documento se apoya en: HUB_SHELL-F27 (Seguir la lista «Termina de configurar tu negocio»), HUB_SHELL-F28 (Ver qué falta para poder facturar).
 Si falla: lo escrito se queda en los campos para corregir solo el que falla (no se vacían). El motivo sale como frase: «El NIF ya no se puede cambiar: este negocio ya ha emitido con él.», «El NIF debe ser un texto.», «El NIF es demasiado largo: el límite de la AEAT es de 20 caracteres.», «Eso no tiene forma de NIF: DNI (12345678Z), NIE (X1234567L), CIF (B12345674) o identificador extranjero con prefijo de país (FR123456789).», «La letra o dígito de control del NIF no es el que corresponde: revísalo y vuelve a escribirlo.»; en una demo, «Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio negocio en erplora.com para remitir de verdad.». Si se guardó pero no se pudo compartir con erplora.com, sale además «No se han podido compartir los datos con ERPlora.». Un perfil que no administra ve los campos sin poder editarlos.
-Implicados: HUB-F221, INVOICE-F01, INVOICE-F03, VERIFACTU-F01
+Implicados: HUB-F221, INVOICE-F01, INVOICE-F03, VERIFACTU-F01, REC_ALTA-F09
 QA: ninguno
 
 ### HUB_SHELL-F165 Ir a dar de alta la impresora y configurar el tique
@@ -190,7 +190,7 @@ Pasos:
 Entra: las apps instaladas.
 Sale: nada guardado; la plantilla del tique y las impresoras son de la app de impresión, no del shell.
 Si falla: no falla; es navegación.
-Implicados: PRINTING-F01, PRINTING-F02, PRINTING-F06
+Implicados: PRINTING-F01, PRINTING-F02, PRINTING-F06, REC_ALTA-F17
 QA: ninguno
 
 ### HUB_SHELL-F166 [retirado] Ver quién está sacando cada tipo de tique
@@ -209,7 +209,7 @@ Pasos:
 Entra: el permiso elegido de una app instalada.
 Sale: el permiso concedido a esa app (HUB-F32); en el mismo gesto el hub devuelve a la cola todos los avisos del hub que habían caído por un permiso sin conceder, de cualquier app (HUB-F58); la campana y la pestaña Eventos caídos no se releen.
 Si falla: el interruptor vuelve a su sitio y sale «No se pudo cambiar el permiso.». Si no se pudieron leer los permisos de una app, esa app falta en la lista sin decirlo; si no se pudo leer la lista de apps, sale «No se pudieron cargar los permisos.» y debajo «Ninguna app instalada pide permisos.». La lista se carga la primera vez que se entra en la pestaña y no se vuelve a leer hasta recargar la pantalla.
-Implicados: FLOWS-F01, HUB-F32, HUB-F58, HUB-F111, PRINTING-F16, VERIFACTU-F01
+Implicados: FLOWS-F01, HUB-F32, HUB-F58, HUB-F111, PRINTING-F16, VERIFACTU-F01, REC_ALTA-F10
 QA: ninguno
 
 ### HUB_SHELL-F168 Retirar un permiso a una app
@@ -237,7 +237,7 @@ Pasos:
 Entra: el informe de la importación, para saber qué apps se instalaron.
 Sale: los permisos concedidos a esas apps (HUB-F32) si se acepta. Una plantilla nunca concede nada por sí sola (HUB-F237).
 Si falla: «No se han podido dar los permisos de {apps}. Vuelve a intentarlo o actívalos en Ajustes → Permisos.»; quedan en la ventana solo las apps que fallaron.
-Implicados: HUB-F32, HUB-F237
+Implicados: HUB-F32, HUB-F237, REC_ALTA-F08
 QA: ninguno
 
 ### HUB_SHELL-F170 Conectar el número de WhatsApp del negocio
@@ -253,8 +253,7 @@ Pasos:
 Entra: el código y los identificadores que da Facebook al terminar; el hub los reenvía con su credencial de máquina (el navegador no la ve).
 Sale: el número queda conectado en erplora.com (HUB-F260); empiezan a llegar mensajes (HUB-F263).
 Si falla: la frase del motivo y, si procede, **Reintentar**: «La conexión se canceló antes de terminar.» y «No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.» (las decide la propia pantalla), «No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.» (el 404 de erplora.com), la de quien no puede conectar, o la genérica «Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.». Las frases propias de los motivos de erplora.com y de Meta (`whatsappConnect.errors.not_configured`, `internal_error`, `no_business_account`, `no_access_token`, `meta_unreachable`, `meta_api_error`) no se ven nunca a través del hub: un fallo 5xx llega como `cloud_rejected` (`crates/server/src/cloud_proxy.rs`, `cloud_envelope_passthrough`) y una negativa en prosa no es un código (`lib/whatsapp-connect.ts`, `refusalCode`), así que las dos caen en la genérica. Si la plataforma no tiene WhatsApp configurado, al administrador el bloque no le pinta nada (ni botón, ni mensaje): no se ofrece conectar; quien no administra ve igualmente la frase de negativa. Si el elemento no existe en un hub antiguo, la Bandeja lo dice.
-Implicados: HUB-F260, WHATSAPP_INBOX-F01
-Pendiente de enlazar: saas — pasarela de WhatsApp: canjea el código, guarda el token y suscribe el número
+Implicados: HUB-F260, WHATSAPP_INBOX-F01, SAAS_WHATSAPP_INBOX-F01, SAAS_WHATSAPP_INBOX-F02
 QA: WA-01, WA-07
 
 ### HUB_SHELL-F171 Ver si el número está bien conectado y reconectarlo
@@ -300,7 +299,7 @@ Pasos:
 Entra: el nombre, el idioma, la finalidad, las secciones y las apps; la lista de apps instaladas y, si el hub lo impone, la finalidad fijada.
 Sale: un `.blueprint.zip` (HUB-F230, HUB-F231). Con «Plantilla» la pantalla oculta Usuarios y Fiscal y manda las dos a `false`; el hub excluye personas y NIF, pero el certificado lo decide la casilla tal como llega al hub (si no se pudo leer la finalidad impuesta, en una demo se puede elegir «Copia» con Fiscal marcado y el certificado viaja), y «Imágenes y media» copia también `media/modules/verifactu/**` (ERPlora/hub#2496). El texto de la demo «los datos fiscales nunca viajan en su archivo» es falso mientras siga abierta esa issue.
 Si falla: «La exportación falló: {motivo}» con la frase del hub; si tarda demasiado, «El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.»; si no se puede guardar, «No se ha podido descargar el archivo.», o en móvil y tableta «Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.».
-Implicados: HUB-F230, HUB-F231, HUB-F232, HUB_APP-F30
+Implicados: HUB-F230, HUB-F231, HUB-F232, HUB_APP-F30, REC_ALTA-F23
 QA: qa-hub §4
 
 ### HUB_SHELL-F174 Elegir qué apps, datos y tablas viajan en la exportación
@@ -315,7 +314,7 @@ Pasos:
 Entra: las apps instaladas y el recuento de filas por tabla (HUB-F232).
 Sale: nada guardado; la selección viaja al exportar.
 Si falla: si no se pueden leer las apps instaladas, la tabla sale vacía; si no se puede leer el recuento de tablas, no salen las tarjetas de tablas y se exporta todo.
-Implicados: HUB-F230, HUB-F232
+Implicados: HUB-F230, HUB-F232, REC_ALTA-F23
 QA: ninguno
 
 ### HUB_SHELL-F175 Elegir una plantilla del catálogo para importar
@@ -330,7 +329,7 @@ Entra: el catálogo de plantillas de erplora.com y la plantilla elegida (HUB-F23
 Sale: nada guardado hasta F177.
 En este mismo documento se apoya en: HUB_SHELL-F26 (Empezar con una plantilla de un negocio como el tuyo).
 Si falla: un perfil sin permiso de administrar no pide el catálogo y lee «Solo un administrador puede ver e importar plantillas.» (y arriba «Solo un administrador puede importar.»); sin plantillas, «Todavía no hay plantillas publicadas para tu negocio.»; si el catálogo no se pudo leer, «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con **Reintentar**; si la plantilla no baja o no se lee, «No se pudo leer el fichero: {motivo}».
-Implicados: HUB-F234, INVENTORY-F12
+Implicados: HUB-F234, INVENTORY-F12, REC_ALTA-F08
 QA: qa-hub §4
 
 ### HUB_SHELL-F176 Subir un fichero para importar
@@ -361,7 +360,7 @@ Pasos:
 Entra: las casillas y el identificador de subida; el origen (plantilla y versión) si vino del catálogo.
 Sale: la importación completa (HUB-F235): apps instaladas, secciones aplicadas, roles, permisos de apps y automatizaciones (HUB-F237) y un informe guardado por lote (HUB-F239).
 Si falla: solo un perfil con permiso de administrar puede pulsar **Importar**; el hub vuelve a comprobarlo.
-Implicados: HUB-F235, HUB-F236, HUB-F237, INVENTORY-F12
+Implicados: HUB-F235, HUB-F236, HUB-F237, INVENTORY-F12, REC_ALTA-F08
 QA: qa-hub §4
 
 ### HUB_SHELL-F178 Leer el informe de la importación
