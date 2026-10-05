@@ -13,7 +13,7 @@ Pasos:
 2. Mientras el hub contesta, sale un círculo de carga en el centro de la pantalla.
 3. Abajo hay cinco pestañas, en este orden: **Recursos**, **Plan y límites**, **Actualizaciones**, **Eventos caídos**, **Registros**. Se abre **Recursos**; la pestaña elegida queda en la dirección (`#resources`, `#plan`, `#updates`, `#events`, `#logs`), así que el botón Atrás y un enlace guardado vuelven a la misma pestaña.
 4. Una dirección con una pestaña que no existe abre **Recursos**; la antigua `#backups` ya no es una pestaña: lleva a **Ajustes › Datos y copias**.
-Entra: la sesión de cualquiera de los perfiles (la entrada del menú no se oculta a nadie); el estado del sistema que da el hub (HUB-F166).
+Entra: la sesión de cualquiera de los perfiles (la entrada del menú no se oculta a nadie); el estado del sistema que da el hub (HUB-F166). También se llega a `#updates` desde Apps (acción de ver las actualizaciones del hub).
 Sale: nada guardado.
 Si falla: si el hub no contesta al estado del sistema sale, encima de la pestaña, el aviso «No se pudo consultar el sistema — Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo.» con **Reintentar**, que solo vuelve a pedir ese estado (cada pestaña pide lo suyo aparte). En móvil la barra de pestañas se desplaza; en tableta y escritorio caben todas.
 Implicados: pendiente
@@ -27,7 +27,7 @@ Pantalla: Sistema › Recursos
 Pasos:
 1. Abre **Recursos**. El título es «Recursos en la nube» y una pastilla dice «Nube».
 2. Debajo hay un selector de rango: «3 h», «24 h» (el que se abre) y «3 días». Es el máximo a propósito: erplora.com no guarda más.
-3. Ve cuatro tarjetas: **CPU**, **Memoria**, **Base de datos** (el tamaño si se conoce; si no, «PostgreSQL» y debajo «Base de datos compartida») y **Conexiones**. CPU, memoria y conexiones llevan el valor actual y la evolución del rango elegido, con la etiqueta «Últimas 24 horas» (o la del rango).
+3. Ve cuatro tarjetas: **CPU**, **Memoria**, **Base de datos** (siempre «PostgreSQL» y debajo «Base de datos compartida»: el hub no manda el tamaño; el tamaño solo lo da **Plan y límites**) y **Conexiones**. CPU, memoria y conexiones llevan el valor actual y la evolución del rango elegido, con la etiqueta «Últimas 24 horas» (o la del rango).
 4. Cerca del límite de su plan, la tarjeta dice «Al {pct} % del límite de tu plan.»; por encima, «Al {pct} % del límite de tu plan: el hub puede ir más lento.». Si erplora.com marca que el plan se queda corto, sale además «Tu plan se está quedando corto de recursos. Con un plan mayor este hub tiene más margen.» con **Actualizar plan**, que abre erplora.com en el navegador del sistema; ese botón no sale en la copia que reparte Google Play.
 5. Cambiar de rango vuelve a pedir la evolución. La pantalla no se refresca sola: se ve lo que había al abrirla o al cambiar de rango.
 Entra: el estado actual del hub (HUB-F166) y la evolución de uso que el hub pide a erplora.com (HUB-F165); el aviso de plan corto lo decide erplora.com.
@@ -107,12 +107,12 @@ Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y regis
 QA: ninguno
 
 ### HUB_SHELL-F141 Ver el plan y sus límites
-Estado: parcial — quien no administra ve «Las métricas de recursos no están disponibles» con un Reintentar que no sirve, porque el hub le niega el uso en vivo; y un refresco que falla deja los números viejos sin avisar (leído, sin ejecutar)
+Estado: parcial — quien no administra ve «Las métricas de recursos no están disponibles» con un Reintentar que no sirve, porque el hub le niega el uso en vivo (401, también a una sesión válida sin rol); un refresco que falla deja los números viejos sin avisar; la pastilla solo avisa en el plan Gratis (en cualquier plan de pago dice «Dentro del límite» en verde aunque la memoria esté al 95 %); y el plan se pinta con el identificador interno con mayúscula («Free»), sin traducir (leído, sin ejecutar)
 Actor: administrador
 Pantalla: Sistema › Plan y límites
 Pasos:
 1. Abre **Plan y límites**.
-2. Arriba ve el plan actual (o «Desconocido») y una pastilla: «Dentro del límite» o «Cerca del límite».
+2. Arriba ve el plan actual (o «Desconocido») y una pastilla: «Dentro del límite» o «Cerca del límite». La pastilla solo puede decir «Cerca del límite» en el plan Gratis; en los demás planes siempre dice «Dentro del límite», aunque las barras de abajo estén en rojo.
 3. Debajo hay cinco tarjetas: **Memoria (RAM)** y **CPU** con porcentaje y barra (verde, amarillo desde el 80 %, rojo desde el 90 %); **Base de datos** con el tamaño frente a la cuota del plan (o «Sin cuota de plan»); **Dispositivos** y **Personas** como «n / tope» con «Límite del plan» o «Ilimitado».
 4. En el plan Gratis, si la memoria o la base de datos pasan del umbral, o los dispositivos o las plazas de personas están todos ocupados, sale «Te estás quedando sin margen en tu plan» con la causa («Este hub está cerca de su límite de memoria…», «Estás usando todos los dispositivos que permite tu plan.», «Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más.») y «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.». No hay botón de pago: lo retiró a propósito el requisito de las tiendas de aplicaciones.
 5. Mientras la pestaña está abierta y visible, se actualiza cada 5 segundos («En vivo — se actualiza cada pocos segundos mientras esta página está abierta.»).
@@ -131,7 +131,7 @@ Pantalla: Sistema › Actualizaciones
 Pasos:
 1. Abre **Actualizaciones**. El título es «Qué te hemos actualizado» y una pastilla dice «Vas por la {versión}» (con «—» si el hub no la dio).
 2. Debajo: «Este Hub web se actualiza automáticamente durante los despliegues del servicio.». El hub se actualiza solo, sin preguntar y sin botón: esta pestaña existe para que el dueño pueda saber qué le cambiaron.
-3. Si hubo cambios, salen agrupados por día (más reciente primero; «Hoy», «Ayer» o la fecha completa en el reloj del negocio): hora, nombre de la app como el dueño la conoce y «1.1.1 → 1.1.2».
+3. Si hubo cambios (como mucho los 20 últimos, de los últimos 90 días), salen agrupados por día (más reciente primero; «Hoy», «Ayer» o la fecha completa en el reloj del negocio): hora, nombre de la app como el dueño la conoce y «1.1.1 → 1.1.2».
 4. Una vuelta atrás se dice: «Volvió a la {versión}: la nueva no arrancó». Una app que quedó sin funcionar: «Esta app no está funcionando: estamos en ello». El error técnico que causó la vuelta atrás no se pinta.
 5. Sin cambios: «No te hemos cambiado nada — No hemos actualizado nada en este hub últimamente. Cuando lo hagamos, aparecerá aquí.». Al cambiar de idioma se vuelve a pedir, porque los nombres de las apps vienen ya traducidos.
 Entra: la versión del hub y el historial de actualizaciones (HUB-F167).
@@ -159,16 +159,16 @@ Pendiente de enlazar: hub — HUB_SHELL, Aplicaciones, plan y archivos (Mis apps
 QA: ninguno
 
 ### HUB_SHELL-F144 Ver el registro de sucesos del sistema
-Estado: hecho
+Estado: parcial — el «evento» es el nombre interno del aviso y el «detalle» su estado crudo (`delivered`, `pending`) o su último error tal cual, sin traducir; «El runtime no ha reportado…» es jerga; y cualquier sesión lee el último error de los avisos caídos que Eventos caídos esconde a quien no administra (leído, sin ejecutar)
 Actor: administrador, responsable, empleado
 Pantalla: Sistema › Registros
 Pasos:
 1. Abre **Registros**: el título es «Registro de eventos».
 2. Ve una tabla con **Hora**, **Nivel** (pastilla INFO, WARN o ERROR; se puede filtrar por nivel) y **Evento** (el mensaje y, a su lado, el detalle). Se busca con «Buscar evento…» y pagina de 20 en 20.
 3. Sin sucesos: «Sin eventos — El runtime no ha reportado eventos recientes.».
-Entra: los últimos sucesos que lista el hub (HUB-F166, los últimos 50 avisos entre apps).
+Entra: los 50 últimos avisos entre apps (HUB-F166) con su estado o su último error, sin el contenido del aviso; los lee cualquier sesión, a diferencia de la cola de F145, que es solo de dueño o administrador.
 Sale: nada guardado.
-Si falla: si el estado del sistema no se pudo leer, sale el aviso general de F135 y debajo la lista vacía «Sin eventos»; el mensaje de cada fila es el del hub, sin traducir.
+Si falla: si el estado del sistema no se pudo leer, sale el aviso general de F135 y debajo la lista vacía «Sin eventos»; el mensaje de cada fila es el del hub, sin traducir. Una lectura fallida sale como «Sin eventos» bajo el aviso de error.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F166 (el estado del sistema y sus registros)
 QA: ninguno

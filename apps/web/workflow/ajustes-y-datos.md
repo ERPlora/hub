@@ -11,12 +11,13 @@ Pantalla: Ajustes
 Pasos:
 1. Pulsa **Ajustes** en el menú lateral (sección «Cuenta»), o llega desde un enlace de otra pantalla (la lista de puesta en marcha de Inicio, la campana o el botón de configurar de una app).
 2. Abajo hay cinco pestañas: **General**, **Negocio**, **Impresión**, **Permisos** y **Datos y copias**. Se abre **General**. La pestaña elegida queda en la dirección (`#hub`, `#business`, `#tickets`, `#permissions`, `#data`), así que Atrás y un enlace guardado vuelven a ella.
-3. Las direcciones antiguas siguen llevando a su sitio: `#tax` abre **Negocio** (es la que sigue usando VeriFactu para su «Configura VeriFactu»), `#store` y cualquier pestaña desconocida abren **General**, y las antiguas páginas `/export` e `/import` abren **Datos y copias**. `?data=export` abre **Datos y copias** ya en Exportar.
-4. Quien no es dueño ni administrador ve todo en solo lectura: los desplegables se sustituyen por el valor, los campos no se pueden editar, los interruptores salen apagados y el botón «Guardar cambios» no existe.
-5. Cada cambio de **General** se guarda al instante («Ajustes guardados»); **Negocio** se guarda con su botón.
+3. Las direcciones antiguas siguen llevando a su sitio: `#tax` abre **Negocio** (lo llevan versiones de VeriFactu ya publicadas; la actual lleva a su propia Configuración), `#store` y cualquier pestaña desconocida abren **General**, y las antiguas páginas `/export` e `/import` abren **Datos y copias**. `?data=export` abre **Datos y copias** ya en Exportar.
+4. Quien no es dueño ni administrador ve todo en solo lectura: los desplegables se sustituyen por el valor, los campos no se pueden editar, los interruptores no se pueden pulsar y muestran su valor, y el botón «Guardar cambios» no existe.
+5. **General** también trae tres tarjetas que son de otras áreas: «Este dispositivo» (HUB_SHELL-F11), «Pinpad» y «Dispositivos» (HUB_SHELL-F99 a F104).
+6. Cada cambio de **General** se guarda al instante («Ajustes guardados»); **Negocio** se guarda con su botón.
 Entra: los ajustes del negocio que da el hub (HUB-F220); se leen al arrancar y otra vez al abrir la pantalla.
 Sale: nada guardado.
-Si falla: la lectura al abrir no avisa si falla; se queda lo que había en memoria, o los valores por defecto si no había nada.
+Si falla: la lectura al abrir no avisa si falla; se queda lo que había en memoria, o los valores por defecto si no había nada. Lo que depende de los nombres y direcciones de las pestañas está listado en el índice (los módulos enlazan a `#hub` y, en versiones publicadas, a `#tax`).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F220 (leer los ajustes del negocio)
 Pendiente de enlazar: verifactu — VERIFACTU-F01 (el enlace «Configura VeriFactu» abre Ajustes › Negocio)
@@ -58,7 +59,7 @@ Pendiente de enlazar: flows — FLOWS-F13 (el horario de una automatización se 
 QA: ninguno
 
 ### HUB_SHELL-F158 Cambiar la moneda del negocio
-Estado: hecho
+Estado: parcial — los nombres de las monedas («US Dollar», «Pound Sterling», «Swedish Krona»…) están escritos en inglés en el código, fuera de i18n: quien usa el producto en español los lee en inglés
 Actor: administrador
 Pantalla: Ajustes › General
 Pasos:
@@ -88,7 +89,7 @@ Pendiente de enlazar: hub — HUB_SHELL, Acceso y navegación (Mi perfil: el idi
 QA: ninguno
 
 ### HUB_SHELL-F160 Elegir la paleta de colores del negocio
-Estado: hecho
+Estado: parcial — quien no administra lee el identificador interno de la paleta («erplora»), no un nombre
 Actor: administrador
 Pantalla: Ajustes › General
 Pasos:
@@ -110,7 +111,7 @@ Pasos:
 2. Al encenderlo se guarda al instante y aparece la entrada «API» en el menú lateral; al apagarlo desaparece, sin recargar.
 Entra: el interruptor.
 Sale: el ajuste de documentación de la API (HUB-F221); la seguridad real es la sesión que exige el hub para ver el documento.
-Si falla: el interruptor vuelve a su valor y sale el motivo. A quien no administra le sale desactivado.
+Si falla: sale el motivo; que el interruptor vuelva visualmente a su valor está sin confirmar (la vuelta atrás no cambia el valor enlazado). A quien no administra le sale desactivado.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F221 (cambiar los ajustes del negocio)
 Pendiente de enlazar: hub — HUB_SHELL, Personas y permisos (la página de documentación de la API)
@@ -139,7 +140,7 @@ Pasos:
 2. Viene apagado. Al encenderlo, el sistema operativo lo recuerda y el interruptor muestra lo que el sistema contesta, no lo que se pidió.
 Entra: el interruptor.
 Sale: el arranque automático del sistema operativo, de este equipo, no del negocio.
-Si falla: «No se pudo cambiar el ajuste de arranque al iniciar sesión» y el interruptor vuelve a lo que el sistema dice.
+Si falla: «No se pudo cambiar el ajuste de arranque al iniciar sesión»; que el interruptor vuelva visualmente a lo que el sistema dice está sin confirmar.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_APP (arranque automático de la app de escritorio)
 QA: ninguno
@@ -196,7 +197,7 @@ Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (la campana de impr
 QA: ninguno
 
 ### HUB_SHELL-F167 Conceder un permiso a una app
-Estado: parcial — tras conceder no se relee ni la campana de eventos caídos ni la lista de puesta en marcha, aunque el hub haya reenviado en ese gesto los avisos que cayeron por falta de permiso; y si la carga falla, a la vez sale un aviso de error y «Ninguna app instalada pide permisos»
+Estado: parcial — no hay confirmación al conceder ni al retirar, ni siquiera con el certificado; tras conceder no se relee ni la campana de eventos caídos ni la lista de puesta en marcha, aunque el hub haya reenviado en ese gesto los avisos que cayeron por falta de permiso; y si la carga falla, a la vez sale un aviso de error y «Ninguna app instalada pide permisos»
 Actor: administrador
 Pantalla: Ajustes › Permisos
 Pasos:
@@ -205,7 +206,7 @@ Pasos:
 3. Enciende el interruptor del permiso. Sale «{permiso} concedido a {app}.» y la consecuencia desaparece.
 4. El permiso de administrar automatizaciones se concede aquí a la app que las necesita; lo que el motor de automatizaciones exige después a la sesión es cosa del hub.
 Entra: el permiso elegido de una app instalada.
-Sale: el permiso concedido a esa app (HUB-F32); en el mismo gesto el hub devuelve a la cola los avisos que habían caído por falta de ese permiso (HUB-F58).
+Sale: el permiso concedido a esa app (HUB-F32); en el mismo gesto el hub devuelve a la cola todos los avisos del hub que habían caído por un permiso sin conceder, de cualquier app (HUB-F58); la campana y la pestaña Eventos caídos no se releen.
 Si falla: el interruptor vuelve a su sitio y sale «No se pudo cambiar el permiso.». Si no se pudieron leer los permisos de una app, esa app falta en la lista sin decirlo; si no se pudo leer la lista de apps, sale «No se pudieron cargar los permisos.» y debajo «Ninguna app instalada pide permisos.». La lista se carga la primera vez que se entra en la pestaña y no se vuelve a leer hasta recargar la pantalla.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F32 (conceder o retirar un permiso de host a una aplicación)
@@ -237,7 +238,8 @@ Pantalla: Permisos de tus apps (aviso al terminar una importación)
 Pasos:
 1. Al terminar de cargar una plantilla (desde Ajustes › Datos y copias, desde la tarjeta de un negocio vacío de Inicio o con el asistente) sale una ventana **Permisos de tus apps**, solo si alguna de las apps instaladas pide algo que aún no está concedido: «La plantilla ha instalado estas apps y necesitan tu permiso para funcionar: una plantilla no puede dártelo por ti. Puedes cambiarlo cuando quieras en Ajustes → Permisos.».
 2. Cada app lista sus permisos, lo que permiten y qué deja de funcionar sin ellos.
-3. **Dar permisos** los concede todos de una vez («Dando permisos…»); la lista de puesta en marcha se relee. **Ahora no** (o tocar fuera) cierra sin conceder nada.
+3. La ventana sale también tras cargar la copia de otro negocio o tras «Reintentar lo que falta», aunque su texto hable de «la plantilla».
+4. **Dar permisos** los concede todos de una vez («Dando permisos…»); la lista de puesta en marcha se relee. **Ahora no** (o tocar fuera) cierra sin conceder nada.
 Entra: el informe de la importación, para saber qué apps se instalaron.
 Sale: los permisos concedidos a esas apps (HUB-F32) si se acepta. Una plantilla nunca concede nada por sí sola (HUB-F237).
 Si falla: «No se han podido dar los permisos de {apps}. Vuelve a intentarlo o actívalos en Ajustes → Permisos.»; quedan en la ventana solo las apps que fallaron.
@@ -251,14 +253,14 @@ Estado: parcial — hoy Meta solo deja conectar números del portfolio de ERPlor
 Actor: administrador
 Pantalla: Tu número (bloque de la Bandeja de WhatsApp)
 Pasos:
-1. Abre **Bandeja de WhatsApp → Ajustes**; el bloque **Tu número** dice: «Conecta el número de WhatsApp de tu negocio. Iniciarás sesión con Facebook y escanearás un código QR con la app de WhatsApp Business de tu móvil.» y muestra **Conectar WhatsApp**. A quien no es dueño ni administrador le dice «Solo un dueño o un administrador puede conectar el número de WhatsApp.» y no hay botón.
+1. Abre **Bandeja de WhatsApp → Ajustes**; el bloque **Tu número** dice: «Conecta el número de WhatsApp de tu negocio. Iniciarás sesión con Facebook y escanearás un código QR con la app de WhatsApp Business de tu móvil.» y muestra **Conectar WhatsApp**. A quien no es dueño ni administrador el hub le niega el estado (403): ese perfil no ve la presentación, ni el número, ni botones; solo la frase roja «Solo un dueño o un administrador puede conectar el número de WhatsApp.», sin Reintentar.
 2. Pulsa **Conectar WhatsApp**: «Abriendo la conexión con WhatsApp…». El navegador carga el programa de Facebook (en español o inglés) y abre su ventana.
 3. En la ventana inicia sesión, elige conectar la app de WhatsApp Business, escribe el número y escanea el QR con la app del móvil.
 4. Al cerrarse, «Conectando tu número…»: el hub entrega a erplora.com lo que devolvió Facebook (un código de un solo uso y los identificadores).
 5. El bloque pasa a **Conectado** con el número, la etiqueta «App de WhatsApp Business» si salió de ahí y **Desconectar**; debajo, «Los mensajes de tus clientes llegan a la Bandeja y las automatizaciones los contestan.».
 Entra: el código y los identificadores que da Facebook al terminar; el hub los reenvía con su credencial de máquina (el navegador no la ve).
 Sale: el número queda conectado en erplora.com (HUB-F260); empiezan a llegar mensajes (HUB-F263).
-Si falla: la frase del motivo y, si procede, **Reintentar**: «La conexión se canceló antes de terminar.», «No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.», «Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.», «No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.», «WhatsApp no responde ahora mismo. Vuelve a intentarlo en unos minutos.» y otras. Si la plataforma no tiene WhatsApp configurado, el bloque no pinta nada (ni botón, ni mensaje): no se ofrece conectar. Si el elemento no existe en un hub antiguo, la Bandeja lo dice.
+Si falla: la frase del motivo y, si procede, **Reintentar**: «La conexión se canceló antes de terminar.», «No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.», «Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.», «No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.», «WhatsApp no responde ahora mismo. Vuelve a intentarlo en unos minutos.» y otras. Si la plataforma no tiene WhatsApp configurado, al administrador el bloque no le pinta nada (ni botón, ni mensaje): no se ofrece conectar; quien no administra ve igualmente la frase de negativa. Si el elemento no existe en un hub antiguo, la Bandeja lo dice.
 Implicados: pendiente
 Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F01 (conectar el número)
 Pendiente de enlazar: hub — HUB-F260 (conectar el número de WhatsApp del negocio)
@@ -271,11 +273,11 @@ Actor: administrador
 Pantalla: Tu número (bloque de la Bandeja de WhatsApp)
 Pasos:
 1. En **Tu número**, cada número conectado sale con una etiqueta: **Conectado** en verde, o **Hay que reconectar** en rojo si WhatsApp retiró el permiso de escribir en nombre del negocio.
-2. Con **Hay que reconectar** el bloque dice: «WhatsApp ha retirado el permiso para escribir en nombre de tu negocio. Los mensajes de tus clientes no están llegando y nada de lo que contestes sale. Vuelve a conectar tu número para recuperar el canal.» y, a un administrador, el botón **Volver a conectar WhatsApp**; a los demás, «Solo un dueño o un administrador puede conectar el número de WhatsApp.». La frase de «tus mensajes llegan a la Bandeja» no sale mientras el permiso está caído.
+2. Con **Hay que reconectar** el bloque dice: «WhatsApp ha retirado el permiso para escribir en nombre de tu negocio. Los mensajes de tus clientes no están llegando y nada de lo que contestes sale. Vuelve a conectar tu número para recuperar el canal.» y el botón **Volver a conectar WhatsApp**. La frase de «tus mensajes llegan a la Bandeja» no sale mientras el permiso está caído.
 3. Pulsarlo abre la misma ventana de Facebook que en F170; no hace falta desconectar antes. Al volver, el bloque se vuelve a leer y se pone verde solo.
 Entra: la lista de números con su marca de «hay que reconectar», que viene de erplora.com (HUB-F261).
 Sale: el permiso renovado en erplora.com.
-Si falla: igual que F170; quien no administra puede recibir del hub «Solo un dueño o un administrador puede conectar el número de WhatsApp.» en lugar del estado, sin **Reintentar**. Si el hub antiguo de erplora.com no manda la marca, el bloque lee «Conectado»: la falta de dato no levanta la alarma.
+Si falla: igual que F170; a quien no es dueño ni administrador el hub le niega el estado: solo ve, en rojo, «Solo un dueño o un administrador puede conectar el número de WhatsApp.», sin número, sin «Hay que reconectar» y sin **Reintentar**. Si el hub antiguo de erplora.com no manda la marca, el bloque lee «Conectado»: la falta de dato no levanta la alarma.
 Implicados: pendiente
 Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F02 (volver a conectar el número)
 Pendiente de enlazar: hub — HUB-F261 (qué número está conectado y si hay que reconectarlo)
@@ -299,18 +301,18 @@ Pendiente de enlazar: hub — HUB-F262 (desconectar o volver a conectar el núme
 QA: WA-01, WA-09
 
 ### HUB_SHELL-F173 Exportar una copia de seguridad o una plantilla
-Estado: parcial — «Ajustes» se exporta entero o no se exporta (la selección ajuste a ajuste no existe); el nombre viene relleno con «hub» en vez del nombre del negocio
+Estado: parcial — «Ajustes» se exporta entero o no se exporta; el nombre viene relleno con «hub»; la copia de seguridad solo restaura de verdad en el MISMO hub (en otro hub entran la configuración y los datos de las apps, pero no las personas, ni el NIF, la razón social y el domicilio, ni la numeración, ni los permisos, aunque la pantalla diga «mudar» e «Incluye a tu gente», y el certificado nunca se aplica); con «Plantilla», «Imágenes y media» (marcada por defecto) copia también la carpeta de VeriFactu con los XML enviados a Hacienda, con datos de clientes (ERPlora/hub#2496); y el código conserva un `TODO(ADR-0113)` en producción
 Actor: administrador
 Pantalla: Ajustes › Datos y copias › Exportar
 Pasos:
 1. Abre **Datos y copias** y elige **Exportar** en el selector de arriba (Importar, Exportar y Restablecer). Dice: «Empaqueta cómo está configurado este negocio — y si quieres sus datos — como una plantilla que puedes cargar en otro negocio.». Un perfil que no administra lee «Solo un administrador puede exportar el negocio.» y no puede pulsar **Exportar**.
 2. Escribe el **Nombre** y elige el **Idioma** del archivo; debajo se ve el nombre final: «{nombre}_{idioma}.blueprint.zip».
-3. Responde «¿Para qué es este archivo?»: **Copia de seguridad de este negocio** («Copia privada para restaurar o mudar este negocio. Incluye a tu gente y sus accesos.», la que viene marcada) o **Plantilla para compartir** («Para publicar o dar a otro negocio. Nunca incluye personas, PIN ni certificados fiscales.»). En una instalación de demostración o de pruebas solo se puede exportar plantilla y la elección sale apagada con «Esta es una instalación de demostración o de pruebas, así que solo puede exportar plantillas: las personas, los PIN y los datos fiscales nunca viajan en su archivo.». La elección se conserva si se pasa a Importar o Restablecer y se vuelve.
+3. Responde «¿Para qué es este archivo?»: **Copia de seguridad de este negocio** («Copia privada para restaurar o mudar este negocio. Incluye a tu gente y sus accesos.», la que viene marcada; el texto promete más de lo que hace en otro hub, ver el `Estado`) o **Plantilla para compartir** («Para publicar o dar a otro negocio. Nunca incluye personas, PIN ni certificados fiscales.»). En una instalación de demostración o de pruebas solo se puede exportar plantilla y la elección sale apagada con «Esta es una instalación de demostración o de pruebas, así que solo puede exportar plantillas: las personas, los PIN y los datos fiscales nunca viajan en su archivo.». La elección se conserva si se pasa a Importar o Restablecer y se vuelve.
 4. Marca las **Secciones**: **Usuarios** («Empleados, roles y permisos»), **Ajustes** («Ajustes del negocio: moneda, idioma, datos fiscales»; en una plantilla, «…país, moneda, idioma y tema. Nunca el NIF ni la razón social.»), **Fiscal** («Configuración VeriFactu y el certificado de empresa», viene sin marcar y avisa: «Incluye el certificado: el .p12 viaja tal cual y conserva su contraseña. Comparte el fichero solo con gente de confianza.») e **Imágenes y media**. Con «Plantilla» desaparecen Usuarios y Fiscal.
 5. Elige las apps (F174) y pulsa **Exportar**. Mientras trabaja: «Exportando…».
 6. En un navegador, el archivo baja por el gestor de descargas y sale «{archivo} descargado.»; en la app instalada lo guarda la propia app y el aviso dice «Guardado en {ruta}».
 Entra: el nombre, el idioma, la finalidad, las secciones y las apps; la lista de apps instaladas y, si el hub lo impone, la finalidad fijada.
-Sale: un `.blueprint.zip` (HUB-F230, HUB-F231); la finalidad de plantilla excluye identidades y fiscal en el hub aunque la pantalla las mande, y el certificado de «Fiscal» viaja tal cual.
+Sale: un `.blueprint.zip` (HUB-F230, HUB-F231). Con «Plantilla» la pantalla oculta Usuarios y Fiscal y manda las dos a `false`; el hub excluye personas y NIF, pero el certificado lo decide la casilla tal como llega al hub (si no se pudo leer la finalidad impuesta, en una demo se puede elegir «Copia» con Fiscal marcado y el certificado viaja), y «Imágenes y media» copia también `media/modules/verifactu/**` (ERPlora/hub#2496). El texto de la demo «los datos fiscales nunca viajan en su archivo» es falso mientras siga abierta esa issue.
 Si falla: «La exportación falló: {motivo}» con la frase del hub; si tarda demasiado, «El servidor está tardando demasiado en generar la copia. Inténtalo de nuevo en un momento.»; si no se puede guardar, «No se ha podido descargar el archivo.», o en móvil y tableta «Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F230 (exportar los datos del negocio)
@@ -324,7 +326,7 @@ Actor: administrador
 Pantalla: Ajustes › Datos y copias › Exportar
 Pasos:
 1. En **Exportar**, bajo «Apps» («Elige qué apps instaladas registra la plantilla y si sus datos viajan con ella»), una tabla con una fila por app instalada: **App**, **Versión**, y dos casillas, **App** (registrarla para que se instale) y **Datos** (llevar también sus datos). Vienen todas con la app marcada y sin datos.
-2. Desmarcar la app desmarca y desactiva sus datos. **Seleccionar todo** marca app y datos de todas; **Deseleccionar todo** lo deshace.
+2. Desmarcar la app desmarca y desactiva sus datos. **Seleccionar todo** marca app y datos de todas; **Deseleccionar todo** desmarca app y datos de todas (no vuelve a lo de fábrica: deja la plantilla sin ninguna app registrada).
 3. Al marcar **Datos** de una app aparece debajo una tarjeta con el nombre de la app y una casilla por tabla con su número de filas. Desmarcar una tabla la deja fuera: es una herramienta para no publicar, por ejemplo, las citas pasadas de la peluquería de origen.
 4. Pulsar **Exportar** (F173) manda la selección. Sin ninguna tabla desmarcada se manda «todas» (no la lista), para que una tabla nueva de una app no se quede fuera sin que nadie lo decida.
 Entra: las apps instaladas y el recuento de filas por tabla (HUB-F232).
@@ -371,7 +373,7 @@ Estado: parcial — las apps del fichero se instalan aunque se desmarquen, los r
 Actor: administrador
 Pantalla: Ajustes › Datos y copias › Importar
 Pasos:
-1. Tras elegir una plantilla o un fichero, ve su resumen: **Nombre**, **Idioma**, **País**, **Apps** (cuántas) y **Creado**.
+1. Tras elegir una plantilla o un fichero, ve su resumen: **Nombre**, **Idioma**, **País** (el idioma y el país salen como códigos, `es`, `ES`, mientras el catálogo los da por nombre), **Apps** (cuántas) y **Creado**.
 2. En «Secciones detectadas» solo salen las que el fichero trae, todas marcadas: **Usuarios**, **Ajustes**, **Fiscal** («Configuración VeriFactu y el certificado de empresa (.p12)») e **Imágenes y media**.
 3. En «Apps», una casilla por app del fichero, con su identificador interno y «v{versión}» (más «incluye datos» si los trae).
 4. Pulsa **Importar** («Importando… instalando apps y aplicando datos.») o **Elegir otro fichero** para volver.
@@ -388,7 +390,7 @@ Pendiente de enlazar: inventory — INVENTORY-F12 (importar una plantilla y su i
 QA: qa-hub §4
 
 ### HUB_SHELL-F178 Leer el informe de la importación
-Estado: hecho
+Estado: parcial — la fila Fiscal dice «Saltado» aunque se marcara y el certificado pendiente (que el hub nunca aplica y manda a subir a mano) no se avisa nunca; las filas de datos de app enseñan el identificador interno («App {id}»); y «Numeración descartada… configúralas en Ajustes» manda a un sitio donde no hay series
 Actor: administrador
 Pantalla: Ajustes › Datos y copias › Importar
 Pasos:
@@ -405,7 +407,7 @@ Pendiente de enlazar: inventory — INVENTORY-F12 (el informe por secciones de u
 QA: qa-hub §4
 
 ### HUB_SHELL-F179 Volver al informe de una importación que no entró entera y reintentar
-Estado: parcial — el informe viejo tapa el catálogo cada vez que se abre Importar mientras tenga una fila «Descartado» o «Aplicado en parte» (que es lo normal en una plantilla), y justo tras una importación con fallos no sale el botón de reintentar hasta volver a entrar (leído, sin ejecutar)
+Estado: parcial — el informe viejo tapa el catálogo cada vez que se abre Importar mientras tenga una fila «Descartado» o «Aplicado en parte» (lo normal al cargar la copia de seguridad de otro negocio o plantillas antiguas; una plantilla actual da Aplicado o Saltado), y justo tras una importación con fallos no sale el botón de reintentar hasta volver a entrar (leído, sin ejecutar)
 Actor: administrador
 Pantalla: Ajustes › Datos y copias › Importar
 Pasos:
@@ -438,18 +440,19 @@ Pendiente de enlazar: hub — HUB-F241 (deshacer una importación)
 QA: ninguno
 
 ### HUB_SHELL-F181 Restablecer el negocio por secciones
-Estado: parcial — escribir mal el nombre (o no tener razón social guardada) cierra la ventana sin decir nada; si el hub rechaza, no se ve el motivo; y «Ficheros e imágenes» y «Configuración fiscal» se pueden marcar y el hub no borra nada de ellas
+Estado: parcial — escribir mal el nombre (o no tener razón social guardada: entonces no se puede restablecer nunca) cierra la ventana sin decir nada; si el hub rechaza, no se ve el motivo; quien no administra ve una lista vacía y ningún mensaje; tras restablecer los ajustes el shell no los relee; y la pantalla no dice qué NO se borra
 Actor: administrador
 Pantalla: Ajustes › Datos y copias › Restablecer
 Pasos:
 1. En **Restablecer**: «Borra definitivamente los datos que marques. No se puede deshacer: si dudas, expórtate antes una copia.». El botón **Exportar una copia antes** lleva a Exportar.
-2. Aparece una casilla por cada sección que tenga filas, con su número («{n} filas»): **Ajustes del negocio**, **Empleados**, **Ficheros e imágenes**, **Configuración fiscal**, **Roles activos**, **Cola de impresión** y una por cada app (por su nombre). Las que el hub bloquea (si el negocio ya emitió registros fiscales) salen sin poder marcarse y con el motivo al lado. Con «O borrar por secciones» si hay importaciones que deshacer.
+2. Aparece una casilla por cada sección que tenga filas, con su número («{n} filas»): **Ajustes del negocio**, **Empleados**, **Roles activos**, **Cola de impresión** y una por cada app (por su nombre). Las que el hub bloquea (si el negocio ya emitió registros fiscales) salen sin poder marcarse y con el motivo al lado. Con «O borrar por secciones» si hay importaciones que deshacer.
 3. Marca lo que quiere. **Restablecer el negocio** (rojo) se activa con al menos una.
 4. Sale «Esto no se puede deshacer — Se borrarán definitivamente {n} filas:» con el desglose, y un campo de texto con la razón social del negocio como pista. Hay que escribir exactamente esa razón social (la de Ajustes › Negocio) y pulsar **Borrar definitivamente** (o **Cancelar**).
 5. Sale el informe: una línea por sección con «{nombre} — {n} filas borradas», y la lista se recalcula.
 Entra: el plan del hub (filas y bloqueos por sección, HUB-F242) y la selección.
 Sale: borrado definitivo de lo marcado; el hub no pide ninguna confirmación (solo la pide esta pantalla) y revalida que sea administrador y el límite fiscal.
-Si falla: si el nombre escrito no coincide, o el negocio no tiene razón social guardada, la ventana se cierra sin mensaje y no se borra nada; si el hub rechaza (por ejemplo, el límite fiscal), no se muestra su motivo y no se avisa; si no se pudo leer el plan, la lista sale vacía. El manual dice «escribe el nombre del negocio»: lo que hay que escribir es la razón social.
+Lo que NO borra (HUB-F242): archivos, certificado, perfil fiscal, automatizaciones, permisos de las apps, llaves de API, dispositivos, historial de avisos, ni las sesiones y perfiles de las personas borradas; tampoco borra a quien lo ejecuta; y con el negocio ya emitiendo, Ventas, Facturas y VeriFactu quedan bloqueados, así que «empezar de cero» no es posible.
+Si falla: si el nombre escrito no coincide, o el negocio no tiene razón social guardada, la ventana se cierra sin mensaje y no se borra nada; si el hub rechaza (por ejemplo, el límite fiscal), no se muestra su motivo y no se avisa; si no se pudo leer el plan (por ejemplo, un perfil que no administra: el hub contesta 401 o 403), la lista sale vacía, el botón rojo desactivado y no se da ningún mensaje, ni se piden las importaciones deshacibles. El manual dice «escribe el nombre del negocio»: lo que hay que escribir es la razón social.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F242 (restablecer el hub)
 Pendiente de enlazar: verifactu — el límite fiscal que bloquea el borrado tras emitir
