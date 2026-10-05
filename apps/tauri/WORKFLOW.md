@@ -113,7 +113,7 @@ Ajustes` (Hub › «Arrancar al iniciar sesión») · `HUB_SHELL: Barra superior
 
 La aplicación no «cambia de modo»: **Tauri decide por el origen de la página que enseña la ventana**
 qué órdenes nativas acepta. Hay tres juegos (`capabilities/*.json`), todos para la ventana `main`.
-La cualquier otra ventana (la de impresión) no tiene ninguno.
+Cualquier otra ventana (la de impresión) no tiene ninguno.
 
 | Juego | Se aplica a | Puede | No puede |
 |---|---|---|---|
