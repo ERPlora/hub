@@ -219,7 +219,7 @@ Pendiente de enlazar: architecture — REC_FISCAL-F07 (impresión automática de
 Pendiente de enlazar: hub — HUB-F190 (pedir imprimir un documento desde una pantalla)
 Pendiente de enlazar: hub — HUB-F199 (el hub da por hecho lo que el dispositivo confirma)
 Pendiente de enlazar: hub — HUB_PERIPHERALS-F06 (sacar un documento por una impresora de red)
-QA: R-09, L-04, qa-hub §8
+QA: R-09, L-04, qa-hub §8 (discrepa)
 
 ### HUB_SHELL-F71 Abrir el cajón al cobrar
 Estado: parcial — se abre con cualquier forma de pago (no solo efectivo), siempre por el pin 2, nunca con una impresora USB ni desde el navegador; si no se abre, el error se descarta y nadie lo sabe; no hay «Abrir cajón» manual ni «Sin venta»
