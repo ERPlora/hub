@@ -2,6 +2,35 @@
 
 Prefijo: HUB_SHELL
 
+> Detalle del área «Ajustes del negocio y datos»: la pantalla Ajustes y sus pestañas (General,
+> Negocio, Impresión, Permisos, Datos y copias), la ventana «Permisos de tus apps» y el bloque «Tu
+> número» de la Bandeja de WhatsApp. En Ajustes › General, las tarjetas «Este dispositivo» (área de
+> acceso, HUB_SHELL-F11), «Pinpad» y «Dispositivos» (área de personas, HUB_SHELL-F99…F104) no son de
+> este fichero; en Ajustes › Impresión, la tarjeta «Estado de impresión» la cuenta el
+> fichero de avisos e impresión (HUB_SHELL-F75; aquí F166 quedó retirado). Código: `views/SettingsPage.vue`,
+> `components/WhatsAppConnect.vue`, `DataPanel.vue`, `ExportPanel.vue`, `ImportPanel.vue`,
+> `ImportPermissionsConsent.vue`, `ResetPanel.vue` y `lib/settings-tabs.ts`, `hub-settings.ts`,
+> `timezone.ts`, `import-retry.ts`, `import-permissions.ts`, `app-names.ts`, `whatsapp-connect.ts`,
+> `autostart.ts` (el interruptor; el arranque en sí es de `HUB_APP`).
+
+## Referencia adoptada
+
+- **Ajustes**: Odoo (Ajustes › Empresa: razón social, NIF, dirección, moneda, idioma, zona), Square
+  (Cuenta y configuración › Información del negocio), Shopify (Configuración › General) y Business
+  Central (Información de la empresa).
+- **Datos**: la exportación e importación de «plantillas de configuración» de Odoo (módulos de datos)
+  y Shopify (exportar/importar CSV), más el «restablecer» tipo GitHub (teclear el nombre).
+- **«Tu número»**: Embedded Signup de Meta con coexistencia (especificación oficial de Meta).
+
+## Antes de empezar
+
+- Para tocar Ajustes, Permisos o Datos hace falta ser dueño o administrador; el resto de perfiles lee
+  Ajustes en solo lectura.
+- Para el bloque «Tu número»: la app de la Bandeja de WhatsApp instalada y WhatsApp configurado en la
+  plataforma.
+- Para exportar o importar: la lista de apps instaladas ya cargada; para importar una plantilla,
+  conexión con erplora.com.
+
 ## Flujos
 
 ### HUB_SHELL-F155 Abrir Ajustes y moverse por sus pestañas
@@ -180,21 +209,9 @@ Implicados: pendiente
 Pendiente de enlazar: printing — la pantalla de impresoras y plantilla del tique (a la que lleva la fila)
 QA: ninguno
 
-### HUB_SHELL-F166 Ver quién está sacando cada tipo de tique
-Estado: hecho
-Actor: administrador, responsable, empleado
-Pantalla: Ajustes › Impresión
-Pasos:
-1. En **Impresión**, la tarjeta **Estado de impresión** («Qué dispositivos están sacando cada tipo de tique ahora mismo.») solo existe si el negocio ha imprimido alguna vez; un negocio que nunca ha impreso no ve nada.
-2. Una fila por tipo (**Tiques de venta**, **Comandas de cocina**, **Comandas de barra**, **Etiquetas**; un tipo desconocido sale con su nombre): «Imprimiendo en {equipos}» en verde; «Nadie está imprimiendo esto — {n} tique en espera» en rojo; o «El dispositivo que imprimía esto no responde» en ámbar. Las dos últimas añaden «Abre la app de ERPlora en el equipo conectado a esta impresora.».
-3. Se vuelve a pedir cada vez que se entra en la pestaña.
-Entra: la cobertura de impresión por tipo (HUB impresión).
-Sale: nada guardado.
-Si falla: «No se ha podido comprobar quién está imprimiendo ahora mismo.», nunca una pantalla vacía en verde ni filas inventadas.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, impresión (la cobertura por estación)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (la campana de impresión y esta misma tarjeta; HUB-F201 y HUB-F202)
-QA: ninguno
+### HUB_SHELL-F166 [retirado] Ver quién está sacando cada tipo de tique
+Implicados: ninguno
+Sustituido por HUB_SHELL-F75 (`workflow/avisos-e-impresion.md`): era el mismo gesto, la tarjeta «Estado de impresión» de Ajustes › Impresión (`lib/print-coverage.ts`).
 
 ### HUB_SHELL-F167 Conceder un permiso a una app
 Estado: parcial — no hay confirmación al conceder ni al retirar, ni siquiera con el certificado; tras conceder no se relee ni la campana de eventos caídos ni la lista de puesta en marcha, aunque el hub haya reenviado en ese gesto los avisos que cayeron por falta de permiso; y si la carga falla, a la vez sale un aviso de error y «Ninguna app instalada pide permisos»
@@ -234,7 +251,7 @@ QA: ninguno
 ### HUB_SHELL-F169 Dar los permisos de las apps que ha instalado una plantilla
 Estado: hecho
 Actor: administrador
-Pantalla: Permisos de tus apps (aviso al terminar una importación)
+Pantalla: Permisos de tus apps
 Pasos:
 1. Al terminar de cargar una plantilla (desde Ajustes › Datos y copias, desde la tarjeta de un negocio vacío de Inicio o con el asistente) sale una ventana **Permisos de tus apps**, solo si alguna de las apps instaladas pide algo que aún no está concedido: «La plantilla ha instalado estas apps y necesitan tu permiso para funcionar: una plantilla no puede dártelo por ti. Puedes cambiarlo cuando quieras en Ajustes → Permisos.».
 2. Cada app lista sus permisos, lo que permiten y qué deja de funcionar sin ellos.
@@ -251,7 +268,7 @@ QA: ninguno
 ### HUB_SHELL-F170 Conectar el número de WhatsApp del negocio
 Estado: parcial — hoy Meta solo deja conectar números del portfolio de ERPlora (verificación del negocio y revisión de la app pendientes, pm#277)
 Actor: administrador
-Pantalla: Tu número (bloque de la Bandeja de WhatsApp)
+Pantalla: Tu número
 Pasos:
 1. Abre **Bandeja de WhatsApp → Ajustes**; el bloque **Tu número** dice: «Conecta el número de WhatsApp de tu negocio. Iniciarás sesión con Facebook y escanearás un código QR con la app de WhatsApp Business de tu móvil.» y muestra **Conectar WhatsApp**. A quien no es dueño ni administrador el hub le niega el estado (403): ese perfil no ve la presentación, ni el número, ni botones; solo la frase roja «Solo un dueño o un administrador puede conectar el número de WhatsApp.», sin Reintentar.
 2. Pulsa **Conectar WhatsApp**: «Abriendo la conexión con WhatsApp…». El navegador carga el programa de Facebook (en español o inglés) y abre su ventana.
@@ -260,7 +277,7 @@ Pasos:
 5. El bloque pasa a **Conectado** con el número, la etiqueta «App de WhatsApp Business» si salió de ahí y **Desconectar**; debajo, «Los mensajes de tus clientes llegan a la Bandeja y las automatizaciones los contestan.».
 Entra: el código y los identificadores que da Facebook al terminar; el hub los reenvía con su credencial de máquina (el navegador no la ve).
 Sale: el número queda conectado en erplora.com (HUB-F260); empiezan a llegar mensajes (HUB-F263).
-Si falla: la frase del motivo y, si procede, **Reintentar**: «La conexión se canceló antes de terminar.», «No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.», «Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.», «No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.», «WhatsApp no responde ahora mismo. Vuelve a intentarlo en unos minutos.» y otras. Si la plataforma no tiene WhatsApp configurado, al administrador el bloque no le pinta nada (ni botón, ni mensaje): no se ofrece conectar; quien no administra ve igualmente la frase de negativa. Si el elemento no existe en un hub antiguo, la Bandeja lo dice.
+Si falla: la frase del motivo y, si procede, **Reintentar**: «La conexión se canceló antes de terminar.» y «No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.» (las decide la propia pantalla), «No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.» (el 404 de erplora.com), la de quien no puede conectar, o la genérica «Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.». Las frases propias de los motivos de erplora.com y de Meta (`whatsappConnect.errors.not_configured`, `internal_error`, `no_business_account`, `no_access_token`, `meta_unreachable`, `meta_api_error`) no se ven nunca a través del hub: un fallo 5xx llega como `cloud_rejected` (`crates/server/src/cloud_proxy.rs`, `cloud_envelope_passthrough`) y una negativa en prosa no es un código (`lib/whatsapp-connect.ts`, `refusalCode`), así que las dos caen en la genérica. Si la plataforma no tiene WhatsApp configurado, al administrador el bloque no le pinta nada (ni botón, ni mensaje): no se ofrece conectar; quien no administra ve igualmente la frase de negativa. Si el elemento no existe en un hub antiguo, la Bandeja lo dice.
 Implicados: pendiente
 Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F01 (conectar el número)
 Pendiente de enlazar: hub — HUB-F260 (conectar el número de WhatsApp del negocio)
@@ -270,7 +287,7 @@ QA: WA-01, WA-07
 ### HUB_SHELL-F171 Ver si el número está bien conectado y reconectarlo
 Estado: hecho
 Actor: administrador
-Pantalla: Tu número (bloque de la Bandeja de WhatsApp)
+Pantalla: Tu número
 Pasos:
 1. En **Tu número**, cada número conectado sale con una etiqueta: **Conectado** en verde, o **Hay que reconectar** en rojo si WhatsApp retiró el permiso de escribir en nombre del negocio.
 2. Con **Hay que reconectar** el bloque dice: «WhatsApp ha retirado el permiso para escribir en nombre de tu negocio. Los mensajes de tus clientes no están llegando y nada de lo que contestes sale. Vuelve a conectar tu número para recuperar el canal.» y el botón **Volver a conectar WhatsApp**. La frase de «tus mensajes llegan a la Bandeja» no sale mientras el permiso está caído.
@@ -287,7 +304,7 @@ QA: WA-09
 ### HUB_SHELL-F172 Desconectar el número de WhatsApp
 Estado: hecho
 Actor: administrador
-Pantalla: Tu número (bloque de la Bandeja de WhatsApp)
+Pantalla: Tu número
 Pasos:
 1. En **Tu número**, pulsa **Desconectar** (rojo, junto al número; solo un administrador lo ve).
 2. El navegador pregunta, en su ventana de confirmación: «¿Desconectar este número? Los mensajes dejarán de llegar aquí.». Si cancela, no pasa nada.
@@ -378,7 +395,7 @@ Pasos:
 3. En «Apps», una casilla por app del fichero, con su identificador interno y «v{versión}» (más «incluye datos» si los trae).
 4. Pulsa **Importar** («Importando… instalando apps y aplicando datos.») o **Elegir otro fichero** para volver.
 5. Al terminar sale el informe (F178). Si el hub rechaza la importación, vuelve a esta pantalla con «La importación falló: {motivo}» y el fichero cargado.
-6. Cuando termina, el menú lateral se actualiza con las apps nuevas.
+6. Cuando termina, el lanzador «Mis apps» de la barra superior se actualiza con las apps nuevas (las apps no están en el menú lateral).
 Entra: las casillas y el identificador de subida; el origen (plantilla y versión) si vino del catálogo.
 Sale: la importación completa (HUB-F235): apps instaladas, secciones aplicadas, roles, permisos de apps y automatizaciones (HUB-F237) y un informe guardado por lote (HUB-F239).
 Si falla: solo un perfil con permiso de administrar puede pulsar **Importar**; el hub vuelve a comprobarlo.
@@ -457,3 +474,72 @@ Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F242 (restablecer el hub)
 Pendiente de enlazar: verifactu — el límite fiscal que bloquea el borrado tras emitir
 QA: ninguno
+
+## Cobertura contra la referencia
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| País, zona, moneda, idioma, paleta del negocio | hecho (moneda, idioma y paleta: parcial) | HUB_SHELL-F156 a F161 |
+| Nombre comercial, teléfono y correo del negocio | no hecho | HUB_SHELL-F164 |
+| Identidad fiscal y domicilio en partes | parcial | HUB_SHELL-F164 |
+| Certificado, vía de envío, producción y vuelta a pruebas | de VeriFactu (módulo), no del shell | VERIFACTU-F02/F03/F04/F08/F09 |
+| Permisos de las apps: conceder y retirar | parcial / hecho | HUB_SHELL-F167, HUB_SHELL-F168 |
+| Permisos tras importar una plantilla | hecho | HUB_SHELL-F169 |
+| «Tu número» de WhatsApp: conectar, estado, reconectar, desconectar | parcial / hecho | HUB_SHELL-F170, F171, F172 |
+| Exportar copia o plantilla | parcial | HUB_SHELL-F173, HUB_SHELL-F174 |
+| Importar plantilla o fichero, con informe por sección | parcial | HUB_SHELL-F175 a F179 |
+| Deshacer una importación | parcial | HUB_SHELL-F180 |
+| Restablecer con confirmación | parcial | HUB_SHELL-F181 |
+| Tarjetas Este dispositivo / Pinpad / Dispositivos | de otras áreas | HUB_SHELL-F11, HUB_SHELL-F99 a F104 |
+
+## Datos: de quién es cada dato
+
+- Los ajustes del negocio, los permisos concedidos a cada app, el informe de importación y los
+  números de WhatsApp son del servidor; esta área no guarda nada propio. Lo único que la pantalla
+  recuerda es la pestaña, en la dirección; las selecciones de exportar no se guardan.
+- Datos personales que pasan por estas pantallas: la razón social y el NIF (de una persona física en
+  un autónomo), el domicilio fiscal, el número de teléfono de WhatsApp y el nombre de las personas
+  dentro de una copia de seguridad (exportación con «Usuarios»).
+
+## Reglas que no se rompen
+
+- Una plantilla nunca concede permisos por sí misma: se piden con la ventana de HUB_SHELL-F169.
+- Restablecer exige teclear la razón social guardada en Ajustes › Negocio; la autoridad sobre el
+  borrado y el límite fiscal es el hub.
+
+Lo que se busca y hoy **no** se cumple (huecos, no reglas):
+
+- «Exportar como plantilla no lleva personas, PIN, NIF ni certificados». Hoy: Usuarios y Fiscal los
+  oculta la pantalla; el certificado lo decide la casilla tal como llega al hub; «Imágenes y media»
+  (marcada por defecto) copia los XML enviados de VeriFactu (ERPlora/hub#2496) (HUB_SHELL-F173).
+- «La copia de seguridad sirve para mudar el negocio». Solo restaura de verdad en el mismo hub
+  (HUB_SHELL-F173).
+
+## Lo que NO hace, a propósito
+
+- No se sube el certificado, ni se elige la vía de envío, ni se pasa a producción desde Ajustes: es
+  del módulo VeriFactu.
+- Restablecer no borra archivos, certificado, perfil fiscal, automatizaciones, permisos de las apps,
+  llaves de API, dispositivos, historial de avisos ni a quien lo ejecuta.
+
+## Dudas abiertas
+
+- ¿El informe de una importación vieja debe seguir tapando el catálogo cuando solo hay filas
+  «Descartado»?
+
+## Fuentes contrastadas
+
+- Manual `08-ajustes-del-negocio.md` y los flujos del servidor: «Ajustes › Hub»; la pestaña se llama
+  **General**. El manual lista la zona horaria como editable; el hub la deduce del país salvo que se
+  declare, y la pantalla ofrece «Automática» más las zonas del país.
+- Manual `09-datos-importacion-exportacion.md`: «Ajustes > Datos» y «escribe el nombre del negocio»;
+  la pestaña es **Datos y copias** y hay que escribir la **razón social** de Ajustes › Negocio, exacta.
+- Servidor (HUB-F242): «las secciones archivos y datos fiscales se aceptan pero no borran nada»; la
+  pantalla nunca las ofrece (el plan no las trae); existen las claves `settings.reset_media` y
+  `settings.reset_fiscal`, sin uso.
+- La nota del informe de importación del hub (`export_import.rs:812-817`) manda a subir el
+  certificado «en Ajustes → Negocio»; allí no hay certificado.
+- Servidor (HUB-F235): «las apps del manifiesto se instalan aunque no estén marcadas»; la pantalla
+  ofrece una casilla por app.
+- Los comentarios de `settings-tabs.ts` dicen que «Negocio» contiene «los datos de la empresa y su
+  certificado»; solo los datos.

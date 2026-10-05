@@ -12,6 +12,23 @@ Prefijo: HUB_SHELL
 > módulos; solo las descripciones de las consultas y órdenes que cada módulo expone para elegir
 > herramientas (HUB-F276). Por eso este panel no cita documentación como fuente de nada.
 
+## Referencia adoptada
+
+Los asistentes dentro de producto que operan un ERP/TPV por lenguaje natural (Business Central
+Copilot, Odoo AI, SAP Joule, Shopify Sidekick, Square AI, Toast IQ), ya contrastados en
+`.claude/agents/qa-hub-assistant.md` («El mercado decide»): panel persistente, previsualizar y
+confirmar antes de cambiar nada, fricción según el daño (clic / escribir / no desde el chat), «ir a…»
+tras la acción, «no lo sé / hazlo aquí» honesto, cuota visible, denunciar la respuesta. No se rehízo
+la búsqueda de mercado.
+
+## Antes de empezar
+
+- Sesión abierta (el panel no existe en Acceso ni en Activación requerida).
+- Para que el asistente responda: hub con credencial de máquina enrolada y nivel de asistente (el que
+  da el plan del negocio, ADR-0474). Para la puesta en marcha guiada, nada más.
+- Para que la tarjeta dé nombre a una acción, la app tiene que traer su traducción de órdenes (hoy
+  solo Ventas).
+
 ## Flujos
 
 ### HUB_SHELL-F185 Abrir y cerrar el panel del asistente
@@ -389,7 +406,8 @@ respuesta y de la pregunta (HUB-F278). El panel no guarda nada de eso en el serv
 - El guion de QA da por pendiente el borrado del historial al cambiar de usuario; el código ya lo hace (hub#1544, cerrada; HUB-F138 de acceso ya dice lo mismo). `qa-hub-assistant` pide que la tarjeta diga «de qué app viene»: el panel calcula el nombre de la app
   pero no lo enseña (`described.app` no se usa). También espera «`MAX_TOOL_ITERS` agotado con mensaje
   humano»: el panel o calla o dice «No se pudo contactar», y «cierra el drawer a mitad ... nada se
-  ejecuta»: cerrar el panel no corta el turno.
+  ejecuta»: cerrar el panel no corta el turno. Y espera que un perfil sin permiso pueda llegar al PIN
+  de un responsable por el chat: no, la orden ni se le ofrece al asistente (HUB_SHELL-F193).
 - El comentario de `AssistantDrawer.vue` dice «lo destructivo ni llega aquí: no se ofrece como tool»; es
   cierto para el hub, no para las órdenes de borrar de una app, que sí llegan (`assistant-danger.ts` es
   la política). `architecture/saas/assistant.md` describe una herramienta `search_docs` sobre la

@@ -8,6 +8,36 @@ Prefijo: HUB_SHELL
 > (`workflow/acceso.md`, HUB-F130…F144) y aquí solo se enlaza. Las pantallas que se citan en
 > `Pantalla:` son las de `## Pantallas` del índice `apps/web/WORKFLOW.md`.
 
+## Referencia adoptada
+
+Contrastada en `.claude/agents/qa-hub-restaurant.md` §2, en las decisiones de
+`architecture/hub/auth.md` y en los comentarios de las vistas que citan su referencia:
+
+- **Entrar con PIN en un dispositivo compartido, con rejilla de caras, y relevo de turno sin cerrar
+  la venta**: Square (Team passcodes) y Toast (employee passcodes, «switch user» como capa encima de
+  la app). PIN de longitud fija por negocio, 4 o 6, que entra al último dígito: Clover (hub#974).
+- **Placa (RFID/NFC) como la misma identidad que el PIN, nunca sustituta**: Toast, Aloha/NCR,
+  Square, Lightspeed (ADR-0347).
+- **Arranque que no encuentra el servidor: un aviso y un solo gesto, reintentar**: Square, Toast,
+  Lightspeed (hub#2143).
+- **Una franja persistente mientras no hay conexión, que se va sola**: Square, Toast, Shopify POS
+  ([Square — modo sin conexión](https://squareup.com/help/es/es/article/7777-process-card-payments-with-offline-mode)).
+- **Dirección inexistente: una página que lo dice y una salida**: Shopify admin, Square Dashboard,
+  Stripe, Odoo, Business Central (hub#1723).
+- **Pantalla de venta sin el marco de la aplicación**: Odoo POS, Square, Lightspeed (pantalla
+  completa).
+- **Instalar como aplicación desde el navegador, sin que el producto lo pida**: hub#685, hub#1715.
+
+## Antes de empezar
+
+Lo común (hub dado de alta, primera entrada con una cuenta de erplora.com) está en el índice. Lo
+propio de esta área:
+
+- En una caja compartida: márcala como compartida (HUB_SHELL-F11), decide en **Ajustes › General**,
+  tarjeta «Pinpad», si se pregunta quién vende y cada cuánto (HUB_SHELL-F99), y que cada persona
+  tenga su PIN (HUB_SHELL-F03, HUB_SHELL-F22 o Empleados, HUB_SHELL-F85).
+- Tras dar un PIN nuevo, recarga ERPlora en las cajas para que salga en la rejilla.
+
 ## Flujos
 
 ### HUB_SHELL-F01 Entrar con la cuenta de erplora.com
@@ -178,7 +208,7 @@ QA: ninguno
 ### HUB_SHELL-F11 Decidir si este dispositivo es compartido o personal
 Estado: parcial — el rechazo del hub se pinta con su texto en inglés y el identificador del dispositivo («this hub does not know the device …»)
 Actor: administrador
-Pantalla: Este dispositivo
+Pantalla: Ajustes › General
 Pasos:
 1. Desde el propio dispositivo, abre **Ajustes → General**; bajo «Este dispositivo»: «Cómo pregunta este dispositivo quién lo está usando. Cada dispositivo del negocio se decide por separado.».
 2. Elige «Compartido — una caja o tablet que usan varias personas» («Pide PIN al entrar y la olvida al acabar el turno, así que cada venta queda atribuida a quien la hizo.») o «Personal — un dispositivo que solo usas tú» («La sesión se queda abierta y nunca pide PIN…»).
@@ -281,21 +311,21 @@ Pasos:
 3. Una app que este hub no tiene, abierta por su dirección, vuelve a **Inicio** con «Esta app no está disponible para este hub.».
 Entra: la dirección.
 Sale: nada.
-Si falla: sin sesión, cualquier dirección lleva a **Acceso**. Las direcciones retiradas `/export`, `/import` llevan a Ajustes › Datos y `/first-run` a Inicio.
+Si falla: sin sesión, cualquier dirección lleva a **Acceso**. Las direcciones retiradas `/export`, `/import` llevan a Ajustes › Datos y copias y `/first-run` a Inicio.
 Implicados: ninguno
 QA: ninguno
 
 ### HUB_SHELL-F18 Poner la pantalla de una app a pantalla completa
 Estado: hecho
-Actor: empleado, responsable
+Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo
 Pasos:
 1. En una pantalla de app que lo ofrece (Vender, la Pantalla de cocina), elige «Pantalla completa» en su menú.
 2. Desaparecen el menú lateral, la barra superior y las pestañas de abajo; en un navegador que lo permite, también la barra del navegador.
-3. «Salir de pantalla completa» en el mismo menú, o Esc, lo devuelve. Salir de esa pantalla también.
-Entra: la petición de la app; que su pestaña lo haya declarado en su `module.json` (`navigation[].chrome`), cosa que comprueba la vista de un módulo de este mismo documento.
+3. «Salir de pantalla completa» en el mismo menú, Esc (salir del modo del navegador) o irse de la app lo devuelven todo.
+Entra: la petición de la app; que su pestaña lo haya declarado en su `module.json` (`navigation[].chrome`), cosa que comprueba la vista de un módulo. La app solo pide; el marco es del shell y solo atiende lo declarado (`lib/immersive.ts`, ADR-0048). Este flujo recoge también el antiguo HUB_SHELL-F55 «Vender a pantalla completa», retirado por describir el mismo gesto.
 Sale: nada guardado; no se recuerda al volver.
-Si falla: si el navegador no deja ocupar la pantalla entera, igual se esconden las barras del hub. Las franjas de bloqueo y de conexión siguen a la vista.
+Si falla: si el navegador no deja ocupar la pantalla entera (el iPhone no lo da), igual se esconden las barras del hub. Las franjas de bloqueo y de conexión siguen a la vista.
 Implicados: pendiente
 Pendiente de enlazar: kitchen — KITCHEN-F10 (el modo pantalla completa del tablero de cocina)
 QA: qa-hub-restaurant §7.17
@@ -377,3 +407,143 @@ Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F142 (pase hacia la cuenta propia)
 Pendiente de enlazar: saas — página de la cuenta y borrado de la cuenta
 QA: L-17
+
+## Cobertura contra la referencia
+
+**Acceso y sesión**
+
+| Elemento de la referencia | Estado | Flujo |
+|---|---|---|
+| Entrar con cuenta, segundo factor y Google | hecho | F01 |
+| «Confiar en este dispositivo» decide si el dispositivo es de confianza | no hecho: el hub confía en todo acceso con cuenta; la casilla solo decide el PIN y si el navegador recuerda a la persona | F01 |
+| Decir por qué no se entra (baja, ya no miembro) | parcial: misma frase que credenciales erróneas | F01 |
+| Entrar desde el panel de gestión sin volver a identificarse | parcial: en el navegador no hace el dispositivo de confianza | F02 |
+| Pedir el PIN propio en el primer acceso a una caja | parcial: solo con «Confiar» y no al entrar por el panel | F02, F03 |
+| Rejilla de caras y PIN de longitud fija | parcial: la rejilla es la del arranque hasta recargar | F04 |
+| Bloqueo por intentos con el tiempo de espera | hecho (lo aplica el servidor, HUB-F135) | F04 |
+| Placa en el acceso | parcial: sin validar con hardware real | F05 |
+| Placa en el relevo de turno | no hecho | F09 |
+| Relevo de turno encima de la venta | parcial: el lanzador y la lista siguen siendo los de quien se fue hasta navegar | F09 |
+| Cierre por inactividad configurable | parcial: solo la pantalla; sin aviso previo ni motivo | F08 |
+| Avisar de la sesión desalojada por el plan | hecho | F06 |
+| Dispositivo compartido o personal | hecho (rechazo en inglés) | F11 |
+| Cerrar todas mis sesiones | no hecho (tampoco en el servidor) | — |
+| Modo quiosco (una sola app, sin salir) | no existe; lo más cercano es pantalla completa | F18 |
+
+**Navegación y marco**
+
+| Elemento de la referencia | Estado | Flujo |
+|---|---|---|
+| Arranque sin servidor: aviso y reintentar | hecho | F13 |
+| Cambiar de negocio cerrando la sesión | parcial: no la cierra | F16 |
+| Trabajar sin conexión con el hub | no existe (hub en la nube): solo se avisa | F14 |
+| Franja persistente sin conexión | hecho | F14 |
+| Menú filtrado por el rol | parcial: el menú enseña todo; recortan las pantallas | F15 |
+| Lanzador de apps | hecho | F15, F32 |
+| Página «no existe» con salida | hecho | F17 |
+| Pantalla completa para el TPV y la cocina | hecho | F18 |
+| Instalar como aplicación y abrir en el móvil | hecho (sin pedirlo nunca) | F19 |
+| Avisar de una versión nueva de la app instalada | hecho | F20 |
+| Avisar de una versión nueva del hub en el navegador | no hecho, a propósito: se aplica al recargar | F19 |
+| Perfil: datos, foto, idioma, tema | hecho | F21 |
+| Cambiar el propio PIN | hecho | F22 |
+| Borrar la cuenta desde la app | hecho (en erplora.com) | F23 |
+
+## Datos: de quién es cada dato
+
+El perfil, el PIN, el modo del dispositivo y los dispositivos son del hub (`HUB`, HUB-F132, HUB-F139,
+HUB-F143). Lo que esta área guarda en **el navegador del dispositivo** (leído en `src/lib/*.ts` y
+`src/views/LoginPage.vue`):
+
+| Dónde (navegador) | Qué guarda | Dato personal | Cuándo se borra |
+|---|---|---|---|
+| `erplora.session` | identificador, nombre, correo, foto, rol y permisos de quien tiene la sesión | sí | al cerrar sesión o perderla |
+| `erplora.hub_session`, `erplora.hub_session_credential` | la sesión del hub y cómo se abrió (cuenta, PIN, placa) | credencial | al cerrar sesión |
+| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión y en el relevo de turno; **no** si el acceso con cuenta falla después de que erplora.com acepte la contraseña, ni al entrar con PIN, ni con «Cambiar de negocio» [SEG] |
+| `erplora.trusted_users`, `erplora.trusted` | id, nombre, **correo** e iniciales de quien entró con su cuenta en este navegador sin desmarcar «Confiar» (marcada por defecto, también donde no se ve); la rejilla de PIN enseña el correo | sí | nunca al cerrar sesión, al quitar el dispositivo ni al pasarlo a personal [SEG]; se recorta contra la lista del hub al abrir Acceso (conservando el correo de quien siga con PIN) y se vacía si nadie tiene PIN |
+| `erplora.device_id` | el identificador de este dispositivo | no | nunca (es lo que el hub reconoce como de confianza) |
+| `erplora.locale` | el idioma activo | no | se rehace en cada arranque |
+| `erplora.theme`, `erplora.palette` | claves antiguas del tema | no | se borran al arrancar |
+
+El PIN no se guarda nunca: viaja en el cuerpo de la petición y el ticket del código de verificación
+vive solo en memoria. En memoria (no en el navegador) queda, tras el relevo, el menú de apps de quien
+se fue. La conversación del asistente (`erplora.assistant.history`) es del área «Asistente».
+
+## Reglas que no se rompen
+
+Solo lo que el código hace cumplir:
+
+- Con un hub sin alta, una sesión guardada se cierra y no hay pinpad (router, `authGate`).
+- El pinpad y la placa solo se ofrecen con dispositivo compartido, de confianza **según el hub** y
+  un negocio que pregunta; sin respuesta del hub, no hay pinpad. La placa solo se atiende en el paso
+  PIN.
+- Un rechazo del hub solo cierra la sesión si una comprobación aparte confirma que está muerta (no
+  por falta de rol ni por un corte de red), y la cierra una vez aunque haya muchas peticiones en vuelo.
+- El relevo de turno no navega y no suelta la sesión anterior hasta tener la nueva; un PIN erróneo no
+  cambia nada.
+- El hub solo da el pase hacia erplora.com a una sesión abierta con la cuenta; a cualquier otra, la
+  pantalla le abre el enlace normal, que pide la contraseña. El botón «erplora.com» solo se ofrece con
+  el permiso de administrar.
+- La franja de conexión no se puede cerrar.
+
+Lo que hoy **no** se cumple y no es una regla, sino un hueco de seguridad [SEG] (detalle en sus
+flujos): los tokens de erplora.com de un acceso fallido se quedan y los usa la sesión siguiente
+(HUB_SHELL-F01); tras el relevo el lanzador y la lista son los de quien se fue (HUB_SHELL-F09); una
+lectura rota del dial desarma el cierre por inactividad (HUB_SHELL-F08); los correos de la rejilla
+sobreviven al cierre de sesión, a quitar el dispositivo y a pasarlo a personal (HUB_SHELL-F04);
+«Cambiar de negocio» no cierra la sesión (HUB_SHELL-F16).
+
+## Lo que NO hace, a propósito
+
+- No pide instalar ERPlora como aplicación ni interrumpe para ofrecerlo: el QR espera en el menú
+  (hub#685, hub#1715).
+- La franja sin conexión no tiene «Reintentar»: recargar perdería lo tecleado y no arreglaría la red;
+  el reintento vive en la pantalla que falló.
+- No adivina direcciones (`/tpv` → Vender): el shell no conoce los ids de las apps.
+- La pantalla nunca decide si un PIN es correcto: lo decide el hub.
+- Las apps no viven en el menú lateral: se abren desde el lanzador «Mis apps» de la barra superior y
+  desde Inicio.
+- No avisa de una versión nueva del hub en el navegador: se aplica sola al recargar.
+
+## Dudas abiertas
+
+Se resuelven con `market-decision`; no las decide el worker.
+
+- **Menú por rol.** Square y Toast esconden lo que el rol no puede usar; aquí el empleado ve Empleados,
+  Mi plan, Apps, Sistema y Ajustes y las pantallas le recortan dentro (HUB_SHELL-F15).
+- **Cierre por inactividad.** ¿Aviso con cuenta atrás antes de cerrar y una frase después? Hoy vuelve
+  al pinpad sin decir nada (HUB_SHELL-F08).
+- **Placa en el relevo de turno** (HUB_SHELL-F09).
+- **PIN tras entrar desde el panel.** ¿Pedirlo también ahí, como tras el acceso con «Confiar»?
+  (HUB_SHELL-F02, HUB_SHELL-F03).
+- **Correos en la rejilla de caras.** La rejilla de una caja compartida enseña el correo de quien entró
+  allí con su cuenta, guardado en el navegador y que no se borra al cerrar sesión; el hub, en cambio,
+  nunca da el correo en su lista pública.
+- **La casilla «Confiar en este dispositivo».** Hacerla real (que el hub no confíe sin ella) o
+  quitarla; hoy su ⓘ promete lo que no pasa.
+- **Pantalla «Activación requerida».** Retirarla o volver a cablearla: hoy no se alcanza.
+
+## Fuentes contrastadas
+
+- `hub` HUB-F138 (servidor) dice que quien entra en el relevo teclea su PIN «o pasa su placa»: el
+  relevo no acepta placa (HUB_SHELL-F09). Lo del historial del asistente ya casa: HUB-F138 dice que el
+  relevo lo borra, como hace `src/lib/user-switch.ts` (`switchUser`, hub#1544).
+- `hub` HUB-F133 dice que la lista de personas nunca lleva el correo; la rejilla del shell enseña el
+  correo guardado en el navegador (`LoginPage.vue`, tarjeta de persona).
+- `hub` HUB-F132 dice que la pantalla pide el PIN tras entrar por primera vez con la cuenta en un
+  dispositivo compartido; solo lo hace si se marcó «Confiar» y nunca al entrar por el pase del panel.
+- `hub` HUB-F136 dice que el cierre por inactividad lo hace solo la pantalla: confirmado
+  (`src/lib/idle-logout.ts`), y además sin aviso.
+- `hub` y el manual (`hand-book/hub/01-acceso-y-navegacion.md`, «Pantalla de activación cuando el Hub
+  no puede confirmar un acceso válido»): la pantalla «Activación requerida» no se alcanza nunca;
+  `src/lib/entitlement.ts` solo pone `unknown` o `unlocked`, nunca `needs_activation`.
+- Manual 01: «En móvil, las acciones secundarias se agrupan en **Más**»: el botón no tiene texto, es
+  ⋮ con el nombre accesible «Más opciones».
+- Manual 03 («Usa Perfil para el PIN propio»): Mi perfil muestra «Ese PIN ya lo tiene otro usuario
+  activo…» sin freno, un oráculo del PIN de otros (hub#2499, HUB_SHELL-F22).
+- `es.ts` `login.popoverBody` («Si no la marcas, siempre tendrás que iniciar sesión con email») es
+  falso: el hub vuelve de confianza el dispositivo en todo acceso con cuenta (HUB_SHELL-F01).
+- `es.ts` `shell.changeHubBody` («Este dispositivo cerrará la sesión de este negocio…»): no la cierra
+  (HUB_SHELL-F16).
+- `es.ts` `notFound.body` dice que las apps «se abren desde el menú»: no están en el menú lateral,
+  se abren desde el lanzador de la barra o desde Inicio.

@@ -14,6 +14,33 @@ Prefijo: HUB_SHELL
 > `lib/hub-users.ts`, `approvals.ts`, `api-keys.ts`, `devices.ts`, `pinpad-dial.ts`, `badge-scanner.ts`,
 > `nfc-badge.ts`.
 
+## Referencia adoptada
+
+Contrastada en los comentarios del propio código (que citan las issues donde se decidió) y en
+`qa-hub-restaurant §2`; no se ha rehecho.
+
+- **Personas y PIN.** Square (permisos de equipo, passcode), Toast (empleados, PIN), Lightspeed y
+  Odoo (usuarios): una identidad por persona, baja sin borrado, PIN por caja. Longitud fija de 4 o 6
+  dígitos con envío al último dígito: gana Clover sobre Toast (3-8), Lightspeed K (4-6) y Shopify
+  (4-6), que obligan a un botón de confirmar (decisión hub#974, citada en `lib/pin-length.ts`).
+- **Placa.** Captura por temporización en un listener global, nunca por foco de campo (el foro de
+  Odoo es el archivo de por qué); revocar la placa sin tocar el PIN (el caso Lightspeed L-Series, de
+  tarjeta irrevocable); Square, Toast y Aloha para «pasar la tarjeta» (hub#658, hub#988).
+- **Dispositivos.** El listado de dispositivos de Google, Apple y Shopify: nombre que pone el
+  negocio, última actividad, quitar con confirmación en la propia fila (hub#455, hub#2203, hub#2215).
+- **Aprobación por PIN.** Square y Toast (el responsable autoriza sin cerrar la sesión del cajero);
+  este fichero solo cubre el registro (ADR-0265, hub#512); el diálogo es de «La vista de un módulo».
+
+## Antes de empezar
+
+- Para dar de alta con cuenta, el hub tiene que estar enlazado con erplora.com (si no, el aviso «Este
+  hub todavía no puede enviar invitaciones.»).
+- Los roles de una app (camarero, cocina…) nacen apagados: se encienden en **Empleados › Roles**
+  antes de poder asignarlos.
+- Para que las llaves de API tengan algo que dar, hace falta al menos una app instalada que publique
+  operaciones de API; la documentación de la API viene apagada y la enciende un administrador en
+  **Ajustes › General** (HUB_SHELL-F161).
+
 ## Flujos
 
 ### HUB_SHELL-F80 Ver la lista de personas del negocio
@@ -419,3 +446,100 @@ Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexi
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F141 (ver, nombrar y quitar los dispositivos del negocio)
 QA: ninguno
+
+## Cobertura contra la referencia
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Alta de persona solo con PIN | hecho | HUB_SHELL-F81 |
+| Alta con cuenta e invitación por correo | parcial (la invitada sale «Sin acceso» hasta su primer acceso) | HUB_SHELL-F82 |
+| Reenviar una invitación | no hecho (la salida es volver a guardar, que choca con «email repetido») | HUB_SHELL-F82 |
+| Tope de personas del plan | parcial (botón solo en la ficha) | HUB_SHELL-F83 |
+| Editar, baja con historial y reincorporar | hecho / parcial | HUB_SHELL-F84, F88, F89 |
+| PIN de otra persona: poner, cambiar, retirar | hecho | HUB_SHELL-F85, F86 |
+| Placa: alta por lector USB o NFC y revocar | hecho | HUB_SHELL-F87 |
+| Ver cómo entra cada persona | hecho | HUB_SHELL-F90 |
+| Roles de fábrica y de apps; encender los de apps | parcial (identificadores a la vista; la ficha hace administrador a quien solo tiene PIN, hub#2500) | HUB_SHELL-F91, F92 |
+| Crear un rol propio / editar qué permite un rol | no hecho (decisión del servidor: los roles los fijan las apps) | HUB_SHELL-F91 |
+| Ver qué permisos concretos tiene un rol y quiénes son sus miembros | no hecho (solo recuentos) | HUB_SHELL-F91 |
+| Registro de aprobaciones por PIN | parcial (códigos técnicos) | HUB_SHELL-F93 |
+| Aprobar o rechazar desde una bandeja (propuestas del asistente, preguntas de automatizaciones) | no está en Empleados: se decide en Automatizaciones › Pendiente de ti (FLOWS-F24); la aprobación por PIN va en un diálogo de la vista de un módulo | — |
+| Llaves de API: crear, ver una vez, rotar, revocar | hecho / parcial (rotar sin pregunta) | HUB_SHELL-F94 a F97 |
+| Documentación de la API | parcial (textos) | HUB_SHELL-F98 |
+| Política de PIN, longitud, inactividad | hecho | HUB_SHELL-F99, F100 |
+| Dispositivos: ver, nombrar, quitar, limpiar | hecho | HUB_SHELL-F101 a F104 |
+| Normas propias del negocio (políticas) | no hecho (sin pantalla; solo API y asistente) | — |
+
+## Datos: de quién es cada dato
+
+Ninguna de estas pantallas es dueña de un dato: leen y piden al servidor.
+
+- **Personas** (nombre, email de acceso, rol, huella del PIN y de la placa, estado): del hub
+  (`hub_user`, HUB-F145 a F149); la ficha de profesional de `staff` es otra cosa que se vincula. La
+  membresía de la cuenta vive en erplora.com.
+- **Roles y su activación**: del hub; las definen las apps instaladas.
+- **Registro de aprobaciones**: del hub; solo lectura, nadie lo edita.
+- **Llaves de API**: del hub; el token entero solo viaja una vez, al crear o rotar.
+- **Dispositivos y su nombre**: del hub; el nombre lo escribe el negocio, el resto lo elige el
+  dispositivo y solo sirve para reconocerlo.
+- **Política de PIN, longitud y documentación de la API**: ajustes del negocio del hub.
+
+Datos personales que pasan por estas pantallas: nombre y email de cada persona (en pantalla y en el
+CSV `personal` que se baja al dispositivo); quién aprobó qué, con identificadores (CSV de
+Aprobaciones); la etiqueta del dispositivo, que es el nombre de la última persona que entró. La
+pantalla no guarda ninguno de ellos en el navegador (sin confirmar al revisar el almacenamiento local
+de estos componentes: solo se han leído estas vistas).
+
+## Reglas que no se rompen
+
+- **Una persona no se borra: se da de baja** (la baja desactiva; ventas, aprobaciones y auditoría la
+  siguen nombrando).
+- **El PIN y la placa no se leen nunca**: el PIN va enmascarado al teclearlo y la pantalla solo sabe
+  si existe; el token de una llave se enseña una vez.
+- **Roles, política de PIN y dispositivos pintan lo que confirma el servidor**, sin optimismo local.
+- La lista de personas y la de roles son la excepción conocida a «un fallo no se pinta como un
+  vacío» (regla común del índice): bajo el aviso de error siguen diciendo «Aún no hay…»
+  (HUB_SHELL-F80).
+
+## Lo que NO hace, a propósito
+
+- No crea roles ni edita permisos de un rol (los fijan las apps).
+- No reenvía invitaciones, no enseña un PIN ni una placa ya puestos y no recupera un token.
+- No edita las normas del negocio (políticas): no tienen pantalla.
+- No aprueba ni rechaza nada desde Empleados: ese registro es solo lectura.
+
+## Dudas abiertas
+
+Se resuelven con `market-decision`; no las decide el worker.
+
+- ¿Crear roles propios o editar qué permite cada uno? (el mercado suele ofrecerlo, sin contrastar en
+  este encargo; en el hub lo fijan las apps.) Lo dice la decisión de roles del servidor; confirmar si
+  entra en el MVP.
+- ¿Reenviar una invitación que no salió? Hoy el aviso manda a «volver a guardar», que no funciona.
+- ¿Pedir confirmación al rotar una llave de API? ¿Y avisar de que sobrevive a la baja de quien la creó?
+- ¿Debe el aviso de plazas llevar «Actualizar plan» también en el alta rápida y en Sistema › Plan y
+  límites, o es steering (hub#479)?
+
+## Fuentes contrastadas
+
+- Servidor HUB-F147: «la pantalla ofrece «Actualizar plan»». Solo la Ficha de usuario lo ofrece, y
+  en la práctica solo al reincorporar; el alta de la tabla y Sistema › Plan y límites no.
+- HUB-F145 «Pasos: elige un rol que se pueda asignar» vale en el alta; la ficha de edición ofrece todos
+  (hub#2500).
+- Servidor HUB-F140: «Guarda» como paso. Las tarjetas del pinpad guardan al mover cada control, sin
+  botón.
+- Servidor HUB-F153: «qué acción». La tabla enseña el código de la orden y del permiso.
+  La explicación de la pestaña promete conservar el registro «mientras tu negocio esté en ERPlora»;
+  el hub lo borra a los cuatro años (`crates/runtime/src/retention.rs:110-113`, confirmado).
+- Servidor, actores «responsable»: el rol de la pantalla se llama «Encargado» (`manager`).
+- Servidor HUB-F150: «tres roles de fábrica (administrador, responsable y empleado)». El catálogo
+  de la pantalla puede traer además «Propietario» (rol antiguo, si alguien lo lleva), que sale como
+  «App desinstalada».
+- Código `PinPolicyCard` y `DevicesCard` (comentarios): «Ajustes › Hub». La pestaña se llama
+  **General**.
+- Frase de rol apagado en el catálogo de motivos: «Enciéndelo en Ajustes → Roles». Los roles se
+  encienden en Empleados › Roles; el texto de la introducción de la Documentación de la API manda a
+  «Usuarios → API keys», que hoy es Empleados › API keys.
+- Manual `hand-book/hub/03-personas-y-permisos.md`: «Lista vacía con opción de alta» y «Perfil: PIN
+  propio». Cierto; el PIN propio es de Mi perfil (HUB_SHELL-F22, área de acceso, que recoge además el
+  oráculo del PIN de otros, hub#2499).
