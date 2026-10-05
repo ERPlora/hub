@@ -370,3 +370,145 @@ Sale: céntimos, euros, sin dinero o mezcla, sin crear ni escribir nada.
 Si falla: una mezcla se comunica por el registro de errores y por stderr.
 Implicados: ninguno
 QA: ninguno
+
+### HUB-F245 Ver y descargar archivos
+Estado: hecho
+Actor: administrador, responsable, empleado, cajero
+Pantalla: HUB_SHELL: Archivos
+Pasos:
+1. La persona abre **Archivos** y navega por carpetas.
+2. Abre un archivo en el visor o lo descarga.
+Entra: la carpeta o la ruta; sesión de usuario de cualquier perfil. Una llave de API no entra.
+Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero.
+Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Archivos
+Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F06, adjuntos recibidos (aquí solo dónde se guardan)
+QA: ninguno
+
+### HUB-F246 Subir, organizar y borrar archivos
+Estado: parcial — no existe copiar; los archivos no se pueden borrar ni subir en carpetas de apps que no lo declaran
+Actor: administrador
+Pantalla: HUB_SHELL: Archivos
+Pasos:
+1. El administrador sube ficheros, crea una carpeta, renombra, mueve o borra.
+2. El hub comprueba qué permite la carpeta.
+Entra: ruta y acción, con sesión de propietario o administrador.
+Sale: la carpeta decide: `_logs` y `_system` y la raíz `modules` son solo lectura; bajo `modules/<carpeta>/` manda lo que la app declara en `static_files.user_actions` (sin declarar, solo lectura); cualquier otra carpeta, gestión completa. Renombrar solo cambia el nombre (no admite rutas). Mover exige poder borrar el origen y subir al destino, y no deja meter una carpeta en sí misma. Crear carpeta cuenta como subir. Todo se hace en el almacenamiento de erplora.com, que valida las rutas.
+Si falla: 403 `media.read_only_folder`, 400 `media.invalid_name`, `media.same_path`, `media.move_into_itself`; 424 con la nube.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Archivos
+QA: ninguno
+
+### HUB-F247 Guardar ficheros desde una app
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Una app declara `static_files.folder` en su manifiesto.
+2. Al instalarla, el hub crea `media/modules/<carpeta>/`.
+3. La app pide escribir un fichero con una ruta relativa.
+Entra: carpeta (minúsculas, dígitos, `_`, `-`, hasta 64) y ruta relativa sin `..`, sin `/` inicial, sin `\`.
+Sale: el fichero queda en `modules/<carpeta>/<ruta>` y el hub devuelve esa ruta; en producción por el almacenamiento de erplora.com, en desarrollo en disco, con la misma ruta lógica. Una app solo escribe en su carpeta; la persona la ve en Archivos según HUB-F246.
+Si falla: carpeta o ruta inválida, error de almacenamiento antes de tocar la red; sin credencial de máquina, la instalación de una app con `static_files` falla.
+Implicados: VERIFACTU-F13
+QA: ninguno
+
+### HUB-F248 Borrar los datos de una persona: el aviso único
+Estado: parcial — el aviso lo emite Clientes y solo lo escuchan WhatsApp, Servicios y el hub; Citas, Reservas y Reservas online no; el motivo escrito por el administrador queda en el propio aviso durante 90 días
+Actor: administrador, sistema
+Pantalla: HUB_SHELL: Clientes › ficha del cliente
+Pasos:
+1. El administrador pulsa **Borrar datos personales** en la ficha (flujo de Clientes).
+2. Clientes sustituye los datos de la ficha y publica `customer.anonymized`.
+3. El hub entrega ese aviso a quien lo escucha y vacía su propio historial (HUB-F249).
+Entra: el aviso `<sujeto>.anonymized` con su `<sujeto>_id` (de Clientes: `customer_id` y `reason`, hasta 500 caracteres).
+Sale: el contrato es solo un nombre: el hub reconoce cualquier evento que acabe en `.anonymized` con el identificador del sujeto como cadena y no nombra a ningún módulo. Cada módulo que guarda algo de la persona se suscribe a ese aviso y borra lo suyo (HUB-F250); lo que no lo hace, se queda. Es idempotente: repetirlo no cambia nada. Cualquier app puede emitir un `.anonymized` y vaciar el historial de un identificador ajeno (no hay regla de permiso, hub#2485).
+Si falla: si el vaciado del hub falla, el aviso se difiere y se reintenta con espera creciente, y no se marca entregado hasta que termina.
+Implicados: CUSTOMERS-F16
+QA: L-10, WA-06 (discrepa)
+
+### HUB-F249 Vaciar el historial del hub que nombra a la persona
+Estado: parcial — no repasa lo que estaba en curso al borrar y acaba después (hub#2484), ni las copias que llevan el dato sin el identificador (hub#2477, hub#2474), ni el propio aviso de borrado
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. El hub entrega un aviso `<sujeto>.anonymized`.
+2. En una sola sentencia vacía (`{}`) lo terminal que nombra ese identificador.
+3. Registra cuántas filas vació.
+Entra: el identificador y el hub.
+Sale: se vacían, sin borrar la fila: los avisos entregados o descartados cuyo contenido tiene el identificador como valor; las ejecuciones terminadas (hechas, fallidas, canceladas) que lo tocan en entrada, variables, paso o propuesta, o que nacieron de un aviso así; todos los pasos y propuestas de esas ejecuciones; y los avisos que esas ejecuciones encolaron (un recordatorio lleva el teléfono sin el identificador). No se tocan los avisos pendientes o atascados ni las ejecuciones vivas: conservan los datos hasta procesarse o hasta la retención de 90 días (HUB-F253). Se conserva la fila porque es el rastro de la trazabilidad. Solo este hub; reentrega sin efecto. Coste: un barrido del historial terminal por borrado.
+Si falla: error de base de datos; el aviso queda sin entregar y el reintento lo completa; nada queda medio vaciado.
+Implicados: CUSTOMERS-F16, WHATSAPP_INBOX-F11
+QA: L-10
+
+### HUB-F250 Lo que le toca a cada app al recibir el aviso de borrado
+Estado: parcial — Citas (nombre, teléfono, correo y notas en citas, series e historial), Reservas (RESERVATIONS-F22) y Reservas online no escuchan el aviso
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Una app que guarda datos de la persona escucha el aviso.
+2. Vacía sus tablas por el identificador de la ficha.
+Entra: `customer.anonymized` y su identificador.
+Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Servicios marca sus bonos; Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
+Si falla: el aviso de esa app se reintenta como cualquier otro.
+Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11, VERIFACTU-F15
+QA: L-10, WA-06 (discrepa)
+
+### HUB-F251 Borrar los datos de un número sin ficha
+Estado: no hecho — la bandeja de WhatsApp borra sus conversaciones pero no emite ningún aviso `.anonymized` con un identificador que el hub pueda buscar: los mensajes y su número siguen 90 días en el historial del hub (hub#2474, hub#2477)
+Actor: administrador
+Pantalla: HUB_SHELL: WhatsApp › Bandeja de entrada
+Pasos:
+1. El administrador pulsa **Borrar datos de este número** en una conversación.
+2. La app borra lo suyo.
+3. Debería avisar al hub para vaciar las copias de los mensajes.
+Entra: el identificador de la conversación o una huella del número.
+Sale: hoy, nada en el hub. `hub.whatsapp.message_received` y `whatsapp_inbox.message.received` guardan número, nombre y texto sin identificador de ficha.
+Si falla: sin confirmar (no existe).
+Implicados: WHATSAPP_INBOX-F10
+QA: L-11, WA-06 (discrepa)
+
+### HUB-F252 Borrar los datos de una persona del equipo
+Estado: no hecho — el hub solo desactiva a una persona (cierra sus sesiones); nombre, correo, PIN cifrado, perfil y preferencias se quedan, y no hay vaciado en el historial
+Actor: administrador
+Pantalla: ninguna
+Pasos:
+1. El administrador da de baja a una persona del equipo.
+2. El hub la marca inactiva y cierra sus sesiones.
+Entra: la persona.
+Sale: nada se borra ni se seudonimiza. La atribución («quién autorizó qué») conserva el identificador cuatro años y el lector resuelve el nombre.
+Si falla: no aplica.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB, acceso (dar de baja a una persona)
+QA: ninguno
+
+### HUB-F253 Purgar el historial por retención
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Cada hora el hub cierra primero las propuestas caducadas de las automatizaciones.
+2. Después borra el historial terminal con más de 90 días.
+3. Registra cuántas filas borró.
+Entra: el reloj y el historial de avisos y ejecuciones.
+Sale: se borran, a 90 días desde su fin: avisos entregados o descartados (con sus marcadores de entrega), ejecuciones hechas, fallidas o canceladas con sus pasos, propuestas y esperas. Los recibos de autorización de un responsable duran cuatro años (1461 días) y contienen la huella del contenido, no el contenido. No se purgan nunca los avisos pendientes o atascados, ni las ejecuciones vivas. Es dura (`DELETE`), en lotes de 500 y hasta 20 pasadas por vuelta. Los 90 días son fijos. El historial de actualizaciones solo enseña 90 días y los dispositivos sin uso se limpian a mano a los 30 días (Acceso). Nada purga la cola de impresión, que guarda el HTML de cada documento hasta restablecer el hub.
+Si falla: se registra el aviso y la vuelta siguiente continúa.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB, avisos entre módulos (avisos atascados y su reintento)
+QA: ninguno
+
+### HUB-F254 Registrar la actividad del negocio para el SaaS
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Alguien entra, sale, cobra, devuelve o abre o cierra caja.
+2. El hub anota un hecho con quién lo hizo.
+3. En el latido diario lo manda al SaaS y borra lo entregado.
+Entra: la orden pública (`complete_sale`, `refund`, apertura y cierre de caja) o el inicio y cierre de sesión.
+Sale: una fila `(id, tipo, usuario del hub, instante)`: nunca nombre, ni nada del cliente final. No se anota sin persona detrás (tareas, avisos). Se lee sin borrar, hasta 500 por latido, y solo se borra tras la confirmación del SaaS; el SaaS descarta duplicados por id. Sin conexión conserva 5.000 y descarta lo más antiguo. Anotar nunca falla la venta.
+Si falla: un fallo al anotar se escribe en el log y la operación sigue.
+Implicados: pendiente
+Pendiente de enlazar: saas — recepción de la actividad del hub
+QA: ninguno
