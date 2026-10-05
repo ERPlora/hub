@@ -26,7 +26,7 @@ Pasos:
 3. Si lo guardado se deshace (la orden falla a mitad), el aviso tampoco existe: nunca hay un aviso de algo que no pasó, ni algo que pasó sin su aviso.
 4. La orden contesta en cuanto se guarda; los módulos que escuchan el aviso reaccionan después, en segundo plano (HUB-F51), nunca dentro de la misma orden.
 Entra: la orden de un módulo con los avisos que declara en su manifiesto (`emit`), y quién la pidió (persona, automatización o el propio hub).
-Sale: una fila en la cola de salida (`_event_outbox`, estado pendiente) con el aviso, su contenido, el módulo que lo emite, la persona que lo causó, la automatización que lo emitió si la hay (`run_id`), el aviso que lo provocó si es una reacción en cadena (`parent_event_id`) y la pantalla que mandó la orden (`client_instance`). Si el manifiesto declara una clave de no repetición para ese aviso (`emit[].dedup_key`, por ejemplo el identificador del mensaje de WhatsApp), un segundo aviso con la misma clave en el mismo hub no se apunta. Si el módulo devuelve desde su código el mismo aviso que declara, se apunta una sola vez, la copia del código (hub#1786). También empuja el aviso a las pantallas en vivo (HUB-F60).
+Sale: una fila en la cola de salida (`_event_outbox`, estado pendiente) con el aviso, su contenido, el módulo que lo emite, la persona que lo causó, la automatización que lo emitió si la hay (`run_id`), el aviso que lo provocó si es una reacción en cadena (`parent_event_id`) y la pantalla que mandó la orden (`client_instance`). Si el manifiesto declara una clave de no repetición para ese aviso (`emit[].dedup_key`, por ejemplo el identificador del mensaje de WhatsApp), un segundo aviso con la misma clave en el mismo hub no se apunta. Si el módulo devuelve desde su código el mismo aviso que declara, se apunta una sola vez, la copia del código (hub#1786), y en ese caso no se aplica la clave de no repetición. También empuja el aviso a las pantallas en vivo (HUB-F60).
 Si falla: si la orden falla, no queda ni el cambio ni el aviso, y quien la pidió ve el error de la orden. Una orden que no exige filas cambiadas (`min_affected_rows`) contesta bien y emite su aviso aunque no haya cambiado nada. Si el código de un módulo (no su manifiesto) devuelve un aviso que el módulo no declara en `events.emits` ni en el `emit` de sus órdenes, o del espacio de nombres de otro módulo instalado, o un aviso de mensaje o de impresión sin tener ese permiso declarado, la orden se rechaza entera y no se apunta nada (lo primero solo en un módulo que declara `events.emits`, como todos los publicados). Una clave de no repetición que el contenido no trae se ignora con un aviso en el registro del servidor y el aviso sale sin deduplicar.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, módulos y órdenes: ejecutar una orden de un módulo y su comprobación de qué avisos puede emitir
@@ -61,8 +61,8 @@ Pasos:
 4. Lo que hizo la orden que lo emitió sigue hecho: la venta sigue cobrada, la anulación sigue anulada.
 Entra: el aviso pendiente y el error del módulo que falló.
 Sale: el aviso con su contador de intentos, la hora del siguiente intento y el último error; al agotarse, el aviso en estado caído (`dead`), con su contenido completo intacto. Los módulos que sí lo recibieron no vuelven a recibirlo.
-Si falla: si la base de datos falla al apuntar el reintento, el aviso se queda como estaba y se vuelve a tomar en el siguiente repaso. Nadie avisa al módulo que emitió el aviso ni a la persona que lo causó: el único rastro es el recuento de la campana para el administrador (HUB-F59) y la lista de «Eventos caídos». El contador que guarda el aviso caído dice 7, no 8 (el intento que lo mata no se suma).
-Implicados: CASH_REGISTER-F14, INVENTORY-F21, INVOICE-F06, KITCHEN-F05, REC_FISCAL-F09
+Si falla: si la base de datos falla al apuntar el reintento, el aviso se queda como estaba y se vuelve a tomar a los 5 minutos, cuando caduca su reserva. Nadie avisa al módulo que emitió el aviso ni a la persona que lo causó: el único rastro es el recuento de la campana para el administrador (HUB-F59) y la lista de «Eventos caídos». El contador que guarda el aviso caído dice 7, no 8 (el intento que lo mata no se suma).
+Implicados: CASH_REGISTER-F14, FLOWS-F25, INVENTORY-F21, INVOICE-F06, KITCHEN-F05, PRINTING-F16, REC_FISCAL-F09
 QA: BD-09, qa-hub-flows R8, qa-hub-restaurant §11
 
 ### HUB-F53 Mandar a «Eventos caídos» al momento lo que reintentar no arregla
@@ -93,7 +93,7 @@ Pasos:
 3. Desde ahí lo reenvía (HUB-F55, HUB-F56) o lo cierra (HUB-F57).
 Entra: la sesión de un dueño o administrador de este hub.
 Sale: nada guardado. La lista de cerrados (`GET /api/hub/events/discarded`) da quién cerró cada uno, cuándo y por qué, sin el contenido.
-Si falla: sin sesión, el hub contesta que no hay sesión; con la sesión de un perfil que no administra (cajero, empleado), la rechaza. Si la petición la hace un módulo, ese módulo necesita además el permiso «Administrar automatizaciones» concedido. Una API key o el token de máquina no sirven. Los avisos caídos de otro hub no se ven.
+Si falla: sin sesión, el hub contesta que no hay sesión; con la sesión de un perfil que no administra (cajero, empleado), la rechaza. Si la petición se declara hecha por un módulo (cabecera `X-Erplora-Module`), ese módulo necesita además «Administrar automatizaciones» concedido; es una declaración, no una autenticación: un módulo que no se declara pasa solo con la sesión del administrador (la misma regla vale para HUB-F55…F59 y F63). Una API key o el token de máquina no sirven. Los avisos caídos de otro hub no se ven.
 Implicados: FLOWS-F25
 Pendiente de enlazar: hub — HUB_SHELL, Sistema › Eventos caídos (la pantalla que lista, reenvía y descarta)
 QA: BD-10, qa-hub-flows R8
@@ -152,7 +152,7 @@ Pantalla: HUB_SHELL: Ajustes › Permisos
 Pasos:
 1. Un aviso cayó porque a un módulo le faltaba un permiso de primitiva (impresora, mensajes, certificado) que nadie había concedido (HUB-F53).
 2. El dueño concede ese permiso en Ajustes → Permisos.
-3. En ese mismo gesto el hub devuelve a la cola todos los avisos caídos por un permiso sin conceder, de todo el hub; no hace falta ir a «Eventos caídos».
+3. Al conceder cualquier permiso de primitiva a cualquier módulo, el hub devuelve a la cola todos los avisos caídos por un permiso sin conceder, de todo el hub; no hace falta ir a «Eventos caídos».
 4. Los que siguen sin su permiso vuelven a caer en la siguiente pasada, con su motivo.
 Entra: el permiso concedido.
 Sale: los avisos caídos con el motivo `module.capability_denied`, pendientes otra vez. Retirar un permiso no mueve nada.
@@ -177,51 +177,52 @@ Pendiente de enlazar: hub — HUB_SHELL, campana de Notificaciones (fuente «Eve
 QA: BD-09
 
 ### HUB-F60 Avisar a las pantallas en vivo
-Estado: hecho
+Estado: parcial — no filtra por perfil: cualquier sesión del hub, también la de un cajero, recibe todos los avisos con los datos de los clientes; el tope de 16 conexiones es para el hub entero (todas las pantallas comparten llave); en `/ws` un segundo mensaje de autenticación cambia la llave y su alcance; el canal SSE acepta una API key de larga duración en la dirección; y revocar una llave o cerrar sesión no corta un canal ya abierto (leído, sin ejecutar)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al abrirse, la aplicación del hub pide al hub un pase de un solo uso (vale 60 segundos) con la sesión de quien la usa.
-2. Con ese pase abre el canal en vivo. Desde entonces recibe al momento cada aviso que se guarda en el hub: una venta cobrada, una comanda nueva, una cita, un módulo instalado.
+1. Al abrirse, la aplicación del hub pide al hub un pase de un solo uso (vale 60 segundos) con la sesión de quien la usa, sea del perfil que sea.
+2. Con ese pase abre el canal en vivo (por SSE, en la dirección; o por WebSocket, en el primer mensaje). Desde entonces recibe al momento cada aviso que se guarda en el hub: una venta cobrada, una comanda nueva, una cita, una pregunta de una automatización, un módulo instalado.
 3. Cada pantalla reacciona por su cuenta: la cocina pinta la comanda, el TPV que cobró imprime el tique, la campana o el aviso del sistema avisan.
 4. Si la conexión se corta, la aplicación pide otro pase y se vuelve a conectar.
 Entra: la sesión de una persona del hub (para el pase), o una API key del hub que pueda leer (para una integración).
-Sale: cada aviso con su contenido, el módulo que lo emitió y la pantalla que mandó la orden (`client_instance`), por WebSocket (`/ws`) o por SSE (`/api/events`). La aplicación entra con la llave de solo lectura del propio hub y lo recibe todo; una llave de integración con permisos por módulo solo recibe los avisos de los módulos que puede leer, y ninguno del propio hub.
-Si falla: el canal en vivo no guarda nada: un aviso que llega mientras la pantalla está desconectada, o que se pierde porque la pantalla va lenta (más de 256 avisos de retraso), no se le vuelve a mandar; los módulos sí lo reciben por la cola (HUB-F51). Sin credencial, o con una de otro hub, se rechaza; una llave que solo puede escribir también; más de 16 conexiones con la misma llave se rechazan.
+Sale: cada aviso con su contenido, el módulo que lo emitió y la pantalla que mandó la orden (`client_instance`), por WebSocket (`/ws`) o por SSE (`/api/events`). La aplicación entra con la llave de solo lectura del propio hub y recibe **todo, sea cual sea el perfil de quien la abre** (también un cajero recibe los avisos con datos de clientes, los mensajes de WhatsApp y las preguntas de las automatizaciones). Una llave de integración `read_only` o `full` lo recibe todo; una `custom`, solo lo de los módulos que puede leer, y nada del hub. Los avisos propios del hub (módulo instalado, impresión) llevan otra forma de mensaje (`{"type": …}`).
+Si falla: el canal en vivo no guarda nada: un aviso que llega mientras la pantalla está desconectada, o que se pierde porque la pantalla va lenta (más de 256 avisos de retraso), no se le vuelve a mandar; los módulos sí lo reciben por la cola (HUB-F51). Sin credencial, o con una de otro hub, se rechaza; una llave que solo puede escribir también. Más de 16 conexiones a la vez **en todo el hub** (todas las pantallas y dispositivos comparten la llave de la aplicación) se rechazan: la pantalla 17.ª se queda sin avisos en vivo. En `/ws` los rechazos llegan como mensaje `stream.error`, no como código HTTP, y una credencial inválida en la cabecera del saludo se ignora y acaba en «sin autenticar» a los 15 segundos.
 Implicados: KITCHEN-F05
 Pendiente de enlazar: hub — HUB_SHELL, la aplicación: imprimir al oír la venta o la comanda solo en el dispositivo que la mandó, y lanzar el aviso del sistema
 Pendiente de enlazar: hub — HUB_APP, aviso del sistema de la app instalada al llegar una comanda o una cita
+Pendiente de enlazar: hub — HUB, acceso, personas y plan: la llave de solo lectura de la aplicación y el pase del canal en vivo
 QA: qa-hub-restaurant §7.08
 
 ### HUB-F61 Mandar el email o el WhatsApp que pide un módulo o una automatización
-Estado: hecho
+Estado: parcial — un mensaje puede salir dos veces: el envío y la marca de «enviado» son dos escrituras separadas y a ERPlora no se le pasa clave de no repetición (leído, sin ejecutar)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Un módulo (o un paso «Enviar un mensaje» de una automatización, HUB-F93) deja un aviso de mensaje pendiente: por qué canal, a quién, con qué plantilla y qué texto.
 2. El hub comprueba, antes de que salga nada, que quien lo pide puede: un módulo necesita el permiso de mensajes concedido, haber declarado ese canal y que el destinatario sea del propio hub (la lista de destinatarios permitidos de los ajustes, o el correo de un usuario activo); una automatización necesita sus dos permisos vivos, canal y de dónde sale el destinatario, que se vuelven a leer en ese momento.
 3. Lo manda por ERPlora: el correo sale con el remitente verificado de ERPlora y la respuesta va al negocio; el WhatsApp sale con el número del negocio, descontando su cuota.
-4. Lo apunta como enviado, con el identificador que le dio WhatsApp, para no repetirlo y para saber qué automatización preguntó si el cliente contesta tocando un botón.
+4. Después, en una escritura aparte, lo apunta como enviado, con el identificador que le dio WhatsApp, para no repetir lo que ya consta como enviado y para saber qué automatización preguntó si el cliente contesta tocando un botón.
 Entra: el aviso de mensaje (`*.reminder.due`): canal, destinatario, plantilla y variables.
 Sale: el mensaje entregado al proveedor y la marca de envío con el identificador del proveedor, la automatización y su paso. Un archivo de cabecera subido al hub se firma en cada intento para que WhatsApp lo pueda descargar.
-Si falla: un fallo de red o del proveedor sigue la escalera de HUB-F52; cuota agotada o permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno o uno que no es del hub se rechazan y acaban en «Eventos caídos». El SMS no tiene transporte y se rechaza. Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
+Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402/429) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, o falla apuntar la marca, el reintento lo vuelve a mandar: el cliente puede recibir el mismo WhatsApp o correo dos veces. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
 Implicados: pendiente
 Pendiente de enlazar: saas — proxy de notificaciones del dispositivo: enviar el correo y el WhatsApp del hub y cobrar la cuota
 Pendiente de enlazar: hub — HUB, WhatsApp y asistente: cuota de WhatsApp del negocio
 QA: qa-hub-flows R7
 
 ### HUB-F62 Ejecutar las tareas programadas de los módulos
-Estado: parcial — una tarea cuya orden falla se repite cada 5 minutos para siempre sin dejar rastro fuera del registro del servidor (ni campana, ni «Eventos caídos», ni contador de intentos); y no hay ninguna pantalla que diga qué tareas hay ni cuándo corrieron por última vez
+Estado: parcial — una tarea cuya orden falla se repite cada 5 minutos para siempre sin dejar rastro fuera del registro del servidor (ni campana, ni «Eventos caídos», ni contador de intentos), y ese fallo corta el resto de tareas vencidas de ese segundo; y no hay ninguna pantalla que diga qué tareas hay ni cuándo corrieron por última vez
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Un módulo declara en su manifiesto tareas que el hub debe hacer solo cada cierto tiempo. Hoy: cerrar las cajas olvidadas (cada 5 min), soltar las reservas sin confirmar y las mesas retenidas (cada 15 min), caducar las sesiones de bono retenidas (cada hora), enviar a la AEAT lo que quedó pendiente (cada 5 min) y repasar las conversaciones de WhatsApp sin ficha (cada 15 min).
-2. Al instalar o actualizar el módulo, el hub apunta sus tareas; al actualizar conserva cuándo toca la siguiente; las que el módulo ya no declara se borran.
+2. Al instalar o actualizar el módulo, el hub apunta sus tareas; al actualizar conserva cuándo toca la siguiente, también si el módulo cambió el horario (el nuevo se aplica a partir de esa vez); las que el módulo ya no declara se borran.
 3. Cada segundo el hub mira qué tareas tocan y ejecuta la orden de cada una como el propio hub, sin persona detrás.
 4. Si el hub estuvo apagado y se perdió varias pasadas, al volver la hace **una sola vez** y sigue con la siguiente hora que toque (o ninguna, si la tarea lo pide así).
 Entra: las tareas del manifiesto (`scheduled_tasks`: orden del propio módulo, horario `cron` de 5 campos, datos y qué hacer con lo perdido).
 Sale: los efectos de la orden y la hora de la siguiente vez, guardados juntos: si la orden falla, la tarea no avanza. Los horarios se leen en hora UTC, no en la del negocio (las automatizaciones sí usan la hora del negocio, HUB-F83).
-Si falla: una orden que falla deja la tarea apartada 5 minutos y se vuelve a intentar, sin límite. Un horario que el hub no sabe leer no se programa (se avisa en el registro del servidor). Una tarea de un módulo desactivado no corre y solo se reprograma. Con dos copias del hub a la vez durante una actualización, cada tarea la ejecuta una sola.
+Si falla: una orden que falla deja la tarea apartada 5 minutos y se vuelve a intentar, sin límite; además corta el repaso de ese segundo, y las demás tareas vencidas esperan al siguiente. Un horario que el hub no sabe leer no se programa (se avisa en el registro del servidor). Una tarea de un módulo desactivado no corre y solo se reprograma. Con dos copias del hub a la vez durante una actualización, cada tarea la ejecuta una sola.
 Implicados: VERIFACTU-F20, REC_FISCAL-F06
 Pendiente de enlazar: hub — HUB, módulos y órdenes: el instalador que apunta las tareas programadas al instalar, actualizar y desinstalar
 QA: ninguno
@@ -235,7 +236,7 @@ Pasos:
 2. El hub devuelve el aviso, las automatizaciones que arrancó y los avisos que nacieron al entregarlo, un nivel cada vez.
 3. Para seguir bajando, se pide lo mismo con cada aviso hijo.
 Entra: el identificador del aviso y la sesión de un administrador (`GET /api/hub/events/{id}/trace`).
-Sale: el aviso (sin su contenido), sus ejecuciones de automatización y los avisos hijos, hasta 200 de cada.
+Sale: el aviso sin su contenido, pero sus ejecuciones de automatización con sus datos de entrada (normalmente el contenido completo del aviso, con datos de clientes), y los avisos hijos sin contenido, hasta 200 de cada.
 Si falla: un aviso de otro hub o que ya se podó (90 días después de entregarse) da «no encontrado». El mismo rechazo de sesión que HUB-F54.
 Implicados: ninguno
 QA: qa-hub-flows R8
@@ -245,13 +246,13 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Cada vez que una persona o una integración del hub hace algo con una credencial válida, el hub anota la hora (sin escribir nada en ese momento).
+1. Cada petición que trae una sesión o una API key del hub y no es rechazada por falta de permiso (401/403) cuenta como entrada: el hub anota la hora (sin escribir nada en ese momento) y no comprueba aparte que la credencial sea válida.
 2. Cada minuto guarda esa hora en la base de datos, y al apagarse de forma ordenada, también.
 3. En su latido diario a ERPlora le dice cuándo entró alguien por última vez, solo si ha habido entradas nuevas.
 4. ERPlora usa esa hora para no apagar ni borrar un hub gratuito que se está usando.
-Entra: las peticiones con sesión o con API key que no fueron rechazadas.
+Entra: las peticiones con cabecera de sesión (`X-Hub-Session`) o de API key (`Bearer erpl_live_…`) que no terminaron en 401/403, también las de rutas que no autentican (`/healthz`, `/api/hub/context`) y las que terminan en 404 o 500.
 Sale: la hora de la última entrada (`_hub_activity`), que nunca retrocede, y la hora que ERPlora ya confirmó.
-Si falla: un intento con credencial caducada o rechazada no cuenta, ni las visitas anónimas (la pantalla de entrada, un comprobador de salud). Si el hub muere de golpe, se puede perder como mucho el último minuto. Si el latido falla, se vuelve a mandar en el siguiente.
+Si falla: una petición rechazada con 401/403 no cuenta, ni las anónimas (sin cabecera), ni el pase del canal en vivo, ni el primer mensaje de `/ws`, ni la llave de máquina (`erpk_`). Si el hub muere de golpe, se puede perder como mucho el último minuto. Si el latido falla, se vuelve a mandar en el siguiente.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, acceso, personas y plan: el latido diario a ERPlora que lleva la última entrada
 Pendiente de enlazar: saas — ciclo de vida del hub gratuito: apagar a los 60 días sin entradas y borrar a los 120

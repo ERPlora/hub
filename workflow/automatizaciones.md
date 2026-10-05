@@ -12,8 +12,10 @@ Prefijo: HUB
 > `flows` (FLOWS-F01…F29) y las recetas de WhatsApp se encienden desde la Bandeja de WhatsApp. Aquí
 > se cuenta qué hace el hub cuando esas pantallas le piden algo, y qué hace solo, por su cuenta.
 > Todas las puertas del motor exigen la **sesión de un dueño o administrador** del hub (anónimo:
-> rechazo por falta de sesión; cajero o empleado: rechazo por perfil) y, si la petición la hace un
-> módulo, que ese módulo tenga **«Administrar automatizaciones»** (`manage_flows`) concedido. Las
+> rechazo por falta de sesión; cajero o empleado: rechazo por perfil) y, si la petición se declara
+> hecha por un módulo (cabecera `X-Erplora-Module`), que ese módulo tenga **«Administrar
+> automatizaciones»** (`manage_flows`) concedido. Esa cabecera es una **declaración, no una
+> autenticación**: un módulo que no se declara pasa solo con la sesión del administrador. Las
 > excepciones (las recetas de fábrica) se dicen en su flujo.
 
 ## Flujos
@@ -80,7 +82,7 @@ Pendiente de enlazar: hub — HUB, negocio y datos: la zona horaria del negocio 
 QA: qa-hub-flows R2
 
 ### HUB-F84 Arrancar una automatización una vez, en una fecha y hora
-Estado: parcial — la fecha se compara como texto con la hora UTC, así que una fecha escrita con un desplazamiento distinto de UTC (`+02:00`) dispara dos horas tarde, y una con desplazamiento negativo, antes (leído, sin ejecutar; el único test usa `+00:00`)
+Estado: parcial — el hub compara la fecha como texto con la hora UTC: una fecha con desplazamiento distinto de UTC (`+02:00`), que puede llegar por la API, por un borrador del asistente o por una receta, dispara dos horas tarde, o antes si es negativo (leído, sin ejecutar). El editor de Automatizaciones siempre manda UTC (`Z`) y con él no ocurre
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -89,12 +91,12 @@ Pasos:
 3. Después ese disparador se apaga para siempre.
 Entra: el instante (`at`, RFC-3339 con desplazamiento obligatorio).
 Sale: una ejecución pendiente; el disparador apagado y sin próxima hora.
-Si falla: un instante ilegible no se guarda (`flow.invalid_at`). Un instante ya pasado dispara en cuanto se guarda la automatización encendida.
+Si falla: un instante ilegible no se guarda (`flow.invalid_at`). Un instante ya pasado dispara en cuanto se guarda la automatización encendida, y uno que venció con el hub apagado dispara al volver.
 Implicados: FLOWS-F13
 QA: qa-hub-flows R2
 
 ### HUB-F85 Lanzar una automatización a mano
-Estado: parcial — solo por la API: Automatizaciones no tiene botón «Ejecutar» (FLOWS-F22), y las ejecuciones a mano no cuentan para el límite de 30 por minuto
+Estado: parcial — solo por la API: Automatizaciones no tiene botón «Ejecutar» (FLOWS-F22); y las ejecuciones a mano no tienen límite, pero sí cuentan: 30 lanzadas a mano en un minuto frenan durante ese minuto los disparos por aviso y por horario de esa automatización
 Actor: administrador
 Pantalla: asistente
 Pasos:
@@ -122,13 +124,13 @@ Implicados: FLOWS-F03, FLOWS-F11, FLOWS-F21
 QA: qa-hub-flows R10
 
 ### HUB-F87 Pausar una automatización y volver a encenderla
-Estado: parcial — pausar no frena todo: una pregunta o propuesta que esperaba se puede aprobar y su acción se ejecuta, los mensajes que ya estaban en cola salen, y un turno del asistente en curso termina; y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
+Estado: parcial — pausar no frena todo: una propuesta que esperaba se puede aprobar y su acción se ejecuta, los mensajes que ya estaban en cola salen, una llamada a otro sistema en vuelo se hace, y un turno del asistente en curso puede ejecutar su acción o dejar una propuesta nueva aunque ya esté en pausa; y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
 Actor: administrador
 Pantalla: Automatizaciones: Automatizaciones
 Pasos:
 1. Se guarda la automatización con el interruptor apagado (HUB-F86).
 2. Desde ese momento no arranca con ningún aviso ni horario.
-3. Una ejecución que estaba lista para seguir se cancela en su siguiente paso (en un segundo); una que estaba esperando un plazo se cancela al despertar, salvo que se haya vuelto a encender antes.
+3. Una ejecución que estaba lista para seguir se cancela en su siguiente paso (en un segundo); si la pausa llega mientras el motor la está avanzando en ese mismo segundo, puede dar hasta 8 pasos más. Una que estaba esperando un plazo se cancela al despertar, salvo que se haya vuelto a encender antes; mientras tanto, los avisos que cancelan o reprograman su espera siguen actuando.
 4. Al volver a encenderla, arranca de nuevo con lo que pase desde entonces.
 Entra: la automatización con `enabled: false` o `true`.
 Sale: la automatización pausada o encendida; las ejecuciones canceladas con el motivo «la automatización se apagó mientras corría». Los permisos y el historial se quedan.
@@ -145,7 +147,7 @@ Pasos:
 2. Deja de arrancar al momento; lo que esperaba un plazo se cancela al momento; sus permisos se retiran; los mensajes que tenía en cola ya no saldrán.
 3. Su historial se conserva.
 Entra: la automatización y la sesión del administrador.
-Sale: la automatización marcada como borrada (quién y cuándo, nunca se borra la fila), sus disparadores y esperas desarmados, sus permisos retirados, sus ejecuciones dormidas o pendientes canceladas (`flow.flow_deleted`), y sus mensajes en cola cerrados en «Eventos caídos» sin destinatario (HUB-F53). Si era una receta de fábrica, volver a encenderla desde su módulo crea otra.
+Sale: la automatización marcada como borrada (quién y cuándo, nunca se borra la fila), sus disparadores y esperas desarmados, sus permisos retirados, sus ejecuciones dormidas o pendientes canceladas (`flow.flow_deleted`), y sus mensajes en cola se cierran en «Eventos caídos» sin destinatario cuando el repartidor vuelve a tomarlos (al momento si estaban pendientes, en su próximo reintento si estaban apartados) (HUB-F53). Aprobar una propuesta pendiente de una automatización borrada se niega (sin permiso) y la propuesta sigue en la bandeja hasta que se rechaza o caduca. Si era una receta de fábrica, volver a encenderla desde su módulo crea otra.
 Si falla: una automatización que ya no existe da «no encontrada».
 Implicados: FLOWS-F09
 QA: qa-hub-flows R10
@@ -192,7 +194,7 @@ Implicados: FLOWS-F14
 QA: qa-hub-flows R1, BD-10
 
 ### HUB-F92 Paso «Esperar»
-Estado: parcial — si el hub muere justo después de apuntar la espera y antes de guardarla, al volver la ejecución sigue en el paso siguiente sin esperar (leído, sin ejecutar)
+Estado: parcial — si el hub muere justo después de apuntar la espera y antes de guardarla, al volver (a los 5 minutos, cuando caduca su reserva) la ejecución sigue en el paso siguiente sin esperar (leído, sin ejecutar)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -201,7 +203,7 @@ Pasos:
 3. Al vencer, sigue con el paso siguiente. Si la fecha ya había pasado, según se haya dicho: termina, sigue al momento o falla.
 Entra: segundos o la ruta de una fecha, el adelanto, el máximo, qué hacer si ya pasó, y hasta 5 avisos que cancelan o reprograman, con hasta 3 datos para casarlos.
 Sale: la ejecución dormida con su hora de despertar y sus esperas armadas (`_flow_run_waits`).
-Si falla: una espera de más de 90 días, demasiados avisos o reprogramaciones no se guardan (`flow.delay_horizon`, `flow.max_reschedules`). Si se pausa la automatización, la ejecución se cancela al despertar.
+Si falla: una espera fija de más de 90 días, o demasiados avisos o reprogramaciones, no se guardan (`flow.delay_horizon`, `flow.max_reschedules`). Una espera hasta una fecha que cae a más de 90 días para la ejecución en ese paso con `flow.delay_horizon`, también al reprogramarse. Si se pausa la automatización, la ejecución se cancela al despertar.
 Implicados: FLOWS-F14
 QA: qa-hub-flows R3
 
@@ -215,8 +217,8 @@ Pasos:
 3. Deja el mensaje en la cola de salida, junto con el paso: que salga de verdad lo hace la cola (HUB-F61), que vuelve a leer los permisos al enviarlo.
 4. El historial dice «Mensaje en cola para mandarse» y oculta el teléfono o el correo.
 Entra: el canal, la consulta y el campo del destinatario, la plantilla de WhatsApp o el asunto del correo, el texto con datos insertados y, si hace falta, la cabecera y los botones.
-Sale: un aviso de mensaje pendiente (`flow.reminder.due`) con el destinatario (solo ahí) y el paso hecho en el historial con el destinatario oculto.
-Si falla: ninguno o más de un destinatario, o uno con mala forma, para la ejecución (`recipient_not_found`, `recipient_ambiguous`, `recipient_invalid`). El SMS no se guarda. Sin permiso, `flow.grant_denied`. Retirar el permiso con el mensaje en cola lo cierra para siempre (HUB-F53).
+Sale: un aviso de mensaje pendiente (`flow.reminder.due`) con el destinatario (solo ahí) y el paso hecho en el historial. El historial oculta la dirección, no el resto: guarda el texto del mensaje con los datos insertados y los datos de la consulta del destinatario.
+Si falla: ninguno o más de un destinatario, o uno con mala forma, para la ejecución (`recipient_not_found`, `recipient_ambiguous`, `recipient_invalid`); un texto que sale de un paso que no lo publicó, `flow.text_not_found`; una lista de opciones que no está, `flow.options_not_found`; una lista de opciones vacía termina la ejecución **bien, sin mandar nada**. El SMS no se guarda. Sin permiso, `flow.grant_denied`. Retirar el permiso con el mensaje en cola lo cierra para siempre (HUB-F53).
 Implicados: FLOWS-F15
 QA: qa-hub-flows R7
 
@@ -231,22 +233,22 @@ Pasos:
 4. Guarda la respuesta (código, y el cuerpo como datos o como texto) para los pasos siguientes.
 Entra: método (GET, POST, PUT, PATCH, DELETE), dirección, cabeceras, cuerpo y tiempo de espera (1 a 30 s, 10 de fábrica).
 Sale: la salida del paso con el código y el cuerpo, cortado a 1 MiB con la marca de cortado; los secretos sustituidos por asteriscos en lo guardado.
-Si falla: sin permiso, ninguna llamada sale. Una dirección con usuario y contraseña, interna o que resuelve a una interna se bloquea (`flow.http_blocked`); no se siguen redirecciones; una respuesta que no es 2xx (`flow.http_status`) o que tarda más del plazo (`flow.http_timeout`) para la ejecución salvo «seguir si falla».
+Si falla: sin permiso, ninguna llamada sale. Una dirección con usuario y contraseña, interna o que resuelve a una interna se bloquea (`flow.http_blocked`); una dirección rellenada que no es una URL, `flow.http_url_invalid`; no se siguen redirecciones; una respuesta que no es 2xx (`flow.http_status`), un fallo de conexión o de TLS (`flow.http_failed`) o que tarda más del plazo (`flow.http_timeout`) para la ejecución salvo «seguir si falla». La llamada sale **al menos una vez**: si el hub se reinicia durante la llamada, se repite a los 5 minutos, así que un servicio que no admite repetirse necesita su clave de no repetición en el documento. El tapado de secretos en la respuesta es por coincidencia exacta: si el otro sistema lo devuelve codificado (base64, URL), no se tapa.
 Implicados: FLOWS-F16
 QA: qa-hub-flows R5, qa-hub-flows R9
 
 ### HUB-F95 Paso «Pedírselo al asistente»
-Estado: parcial — el texto que se le pide solo puede usar datos de pasos terminados bien (uno saltado o que falló con «seguir» sale vacío) y no conoce la hora actual (leído, sin ejecutar); no hay tope de gasto propio, solo el número de vueltas
+Estado: parcial — el encargo solo puede insertar datos de pasos terminados bien (uno saltado o que falló con «seguir» sale vacío) y no la hora (el asistente sí la recibe en sus instrucciones, en UTC) (leído, sin ejecutar); no hay tope de gasto propio, solo el número de vueltas
 Actor: sistema, asistente
 Pantalla: ninguna
 Pasos:
 1. El hub manda al asistente el encargo del paso, con los datos insertados, y le ofrece solo las consultas y acciones que la automatización tiene concedidas y el paso declara.
-2. El asistente consulta y propone. Con «Que me lo pregunte» (de fábrica), lo que quiera cambiar queda en la bandeja esperando a un administrador (HUB-F100) y la ejecución espera; con «Que lo haga por su cuenta», lo ejecuta.
-3. Como mucho las vueltas indicadas (de 1 a 10; 6 de fábrica). Un fallo pasajero del proveedor se vuelve a pedir hasta 3 veces, nunca repitiendo una acción.
+2. El asistente consulta y propone. Con «Que me lo pregunte» (de fábrica), lo que quiera cambiar queda en la bandeja esperando a un administrador (HUB-F100) y la ejecución espera, salvo una orden que solo responde (de solo lectura), que se ejecuta sin pasar por la bandeja; con «Que lo haga por su cuenta», lo ejecuta.
+3. Como mucho las vueltas indicadas (de 1 a 10; 6 de fábrica). Ante un fallo pasajero del proveedor hace 3 intentos en total (con pausas de 1 y 3 segundos), nunca repitiendo una acción; es un mecanismo propio, no la escalera de los avisos.
 4. Guarda lo que contestó y las herramientas que usó.
 Entra: el encargo, las herramientas permitidas, la política, las vueltas y, si se pide, los datos que tiene que devolver.
 Sale: la salida del paso (`text`, las llamadas a herramientas y los datos pedidos) y, con «Que me lo pregunte», una propuesta en la bandeja que caduca a las 72 horas.
-Si falla: un secreto en el encargo o más de 10 vueltas no se guardan. Se para con `agent_max_iters`, `agent_timeout` (60 s el paso, 45 s cada turno), `agent_upstream`, `agent_no_output` o `agent_bad_output`, salvo «seguir si falla».
+Si falla: un secreto en el encargo o más de 10 vueltas no se guardan. Sin enlace con ERPlora, `flow.agent_no_cloud_credential`. Se para con `agent_max_iters`, `agent_timeout` (60 s el paso, 45 s cada turno), `agent_upstream`, `agent_no_output` o `agent_bad_output`, salvo «seguir si falla».
 Implicados: FLOWS-F17
 Pendiente de enlazar: hub — HUB, WhatsApp y asistente: el proxy del asistente y su medición de uso
 QA: qa-hub-flows R6, L-12
@@ -258,10 +260,10 @@ Pantalla: ninguna
 Pasos:
 1. Al llegar al paso, el hub deja la pregunta (con su texto y detalles ya rellenados) en la bandeja y la ejecución se para ahí.
 2. Espera la respuesta hasta el plazo (de 1 segundo a 30 días; 72 horas de fábrica).
-3. Con un sí, sigue. Con un no: para la ejecución o sigue, según se dijo. Sin respuesta en plazo: cuenta como un no, para o sigue, según se dijo.
+3. Con un sí, sigue. Con un no: para la ejecución o sigue, según se dijo. Sin respuesta en plazo: o se cancela la ejecución (de fábrica, también con «contarlo como un no») o sigue con la respuesta «caducada», según el plazo diga; no se aplica lo que se dijo para un no.
 4. La respuesta (sí, no o caducada, quién y la nota) queda como dato para un «Solo sigue si» posterior.
 Entra: título, detalles, rol, plazo, qué hacer con un no y con el silencio.
-Sale: una pregunta pendiente (`_flow_approvals`, tipo decisión) y la ejecución esperando. Este paso no pide permiso.
+Sale: una pregunta pendiente (`_flow_approvals`, tipo decisión), la ejecución esperando y un aviso efímero por el canal en vivo (`flow.approval.created`, con el título y el resumen ya rellenados, que pueden llevar datos del cliente y que recibe toda pantalla del hub, HUB-F60). Este paso no pide permiso.
 Si falla: un plazo fuera de rango o una pregunta vacía no se guardan.
 Implicados: FLOWS-F18
 QA: qa-hub-flows R6, BD-10
@@ -275,7 +277,7 @@ Pasos:
 2. Cualquier paso puede decir «si falla, sigue»: el fallo queda escrito en el paso, la ejecución continúa y los pasos siguientes pueden mirar si falló.
 3. Sin decir nada, un paso que falla para la ejecución.
 Entra: `run_if` (condiciones como las de HUB-F91) y `on_error` (`stop` o `continue`) de cada paso.
-Sale: el paso saltado (`skipped`) o fallido con su error, y la ejecución siguiendo. No hay reintento de un paso.
+Sale: el paso saltado no aparece en el historial (los pasos siguientes lo ven como `steps.<id>.skipped`); el fallido queda con su error; la ejecución sigue. No hay reintento de un paso.
 Si falla: un valor de `on_error` que no es ninguno de los dos no se guarda.
 Implicados: FLOWS-F14, WHATSAPP_INBOX-F20
 QA: qa-hub-flows R8
@@ -288,7 +290,7 @@ Pasos:
 1. La pantalla manda la **lista entera** de permisos que debe tener la automatización: acciones, consultas, canales de mensaje, de dónde sale el destinatario y direcciones externas.
 2. El hub comprueba toda la lista antes de tocar nada: que cada acción y consulta existe, que no es interna, que cada patrón de dirección, canal y destinatario está bien escrito, y que cada límite tiene sentido.
 3. Retira lo que ya no está y concede lo nuevo. Un permiso puede llevar límites: ciertos datos tienen que ser un valor fijo o lo que averiguó la propia automatización.
-4. Desde ese momento, cada paso comprueba su permiso al ejecutarse, también los que ya estaban en marcha.
+4. Desde ese momento, cada paso comprueba su permiso al ejecutarse, también los que ya estaban en marcha. Quién concedió no importa: no se comprueba qué puede hacer quien concede, y la automatización sigue actuando aunque su creador deje de ser administrador o se desactive (ADR-0283 D2).
 Entra: la lista de permisos (`command`, `query`, `notify`, `http`, `recipient_query`, con su límite si lo tiene) y la sesión del administrador.
 Sale: los permisos vivos de la automatización, con quién los concedió o retiró y cuándo. La lectura marca un permiso cuyo límite no se puede leer (`payload_unreadable`); ese permiso no autoriza nada.
 Si falla: una acción o consulta que no existe, «no encontrada»; una interna, rechazo; un patrón, canal o destinatario mal escrito, o un límite con un secreto, rechazo con su código. En todos esos casos no cambia nada. Con un límite incumplido, el paso se para con `flow.grant_payload_denied`.
@@ -301,7 +303,7 @@ Actor: administrador
 Pantalla: Automatizaciones: Editor de automatización
 Pasos:
 1. Se guarda un secreto con su nombre (en mayúsculas, hasta 64 caracteres) y su valor.
-2. El hub lo cifra y solo vuelve a enseñar el nombre: no hay forma de leer el valor.
+2. El hub lo cifra y solo vuelve a enseñar el nombre: no hay pantalla ni puerta que devuelva el valor. Pero quien puede crear automatizaciones puede enviarlo con un paso «Llamar a otro sistema» a una dirección que él mismo conceda.
 3. Un paso «Llamar a otro sistema» lo usa en la dirección, las cabeceras o el cuerpo; en el historial sale como asteriscos, y si el otro sistema lo devuelve en su respuesta o en su error, también se tapa.
 4. Borrar un secreto lo vacía; los pasos que lo usaban fallarán.
 Entra: nombre y valor; la sesión del administrador.
@@ -311,7 +313,7 @@ Implicados: FLOWS-F16
 QA: qa-hub-flows R5
 
 ### HUB-F100 Decidir una pregunta o una propuesta que espera
-Estado: parcial — dos aprobaciones a la vez de la misma propuesta (o una aprobación justo cuando caduca) pueden ejecutar la acción dos veces (leído, sin ejecutar); y aprobar ejecuta aunque la automatización esté en pausa
+Estado: parcial — dos aprobaciones a la vez de la misma propuesta pueden ejecutar la acción dos veces, y una aprobación que coincide con el barrido de caducadas la ejecuta aunque la fila acabe «caducada» y la ejecución cancelada (leído, sin ejecutar); y aprobar ejecuta aunque la automatización esté en pausa
 Actor: administrador
 Pantalla: Automatizaciones: Automatizaciones
 Pasos:
@@ -321,7 +323,7 @@ Pasos:
 4. Si es una pregunta, no ejecuta nada: la ejecución sigue con la respuesta como dato.
 5. Un no hace lo que el paso dijo (parar o seguir).
 Entra: la pregunta o propuesta, la decisión, la nota y la sesión (de ahí sale quién decidió, nunca del cuerpo).
-Sale: la decisión guardada con quién, cuándo y la nota; la ejecución sigue, se cancela o, si la acción aprobada falla, queda fallida con el error.
+Sale: la decisión guardada con quién, cuándo y la nota; la ejecución sigue, se cancela o, si la acción aprobada falla, queda fallida con el error. Al llegar y al caducar una propuesta sale un aviso efímero por el canal en vivo (`flow.approval.created` / `flow.approval.expired`) que refresca la bandeja.
 Si falla: ya decidida, «alguien ya contestó» (`flow.approval_already_decided`); caducada, `flow.approval_expired`; de otro rol y sin ser administrador, `flow.approval_not_yours`. Si al aprobar falta el permiso, la propuesta sigue pendiente.
 Implicados: FLOWS-F24
 QA: qa-hub-flows R6
@@ -345,7 +347,7 @@ Actor: administrador
 Pantalla: Automatizaciones: Editor de automatización
 Pasos:
 1. Cada ejecución queda guardada con su estado (pendiente, en marcha, esperando, esperando respuesta, terminada, fallida, cancelada), cuándo empezó y terminó, y su último error.
-2. Cada paso guarda lo que entró, lo que salió y su error, con los secretos y el destinatario de los mensajes ocultos.
+2. Cada paso hecho guarda lo que entró, lo que salió y su error, con los secretos y la dirección del destinatario de los mensajes ocultos; un paso saltado por su «solo si» no deja fila.
 3. La pantalla pide las ejecuciones de una automatización de 50 en 50 (hasta 200) de la más nueva a la más antigua, y el detalle de una con sus pasos y los avisos que emitió.
 4. A los 90 días de terminar, la ejecución y sus pasos, preguntas y esperas se borran; las que siguen vivas no se borran nunca.
 Entra: la automatización o la ejecución, y la sesión del administrador.
@@ -383,7 +385,7 @@ Implicados: FLOWS-F05
 QA: qa-hub-flows R7
 
 ### HUB-F105 Encender una receta de fábrica con exactamente sus permisos
-Estado: hecho
+Estado: parcial — conceder los permisos no es todo-o-nada: un fallo de base de datos a mitad deja permisos a medias, y la siguiente activación la enciende así; y dos activaciones a la vez pueden crear dos automatizaciones (leído, sin ejecutar)
 Actor: administrador
 Pantalla: Bandeja de WhatsApp: Ajustes
 Pasos:
@@ -393,7 +395,7 @@ Pasos:
 4. Pulsar dos veces es una sola automatización.
 Entra: el módulo y la receta, y la sesión del administrador. Un módulo solo puede encender las suyas.
 Sale: la automatización encendida, marcada con la receta de la que sale y su huella (para saber después si hay versión nueva); nueva o reutilizada.
-Si falla: si algo falla a mitad, queda en pausa y sin permisos, nunca encendida a medias; la siguiente activación la reutiliza. Una receta apartada se niega con su motivo; una que no existe, «no encontrada»; otro módulo, `flow.template_not_yours`.
+Si falla: si falla antes de conceder, queda en pausa y sin permisos, y la siguiente activación la reutiliza y le da los de la receta. Si falla a mitad de conceder, queda en pausa con parte de los permisos, y la siguiente activación la **enciende con esos**: el hub no garantiza deshacer lo que llegó a encender. Una receta apartada se niega con su motivo; una que no existe, «no encontrada»; otro módulo, `flow.template_not_yours`.
 Implicados: WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15, REC_WA_CITA-F01, REC_WA_MESA-F01
 QA: WR-01, WA-01
 
@@ -431,7 +433,7 @@ Actor: administrador
 Pantalla: Automatizaciones: Editor de automatización
 Pasos:
 1. Al elegir «Pasa algo», el editor pide al hub qué avisos existen en este negocio.
-2. El hub junta los que declaran los módulos instalados y los que ha visto pasar de verdad (en los últimos 90 días), con quién los declara y cuándo se vio el último.
+2. El hub junta los que declaran los módulos instalados y los que ha visto pasar de verdad (lo que queda en su historial: los entregados de los últimos 90 días y los pendientes o caídos de cualquier antigüedad), con quién los declara y cuándo se vio el último.
 Entra: la sesión del administrador (y «Administrar automatizaciones» si lo pide un módulo).
 Sale: la lista de nombres, sin contenido.
 Si falla: el mismo rechazo de sesión de todo el motor.
@@ -439,13 +441,13 @@ Implicados: FLOWS-F04, FLOWS-F13
 QA: qa-hub-flows R0
 
 ### HUB-F109 Enseñar ejemplos reales de un aviso con los datos de personas ocultos
-Estado: hecho
+Estado: parcial — el texto que escribe un cliente en un WhatsApp entrante sale como ejemplo (hasta 64 caracteres): su clave `text` no está entre las de texto libre y el aviso no cuenta como «de una persona»; y un teléfono de 9 dígitos sin prefijo bajo una clave neutra no se detecta (leído, sin ejecutar)
 Actor: administrador
 Pantalla: Automatizaciones: Editor de automatización
 Pasos:
 1. El editor pide qué datos trae un aviso («Total de la venta — 42,50 €»).
 2. El hub mira los últimos avisos de ese nombre en este negocio (5, hasta 20) y devuelve cada dato con su tipo, en cuántos aparece y un ejemplo.
-3. El ejemplo se oculta, pero el dato se lista, cuando puede ser de una persona: por el nombre del dato (correo, teléfono, dirección, NIF, IBAN, tarjeta…), por estar dentro de un cliente o un empleado, porque el aviso es de una persona y el dato es su nombre o su ciudad, porque es texto libre (notas, comentarios) o porque el valor parece un correo, un IBAN, una tarjeta o un teléfono.
+3. El ejemplo se oculta, pero el dato se lista, cuando puede ser de una persona: por el nombre del dato (correo, teléfono, dirección, NIF, IBAN, tarjeta…), por estar dentro de un cliente o un empleado, porque el aviso es de una persona y el dato es su nombre o su ciudad, porque es texto libre (notas, comentarios, `message`, `body`; **no** `text`: el texto de un WhatsApp entrante se enseña) o porque el valor parece un correo, un IBAN, una tarjeta o un teléfono con prefijo.
 4. Las listas se dan como un dato con su longitud, sin entrar.
 Entra: el nombre del aviso y cuántas muestras.
 Sale: la forma del aviso (hasta 200 datos, 6 niveles, ejemplos de 64 caracteres), nunca los avisos enteros.
@@ -454,7 +456,7 @@ Implicados: FLOWS-F14, FLOWS-F20
 QA: qa-hub-flows R0, qa-hub-flows R1
 
 ### HUB-F110 Frenar una automatización que se dispara en bucle
-Estado: parcial — lo que se descarta por el límite solo queda en el registro del servidor: ni el historial ni la campana dicen que una automatización se frenó; y las ejecuciones a mano no tienen límite
+Estado: parcial — lo que se descarta por el límite solo queda en el registro del servidor: ni el historial ni la campana dicen que una automatización se frenó; y las ejecuciones a mano no tienen límite, aunque cuentan para el de los disparos por aviso y por horario
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -487,11 +489,11 @@ Actor: administrador
 Pantalla: Automatizaciones: Editor de automatización
 Pasos:
 1. En un paso «Enviar un mensaje» con una plantilla que lleva cabecera, se sube el archivo.
-2. El hub mira el archivo por dentro (no por su nombre): tiene que ser JPEG o PNG, MP4 o PDF, del tipo que pide la cabecera y como mucho 5, 16 o 100 MB.
-3. Lo guarda en el hub con un nombre propio (su huella) y devuelve la referencia que guarda el paso.
+2. El hub mira el archivo por dentro (no por su nombre): tiene que ser JPEG o PNG, MP4 o PDF, del tipo que pide la cabecera (sin tipo, se toma «imagen») y como mucho 5, 16 o 100 MiB.
+3. Lo guarda en el almacén de ERPlora del hub (no en su disco) con un nombre propio (su huella) y devuelve la referencia que guarda el paso.
 4. En cada envío, el hub pide a ERPlora un enlace firmado a ese archivo para que WhatsApp lo descargue.
 Entra: el tipo de cabecera y el archivo; la sesión del administrador.
-Sale: el archivo en el almacén del hub y su referencia, tipo y tamaño. El mismo archivo subido dos veces es uno.
-Si falla: un archivo de otro tipo, demasiado grande o un formulario mal hecho se rechazan; si el almacén falla, error. Si el archivo se borra después, el envío falla y acaba en «Eventos caídos».
+Sale: el archivo en el almacén de ERPlora del hub y su referencia, tipo y tamaño. El mismo archivo subido dos veces lleva el mismo nombre (que sea un solo archivo depende de ERPlora, sin confirmar).
+Si falla: un archivo de otro tipo, demasiado grande o un formulario mal hecho se rechazan; si el almacén falla, error. Si la firma del enlace falla al enviar, se reintenta 8 veces y acaba en «Eventos caídos»; si el archivo se borró, hoy ERPlora firma igual (saas#2393) y el fallo llega después, desde WhatsApp.
 Implicados: FLOWS-F15
 QA: qa-hub-flows R7
