@@ -9,6 +9,12 @@ Prefijo: HUB_SHELL
 > (HUB-F34, HUB-F35) y en cada app; aquí solo lo que se ve. Las pantallas que se citan en
 > `Pantalla:` son las de `## Pantallas` del índice `apps/web/WORKFLOW.md`.
 
+## Referencia adoptada
+
+- **Inicio con una guía de puesta en marcha que se cierra sola al terminar, y un empuje inicial con
+  plantilla de sector**: las guías de arranque de Shopify, Odoo y Square (hub#368, hub#372).
+- **Tablero de paneles que aportan las apps, con presets por sector**: ADR-0054.
+
 ## Flujos
 
 ### HUB_SHELL-F25 Ver el negocio de un vistazo al entrar
@@ -32,12 +38,12 @@ Actor: administrador
 Pantalla: Inicio
 Pasos:
 1. En un negocio sin apps, quien lo administra ve arriba «Empieza con un negocio como el tuyo» — «Elige el que más se parezca al tuyo y te dejamos sus apps y su catálogo listos de una vez. Después tendrás que poner tus propios datos.» y «Trae además datos de ejemplo —clientes, citas— para que veas cómo funciona todo.».
-2. Hasta cuatro plantillas (primero las del país del negocio, después las de su idioma), cada una con su nombre, su descripción y «Usar esta». Al lado, «Ver todas las plantillas» (lleva a Ajustes › Datos) y «Ahora no» (cierra la tarjeta).
+2. Hasta cuatro plantillas (primero las del país del negocio, después las de su idioma), cada una con su nombre, su descripción y «Usar esta». Al lado, «Ver todas las plantillas» (lleva a Ajustes › Datos y copias) y «Ahora no» (cierra la tarjeta).
 3. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se descarga, se comprueba y se importa, sin pantallas intermedias.
 4. Resultado en la misma tarjeta: «Ya tienes tus apps y tu catálogo» — «Lo que queda es lo que solo puedes contestar tú: los datos de tu negocio. Los tienes en la lista de abajo.» y «Los datos de ejemplo están para que trastees. Puedes quitarlos cuando quieras desde Ajustes › Datos.»; «Continuar» la cierra.
 Entra: el catálogo de plantillas de erplora.com (a través del hub), el país y el idioma del negocio, el permiso de administrar.
 Sale: pide al hub importar la plantilla (apps, ajustes del negocio, imágenes y datos de las apps; nunca personas ni datos fiscales). Después refresca el menú de apps, la lista de configuración, los paneles, la salud y la actividad, y, si la plantilla trae apps que piden permisos, abre la pregunta de permisos (HUB_SHELL, Ajustes y datos).
-Si falla: apps que hay que añadir al plan: «Estas hay que añadirlas antes a tu plan: {apps}». Algo que no entró: «Estas no han entrado: {apps}…», «Esto no ha entrado: {parts}…» o «Hay algo más que no ha entrado…», con «Ver el informe» (Ajustes › Datos). No se pudo empezar: «No se ha podido abrir esa plantilla» — «No ha cambiado nada en tu negocio…» con el motivo y «Intentar otra vez». Cortado a medias: «La configuración no ha terminado» — «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.», sin reintento.
+Si falla: apps que hay que añadir al plan: «Estas hay que añadirlas antes a tu plan: {apps}». Algo que no entró: «Estas no han entrado: {apps}…», «Esto no ha entrado: {parts}…» o «Hay algo más que no ha entrado…», con «Ver el informe» (Ajustes › Datos y copias). No se pudo empezar: «No se ha podido abrir esa plantilla» — «No ha cambiado nada en tu negocio…» con el motivo y «Intentar otra vez». Cortado a medias: «La configuración no ha terminado» — «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.», sin reintento.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F234 (traer una plantilla del catálogo)
 Pendiente de enlazar: hub — HUB-F235 (importar un fichero o una plantilla)
@@ -156,7 +162,7 @@ Pasos:
 1. En **Inicio**, bajo la lista de configuración, está el tablero de paneles («Cargando widgets…» mientras llega).
 2. Cada panel es una tarjeta con su título e icono: una cifra, una lista con barras, una cronología, un gráfico o un trozo de la pantalla de la app.
 3. Los que salen de primeras son los que la app marca como recomendados para el sector del negocio; si el negocio no tiene sector, hasta seis recomendados, repartidos entre apps.
-4. Mientras el negocio está vacío hay además el panel «Configura tu negocio» — «Carga una plantilla para tu negocio o restaura una copia para empezar.» con «Configurar», que lleva a Ajustes › Datos; desaparece del catálogo en cuanto hay apps.
+4. Mientras el negocio está vacío hay además el panel «Configura tu negocio» — «Carga una plantilla para tu negocio o restaura una copia para empezar.» con «Configurar», que lleva a Ajustes › Datos y copias; desaparece del catálogo en cuanto hay apps.
 Entra: el bloque `widgets` del `module.json` de cada app activa, del plan y con menú visible para quien mira; los datos de cada panel, pedidos por la puerta normal de consultas con los permisos de quien mira, como mucho cuatro a la vez.
 Sale: nada guardado en el hub.
 Si falla: panel sin filas: «Sin datos». Consulta rechazada o rota: «No disponible», nunca una cifra vieja o inventada. Si no se pueden leer los manifiestos, no hay paneles de apps y el tablero dice «Panel vacío. Pulsa ⋮ para añadir widgets.».
@@ -250,12 +256,72 @@ Estado: hecho
 Actor: administrador
 Pantalla: Inicio
 Pasos:
-1. Termina una importación desde la tarjeta de plantillas o desde Ajustes › Datos.
+1. Termina una importación desde la tarjeta de plantillas o desde Ajustes › Datos y copias.
 2. Sin recargar, **Inicio** vuelve a leer la lista de configuración, los paneles (el de «Configura tu negocio» se va si ya hay apps), la salud y la actividad; «Mis apps» y el lanzador enseñan las apps nuevas.
-3. El informe de lo que entró y lo que no queda en Ajustes › Datos, al que lleva «Ver el informe».
+3. El informe de lo que entró y lo que no queda en Ajustes › Datos y copias, al que lleva «Ver el informe».
 Entra: el aviso de fin de importación de la propia pantalla.
 Sale: nada guardado.
 Si falla: lo que no se pudo leer conserva lo último que se leyó, salvo la actividad (HUB_SHELL-F36).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F239 (el informe de la importación y la tarjeta de inicio)
 QA: BD-01
+
+## Cobertura contra la referencia
+
+| Elemento de la referencia | Estado | Flujo |
+|---|---|---|
+| Guía de puesta en marcha con progreso | hecho | F27 |
+| Pasos que nadie marca a mano: se comprueban | hecho | F27, F31 |
+| Bloqueo legal visible en todas las pantallas | hecho | F28 |
+| Delegar un paso que no es tuyo | hecho («Esto lo tiene que configurar un administrador.») | F27 |
+| Plantilla de sector de un clic | parcial: fallo del catálogo mudo; «Ahora no» no se recuerda | F26 |
+| Datos de ejemplo opcionales | no hecho: vienen siempre con la plantilla | F26 |
+| Paneles por app con presets por sector | parcial: sin filtro por permiso en la pantalla | F33, F34 |
+| Tablero guardado por persona | no hecho: se guarda por navegador | F34 |
+| Paneles en vivo | hecho para lo que la app declara | F35 |
+| Actividad reciente | parcial: importe ×100, solo ventas y estados mal nombrados | F36 |
+| Estado de la impresora y de WhatsApp | parcial: detalle solo al pasar el ratón | F37 |
+
+## Datos: de quién es cada dato
+
+La lista de puesta en marcha y los paneles son del hub y de cada app (HUB-F34, HUB-F35). Lo que esta
+área guarda en el navegador del dispositivo:
+
+| Dónde (navegador) | Qué guarda | Dato personal | Cuándo se borra |
+|---|---|---|---|
+| `erplora.apps.usage` | cuántas veces se abre cada app | no | nunca |
+| tablero de paneles (`okwb:dashboard-hub`) | qué paneles y en qué orden | no | nunca; compartido por quien use el navegador |
+
+En memoria (no en el navegador) queda, tras cerrar sesión, la última lista de puesta en marcha.
+
+## Reglas que no se rompen
+
+- La franja «Todavía no puedes facturar» no se puede cerrar y solo sale con un paso «Necesario para
+  facturar» pendiente.
+- Un panel que falla dice «No disponible»: nunca un valor viejo ni inventado.
+
+## Dudas abiertas
+
+Se resuelven con `market-decision`; no las decide el worker.
+
+- **Tablero por persona o por dispositivo.** Hoy se guarda en el navegador y lo comparten todos los de
+  una caja (HUB_SHELL-F34).
+
+## Fuentes contrastadas
+
+- Manual 02: «el tablero incluye una entrada de datos del núcleo»: solo mientras el negocio no tiene
+  apps (hub#2199).
+- `cash_register` CASH_REGISTER-F12 dice que el empleado no ve «Caja (sesión actual)»: la pantalla no
+  filtra paneles por permiso (`DashboardPage.vue`, `hasPermission: () => null`); lo ve en el catálogo
+  y, si está puesto, sale «No disponible».
+- `src/i18n/locales/es.ts`: `dashboard.noWidgets` («Ninguna app instalada ofrece widgets todavía.»)
+  no lo usa ninguna pantalla.
+- `system.health.printerUnknownDetail` promete «Volveremos a comprobarlo solos»; Inicio solo lo relee
+  al volver a la pantalla.
+- `src/lib/dashboard-activity.test.ts` alimenta `total: '12.5'` (euros) cuando `sales.list` da
+  céntimos: no detecta el importe ×100 de HUB_SHELL-F36.
+- QA `qa-hub-restaurant` §7.00 pide «recargar y volver a entrar: no reaparece onboarding»: la tarjeta
+  de plantillas reaparece al recargar mientras el negocio siga sin apps («Ahora no» no se recuerda).
+- Dos textos de la tarjeta de plantillas («Puedes quitarlos cuando quieras desde Ajustes › Datos.» y
+  «Compruébalo en Ajustes › Datos antes de volver a intentarlo.») nombran la pestaña como «Datos»; su
+  rótulo es «Datos y copias».

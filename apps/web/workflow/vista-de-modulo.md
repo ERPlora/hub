@@ -7,8 +7,30 @@ Prefijo: HUB_SHELL
 > `components/ModuleSettingsForm.vue`, `lib/module-settings.ts`, `components/ModulePlanPanel.vue`,
 > `lib/module-quota.ts`, `lib/module-usage.ts`, `lib/protects.ts`, `components/ElevationDialog.vue`,
 > `lib/elevation.ts`, `lib/runtime-error-sentence.ts`, `lib/module-failure-message.ts`,
-> `lib/invalid-field.ts`, `lib/slot-fillers.ts`, `lib/immersive.ts`, `lib/outfitkit-skew.ts` y la
+> `lib/invalid-field.ts`, `lib/slot-fillers.ts`, `lib/outfitkit-skew.ts` (la pantalla completa, `lib/immersive.ts`, es HUB_SHELL-F18 del área de acceso) y la
 > traducción de rechazos del SDK (`packages/module-sdk/src/index.ts`, `unwrap`).
+
+## Referencia adoptada
+
+- **Estados de carga de una pantalla**: esqueleto de página (Shopify Polaris SkeletonPage, Ionic
+  `ion-skeleton-text`); «cargando / sin red / fallo / vacío / no instalada» son frases distintas
+  (hub#770, hub#1169, hub#1743).
+- **Aprobación del encargado sin cerrar la sesión de la cajera** (Square, Toast, Aloha): diálogo con
+  la persona y su PIN o su placa, la acción se hace una vez y queda a dos nombres. Contrastado en
+  `sales/WORKFLOW.md` (Toast — anulaciones) y `qa-hub-restaurant.md` §6.
+- **Bloqueo de la venta con la caja cerrada** (Odoo POS, Square: abrir caja antes de vender) —
+  contrastado en `cash_register` (CASH_REGISTER-F04).
+- **El hub no vende** (Google Play / Microsoft Store, anti-steering, hub#479): la pestaña Plan
+  enseña planes y lleva a la cuenta del cliente, no a un checkout.
+
+## Antes de empezar
+
+- La pestaña «Ajustes» de una app solo existe si su `module.json` declara el bloque `settings`
+  (hoy: appointments, cash_register, inventory, kitchen, sales, services, staff, tables); la pestaña
+  «Plan», si declara `billing`.
+- El bloqueo por suscripción, el rebote de apps fuera del plan y el estado de la pestaña «Plan» solo
+  se ven con una sesión iniciada con cuenta de erplora.com (regla común «Sesión de PIN frente a
+  sesión con cuenta» del índice; HUB_SHELL-F41, F46, F49).
 
 ## Flujos
 
@@ -17,7 +39,7 @@ Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo
 Pasos:
-1. La persona abre una app desde el menú lateral, desde «Mis apps» de Inicio o con «Abrir» en Aplicaciones.
+1. La persona abre una app desde el lanzador «Mis apps» de la barra superior, desde «Mis apps» de Inicio o con «Abrir» en Apps (las apps no están en el menú lateral).
 2. Mientras baja el código de la app se ve un esqueleto de página (una barra de título y seis filas grises); quien usa lector de pantalla oye «Cargando módulo…».
 3. La app aparece con su nombre traducido arriba y, si tiene más de una pestaña, la barra de pestañas abajo; se abre en la primera pestaña y la dirección pasa a nombrarla (`/m/<app>/<pestaña>`), de modo que «Atrás» sale de la app y no recorre pestañas.
 4. Un enlace directo a una pestaña (`/m/inventory/products`) abre esa pestaña.
@@ -273,20 +295,9 @@ Implicados: pendiente
 Pendiente de enlazar: sales — SALES-F01 (el TPV monta las piezas de mesa y cliente)
 QA: ninguno
 
-### HUB_SHELL-F55 Vender a pantalla completa
-Estado: hecho
-Actor: empleado, responsable, administrador
-Pantalla: Vista de un módulo
-Pasos:
-1. En una pestaña que lo declara (el TPV, la pantalla de cocina), la persona elige «Pantalla completa» en el menú de la app.
-2. Desaparecen el menú lateral, la barra superior y la barra de pestañas; en el navegador, también su barra si lo deja.
-3. «Salir de pantalla completa», salir del modo del navegador o irse de la app devuelven todo.
-Entra: la lista `chrome` de la pestaña en el `module.json`; la app solo pide, el shell solo atiende lo declarado.
-Sale: nada.
-Si falla: si el navegador niega su pantalla completa (iPhone), el shell igualmente esconde su marco.
-Implicados: pendiente
-Pendiente de enlazar: kitchen — KITCHEN-F10 (el modo pantalla completa del shell en el tablero de cocina)
-QA: ninguno
+### HUB_SHELL-F55 [retirado] Vender a pantalla completa
+Implicados: ninguno
+Sustituido por HUB_SHELL-F18 (acceso y navegación): era el mismo gesto, la pantalla completa de `lib/immersive.ts`.
 
 ### HUB_SHELL-F56 Pintar una app con los componentes visuales del hub
 Estado: parcial — la diferencia de versión entre los componentes del hub y los que trae la app solo se anota en la consola del navegador; nadie la ve ni la impide, y una app construida con otra versión puede pintarse mal
@@ -301,3 +312,77 @@ Sale: una línea en la consola por app.
 Si falla: nadie se entera salvo quien mire la consola.
 Implicados: ninguno
 QA: ninguno
+
+## Cobertura contra la referencia
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Cargando / sin red / fallo / vacío / no instalada / pestaña inexistente | hecho | HUB_SHELL-F40, HUB_SHELL-F41 |
+| Estado «sin permiso» propio en la vista de una app | no hecho (se dice «Aquí todavía no hay nada») | HUB_SHELL-F41 |
+| Estado «necesita un hub más nuevo» en la vista | no hecho (solo al instalar/actualizar en Apps) | HUB_SHELL-F41 |
+| Pestañas y nombres traducidos, sin recargar al cambiar de idioma | hecho | HUB_SHELL-F42 |
+| Ajustes declarativos: ver | parcial (lectura fallida → valores de fábrica sin aviso) | HUB_SHELL-F43 |
+| Ajustes declarativos: guardar con el mismo permiso que el servidor | parcial (pantalla: solo administrador) | HUB_SHELL-F44 |
+| Ajustes: validación antes de enviar (mínimos, obligatorios) | no hecho (solo el servidor) | HUB_SHELL-F44 |
+| Probar un ajuste sin guardar | parcial (ninguna app lo declara) | HUB_SHELL-F45 |
+| Plan de la app: estado, planes, «tu plan» | parcial (un fallo de erplora.com no se dice) | HUB_SHELL-F46 |
+| Consumo del mes y aviso de tope | hecho | HUB_SHELL-F47 |
+| Gestionar el plan fuera de la app (sin vender dentro) | hecho | HUB_SHELL-F48 |
+| App bloqueada por suscripción, sin perder datos | parcial (solo con cuenta de erplora.com; no se remonta al contratar) | HUB_SHELL-F49 |
+| Vender solo con la caja abierta (bloqueo en pantalla) | parcial | HUB_SHELL-F50 |
+| Aprobación del encargado con PIN o placa | hecho | HUB_SHELL-F51 |
+| Rechazos en el idioma de la persona | parcial (permiso, caja, aprobación cancelada, app fuera del plan; frase de la app solo tras pintarse) | HUB_SHELL-F52 |
+| Campo rechazado señalado | hecho | HUB_SHELL-F53 |
+| Piezas de otras apps dentro de una pantalla | hecho | HUB_SHELL-F54 |
+| TPV a pantalla completa | hecho | HUB_SHELL-F18 (área de acceso; F55 retirado) |
+
+## Datos: de quién es cada dato
+
+Ninguno de estos flujos tiene tabla propia: todo lo que pintan se lee del hub o de erplora.com.
+
+| Dato | Dueño | Cómo lo lee el shell |
+|---|---|---|
+| Menú, nombres traducidos, versión instalada | hub (HUB-F31) | `GET /api/navigation`, `GET /api/modules` |
+| Bloques `settings`, `billing`, `protects`, `bell`, `provides_slots`, `chrome` | cada app (`module.json`) | el fichero servido, una vez por sesión |
+| Valores de ajustes | cada app (su tabla `<app>_settings`) | la consulta y la orden que declara la app |
+| Estado de la suscripción de una app | erplora.com | `/api/v1/hub/device/module-subscription/` con la cuenta de la persona |
+| Apps permitidas y bloqueadas | erplora.com vía el hub (HUB-F162) | el plan del hub |
+| Personas para aprobar | hub (`pin_users` del contexto) | `GET /api/hub/context` |
+
+Dato personal que pasa por esta área (no se guarda en el shell): los nombres de todas las personas
+del hub en el diálogo de aprobación, visibles a quien lo abre.
+
+## Reglas que no se rompen
+
+- **La aprobación se pide solo para órdenes, una a la vez, y se gasta una vez** (SDK `command` /
+  `elevate`; `elevation.ts` `askForApproval`).
+- **La pantalla no es la autoridad** (regla común del índice): el bloqueo de caja, el permiso de
+  guardar ajustes y el bloqueo por suscripción los vuelve a aplicar el hub en cada orden. Con sesión
+  de PIN la pantalla ni siquiera conoce el bloqueo por suscripción: solo lo aplica el hub.
+- **La pantalla de una app recibe un cliente identificado como esa app** (`client.forModule(moduleId)`;
+  la de bloqueo, como la app que bloquea), para sus permisos de host. **No es una barrera**: lee
+  consultas de otras apps con el permiso de la persona, `forModule` es pública y `globalThis.erplora`
+  no lleva identidad. Lo que protege es el permiso de cada consulta y orden en el hub.
+
+## Lo que NO hace, a propósito
+
+- No vende ni cancela suscripciones dentro del hub (regla común del índice, hub#479).
+- No filtra por perfil la lista de personas del diálogo de aprobación (decide el hub; filtrarla
+  publicaría quién es responsable).
+
+## Dudas abiertas
+
+- ¿La pestaña «Ajustes» debe dejar guardar a quien tenga el permiso de la orden (responsable), como
+  el servidor, o el servidor debe exigir administrador? Afecta a SALES-F34, KITCHEN-F26,
+  INVENTORY-F19, CASH_REGISTER-F01.
+
+## Fuentes contrastadas
+
+- `architecture/hub/module-system.md` §3quater pone el título de ajustes como cabecera del
+  formulario: el shell lo omite si repite el nombre de la app.
+- El comentario del SDK (`packages/module-sdk/src/index.ts:1212-1214`) dice que cinco apps
+  (`customers`, `online_booking`, `tasks`, `tickets`, `whatsapp_inbox`) guardan sus frases de error
+  en forma anidada: en `origin/main` las cinco ya tienen `errors` plano.
+- El comentario de `ModuleView.vue` (guard con `component`) dice que «sin bundle, el fallback
+  genérico se queda»; el fallback solo se pinta si el bloqueo NO declara componente, así que sin
+  bundle la vista queda en blanco.

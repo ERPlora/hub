@@ -2,6 +2,25 @@
 
 Prefijo: HUB_SHELL
 
+> Detalle del área «Sistema»: la pantalla Sistema y sus cinco pestañas (Recursos, Plan y límites,
+> Actualizaciones, Eventos caídos, Registros) y el informe automático de errores de la pantalla.
+> Código: `views/SystemPage.vue` y `lib/system.ts`, `system-tabs.ts`, `system-health.ts`,
+> `system-metrics.ts`, `system-usage.ts`, `dead-letter.ts`, `update-history.ts`, `app-update.ts`,
+> `error-report.ts`. La pestaña Plan y límites la cuenta HUB_SHELL-F128
+> (`workflow/plan-y-archivos.md`; aquí F141 quedó retirado); «Tus apps» de Actualizaciones, HUB_SHELL-F119 (`workflow/aplicaciones.md`).
+
+## Referencia adoptada
+
+El panel de estado de Square Dashboard / Toast («Hardware» y estado de impresoras), la página
+«Estado del sistema» de Odoo (rendimiento + actualizaciones) y la bandeja de «eventos fallidos con
+reintento» de Zapier / Make / Shopify Flow (ver, reintentar uno, reintentar todos, descartar). Ya
+contrastadas en `qa-hub-flows` R8 y `qa-hub` §8.
+
+## Antes de empezar
+
+- Para ver y tocar los eventos caídos hace falta ser dueño o administrador; el resto de perfiles ve la
+  pestaña como vacía (HUB_SHELL-F145).
+
 ## Flujos
 
 ### HUB_SHELL-F135 Abrir Sistema y moverse por sus pestañas
@@ -106,23 +125,9 @@ Pendiente de enlazar: hub — HUB_PERIPHERALS (descubrimiento de impresoras en l
 Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y registro de dispositivos de la app instalada)
 QA: ninguno
 
-### HUB_SHELL-F141 Ver el plan y sus límites
-Estado: parcial — quien no administra ve «Las métricas de recursos no están disponibles» con un Reintentar que no sirve, porque el hub le niega el uso en vivo (401, también a una sesión válida sin rol); un refresco que falla deja los números viejos sin avisar; la pastilla solo avisa en el plan Gratis (en cualquier plan de pago dice «Dentro del límite» en verde aunque la memoria esté al 95 %); y el plan se pinta con el identificador interno con mayúscula («Free»), sin traducir (leído, sin ejecutar)
-Actor: administrador
-Pantalla: Sistema › Plan y límites
-Pasos:
-1. Abre **Plan y límites**.
-2. Arriba ve el plan actual (o «Desconocido») y una pastilla: «Dentro del límite» o «Cerca del límite». La pastilla solo puede decir «Cerca del límite» en el plan Gratis; en los demás planes siempre dice «Dentro del límite», aunque las barras de abajo estén en rojo.
-3. Debajo hay cinco tarjetas: **Memoria (RAM)** y **CPU** con porcentaje y barra (verde, amarillo desde el 80 %, rojo desde el 90 %); **Base de datos** con el tamaño frente a la cuota del plan (o «Sin cuota de plan»); **Dispositivos** y **Personas** como «n / tope» con «Límite del plan» o «Ilimitado».
-4. En el plan Gratis, si la memoria o la base de datos pasan del umbral, o los dispositivos o las plazas de personas están todos ocupados, sale «Te estás quedando sin margen en tu plan» con la causa («Este hub está cerca de su límite de memoria…», «Estás usando todos los dispositivos que permite tu plan.», «Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más.») y «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.». No hay botón de pago: lo retiró a propósito el requisito de las tiendas de aplicaciones.
-5. Mientras la pestaña está abierta y visible, se actualiza cada 5 segundos («En vivo — se actualiza cada pocos segundos mientras esta página está abierta.»).
-Entra: el uso en vivo del hub frente a los límites de su plan (HUB-F165); solo lo da a un administrador.
-Sale: nada guardado.
-Si falla: «Las métricas de recursos no están disponibles — El Hub no ha podido informar de su uso de recursos ahora mismo. Puedes reintentarlo.» con **Reintentar**. Es el mismo aviso para un fallo del hub y para un perfil sin permiso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F165 (uso de recursos frente a los límites del plan)
-Pendiente de enlazar: hub — HUB_SHELL, Aplicaciones, plan y archivos (los límites de personas y dispositivos que pinta Mi plan)
-QA: ninguno
+### HUB_SHELL-F141 [retirado] Ver el plan y sus límites
+Implicados: ninguno
+Sustituido por HUB_SHELL-F128 (`workflow/plan-y-archivos.md`): era el mismo gesto, la pestaña Sistema › Plan y límites (`components/PlanLimitsPanel.vue`).
 
 ### HUB_SHELL-F142 Saber qué versión corre y qué se le ha actualizado
 Estado: parcial — un historial que no se pudo leer sale igual que uno vacío («No te hemos cambiado nada»), justo la confusión que Eventos caídos evita; no hay botón para actualizar el hub a propósito (se actualiza solo)
@@ -264,3 +269,58 @@ Implicados: pendiente
 Pendiente de enlazar: hub — HUB, el embudo de errores del frontend (`/api/error-report`) hacia erplora.com
 Pendiente de enlazar: hub — HUB_SHELL, Asistente (el informe a mano bajo cada respuesta)
 QA: ninguno
+
+## Cobertura contra la referencia
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Uso de CPU, memoria, BD y conexiones con rango | hecho | HUB_SHELL-F136 |
+| Estado de impresoras, con salida para arreglarlo | parcial | HUB_SHELL-F137 |
+| Avisos del dispositivo y búsqueda de impresoras, con salida | hecho | HUB_SHELL-F139, HUB_SHELL-F140 |
+| Plan y límites en vivo | parcial | HUB_SHELL-F128 (`plan-y-archivos.md`; F141 retirado) |
+| Versión que corre e historial de cambios | parcial | HUB_SHELL-F142 |
+| Actualizar el hub desde la pantalla | no hecho a propósito (se actualiza solo) | HUB_SHELL-F142 |
+| Actualizar las apps | hecho (desde Mis apps) | HUB_SHELL-F143 |
+| Registro de sucesos | hecho | HUB_SHELL-F144 |
+| Cola de eventos fallidos: ver, reenviar uno, reenviar todos | parcial | HUB_SHELL-F145, HUB_SHELL-F146, HUB_SHELL-F147 |
+| Descartar con motivo | parcial (no se envía el motivo) | HUB_SHELL-F148 |
+| Ver lo ya cerrado (quién, cuándo, por qué) | no hecho (el hub lo da, no hay pantalla) | HUB_SHELL-F148 |
+| Informe de error automático | parcial | HUB_SHELL-F149 |
+| Botón «Informar de un problema» a mano en Sistema | no hecho | — |
+
+## Datos: de quién es cada dato
+
+- La cola de eventos es del servidor; esta área no guarda nada propio. Lo único que la pantalla
+  recuerda es la pestaña, en la dirección; el rango de uso no se guarda.
+- Datos personales: el contenido de los eventos caídos (la pantalla no lo pinta pero el hub lo sirve).
+  El informe automático de errores (HUB_SHELL-F149) puede arrastrar texto de pantalla dentro del
+  mensaje o la pila.
+
+## Reglas que no se rompen
+
+- Descartar un evento caído no borra la fila.
+
+## Lo que NO hace, a propósito
+
+- No hay botón de «Actualizar el hub»: se actualiza solo y Sistema solo cuenta lo que cambió.
+- No hay botón «Ver planes» en Plan y límites (regla común del índice: el hub no vende).
+- No se edita el contenido de un evento caído: se arregla la causa y se reenvía tal cual.
+- No hay pestaña de documentos en Sistema (retirada; quedan textos sin uso en los catálogos) ni macOS
+  en la descarga de la app.
+
+## Dudas abiertas
+
+- ¿Descartar un evento caído debe pedir un motivo en pantalla (el hub lo admite)? Propuesta: sí, un
+  campo opcional, y sustituir la ventana del navegador por la del producto.
+- ¿Una pestaña de Eventos caídos para quien no administra debe decir «solo un administrador»?
+  Propuesta: sí.
+- ¿Los 100 eventos más recientes bastan, o hay que paginar?
+
+## Fuentes contrastadas
+
+- Manual `07-sistema.md`: dice «Eventos» y «acciones administrativas ocultas o rechazadas para otros
+  roles»; la pestaña se llama «Eventos caídos» y a un no administrador le sale vacía («Todo en orden»).
+- Servidor (HUB-F57): el motivo del descarte es opcional y se guarda; la pantalla no lo manda.
+  Servidor (HUB-F54): el hub sirve el contenido y quién causó el evento; la pantalla no los pinta.
+- Servidor (HUB-F166): «últimos 50 avisos entre apps como Registros y los documentos guardados en la
+  nube»; la pantalla ya no tiene documentos.
