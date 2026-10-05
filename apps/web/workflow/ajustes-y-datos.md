@@ -241,7 +241,7 @@ Implicados: HUB-F32, HUB-F237
 QA: ninguno
 
 ### HUB_SHELL-F170 Conectar el número de WhatsApp del negocio
-Estado: parcial — hoy Meta solo deja conectar números del portfolio de ERPlora (verificación del negocio y revisión de la app pendientes, pm#277)
+Estado: parcial — hoy Meta solo deja conectar números del portfolio de ERPlora (verificación del negocio y revisión de la app pendientes, pm#277); la etiqueta «App de WhatsApp Business» no sale nunca, porque erplora.com no manda `is_on_biz_app` ni al conectar ni en la lista de números
 Actor: administrador
 Pantalla: Tu número
 Pasos:
@@ -249,7 +249,7 @@ Pasos:
 2. Pulsa **Conectar WhatsApp**: «Abriendo la conexión con WhatsApp…». El navegador carga el programa de Facebook (en español o inglés) y abre su ventana.
 3. En la ventana inicia sesión, elige conectar la app de WhatsApp Business, escribe el número y escanea el QR con la app del móvil.
 4. Al cerrarse, «Conectando tu número…»: el hub entrega a erplora.com lo que devolvió Facebook (un código de un solo uso y los identificadores).
-5. El bloque pasa a **Conectado** con el número, la etiqueta «App de WhatsApp Business» si salió de ahí y **Desconectar**; debajo, «Los mensajes de tus clientes llegan a la Bandeja y las automatizaciones los contestan.».
+5. El bloque pasa a **Conectado** con el número y **Desconectar** (la etiqueta «App de WhatsApp Business» saldría si erplora.com dijera que el número es de esa app, pero no lo dice ni al conectar, que solo devuelve el identificador y el número visible, ni en la lista, HUB-F261); debajo, «Los mensajes de tus clientes llegan a la Bandeja y las automatizaciones los contestan.».
 Entra: el código y los identificadores que da Facebook al terminar; el hub los reenvía con su credencial de máquina (el navegador no la ve).
 Sale: el número queda conectado en erplora.com (HUB-F260); empiezan a llegar mensajes (HUB-F263).
 Si falla: la frase del motivo y, si procede, **Reintentar**: «La conexión se canceló antes de terminar.» y «No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.» (las decide la propia pantalla), «No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.» (el 404 de erplora.com), la de quien no puede conectar, o la genérica «Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.». Las frases propias de los motivos de erplora.com y de Meta (`whatsappConnect.errors.not_configured`, `internal_error`, `no_business_account`, `no_access_token`, `meta_unreachable`, `meta_api_error`) no se ven nunca a través del hub: un fallo 5xx llega como `cloud_rejected` (`crates/server/src/cloud_proxy.rs`, `cloud_envelope_passthrough`) y una negativa en prosa no es un código (`lib/whatsapp-connect.ts`, `refusalCode`), así que las dos caen en la genérica. Si la plataforma no tiene WhatsApp configurado, al administrador el bloque no le pinta nada (ni botón, ni mensaje): no se ofrece conectar; quien no administra ve igualmente la frase de negativa. Si el elemento no existe en un hub antiguo, la Bandeja lo dice.

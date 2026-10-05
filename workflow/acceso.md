@@ -57,7 +57,7 @@ Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: HUB_SHELL: Acceso
 Pasos:
-1. En la pantalla de acceso, la persona escribe su correo y su contraseña (o pulsa «Continuar con Google») y, si su cuenta lo pide, el código de verificación que le llega por correo. Ese paso lo resuelve erplora.com; el hub no ve nunca la contraseña.
+1. En la pantalla de acceso, la persona escribe su correo y su contraseña (o pulsa «Continuar con Google») y, si su cuenta tiene la verificación en dos pasos, el código de su app autenticadora o uno de sus códigos de recuperación (erplora.com no manda nada por correo: contesta `delivered: false`). Ese paso lo resuelve erplora.com; el hub no ve nunca la contraseña.
 2. Con la cuenta ya comprobada, el hub mira si esa persona es miembro de **este** negocio en erplora.com. Si lo es, la busca entre sus usuarios (primero por su cuenta de erplora.com, después por su correo de acceso, comparado **letra a letra, mayúsculas incluidas**) y, si no la encuentra, la da de alta con el rol por defecto del despliegue (`HUB_DEFAULT_ROLE`; empleado si no se dice).
 3. Si en erplora.com es dueña o administradora del negocio, el hub le garantiza como mínimo el rol de administrador; nunca le baja el rol que ya tuviera.
 4. Si la persona entró desde un dispositivo identificado, el hub lo apunta como dispositivo de confianza (a partir de ahí el PIN funciona en él) y le pone de nombre el del navegador («Chrome · Android») si aún no tenía. La casilla «Confiar en este dispositivo» de la pantalla no interviene: el hub lo marca siempre que llega el identificador del dispositivo.
@@ -166,7 +166,7 @@ Estado: hecho
 Actor: sistema
 Pantalla: HUB_SHELL: Acceso
 Pasos:
-1. El plan del negocio admite un solo dispositivo a la vez (el plan gratuito).
+1. El plan del negocio admite un solo dispositivo a la vez (el plan gratuito). Ese tope lo pone erplora.com en el permiso firmado, y en erplora.com ninguna migración lo escribe: solo el comando manual `sync_hub_plans`; si no se ha ejecutado, el gratuito llega sin tope y nadie es desalojado.
 2. Alguien entra en otro dispositivo, con PIN, placa o cuenta.
 3. El hub da por terminadas las sesiones de todos los demás dispositivos y apunta el motivo.
 4. En el dispositivo desalojado, la siguiente acción lleva al acceso con «Sesión abierta en otro dispositivo» y «Tu plan cubre un dispositivo a la vez…», con la salida a ampliar el plan.
@@ -276,7 +276,7 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Alguien a quien quitaron del negocio en erplora.com intenta entrar con su cuenta.
-2. El hub ve que la credencial ya no lo nombra miembro de este negocio.
+2. El hub ve que la credencial ya no lo nombra miembro de este negocio. Eso solo pasa con una credencial de un acceso nuevo (contraseña, Google o el pase desde el panel, que es lo único que manda la pantalla del hub): una credencial **renovada** copia la lista de negocios de la que renueva y sigue nombrándolo miembro mientras se renueve, y la puerta del hub acepta cualquier credencial firmada y vigente, sin distinguir si es renovada.
 3. Antes de rechazarlo, lo da de baja en el hub y borra sus sesiones: deja de aparecer en el pinpad y su PIN y su placa dejan de servir.
 4. Si más adelante vuelve a ser miembro, su próximo acceso con la cuenta lo reincorpora en la misma ficha, con el rol que le dé la membresía de ese día.
 Entra: la credencial de erplora.com sin este negocio en su lista.

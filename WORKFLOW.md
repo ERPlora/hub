@@ -368,14 +368,14 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F275 | Recortar las herramientas a los módulos que importan para la pregunta | hecho | [asistente.md](workflow/asistente.md) |
 | HUB-F276 | Anclar al asistente a lo que este hub tiene instalado | parcial | [asistente.md](workflow/asistente.md) |
 | HUB-F277 | Ver el plan del asistente y lo que queda del mes | hecho | [asistente.md](workflow/asistente.md) |
-| HUB-F278 | Denunciar una respuesta del asistente | hecho | [asistente.md](workflow/asistente.md) |
+| HUB-F278 | Denunciar una respuesta del asistente | parcial | [asistente.md](workflow/asistente.md) |
 | HUB-F279 | Pedirle un paso al asistente dentro de una automatización | hecho | [asistente.md](workflow/asistente.md) |
 | HUB-F300 | Resolver el perfil fiscal del hub al arrancar | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F301 | Saber dónde y por qué vía declara el hub | hecho | [fiscal.md](workflow/fiscal.md) |
 | HUB-F302 | Guardar o sustituir el certificado del negocio | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F303 | Borrar el certificado del negocio | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F304 | Elegir la vía de envío: mi certificado o ERPlora | hecho | [fiscal.md](workflow/fiscal.md) |
-| HUB-F305 | Enviar la autorización de representación y seguir su estado | hecho | [fiscal.md](workflow/fiscal.md) |
+| HUB-F305 | Enviar la autorización de representación y seguir su estado | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F306 | Pedir, recoger y renovar la conexión segura con la celda fiscal | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F307 | Pasar a producción | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F308 | Volver a pruebas mientras no se haya declarado nada en producción | parcial | [fiscal.md](workflow/fiscal.md) |

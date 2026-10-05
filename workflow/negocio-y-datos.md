@@ -112,7 +112,7 @@ Pantalla: ninguna
 Pasos:
 1. Al arrancar, el hub lee `HUB_COUNTRY`.
 2. Si es un país ISO y no hay país guardado, lo guarda.
-3. Si es una demo, rellena NIF, razón social y domicilio vacíos con los de ERPlora Demo.
+3. Si es una demo, rellena NIF, razón social y domicilio vacíos con los de ERPlora Demo. A una demo erplora.com le manda `HUB_COUNTRY` vacío, así que la demo no recibe país y el paso 2 no guarda ninguno.
 Entra: `HUB_COUNTRY` del despliegue y la marca de demo.
 Sale: `country_code` con autor `system:provisioning`; en la demo, las tres claves con autor `system:demo`. Nunca pisa un valor ya guardado ni una corrección del administrador.
 Si falla: se escribe una línea en el log y el arranque sigue.

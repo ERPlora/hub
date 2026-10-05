@@ -130,13 +130,13 @@ Implicados: ninguno
 QA: ninguno
 
 ### HUB_SHELL-F46 Ver el plan de una app de pago en su pestaña «Plan»
-Estado: parcial — si erplora.com no contesta, la pestaña no lo dice: pinta el plan gratuito como «Activo» (o «Sin plan» en una app sin plan gratuito); y la consulta va directa a erplora.com con la cuenta de la persona, así que con una sesión de PIN (que no lleva cuenta de erplora.com) erplora.com la rechaza y cae siempre en ese mismo caso
+Estado: parcial — una suscripción cancelada que sigue dentro del periodo pagado sale como «Activo» con «Se renueva el …», porque erplora.com la contesta `active`; para una app sin listar o retirada, «se gestionan desde tu cuenta de ERPlora» manda a una página que contesta 404; si erplora.com no contesta, la pestaña no lo dice: pinta el plan gratuito como «Activo» (o «Sin plan» en una app sin plan gratuito); y la consulta va directa a erplora.com con la cuenta de la persona, así que con una sesión de PIN (que no lleva cuenta de erplora.com) erplora.com la rechaza y cae siempre en ese mismo caso
 Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo › Plan
 Pasos:
 1. En una app que declara planes, la persona toca «Plan».
-2. Arriba, «Tu plan» con «Comprobando tu suscripción…» y después el estado: «Activo», «En prueba», «Pago pendiente», «Cancelado», «Caducado» o «Sin plan», con su línea: «Se renueva el …», «Prueba hasta el …», «Se cancela el …», «Estás en {plan}, el plan con el que entra todo el mundo.», «Incluido en tu plan {plan}.» o «Tu suscripción ha caducado. Sigues en {plan}.».
-3. Siempre: «Los planes de este módulo se gestionan desde tu cuenta de ERPlora, en erplora.com.».
+2. Arriba, «Tu plan» con «Comprobando tu suscripción…» y después el estado: «Activo», «En prueba», «Pago pendiente», «Cancelado», «Caducado» o «Sin plan», con su línea: «Se renueva el …», «Prueba hasta el …», «Se cancela el …» (que no se ve nunca con una fecha por venir: erplora.com contesta `active` a una suscripción cancelada mientras dura el periodo pagado, y `expired` cuando acaba), «Estás en {plan}, el plan con el que entra todo el mundo.», «Incluido en tu plan {plan}.» o «Tu suscripción ha caducado. Sigues en {plan}.».
+3. Siempre: «Los planes de este módulo se gestionan desde tu cuenta de ERPlora, en erplora.com.». Para una app sin listar o retirada es falso: la página de la cuenta y la ficha de erplora.com contestan 404 a una app fuera del catálogo; solo queda cancelarla por la API del hub mientras siga publicada.
 4. Debajo, una tarjeta por plan de la app con su nombre traducido, su precio («Gratis», «/mes», «/año») y lo que incluye («Incluye …», «{n} días de prueba», «… por unidad extra»); la del plan actual va destacada con «Tu plan». Si el nivel lo da el plan del hub, las tarjetas no llevan precio.
 5. Una app sin planes: «Este módulo no ofrece planes de pago.».
 Entra: los planes del `billing` del `module.json` y sus traducciones; el estado de la suscripción de esa app para este hub, pedido a erplora.com con la cuenta de la persona y el hub (`/api/v1/hub/device/module-subscription/`).

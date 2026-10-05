@@ -195,7 +195,7 @@ Pasos:
 5. Pasa la respuesta a HUB_VERIFACTU-F08.
 Entra: el XML comprobado; la conexión segura del hub, si la hay; el permiso de envío de la nube.
 Sale: la respuesta de la AEAT tal como la devuelve la celda.
-Si falla: si la nube niega el permiso, o la celda no responde, el registro va a la cola con su motivo; en producción sin autorización aprobada la celda lo rechaza (y el núcleo ya habría negado la venta: HUB-F313). Si la nube contesta que este hub debe ir por su propio certificado, no hay vía por la celda.
+Si falla: si la nube niega el permiso, o la celda no responde, el registro va a la cola con su motivo; en producción sin autorización aprobada la celda lo rechaza (y el núcleo ya habría negado la venta: HUB-F313), salvo si el NIF del negocio es el de ERPlora (el de la identidad de demostración: la celda lo trata como «nombre propio») o si el hub declaró a erplora.com el NIF de otro negocio con otorgamiento vigente, que viaja en el permiso (VFGW-F08). Si la nube contesta que este hub debe ir por su propio certificado, no hay vía por la celda.
 Implicados: HUB-F305, HUB-F306, VFGW-F01, VFGW-F02, VFGW-F06, VFGW-F08, VFGW-F10, VFGW-F12, VFGW-F18
 Pendiente de enlazar: saas — acuñar el permiso de envío de la celda para cada hub (`/api/v1/hub/device/fiscal/gateway-token/`), también sin autorización para el carril de pruebas
 QA: qa-hub §7, qa-hub-restaurant §7.11

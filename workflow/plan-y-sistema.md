@@ -23,7 +23,7 @@ Pasos:
 1. El despliegue arranca el hub con su identificador de negocio, su base de datos y su credencial de máquina.
 2. El hub pide a erplora.com la clave con la que comprobará los accesos con cuenta (hasta 5 s), aplica sus migraciones, apunta su versión, siembra al dueño de la cuenta y carga las apps instaladas (si una versión nueva no arranca, vuelve a la anterior).
 3. Lanza sus tareas de fondo **antes** de abrir la puerta: avisos y automatizaciones cada segundo, la recogida de WhatsApp, la poda horaria, y la comprobación del plan con el latido (HUB-F162, HUB-F164), que sale al instante y luego cada 24 h; así que al arrancar sale un latido antes de que el hub escuche.
-4. Abre la puerta y, en cuanto puede servir (HUB-F161), manda a erplora.com un único aviso de «ya atiendo» con casi el mismo resumen que el latido (sin la última actividad de las personas).
+4. Abre la puerta y, en cuanto puede servir (HUB-F161), manda a erplora.com un único aviso de «ya atiendo» con casi el mismo resumen que el latido (sin la última actividad de las personas). Si erplora.com todavía tiene el hub como «desplegando», antes de contestar a ese aviso (o al latido) sondea varias veces seguidas su `/readyz` y solo con todas buenas lo da por activo: el hub espera con la petición abierta mientras tanto.
 Entra: el identificador del negocio (`HUB_ID`), la base de datos (`HUB_DATABASE_URL`, obligatoria), la credencial de máquina (`HUB_CLOUD_API_TOKEN`), el correo del dueño (`HUB_OWNER_EMAIL`), la dirección de erplora.com (`HUB_CLOUD_API_URL`; sin ella, producción).
 Sale: el hub sirviendo; la fila de versión en el historial (HUB-F167); el dueño marcado en su ficha; el aviso de arranque (`POST /api/v1/hub/device/heartbeat/`) con la credencial de máquina (`X-Api-Key` si es una llave `erpk_…`, `X-Hub-Token` si es la antigua; siempre con `X-Hub-Id`).
 En este mismo documento se apoya en: HUB-F25 (Reponer las aplicaciones al arrancar y actualizarlas solas).
@@ -51,7 +51,7 @@ Estado: parcial — la respuesta, sin sesión, lleva la versión y los errores i
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. El orquestador del servidor pregunta cada 30 s si el hub está listo.
+1. El orquestador del servidor pregunta cada 30 s si el hub está listo. erplora.com también lo pregunta, varias veces seguidas, cuando recibe un aviso o un latido de un hub que todavía tiene como «desplegando» (HUB-F159), y mantiene abierta la petición del hub mientras lo hace.
 2. El hub comprueba su base de datos, que la tabla de migraciones se pueda leer (no que haya alguna) y que todas las apps activas estén cargadas.
 3. Si todo está bien contesta «listo»; si algo falla o no lo sabe, «no me mandes tráfico». Que el despliegue de una versión que no llega a «listo» se deshaga es cosa de la infraestructura (sin confirmar en este repo).
 Entra: nada; sin sesión.
@@ -66,9 +66,9 @@ Estado: parcial — el plan vive solo en memoria (tras reiniciar sin conexión n
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al arrancar y después cada 24 horas, el hub pide a erplora.com su permiso firmado: el plan, las apps permitidas con su nivel, el número de dispositivos, de personas y el tamaño de base de datos, y hasta cuándo vale sin conexión.
+1. Al arrancar y después cada 24 horas, el hub pide a erplora.com su permiso firmado: el plan, las apps permitidas con su nivel, el número de dispositivos, de personas y el tamaño de base de datos, y hasta cuándo vale sin conexión. erplora.com solo lista las apps publicadas y activas que tienen versión en el carril del hub: borrar o apagar una app en erplora.com la quita del permiso.
 2. Comprueba la firma con la clave de erplora.com y se lo queda.
-3. Una app que ya no está en el permiso (de pago o gratuita) deja de responder al momento en las órdenes y consultas de la pantalla, sin desinstalarse ni perder datos; su API pública, sus tareas programadas, sus automatizaciones y sus avisos siguen corriendo. Si erplora.com no contesta, las apps gratuitas siguen siempre; una de pago (o de un nivel desconocido, que cuenta como de pago) se corta solo tras tres fallos seguidos **y** pasada su gracia. Con una comprobación al arrancar y otra cada 24 h, el tercer fallo llega a las 72 h; la gracia la pone erplora.com en el permiso (según los comentarios del código, 5 días las de pago y 7 la general; sin confirmar en el SaaS): **a los 3 días sin conexión no se corta nada**, las de pago caen hacia el día 5 (o el 7) y las gratuitas nunca. Si el hub se reinicia durante el corte, vuelve a «todo abierto» y además el acceso con cuenta deja de estar disponible.
+3. Una app que ya no está en el permiso (de pago o gratuita) deja de responder al momento en las órdenes y consultas de la pantalla, sin desinstalarse ni perder datos; su API pública, sus tareas programadas, sus automatizaciones y sus avisos siguen corriendo. Si erplora.com no contesta, las apps gratuitas siguen siempre; una de pago (o de un nivel desconocido, que cuenta como de pago) se corta solo tras tres fallos seguidos **y** pasada su gracia. Con una comprobación al arrancar y otra cada 24 h, el tercer fallo llega a las 72 h; la gracia la pone erplora.com en el permiso (5 días desde la emisión las de pago, `paid_grace_until`, y 7 la general, `grace_until`; el permiso vale 24 h): **a los 3 días sin conexión no se corta nada**, las de pago caen hacia el día 5 (o el 7) y las gratuitas nunca. Si el hub se reinicia durante el corte, vuelve a «todo abierto» y además el acceso con cuenta deja de estar disponible.
 4. Los topes de personas y dispositivos se aplican al dar de alta (HUB-F147) y al entrar (HUB-F137).
 Entra: el permiso firmado (`GET /api/v1/hub/device/entitlement/`) con la credencial de máquina; la clave pública (`/api/v1/auth/public-key/`).
 Sale: el plan verificado en memoria; las órdenes y consultas de una app bloqueada contestan `module_entitlement_blocked` (402) y la vista del módulo dice «Suscripción necesaria». Con una sesión de PIN (sin credencial de erplora.com) la pantalla no conoce el plan y no pinta el bloqueo: la app aparece normal y sus peticiones fallan con el 402. La pantalla recibe el plan por una puerta propia con 60 s de memoria, que ante un «demasiadas peticiones» de erplora.com sigue sirviendo el último bueno. En el mismo turno se recoge el cupo de mensajes de WhatsApp del mes.
@@ -83,7 +83,7 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. El dueño cambia de plan en erplora.com.
-2. erplora.com manda al hub el permiso nuevo ya firmado.
+2. erplora.com manda al hub el permiso nuevo ya firmado. Es el único caso en que lo empuja: comprar o cancelar una app, o una suspensión, no empujan nada y llegan con la comprobación de cada 24 h (HUB-F162).
 3. El hub comprueba la firma, que es para este negocio y que no es más viejo que el que tiene (el mismo momento de emisión se acepta), y lo aplica sin esperar a la comprobación diaria ni a un reinicio.
 Entra: el permiso firmado; no hace falta sesión ni llave: la firma es la prueba. Pasa por la barrera de registro (HUB-F160) y por un freno de 5 rechazos por dirección (sin cabecera de proxy, todos comparten la misma clave).
 Sale: el plan nuevo en memoria; las apps y topes cambian desde la siguiente petición.

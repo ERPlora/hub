@@ -35,7 +35,7 @@ Pantalla: Ventana de ERPlora
 Pasos:
 1. Abre la aplicación recién instalada: no recuerda ningún negocio, así que carga la página de entrada
    de erplora.com (`/shell/`).
-2. Inicia sesión o crea la cuenta (el negocio gratuito se crea al registrarse).
+2. Inicia sesión o crea la cuenta. Registrarse no crea el negocio: hace falta un paso más en erplora.com, «¿Cómo se llama tu negocio?» o, desde «Abre tu hub» sin ninguno, «Crear hub gratuito» → «Crea tu hub» con su nombre.
 3. Con un solo negocio listo, entra solo; con varios, elige uno en «Abre tu hub» (cada tarjeta enseña
    su rol y, si aún se despliega, «Preparando tu hub… esta página se refresca sola»).
 4. El SaaS lleva la ventana al negocio con la marca `?shell=1`. La aplicación recuerda **el origen** de
@@ -118,7 +118,7 @@ Pasos:
 Entra: el `hub.url` y la respuesta del negocio.
 Sale: el fichero borrado y la ventana en el SaaS. La asimetría es a propósito: olvidar de más obliga a
 rehacer el alta; olvidar de menos deja una pantalla fea que se arregla sola.
-Si falla: sin red no olvida nada (HUB_APP-F11). Con un enlace de apertura (HUB_APP-F03) no corre el
+Si falla: sin red no olvida nada (HUB_APP-F11). Sin confirmar: qué contesta hoy la dirección de un negocio pausado (servicio a cero réplicas) desde que el borde dejó Cloudflare; si fuera un 404, la aplicación lo olvidaría como si se hubiera borrado. Con un enlace de apertura (HUB_APP-F03) no corre el
 chequeo, para no llevarse por delante lo que se acaba de pedir. Se ve el 404 un instante antes del
 SaaS.
 Implicados: pendiente

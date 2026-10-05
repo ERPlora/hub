@@ -123,14 +123,14 @@ Implicados: HUB_VERIFACTU-F06, VERIFACTU-F04
 QA: qa-hub §7
 
 ### HUB-F305 Enviar la autorización de representación y seguir su estado
-Estado: hecho
+Estado: parcial — [SEG] el estado que sigue el hub es el del otorgamiento del NIF que el hub declara, no uno ligado a este hub: erplora.com no comprueba que ese NIF sea de este negocio, así que declarar el NIF de otro negocio con otorgamiento vigente da «vigente» (y su historial)
 Actor: administrador, sistema
 Pantalla: VERIFACTU: Configuración
 Pasos:
 1. En **VeriFactu → Configuración**, pestaña «Lo remite ERPlora», el administrador pide el modelo oficial relleno con los datos del negocio y de quien firma; el hub lo trae del SaaS como PDF.
 2. Sube el modelo firmado (PDF), la copia del DNI o NIE, la muestra de firma si es NIE y, si el negocio es una sociedad (NIF que empieza por letra de entidad), el justificante de representación; cada documento, menos de 10 MB.
 3. El hub comprueba lo que falta antes de cruzar la red y reenvía los documentos al SaaS con la credencial de máquina; el estado pasa a «pendiente» hasta que una persona de ERPlora lo revisa.
-4. Cada vez que se abre la pantalla, el hub pregunta al SaaS el estado (pendiente, vigente, rechazado, revocado o ninguno), el motivo de un rechazo y el historial de envíos, y guarda una copia del estado y su fecha en el perfil fiscal.
+4. Cada vez que se abre la pantalla, el hub pregunta al SaaS el estado (pendiente, vigente, rechazado, revocado o ninguno), el motivo de un rechazo y el historial de envíos, y guarda una copia del estado y su fecha en el perfil fiscal. Lo que contesta el SaaS es el otorgamiento del NIF que este hub le ha declarado (el de Ajustes › Negocio publicado), sea de quien sea: el otorgamiento no está atado al hub y el SaaS no comprueba que el NIF sea de este negocio.
 5. Además, cada hora, un hub en producción por la vía de ERPlora vuelve a preguntar solo: si ERPlora revoca o rechaza la autorización, el hub deja de cobrar sin que nadie abra la pantalla; si la vuelve a aprobar, vuelve a cobrar.
 Entra: los datos del negocio y de quien firma y los documentos, del administrador; el estado, del SaaS.
 Sale: la autorización en el SaaS para revisión; en el hub, solo el estado y su fecha (`_hub_fiscal_profile`); los documentos no se guardan en el hub ni salen en el registro del servidor.
@@ -157,12 +157,12 @@ Pendiente de enlazar: saas — recibir la solicitud de firma del hub en su exped
 QA: qa-hub §7
 
 ### HUB-F307 Pasar a producción
-Estado: parcial — la comprobación de «listo» usa el estado calculado en el último arranque (HUB-F300): tras configurar sin reiniciar se niega con `fiscal.not_ready`, y con un estado viejo puede dejar pasar a un hub que ya no tiene vía (que luego no podrá cobrar, HUB-F313)
+Estado: parcial — [SEG] la autorización aprobada que exige es la del NIF que el hub declara a erplora.com, no una atada a este hub (HUB-F305); la comprobación de «listo» usa el estado calculado en el último arranque (HUB-F300): tras configurar sin reiniciar se niega con `fiscal.not_ready`, y con un estado viejo puede dejar pasar a un hub que ya no tiene vía (que luego no podrá cobrar, HUB-F313)
 Actor: administrador
 Pantalla: VERIFACTU: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, el administrador pulsa «Pasar a producción» y confirma.
-2. El núcleo comprueba, en este orden: que el hub no haya cesado; que no sea de demostración; que, si declara por la vía de ERPlora, la autorización esté aprobada; que el perfil esté «listo»; y que el certificado propio que firma no haya caducado.
+2. El núcleo comprueba, en este orden: que el hub no haya cesado; que no sea de demostración; que, si declara por la vía de ERPlora, la autorización esté aprobada (la copia del estado de HUB-F305: la del NIF que el hub declara, sin que erplora.com compruebe que es suyo); que el perfil esté «listo»; y que el certificado propio que firma no haya caducado.
 3. Si todo está, el hub pasa a producción: congela el NIF del negocio como el de la cadena y anota el momento. Pulsarlo estando ya en producción no hace nada.
 4. Los registros nuevos nacen en la cadena de producción; los que nacieron en pruebas siguen yendo a pruebas.
 Entra: el perfil fiscal, la vía, la autorización y la caducidad del certificado, del núcleo.
@@ -281,9 +281,9 @@ Estado: hecho
 Actor: sistema
 Pantalla: VERIFACTU: Ajustes
 Pasos:
-1. Un hub desplegado como demostración (marca `HUB_DEMO`, que solo pone el SaaS al crearlo) nunca puede pasar a producción.
+1. Un hub desplegado como demostración (marca `HUB_DEMO`, que solo pone el SaaS al crearlo) nunca puede pasar a producción. erplora.com la pone a las demos, al hub canario de cada versión y, en PRE (`HUB_FISCAL_FORCE_TESTING`), a todos los hubs. Junto con la falta de conexión segura, es la única barrera entre la demo, que lleva el NIF de ERPlora, y producción: con ese NIF, la celda presenta sin otorgamiento (VFGW-F08).
 2. Ninguna orden puede escribir otro entorno fiscal que el de pruebas.
-3. Al arrancar, el núcleo le siembra, si no tiene una, una identidad fiscal de demostración (NIF y razón social) para que sus ventas se puedan facturar. Puede tener certificado propio, y envía de verdad, siempre al entorno de pruebas de la AEAT.
+3. Al arrancar, el núcleo le siembra, si no tiene una, una identidad fiscal de demostración (NIF y razón social) para que sus ventas se puedan facturar. Puede tener certificado propio, y envía de verdad, siempre al entorno de pruebas de la AEAT. Esa identidad sembrada no se publica a erplora.com (solo publica guardar Ajustes › Negocio): por la vía de ERPlora no se envía nada hasta que el visitante guarda su identidad, porque erplora.com rechaza el permiso de la celda (`400 obligado_nif_invalid`) y los registros esperan en la cola.
 Entra: la marca de demostración del despliegue, leída una vez al arrancar.
 Sale: el perfil con «no puede pasar a producción»; la pantalla lo explica.
 Si falla: un intento de pasar a producción: `fiscal.go_live_forbidden`; uno de escribir otro entorno: la negativa de demostración (`demo_fiscal_environment_locked`).
@@ -329,7 +329,7 @@ QA: BD-02, qa-hub §7
 | Comprobar el certificado al subirlo (contraseña, caducidad visible) | parcial: no comprueba la contraseña; no enseña la caducidad | HUB-F302 |
 | Elegir la vía (propia o ERPlora) sin perder el certificado | hecho | HUB-F304 |
 | Quitar el certificado sin dejar al negocio sin vía | parcial: en producción no se impide | HUB-F303 |
-| Autorización de representación (Anexo I) con revisión humana | hecho (revisión en el SaaS) | HUB-F305 |
+| Autorización de representación (Anexo I) con revisión humana | parcial: revisión en el SaaS, pero el otorgamiento va por el NIF que declara el hub, no atado a él | HUB-F305 |
 | Conexión segura con la celda | parcial: sin renovación ni aviso de caducidad en el hub | HUB-F306 |
 | Paso a producción con comprobaciones | parcial: estado «listo» del último arranque; adopción única sin comprobaciones al arrancar (hub#2079) | HUB-F300, HUB-F307 |
 | Paso a producción irreversible tras la primera emisión | parcial: el sello no lo pone la factura de una venta | HUB-F308 |

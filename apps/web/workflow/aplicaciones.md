@@ -67,7 +67,7 @@ Pasos:
 2. Mientras llega: «Cargando el catálogo…». Después, tarjetas (en un móvil siempre tarjetas) o tabla con «App», «Versión», «Categoría», «Descripción», «Precio» y «Estado» («Instalado», «Disponible», «No disponible», «Instalando…», «Actualizar a {version}» o «Necesita ERPlora {version}»).
 3. Busca en «Buscar apps para añadir…» (nombre, descripción y categoría) y filtra por categoría, precio y estado.
 4. Un administrador ve la acción «Instalar» o «Actualizar» en la fila que corresponda (HUB_SHELL-F109 y F116); en una demo, no: «Estás viendo el catálogo real en modo demostración. Conecta un negocio real para instalar apps.».
-Entra: el catálogo de erplora.com que reenvía el hub, en el idioma del negocio; cruzado con las apps instaladas en el hub, que es lo que manda para decir «Instalado» (el catálogo puede ir por detrás).
+Entra: el catálogo de erplora.com que reenvía el hub; el hub pide el idioma del negocio (`?lang=`), pero esa puerta de erplora.com lo ignora: con la credencial de máquina sale en el idioma que manda la pantalla (`Accept-Language`, que el hub reenvía) y, si va con la cuenta de la persona, en el que tenga guardado en erplora.com (solo la puerta pública, la de un hub sin enrolar, respeta `?lang=`); cruzado con las apps instaladas en el hub, que es lo que manda para decir «Instalado» (el catálogo puede ir por detrás).
 Sale: nada guardado. Recupera el catálogo al volver el foco a la ventana, para ver al instante una suscripción contratada fuera.
 Si falla: «No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.» con «Reintentar»; las filas que ya había se conservan. Sin respuesta todavía, «Cargando el catálogo…»; con una búsqueda sin resultados, «No hay apps que coincidan con tu búsqueda.» (cada situación con su frase).
 Implicados: pendiente
@@ -80,7 +80,7 @@ Actor: administrador, responsable, empleado
 Pantalla: Apps
 Pasos:
 1. En el catálogo, la columna «Precio» dice «Gratis», «Incluida en tu plan», «{price} €/mes», «{price} €/año», «{price} €» (pago único) o «Consultar».
-2. Si erplora.com manda una etiqueta de precio propia, esa es la que sale tal cual.
+2. La pantalla pintaría tal cual una etiqueta de precio propia de erplora.com, pero el catálogo de erplora.com no la manda nunca: el importe sale del precio más bajo que declara (`price_from`, el mínimo de sus planes de pago).
 3. Una app sin importe conocido nunca enseña la unidad sola («€/mes» sin cifra): sale «Consultar».
 4. La pestaña **De pago** reúne todo lo que no es gratis, incluidas las «Incluida en tu plan».
 Entra: el precio, el ciclo y si va en el plan, que manda erplora.com.
@@ -278,7 +278,7 @@ Actor: administrador, responsable, empleado
 Pantalla: Apps
 Pasos:
 1. Una app instalada que el catálogo ha retirado sale en **Mis apps** con la etiqueta «Retirada» junto al nombre.
-2. Arriba, un aviso en amarillo lo explica: «Ya no están en el catálogo: {apps}. Aquí siguen funcionando y siguen recibiendo actualizaciones — simplemente ya no se ofrecen, así que no las encontrarás para instalarlas en otro sitio.».
+2. Arriba, un aviso en amarillo lo explica: «Ya no están en el catálogo: {apps}. Aquí siguen funcionando y siguen recibiendo actualizaciones — simplemente ya no se ofrecen, así que no las encontrarás para instalarlas en otro sitio.». Es cierto en producción, donde erplora.com las sigue sirviendo a quien ya las tiene; en PRE no: el permiso firmado de PRE sale del catálogo y deja fuera las retiradas (HUB-F162). Si la app es de pago, su suscripción ya no se gestiona desde la página de erplora.com, que contesta 404 a una app fuera del catálogo.
 3. La app sigue como cualquier otra: se abre, se desactiva y se desinstala.
 Entra: para las apps que el catálogo no lista, el estado de publicación que pregunta el hub una a una. Con un hub sano no cuesta ninguna petición.
 Sale: nada guardado.

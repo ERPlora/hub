@@ -55,7 +55,7 @@ Pasos:
 2. Lee arriba «Los cambios de plan se gestionan desde tu cuenta de ERPlora, en erplora.com.» y la tabla: «Suscripción», «Precio» (importe y ciclo, por ejemplo «/mes»), «Renueva» y «Estado». Sin ninguna: «No hay suscripciones activas».
 3. Al volver a la ventana o a la pestaña del navegador, se recargan solas: contratar o cancelar en erplora.com se ve al volver.
 4. En **Pagos** solo hay un aviso: «Los métodos de pago se gestionan desde tu cuenta de ERPlora, en erplora.com.».
-Entra: las suscripciones de apps de la persona que da erplora.com (importe, periodo, estado, fin de periodo); la pantalla busca otros nombres (`plan_name`, `plan_price`, `billing_cycle`, `cancel_at_period_end`) y los estados de erplora.com (`active`, `past_due`, `cancelled`, `unpaid`) no son de factura.
+Entra: las suscripciones de apps de la persona que da erplora.com (importe, periodo, estado, fin de periodo); la pantalla busca otros nombres (`plan_name`, `plan_price`, `billing_cycle`, `cancel_at_period_end`) y los estados de erplora.com (`active`, `past_due`, `cancelled`, `unpaid`) no son de factura. erplora.com manda además `currency`, sacada de la moneda de la persona (con «USD» si no tiene), que la pantalla no lee: pinta siempre euros.
 Sale: nada guardado. No hay botón para comprar, cambiar o cancelar: se hace fuera.
 Si falla: lo mismo que HUB_SHELL-F126 (cuenta no iniciada, o error con «Reintentar»).
 Implicados: pendiente
