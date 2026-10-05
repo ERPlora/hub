@@ -149,7 +149,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F22 | Sembrar los datos de partida de un módulo | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F23 | Actualizar una aplicación | parcial | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F24 | Consultar qué actualizaciones y versiones hay | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
-| HUB-F25 | Reponer las aplicaciones al arrancar y actualizarlas solas | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
+| HUB-F25 | Reponer las aplicaciones al arrancar y actualizarlas solas | parcial | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F26 | Seguir lo que otra copia del hub instaló, actualizó, apagó o quitó | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F27 | Activar una aplicación | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F28 | Desactivar una aplicación preguntando antes si puede irse | parcial | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
@@ -158,7 +158,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F31 | Servir el menú, las pantallas y los ficheros de las aplicaciones | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F32 | Conceder o retirar un permiso de host a una aplicación | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F33 | Leer y guardar los ajustes de un módulo | parcial | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
-| HUB-F34 | Servir los datos de los paneles de Inicio | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
+| HUB-F34 | Servir los datos de los paneles de Inicio | parcial | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F35 | Calcular la lista de puesta en marcha | hecho | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 
 Áreas del servidor que faltan aquí: (integrador) filas de avisos (F50–), automatizaciones (F80–),
@@ -183,17 +183,17 @@ fiscal (F300–).
 | Instalar una app con sus dependencias | hecho | HUB-F19 |
 | Instalar sin cobrar una dependencia de pago sin consentimiento | hecho (se para y dice qué contratar) | HUB-F19 |
 | Verificar integridad y firma del paquete | hecho (firma obligatoria solo si el despliegue tiene claves) | HUB-F19 |
-| Seguir cobrando mientras se instala una app | no hecho: la instalación retiene las órdenes | HUB-F19 |
+| Seguir cobrando mientras se instala, actualiza o reconcilia una app | no hecho: el hub entero deja de atender, sin tope total de tiempo | HUB-F19, HUB-F23, HUB-F26 |
 | Actualizar una app sin reiniciar y volver a la anterior si falla | hecho | HUB-F23 |
-| Actualizaciones automáticas | hecho al arrancar sin carpeta de descargas (nube); con carpeta, sin confirmar | HUB-F25 |
-| No bajar de versión | parcial: la API con versión explícita sí baja | HUB-F23 |
+| Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); en la nube vuelven encendidas las apagadas | HUB-F25 |
+| No bajar de versión ni saltarse el pin de soporte | parcial: un administrador, por la API con versión explícita, baja y se salta el pin | HUB-F23 |
 | Apagar una app y lo que depende de ella | hecho | HUB-F28 |
-| Desinstalar avisando de lo que depende | hecho | HUB-F29 |
+| Desinstalar avisando de lo que depende | parcial: si se fuerza, las dependientes quedan activas y la app quitada vuelve en el siguiente arranque | HUB-F29 |
 | Desinstalar conservando los datos | hecho | HUB-F29 |
 | Borrar los datos de una app desinstalada | no hecho, a propósito | — |
 | Permisos de la app concedidos por el dueño | hecho | HUB-F32 |
-| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor | HUB-F33 |
-| Paneles de Inicio por app | hecho (servidor); el tablero es de `HUB_SHELL` | HUB-F34 |
+| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor; sin permiso de lectura se ven los de fábrica | HUB-F33 |
+| Paneles de Inicio por app | parcial: un panel sin permiso sale «No disponible» en vez de ocultarse | HUB-F34 |
 | Lista de puesta en marcha | hecho | HUB-F35 |
 | Aprobación del responsable con PIN para una acción | hecho | HUB-F05 |
 | Validar lo que llega antes de ejecutar | hecho | HUB-F04 |
@@ -281,8 +281,10 @@ API, otra app).
   de cero (HUB-F18), en los módulos que enlazan la aritmética común.
 - **Nada fiscal se simula.** Los candados fiscales del hub (perfil fiscal) se aplican a toda orden,
   también a las de un manejador o una automatización; una demo nunca sale del entorno de pruebas.
-- **Las migraciones solo avanzan** y un `DROP` se convierte en un cambio de nombre: no se pierden
-  datos al actualizar ni al desinstalar.
+- **Las migraciones solo avanzan** y un `DROP TABLE` o `DROP COLUMN` se convierte en un cambio de
+  nombre a `_deprecated_…` (`DROP INDEX` y `DROP CONSTRAINT` se ejecutan; nueve ficheros publicados
+  entran por una lista de excepciones): no se pierden filas al actualizar ni al desinstalar. El hub
+  no deshace una migración aplicada, ni siquiera si la instalación falla después.
 - **Una app que aún debe registros a la AEAT no se apaga ni se quita**, y en producción no se queda
   el hub sin quien cumpla su régimen fiscal.
 - **Un paquete no entra sin su huella SHA-256**; con claves de confianza desplegadas, tampoco sin
@@ -301,7 +303,8 @@ API, otra app).
 - No tiene funciones de negocio: vender, cobrar, facturar o reservar son de las apps.
 - No cobra una app de pago por su cuenta: si el plan pide comprarla, se para y lo dice.
 - No borra los datos de una app al desinstalarla.
-- No baja de versión una app desde la pantalla ni la actualiza a una versión en cuarentena.
+- No ofrece en la pantalla bajar de versión ni versiones en cuarentena (por la API, un administrador
+  con versión explícita sí puede bajar: hueco, HUB-F23).
 - No pide PIN para leer: un informe no se desbloquea con el código del responsable.
 - No deja que un manejador WASM toque la base de datos, la red ni otra app: propone, y el hub valida.
   El motor nativo de confianza (hoy VeriFactu) sí lee cualquier tabla con `SELECT`, usa la red y el
@@ -322,20 +325,32 @@ Se resuelven con `market-decision`; no las decide el worker.
 1. ¿Quién guarda los ajustes de una app: solo el administrador (la pantalla) o quien tenga el
    permiso de la orden de guardar (el servidor, el asistente)? Hoy discrepan (HUB-F33, SALES-F34,
    KITCHEN-F26, INVENTORY-F19).
-2. ¿Debe una instalación dejar cobrar mientras descarga, o es aceptable parar la caja durante una
-   instalación? (HUB-F19)
+2. Instalar, actualizar o reconciliar una app deja al hub entero sin atender —caja y comprobación de
+   salud incluidas— sin tope total de tiempo: ¿se acepta, o se descarga fuera del candado? (HUB-F19,
+   HUB-F23, HUB-F26)
 3. ¿Se puede bajar de versión una app con una versión explícita por la API de un administrador, o
    solo soporte? (HUB-F23)
-4. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, ¿se
-   actualizan solas las apps al arrancar? Hoy solo lo hace el arranque que no encuentra la carpeta
-   (HUB-F25).
+4. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
+   no se actualizan solas al arrancar (solo las que no encuentra en la carpeta); y en la nube cada
+   despliegue vuelve a encender las apagadas. ¿Es lo que se quiere? (HUB-F25)
 5. Forzar la desinstalación de una app de la que dependen otras: ¿debe quitar (o apagar) esas otras?
    Odoo y Business Central las quitan juntas tras enseñarlas; hoy ERPlora las deja activas sin su
-   dependencia (HUB-F29).
+   dependencia, y en el siguiente arranque vuelve a instalar sola la app quitada o, sin catálogo,
+   arranca con la salud en rojo (HUB-F29).
 6. Cuando una orden aprobada con PIN falla después de la puerta, ¿se debe devolver la aprobación?
    (HUB-F05)
 7. ¿Qué frase ve la cajera cuando una orden de Venta se rechaza porque la caja está cerrada? Hoy el
    código `protects_guard` no tiene traducción (HUB-F13, CASH_REGISTER-F04).
+8. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
+   - si la cuarentena se respeta con una versión explícita que llega por el plan de ERPlora (depende
+     del SaaS);
+   - si `/readyz` retenido por el candado durante una instalación larga hace que Swarm reinicie el
+     contenedor (depende del `healthcheck` de `infra`);
+   - si una migración que falla a la mitad se deshace sola (depende de si `erplora-db` ejecuta cada
+     fichero en una transacción);
+   - si `request_install`, que no pasa `module_id_is_safe` como actualizar y versiones, es explotable:
+     el id y la versión van sin codificar dentro de las URLs firmadas a ERPlora y de las rutas de
+     caché.
 
 Áreas del servidor que faltan aquí: (integrador) dudas de las demás áreas.
 
@@ -358,5 +373,19 @@ Se resuelven con `market-decision`; no las decide el worker.
 - `hand-book/hub/06-aplicaciones.md` habla de «Aviso de permisos solicitados antes de instalar»: es
   de la pantalla; el servidor instala la app sin ningún permiso concedido y los concede después por
   Ajustes › Permisos (HUB-F32).
+
+- INVENTORY-F19 dice que, sin permiso, sale «No se pudieron cargar los ajustes.»; la pantalla pinta en
+  silencio los valores de fábrica (HUB-F33). SALES-F34 y KITCHEN-F26 deberían decir lo mismo, y
+  KITCHEN-F26 que el responsable guarda por el asistente.
+- CASH_REGISTER-F12 dice que el empleado no ve «Caja (sesión actual)»; lo ve, con «No disponible»
+  (HUB-F34).
+- CASH_REGISTER-F01 no describe su paso de puesta en marcha («Tu caja»: hecho tras el primer
+  guardado, solo administrador, 🟡) (HUB-F35).
+- VERIFACTU-F32: la pantalla no traduce `verifactu.unsent_records` (HUB-F28).
+- INVOICE-F04 y REC_FISCAL-F10 deben apuntar su «Pendiente de enlazar hub» a HUB-F17; INVOICE-F04,
+  además, que la frase del descuadre (`invoice.tax_quota_mismatch`) sale en inglés y en céntimos.
+- `architecture/hub/runtime-dispatcher.md` §2.0 no tiene la puerta de reglas del dueño ni el cambio
+  parcial, y sus números de línea ya no casan (HUB-F03).
+- `crates/runtime/src/public_claim.rs:34` dice migración v51; es la v52 (HUB-F16).
 
 Áreas del servidor que faltan aquí: (integrador) discrepancias de las demás áreas.
