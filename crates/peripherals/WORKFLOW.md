@@ -98,7 +98,8 @@ resultados no se sabe si la impresora está apagada, en otra red o tras un corta
 con la dirección que sale en la hoja de la impresora (HUB_PERIPHERALS-F02). Si el mDNS no arranca,
 queda el barrido. Una impresora que solo se anuncia por IPP aparece con el puerto del anuncio (631),
 no el 9100.
-Implicados: PRINTING-F02
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
 Pendiente de enlazar: hub — HUB_APP, la búsqueda de impresoras y el permiso de red local en la aplicación instalada
 QA: qa-hub §8, qa-hub-android §15
 
@@ -120,7 +121,8 @@ Si falla: dirección que no es IPv4 o puerto 0, se rechaza sin llamar a nadie (�
 válida…» en la pantalla de Impresión); si nadie contesta en 3 s, «Ninguna impresora ha respondido en
 {dirección}…» y no se guarda. Contestar en el 9100 no prueba que sea una térmica: una láser de oficina
 también contesta, y la impresora se guarda como «sin clasificar».
-Implicados: PRINTING-F03
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F03 (añadir una impresora por su IP)
 Pendiente de enlazar: hub — HUB_APP, el formulario «Añadir impresora por IP» de la aplicación instalada
 QA: qa-hub-android §15
 
@@ -144,7 +146,8 @@ Si falla: si el sistema no tiene las herramientas de CUPS o no responde en 20 s,
 USB y la búsqueda de red sigue funcionando; solo queda un aviso en el registro de la aplicación, no
 en pantalla. En Android no hay cola del sistema que consultar, y en Windows no se sabe hacer
 (HUB_PERIPHERALS-F08).
-Implicados: PRINTING-F02
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F04 Recordar cada impresora y su función
@@ -155,7 +158,7 @@ Pasos:
 1. En la tarjeta de la impresora abre el desplegable «Rol» y elige una función (Recibo, Cocina,
    Barra, Etiqueta).
 2. La aplicación recuerda la función aunque se cierre y se vuelva a abrir.
-3. Con el tiempo se puede cambiarle el nombre o quitarla de la lista.
+3. Con el tiempo se puede cambiarle el nombre o quitarla de la lista; pero el nombre que se le ponga dura hasta la siguiente búsqueda, que vuelve a poner el del anuncio, «Network Printer (IP)» o el de la cola.
 Entra: la impresora elegida y la función.
 Sale: una entrada por impresora en el fichero de dispositivos de la aplicación (`devices.json`, en
 su carpeta de datos), con su identificador (la MAC si se conoce y, si no, `network:<ip>:<puerto>` o
@@ -168,9 +171,11 @@ sepa que este dispositivo imprime esa función es otro paso (HUB-F196).
 Si falla: asignar función a una impresora que el registro no tiene («escanea otra vez e inténtalo»);
 no pasa si la impresora salió de una búsqueda de esta aplicación. Si el fichero está corrupto o no se
 puede leer, la aplicación arranca con el registro vacío y avisa solo en el registro técnico: las
-funciones se pierden y hay que volver a ponerlas. No existe la acción de dejar una impresora sin
-función.
-Implicados: PRINTING-F04, HUB-F196
+funciones se pierden y hay que volver a ponerlas. No existe la acción de dejar una impresora
+sin función. Quitarle la función a una impresora o borrarla del registro **no da de baja al dispositivo en el hub** (HUB-F197): el hub sigue dando la función por cubierta.
+Implicados: HUB-F196
+Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
+
 Pendiente de enlazar: hub — HUB_APP, el registro de dispositivos de la aplicación instalada y sus órdenes
 QA: qa-hub §8
 
@@ -192,16 +197,19 @@ búsqueda salen siempre «Lista» porque se acaban de ver contestar).
 Si falla: si la aplicación no puede leer su red local, no recupera nada y no lo dice; con la
 impresora apagada el vigilante la marca fuera de línea y ningún trabajo de la cola lo sabe (los
 trabajos siguen yendo a esa dirección: HUB_PERIPHERALS-F06).
-Implicados: PRINTING-F02
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
 QA: ninguno
 
 ### HUB_PERIPHERALS-F06 Sacar un documento por una impresora de red
-Estado: parcial — si la impresora de red está apagada o sin papel, el documento no sale y nadie se entera: la aplicación da el trabajo por entregado al ponerlo en su cola interna, el hub lo marca «hecho» y el fallo solo queda en el registro técnico
+Estado: parcial — si la impresora de red está apagada o sin papel, el documento no sale y nadie se entera: `erplora_print` (`apps/tauri/src-tauri/src/lib.rs:1671-1683`) pone los bytes en una cola en memoria y contesta `Ok`; sus 3 intentos solo dejan rastro con `eprintln!` (`lib.rs:1256-1266`); el dispositivo manda `done` (`apps/web/src/lib/print-drain.ts:212-213`) y el hub marca el trabajo «hecho»; no hay reintento, estado «fallido» ni aviso
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. El dispositivo que imprime (el que tiene la función en el hub) recibe un trabajo y se lo pasa a la
-   aplicación con la impresora de esa función, el tipo de documento y el documento.
+1. La caja que cobra o dispara la comanda, si tiene una impresora con esa función, la manda **directamente**
+   sin pasar por la cola del hub (`print.ts:381-404`): en ese caso un papel perdido no deja ninguna fila
+   en el hub. Si no, el dispositivo que imprime (el que tiene la función en el hub) recibe un trabajo de
+   la cola. En los dos casos se lo pasa a la aplicación con la impresora de esa función, el tipo de documento y el documento.
 2. La aplicación comprueba que el tipo de documento es uno conocido y compone los bytes ESC/POS
    (HUB_PERIPHERALS-F09 a F13).
 3. Pone los bytes en su cola interna y contesta «correcto» al dispositivo.
@@ -211,8 +219,7 @@ Entra: el identificador de la impresora (`network:<ip>:<puerto>`), el tipo de do
 ocho: tique, factura, comanda, albarán, etiqueta, cierre de caja, cuenta, genérico) y el documento ya
 estructurado (nunca HTML).
 Sale: los bytes en el papel. El resultado de cada intento (completado o fallido, con el motivo) se
-escribe en el registro técnico de la aplicación y nada más: ni vuelve a quien pidió el papel, ni el
-hub lo sabe, ni la persona lo ve. La cola interna vive en memoria: lo que está esperando se pierde si
+escribe en el registro técnico de la aplicación y nada más: ni vuelve a quien pidió el papel, el hub lo marca «hecho» si venía de la cola (si salió directo, no sabe nada) y la persona no lo ve. La cola interna vive en memoria: lo que está esperando se pierde si
 se cierra la aplicación. El trabajo no se deduplica aquí (la clave `jobId` viaja pero no se
 comprueba): un mismo trabajo mandado dos veces saca dos papeles.
 Si falla: antes de ponerlo en la cola sí hay error y vuelve a quien lo pidió: identificador de
@@ -222,8 +229,15 @@ sin los datos que exige (emisor, número, cliente, NIF del cliente, desglose de 
 impresora apagada, sin papel o fuera de la red, tras los 3 intentos solo se anota; la comanda o el
 tique no salen y ni el cajero ni la cocina reciben aviso. Es lo que el guion de QA (§10, «impresora
 sin papel/offline: el trabajo queda pendiente y la pantalla informa») no consigue hoy.
-Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, HUB-F199
+Implicados: HUB-F199
+Pendiente de enlazar: printing — PRINTING-F05 (hacer una prueba de impresión)
+Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
+Pendiente de enlazar: printing — PRINTING-F09 (imprimir la cuenta de la mesa)
+Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
+Pendiente de enlazar: printing — PRINTING-F12 (imprimir la etiqueta de un código de barras)
+Pendiente de enlazar: hub — HUB_SHELL, avisos e impresión (la puerta de impresión del shell: directo o por la cola)
 Pendiente de enlazar: hub — HUB_APP, la orden de imprimir de la aplicación instalada
+
 QA: qa-hub-restaurant §16, qa-hub §8
 
 ### HUB_PERIPHERALS-F07 Sacar un documento por una impresora USB
@@ -240,8 +254,8 @@ Pasos:
    motivo que da el sistema en ese momento.
 Entra: el identificador `usb:<cola>` y los bytes ya compuestos; el nombre de la cola se valida (sin
 espacios, `/` ni `#`, sin empezar por `-`, hasta 127 caracteres).
-Sale: el papel, o un error que vuelve a quien imprimió y que el dispositivo comunica al hub como
-fallo del trabajo (se reintenta hasta 5 entregas). Cancelar al vencer los 15 s existe para que un
+Sale: el papel, o un error que vuelve a «Probar» y sale en rojo en la pantalla de Impresión (ningún
+trabajo de la cola llega a una USB, así que hoy es el único llamante). Cancelar al vencer los 15 s existe para que un
 tique que no salió no aparezca horas después, con un número que la caja ya dio por fallido. Sin
 cola interna ni reintentos propios: es directo.
 Si falla: «la impresora de la cola `…` no está lista (…); el trabajo NO se mandó», «la cola `…`
@@ -249,7 +263,8 @@ rechazó el trabajo: …» o «la impresora aún tenía el tique 15 s después d
 que NO salió y no aparecerá después». Si las herramientas de CUPS no están, «No se pudo ejecutar
 `lp`…». Si el estado no se pudo leer se manda igualmente y se deja al sistema decidir. Si `lp` no
 devuelve el identificador del trabajo, se da por mandado sin comprobar que salió.
-Implicados: PRINTING-F02, HUB-F199
+Implicados: HUB-F199
+Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F08 Impresora USB en Windows
@@ -265,11 +280,12 @@ Sale: el papel, con la misma garantía de aviso que HUB_PERIPHERALS-F07 (no sale
 Si falla: hoy, en Windows no se listan colas USB (el comando de CUPS no existe) y una impresora
 asignada a una cola USB falla con «No se pudo ejecutar `lp`». Una impresora térmica de Windows se
 usa hoy por red (IP).
-Implicados: PRINTING-F02
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
 QA: ninguno
 
 ### HUB_PERIPHERALS-F09 Sacar el tique o la factura
-Estado: parcial — la fecha y la hora del papel son las del momento de imprimir (reloj del dispositivo), no las de la venta: un tique que esperó en la cola, o una reimpresión, sale con otra hora
+Estado: parcial — la fecha y la hora del papel son las del momento de imprimir (reloj del dispositivo), no las de la venta: un tique que esperó en la cola, o una reimpresión, sale con otra hora; y una impresora de red apagada lo pierde sin aviso (HUB_PERIPHERALS-F06)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -277,13 +293,12 @@ Pasos:
 2. El papel sale así, de arriba abajo: si lleva QR fiscal, el texto «QR tributario:» y el QR, y
    debajo la leyenda «VERI*FACTU»; el nombre del negocio, su dirección, su NIF y su teléfono; el
    número del tique y la fecha; el cajero y el cliente si vienen; las líneas con sus suplementos (el
-   suplemento sin importe, bajo la línea); el subtotal, el descuento, el IVA y el total; el pago, lo
-   entregado y el cambio; la cabecera y el pie del negocio; «Gracias»; y, si el negocio puso un
+   suplemento sin importe, bajo la línea); el subtotal, el IVA, el descuento y el total; el pago, lo
+   entregado y el cambio; el QR «pide tu factura» si el documento lo trae; la cabecera y el pie del negocio; «Gracias»; y, si el negocio puso un
    enlace propio, su nota y un QR más pequeño.
 3. Una **factura completa** lleva además el título de factura (o factura rectificativa), el
    desglose de IVA por tipo (porcentaje, base y cuota), el NIF y el nombre del cliente.
-4. Una reimpresión lleva la marca «DUPLICADO» (solo si quien pide imprimir lo dice con un `true`
-   explícito); un tique que no lleva QR «pide tu factura» no lo pinta.
+4. La marca «DUPLICADO» sale solo con un `true` explícito, debajo de los datos del negocio. «QR tributario:» y «VERI*FACTU» son textos que manda el productor, no fijos.
 5. Se corta el papel.
 Entra: el documento estructurado que compone `sales` (o `invoice`); la moneda llega con su escala de
 decimales (euro 2, yen 0, dinar 3) y el idioma con `locale`.
@@ -295,7 +310,10 @@ imprimir»). Un campo que falta sale en blanco o con su valor por omisión (nomb
 negocio no trae el suyo): el papel no avisa. Un tique sin QR fiscal sale igual, sin marca: que el QR
 llegue o no es de Ventas (SALES) y de la cola (el tique puede salir antes de que esté listo, y la
 pantalla avisa «El tique salió antes de que estuviera listo su QR de VeriFactu»).
-Implicados: PRINTING-F07, PRINTING-F08, SALES-F01
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
+Pendiente de enlazar: printing — PRINTING-F08 (reimprimir un tique o una factura)
+Pendiente de enlazar: sales — SALES-F01 (vender y cobrar en efectivo)
 QA: R-09, qa-hub §8
 
 ### HUB_PERIPHERALS-F10 Sacar la comanda de cocina o barra
@@ -317,11 +335,14 @@ Sale: el papel. La función (Cocina o Barra) la decide el hub; esta parte pinta 
 Si falla: un documento que no es objeto se rechaza antes de imprimir. Con un campo sin rellenar sale
 con su valor por omisión (cantidad 1). Sin comprobar que sea una comanda: una comanda sin líneas sale
 con la cabecera y nada más.
-Implicados: PRINTING-F10, KITCHEN-F08, KITCHEN-F17
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
+Pendiente de enlazar: kitchen — KITCHEN-F08 (la comanda sale en papel en cada estación)
+Pendiente de enlazar: kitchen — KITCHEN-F17 (imprimir el pase al marcar lista)
 QA: qa-hub-restaurant §08, qa-hub-restaurant §16
 
 ### HUB_PERIPHERALS-F11 Sacar la cuenta de la mesa
-Estado: hecho
+Estado: parcial — una impresora de red apagada la pierde sin aviso (HUB_PERIPHERALS-F06)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -335,7 +356,8 @@ hay registro de facturación. Un papel que pasa por factura sería un problema l
 Si falla: una cuenta **sin líneas** se rechaza («una cuenta tiene líneas que cobrar; este documento no
 trae ninguna (¿es la forma de la pantalla, con `lines`?)») en vez de cortar un papel en blanco con
 total 0,00.
-Implicados: PRINTING-F09
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F09 (imprimir la cuenta de la mesa)
 QA: R-08
 
 ### HUB_PERIPHERALS-F12 Sacar la etiqueta de un código de barras
@@ -353,7 +375,9 @@ más de 250 caracteres, se imprime el texto entre corchetes. Se configura la alt
 ancho del módulo.
 Si falla: sin código, sale el nombre y el precio sin código; sin precio, sin precio. El cajón de la
 etiqueta es el de un tique: una impresora de etiquetas de rollo no entiende estos bytes.
-Implicados: PRINTING-F12, INVENTORY-F25
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F12 (imprimir la etiqueta de un código de barras)
+Pendiente de enlazar: inventory — INVENTORY-F25 (imprimir la etiqueta del código de barras)
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F13 Sacar el cierre de caja, el albarán o un documento genérico
@@ -370,7 +394,9 @@ Pasos:
 Entra: el documento estructurado de quien lo pida.
 Sale: el papel; fechas del momento de imprimir, como en HUB_PERIPHERALS-F09.
 Si falla: como el resto: un documento que no es objeto se rechaza; un campo que falta, en blanco.
-Implicados: PRINTING-F16, PRINTING-F17
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F16 (mandar imprimir desde el asistente o un flujo)
+Pendiente de enlazar: printing — PRINTING-F17 (imprimir el cierre de caja)
 QA: ninguno
 
 ### HUB_PERIPHERALS-F14 Hacer una hoja de prueba
@@ -385,13 +411,14 @@ Entra: el identificador de la impresora, y opcionalmente el nombre del negocio y
 llegan, sale «ERPlora» y en español).
 Sale: la hoja, por la cola interna si es de red (F06) y directa si es USB o Bluetooth. Va en el idioma
 del hub, firmada con el nombre del negocio, y no pasa por la cola del hub.
-Si falla: con una impresora de red no hay error aunque no conteste. Con USB o Bluetooth, el error de la
+Si falla: con una impresora de red no hay error aunque no conteste (`lib.rs:1687-1712` la pone en la misma cola en memoria que `erplora_print`, `lib.rs:1671-1683`). Con USB o Bluetooth, el error de la
 impresora vuelve y sale en rojo en la pantalla.
-Implicados: PRINTING-F05
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F05 (hacer una prueba de impresión)
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F15 Abrir el cajón
-Estado: hecho
+Estado: parcial — al cobrar solo se abre con una impresora de «Recibo» de red o Bluetooth del dispositivo que cobró (una USB nunca); si no se abre nadie lo sabe (el error se descarta en `print-on-sale.ts:195`); con la impresora de red apagada el intento no tiene plazo propio
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -399,14 +426,17 @@ Pasos:
 2. La aplicación manda a la impresora del tique el pulso que abre el cajón: por el pin 2 del conector
    (lo normal) o por el pin 5 si quien lo pide lo indica.
 3. El cajón se abre.
-Entra: la impresora (red, USB o Bluetooth) y el pin (2 por omisión; cualquier valor distinto de 2 se
+Entra: la impresora (red o Bluetooth al cobrar; USB solo si alguien llamara a la orden directamente, y hoy nadie lo hace) y el pin (2 por omisión; cualquier valor distinto de 2 se
 trata como pin 5).
 Sale: cinco bytes en la impresora; nada guardado y nada avisado al hub. No pasa por ninguna cola: tiene
 que hacerse aquí y ahora, desde el dispositivo que está junto a la impresora.
 Si falla: una impresora de red que no contesta devuelve error a quien lo pidió («impresora
 inalcanzable»); una USB o Bluetooth, igual. Ese error se pierde antes de llegar a la persona (HUB-F207).
 Un pulso por el pin equivocado no da error: el cajón simplemente no se abre.
-Implicados: PRINTING-F13, SALES-F01, HUB-F207
+Implicados: HUB-F207
+Pendiente de enlazar: printing — PRINTING-F13 (abrir el cajón al cobrar)
+Pendiente de enlazar: sales — SALES-F01 (vender y cobrar en efectivo)
+
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB_PERIPHERALS-F16 Ajustar el papel: ancho, caracteres, idioma y corte
@@ -429,7 +459,8 @@ de la impresora (el QR en modelo 2, módulo de 4 puntos, el promocional de 3, co
 Si falla: un carácter que no está en la tabla sale como `?`; un texto de una sola palabra más ancho que
 la línea se deja entero y la impresora lo dobla; en un rollo de 80 mm el papel queda estrecho (32 de
 las 48 columnas que cabrían).
-Implicados: PRINTING-F06
+Implicados: pendiente
+Pendiente de enlazar: printing — PRINTING-F06 (elegir cómo imprime el negocio)
 QA: ninguno
 
 ## Cobertura contra la referencia
@@ -438,7 +469,7 @@ QA: ninguno
 |---|---|---|
 | Buscar impresoras de red (mDNS y barrido al 9100) | hecho | F01 |
 | Añadir una impresora por IP | hecho | F02 |
-| Impresora USB (macOS, Linux) | parcial: se lista, se prueba y se sabe imprimir, pero no recibe trabajos de la cola | F03, F07 |
+| Impresora USB (macOS, Linux) | parcial: se lista y se prueba; no recibe nada de la caja, de la cola ni del cajón | F03, F07 |
 | Impresora USB en Windows | no hecho | F08 |
 | Impresora Bluetooth (Android) | complemento de Android (HUB_APP); aquí solo se valida el identificador | F06 |
 | Función por impresora recordada | parcial: no se puede quitar | F04 |
@@ -448,11 +479,11 @@ QA: ninguno
 | Tique con QR fiscal, «DUPLICADO» y QR promocional | parcial: la hora es la de imprimir | F09 |
 | Factura completa con desglose de IVA | hecho | F09 |
 | Comanda con etiqueta de sala, ronda, suplementos y urgente | parcial: la hora es la de imprimir | F10 |
-| Cuenta no fiscal | hecho | F11 |
+| Cuenta no fiscal | parcial: pérdida sin aviso con la red apagada | F11 |
 | Etiqueta con código de barras nativo | parcial: térmica de tiques, no de etiquetas | F12 |
 | Cierre de caja, albarán, genérico | parcial: sin productor | F13 |
 | Hoja de prueba | parcial: sin aviso con red apagada | F14 |
-| Cajón (pin 2 y pin 5) | hecho | F15 |
+| Cajón (pin 2 y pin 5) | parcial: nunca por USB, error descartado, sin plazo | F15 |
 | Ancho 58 y 80 mm | no hecho: siempre 32 columnas | F16 |
 | Logo e imágenes en el papel | no hecho | F16 |
 | Báscula | no existe (dudas abiertas) | — |
@@ -483,13 +514,13 @@ QA: ninguno
 - **La cuenta de la mesa no lleva serie, ni forma de pago ni QR fiscal, y lleva el aviso de que no es
   una factura.** El tique solo lleva «DUPLICADO» si se pide con un `true` explícito.
 - **Un USB que no está listo no recibe el trabajo y, si lo acepta y no lo saca en 15 s, se cancela**:
-  nunca queda un tique detenido que salga horas después.
+  salvo que CUPS no deje leer la cola o no devuelva el identificador del trabajo (entonces se da por mandado sin seguirlo), no queda un tique detenido que salga horas después.
 - **La impresora se identifica por su transporte**: `network:<ip>:<puerto>`, `bluetooth:<mac>` o
   `usb:<cola>`; cualquier otro identificador se rechaza al entrar, no dentro de una conexión.
 - **Una impresora que no contestó no se guarda al añadirla por IP**, y una búsqueda sin permiso de red
   local no devuelve una lista vacía: dice que no pudo mirar.
-- **El registro no pisa lo que la persona decidió**: volver a encontrar una impresora conserva su
-  función y su fecha de alta.
+- **El registro conserva lo que la persona decidió**: volver a encontrar una impresora conserva su
+  función y su fecha de alta (el nombre no: lo repone la búsqueda).
 - **No se adivina que una impresora sea térmica.** Solo el anuncio IPP la marca «a4»; el resto queda
   «sin clasificar».
 
@@ -540,8 +571,7 @@ Contra `origin/develop` del hub (05/10/2026). Una línea por discrepancia; manda
 - **Comentario de `escpos.rs` («80 mm ≈ 32 caracteres»)**: en una térmica de 80 mm con la fuente A caben
   48 columnas; el crate compone a 32 siempre (F16).
 - **`architecture/hub/crates/peripherals.md`** presenta el crate como «el camino vivo» de la cola; hoy
-  solo lo recorren los trabajos que el hub entrega a un dispositivo con impresora de red o Bluetooth, la
-  hoja de prueba y el cajón; una USB solo recibe la hoja de prueba y el cajón (F07).
+  lo recorren la impresión directa de la caja y los trabajos que el hub entrega a un dispositivo con impresora de red o Bluetooth, la hoja de prueba y el cajón; una USB solo recibe la hoja de prueba («Probar»): ni tiques, ni comandas, ni trabajos de la cola, ni el cajón al cobrar (F07, F15).
 - **`hand-book/hub/11-app-instalada-y-hardware.md`** no nombra USB, Bluetooth, ni el cajón: la
   documentación para la persona sobre hardware es el capítulo del módulo Impresión.
 - **Pantalla Impresoras** (`status`): el crate devuelve estados que la pantalla no traduce (`busy`,
