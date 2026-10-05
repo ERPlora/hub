@@ -13,7 +13,7 @@ Pasos:
 2. Ve país, región, zona horaria, moneda, idioma, apariencia, identidad del negocio y las opciones del PIN. Quien no administra los ve sin poder guardarlos (lo pinta el shell).
 3. Antes de iniciar sesión, el teclado del PIN y el formato de dinero salen de otra lectura sin sesión (moneda, decimales, idioma, zona resuelta y dígitos del PIN).
 Entra: una sesión de usuario válida, de cualquier perfil (`GET /api/settings`); la lectura sin sesión es `GET /api/hub/context`.
-Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión.
+Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión. Esa lectura sin sesión publica además el identificador del hub (la llave de HUB-F236) y el nombre y rol de cada persona con PIN, para la rejilla de acceso.
 Si falla: sin sesión, 401 con su código. Si la lectura de arranque falla, el shell arranca con los valores por defecto (EUR, español, UTC).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Hub (la pantalla que pinta estos valores)
@@ -50,15 +50,15 @@ Implicados: VERIFACTU-F01
 QA: BD-02
 
 ### HUB-F223 Congelar el NIF y el país, y casar la región con el país
-Estado: hecho
+Estado: parcial — cambiar solo el país no revalida la región guardada (queda p. ej. `ES-CN` con país `PT`, y la zona deducida pasa a Atlantic/Canary); la región tampoco se congela al salir a producción
 Actor: administrador, sistema
-Pantalla: HUB_SHELL: Ajustes › Negocio
+Pantalla: HUB_SHELL: Ajustes › Negocio (NIF) y Ajustes › Hub (país y región)
 Pasos:
 1. Un hub que ya emitió su primer registro fiscal intenta cambiar el identificador fiscal, o uno que ya salió a producción intenta cambiar el país.
 2. El hub compara el valor normalizado con el guardado y con el ancla del perfil fiscal.
 3. Si cambia, lo rechaza.
 Entra: `business_tax_id` o `country_code` en un guardado de ajustes.
-Sale: nada guardado. El NIF se congela con el primer registro enviado; el país, al pasar el perfil a activo o cerrado. Repetir el mismo valor no es un cambio. La región (`ES-CN`…) debe empezar por el país del lote o, si no viene, el guardado; vaciarla siempre vale. Si el perfil no se puede leer, no se congela nada.
+Sale: nada guardado. El NIF se congela con el primer registro enviado; el país, al pasar el perfil a activo o cerrado. Repetir el mismo valor no es un cambio. Si el lote trae región, debe empezar por el país del lote o, si no viene, por el guardado; vaciarla siempre vale. Cambiar solo el país no revisa la región guardada. Si el perfil no se puede leer, no se congela nada.
 Si falla: `business_tax_id_frozen` o `hub_country_frozen`, con el valor al que está anclado y desde cuándo; o 422 `settings.region_code`.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, perfil fiscal (el perfil guarda su propia copia del país y el sello del primer registro)
@@ -73,7 +73,7 @@ Pasos:
 2. El hub guarda y, si hay NIF, lo manda al SaaS con la credencial de máquina (espera 5 segundos como máximo).
 3. La respuesta de guardado dice si no llegó.
 Entra: la identidad guardada y `business_identity_for_erplora_billing`.
-Sale: el SaaS refleja el NIF para la autorización de representación; solo con la casilla marcada toca el perfil que paga el hub. La casilla viaja siempre, también apagada, y no viaja en una plantilla. Un guardado de otra clave no publica nada. También existe `POST /api/business/fiscal-identity`, que reenvía lo guardado.
+Sale: el SaaS refleja el NIF para la autorización de representación; solo con la casilla marcada toca el perfil que paga el hub. La casilla viaja siempre, también apagada, y no viaja en una plantilla. Publican los cambios de NIF, razón social, `business_address`, país o la casilla; un guardado de otra clave no publica nada, tampoco uno que solo traiga partes del domicilio (sin NIF): recompone la línea pero no la publica. También existe `POST /api/business/fiscal-identity`, que reenvía lo guardado.
 Si falla: el guardado queda escrito y la respuesta lleva `fiscal_identity_publish_error` (`cloud_rejected` o `cloud_unreachable`). Sin NIF o sin credencial de máquina no se avisa.
 Implicados: pendiente
 Pendiente de enlazar: saas — alta de la identidad fiscal y perfil de facturación del hub
@@ -95,13 +95,13 @@ Pendiente de enlazar: saas — alta del hub (el país elegido que viaja como `HU
 QA: BD-02
 
 ### HUB-F226 Moneda, decimales e idioma del negocio
-Estado: hecho
+Estado: parcial — una vez declarados, `currency_decimals` no se puede vaciar por esta puerta (el vacío da 422) para volver a resolverlos del registro
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › Hub
 Pasos:
 1. El administrador elige moneda e idioma y guarda.
-2. Solo si la moneda no está en el registro ISO-4217, declara sus decimales.
-Entra: `currency` (3 letras, se pasa a mayúsculas), `currency_decimals` (0 a 4 o vacío), `language` (`es` o `en`).
+2. Solo si la moneda no está en el registro ISO-4217, declara sus decimales (no hay vuelta atrás a «los del registro»).
+Entra: `currency` (3 letras, se pasa a mayúsculas), `currency_decimals` (entero de 0 a 4), `language` (`es` o `en`).
 Sale: el dinero viaja en unidades mínimas; los decimales salen de `currency_decimals` o, si no, del registro (EUR 2, JPY 0, KWD 3, desconocida 2). El idioma decide el del papel de la impresora y el de quien llama cuando no tiene el suyo (HUB-F228). La moneda no se entrega a los módulos en las órdenes y no se bloquea tras vender.
 Si falla: 422 con la clave; una fila ilegible se lee como el valor por defecto.
 Implicados: pendiente
@@ -117,7 +117,7 @@ Pasos:
 2. Si su país tiene varios husos, elige una zona por nombre (Europe/Madrid).
 3. El hub guarda el nombre.
 Entra: `timezone` (nombre IANA, o vacío para deducirla), `country_code`, `region_code`.
-Sale: la zona resuelta es la declarada si vale; si no, la deducida del país y la región. Se deduce solo donde es única: España Europe/Madrid (`ES-CN` Atlantic/Canary), Portugal Lisbon (`PT-20` Azores, `PT-30` Madeira) y 30 países europeos; un país con varios husos o fuera de la tabla da UTC hasta que se declare. Una abreviatura (`CEST`) o un desfase (`+02:00`) se rechaza. Una fila corrupta degrada a la deducción. Se ofrece resuelta en la lectura sin sesión.
+Sale: la zona resuelta es la declarada si vale; si no, la deducida del país y la región. Se deduce solo donde es única: España Europe/Madrid (`ES-CN` Atlantic/Canary), Portugal Lisbon (`PT-20` Azores, `PT-30` Madeira) y otros 29 países europeos; un país con varios husos o fuera de la tabla da UTC hasta que se declare. Se rechaza todo lo que no sea un nombre de la base IANA (`CEST`, `+02:00`); algunos nombres heredados como `CET` sí son IANA y se aceptan. Una fila corrupta degrada a la deducción. Se ofrece resuelta en la lectura sin sesión.
 Si falla: 422 `settings.timezone`. Si la tabla no se lee, se deduce del país por defecto (`ES`).
 Implicados: SCHEDULES-F09
 QA: BD-06
@@ -152,7 +152,7 @@ Pendiente de enlazar: hub — HUB, automatizaciones (disparadores de reloj)
 QA: ninguno
 
 ### HUB-F230 Exportar los datos del negocio
-Estado: parcial — el volcado traga en silencio los errores de lectura de usuarios, perfiles y automatizaciones (un fallo da un zip sin esa parte y sin avisar), descarta lo marcado como borrado (`is_deleted`) y toda fila con `created_by = 'system'`, y el nombre y país del manifiesto se leen de claves que no existen (`business_name`, `country`): salen vacío y `ES`
+Estado: parcial — un fallo al leer usuarios, perfiles, ajustes, roles, permisos de módulo, automatizaciones o las filas de una tabla de app da un zip sin esa parte y sin aviso; el nombre y el país del manifiesto se leen de claves que no existen (`business_name`, `country`): salen vacío y `ES`; y con finalidad plantilla el certificado propio y la carpeta de archivos de cada app (los XML de Verifactu) entran igualmente (HUB-F231)
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
 Pasos:
@@ -160,21 +160,21 @@ Pasos:
 2. Marca personas, ajustes, datos fiscales, archivos y, por app, si entra la app y sus datos (y qué tablas).
 3. Pulsa exportar; el navegador descarga `<nombre>_<idioma>.blueprint.zip`.
 Entra: nombre, idioma y selección, con sesión de administrador.
-Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Una plantilla no lleva personas, datos fiscales, permisos ni automatizaciones; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
-Si falla: nombre inválido, 422; sin sesión de administrador, 401. Una parte que no se puede leer falta del zip sin aviso.
+Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Se dejan fuera, a propósito, las filas borradas y las que la app siembra al instalarse (salvo las tablas cuya semilla es dato del negocio, como `taxes_rule`). Una plantilla no lleva personas, permisos ni automatizaciones, ni las tablas y la sección fiscales (`verifactu_config`, certificado en el motor) ni la numeración; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
+Si falla: nombre inválido (letras, números, `-`, `_` y `.`), 422; sin sesión de administrador, 401. Una parte que no se puede leer falta del zip sin aviso.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
 QA: ninguno
 
 ### HUB-F231 Meter los archivos y el certificado en el zip
-Estado: parcial — con finalidad plantilla y «datos fiscales» marcado, esta capa añade igualmente el certificado propio al zip; los ficheros de más de 25 MiB se omiten sin decirlo y todo se carga en memoria antes de empaquetar
+Estado: parcial — con finalidad plantilla, «datos fiscales» añade igualmente el certificado propio (esta capa mira la casilla en bruto, no el valor efectivo del motor), y «archivos» copia también las carpetas de las apps (`modules/verifactu/`, con los XML que llevan NIF y nombre de clientes), sin mirar la finalidad; los ficheros de más de 25 MiB se omiten sin decirlo y todo se carga en memoria antes de empaquetar
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
 Pasos:
 1. El administrador marca datos fiscales y/o archivos.
 2. El hub añade el certificado y recorre la carpeta de archivos.
 Entra: la selección del export.
-Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero de la carpeta de archivos bajo `media/`, menos las carpetas de primer nivel que empiezan por `_` (registros y sistema). El sha256 de cada uno entra en el manifiesto.
+Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero del almacenamiento bajo `media/`, incluidas las carpetas de las apps, menos las de primer nivel que empiezan por `_` (registros y sistema). No se filtra por finalidad. El sha256 de cada uno entra en el manifiesto.
 Si falla: un fichero que no se descarga, o pasa de 25 MiB, falta del zip y solo queda en el log.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
@@ -203,7 +203,7 @@ Pasos:
 2. El hub lo abre en memoria, comprueba las rutas y lee el manifiesto.
 3. La pantalla muestra nombre, idioma, país, apps y secciones, y deja marcar qué aplicar.
 Entra: el zip (hasta 256 MiB).
-Sale: un identificador de subida y el manifiesto; el zip queda en una carpeta temporal del hub hasta que se importa.
+Sale: un identificador de subida y el manifiesto; el zip queda en una carpeta temporal del hub hasta que se importa; uno inspeccionado y nunca importado se queda hasta que el contenedor se reinicia.
 Si falla: 422 si el zip está mal formado, una ruta intenta salir de su carpeta, falta `manifest.json` o la versión de formato no es la 1.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar
@@ -225,7 +225,7 @@ Pendiente de enlazar: saas — catálogo de plantillas y descarga firmada
 QA: BD-01
 
 ### HUB-F235 Importar un fichero o una plantilla
-Estado: parcial — el aviso «sin SQL arbitrario» cubre la forma, no el valor: una sección no se aplica en una transacción, así que una sentencia que falla deja las anteriores escritas (quedan en el lote y se pueden deshacer, salvo ajustes y tablas sin `id`); y las apps del manifiesto se instalan aunque no estén marcadas
+Estado: parcial — una sección no se aplica en una transacción, así que una sentencia que falla deja las anteriores escritas (quedan en el lote y se pueden deshacer, salvo ajustes y tablas sin `id`); las apps del manifiesto se instalan aunque no estén marcadas; los archivos del zip se escriben en cualquier carpeta, también en las de solo lectura de las apps y en `_logs`, sin la política de HUB-F246; y en una tabla de objeto único se retira lo que hubiera antes aunque lo escribiera el negocio
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › Datos › Importar
 Pasos:
@@ -233,7 +233,7 @@ Pasos:
 2. El hub comprueba la integridad y instala las apps que falten.
 3. Aplica las secciones y devuelve el informe (HUB-F239).
 Entra: el identificador de subida y la selección (personas, ajustes, fiscal, archivos, apps con datos).
-Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps), solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. Una sección que sustituye a una fila de marcador sembrada por la app (por ejemplo el horario genérico) la retira si la sección aterrizó. El arranque de un hub nuevo ya no importa ninguna plantilla.
+Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps): solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino; la única excepción es el `UPDATE` de la retirada de marcadores de abajo. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos, en la carpeta que nombre cada ruta: solo se comprueba que no se salga de `media/`, sin política de carpetas ni filtro por finalidad. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. En una tabla que la app declara como objeto único (su semilla se guarda por el hub entero, p. ej. la semana de Horarios), lo que hubiera antes —sembrado, escrito por el negocio o traído por otra plantilla— se marca como borrado (apuntado en el lote) en cuanto entra al menos una fila del fichero, también en la copia propia; el informe de la sección no lo dice. El arranque de un hub nuevo ya no importa ninguna plantilla.
 Si falla: una sección fallida se anota y el resto sigue; una app que no se instala deja `failed` su sección («módulo no instalado»).
 Implicados: INVENTORY-F12, SCHEDULES-F12
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar
@@ -241,14 +241,14 @@ Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la sema
 QA: BD-01, qa-hub §4
 
 ### HUB-F236 Qué deja entrar el hub según de quién es el fichero
-Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context`: un zip fabricado con él pasa por copia propia y se lleva personas, permisos, automatizaciones y datos ligados a la instalación
+Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context`: un zip fabricado con él pasa por copia propia y trae personas con `pin_hash`, ajustes sin validar, permisos de módulo y automatizaciones encendidas con sus permisos. Hace falta que un administrador del propio hub suba el fichero; no es una puerta anónima
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. El hub compara el origen del manifiesto con su propio identificador; un origen vacío nunca coincide.
 2. Aplica a cada sección la regla de abajo.
 Entra: el manifiesto y la selección.
-Sale: nunca entran los datos de sistema (`_*`). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla.
+Sale: nunca entran los datos de sistema (`_*`). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla. El sha256 se comprueba contra el propio manifiesto (prueba que el zip no se corrompió, no de dónde viene), se exige sesión de administrador y el servidor no pide otra confirmación. En la copia propia los ajustes se escriben sin pasar por la validación ni las congelaciones de HUB-F221 y HUB-F223 (solo las claves sin fila).
 Si falla: la sección descartada sale `Ignored` con su código y el número de filas.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, perfil fiscal (la cadena VeriFactu no cruza hubs)
@@ -264,7 +264,7 @@ Pasos:
 3. Guarda las automatizaciones por la misma puerta que la pantalla de automatizaciones.
 4. Al terminar, la pantalla pregunta por los permisos que una plantilla no puede conceder.
 Entra: `active_roles`, `capability_grants` y `flows` del manifiesto.
-Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa (`flows_paused_without_grants`). Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). El mismo nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
+Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa: `flow_grants_not_portable` si el fichero no es la copia propia, `flows_paused_without_grants` si lo es y algún permiso no volvió. Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). El mismo nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
 Si falla: un fallo de base de datos sale `Failed`, no como descarte.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, automatizaciones (guardar una automatización y sus permisos)
@@ -322,7 +322,7 @@ Pasos:
 1. El administrador elige una importación de la lista y la deshace.
 2. El hub borra las filas que trajo.
 Entra: el lote.
-Sale: se borran exactamente las filas registradas, en una transacción, sin tocar lo creado después; vuelven los marcadores sembrados que el lote retiró, si nadie escribió ahí. La lista avisa de las tablas editadas después. Deshacer dos veces, o un lote ajeno, no hace nada.
+Sale: se borran exactamente las filas registradas, en una transacción, sin tocar lo creado después; vuelven los marcadores sembrados que el lote retiró, si nadie escribió ahí. La lista avisa solo de las tablas de objeto único (p. ej. el horario) en las que el negocio escribió después; una fila importada que se editó después se borra igual al deshacer. Deshacer dos veces, o un lote ajeno, no hace nada.
 Si falla: si el borrado revierte, el lote sigue.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Restablecer
@@ -337,8 +337,8 @@ Pasos:
 2. Marca solo lo necesario y confirma en pantalla.
 3. Lee el informe.
 Entra: la selección (ajustes, personas, roles, cola de impresión, apps); todo apagado por defecto.
-Sale: borrado duro, acotado al hub, en una sola transacción, en orden inverso de claves foráneas; las filas que sembró la app sobreviven. Las personas se borran menos quien ejecuta (sale de su sesión). La cola de impresión se vacía; las impresoras emparejadas no. Si el hub ya emitió registros fiscales (sello del primer registro o facturas remitidas), Verifactu, Facturas y Ventas y los datos fiscales quedan bloqueados (RD 1007/2023) y el servidor lo rechaza con 409 aunque el cliente lo fuerce. No toca historial de avisos ni automatizaciones.
-Si falla: 409 con el motivo y «No se ha borrado nada»; si la transacción falla, no se borra nada.
+Sale: borrado duro, acotado al hub, en una sola transacción, en orden inverso de claves foráneas; las filas que sembró la app sobreviven. Las personas se borran menos quien ejecuta (se identifica por su sesión, nunca por el cuerpo de la petición). La cola de impresión se vacía; las impresoras emparejadas no. Si el hub ya emitió registros fiscales (sello del primer registro o facturas remitidas), Verifactu, Facturas y Ventas y los datos fiscales quedan bloqueados (RD 1007/2023) y el servidor lo rechaza con 409 aunque el cliente lo fuerce. El plan no muestra las secciones de archivos ni de datos fiscales. No toca historial de avisos, automatizaciones, permisos de módulo, certificado, perfil fiscal, llaves de API ni dispositivos de confianza; las sesiones, perfiles y preferencias de las personas borradas se quedan. La petición no lleva ningún token de confirmación.
+Si falla: 409 con el motivo y «No se ha borrado nada»; si la transacción falla, tampoco se borra nada, pero sale también 409, indistinguible del bloqueo legal.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Restablecer
 QA: ninguno
@@ -379,7 +379,7 @@ Pasos:
 1. La persona abre **Archivos** y navega por carpetas.
 2. Abre un archivo en el visor o lo descarga.
 Entra: la carpeta o la ruta; sesión de usuario de cualquier perfil. Una llave de API no entra.
-Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero.
+Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero: la política de carpetas de HUB-F246 solo regula escribir. El alcance es el negocio propio.
 Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, Archivos
@@ -418,14 +418,14 @@ QA: ninguno
 ### HUB-F248 Borrar los datos de una persona: el aviso único
 Estado: parcial — el aviso lo emite Clientes y solo lo escuchan WhatsApp, Servicios y el hub; Citas, Reservas y Reservas online no; el motivo escrito por el administrador queda en el propio aviso durante 90 días
 Actor: administrador, sistema
-Pantalla: HUB_SHELL: Clientes › ficha del cliente
+Pantalla: CUSTOMERS: ficha del cliente
 Pasos:
 1. El administrador pulsa **Borrar datos personales** en la ficha (flujo de Clientes).
 2. Clientes sustituye los datos de la ficha y publica `customer.anonymized`.
 3. El hub entrega ese aviso a quien lo escucha y vacía su propio historial (HUB-F249).
 Entra: el aviso `<sujeto>.anonymized` con su `<sujeto>_id` (de Clientes: `customer_id` y `reason`, hasta 500 caracteres).
 Sale: el contrato es solo un nombre: el hub reconoce cualquier evento que acabe en `.anonymized` con el identificador del sujeto como cadena y no nombra a ningún módulo. Cada módulo que guarda algo de la persona se suscribe a ese aviso y borra lo suyo (HUB-F250); lo que no lo hace, se queda. Es idempotente: repetirlo no cambia nada. Cualquier app puede emitir un `.anonymized` y vaciar el historial de un identificador ajeno (no hay regla de permiso, hub#2485).
-Si falla: si el vaciado del hub falla, el aviso se difiere y se reintenta con espera creciente, y no se marca entregado hasta que termina.
+Si falla: si el vaciado del hub falla, el aviso se difiere y se reintenta con espera creciente hasta 8 veces; después queda atascado (dead-letter) hasta que alguien lo reintente. El identificador se busca como cadena entre comillas en cualquier punto del contenido, claves incluidas.
 Implicados: CUSTOMERS-F16
 QA: L-10, WA-06 (discrepa)
 
@@ -438,7 +438,7 @@ Pasos:
 2. En una sola sentencia vacía (`{}`) lo terminal que nombra ese identificador.
 3. Registra cuántas filas vació.
 Entra: el identificador y el hub.
-Sale: se vacían, sin borrar la fila: los avisos entregados o descartados cuyo contenido tiene el identificador como valor; las ejecuciones terminadas (hechas, fallidas, canceladas) que lo tocan en entrada, variables, paso o propuesta, o que nacieron de un aviso así; todos los pasos y propuestas de esas ejecuciones; y los avisos que esas ejecuciones encolaron (un recordatorio lleva el teléfono sin el identificador). No se tocan los avisos pendientes o atascados ni las ejecuciones vivas: conservan los datos hasta procesarse o hasta la retención de 90 días (HUB-F253). Se conserva la fila porque es el rastro de la trazabilidad. Solo este hub; reentrega sin efecto. Coste: un barrido del historial terminal por borrado.
+Sale: se vacían, sin borrar la fila: los avisos entregados o descartados cuyo contenido tiene el identificador como valor; las ejecuciones terminadas (hechas, fallidas, canceladas) que lo tocan en entrada, variables, paso o propuesta, o que nacieron de un aviso así; todos los pasos y propuestas de esas ejecuciones; y los avisos que esas ejecuciones encolaron (un recordatorio lleva el teléfono sin el identificador). No se tocan los avisos pendientes o atascados ni las ejecuciones vivas: conservan los datos hasta procesarse o hasta la retención de 90 días (HUB-F253). Se conserva la fila porque es el rastro de la trazabilidad. Solo este hub; reentrega sin efecto. Coste: un barrido de todo `_event_outbox` del hub y de las ejecuciones terminales por cada borrado. No toca la cola de impresión ni los localizadores públicos (`_public_claim`).
 Si falla: error de base de datos; el aviso queda sin entregar y el reintento lo completa; nada queda medio vaciado.
 Implicados: CUSTOMERS-F16, WHATSAPP_INBOX-F11
 QA: L-10
@@ -451,7 +451,7 @@ Pasos:
 1. Una app que guarda datos de la persona escucha el aviso.
 2. Vacía sus tablas por el identificador de la ficha.
 Entra: `customer.anonymized` y su identificador.
-Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Servicios marca sus bonos; Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
+Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Servicios marca sus bonos; Nadie toca los XML de Verifactu del almacenamiento de archivos ni los localizadores públicos. Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
 Si falla: el aviso de esa app se reintenta como cualquier otro.
 Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11
 QA: L-10, WA-06 (discrepa)
@@ -512,4 +512,18 @@ Sale: una fila `(id, tipo, usuario del hub, instante)`: nunca nombre, ni nada de
 Si falla: un fallo al anotar se escribe en el log y la operación sigue.
 Implicados: pendiente
 Pendiente de enlazar: saas — recepción de la actividad del hub
+QA: ninguno
+
+### HUB-F255 Aplicar la semilla SQL del despliegue al arrancar
+Estado: parcial — el SQL se ejecuta sin la validación del import (cualquier sentencia, no solo `INSERT` de literales en las tablas de una sección)
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. El despliegue pasa `HUB_SEED_SQL` (SQL inline) o `HUB_SEED_SQL_PATH` (fichero); si están los dos, gana el inline.
+2. Al arrancar, tras las tablas de sistema, el hub ejecuta el SQL.
+Entra: el SQL del despliegue, con el identificador del hub.
+Sale: la configuración inicial escrita; la idempotencia la pone el propio SQL. Es configuración del despliegue, no una plantilla.
+Si falla: un seed roto aborta el arranque con un error claro.
+Implicados: pendiente
+Pendiente de enlazar: infra — cómo el despliegue compone y pasa la semilla
 QA: ninguno
