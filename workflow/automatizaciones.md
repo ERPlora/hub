@@ -51,7 +51,7 @@ Pasos:
 Entra: `{name, enabled, definition}`; la sesión del administrador.
 Sale: la automatización guardada (`_flow`) con quién la creó, y sus disparadores armados (`_flow_triggers`). Si no se dice nada, nace **encendida**: la pausa de la galería, la copia y el borrador la pide la pantalla.
 Si falla: sin nombre o sin documento, se rechaza. Una versión de documento distinta de la 1 (también más nueva) se rechaza (`flow.unknown_schema_version`). Una clave que el hub no conoce, pasos vacíos o repetidos, un operador desconocido o un secreto usado fuera de un paso «Llamar a otro sistema» se rechazan (`flow.invalid_definition`, `flow.unknown_operator`, `flow.secret_not_available`). Un horario o una fecha imposibles, `flow.invalid_cron` / `flow.invalid_at`. Una consulta que el hub no tiene, «no encontrada». Una acción **interna** de un módulo se rechaza; una acción que **no existe** se acepta (puede ser de un módulo aún no instalado) y fallará al ejecutarse o al conceder su permiso. Todos los mensajes del hub van en inglés.
-Implicados: FLOWS-F04, FLOWS-F08, FLOWS-F12, FLOWS-F27
+Implicados: FLOWS-F04, FLOWS-F08, FLOWS-F12, FLOWS-F27, FLOWS-F05, FLOWS-F13
 QA: qa-hub-flows R1, BD-10
 
 ### HUB-F81 Ver las automatizaciones del negocio
@@ -95,9 +95,9 @@ Pasos:
 5. En el cambio de hora: una hora que no existe (primavera) dispara en el salto; una hora que se repite (otoño) dispara una sola vez.
 Entra: el horario (`cron` de 5 campos con rangos, listas, pasos, nombres de mes y de día, y `@daily` y similares) y la zona del negocio.
 Sale: una ejecución pendiente por disparo; la próxima hora guardada en UTC. Si cambia la zona del negocio, el horario se recalcula.
+En este mismo documento se apoya en: HUB-F227 (Fijar la zona horaria del negocio), HUB-F229 (Mover los horarios de las automatizaciones con la zona).
 Si falla: un horario imposible no se guarda (HUB-F80). Por encima de 30 ejecuciones por minuto, el disparo se salta. Los datos de entrada que un horario declara se resuelven sin aviso detrás (vacíos), y un filtro en un disparador por horario se acepta y se ignora.
 Implicados: FLOWS-F13
-Pendiente de enlazar: hub — HUB, negocio y datos: la zona horaria del negocio que el hub declara o deduce del país
 QA: qa-hub-flows R2
 
 ### HUB-F84 Arrancar una automatización una vez, en una fecha y hora
@@ -267,9 +267,9 @@ Pasos:
 4. Guarda lo que contestó y las herramientas que usó.
 Entra: el encargo, las herramientas permitidas, la política, las vueltas y, si se pide, los datos que tiene que devolver.
 Sale: la salida del paso (`text`, las llamadas a herramientas y los datos pedidos) y, con «Que me lo pregunte», una propuesta en la bandeja que caduca a las 72 horas.
+En este mismo documento se apoya en: HUB-F273 (Conversar con el asistente), HUB-F277 (Ver el plan del asistente y lo que queda del mes), HUB-F279 (Pedirle un paso al asistente dentro de una automatización).
 Si falla: un secreto en el encargo o más de 10 vueltas no se guardan. Sin enlace con ERPlora, `flow.agent_no_cloud_credential`. Se para con `agent_max_iters`, `agent_timeout` (60 s el paso, 45 s cada turno), `agent_upstream`, `agent_no_output` o `agent_bad_output`, salvo «seguir si falla».
-Implicados: FLOWS-F17
-Pendiente de enlazar: hub — HUB, WhatsApp y asistente: el proxy del asistente y su medición de uso
+Implicados: FLOWS-F17, WHATSAPP_INBOX-F20
 QA: qa-hub-flows R6, L-12
 
 ### HUB-F96 Paso «Preguntar antes a alguien»
@@ -313,7 +313,7 @@ Pasos:
 Entra: la lista de permisos (`command`, `query`, `notify`, `http`, `recipient_query`, con su límite si lo tiene) y la sesión del administrador.
 Sale: los permisos vivos de la automatización, con quién los concedió o retiró y cuándo. La lectura marca un permiso cuyo límite no se puede leer (`payload_unreadable`); ese permiso no autoriza nada.
 Si falla: una acción o consulta que no existe, «no encontrada»; una interna, rechazo; un patrón, canal o destinatario mal escrito, o un límite con un secreto, rechazo con su código. En todos esos casos no cambia nada. Con un límite incumplido, el paso se para con `flow.grant_payload_denied`.
-Implicados: FLOWS-F19
+Implicados: FLOWS-F19, FLOWS-F15, FLOWS-F16
 QA: qa-hub-flows R3, BD-10
 
 ### HUB-F99 Guardar secretos que no se pueden volver a leer
@@ -371,9 +371,9 @@ Pasos:
 4. A los 90 días de terminar, la ejecución y sus pasos, preguntas y esperas se borran; las que siguen vivas no se borran nunca.
 Entra: la automatización o la ejecución, y la sesión del administrador.
 Sale: nada guardado al leer.
+En este mismo documento se apoya en: HUB-F249 (Vaciar el historial del hub que nombra a la persona), HUB-F253 (Purgar el historial por retención).
 Si falla: una ejecución de otro hub o ya podada da «no encontrada». Lo que devuelven las consultas y el asistente se guarda legible, también datos de clientes, hasta la poda o el borrado de ese cliente.
 Implicados: FLOWS-F23
-Pendiente de enlazar: hub — HUB, negocio y datos: la poda de 90 días y el vaciado del historial al borrar un cliente
 QA: qa-hub-flows R1, qa-hub-flows R8, BD-10
 
 ### HUB-F103 Reanudar una ejecución desde el paso que falló
@@ -400,7 +400,7 @@ Pasos:
 Entra: las carpetas de recetas de los módulos instalados y la sesión de un administrador. No pide «Administrar automatizaciones»: un módulo sin ese permiso recibe solo las suyas.
 Sale: las recetas ofrecidas y las descartadas (`discarded[]`, con el módulo que falta y la versión pedida).
 Si falla: un módulo en pausa no ofrece las suyas. Los permisos que se enseñan son una petición, no una concesión.
-Implicados: FLOWS-F05
+Implicados: FLOWS-F05, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F18
 QA: qa-hub-flows R7
 
 ### HUB-F105 Encender una receta de fábrica con exactamente sus permisos
@@ -443,7 +443,7 @@ Pasos:
 Entra: el módulo y la receta, y la sesión del administrador; puede pedirlo el propio módulo o el que tiene «Administrar automatizaciones».
 Sale: la misma automatización (mismo historial), con la receta de hoy.
 Si falla: una receta que nunca se encendió, «no encontrada»; otro módulo sin «Administrar automatizaciones», `flow.template_not_yours`; una receta apartada, su motivo.
-Implicados: FLOWS-F06, WHATSAPP_INBOX-F18
+Implicados: FLOWS-F06, WHATSAPP_INBOX-F18, REC_WA_CITA-F01, REC_WA_MESA-F01
 QA: ninguno
 
 ### HUB-F108 Ofrecer el catálogo de avisos del negocio
@@ -471,7 +471,7 @@ Pasos:
 Entra: el nombre del aviso y cuántas muestras.
 Sale: la forma del aviso (hasta 200 datos, 6 niveles, ejemplos de 64 caracteres), nunca los avisos enteros.
 Si falla: un aviso que nadie declara y nunca se vio, «no encontrado»; uno declarado sin ejemplos vivos se contesta con 0 muestras.
-Implicados: FLOWS-F14, FLOWS-F20
+Implicados: FLOWS-F14, FLOWS-F20, FLOWS-F13
 QA: qa-hub-flows R0, qa-hub-flows R1
 
 ### HUB-F110 Frenar una automatización que se dispara en bucle
@@ -498,8 +498,7 @@ Pasos:
 Entra: la sesión del administrador (y «Administrar automatizaciones» si lo pide un módulo).
 Sale: la versión del documento (hoy 1), la del hub y el esquema completo, el mismo que el hub usa para juzgar.
 Si falla: sin sesión de administrador o sin el permiso del módulo, el rechazo correspondiente, que la pantalla traduce en sus avisos de entrada.
-Implicados: FLOWS-F01
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos: conceder «Administrar automatizaciones» a un módulo
+Implicados: FLOWS-F01, FLOWS-F27, HUB_SHELL-F167
 QA: qa-hub-flows R0, qa-hub-flows R3
 
 ### HUB-F112 Subir la foto, el vídeo o el PDF de la cabecera de un WhatsApp

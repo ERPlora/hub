@@ -59,16 +59,7 @@ ni sale en Impresión ni en el cierre de caja; si el papel se pierde (HUB-F199) 
 Si falla: sin sesión, 401. Identificador vacío, tipo de documento que no es de los ocho, documento que
 no es un objeto, vacío o de más de 512 KiB, papel desconocido, o una función que este hub no tiene:
 422 con el motivo (y, en la función, las que sí hay). Nada se guarda. Las pantallas de los módulos sí entran por aquí (puerta `erplora.print`); solo las órdenes de módulo que emiten `…print.due` entran por HUB-F191.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
-Pendiente de enlazar: printing — PRINTING-F09 (imprimir la cuenta de la mesa)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: printing — PRINTING-F12 (imprimir la etiqueta de un código de barras)
-Pendiente de enlazar: inventory — INVENTORY-F25 (imprimir la etiqueta del código de barras)
-Pendiente de enlazar: kitchen — KITCHEN-F14 (marcar urgente una ronda desde la pantalla de cocina)
-Pendiente de enlazar: kitchen — KITCHEN-F17 (imprimir el pase al marcar lista)
-Pendiente de enlazar: kitchen — KITCHEN-F20 (marcar urgente una ronda desde el TPV)
-Pendiente de enlazar: hub — HUB_SHELL, avisos e impresión (la puerta de impresión del shell: directo o por la cola; el tique al oír la venta y la comanda al nacer, solo en el dispositivo que cobró)
+Implicados: HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F77, INVENTORY-F25, KITCHEN-F08, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12, REC_FISCAL-F07
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB-F191 Pedir imprimir desde un módulo, un flujo o el asistente
@@ -85,6 +76,7 @@ Entra: el aviso con `jobId`, `role` (opcional), `documentType`, `document` y `fo
 emite la orden de un módulo que declara la capacidad `printer`.
 Sale: la misma fila en la cola. Sin puerta de flujo propia: el hub no emite nunca un `…print.due`, solo
 los módulos. No difunde el aviso en vivo (HUB-F198).
+En este mismo documento se apoya en: HUB-F52 (Reintentar un aviso que un módulo no pudo procesar), HUB-F53 (Mandar a «Eventos caídos» al momento lo que reintentar no arregla), HUB-F54 (Ver la cola de avisos caídos), HUB-F55 (Reenviar un aviso caído), HUB-F56 (Reenviar todos los avisos caídos), HUB-F58 (Reenviar solo lo que un permiso había rechazado, al concederlo).
 Si falla: si el aviso lo devuelve el código del módulo, la orden falla entera cuando el módulo no
 declara la capacidad; si es un `emit` declarado en el manifiesto, la orden responde bien y el aviso
 acaba en Eventos caídos, marcado por permiso. Si el módulo la declara pero el usuario no la ha
@@ -93,10 +85,7 @@ reintentos, y se encola solo al conceder el permiso. Si la cola rechaza el traba
 función que no existe, documento mal formado), el aviso se reintenta con espera creciente hasta 8
 veces y acaba en Eventos caídos; la orden ya había contestado «bien». Sin módulo atribuido, no se
 imprime.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F16 (mandar imprimir desde el asistente o un flujo)
-Pendiente de enlazar: flows — FLOWS-F25 (reenviar o cerrar lo que no llegó a pasar)
-Pendiente de enlazar: hub — HUB, avisos entre módulos (reintentar y listar los avisos caídos)
+Implicados: FLOWS-F25, PRINTING-F16
 QA: ninguno
 
 ### HUB-F192 Repetir una petición sin repetir el papel
@@ -116,11 +105,7 @@ Si falla: un identificador vacío se rechaza. Si una pantalla reutiliza una clav
 (las etiquetas de Inventario usan el SKU), la segunda etiqueta del mismo producto, hoy o dentro de un
 mes, no sale y no dice nada: «ya estaba» cuenta como éxito. La impresión directa del dispositivo no
 comprueba la clave (HUB_PERIPHERALS-F06).
-Implicados: pendiente
-Pendiente de enlazar: inventory — INVENTORY-F25 (imprimir la etiqueta del código de barras)
-Pendiente de enlazar: kitchen — KITCHEN-F17 (imprimir el pase al marcar lista)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: printing — PRINTING-F12 (imprimir la etiqueta de un código de barras)
+Implicados: INVENTORY-F25, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F10, PRINTING-F12
 QA: qa-hub-restaurant §16
 
 ### HUB-F193 Decidir por qué impresora sale cada documento
@@ -143,12 +128,7 @@ reparte el trabajo, no por una palabra). Cambiar el nombre visible de una funci�
 Si falla: un hub sin ninguna función no puede imprimir («no hay a dónde salga el papel»). Una función
 nombrada por error nunca abre una cola huérfana: es rechazo, no cola nueva. Una comanda de un hub que
 borró «Cocina» sale por Recibo.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: kitchen — KITCHEN-F14 (marcar urgente una ronda desde la pantalla de cocina)
-Pendiente de enlazar: kitchen — KITCHEN-F17 (imprimir el pase al marcar lista)
-Pendiente de enlazar: kitchen — KITCHEN-F20 (marcar urgente una ronda desde el TPV)
+Implicados: KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F04, PRINTING-F10
 QA: qa-hub §8, qa-hub-restaurant §08
 
 ### HUB-F194 Cambiar a qué función va cada documento
@@ -166,8 +146,7 @@ solo para los tipos que faltan y nunca encima de lo elegido; una ruta cuya funci
 vacía, rota, en vez de esconderse.
 Si falla: tipo desconocido o función que no existe, 422 con los nombres válidos. Sin sesión de
 administrador, 401 o 403.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
+Implicados: PRINTING-F04
 QA: ninguno
 
 ### HUB-F195 Crear, renombrar y quitar una función de impresión
@@ -187,8 +166,7 @@ Si falla: clave repetida o inválida, nombre largo, o sin clave y sin nombre, 42
 o imprimiéndose, o la de Recibo, 409. Los trabajos muertos o retirados no impiden borrarla: quedan
 apuntando a una función que no existe (reintentar uno de ellos lo deja sin nadie que lo pueda sacar;
 solo se puede descartar).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
+Implicados: PRINTING-F04
 QA: ninguno
 
 ### HUB-F196 Dar de alta un dispositivo como el que imprime una función
@@ -212,10 +190,7 @@ Si falla: sin `X-Device-Id`, 422; función que no existe, 422 con las que hay; n
 caracteres, 422; sin sesión, 401. Una impresora **USB** no se da de alta (la puerta del shell solo
 acepta red y Bluetooth), por eso no recibe trabajos (HUB_PERIPHERALS-F07). Un dispositivo que se dio de
 alta y se apaga sigue en la lista, «no vivo».
-Implicados: HUB_PERIPHERALS-F04
-Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
-Pendiente de enlazar: hub — HUB_APP, el alta del dispositivo y la búsqueda de impresoras en la aplicación instalada
-Pendiente de enlazar: hub — HUB_SHELL, quién da de alta el dispositivo al arrancar
+Implicados: HUB_PERIPHERALS-F04, HUB_APP-F13, HUB_APP-F17, HUB_APP-F18, HUB_SHELL-F73, PRINTING-F04
 QA: qa-hub §8, qa-hub-android §15
 
 ### HUB-F197 Mantener vivo o retirar un dispositivo de impresión
@@ -236,7 +211,7 @@ Si falla: sin `X-Device-Id`, 422; retirar a otro sin ser administrador, 403. «R
 respuesta correcta, no un error: significa «no imprimes nada aquí, regístrate». Un dispositivo cuyo canal en vivo murió por un
 código fatal (`unauthenticated`, `print.host_not_registered`, `print.not_ready`) sigue dando señales por HTTP y cuenta
 como vivo: «sin atender» no salta y la cobertura dice que la función se imprime (HUB-F201, HUB-F202).
-Implicados: pendiente
+Implicados: HUB_APP-F17, HUB_APP-F18, HUB_SHELL-F73
 Pendiente de enlazar: hub — HUB_SHELL y HUB_APP, el alta del dispositivo al arrancar y su retirada (ninguna pantalla retira ni da de baja una función quitada)
 QA: ninguno
 
@@ -260,8 +235,7 @@ este hub, incluidos los de otro hub), `print.role_not_hosted` (pide una función
 `print.frame_too_large` (más de 8 KiB). Sin `hello` en 15 s, se cuelga. Todas cierran el canal salvo
 `print.role_not_hosted`; la sesión sola no basta (un móvil con sesión no puede vaciar la cola) ni el registro solo (el
 identificador no es una credencial).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_APP, el canal de impresión del dispositivo instalado (reconexión)
+Implicados: HUB_APP-F18, HUB_SHELL-F74
 QA: qa-hub §8
 
 ### HUB-F199 Sacar un trabajo de la cola y confirmar que salió el papel
@@ -282,9 +256,7 @@ salga **otra vez**: el hub prefiere un papel de más a un cliente sin tique.
 Si falla: confirmar o fallar un trabajo de otra función, o desde un dispositivo no dado de alta, se
 rechaza; confirmar un trabajo que ya está muerto o retirado contesta «no confirmado» sin cambiar nada;
 un trabajo que el hub ya no tiene también. Confirmar con el reserva vencido se acepta: el papel salió.
-Implicados: HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F07
-Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
+Implicados: HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F07, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F74, PRINTING-F07, PRINTING-F10
 QA: qa-hub-restaurant §16
 
 ### HUB-F200 Un trabajo que no sale acaba «muerto»
@@ -304,8 +276,7 @@ función —también si se la quitaron sin retirarlo del hub, HUB-F197—, o una
 desconexiones; una USB nunca recibe trabajos de la cola; una impresora de red apagada no lo mata,
 porque el dispositivo ya lo dio por hecho (HUB-F199). Un dispositivo que falla deja de pedir esa función
 hasta que le llegue un aviso o se reconecte, para no gastar las cinco entregas en milisegundos; y el trabajo devuelto no despierta a nadie (HUB-F199).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F14 (sacar del atasco un trabajo de impresión)
+Implicados: HUB_SHELL-F74, PRINTING-F14
 QA: qa-hub-restaurant §16
 
 ### HUB-F201 Trabajo en cola y nadie conectado para sacarlo
@@ -327,16 +298,11 @@ minuto, la función en la lista de «sin atender». «Vivo» es la misma definic
 Si falla: con un dispositivo caído menos de 90 s no se avisa; la espera la ve quien mire la cola, no
 quien cobra. Al conectarse un dispositivo de esa función, vacía lo que esperaba, en orden. Un dispositivo
 con el canal en vivo muerto que sigue dando señales por HTTP cuenta como vivo, y la alarma no salta (HUB-F197).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F01 (ver cómo va la impresión)
-Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F08 (revisar lo que queda pendiente antes de cerrar)
-Pendiente de enlazar: hub — HUB_SHELL, la campana de impresión y la tarjeta «Estado de impresión» de Ajustes
+Implicados: CASH_REGISTER-F08, HUB_SHELL-F60, HUB_SHELL-F63, HUB_SHELL-F75, PRINTING-F01, PRINTING-F07, PRINTING-F10
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB-F202 Saber qué funciones tienen quién las imprima
-Estado: hecho
+Estado: parcial — un dispositivo cuyo canal de impresión se paró sigue contando como vivo, y una función que se le quitó a una impresora en la aplicación sigue saliendo cubierta: la vista puede decir que hay quien imprima cuando no lo hay (ERPlora/hub#2494)
 Actor: empleado, responsable, administrador, sistema
 Pantalla: PRINTING: Impresoras
 Pasos:
@@ -353,10 +319,7 @@ Sale: la misma vista para las tres puertas, con el veredicto ya resuelto: nadie 
 función sin dispositivo y sin trabajo no aparece (hasta que algo espere); un hub sin impresoras da una lista
 vacía.
 Si falla: una lectura que falla no se pinta como «todo al día» (la pantalla lo cuida).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F01 (ver cómo va la impresión)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F08 (revisar lo que queda pendiente antes de cerrar)
-Pendiente de enlazar: hub — HUB_SHELL, la campana y la tarjeta «Estado de impresión»
+Implicados: CASH_REGISTER-F08, HUB_SHELL-F37, HUB_SHELL-F63, HUB_SHELL-F75, HUB_SHELL-F137, PRINTING-F01
 QA: qa-hub §8
 
 ### HUB-F203 Leer la cola de trabajos
@@ -375,9 +338,7 @@ antiguo. Quién retiró o relanzó un trabajo, cuándo, por qué y desde qué m�
 persona, **solo** se ve con permiso de administrador; para el mostrador esas claves no existen.
 Si falla: sin filtro de estado la lista mezcla los hechos y trae los más antiguos primero, y con más de
 100 filas no llega a los pendientes (la pantalla de Impresión pide cada estado por separado).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F01 (ver cómo va la impresión)
-Pendiente de enlazar: printing — PRINTING-F14 (sacar del atasco un trabajo de impresión)
+Implicados: PRINTING-F01, PRINTING-F14
 QA: qa-hub §8
 
 ### HUB-F204 Reintentar un trabajo muerto
@@ -395,8 +356,7 @@ reintento). No despierta a nadie: lo saca el próximo dispositivo que se conecte
 Si falla: un trabajo que no está muerto, 409 (`print.job_not_requeueable`) con su estado real; que no
 existe en este hub, 404; sin administrador, 401/403; módulo sin el permiso, rechazo. Un trabajo de una
 función ya borrada vuelve a pendiente y no lo recoge nadie.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F14 (sacar del atasco un trabajo de impresión)
+Implicados: PRINTING-F14
 QA: qa-hub-restaurant §16, qa-hub §8
 
 ### HUB-F205 Descartar un trabajo que no debe salir
@@ -413,8 +373,7 @@ Sale: el trabajo retirado, **sin borrar**: quién, cuándo, por qué módulo y p
 recibe más. Es la única forma de poder borrar una función con trabajo esperando.
 Si falla: un trabajo que se está imprimiendo, ya hecho o ya retirado, 409 (`print.job_not_discardable`) con su estado; que no
 existe, 404; sin permisos, rechazo.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F14 (sacar del atasco un trabajo de impresión)
+Implicados: PRINTING-F14
 QA: qa-hub-restaurant §16, qa-hub §8
 
 ### HUB-F206 Cuánto tiempo guarda el hub los trabajos de impresión
@@ -433,10 +392,10 @@ descarte, quién relanzó o retiró (`retried_by`, `discarded_by`), qué disposi
 (`claimed_by`) y quién cambió el mapa (`_print_route.updated_by`) o dio de alta el dispositivo
 (`_print_host.registered_by`). Los avisos `…print.due` del
 registro de avisos se borran a los 90 días; la fila de la cola no.
+En este mismo documento se apoya en: HUB-F242 (Restablecer el hub), HUB-F248 (Borrar los datos de una persona: el aviso único), HUB-F249 (Vaciar el historial del hub que nombra a la persona), HUB-F253 (Purgar el historial por retención).
 Si falla: el borrado de un cliente (hub#2467) vacía la copia del aviso `…print.due` ya entregado si lleva su id, pero no la fila de la cola: un cliente que pide el borrado de sus datos sigue en ella y no hay forma de
 quitarlo, salvo reiniciar todo el negocio. Tampoco hay límite de tamaño ni de edad.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, negocio y datos (retención, borrado de un cliente y reinicio del negocio)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F207 Abrir el cajón por la impresora (lo que sabe el servidor)
@@ -452,10 +411,7 @@ Sale: nada en el hub. El pulso no es un documento, no entra en la cola, no queda
 Se abre con cualquier forma de pago (no solo efectivo) y siempre por el pin 2.
 Si falla: con una impresora de Recibo USB no se abre nunca (la resolución del shell descarta las USB); el error de la impresora se descarta sin aviso; si el dispositivo está en un navegador, no se
 abre. No existe «Abrir cajón / sin venta» con permiso y registro.
-Implicados: HUB_PERIPHERALS-F15
-Pendiente de enlazar: printing — PRINTING-F13 (abrir el cajón al cobrar)
-Pendiente de enlazar: sales — SALES-F01 (vender y cobrar en efectivo)
-Pendiente de enlazar: hub — HUB_SHELL, abrir el cajón al cobrar en el dispositivo que cobró
+Implicados: HUB_PERIPHERALS-F15, HUB_APP-F21, HUB_SHELL-F71, PRINTING-F13, SALES-F01
 QA: qa-hub §8
 
 ## Cobertura contra la referencia

@@ -44,10 +44,7 @@ Pasos:
 Entra: el catálogo de plantillas de erplora.com (a través del hub), el país y el idioma del negocio, el permiso de administrar.
 Sale: pide al hub importar la plantilla (apps, ajustes del negocio, imágenes y datos de las apps; nunca personas ni datos fiscales). Después refresca el menú de apps, la lista de configuración, los paneles, la salud y la actividad, y, si la plantilla trae apps que piden permisos, abre la pregunta de permisos (HUB_SHELL, Ajustes y datos).
 Si falla: apps que hay que añadir al plan: «Estas hay que añadirlas antes a tu plan: {apps}». Algo que no entró: «Estas no han entrado: {apps}…», «Esto no ha entrado: {parts}…» o «Hay algo más que no ha entrado…», con «Ver el informe» (Ajustes › Datos y copias). No se pudo empezar: «No se ha podido abrir esa plantilla» — «No ha cambiado nada en tu negocio…» con el motivo y «Intentar otra vez». Cortado a medias: «La configuración no ha terminado» — «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.», sin reintento.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F234 (traer una plantilla del catálogo)
-Pendiente de enlazar: hub — HUB-F235 (importar un fichero o una plantilla)
-Pendiente de enlazar: hub — HUB-F239 (el informe de la importación)
+Implicados: HUB-F234, HUB-F235, HUB-F239
 QA: BD-01, qa-hub-restaurant §7.00
 
 ### HUB_SHELL-F27 Seguir la lista «Termina de configurar tu negocio»
@@ -63,8 +60,7 @@ Pasos:
 Entra: la lista que calcula el hub para esta persona (`hub.setup.status`): solo los pasos que puede hacer, salvo los que bloquean la facturación, que ven todos.
 Sale: nada guardado; se relee al entrar, al cambiar de pantalla, al cambiar de idioma y al instalar, activar, desactivar o quitar una app.
 Si falla: si no llega respuesta, la tarjeta no sale (o se queda con la última que llegó); nunca dice «listo» sin respuesta. Cerrar sesión no borra la última lista leída: si la lectura de la persona siguiente falla, ve la de la anterior hasta que una lectura funcione. Un paso que no es de esta persona: «Esto lo tiene que configurar un administrador.» sin botón. Un paso «Todavía no disponible»: «Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.» sin botón. «Tus apps» no sale en Inicio porque ya lo ofrece «Mis apps»; con «Ver todo» sí.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F35 (calcular la lista de puesta en marcha)
+Implicados: HUB-F35
 QA: BD-01, BD-02
 
 ### HUB_SHELL-F28 Ver qué falta para poder facturar
@@ -79,11 +75,7 @@ Pasos:
 Entra: el contador de pasos que bloquean y esos pasos, de la misma lista de HUB_SHELL-F27.
 Sale: nada guardado; se relee en cada cambio de pantalla, así aparece también si a mitad de sesión se instala una app que pide certificado.
 Si falla: sin respuesta del hub no hay franja (una lectura rota no es una respuesta). La franja no sale en Acceso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F35 (los pasos ⛔ que bloquean)
-Pendiente de enlazar: hub — HUB-F317 (no emitir un documento fiscal sin la identidad del negocio)
-Pendiente de enlazar: hub — HUB-F313 (en producción, sin vía no se cobra)
-Pendiente de enlazar: verifactu — VERIFACTU-F01 (identidad fiscal del negocio y el paso de VeriFactu en la lista)
+Implicados: HUB-F35, HUB-F313, HUB-F317, VERIFACTU-F01
 QA: BD-02
 
 ### HUB_SHELL-F29 Dar a una app el permiso que le falta desde la lista
@@ -97,8 +89,7 @@ Pasos:
 Entra: los permisos que pide la app y aún no tiene, que da el hub en el paso.
 Sale: nada desde aquí; el permiso se concede en Ajustes › Permisos.
 Si falla: sin ser administrador, la fila no tiene botón y dice quién puede hacerlo.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F32 (conceder o retirar un permiso de host a una aplicación)
+Implicados: HUB-F32
 QA: BD-03
 
 ### HUB_SHELL-F30 Pedirle al asistente que repase la configuración
@@ -112,8 +103,7 @@ Pasos:
 Entra: nada más que el tema; el asistente lee la lista por su cuenta.
 Sale: abre el asistente (área del asistente de este documento).
 Si falla: sin asistente disponible, las filas siguen llevando a su pantalla.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F273 (conversar con el asistente)
+Implicados: HUB-F273
 QA: ninguno
 
 ### HUB_SHELL-F31 Ver los pasos que aportan las apps
@@ -128,14 +118,7 @@ Pasos:
 Entra: los pasos de las apps que añade el hub a la lista.
 Sale: nada guardado.
 Si falla: un paso cuya comprobación no se puede hacer (sin permiso, una lectura rota) no sale. Un título que la app no traduce sale en inglés.
-Implicados: pendiente
-Pendiente de enlazar: inventory — INVENTORY-F28 (completar el paso «Tu catálogo»)
-Pendiente de enlazar: schedules — SCHEDULES-F03 (el paso «Confirma tu horario»)
-Pendiente de enlazar: tables — TABLES-F02 (el paso «Tus mesas»)
-Pendiente de enlazar: invoice — INVOICE-F14 (la tarea «Tu numeración de facturas»)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F01 (los primeros pasos de Caja)
-Pendiente de enlazar: verifactu — VERIFACTU-F01 (el paso «Configura VeriFactu»)
-Pendiente de enlazar: hub — HUB-F35 (los pasos de las apps)
+Implicados: CASH_REGISTER-F01, HUB-F35, INVENTORY-F28, INVOICE-F14, SCHEDULES-F03, TABLES-F02, VERIFACTU-F01
 QA: BD-01, BD-02
 
 ### HUB_SHELL-F32 Abrir una app desde «Mis apps»
@@ -150,8 +133,7 @@ Pasos:
 Entra: la lista de apps del menú que da el hub (la misma del lanzador de la barra).
 Sale: cuenta en este navegador cuántas veces se abre cada app (solo para ordenar).
 Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lector de pantalla. Sin apps de verdad: «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si la lista no se pudo pedir: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca «no tienes apps».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F31 (servir el menú de las aplicaciones)
+Implicados: HUB-F31
 QA: BD-03
 
 ### HUB_SHELL-F33 Ver los paneles de las apps en Inicio
@@ -166,11 +148,7 @@ Pasos:
 Entra: el bloque `widgets` del `module.json` de cada app activa, del plan y con menú visible para quien mira; los datos de cada panel, pedidos por la puerta normal de consultas con los permisos de quien mira, como mucho cuatro a la vez.
 Sale: nada guardado en el hub.
 Si falla: panel sin filas: «Sin datos». Consulta rechazada o rota: «No disponible», nunca una cifra vieja o inventada. Si no se pueden leer los manifiestos, no hay paneles de apps y el tablero dice «Panel vacío. Pulsa ⋮ para añadir widgets.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F34 (servir los datos de los paneles de Inicio)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F12 (la caja en los paneles del inicio)
-Pendiente de enlazar: inventory — INVENTORY-F17 (los paneles de stock del Inicio)
-Pendiente de enlazar: verifactu — VERIFACTU-F31 (los paneles de VeriFactu)
+Implicados: CASH_REGISTER-F12, HUB-F34, INVENTORY-F17, VERIFACTU-F31
 QA: R-01, qa-hub-restaurant §7.12
 
 ### HUB_SHELL-F34 Personalizar el tablero de paneles
@@ -184,7 +162,7 @@ Pasos:
 Entra: el catálogo de paneles de HUB_SHELL-F33.
 Sale: el tablero elegido, guardado en este navegador: lo comparten todas las personas que usan este dispositivo y no viaja a otro.
 Si falla: un panel guardado que ya no está en el catálogo (su app se quitó) desaparece del tablero sin aviso.
-Implicados: ninguno
+Implicados: HUB-F34
 QA: ninguno
 
 ### HUB_SHELL-F35 Mantener los paneles al día sin recargar
@@ -198,10 +176,7 @@ Pasos:
 Entra: los avisos en vivo del hub que el panel declara (`refresh_on`).
 Sale: nada guardado.
 Si falla: el refresco que falla deja «No disponible», no el valor de antes. Un panel no se refresca con un aviso que su app no declara (por ejemplo, el stock tras una venta).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F60 (avisar a las pantallas en vivo)
-Pendiente de enlazar: inventory — INVENTORY-F17 (cuándo se refrescan los paneles de stock)
-Pendiente de enlazar: verifactu — VERIFACTU-F31 (el panel «Pendientes VeriFactu» y su refresco)
+Implicados: CASH_REGISTER-F12, HUB-F34, HUB-F60, INVENTORY-F17, VERIFACTU-F31
 QA: qa-hub-restaurant §7.12
 
 ### HUB_SHELL-F36 Consultar la actividad reciente
@@ -215,8 +190,7 @@ Pasos:
 Entra: las ventas de la app Ventas (`sales.list`, con el total en céntimos), si está activa, con los permisos de quien mira.
 Sale: nada guardado.
 Si falla: sin la app Ventas, la tabla vacía. Un fallo de lectura también la deja vacía, sin aviso.
-Implicados: pendiente
-Pendiente de enlazar: sales — SALES-F28 (consultar el historial y las cifras de ventas)
+Implicados: SALES-F28
 QA: ninguno
 
 ### HUB_SHELL-F37 Ver si la impresora y WhatsApp funcionan
@@ -231,10 +205,7 @@ Pasos:
 Entra: la cobertura de impresión del hub (quién imprime tiques ahora), la lista de apps instaladas y, solo con WhatsApp, sus números a través de erplora.com.
 Sale: nada guardado.
 Si falla: sin app de impresión o de WhatsApp no hay aviso de esa cosa. Si no se puede saber qué hay instalado, o leer los números de WhatsApp, no se dice nada (no se sabe ≠ caído).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F202 (saber qué funciones tienen quién las imprima)
-Pendiente de enlazar: hub — HUB-F261 (saber qué número está conectado y si hay que reconectarlo)
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F02 (volver a conectar el número, adonde lleva «Volver a conectar WhatsApp»)
+Implicados: HUB-F202, HUB-F261, WHATSAPP_INBOX-F02
 QA: ninguno
 
 ### HUB_SHELL-F38 Ir a configurar desde el panel «Configura tu negocio»
@@ -262,8 +233,7 @@ Pasos:
 Entra: el aviso de fin de importación de la propia pantalla.
 Sale: nada guardado.
 Si falla: lo que no se pudo leer conserva lo último que se leyó, salvo la actividad (HUB_SHELL-F36).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F239 (el informe de la importación y la tarjeta de inicio)
+Implicados: HUB-F239
 QA: BD-01
 
 ## Cobertura contra la referencia

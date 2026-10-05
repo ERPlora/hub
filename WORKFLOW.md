@@ -308,7 +308,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F199 | Sacar un trabajo de la cola y confirmar que salió el papel | parcial | [impresion.md](workflow/impresion.md) |
 | HUB-F200 | Un trabajo que no sale acaba «muerto» | hecho | [impresion.md](workflow/impresion.md) |
 | HUB-F201 | Trabajo en cola y nadie conectado para sacarlo | hecho | [impresion.md](workflow/impresion.md) |
-| HUB-F202 | Saber qué funciones tienen quién las imprima | hecho | [impresion.md](workflow/impresion.md) |
+| HUB-F202 | Saber qué funciones tienen quién las imprima | parcial | [impresion.md](workflow/impresion.md) |
 | HUB-F203 | Leer la cola de trabajos | hecho | [impresion.md](workflow/impresion.md) |
 | HUB-F204 | Reintentar un trabajo muerto | hecho | [impresion.md](workflow/impresion.md) |
 | HUB-F205 | Descartar un trabajo que no debe salir | hecho | [impresion.md](workflow/impresion.md) |

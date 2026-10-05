@@ -60,8 +60,7 @@ Pasos:
 Entra: lo que la persona escribe; toda la conversación de la sesión viaja en cada pregunta (HUB_SHELL-F195).
 Sale: pide la respuesta al servidor (HUB-F273), que la reenvía y la mide; el panel no guarda nada fuera del navegador.
 Si falla: sin conexión, servicio caído o sin mensajes: HUB_SHELL-F199 y HUB_SHELL-F197. Pulsar «Detener» no deshace una orden que ya estaba ejecutándose.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F273 (conversar con el asistente: el servidor que contesta lo que este panel pregunta)
+Implicados: HUB-F273
 QA: qa-hub-assistant §1 (el banco), qa-hub-assistant §R0
 
 ### HUB_SHELL-F187 Adjuntar un archivo o dictar por voz
@@ -125,10 +124,7 @@ Pasos:
 Entra: la orden, sus datos y las marcas que manda el servidor (riesgo, qué datos son dinero, si solo lee); los nombres de acción que cada app trae en su traducción (`commands.<orden>.label`).
 Sale: si se acepta, la orden se ejecuta por la misma puerta y con el mismo permiso que el botón de la pantalla, revisado otra vez en el servidor (HUB-F274). El panel no pregunta ni guarda nada más. La orden de Automatizaciones que deja un borrador (FLOWS-F26) pasa por esta tarjeta y, al no traer Automatizaciones etiquetas, sale sin nombre.
 Si falla: sin función de confirmar, el panel cancela toda orden (nunca se muta en silencio). Una orden que el servidor rechaza vuelve al asistente como error y es él quien lo cuenta (HUB_SHELL-F192). El nombre de las acciones de una app instalada durante esta sesión no se carga hasta recargar (la lista se carga una vez, al montar el shell).
-Implicados: pendiente
-Pendiente de enlazar: flows — FLOWS-F26 (Pedirle al asistente una automatización: la orden que se ofrece como herramienta y se confirma en esta tarjeta)
-Pendiente de enlazar: hub — HUB-F274 (qué herramientas se ofrecen, y las marcas de riesgo y de solo lectura que decide esta tarjeta)
-Pendiente de enlazar: hub — HUB, módulos y órdenes (la misma puerta de órdenes que usa el botón de la pantalla)
+Implicados: FLOWS-F26, HUB-F03, HUB-F273, HUB-F274
 QA: qa-hub-assistant §R1, qa-hub-assistant §R3 (punto 4)
 
 ### HUB_SHELL-F191 Acciones peligrosas: escribir para confirmar, o no desde el chat
@@ -143,8 +139,7 @@ Pasos:
 Entra: el riesgo que declara la app (`normal`, `destructive`, `bulk_destructive`; un valor desconocido llega como `destructive`) y los datos de la orden.
 Sale: si se acepta, lo mismo que HUB_SHELL-F190. El panel no sabe qué es una cita o una factura: solo aplica la política.
 Si falla: un aviso con la palabra equivocada no ejecuta nada y el asistente lo cuenta como cancelado. Las acciones destructivas del propio hub no se ofrecen nunca (HUB-F274). Las órdenes de borrar o anular de una app que no declara riesgo (Ventas, Inventario, Clientes, Reservas, Cocina, Mesas, Personal, Servicios…) llegan con una tarjeta de un clic.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F274 (declarar el riesgo y qué órdenes se ofrecen; un riesgo desconocido llega como destructivo)
+Implicados: HUB-F274
 QA: qa-hub-assistant §R3 (puntos 3 y 4)
 
 ### HUB_SHELL-F192 Comprobar lo que dice el asistente contra lo que de verdad hizo
@@ -162,9 +157,7 @@ Pasos:
 Entra: las órdenes del turno con su desenlace (hecha, error o cancelada) y sus resultados; el mapa real de pantallas.
 Sale: el aviso sobre el mensaje; nada se manda al servidor. Aplicar una plantilla devuelve además al asistente lo que sigue sin hacer, para que no diga que ya se puede facturar.
 Si falla: «hecha» significa que la puerta de órdenes no lanzó error y la persona aprobó la tarjeta. Una orden de una app que no comprueba cuántas filas tocó responde bien sin haber hecho nada (doble apertura de caja, doble cierre) y el asistente puede contar que sí; un lote que pone a cero lo que no se le nombró devuelve éxito. Las herramientas del núcleo para instalar una app y aplicar una plantilla devuelven un error escrito (falta el dato, la app no está en el catálogo) sin lanzarlo: cuentan como hechas. Si el turno termina en error (más de 6 rondas, red cortada, servicio que rechaza a mitad), no se hace ninguna comprobación y un «he creado…» de una ronda anterior queda sin marcar. Ese filtro de filas no lo hace este panel: lo tiene que hacer la orden del servidor (HUB, módulos y órdenes).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F273 (los recibos del turno: el panel los construye de lo que ejecuta; el servidor no los guarda)
-Pendiente de enlazar: hub — HUB, módulos y órdenes (que una orden diga cuántas filas cambió; hoy una orden sin esa comprobación contesta bien sin hacer nada)
+Implicados: HUB-F06, HUB-F273
 QA: qa-hub-assistant §R0, qa-hub-assistant §R2, qa-hub-assistant §R4
 
 ### HUB_SHELL-F193 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
@@ -179,10 +172,7 @@ Pasos:
 Entra: la sesión local de quien pregunta, que es la que firma cada orden.
 Sale: la orden ejecutada con esa persona como autora; nunca con un aprobador, porque el asistente no pide aprobación.
 Si falla: sin permiso, el asistente no tiene la herramienta y lo explica con sus palabras (sin texto fijo del panel). Si un permiso se perdiera entre ofrecer la orden y ejecutarla, el servidor la rechaza (HUB-F151) y el asistente recibe el error. La conexión del transporte con la ventana del PIN existe pero ningún camino del asistente llega a ella.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F274 (qué herramientas se ofrecen a cada perfil)
-Pendiente de enlazar: hub — HUB-F05 (pedir la aprobación de un responsable cuando falta el permiso: lo que el botón hace y el chat no)
-Pendiente de enlazar: hub — HUB-F151 (rechazar una orden para la que no se tiene permiso)
+Implicados: HUB-F05, HUB-F151, HUB-F274
 QA: qa-hub-assistant §R3 (puntos 5 y 9)
 
 ### HUB_SHELL-F194 Pedirle varias cosas seguidas
@@ -198,8 +188,7 @@ Pasos:
 Entra: la petición; cada resultado de orden, que vuelve al asistente.
 Sale: tantas órdenes como tarjetas aprobadas, cada una en su app (HUB-F273, HUB-F274).
 Si falla: si falla una orden a mitad, el asistente la recibe como error y debe contarlo; las anteriores no se deshacen. Con la red cortada a mitad se aplica HUB_SHELL-F199; pasada la sexta ronda, lo dicho arriba.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F273 (el bucle de herramientas; el SaaS manda como mucho una herramienta por respuesta)
+Implicados: HUB-F273
 QA: qa-hub-assistant §R4
 
 ### HUB_SHELL-F195 La conversación: qué se guarda, dónde y cuándo se borra
@@ -217,9 +206,7 @@ Pasos:
 Entra: los mensajes del panel; los cierres de sesión y los relevos de usuario.
 Sale: la clave del navegador; en cada pregunta, el hilo entero va al servidor (HUB-F273) y se olvida al acabar el turno.
 Si falla: un almacenamiento lleno o bloqueado (modo privado) se ignora en silencio. Un hilo guardado ilegible arranca vacío.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F273 (el hub no guarda la conversación)
-Pendiente de enlazar: hub — HUB-F136 y HUB-F138 (cerrar sesión y cambiar de usuario, que disparan el borrado)
+Implicados: HUB-F136, HUB-F138, HUB-F273
 QA: qa-hub-assistant §Pendiente (fase C) (cambio de usuario por PIN), qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F196 El asistente en la puesta en marcha
@@ -235,8 +222,7 @@ Pasos:
 Entra: el estado de la lista de puesta en marcha, filtrado por país y por permiso (HUB-F35); lo que la persona escribe.
 Sale: el contexto de configuración, solo para el modelo; la conversación normal.
 Si falla: si nunca se pudo leer el estado, el contexto dice que no se pudo y el asistente no afirma que el negocio esté configurado; si ya hubo una lectura buena y la nueva falla, se usa la anterior sin avisar. Los atajos se reducen a «¿Qué falta por configurar?». La tarjeta de Inicio conserva «Configurar» en cada paso, así que un asistente caído no deja a nadie sin salida.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F35 (calcular la lista de puesta en marcha que el asistente lee)
+Implicados: HUB-F35
 QA: qa-hub-assistant §R0 (pregunta 4), qa-hub-assistant §R4 (montar el hub por chat)
 
 ### HUB_SHELL-F197 Ver el plan del asistente, el límite de uso y ampliarlo
@@ -255,8 +241,7 @@ Pasos:
 Entra: nivel, mensajes usados, límite y fecha de renovación que da el SaaS; planes contratables.
 Sale: la dirección de pago o de la página de plan se abre en el navegador (HUB-F277); al volver a la caja se relee el plan cada vez que la ventana recupera el foco. Si el corte fuera por sesiones, la frase sigue diciendo «mensajes este mes» con un número de sesiones; el panel no cobra nada ni lleva contador propio.
 Si falla: sin planes contratables, «Ahora mismo no hay planes a los que ampliar.»; sin dirección de pago, «No se pudo contactar con el asistente.» (texto que no corresponde); si el navegador no abre: «No se pudo abrir la página de pago en el navegador. Inténtalo de nuevo y, si sigue fallando, actualiza la app de ERPlora.» o, para el plan, «No se pudo abrir la página de tu plan en el navegador. Inténtalo de nuevo.»
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F277 (ver el plan del asistente y lo que queda del mes)
+Implicados: HUB-F277
 Pendiente de enlazar: saas — asistente: nivel y consumo, y planes contratables
 QA: qa-hub-assistant §R4 (el 429), qa-hub-assistant §0 (la cuota del banco)
 
@@ -272,8 +257,7 @@ Pasos:
 Entra: el texto de la respuesta, la pregunta anterior y el comentario.
 Sale: la denuncia al hub, que la deja en su registro de errores para revisión (HUB-F278). Cualquier perfil puede denunciar. El panel no pide motivo, aunque el servidor lo admita, ni ofrece 👍 o 👎.
 Si falla: «No se pudo enviar la denuncia. Inténtalo de nuevo.» y el botón sigue ahí. El botón sale también bajo los mensajes que escribe el propio panel («No se pudo contactar…», «(sin respuesta)»), que no son de ningún modelo.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F278 (denunciar una respuesta del asistente: el registro que guarda lo que este botón manda)
+Implicados: HUB-F278
 QA: qa-hub-assistant §Pendiente (fase C) («Report an issue»)
 
 ### HUB_SHELL-F199 El asistente sin conexión, con el servicio caído o sin plan
@@ -289,9 +273,7 @@ Pasos:
 Entra: el desenlace de la petición del panel al hub.
 Sale: solo texto en el hilo (también queda guardado, y viaja al asistente en la siguiente pregunta como si lo hubiera dicho él).
 Si falla: un hub que no responde lo cuenta el aviso general de la barra (área de acceso y navegación), no este panel. El botón de HUB_SHELL-F198 aparece también bajo estos mensajes aunque no sean del modelo.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F273 (los fallos del servicio llegan con un código: `cloud_unreachable`, cupo agotado, proveedor sin credencial)
-Pendiente de enlazar: hub — HUB-F277 (nivel y consumo)
+Implicados: HUB-F273, HUB-F277
 QA: qa-hub-assistant §R4 (negativos de cadena), qa-hub-assistant §R6
 
 ## Cobertura contra la referencia

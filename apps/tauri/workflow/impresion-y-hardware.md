@@ -25,9 +25,7 @@ nada: el módulo Impresión dice «No se encontraron impresoras de red (puerto 9
 «No se ha encontrado ninguna impresora en esta red…» del hub no la llama nadie; lo dicho en HUB_APP-F09 para macOS). En el
 emulador de Android el barrido recorre la red del emulador y no encuentra nada: no es un defecto (QA).
 Desde un navegador: «Desde el navegador, este dispositivo no puede llegar a las impresoras…».
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y registro de dispositivos de la app instalada)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F01 (cómo se busca) y HUB-F196 (alta del dispositivo y búsqueda)
+Implicados: HUB-F196, HUB_PERIPHERALS-F01, HUB_PERIPHERALS-F04, PRINTING-F02
 QA: qa-hub §8, qa-hub-android Fase 3
 
 ### HUB_APP-F14 Añadir una impresora por su IP
@@ -47,9 +45,7 @@ escribió mal (`invalid_printer_address`: «La dirección no es válida…») de
 (`printer_unreachable`: «Ninguna impresora ha respondido en {dirección}…»); una aplicación más antigua
 que la orden da «No se pudo añadir la impresora. Actualiza la app…». Contestar en el 9100 no prueba que
 sea térmica: una láser de oficina también contesta.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F03 (alta de impresora por IP en la app instalada)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F02 (cómo se comprueba la dirección)
+Implicados: HUB_PERIPHERALS-F02, PRINTING-F03
 QA: qa-hub-android Fase 3
 
 ### HUB_APP-F15 Impresora Bluetooth (solo Android)
@@ -69,10 +65,7 @@ Si falla: Bluetooth apagado o sin permiso, o impresora fuera de alcance/apagada:
 motivo («impresora inalcanzable: …» o `bluetooth_permission_denied`) y la persona lo ve en la hoja de
 prueba y el hub marca el trabajo como fallido para reintentar. El conectar puede tardar segundos; la
 orden no deja la pantalla colgada porque corre fuera del hilo principal.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y registro de dispositivos de la app instalada)
-Pendiente de enlazar: printing — PRINTING-F05 (hacer una prueba de impresión)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F09 y F10 (contenido del papel) y HUB_PERIPHERALS-F14 (hoja de prueba); el transporte Bluetooth no tiene flujo en HUB_PERIPHERALS
+Implicados: HUB_PERIPHERALS-F09, HUB_PERIPHERALS-F14, PRINTING-F02, PRINTING-F05
 QA: qa-hub-android Pendiente (Bluetooth SPP, fase C)
 
 ### HUB_APP-F16 Impresora USB (solo ordenador)
@@ -93,9 +86,7 @@ Entra: el identificador `usb:<cola>`.
 Sale: solo la hoja de prueba y la orden directa; con las colas CUPS la aplicación comprueba el estado
 antes de enviar y cancela a los 15 s lo que no sale (`HUB_PERIPHERALS-F07`).
 Si falla: en Windows no se listan colas (no hay `lp`): una impresora USB de Windows se usa por red.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y registro de dispositivos de la app instalada)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F03, F07 y F08
+Implicados: HUB_PERIPHERALS-F03, PRINTING-F02
 QA: qa-hub §8
 
 ### HUB_APP-F17 Dar nombre y función a una impresora, y quitarla
@@ -122,9 +113,7 @@ función ya anunciada no se retira (`HUB-F197`). No existe la acción «dejar si
 renombrar y la de quitar existen y están concedidas, pero **ninguna pantalla las llama** (el SDK no tiene
 `setDeviceName` ni `removeDevice`; el módulo Impresión solo usa `setDeviceRole`, `addNetworkPrinter` y
 `testPrint`) y, con una clave que no existe, contestan «correcto» (`registry.rs:431-434,476-479`).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F04 (registro) y HUB-F196/F197 (alta y retirada del puesto en el hub)
+Implicados: HUB-F196, HUB-F197, HUB_PERIPHERALS-F04, PRINTING-F04
 QA: qa-hub §8
 
 ### HUB_APP-F18 Ser el puesto que imprime
@@ -146,9 +135,7 @@ reconexión son del hub y de la página.
 Si falla: un navegador sin aplicación no es puesto. Una USB no cuenta como alcanzable (HUB_APP-F16). Lo
 que la aplicación no hace es avisar al hub de que una impresora se apagó: el vigilante marca en línea o fuera de
 línea cada 30 s en `devices.json` y sus eventos van a un `eprintln!` que nadie lee (HUB_PERIPHERALS-F05).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F196 (alta del dispositivo y búsqueda), HUB-F197 (mantener vivo) y HUB-F198 (canal en vivo y reconexión)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (arranque del puesto)
+Implicados: HUB-F196, HUB-F197, HUB-F198, HUB_PERIPHERALS-F04, HUB_SHELL-F73, HUB_SHELL-F74, HUB_SHELL-F162
 QA: qa-hub §8
 
 ### HUB_APP-F19 Imprimir un tique, una factura o una comanda
@@ -184,12 +171,7 @@ Sale: lo que **se le devuelve a la pantalla** por caso:
    trabajo a una impresora apagada. No hay estado de fallo, reintento posterior ni aviso a la persona.
 Si falla: lo anterior. La salida de verdad es mirar el papel; QA lo dice (qa-hub §8: «mira si sale papel,
 no el valor de retorno»). Ver también `HUB_PERIPHERALS-F06` y `HUB-F199`.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F07 (impresión automática del tique al cobrar)
-Pendiente de enlazar: printing — PRINTING-F10 (impresión de la comanda al disparar el pedido)
-Pendiente de enlazar: sales — SALES-F01 (cobrar un tique (el shell imprime y abre el cajón))
-Pendiente de enlazar: kitchen — KITCHEN-F08 (el shell imprime la comanda al nacer)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F06 (enviar un documento a la impresora de red) y HUB-F199 (confirmar que salió el papel)
+Implicados: HUB-F199, HUB_PERIPHERALS-F06, KITCHEN-F08, PRINTING-F07, PRINTING-F10, SALES-F01
 QA: qa-hub §8, qa-hub-restaurant §16, qa-hub-android Fase 3
 
 ### HUB_APP-F20 Hacer una hoja de prueba
@@ -205,9 +187,7 @@ Sale: la hoja; nada guardado; no pasa por la cola del hub. Un módulo más antig
 no manda datos y la hoja sale igual con «ERPlora» en español.
 Si falla: de red: no hay error aunque la impresora no conteste (HUB_APP-F19). De USB o Bluetooth: el
 error vuelve y sale en rojo. Por eso **añadir por IP sí comprueba la conexión y «Probar» no**.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F05 (hacer una prueba de impresión)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F14 (hoja de prueba)
+Implicados: HUB_PERIPHERALS-F14, PRINTING-F05
 QA: qa-hub §8, qa-hub-android Fase 3
 
 ### HUB_APP-F21 Abrir el cajón
@@ -228,10 +208,7 @@ inalcanzable. Pero la pantalla lo descarta (`apps/web/src/lib/print-on-sale.ts:1
 undefined)`). La conexión de red no lleva plazo propio (`crates/peripherals/src/drawer.rs`, `open_drawer`):
 una IP que no responde cuelga la orden lo que dure el plazo del sistema, y el error es el de E/S, no
 «impresora inalcanzable». Un pulso por el pin equivocado no da error: el cajón no se abre.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F13 (apertura del cajón por la impresora)
-Pendiente de enlazar: sales — SALES-F01 (cobrar un tique (el shell imprime y abre el cajón))
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F15 (abrir el cajón) y HUB-F207 (lo que sabe el servidor)
+Implicados: HUB-F207, HUB_PERIPHERALS-F15, PRINTING-F13, SALES-F01
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB_APP-F22 Imprimir un documento A4 con el diálogo del sistema
@@ -253,8 +230,7 @@ Si falla: documento vacío o demasiado grande: `print_document_refused`; sistema
 hay una impresora de «Recibo» alcanzable, **la puerta sigue**: el documento sale por la térmica y vuelve
 `via: bridge`, dado por impreso (`print.ts:375-411`); solo sin impresora devuelve el motivo. El documento corre sin scripts (política
 que no permite ninguno), sin permisos de ninguna orden y sin poder navegar a otro sitio.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (puerta de impresión y documento A4)
+Implicados: HUB_SHELL-F77
 QA: qa-hub-android Fase 3
 
 ### HUB_APP-F23 Leer una tarjeta NFC para entrar
@@ -278,7 +254,5 @@ tarjetas acercándolas.», una vez por pantalla) y tarjeta que da un número nue
 placa. Prueba con otra.»). Un UID de ceros o de menos de 4 bytes también se rechaza. Pasada la ventana sin
 tarjeta no es un error. En ordenador la orden contesta siempre `nfc_unavailable`. El NFC no es requisito
 de instalación: la ficha de Play sigue abierta a tabletas sin chip.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F134 (entrar pasando la placa)
-Pendiente de enlazar: hub — HUB_SHELL, Acceso y Personas (captura de la placa y ficha de personal)
+Implicados: HUB-F134, HUB_SHELL-F05, HUB_SHELL-F87
 QA: ninguno

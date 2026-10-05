@@ -24,9 +24,8 @@ Sale: la aplicación `com.erplora.app` con su versión (la de `tauri.conf.json`,
 Si falla: Windows muestra su aviso de editor desconocido; macOS, el de desarrollador no verificado;
 Android sin Play no hay camino de instalación del cliente. En Linux solo hay `.deb` y AppImage de
 QA, sin canal anunciado.
-Implicados: pendiente
+Implicados: HUB_SHELL-F138
 Pendiente de enlazar: saas — descarga `/app/download/<plataforma>/` y su redirección a la tienda
-Pendiente de enlazar: hub — HUB_SHELL, Sistema (descargar la aplicación desde el navegador)
 QA: qa-hub-android Fase 0
 
 ### HUB_APP-F02 Primer arranque: entrar y abrir el negocio
@@ -52,9 +51,8 @@ Si falla: un destino que no es de la plataforma (el marcador viene de un enlace 
 recuerda** y no queda rastro (la aplicación no instala ningún destino para sus registros); un `hub.url` editado a mano o de una versión sin el
 filtro se revalida al leerlo y, si no vale, se arranca en el SaaS. Sin red, HUB_APP-F11. Un negocio con
 dominio propio no tiene hardware en la aplicación (ver «Qué puede hacer cada página»).
-Implicados: pendiente
+Implicados: HUB_SHELL-F02
 Pendiente de enlazar: saas — pantalla «Abre tu hub» (`/shell/`, `/shell/open/<id>/`, `?choose=1`) y alta del negocio gratuito
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (el hub se abre con una sesión que trae el SaaS)
 QA: qa-hub-android Fase 0, qa-hub-android Fase 1
 
 ### HUB_APP-F03 Abrir un negocio desde un enlace
@@ -78,9 +76,8 @@ hace nada, en silencio y a propósito: el que decide qué mostrar es el navegado
 negocio inexistente sí se acepta (se valida la forma, no la existencia). **Cualquier página o correo puede mandar este enlace y cambiar el negocio recordado del mostrador sin
 preguntar** (`lib.rs:2086-2098`, `1118-1127`). Un enlace `erplora://notice` no es una navegación: es el
 clic en un aviso (HUB_APP-F25).
-Implicados: pendiente
+Implicados: HUB_SHELL-F19
 Pendiente de enlazar: saas — lanzadera «Abrir terminal» y su enlace visible de reserva
-Pendiente de enlazar: hub — HUB_SHELL, Sistema (código QR del menú: abre el negocio por https en otro dispositivo, no la aplicación)
 QA: ninguno
 
 ### HUB_APP-F04 Cambiar de negocio
@@ -102,9 +99,8 @@ dispositivo): reasignar una caja a otro local no obliga a desinstalar (en Androi
 destruiría).
 Si falla: sin ventana no falla, simplemente no navega. Defecto de seguridad `[SEG]`: ver «Dudas abiertas» y los huecos. Con un solo negocio, sin `?choose=1` el SaaS lo
 volvería a abrir al instante; por eso este camino lo lleva.
-Implicados: pendiente
+Implicados: HUB_SHELL-F16
 Pendiente de enlazar: saas — lista de negocios `?choose=1`
-Pendiente de enlazar: hub — HUB_SHELL, Barra superior (control «Cambiar de negocio»)
 QA: qa-hub-android Fase 1
 
 ### HUB_APP-F05 Olvidar un negocio que ya no existe
@@ -148,8 +144,7 @@ Si falla: si no puede crear su carpeta de datos, devuelve error y la página usa
 navegador integrado se acuña y guarda en el origen (`browserDeviceId`), que se pierde al limpiar los datos de
 la ventana. Un origen sin juego `default` ni
 `onboarding` ni siquiera puede preguntar (ver «Qué puede hacer cada página»).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F137 (perder la sesión por abrirla en otro dispositivo) y HUB-F139 (dispositivo compartido o personal)
+Implicados: HUB-F137, HUB-F139
 QA: qa-hub-android Fase 0
 
 ### HUB_APP-F10 Cada página tiene su juego de permisos
@@ -169,7 +164,7 @@ Si falla: un origen fuera de la plataforma no puede pedir `device_context`; el a
 hardware; y la orden de reintentar de la pantalla de espera solo existe para la página incluida (un
 origen remoto no puede mover la ventana). Una orden declarada y sin permiso generado la caza el test `tests/shell_surface.rs:247-300`; una orden no
 concedida se rechaza en ejecución.
-Implicados: ninguno
+Implicados: HUB_SHELL-F162
 QA: ninguno
 
 ### HUB_APP-F11 Cuando no hay conexión con el negocio
@@ -192,8 +187,7 @@ Sale: la ventana en la pantalla de espera o de vuelta; sin datos guardados.
 Si falla: si no puede construir la comprobación se queda en la pantalla de espera sin dejar rastro del motivo. Con red pero con el servidor del negocio caído y el borde contestando, no hay pantalla
 de espera (es lo que el borde sirva). No es la franja «sin conexión» de dentro del hub (eso lo pinta el
 hub, `HUB_SHELL`).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (franja sin conexión y pantalla «no se puede conectar» del arranque del hub)
+Implicados: HUB_SHELL-F13, HUB_SHELL-F14
 QA: qa-hub-android Fase 4
 
 ### HUB_APP-F12 En la copia de Google Play, solo páginas del SaaS que no cobran

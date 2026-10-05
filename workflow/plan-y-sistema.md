@@ -26,10 +26,10 @@ Pasos:
 4. Abre la puerta y, en cuanto puede servir (HUB-F161), manda a erplora.com un único aviso de «ya atiendo» con casi el mismo resumen que el latido (sin la última actividad de las personas).
 Entra: el identificador del negocio (`HUB_ID`), la base de datos (`HUB_DATABASE_URL`, obligatoria), la credencial de máquina (`HUB_CLOUD_API_TOKEN`), el correo del dueño (`HUB_OWNER_EMAIL`), la dirección de erplora.com (`HUB_CLOUD_API_URL`; sin ella, producción).
 Sale: el hub sirviendo; la fila de versión en el historial (HUB-F167); el dueño marcado en su ficha; el aviso de arranque (`POST /api/v1/hub/device/heartbeat/`) con la credencial de máquina (`X-Api-Key` si es una llave `erpk_…`, `X-Hub-Token` si es la antigua; siempre con `X-Hub-Id`).
+En este mismo documento se apoya en: HUB-F25 (Reponer las aplicaciones al arrancar y actualizarlas solas).
 Si falla: sin base de datos o sin poder migrar, el hub no arranca. Si erplora.com no da la clave, arranca igual: el acceso con cuenta queda no disponible y el PIN funciona. Si el aviso de arranque falla o el hub tarda más de 5 minutos en estar listo, no se reintenta: erplora.com se entera por su propio sondeo. Una app que no se puede cargar queda apuntada como arranque incompleto (HUB-F161).
 Implicados: pendiente
 Pendiente de enlazar: saas — aprovisionar el hub, inyectar su credencial de máquina y recibir el latido de arranque
-Pendiente de enlazar: hub — HUB, módulos y órdenes (cargar, actualizar y reponer las apps al arrancar)
 QA: qa-hub-restaurant §7.00
 
 ### HUB-F160 No abrir nada hasta que el hub esté registrado
@@ -43,8 +43,7 @@ Pasos:
 Entra: las dos mitades de la identidad de máquina; el hub de desarrollo está exento.
 Sale: `428 machine_registration_required` para todo lo demás; el contexto público dice `registration_required`, nunca el secreto.
 Si falla: la pantalla no tiene frase propia para este rechazo (sin confirmar qué pinta).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (qué ve la persona en un hub sin registrar)
+Implicados: HUB_SHELL-F12
 QA: ninguno
 
 ### HUB-F161 Decir si el hub está listo para servir
@@ -58,7 +57,7 @@ Pasos:
 Entra: nada; sin sesión.
 Sale: `/readyz` con el estado general, la versión y cada comprobación (la base de datos, las migraciones contadas, las apps que faltan o fallaron con su motivo): 200 solo si todo está bien, 503 en otro caso. `/healthz` solo dice que el proceso vive. Ninguna de las dos pregunta a erplora.com ni pasa por el freno de carga. Como `/readyz` no pide sesión, cualquiera lee la versión del hub y, si la base de datos falla, el texto crudo del error (ver huecos).
 Si falla: un 503 deja el hub sin tráfico hasta que se recupere; el motivo queda en el cuerpo.
-Implicados: pendiente
+Implicados: HUB_SHELL-F13, HUB_SHELL-F14
 Pendiente de enlazar: infra — comprobación de salud del contenedor y vuelta atrás del despliegue
 QA: ninguno
 
@@ -74,10 +73,8 @@ Pasos:
 Entra: el permiso firmado (`GET /api/v1/hub/device/entitlement/`) con la credencial de máquina; la clave pública (`/api/v1/auth/public-key/`).
 Sale: el plan verificado en memoria; las órdenes y consultas de una app bloqueada contestan `module_entitlement_blocked` (402) y la vista del módulo dice «Suscripción necesaria». Con una sesión de PIN (sin credencial de erplora.com) la pantalla no conoce el plan y no pinta el bloqueo: la app aparece normal y sus peticiones fallan con el 402. La pantalla recibe el plan por una puerta propia con 60 s de memoria, que ante un «demasiadas peticiones» de erplora.com sigue sirviendo el último bueno. En el mismo turno se recoge el cupo de mensajes de WhatsApp del mes.
 Si falla: sin ninguna comprobación buena todavía, no se bloquea nada (la autoridad es erplora.com). Una firma que no cuadra cuenta como fallo y se mantiene lo último bueno. Ante un fallo de red, la puerta de la pantalla contesta 424 y no sirve el último bueno (solo lo hace ante un «demasiadas peticiones»). Las llamadas no tienen tiempo máximo: si una se queda colgada, el turno diario se congela, no cuenta fallos (las apps de pago nunca se cortan) y no sale el latido.
-Implicados: pendiente
+Implicados: HUB_SHELL-F41, HUB_SHELL-F46, HUB_SHELL-F49, HUB_SHELL-F128, WHATSAPP_INBOX-F13
 Pendiente de enlazar: saas — emitir el permiso firmado del plan (apps, niveles, topes y gracia)
-Pendiente de enlazar: hub — HUB_SHELL, vista del módulo bloqueado y pestaña Plan del módulo
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F13 (el tope de mensajes del mes, que el hub recoge en el mismo turno)
 QA: ninguno
 
 ### HUB-F163 Aplicar un cambio de plan al momento
@@ -122,8 +119,7 @@ Pasos:
 Entra: la sesión de administrador para el uso en vivo; cualquier sesión para la evolución, que el hub pide a erplora.com con su credencial.
 Sale: nada guardado. El uso en vivo sale del contenedor y de la base de datos, con los límites del último plan verificado (sin plan, límites a 0 = ilimitado); la evolución la guarda erplora.com y el hub la pasa tal cual con 30 s de memoria.
 Si falla: la memoria, la CPU y la base de datos que no se pudieron medir salen como no medidas («No hemos podido leerlo», «n/d»); en cambio sesiones, dispositivos y personas salen a **0** si su consulta falla. Si erplora.com no da la evolución, el hub contesta 424 con «no sé» para cada medida; un intervalo que no sea 3 h, 24 h o 3 días, `invalid_range` (400). Sin ser administrador, el uso en vivo responde 401.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Sistema › Recursos y Plan y límites
+Implicados: HUB_SHELL-F128, HUB_SHELL-F136
 Pendiente de enlazar: saas — series de uso de recursos por hub
 QA: ninguno
 
@@ -136,10 +132,9 @@ Pasos:
 2. Ve el uso de CPU y memoria, la base de datos y sus conexiones, los últimos 50 avisos entre apps como **Registros** (error, aviso o información). La pantalla ya no enseña los documentos guardados en la nube, aunque el servidor los sigue pidiendo.
 Entra: la sesión (cualquier rol; no una llave); los documentos y el espacio usado los pide el hub a erplora.com con su credencial.
 Sale: nada guardado.
+En este mismo documento se apoya en: HUB-F50 (Dejar un aviso en la cola al guardar una orden), HUB-F51 (Entregar un aviso a los módulos que lo escuchan), HUB-F52 (Reintentar un aviso que un módulo no pudo procesar).
 Si falla: «No se pudo consultar el sistema» con «Reintentar»; si erplora.com no da los documentos, la lista sale vacía.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Sistema (Recursos y Registros)
-Pendiente de enlazar: hub — HUB, avisos entre módulos (la cola de avisos de la que salen los registros)
+Implicados: HUB_SHELL-F135, HUB_SHELL-F136, HUB_SHELL-F144
 QA: ninguno
 
 ### HUB-F167 Saber qué versión corre y qué se le ha actualizado
@@ -152,10 +147,9 @@ Pasos:
 3. En **Sistema → Actualizaciones** se ve «Vas por la {version}» y «Qué te hemos actualizado», agrupado por días.
 Entra: la versión del hub, fijada al compilar; las actualizaciones de apps.
 Sale: el historial (`_update_history`), sin datos personales. La pantalla lee como mucho 20 entradas de los últimos 90 días, con el nombre de cada app en su idioma; el motivo técnico de un fallo viaja pero no se pinta.
+En este mismo documento se apoya en: HUB-F23 (Actualizar una aplicación), HUB-F25 (Reponer las aplicaciones al arrancar y actualizarlas solas).
 Si falla: sin cambios, «No te hemos cambiado nada»; una vuelta atrás, «Volvió a la {version}: la nueva no arrancó»; una app perdida, «Esta app no está funcionando: estamos en ello». Si no se puede apuntar la versión al arrancar, queda en el registro y el hub arranca igual.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Sistema › Actualizaciones
-Pendiente de enlazar: hub — HUB, módulos y órdenes (actualizar una app y volver atrás)
+Implicados: HUB_SHELL-F20, HUB_SHELL-F142
 QA: qa-hub-restaurant §7.00
 
 ### HUB-F168 Hablar con erplora.com en nombre del negocio
@@ -169,10 +163,10 @@ Pasos:
 4. Devuelve la respuesta, o un motivo que la pantalla sabe traducir.
 Entra: la sesión de la persona (también para la versión publicada de la app, aunque esa llamada a erplora.com sale sin credencial); la credencial de máquina, que solo vive en el servidor.
 Sale: la respuesta de erplora.com. La credencial del hub y la de la persona solo viajan a erplora.com y a los anfitriones de confianza declarados en el despliegue; a cualquier otro destino se llama sin ellas. Las facturas, suscripciones y el estado de suscripción de una app los pide la pantalla a erplora.com con la credencial de la persona, sin pasar por aquí.
+En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F24 (Consultar qué actualizaciones y versiones hay), HUB-F260 (Conectar el número de WhatsApp del negocio), HUB-F261 (Saber qué número está conectado y si hay que reconectarlo), HUB-F277 (Ver el plan del asistente y lo que queda del mes).
 Si falla: erplora.com no contesta, «Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.» (`cloud_unreachable`, 424); contesta con error, «ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.» (`cloud_rejected`); hub sin conectar, «Este hub todavía no está conectado con ERPlora.». El cuerpo de un error 5xx de erplora.com no llega al navegador, pero los 4xx se pasan tal cual, con su texto en inglés. Las llamadas no tienen tiempo máximo (tampoco el catálogo); solo instalar, actualizar, listar versiones y pedir una instalación cortan a los 30 s sin respuesta.
 Implicados: pendiente
 Pendiente de enlazar: saas — puertas de máquina del hub (catálogo, plantillas, asistente, WhatsApp, series, miembros)
-Pendiente de enlazar: hub — HUB, módulos y órdenes (catálogo e instalación) y HUB, mensajería y asistente (WhatsApp y asistente)
 QA: ninguno
 
 ### HUB-F169 Dejar que un motor del hub llame a erplora.com con la identidad del negocio
@@ -185,9 +179,9 @@ Pasos:
 3. El hub rechaza cualquier ruta que intente salir de su propia dirección de erplora.com.
 Entra: la petición del motor; la credencial de máquina.
 Sale: la respuesta tal cual al motor. El contenido de la respuesta nunca se copia a un error ni al registro.
+En este mismo documento se apoya en: HUB-F305 (Enviar la autorización de representación y seguir su estado), HUB-F306 (Pedir, recoger y renovar la conexión segura con la celda fiscal).
 Si falla: una ruta que no es suya, `cloud_call.path_not_mine`; un fallo de red se devuelve al motor, que decide si reintenta.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, perfil fiscal (identidad de la pasarela y autorización de representación)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F170 Rechazar trabajo cuando el hub está saturado

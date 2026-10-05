@@ -42,7 +42,7 @@ Pasos:
 Entra: las facturas del usuario que da erplora.com con la sesión de la cuenta (el hub no pide filtrar por negocio; los estados de erplora.com son borrador, pendiente, pagada, fallida y devuelta, y la pantalla solo conoce cinco de otro vocabulario); el PDF se pide al descargar. Cualquiera que haya entrado con su cuenta ve las suyas.
 Sale: nada guardado en el hub. El hub no emite ni cobra: es información del plan.
 Si falla: «No pudimos cargar la facturación» con «Comprueba la conexión e inténtalo de nuevo. Puedes seguir utilizando el Hub.» y «Reintentar»; si falla la descarga, un aviso (con la frase propia de la app instalada cuando no puede guardar archivos).
-Implicados: pendiente
+Implicados: HUB_APP-F30
 Pendiente de enlazar: saas — facturas y suscripciones del negocio en el panel de erplora.com
 QA: ninguno
 
@@ -75,9 +75,7 @@ Pasos:
 Entra: el uso en vivo del hub y los topes del último plan verificado (HUB-F165); el hub solo lo da a un administrador.
 Sale: nada guardado.
 Si falla: «Las métricas de recursos no están disponibles» con «El Hub no ha podido informar de su uso de recursos ahora mismo. Puedes reintentarlo.» y «Reintentar». Es el mismo aviso para un fallo del hub y para un perfil sin permiso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F165 (ver el uso de recursos frente a los límites del plan)
-Pendiente de enlazar: hub — HUB-F162 (comprobar el plan y qué apps puede usar el negocio)
+Implicados: HUB-F162, HUB-F165
 QA: ninguno
 
 ### HUB_SHELL-F129 Ir a erplora.com a gestionar o mejorar el plan
@@ -93,8 +91,7 @@ Pasos:
 Entra: la distribución de la copia, la sesión (cuenta o PIN) y el identificador del negocio.
 Sale: nada guardado en el hub; el pase lo pide el hub a erplora.com (HUB-F142).
 Si falla: lo dicho en el paso 4; nunca un botón que no hace nada.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F142 (abrir erplora.com ya identificado)
+Implicados: HUB-F142, HUB_APP-F29
 Pendiente de enlazar: saas — emitir y canjear el pase de un solo uso hacia el panel
 QA: L-17
 
@@ -110,9 +107,7 @@ Pasos:
 Entra: el listado de la carpeta con qué se puede hacer en ella. La pantalla enseña a cualquier sesión, cajero incluido, lo mismo que sirve la API: la carpeta de registros, la de actividad del sistema y los XML de VeriFactu (ERPlora/hub#2495); no oculta nada.
 Sale: nada guardado.
 Si falla: «No se pudieron cargar los archivos» con el motivo («Esta carpeta es de una app que no permite cambiar sus archivos.», el de erplora.com sin contestar o, si no llegó a salir, «Comprueba la conexión y vuelve a intentarlo.») y «Reintentar»; el gestor queda vacío sin inventar datos.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F245 (ver y descargar archivos)
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F06 (los adjuntos recibidos se guardan en la carpeta de la app)
+Implicados: HUB-F245, WHATSAPP_INBOX-F06
 QA: ninguno
 
 ### HUB_SHELL-F131 Subir archivos y crear carpetas
@@ -127,8 +122,7 @@ Pasos:
 Entra: los archivos o el nombre; la carpeta abierta.
 Sale: pide al servidor guardar en el almacenamiento (HUB-F246); crear una carpeta cuenta como subir.
 Si falla: «No se pudieron subir los archivos.» o la causa: «No se ha elegido ningún archivo para subir.», «Ahora mismo se están procesando demasiados archivos. Inténtalo de nuevo en un momento.», «Esta carpeta es de una app que no permite cambiar sus archivos.», «Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.»; «No se pudo crear la carpeta.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F246 (subir, organizar y borrar archivos)
+Implicados: HUB-F246
 QA: ninguno
 
 ### HUB_SHELL-F132 Previsualizar y descargar un archivo
@@ -143,8 +137,7 @@ Pasos:
 Entra: los bytes del archivo, que pide el hub al almacenamiento; el navegador nunca toca el almacenamiento.
 Sale: nada guardado. Abrir un `.log` no descarga el lector de PDF.
 Si falla: cualquier fallo al traer o al dibujar sale como «No se pudo abrir el archivo»: «No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo.» (el visor no distingue un archivo demasiado grande del resto; el tope de 25 MiB es del hub, HUB-F245, y su frase «Ese archivo es demasiado grande para abrirlo aquí. Descárgalo.» no llega a salir en el visor); si la app instalada no puede guardar archivos (por ejemplo en una tableta), una frase propia que lo dice.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F245 (ver y descargar archivos)
+Implicados: HUB-F245, HUB_APP-F30
 QA: ninguno
 
 ### HUB_SHELL-F133 Mover y renombrar un archivo o una carpeta
@@ -159,8 +152,7 @@ Pasos:
 Entra: el origen y el destino, o el nombre nuevo.
 Sale: pide al servidor el cambio (HUB-F246). Mover exige poder borrar en el origen y subir en el destino.
 Si falla: «No se pudo mover. Puede que la carpeta de destino sea de solo lectura.» / «No se pudo renombrar. Puede que esta carpeta sea de solo lectura.» o la causa exacta: «El archivo ya está en esa carpeta.», «Una carpeta no se puede mover dentro de sí misma.», «Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.», «Esta carpeta es de una app que no permite cambiar sus archivos.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F246 (subir, organizar y borrar archivos)
+Implicados: HUB-F246
 QA: ninguno
 
 ### HUB_SHELL-F134 Borrar un archivo o una carpeta
@@ -174,8 +166,7 @@ Pasos:
 Entra: la ruta.
 Sale: pide al servidor el borrado (HUB-F246); no hay papelera. Las carpetas de las apps que no lo permiten no se pueden vaciar.
 Si falla: «No se pudo eliminar el archivo.» o la causa (carpeta de solo lectura, sesión caducada: «Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.», o «Ese archivo o carpeta ya no existe. Actualiza la lista.»).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F246 (subir, organizar y borrar archivos)
+Implicados: HUB-F246
 QA: ninguno
 
 ## Cobertura contra la referencia

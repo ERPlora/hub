@@ -65,8 +65,7 @@ Pasos:
 Entra: la credencial firmada que entrega erplora.com (JWT con la lista de negocios de los que es miembro y su rol en cada uno), comprobada sin conexión con la clave pública de erplora.com que el hub carga al arrancar (`HUB_JWT_PUBLIC_KEY` o `/api/v1/auth/public-key/`); el `device_id` del navegador o de la app.
 Sale: la sesión (`hub_session`, credencial `cloud`), la persona enlazada o creada (`hub_user`), su correo en el perfil si estaba vacío, la fila de confianza del dispositivo (`hub_trusted_device`) y una línea de actividad de inicio de sesión. Esta entrada no gasta plaza del plan: la plaza de un miembro la controla erplora.com. Si el correo del token difiere solo en mayúsculas del que se escribió al invitar, el hub crea una **segunda** ficha (sin pasar por el tope de plazas) y la invitada queda sin enlazar (ver huecos).
 Si falla: sin credencial, `cloud_token_missing`; credencial caducada o no firmada por erplora.com, `cloud_token_invalid`; el hub no pudo cargar la clave pública al arrancar, `cloud_login_not_configured` (503) y solo funciona el PIN; quien ya no es miembro, `not_a_member` (y el hub le cierra la puerta, HUB-F144); a quien el administrador dio de baja en el hub, `user_deactivated`. La pantalla no tiene frase propia para estos dos últimos: dice «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Hueco de seguridad: si erplora.com acepta la contraseña y el hub rechaza la entrada, los tokens de erplora.com se quedan guardados en el navegador (`LoginPage.vue`).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (formulario de correo, Google y código de verificación)
+Implicados: HUB_SHELL-F01
 Pendiente de enlazar: saas — inicio de sesión, segundo factor y emisión del JWT con la membresía por negocio
 QA: qa-hub-restaurant §7.02
 
@@ -82,9 +81,8 @@ Pasos:
 Entra: el pase (máximo 128 caracteres, un solo uso, vida de 120 s, atado a este negocio); la credencial de máquina del hub.
 Sale: lo mismo que HUB-F130, más los tokens de erplora.com de la persona para que el shell los guarde.
 Si falla: pase vacío o demasiado largo, `courier_invalid`; pase caducado, usado o de otro negocio, `courier_rejected`; erplora.com rechaza al hub o no contesta, `cloud_rejected`, `cloud_unreachable` o `cloud_unreadable` (424). La pantalla dice «No se pudo entrar desde el panel de ERPlora» con «Inicia sesión aquí para continuar.» y deja el acceso normal a mano.
-Implicados: pendiente
+Implicados: HUB_SHELL-F02
 Pendiente de enlazar: saas — puertas de entrada al hub con pase de un solo uso (entrar en mi negocio, abrir la app)
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (canje del pase al cargar)
 QA: ninguno
 
 ### HUB-F132 Elegir o cambiar el propio PIN
@@ -99,8 +97,7 @@ Pasos:
 Entra: la sesión de la persona (solo puede tocar su propio PIN); el número de dígitos del negocio (4 o 6).
 Sale: el PIN guardado como huella (argon2id) en su ficha; el anterior deja de valer. No se avisa a erplora.com. Esta puerta no tiene freno por intentos (ni por nombre ni por dirección), y su rechazo «ya lo tiene otro usuario activo» dice si un PIN es de alguien: es un hueco de seguridad (ver huecos).
 Si falla: PIN actual que no coincide, «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; dígitos repetidos o seguidos (1111, 1234), «Ese PIN se adivina a la primera…»; PIN que ya usa otra persona activa, «Ese PIN ya lo tiene otro usuario activo…»; longitud distinta de la del negocio, el aviso de dígitos. La ficha del dueño de la cuenta solo la cambia él (HUB-F148), pero esta puerta es la suya.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (alta del PIN tras el primer acceso) y Mi perfil (cambiar mi PIN)
+Implicados: HUB_SHELL-F03, HUB_SHELL-F22, HUB_SHELL-F85
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F133 Entrar con PIN
@@ -115,8 +112,7 @@ Pasos:
 Entra: el nombre, el PIN y el `device_id`; la lista pública de personas con PIN y la longitud del PIN, que el hub sirve sin sesión a la pantalla de acceso (nombre, rol e identificador, nunca el correo; la misma respuesta lleva el identificador del negocio). En una demo (`HUB_DEMO`) sin ningún dispositivo de confianza, el primero que manda un PIN queda adoptado.
 Sale: la sesión (`hub_session`, credencial `pin`), con su duración según el dispositivo y el negocio (HUB-F136); si el plan admite un solo dispositivo, cierra las sesiones de los demás (HUB-F137). El PIN se comprueba en el hub: funciona aunque erplora.com no responda.
 Si falla: dispositivo que nunca entró con una cuenta o que un administrador quitó (no se distinguen), «En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí…»; navegador que no guarda datos, «Este navegador no puede recordar qué dispositivo es…»; nombre o PIN erróneos, «PIN incorrecto»; demasiados fallos, «Demasiados intentos fallidos. Espera {minutes} minutos…». Con el dial del negocio en «no mostrar pinpad» no hay rejilla y quien solo tiene PIN no puede entrar (HUB-F140).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (rejilla de personas y pinpad)
+Implicados: HUB_SHELL-F04
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F134 Entrar pasando la placa
@@ -130,8 +126,7 @@ Pasos:
 Entra: el número que lee el lector (4 a 64 caracteres) y el `device_id`.
 Sale: la sesión (credencial `badge`, con la referencia de la tarjeta, nunca su número). Los intentos fallidos se cuentan contra la tarjeta, no contra un nombre.
 Si falla: tarjeta que no es de nadie o cuyo dueño está de baja, un único aviso, «Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.»; dispositivo sin confianza o freno, los mismos avisos que HUB-F133.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (captura de la ráfaga del lector) y HUB_APP (lector NFC de Android)
+Implicados: HUB_APP-F23, HUB_SHELL-F05, HUB_SHELL-F87
 QA: ninguno
 
 ### HUB-F135 Frenar a quien prueba PIN o sesiones
@@ -146,7 +141,7 @@ Pasos:
 Entra: los rechazos de las puertas de PIN y placa (y, solo por nombre, de la aprobación); la dirección del último salto del proxy (`X-Forwarded-For`); sin esa cabecera no hay freno por dirección.
 Sale: la respuesta `too_many_attempts` (429) con los segundos que faltan; una línea de registro `event=auth_failed` por fallo (con la dirección y, para sesiones, una huella del token, nunca el token) para que el borde pueda banear. Los contadores viven en memoria: un reinicio los pone a cero.
 Si falla: detrás de una misma dirección pública (CGNAT, wifi de un centro comercial) veinte fallos ajenos cierran el PIN a toda la tienda 15 minutos; se pasa solo. La pantalla lo dice con «Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.».
-Implicados: pendiente
+Implicados: HUB_SHELL-F04
 Pendiente de enlazar: infra — vigilante del borde que lee `event=auth_failed` y banea (infra#338)
 QA: qa-hub-restaurant §7.02
 
@@ -163,9 +158,7 @@ Pasos:
 Entra: el token de sesión en la cabecera `X-Hub-Session`; el modo del dispositivo (HUB-F139) y el dial del negocio (HUB-F140).
 Sale: la sesión con su caducidad; al cerrarla, la fila borrada y una línea de actividad de cierre. Dar de baja a la persona o quitar el dispositivo también borra sus sesiones (HUB-F149, HUB-F141). De esa caducidad dependen además: la lista de dispositivos («sesión abierta», último uso) y su limpieza de 30 días (HUB-F141), el recuento de dispositivos con sesión del latido (HUB-F164) y de Plan y límites (HUB-F165), la cookie de las fotos (es el mismo token) y el plazo en que sigue viva la sesión de quien se quitó en erplora.com (HUB-F144). Cambiar la duración obliga a revisar esos flujos.
 Si falla: una sesión caducada, borrada o de una persona dada de baja recibe 401 en su siguiente petición, también desde la pantalla de un módulo; la pantalla dice «Tu sesión ha terminado: caducó o se abrió en otro dispositivo. Vuelve a entrar.» y lleva al acceso. La venta a medias no se pierde: sus líneas ya estaban guardadas.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, detector de inactividad y reacción única al 401
-Pendiente de enlazar: flows — FLOWS-F01 (la sesión de administrador que exige el motor de automatizaciones)
+Implicados: FLOWS-F01, HUB_SHELL-F07, HUB_SHELL-F08, HUB_SHELL-F10, HUB_SHELL-F195
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F137 Perder la sesión porque se abrió en otro dispositivo
@@ -180,8 +173,7 @@ Pasos:
 Entra: el número de dispositivos del plan, del último plan verificado (HUB-F162); sin plan verificado no hay límite, y un acceso que no dice qué dispositivo es (el acceso con cuenta no lo exige) no desaloja a nadie: solo el siguiente acceso que sí lo dice desaloja a todos los demás.
 Sale: las sesiones de los otros dispositivos caducadas con el motivo `device_limit`; el 401 de la puerta que sondea la pantalla lleva el código `session_evicted_device_limit`. Las sesiones del mismo dispositivo se conservan.
 Si falla: si el hub no puede leer el motivo, el 401 sale sin él y la pantalla solo dice que la sesión terminó.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Acceso (aviso de sesión desalojada y salida a ampliar el plan)
+Implicados: HUB_APP-F06, HUB_SHELL-F06
 Pendiente de enlazar: saas — número de dispositivos por plan en el permiso firmado
 QA: ninguno
 
@@ -198,8 +190,7 @@ Entra: el nombre y el PIN de quien entra; el token de quien sale.
 Sale: una sesión nueva y la anterior borrada. Cuando el PIN nuevo se acepta, la pantalla además olvida las credenciales de erplora.com y la conversación con el asistente de quien se fue (hub#1538, hub#1544, cerrada). El servidor no guarda ninguna conversación del asistente que haya que borrar.
 Hueco de la pantalla (no del servidor): tras el relevo, el lanzador, «Mis apps» y la lista siguen siendo los de quien se fue hasta que se navega.
 Si falla: un PIN rechazado no cambia nada (quien estaba dentro sigue dentro, con su conversación): «Esos datos no han funcionado…». Dispositivo sin confianza: «Este dispositivo todavía no está dado de alta para el PIN…».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Cambiar de usuario (la rejilla sobre la venta, el relevo de credenciales y el borrado de la conversación del asistente)
+Implicados: HUB_SHELL-F09, HUB_SHELL-F195
 QA: qa-hub-restaurant §7.02, L-13
 
 ### HUB-F139 Marcar un dispositivo como compartido o personal
@@ -214,8 +205,7 @@ Pasos:
 Entra: el dispositivo (el que hace la petición, o uno nombrado); la sesión de administrador.
 Sale: el modo, quién y cuándo lo cambió. La pantalla de acceso lo lee sin sesión junto con el dial del negocio y si el dispositivo es de confianza. Un dispositivo desconocido, ilegible o sin identificar se trata siempre como compartido. Entrar otra vez con la cuenta no pisa el modo. El cambio vale para las sesiones que se abran a partir de ahora: la abierta conserva su caducidad (HUB-F136). La puerta sin sesión que lee la pantalla de acceso dice, para cualquier identificador que se le presente, su modo y si es de confianza.
 Si falla: un dispositivo en el que nadie entró nunca con una cuenta no se puede marcar (`hub.device.unknown_device`); sin ser administrador, «Solo un administrador puede cambiar cómo entra la gente en este dispositivo.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › General › Este dispositivo
+Implicados: HUB_APP-F06, HUB_SHELL-F11
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F140 Decidir si el negocio pide PIN y cuántos dígitos tiene
@@ -229,10 +219,9 @@ Pasos:
 4. Vale para todo el negocio y se combina con el modo de cada dispositivo: gana siempre lo más estricto.
 Entra: la sesión de administrador.
 Sale: los ajustes del negocio `pin_policy` (`always`, `per_shift` o `never`), `pin_inactivity_minutes` y `pin_length`, con quién los cambió. «No mostrar pinpad» nunca alarga la sesión de un dispositivo compartido: renuncia a saber quién vende, no al candado. Los PIN de la otra longitud siguen funcionando hasta que su dueño los cambia. Como la duración se fija al abrir, pasar a «pedir siempre» no acorta las sesiones ya abiertas (hasta 30 días en un dispositivo personal).
+En este mismo documento se apoya en: HUB-F220 (Leer los ajustes del negocio), HUB-F221 (Cambiar los ajustes del negocio).
 Si falla: un valor fuera de lo permitido se rechaza (422); sin ser administrador, «Solo un administrador puede cambiar si se pregunta.». Un valor guardado que no se entiende vuelve al de fábrica (`per_shift`, 5 minutos, 4 dígitos), nunca a «no preguntar».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › General › Pinpad
-Pendiente de enlazar: hub — HUB, negocio y datos (los ajustes del negocio y su puerta de escritura)
+Implicados: HUB_SHELL-F08, HUB_SHELL-F99, HUB_SHELL-F100
 QA: ninguno
 
 ### HUB-F141 Ver, nombrar y quitar los dispositivos del negocio
@@ -247,8 +236,7 @@ Pasos:
 Entra: la sesión de administrador; el dispositivo desde el que pregunta.
 Sale: el nombre del dispositivo; al quitarlo, sus sesiones borradas y su confianza retirada (con ella, el modo personal). Quitar el propio dispositivo cierra la sesión de quien lo hace. Volver a entrar con una cuenta lo hace de confianza otra vez: se corta el dispositivo, no la persona.
 Si falla: «Ese dispositivo ya no está registrado aquí. Actualiza la lista.»; nombre largo, «Ese nombre es demasiado largo…»; sin ser administrador, «Solo el propietario o un administrador puede gestionar los dispositivos.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › General › Dispositivos
+Implicados: HUB_SHELL-F101, HUB_SHELL-F102, HUB_SHELL-F103, HUB_SHELL-F104
 QA: ninguno
 
 ### HUB-F142 Abrir erplora.com ya identificado
@@ -263,9 +251,8 @@ Pasos:
 Entra: la sesión, la credencial de erplora.com de la persona y el destino (solo rutas propias de erplora.com).
 Sale: la dirección con el pase; nada guardado en el hub.
 Si falla: sesión de PIN, `handoff_requires_cloud_login`; sin ser administrador para un destino de gestión, `handoff_requires_administer`; credencial de otra persona, `handoff_identity_mismatch`; destino no permitido, `handoff_destination_not_allowed`. En todos los casos la pantalla abre el enlace normal de erplora.com, que pide la contraseña.
-Implicados: pendiente
+Implicados: HUB_SHELL-F16, HUB_SHELL-F23, HUB_SHELL-F48, HUB_SHELL-F129
 Pendiente de enlazar: saas — emitir y canjear el pase de un solo uso hacia el panel
-Pendiente de enlazar: hub — HUB_SHELL, puerta compartida a erplora.com (Mi perfil, Mi plan, Actualizar plan)
 QA: L-17
 
 ### HUB-F143 Cambiar mis datos, idioma, apariencia y foto
@@ -280,8 +267,7 @@ Pasos:
 Entra: la sesión (el perfil siempre es el de quien la tiene; no se puede pedir el de otro).
 Sale: el perfil (`hub_user_profile`) y las preferencias (`hub_user_pref`); la foto en el almacén del hub. El correo del perfil no es el de acceso (ese lo cambia un administrador, HUB-F148), pero **si la persona no tiene correo de acceso** (todo usuario local), Personal usa el del perfil en su lugar y con él decide qué membresía de erplora.com da o quita al cambiarle el rol o darla de baja (HUB-F148, HUB-F149). Como el perfil se edita sin comprobar a quién pertenece el correo, es un hueco de seguridad (ver huecos). Nombre y apellidos hasta 150 caracteres; idioma español o inglés.
 Si falla: «No se pudo guardar el perfil»; foto que no es JPG, PNG o WebP o pasa de 2 MB, «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Mi perfil
+Implicados: HUB_SHELL-F21
 QA: ninguno
 
 ### HUB-F144 Cerrar la puerta a quien ya no es miembro en erplora.com
@@ -296,7 +282,7 @@ Pasos:
 Entra: la credencial de erplora.com sin este negocio en su lista.
 Sale: la ficha desactivada y marcada como cerrada por erplora.com (`cloud_revoked_at`), sus sesiones borradas; respuesta `not_a_member`. Hasta ese intento, su sesión abierta vive hasta su caducidad (12 h en compartido, 30 días en personal, 1 h con «pedir siempre») y su PIN y su placa valen sin plazo; si su correo de acceso difiere en mayúsculas del de la cuenta, ni siquiera ese intento la cierra. Para cortarla en el acto, se da de baja en el hub (HUB-F149). Una baja hecha por el administrador del hub no se deshace así: esa persona recibe `user_deactivated` hasta que la reincorporen (HUB-F149).
 Si falla: si la baja local no se puede escribir, queda en el registro de errores y el acceso se rechaza igual.
-Implicados: pendiente
+Implicados: HUB_SHELL-F01
 Pendiente de enlazar: saas — quitar a un miembro del negocio
 QA: ninguno
 

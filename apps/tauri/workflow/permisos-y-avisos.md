@@ -28,9 +28,7 @@ que seguir vendiendo. El NFC y el servicio en primer plano son permisos de insta
 Si falla: sin el permiso de red local el barrido y el envío a la red son tiempos de espera, no errores
 (Android los bloquea por debajo de la API): sin protección parecería «no hay impresoras» (HUB_APP-F13).
 Después de dos «no» Android deja de mostrar el diálogo para siempre: la salida es HUB_APP-F08.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y registro de dispositivos de la app instalada)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (la frase previa y el permiso de notificaciones)
+Implicados: HUB_PERIPHERALS-F01, HUB_SHELL-F68, HUB_SHELL-F139, PRINTING-F02
 QA: qa-hub-android Fase 2, qa-hub-android Fase 3
 
 ### HUB_APP-F08 Volver a activar un permiso negado
@@ -49,8 +47,7 @@ Si falla: un dispositivo sin esa página (modo quiosco) o una aplicación más a
 y la pantalla dice dónde ir en vez de quedarse muda («Tu dispositivo no ha vuelto a preguntar. Abre sus
 ajustes, busca ERPlora y concédele el acceso a la red local.»). En ordenador no hay estado: la ausencia
 del permiso se lee como «no aplica», nunca como «negado».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Sistema (tarjeta de impresión y fila de avisos desactivados)
+Implicados: HUB_SHELL-F68, HUB_SHELL-F139, HUB_SHELL-F140
 QA: qa-hub-android Fase 2
 
 ### HUB_APP-F09 Red local en ordenador (macOS y Windows)
@@ -70,8 +67,7 @@ Sale: nada guardado por la aplicación; el sistema recuerda la respuesta.
 Si falla: negado en macOS, la búsqueda no encuentra nada y no hay señal que lo distinga de «no hay
 impresoras»; y **imprimir por red también contesta «correcto» y el papel se pierde** (`lib.rs:1370-1394`, la
 comprobación solo mira Android). Se arregla en Ajustes del sistema › Privacidad › Red local.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F01 (búsqueda de impresoras)
+Implicados: HUB_PERIPHERALS-F01
 QA: ninguno
 
 ### HUB_APP-F24 Avisar con el sistema aunque nadie mire la pantalla
@@ -90,10 +86,7 @@ Entra: título, cuerpo, número (si cabe en 32 bits) y ruta (solo pantallas del 
 Sale: la notificación. **Nunca falla hacia arriba**: permiso negado o plataforma que no puede mostrarla se pierde sin rastro y la comanda o la cita siguen. Un número fuera de rango no impide el aviso, solo le quita su destino.
 Si falla: un navegador sin aplicación no tiene aviso del sistema. Sin permiso negado no hay otra señal que
 el que el aviso no sale (la fila «Los avisos están desactivados» de Sistema lo cuenta).
-Implicados: pendiente
-Pendiente de enlazar: kitchen — KITCHEN-F05 (el aviso del sistema «Nueva comanda»)
-Pendiente de enlazar: hub — HUB-F60 (avisar a las pantallas en vivo)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (qué eventos disparan un aviso)
+Implicados: HUB-F60, HUB_SHELL-F64, HUB_SHELL-F65, HUB_SHELL-F66, KITCHEN-F05
 QA: qa-hub-restaurant §7.08
 
 ### HUB_APP-F25 Tocar un aviso
@@ -115,9 +108,7 @@ Sale: la pantalla abierta; el toque se entrega **una vez**. Si la página es nue
 usa la ruta que el aviso trae, tras comprobar de nuevo que es una pantalla del hub.
 Si falla: un aviso sin número solo trae la ventana al frente. Una ruta que no es de una pantalla del hub
 (otra dirección, `//…`) se descarta. Un aviso que pasó sin clic (macOS, Linux) no abre nada.
-Implicados: pendiente
-Pendiente de enlazar: kitchen — KITCHEN-F05 (el aviso del sistema «Nueva comanda»)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (campana y destino del aviso)
+Implicados: HUB_SHELL-F64, HUB_SHELL-F67, KITCHEN-F05
 QA: ninguno
 
 ### HUB_APP-F26 Seguir a la escucha con la pantalla apagada (Android)
@@ -142,6 +133,5 @@ Sale: el servicio y su notificación silenciosa, sin sonido ni insignia. No se r
 Si falla: Android 12 o posterior no deja arrancar un servicio en primer plano desde el segundo plano: la
 orden rechaza y los avisos siguen funcionando con la aplicación en pantalla. Sin los permisos de servicio
 (Android 14) lanza error. En ordenador no se necesita: la aplicación no se duerme mientras esté abierta.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (cuándo pedir escuchar) y HUB-F60 (los avisos nacen en la página)
+Implicados: HUB-F60, HUB_SHELL-F69, HUB_SHELL-F139
 QA: qa-hub-android Pendiente (pantalla apagada y segundo plano)

@@ -20,8 +20,7 @@ Si falla: un fallo al registrar se propaga y la pantalla dice «No se pudo cambi
 iniciar sesión». En Android la orden rechaza a propósito y el control no se pinta. Arrancar con el
 ordenador es para que siempre haya un puesto que saque la cola; abrir el equipo no garantiza que haya
 sesión iniciada en el hub.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes (control «Arrancar al iniciar sesión»)
+Implicados: HUB_SHELL-F163
 QA: ninguno
 
 ### HUB_APP-F28 Botón Atrás de Android
@@ -37,7 +36,7 @@ Pasos:
 Entra: la pulsación.
 Sale: la aplicación en segundo plano.
 Si falla: una aplicación más antigua que la orden devuelve el botón a Tauri, que sale por sí misma.
-Implicados: pendiente
+Implicados: HUB_SHELL-F15
 Pendiente de enlazar: hub — HUB_SHELL, Acceso (navegación y botón Atrás)
 QA: ninguno
 
@@ -60,8 +59,7 @@ Si falla: una dirección que no es de las anteriores, con usuario o contraseña,
 (`file:`, `javascript:`) se rechaza (`external_url_refused`); sin navegador instalado, o que dice que no
 (`external_url_unavailable`). La página convierte ambos en un aviso: un botón que no hace nada es el
 defecto que esto evita. Desde un navegador normal es una pestaña nueva.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Aplicaciones, plan y archivos (salidas al SaaS)
+Implicados: HUB_SHELL-F16, HUB_SHELL-F48, HUB_SHELL-F129
 QA: qa-hub-android Fase 4
 
 ### HUB_APP-F30 Guardar una descarga
@@ -82,8 +80,7 @@ Si falla: un nombre con separadores, `:` (flujos alternativos de Windows), carac
 puntos o de más de 255 bytes se rechaza (`download_refused`) en vez de recortarse. Sin carpeta de
 descargas alcanzable: «Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un
 navegador para descargarlo.»; cualquier otro fallo, «No se ha podido descargar el archivo.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Aplicaciones, plan y archivos (descargar un archivo) y Ajustes (exportar)
+Implicados: HUB_SHELL-F126, HUB_SHELL-F132, HUB_SHELL-F173
 QA: ninguno
 
 ### HUB_APP-F31 Saber que hay una versión nueva y actualizar
@@ -109,7 +106,6 @@ Si falla: sin red, versión ilegible o sin respuesta: silencio, ni alarma ni «e
 copias de Play y de Microsoft Store no hay destino y no se ofrece (Google prohíbe descargar un APK fuera de
 Play). macOS no tiene descarga. Una versión con sufijo (`1.2.3-beta`) se ignora. «No hemos podido abrir
 tu navegador…» si no se pudo abrir.
-Implicados: pendiente
+Implicados: HUB_SHELL-F20
 Pendiente de enlazar: saas — publicación de versión y redirección a la tienda
-Pendiente de enlazar: hub — HUB_SHELL, Sistema y menú lateral (aviso de actualización)
 QA: qa-hub-android Fase 4

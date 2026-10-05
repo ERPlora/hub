@@ -52,12 +52,9 @@ Pasos:
 6. Las pantallas reciben `module.installed` y refrescan el menú; la respuesta dice qué dependencias se instalaron de paso.
 Entra: `POST /api/modules/request-install` con sesión de administrador y la credencial de máquina del hub; el catálogo y los paquetes de ERPlora. También instalan por aquí la importación de una plantilla (Ajustes › Datos y copias) y la reposición del arranque (HUB-F25).
 Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Durante todo el proceso el hub mantiene su candado de escritura: cada petición (consultas, órdenes, menú, autenticación, `/readyz`) espera; cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando retiene el hub sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`).
+En este mismo documento se apoya en: HUB-F62 (Ejecutar las tareas programadas de los módulos), HUB-F104 (Servir las recetas de fábrica de los módulos), HUB-F235 (Importar un fichero o una plantilla).
 Si falla: dependencia de pago sin contratar, `install_blocked` (409) con lo que hay que comprar; versión inexistente o app fuera del catálogo del hub, 404; firma rechazada, `install_bad_signature` (403); un paquete que no pasa la validación o una migración que falla, `install_runtime_failed` (422) —el motivo concreto se pierde en el código—, y lo que ya se aplicó (migraciones, filas de semilla, dependencias instaladas de paso, declaración del régimen fiscal) se queda; la app necesita un hub más nuevo, `core_version_too_old` (422): «Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.»; ERPlora no contesta a tiempo, «ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.» (424). El sobre de error es `{ok: false, error: "<frase>", code}`, con el código en la raíz. Sin sesión de administrador, 401 (también con sesión que no es de administrador). Ningún fallo de instalación sale como 5xx. Fallar al guardar la copia, al avisar a ERPlora o al indexar no deshace la instalación.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Apps: el botón «Instalar», el consentimiento de permisos y las fases en vivo
-Pendiente de enlazar: hub — HUB, negocio y datos: importar una plantilla instala sus apps por esta puerta
-Pendiente de enlazar: hub — HUB, automatizaciones: las recetas de fábrica que la app publica al registrarse
-Pendiente de enlazar: hub — HUB, avisos: las tareas programadas que la app declara
+Implicados: HUB_SHELL-F109, HUB_SHELL-F110, HUB_SHELL-F111, HUB_SHELL-F112, HUB_SHELL-F113, HUB_SHELL-F115
 Pendiente de enlazar: saas — marketplace: el plan de instalación, las versiones, la descarga y el registro de la instalación
 QA: BD-03
 
@@ -73,7 +70,7 @@ Pasos:
 Entra: el paquete ya descargado y verificado.
 Sale: si se rechaza en los pasos 1–3, nada salvo la declaración del régimen fiscal, que se escribe antes de comprobar el nombre `hub` y las dependencias; si se rechaza en el paso 4, quedan las migraciones y la semilla ya aplicadas. Si pasa, sigue la instalación. Los avisos del manifiesto quedan en el registro y en la lista de apps (`manifest_warnings`).
 Si falla: por la puerta de desarrollo (HUB-F30), el motivo con su código estable (`role_grants_admin`, `fiscal.provider_not_free`, `missing_dependency`, `dependency_too_old`…); desde el catálogo y al actualizar, todos se aplanan a `install_runtime_failed` salvo `core_version_too_old`. Si era una actualización, el hub sigue sirviendo la versión anterior.
-Implicados: ninguno
+Implicados: HUB_SHELL-F91, HUB_SHELL-F114
 QA: ninguno
 
 ### HUB-F21 Aplicar las migraciones de un módulo con su guarda
@@ -102,10 +99,9 @@ Pasos:
 4. Para Impuestos en un negocio de España, añade además los tipos de IVA que faltan.
 Entra: `seed.postgres` del manifiesto.
 Sale: las filas de partida del módulo, firmadas por «system».
+En este mismo documento se apoya en: HUB-F235 (Importar un fichero o una plantilla), HUB-F238 (Volver a importar lo mismo).
 Si falla: un error en la semilla aborta la instalación o la actualización (el hub sigue sirviendo la versión anterior), pero las sentencias anteriores de la semilla se quedan: no corre en una transacción. El SQL de la semilla solo puede escribir en tablas del módulo (HUB-F20).
-Implicados: pendiente
-Pendiente de enlazar: schedules — SCHEDULES-F12 (partir de una semana por defecto al instalar y al actualizar)
-Pendiente de enlazar: hub — HUB, negocio y datos: importar una plantilla sin duplicar lo que sembró el módulo
+Implicados: SCHEDULES-F12
 QA: BD-01
 
 ### HUB-F23 Actualizar una aplicación
@@ -121,10 +117,9 @@ Pasos:
 6. Anota el cambio en el historial de actualizaciones, reindexa sus textos para el asistente y avisa `module.updated` y `module.installed`.
 Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial de máquina; versión opcional.
 Sale: la app en la versión nueva (o en la de antes), la línea del historial y los avisos en vivo.
+En este mismo documento se apoya en: HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
 Si falla: app no instalada, `update_not_installed` (404); dependencia de pago, `install_blocked` (409); la nueva falla y vuelve la anterior: respuesta correcta con el aviso `module.update_failed_kept_previous`; fallan las dos (en la práctica, solo si alguien quita la app entre los dos intentos): `module.update_lost` (424), con la versión en lugar del nombre de la app en `error`, y la pantalla dice «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.». Las migraciones que la versión nueva ya aplicó se quedan.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Apps: el botón «Actualizar» y el desplegable de versión
-Pendiente de enlazar: hub — HUB, acceso: el historial de actualizaciones que se ve en Sistema
+Implicados: HUB_SHELL-F116, HUB_SHELL-F117, HUB_SHELL-F142
 QA: BD-03
 
 ### HUB-F24 Consultar qué actualizaciones y versiones hay
@@ -138,8 +133,7 @@ Pasos:
 Entra: `GET /api/modules/updates` (cualquier sesión) y `GET /api/modules/:id/versions` (sesión de administrador).
 Sale: nada guardado.
 Si falla: sin credencial de máquina o con ERPlora sin contestar, cada app sale como «no lo sé» (`checked: false`), nunca como «al día»; la lista de versiones sale vacía. Si falla la lectura de la base, `/api/modules/updates` contesta 500. Solo se consultan las apps activas.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Apps y campana: el aviso de actualizaciones disponibles
+Implicados: HUB_SHELL-F60, HUB_SHELL-F116, HUB_SHELL-F118, HUB_SHELL-F119, HUB_SHELL-F120, HUB_SHELL-F143
 QA: BD-03
 
 ### HUB-F25 Reponer las aplicaciones al arrancar y actualizarlas solas
@@ -153,9 +147,9 @@ Pasos:
 4. Lo que no se pueda reponer por ninguna vía se denuncia y deja la comprobación de salud del hub en rojo, para que el despliegue no se dé por bueno.
 Entra: `hub_module`, la carpeta de descargas, el catálogo y `hub_module_package`.
 Sale: el hub sirviendo las mismas apps (o versiones más nuevas), las líneas del historial de actualizaciones y, si falta alguna, el aviso de arranque incompleto.
+En este mismo documento se apoya en: HUB-F161 (Decir si el hub está listo para servir), HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
 Si falla: un hub sin credencial de máquina no puede volver a descargar y depende de la copia local; una app instalada antes de que existiera la copia y sin catálogo queda fuera y la salud del hub lo dice.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, acceso: la comprobación de salud que exige todas las apps registradas y el historial de actualizaciones
+Implicados: HUB_SHELL-F142
 QA: ninguno
 
 ### HUB-F26 Seguir lo que otra copia del hub instaló, actualizó, apagó o quitó
@@ -186,7 +180,7 @@ Pasos:
 Entra: `POST /api/modules/:id/activate` con sesión de administrador.
 Sale: el estado en `hub_module`.
 Si falla: app no instalada, 404; si falta una dependencia, la respuesta es 404 pero la app pedida ya quedó guardada como activa (defecto). Sin sesión, o con sesión que no es de administrador, 401 (todas las puertas de F19–F30 contestan 401, no 403).
-Implicados: ninguno
+Implicados: HUB_SHELL-F123
 QA: ninguno
 
 ### HUB-F28 Desactivar una aplicación preguntando antes si puede irse
@@ -201,10 +195,9 @@ Pasos:
 5. Si puede, apaga la pedida (queda apagada hasta que alguien la encienda) y las arrastradas (vuelven solas, HUB-F27). Las pantallas reciben `module.deactivated`, solo para la app pedida. En la nube, el siguiente despliegue puede volver a encenderla (HUB-F25).
 Entra: `POST /api/modules/:id/deactivate` con sesión de administrador.
 Sale: el estado en `hub_module`. Una app apagada no sirve consultas ni órdenes (`module_inactive`) ni aporta menú, paneles ni pasos de puesta en marcha.
+En este mismo documento se apoya en: HUB-F316 (No dejar en producción a un hub sin ningún módulo que cumpla su régimen).
 Si falla: el código del módulo con su recuento (409) o el candado fiscal del hub; nada cambia. Al arrancar, volver a apagar lo que ya estaba apagado no pasa por estas preguntas.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar con registros sin enviar)
-Pendiente de enlazar: hub — HUB, perfil fiscal: el candado del proveedor fiscal en producción
+Implicados: HUB_SHELL-F122, HUB_SHELL-F125, VERIFACTU-F32
 QA: L-14
 
 ### HUB-F29 Desinstalar una aplicación
@@ -220,9 +213,7 @@ Pasos:
 Entra: `POST /api/modules/:id/uninstall` con sesión de administrador y, opcionalmente, `{"force": true}`.
 Sale: la app fuera del hub. **Sus tablas y sus datos se quedan** en la base, y también su carpeta en la caché de descargas, sus permisos de host concedidos y su declaración fiscal. ERPlora no recibe aviso de la desinstalación.
 Si falla: dependientes, `has_dependents` (409) con la lista en `dependents`; motor con trabajo pendiente o último proveedor fiscal, su código (409); nada cambia.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar con registros sin enviar)
-Pendiente de enlazar: hub — HUB_SHELL, Apps: el aviso que nombra lo que se rompe y ofrece quitarla igualmente
+Implicados: HUB_SHELL-F124, HUB_SHELL-F125, VERIFACTU-F32
 QA: L-14
 
 ### HUB-F30 Instalar un módulo desde una carpeta en modo desarrollo
@@ -250,8 +241,7 @@ Pasos:
 Entra: `GET /api/navigation`, `GET /api/modules` (con sesión) y `/modules/:id/v/:versión/…` (sin sesión).
 Sale: nada guardado.
 Si falla: una app no instalada o un fichero que no existe, 404 (nunca la página del hub disfrazada de código). Una pestaña sin permiso declarado se enseña a todos; detrás, cada consulta y orden vuelve a comprobar el permiso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, menú lateral y vista de un módulo
+Implicados: HUB_SHELL-F15, HUB_SHELL-F32, HUB_SHELL-F40, HUB_SHELL-F41, HUB_SHELL-F42, HUB_SHELL-F105
 QA: BD-03
 
 ### HUB-F32 Conceder o retirar un permiso de host a una aplicación
@@ -265,10 +255,9 @@ Pasos:
 4. Al conceder, vuelve a poner en la cola **todos** los avisos del hub que murieron por falta de un permiso de host, no solo los de esa app (los que siguen sin permiso vuelven a morir).
 Entra: `GET /api/modules/:id/capabilities` (cualquier sesión) y `PUT` del mismo con sesión de administrador.
 Sale: `_module_capability_grants`. Sin el permiso, el motor propio de la app no corre (HUB-F12), sus recordatorios no salen y su paso de puesta en marcha sigue pendiente (HUB-F35). Una copia de seguridad del mismo hub los vuelve a conceder al restaurarse; una plantilla, no.
+En este mismo documento se apoya en: HUB-F58 (Reenviar solo lo que un permiso había rechazado, al concederlo).
 Si falla: un permiso desconocido o no declarado, error. Varios cambios en un mismo guardado no son atómicos: si uno falla, los anteriores ya quedaron; un valor que no sea verdadero o falso se toma como «retirar». Si los avisos no se pueden volver a encolar, se quedan en avisos caídos y se dice en el registro. Al restaurar una copia, quién concedió queda como `blueprint`.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos
-Pendiente de enlazar: hub — HUB, avisos: reintentar los avisos rechazados por falta de permiso
+Implicados: FLOWS-F01, HUB_SHELL-F29, HUB_SHELL-F109, HUB_SHELL-F115, HUB_SHELL-F167, HUB_SHELL-F168, HUB_SHELL-F169
 QA: BD-03
 
 ### HUB-F33 Leer y guardar los ajustes de un módulo
@@ -283,12 +272,7 @@ Pasos:
 Entra: el bloque `settings` del `module.json` (esquema, consulta, orden).
 Sale: la fila de ajustes del módulo y el aviso que su orden emita.
 Si falla: si la consulta de lectura falla, el error se traga y se pintan los valores de fábrica del esquema como si fueran los del negocio («No se pudieron cargar los ajustes.» solo sale si falla otra cosa, como el esquema). Los ven así quienes no tienen permiso de leerlos —hoy solo los empleados de Venta e Inventario, cuya consulta de lectura pide el permiso de gestionar los ajustes; en Cocina y Caja el empleado sí puede leerlos— y cualquiera tras un fallo pasajero de lectura; solo un administrador puede pisar entonces lo guardado con esos valores de fábrica, si guarda sin darse cuenta; al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, vista de un módulo: la pestaña «Ajustes» generada desde el bloque de ajustes
-Pendiente de enlazar: cash_register — CASH_REGISTER-F01 (configurar cómo funciona la caja)
-Pendiente de enlazar: sales — SALES-F34 (ajustar el TPV)
-Pendiente de enlazar: kitchen — KITCHEN-F26 (ajustar la pantalla de cocina)
-Pendiente de enlazar: inventory — INVENTORY-F19 (ajustar el inventario)
+Implicados: CASH_REGISTER-F01, HUB_SHELL-F43, HUB_SHELL-F44, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: qa-hub-restaurant §7.03 (discrepa)
 
 ### HUB-F34 Servir los datos de los paneles de Inicio
@@ -302,13 +286,9 @@ Pasos:
 4. Cuando el hub emite por el canal en vivo (`/ws`) uno de los avisos que el panel declara, la pantalla vuelve a pedirla; solo en los paneles declarativos, no en los de componente propio.
 Entra: el bloque `widgets` de cada `module.json`; la sesión de quien mira.
 Sale: nada guardado; los datos del panel. El hub no pinta paneles ni decide cuáles se ven: solo sirve el manifiesto, la consulta y los avisos en vivo.
+En este mismo documento se apoya en: HUB-F60 (Avisar a las pantallas en vivo).
 Si falla: un panel cuya consulta exige un permiso que la persona no tiene recibe `permission_denied` y se pinta con «No disponible» (la pantalla no lo oculta por su `permission`). Los paneles de una app apagada, fuera del plan, o sin ninguna pestaña visible para esa persona no se pintan. Un panel no se refresca con un aviso que su app no emite: Inventario no emite ningún aviso que sus paneles escuchen cuando una venta descuenta stock, solo al cruzar el umbral (INVENTORY-F17).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Inicio: el tablero de paneles, su selección y su refresco
-Pendiente de enlazar: hub — HUB, avisos: el canal en vivo que dispara el refresco
-Pendiente de enlazar: cash_register — CASH_REGISTER-F12 (ver la caja en los paneles del inicio)
-Pendiente de enlazar: inventory — INVENTORY-F17 (ver el panel y los productos con stock bajo)
-Pendiente de enlazar: verifactu — VERIFACTU-F31 (vigilar los envíos desde el panel y los eventos)
+Implicados: CASH_REGISTER-F12, HUB_SHELL-F33, HUB_SHELL-F34, HUB_SHELL-F35, INVENTORY-F17, VERIFACTU-F31
 QA: R-01, qa-hub-restaurant §7.12
 
 ### HUB-F35 Calcular la lista de puesta en marcha
@@ -324,13 +304,7 @@ Pasos:
 Entra: `hub.setup.status` (consulta del hub, con sesión); el bloque `setup` de cada `module.json`; lo último que dijo el catálogo (una hora de validez).
 Sale: `{items, pending, unavailable, blocking_pending, total}`; nada guardado salvo la última respuesta del catálogo.
 Si falla: un paso cuya comprobación no se puede hacer (sin permiso para la consulta, una lectura rota) no sale, en vez de salir pendiente. «Tus apps» sale como no disponible si el catálogo dijo hace menos de una hora que no hay nada instalable.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Inicio: la tarjeta «Termina de configurar tu negocio», la franja de bloqueo y el asistente que la leen
-Pendiente de enlazar: inventory — INVENTORY-F28 (completar el primer paso «Tu catálogo»)
-Pendiente de enlazar: schedules — SCHEDULES-F03 (confirmar la semana por defecto)
-Pendiente de enlazar: tables — TABLES-F02 (el paso «Tus mesas» queda hecho con una mesa en uso)
-Pendiente de enlazar: invoice — INVOICE-F14 (preparar la numeración desde la tarea de Inicio)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F01 (los primeros pasos de Caja)
+Implicados: CASH_REGISTER-F01, HUB_SHELL-F27, HUB_SHELL-F28, HUB_SHELL-F31, HUB_SHELL-F196, INVENTORY-F28, INVOICE-F14, SCHEDULES-F03, TABLES-F02, VERIFACTU-F01
 QA: BD-01, BD-02
 
 ## Cobertura contra la referencia

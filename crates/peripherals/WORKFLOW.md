@@ -98,9 +98,7 @@ resultados no se sabe si la impresora está apagada, en otra red o tras un corta
 con la dirección que sale en la hoja de la impresora (HUB_PERIPHERALS-F02). Si el mDNS no arranca,
 queda el barrido. Una impresora que solo se anuncia por IPP aparece con el puerto del anuncio (631),
 no el 9100.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
-Pendiente de enlazar: hub — HUB_APP, la búsqueda de impresoras y el permiso de red local en la aplicación instalada
+Implicados: HUB_APP-F07, HUB_APP-F09, HUB_APP-F13, HUB_SHELL-F140, PRINTING-F02
 QA: qa-hub §8, qa-hub-android §15
 
 ### HUB_PERIPHERALS-F02 Añadir una impresora de red por su IP
@@ -121,9 +119,7 @@ Si falla: dirección que no es IPv4 o puerto 0, se rechaza sin llamar a nadie (�
 válida…» en la pantalla de Impresión); si nadie contesta en 3 s, «Ninguna impresora ha respondido en
 {dirección}…» y no se guarda. Contestar en el 9100 no prueba que sea una térmica: una láser de oficina
 también contesta, y la impresora se guarda como «sin clasificar».
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F03 (añadir una impresora por su IP)
-Pendiente de enlazar: hub — HUB_APP, el formulario «Añadir impresora por IP» de la aplicación instalada
+Implicados: HUB_APP-F14, PRINTING-F03
 QA: qa-hub-android §15
 
 ### HUB_PERIPHERALS-F03 Encontrar las impresoras USB del ordenador
@@ -146,8 +142,7 @@ Si falla: si el sistema no tiene las herramientas de CUPS o no responde en 20 s,
 USB y la búsqueda de red sigue funcionando; solo queda un aviso en el registro de la aplicación, no
 en pantalla. En Android no hay cola del sistema que consultar, y en Windows no se sabe hacer
 (HUB_PERIPHERALS-F08).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
+Implicados: HUB_APP-F16, PRINTING-F02
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F04 Recordar cada impresora y su función
@@ -173,8 +168,7 @@ no pasa si la impresora salió de una búsqueda de esta aplicación. Si el fiche
 puede leer, la aplicación arranca con el registro vacío y avisa solo en el registro técnico: las
 funciones se pierden y hay que volver a ponerlas. No existe la acción de dejar una impresora
 sin función. Quitarle la función a una impresora o borrarla del registro **no da de baja al dispositivo en el hub** (HUB-F197): el hub sigue dando la función por cubierta.
-Implicados: HUB-F196
-Pendiente de enlazar: printing — PRINTING-F04 (asignar qué sale por cada impresora)
+Implicados: HUB-F196, HUB_APP-F13, HUB_APP-F17, HUB_APP-F18, HUB_SHELL-F73, PRINTING-F02, PRINTING-F04
 
 Pendiente de enlazar: hub — HUB_APP, el registro de dispositivos de la aplicación instalada y sus órdenes
 QA: qa-hub §8
@@ -197,8 +191,7 @@ búsqueda salen siempre «Lista» porque se acaban de ver contestar).
 Si falla: si la aplicación no puede leer su red local, no recupera nada y no lo dice; con la
 impresora apagada el vigilante la marca fuera de línea y ningún trabajo de la cola lo sabe (los
 trabajos siguen yendo a esa dirección: HUB_PERIPHERALS-F06).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
+Implicados: PRINTING-F02
 QA: ninguno
 
 ### HUB_PERIPHERALS-F06 Sacar un documento por una impresora de red
@@ -229,14 +222,7 @@ sin los datos que exige (emisor, número, cliente, NIF del cliente, desglose de 
 impresora apagada, sin papel o fuera de la red, tras los 3 intentos solo se anota; la comanda o el
 tique no salen y ni el cajero ni la cocina reciben aviso. Es lo que el guion de QA (§10, «impresora
 sin papel/offline: el trabajo queda pendiente y la pantalla informa») no consigue hoy.
-Implicados: HUB-F199
-Pendiente de enlazar: printing — PRINTING-F05 (hacer una prueba de impresión)
-Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
-Pendiente de enlazar: printing — PRINTING-F09 (imprimir la cuenta de la mesa)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: printing — PRINTING-F12 (imprimir la etiqueta de un código de barras)
-Pendiente de enlazar: hub — HUB_SHELL, avisos e impresión (la puerta de impresión del shell: directo o por la cola)
-Pendiente de enlazar: hub — HUB_APP, la orden de imprimir de la aplicación instalada
+Implicados: HUB-F199, HUB_APP-F19, HUB_SHELL-F70, HUB_SHELL-F72, HUB_SHELL-F74, HUB_SHELL-F77, PRINTING-F05, PRINTING-F07, PRINTING-F09, PRINTING-F10, PRINTING-F12
 
 QA: qa-hub-restaurant §16, qa-hub §8
 
@@ -263,8 +249,7 @@ rechazó el trabajo: …» o «la impresora aún tenía el tique 15 s después d
 que NO salió y no aparecerá después». Si las herramientas de CUPS no están, «No se pudo ejecutar
 `lp`…». Si el estado no se pudo leer se manda igualmente y se deja al sistema decidir. Si `lp` no
 devuelve el identificador del trabajo, se da por mandado sin comprobar que salió.
-Implicados: HUB-F199
-Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
+Implicados: HUB-F199, PRINTING-F02
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F08 Impresora USB en Windows
@@ -280,8 +265,7 @@ Sale: el papel, con la misma garantía de aviso que HUB_PERIPHERALS-F07 (no sale
 Si falla: hoy, en Windows no se listan colas USB (el comando de CUPS no existe) y una impresora
 asignada a una cola USB falla con «No se pudo ejecutar `lp`». Una impresora térmica de Windows se
 usa hoy por red (IP).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F02 (encontrar y dar de alta una impresora de la red)
+Implicados: PRINTING-F02
 QA: ninguno
 
 ### HUB_PERIPHERALS-F09 Sacar el tique o la factura
@@ -310,10 +294,7 @@ imprimir»). Un campo que falta sale en blanco o con su valor por omisión (nomb
 negocio no trae el suyo): el papel no avisa. Un tique sin QR fiscal sale igual, sin marca: que el QR
 llegue o no es de Ventas (SALES) y de la cola (el tique puede salir antes de que esté listo, y la
 pantalla avisa «El tique salió antes de que estuviera listo su QR de VeriFactu»).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
-Pendiente de enlazar: printing — PRINTING-F08 (reimprimir un tique o una factura)
-Pendiente de enlazar: sales — SALES-F01 (vender y cobrar en efectivo)
+Implicados: HUB_APP-F15, HUB_SHELL-F76, PRINTING-F07, PRINTING-F08, SALES-F01
 QA: R-09, qa-hub §8
 
 ### HUB_PERIPHERALS-F10 Sacar la comanda de cocina o barra
@@ -335,10 +316,7 @@ Sale: el papel. La función (Cocina o Barra) la decide el hub; esta parte pinta 
 Si falla: un documento que no es objeto se rechaza antes de imprimir. Con un campo sin rellenar sale
 con su valor por omisión (cantidad 1). Sin comprobar que sea una comanda: una comanda sin líneas sale
 con la cabecera y nada más.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: kitchen — KITCHEN-F08 (la comanda sale en papel en cada estación)
-Pendiente de enlazar: kitchen — KITCHEN-F17 (imprimir el pase al marcar lista)
+Implicados: HUB_SHELL-F72, KITCHEN-F08, KITCHEN-F17, PRINTING-F10
 QA: qa-hub-restaurant §08, qa-hub-restaurant §16
 
 ### HUB_PERIPHERALS-F11 Sacar la cuenta de la mesa
@@ -356,8 +334,7 @@ hay registro de facturación. Un papel que pasa por factura sería un problema l
 Si falla: una cuenta **sin líneas** se rechaza («una cuenta tiene líneas que cobrar; este documento no
 trae ninguna (¿es la forma de la pantalla, con `lines`?)») en vez de cortar un papel en blanco con
 total 0,00.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F09 (imprimir la cuenta de la mesa)
+Implicados: PRINTING-F09
 QA: R-08
 
 ### HUB_PERIPHERALS-F12 Sacar la etiqueta de un código de barras
@@ -375,9 +352,7 @@ más de 250 caracteres, se imprime el texto entre corchetes. Se configura la alt
 ancho del módulo.
 Si falla: sin código, sale el nombre y el precio sin código; sin precio, sin precio. El cajón de la
 etiqueta es el de un tique: una impresora de etiquetas de rollo no entiende estos bytes.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F12 (imprimir la etiqueta de un código de barras)
-Pendiente de enlazar: inventory — INVENTORY-F25 (imprimir la etiqueta del código de barras)
+Implicados: INVENTORY-F25, PRINTING-F12
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F13 Sacar el cierre de caja, el albarán o un documento genérico
@@ -394,9 +369,7 @@ Pasos:
 Entra: el documento estructurado de quien lo pida.
 Sale: el papel; fechas del momento de imprimir, como en HUB_PERIPHERALS-F09.
 Si falla: como el resto: un documento que no es objeto se rechaza; un campo que falta, en blanco.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F16 (mandar imprimir desde el asistente o un flujo)
-Pendiente de enlazar: printing — PRINTING-F17 (imprimir el cierre de caja)
+Implicados: PRINTING-F16, PRINTING-F17
 QA: ninguno
 
 ### HUB_PERIPHERALS-F14 Hacer una hoja de prueba
@@ -413,8 +386,7 @@ Sale: la hoja, por la cola interna si es de red (F06) y directa si es USB o Blue
 del hub, firmada con el nombre del negocio, y no pasa por la cola del hub.
 Si falla: con una impresora de red no hay error aunque no conteste (`lib.rs:1687-1712` la pone en la misma cola en memoria que `erplora_print`, `lib.rs:1671-1683`). Con USB o Bluetooth, el error de la
 impresora vuelve y sale en rojo en la pantalla.
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F05 (hacer una prueba de impresión)
+Implicados: HUB_APP-F15, HUB_APP-F20, PRINTING-F05
 QA: qa-hub §8
 
 ### HUB_PERIPHERALS-F15 Abrir el cajón
@@ -433,9 +405,7 @@ que hacerse aquí y ahora, desde el dispositivo que está junto a la impresora.
 Si falla: una impresora de red que no contesta devuelve error a quien lo pidió («impresora
 inalcanzable»); una USB o Bluetooth, igual. Ese error se pierde antes de llegar a la persona (HUB-F207).
 Un pulso por el pin equivocado no da error: el cajón simplemente no se abre.
-Implicados: HUB-F207
-Pendiente de enlazar: printing — PRINTING-F13 (abrir el cajón al cobrar)
-Pendiente de enlazar: sales — SALES-F01 (vender y cobrar en efectivo)
+Implicados: HUB-F207, HUB_APP-F21, HUB_SHELL-F71, PRINTING-F13, SALES-F01
 
 QA: qa-hub §8, qa-hub-restaurant §16
 
@@ -459,8 +429,7 @@ de la impresora (el QR en modelo 2, módulo de 4 puntos, el promocional de 3, co
 Si falla: un carácter que no está en la tabla sale como `?`; un texto de una sola palabra más ancho que
 la línea se deja entero y la impresora lo dobla; en un rollo de 80 mm el papel queda estrecho (32 de
 las 48 columnas que cabrían).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F06 (elegir cómo imprime el negocio)
+Implicados: PRINTING-F06
 QA: ninguno
 
 ## Cobertura contra la referencia

@@ -43,9 +43,7 @@ Pasos:
 Entra: la sesión de administrador; el nombre (hasta 150 caracteres), el rol, el PIN y la placa opcional; las plazas del plan (HUB-F147).
 Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148).
 Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: el **alta** de un usuario local no admite administrador (ojo: la edición de la ficha sí deja subirlo después a administrador, HUB-F148, y un administrador con PIN entra por el pinpad con todos sus permisos; solo el pase a erplora.com, HUB-F142, exige haber entrado con la cuenta); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › Personal (alta con «Usuario local»)
-Pendiente de enlazar: staff — STAFF-F01 (la ficha de profesional que luego se vincula a esta cuenta)
+Implicados: HUB_SHELL-F81, STAFF-F01
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F146 Invitar a una persona con su cuenta de erplora.com
@@ -60,11 +58,8 @@ Pasos:
 Entra: la sesión de administrador; nombre, correo, rol y PIN opcional; la credencial de máquina del hub hacia erplora.com.
 Sale: la ficha con el correo de acceso escrito en los dos sitios (acceso y perfil); la membresía y la invitación en erplora.com (`POST /api/v1/hub/device/members/`). El administrador nunca conoce la contraseña. Hay una segunda puerta (`/api/members`, que la pantalla no usa) que es alta-o-reinvitación por correo: si el correo ya existe, le cambia el rol, la reactiva y vuelve a avisar a erplora.com; no lleva nombre, PIN ni placa, y comparte con Personal solo las barandillas, el rol concedible y el tope de plazas.
 Si falla: sin correo, «account_needs_email»; un rol que no sea de los tres de fábrica, «A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee…»; correo que el hub ya conoce, «Este hub ya conoce ese email…»; repartir administración sin ser administrador, «No puedes repartir un rol por encima del tuyo…». Si erplora.com no contesta, rechaza o frena, la ficha local queda escrita y la respuesta lo dice (`cloud_unreachable`, `cloud_rejected` o «Demasiados cambios en poco tiempo: la invitación todavía no ha salido…»). Volver a guardar **no** la reenvía: un alta nueva choca con «Este hub ya conoce ese email…» y guardar la ficha sin cambiar rol, correo ni estado no llama a erplora.com. Hoy solo la reenvía la puerta `/api/members`. Hub sin conectar con erplora.com: `not_enrolled`.
-Implicados: pendiente
+Implicados: HUB_SHELL-F82, STAFF-F01, STAFF-F03
 Pendiente de enlazar: saas — dar de alta a un miembro del negocio y mandarle la invitación
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › Personal (alta de cuenta)
-Pendiente de enlazar: staff — STAFF-F01 (la cuenta que luego se vincula a la ficha de profesional)
-Pendiente de enlazar: staff — STAFF-F03 (vincular la ficha de profesional con esta cuenta)
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F147 Llegar al tope de plazas del plan
@@ -79,9 +74,8 @@ Pasos:
 Entra: el tope de personas del último plan verificado (HUB-F162); sin plan verificado no hay tope. Se cuentan solo las personas activas de este negocio.
 Sale: nada escrito en el hub; el rechazo `hub.users.user_limit_reached` (409). Salvo al **reincorporar** a una persona con cuenta: el hub avisa antes a erplora.com (que recrea la membresía y la invitación) y solo después pide la plaza, así que con el plan lleno erplora.com ya la ha readmitido cuando el hub contesta 409. Dos altas a la vez no pueden coger la misma plaza: la plaza se pide en el mismo paso que se escribe. Cambiar el rol de quien ya está dentro no gasta plaza. Quien entra con su cuenta por primera vez no pasa por este tope: esa plaza la controla erplora.com.
 Si falla: «Tu plan tiene todas las plazas ocupadas. Da de baja a alguien que ya no trabaje aquí, o pasa a un plan con más plazas.».
-Implicados: pendiente
+Implicados: HUB_SHELL-F83
 Pendiente de enlazar: saas — tope de plazas por plan en el permiso firmado y en la invitación
-Pendiente de enlazar: hub — HUB_SHELL, Empleados (aviso de plazas y «Actualizar plan»)
 QA: ninguno
 
 ### HUB-F148 Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona
@@ -96,9 +90,7 @@ Pasos:
 Entra: la sesión de administrador; los campos que cambian (solo esos).
 Sale: la ficha. El orden depende del cambio: lo que concede (rol, correo, reincorporación) se pide primero a erplora.com y solo después se escribe aquí; el nombre, el PIN y la placa no se cuentan a erplora.com y funcionan aunque no conteste. El correo con el que se habla con erplora.com es el de acceso o, si no lo hay, el del perfil de la persona (HUB-F143). La edición **no** repite la guarda del alta local: un administrador puede subir a administrador a una persona que solo tiene PIN, y desde ese momento ese PIN abre una sesión de administrador (ver huecos).
 Si falla: la ficha del dueño de la cuenta solo la cambia él, PIN incluido («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»); nadie se da de alta su propia placa («Nadie da de alta su propia placa. Pídeselo a otro administrador.», salvo el dueño); la placa no puede quedar como única forma de entrar («La placa no puede ser su única vía de entrada…»); quitar el rol de administrador al último que queda, «No puedes dar de baja al último administrador…»; un rol de un módulo que está apagado, «Ya no se puede asignar «{role}».»; PIN o correo repetidos, los avisos de HUB-F132 y HUB-F146.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › Personal (editar la ficha)
-Pendiente de enlazar: staff — STAFF-F03 (el rol de permisos y el PIN son de la cuenta, no de la ficha de profesional)
+Implicados: HUB_SHELL-F84, HUB_SHELL-F85, HUB_SHELL-F86, HUB_SHELL-F87, HUB_SHELL-F92, STAFF-F03
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F149 Dar de baja y reincorporar a una persona
@@ -112,10 +104,8 @@ Pasos:
 Entra: la sesión de administrador; la persona.
 Sale: la ficha desactivada (nunca borrada: ventas, aprobaciones y auditoría siguen nombrándola), sus sesiones borradas, y fuera del pinpad y de la lista de personas activas; la membresía retirada en erplora.com. Cerrar la puerta va primero en local y no depende de que erplora.com conteste. Reactivar pide plaza (HUB-F147) y la membresía otra vez. Si la persona no tiene correo de acceso, la baja quita en erplora.com la membresía del correo de su perfil (HUB-F143). La comprobación del último administrador se hace antes de llamar a erplora.com y la escritura después: dos bajas o degradaciones simultáneas pueden dejar el negocio sin administrador (ver huecos). La revocación desde erplora.com (HUB-F144) tampoco mira si es el último.
 Si falla: «No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.»; la ficha del dueño no la da de baja nadie más. Si erplora.com no contesta al quitar la membresía, la baja local se queda y la respuesta lo dice; esa persona no podrá entrar en el hub, pero sigue siendo miembro allí hasta que se repita.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › Personal (dar de baja)
+Implicados: HUB_SHELL-F88, HUB_SHELL-F89, STAFF-F03
 Pendiente de enlazar: saas — quitar a un miembro del negocio
-Pendiente de enlazar: staff — STAFF-F03 (dar de baja la cuenta no toca la ficha de profesional)
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F150 Ver los roles y encender los que trae un módulo
@@ -128,10 +118,9 @@ Pasos:
 3. Desde entonces aparece entre los roles al dar de alta o editar a una persona.
 Entra: la sesión (leer, cualquiera; encender o apagar, administrador); los roles y permisos que declaran los módulos activos.
 Sale: el rol encendido o apagado, con quién lo hizo (`hub_role_activation`). Los permisos de un rol son la suma de lo que le conceden los módulos activos con esa misma clave (un rol que «deriva» de responsable o empleado no hereda sus permisos); el administrador además administra el hub y toda sesión puede ver al personal. Un rol de un módulo no abre las puertas de administración del hub (miran el rol), pero si un manifiesto le concede `*`, ese comodín pasa todos los permisos, también los del núcleo (hoy ningún módulo publicado lo hace; el instalador no lo impide). Una plantilla del negocio también puede encender roles al importarse, por la misma puerta.
+En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F20 (Rechazar un paquete que rompe las reglas del hub).
 Si falla: los roles de fábrica no se apagan («immutable»); no se puede encender un rol que ningún módulo declara («unknown»); sin ser administrador, el aviso de permiso de la pestaña.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › Roles
-Pendiente de enlazar: hub — HUB, módulos y órdenes (los roles que declara un módulo y su validación al instalar)
+Implicados: HUB_SHELL-F91
 QA: qa-hub-restaurant §6
 
 ### HUB-F151 Rechazar una orden para la que no se tiene permiso
@@ -145,10 +134,9 @@ Pasos:
 4. Si no lo tiene y es una orden que un responsable sí puede hacer, la rechaza diciendo que se puede aprobar con PIN, y la pantalla abre el diálogo de aprobación (HUB-F152); si no se puede aprobar, la rechaza sin más.
 Entra: la sesión o la llave, y el permiso que declara el módulo para esa orden.
 Sale: `permission_denied` (403) o `requires_elevation` (403) con el permiso que falta; nada ejecutado. Las páginas del propio hub que piden sesión de administrador (ajustes, personal, llaves, dispositivos, métricas, automatizaciones) contestan `forbidden` o 401 según la puerta. Una llave de API nunca recibe la oferta de aprobación.
+En este mismo documento se apoya en: HUB-F01 (Leer datos de un módulo), HUB-F03 (Ejecutar una orden de un módulo).
 Si falla: no hay frase genérica en español para `permission_denied`: cada pantalla pinta su propio aviso de permiso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, módulos y órdenes (el embudo de una orden y dónde va la comprobación de permiso)
-Pendiente de enlazar: flows — FLOWS-F01 (la sesión de administrador que exige el motor)
+Implicados: FLOWS-F01, HUB_SHELL-F193
 QA: qa-hub-restaurant §6
 
 ### HUB-F152 Aprobar una acción con el PIN de un responsable
@@ -163,10 +151,7 @@ Pasos:
 Entra: la sesión del cajero; el nombre y PIN (o la placa) de quien aprueba; la orden exacta y sus datos.
 Sale: un pase de un solo uso, válido 120 s, atado a ese negocio, ese cajero, esa orden y esos datos tal como los manda el cajero (aprobar un descuento del 25 % no sirve para uno del 60 %); no está atado a la sesión ni al dispositivo, sino al cajero. Vive en la memoria del proceso: un reinicio lo pierde y, durante un despliegue con dos copias del hub, no sirve en la otra. El pase se gasta y el recibo (quién pidió, quién aprobó, qué orden y permiso, una huella de los datos, fecha y si fue PIN o placa, con el índice de la placa) se escribe en el control de permisos, **antes** de validar los datos, aplicar las normas del dueño (HUB-F154) y lo fiscal: si la orden falla después, hay que pedir otra aprobación y el recibo queda. Sin recibo no se ejecuta. El SQL del módulo recibe el id del cajero y el id de quien aprobó (`:approved_by`), no sus nombres; un manejador WASM no recibe `approved_by`.
 Si falla: nombre desconocido, PIN erróneo o persona de baja dan el mismo aviso, «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.»; quien aprueba no puede hacerlo él mismo, «Esa persona no puede aprobarlo…»; lo que solo hace un administrador (identidad fiscal, plan, instalar apps), «Esto no se aprueba con un PIN…»; si el cajero ya tiene permiso, «Esto ya no necesita aprobación…». Cinco PIN erróneos con el mismo nombre lo frenan 5 minutos; esta puerta no tiene freno por dirección (HUB-F135).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, diálogo de aprobación y SDK de módulos (reintento con la aprobación)
-Pendiente de enlazar: sales — SALES-F14 (descuento por encima del límite con el PIN del encargado)
-Pendiente de enlazar: sales — SALES-F18 (eliminar una cuenta abierta con aprobación)
+Implicados: HUB_SHELL-F51, HUB_SHELL-F93, SALES-F14, SALES-F18
 QA: qa-hub-restaurant §6
 
 ### HUB-F153 Consultar quién aprobó qué
@@ -179,10 +164,9 @@ Pasos:
 3. Busca por persona o acción; las personas dadas de baja siguen saliendo con su nombre.
 Entra: la sesión de administrador (permiso de administrar el hub).
 Sale: nada; es una lectura paginada del registro de aprobaciones (`hub.approvals.list`). Nadie puede editar ni borrar una fila; el hub las poda solo a los cuatro años.
+En este mismo documento se apoya en: HUB-F253 (Purgar el historial por retención).
 Si falla: «No se pudo cargar el registro de aprobaciones.»; vacío, «Todavía nadie ha tenido que autorizar nada en este Hub.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › Aprobaciones
-Pendiente de enlazar: hub — HUB, negocio y datos (la poda de los recibos a los cuatro años)
+Implicados: HUB_SHELL-F93
 QA: ninguno
 
 ### HUB-F154 Escribir una norma propia del negocio
@@ -196,9 +180,9 @@ Pasos:
 4. La norma se cambia, se apaga o se borra cuando se quiera.
 Entra: la sesión de administrador (nunca una llave ni la máquina); los puntos de control que declara cada módulo; la condición en el mismo lenguaje de las automatizaciones.
 Sale: la norma (`_policy`, con quién la creó, cambió o borró; el borrado es lógico), como mucho 20 por punto de control. Al llegar una orden, el hub la evalúa después de completar los datos y antes de ejecutarla; una norma solo puede restringir, nunca conceder.
+En este mismo documento se apoya en: HUB-F03 (Ejecutar una orden de un módulo), HUB-F19 (Instalar una aplicación del catálogo).
 Si falla: una orden bloqueada responde `policy.blocked` con el mensaje del dueño. Si a la orden le falta un dato que la norma necesita, el hub **deniega**. Una norma con el desenlace de aprobación se rechaza al guardarla (501).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, módulos y órdenes (carga de los puntos de control de cada módulo y el embudo de la orden)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F155 Crear, rotar y revocar llaves de API
@@ -212,10 +196,9 @@ Pasos:
 4. «Rotar» da un token nuevo e invalida el anterior; «Revocar» la apaga de inmediato.
 Entra: la sesión de administrador; los módulos instalados que exponen API.
 Sale: la llave (`hub_api_key`) con su secreto guardado como huella, quién la creó y cuándo se usó por última vez. Los modos generales cubren también las apps que se instalen después. No caduca, y sigue viva aunque a quien la creó lo den de baja o le quiten la administración (`created_by` es solo auditoría). Revocar no la borra (queda «Revocada»). La llave «ERPlora app», que el hub se emite para leer sus propios avisos en vivo, no se rota ni se revoca.
+En este mismo documento se apoya en: HUB-F60 (Avisar a las pantallas en vivo).
 Si falla: «No se pudo crear la API key.»; la llave del sistema, «Esta clave la emite ERPlora para sí misma. No se puede rotar ni borrar.»; sin ser administrador, «Solo el propietario o un administrador puede gestionar las claves de API.». Rotar una llave revocada la vuelve a dejar activa.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Empleados › API keys
-Pendiente de enlazar: hub — HUB, avisos entre módulos (la llave «ERPlora app» y el canal de avisos en vivo)
+Implicados: HUB_SHELL-F94, HUB_SHELL-F95, HUB_SHELL-F96, HUB_SHELL-F97
 QA: ninguno
 
 ### HUB-F156 Leer y escribir datos del negocio con una llave de API
@@ -229,9 +212,9 @@ Pasos:
 4. Contesta igual que a la pantalla, y lo que escribe queda a nombre de la llave.
 Entra: la llave en `Authorization: Bearer erpl_live_…`; la operación (`/api/v1/<módulo>/q/<consulta>` o `/c/<orden>`).
 Sale: la respuesta del módulo; las escrituras con autor `apikey:<id>`; el último uso de la llave. La llave no ve al personal ni puede pedir aprobaciones, y no sirve en las puertas de la pantalla.
+En este mismo documento se apoya en: HUB-F01 (Leer datos de un módulo), HUB-F03 (Ejecutar una orden de un módulo), HUB-F15 (Consultar qué órdenes y consultas acepta el hub).
 Si falla: operación que el módulo no publica o no existe, 404 (las dos igual), también sin llave: un anónimo distingue así una operación publicada (401) de una que no (404); llave desconocida o revocada, 401; sin permiso, `permission_denied`; pasado el límite, `rate_limited` (429) con `Retry-After`.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, módulos y órdenes (qué operaciones publica un módulo para terceros)
+Implicados: HUB_SHELL-F97
 QA: ninguno
 
 ### HUB-F157 Consultar la documentación de la API
@@ -244,10 +227,9 @@ Pasos:
 3. Para probarlas pega una llave en «Authorize»; la documentación no da acceso por sí sola.
 Entra: la sesión de la persona (no una llave); los módulos instalados.
 Sale: nada guardado; el documento OpenAPI 3.1 del negocio (`/api/v1/openapi.json`), que crece y mengua al instalar o quitar módulos.
+En este mismo documento se apoya en: HUB-F221 (Cambiar los ajustes del negocio).
 Si falla: apagada, 404; sin sesión o con una llave, 401. La pantalla dice «No se pudo cargar la documentación» con «Reintentar».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Documentación de la API
-Pendiente de enlazar: hub — HUB, negocio y datos (el ajuste que enciende la documentación)
+Implicados: HUB_SHELL-F98
 QA: ninguno
 
 ### HUB-F158 Dar la lista de personas del negocio a los módulos
@@ -261,9 +243,7 @@ Pasos:
 Entra: cualquier sesión de una persona del negocio (todas pueden ver al personal); una llave de API no.
 Sale: nada guardado; la lista (`hub.users.list`) con activos y de baja. Hay una hermana con los roles (`hub.roles.list`). La pantalla de acceso recibe sin sesión otra lista más corta: solo las personas activas con PIN.
 Si falla: sin sesión o con una llave, sin permiso; cada módulo decide qué pinta (la cocina deja la comanda sin camarero).
-Implicados: pendiente
-Pendiente de enlazar: kitchen — KITCHEN-F10 (nombrar a quien envió la comanda)
-Pendiente de enlazar: staff — STAFF-F03 (las cuentas activas que se ofrecen para vincular la ficha)
+Implicados: HUB_SHELL-F80, KITCHEN-F10, STAFF-F01, STAFF-F03
 QA: ninguno
 
 ## Cobertura contra la referencia

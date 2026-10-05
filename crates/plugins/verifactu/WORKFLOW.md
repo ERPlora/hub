@@ -106,10 +106,7 @@ Pasos:
 Entra: el aviso de factura emitida o rectificada de Facturación (`invoice.created`, `invoice.rectified`) y la fila de la factura (lectura acotada de ADR-0058); el entorno del perfil fiscal del núcleo; los datos del productor.
 Sale: el registro de alta en la tabla de registros del módulo (avisa: `verifactu.record.created`), el evento de auditoría y el resultado del envío. Todo en una sola operación: si algo falla, no queda ni registro ni número gastado.
 Si falla: lo que no cuadra o no tiene emisor se niega y el aviso de Facturación se reintenta hasta quedar en «Eventos caídos» (Sistema). Sin el permiso «Certificado del negocio (firma fiscal)» no corre: el aviso acaba en esa misma cola como permiso denegado y se reprocesa al concederlo. Una factura con registro ya existente choca con la guarda de unicidad y también acaba ahí (verifactu#110).
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F13 (registrar una factura emitida) y VERIFACTU-F14 (rectificativa)
-Pendiente de enlazar: architecture — REC_FISCAL-F04 (registrar y encadenar el documento)
-Pendiente de enlazar: hub — HUB, avisos entre módulos (entrega del aviso, reintentos y «Eventos caídos»)
+Implicados: HUB-F12, HUB-F51, HUB-F52, HUB-F53, HUB-F54, HUB-F58, REC_FISCAL-F04, VERIFACTU-F13, VERIFACTU-F14
 QA: L-04, L-03, BD-09, R-09, B-06, qa-hub §7
 
 ### HUB_VERIFACTU-F02 Sellar un registro a mano, por la puerta manual
@@ -123,8 +120,7 @@ Pasos:
 Entra: los datos del registro, escritos por quien llama.
 Sale: el registro sellado (avisa: `verifactu.record.created`) y su envío.
 Si falla: sin NIF del emisor, con importes que no cuadran o sin el permiso del certificado, se niega sin escribir nada. Sin permiso de gestión de VeriFactu, el hub pide el PIN de un responsable.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F13 (la puerta manual que usa el asistente)
+Implicados: HUB-F12, VERIFACTU-F13
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F03 Sellar un registro de anulación y su huella
@@ -138,9 +134,7 @@ Pasos:
 Entra: los datos de la factura anulada, que da quien llama.
 Sale: el registro de anulación sellado y enviado (avisa: `verifactu.record.created`). La factura sigue existiendo en Facturación.
 Si falla: como HUB_VERIFACTU-F02. Ningún aviso de otro módulo crea anulaciones: anular una venta o una factura no llega aquí.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F30 (anular un registro enviado por error)
-Pendiente de enlazar: architecture — REC_FISCAL-F13 (anular una venta cobrada, que hoy no produce nada fiscal)
+Implicados: HUB-F12, REC_FISCAL-F13, VERIFACTU-F30
 QA: L-04 (discrepa), qa-hub §7 (discrepa)
 
 ### HUB_VERIFACTU-F04 Comprobar el XML contra las reglas de la AEAT antes de enviarlo
@@ -155,9 +149,7 @@ Pasos:
 Entra: el registro sellado; los datos del productor y la vía del momento.
 Sale: el XML guardado (`xml/<registro>.xml`) o el rechazo local (avisa: `verifactu.record.rejected`, motivo `xsd_invalid`).
 Si falla: el rechazo local ya tiene gastado su número y deja de ser eslabón para la huella del siguiente, pero no para su registro anterior declarado en el XML (ver Estado). Si el registro venía de la cola, su entrada no se cierra: cada pasada lo vuelve a comprobar y suma un «con error». Una F1/F3/R rechazada solo por faltarle el cliente se recompone con el cliente de la factura en la siguiente pasada de la cola (HUB_VERIFACTU-F10); cualquier otro rechazo local queda así para siempre y cuenta como no enviado.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F15 (un XML que no pasa el esquema queda «Rechazado») y VERIFACTU-F24
-Pendiente de enlazar: architecture — REC_FISCAL-F03 (tique por encima del techo que entra por el asistente o la API)
+Implicados: REC_FISCAL-F03, REC_FISCAL-F04, VERIFACTU-F13, VERIFACTU-F15, VERIFACTU-F24, VFGW-F08
 QA: L-04, L-01, qa-hub §7
 
 ### HUB_VERIFACTU-F05 Enviar el registro en el momento, o dejarlo esperando con su motivo
@@ -173,9 +165,7 @@ Pasos:
 Entra: el registro sellado; la vía del momento (certificado del núcleo o acceso a la celda).
 Sale: el registro presentado y su respuesta, o «Pendiente» con su evento, o una entrada en la cola.
 Si falla: un registro que no sabe su entorno no se envía a ninguno: queda en la cola con el motivo «entorno desconocido» (avisa: `verifactu.record.rejected`, motivo `record_environment_unknown`). Sin los datos del productor el sobre no se puede construir: entra en la cola con el motivo `record_not_declarable` y sale cuando lleguen.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F15 (enviar el registro y recoger su respuesta) y VERIFACTU-F17 (por qué espera)
-Pendiente de enlazar: architecture — REC_FISCAL-F05 (enviar el registro a la AEAT en el momento)
+Implicados: REC_FISCAL-F05, VERIFACTU-F15, VERIFACTU-F17
 QA: L-04, BD-09, R-09, B-06, qa-hub §7
 
 ### HUB_VERIFACTU-F06 Presentar con el certificado propio, directo a la AEAT
@@ -190,8 +180,7 @@ Pasos:
 Entra: el XML comprobado; el certificado del núcleo (identidad, tipo y titular).
 Sale: la respuesta de la AEAT, o un fallo de conexión o de certificado.
 Si falla: un certificado caducado o revocado se ve como rechazo de la conexión, no antes; un fallo de red o un 5xx van a la cola (HUB_VERIFACTU-F08).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, perfil fiscal: HUB-F302 (guardar o sustituir el certificado del negocio) y HUB-F304 (elegir la vía)
+Implicados: HUB-F302, HUB-F304
 QA: qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB_VERIFACTU-F07 Presentar por la vía de ERPlora, a través de la celda fiscal
@@ -207,10 +196,8 @@ Pasos:
 Entra: el XML comprobado; la conexión segura del hub, si la hay; el permiso de envío de la nube.
 Sale: la respuesta de la AEAT tal como la devuelve la celda.
 Si falla: si la nube niega el permiso, o la celda no responde, el registro va a la cola con su motivo; en producción sin autorización aprobada la celda lo rechaza (y el núcleo ya habría negado la venta: HUB-F313). Si la nube contesta que este hub debe ir por su propio certificado, no hay vía por la celda.
-Implicados: pendiente
-Pendiente de enlazar: verifactu-gateway — presentar el registro en nombre del negocio por `POST /v1/verifactu/transmissions` (carril mutuo y carril de pruebas), devolver la respuesta de la AEAT con la huella de lo recibido, y no aceptar nunca un registro de producción por el carril de pruebas
+Implicados: HUB-F305, HUB-F306, VFGW-F01, VFGW-F02, VFGW-F06, VFGW-F08, VFGW-F10, VFGW-F12, VFGW-F18
 Pendiente de enlazar: saas — acuñar el permiso de envío de la celda para cada hub (`/api/v1/hub/device/fiscal/gateway-token/`), también sin autorización para el carril de pruebas
-Pendiente de enlazar: hub — HUB, perfil fiscal: HUB-F305 (autorización de representación) y HUB-F306 (conexión segura con la celda)
 QA: qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB_VERIFACTU-F08 Clasificar la respuesta de la AEAT
@@ -226,10 +213,7 @@ Pasos:
 Entra: la respuesta de la AEAT, directa o a través de la celda.
 Sale: el estado, el código, el mensaje y el CSV en el registro; el evento de auditoría; avisos públicos `verifactu.record.rejected` (rechazo, fallo de envío) y `verifactu.record.accepted_with_errors`, que llevan el id del registro, el número de factura, el estado, el motivo, el código, el mensaje de la AEAT (que puede traer el NIF y el nombre del obligado, como en un Fault 4116) y el entorno; nunca importes, huella ni XML. Un aceptado limpio no avisa a nadie más que con el `verifactu.record.transmitted` del envío manual.
 Si falla: el «Error» del paso 5 se queda así hasta que alguien lo reenvíe a mano (HUB_VERIFACTU-F11).
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F15 (estados del registro) y VERIFACTU-F24 (actuar ante un rechazado)
-Pendiente de enlazar: architecture — REC_FISCAL-F05 (respuesta no reconocida)
-Pendiente de enlazar: flows — FLOWS-F04 (automatizaciones que escuchan los avisos de rechazo)
+Implicados: FLOWS-F04, REC_FISCAL-F05, VERIFACTU-F15, VERIFACTU-F24, VFGW-F06
 QA: L-04, qa-hub §7
 
 ### HUB_VERIFACTU-F09 Reengancharse a la cadena de la AEAT tras un rechazo de encadenamiento
@@ -244,8 +228,7 @@ Pasos:
 Entra: el rechazo de la AEAT y su consulta del mes en curso.
 Sale: un ancla de recuperación en la cadena (evento «Cadena recuperada»), el registro reencadenado y su respuesta.
 Si falla: sin registros de la AEAT con huella, no hay ancla y queda el rechazo original; si la consulta no sale por la red, se reintenta desde la cola. Un 2007 que llega como «aceptado con errores» no dispara nada: ya está en la AEAT.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F15 (rechazo por la cadena: se reengancha y se reenvía una vez)
+Implicados: REC_FISCAL-F05, VERIFACTU-F15, VFGW-F07
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F10 Drenar la cola de contingencia: una pasada
@@ -261,10 +244,7 @@ Pasos:
 Entra: la cola y los registros pendientes; la vía del momento.
 Sale: los registros enviados y sus respuestas (como HUB_VERIFACTU-F08) (avisa: `verifactu.contingency.processed`).
 Si falla: el «Error» sin cola de HUB_VERIFACTU-F08 no se recoge. Lo que quede por encima de 85 sale en la pasada siguiente.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F20 (contingencia automática) y VERIFACTU-F21 (procesar la cola a mano)
-Pendiente de enlazar: architecture — REC_FISCAL-F06 (si no pudo salir: contingencia y envío posterior)
-Pendiente de enlazar: verifactu-gateway — presentar los envíos tardíos marcados como incidencia y servir el carril de pruebas
+Implicados: HUB-F12, REC_FISCAL-F06, VERIFACTU-F20, VERIFACTU-F21, VFGW-F09, VFGW-F10, VFGW-F12, VFGW-F18
 QA: L-04, BD-09, qa-hub §7, qa-hub-restaurant §7.11
 
 ### HUB_VERIFACTU-F11 Enviar a mano un registro concreto
@@ -278,9 +258,7 @@ Pasos:
 Entra: el registro elegido.
 Sale: el envío y su respuesta (avisa: `verifactu.record.transmitted`).
 Si falla: un registro ya aceptado no se reenvía («el registro ya fue aceptado por la AEAT»); sin vía se niega; un fallo de red lo deja en la cola.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F25 (reenviar un registro concreto)
-Pendiente de enlazar: architecture — REC_FISCAL-F05 (reenvío a mano de lo que no salió)
+Implicados: REC_FISCAL-F05, VERIFACTU-F25, VFGW-F09
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F12 Recalcular y comprobar las huellas de la cadena
@@ -294,8 +272,7 @@ Pasos:
 Entra: el NIF del emisor (o el de la configuración) y los registros de la cadena.
 Sale: el veredicto como evento «Cadena verificada» o «Cadena rota» (avisa: `verifactu.chain.validated`).
 Si falla: sin NIF se niega («falta issuer_nif del obligado…»). Sin el permiso del certificado, se niega aunque solo lea.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F26 (verificar la cadena de huellas)
+Implicados: VERIFACTU-F26
 QA: L-14, qa-hub §7
 
 ### HUB_VERIFACTU-F13 Consultar los registros que tiene la AEAT
@@ -309,8 +286,7 @@ Pasos:
 Entra: el NIF del emisor; la respuesta de la AEAT.
 Sale: la foto de lo que tiene la AEAT, que sustituye a la anterior de ese emisor (sea del entorno que sea), y el evento «Consulta a la AEAT» (avisa: `verifactu.aeat.queried`). No toca la cadena.
 Si falla: un Fault de la AEAT es un error, no «cero registros»; sin vía o sin red, error visible.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F27 (consultar lo que tiene la AEAT)
+Implicados: VERIFACTU-F27, VFGW-F07
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F14 Anclar la cadena en el último registro de la AEAT
@@ -324,8 +300,7 @@ Pasos:
 Entra: el NIF del emisor; el último registro del mes en curso que tiene la AEAT.
 Sale: el ancla de recuperación (avisa: `verifactu.chain.recovered`), la foto de la AEAT actualizada y el evento «Cadena recuperada desde la AEAT…».
 Si falla: si la AEAT no tiene registros del mes en curso, «la AEAT no devolvió registros para este emisor/periodo; nada que recuperar»; si los tiene sin huella, tampoco ancla. Solo el administrador. Si el último registro del mes es la muestra de una prueba en vivo con certificado propio (HUB_VERIFACTU-F17, hub#2490), la cadena se ancla sobre ella.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F28 (recuperar la cadena desde la AEAT)
+Implicados: VERIFACTU-F28, VFGW-F07
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F15 Anclar la cadena en una huella aportada a mano
@@ -339,8 +314,7 @@ Pasos:
 Entra: la huella, el número y la fecha que escribe el administrador.
 Sale: el ancla (avisa: `verifactu.chain.recovered`) y el evento «Cadena continuada manualmente…».
 Si falla: una huella mal formada se niega («record_hash debe ser 64 caracteres hexadecimales (SHA-256)»). Solo el administrador.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F29 (continuar la cadena de otra aplicación)
+Implicados: VERIFACTU-F29
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F16 Probar la vía de ERPlora sin presentar nada (prueba de conexión)
@@ -355,9 +329,7 @@ Pasos:
 Entra: el tipo de prueba; la vía y el entorno del hub; la configuración guardada del módulo.
 Sale: un solo evento «Prueba de conexión» con el resultado (vía, entorno, huella y QR de la muestra, respuesta de la celda) (avisa: `verifactu.diagnostic.run`). Ningún registro, ningún cambio en la cadena.
 Si falla: sin configuración guardada del módulo se niega («VeriFactu sin configurar»); sin el permiso del certificado, se niega.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F10 (probar la conexión con la AEAT)
-Pendiente de enlazar: verifactu-gateway — responder si la celda puede remitir ahora (`GET /readyz`: estado, motivo, envío activo y NIF del titular del Sello)
+Implicados: VERIFACTU-F10, VFGW-F13
 QA: qa-hub §7
 
 ### HUB_VERIFACTU-F17 Prueba en vivo con el certificado propio
@@ -373,9 +345,7 @@ Pasos:
 Entra: el tipo de prueba; el certificado del núcleo; el entorno del perfil fiscal.
 Sale: un evento «Prueba de conexión» con el resultado (avisa: `verifactu.diagnostic.run`) y ningún registro local. Hoy, además, un alta en la AEAT que el hub no tiene: en producción queda en la AEAT real y una recuperación posterior (HUB_VERIFACTU-F14) puede anclar la cadena sobre ella.
 Si falla: un certificado caducado o revocado se ve como rechazo de la conexión («…revisa que no esté caducado ni revocado»); sin red, «inténtalo en unos minutos». Sin configuración guardada no se niega: con certificado propio el motor arma una configuración con lo que dice el núcleo y se para en el NIF del emisor («Configura el NIF…»); «VeriFactu sin configurar» solo lo ve un hub sin certificado propio (HUB_VERIFACTU-F16). La prueba decide «aceptado» con su propia regla (registro correcto o aceptado con errores, o envío correcto), no con la clasificación de HUB_VERIFACTU-F08.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — VERIFACTU-F10 (prueba en vivo con certificado propio) y VERIFACTU-F11 (factura de prueba, cuyo importe hub#2490 pide revisar con el mismo criterio)
-Pendiente de enlazar: architecture — REC_FISCAL-F14 (de pruebas a producción sin perder ningún tique)
+Implicados: REC_FISCAL-F14, VERIFACTU-F10
 QA: qa-hub §7
 
 ## Cobertura contra la referencia

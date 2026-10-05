@@ -35,8 +35,7 @@ Pasos:
 Entra: la sesión de cualquiera de los perfiles (la entrada del menú no se oculta a nadie); el estado del sistema que da el hub (HUB-F166). También se llega a `#updates` desde Apps (acción de ver las actualizaciones del hub).
 Sale: nada guardado.
 Si falla: si el hub no contesta al estado del sistema sale, encima de la pestaña, el aviso «No se pudo consultar el sistema — Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo.» con **Reintentar**, que solo vuelve a pedir ese estado (cada pestaña pide lo suyo aparte). En móvil la barra de pestañas se desplaza; en tableta y escritorio caben todas.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F166 (el estado del sistema, sus registros y la versión que lee esta pantalla)
+Implicados: HUB-F166
 QA: ninguno
 
 ### HUB_SHELL-F136 Ver cuánto está usando el hub
@@ -51,10 +50,9 @@ Pasos:
 5. Cambiar de rango vuelve a pedir la evolución. La pantalla no se refresca sola: se ve lo que había al abrirla o al cambiar de rango.
 Entra: el estado actual del hub (HUB-F166) y la evolución de uso que el hub pide a erplora.com (HUB-F165); el aviso de plan corto lo decide erplora.com.
 Sale: nada guardado. **Actualizar plan** sale por la puerta compartida a erplora.com con pase de un solo uso.
+En este mismo documento se apoya en: HUB_SHELL-F16 (Ir a erplora.com ya identificado), HUB_SHELL-F129 (Ir a erplora.com a gestionar o mejorar el plan).
 Si falla: lo que no se pudo medir sale «No hemos podido leerlo», nunca 0 ni una línea verde plana; si la evolución no llega pero el valor actual sí, se pinta ese valor. Si el viaje a erplora.com no se puede hacer, un aviso lo dice («No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu plan.»).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F165 (uso de recursos frente a los límites del plan) y HUB-F166
-Pendiente de enlazar: hub — HUB_SHELL, Acceso y navegación (la puerta compartida a erplora.com: «Actualizar plan»)
+Implicados: HUB-F165, HUB-F166
 QA: ninguno
 
 ### HUB_SHELL-F137 Ver si la impresora está lista
@@ -70,9 +68,7 @@ Pasos:
 Entra: la cobertura de impresión (quién saca cada estación, HUB impresión), las apps instaladas y la sonda del hardware de este dispositivo (HUB_PERIPHERALS).
 Sale: nada guardado.
 Si falla: lo que no se pudo leer es el tercer estado, «No hemos podido comprobar», en neutro: nunca verde, y sin botón, porque el fallo no es tarea de quien mira. La lista de apps ilegible deja la tarjeta oculta.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, impresión (la cobertura por estación que decide la frase)
-Pendiente de enlazar: printing — la app de impresión (su pantalla de configuración, a la que lleva el botón)
+Implicados: HUB-F202, PRINTING-F01, PRINTING-F04
 QA: ninguno
 
 ### HUB_SHELL-F138 Descargar la app de ERPlora desde Sistema
@@ -86,10 +82,9 @@ Pasos:
 4. Instala la app y la vincula (los pasos de arriba).
 Entra: la plataforma elegida.
 Sale: nada guardado. La descarga es la de erplora.com (siempre la última publicada).
+En este mismo documento se apoya en: HUB_SHELL-F20 (Actualizar la aplicación instalada cuando hay versión nueva).
 Si falla: «No se ha podido descargar el archivo.». Dentro de la app instalada este bloque no existe (sería la app ofreciéndose instalarse); actualizar la app instalada es otro gesto, desde el menú lateral.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_APP (instalar la aplicación)
-Pendiente de enlazar: hub — HUB_SHELL, Acceso y navegación (el aviso de actualización de la app en el menú lateral)
+Implicados: HUB_APP-F01
 QA: ninguno
 
 ### HUB_SHELL-F139 Volver a activar los avisos de este dispositivo
@@ -103,10 +98,9 @@ Pasos:
 4. Si no: «Tu dispositivo no ha vuelto a preguntar. Entra en sus ajustes, busca ERPlora y activa sus notificaciones.». **Abrir los ajustes** lleva a la página de la app en los ajustes del dispositivo; al volver a la app la tarjeta se actualiza sola.
 Entra: el permiso de notificaciones del dispositivo y las apps activas.
 Sale: el permiso del dispositivo y, si se concede, la escucha con pantalla apagada (HUB_APP).
+En este mismo documento se apoya en: HUB_SHELL-F60 (Ver en la campana lo que espera atención), HUB_SHELL-F61 (Atender desde la campana lo que pone una app).
 Si falla: si los ajustes del dispositivo no se pueden abrir (app más antigua que la orden) se dice a dónde ir a mano, con la misma frase.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_APP (permiso de notificaciones y escucha con la pantalla apagada)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (la campana y qué apps cuentan como fuente de avisos)
+Implicados: HUB_APP-F07, HUB_APP-F08, HUB_APP-F26
 QA: ninguno
 
 ### HUB_SHELL-F140 Volver a permitir la búsqueda de impresoras
@@ -120,9 +114,7 @@ Pasos:
 Entra: el permiso de red local del dispositivo.
 Sale: el permiso del dispositivo.
 Si falla: igual que F139.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_PERIPHERALS (descubrimiento de impresoras en la red local)
-Pendiente de enlazar: printing — PRINTING-F02 (búsqueda de impresoras y registro de dispositivos de la app instalada)
+Implicados: HUB_APP-F08, HUB_PERIPHERALS-F01, PRINTING-F02
 QA: ninguno
 
 ### HUB_SHELL-F141 [retirado] Ver el plan y sus límites
@@ -142,9 +134,7 @@ Pasos:
 Entra: la versión del hub y el historial de actualizaciones (HUB-F167).
 Sale: nada guardado.
 Si falla: la lectura no lanza nada y una lectura fallida sale como lista vacía; la versión ilegible, como «—».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F167 (versión que corre e historial de actualizaciones)
-Pendiente de enlazar: hub — HUB, módulos y órdenes (actualizar una app y volver atrás)
+Implicados: HUB-F23, HUB-F25, HUB-F167
 QA: qa-hub-restaurant §7.00
 
 ### HUB_SHELL-F143 Saber si tus apps tienen una versión nueva
@@ -157,10 +147,9 @@ Pasos:
 3. **Ir a Mis apps** abre Apps en «Mis apps», donde se actualiza.
 Entra: la misma cuenta que usa la campana (solo lo que este hub puede aplicar); esta pestaña no pregunta al catálogo por su cuenta.
 Sale: nada guardado.
+En este mismo documento se apoya en: HUB_SHELL-F105 (Ver las apps instaladas en el negocio), HUB_SHELL-F116 (Actualizar una app).
 Si falla: una comprobación fallida nunca dice «al día»; con un recuento ya conocido, gana el recuento.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F24 (el aviso de actualizaciones disponibles en Apps y en la campana)
-Pendiente de enlazar: hub — HUB_SHELL, Aplicaciones, plan y archivos (Mis apps y actualizar una app)
+Implicados: HUB-F24
 QA: ninguno
 
 ### HUB_SHELL-F144 Ver el registro de sucesos del sistema
@@ -174,8 +163,7 @@ Pasos:
 Entra: los 50 últimos avisos entre apps (HUB-F166) con su estado o su último error, sin el contenido del aviso; los lee cualquier sesión, a diferencia de la cola de F145, que es solo de dueño o administrador.
 Sale: nada guardado.
 Si falla: si el estado del sistema no se pudo leer, sale el aviso general de F135 y debajo la lista vacía «Sin eventos»; el mensaje de cada fila es el del hub, sin traducir. Una lectura fallida sale como «Sin eventos» bajo el aviso de error.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F166 (el estado del sistema y sus registros)
+Implicados: HUB-F166
 QA: ninguno
 
 ### HUB_SHELL-F145 Ver los eventos caídos
@@ -191,13 +179,9 @@ Pasos:
 6. Un perfil que no es dueño ni administrador no pide la cola (el hub se la negaría) y la pestaña le sale como si estuviera vacía.
 Entra: la cola de eventos caídos del hub (HUB-F54); solo un dueño o administrador.
 Sale: nada guardado. La lista se carga al entrar en la pestaña y cuando la sesión pasa a ser de administrador; no se refresca sola ni tiene botón de recargar.
+En este mismo documento se apoya en: HUB_SHELL-F60 (Ver en la campana lo que espera atención), HUB_SHELL-F62 (Ver en la campana los avisos entre apps que no se entregaron).
 Si falla: un fallo de lectura no es una cola vacía: sale «No se pudo consultar el sistema — No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.» con **Reintentar**, para que un error de red o de permiso no se lea como «Todo en orden» (puede ser fiscal).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F54 (ver la cola de avisos caídos)
-Pendiente de enlazar: hub — HUB_SHELL, Avisos e impresión (la fila «Eventos caídos» de la campana, que lleva aquí)
-Pendiente de enlazar: flows — FLOWS-F25 (la misma cola vista desde Automatizaciones)
-Pendiente de enlazar: invoice — INVOICE-F06 (la venta sin factura se ve aquí)
-Pendiente de enlazar: arch — REC_FISCAL-F09 (la pestaña «Eventos caídos», sus reintentos y la campana)
+Implicados: CASH_REGISTER-F14, FLOWS-F25, HUB-F54, INVOICE-F06, REC_FISCAL-F09
 QA: qa-hub-flows R8
 
 ### HUB_SHELL-F146 Reenviar un evento caído
@@ -212,13 +196,7 @@ Pasos:
 Entra: el evento elegido (solo los reenviables tienen el botón).
 Sale: el evento pendiente de nuevo, con los intentos a cero (HUB-F55); solo lo recibe la app que había fallado.
 Si falla: «No se pudo reenviar: {motivo}». El motivo sale de un código, no del texto del hub: «ese mensaje ya no está en la cola; actualiza la lista.», «a ese mensaje le faltan los datos que necesita para volver a enviarse.», «se retiró el permiso que lo generó; vuelve a concederlo y lanza la automatización.», «la app que lo generó ya no tiene permiso para hacerlo.»; sin código conocido, «no se ha podido leer el motivo».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F55 (reenviar un aviso caído)
-Pendiente de enlazar: flows — FLOWS-F25 (reenviar desde la bandeja de Automatizaciones)
-Pendiente de enlazar: invoice — INVOICE-F06 (reenviar el cobro que no llegó a facturarse)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F14 (reenviar los avisos de caja que un módulo no pudo procesar)
-Pendiente de enlazar: inventory — INVENTORY-F21 (reenviar un aviso entre módulos)
-Pendiente de enlazar: arch — REC_FISCAL-F09
+Implicados: CASH_REGISTER-F14, FLOWS-F25, HUB-F54, HUB-F55, INVENTORY-F21, INVOICE-F06, REC_FISCAL-F09
 QA: qa-hub-flows R8
 
 ### HUB_SHELL-F147 Reenviar todos los eventos caídos
@@ -231,9 +209,7 @@ Pasos:
 Entra: la sesión de administrador.
 Sale: todos los eventos caídos reenviables del hub vuelven a la cola, también los que no caben en la lista de 100 (HUB-F56); los no reenviables se quedan.
 Si falla: «No se pudo reenviar: {motivo}», con las mismas frases que F146.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F56 (reenviar todos los avisos caídos)
-Pendiente de enlazar: flows — FLOWS-F25 (reenviar todos desde Automatizaciones)
+Implicados: FLOWS-F25, HUB-F54, HUB-F56, INVOICE-F06
 QA: qa-hub-flows R8
 
 ### HUB_SHELL-F148 Descartar un evento caído
@@ -247,11 +223,7 @@ Pasos:
 Entra: el evento elegido.
 Sale: el evento cerrado, con quién y cuándo (HUB-F57); no se borra y no se vuelve a intentar. Descartar el cobro de una venta la deja sin factura para siempre. La pantalla no manda motivo, así que el campo queda vacío.
 Si falla: «No se pudo descartar: {motivo}», con las mismas frases que F146.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F57 (cerrar un aviso caído con motivo)
-Pendiente de enlazar: flows — FLOWS-F25 (cerrar con motivo desde Automatizaciones)
-Pendiente de enlazar: invoice — INVOICE-F06 (descartar el cobro deja la venta sin factura)
-Pendiente de enlazar: arch — REC_FISCAL-F09
+Implicados: FLOWS-F25, HUB-F54, HUB-F57, INVOICE-F06, REC_FISCAL-F09
 QA: qa-hub-flows R8
 
 ### HUB_SHELL-F149 Informar de un error de la pantalla sin que nadie lo pida
@@ -264,10 +236,10 @@ Pasos:
 3. Un error idéntico no se vuelve a enviar durante 30 segundos, y se recuerdan como mucho 50 distintos.
 Entra: el mensaje del error, su pila, la dirección de la pantalla, el componente; la app de la vista de un módulo no consta (siempre vacío).
 Sale: un informe al hub, que lo reenvía a erplora.com. No se guarda nada en el navegador.
+En este mismo documento se apoya en: HUB_SHELL-F198 (Informar de una respuesta mala).
 Si falla: no pasa nada visible: el envío es de mejor esfuerzo, no se reintenta y no genera otro informe.
-Implicados: pendiente
+Implicados: HUB-F278
 Pendiente de enlazar: hub — HUB, el embudo de errores del frontend (`/api/error-report`) hacia erplora.com
-Pendiente de enlazar: hub — HUB_SHELL, Asistente (el informe a mano bajo cada respuesta)
 QA: ninguno
 
 ## Cobertura contra la referencia

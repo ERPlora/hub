@@ -46,8 +46,7 @@ Pasos:
 Entra: el menú de las apps activas, con sus nombres en el idioma de la persona y la versión instalada (HUB-F31); el `module.json` y el código de la app, pedidos una sola vez por sesión.
 Sale: la pantalla de la app montada. Recibe un cliente del hub identificado como esa app (para sus permisos de host); no es una barrera: puede leer consultas de otras apps con el permiso de la persona, y cualquier componente puede pedir otra identidad (`forModule` es pública) o usar `globalThis.erplora`. Lo que protege es el permiso de cada consulta y orden en el hub. Nada guardado.
 Si falla: ver HUB_SHELL-F41. Si la persona se va de la app, la pantalla escondida suelta la app (deja de oír avisos y la dirección) y al volver la monta de nuevo: así una caja escondida no se come el `?appointment_id=` de la caja visible (hub#1797); un ir y volver rápido no deja la pantalla en el esqueleto para siempre (hub#2241).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F31 (servir el menú, las pantallas y los ficheros de las aplicaciones)
+Implicados: HUB-F31
 QA: BD-03
 
 ### HUB_SHELL-F41 Entender por qué una app no se abre
@@ -65,9 +64,7 @@ Pasos:
 Entra: el menú (HUB-F31), la lista de apps instaladas del hub y el permiso de apps del plan (HUB-F162).
 Sale: nada.
 Si falla: si la pregunta «¿está instalada?» falla, se ve el aviso de fallo (3), nunca uno inventado. Un hub que contesta 500 no se confunde con uno sin red (hub#1743). Una app de pago bloqueada no cae aquí: tiene su tarjeta (HUB_SHELL-F49).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F31 (el menú quita las pestañas que piden un permiso que la persona no tiene)
-Pendiente de enlazar: hub — HUB-F162 (qué apps puede usar el negocio)
+Implicados: HUB-F31, HUB-F162
 QA: BD-03
 
 ### HUB_SHELL-F42 Moverse entre las pestañas de una app
@@ -82,8 +79,7 @@ Pasos:
 Entra: los nombres de las pestañas, que traduce el hub (HUB-F31); el shell añade dos pestañas suyas: «Ajustes» (si la app declara ajustes) y «Plan» (si la app declara planes).
 Sale: nada.
 Si falla: si pedir los nombres en el idioma nuevo falla, se quedan los anteriores hasta el siguiente cambio (hub#2353).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F31 (nombres de las pestañas traducidos por el hub)
+Implicados: HUB-F31
 QA: ninguno
 
 ### HUB_SHELL-F43 Ver los ajustes de una app en su pestaña «Ajustes»
@@ -101,12 +97,7 @@ Pasos:
 Entra: el bloque `settings` del `module.json` (esquema, consulta de lectura y orden de guardar), el esquema servido con la app, las traducciones `settings` de su `locales/<idioma>.json` y la consulta de lectura (HUB-F33).
 Sale: nada.
 Si falla: si el esquema no carga, «No se pudieron cargar los ajustes.». Si es la lectura de valores la que falla, no se dice nada y se ven los de fábrica (leído en el código, sin ejecutar). En Caja, Cocina, Citas, Servicios, Personal y Mesas el empleado sí lee los valores reales. Sin traducción de un campo, su título del esquema (inglés) o el nombre de la columna «humanizado» (`Warning Time Minutes`). Un campo de tipo objeto o lista se pinta como texto y, si se edita, se guarda como cadena y el hub lo rechaza.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F33 (leer y guardar los ajustes de un módulo)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F01 (configurar cómo funciona la caja)
-Pendiente de enlazar: sales — SALES-F34 (ajustar el TPV)
-Pendiente de enlazar: kitchen — KITCHEN-F26 (ajustar la pantalla de cocina)
-Pendiente de enlazar: inventory — INVENTORY-F19 (ajustar el inventario)
+Implicados: CASH_REGISTER-F01, HUB-F33, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: ninguno
 
 ### HUB_SHELL-F44 Guardar los ajustes de una app
@@ -121,13 +112,7 @@ Pasos:
 Entra: todos los valores del formulario, uno por campo del esquema, en la forma que declara el esquema (un sí/no guardado como 0/1 se manda como 0/1; un número vaciado, como `null`).
 Sale: la orden de guardar de la app, que pasa por el embudo de siempre: permiso, esquema con sus valores por defecto y su comprobación (HUB-F03, HUB-F04, HUB-F33). La app avisa a quien escuche, si su orden lo hace.
 Si falla: un rechazo sin campos (permiso, una regla de la app) se queda en pantalla con su frase: la del catálogo del shell si el código la tiene; si no, el texto que dejó el SDK (la frase de plataforma, la de la app, o el del hub tal cual); solo si viene vacío, «No se pudieron guardar los ajustes.» (hub#1094). Siempre sale además el aviso flotante «No se pudieron guardar los ajustes.». Un rechazo de permiso llega como «permiso denegado: requiere `…`», con el nombre interno del permiso (leído en el código, sin ejecutar).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F33 (la pantalla solo deja guardar al administrador; el servidor acepta a quien tenga el permiso)
-Pendiente de enlazar: hub — HUB-F04 (comprobar el contenido de una orden contra su esquema y rellenar lo que falta)
-Pendiente de enlazar: sales — SALES-F34 (ajustar el TPV)
-Pendiente de enlazar: kitchen — KITCHEN-F26 (ajustar la pantalla de cocina)
-Pendiente de enlazar: inventory — INVENTORY-F19 (ajustar el inventario)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F01 (configurar cómo funciona la caja)
+Implicados: CASH_REGISTER-F01, HUB-F04, HUB-F33, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: ninguno
 
 ### HUB_SHELL-F45 Probar un ajuste antes de guardarlo
@@ -157,8 +142,7 @@ Pasos:
 Entra: los planes del `billing` del `module.json` y sus traducciones; el estado de la suscripción de esa app para este hub, pedido a erplora.com con la cuenta de la persona y el hub (`/api/v1/hub/device/module-subscription/`).
 Sale: nada.
 Si falla: ver el estado. Al volver a la ventana (o recuperar el foco) se vuelve a preguntar. Un plan que erplora.com nombra y esta versión de la app no conoce no se marca en ninguna tarjeta.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F162 (comprobar el plan y qué apps puede usar el negocio)
+Implicados: HUB-F162, HUB-F272, WHATSAPP_INBOX-F13
 Pendiente de enlazar: saas — estado de la suscripción de una app para un hub (`module-subscription`)
 QA: ninguno
 
@@ -173,9 +157,7 @@ Pasos:
 Entra: la consulta de consumo que declara la app (`billing.usage`), con el permiso de la propia app; el nombre de la métrica, traducido por la app.
 Sale: nada.
 Si falla: un fallo del hub: «No se ha podido leer tu consumo. Inténtalo dentro de un momento.». A quien no tiene permiso de leerlo no se le enseña la línea ni se le avisa de un fallo. El número lo escribe el hub una vez al día (HUB-F272): puede ir hasta un día por detrás.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F272 (reflejar en el hub el cupo y el consumo de WhatsApp del mes)
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F13 (ver el consumo del mes y llegar al tope)
+Implicados: HUB-F272, WHATSAPP_INBOX-F13
 QA: WA-03
 
 ### HUB_SHELL-F48 Ir a gestionar el plan de una app en erplora.com
@@ -189,8 +171,7 @@ Pasos:
 Entra: el hub y la app; un pase de un solo uso para entrar en erplora.com.
 Sale: nada en el hub. El hub no vende: no hay botón de comprar ni de cancelar en la app.
 Si falla: «No se pudo abrir la gestión del plan. Inténtalo de nuevo.». En la app de Google Play los dos botones no aparecen (la línea «se gestionan desde tu cuenta…» sí).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F142 (puerta compartida a erplora.com: Mi plan, Actualizar plan)
+Implicados: HUB-F142, HUB_APP-F29
 QA: ninguno
 
 ### HUB_SHELL-F49 Ver una app de pago bloqueada
@@ -205,8 +186,7 @@ Pasos:
 Entra: la lista de apps bloqueadas del plan del hub (HUB-F162), que el shell solo pide si la sesión trae cuenta de erplora.com; sin ella (PIN, o tras un relevo con PIN) el shell no bloquea nada.
 Sale: nada; los datos de la app no se tocan.
 Si falla: el hub rechaza igualmente cada lectura y orden de la app (402), aunque la pantalla no lo sepa; con sesión de PIN eso es lo que ve la persona, con la frase interna del hub «el módulo `x` no está incluido en el entitlement vigente del hub», sin traducir.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F162 (una app que ya no está en el permiso deja de responder sin perder datos)
+Implicados: HUB-F162
 QA: ninguno
 
 ### HUB_SHELL-F50 Ver una pantalla bloqueada hasta que otra app cumpla su condición
@@ -222,10 +202,7 @@ Pasos:
 Entra: el bloque `protects` de las apps activas (la consulta de ajustes, el ajuste que lo arma, la ruta que protege y la consulta de la condición), leídas con la sesión de la persona; el aviso de reanudar (`cash_register.session_opened`).
 Sale: nada. Esta es la mitad visible; la que manda es la del hub (HUB-F13), que rechaza las órdenes de la app protegida venga de donde venga.
 Si falla: con la caja cerrada desde otro dispositivo mientras el TPV ya está abierto, el TPV sigue a la vista y la orden de cobro vuelve rechazada con la frase del hub (`protects_guard`, en inglés). La pestaña «Ajustes» y «Plan» de la app protegida nunca se bloquean.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F13 (bloquear las órdenes de un módulo mientras otro no cumpla su condición)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F04 (vender solo con la caja abierta)
-Pendiente de enlazar: sales — SALES-F08 (cobrar sin la caja abierta)
+Implicados: CASH_REGISTER-F04, HUB-F13, SALES-F08
 QA: R-01, B-01, BD-04
 
 ### HUB_SHELL-F51 Aprobar con el PIN de un responsable
@@ -241,10 +218,7 @@ Pasos:
 Entra: el rechazo del hub que dice qué permiso falta (`requires_elevation`); el nombre y el PIN, o la placa; las personas del hub (`pin_users`); el nombre de la acción en el idioma de la app (`commands` de su `locales`).
 Sale: el PIN lo comprueba el hub, que da un pase de un solo uso atado a esa acción exacta; el SDK repite la orden con él una sola vez (HUB-F05, HUB-F152). Solo las órdenes piden aprobación: una consulta sin permiso es un rechazo.
 Si falla: el diálogo se queda abierto: «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.» (el mismo para nombre desconocido, PIN erróneo o persona de baja); «Esa persona no puede aprobarlo…»; «Esto no se aprueba con un PIN…»; «Esto ya no necesita aprobación…»; tras cinco intentos, la espera en minutos; cualquier otra cosa, «No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.». «Cancelar» (o cerrar) devuelve a la app el rechazo original, y lo que enseñe es cosa de la app. Si la app no sabe nombrar la acción: «Se aprueba: una acción de {app}» o «Se aprueba: una acción que esta app no sabe nombrar». La misma orden repetida (un doble toque) se une al diálogo abierto y recibe su mismo resultado; una acción distinta mientras hay uno abierto se rechaza, no se apila. Si tras aprobar el hub vuelve a pedir aprobación (pase caducado, otra copia del hub), no se abre otro diálogo: llega a la app como rechazo, con el texto en inglés «requires elevation: `…` needs approval from a manager», y hay que repetir la acción. El catálogo con los nombres de las acciones se carga una vez al entrar: una app instalada después o un cambio de idioma no se reflejan hasta recargar.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F05 (pedir la aprobación de un responsable cuando falta el permiso)
-Pendiente de enlazar: hub — HUB-F152 (aprobar una acción con el PIN de un responsable)
-Pendiente de enlazar: sales — SALES-F14 (descuento por encima del tope con el PIN del responsable)
+Implicados: HUB-F05, HUB-F152, SALES-F14
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F52 Leer en palabras de la persona por qué el hub rechazó algo
@@ -259,9 +233,7 @@ Pasos:
 Entra: el sobre de error del hub (`code`, `message`, y aparte el permiso, los campos, la app y lo que falta); el bloque `errors` de los `locales` de cada app.
 Sale: la frase que pinta la app o el shell. Nada guardado.
 Si falla: sin frase en español, la persona lee el inglés de la app o del hub; esos casos se ven en el estado. Quién lee el sobre de error y hay que revisar si cambia: ver «Qué revisar si cambia el formato de los errores» en el índice.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F14 (contestar un fallo con un código estable y sin detalles internos)
-Pendiente de enlazar: hub — HUB-F13 (el rechazo `protects_guard` no tiene frase propia)
+Implicados: HUB-F13, HUB-F14
 QA: ninguno
 
 ### HUB_SHELL-F53 Ver señalado el campo que el hub rechazó
@@ -276,8 +248,7 @@ Pasos:
 Entra: los campos que nombra el rechazo (`error.fields`, o `field` y `reason` en el núcleo), nunca sacados de la frase.
 Sale: nada.
 Si falla: un motivo sin frase en el catálogo deja la que mandó el hub.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F04 (comprobar el contenido de una orden contra su esquema)
+Implicados: HUB-F04, HUB-F14
 QA: ninguno
 
 ### HUB_SHELL-F54 Ver dentro de una pantalla las piezas que aportan otras apps
@@ -291,8 +262,7 @@ Pasos:
 Entra: el bloque `provides_slots` de cada app activa con derecho del plan.
 Sale: nada.
 Si falla: una app cuya pieza no carga se omite y las demás siguen; sin ninguna, el hueco queda vacío.
-Implicados: pendiente
-Pendiente de enlazar: sales — SALES-F01 (el TPV monta las piezas de mesa y cliente)
+Implicados: SALES-F01
 QA: ninguno
 
 ### HUB_SHELL-F55 [retirado] Vender a pantalla completa

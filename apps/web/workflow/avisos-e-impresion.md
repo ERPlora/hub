@@ -56,10 +56,7 @@ Pasos:
 Entra: cuatro fuentes que el shell consulta por su cuenta: el número de eventos caídos (cada 60 s, HUB-F59), las funciones de impresión sin atender (cada 30 s, HUB-F201), los contadores que declaran las apps (cada 30 s) y las actualizaciones de apps (cada varias horas, HUB-F24).
 Sale: nada guardado.
 Si falla: una consulta que no llega deja el número que había (un hub caído no se lee como «todo al día»); en eventos caídos, una respuesta de rechazo pone 0. Con la pestaña del navegador escondida solo siguen los contadores de las apps. Al cambiar de persona con el PIN se recalculan al momento los contadores de las apps y las actualizaciones; «Eventos caídos» e impresión esperan a su siguiente vuelta (un empleado que releva a un administrador puede ver «Eventos caídos» hasta 60 s). Las filas «Eventos caídos» y «Nadie está imprimiendo» navegan sin cerrar la lista (sin confirmar en pantalla si se queda abierta encima).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F59 (contar los avisos caídos para la campana)
-Pendiente de enlazar: hub — HUB-F201 (trabajo en cola y nadie conectado para sacarlo)
-Pendiente de enlazar: hub — HUB-F24 (consultar qué actualizaciones y versiones hay)
+Implicados: HUB-F24, HUB-F59, HUB-F201
 QA: ninguno
 
 ### HUB_SHELL-F61 Atender desde la campana lo que pone una app
@@ -75,11 +72,7 @@ Pasos:
 Entra: el bloque `bell` del `module.json` de cada app activa (una consulta de la propia app que devuelve `count`, su permiso y su pestaña); la consulta se hace con la sesión de quien mira.
 Sale: nada.
 Si falla: un contador cuyo permiso no tiene la persona no aparece. Un contador que pida una consulta de otra app se ignora. Si la consulta falla, queda el último número conocido.
-Implicados: pendiente
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F09 (ver quién espera respuesta)
-Pendiente de enlazar: architecture — REC_WA_CITA-F09 (cuando la respuesta automática no puede contestar, la campana lo cuenta)
-Pendiente de enlazar: architecture — REC_WA_MESA-F09 (cuando la respuesta automática no puede contestar, la campana lo cuenta)
-Pendiente de enlazar: appointments — el contador «citas por confirmar» de la campana
+Implicados: APPOINTMENTS-F03, APPOINTMENTS-F18, REC_WA_CITA-F09, REC_WA_MESA-F09, WHATSAPP_INBOX-F09
 QA: ninguno
 
 ### HUB_SHELL-F62 Ver en la campana los avisos entre apps que no se entregaron
@@ -94,10 +87,7 @@ Pasos:
 Entra: el número de caídos (HUB-F59), pedido solo con la sesión de un administrador.
 Sale: nada.
 Si falla: un empleado o un responsable no ve la fila. Un fallo al preguntar deja el número anterior.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F59 (contar los avisos caídos para la campana)
-Pendiente de enlazar: invoice — INVOICE-F06 (una venta cobrada que no se ha podido facturar)
-Pendiente de enlazar: architecture — REC_FISCAL-F09 (la pestaña «Eventos caídos» de Sistema y la campana)
+Implicados: HUB-F59, INVOICE-F06, REC_FISCAL-F09
 QA: BD-09
 
 ### HUB_SHELL-F63 Ver en la campana que nadie está imprimiendo una función
@@ -112,9 +102,7 @@ Pasos:
 Entra: las funciones sin atender, ya decididas por el hub (`GET /api/print/undrained`, HUB-F201): cuántos esperan y desde cuándo.
 Sale: nada.
 Si falla: solo ve lo que pasó por la cola del hub. Un tique impreso directo que no salió (impresora apagada) no llega nunca aquí (hub#2494). Un dispositivo cuenta como vivo, y la fila no sale, aunque no saque nada: si dejó de tener esa función en la app pero sigue dado de alta; si su canal de impresión se paró para siempre por un rechazo (sesión caducada al reconectar, retirada, saludo tardío) mientras su alta sigue latiendo; o si un trabajo le falló y nadie lo vuelve a pedir (HUB_SHELL-F74). Los trabajos se apilan hasta reiniciar la app de ese dispositivo.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F201 (trabajo en cola y nadie conectado para sacarlo)
-Pendiente de enlazar: hub — HUB-F202 (saber qué funciones tienen quién las imprima)
+Implicados: HUB-F201, HUB-F202
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB_SHELL-F64 Recibir un aviso del sistema cuando sube un contador de la campana
@@ -129,8 +117,7 @@ Pasos:
 Entra: la subida de un contador respecto a la vuelta anterior de la misma sesión.
 Sale: la notificación del dispositivo.
 Si falla: lo que ya esperaba al entrar no avisa (es lo pendiente, no algo nuevo). Las citas no avisan por aquí: tienen su aviso propio (HUB_SHELL-F66). En el navegador no hay aviso del sistema. Con los avisos denegados no se intenta.
-Implicados: pendiente
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F09 (ver quién espera respuesta)
+Implicados: HUB_APP-F24, HUB_APP-F25, REC_WA_CITA-F09, REC_WA_MESA-F09, WHATSAPP_INBOX-F09
 QA: ninguno
 
 ### HUB_SHELL-F65 Recibir el aviso del sistema «Nueva comanda»
@@ -146,10 +133,7 @@ Pasos:
 Entra: el aviso en vivo de comanda creada (`kitchen.order.created`, HUB-F60) y la cabecera y las líneas de la comanda, leídas a Cocina.
 Sale: la notificación del dispositivo, antes de imprimir nada.
 Si falla: un fallo del aviso no frena la impresión. Si la pantalla estaba desconectada del canal en vivo cuando nació la comanda, no hay aviso (el canal no guarda nada). En el navegador no hay aviso del sistema.
-Implicados: pendiente
-Pendiente de enlazar: kitchen — KITCHEN-F05 (recibir la ronda que envía el TPV)
-Pendiente de enlazar: hub — HUB-F60 (avisar a las pantallas en vivo)
-Pendiente de enlazar: hub — HUB_APP, aviso del sistema de la app instalada al llegar una comanda o una cita
+Implicados: HUB-F60, HUB_APP-F24, KITCHEN-F05
 QA: qa-hub-restaurant §08
 
 ### HUB_SHELL-F66 Recibir el aviso del sistema de una cita nueva o cancelada
@@ -164,8 +148,7 @@ Pasos:
 Entra: los avisos en vivo de cita creada o cancelada y la ficha de la cita, leída a Citas.
 Sale: la notificación del dispositivo.
 Si falla: una cita dada desde una caja no avisa (quien la dio ya lo sabe). Si la ficha no se puede leer, se usa lo que traía el aviso.
-Implicados: pendiente
-Pendiente de enlazar: appointments — avisos de cita creada y cancelada
+Implicados: APPOINTMENTS-F06, APPOINTMENTS-F18, HUB-F60, HUB_APP-F24
 QA: B-02
 
 ### HUB_SHELL-F67 Tocar un aviso del sistema y abrir su pantalla
@@ -179,8 +162,7 @@ Pasos:
 Entra: el número del aviso, y la pantalla que se le dio al mandarlo.
 Sale: nada.
 Si falla: solo se sigue una dirección que es una pantalla del hub; cualquier otra cosa deja la app donde estaba. La app recuerda los 50 últimos avisos. Un mismo toque no abre dos veces.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_APP, guardar el toque de un aviso hasta que la página lo recoja
+Implicados: HUB_APP-F25, KITCHEN-F05
 QA: ninguno
 
 ### HUB_SHELL-F68 Permitir los avisos del sistema en el dispositivo
@@ -195,8 +177,7 @@ Pasos:
 Entra: qué apps están activas y cuáles ponen contador en la campana; el estado del permiso en Android.
 Sale: el permiso del dispositivo; la marca de «ya preguntado» guardada en el dispositivo.
 Si falla: con el permiso denegado no se manda ningún aviso (mandarlo haría saltar la pregunta pelada de Android en mitad del servicio). En el ordenador, en el navegador y en Android anterior a 13 no hay nada que pedir: no sale ni la hoja ni la fila.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_APP, permiso de notificaciones de la app instalada
+Implicados: HUB_APP-F07, HUB_APP-F08
 QA: qa-hub-android §Fase 2
 
 ### HUB_SHELL-F69 Seguir recibiendo avisos con la pantalla apagada
@@ -210,8 +191,7 @@ Pasos:
 Entra: la sesión, el permiso y las apps activas.
 Sale: el servicio de escucha de Android encendido o apagado.
 Si falla: si no se puede encender, se anota y los avisos solo llegan con la app delante. Fuera de Android no hace nada.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_APP, mantener la app escuchando durante el turno (servicio en primer plano)
+Implicados: HUB_APP-F26
 QA: ninguno
 
 ### HUB_SHELL-F70 Imprimir el tique al cobrar, solo en el dispositivo que cobró
@@ -229,13 +209,7 @@ Pasos:
 Entra: el aviso en vivo «venta cobrada» con la pantalla que la mandó (`sale.completed`, HUB-F60); los ajustes de Impresión; el papel que compone Ventas (`erp-sales-document`).
 Sale: el papel, o un trabajo en la cola del hub con clave `sale-<id>` (HUB-F190).
 Si falla: la venta nunca se cae. En la caja sale: «El tique está en espera: aún no hay ninguna impresora dada de alta. Da una de alta y saldrá solo.» (en cola sin nadie); «El tique NO se imprimió. Vuelve a imprimirlo desde la pantalla del tique.» (no hay impresora ni cola); «El tique no se pudo preparar y NO se imprimió. Imprímelo desde la pantalla del tique.». Por el directo con la impresora de red apagada no sale nada en pantalla y el hub no tiene fila; por la cola, el dispositivo confirma «salió» y el hub lo marca hecho (leído en el código, sin ejecutar). Una venta hecha por la API o un flujo no la imprime ninguna caja. Sin Impresión instalada, o si la persona no puede leer sus ajustes (un rol personalizado sin `printing.view_settings`), no se imprime ni se avisa. Con más de 16 pantallas conectadas al canal en vivo, la 17.ª no oye la venta. Si el tique fue por la cola y el dispositivo que la saca tiene el canal parado o le falló, se queda esperando sin aviso en la caja ni fila en la campana (HUB_SHELL-F74).
-Implicados: pendiente
-Pendiente de enlazar: sales — SALES-F01 (el shell imprime el tique al oír la venta, solo en el dispositivo que cobró)
-Pendiente de enlazar: printing — PRINTING-F07 (imprimir el tique al cobrar)
-Pendiente de enlazar: architecture — REC_FISCAL-F07 (impresión automática del tique al cobrar)
-Pendiente de enlazar: hub — HUB-F190 (pedir imprimir un documento desde una pantalla)
-Pendiente de enlazar: hub — HUB-F199 (el hub da por hecho lo que el dispositivo confirma)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F06 (sacar un documento por una impresora de red)
+Implicados: HUB-F60, HUB-F190, HUB-F199, HUB_PERIPHERALS-F06, PRINTING-F07, REC_FISCAL-F07, SALES-F01
 QA: R-09, L-04, qa-hub §8 (discrepa)
 
 ### HUB_SHELL-F71 Abrir el cajón al cobrar
@@ -250,11 +224,7 @@ Pasos:
 Entra: el ajuste de Impresión; la impresora «Recibo» de red o Bluetooth del dispositivo.
 Sale: el pulso; nada guardado ni en cola: el cajón está aquí o no está.
 Si falla: sin impresora «Recibo» alcanzable, en el navegador, con una USB o con la impresora sin contestar, el cajón no se abre y no sale ningún aviso (`print-on-sale.ts:194-195`, leído en el código, sin ejecutar).
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F13 (abrir el cajón al cobrar)
-Pendiente de enlazar: sales — SALES-F01 (el shell abre el cajón al oír la venta)
-Pendiente de enlazar: hub — HUB-F207 (abrir el cajón por la impresora, lo que sabe el servidor)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F15 (abrir el cajón)
+Implicados: HUB-F207, HUB_PERIPHERALS-F15, PRINTING-F13, SALES-F01
 QA: R-09, qa-hub §8
 
 ### HUB_SHELL-F72 Imprimir la comanda al disparar la ronda, solo en el TPV que la envió
@@ -271,11 +241,7 @@ Pasos:
 Entra: el aviso de comanda creada con la pantalla que la mandó; las líneas y la cabecera (de Cocina); el nombre de quien la disparó, leído a la lista de personas del hub y, si no está, al equipo de Personal.
 Sale: una hoja por función, clave `kitchen-<pedido>-<función>`.
 Si falla: nunca bloquea a la camarera. Una comanda sin caja que la disparó, con todas las pantallas cerradas o desconectadas (un pedido online de madrugada), no la encola nadie: ni papel ni aviso; y si la cola no tiene quien la saque, cada pantalla abierta saca el aviso de espera. Avisos: «No se imprimió la comanda de {estación} de {mesa}. Revisa la impresora y avisa en {estación}: la comanda está en la pantalla de cocina.»; «La comanda de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Da una de alta y saldrá sola.». Nunca se desvía a la impresora de tiques. Sin nombre que poner (la persona ya no está, no se pudo leer), la línea de camarero no sale.
-Implicados: pendiente
-Pendiente de enlazar: kitchen — KITCHEN-F08 (la comanda sale en papel en cada estación)
-Pendiente de enlazar: printing — PRINTING-F10 (imprimir la comanda en cocina y barra)
-Pendiente de enlazar: staff — STAFF-F09 (dar el equipo a otros módulos: el nombre de quien atiende)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F10 (sacar la comanda de cocina o barra)
+Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN-F08, PRINTING-F10, STAFF-F09
 QA: qa-hub-restaurant §08, BD-08
 
 ### HUB_SHELL-F73 Dar de alta este dispositivo como el que imprime
@@ -291,11 +257,7 @@ Pasos:
 Entra: las impresoras y funciones del dispositivo (HUB_PERIPHERALS-F04); el identificador del dispositivo y la sesión.
 Sale: el alta en el hub por función (HUB-F196) y su latido (HUB-F197).
 Si falla: en un navegador (sin identificador de dispositivo o sin hardware) no se da de alta nada. Un rechazo del hub solo se anota en la consola. Sin sesión, espera a que alguien entre.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F196 (dar de alta un dispositivo como el que imprime una función)
-Pendiente de enlazar: hub — HUB-F197 (mantener vivo o retirar un dispositivo de impresión)
-Pendiente de enlazar: printing — PRINTING-F04 (mapa documento → función y registro de los dispositivos que imprimen)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F04 (recordar cada impresora y su función)
+Implicados: HUB-F196, HUB-F197, HUB_APP-F18, HUB_PERIPHERALS-F04, PRINTING-F04
 QA: qa-hub §8, qa-hub-android §Fase 2
 
 ### HUB_SHELL-F74 Sacar los trabajos de la cola y confirmar que salieron
@@ -311,11 +273,7 @@ Pasos:
 Entra: los trabajos de la cola, con el documento ya compuesto (HUB-F198, HUB-F199).
 Sale: «salió» o «falló» con el motivo por cada trabajo.
 Si falla: si el dispositivo no puede imprimirlo (ya no tiene impresora con esa función, «no printer on this device holds the … role»; una Bluetooth que no contesta), contesta «falló» y deja de pedir esa función. El trabajo vuelve a la cola, pero el hub no despierta a nadie: nadie lo vuelve a pedir hasta que llega otro de esa función o el dispositivo se reconecta; a los 5 intentos muere. Mientras, el dispositivo late y cuenta como vivo, y la campana calla. Si el hub le dice que no imprime nada aquí, que la sesión no vale o que saludó tarde, el canal se para para siempre (no reintenta en bucle) y solo lo anota en la consola, pero el alta sigue latiendo por su lado (HUB_SHELL-F73).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F198 (conectar el dispositivo a la cola en vivo)
-Pendiente de enlazar: hub — HUB-F199 (sacar un trabajo de la cola y confirmar que salió el papel)
-Pendiente de enlazar: hub — HUB-F200 (un trabajo que no sale acaba muerto)
-Pendiente de enlazar: printing — PRINTING-F14 (sacar del atasco un trabajo de impresión)
+Implicados: HUB-F198, HUB-F199, HUB-F200, HUB_APP-F18, HUB_PERIPHERALS-F06, PRINTING-F14
 QA: qa-hub-restaurant §16
 
 ### HUB_SHELL-F75 Ver quién imprime cada función
@@ -331,10 +289,7 @@ Pasos:
 Entra: los dispositivos dados de alta y la cobertura por función (`GET /api/print/hosts`, HUB-F202).
 Sale: nada.
 Si falla: «No se ha podido comprobar quién está imprimiendo ahora mismo.» (nunca una pantalla verde vacía ni filas inventadas). Un negocio que nunca imprimió no ve la tarjeta. Una función que no está en el catálogo sale con su clave. Un tique impreso directo nunca aparece aquí.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F202 (saber qué funciones tienen quién las imprima)
-Pendiente de enlazar: printing — PRINTING-F01 (ver cómo va la impresión)
-Pendiente de enlazar: cash_register — CASH_REGISTER-F08 (revisar lo que queda pendiente antes de cerrar)
+Implicados: HUB-F201, HUB-F202, PRINTING-F01
 QA: qa-hub §8
 
 ### HUB_SHELL-F76 Saber qué sale en el papel del tique y dónde se cambia
@@ -350,10 +305,7 @@ Pasos:
 Entra: el papel de Ventas (`printableDocument`); los decimales de la moneda del hub.
 Sale: nada.
 Si falla: el primer papel de una venta sale como original y los siguientes del mismo dispositivo como «DUPLICADO».
-Implicados: pendiente
-Pendiente de enlazar: printing — PRINTING-F08 (lo que va en el papel y reimprimir)
-Pendiente de enlazar: sales — SALES-F34 (cabecera y pie del tique en los ajustes del TPV)
-Pendiente de enlazar: hub — HUB_PERIPHERALS-F09 (sacar el tique o la factura: la hora es la de imprimir)
+Implicados: HUB_PERIPHERALS-F09, PRINTING-F07, SALES-F29, SALES-F34
 QA: L-04
 
 ### HUB_SHELL-F77 Imprimir un documento desde una pantalla
@@ -369,14 +321,7 @@ Pasos:
 Entra: la petición de la app (función, tipo de documento, documento, papel), por la puerta única del shell (`erplora.print`): ninguna app abre el hardware ni el diálogo del navegador por su cuenta.
 Sale: el papel, un trabajo en la cola (HUB-F190) o el diálogo de impresión.
 Si falla: dentro de la app instalada no hay respaldo de navegador: si no hay impresora ni cola, la respuesta es «no salió» y la app avisa. Un documento sin contenido estructurado no se encola (saldría en blanco). Con la impresora de red apagada vale lo de HUB_SHELL-F70.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F190 (pedir imprimir un documento desde una pantalla o un dispositivo)
-Pendiente de enlazar: printing — PRINTING-F09 (imprimir la cuenta de la mesa)
-Pendiente de enlazar: kitchen — KITCHEN-F14 (el aviso de urgencia sale por la puerta de impresión, a la función de cada estación)
-Pendiente de enlazar: kitchen — KITCHEN-F17 (el pase sale por la puerta de impresión)
-Pendiente de enlazar: kitchen — KITCHEN-F20 (el aviso de urgencia desde el TPV sale por la puerta de impresión)
-Pendiente de enlazar: inventory — INVENTORY-F25 (la etiqueta del código de barras, por la puerta y la cola con su clave)
-Pendiente de enlazar: hub — HUB_APP, diálogo de impresión nativo del sistema para A4
+Implicados: HUB-F190, HUB_APP-F22, HUB_PERIPHERALS-F06, INVENTORY-F25, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F09
 QA: qa-hub §8
 
 ## Cobertura contra la referencia

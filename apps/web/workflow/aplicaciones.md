@@ -42,8 +42,7 @@ Pasos:
 Entra: la lista de apps instaladas según el hub (no según el catálogo de erplora.com); cuál ofrece hoy el catálogo para cada una (HUB_SHELL-F116).
 Sale: nada guardado. La lista se recarga sola al instalar, activar, desactivar o desinstalar desde otra pestaña u otro dispositivo y al cambiar de idioma; el catálogo, además, al volver a la ventana.
 Si falla: sin respuesta, «No hemos podido leer tus apps. No ha habido respuesta, o esta sesión ya no es válida — vuelve a entrar si sigue pasando.» con «Reintentar»; la lista que ya había se conserva (un fallo nunca se lee como «no tienes apps»). Con una lista que de verdad vuelve vacía: «Aún no tienes apps. Abre «Añadir apps» para instalar la primera.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F31 (servir el menú, las pantallas y los ficheros de las aplicaciones, de donde sale la lista de apps)
+Implicados: HUB-F31
 QA: BD-03
 
 ### HUB_SHELL-F106 Abrir una app desde Apps
@@ -104,9 +103,7 @@ Pasos:
 Entra: la app y la versión elegidas; los permisos que declara (del hub si ya la conoce, y si no del catálogo). No se confirma el precio ni qué otras apps entrarán: solo la versión (si hay varias) y los permisos de la app pedida.
 Sale: pide al servidor la instalación (HUB-F19) y concede los permisos aceptados (HUB-F32); sigue las fases por el canal en vivo. Una instalación empezada desde otro dispositivo se ve igual en esta pantalla, y el aviso «{name} instalado.» sale en todos los dispositivos que tengan Apps abierta. Las apps instaladas de paso no pasan por la pregunta de permisos ni los reciben: una dependencia con permisos de host queda con todo denegado y ningún aviso lo dice (el de HUB_SHELL-F115 es solo de la app pedida). Si se sale de Apps mientras instala, el aviso y su resultado pasan a un aviso global y no se pierden.
 Si falla: HUB_SHELL-F110 a F115 según la causa. Si no es administrador: «Puedes ver las apps, pero solo un administrador puede instalarlas, activarlas o desinstalarlas.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo)
-Pendiente de enlazar: hub — HUB-F32 (conceder o retirar un permiso de host a una aplicación)
+Implicados: HUB-F19, HUB-F32
 Pendiente de enlazar: saas — marketplace: el plan de instalación, las versiones y la descarga
 QA: BD-03
 
@@ -122,8 +119,7 @@ Pasos:
 Entra: la lista de apps que el hub instaló de paso.
 Sale: nada guardado en la pantalla. Es el reverso del aviso de desinstalar, que nombra lo que dejaría de funcionar (HUB_SHELL-F124). Una app sin dependencias nuevas recibe el aviso simple, sin «También se instaló».
 Si falla: si no se puede instalar una dependencia, no se instala nada y sale el motivo (HUB_SHELL-F112).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo: el plan de instalación con sus dependencias)
+Implicados: HUB-F19
 QA: BD-03
 
 ### HUB_SHELL-F111 Intentar instalar una app que necesita suscripción
@@ -138,8 +134,7 @@ Pasos:
 Entra: qué apps tiene permitidas el negocio, que manda erplora.com (si aún no se ha podido saber, se deja intentar y el hub decide).
 Sale: nada guardado ni cobrado. La pantalla nunca lleva a una página de pago desde dentro (las tiendas de Google y Microsoft lo rechazan).
 Si falla: sin conexión con erplora.com no se puede saber si hay suscripción: se deja pasar y el hub la comprueba al instalar.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo: dependencia de pago sin contratar)
+Implicados: HUB-F19
 Pendiente de enlazar: saas — suscripción de las apps de pago
 QA: BD-03
 
@@ -155,8 +150,7 @@ Pasos:
 Entra: el rechazo del hub con su código.
 Sale: nada guardado; el hub deja la instalación como estaba. Sin frase para ese código, sale la frase que mandó el hub tal cual; sin ninguna, «No se pudo iniciar la instalación de {name}.».
 Si falla: si el reintento vuelve a fallar, vuelve a salir el aviso con su motivo; al cerrar, la fila queda como «Disponible».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo: los motivos de rechazo)
+Implicados: HUB-F19
 QA: BD-03
 
 ### HUB_SHELL-F113 Seguir una instalación mientras se navega
@@ -170,8 +164,7 @@ Pasos:
 Entra: los avisos de progreso por fases que manda el hub por el canal en vivo.
 Sale: nada guardado. La retención de consultas y órdenes durante la instalación es del servidor (HUB-F19): la pantalla de Apps no la nombra y quien cobra en otro dispositivo solo nota que sus pantallas tardan; la barra de espera de arriba solo se ve en el dispositivo que instala.
 Si falla: si el canal en vivo se cae, la fila se queda en «Instalando…» hasta que la orden contesta o se recarga la pantalla. Si la instalación falla después de salir de Apps y volver, el resultado sale en el aviso global pero la fila de la pantalla nueva sigue en «Instalando…», porque solo la limpia el aviso de instalada (leído en el código, sin ejecutar). La orden de instalar no tiene tiempo máximo en el cliente.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F19 (instalar una aplicación del catálogo: el hub retiene todas las órdenes mientras dura)
+Implicados: HUB-F19
 QA: ninguno
 
 ### HUB_SHELL-F114 Ver que una app necesita un hub más nuevo
@@ -185,8 +178,7 @@ Pasos:
 Entra: el mínimo que declara la app y la versión del hub.
 Sale: nada guardado.
 Si falla: sin la versión del hub, la comprobación se salta y se avisa en la consola del navegador, no a la persona.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F20 (rechazar un paquete que rompe las reglas del hub: `core_version_too_old`)
+Implicados: HUB-F20
 QA: ninguno
 
 ### HUB_SHELL-F115 Saber que una app se instaló sin sus permisos
@@ -199,10 +191,9 @@ Pasos:
 3. El botón lleva a **Ajustes › Permisos**, donde se enciende cada permiso de la app.
 Entra: el fallo al conceder, que no deshace la instalación.
 Sale: la app instalada y sin permisos; nada más.
+En este mismo documento se apoya en: HUB_SHELL-F167 (Conceder un permiso a una app).
 Si falla: el aviso es el propio fallo; si el permiso tampoco se puede conceder desde Ajustes › Permisos, sale el motivo de esa pantalla.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F32 (conceder o retirar un permiso de host a una aplicación)
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos (la pantalla donde se conceden los permisos de cada app)
+Implicados: HUB-F19, HUB-F32
 QA: ninguno
 
 ### HUB_SHELL-F116 Actualizar una app
@@ -218,9 +209,7 @@ Pasos:
 Entra: la versión nueva que ofrece el catálogo; si soporte ha fijado una versión, esa manda.
 Sale: pide al servidor la actualización (HUB-F23). Si falla, el hub deja la versión que había y funcionando.
 Si falla: «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F23 (actualizar una aplicación)
-Pendiente de enlazar: hub — HUB-F24 (consultar qué actualizaciones y versiones hay)
+Implicados: HUB-F23, HUB-F24
 QA: BD-03
 
 ### HUB_SHELL-F117 Actualizar todas las apps de una vez
@@ -236,8 +225,7 @@ Pasos:
 Entra: las apps con versión nueva que el hub marca (las que necesitan un hub más nuevo no entran, HUB_SHELL-F118).
 Sale: usa la misma actualización que el botón de cada fila (HUB-F23), así que un fallo de una no frena a las demás. Mientras corre, el botón de cada fila queda apagado.
 Si falla: cada fallo sale en su línea con la misma frase que daría «Actualizar» en su fila, incluida la de las apps de pago sin contratar.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F23 (actualizar una aplicación)
+Implicados: HUB-F23
 QA: BD-03
 
 ### HUB_SHELL-F118 Ver que una actualización necesita un hub más nuevo
@@ -252,8 +240,7 @@ Pasos:
 Entra: el mínimo de la versión nueva que ofrece el catálogo y la versión del hub.
 Sale: nada guardado.
 Si falla: sin la versión del hub o sin mínimo declarado, la fila ofrece «Actualizar» como siempre.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F24 (consultar qué actualizaciones y versiones hay: si hace falta un hub más nuevo)
+Implicados: HUB-F24
 QA: ninguno
 
 ### HUB_SHELL-F119 Enterarse de que hay versiones nuevas
@@ -268,8 +255,7 @@ Pasos:
 Entra: la respuesta del hub, app por app.
 Sale: solo el contador de la campana; no se guarda nada. Una comprobación que falla no borra el número anterior ni lo pone a cero.
 Si falla: lo dicho en el paso 4; quien no administra no ve este aviso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F24 (consultar qué actualizaciones y versiones hay)
+Implicados: HUB-F24
 QA: ninguno
 
 ### HUB_SHELL-F120 Volver a comprobar las actualizaciones cuando falla la comprobación
@@ -283,8 +269,7 @@ Pasos:
 Entra: la respuesta del hub (cada app lleva «he podido comprobarlo» sí o no).
 Sale: nada guardado. «No lo sé» nunca se pinta como «al día». Si una app sí se pudo comprobar y tiene versión nueva, se sigue ofreciendo aunque el aviso siga.
 Si falla: el aviso no sale en el catálogo ni a quien no administra.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F24 (consultar qué actualizaciones y versiones hay: sin credencial o sin ERPlora sale «no lo sé»)
+Implicados: HUB-F24
 QA: ninguno
 
 ### HUB_SHELL-F121 Ver qué apps ya no se ofrecen
@@ -314,9 +299,7 @@ Pasos:
 Entra: las dependencias que declaran las apps instaladas.
 Sale: pide al servidor apagarla (HUB-F28). Los datos no se tocan. Cada pestaña y dispositivo del hub recibe el cambio y se refresca.
 Si falla: «No se pudo cambiar el estado de {name}.» o la frase del motor que se niega (HUB_SHELL-F125).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F28 (desactivar una aplicación preguntando antes si puede irse)
-Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar con registros sin enviar)
+Implicados: HUB-F28, VERIFACTU-F32
 QA: L-14
 
 ### HUB_SHELL-F123 Activar una app
@@ -330,8 +313,7 @@ Pasos:
 Entra: las dependencias declaradas.
 Sale: pide al servidor encenderla (HUB-F27).
 Si falla: «No se pudo cambiar el estado de {name}.» o la frase del hub; la pantalla solo recarga la lista si todo va bien, así que ese error no muestra la app ya activa.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F27 (activar una aplicación)
+Implicados: HUB-F27
 QA: ninguno
 
 ### HUB_SHELL-F124 Desinstalar una app
@@ -346,9 +328,7 @@ Pasos:
 Entra: las apps instaladas y sus dependencias, para nombrar lo que se rompe.
 Sale: pide al servidor desinstalar (HUB-F29), forzando solo si la pregunta ya nombró dependientes (los nombres de esa lista son identificadores). Las dependientes quedan «Activo» en Mis apps y fallan en el siguiente arranque con una dependencia que falta. Los datos y archivos se quedan en la base y en Archivos.
 Si falla: «No se pudo desinstalar {name}.»; si la lista con la que se preguntó se había quedado vieja y el hub encuentra dependientes: «{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.» (con los identificadores que mandó el hub y la lista recargada); o la negativa de un motor (HUB_SHELL-F125).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F29 (desinstalar una aplicación)
-Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar con registros sin enviar)
+Implicados: HUB-F29, VERIFACTU-F32
 QA: L-14
 
 ### HUB_SHELL-F125 Ver que una app se niega a desactivarse o desinstalarse
@@ -363,10 +343,7 @@ Pasos:
 Entra: el rechazo del hub con el código del motor y la frase que mandó.
 Sale: nada guardado. La pantalla solo conoce códigos genéricos de plataforma; la frase de un motor la pinta tal cual, porque el hub dice más que cualquier genérico.
 Si falla: sin frase del hub, «No se pudo cambiar el estado de {name}.» o «No se pudo desinstalar {name}.».
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB-F28 (desactivar una aplicación preguntando antes si puede irse)
-Pendiente de enlazar: hub — HUB-F29 (desinstalar una aplicación)
-Pendiente de enlazar: verifactu — VERIFACTU-F32 (impedir apagar o desinstalar con registros sin enviar)
+Implicados: HUB-F28, HUB-F29, VERIFACTU-F32
 QA: L-14
 
 

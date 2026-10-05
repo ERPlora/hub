@@ -27,9 +27,7 @@ Pasos:
 Entra: la carpeta o la ruta; sesión de usuario de cualquier perfil. Una llave de API no entra.
 Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero: la política de carpetas de HUB-F246 solo regula escribir. El alcance es el negocio propio.
 Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Archivos
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F06, adjuntos recibidos (aquí solo dónde se guardan)
+Implicados: HUB_SHELL-F130, HUB_SHELL-F132, WHATSAPP_INBOX-F06
 QA: ninguno
 
 ### HUB-F246 Subir, organizar y borrar archivos
@@ -42,8 +40,7 @@ Pasos:
 Entra: ruta y acción, con sesión de propietario o administrador.
 Sale: la carpeta decide: `_logs` y `_system` y la raíz `modules` son solo lectura; bajo `modules/<carpeta>/` manda lo que la app declara en `static_files.user_actions` (sin declarar, solo lectura); cualquier otra carpeta, gestión completa. Renombrar solo cambia el nombre (no admite rutas). Mover exige poder borrar el origen y subir al destino, y no deja meter una carpeta en sí misma. Crear carpeta cuenta como subir. Todo se hace en el almacenamiento de erplora.com, que valida las rutas.
 Si falla: 403 `media.read_only_folder`, 400 `media.invalid_name`, `media.same_path`, `media.move_into_itself`; 424 con la nube.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Archivos
+Implicados: HUB_SHELL-F131, HUB_SHELL-F133, HUB_SHELL-F134
 QA: ninguno
 
 ### HUB-F247 Guardar ficheros desde una app
@@ -57,8 +54,7 @@ Pasos:
 Entra: carpeta (minúsculas, dígitos, `_`, `-`, hasta 64) y ruta relativa sin `..`, sin `/` inicial, sin `\`.
 Sale: el fichero queda en `modules/<carpeta>/<ruta>` y el hub devuelve esa ruta; en producción por el almacenamiento de erplora.com, en desarrollo en disco, con la misma ruta lógica. Una app solo escribe en su carpeta; la persona la ve en Archivos según HUB-F246.
 Si falla: carpeta o ruta inválida, error de almacenamiento antes de tocar la red; sin credencial de máquina, la instalación de una app con `static_files` falla.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — la copia de cada XML en el almacenamiento de ficheros del módulo
+Implicados: VERIFACTU-F15
 QA: ninguno
 
 ### HUB-F248 Borrar los datos de una persona: el aviso único
@@ -117,7 +113,7 @@ Implicados: WHATSAPP_INBOX-F10
 QA: L-11, WA-06 (discrepa)
 
 ### HUB-F252 Borrar los datos de una persona del equipo
-Estado: no hecho — el hub solo desactiva a una persona (cierra sus sesiones); nombre, correo, PIN cifrado, perfil y preferencias se quedan, y no hay vaciado en el historial
+Estado: no hecho — el hub solo desactiva a una persona (cierra sus sesiones); nombre, correo, la huella de su PIN, perfil y preferencias se quedan, y no hay vaciado en el historial
 Actor: administrador
 Pantalla: ninguna
 Pasos:
@@ -125,9 +121,9 @@ Pasos:
 2. El hub la marca inactiva y cierra sus sesiones.
 Entra: la persona.
 Sale: nada se borra ni se seudonimiza. La atribución («quién autorizó qué») conserva el identificador cuatro años y el lector resuelve el nombre.
+En este mismo documento se apoya en: HUB-F149 (Dar de baja y reincorporar a una persona).
 Si falla: no aplica.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, acceso (dar de baja a una persona)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F253 Purgar el historial por retención
@@ -140,9 +136,9 @@ Pasos:
 3. Registra cuántas filas borró.
 Entra: el reloj y el historial de avisos y ejecuciones.
 Sale: se borran, a 90 días desde su fin: avisos entregados o descartados (con sus marcadores de entrega), ejecuciones hechas, fallidas o canceladas con sus pasos, propuestas y esperas. Los recibos de autorización de un responsable duran cuatro años (1461 días) y contienen la huella del contenido, no el contenido. No se purgan nunca los avisos pendientes o atascados, ni las ejecuciones vivas. Es dura (`DELETE`), en lotes de 500 y hasta 20 pasadas por vuelta. Los 90 días son fijos. El historial de actualizaciones solo enseña 90 días y los dispositivos sin uso se limpian a mano a los 30 días (Acceso). Nada purga la cola de impresión, que guarda el HTML de cada documento hasta restablecer el hub.
+En este mismo documento se apoya en: HUB-F54 (Ver la cola de avisos caídos), HUB-F55 (Reenviar un aviso caído), HUB-F56 (Reenviar todos los avisos caídos), HUB-F57 (Cerrar un aviso caído con motivo).
 Si falla: se registra el aviso y la vuelta siguiente continúa.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, avisos entre módulos (avisos atascados y su reintento)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F254 Registrar la actividad del negocio para el SaaS

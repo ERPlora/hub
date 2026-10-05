@@ -43,8 +43,7 @@ Pasos:
 Entra: una sesión de usuario válida, de cualquier perfil (`GET /api/settings`); la lectura sin sesión es `GET /api/hub/context`.
 Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión. Esa lectura sin sesión publica además el identificador del hub (la llave de HUB-F236) y el nombre y rol de cada persona con PIN, para la rejilla de acceso.
 Si falla: sin sesión, 401 con su código. Si la lectura de arranque falla, el shell arranca con los valores por defecto (EUR, español, UTC).
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Hub (la pantalla que pinta estos valores)
+Implicados: HUB_SHELL-F155
 QA: BD-02
 
 ### HUB-F221 Cambiar los ajustes del negocio
@@ -57,10 +56,9 @@ Pasos:
 3. Si todo valida, escribe clave a clave y devuelve el objeto completo actualizado.
 Entra: un mapa parcial de claves, con la sesión de un propietario o administrador. No sirve una llave de API ni el token de máquina.
 Sale: una fila por clave con quién la cambió (`hub_user:<id>`) y cuándo. No sale ningún aviso a los módulos: no existe un evento de ajustes cambiados; cada módulo recibe el valor nuevo en la siguiente orden que se le dé (HUB-F228). Claves: `currency`, `currency_decimals`, `language`, `country_code`, `region_code`, `timezone`, `theme_palette`, `api_docs_enabled`, `notify_allowed_recipients`, las de identidad (HUB-F222) y `pin_policy`, `pin_length`, `pin_inactivity_minutes` (de Acceso). No guarda historial de valores anteriores.
+En este mismo documento se apoya en: HUB-F140 (Decidir si el negocio pide PIN y cuántos dígitos tiene).
 Si falla: el rechazo por validación no escribe nada. Las escrituras de un lote no van en una única transacción: si la base falla a mitad, las claves anteriores quedan guardadas y se ve el error.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, acceso (las claves del PIN que comparten esta puerta)
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Hub (formulario de ajustes)
+Implicados: HUB_SHELL-F156, HUB_SHELL-F157, HUB_SHELL-F158, HUB_SHELL-F159, HUB_SHELL-F160, HUB_SHELL-F161, HUB_SHELL-F164
 QA: BD-02
 
 ### HUB-F222 Guardar la identidad del negocio
@@ -87,9 +85,9 @@ Pasos:
 3. Si cambia, lo rechaza.
 Entra: `business_tax_id` o `country_code` en un guardado de ajustes.
 Sale: nada guardado. El NIF se congela con el primer registro enviado; el país, al pasar el perfil a activo o cerrado. Repetir el mismo valor no es un cambio. Si el lote trae región, debe empezar por el país del lote o, si no viene, por el guardado; vaciarla siempre vale. Cambiar solo el país no revisa la región guardada. Si el perfil no se puede leer, no se congela nada.
+En este mismo documento se apoya en: HUB-F300 (Resolver el perfil fiscal del hub al arrancar), HUB-F307 (Pasar a producción).
 Si falla: `business_tax_id_frozen` o `hub_country_frozen`, con el valor al que está anclado y desde cuándo; o 422 `settings.region_code`.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, perfil fiscal (el perfil guarda su propia copia del país y el sello del primer registro)
+Implicados: ninguno
 QA: BD-02
 
 ### HUB-F224 Publicar la identidad del negocio en el SaaS
@@ -131,9 +129,9 @@ Pasos:
 2. Solo si la moneda no está en el registro ISO-4217, declara sus decimales (no hay vuelta atrás a «los del registro»).
 Entra: `currency` (3 letras, se pasa a mayúsculas), `currency_decimals` (entero de 0 a 4), `language` (`es` o `en`).
 Sale: el dinero viaja en unidades mínimas; los decimales salen de `currency_decimals` o, si no, del registro (EUR 2, JPY 0, KWD 3, desconocida 2). El idioma decide el del papel de la impresora y el de quien llama cuando no tiene el suyo (HUB-F228). La moneda no se entrega a los módulos en las órdenes y no se bloquea tras vender.
+En este mismo documento se apoya en: HUB-F190 (Pedir imprimir un documento desde una pantalla o un dispositivo).
 Si falla: 422 con la clave; una fila ilegible se lee como el valor por defecto.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, impresión (el idioma del papel se sella en cada documento)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F227 Fijar la zona horaria del negocio
@@ -174,9 +172,9 @@ Pasos:
 3. En el siguiente barrido reprograma todo disparador de reloj calculado con otra zona.
 Entra: la expresión del disparador y la zona resuelta.
 Sale: la hora del disparador es hora de pared del negocio. Una hora que se repite al cambiar el reloj se toma la primera vez; una que no existe pasa al final del hueco. Un disparador de instante fijo lleva su propio desfase. La zona no se guarda en el documento: corregir el país corrige todas a la vez.
+En este mismo documento se apoya en: HUB-F83 (Arrancar una automatización según un horario, en la hora del negocio), HUB-F84 (Arrancar una automatización una vez, en una fecha y hora).
 Si falla: una expresión que no se puede resolver no se programa y se avisa.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, automatizaciones (disparadores de reloj)
+Implicados: ninguno
 QA: ninguno
 
 ### HUB-F230 Exportar los datos del negocio
@@ -190,8 +188,7 @@ Pasos:
 Entra: nombre, idioma y selección, con sesión de administrador.
 Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Se dejan fuera, a propósito, las filas borradas y las que la app siembra al instalarse (salvo las tablas cuya semilla es dato del negocio, como `taxes_rule`). Una plantilla no lleva personas, permisos ni automatizaciones, ni las tablas y la sección fiscales (`verifactu_config`, certificado en el motor) ni la numeración; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
 Si falla: nombre inválido (letras, números, `-`, `_` y `.`), 422; sin sesión de administrador, 401. Una parte que no se puede leer falta del zip sin aviso.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
+Implicados: HUB_SHELL-F173, HUB_SHELL-F174
 QA: ninguno
 
 ### HUB-F231 Meter los archivos y el certificado en el zip
@@ -204,8 +201,7 @@ Pasos:
 Entra: la selección del export.
 Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero del almacenamiento bajo `media/`, incluidas las carpetas de las apps, menos las de primer nivel que empiezan por `_` (registros y sistema). No se filtra por finalidad. El sha256 de cada uno entra en el manifiesto.
 Si falla: un fichero que no se descarga, o pasa de 25 MiB, falta del zip y solo queda en el log.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
+Implicados: HUB_SHELL-F173
 QA: ninguno
 
 ### HUB-F232 Ver qué tablas y cuántas filas lleva cada app
@@ -218,8 +214,7 @@ Pasos:
 Entra: sesión de administrador.
 Sale: por app, sus tablas con el número de filas que de verdad volcaría el export (mismas reglas de hub, borrados y filas sembradas), de más a menos, y la finalidad impuesta si la hay.
 Si falla: 401 sin sesión de administrador.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
+Implicados: HUB_SHELL-F173, HUB_SHELL-F174
 QA: ninguno
 
 ### HUB-F233 Inspeccionar un fichero antes de importarlo
@@ -233,8 +228,7 @@ Pasos:
 Entra: el zip (hasta 256 MiB).
 Sale: un identificador de subida y el manifiesto; el zip queda en una carpeta temporal del hub hasta que se importa; uno inspeccionado y nunca importado se queda hasta que el contenedor se reinicia.
 Si falla: 422 si el zip está mal formado, una ruta intenta salir de su carpeta, falta `manifest.json` o la versión de formato no es la 1.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar
+Implicados: HUB_SHELL-F176
 QA: ninguno
 
 ### HUB-F234 Traer una plantilla del catálogo
@@ -248,7 +242,7 @@ Pasos:
 Entra: el identificador de la plantilla (y el idioma si hay dos).
 Sale: el zip, entregado solo si su sha256 coincide con el que anunció el SaaS; la credencial de máquina no sale del hub. Lista y descarga piden sesión de usuario de cualquier perfil; aplicarla pide administrador.
 Si falla: sin credencial, 424; hash distinto, error y ningún byte; un identificador en dos idiomas, el SaaS contesta 400.
-Implicados: pendiente
+Implicados: HUB_SHELL-F26, HUB_SHELL-F175, INVENTORY-F12
 Pendiente de enlazar: saas — catálogo de plantillas y descarga firmada
 QA: BD-01
 
@@ -263,8 +257,7 @@ Pasos:
 Entra: el identificador de subida y la selección (personas, ajustes, fiscal, archivos, apps con datos).
 Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps): solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino; la única excepción es el `UPDATE` de la retirada de marcadores de abajo. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos, en la carpeta que nombre cada ruta: solo se comprueba que no se salga de `media/`, sin política de carpetas ni filtro por finalidad. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. En una tabla que la app declara como objeto único (su semilla se guarda por el hub entero, p. ej. la semana de Horarios), lo que hubiera antes —sembrado, escrito por el negocio o traído por otra plantilla— se marca como borrado (apuntado en el lote) en cuanto entra al menos una fila del fichero, también en la copia propia; el informe de la sección no lo dice. El arranque de un hub nuevo ya no importa ninguna plantilla.
 Si falla: una sección fallida se anota y el resto sigue; una app que no se instala deja `failed` su sección («módulo no instalado»).
-Implicados: INVENTORY-F12, SCHEDULES-F12
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar
+Implicados: INVENTORY-F12, SCHEDULES-F12, HUB_SHELL-F26, HUB_SHELL-F177
 Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la semana de Horarios
 QA: BD-01, qa-hub §4
 
@@ -277,9 +270,9 @@ Pasos:
 2. Aplica a cada sección la regla de abajo.
 Entra: el manifiesto y la selección.
 Sale: nunca entran los datos de sistema (`_*`). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla. El sha256 se comprueba contra el propio manifiesto (prueba que el zip no se corrompió, no de dónde viene), se exige sesión de administrador y el servidor no pide otra confirmación. En la copia propia los ajustes se escriben sin pasar por la validación ni las congelaciones de HUB-F221 y HUB-F223 (solo las claves sin fila).
+En este mismo documento se apoya en: HUB-F300 (Resolver el perfil fiscal del hub al arrancar), HUB-F314 (Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena).
 Si falla: la sección descartada sale `Ignored` con su código y el número de filas.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, perfil fiscal (la cadena VeriFactu no cruza hubs)
+Implicados: HUB_SHELL-F177
 QA: BD-01
 
 ### HUB-F237 Permisos, roles y automatizaciones que trae el fichero
@@ -293,10 +286,9 @@ Pasos:
 4. Al terminar, la pantalla pregunta por los permisos que una plantilla no puede conceder.
 Entra: `active_roles`, `capability_grants` y `flows` del manifiesto.
 Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa: `flow_grants_not_portable` si el fichero no es la copia propia, `flows_paused_without_grants` si lo es y algún permiso no volvió. Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). El mismo nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
+En este mismo documento se apoya en: HUB-F80 (Crear una automatización), HUB-F98 (Conceder, limitar y retirar los permisos de una automatización).
 Si falla: un fallo de base de datos sale `Failed`, no como descarte.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, automatizaciones (guardar una automatización y sus permisos)
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos (los permisos que la plantilla no concede)
+Implicados: HUB_SHELL-F169, HUB_SHELL-F177
 QA: BD-01
 
 ### HUB-F238 Volver a importar lo mismo
@@ -323,8 +315,7 @@ Pasos:
 Entra: el resultado de la importación.
 Sale: una fila por sección con su estado, el motivo estable y las filas descartadas; más apps instaladas (`installed`, `already_installed`, `failed`, `blocked`, versión pedida si se sustituyó), archivos copiados y fallidos, estado del certificado y el origen (plantilla y versión, o fichero local). Se guarda por lote y se borra al deshacerlo.
 Si falla: si no se puede guardar, la importación vale y solo se pierde esta vista.
-Implicados: INVENTORY-F12
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar (informe y tarjeta de inicio)
+Implicados: INVENTORY-F12, HUB_SHELL-F26, HUB_SHELL-F39, HUB_SHELL-F178, HUB_SHELL-F179
 QA: BD-01
 
 ### HUB-F240 Reintentar lo que falló en una importación
@@ -338,8 +329,7 @@ Pasos:
 Entra: el lote del informe.
 Sale: reaplica solo secciones `Failed`, apps `failed` o `blocked` y archivos que fallaron. Se niega si el catálogo ya sirve otra versión. Si no queda nada, responde que no hay nada que reintentar.
 Si falla: `import_origin_not_retryable`, `import_retry_version_unavailable`, `import_retry_batch_not_found`.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar (botón de reintento)
+Implicados: HUB_SHELL-F179
 QA: ninguno
 
 ### HUB-F241 Deshacer una importación
@@ -352,12 +342,11 @@ Pasos:
 Entra: el lote.
 Sale: se borran exactamente las filas registradas, en una transacción, sin tocar lo creado después; vuelven los marcadores sembrados que el lote retiró, si nadie escribió ahí. La lista avisa solo de las tablas de objeto único (p. ej. el horario) en las que el negocio escribió después; una fila importada que se editó después se borra igual al deshacer. Deshacer dos veces, o un lote ajeno, no hace nada.
 Si falla: si el borrado revierte, el lote sigue.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Restablecer
+Implicados: HUB_SHELL-F180
 QA: ninguno
 
 ### HUB-F242 Restablecer el hub
-Estado: parcial — las secciones «archivos» y «datos fiscales» se aceptan pero no borran nada (solo bloquean si ya se emitió); el borrado de personas deja su perfil y preferencias; el servidor no pide ninguna confirmación (el nombre del negocio lo pide la pantalla)
+Estado: parcial — las secciones «archivos» y «datos fiscales» se aceptan pero no borran nada (solo bloquean si ya se emitió); el borrado de personas deja su perfil y preferencias; el servidor no pide ninguna confirmación (la razón social la pide la pantalla)
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › Datos y copias › Restablecer
 Pasos:
@@ -367,8 +356,7 @@ Pasos:
 Entra: la selección (ajustes, personas, roles, cola de impresión, apps); todo apagado por defecto.
 Sale: borrado duro, acotado al hub, en una sola transacción, en orden inverso de claves foráneas; las filas que sembró la app sobreviven. Las personas se borran menos quien ejecuta (se identifica por su sesión, nunca por el cuerpo de la petición). La cola de impresión se vacía; las impresoras emparejadas no. Si el hub ya emitió registros fiscales (sello del primer registro o facturas remitidas), Verifactu, Facturas y Ventas y los datos fiscales quedan bloqueados (RD 1007/2023) y el servidor lo rechaza con 409 aunque el cliente lo fuerce. El plan no muestra las secciones de archivos ni de datos fiscales. No toca historial de avisos, automatizaciones, permisos de módulo, certificado, perfil fiscal, llaves de API ni dispositivos de confianza; las sesiones, perfiles y preferencias de las personas borradas se quedan. La petición no lleva ningún token de confirmación.
 Si falla: 409 con el motivo y «No se ha borrado nada»; si la transacción falla, tampoco se borra nada, pero sale también 409, indistinguible del bloqueo legal.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Restablecer
+Implicados: HUB_SHELL-F181
 QA: ninguno
 
 ### HUB-F243 Convertir el dinero de un hub antiguo a céntimos

@@ -59,9 +59,9 @@ Pasos:
 4. La orden contesta en cuanto se guarda; los módulos que escuchan el aviso reaccionan después, en segundo plano (HUB-F51), nunca dentro de la misma orden.
 Entra: la orden de un módulo con los avisos que declara en su manifiesto (`emit`), y quién la pidió (persona, automatización o el propio hub).
 Sale: una fila en la cola de salida (`_event_outbox`, estado pendiente) con el aviso, su contenido, el módulo que lo emite, la persona que lo causó, la automatización que lo emitió si la hay (`run_id`), el aviso que lo provocó si es una reacción en cadena (`parent_event_id`) y la pantalla que mandó la orden (`client_instance`). Si el manifiesto declara una clave de no repetición para ese aviso (`emit[].dedup_key`, por ejemplo el identificador del mensaje de WhatsApp), un segundo aviso con la misma clave en el mismo hub no se apunta. Si el módulo devuelve desde su código el mismo aviso que declara, se apunta una sola vez, la copia del código (hub#1786), y en ese caso no se aplica la clave de no repetición. También empuja el aviso a las pantallas en vivo (HUB-F60).
+En este mismo documento se apoya en: HUB-F03 (Ejecutar una orden de un módulo), HUB-F10 (Ejecutar el manejador de un módulo y validar lo que propone).
 Si falla: si la orden falla, no queda ni el cambio ni el aviso, y quien la pidió ve el error de la orden. Una orden que no exige filas cambiadas (`min_affected_rows`) contesta bien y emite su aviso aunque no haya cambiado nada. Si el código de un módulo (no su manifiesto) devuelve un aviso que el módulo no declara en `events.emits` ni en el `emit` de sus órdenes, o del espacio de nombres de otro módulo instalado, o un aviso de mensaje o de impresión sin tener ese permiso declarado, la orden se rechaza entera y no se apunta nada (lo primero solo en un módulo que declara `events.emits`, como todos los publicados). Una clave de no repetición que el contenido no trae se ignora con un aviso en el registro del servidor y el aviso sale sin deduplicar.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, módulos y órdenes: ejecutar una orden de un módulo y su comprobación de qué avisos puede emitir
+Implicados: ninguno
 QA: BD-09, qa-hub-flows R1, qa-hub-flows R7
 
 ### HUB-F51 Entregar un aviso a los módulos que lo escuchan
@@ -76,10 +76,9 @@ Pasos:
 5. Si todo fue bien, el aviso queda como entregado. Si algo falló, solo se repite lo que falló (HUB-F52).
 Entra: los avisos pendientes de la cola y la lista de módulos activos con lo que escucha cada uno (`events.listen`).
 Sale: los efectos de cada módulo que escucha, en el hub del aviso y atribuidos a la persona que lo causó (el `created_by` de un movimiento de stock dice quién cobró); la marca de entrega por módulo (`_event_delivery`); los avisos que esos módulos emiten a su vez, con un nivel más de cadena; y el aviso marcado como entregado. Las reacciones en cadena también llegan a las pantallas en vivo.
+En este mismo documento se apoya en: HUB-F191 (Pedir imprimir desde un módulo, un flujo o el asistente), HUB-F248 (Borrar los datos de una persona: el aviso único), HUB-F249 (Vaciar el historial del hub que nombra a la persona).
 Si falla: un módulo que falla no impide que los demás reciban el aviso en la misma pasada. Una cadena de reacciones de más de 16 niveles se corta y el aviso va directamente a «Eventos caídos». Un módulo desactivado no recibe el aviso y, si se vuelve a activar, no recibe los que se entregaron mientras estaba apagado. Si dos copias del hub corren a la vez durante una actualización, cada aviso lo toma solo una; si la copia que lo tomó muere a mitad, otra lo retoma a los 5 minutos. El orden de entrega es el de llegada mientras nada falla: un aviso que se reintenta puede llegar después de otros más nuevos.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, negocio y datos: vaciar del historial del hub lo que nombra a un cliente borrado (`customer.anonymized`)
-Pendiente de enlazar: hub — HUB, impresión: dejar en la cola de impresión el trabajo que trae un aviso `*.print.due`
+Implicados: HUB_VERIFACTU-F01
 QA: BD-09, qa-hub-flows R3, qa-hub-flows R9, qa-hub-restaurant §7.03
 
 ### HUB-F52 Reintentar un aviso que un módulo no pudo procesar
@@ -94,7 +93,7 @@ Pasos:
 Entra: el aviso pendiente y el error del módulo que falló.
 Sale: el aviso con su contador de intentos, la hora del siguiente intento y el último error; al agotarse, el aviso en estado caído (`dead`), con su contenido completo intacto. Los módulos que sí lo recibieron no vuelven a recibirlo.
 Si falla: si la base de datos falla al apuntar el reintento, el aviso se queda como estaba y se vuelve a tomar a los 5 minutos, cuando caduca su reserva. Nadie avisa al módulo que emitió el aviso ni a la persona que lo causó: el único rastro es el recuento de la campana para el administrador (HUB-F59) y la lista de «Eventos caídos». El contador que guarda el aviso caído dice 7, no 8 (el intento que lo mata no se suma).
-Implicados: CASH_REGISTER-F14, FLOWS-F25, INVENTORY-F21, INVOICE-F06, KITCHEN-F05, PRINTING-F16, REC_FISCAL-F09
+Implicados: CASH_REGISTER-F14, FLOWS-F25, INVENTORY-F21, INVOICE-F06, KITCHEN-F05, PRINTING-F16, REC_FISCAL-F09, HUB_VERIFACTU-F01
 QA: BD-09, qa-hub-flows R8, qa-hub-restaurant §11
 
 ### HUB-F53 Mandar a «Eventos caídos» al momento lo que reintentar no arregla
@@ -110,9 +109,9 @@ Pasos:
 3. Los dos primeros se pueden reenviar (al conceder el permiso o recuperar la cuota). El tercero no: al aviso se le borra el destinatario y no se ofrece reenviarlo.
 Entra: el aviso y la negativa del permiso, de la cuota o de la automatización.
 Sale: el aviso caído con su motivo (`failure_kind`: `module.capability_denied`, vacío para la cuota, o `flow.release_revoked`). En el tercer caso, el teléfono o el correo del destinatario desaparece del contenido guardado y queda la marca de destinatario oculto.
+En este mismo documento se apoya en: HUB-F10 (Ejecutar el manejador de un módulo y validar lo que propone), HUB-F32 (Conceder o retirar un permiso de host a una aplicación).
 Si falla: solo se mata al momento si esa negativa es el único fallo de la pasada; si otro módulo también falló, el aviso sigue la escalera normal de HUB-F52. Un fallo de la base de datos al comprobar el permiso no cuenta como negativa: sigue la escalera.
-Implicados: PRINTING-F16
-Pendiente de enlazar: hub — HUB, módulos y órdenes: conceder y comprobar el permiso de una primitiva del hub (impresora, mensajes, certificado) de un módulo
+Implicados: PRINTING-F16, FLOWS-F25, HUB_VERIFACTU-F01
 QA: qa-hub-flows R8
 
 ### HUB-F54 Ver la cola de avisos caídos
@@ -126,8 +125,7 @@ Pasos:
 Entra: la sesión de un dueño o administrador de este hub.
 Sale: nada guardado. La lista de cerrados (`GET /api/hub/events/discarded`) da quién cerró cada uno, cuándo y por qué, sin el contenido.
 Si falla: sin sesión, el hub contesta que no hay sesión; con la sesión de un perfil que no administra (cajero, empleado), la rechaza. Si la petición se declara hecha por un módulo (cabecera `X-Erplora-Module`), ese módulo necesita además «Administrar automatizaciones» concedido; es una declaración, no una autenticación: un módulo que no se declara pasa solo con la sesión del administrador (la misma regla vale para HUB-F55…F59 y F63). Una API key o el token de máquina no sirven. Los avisos caídos de otro hub no se ven.
-Implicados: FLOWS-F25
-Pendiente de enlazar: hub — HUB_SHELL, Sistema › Eventos caídos (la pantalla que lista, reenvía y descarta)
+Implicados: FLOWS-F25, CASH_REGISTER-F14, HUB_SHELL-F145, HUB_SHELL-F146, HUB_SHELL-F147, HUB_SHELL-F148, HUB_VERIFACTU-F01, INVENTORY-F21
 QA: BD-10, qa-hub-flows R8
 
 ### HUB-F55 Reenviar un aviso caído
@@ -142,8 +140,7 @@ Pasos:
 Entra: el aviso caído elegido y la sesión de un administrador.
 Sale: el aviso pendiente de nuevo, con el error y el motivo borrados; el contenido no se edita.
 Si falla: un aviso que ya no está caído (se entregó, se cerró, no existe o es de otro hub) da «no encontrado». Uno marcado como no reenviable (permiso de una automatización retirado) se niega con su motivo (`409`, mensaje del hub en inglés): hay que volver a conceder el permiso y relanzar la automatización.
-Implicados: FLOWS-F25, INVOICE-F06, REC_FISCAL-F09, CASH_REGISTER-F14
-Pendiente de enlazar: hub — HUB_SHELL, Sistema › Eventos caídos (reintentar desde la pantalla)
+Implicados: FLOWS-F25, INVOICE-F06, REC_FISCAL-F09, CASH_REGISTER-F14, HUB_SHELL-F146
 QA: BD-10, qa-hub-flows R8
 
 ### HUB-F56 Reenviar todos los avisos caídos
@@ -157,8 +154,7 @@ Pasos:
 Entra: la sesión de un administrador.
 Sale: los avisos caídos reenviables, pendientes otra vez con los intentos a cero. Los que no se pueden reenviar se quedan donde estaban. Repetirlo sin avisos caídos no mueve nada.
 Si falla: el mismo rechazo de sesión que HUB-F54.
-Implicados: FLOWS-F25
-Pendiente de enlazar: hub — HUB_SHELL, Sistema › Eventos caídos (botón «Reenviar todos»)
+Implicados: FLOWS-F25, HUB_SHELL-F147
 QA: qa-hub-flows R8
 
 ### HUB-F57 Cerrar un aviso caído con motivo
@@ -171,10 +167,9 @@ Pasos:
 3. El aviso deja de estar en la cola de caídos y no se vuelve a intentar nunca.
 Entra: el aviso caído, el motivo (opcional; se guarda sin espacios sobrantes y cortado a 500 caracteres) y la sesión del administrador.
 Sale: el aviso cerrado (`discarded`), con la hora, quién lo cerró (sale de la sesión, nunca de lo que se envía) y el motivo. No se borra: se conserva 90 días desde el cierre y después la poda del historial lo quita. Cerrar el cobro de una venta deja esa venta sin factura para siempre.
+En este mismo documento se apoya en: HUB-F253 (Purgar el historial por retención).
 Si falla: un aviso que ya no está caído da «no encontrado» y no cambia nada.
-Implicados: FLOWS-F25, INVOICE-F06, REC_FISCAL-F09
-Pendiente de enlazar: hub — HUB_SHELL, Sistema › Eventos caídos (descartar desde la pantalla)
-Pendiente de enlazar: hub — HUB, negocio y datos: la poda de 90 días del historial terminal
+Implicados: FLOWS-F25, INVOICE-F06, REC_FISCAL-F09, HUB_SHELL-F148
 QA: BD-10, qa-hub-flows R8
 
 ### HUB-F58 Reenviar solo lo que un permiso había rechazado, al concederlo
@@ -189,8 +184,7 @@ Pasos:
 Entra: el permiso concedido.
 Sale: los avisos caídos con el motivo `module.capability_denied`, pendientes otra vez. Retirar un permiso no mueve nada.
 Si falla: si el reenvío no puede hacerse (base de datos caída), el permiso queda concedido igual, el fallo va al registro del servidor y los avisos se quedan caídos para reenviarlos a mano (HUB-F55).
-Implicados: PRINTING-F16
-Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos (conceder el permiso de una app)
+Implicados: PRINTING-F16, HUB_SHELL-F167, HUB_VERIFACTU-F01
 QA: ninguno
 
 ### HUB-F59 Contar los avisos caídos para la campana
@@ -204,8 +198,7 @@ Pasos:
 Entra: la sesión de un administrador.
 Sale: el número de avisos caídos del hub; ningún contenido.
 Si falla: el mismo rechazo de sesión que HUB-F54: un cajero o un empleado no recibe el número. El número no dice qué aviso es ni de qué documento (por ejemplo, que es una venta sin factura).
-Implicados: INVOICE-F06, REC_FISCAL-F09
-Pendiente de enlazar: hub — HUB_SHELL, campana de Notificaciones (fuente «Eventos caídos», que sondea este número cada 60 s)
+Implicados: INVOICE-F06, REC_FISCAL-F09, HUB_SHELL-F60, HUB_SHELL-F62
 QA: BD-09
 
 ### HUB-F60 Avisar a las pantallas en vivo
@@ -219,11 +212,9 @@ Pasos:
 4. Si la conexión se corta, la aplicación pide otro pase y se vuelve a conectar.
 Entra: la sesión de una persona del hub (para el pase), o una API key del hub que pueda leer (para una integración).
 Sale: cada aviso con su contenido, el módulo que lo emitió y la pantalla que mandó la orden (`client_instance`), por WebSocket (`/ws`) o por SSE (`/api/events`). La aplicación entra con la llave de solo lectura del propio hub y recibe **todo, sea cual sea el perfil de quien la abre** (también un cajero recibe los avisos con datos de clientes, los mensajes de WhatsApp y las preguntas de las automatizaciones). Una llave de integración `read_only` o `full` lo recibe todo; una `custom`, solo lo de los módulos que puede leer, y nada del hub. Los avisos propios del hub (módulo instalado, impresión) llevan otra forma de mensaje (`{"type": …}`).
+En este mismo documento se apoya en: HUB-F155 (Crear, rotar y revocar llaves de API).
 Si falla: el canal en vivo no guarda nada: un aviso que llega mientras la pantalla está desconectada, o que se pierde porque la pantalla va lenta (más de 256 avisos de retraso), no se le vuelve a mandar; los módulos sí lo reciben por la cola (HUB-F51). Sin credencial, o con una de otro hub, se rechaza; una llave que solo puede escribir también. Más de 16 conexiones a la vez **en todo el hub** (todas las pantallas y dispositivos comparten la llave de la aplicación) se rechazan: la pantalla 17.ª se queda sin avisos en vivo. En `/ws` los rechazos llegan como mensaje `stream.error`, no como código HTTP, y una credencial inválida en la cabecera del saludo se ignora y acaba en «sin autenticar» a los 15 segundos.
-Implicados: KITCHEN-F05
-Pendiente de enlazar: hub — HUB_SHELL, la aplicación: imprimir al oír la venta o la comanda solo en el dispositivo que la mandó, y lanzar el aviso del sistema
-Pendiente de enlazar: hub — HUB_APP, aviso del sistema de la app instalada al llegar una comanda o una cita
-Pendiente de enlazar: hub — HUB, acceso, personas y plan: la llave de solo lectura de la aplicación y el pase del canal en vivo
+Implicados: KITCHEN-F05, HUB_APP-F24, HUB_APP-F26, HUB_SHELL-F35, HUB_SHELL-F65, HUB_SHELL-F66, HUB_SHELL-F70, HUB_SHELL-F72, SALES-F01
 QA: qa-hub-restaurant §7.08
 
 ### HUB-F61 Mandar el email o el WhatsApp que pide un módulo o una automatización
@@ -237,10 +228,10 @@ Pasos:
 4. Después, en una escritura aparte, lo apunta como enviado, con el identificador que le dio WhatsApp, para no repetir lo que ya consta como enviado y para saber qué automatización preguntó si el cliente contesta tocando un botón.
 Entra: el aviso de mensaje (`*.reminder.due`): canal, destinatario, plantilla y variables.
 Sale: el mensaje entregado al proveedor y la marca de envío con el identificador del proveedor, la automatización y su paso. Un archivo de cabecera subido al hub se firma en cada intento para que WhatsApp lo pueda descargar.
+En este mismo documento se apoya en: HUB-F266 (Mandar un WhatsApp desde el hub), HUB-F272 (Reflejar en el hub el cupo y el consumo de WhatsApp del mes).
 Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402/429) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, o falla apuntar la marca, el reintento lo vuelve a mandar: el cliente puede recibir el mismo WhatsApp o correo dos veces. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
-Implicados: pendiente
+Implicados: FLOWS-F15
 Pendiente de enlazar: saas — proxy de notificaciones del dispositivo: enviar el correo y el WhatsApp del hub y cobrar la cuota
-Pendiente de enlazar: hub — HUB, WhatsApp y asistente: cuota de WhatsApp del negocio
 QA: qa-hub-flows R7
 
 ### HUB-F62 Ejecutar las tareas programadas de los módulos
@@ -254,9 +245,9 @@ Pasos:
 4. Si el hub estuvo apagado y se perdió varias pasadas, al volver la hace **una sola vez** y sigue con la siguiente hora que toque (o ninguna, si la tarea lo pide así).
 Entra: las tareas del manifiesto (`scheduled_tasks`: orden del propio módulo, horario `cron` de 5 campos, datos y qué hacer con lo perdido).
 Sale: los efectos de la orden y la hora de la siguiente vez, guardados juntos: si la orden falla, la tarea no avanza. Los horarios se leen en hora UTC, no en la del negocio (las automatizaciones sí usan la hora del negocio, HUB-F83).
+En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F23 (Actualizar una aplicación), HUB-F29 (Desinstalar una aplicación).
 Si falla: una orden que falla deja la tarea apartada 5 minutos y se vuelve a intentar, sin límite; además corta el repaso de ese segundo, y las demás tareas vencidas esperan al siguiente. Un horario que el hub no sabe leer no se programa (se avisa en el registro del servidor). Una tarea de un módulo desactivado no corre y solo se reprograma. Con dos copias del hub a la vez durante una actualización, cada tarea la ejecuta una sola.
 Implicados: VERIFACTU-F20, REC_FISCAL-F06
-Pendiente de enlazar: hub — HUB, módulos y órdenes: el instalador que apunta las tareas programadas al instalar, actualizar y desinstalar
 QA: ninguno
 
 ### HUB-F63 Seguir la cadena de lo que provocó un aviso
@@ -284,9 +275,9 @@ Pasos:
 4. ERPlora usa esa hora para no apagar ni borrar un hub gratuito que se está usando.
 Entra: las peticiones con cabecera de sesión (`X-Hub-Session`) o de API key (`Bearer erpl_live_…`) que no terminaron en 401/403, también las de rutas que no autentican (`/healthz`, `/api/hub/context`) y las que terminan en 404 o 500.
 Sale: la hora de la última entrada (`_hub_activity`), que nunca retrocede, y la hora que ERPlora ya confirmó.
+En este mismo documento se apoya en: HUB-F164 (Mandar el latido diario de uso a erplora.com).
 Si falla: una petición rechazada con 401/403 no cuenta, ni las anónimas (sin cabecera), ni el pase del canal en vivo, ni el primer mensaje de `/ws`, ni la llave de máquina (`erpk_`). Si el hub muere de golpe, se puede perder como mucho el último minuto. Si el latido falla, se vuelve a mandar en el siguiente.
 Implicados: pendiente
-Pendiente de enlazar: hub — HUB, acceso, personas y plan: el latido diario a ERPlora que lleva la última entrada
 Pendiente de enlazar: saas — ciclo de vida del hub gratuito: apagar a los 60 días sin entradas y borrar a los 120
 QA: ninguno
 
