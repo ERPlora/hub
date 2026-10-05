@@ -15,10 +15,11 @@ Prefijo: HUB
 ## Flujos
 
 ### HUB-F300 Resolver el perfil fiscal del hub al arrancar
-Estado: parcial — el estado «listo» (identidad, vía y un módulo que cumple el régimen) solo se recalcula al arrancar el hub: un negocio que sube su certificado o firma su conexión segura sigue «sin configurar» hasta el siguiente arranque, y uno que borra su certificado sigue «listo» (leído, sin ejecutar)
+Estado: parcial — el estado «listo» (identidad, vía y un módulo que cumple el régimen) solo se recalcula al arrancar el hub: un negocio que sube su certificado o firma su conexión segura sigue «sin configurar» hasta el siguiente arranque, y uno que borra su certificado sigue «listo» (leído, sin ejecutar); y el paso 0 pasa a producción sin ninguna comprobación
 Actor: sistema
 Pantalla: ninguna
 Pasos:
+0. Antes de nada, una sola vez por hub (transición de ERPlora/hub#2079): si la configuración del módulo VeriFactu dice producción y el perfil dice pruebas, el perfil pasa a producción tal cual —sin mirar si está listo, la autorización ni la caducidad del certificado—, salvo en una demostración o un hub cerrado. Es para los hubs que pasaron a producción con el antiguo selector del módulo.
 1. Cada vez que el hub arranca, con los módulos ya cargados, el núcleo lee el país del negocio y busca su régimen: España → VeriFactu; un país sin régimen no debe nada.
 2. Un hub nuevo nace «sin configurar» (o «no exigible» fuera de España), con su número de instalación fijado al identificador del hub.
 3. Mientras no está en producción, el perfil sigue al país, y pasa a «listo» si tiene NIF y razón social, una vía de envío (certificado propio activo o conexión segura firmada) y un módulo activo que cumple su régimen; si no, vuelve a «sin configurar».
@@ -37,7 +38,7 @@ Actor: sistema, empleado, responsable, administrador
 Pantalla: VeriFactu: Ajustes
 Pasos:
 1. Cualquier pantalla con sesión local pregunta al núcleo por la vía de envío: la vía (certificado propio o ERPlora), el estado de la autorización y su fecha, qué impide declarar ahora mismo (o nada), dónde se arregla y cuándo caduca el certificado propio.
-2. El entorno (pruebas o producción), si puede pasar a producción y si ya declaró de verdad se leen por separado.
+2. El entorno (pruebas o producción), si puede pasar a producción y si ya declaró de verdad se leen por separado. «Ya declaró de verdad» hoy dice «no» aunque ya se haya vendido en producción, hasta la primera rectificativa (HUB-F308).
 3. El estado del certificado dice si hay uno subido, quién y cuándo lo subió, si está en uso y cuál firma; nunca los bytes ni la contraseña.
 Entra: el perfil fiscal, el certificado y la conexión segura, del núcleo; el módulo que cumple el régimen declara la ruta de su puesta en marcha.
 Sale: nada; es consulta (`hub.fiscal.transmission`, `GET /api/fiscal/go-live`, `GET /api/business/certificate`). El estado de la autorización sale de la copia guardada, sin preguntar a la nube.
@@ -73,7 +74,7 @@ Pasos:
 2. El núcleo borra el certificado; desde ese momento la vía es la de ERPlora.
 3. Avisa al SaaS de la vía nueva.
 Entra: la orden del administrador.
-Sale: el certificado borrado; los registros siguientes salen por la celda de ERPlora; el latido al SaaS.
+Sale: el certificado borrado; los registros siguientes salen por la celda de ERPlora; el latido al SaaS. Lo que ya estaba en la cola sigue en su cadena y en el siguiente intento sale por la celda, con el Sello como presentador, si la vía de ERPlora está lista; si es de producción y el hub no tiene conexión segura, el carril de pruebas lo niega y espera sin límite.
 Si falla: quien no es administrador o un módulo sin el permiso del certificado reciben la negativa. Un hub de demostración también puede borrarlo.
 Implicados: pendiente
 Pendiente de enlazar: verifactu — VERIFACTU-F03 (quitar el certificado propio)
@@ -115,17 +116,18 @@ Pendiente de enlazar: saas — servir el modelo oficial, recibir los documentos,
 QA: qa-hub §7
 
 ### HUB-F306 Pedir, recoger y renovar la conexión segura con la celda fiscal
-Estado: parcial — el hub no renueva solo ni avisa antes de que caduque (el aviso de «caduca pronto» es de la pantalla) y da por válida una conexión caducada; el servicio que recoge la firma no arranca si el hub arrancó sin credencial de máquina; borrar la identidad en producción no se impide y deja al hub sin vía
+Estado: parcial — el hub no renueva solo ni avisa antes de que caduque (el aviso de «caduca pronto» es de la pantalla) y da por válida una conexión caducada; «Renovar» no presenta una solicitud nueva mientras el expediente diga «aprobada»; el servicio que recoge la firma no arranca si el hub arrancó sin credencial de máquina; borrar la identidad en producción no se impide y deja al hub sin vía; las puertas de la identidad no piden el permiso del certificado a un módulo, a diferencia de las del certificado
 Actor: administrador, sistema
 Pantalla: VeriFactu: Configuración
 Pasos:
 1. En **VeriFactu → Configuración**, bloque «Conexión segura con ERPlora», el administrador pulsa «Solicitar la conexión».
 2. El hub crea su clave privada (nace en el hub, cifrada, y no sale nunca) y una solicitud de firma a nombre de este hub, y la presenta en el expediente del hub en el SaaS con su credencial de máquina.
 3. Una persona de ERPlora la firma. Mientras tanto, el hub pregunta solo cada 2 minutos; «Comprobar el estado» pregunta en el momento. Cuando está firmada, instala el certificado: comprueba que es de su clave, de su nombre y que no ha caducado.
-4. Para renovar se repite la solicitud con la misma clave; si la renovación llega sin la autoridad de confianza, reutiliza la guardada.
+4. Para renovar, el administrador vuelve a pulsar: el hub no presenta una solicitud nueva mientras el expediente diga «aprobada»; instala lo que ERPlora haya emitido en esa fila (con la misma clave) y, si llega sin autoridad de confianza, reutiliza la guardada. El servicio de fondo no lo recoge (solo trabaja mientras no hay certificado).
+5. El operador de ERPlora tiene además puertas manuales de administrador: pedir la solicitud de firma, instalar un certificado firmado sin pasar por el expediente y olvidar la identidad entera (clave incluida). El estado (con su fecha de caducidad) lo lee cualquier sesión y es lo que la pantalla usa para «caduca pronto».
 Entra: la orden del administrador; el certificado firmado, del SaaS.
 Sale: la identidad de máquina en la tabla de sistema `_hub_gateway_identity`; con ella, el hub tiene vía por la celda (carril mutuo) y lo nota el estado «listo» del perfil en el siguiente arranque (HUB-F300).
-Si falla: la respuesta dice el estado (`filed`, `awaiting_review`, `installed`, `rejected` con el motivo, `out_of_budget` si se pasó del presupuesto de 30 comprobaciones por hora) o un código de rechazo (`enrolment.no_machine_credential`, `enrolment.cloud_unreachable`, `enrolment.cloud_refused`, `enrolment.install_refused`…). Una solicitud rechazada no se vuelve a presentar sola. Sin la clave maestra del despliegue no se crea ninguna clave.
+Si falla: la respuesta dice el estado (`filed`, `awaiting_review` —también para una identidad revocada o sustituida—, `installed`, `rejected` con el motivo) o un código de rechazo (`enrolment.no_machine_credential`, `enrolment.cloud_unreachable`, `enrolment.cloud_refused`, `enrolment.install_refused`…). La puerta crea su presupuesto en cada petición, así que nunca contesta `out_of_budget`: el presupuesto de 30 pasadas por hora solo lo agota el servicio de fondo. Una solicitud rechazada no se vuelve a presentar sola. Sin la clave maestra del despliegue no se crea ninguna clave.
 Implicados: pendiente
 Pendiente de enlazar: verifactu — VERIFACTU-F07 (solicitar o renovar la conexión segura)
 Pendiente de enlazar: saas — recibir la solicitud de firma del hub en su expediente, firmarla o devolverla con motivo, y entregar el certificado con la autoridad de confianza
@@ -143,14 +145,14 @@ Pasos:
 4. Los registros nuevos nacen en la cadena de producción; los que nacieron en pruebas siguen yendo a pruebas.
 Entra: el perfil fiscal, la vía, la autorización y la caducidad del certificado, del núcleo.
 Sale: el perfil en producción (`POST /api/fiscal/go-live`). Desde ese momento el motor envía a la AEAT real y el NIF de Ajustes › Negocio no se puede cambiar una vez emitido.
-Si falla: `fiscal.hub_closed`, `fiscal.go_live_forbidden` (demostración), `fiscal.no_representation_grant`, `fiscal.not_ready` o `fiscal.own_certificate_expired`, y el hub sigue en pruebas. Solo el administrador; un módulo sin el permiso del certificado no puede pedirlo.
+Si falla: `fiscal.hub_closed`, `fiscal.go_live_forbidden` (demostración), `fiscal.no_representation_grant`, `fiscal.not_ready` o `fiscal.own_certificate_expired`, y el hub sigue en pruebas. Esta no es la única forma de llegar a producción: el arranque adopta una sola vez, sin comprobaciones, el entorno que diga la configuración del módulo (HUB-F300, paso 0). Y no mira la conexión segura: con un «listo» viejo pasa un hub que ya no tiene vía. Solo el administrador; un módulo sin el permiso del certificado no puede pedirlo.
 Implicados: pendiente
 Pendiente de enlazar: verifactu — VERIFACTU-F08 (pasar a producción)
 Pendiente de enlazar: architecture — REC_FISCAL-F14 (de pruebas a producción sin perder ningún tique)
 QA: L-04, BD-02, qa-hub §7
 
 ### HUB-F308 Volver a pruebas mientras no se haya declarado nada en producción
-Estado: parcial — la vuelta se cierra con el sello «primer registro en producción», que solo pone una orden declarativa que declara el aviso que abre la cadena; la emisión de facturas de Facturación es un manejador que devuelve ese aviso y no lo pone, así que tras vender en producción se puede seguir volviendo a pruebas hasta la primera rectificativa, y las ventas siguientes irían a la AEAT de pruebas (leído, sin ejecutar)
+Estado: parcial — la vuelta se cierra con el sello «primer registro en producción», que solo pone una orden declarativa que declara el aviso que abre la cadena; la emisión de facturas de Facturación es un manejador que devuelve ese aviso y no lo pone, así que tras vender en producción se puede seguir volviendo a pruebas hasta la primera rectificativa, y las ventas siguientes irían a la AEAT de pruebas (leído, sin ejecutar; confirmado por la verificación de la oleada); el test que dice probarlo (`crates/runtime/tests/fiscal_mode.rs:131-169`) no recorre el camino real: llama directamente a la función que pone el sello
 Actor: administrador
 Pantalla: VeriFactu: Ajustes
 Pasos:
@@ -271,7 +273,7 @@ Pantalla: VeriFactu: Ajustes
 Pasos:
 1. Un hub desplegado como demostración (marca `HUB_DEMO`, que solo pone el SaaS al crearlo) nunca puede pasar a producción.
 2. Ninguna orden puede escribir otro entorno fiscal que el de pruebas.
-3. Sí puede tener identidad fiscal y certificado propio, y envía de verdad, siempre al entorno de pruebas de la AEAT.
+3. Al arrancar, el núcleo le siembra, si no tiene una, una identidad fiscal de demostración (NIF y razón social) para que sus ventas se puedan facturar. Puede tener certificado propio, y envía de verdad, siempre al entorno de pruebas de la AEAT.
 Entra: la marca de demostración del despliegue, leída una vez al arrancar.
 Sale: el perfil con «no puede pasar a producción»; la pantalla lo explica.
 Si falla: un intento de pasar a producción: `fiscal.go_live_forbidden`; uno de escribir otro entorno: la negativa de demostración (`demo_fiscal_environment_locked`).
@@ -280,12 +282,12 @@ Pendiente de enlazar: verifactu — VERIFACTU-F08 (en un hub de demostración no
 QA: BD-02, qa-hub §7
 
 ### HUB-F316 No dejar en producción a un hub sin ningún módulo que cumpla su régimen
-Estado: hecho
+Estado: parcial — al desinstalar solo se mira el módulo que se desinstala, no lo que arrastra: desinstalar Facturación forzando la guarda de dependientes deja a VeriFactu sin facturas que registrar, la venta deja de contar como apertura de cadena y el TPV cobra sin factura ni registro (leído, sin ejecutar)
 Actor: sistema
 Pantalla: HUB_SHELL: Aplicaciones
 Pasos:
 1. Alguien desactiva o desinstala un módulo, o uno que arrastra a otros (apagar Facturación apaga VeriFactu).
-2. Con el hub en producción, el núcleo calcula todo lo que se iría y, si no quedaría ningún módulo activo que cumpla el régimen, lo niega aunque la cola esté vacía.
+2. Con el hub en producción, al **desactivar** el núcleo calcula todo lo que se iría (el módulo y lo que arrastra) y, si no quedaría ningún módulo activo que cumpla el régimen, lo niega aunque la cola esté vacía. Al **desinstalar** solo mira el módulo que se desinstala; la desinstalación forzada (para un administrador, que salta la guarda de dependientes) no salta esta guarda, pero como Facturación no cumple ningún régimen, quitarla pasa.
 3. Con dos módulos del mismo régimen, quitar uno se permite.
 Entra: el conjunto de módulos que se irían y el perfil fiscal.
 Sale: nada si se niega.
