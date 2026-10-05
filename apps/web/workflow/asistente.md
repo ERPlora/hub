@@ -20,7 +20,7 @@ Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
 1. Con la sesión abierta, pulsa el icono de destellos «Asistente» de la barra superior. En una pantalla estrecha el mismo botón está dentro de «Más opciones», con el mismo nombre. Volver a pulsarlo lo cierra.
-2. El panel entra por la derecha. En móvil (menos de 768 px) cubre la pantalla y deja detrás un velo oscuro. En tableta y escritorio ocupa entre 360 y 420 px de ancho y empuja el contenido hacia la izquierda: se puede seguir trabajando en la pantalla con el panel abierto.
+2. El panel entra por la derecha. En móvil (menos de 768 px) lleva velo oscuro detrás y mide hasta 420 px: en un teléfono de 420 px o menos cubre la pantalla; entre 421 y 767 px es un panel de 420 px con velo. En tableta y escritorio ocupa entre 360 y 420 px de ancho, sin velo, y empuja el contenido hacia la izquierda: se puede seguir trabajando en la pantalla con el panel abierto.
 3. Se cierra con la × de la cabecera («Cerrar»), pulsando el velo (solo móvil), volviendo a pulsar el icono de la barra, o al pulsar «Ir a …» en una respuesta (HUB_SHELL-F189).
 4. Si se deja abierto, sigue abierto al cambiar de pantalla y al recargar la página: el navegador recuerda solo «abierto» o «cerrado».
 Entra: la sesión; el recordatorio local de abierto/cerrado (`erplora.assistant.open`).
@@ -30,7 +30,7 @@ Implicados: ninguno
 QA: qa-hub-assistant §1 (el banco, punto 1)
 
 ### HUB_SHELL-F186 Preguntar al asistente y leer cómo escribe
-Estado: parcial — «Detener» antes de que llegue el primer texto deja una burbuja vacía con los tres puntos animados para siempre (y así queda guardada); en un teclado de móvil sin tecla Mayús no se puede escribir un salto de línea, y el panel no se cierra con Esc (no hay manejador de esa tecla)
+Estado: parcial — «Detener» antes de que llegue el primer texto deja una burbuja vacía con los tres puntos animados para siempre (y así queda guardada); recargar la página a mitad de una respuesta pierde lo ya escrito y deja la misma burbuja de puntos para siempre (el hilo solo se guarda al enviar y al terminar, detener o fallar); en un teclado de móvil sin tecla Mayús no se puede escribir un salto de línea, y el panel no se cierra con Esc (no hay manejador de esa tecla)
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
@@ -48,7 +48,7 @@ Pendiente de enlazar: hub — HUB-F273 (conversar con el asistente: el servidor 
 QA: qa-hub-assistant §1 (el banco), qa-hub-assistant §R0
 
 ### HUB_SHELL-F187 Adjuntar un archivo o dictar por voz
-Estado: parcial — la burbuja de una imagen enviada la rotula «image» (inglés, sin traducir); los adjuntos (hasta 8 MB cada uno, en base64) se vuelven a enviar en cada pregunta siguiente y llenan el almacenamiento donde se guarda la conversación; el micrófono se enseña aunque el aparato no pueda grabar, y solo avisa al pulsarlo
+Estado: parcial — el dictado va del navegador directo a erplora.com con el pase personal de quien entró con contraseña: con una sesión de PIN, o tras cualquier cambio de usuario (que borra ese pase), siempre acaba en «No se ha podido transcribir el audio.»; el panel acepta adjuntos de 8 MB pero el hub rechaza un cuerpo de más de 2 MB, así que un adjunto de más de ~1,5 MB hace que ese turno y todos los siguientes digan «No se pudo contactar con el asistente.» (leído, sin ejecutar); la burbuja de una imagen enviada la rotula «image» (inglés, sin traducir); los adjuntos se vuelven a enviar en cada pregunta y llenan el almacenamiento de la conversación; el micrófono se enseña aunque el aparato no pueda grabar, y solo avisa al pulsarlo
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
@@ -56,8 +56,8 @@ Pasos:
 2. Se envían con el siguiente mensaje, con o sin texto. En la burbuja de la persona quedan como fichas con el nombre.
 3. Para dictar, pulsa «Dictar por voz». El navegador pide permiso del micrófono. Mientras graba, el botón se pone rojo y se llama «Detener la grabación».
 4. Al parar, un indicador gira mientras se transcribe y el texto cae en el cuadro (detrás de lo que ya hubiera). **No se envía solo**: la persona lo revisa y pulsa «Enviar».
-Entra: el archivo elegido o el audio grabado (máximo 2 MB).
-Sale: el archivo viaja con la pregunta y lo lee el servicio del asistente (HUB-F273); el audio va a la transcripción del SaaS, nunca a un modelo desde el hub.
+Entra: el archivo elegido (el panel deja 8 MB, pero toda la conversación tiene que caber en 2 MB al enviarse) o el audio grabado (máximo 2 MB).
+Sale: el archivo viaja con la pregunta y lo lee el servicio del asistente (HUB-F273); el audio sale del navegador directo a la transcripción de erplora.com, sin pasar por el hub, con el pase de erplora.com de quien está en la caja (nunca a un modelo desde el hub).
 Si falla: un archivo de más de 8 MB: «El archivo es demasiado grande.» durante 4 segundos y no se adjunta. Micrófono denegado: «El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.»; aparato sin grabación: «Este navegador no puede grabar audio.»; audio de más de 2 MB o transcripción rota: «No se ha podido transcribir el audio.» (el mismo texto para las dos causas).
 Implicados: pendiente
 Pendiente de enlazar: saas — asistente: lectura de documentos adjuntos y transcripción de voz (`apps/speech`)
@@ -95,77 +95,77 @@ Implicados: ninguno
 QA: qa-hub-assistant §R1 (el «Ir a…» lleva al registro), qa-hub-assistant §R3
 
 ### HUB_SHELL-F190 Confirmar una acción antes de que se ejecute
-Estado: parcial — la tarjeta enseña los nombres técnicos de los datos («price_cents: 15,00 €»), no dice de qué app viene la acción, y una acción del núcleo (instalar una app, aplicar una plantilla) o de una app instalada hace un momento sale como «Una acción que esta app no sabe nombrar»; además las líneas de la tarjeta se pasan al aviso como saltos de línea que el aviso de Ionic probablemente junta en un solo párrafo (sin ver en pantalla)
+Estado: parcial — la acción solo tiene nombre si su app trae la etiqueta en su traducción, y hoy solo la trae Ventas (17 de sus 31 órdenes del asistente): en las otras 26 apps y en las herramientas del núcleo la tarjeta dice «Una acción que esta app no sabe nombrar»; los datos salen con su nombre técnico («price», «service_id») y sin decir de qué app vienen; las líneas se juntan en un solo párrafo porque el aviso no lleva la clase que respeta los saltos de línea (`theme/polish.css`, `cascade-alert`); los importes en euros solo en los campos de primer nivel que el esquema marca
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Tarjeta de confirmación del asistente
 Pasos:
 1. La persona le pide algo que cambia datos («crea el servicio Corte caballero a 15 € de 30 min», «instala la app de citas»).
-2. Antes de ejecutar, aparece un aviso encima de todo: «El asistente quiere ejecutar una acción». Debajo, la acción con el nombre que le da la propia app (p. ej. «Anular una venta») o, si la app no sabe nombrarla, «Una acción que esta app no sabe nombrar». Nunca el nombre interno de la orden.
-3. El cuerpo lista cada dato que el asistente va a mandar, uno por línea y siempre en el mismo orden (alfabético por nombre del dato). Los importes que el servidor marca como dinero salen en euros («15,00 €», no «1500»); un sí/no sale «Sí»/«No», un dato vacío «—» y un dato compuesto como texto compacto.
-4. «Ejecutar» lanza la orden con la sesión de quien preguntó (HUB_SHELL-F193). «Cancelar», cerrar tocando fuera o recargar la página no ejecutan nada: el asistente recibe «no confirmado» y se lo dice a la persona.
-5. Las consultas que solo leen no piden tarjeta («¿qué huecos libres hay?»). Cualquier otra orden la pide, también una que el módulo publique como orden aunque solo conteste, salvo que el servidor la marque expresamente como lectura (HUB-F274); ante cualquier duda, hay tarjeta.
+2. Antes de ejecutar, aparece un aviso encima de todo: «El asistente quiere ejecutar una acción». Debajo, la acción con el nombre que le da la propia app (por ejemplo «Anular una venta cobrada», en Ventas) o, en casi todas las demás, «Una acción que esta app no sabe nombrar». Nunca el nombre interno de la orden.
+3. El cuerpo lista cada dato que el asistente va a mandar, siempre en el mismo orden (alfabético por nombre del dato), pero en un solo párrafo. Un importe sale en la moneda del negocio («15,00 €», no «1500») solo si es un campo de primer nivel que el esquema de la orden marca como céntimos; dentro de una lista (altas en lote) se ven los céntimos en crudo. Un sí/no sale «Sí»/«No», un dato vacío «—» y un dato compuesto como texto compacto.
+4. «Ejecutar» lanza la orden con la sesión de quien preguntó. «Cancelar» y cerrar tocando fuera no ejecutan nada: el asistente recibe «no confirmado» y se lo dice a la persona. Recargar la página con la tarjeta abierta mata el turno: nada se ejecuta y el asistente no recibe nada.
+5. Las consultas que solo leen no piden tarjeta. Una orden pide tarjeta si el servidor la marca como orden y no como lectura; ante la duda sobre esa marca, hay tarjeta. Una llamada sin tipo (que no estuviera en las notas del turno) iría por la puerta de consultas sin tarjeta, sin poder escribir.
 6. Mientras la tarjeta está abierta, el resto del panel no se puede usar. Cada orden de la misma respuesta pide la suya.
-Entra: la orden, sus datos y las marcas que manda el servidor (riesgo, qué datos son dinero, si solo lee); los nombres de acción que cada app trae en su traducción.
-Sale: si se acepta, la orden se ejecuta por la misma puerta y con el mismo permiso que el botón de la pantalla, revisado otra vez en el servidor (HUB-F274). El panel no pregunta ni guarda nada más.
-Si falla: sin función de confirmar, el panel cancela toda orden (nunca se muta en silencio). Una orden que el servidor rechaza vuelve al asistente como error y es él quien lo cuenta (HUB_SHELL-F192). Las acciones de una app instalada durante esta misma sesión (por ejemplo, por el propio asistente) no tienen nombre hasta recargar: la lista de nombres se carga una vez, al montar el shell.
-Implicados: FLOWS-F26
+Entra: la orden, sus datos y las marcas que manda el servidor (riesgo, qué datos son dinero, si solo lee); los nombres de acción que cada app trae en su traducción (`commands.<orden>.label`).
+Sale: si se acepta, la orden se ejecuta por la misma puerta y con el mismo permiso que el botón de la pantalla, revisado otra vez en el servidor (HUB-F274). El panel no pregunta ni guarda nada más. La orden de Automatizaciones que deja un borrador (FLOWS-F26) pasa por esta tarjeta y, al no traer Automatizaciones etiquetas, sale sin nombre.
+Si falla: sin función de confirmar, el panel cancela toda orden (nunca se muta en silencio). Una orden que el servidor rechaza vuelve al asistente como error y es él quien lo cuenta (HUB_SHELL-F192). El nombre de las acciones de una app instalada durante esta sesión no se carga hasta recargar (la lista se carga una vez, al montar el shell).
+Implicados: pendiente
+Pendiente de enlazar: flows — FLOWS-F26 (Pedirle al asistente una automatización: la orden que se ofrece como herramienta y se confirma en esta tarjeta)
 Pendiente de enlazar: hub — HUB-F274 (qué herramientas se ofrecen, y las marcas de riesgo y de solo lectura que decide esta tarjeta)
 Pendiente de enlazar: hub — HUB, módulos y órdenes (la misma puerta de órdenes que usa el botón de la pantalla)
 QA: qa-hub-assistant §R1, qa-hub-assistant §R3 (punto 4)
 
 ### HUB_SHELL-F191 Acciones peligrosas: escribir para confirmar, o no desde el chat
-Estado: parcial — si lo que se escribe no coincide, la acción se cancela sin decir por qué; la frase dice «no se puede deshacer desde la pantalla», que confunde porque se está en el chat; y solo funciona para las órdenes cuya app declara el riesgo (una app que no lo declara se trata como orden corriente)
+Estado: parcial — la política existe, pero solo Citas declara el riesgo de sus borrados (4 órdenes): anular una venta, borrar productos, clientes, reservas, comandas, mesas o servicios se confirma con un clic; si lo escrito no coincide, la acción se cancela sin decir por qué; la frase dice «no se puede deshacer desde la pantalla», que confunde estando en el chat
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Tarjeta de confirmación del asistente
 Pasos:
 1. Una orden que su app declara destructiva no se confirma con un clic: el aviso pide escribir una palabra. Dice «Esto no se puede deshacer desde la pantalla. Escribe BORRAR para confirmar.» y el cuadro lleva «BORRAR» como pista.
-2. Una orden que borra muchos registros a la vez enseña primero cuántos: «Vas a borrar 12 registros.» (o «1 registro»), y pide escribir **ese número**, no una palabra: obliga a leer la frase donde está la cifra.
+2. Una orden que su app declara de borrado masivo enseña primero cuántos: «Vas a borrar 12 registros.» (o «1 registro»), y pide escribir **ese número**, no una palabra.
 3. El número lo saca el panel de la lista más larga que trae la propia orden. Si la orden no nombra los registros (un «todas», un filtro) o la lista está vacía, no se ejecuta desde el chat: el aviso dice «No puedo saber cuántos registros borraría esto, así que no lo hago desde aquí. Abre la pantalla, donde puedes verlos.» y solo ofrece «Cancelar».
-4. Solo se ejecuta si lo escrito coincide exactamente (sin contar espacios) y se pulsa «Ejecutar». En cualquier otro caso, nada.
-Entra: el riesgo que declara la app (`corriente`, `destructiva`, `masiva`) y los datos de la orden.
+4. Solo se ejecuta si lo escrito coincide exactamente (distingue mayúsculas: «borrar» no vale; solo se quitan los espacios de los extremos) y se pulsa «Ejecutar». En cualquier otro caso, nada.
+Entra: el riesgo que declara la app (`normal`, `destructive`, `bulk_destructive`; un valor desconocido llega como `destructive`) y los datos de la orden.
 Sale: si se acepta, lo mismo que HUB_SHELL-F190. El panel no sabe qué es una cita o una factura: solo aplica la política.
-Si falla: un aviso con la palabra equivocada no ejecuta nada y el asistente lo cuenta como cancelado. Las acciones destructivas del propio hub (desinstalar, reiniciar, borrar datos) no se ofrecen nunca, así que no llegan a esta tarjeta (HUB-F274); las órdenes de borrar de una app sí llegan.
+Si falla: un aviso con la palabra equivocada no ejecuta nada y el asistente lo cuenta como cancelado. Las acciones destructivas del propio hub no se ofrecen nunca (HUB-F274). Las órdenes de borrar o anular de una app que no declara riesgo (Ventas, Inventario, Clientes, Reservas, Cocina, Mesas, Personal, Servicios…) llegan con una tarjeta de un clic.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F274 (declarar el riesgo y qué órdenes se ofrecen; un riesgo desconocido llega como destructivo)
 QA: qa-hub-assistant §R3 (puntos 3 y 4)
 
 ### HUB_SHELL-F192 Comprobar lo que dice el asistente contra lo que de verdad hizo
-Estado: parcial — el panel no enseña ningún recibo de lo ejecutado ni distingue «el servidor respondió bien» de «cambió algo»: una orden que contesta sin error cuenta como hecha aunque no haya tocado ninguna fila, y una sola orden correcta del turno basta para que ninguna otra afirmación del mismo turno se marque; tampoco se enseña de dónde sale una cifra
+Estado: parcial — el panel no enseña ningún recibo de lo ejecutado ni distingue «el servidor respondió bien» de «cambió algo»: una orden que contesta sin error cuenta como hecha aunque no haya tocado ninguna fila; instalar una app y aplicar una plantilla devuelven un error escrito sin fallar y también cuentan como hechas; una orden cuya respuesta se pierde cuenta como fallida y el aviso puede decir «No se ha modificado nada» aunque quizá sí se ejecutó; si el turno termina en error no se comprueba nada; una sola orden correcta del turno basta para que ninguna otra afirmación del mismo turno se marque; no se enseña de dónde sale una cifra
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
 1. Al acabar cada respuesta, el panel la compara con lo que se ejecutó en ese turno. No se fía de lo que la respuesta dice de sí misma.
 2. Si la respuesta afirma un cambio («he creado…», «se ha actualizado…», «queda guardado», «has been created…») y en el turno no se ejecutó ninguna orden que cambie datos, o la persona la canceló, o falló, aparece **fuera de la burbuja** el aviso «El asistente ha dicho que hizo un cambio, pero no se ejecutó ninguna acción. No se ha modificado nada.»
-3. Si la respuesta escribe un identificador (un código largo) que ninguna consulta de ese turno devolvió y que la persona tampoco escribió: «Esta respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.»
+3. Si la respuesta escribe un identificador (un código largo) que ninguna consulta de ese turno devolvió y que la última pregunta de la persona tampoco contenía: «Esta respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.» Un identificador leído en un turno anterior de la misma conversación se marca como no leído, y una última pregunta con adjuntos no cuenta como texto.
 4. Si nombra una pantalla que este hub no sirve: «Esta respuesta señala una pantalla que no existe aquí.» y no se ofrece botón (HUB_SHELL-F189).
 5. Los avisos van con un icono de alerta, no los escribe el modelo y se quedan con ese mensaje, también tras recargar. Una respuesta limpia no lleva nada.
-6. Tras una orden aceptada, lo único que la persona ve es lo que el asistente cuente con sus palabras y, para comprobarlo, el «Ir a …» a la pantalla del registro.
+6. Tras una orden aceptada, lo único que la persona ve es lo que el asistente cuente con sus palabras y, para comprobarlo, el «Ir a …» a la pantalla del registro. Si una orden pierde su respuesta (se cae la red), sale el aviso del sistema «No sabemos si la operación se completó. Comprueba el resultado antes de reintentar.»
+7. Al aplicar una plantilla por el chat, el shell además pregunta en pantalla por los permisos de las apps que ha traído (HUB_SHELL-F196).
 Entra: las órdenes del turno con su desenlace (hecha, error o cancelada) y sus resultados; el mapa real de pantallas.
-Sale: el aviso sobre el mensaje; nada se manda al servidor. Aplicar una plantilla devuelve además al asistente lo que sigue sin hacer (qué pasos de la puesta en marcha siguen bloqueando), para que no diga que ya se puede facturar.
-Si falla: «hecha» significa que la puerta de órdenes no devolvió error y la persona aprobó la tarjeta. Una orden de una app que no comprueba cuántas filas tocó responde bien sin haber hecho nada (doble apertura de caja, doble cierre) y el asistente puede contar que sí; igualmente, un lote que pone a cero lo que no se le nombró devuelve éxito. Ese filtro no lo hace este panel: lo tiene que hacer la orden del servidor (HUB, módulos y órdenes).
+Sale: el aviso sobre el mensaje; nada se manda al servidor. Aplicar una plantilla devuelve además al asistente lo que sigue sin hacer, para que no diga que ya se puede facturar.
+Si falla: «hecha» significa que la puerta de órdenes no lanzó error y la persona aprobó la tarjeta. Una orden de una app que no comprueba cuántas filas tocó responde bien sin haber hecho nada (doble apertura de caja, doble cierre) y el asistente puede contar que sí; un lote que pone a cero lo que no se le nombró devuelve éxito. Las herramientas del núcleo para instalar una app y aplicar una plantilla devuelven un error escrito (falta el dato, la app no está en el catálogo) sin lanzarlo: cuentan como hechas. Si el turno termina en error (más de 6 rondas, red cortada, servicio que rechaza a mitad), no se hace ninguna comprobación y un «he creado…» de una ronda anterior queda sin marcar. Ese filtro de filas no lo hace este panel: lo tiene que hacer la orden del servidor (HUB, módulos y órdenes).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F273 (los recibos del turno: el panel los construye de lo que ejecuta; el servidor no los guarda)
 Pendiente de enlazar: hub — HUB, módulos y órdenes (que una orden diga cuántas filas cambió; hoy una orden sin esa comprobación contesta bien sin hacer nada)
 QA: qa-hub-assistant §R0, qa-hub-assistant §R2, qa-hub-assistant §R4
 
 ### HUB_SHELL-F193 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
-Estado: parcial — el panel no muestra nada propio cuando falta un permiso: lo cuenta el modelo con el error que reciba, sin texto fijo; y que la ventana del PIN se abra también cuando la orden viene del asistente la hace el transporte común y ningún test del asistente la ejercita
+Estado: parcial — una persona sin el permiso de una orden no la tiene entre las herramientas del asistente, aunque un responsable pudiera aprobarla con su PIN: la ventana de aprobación no se abre nunca desde el chat, mientras que el mismo botón de la pantalla sí la abre (diferencia con el botón); el panel tampoco muestra nada propio cuando falta un permiso: lo cuenta el modelo con sus palabras
 Actor: empleado, cajero, responsable, administrador
 Pantalla: Asistente
 Pasos:
-1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con los botones, nada más. Una persona sin permiso para una orden no la tiene entre las herramientas del asistente: es como si no existiera, y así lo dice.
-2. Si una orden pide un permiso que la persona no tiene pero sí el perfil responsable, al pulsar «Ejecutar» aparece la ventana «Hace falta una aprobación» con «Se aprueba: {acción}». Un responsable elige su nombre y teclea su PIN o pasa su placa. Si lo aprueba, la orden sigue y queda anotado quién la aprobó.
-3. Si cancela o el PIN no vale, la orden no se ejecuta, el asistente recibe el error y se lo explica a la persona. Si hay ya una ventana de aprobación abierta, una segunda petición se rechaza sin cola.
-4. Instalar una app y aplicar una plantilla solo se ofrecen a quien administra (HUB-F274); el panel no vuelve a comprobarlo, lo revisa el servidor cada vez.
-5. Lo que el asistente trae de vuelta (listas, cifras) es lo que esa sesión puede leer: el panel no filtra nada por su cuenta.
+1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con los botones, nada más. Una orden cuyo permiso la sesión no tiene no está entre las herramientas del asistente: es como si no existiera, y así lo dice.
+2. Por eso un cajero que le pide anular una venta no recibe la herramienta: el asistente contesta que no puede, sin ventana de PIN. En la pantalla, el botón de anular sí abriría «Hace falta una aprobación» para que un responsable teclee su PIN o pase su placa. Esa vía no existe desde el chat.
+3. Instalar una app y aplicar una plantilla solo se ofrecen a quien administra (HUB-F274); el servidor lo vuelve a revisar en cada orden.
+4. Lo que el asistente trae de vuelta (listas, cifras) es lo que esa sesión puede leer: el panel no filtra nada por su cuenta.
 Entra: la sesión local de quien pregunta, que es la que firma cada orden.
-Sale: la orden ejecutada con el empleado como autor y, si hubo PIN, el responsable como aprobador (HUB-F152).
-Si falla: sin permiso y sin aprobación posible, el asistente recibe el rechazo del servidor (HUB-F151) y lo explica con sus palabras; en la ventana del PIN, los textos son los de esa ventana («Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.»). Una acción del núcleo no tiene nombre en esa ventana: sale «una acción que esta app no sabe nombrar».
+Sale: la orden ejecutada con esa persona como autora; nunca con un aprobador, porque el asistente no pide aprobación.
+Si falla: sin permiso, el asistente no tiene la herramienta y lo explica con sus palabras (sin texto fijo del panel). Si un permiso se perdiera entre ofrecer la orden y ejecutarla, el servidor la rechaza (HUB-F151) y el asistente recibe el error. La conexión del transporte con la ventana del PIN existe pero ningún camino del asistente llega a ella.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F274 (qué herramientas se ofrecen a cada perfil)
-Pendiente de enlazar: hub — HUB-F05 (pedir la aprobación de un responsable cuando falta el permiso)
+Pendiente de enlazar: hub — HUB-F05 (pedir la aprobación de un responsable cuando falta el permiso: lo que el botón hace y el chat no)
 Pendiente de enlazar: hub — HUB-F151 (rechazar una orden para la que no se tiene permiso)
-Pendiente de enlazar: hub — HUB-F152 (aprobar una acción con el PIN de un responsable)
 QA: qa-hub-assistant §R3 (puntos 5 y 9)
 
 ### HUB_SHELL-F194 Pedirle varias cosas seguidas
@@ -186,26 +186,27 @@ Pendiente de enlazar: hub — HUB-F273 (el bucle de herramientas; el SaaS manda 
 QA: qa-hub-assistant §R4
 
 ### HUB_SHELL-F195 La conversación: qué se guarda, dónde y cuándo se borra
-Estado: parcial — no hay «nueva conversación»: el hilo crece sin límite, se reenvía entero en cada pregunta y, si el servicio lo rechaza por demasiado grande, la persona solo sale cerrando sesión o cambiando de usuario; si el navegador no deja guardar (un adjunto grande), el hilo sigue en memoria pero no sobrevive a una recarga
+Estado: parcial — no hay «nueva conversación»: el hilo se reenvía entero en cada pregunta (el servicio solo lee los 100 mensajes más recientes, sin decirlo) y, si el cuerpo pasa de 2 MB, el hub lo rechaza y la persona solo sale cerrando sesión o cambiando de usuario; si el navegador no deja guardar (un adjunto grande), el hilo sigue en memoria pero no sobrevive a una recarga; recargar a mitad de una respuesta la pierde; al cambiar de usuario se borra el hilo pero no el texto ni los adjuntos sin enviar, ni el aviso de cuota agotada, ni el modo configuración
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
-1. El hilo vive solo en el navegador de esa pestaña (`sessionStorage`, clave `erplora.assistant.history`): ni el hub ni erplora.com guardan la conversación. Se guarda al enviar y al terminar cada respuesta.
-2. Recargar la página lo recupera. Cerrar la pestaña o la ventana lo pierde. Cerrar el panel no lo borra.
-3. Se vacía del todo, y con él cualquier respuesta que estuviera llegando (que se corta y libera el cuadro), cuando: la persona cierra sesión; la sesión caduca o se pierde por inactividad o por abrirse en otro dispositivo; o **cambia de usuario con PIN** en la misma caja, en cuanto el PIN nuevo es aceptado. La persona que llega abre el panel y lo encuentra vacío.
+1. El hilo vive solo en el navegador de esa pestaña (`sessionStorage`, clave `erplora.assistant.history`): ni el hub ni erplora.com guardan la conversación. Se guarda al enviar y al terminar, detener o fallar una respuesta, nunca mientras se escribe.
+2. Recargar la página lo recupera (sin lo que estuviera llegando). Cerrar la pestaña o la ventana lo pierde. Cerrar el panel no lo borra.
+3. Se vacía el hilo, y con él se corta cualquier respuesta que estuviera llegando (se libera el cuadro), cuando: la persona cierra sesión; la sesión caduca o se pierde por inactividad o por abrirse en otro dispositivo; o **cambia de usuario con PIN** en la misma caja, en cuanto el PIN nuevo es aceptado.
 4. Si el PIN del cambio de usuario se rechaza, no se borra nada: quien estaba sigue dentro con su hilo.
 5. Lo que se guarda: lo que escribió la persona (con sus adjuntos), lo que respondió el asistente y los avisos de comprobación. No se guardan las órdenes ejecutadas ni lo que enseñó la tarjeta.
-6. Para empezar de cero sin salir, hoy no hay botón.
+6. Al cambiar de usuario **no** se limpian: el texto escrito y no enviado, los adjuntos sin enviar, el aviso de cuota agotada de quien se fue (sale bajo la primera respuesta de quien llega), el modo configuración (su panel vacío dice «Revisa la configuración de tu negocio…» y sus preguntas llevan ese contexto; no se apaga ni al cerrar sesión, hasta recargar) y el panel abierto. Cerrar sesión sí desmonta el panel y limpia texto, adjuntos y cuota.
+7. Para empezar de cero sin salir, hoy no hay botón.
 Entra: los mensajes del panel; los cierres de sesión y los relevos de usuario.
 Sale: la clave del navegador; en cada pregunta, el hilo entero va al servidor (HUB-F273) y se olvida al acabar el turno.
 Si falla: un almacenamiento lleno o bloqueado (modo privado) se ignora en silencio. Un hilo guardado ilegible arranca vacío.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F273 (el hub no guarda la conversación)
-Pendiente de enlazar: hub — HUB-F136 y HUB-F138 (cerrar sesión y cambiar de usuario, que disparan el borrado; HUB-F138 dice hoy que el historial sigue en pantalla, y no es lo que hace el código)
+Pendiente de enlazar: hub — HUB-F136 y HUB-F138 (cerrar sesión y cambiar de usuario, que disparan el borrado)
 QA: qa-hub-assistant §Pendiente (fase C) (cambio de usuario por PIN), qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F196 El asistente en la puesta en marcha
-Estado: hecho
+Estado: parcial — si la relectura de la lista falla, el asistente recibe la última lista leída como si fuera de ahora (solo dice «no se pudo» si nunca hubo una lectura buena); el modo configuración no se apaga hasta recargar la página, y pasa a la persona siguiente (HUB_SHELL-F195)
 Actor: administrador, responsable
 Pantalla: Asistente
 Pasos:
@@ -216,13 +217,13 @@ Pasos:
 5. Si pide aplicar una plantilla de sector o instalar una app, pasa por la tarjeta (HUB_SHELL-F190). Al terminar de aplicar una plantilla, el shell pregunta en pantalla los permisos de las apps que ha traído, no el modelo.
 Entra: el estado de la lista de puesta en marcha, filtrado por país y por permiso (HUB-F35); lo que la persona escribe.
 Sale: el contexto de configuración, solo para el modelo; la conversación normal.
-Si falla: si no se puede leer el estado, el contexto dice que no se pudo y el asistente no afirma que el negocio esté configurado; los atajos se reducen a «¿Qué falta por configurar?». La tarjeta de Inicio conserva «Configurar» en cada paso, así que un asistente caído no deja a nadie sin salida.
+Si falla: si nunca se pudo leer el estado, el contexto dice que no se pudo y el asistente no afirma que el negocio esté configurado; si ya hubo una lectura buena y la nueva falla, se usa la anterior sin avisar. Los atajos se reducen a «¿Qué falta por configurar?». La tarjeta de Inicio conserva «Configurar» en cada paso, así que un asistente caído no deja a nadie sin salida.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F35 (calcular la lista de puesta en marcha que el asistente lee)
 QA: qa-hub-assistant §R0 (pregunta 4), qa-hub-assistant §R4 (montar el hub por chat)
 
 ### HUB_SHELL-F197 Ver el plan del asistente, el límite de uso y ampliarlo
-Estado: parcial — el aviso de cuota, una vez agotada, se queda pegado al último mensaje del hilo para siempre (también tras renovarse o tras ampliar el plan, y le saldría a la persona que llega tras un cambio de usuario); el plan se escribe con su identificador interno («Plan basic»); el texto para quien no puede pagar manda a «el responsable del negocio», pero solo pagan el propietario y el administrador
+Estado: parcial — el aviso de cuota, una vez agotada, se queda pegado al último mensaje del hilo hasta recargar la página o cerrar sesión (también tras renovarse, tras ampliar el plan y tras un cambio de usuario); el plan se escribe con su identificador interno («Plan basic»); el texto para quien no puede pagar manda a «el responsable del negocio», pero solo pagan el propietario y el administrador
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
@@ -230,12 +231,12 @@ Pasos:
 2. Desde el 80 % de los mensajes del mes, el pie dice «Plan {plan} — te quedan {n} de {total} mensajes este mes.», con «Se renuevan el {fecha}.» y, cuando el nivel viene del plan del negocio, «Incluido en tu plan {nombre}.». Por debajo del 80 % no se enseña nada.
 3. El contador se mueve al terminar cada respuesta, sin recargar.
 4. Al agotarse, la respuesta es «Has usado todos tus mensajes del asistente Plan {plan} — {usados} de {total} mensajes este mes. Se renuevan el {fecha}.» (no «No se pudo contactar»), y debajo lo que toca a esa persona.
-5. Un administrador o propietario, cuando el nivel lo da el plan del negocio, ve «Incluido en tu plan {nombre}.» y el botón «Subir de plan», que abre la página del plan de su cuenta en el navegador (la misma puerta que el menú «Mi plan»).
-6. Si el nivel viene de una compra propia del asistente, ve «Ver planes»: con un solo plan contratable va directo al pago; con varios, una hoja «Elige un plan» con «{nombre} — {precio} €/mes» y «Ir al pago». El pago se abre fuera de la caja, y al volver se relee el plan.
-7. En la copia de la app instalada desde Google Play no hay botón de pago: «El plan del asistente se amplía desde tu cuenta de ERPlora, en erplora.com.»
+5. Un administrador o propietario, cuando el SaaS dice que el nivel lo da el plan del negocio, ve «Incluido en tu plan {nombre}.» y el botón «Subir de plan», que abre la página del plan de su cuenta en el navegador (la misma puerta que el menú «Mi plan»).
+6. Si el SaaS no dice que el nivel lo da el plan (hub gratuito, compra propia o sin dato), ve «Ver planes»: con un solo plan contratable va directo al pago; con varios, una hoja «Elige un plan» con «{nombre} — {precio} €/mes» y «Ir al pago». El pago se abre fuera de la caja, y al volver se relee el plan.
+7. En la copia de la app instalada desde Google Play un administrador no ve ningún botón de pago, ni «Subir de plan» ni «Ver planes»: «El plan del asistente se amplía desde tu cuenta de ERPlora, en erplora.com.»
 8. Quien no administra ve «Pídele al responsable del negocio que amplíe el plan del asistente.» y ningún botón.
 Entra: nivel, mensajes usados, límite y fecha de renovación que da el SaaS; planes contratables.
-Sale: la dirección de pago o de la página de plan se abre en el navegador (HUB-F277); el panel no cobra nada ni lleva contador propio.
+Sale: la dirección de pago o de la página de plan se abre en el navegador (HUB-F277); al volver a la caja se relee el plan cada vez que la ventana recupera el foco. Si el corte fuera por sesiones, la frase sigue diciendo «mensajes este mes» con un número de sesiones; el panel no cobra nada ni lleva contador propio.
 Si falla: sin planes contratables, «Ahora mismo no hay planes a los que ampliar.»; sin dirección de pago, «No se pudo contactar con el asistente.» (texto que no corresponde); si el navegador no abre: «No se pudo abrir la página de pago en el navegador. Inténtalo de nuevo y, si sigue fallando, actualiza la app de ERPlora.» o, para el plan, «No se pudo abrir la página de tu plan en el navegador. Inténtalo de nuevo.»
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F277 (ver el plan del asistente y lo que queda del mes)
@@ -259,13 +260,13 @@ Pendiente de enlazar: hub — HUB-F278 (denunciar una respuesta del asistente: e
 QA: qa-hub-assistant §Pendiente (fase C) («Report an issue»)
 
 ### HUB_SHELL-F199 El asistente sin conexión, con el servicio caído o sin plan
-Estado: parcial — el panel no desactiva ni avisa de que no hay red antes de enviar; no hay «Reintentar»; si el corte llega con parte del texto ya escrito se queda la respuesta a medias sin ningún aviso; una sesión caducada durante la charla se lee como «no se pudo contactar» en vez de llevar a la entrada; los fallos permanentes (el servicio sin credencial, sin plan, el hilo demasiado grande) dicen «vuelve a intentarlo en unos minutos»
+Estado: parcial — el panel no desactiva ni avisa de que no hay red antes de enviar; no hay «Reintentar»; si el corte llega con parte del texto ya escrito se queda la respuesta a medias sin ningún aviso; una sesión caducada durante la charla se lee como «no se pudo contactar» en vez de llevar a la entrada; los fallos permanentes que sí llegan con texto (sin credencial, sin nivel) dicen «vuelve a intentarlo en unos minutos»; las órdenes que pierden su respuesta dejan el aviso «No sabemos si la operación se completó…»
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
 1. Sin Internet en el aparato, el aviso general de conexión de la barra del shell aparece, pero el panel sigue abierto y se puede escribir. Al enviar, la burbuja del asistente dice «No se pudo contactar con el asistente.»
 2. Con Internet pero sin llegar a erplora.com (el hub lo avisa así), el mensaje es el mismo.
-3. Si erplora.com contesta que no atiende (proveedor sin credencial, sin modelo, negocio sin nivel, petición demasiado grande), el mensaje es otro: «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.» El panel distingue las dos cosas por quién emite el fallo, no por su texto.
+3. Solo si erplora.com rechaza **dentro** de una respuesta que ya está en marcha (proveedor sin credencial, sin modelo, negocio sin nivel, hilo de más de 1 MB de texto) el mensaje es otro: «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.» Cualquier rechazo HTTP de erplora.com (sesión del hub no reconocida, petición inválida, freno por tasa) el hub lo cuenta como «no se pudo contactar», y un cuerpo de más de 2 MB lo rechaza el propio hub con un 413 que el panel lee igual (leído, sin ejecutar).
 4. Quedarse sin mensajes del mes no es una avería: HUB_SHELL-F197.
 5. En todos los casos el cuadro vuelve a estar activo y la pregunta queda en el hilo; para repetirla hay que escribirla o enviar otra.
 Entra: el desenlace de la petición del panel al hub.
@@ -290,20 +291,20 @@ ejecutar, confirmar con el dato real, ofrecer el «ir a…», y si no puede deci
 | Empezar una conversación nueva sin cerrar sesión | no hecho | HUB_SHELL-F195 |
 | Historial entre sesiones y dispositivos (Sidekick lo guarda) | no hecho (decisión: la conversación vive solo en el navegador, ADR-0149) | HUB_SHELL-F195 |
 | Respuesta con tablas, listas y enlaces a pantallas | hecho | HUB_SHELL-F188, HUB_SHELL-F189 |
-| Previsualizar lo que va a hacer antes de ejecutar | parcial: lista de datos, sin el valor anterior ni el efecto | HUB_SHELL-F190 |
+| Previsualizar lo que va a hacer antes de ejecutar | parcial: datos con nombre técnico, en un párrafo, sin nombre de acción en 26 de 27 apps, sin el valor anterior ni el efecto | HUB_SHELL-F190 |
 | Previsualizar un plan entero de varios pasos | no hecho | HUB_SHELL-F194 |
 | Confirmación antes de cada cambio | hecho | HUB_SHELL-F190 |
-| Fricción según el daño (clic, escribir, no desde el chat) | hecho | HUB_SHELL-F191 |
+| Fricción según el daño (clic, escribir, no desde el chat) | parcial: la política está, pero solo Citas declara el riesgo de sus borrados; en el resto, borrar o anular se confirma con un clic | HUB_SHELL-F191 |
 | Confirmar el resultado con el dato real (número, importe) | parcial: depende de lo que cuente el modelo; el panel no pinta un recibo | HUB_SHELL-F192 |
 | Marca de «hecho» que distinga ejecutado de «respondió bien» | no hecho | HUB_SHELL-F192 |
 | «Ir a…» a la pantalla del registro | hecho | HUB_SHELL-F189 |
 | Deshacer lo hecho por el asistente | no hecho | HUB_SHELL-F194 |
 | Mismo permiso que el botón; el asistente no puede más | hecho | HUB_SHELL-F193 |
-| Aprobación de un responsable (PIN) cuando falta el permiso | parcial: la ventana es la común, sin prueba del camino del asistente | HUB_SHELL-F193 |
-| Aviso cuando la respuesta afirma algo que no pasó | hecho | HUB_SHELL-F192 |
+| Aprobación de un responsable (PIN) cuando falta el permiso | no hecho: la orden ni se ofrece al asistente; el botón de la pantalla sí abre el PIN | HUB_SHELL-F193 |
+| Aviso cuando la respuesta afirma algo que no pasó | parcial: tres agujeros (herramientas del núcleo con error escrito, respuesta perdida, turno terminado en error) | HUB_SHELL-F192 |
 | Citar de dónde sale cada cifra (registro, enlace) | no hecho | HUB_SHELL-F192 |
 | Adjuntar fotos y documentos; dictado que no se envía solo | parcial | HUB_SHELL-F187 |
-| Puesta en marcha guiada y leyendo el estado real | hecho | HUB_SHELL-F196 |
+| Puesta en marcha guiada y leyendo el estado real | parcial: una relectura fallida reutiliza la lista anterior | HUB_SHELL-F196 |
 | Cuota visible antes de agotarse y salida al plan | parcial | HUB_SHELL-F197 |
 | Denunciar una respuesta | hecho | HUB_SHELL-F198 |
 | Valorar con 👍/👎 | no hecho | HUB_SHELL-F198 |
@@ -319,14 +320,15 @@ que el panel garantiza y lo que no:
 | Garantía | Estado | Flujo |
 |---|---|---|
 | Se pide confirmación siempre que la orden cambie datos o dude de si los cambia | hecho | HUB_SHELL-F190 |
-| La tarjeta enseña los datos que se van a mandar, con el dinero en euros | hecho | HUB_SHELL-F190 |
+| La tarjeta enseña los datos que se van a mandar, con el dinero en la moneda del negocio | parcial: solo importes de primer nivel que el esquema marca; dentro de un lote, céntimos en crudo; nombres técnicos; en un párrafo | HUB_SHELL-F190 |
 | La tarjeta enseña qué cambia de lo que ya hay (valor anterior → nuevo) | no hecho | HUB_SHELL-F190 |
-| La tarjeta del alta en lote cuenta cuántas filas son | no hecho (solo cuenta para los borrados masivos) | HUB_SHELL-F191 |
-| Borrar con riesgo declarado pide escribir; masivo pide escribir el número | hecho | HUB_SHELL-F191 |
-| Una app que no declara el riesgo de su borrado se confirma con un clic | parcial | HUB_SHELL-F191 |
+| La tarjeta del alta en lote cuenta cuántas filas son | no hecho (solo cuenta para los borrados masivos declarados); un alta en lote crea todas sus filas con una sola tarjeta | HUB_SHELL-F191 |
+| Borrar con riesgo declarado pide escribir; masivo pide escribir el número | hecho (solo para lo que la app declara) | HUB_SHELL-F191 |
+| Una app que no declara el riesgo de su borrado se confirma con un clic | hueco: es el caso de 26 de 27 apps | HUB_SHELL-F191 |
 | El panel distingue «hecho» de «el servidor respondió bien» | no hecho | HUB_SHELL-F192 |
 | Un rechazo del servidor llega a la persona con palabras del modelo, sin texto fijo | parcial | HUB_SHELL-F192, HUB_SHELL-F193 |
-| Quien no tiene permiso no ve la herramienta | hecho (lo decide el servidor) | HUB_SHELL-F193 |
+| Quien no tiene permiso no ve la herramienta (tampoco si un responsable podría aprobarla con su PIN) | hecho (lo decide el servidor) | HUB_SHELL-F193 |
+| Una orden de la que solo un responsable puede responder con su PIN se puede pedir al asistente | no hecho | HUB_SHELL-F193 |
 
 ## Datos: de quién es cada dato
 
@@ -336,7 +338,7 @@ El panel no es dueño de ningún dato de negocio. Lo que guarda es solo del nave
 |---|---|---|---|
 | La conversación (texto, adjuntos en base64, avisos de comprobación, identificador de cada respuesta) | `sessionStorage`, clave `erplora.assistant.history`, por pestaña | de la persona que la escribió | cerrar sesión, caducar la sesión, cambiar de usuario con PIN aceptado, cerrar la pestaña |
 | Si el panel está abierto | `localStorage`, clave `erplora.assistant.open` | del aparato | nunca; no distingue personas |
-| Qué quiere ver el panel al abrirse (la puesta en marcha) | memoria de la pantalla | de la sesión | al enviar la primera pregunta |
+| Qué quiere ver el panel (el modo de configuración) | memoria del módulo del shell | del aparato | al recargar la página; solo el paso concreto se olvida al enviar la primera pregunta |
 | Plan y consumo del mes | memoria de la pantalla; la verdad es del SaaS | del negocio | al recargar |
 
 Dato personal: el contenido de la conversación puede traer nombres de clientes, importes y
@@ -350,11 +352,12 @@ respuesta y de la pregunta (HUB-F278). El panel no guarda nada de eso en el serv
   forma de preguntar, cancela; solo una marca de «solo lee» literalmente verdadera salta la tarjeta.
 - **El asistente no tiene más permiso que quien pregunta**: ejecuta con la sesión local y por la misma
   puerta que el botón; el servidor lo vuelve a revisar en cada orden.
-- **Un borrado masivo que no dice cuántos registros afecta no se hace desde el chat.**
+- **Un borrado que su app declara masivo y que no dice cuántos registros afecta no se hace desde el chat.**
 - **Una dirección que escribe el modelo no saca a la persona del hub**: solo se sigue una pantalla de
   este hub que exista; el HTML de la respuesta no se interpreta.
-- **La conversación de una persona no pasa a la siguiente en la misma caja** (cerrar sesión o cambiar
-  de usuario la vacía y corta lo que esté llegando).
+- Cambiar de usuario con PIN o cerrar sesión vacía el hilo y corta lo que esté llegando. Hueco: con
+  el cambio de usuario se quedan el texto y los adjuntos sin enviar, el aviso de cuota de quien se fue
+  y el modo configuración (HUB_SHELL-F195).
 - **Lo dictado no se envía solo.**
 - **El pago de un plan lo ofrece solo quien administra, y no en la copia de Google Play.**
 
@@ -364,7 +367,7 @@ respuesta y de la pregunta (HUB-F278). El panel no guarda nada de eso en el serv
 - No ejecuta acciones destructivas del propio hub (desinstalar, reiniciar, borrar datos).
 - No lee la documentación de las apps; contesta con las descripciones de sus consultas y órdenes.
 - No cita fuentes ni valora respuestas con 👍/👎; no deshace lo que ejecutó.
-- No hace «lo mismo en lote» con una sola confirmación: cada orden pide la suya.
+- Una tarjeta no aprueba dos órdenes; pero una orden de alta en lote crea todas sus filas con una sola tarjeta, sin decir cuántas.
 
 ## Dudas abiertas
 
@@ -383,12 +386,7 @@ respuesta y de la pregunta (HUB-F278). El panel no guarda nada de eso en el serv
   capacidad está disponible: el código lo muestra siempre con sesión (`setAssistantAvailable` no la
   llama nadie). Dice también que el dictado aparece «cuando el dispositivo lo admite»: el botón se
   enseña siempre y avisa al pulsarlo.
-- `hub-wf-acceso/workflow/acceso.md` (HUB-F138) escribe que el historial del asistente de quien se fue
-  sigue en la pantalla tras cambiar de usuario (hub#1544); el código lo vacía en cuanto el PIN nuevo
-  se acepta (`lib/user-switch.ts`, `clearAssistantHistory()`, con test `user-switch.test.ts`) y también
-  en `logout()` (`lib/session.ts`). El guion de QA lo lista como pendiente («el historial no pasa al
-  siguiente usuario») y el código lo cumple.
-- `qa-hub-assistant` pide que la tarjeta diga «de qué app viene»: el panel calcula el nombre de la app
+- El guion de QA da por pendiente el borrado del historial al cambiar de usuario; el código ya lo hace (hub#1544, cerrada; HUB-F138 de acceso ya dice lo mismo). `qa-hub-assistant` pide que la tarjeta diga «de qué app viene»: el panel calcula el nombre de la app
   pero no lo enseña (`described.app` no se usa). También espera «`MAX_TOOL_ITERS` agotado con mensaje
   humano»: el panel o calla o dice «No se pudo contactar», y «cierra el drawer a mitad ... nada se
   ejecuta»: cerrar el panel no corta el turno.
