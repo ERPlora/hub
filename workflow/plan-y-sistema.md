@@ -67,7 +67,7 @@ Pasos:
 3. Una app que ya no está en el permiso (de pago o gratuita) deja de responder al momento en las órdenes y consultas de la pantalla, sin desinstalarse ni perder datos; su API pública, sus tareas programadas, sus automatizaciones y sus avisos siguen corriendo. Si erplora.com no contesta, las apps gratuitas siguen siempre; una de pago (o de un nivel desconocido, que cuenta como de pago) se corta solo tras tres fallos seguidos **y** pasada su gracia. Con una comprobación al arrancar y otra cada 24 h, el tercer fallo llega a las 72 h; la gracia la pone erplora.com en el permiso (según los comentarios del código, 5 días las de pago y 7 la general; sin confirmar en el SaaS): **a los 3 días sin conexión no se corta nada**, las de pago caen hacia el día 5 (o el 7) y las gratuitas nunca. Si el hub se reinicia durante el corte, vuelve a «todo abierto» y además el acceso con cuenta deja de estar disponible.
 4. Los topes de personas y dispositivos se aplican al dar de alta (HUB-F147) y al entrar (HUB-F137).
 Entra: el permiso firmado (`GET /api/v1/hub/device/entitlement/`) con la credencial de máquina; la clave pública (`/api/v1/auth/public-key/`).
-Sale: el plan verificado en memoria; las órdenes y consultas de una app bloqueada contestan `module_entitlement_blocked` (402) y la vista del módulo dice «Suscripción necesaria». La pantalla recibe el plan por una puerta propia con 60 s de memoria, que ante un «demasiadas peticiones» de erplora.com sigue sirviendo el último bueno. En el mismo turno se recoge el cupo de mensajes de WhatsApp del mes.
+Sale: el plan verificado en memoria; las órdenes y consultas de una app bloqueada contestan `module_entitlement_blocked` (402) y la vista del módulo dice «Suscripción necesaria». Con una sesión de PIN (sin credencial de erplora.com) la pantalla no conoce el plan y no pinta el bloqueo: la app aparece normal y sus peticiones fallan con el 402. La pantalla recibe el plan por una puerta propia con 60 s de memoria, que ante un «demasiadas peticiones» de erplora.com sigue sirviendo el último bueno. En el mismo turno se recoge el cupo de mensajes de WhatsApp del mes.
 Si falla: sin ninguna comprobación buena todavía, no se bloquea nada (la autoridad es erplora.com). Una firma que no cuadra cuenta como fallo y se mantiene lo último bueno. Ante un fallo de red, la puerta de la pantalla contesta 424 y no sirve el último bueno (solo lo hace ante un «demasiadas peticiones»). Las llamadas no tienen tiempo máximo: si una se queda colgada, el turno diario se congela, no cuenta fallos (las apps de pago nunca se cortan) y no sale el latido.
 Implicados: pendiente
 Pendiente de enlazar: saas — emitir el permiso firmado del plan (apps, niveles, topes y gracia)
@@ -212,3 +212,63 @@ Sale: nada nuevo; la garantía de que un token, un PIN o un dispositivo de un ne
 Si falla: sin `HUB_ID`, el hub toma el identificador de desarrollo y no se da por registrado (HUB-F160); con `HUB_ID` vacío y credencial, sí se da por registrado (ver huecos), y solo las filas de confianza de dispositivo se niegan a escribirse.
 Implicados: ninguno
 QA: qa-hub-restaurant §6
+
+## Cobertura contra la referencia
+
+Referencia adoptada: **plan firmado verificable sin conexión con gracia**, el patrón de licencia
+offline (ADR-0154, `architecture/hub/auth.md` §2.10).
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Plan firmado, gracia sin conexión, bloqueo de apps | parcial (memoria; tras reinicio sin topes; el corte no alcanza la API pública, tareas, automatizaciones ni avisos; sin tiempo límite; con sesión de PIN la pantalla no pinta el bloqueo) | HUB-F162 |
+| Cambio de plan aplicado al momento | hecho | HUB-F163 |
+| Hub pausado | no hecho en el servidor | HUB-F162 |
+| Tope de tamaño de base de datos | no hecho (solo se muestra) | HUB-F165 |
+| Listo para servir / salud | hecho | HUB-F161 |
+| Uso de recursos frente a límites | hecho | HUB-F165 |
+| Versión e historial de actualizaciones | parcial (sin autor) | HUB-F167 |
+| Freno de carga | parcial (sin texto traducido) | HUB-F170 |
+
+## Datos: de quién es cada dato
+
+Las tablas de toda el área están en [acceso.md](acceso.md). De erplora.com, leídos por su puerta
+(HUB-F168): la credencial firmada de la persona (JWT con `hubs[]`), el plan firmado, la membresía e
+invitación (`/api/v1/hub/device/members/`), las series de uso, los documentos, el catálogo y las
+facturas (estas, desde la pantalla con la credencial de la persona). `_update_history` y `_hub_meta`
+no guardan datos personales (el historial no tiene autor).
+
+## Lo que NO hace, a propósito
+
+- No persiste el plan verificado en base de datos: vive en memoria (HUB-F162).
+
+## Dudas abiertas
+
+- **Freno de carga**: ¿texto traducido para `service_overloaded`?
+- El hub pausado y el plan tras un reinicio sin conexión están en las dudas comunes del índice.
+
+## Fuentes contrastadas
+
+- `architecture/hub/auth.md` §2.3 (tabla) dice que la máquina usa `X-Hub-Token`; el código manda
+  `X-Api-Key` cuando la credencial es una llave `erpk_…` (`crates/cloud-client/src/lib.rs`).
+- `architecture/hub/auth.md` §2.3 dice que el runtime aún manda `X-Webhook-Secret` para el M2M de
+  fondo; no hay ningún uso de `Auth::Webhook` en el servidor ni en el runtime.
+- `architecture/hub/auth.md` lista `bootstrap` y `enroll` entre los endpoints usados; el hub no los
+  llama.
+- `architecture/hub/auth.md` §2.10 dice «sin token válido ni cacheado no monta los módulos»; el código
+  deja pasar todo mientras no haya una comprobación buena (`crates/server/src/entitlement.rs`)
+  (HUB-F162).
+- `architecture/hub/system-info.md` dice que no hay rama de ECS y que documentos y registros están
+  pendientes; los dos existen. En Hetzner la CPU y la memoria solo traen el porcentaje y
+  `documents[].url` es siempre nulo (HUB-F166).
+- `architecture/hub/versioning.md` cita `GET /system`; la ruta es `/api/system`. El comentario de
+  `crates/runtime/src/core_version.rs` dice que `/api/hub/context` publica la versión: no lo hace
+  (HUB-F167).
+- `crates/server/src/entitlement.rs` (comentario) dice que el límite de peticiones del SaaS es por IP;
+  el documento dice que ahora es por hub.
+- `crates/server/src/whatsapp_quota.rs` (comentario) dice que no hay vía SaaS→hub;
+  `POST /api/entitlement/refresh` (HUB-F163) lo es.
+- Manual `hand-book/hub/01`: «Pantalla de activación cuando el Hub no puede confirmar un acceso
+  válido»; la pantalla no se alcanza (nadie pone ese estado en `apps/web/src/lib/entitlement.ts`)
+  (HUB-F162).
+- Manual `hand-book/hub/05` y `07` hablan de «Sistema > Plan»; la pestaña es «Plan y límites»
+  (HUB-F165).

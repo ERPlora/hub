@@ -18,6 +18,15 @@ Prefijo: HUB
 > autenticación**: un módulo que no se declara pasa solo con la sesión del administrador. Las
 > excepciones (las recetas de fábrica) se dicen en su flujo.
 
+## Antes de empezar
+
+- Para automatizar: instalar Automatizaciones, concederle «Administrar automatizaciones» y entrar
+  como dueño o administrador (HUB-F111, FLOWS-F01).
+- Para usar secretos en «Llamar a otro sistema», el hub necesita su llave de cifrado
+  (`HUB_SECRETS_KEY`, del despliegue) (HUB-F99).
+- Lo que vale también para los avisos (permisos para imprimir o avisar, mensajes) está en
+  [avisos.md](avisos.md).
+
 ## Flujos
 
 ### HUB-F80 Crear una automatización
@@ -497,3 +506,89 @@ Sale: el archivo en el almacén de ERPlora del hub y su referencia, tipo y tama�
 Si falla: un archivo de otro tipo, demasiado grande o un formulario mal hecho se rechazan; si el almacén falla, error. Si la firma del enlace falla al enviar, se reintenta 8 veces y acaba en «Eventos caídos»; si el archivo se borró, hoy ERPlora firma igual (saas#2393) y el fallo llega después, desde WhatsApp.
 Implicados: FLOWS-F15
 QA: qa-hub-flows R7
+
+## Cobertura contra la referencia
+
+Referencia adoptada: la ya contrastada en `.claude/agents/qa-hub-flows.md` (recorridos R0–R10,
+scorecard contra Zapier, Make, Power Automate, Shopify Flow, Odoo y Business Central) y en el
+`WORKFLOW.md` de `flows`. Se adopta: disparador elegido de una lista (aviso, horario en la hora del
+negocio, fecha, a mano), columna lineal sin bifurcaciones (ADR-0461), permisos explícitos por
+automatización (ADR-0283 D2), pregunta a una persona con plazo y qué pasa con el silencio (Power
+Automate, Odoo «Allowed Group»), secretos de solo escritura, y recetas de fábrica que se encienden
+en un toque desde su módulo (ADR-0470; Square y Vagaro: un interruptor).
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Disparador por aviso, horario (hora del negocio), fecha, a mano | parcial: fecha con desplazamiento mal comparada; a mano solo API | HUB-F82…F85 |
+| Validar el documento entero al guardar | hecho (acción inexistente se acepta) | HUB-F80, HUB-F86 |
+| Acción, consulta, condición, espera, mensaje, llamada, asistente, pregunta | hecho / parcial por paso | HUB-F89…F96 |
+| «Solo si» y «seguir si falla» por paso | hecho; sin reintento por paso | HUB-F97 |
+| Permisos por automatización con límites | parcial (escritura no todo-o-nada) | HUB-F98 |
+| Secretos de solo escritura y protección de llamadas salientes | hecho | HUB-F94, HUB-F99 |
+| Aprobación con plazo y qué pasa con el no y el silencio | parcial: el rol no restringe; doble aprobación posible | HUB-F96, HUB-F100, HUB-F101 |
+| Historial paginado con retención | hecho (90 días) | HUB-F102 |
+| Reanudar desde el paso que falló (Make, Power Automate) | no hecho (hub#952) | HUB-F103 |
+| Recetas de fábrica: servir, encender, apagar, restaurar | parcial: encender no es todo-o-nada; restaurar con hueco de pausa | HUB-F104…F107 |
+| Catálogo de avisos y ejemplos reales sin datos de personas | parcial: el texto de un WhatsApp entrante sale como ejemplo | HUB-F108, HUB-F109 |
+| Protección contra bucles sin parar la caja | parcial: lo descartado no se ve | HUB-F110 |
+| Modo prueba en el servidor | no existe a propósito: lo hace la pantalla (FLOWS-F20) | — |
+
+## Datos: de quién es cada dato
+
+Tablas de sistema del motor, todas con `hub_id`. El inventario de datos personales de avisos y
+automatizaciones, y lo que alcanza el borrado de un cliente, están en [avisos.md](avisos.md).
+
+| Tabla | Qué guarda | Cuánto vive |
+|---|---|---|
+| `_flow` | automatización: nombre, documento (con los destinatarios, textos y direcciones que escribe el dueño), encendida, receta y huella; `created_by`, `updated_by`, `deleted_by` | para siempre (borrado lógico) |
+| `_flow_grants` | permisos con su límite; `granted_by`, `revoked_by` | para siempre (borrado lógico) |
+| `_flow_triggers` | disparadores, filtro, mapeo, horario, próxima/última vez | para siempre (borrado lógico) |
+| `_flow_runs` | ejecución: `input` (los datos del aviso), `vars` (memoria), último error, `created_by` | terminadas: 90 días; vivas: sin límite |
+| `_flow_run_steps` | por paso: entrada, salida, error | con su ejecución |
+| `_flow_approvals` | pregunta o propuesta: texto, resumen, **payload verbatim**, motivo, rol, decisión, `decided_by`, nota | con su ejecución (90 días desde que termina; el recibo de 4 años es `_elevation_audit`, que no guarda el contenido) |
+| `_flow_run_waits` | esperas armadas con el dato de correlación (`correlate_value`, p. ej. el id de una cita) | con su ejecución |
+| `_flow_secrets` | secretos cifrados (AES-256-GCM), credenciales de terceros; `created_by`, `updated_by`, `deleted_by` | para siempre; al borrar se vacía el valor |
+| `media/whatsapp/headers/` | archivos de cabecera subidos (HUB-F112) | sin poda |
+
+## Reglas que no se rompen
+
+- **Una automatización actúa con sus propios permisos**, releídos en cada paso; nace sin ninguno; una
+  receta de fábrica nace con exactamente los de su receta y nunca queda encendida a medias.
+- **Ninguna pantalla ni puerta devuelve un secreto**, y no aparece en el historial. No es secreto
+  frente a quien crea automatizaciones: puede enviarlo con un paso «Llamar a otro sistema» a una
+  dirección que conceda.
+- **Una llamada saliente no llega a la red interna** (comprobación en la propia resolución de nombres).
+
+## Lo que NO hace, a propósito
+
+- No reintenta pasos de automatización ni tiene modo de prueba en el servidor (la prueba es de la
+  pantalla).
+- No bifurca: una automatización es una columna (ADR-0461).
+
+## Dudas abiertas
+
+1. ¿Debe pausar una automatización cancelar también sus preguntas pendientes y sus mensajes en cola?
+2. ¿Debe volver a encenderse una automatización sin disparar lo que venció durante la pausa?
+3. ¿Quién debe poder contestar una pregunta dirigida a un rol (hoy solo administradores)?
+4. ¿Debe haber límite de ejecuciones a mano por minuto?
+
+## Fuentes contrastadas
+
+- `architecture/hub/flows.md` §8: «un run termina con la definición con la que nació (snapshot)»; el
+  código relee el documento en cada paso por número de paso (HUB-F86).
+- `architecture/hub/flows.md` §7.2 / `boot.rs`: el TTL de 72 h es de las propuestas del asistente; una
+  pregunta tiene su propio plazo (1 s…30 d, 72 h de fábrica) (HUB-F96).
+- `WORKFLOW.md` de `flows` (FLOWS-F12, FLOWS-F14): «el hub rechaza al guardar una acción que no existe»;
+  el hub acepta una acción desconocida (solo rechaza las internas); sí rechaza una consulta desconocida
+  (HUB-F80).
+- `WORKFLOW.md` de `flows` (FLOWS-F09, «Reglas»): «lo que esperaba una respuesta se cancela cuando
+  alguien contesta o caduca» — cierto para rechazar o caducar; aprobar una propuesta de una
+  automatización pausada ejecuta la acción antes de cancelar la ejecución, y aprobar una de una
+  automatización borrada se niega (sin permiso) y la deja pendiente (HUB-F87, HUB-F88, HUB-F100).
+- `WORKFLOW.md` de `flows` (FLOWS-F03, «Reglas»): «pausar hace que lo que estaba en marcha se cancele
+  en su siguiente paso»; una espera dormida solo se cancela al despertar, y los mensajes en cola salen
+  igual (HUB-F87).
+- `WORKFLOW.md` de `whatsapp_inbox` (WHATSAPP_INBOX-F14): «quedan… con exactamente los permisos que
+  declaran»; cierto la primera vez; al volver a activar se conservan los del dueño (HUB-F105).
+- Los rechazos del motor que la pantalla pinta tal cual están en inglés (HUB-F80).
+- Guion `qa-hub-flows` R2: prueba «Ejecutar» por la UI; solo existe por la API (HUB-F85).

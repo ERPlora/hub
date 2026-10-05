@@ -11,6 +11,13 @@ Prefijo: HUB
 > `crates/server/src/{assistant,assistant_api,assistant_report,router,embed,agent_runner}.rs`,
 > `crates/server/src/ingest.rs` (`collect_chunks`) y el crate `vector`.
 
+## Antes de empezar
+
+- Nada que configurar. El nivel lo da el plan del hub (ADR-0474). En producción hace falta el hub
+  enrolado (con credencial de máquina; ver [whatsapp.md](whatsapp.md)).
+- Si la base de datos del hub tiene la extensión de vectores, el asistente recorta herramientas por
+  relevancia (HUB-F275); si no, las ofrece todas.
+
 ## Flujos
 
 ### HUB-F273 Conversar con el asistente
@@ -24,7 +31,7 @@ Pasos:
 4. El panel ejecuta las herramientas con la sesión de la persona, pidiendo confirmación antes de cambiar nada (HUB_SHELL), y sigue la conversación.
 Entra: los mensajes de la sesión (`messages`, con sus adjuntos); la sesión local, que da los permisos y el usuario que viaja como dato de gasto, nunca como permiso.
 Sale: un flujo de eventos `token`, `function_call` (anotado con `kind`, `read_only`, `risk` y `money_fields`), `usage` y `done`. **El hub no guarda la conversación**: vive en el navegador durante la sesión (ADR-0149) y el SaaS no la conserva.
-Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta, el flujo se corta a mitad, **o el SaaS rechaza la petición antes de abrir el flujo** (credencial, petición inválida, freno de tasa por hub), el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor; en el último caso dice «no se pudo contactar» cuando en realidad hubo un rechazo, hueco); si el SaaS rechaza el turno dentro del flujo (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
+Si falla: sin sesión, `401`; una llave de API no entra por esta puerta; una conversación de más de 2 MB la corta el propio hub con `413` antes de llegar al asistente; hub sin enrolar, `401` «hub sin credencial»; si el proxy no contesta, el flujo se corta a mitad, **o el SaaS rechaza la petición antes de abrir el flujo** (credencial, petición inválida, freno de tasa por hub), el panel recibe un evento de error con el código `cloud_unreachable` (nunca la dirección del servidor; en el último caso dice «no se pudo contactar» cuando en realidad hubo un rechazo, hueco); si el SaaS rechaza el turno dentro del flujo (cupo agotado, `quota_exceeded`; proveedor sin credencial) el evento de error viaja tal cual y el hub deja la causa en su registro, salvo el cupo agotado, que es el plan funcionando (hub#1738).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, panel del asistente (bucle de herramientas, tarjeta de confirmación, historial de sesión, recibos del turno)
 Pendiente de enlazar: saas — asistente: `POST /api/v1/hub/device/assistant/chat/stream/` con `{input, messages, tools, instructions, user}` que inserta `instructions` como mensaje de sistema, ofrece las `tools` al modelo y devuelve SSE con `function_call` (argumentos completos, uno por llamada), `usage` al cerrar y `error` con `code` y `retriable`, terminado en `[DONE]`; mide un turno solo si se completa
@@ -102,7 +109,7 @@ Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: HUB_SHELL: Asistente
 Pasos:
-1. Bajo una respuesta terminada, la persona pulsa denunciarla y, si quiere, dice el motivo y un comentario.
+1. Bajo una respuesta terminada, la persona pulsa denunciarla y, si quiere, escribe un comentario. El panel no manda motivo: el servidor acepta uno, pero hoy solo llega por la API.
 2. El hub exige una sesión (cualquier perfil: quien se siente ofendido es quien está delante) y que vengan el identificador de la respuesta y su texto.
 3. Lo deja en el registro único de errores del hub como algo a revisar, con quién lo denunció, y el registro lo manda al SaaS.
 Entra: el identificador de la respuesta, su texto, y opcionalmente la pregunta que la provocó, el motivo y el comentario.
@@ -131,3 +138,78 @@ Pendiente de enlazar: flows — FLOWS-F17 (Pedirle un paso al asistente)
 Pendiente de enlazar: hub — HUB, automatizaciones (ejecución del paso, bandeja de aprobaciones, caducidad y decisión de una propuesta)
 Pendiente de enlazar: saas — asistente: el mismo `…/assistant/chat/stream/` de HUB-F273 llamado con la credencial de máquina, sin usuario, y `retriable: false` en los errores que no pasan esperando
 QA: qa-hub-flows R6
+
+## Cobertura contra la referencia
+
+Referencia adoptada:
+
+- **Asistentes que operan un ERP** (contrastado en `.claude/agents/qa-hub-assistant.md` §«El
+  mercado decide»): Business Central Copilot, Shopify Sidekick, Odoo AI, Intercom Fin. Se adopta su
+  flujo: herramientas filtradas por el permiso de quien pregunta, previsualizar y confirmar antes de
+  escribir, anclar las respuestas a los datos del propio negocio, y decir «eso no lo puedo hacer,
+  hazlo aquí».
+- **Pasos de IA en automatizaciones** (n8n AI Agent, Zapier AI, Make): herramientas acotadas por
+  paso, salida estructurada por una función forzada, y aprobación humana de lo que cambia datos.
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Herramientas = operaciones con permiso de quien pregunta | hecho | HUB-F274 |
+| Nada destructivo del hub ofrecido | hecho | HUB-F274 |
+| Riesgo declarado por el módulo, dinero marcado | hecho (la tarjeta la pinta el shell) | HUB-F274 |
+| Anclaje a versión, módulos, pantallas, registros inmutables, fecha | hecho | HUB-F276, HUB-F273 |
+| Anclaje a la documentación de cada módulo instalado | no hecho (no hay índice de `docs/`; ADR-0282 lo aplazó) | HUB-F276 |
+| Recorte de herramientas por relevancia | hecho, con degradación a todas | HUB-F275 |
+| Plan y consumo visibles, ampliar | hecho | HUB-F277 |
+| Denunciar contenido | hecho, de mejor esfuerzo: sin reintento y perdida sin aviso en un hub sin enrolar; el panel no manda motivo | HUB-F278 |
+| Historial de la conversación | en el navegador por sesión (ADR-0149); el hub no guarda nada | HUB-F273 |
+| Paso de IA desatendido con aprobación humana | hecho | HUB-F279 |
+
+## Datos: de quién es cada dato
+
+| Dato | Dónde vive | Dueño | Cómo se borra hoy |
+|---|---|---|---|
+| Índice del asistente (`hub_knowledge_chunk`: módulo, versión, descripción, vector) | BD del hub | hub | al desinstalar el módulo; sin datos personales |
+| Conversación con el asistente | navegador (sesión) | persona | al cerrar sesión |
+| Lo que lee el modelo (preguntas, resultados de herramientas) | proveedor de IA vía SaaS | SaaS | fuera del hub (L-13) |
+| Denuncia de una respuesta (pregunta, respuesta, comentario, usuario que denuncia) | registro de errores → SaaS | SaaS | lo decide el SaaS |
+| Propuesta del paso del asistente (orden y datos, con nombre o teléfono de la clienta) | `_flow_approvals` | hub (automatizaciones) | con su ejecución, a los 90 días de terminar (el recibo de 4 años es `_elevation_audit`, que no guarda el contenido) |
+
+`hub_knowledge_chunk` no se crea por migración sino al arrancar (`ensure_schema`, ADR-0282).
+
+## Reglas que no se rompen
+
+- **Ninguna credencial del proveedor de IA en el hub**: el proxy del SaaS llama al proveedor.
+- **Ampliar el plan del asistente: solo sesión de administrador.**
+- **Lo destructivo del hub nunca se ofrece al asistente**, y las órdenes internas de un módulo
+  tampoco. El permiso de cada herramienta lo revisa el servidor al ejecutarla.
+- **En una automatización, el asistente solo ve lo que el paso nombra, la automatización tiene
+  concedido y su permiso alcanza**; lo que cambia datos con «Que me lo pregunte» no se ejecuta sin
+  persona.
+- **Una llamada repetida al modelo nunca repite una orden del negocio.**
+
+## Lo que NO hace, a propósito
+
+- No guarda la conversación del asistente (ADR-0149).
+- No ofrece al asistente desinstalar, reiniciar ni borrar el hub.
+
+## Dudas abiertas
+
+1. **Documentación de los módulos en el asistente** (ADR-0282 lo dejó fuera): ¿se indexa `docs/` de
+   cada módulo por versión instalada, como hacen Intercom Fin o el Copilot de Business Central?
+
+## Fuentes contrastadas
+
+- `crates/server/src/assistant_api.rs` y `cloud-client::assistant_chat_stream`: «token de máquina si
+  está enrolado; si no, el JWT del usuario» — el JWT solo se usa en un hub de desarrollo
+  (`auth::hub_scoped_auth`); en producción, sin credencial de máquina no hay asistente.
+- `cloud-client::embeddings` dice que la búsqueda de cada turno firma con el JWT del usuario — firma
+  con la misma credencial del turno (`hub_scoped_auth`).
+- `PROMPT-WORKFLOW.md` («las `docs/` del módulo… las indexa el asistente») y ADR-0033 («indexa sus
+  docs al RAG», RAG en `hub/apps/ai/knowledge/`): el hub solo indexa las descripciones `agent`/`ai`
+  para elegir herramientas; no hay índice de `docs/` (ADR-0282 corrige ADR-0033 y aplaza el índice
+  de `docs/`). Lo mismo dicen `architecture/contracts/workflow-contract.md:38` y
+  `architecture/saas/assistant.md:421-422` («la tool `search_docs`»: no existe en el hub).
+- `crates/vector/src/lib.rs` (cabecera): «el store de producción pgvector es un follow-up» — ya
+  existe (`crates/vector/src/pg.rs`, ADR-0282).
+- `hand-book/hub/10-asistente-y-notificaciones.md`: no dice que el asistente puede instalar módulos
+  y aplicar plantillas de sector, ni que lo destructivo no se ofrece nunca.

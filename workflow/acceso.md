@@ -2,12 +2,37 @@
 
 Prefijo: HUB
 
+> **Para qué sirve el área «Acceso, personas y plan».** El servidor del hub decide quién entra y
+> cómo: con la cuenta de erplora.com (la contraseña y el segundo factor los resuelve erplora.com; el
+> hub comprueba la credencial firmada y la membresía de **este** negocio), con un PIN o pasando una
+> placa en un dispositivo de confianza, y cuánto dura la sesión según el dispositivo (compartido o
+> personal) y lo que pide el negocio. Guarda las cuentas del personal (locales con PIN o con cuenta e
+> invitación de erplora.com), sus roles y lo que cada rol puede, aprueba una acción con el PIN de un
+> responsable sin cerrar la sesión del cajero, aplica las normas que escribe el dueño y emite llaves
+> para sistemas externos. Comprueba su plan firmado (apps permitidas, plazas de personas y
+> dispositivos) y sigue funcionando sin conexión dentro de su gracia, manda el latido de uso, habla
+> con erplora.com en nombre del negocio sin enseñar nunca su credencial de máquina, y cuenta su
+> propia salud (listo para servir, recursos, versión, actualizaciones). Lo usan el **administrador**
+> (personal, roles, llaves, dispositivos, PIN del negocio, métricas), el **responsable** (aprobar con
+> su PIN) y todos los perfiles (entrar, su perfil, su PIN); el resto lo hace el **sistema** solo. Lo
+> que vale para toda el área (sus tablas, lo que vive en memoria, la referencia) está al final de
+> este fichero.
+>
 > Detalle del área «Acceso, personas y plan» (oleada 3): cómo entra una persona en el hub, cuánto
 > dura su sesión, qué hace el hub con cada dispositivo y cómo frena a quien prueba credenciales. Lo
 > que la persona ve (la pantalla de acceso, el pinpad, las tarjetas de Ajustes) es de `HUB_SHELL`;
 > aquí está lo que el servidor decide. Cuentas, roles, llaves, plan y sistema siguen en
 > `workflow/personas-y-permisos.md` y `workflow/plan-y-sistema.md`. Lo técnico vive en
 > `architecture/hub/auth.md` (§2.3, §2.9 y siguientes) y no se repite.
+
+## Antes de empezar
+
+- La primera persona entra con su cuenta de erplora.com (HUB-F130) desde la aplicación instalada:
+  ese primer acceso hace al dispositivo **de confianza** y es su alta; sin él, en ese dispositivo no
+  funciona el PIN (HUB-F133).
+- Cada persona elige su PIN propio (HUB-F132). En **Ajustes › General** se decide si cada dispositivo
+  es compartido o personal (HUB-F139), si el negocio pide PIN y cuántos dígitos tiene (HUB-F140).
+- El personal se da de alta en [personas-y-permisos.md](personas-y-permisos.md) (HUB-F145 a HUB-F150).
 
 ## Flujos
 
@@ -36,7 +61,7 @@ Pantalla: HUB_SHELL: Acceso
 Pasos:
 1. En erplora.com la persona pulsa entrar en su negocio (o abre la app instalada, que pasa por el mismo sitio).
 2. El navegador llega al hub con un pase de un solo uso escondido en la dirección; el hub lo canjea con erplora.com usando su propia credencial de máquina.
-3. Con lo que devuelve erplora.com, el hub sigue exactamente el camino de HUB-F130: comprueba la membresía, enlaza o crea a la persona, confía en el dispositivo y abre la sesión.
+3. Con lo que devuelve erplora.com, el hub sigue exactamente el camino de HUB-F130: comprueba la membresía, enlaza o crea a la persona y abre la sesión. Solo cuando se entra desde la aplicación instalada confía además en el dispositivo; desde el navegador, este paso no lo da de alta para el PIN.
 4. La persona aparece dentro sin haber visto la pantalla de acceso.
 Entra: el pase (máximo 128 caracteres, un solo uso, vida de 120 s, atado a este negocio); la credencial de máquina del hub.
 Sale: lo mismo que HUB-F130, más los tokens de erplora.com de la persona para que el shell los guarde.
@@ -150,10 +175,10 @@ Actor: responsable, empleado
 Pantalla: HUB_SHELL: Cambiar de usuario
 Pasos:
 1. En un dispositivo compartido y de confianza, quien está en la caja abre «Cambiar de usuario» en su menú.
-2. La persona que entra elige su nombre y teclea su PIN (o pasa su placa).
+2. La persona que entra elige su nombre y teclea su PIN. El relevo no acepta la placa: quien entra con placa lo hace desde la pantalla de acceso (HUB-F134).
 3. El hub abre la sesión de la nueva persona por la misma puerta que HUB-F133; solo cuando la tiene, la pantalla cierra la del anterior.
 4. La venta sigue en pantalla y lo siguiente queda a nombre de quien entró («Ahora atiende {name}»).
-Entra: el nombre y el PIN (o la placa) de quien entra; el token de quien sale.
+Entra: el nombre y el PIN de quien entra; el token de quien sale.
 Sale: una sesión nueva y la anterior borrada. Cuando el PIN nuevo se acepta, la pantalla además olvida las credenciales de erplora.com y la conversación con el asistente de quien se fue (hub#1538, hub#1544, cerrada). El servidor no guarda ninguna conversación del asistente que haya que borrar.
 Si falla: un PIN rechazado no cambia nada (quien estaba dentro sigue dentro, con su conversación): «Esos datos no han funcionado…». Dispositivo sin confianza: «Este dispositivo todavía no está dado de alta para el PIN…».
 Implicados: pendiente
@@ -257,3 +282,87 @@ Si falla: si la baja local no se puede escribir, queda en el registro de errores
 Implicados: pendiente
 Pendiente de enlazar: saas — quitar a un miembro del negocio
 QA: ninguno
+
+## Cobertura contra la referencia
+
+Referencia adoptada por toda el área, contrastada en `architecture/hub/auth.md` (decisiones de
+mercado ya tomadas con referencias) y en `.claude/agents/qa-hub-restaurant.md` §2/§6. La de cuentas,
+aprobaciones, normas y llaves está en [personas-y-permisos.md](personas-y-permisos.md); la del plan,
+en [plan-y-sistema.md](plan-y-sistema.md). Para entrar y las sesiones se adopta esto:
+
+- **Acceso con PIN en dispositivo compartido, rejilla de caras y relevo sin cerrar la venta**:
+  Square (Team passcodes), Toast (employee passcodes, «switch user» como capa sobre la app). PIN de
+  longitud **fija por negocio, 4 o 6**, que entra solo al último dígito: modelo de Clover (hub#974).
+- **Placa (RFID/NFC/banda) como presentación de la misma identidad, nunca sustituta del PIN**:
+  Toast, Aloha/NCR, Square, Lightspeed (ADR-0347, 15 referencias). Nadie da de alta su propia placa
+  (Toast).
+- **Lista de dispositivos con «quitar este dispositivo» y limpieza de los no usados en 30 días**:
+  pantallas de cuenta de Google, Apple, Microsoft y Shopify (ADR-0258, hub#2215).
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Acceso con cuenta (correo, Google, segundo factor) | hecho (el segundo factor lo hace erplora.com) | HUB-F130 |
+| Entrar desde el panel sin volver a teclear | hecho | HUB-F131 |
+| PIN propio, cambio con el PIN actual | hecho | HUB-F132 |
+| PIN de longitud fija por negocio (4 o 6), no adivinable, único | hecho | HUB-F132, HUB-F140, HUB-F145 |
+| Caducidad o rotación obligatoria del PIN | no hecho (ningún TPV de referencia la exige; fuera) | — |
+| Acceso con PIN en dispositivo compartido de confianza | hecho | HUB-F133 |
+| Acceso con placa (lector USB, NFC) | parcial (sin validar con hardware real) | HUB-F134 |
+| Freno por intentos (por nombre, por placa, por dirección) | hecho | HUB-F135 |
+| Duración de sesión por dispositivo y por negocio | hecho | HUB-F136 |
+| Bloqueo por inactividad | parcial (lo hace la pantalla) | HUB-F136 |
+| Cerrar todas mis sesiones | no hecho | — |
+| Un dispositivo a la vez en el plan gratuito | hecho | HUB-F137 |
+| Cambio rápido de usuario sobre la venta | hecho (solo con PIN, sin placa) | HUB-F138 |
+| Dispositivo compartido / personal | hecho | HUB-F139 |
+| Lista de dispositivos, nombrar, quitar, limpiar | hecho | HUB-F141 |
+
+## Datos: de quién es cada dato
+
+Del área (tablas de sistema; cuáles no llevan `hub_id` lo dice el índice): `hub_user` (personas), `hub_session` (sesiones),
+`hub_trusted_device` (dispositivos de confianza y su modo), `hub_user_profile` y `hub_user_pref`
+(perfil y preferencias), `hub_role_activation` (roles encendidos), `_elevation_audit` (recibos de
+aprobación), `_hub_badge_key` (clave de las placas, sin puerta HTTP), `hub_api_key` y
+`hub_api_key_rate_window` (llaves y su ventana), `_policy` (normas), `_update_history` (versiones),
+`_hub_meta`, y los ajustes `pin_policy`, `pin_inactivity_minutes`, `pin_length` y `api_docs_enabled`
+en `hub_settings` (que guarda la puerta de ajustes de [negocio-y-datos.md](negocio-y-datos.md),
+HUB-F221). El latido de uso manda y vacía `_hub_activity_log`, que es de negocio y datos (HUB-F254).
+
+En memoria del proceso (se pierden al reiniciar): el plan verificado, las aprobaciones sin gastar,
+los contadores de intentos, las memorias de 60 s del plan y de 30 s de las series.
+
+Inventario de datos personales (sacado de las migraciones de sistema); el de cuentas, aprobaciones,
+normas y llaves está en [personas-y-permisos.md](personas-y-permisos.md):
+
+| Dónde | Qué |
+|---|---|
+| `hub_user` | nombre, correo de acceso, `cloud_user_id`, huella del PIN, índice y huella de la placa, rol, activo, `cloud_revoked_at`, marca de dueño |
+| `hub_user_profile` | nombre, apellidos, correo de contacto, ruta de la foto (y la foto en el almacén) |
+| `hub_user_pref` | idioma, tema, paleta |
+| `hub_session` | quién, cuándo, dispositivo, con qué credencial y qué placa (índice), motivo de cierre; sin IP ni navegador |
+| `hub_trusted_device` | `label` = nombre de la última persona que entró en él; `mode_set_by` |
+| Registro del proceso | la dirección IP en las líneas `event=auth_failed` |
+
+## Reglas que no se rompen
+
+- Un PIN solo funciona en un dispositivo donde antes entró una cuenta (confianza armada por defecto;
+  solo `HUB_DEVICE_TRUST=off` la desarma) (HUB-F133).
+- Un dispositivo desconocido o un valor ilegible se tratan como compartido; un dial ilegible vuelve
+  al de fábrica, nunca a «no preguntar»; ninguno de los dos controles alarga lo que el otro acortó.
+- Un PIN es único entre las personas activas, de la longitud del negocio y no adivinable, en todas
+  las puertas (alta, edición, perfil).
+- El acceso con cuenta solo **sube** el rol hasta administrador, nunca lo baja ni da «owner».
+- La caducidad de una sesión se fija al abrirla; cambiar el modo o el dial solo afecta a las nuevas.
+
+## Lo que NO hace, a propósito
+
+- No caduca ni obliga a cambiar el PIN.
+- No guarda la IP ni el navegador de una sesión.
+- No marca el modo del dispositivo desde la pantalla de acceso (solo lo lee).
+
+## Fuentes contrastadas
+
+- `architecture/hub/auth.md` («El PIN, como credencial») dice 4–8 dígitos; el código admite 4 o 6,
+  fijo por negocio (`crates/runtime/src/pin_policy.rs`, hub#974).
+- Que «Este dispositivo» está en «Ajustes › General» y no en «Ajustes › Hub», como dice
+  `architecture/hub/auth.md`, está en las fuentes comunes del índice.

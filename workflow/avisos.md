@@ -2,6 +2,17 @@
 
 Prefijo: HUB
 
+> **Para qué sirve (avisos y automatizaciones).** El hub reparte entre módulos lo que pasa en el
+> negocio: cuando una orden se guarda, deja un **aviso** en una cola que se guarda a la vez que la
+> orden, y un repartidor de fondo lo entrega a cada módulo que lo escucha, con reintentos y con una
+> cola de **avisos caídos** («Eventos caídos») que decide un administrador. Encima de ese reparto
+> corre el **motor de automatizaciones** (ADR-0283, [automatizaciones.md](automatizaciones.md)):
+> reglas que el dueño monta en la pantalla Automatizaciones (módulo `flows`) o que traen de fábrica
+> los módulos (las recetas de WhatsApp), con permisos propios por automatización. También ejecuta
+> las tareas programadas de los módulos, empuja los avisos a las pantallas en vivo y le dice a
+> ERPlora que alguien usa el hub. Lo que vale para las dos partes (datos personales, borrado de un
+> cliente, puertas) está al final de este fichero.
+>
 > Área «Avisos entre módulos» del servidor del hub (`crates/runtime`: `events`, `events_api`,
 > `outbox`, `host_notify`, `scheduler`; `crates/server`: `event_stream`, `outbox_admin`,
 > `notify_transport`, `activity`, y el bucle de fondo de `boot.rs`). Contrastado contra
@@ -13,6 +24,16 @@ Prefijo: HUB
 > código y en las pantallas técnicas se llama *evento*. La **cola de salida** es la tabla donde el
 > aviso espera hasta que todos los que lo escuchan lo han recibido; los **avisos caídos** son los
 > que no se pudieron entregar y esperan a que una persona decida (pantalla «Eventos caídos»).
+
+## Antes de empezar
+
+- Nada que preparar para el reparto de avisos ni las tareas programadas: corren solos desde el
+  arranque del hub.
+- Para que un módulo pueda imprimir o mandar mensajes por la cola, el dueño le concede ese permiso
+  en Ajustes › Permisos (sin él, sus avisos caen al momento en «Eventos caídos» y se reenvían solos al
+  concederlo: HUB-F53, HUB-F58).
+- Para mandar mensajes: el hub enlazado con ERPlora (credencial de máquina) y, para WhatsApp, el
+  número conectado y cupo (HUB-F61).
 
 ## Flujos
 
@@ -257,3 +278,124 @@ Implicados: pendiente
 Pendiente de enlazar: hub — HUB, acceso, personas y plan: el latido diario a ERPlora que lleva la última entrada
 Pendiente de enlazar: saas — ciclo de vida del hub gratuito: apagar a los 60 días sin entradas y borrar a los 120
 QA: ninguno
+
+## Cobertura contra la referencia
+
+Referencia adoptada:
+
+- **Transactional Outbox** (`architecture/hub/event-outbox.md`, decisión del 2026-06-09): el aviso se
+  guarda en la misma transacción que la orden; entrega al menos una vez, sin repetir por módulo.
+- [Business Central — Job Queue Entries](https://learn.microsoft.com/en-us/dynamics365/business-central/admin-job-queues-schedule-tasks):
+  número máximo de intentos con espera entre ellos, estado «Error» que espera a una persona,
+  reiniciar, y aviso cuando una tarea falla. Se adopta la escalera de reintentos y la cola de errores
+  operable; no se adopta el aviso dirigido a quien lanzó la tarea (hueco, HUB-F52).
+- [Odoo OCA `queue_job`](https://github.com/OCA/queue/tree/16.0/queue_job): reintentos con patrón de
+  espera, estado fallido, «Requeue» y «Set to done». Se adopta reenviar y cerrar (aquí con motivo).
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Guardar el aviso con la orden, sin perderlo en un reinicio | hecho | HUB-F50 |
+| Entrega al menos una vez, sin repetir por receptor | hecho para los módulos; un correo o WhatsApp puede salir dos veces | HUB-F51, HUB-F61 |
+| Reintentos con espera creciente y número máximo | hecho (8, ~4 min, fijo; no configurable) | HUB-F52 |
+| Negativas que no merece la pena reintentar, al momento | hecho | HUB-F53 |
+| Cola de errores visible con el motivo | parcial: 100 más recientes, sin paginar | HUB-F54 |
+| Reenviar uno / todos | hecho | HUB-F55, HUB-F56 |
+| Cerrar sin entregar, con quién y por qué | hecho (motivo opcional; la pantalla de Sistema no lo pide: HUB_SHELL) | HUB-F57 |
+| Ver lo cerrado | parcial: lectura en el servidor, sin pantalla (flows#47) | HUB-F54 |
+| Avisar a quien lanzó lo que falló | no hecho: solo el recuento genérico de la campana para el administrador | HUB-F59 |
+| Tareas programadas con estado, último error y reinicio visibles | parcial: corren y se recuperan, pero sin pantalla ni rastro de error | HUB-F62 |
+
+## Datos: de quién es cada dato
+
+Todo lo de avisos y automatizaciones es del hub (tablas de sistema): ningún módulo las escribe salvo
+por las puertas del hub. Las de las automatizaciones están en
+[automatizaciones.md](automatizaciones.md).
+
+| Tabla | Qué guarda | Cuánto vive |
+|---|---|---|
+| `_event_outbox` | cada aviso: nombre, **contenido completo**, módulo emisor, `user_id` de quien lo causó, permisos del emisor (forense), estado, intentos, último error, ejecución y aviso padre, pantalla de origen; al cerrarse, quién (`hub_user:<id>`), cuándo y el motivo libre | entregados y cerrados: 90 días desde que terminan; **pendientes y caídos: sin límite** |
+| `_event_delivery` | marca «entregado a este receptor», id del mensaje del proveedor, automatización y paso que preguntaron | con su aviso |
+| `_scheduled_tasks` | tareas de los módulos, horario, próxima y última vez (sin `hub_id`: un hub por despliegue) | mientras el módulo las declare |
+| `_hub_activity` | hora de la última entrada y la última confirmada por ERPlora | sin límite (una fila) |
+
+No hay que confundir `_hub_activity` (la señal de última entrada, HUB-F64) con `_hub_activity_log`
+(el registro de actividad que viaja en el latido, de [negocio-y-datos.md](negocio-y-datos.md),
+HUB-F254).
+
+**Inventario de datos personales de avisos y automatizaciones** (de las migraciones de sistema
+`crates/runtime/src/system_migrations.rs` de las tablas `_flow*` y `_hub_activity`, y del
+`ENSURE_TABLES` de `outbox.rs`):
+
+- Contenido de los avisos (`_event_outbox.payload`): nombre, teléfono, correo, NIF y notas de clientes
+  en avisos como `customer.created`, `sale.completed`, los mensajes de WhatsApp entrantes
+  (`hub.whatsapp.message_received`) y los mensajes que salen (`*.reminder.due`, con el destinatario
+  `to`). En un aviso caído se enseña entero en pantalla (HUB-F54).
+- Quién hizo qué: `user_id` en cada aviso; `created_by`/`updated_by`/`deleted_by`/`granted_by`/
+  `revoked_by`/`discarded_by`/`decided_by` en las tablas del motor.
+- Texto libre: `discard_reason`, `comment` de una aprobación, `summary`/`title` de una pregunta
+  (rellenados con datos del aviso), lo que el asistente escribe en la salida de su paso.
+- Ejecuciones: `input`, `vars`, entrada y salida de pasos (lo que devuelven las consultas, legible;
+  el texto de los mensajes con los datos insertados), `payload` de las propuestas. La dirección del
+  destinatario de un mensaje se oculta en el historial (solo vive en la cola); los secretos se
+  ocultan. La traza de un aviso (HUB-F63) devuelve el `input` de sus ejecuciones.
+- Canal en vivo (HUB-F60): no guarda nada, pero entrega los avisos completos, con datos de clientes,
+  a cualquier sesión del hub, también la de un cajero.
+- Ejemplos del editor (HUB-F109): el texto de un WhatsApp entrante sale como ejemplo.
+- `_flow_run_waits.correlate_value` (id de una cita o una reserva).
+- **Borrado de un cliente** (lo hace negocio y datos, HUB-F249, `erasure.rs`): al llegar
+  `customer.anonymized`, vacía los avisos **terminados** que contienen su id, las ejecuciones
+  terminadas que lo tocaron con sus pasos y propuestas, y los avisos que esas ejecuciones encolaron.
+  **No** alcanza: avisos pendientes o caídos, ejecuciones vivas (hub#2484), `last_error`, el `error` de
+  cada paso, el `title`, `summary`, `reason` y `comment` de las preguntas, las esperas
+  (`_flow_run_waits`), y copias con el teléfono pero sin el id (mensajes de WhatsApp entrantes,
+  hub#2477; número sin ficha, hub#2474). Cualquier módulo puede emitir un `*.anonymized` sin
+  declararlo (hub#2485).
+
+## Reglas que no se rompen
+
+- **Un aviso existe si y solo si su orden se guardó** (misma transacción).
+- **Un módulo que escucha nunca recibe dos veces el mismo aviso** (marca por receptor en la misma
+  transacción que sus efectos); los módulos no tienen que ser idempotentes. Un mensaje al exterior
+  (correo, WhatsApp) y una llamada de un paso «Llamar a otro sistema» salen **al menos una vez**: se
+  pueden repetir (HUB-F61, HUB-F94).
+- **Un receptor reacciona con la autoridad de su módulo**, nunca con la del cajero; el `hub_id` sale
+  siempre de la fila; la atribución (`created_by`) es la persona que causó el aviso. Las comprobaciones
+  fiscales, de permisos de host y de esquema siguen aplicándose a los receptores.
+- **Un aviso caído no se borra ni se poda** mientras nadie decida; cerrar nunca borra la fila.
+- **Las puertas de la cola de caídos y del motor de automatizaciones exigen sesión de dueño o
+  administrador**, nunca una llave de API ni la credencial de máquina; si la petición se declara
+  hecha por un módulo, ese módulo necesita además «Administrar automatizaciones» (la cabecera es una
+  declaración, no una autenticación: regla común del índice).
+- **Nada sale del hub sin permiso vivo**: un mensaje de módulo exige permiso, canal declarado y
+  destinatario del propio hub; uno de automatización, sus dos permisos releídos al enviar.
+
+## Lo que NO hace, a propósito
+
+- No entrega avisos en orden estricto: con reintentos, uno más nuevo puede llegar antes.
+- No guarda lo que pasa por el canal en vivo: una pantalla desconectada no recibe lo que se perdió.
+- No da a un módulo reactivado los avisos que se entregaron mientras estaba apagado.
+- No manda SMS (no hay transporte).
+- Las tareas programadas de los módulos van en UTC (hub#731): las escribe el programador, no el dueño.
+
+## Dudas abiertas
+
+1. ¿Debe la cola de caídos avisar al módulo o a la persona que causó el aviso (como Business Central
+   avisa a quien lanzó la tarea), en vez de solo el recuento genérico del administrador?
+2. ¿Debe una tarea programada que falla tener intentos máximos, un estado de error visible y un sitio
+   en «Eventos caídos»?
+3. ¿Debe el canal en vivo filtrar por perfil (un cajero no necesita los datos de clientes ni las
+   preguntas de las automatizaciones), y el tope de conexiones ser por dispositivo y no por hub?
+
+## Fuentes contrastadas
+
+- `architecture/hub/state-durability.md` §4: dice que `ActivityState` vive solo en memoria; desde
+  hub#670 se guarda en `_hub_activity` cada minuto (HUB-F64).
+- `crates/server/src/event_stream.rs:675-678`: el comentario dice que `handle_frame` rechaza un segundo
+  `auth`; lo acepta y cambia la llave del socket (HUB-F60).
+- `architecture/hub/event-outbox.md` «Estado / verificado»: el «kick» inmediato tras cada orden no
+  existe; el repartidor solo repasa cada segundo (HUB-F51).
+- `WORKFLOW.md` de `flows` (FLOWS-F25): «tras sus reintentos»; los rechazados por permiso, cuota o
+  permiso de automatización retirado llegan tras el primer intento (HUB-F53).
+- Textos del shell (`apps/web/src/i18n/locales/es.ts`): «Hay {count} evento que el relay no pudo
+  entregar» y «Evento reenviado al relay.» usan la jerga «relay» en la pantalla española (HUB_SHELL).
+- El `409` de reenviar un aviso sale en inglés y la pantalla lo pinta tal cual (HUB-F55).

@@ -2,6 +2,16 @@
 
 Prefijo: HUB
 
+> **Para qué sirve.** El núcleo del hub decide **que** el negocio debe declarar y **por dónde** puede
+> hacerlo, aunque el módulo que cumple el régimen se desinstale: guarda el perfil fiscal (país,
+> régimen, estado, entorno de pruebas o producción, NIF congelado), custodia el certificado del
+> negocio (cifrado, la clave nunca llega a un módulo), lleva la vía de envío (certificado propio o
+> ERPlora en nombre del negocio), copia el estado de la autorización de representación, crea y guarda
+> la identidad de máquina para la celda fiscal, decide el paso a producción y la vuelta a pruebas,
+> sirve la declaración responsable y niega cobrar en producción cuando no hay vía. Lo usan el
+> **administrador** (puesta en marcha), el **cajero** (el TPV lo consulta antes de cobrar) y el
+> **sistema**.
+>
 > La mitad del servidor que no es el motor: el perfil fiscal del negocio y su estado, el
 > certificado, la vía de envío, la autorización de representación, la identidad de máquina ante la
 > celda fiscal, el paso a producción y la regla «en producción, sin vía no se cobra». Escrito contra
@@ -11,6 +21,16 @@ Prefijo: HUB
 > fiscales del despachador (`crates/runtime/src/commands.rs`). El motor (huella, XML, envío) está en
 > `crates/plugins/verifactu/WORKFLOW.md` (HUB_VERIFACTU). Las pantallas son del módulo VeriFactu
 > (`VeriFactu: Configuración`, `VeriFactu: Ajustes`): el hub es país-agnóstico y no pinta ninguna.
+
+## Antes de empezar
+
+En un hub de España, en este orden: NIF y razón social en Ajustes › Negocio; el módulo VeriFactu
+instalado con el permiso «Certificado del negocio (firma fiscal)»; una vía de envío (certificado
+propio, HUB-F302; o la de ERPlora: autorización aprobada, HUB-F305, y conexión segura, HUB-F306);
+probar en pruebas y pasar a producción (HUB-F307). En pruebas la vía de ERPlora funciona sin
+autorización ni conexión segura si ERPlora publica su autoridad de confianza. Un hub de otro país no
+debe nada (HUB-F300). Ojo: el estado «listo» que pide el paso a producción se recalcula al arrancar
+el hub (HUB-F300).
 
 ## Flujos
 
@@ -312,3 +332,128 @@ Implicados: pendiente
 Pendiente de enlazar: architecture — REC_FISCAL-F09 (una venta cobrada que no se pudo facturar)
 Pendiente de enlazar: hub — HUB, negocio y datos (identidad fiscal en Ajustes › Negocio)
 QA: BD-02, qa-hub §7
+
+## Cobertura contra la referencia
+
+Referencia adoptada: la norma, no un competidor: RD 1007/2023 y Orden HAC/1177/2024 (declaración
+responsable en el propio sistema, art. 13.2; `SistemaInformatico`; colaboración social para presentar
+en nombre del obligado); las preguntas frecuentes de la AEAT (todo registro generado tiene que
+llegar). Del mercado (Odoo `l10n_es_edi_verifactu`, Holded) solo el reparto: el certificado es del
+negocio y, si no sube uno, el proveedor remite en su nombre. Decisiones propias: ADR-0081 (certificado
+en el núcleo), ADR-0273 (la obligación es del núcleo), ADR-0320 y ADR-0478 (vía delegada por la
+celda), ADR-0360 (en pruebas no hay nada que autorizar), ADR-0425 (el entorno va en cada registro),
+ADR-0203 (sin identidad no se emite). Guion que la contrasta: bloque legal L-01…L-18 de
+`qa-method-shared.md` y `qa-hub.md` §7.
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| La obligación fiscal no depende de que el módulo esté instalado | parcial: desinstalar forzando Facturación en producción deja cobrar sin factura ni registro | HUB-F300, HUB-F314, HUB-F316 |
+| Certificado del negocio custodiado en el núcleo, cifrado | hecho | HUB-F302 |
+| Comprobar el certificado al subirlo (contraseña, caducidad visible) | parcial: no comprueba la contraseña; no enseña la caducidad | HUB-F302 |
+| Elegir la vía (propia o ERPlora) sin perder el certificado | hecho | HUB-F304 |
+| Quitar el certificado sin dejar al negocio sin vía | parcial: en producción no se impide | HUB-F303 |
+| Autorización de representación (Anexo I) con revisión humana | hecho (revisión en el SaaS) | HUB-F305 |
+| Conexión segura con la celda | parcial: sin renovación ni aviso de caducidad en el hub | HUB-F306 |
+| Paso a producción con comprobaciones | parcial: estado «listo» del último arranque; adopción única sin comprobaciones al arrancar (hub#2079) | HUB-F300, HUB-F307 |
+| Paso a producción irreversible tras la primera emisión | parcial: el sello no lo pone la factura de una venta | HUB-F308 |
+| Cese de actividad | no hecho (sin puerta) | HUB-F309 |
+| Declaración responsable visible en el sistema | hecho | HUB-F310 |
+| En producción, sin vía no se cobra | parcial: vía comprobada sin red; el permiso del certificado no se mira | HUB-F313 |
+| Demo clavada a pruebas | hecho | HUB-F315 |
+| Sin identidad del negocio no se emite | hecho | HUB-F317 |
+
+## Datos: de quién es cada dato
+
+- **Del núcleo (tablas de sistema):** `_hub_fiscal_profile` (país, régimen, estado, entorno, NIF
+  congelado `taxpayer_id`, número de instalación, avisos que abren cadena, marcas de demostración y
+  revisión, fechas de paso a producción, primer registro, cierre y adopción **y quién** cerró o
+  adoptó (`closed_by`, `adopted_by`: identificador de usuario del hub), estado y fecha de la
+  autorización); `_hub_fiscal_regime_registry` (país → régimen y techo de la simplificada, sin datos
+  personales); `_hub_certificate` (el `.p12` y su contraseña cifrados, tipo, caducidad, si está en
+  uso, `uploaded_by`); `_hub_gateway_identity` (clave privada cifrada, certificado de máquina,
+  autoridad, nombre común).
+- **De Ajustes › Negocio** ([negocio-y-datos.md](negocio-y-datos.md)): NIF, razón social, domicilio y
+  país; el perfil copia el NIF al pasar a producción (la puerta de ajustes lo cierra desde el primer
+  registro, HUB-F223).
+- **Del SaaS:** el estado de la autorización (se guarda una copia), los datos del productor y la
+  referencia de la declaración (solo en memoria), el permiso de envío de la celda (memoria del motor).
+- **Datos personales (inventario RGPD, desde `system_migrations.rs` y el código):** el certificado del
+  negocio contiene el nombre y el NIF de su titular (una persona si es autónomo o representante) y se
+  guarda cifrado; `uploaded_by`, `closed_by`, `adopted_by` identifican a personas del hub; el
+  `taxpayer_id` es el NIF del negocio (persona si es autónomo). Los documentos de la autorización
+  (modelo firmado, copia del DNI/NIE, muestra de firma, justificante) y los NIF y nombres de obligado y
+  firmante **pasan** por el hub hacia el SaaS y no se guardan ni salen en el registro del servidor.
+  Nada de esto lo toca el borrado RGPD de un cliente.
+
+## Reglas que no se rompen
+
+- **La obligación es del núcleo**: en producción no se desactiva (con lo que arrastra) ni se
+  desinstala el último módulo que cumple el régimen (HUB-F316) y, sin él, no se abre ninguna cadena
+  (HUB-F314). Hueco: al desinstalar no se mira lo que arrastra (HUB-F316).
+- **En producción, sin vía no se cobra** (`hub.fiscal.transmission` y el despachador leen la misma
+  regla): toda transacción que abriría una cadena fiscal se niega antes de escribir si el hub, en
+  producción, no tiene vía; en pruebas nunca; una AEAT o una celda caídas nunca (HUB-F313).
+- **Sin identidad del negocio no se emite** (ADR-0203) (HUB-F317).
+- **El paso a producción tiene una sola puerta**, la del núcleo, con sus comprobaciones; congela el
+  NIF de la cadena (HUB-F307) — salvo la transición única de ERPlora/hub#2079: un hub que ya había
+  pasado a producción desde el antiguo selector del módulo se anota como en producción al arrancar,
+  una sola vez y sin comprobaciones (HUB-F300, paso 0).
+- **La demo nunca pasa a producción ni escribe otro entorno** (HUB-F315).
+- **El certificado y la clave de máquina nunca se guardan en claro**: sin la clave maestra del
+  despliegue no se guardan; la clave privada nunca sale del hub ni llega a un módulo.
+- **Las puertas del certificado y del entorno exigen sesión de administrador** (leer: cualquier
+  sesión) **y, si quien llama es un módulo, el permiso «Certificado del negocio (firma fiscal)»**.
+- **Un hub cerrado no vuelve a emitir** (HUB-F309; hoy sin puerta que lo cierre).
+- **Hueco, no regla: «la vuelta a pruebas se cierra con la primera venta en producción»** — el sello
+  no lo pone la factura de cada venta (HUB-F308).
+- **Hueco, no regla: «todo tique con QR llega a la AEAT»** — ver el documento del motor
+  (`crates/plugins/verifactu/WORKFLOW.md`).
+
+## Lo que NO hace, a propósito
+
+- No pinta pantallas fiscales: el hub es país-agnóstico y las pantallas son del módulo del régimen.
+- No tramita el cese ante Hacienda (es la baja censal); cerrar el perfil no envía nada.
+- No guarda los documentos de la autorización: los custodia el SaaS.
+- No decide la autorización: la revisa una persona de ERPlora en el SaaS.
+- No deja que la pantalla «olvide» la conexión segura más que por la puerta de administrador
+  (rotación del operador).
+
+## Dudas abiertas
+
+1. ¿Debe recalcularse el estado «listo» al cambiar la identidad, el certificado o la conexión
+   segura, en vez de solo al arrancar (HUB-F300, HUB-F307)?
+2. ¿Debe borrar el certificado en producción tener la misma guarda que apagar el interruptor
+   (HUB-F303)? ¿Y borrar la identidad de máquina (HUB-F306)?
+3. ¿Debe el sello «primer registro en producción» ponerlo también una transacción de manejador que
+   devuelve el aviso que abre la cadena (HUB-F308)? Afecta también al límite fiscal del reinicio del
+   hub, que lee el mismo sello, aunque ahí lo cubre además el conteo de registros remitidos.
+4. ¿Debe la regla de HUB-F313 mirar el permiso «Certificado del negocio (firma fiscal)» y la caducidad
+   de la conexión segura?
+5. ¿Entra en el MVP una puerta para cerrar el perfil de un negocio que cesa (HUB-F309) y otra para
+   adoptar una instalación ajena (HUB-F314)?
+6. ¿Debe la guarda del último proveedor mirar, al desinstalar, lo que arrastra la desinstalación,
+   como ya hace al desactivar (HUB-F316)?
+
+## Fuentes contrastadas
+
+- `architecture/hub/fiscal-engines.md` y el comentario de `certificate.rs` dicen que el certificado
+  se sube en Ajustes → Negocio; se sube en VeriFactu → Configuración.
+- `verifactu/WORKFLOW.md`, VERIFACTU-F02 dice que un hub de demostración «no puede tener certificado
+  propio»; desde hub#1848 sí puede (HUB-F302, HUB-F315).
+- `verifactu/WORKFLOW.md`, VERIFACTU-F09 y REC_FISCAL-F14 dan por hecho que la vuelta a pruebas se
+  cierra con la primera venta en producción; el sello solo lo pone una orden declarativa (HUB-F308,
+  leído, sin ejecutar).
+- `verifactu/WORKFLOW.md`, VERIFACTU-F12 y `producer_facts.rs` dicen que los datos del productor
+  llegan «al minuto»; llegan con el latido del arranque, el diario o el de un cambio de vía
+  (HUB-F310).
+- Comentario de `gateway_enrolment.rs` («presupuesto compartido por el servicio y la puerta»): la
+  puerta crea un presupuesto nuevo en cada petición (HUB-F306).
+- Comentario de `fiscal_profile.rs` («Nothing here rejects anything… hub#556 is the gate»): las
+  negativas ya existen en `commands.rs`.
+- Test `crates/runtime/tests/fiscal_mode.rs:131-169`
+  (`a_sale_that_starts_the_fiscal_chain_in_production_seals_the_go_live`): su nombre promete el
+  camino de una venta, pero llama directamente a `stamp_first_record` (HUB-F308).
+- `qa-hub.md` §7 dice que el estado del registro va «pending→transmitted/accepted»: el motor nunca
+  escribe «transmitted» (ver el documento del motor).
+- Mensaje de `go_live` (`fiscal.no_representation_grant`): «Sign it in Settings → Business»; se firma
+  en VeriFactu → Configuración.

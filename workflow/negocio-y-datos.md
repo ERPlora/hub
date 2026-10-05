@@ -1,13 +1,29 @@
-# WORKFLOW — Hub · Negocio y datos
+# WORKFLOW — Hub (servidor) · Negocio y datos: ajustes, copias e importación
 
 Prefijo: HUB
+
+> Área «Negocio y datos» del servidor del hub, primera mitad (`crates/runtime`: `settings`,
+> `settings_api`, `export`, `import`, `import_sql`, `reset`, `money_backfill`; `crates/server`:
+> `settings`, `export_import`, `reset`): los ajustes del negocio (identidad, moneda, idioma, zona
+> horaria y el reloj que reciben los módulos), exportar e importar copias y plantillas, restablecer
+> el hub y la unidad del dinero. Los archivos, el borrado de los datos de una persona, la retención,
+> el registro de actividad y la semilla del arranque están en
+> [archivos-y-privacidad.md](archivos-y-privacidad.md). Lo que vale para toda el área está al final
+> de este fichero. Las pantallas (Ajustes › General, Negocio y Datos y copias) son de `HUB_SHELL`.
+
+## Antes de empezar
+
+- El país y la zona horaria deben estar bien antes de crear automatizaciones con hora y antes de
+  salir a producción fiscal (el país se congela, HUB-F223).
+- Cambiar ajustes, exportar, importar y restablecer piden sesión de dueño o administrador (regla
+  común del índice); leer los ajustes, cualquier sesión.
 
 ## Flujos
 
 ### HUB-F220 Leer los ajustes del negocio
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
-Pantalla: HUB_SHELL: Ajustes › Hub
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. La persona abre **Ajustes**; la pantalla pide al hub los ajustes del negocio.
 2. Ve país, región, zona horaria, moneda, idioma, apariencia, identidad del negocio y las opciones del PIN. Quien no administra los ve sin poder guardarlos (lo pinta el shell).
@@ -22,7 +38,7 @@ QA: BD-02
 ### HUB-F221 Cambiar los ajustes del negocio
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Hub
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. El administrador cambia uno o varios valores y pulsa guardar.
 2. El hub valida el lote entero antes de escribir nada: una clave desconocida o un valor inválido rechaza todo con 422.
@@ -52,7 +68,7 @@ QA: BD-02
 ### HUB-F223 Congelar el NIF y el país, y casar la región con el país
 Estado: parcial — cambiar solo el país no revalida la región guardada (queda p. ej. `ES-CN` con país `PT`, y la zona deducida pasa a Atlantic/Canary); la región tampoco se congela al salir a producción
 Actor: administrador, sistema
-Pantalla: HUB_SHELL: Ajustes › Negocio (NIF) y Ajustes › Hub (país y región)
+Pantalla: HUB_SHELL: Ajustes › Negocio (NIF) y Ajustes › General (país y región)
 Pasos:
 1. Un hub que ya emitió su primer registro fiscal intenta cambiar el identificador fiscal, o uno que ya salió a producción intenta cambiar el país.
 2. El hub compara el valor normalizado con el guardado y con el ancla del perfil fiscal.
@@ -97,7 +113,7 @@ QA: BD-02
 ### HUB-F226 Moneda, decimales e idioma del negocio
 Estado: parcial — una vez declarados, `currency_decimals` no se puede vaciar por esta puerta (el vacío da 422) para volver a resolverlos del registro
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Hub
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. El administrador elige moneda e idioma y guarda.
 2. Solo si la moneda no está en el registro ISO-4217, declara sus decimales (no hay vuelta atrás a «los del registro»).
@@ -111,7 +127,7 @@ QA: ninguno
 ### HUB-F227 Fijar la zona horaria del negocio
 Estado: hecho
 Actor: administrador, sistema
-Pantalla: HUB_SHELL: Ajustes › Hub
+Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
 1. El administrador comprueba la zona horaria en Ajustes; por defecto no escribe nada.
 2. Si su país tiene varios husos, elige una zona por nombre (Europe/Madrid).
@@ -154,7 +170,7 @@ QA: ninguno
 ### HUB-F230 Exportar los datos del negocio
 Estado: parcial — un fallo al leer usuarios, perfiles, ajustes, roles, permisos de módulo, automatizaciones o las filas de una tabla de app da un zip sin esa parte y sin aviso; el nombre y el país del manifiesto se leen de claves que no existen (`business_name`, `country`): salen vacío y `ES`; y con finalidad plantilla el certificado propio y la carpeta de archivos de cada app (los XML de Verifactu) entran igualmente (HUB-F231)
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Exportar
 Pasos:
 1. El administrador escribe un nombre (letras, números, guiones; hasta 64) y el idioma, y elige copia de seguridad o plantilla.
 2. Marca personas, ajustes, datos fiscales, archivos y, por app, si entra la app y sus datos (y qué tablas).
@@ -169,7 +185,7 @@ QA: ninguno
 ### HUB-F231 Meter los archivos y el certificado en el zip
 Estado: parcial — con finalidad plantilla, «datos fiscales» añade igualmente el certificado propio (esta capa mira la casilla en bruto, no el valor efectivo del motor), y «archivos» copia también las carpetas de las apps (`modules/verifactu/`, con los XML que llevan NIF y nombre de clientes), sin mirar la finalidad; los ficheros de más de 25 MiB se omiten sin decirlo y todo se carga en memoria antes de empaquetar
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Exportar
 Pasos:
 1. El administrador marca datos fiscales y/o archivos.
 2. El hub añade el certificado y recorre la carpeta de archivos.
@@ -183,7 +199,7 @@ QA: ninguno
 ### HUB-F232 Ver qué tablas y cuántas filas lleva cada app
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Exportar
 Pasos:
 1. Al abrir Exportar, la pantalla pide el recuento por tabla de cada app instalada.
 2. El administrador desmarca las tablas que no quiere publicar.
@@ -197,7 +213,7 @@ QA: ninguno
 ### HUB-F233 Inspeccionar un fichero antes de importarlo
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. El administrador elige un `.blueprint.zip` de su equipo.
 2. El hub lo abre en memoria, comprueba las rutas y lee el manifiesto.
@@ -212,7 +228,7 @@ QA: ninguno
 ### HUB-F234 Traer una plantilla del catálogo
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. La pantalla muestra el catálogo de plantillas de erplora.com («Desde erplora.com»).
 2. La persona elige una; el hub la descarga.
@@ -227,7 +243,7 @@ QA: BD-01
 ### HUB-F235 Importar un fichero o una plantilla
 Estado: parcial — una sección no se aplica en una transacción, así que una sentencia que falla deja las anteriores escritas (quedan en el lote y se pueden deshacer, salvo ajustes y tablas sin `id`); las apps del manifiesto se instalan aunque no estén marcadas; los archivos del zip se escriben en cualquier carpeta, también en las de solo lectura de las apps y en `_logs`, sin la política de HUB-F246; y en una tabla de objeto único se retira lo que hubiera antes aunque lo escribiera el negocio
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. El administrador marca qué aplicar y pulsa importar.
 2. El hub comprueba la integridad y instala las apps que falten.
@@ -257,7 +273,7 @@ QA: BD-01
 ### HUB-F237 Permisos, roles y automatizaciones que trae el fichero
 Estado: hecho
 Actor: sistema, administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. Tras las secciones de datos, el hub activa los roles del manifiesto.
 2. Si es la copia propia, devuelve los permisos concedidos a cada app.
@@ -274,7 +290,7 @@ QA: BD-01
 ### HUB-F238 Volver a importar lo mismo
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. El administrador importa un fichero o plantilla que ya aplicó, o uno que choca con datos que ya tiene.
 2. El hub salta las filas que ya existen.
@@ -288,10 +304,10 @@ QA: BD-01
 ### HUB-F239 El informe de la importación
 Estado: hecho
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. Al terminar, la pantalla pinta una línea por sección: aplicada, omitida, descartada, parcial o fallida.
-2. Si se sale de la pantalla, al volver a Ajustes › Datos recupera el último informe.
+2. Si se sale de la pantalla, al volver a Ajustes › Datos y copias recupera el último informe.
 Entra: el resultado de la importación.
 Sale: una fila por sección con su estado, el motivo estable y las filas descartadas; más apps instaladas (`installed`, `already_installed`, `failed`, `blocked`, versión pedida si se sustituyó), archivos copiados y fallidos, estado del certificado y el origen (plantilla y versión, o fichero local). Se guarda por lote y se borra al deshacerlo.
 Si falla: si no se puede guardar, la importación vale y solo se pierde esta vista.
@@ -302,7 +318,7 @@ QA: BD-01
 ### HUB-F240 Reintentar lo que falló en una importación
 Estado: parcial — solo las importaciones de plantilla del catálogo; una de fichero local se rechaza
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Importar
 Pasos:
 1. Tras un informe parcial, el administrador pulsa reintentar.
 2. El hub vuelve a bajar la misma plantilla y aplica solo lo fallido.
@@ -317,7 +333,7 @@ QA: ninguno
 ### HUB-F241 Deshacer una importación
 Estado: parcial — solo quita filas con `id`; los ajustes y las tablas de vínculo no se revierten
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Restablecer
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Restablecer
 Pasos:
 1. El administrador elige una importación de la lista y la deshace.
 2. El hub borra las filas que trajo.
@@ -331,10 +347,10 @@ QA: ninguno
 ### HUB-F242 Restablecer el hub
 Estado: parcial — las secciones «archivos» y «datos fiscales» se aceptan pero no borran nada (solo bloquean si ya se emitió); el borrado de personas deja su perfil y preferencias; el servidor no pide ninguna confirmación (el nombre del negocio lo pide la pantalla)
 Actor: administrador
-Pantalla: HUB_SHELL: Ajustes › Datos › Restablecer
+Pantalla: HUB_SHELL: Ajustes › Datos y copias › Restablecer
 Pasos:
 1. El administrador abre Restablecer y ve cada sección con su número de filas y sus bloqueos.
-2. Marca solo lo necesario y confirma en pantalla.
+2. Marca solo lo necesario y confirma en pantalla escribiendo la razón social del negocio (lo pide la pantalla, no el servidor).
 3. Lee el informe.
 Entra: la selección (ajustes, personas, roles, cola de impresión, apps); todo apagado por defecto.
 Sale: borrado duro, acotado al hub, en una sola transacción, en orden inverso de claves foráneas; las filas que sembró la app sobreviven. Las personas se borran menos quien ejecuta (se identifica por su sesión, nunca por el cuerpo de la petición). La cola de impresión se vacía; las impresoras emparejadas no. Si el hub ya emitió registros fiscales (sello del primer registro o facturas remitidas), Verifactu, Facturas y Ventas y los datos fiscales quedan bloqueados (RD 1007/2023) y el servidor lo rechaza con 409 aunque el cliente lo fuerce. El plan no muestra las secciones de archivos ni de datos fiscales. No toca historial de avisos, automatizaciones, permisos de módulo, certificado, perfil fiscal, llaves de API ni dispositivos de confianza; las sesiones, perfiles y preferencias de las personas borradas se quedan. La petición no lleva ningún token de confirmación.
@@ -371,159 +387,83 @@ Si falla: una mezcla se comunica por el registro de errores y por stderr.
 Implicados: ninguno
 QA: ninguno
 
-### HUB-F245 Ver y descargar archivos
-Estado: hecho
-Actor: administrador, responsable, empleado, cajero
-Pantalla: HUB_SHELL: Archivos
-Pasos:
-1. La persona abre **Archivos** y navega por carpetas.
-2. Abre un archivo en el visor o lo descarga.
-Entra: la carpeta o la ruta; sesión de usuario de cualquier perfil. Una llave de API no entra.
-Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero: la política de carpetas de HUB-F246 solo regula escribir. El alcance es el negocio propio.
-Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Archivos
-Pendiente de enlazar: whatsapp_inbox — WHATSAPP_INBOX-F06, adjuntos recibidos (aquí solo dónde se guardan)
-QA: ninguno
+## Cobertura contra la referencia
 
-### HUB-F246 Subir, organizar y borrar archivos
-Estado: parcial — no existe copiar; los archivos no se pueden borrar ni subir en carpetas de apps que no lo declaran
-Actor: administrador
-Pantalla: HUB_SHELL: Archivos
-Pasos:
-1. El administrador sube ficheros, crea una carpeta, renombra, mueve o borra.
-2. El hub comprueba qué permite la carpeta.
-Entra: ruta y acción, con sesión de propietario o administrador.
-Sale: la carpeta decide: `_logs` y `_system` y la raíz `modules` son solo lectura; bajo `modules/<carpeta>/` manda lo que la app declara en `static_files.user_actions` (sin declarar, solo lectura); cualquier otra carpeta, gestión completa. Renombrar solo cambia el nombre (no admite rutas). Mover exige poder borrar el origen y subir al destino, y no deja meter una carpeta en sí misma. Crear carpeta cuenta como subir. Todo se hace en el almacenamiento de erplora.com, que valida las rutas.
-Si falla: 403 `media.read_only_folder`, 400 `media.invalid_name`, `media.same_path`, `media.move_into_itself`; 424 con la nube.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB_SHELL, Archivos
-QA: ninguno
+Referencia adoptada (la del borrado de una persona está en
+[archivos-y-privacidad.md](archivos-y-privacidad.md)):
 
-### HUB-F247 Guardar ficheros desde una app
-Estado: hecho
-Actor: sistema
-Pantalla: ninguna
-Pasos:
-1. Una app declara `static_files.folder` en su manifiesto.
-2. Al instalarla, el hub crea `media/modules/<carpeta>/`.
-3. La app pide escribir un fichero con una ruta relativa.
-Entra: carpeta (minúsculas, dígitos, `_`, `-`, hasta 64) y ruta relativa sin `..`, sin `/` inicial, sin `\`.
-Sale: el fichero queda en `modules/<carpeta>/<ruta>` y el hub devuelve esa ruta; en producción por el almacenamiento de erplora.com, en desarrollo en disco, con la misma ruta lógica. Una app solo escribe en su carpeta; la persona la ve en Archivos según HUB-F246.
-Si falla: carpeta o ruta inválida, error de almacenamiento antes de tocar la red; sin credencial de máquina, la instalación de una app con `static_files` falla.
-Implicados: pendiente
-Pendiente de enlazar: verifactu — la copia de cada XML en el almacenamiento de ficheros del módulo
-QA: ninguno
+- Ajustes del negocio, zona horaria por nombre IANA y moneda con decimales por ISO-4217: Odoo
+  (compañía), Square y Shopify (ajustes de tienda), Business Central (compañía y moneda). Contraste de
+  mercado reutilizado de ADR-0273/ADR-0195 y de hub#731.
+- Exportar/importar como copia de seguridad frente a plantilla, con mecánica de `migrate`: Odoo
+  (módulos con datos de demo), Shopify (importación de CSV y temas), Toast y Square (menú de
+  plantilla). Ver `architecture/hub/export-import.md`.
 
-### HUB-F248 Borrar los datos de una persona: el aviso único
-Estado: parcial — el aviso lo emite Clientes y solo lo escuchan WhatsApp, Servicios y el hub; Citas, Reservas y Reservas online no; el motivo escrito por el administrador queda en el propio aviso durante 90 días
-Actor: administrador, sistema
-Pantalla: CUSTOMERS: ficha del cliente
-Pasos:
-1. El administrador pulsa **Borrar datos personales** en la ficha (flujo de Clientes).
-2. Clientes sustituye los datos de la ficha y publica `customer.anonymized`.
-3. El hub entrega ese aviso a quien lo escucha y vacía su propio historial (HUB-F249).
-Entra: el aviso `<sujeto>.anonymized` con su `<sujeto>_id` (de Clientes: `customer_id` y `reason`, hasta 500 caracteres).
-Sale: el contrato es solo un nombre: el hub reconoce cualquier evento que acabe en `.anonymized` con el identificador del sujeto como cadena y no nombra a ningún módulo. Cada módulo que guarda algo de la persona se suscribe a ese aviso y borra lo suyo (HUB-F250); lo que no lo hace, se queda. Es idempotente: repetirlo no cambia nada. Cualquier app puede emitir un `.anonymized` y vaciar el historial de un identificador ajeno (no hay regla de permiso, hub#2485).
-Si falla: si el vaciado del hub falla, el aviso se difiere y se reintenta con espera creciente hasta 8 veces; después queda atascado (dead-letter) hasta que alguien lo reintente. El identificador se busca como cadena entre comillas en cualquier punto del contenido, claves incluidas.
-Implicados: CUSTOMERS-F16
-QA: L-10, WA-06 (discrepa)
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Ajustes de negocio con validación y auditoría de autor | hecho (sin historial de valores) | HUB-F221 |
+| Zona horaria del negocio declarada o deducida | hecho | HUB-F227 |
+| Moneda con decimales | hecho | HUB-F226 |
+| Copia de seguridad y plantilla | parcial (errores tragados, certificado en plantilla) | HUB-F230, HUB-F231 |
+| Importar con informe por sección, reintento y deshacer | parcial | HUB-F235, HUB-F239 a HUB-F241 |
+| Restablecer por secciones con bloqueo fiscal | parcial | HUB-F242 |
 
-### HUB-F249 Vaciar el historial del hub que nombra a la persona
-Estado: parcial — no repasa lo que estaba en curso al borrar y acaba después (hub#2484), ni las copias que llevan el dato sin el identificador (hub#2477, hub#2474), ni el propio aviso de borrado
-Actor: sistema
-Pantalla: ninguna
-Pasos:
-1. El hub entrega un aviso `<sujeto>.anonymized`.
-2. En una sola sentencia vacía (`{}`) lo terminal que nombra ese identificador.
-3. Registra cuántas filas vació.
-Entra: el identificador y el hub.
-Sale: se vacían, sin borrar la fila: los avisos entregados o descartados cuyo contenido tiene el identificador como valor; las ejecuciones terminadas (hechas, fallidas, canceladas) que lo tocan en entrada, variables, paso o propuesta, o que nacieron de un aviso así; todos los pasos y propuestas de esas ejecuciones; y los avisos que esas ejecuciones encolaron (un recordatorio lleva el teléfono sin el identificador). No se tocan los avisos pendientes o atascados ni las ejecuciones vivas: conservan los datos hasta procesarse o hasta la retención de 90 días (HUB-F253). Se conserva la fila porque es el rastro de la trazabilidad. Solo este hub; reentrega sin efecto. Coste: un barrido de todo `_event_outbox` del hub y de las ejecuciones terminales por cada borrado. No toca la cola de impresión ni los localizadores públicos (`_public_claim`).
-Si falla: error de base de datos; el aviso queda sin entregar y el reintento lo completa; nada queda medio vaciado.
-Implicados: CUSTOMERS-F16, WHATSAPP_INBOX-F11
-QA: L-10
+## Datos: de quién es cada dato
 
-### HUB-F250 Lo que le toca a cada app al recibir el aviso de borrado
-Estado: parcial — Citas (nombre, teléfono, correo y notas en citas, series e historial), Reservas (RESERVATIONS-F22) y Reservas online no escuchan el aviso
-Actor: sistema
-Pantalla: ninguna
-Pasos:
-1. Una app que guarda datos de la persona escucha el aviso.
-2. Vacía sus tablas por el identificador de la ficha.
-Entra: `customer.anonymized` y su identificador.
-Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Servicios marca sus bonos; Nadie toca los XML de Verifactu del almacenamiento de archivos ni los localizadores públicos. Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
-Si falla: el aviso de esa app se reintenta como cualquier otro.
-Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11
-QA: L-10, WA-06 (discrepa)
+De esta área (las tablas de la segunda mitad, en
+[archivos-y-privacidad.md](archivos-y-privacidad.md)):
 
-### HUB-F251 Borrar los datos de un número sin ficha
-Estado: no hecho — la bandeja de WhatsApp borra sus conversaciones pero no emite ningún aviso `.anonymized` con un identificador que el hub pueda buscar: los mensajes y su número siguen 90 días en el historial del hub (hub#2474, hub#2477)
-Actor: administrador
-Pantalla: HUB_SHELL: WhatsApp › Bandeja de entrada
-Pasos:
-1. El administrador pulsa **Borrar datos de este número** en una conversación.
-2. La app borra lo suyo.
-3. Debería avisar al hub para vaciar las copias de los mensajes.
-Entra: el identificador de la conversación o una huella del número.
-Sale: hoy, nada en el hub. `hub.whatsapp.message_received` y `whatsapp_inbox.message.received` guardan número, nombre y texto sin identificador de ficha.
-Si falla: sin confirmar (no existe).
-Implicados: WHATSAPP_INBOX-F10
-QA: L-11, WA-06 (discrepa)
+- `hub_settings`: 20 claves. Contiene el correo y el teléfono de `notify_allowed_recipients` y la
+  identidad del negocio, que puede ser una persona física si es autónomo. Las claves del PIN y
+  `api_docs_enabled` son del área de acceso, pero se guardan por esta puerta (HUB-F221).
+- `_hub_import_batch`, `_hub_import_row`, `_hub_import_retired_row` y `_hub_import_report`: los lotes
+  de importación, sus filas, lo que retiraron y su informe (HUB-F235 a HUB-F241).
+- `_hub_meta`: la marca de la unidad del dinero (`money_unit`, HUB-F243), entre otras claves de
+  otras áreas.
+- `GET /api/hub/context` expone sin sesión el nombre y el rol de cada persona con PIN, para la rejilla
+  de acceso, y el identificador del hub (HUB-F220).
+- Los datos personales de los clientes viven en cada módulo, no en el hub.
 
-### HUB-F252 Borrar los datos de una persona del equipo
-Estado: no hecho — el hub solo desactiva a una persona (cierra sus sesiones); nombre, correo, PIN cifrado, perfil y preferencias se quedan, y no hay vaciado en el historial
-Actor: administrador
-Pantalla: ninguna
-Pasos:
-1. El administrador da de baja a una persona del equipo.
-2. El hub la marca inactiva y cierra sus sesiones.
-Entra: la persona.
-Sale: nada se borra ni se seudonimiza. La atribución («quién autorizó qué») conserva el identificador cuatro años y el lector resuelve el nombre.
-Si falla: no aplica.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, acceso (dar de baja a una persona)
-QA: ninguno
+## Reglas que no se rompen
 
-### HUB-F253 Purgar el historial por retención
-Estado: hecho
-Actor: sistema
-Pantalla: ninguna
-Pasos:
-1. Cada hora el hub cierra primero las propuestas caducadas de las automatizaciones.
-2. Después borra el historial terminal con más de 90 días.
-3. Registra cuántas filas borró.
-Entra: el reloj y el historial de avisos y ejecuciones.
-Sale: se borran, a 90 días desde su fin: avisos entregados o descartados (con sus marcadores de entrega), ejecuciones hechas, fallidas o canceladas con sus pasos, propuestas y esperas. Los recibos de autorización de un responsable duran cuatro años (1461 días) y contienen la huella del contenido, no el contenido. No se purgan nunca los avisos pendientes o atascados, ni las ejecuciones vivas. Es dura (`DELETE`), en lotes de 500 y hasta 20 pasadas por vuelta. Los 90 días son fijos. El historial de actualizaciones solo enseña 90 días y los dispositivos sin uso se limpian a mano a los 30 días (Acceso). Nada purga la cola de impresión, que guarda el HTML de cada documento hasta restablecer el hub.
-Si falla: se registra el aviso y la vuelta siguiente continúa.
-Implicados: pendiente
-Pendiente de enlazar: hub — HUB, avisos entre módulos (avisos atascados y su reintento)
-QA: ninguno
+- Un lote de ajustes se valida entero antes de escribir (`settings::set_many`).
+- El NIF se congela con el primer registro fiscal y el país al activar el perfil fiscal (HUB-F223).
+- Objetivo, hoy sin cumplir del todo (HUB-F231): una plantilla no lleva personas, datos fiscales,
+  permisos ni automatizaciones. Hoy el servidor mete el certificado propio si «datos fiscales» está
+  marcado y «archivos» copia las carpetas de las apps (los XML de Verifactu). Las identidades solo
+  deben entrar en la copia propia, que hoy se decide por el `hub_id` que declara el propio fichero
+  (HUB-F236, dudas).
+- Las secciones de datos del import solo hacen `INSERT` de literales en las tablas de su sección y
+  nunca tocan tablas `_*`. Excepciones: retira (borrado lógico) el contenido previo de las tablas de
+  objeto único, y sube los archivos del zip a la carpeta que nombren, sin la política de carpetas.
+- Restablecer está acotado por `hub_id`, es una transacción y no borra lo fiscal si ya se emitió.
 
-### HUB-F254 Registrar la actividad del negocio para el SaaS
-Estado: hecho
-Actor: sistema
-Pantalla: ninguna
-Pasos:
-1. Alguien entra, sale, cobra, devuelve o abre o cierra caja.
-2. El hub anota un hecho con quién lo hizo.
-3. En el latido diario lo manda al SaaS y borra lo entregado.
-Entra: la orden pública (`complete_sale`, `refund`, apertura y cierre de caja) o el inicio y cierre de sesión.
-Sale: una fila `(id, tipo, usuario del hub, instante)`: nunca nombre, ni nada del cliente final. No se anota sin persona detrás (tareas, avisos). Se lee sin borrar, hasta 500 por latido, y solo se borra tras la confirmación del SaaS; el SaaS descarta duplicados por id. Sin conexión conserva 5.000 y descarta lo más antiguo. Anotar nunca falla la venta.
-Si falla: un fallo al anotar se escribe en el log y la operación sigue.
-Implicados: pendiente
-Pendiente de enlazar: saas — recepción de la actividad del hub
-QA: ninguno
+## Lo que NO hace, a propósito
 
-### HUB-F255 Aplicar la semilla SQL del despliegue al arrancar
-Estado: parcial — el SQL se ejecuta sin la validación del import (cualquier sentencia, no solo `INSERT` de literales en las tablas de una sección)
-Actor: sistema
-Pantalla: ninguna
-Pasos:
-1. El despliegue pasa `HUB_SEED_SQL` (SQL inline) o `HUB_SEED_SQL_PATH` (fichero); si están los dos, gana el inline.
-2. Al arrancar, tras las tablas de sistema, el hub ejecuta el SQL.
-Entra: el SQL del despliegue, con el identificador del hub.
-Sale: la configuración inicial escrita; la idempotencia la pone el propio SQL. Es configuración del despliegue, no una plantilla.
-Si falla: un seed roto aborta el arranque con un error claro.
-Implicados: pendiente
-Pendiente de enlazar: infra — cómo el despliegue compone y pasa la semilla
-QA: ninguno
+- No avisa a los módulos de que un ajuste cambió.
+- No importa una plantilla al arrancar un hub nuevo (retirado). Sí ejecuta, si el despliegue lo pasa,
+  el SQL de `HUB_SEED_SQL` sin la validación del import (HUB-F255).
+- No guarda la contraseña del certificado en un fichero de exportación ni lo aplica automáticamente.
+
+## Dudas abiertas
+
+- Cómo decidir que un fichero es la copia propia sin fiarse de su manifiesto (firma del hub o prueba
+  de posesión) (HUB-F236).
+- Si la región debe congelarse también tras salir a producción (HUB-F223).
+- Si el servidor debe pedir una confirmación para restablecer (hoy solo la pantalla) (HUB-F242).
+- Si el fichero de exportación debe llevar una marca de unidad de dinero (HUB-F230, HUB-F243).
+
+## Fuentes contrastadas
+
+- `architecture/hub/settings.md` dice que `timezone` está pendiente de código en una nota y como
+  implementada en otra; el código la tiene (`settings.rs`) (HUB-F227).
+- `architecture/hub/export-import.md` está como «contrato propuesto, fases pendientes»; todo está
+  implementado.
+- El comentario de `server/export_import.rs` habla de un import «de arranque»; no tiene llamador
+  (`boot.rs` lo retiró).
+- El manual (09) dice que Restablecer pide escribir el nombre del negocio; lo que pide la pantalla es
+  la razón social, y el servidor no pide nada (HUB-F242).
+- El manual (08) lista la zona horaria como editable; el hub solo la deduce salvo que se declare
+  (HUB-F227).
+- INVENTORY-F09/F11: la multiplicación ×100 y ×10⁶ al reimportar no sale del hub: exportar, importar y
+  `money_backfill` mueven los números tal cual; sale del CSV de la lista de productos (HUB-F238).

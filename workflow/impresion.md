@@ -2,6 +2,22 @@
 
 Prefijo: HUB
 
+> Área «Impresión» del servidor del hub (`crates/runtime`: `printing`, `print_queue`, `print_drain`,
+> `print_hosts`, `print_routes`, `print_stations`, `host_print`; `crates/server`: `print`,
+> `print_ws`): la cola de trabajos de impresión, las funciones (Recibo, Cocina, Barra, Etiqueta) y a
+> qué función va cada documento, los dispositivos que imprimen cada función y cómo se reintenta o se
+> descarta un trabajo. La pantalla «Impresoras» es del módulo Impresión (`printing`); la mitad de
+> dispositivo (descubrir, ESC/POS, USB, cajón) está en `crates/peripherals/WORKFLOW.md`
+> (HUB_PERIPHERALS-F01 a F16).
+
+## Antes de empezar
+
+- Una aplicación instalada abierta en el puesto que tiene la impresora, dada de alta como quien
+  imprime una función (HUB-F196); sin ella los trabajos esperan (HUB-F201).
+- Las cuatro funciones de fábrica (Recibo, Cocina, Barra, Etiqueta) nacen con el hub (solo se
+  siembran si no tiene ninguna); solo Recibo no se puede borrar.
+- La caja que cobra, si tiene la impresora de la función, imprime directo y el hub no ve ese papel.
+
 ## Flujos
 
 ### HUB-F190 Pedir imprimir un documento desde una pantalla o un dispositivo
@@ -429,3 +445,69 @@ Pendiente de enlazar: printing — PRINTING-F13 (abrir el cajón al cobrar)
 Pendiente de enlazar: sales — SALES-F01 (vender y cobrar en efectivo)
 Pendiente de enlazar: hub — HUB_SHELL, abrir el cajón al cobrar en el dispositivo que cobró
 QA: qa-hub §8
+
+## Cobertura contra la referencia
+
+Referencia adoptada: estaciones como filas, mapa tipo de documento → estación y cola con clave por
+trabajo (Toast, Square, Lightspeed K, Odoo, Oracle Simphony, Epson ePOS, Star CloudPRNT; contrastado
+en hub#457/#987, `qa-hub-restaurant` §2). Se adopta: la impresora es un destino y la función dice
+para qué sirve; el trabajo espera si no hay nadie (tarde, no perdido); el mapa falla abierto a
+Recibo.
+
+| Elemento | Estado | Flujo |
+|---|---|---|
+| Cola en el servidor con clave por trabajo | hecho para lo que pasa por la cola; el camino directo de la caja no deja fila | HUB-F190, HUB-F191, HUB-F192 |
+| Estaciones como filas y mapa documento → estación | hecho; sin pantalla | HUB-F193, HUB-F194, HUB-F195 |
+| Hosts múltiples por función, latido, retirar | parcial: retirar solo por API, el dispositivo retirado se vuelve a dar de alta y una función quitada no se da de baja | HUB-F196, HUB-F197 |
+| Canal en vivo con aviso «hay trabajo» | parcial: el aviso no llega con función omitida o escrita distinto, ni por la puerta de módulos, ni al reintentar un trabajo muerto ni cuando vuelve a la cola por un fallo | HUB-F190, HUB-F191, HUB-F198, HUB-F204 |
+| Trabajo en espera sin impresora y alarma | hecho | HUB-F201, HUB-F202 |
+| Reintentar y descartar con sello | hecho | HUB-F204, HUB-F205 |
+| «Hecho» solo cuando sale el papel | parcial: `erplora_print` contesta Ok al encolar en memoria (`apps/tauri/src-tauri/src/lib.rs:1671-1683`) | HUB-F199 |
+| Retención y borrado RGPD de la cola | no hecho | HUB-F206 |
+| Cajón desde el servidor / sin venta | no hecho | HUB-F207 |
+
+## Datos: de quién es cada dato
+
+Del hub, por `hub_id`: la cola de trabajos (`_print_queue`, con el documento entero), las funciones
+(`_print_station`), el mapa (`_print_route`) y los dispositivos que imprimen (`_print_host`: quién y
+cuándo los dio de alta, nombre del dispositivo).
+
+Datos personales: el documento dentro de la cola (cliente, NIF, mesa, camarero, etiqueta de comanda
+con nombre de cliente), el motivo libre de un descarte, `claimed_by` (dispositivo),
+`retried_by`/`discarded_by` (persona), `_print_route.updated_by` y `_print_host.registered_by`. El
+borrado de un cliente (hub#2467) vacía la copia del aviso `…print.due` ya entregado si lleva su id,
+pero no la fila de la cola. No se purga (HUB-F206); restablecer el hub vacía la cola y conserva los
+dispositivos (HUB-F242).
+
+## Reglas que no se rompen
+
+- Aislamiento por hub en toda lectura y escritura; la clave `(hub, jobId)` es única.
+- Vocabulario cerrado de ocho documentos.
+- Solo un dispositivo dado de alta de una función saca sus trabajos (dos negativas distintas).
+- El documento sale de la cola solo por el canal con sesión y registro; por la puerta de módulos
+  viaja también dentro del aviso `…print.due`, visible para el administrador en Eventos caídos.
+- Reintentar y descartar exigen administrador y, si lo pide un módulo, el permiso de impresora de ese
+  módulo; descartar nunca borra.
+
+## Lo que NO hace, a propósito
+
+- No se niega a cobrar sin impresora.
+- No compone el papel.
+- No abre el cajón.
+- No enruta por categoría de producto.
+
+## Dudas abiertas
+
+1. ¿«Hecho» debe significar papel salido (el dispositivo debe devolver el fallo de red)?
+2. ¿Cuánto se conserva la cola y cómo se borra a un cliente (RGPD)?
+3. ¿Pantalla para el mapa y las estaciones?
+4. Idioma del papel por la puerta directa, sin confirmar (la cola sella el `locale` del hub; la
+   directa no).
+5. ¿Debe despertar al dispositivo un trabajo de módulo o un reintento?
+6. Báscula: hub#1217 (ver HUB_PERIPHERALS).
+
+## Fuentes contrastadas
+
+- `architecture/hub/print-queue.md` dice «Tarde, no perdido» y da el aviso en vivo por función: el
+  aviso lleva la palabra del productor (HUB-F190).
+- El guion de QA §10 espera un trabajo pendiente con la impresora apagada: no ocurre (HUB-F199).
