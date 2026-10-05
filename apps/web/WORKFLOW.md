@@ -37,10 +37,29 @@ Un worker lee este índice **y** el fichero del área que va a tocar. Las vistas
 | Ajustes del negocio y datos | `workflow/ajustes-y-datos.md` | F155–F184 | SettingsPage y sus pestañas (settings-tabs, hub-settings, timezone), WhatsAppConnect, DataPanel, ExportPanel, ImportPanel, ImportPermissionsConsent, import-retry, ResetPanel |
 | Asistente | `workflow/asistente.md` | F185–F199 | AssistantDrawer y assistant*.ts (confirmación, peligro, anclaje, historial, plan, informe, rutas, puesta en marcha) |
 
-Una pieza que dos áreas comparten se describe donde se ve y la otra la cita: la tarjeta «Este
-dispositivo» vive dentro de Ajustes › General pero su flujo es de Acceso (HUB_SHELL-F11); «Actualizar
+Una pieza que dos áreas comparten se describe donde se ve y la otra la cita. **Ajustes › General**
+lleva tres tarjetas de tres flujos: «Este dispositivo» (`DeviceModeCard`) es de Acceso
+(HUB_SHELL-F11); «Pinpad» (`PinPolicyCard`) y «Dispositivos» (`DevicesCard`) son de «Personas y
+permisos» (HUB_SHELL-F99…F104); la pestaña en sí, de «Ajustes del negocio y datos». «Actualizar
 ERPlora» del menú es de Acceso (HUB_SHELL-F20) y la pestaña Sistema › Actualizaciones, de Sistema; la
 salud del Inicio (HUB_SHELL-F37) usa las mismas frases que Sistema.
+
+Ficheros de `src/lib/` que la tabla no nombra, y quién los cubre:
+
+| Fichero | Área |
+|---|---|
+| `session.ts`, `courier.ts`, `user-switch.ts`, `pin-policy.ts`, `pinpad-dial.ts`, `pin-length.ts`, `device-mode.ts`, `device.ts`, `cloud.ts` (acceso), `boot.ts`, `boot-screen.ts`, `offline.ts`, `immersive.ts`, `change-hub.ts`, `install-qr.ts`, `deep-link.ts`, `user-profile.ts`, `branding.ts`, `routes.ts`, `hash-tab.ts`, `tabbar-peek.ts`, `list-load-state.ts`, `router/` | Acceso, navegación y perfil |
+| `dashboard-heading.ts`, `dashboard-blueprint-widget.ts`, `blueprint-hero.ts`, `app-usage.ts` | Inicio y puesta en marcha |
+| `autostart.ts` | `HUB_APP` el comportamiento; el interruptor de Ajustes, «Ajustes del negocio y datos» |
+| `bridge-transport.ts`, `client-instance.ts` | «Avisos e impresión» (y `HUB_APP` el transporte de la app) |
+| `device-permission.ts`, `local-network-permission.ts` | `HUB_APP`; su entrada desde Sistema, «Sistema» |
+| `platform-failure.ts` | «Personas y permisos» |
+| `teleported-styles.ts` | «La vista de un módulo» |
+| `media.ts` | «Aplicaciones, plan y archivos» |
+| `money.ts` | regla común (ver «Lo que comparten todas las pantallas») |
+
+`visual-baseline-gate.ts` (herramienta de tests visuales) y `src/parked/` (código sin enrutar) no
+tienen comportamiento visible y no los gobierna ningún flujo.
 
 ## Referencia adoptada
 
@@ -73,8 +92,10 @@ Se adopta esto, contrastado en `.claude/agents/qa-hub-restaurant.md` §2, en las
 
 - El hub tiene que estar **dado de alta** en erplora.com (llega así al crearlo desde el panel); uno
   sin alta solo enseña el acceso y no deja entrar (HUB_SHELL-F12).
-- Cada dispositivo necesita **una primera entrada con una cuenta de erplora.com** miembro del negocio:
-  es lo que lo hace de confianza y enciende el PIN en él (HUB_SHELL-F01, HUB_SHELL-F04).
+- Cada dispositivo necesita **una primera entrada con una cuenta de erplora.com** miembro del negocio,
+  por el formulario o desde la app instalada (en un navegador, entrar por el pase del panel no
+  cuenta): es lo que lo hace de confianza y enciende el PIN en él (HUB_SHELL-F01, HUB_SHELL-F02,
+  HUB_SHELL-F04). Tras dar un PIN nuevo, recarga ERPlora en las cajas para que salga en la rejilla.
 - En una caja compartida: márcala como compartida (HUB_SHELL-F11), decide en **Ajustes → General →
   Pinpad** si se pregunta quién vende y cada cuánto, y que cada persona tenga su PIN (HUB_SHELL-F03,
   HUB_SHELL-F22 o Empleados).
@@ -108,15 +129,20 @@ Vale para todas las áreas; quien escribe una pantalla nueva lo cumple sin volve
 - **Tres tamaños.** Móvil (menos de 768 px): menú en cajón, acciones de la barra plegadas en «Más
   opciones», rejillas a dos filas por debajo de 540 px. Tableta (768–991 px): menú en cajón, barra
   completa. Escritorio (992 px o más): menú fijo que se pliega a iconos. Con poca altura (500 px o
-  menos, un móvil apaisado) las franjas se pliegan a una línea. QA mide 1440, 834 y 390.
+  menos, un móvil apaisado) la franja de bloqueo se pliega a una línea. QA mide 1440, 834 y 390.
 - **Idiomas.** El texto de la pantalla sale de `src/i18n/locales/`: el inglés es la fuente y cada
   cadena nueva lleva su español; un test de paridad lo exige. El idioma es el de la persona (Mi
   perfil), si no el del negocio, si no español. Los nombres y títulos de las apps los traduce el hub.
   Nunca se pinta un código interno (`hub.users.pin_in_use`) ni una traza.
+- **Dinero.** Se pinta con la moneda del hub y los separadores del idioma (`lib/money.ts`). El hub y
+  las apps guardan el dinero en céntimos: se pinta con `formatMoney`, que divide según los decimales
+  de la moneda; `formatAmount` es solo para cifras que ya llegan en euros. Confundirlas multiplica el
+  importe por cien (HUB_SHELL-F36).
 - **Campos.** El shell fija el modo `ios` de Ionic, en el que `fill="outline"` no pinta nada en
-  `ion-input`, `ion-select` e `ion-textarea`. Los campos del shell lo declaran junto a `mode="md"` y,
-  además, un gancho que se carga antes que Ionic lo normaliza para todos, módulos incluidos
-  (hub#760, hub#1060). En `ion-button`, `fill="outline"` sí pinta.
+  `ion-input`, `ion-select` e `ion-textarea`. La regla es una: los campos del shell declaran
+  `fill="outline"` junto a `mode="md"` (lo vigila `theme/ionic-fill-needs-md.test.ts`) y un gancho
+  que se carga antes que Ionic (`lib/ionic-fill.ts`) pone `mode="md"` a todo campo con `fill` que no
+  declare modo, módulos incluidos (hub#760, hub#1060). En `ion-button`, `fill="outline"` sí pinta.
 - **Iconos.** Por el componente del shell y el registro de iconos de Iconify horneado en la
   compilación (`ion:` por defecto): sin SVG sueltos y sin bajar nada de la red.
 - **El PIN de un responsable.** Cuando una orden necesita la aprobación de un responsable, el diálogo
@@ -153,15 +179,16 @@ la frase en rojo bajo el teclado; la ventana no se cierra.
 Fijo a la izquierda en escritorio, en cajón en tableta y móvil. Arriba, la **tarjeta de usuario**
 (foto o iniciales, nombre y correo) que despliega «Perfil», «Cambiar de usuario» (solo en caja
 compartida) y «Cerrar sesión». Secciones «General» (Inicio, Empleados, Archivos) y «Cuenta» (Mi plan,
-Apps, Sistema, API si está publicada, Ajustes). Pie, siempre a la vista: «Actualizar ERPlora ({version})»
-cuando toca, el QR «Ábrelo en el móvil», «Actualizar plan» (salvo en la copia de Google Play), el logo
+Apps, Sistema, API si está publicada, Ajustes). Pie, siempre a la vista: «Actualizar ERPlora ({version})» en
+la app instalada, cuando hay versión nueva y solo a quien administra; el QR «Ábrelo en el móvil», «Actualizar plan» (salvo en la copia de Google Play), el logo
 que lleva a Inicio y la versión. Sin estados propios: las entradas son fijas.
 
 ### Barra superior
 Encima de cada pantalla con marco: botón del menú (tableta y móvil), «Atrás» en las de detalle,
 plegar el menú (escritorio), el título de la pantalla, las acciones de la pantalla, el lanzador
 «Mis apps» (hoja con una baldosa por app y «Apps»; vacía: «Aquí aparecerán tus apps…»), y desde
-768 px «erplora.com», «Cambiar de negocio» (app instalada), «Asistente» y la campana con su número;
+768 px «erplora.com» (quien administra y entró con su cuenta), «Cambiar de negocio» (app
+instalada), «Asistente» (si está disponible) y la campana con su número;
 en el móvil esas cuatro van en «Más opciones». Una línea fina de progreso debajo mientras hay
 peticiones en curso. El contenido de la campana es del área «Avisos e impresión».
 
@@ -239,7 +266,7 @@ gramática y el mismo prefijo. Huecos (`parcial`, `no hecho`): el porqué está 
 | HUB_SHELL-F01 | Entrar con la cuenta de erplora.com | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F02 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F03 | Elegir el PIN la primera vez que se entra en una caja | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
-| HUB_SHELL-F04 | Entrar con PIN | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
+| HUB_SHELL-F04 | Entrar con PIN | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F05 | Entrar pasando la placa | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F06 | Perder la sesión porque se abrió en otro dispositivo | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F07 | La sesión termina mientras se trabaja | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
@@ -249,9 +276,9 @@ gramática y el mismo prefijo. Huecos (`parcial`, `no hecho`): el porqué está 
 | HUB_SHELL-F11 | Decidir si este dispositivo es compartido o personal | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F12 | Abrir un hub que todavía no está dado de alta | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F13 | Abrir ERPlora cuando el hub no contesta | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
-| HUB_SHELL-F14 | Seguir trabajando sin conexión | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
+| HUB_SHELL-F14 | Saber que no hay conexión con el hub | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F15 | Moverse por el menú lateral y la barra superior | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
-| HUB_SHELL-F16 | Ir a erplora.com ya identificado | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
+| HUB_SHELL-F16 | Ir a erplora.com ya identificado | parcial | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F17 | Abrir una dirección que el hub no tiene | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F18 | Poner la pantalla de una app a pantalla completa | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
 | HUB_SHELL-F19 | Abrir el hub en el móvil y dejarlo como aplicación | hecho | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) |
@@ -286,14 +313,15 @@ HUB_SHELL-F24 queda libre en el rango de Acceso.
 | Elemento de la referencia | Estado | Flujo |
 |---|---|---|
 | Entrar con cuenta, segundo factor y Google | hecho | F01 |
+| «Confiar en este dispositivo» decide si el dispositivo es de confianza | no hecho: el hub confía en todo acceso con cuenta; la casilla solo decide el PIN y si el navegador recuerda a la persona | F01 |
 | Decir por qué no se entra (baja, ya no miembro) | parcial: misma frase que credenciales erróneas | F01 |
-| Entrar desde el panel de gestión sin volver a identificarse | hecho | F02 |
+| Entrar desde el panel de gestión sin volver a identificarse | parcial: en el navegador no hace el dispositivo de confianza | F02 |
 | Pedir el PIN propio en el primer acceso a una caja | parcial: solo con «Confiar» y no al entrar por el panel | F02, F03 |
-| Rejilla de caras y PIN de longitud fija | hecho | F04 |
+| Rejilla de caras y PIN de longitud fija | parcial: la rejilla es la del arranque hasta recargar | F04 |
 | Bloqueo por intentos con el tiempo de espera | hecho (lo aplica el servidor, HUB-F135) | F04 |
 | Placa en el acceso | parcial: sin validar con hardware real | F05 |
 | Placa en el relevo de turno | no hecho | F09 |
-| Relevo de turno encima de la venta | hecho | F09 |
+| Relevo de turno encima de la venta | parcial: el lanzador y la lista siguen siendo los de quien se fue hasta navegar | F09 |
 | Cierre por inactividad configurable | parcial: solo la pantalla; sin aviso previo ni motivo | F08 |
 | Avisar de la sesión desalojada por el plan | hecho | F06 |
 | Dispositivo compartido o personal | hecho (rechazo en inglés) | F11 |
@@ -305,6 +333,8 @@ HUB_SHELL-F24 queda libre en el rango de Acceso.
 | Elemento de la referencia | Estado | Flujo |
 |---|---|---|
 | Arranque sin servidor: aviso y reintentar | hecho | F13 |
+| Cambiar de negocio cerrando la sesión | parcial: no la cierra | F16 |
+| Trabajar sin conexión con el hub | no existe (hub en la nube): solo se avisa | F14 |
 | Franja persistente sin conexión | hecho | F14 |
 | Menú filtrado por el rol | parcial: el menú enseña todo; recortan las pantallas | F15 |
 | Lanzador de apps | hecho | F15, F32 |
@@ -330,7 +360,7 @@ HUB_SHELL-F24 queda libre en el rango de Acceso.
 | Paneles por app con presets por sector | parcial: sin filtro por permiso en la pantalla | F33, F34 |
 | Tablero guardado por persona | no hecho: se guarda por navegador | F34 |
 | Paneles en vivo | hecho para lo que la app declara | F35 |
-| Actividad reciente | parcial: solo ventas y estados mal nombrados | F36 |
+| Actividad reciente | parcial: importe ×100, solo ventas y estados mal nombrados | F36 |
 | Estado de la impresora y de WhatsApp | parcial: detalle solo al pasar el ratón | F37 |
 
 > **Integrador:** aquí van las tablas de las demás áreas.
@@ -346,13 +376,18 @@ lo que deja en **el navegador del dispositivo**. Inventario de lo de las áreas 
 |---|---|---|---|
 | `erplora.session` | identificador, nombre, correo, foto, rol y permisos de quien tiene la sesión | sí | al cerrar sesión o perderla |
 | `erplora.hub_session`, `erplora.hub_session_credential` | la sesión del hub y cómo se abrió (cuenta, PIN, placa) | credencial | al cerrar sesión |
-| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión y en el relevo de turno |
-| `erplora.trusted_users`, `erplora.trusted` | id, nombre, **correo** e iniciales de quien entró con «Confiar» en este navegador | sí | **no** al cerrar sesión: se recorta contra la lista del hub al abrir Acceso, y se vacía si el hub no da ninguna persona con PIN |
+| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión y en el relevo de turno; **no** si el acceso con cuenta falla después de que erplora.com acepte la contraseña, ni al entrar con PIN, ni con «Cambiar de negocio» [SEG] |
+| `erplora.trusted_users`, `erplora.trusted` | id, nombre, **correo** e iniciales de quien entró con su cuenta en este navegador sin desmarcar «Confiar» (marcada por defecto, también donde no se ve); la rejilla de PIN enseña el correo | sí | nunca al cerrar sesión, al quitar el dispositivo ni al pasarlo a personal [SEG]; se recorta contra la lista del hub al abrir Acceso (conservando el correo de quien siga con PIN) y se vacía si nadie tiene PIN |
 | `erplora.device_id` | el identificador de este dispositivo | no | nunca (es lo que el hub reconoce como de confianza) |
 | `erplora.apps.usage` | cuántas veces se abre cada app | no | nunca |
-| tablero de paneles (clave `dashboard-hub` de `ok-widget-board`) | qué paneles y en qué orden | no | nunca; compartido por quien use el navegador |
+| tablero de paneles (`okwb:dashboard-hub`) | qué paneles y en qué orden | no | nunca; compartido por quien use el navegador |
 | `erplora.locale` | el idioma activo | no | se rehace en cada arranque |
+| `erplora.theme`, `erplora.palette` | claves antiguas del tema | no | se borran al arrancar |
 | `erplora.assistant.history` (sesión del navegador) | la conversación con el asistente | sí | al cerrar sesión, en el relevo y al cerrar la pestaña |
+
+El PIN no se guarda nunca: viaja en el cuerpo de la petición y el ticket del código de verificación
+vive solo en memoria. En memoria (no en el navegador) quedan además, tras cerrar sesión, la última
+lista de puesta en marcha y, tras el relevo, el menú de apps de quien se fue.
 
 El perfil, el PIN, el modo del dispositivo y los dispositivos son del hub (`HUB`, HUB-F132, HUB-F139,
 HUB-F143); la lista de puesta en marcha y los paneles, del hub y de cada app (HUB-F34, HUB-F35).
@@ -374,14 +409,23 @@ Solo lo que el código hace cumplir:
   por falta de rol ni por un corte de red), y la cierra una vez aunque haya muchas peticiones en vuelo.
 - El relevo de turno no navega y no suelta la sesión anterior hasta tener la nueva; un PIN erróneo no
   cambia nada.
-- El pase hacia erplora.com solo se pide con una sesión abierta con la cuenta; la gestión del negocio
-  solo se ofrece con el permiso de administrar; en la copia de Google Play no hay salida al plan ni
-  a la gestión.
+- El hub solo da el pase hacia erplora.com a una sesión abierta con la cuenta; a cualquier otra, la
+  pantalla le abre el enlace normal, que pide la contraseña. El botón «erplora.com» solo se ofrece con
+  el permiso de administrar; en la copia de Google Play no hay salida al plan ni a la gestión.
 - Las franjas de bloqueo y de conexión no se pueden cerrar; la de bloqueo solo sale con un paso
   «Necesario para facturar» pendiente.
 - Un panel que falla dice «No disponible»: nunca un valor viejo ni inventado.
 - Cada cadena nueva existe en inglés y en español (test de paridad de `src/i18n/`); ninguna pantalla
-  pinta un código interno del hub (`screens-never-paint-a-runtime-code.test.ts`).
+  pinta un código interno del hub (`screens-never-paint-a-runtime-code.test.ts`), salvo cinco que, a
+  propósito, pintan la frase que dio el hub cuando no tienen una propia (lista en el test); «Este
+  dispositivo» es una de ellas.
+
+Lo que hoy **no** se cumple y no es una regla, sino un hueco de seguridad [SEG] (detalle en sus
+flujos): los tokens de erplora.com de un acceso fallido se quedan y los usa la sesión siguiente
+(HUB_SHELL-F01); tras el relevo el lanzador y la lista son los de quien se fue (HUB_SHELL-F09); una
+lectura rota del dial desarma el cierre por inactividad (HUB_SHELL-F08); los correos de la rejilla
+sobreviven al cierre de sesión, a quitar el dispositivo y a pasarlo a personal (HUB_SHELL-F04);
+«Cambiar de negocio» no cierra la sesión (HUB_SHELL-F16).
 
 > **Integrador:** aquí van las reglas de las demás áreas.
 
@@ -413,12 +457,11 @@ Se resuelven con `market-decision`; no las decide el worker.
 - **PIN tras entrar desde el panel.** ¿Pedirlo también ahí, como tras el acceso con «Confiar»?
   (HUB_SHELL-F02, HUB_SHELL-F03).
 - **Correos en la rejilla de caras.** La rejilla de una caja compartida enseña el correo de quien entró
-  allí con «Confiar», guardado en el navegador y que no se borra al cerrar sesión; el hub, en cambio,
+  allí con su cuenta, guardado en el navegador y que no se borra al cerrar sesión; el hub, en cambio,
   nunca da el correo en su lista pública.
+- **La casilla «Confiar en este dispositivo».** Hacerla real (que el hub no confíe sin ella) o
+  quitarla; hoy su ⓘ promete lo que no pasa.
 - **Pantalla «Activación requerida».** Retirarla o volver a cablearla: hoy no se alcanza.
-- **Regla `fill="outline"`.** El `CLAUDE.md` de la raíz dice «nunca `fill="outline"` en `ion-input`»;
-  el shell lo declara con `mode="md"` y lo normaliza un gancho (hub#760, hub#1060). Hay que dejar una
-  sola regla escrita.
 
 > **Integrador:** aquí van las dudas de las demás áreas.
 
@@ -447,8 +490,16 @@ Se resuelven con `market-decision`; no las decide el worker.
   no lo usa ninguna pantalla.
 - `system.health.printerUnknownDetail` promete «Volveremos a comprobarlo solos»; Inicio solo lo relee
   al volver a la pantalla.
-- `CLAUDE.md` de la raíz («nunca `fill="outline"` en `ion-input`…») frente a la convención del shell
-  (`fill="outline" mode="md"`, `src/lib/ionic-fill.ts`).
+- `CLAUDE.md` de la raíz («nunca `fill="outline"` en `ion-input`…») está desfasado: la regla del código
+  es `fill="outline"` con `mode="md"` más el gancho de `src/lib/ionic-fill.ts`.
+- `es.ts` `login.popoverBody` («Si no la marcas, siempre tendrás que iniciar sesión con email») es
+  falso: el hub vuelve de confianza el dispositivo en todo acceso con cuenta (HUB_SHELL-F01).
+- `es.ts` `shell.changeHubBody` («Este dispositivo cerrará la sesión de este negocio…»): no la cierra
+  (HUB_SHELL-F16).
+- `es.ts` `notFound.body` dice que las apps «se abren desde el menú»: no están en el menú lateral,
+  se abren desde el lanzador de la barra o desde Inicio.
+- `src/lib/dashboard-activity.test.ts` alimenta `total: '12.5'` (euros) cuando `sales.list` da
+  céntimos: no detecta el importe ×100 de HUB_SHELL-F36.
 - QA `qa-hub-restaurant` §7.00 pide «recargar y volver a entrar: no reaparece onboarding»: la tarjeta
   de plantillas reaparece al recargar mientras el negocio siga sin apps («Ahora no» no se recuerda).
 

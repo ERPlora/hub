@@ -11,7 +11,7 @@ Prefijo: HUB_SHELL
 ## Flujos
 
 ### HUB_SHELL-F01 Entrar con la cuenta de erplora.com
-Estado: parcial — la pantalla no distingue «ya no eres miembro de este negocio» ni «un administrador te dio de baja» de unas credenciales erróneas: las tres dicen «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.»
+Estado: parcial — la pantalla no distingue «ya no eres miembro de este negocio» ni «un administrador te dio de baja» de unas credenciales erróneas: las tres dicen «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.»; la casilla «Confiar en este dispositivo» no cambia nada en el hub (todo acceso con cuenta vuelve de confianza el dispositivo): desmarcarla solo evita el paso «Crea tu PIN» y que este navegador recuerde a la persona, y su ⓘ promete lo contrario; [SEG] si el acceso falla después de que erplora.com acepte la contraseña, sus tokens se quedan en el navegador y los usa la sesión siguiente
 Actor: administrador, responsable, empleado
 Pantalla: Acceso
 Pasos:
@@ -21,8 +21,8 @@ Pasos:
 4. Si la cuenta pide verificación, la tarjeta cambia a «Verifica que eres tú»: «Hemos enviado un código de un solo uso a tu email. Introdúcelo para continuar.». Escribe el «Código de verificación» y pulsa «Verificar»; «Volver» regresa al formulario.
 5. Si confiaste el dispositivo y aún no tienes PIN, la pantalla te pide uno (HUB_SHELL-F03). Si no, entras en la pantalla que habías pedido o en **Inicio**.
 Entra: el correo y la contraseña (o el código de Google), que comprueba erplora.com; el identificador del dispositivo; si el hub ofrece PIN aquí (modo del dispositivo, confianza y dial del negocio, los tres leídos del hub sin sesión).
-Sale: pide a erplora.com la credencial y al hub la sesión local (`/api/auth/cloud`); guarda en este navegador la sesión, el nombre, el correo, el rol y los permisos de la persona, y los tokens de erplora.com. Con «Confiar» marcado apunta a la persona en la lista de caras de este navegador (con su correo).
-Si falla: campos vacíos o correo sin «@»: «Introduce un email válido y tu contraseña.». Credenciales erróneas, persona dada de baja o que ya no es miembro: «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Código erróneo o caducado: «Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.» (no vuelve a pedir la contraseña). Google que no termina: «No se pudo iniciar sesión con Google. Inténtalo de nuevo.». Hub sin registrar: HUB_SHELL-F12.
+Sale: pide a erplora.com la credencial y al hub la sesión local (`/api/auth/cloud`, con el identificador de este navegador pero sin la casilla): el hub vuelve de confianza el dispositivo siempre. Guarda en este navegador la sesión, el nombre, el correo, el rol y los permisos de la persona, y los tokens de erplora.com (se guardan **antes** de pedir la sesión al hub). Salvo que se desmarque la casilla (marcada por defecto, también donde no se ve), apunta a la persona —con su correo— en la lista de caras de este navegador, que no se borra al cerrar sesión.
+Si falla: campos vacíos o correo sin «@»: «Introduce un email válido y tu contraseña.». Credenciales erróneas, persona dada de baja o que ya no es miembro: «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Código vacío: «Introduce el código que enviamos a tu email.»; erróneo o caducado: «Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.» (no vuelve a pedir la contraseña); otro fallo del código: «No se pudo verificar el código. Inténtalo de nuevo.». Google que no termina: «No se pudo iniciar sesión con Google. Inténtalo de nuevo.». Hub sin registrar: HUB_SHELL-F12. [SEG] Cuando erplora.com acepta la contraseña y el hub rechaza después (baja, ya no miembro, hub que no contesta), los tokens de erplora.com se quedan en el navegador: entrar después con PIN no los borra y la sesión de la persona siguiente los manda al hub, resuelve con ellos el plan y la facturación, y Mi perfil le ofrece «Gestionar cuenta en erplora.com».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F130 (entrar con la cuenta de erplora.com)
 Pendiente de enlazar: hub — HUB-F144 (cerrar la puerta a quien ya no es miembro)
@@ -30,7 +30,7 @@ Pendiente de enlazar: saas — inicio de sesión, código de verificación por c
 QA: qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F02 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
-Estado: parcial — quien entra así nunca ve el paso «Elige un PIN»: en una caja compartida tiene que ir a Mi perfil → PIN por su cuenta para poder entrar después con PIN
+Estado: parcial — quien entra así nunca ve el paso «Elige un PIN»; y en un navegador el pase no lleva el identificador del dispositivo, así que el hub no lo vuelve de confianza: allí no aparecerá el pinpad, no sale en Dispositivos y «Este dispositivo» no se puede cambiar; solo en la app instalada equivale a HUB_SHELL-F01
 Actor: administrador, responsable, empleado
 Pantalla: Acceso
 Pasos:
@@ -38,8 +38,8 @@ Pasos:
 2. El hub abre con un pase escondido en la dirección; la pantalla lo quita de la barra de direcciones antes de nada y lo canjea mientras enseña el indicador de carga.
 3. La persona aparece dentro, en **Inicio**, sin haber visto la pantalla de acceso.
 Entra: el pase de un solo uso (como mucho 128 caracteres; si es más largo se descarta sin canjear) y el identificador del dispositivo.
-Sale: la misma sesión y los mismos datos guardados que HUB_SHELL-F01, sin pasar por el formulario. Un fallo se apunta en el registro de errores del hub con el código, nunca con el pase.
-Si falla: el acceso normal sale con el aviso «No se pudo entrar desde el panel de ERPlora» — «Inicia sesión aquí para continuar.», una sola vez. Si el canje tarda más de 10 segundos, la pantalla deja de esperarlo y sigue como si no hubiera pase.
+Sale: la sesión y los mismos datos guardados que HUB_SHELL-F01, sin pasar por el formulario y sin tocar la lista de caras. El identificador del dispositivo solo viaja desde la app instalada; desde un navegador el hub no apunta el dispositivo ni le aplica el límite de dispositivos del plan. Un fallo se apunta en el registro de errores del hub con el código, nunca con el pase.
+Si falla: el acceso normal sale con el aviso «No se pudo entrar desde el panel de ERPlora» — «Inicia sesión aquí para continuar.», una sola vez. ERPlora no se termina de abrir hasta que el canje acaba, sin tope de tiempo; a los 10 segundos solo deja de esperarlo la decisión de qué pantalla enseñar (sin confirmar qué ve la persona si el canje acaba bien después de ese plazo).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F131 (canjear el pase de un solo uso)
 Pendiente de enlazar: hub — HUB_APP, abrir el hub desde la app instalada con el pase del panel
@@ -54,7 +54,7 @@ Pasos:
 1. Tras HUB_SHELL-F01 con «Confiar en este dispositivo», en un dispositivo compartido que pregunta y si la persona aún no tiene PIN, la tarjeta cambia a «Crea tu PIN de acceso».
 2. Teclea el PIN en el teclado de círculos: «Elige un PIN de {n} dígitos» (4 o 6, lo que diga el negocio).
 3. Repite: «Confirma tu PIN».
-4. Al acertar la repetición se guarda y se entra. Desde ese momento la persona sale en la rejilla de caras de los dispositivos de confianza.
+4. Al acertar la repetición se guarda y se entra. El hub ya la deja entrar con PIN, pero la rejilla de caras de cada dispositivo de confianza la enseña la próxima vez que se cargue ERPlora en él (también en este).
 Entra: la sesión recién abierta; la longitud del PIN del negocio.
 Sale: pide al hub fijar el PIN de quien tiene la sesión (`/api/auth/set-pin`). Si la persona ya tenía PIN, no se le pide otro y se conserva el suyo.
 Si falla: repetición distinta: «Los PIN no coinciden, inténtalo de nuevo» y vuelve al primer paso. Dígitos repetidos o seguidos (1111, 1234): «Ese PIN es demasiado fácil de adivinar: evita dígitos repetidos (1111) y secuencias (1234).». Cualquier rechazo del hub: «No se pudo guardar el PIN. Vuelve a intentarlo.».
@@ -63,7 +63,7 @@ Pendiente de enlazar: hub — HUB-F132 (elegir o cambiar el propio PIN)
 QA: qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F04 Entrar con PIN
-Estado: hecho
+Estado: parcial — la rejilla es la lista que dio el hub al abrir ERPlora: quien recibe un PIN después no aparece y quien se da de baja sigue apareciendo (y recibe «PIN incorrecto») hasta recargar la página; en un hub donde nadie tenía PIN al abrir, tras el primer «Crea tu PIN» Acceso no ofrece el pinpad hasta recargar. Lo mismo vale para Cambiar de usuario y el diálogo de aprobación
 Actor: responsable, empleado
 Pantalla: Acceso
 Pasos:
@@ -71,7 +71,7 @@ Pasos:
 2. Toca tu nombre; sale tu cara y el teclado con tantos círculos como dígitos tenga el PIN del negocio. La flecha a la izquierda del 0 («Cambiar usuario») vuelve a la rejilla.
 3. Teclea el PIN: entra solo al último dígito, sin botón.
 4. Entras en la pantalla que habías pedido o en **Inicio**. El pie de la tarjeta dice «ERPlora · dispositivo de confianza».
-Entra: la lista de personas con PIN y la longitud del PIN, que el hub sirve sin sesión; el nombre elegido y los dígitos.
+Entra: la lista de personas con PIN y la longitud del PIN, que el hub sirve sin sesión en su contexto, leída una vez, al abrir ERPlora; el nombre elegido y los dígitos. Si el navegador recuerda a alguien de esa lista (HUB_SHELL-F01), su tarjeta enseña además su correo.
 Sale: pide al hub la sesión por PIN (`/api/auth/pin`) y guarda la sesión, el rol y los permisos. Funciona aunque erplora.com no responda.
 Si falla: PIN erróneo: los círculos se vacían y debajo «PIN incorrecto». Dispositivo que nunca entró con una cuenta o que un administrador quitó: «En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Navegador que no guarda datos (ventana privada): «Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.». Demasiados intentos: «Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.» (los minutos redondeados hacia arriba; sin dato, «Espera unos minutos»). Siempre queda «Email» para entrar con la cuenta.
 Implicados: pendiente
@@ -137,14 +137,15 @@ Pasos:
 3. La sesión se cierra y la caja vuelve a **Acceso**, al pinpad.
 Entra: el dial del negocio y los minutos (5 si el valor guardado no se entiende), el modo del dispositivo y que haya sesión.
 Sale: la sesión cerrada en el hub y en este navegador. La cuenta abierta la conserva su app.
-Si falla: con «Hasta cerrar sesión», en un dispositivo personal o sin sesión el vigilante no se arma. La persona no ve ningún mensaje de por qué volvió al pinpad.
+Si falla: con «Hasta cerrar sesión», en un dispositivo personal o sin sesión el vigilante no se arma. Si la pantalla no puede leer el dial del negocio (la lectura del modo del dispositivo falla y no la corrige una lectura posterior de los ajustes, por ejemplo al abrir Ajustes › General), toma «por turno» y tampoco se arma: la caja se queda abierta hasta el tope de la sesión, sin aviso. La persona no ve ningún mensaje de por qué volvió al pinpad. Quien cambie este tiempo revisa también la tarjeta Pinpad de Ajustes › General (área «Personas y permisos» de este documento), los topes de la pantalla (1, 5, 10, 15 o 30 minutos; 5 por defecto) y los del servidor (HUB-F140), y el tope de 1 hora de «pedir siempre» (HUB-F136).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F136 (el cierre por inactividad solo lo hace la pantalla)
 Pendiente de enlazar: hub — HUB-F140 (decidir si el negocio pide PIN y tras cuántos minutos)
+Pendiente de enlazar: sales — SALES-F17 (la cuenta abierta queda guardada y se recupera tras volver a entrar)
 QA: ninguno
 
 ### HUB_SHELL-F09 Cambiar de usuario sin perder la venta
-Estado: parcial — el relevo no acepta la placa, solo nombre y PIN (el acceso y la aprobación sí la aceptan)
+Estado: parcial — el relevo no acepta la placa, solo nombre y PIN (el acceso y la aprobación sí la aceptan); [SEG] tras el relevo, el lanzador, «Mis apps» y la lista de configuración siguen siendo los de quien se fue hasta cambiar de pantalla o recargar, y la pantalla abierta sigue enseñando lo que él veía; las caras son las de HUB_SHELL-F04 (lista leída al abrir ERPlora)
 Actor: responsable, empleado
 Pantalla: Cambiar de usuario
 Pasos:
@@ -185,7 +186,7 @@ Pasos:
 4. La pantalla de acceso de este dispositivo cambia en consecuencia: pinpad en compartido, solo cuenta en personal.
 Entra: el dispositivo que hace la petición (nunca otro); la sesión de administrador.
 Sale: pide al hub guardar el modo (`PUT /api/device/mode`); el acceso, el relevo y el vigilante de inactividad leen el modo confirmado.
-Si falla: sin ser administrador las opciones salen desactivadas con «Solo un administrador puede cambiar cómo entra la gente en este dispositivo.». Error sin motivo: «No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.»; con motivo, el texto del hub tal cual.
+Si falla: sin ser administrador las opciones salen desactivadas con «Solo un administrador puede cambiar cómo entra la gente en este dispositivo.». Error sin motivo: «No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.»; con motivo, el texto del hub tal cual. El caso típico es un navegador que solo ha entrado por el pase del panel (HUB_SHELL-F02): el hub no lo conoce y la tarjeta enseña en inglés «this hub does not know the device `…`: sign in online on it once…»; se arregla entrando una vez con la cuenta en ese navegador.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F139 (marcar un dispositivo como compartido o personal)
 QA: qa-hub-restaurant §7.02
@@ -221,18 +222,18 @@ Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F161 (decir si el hub está listo para servir)
 QA: qa-hub-restaurant §7.16
 
-### HUB_SHELL-F14 Seguir trabajando sin conexión
+### HUB_SHELL-F14 Saber que no hay conexión con el hub
 Estado: hecho
 Actor: sistema
 Pantalla: Franja de conexión
 Pasos:
 1. Con sesión abierta, la pantalla pregunta al hub si está ahí cada 30 segundos mientras la pestaña está a la vista.
 2. Si el navegador dice que no hay red, sale bajo la barra la franja «Sin conexión a Internet» — «Lo que necesita Internet —cargar pantallas, sincronizar, enviar facturas— no va a funcionar hasta que vuelva. Este aviso desaparece solo.».
-3. Si hay red pero el hub falla dos veces seguidas: «ERPlora no responde» — «Tu dispositivo parece tener conexión, pero ERPlora no contesta: puede ser tu Internet o un problema por nuestra parte…».
+3. Si hay red pero el hub no contesta dos veces seguidas (10 s cada intento, 5 s entre uno y otro; cualquier respuesta, también un error del servidor, cuenta como que está): «ERPlora no responde» — «Tu dispositivo parece tener conexión, pero ERPlora no contesta: puede ser tu Internet o un problema por nuestra parte…».
 4. Al volver la conexión, la franja desaparece sola; no tiene botón.
 Entra: el estado de red del navegador y la sonda de salud del hub.
 Sale: nada guardado.
-Si falla: la franja no sale en la pantalla de acceso. El reintento de lo que falló vive en cada pantalla, no en la franja.
+Si falla: la franja no sale en la pantalla de acceso. No hay modo sin conexión: todo lo que lee o guarda pasa por el hub, así que hasta que vuelva solo se ve lo que ya estaba en pantalla; al volver no se reintenta nada solo, y el corte no cierra la sesión. El reintento de lo que falló vive en cada pantalla, no en la franja.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F161 (la salud del hub que pregunta la sonda)
 QA: qa-hub-restaurant §7.16
@@ -245,25 +246,25 @@ Pasos:
 1. En escritorio el menú está fijo a la izquierda; el botón de panel de la barra lo pliega a iconos («Colapsar menú» / «Expandir menú»). En tableta y móvil se abre con el botón de la barra («Abrir menú») y se cierra al elegir.
 2. Menú «General»: Inicio, Empleados, Archivos. «Cuenta»: Mi plan, Apps, Sistema, API (solo si Ajustes tiene encendido «Mostrar documentación de la API») y Ajustes. La entrada en uso sale marcada.
 3. Las apps instaladas no están en el menú: se abren con el lanzador de la barra («Mis apps», una baldosa por app y «Apps» al final) o desde **Inicio**.
-4. La barra superior lleva el título de la pantalla, «Atrás» en las de detalle, el lanzador y, desde 768 px, «erplora.com», «Cambiar de negocio», «Asistente» y la campana; en el móvil esas acciones se pliegan en «Más opciones» (⋮) y el número de la campana viaja con él. Una barra fina bajo la barra indica que hay peticiones en curso.
+4. La barra superior lleva el título de la pantalla, «Atrás» en las de detalle, el lanzador y, desde 768 px, «erplora.com», «Cambiar de negocio», «Asistente» y la campana; «Asistente» solo si el asistente está disponible; en el móvil esas acciones se pliegan en «Más opciones» (⋮) y el número de la campana viaja con él. Una barra fina bajo la barra indica que hay peticiones en curso.
 Entra: la lista de apps que el hub sirve a esta persona (ya filtrada por sus permisos), si la API está publicada, la sesión.
 Sale: nada guardado (el plegado del menú no se recuerda al recargar). Las pantallas del menú se descargan en segundo plano tras entrar, para que un toque no dependa de la red.
-Si falla: una pantalla cuyo código no llega: «No se ha podido abrir esa sección. Revisa la conexión y vuelve a intentarlo.»; si al arrancar no llega nada: «ERPlora no ha podido terminar de abrirse» con «Reintentar». Una pantalla que falla por dentro: «No se ha podido abrir esa sección. Algo ha fallado dentro de ERPlora; vuelve a intentarlo.». Lanzador vacío: «Aquí aparecerán tus apps. Pulsa Apps para añadir las que necesite tu negocio.».
+Si falla: una pantalla cuyo código no llega: «No se ha podido abrir esa sección. Revisa la conexión y vuelve a intentarlo.»; si al arrancar no llega nada: «ERPlora no ha podido terminar de abrirse» con «Reintentar». Una pantalla que falla por dentro: «No se ha podido abrir esa sección. Algo ha fallado dentro de ERPlora; vuelve a intentarlo.»; si es la primera al abrir, a pantalla entera «No se ha podido abrir esta pantalla» — «Algo ha fallado dentro de ERPlora al abrir esta pantalla…» con «Reintentar». Lanzador vacío: «Aquí aparecerán tus apps. Pulsa Apps para añadir las que necesite tu negocio.».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F31 (servir el menú, las pantallas y los ficheros de las aplicaciones)
 QA: BD-03
 
 ### HUB_SHELL-F16 Ir a erplora.com ya identificado
-Estado: hecho
+Estado: parcial — [SEG] «Cambiar de negocio» dice que cierra la sesión y no la cierra: la sesión del hub y los tokens de erplora.com quedan vivos hasta que caducan
 Actor: administrador, responsable, empleado
 Pantalla: Barra superior
 Pasos:
 1. Para gestionar el negocio: botón «erplora.com» de la barra («Gestiona tu negocio en erplora.com» en el menú del móvil). Solo lo ve quien administra el hub y entró con su cuenta (no con PIN).
 2. Para cambiar de plan: «Actualizar plan» al pie del menú lateral, visible para todos.
 3. erplora.com se abre en otra pestaña (en la app instalada, en el navegador del sistema) ya identificado, en la página pedida; ERPlora se queda donde estaba.
-4. En la app instalada, «Cambiar de negocio» pregunta «¿Cambiar de negocio?» — «Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.»; «Cambiar» olvida el negocio y abre la lista de erplora.com, «Cancelar» no hace nada.
+4. En la app instalada, «Cambiar de negocio» pregunta «¿Cambiar de negocio?» — «Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.»; «Cambiar» olvida la dirección del negocio y abre la lista de erplora.com, pero no cierra la sesión ni borra los tokens; «Cancelar» no hace nada.
 Entra: la sesión (con cuenta), el permiso de administrar y la distribución de la app.
-Sale: pide al hub un pase de un solo uso hacia erplora.com; si no lo da, abre el enlace normal, que pide la contraseña.
+Sale: pide siempre al hub un pase de un solo uso hacia erplora.com; el hub solo lo da a una sesión abierta con la cuenta, y si no lo da la pantalla abre el enlace normal, que pide la contraseña.
 Si falla: «No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.» o, para el plan, «…para gestionar tu plan.». En la copia de Google Play no salen ni «erplora.com» ni «Actualizar plan».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F142 (abrir erplora.com ya identificado)
@@ -339,7 +340,7 @@ Pasos:
 3. «Cambiar foto» sube una JPG, PNG o WebP («Foto actualizada»); «Quitar» la borra.
 4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» (modo «Sistema (auto)», «Claro», «Oscuro» y la paleta) se guardan al elegir y se aplican al momento; «Usar la apariencia del negocio» deshace lo propio.
 Entra: el perfil de quien tiene la sesión.
-Sale: pide al hub guardar el perfil, las preferencias y la foto; el idioma y la apariencia siguen a la persona en cualquier dispositivo en el que entre.
+Sale: pide al hub guardar el perfil, las preferencias y la foto; el idioma y la apariencia siguen a la persona en cualquier dispositivo en el que entre. El «Correo electrónico» no es solo de contacto: en una persona sin correo de acceso (todo usuario local), el hub lo usa para decidir qué membresía de erplora.com da o quita al cambiarle el rol o darla de baja (HUB-F143).
 Si falla: «No se pudo guardar el perfil»; foto rechazada: «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.».
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F143 (cambiar mis datos, idioma, apariencia y foto)

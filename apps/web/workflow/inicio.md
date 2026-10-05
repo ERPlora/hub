@@ -50,13 +50,13 @@ Actor: administrador, responsable, empleado
 Pantalla: Termina de configurar tu negocio
 Pasos:
 1. En **Inicio** sale la tarjeta «Termina de configurar tu negocio» con «{done} de {total} hechos» y una barra de progreso.
-2. Cada fila: icono, título, descripción y su etiqueta: «Necesario para facturar» (rojo), «Importante» (ámbar), «Recomendado» (gris), «Hecho» (verde) o «Todavía no disponible» (azul). Sin desplegar se ven los pendientes más importantes (cinco; dos en el móvil) y lo heredado de una plantilla («Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.»).
+2. Los pasos propios del hub son cuatro, por este orden: «Tus apps», «Los datos de tu negocio» (razón social y NIF), «Configura la impresora» y «Tu equipo» (más de una persona activa); después, los de las apps (HUB_SHELL-F31). Cada fila: icono, título, descripción y su etiqueta: «Necesario para facturar» (rojo), «Importante» (ámbar), «Recomendado» (gris), «Hecho» (verde) o «Todavía no disponible» (azul). Sin desplegar se ven los pendientes más importantes (cinco; dos en el móvil) y lo heredado de una plantilla («Vino de la plantilla que usaste. Merece un vistazo: tu sala y tus precios son tuyos.»).
 3. Pulsa «Configurar» en una fila: lleva a la pantalla donde se hace (Ajustes › Negocio, la impresora, Empleados, o la pantalla de la app).
 4. Hazlo allí. Al volver (cualquier cambio de pantalla relee la lista) la fila sale «Hecho» y el contador sube. Nadie marca un paso a mano.
-5. «Ver todo» despliega la lista entera, con lo hecho; «Ver menos» la recoge. Con todo hecho la tarjeta dice «Tu negocio está listo» — «No queda nada pendiente en la checklist.».
+5. «Ver todo» despliega la lista entera, con lo hecho; «Ver menos» la recoge. Con todo hecho la tarjeta dice «Tu negocio está listo» — «No queda nada pendiente en la checklist.»; un paso «Recomendado» pendiente (o uno «Todavía no disponible») basta para que no salga.
 Entra: la lista que calcula el hub para esta persona (`hub.setup.status`): solo los pasos que puede hacer, salvo los que bloquean la facturación, que ven todos.
 Sale: nada guardado; se relee al entrar, al cambiar de pantalla, al cambiar de idioma y al instalar, activar, desactivar o quitar una app.
-Si falla: si no llega respuesta, la tarjeta no sale (o se queda con la última que llegó); nunca dice «listo» sin respuesta. Un paso que no es de esta persona: «Esto lo tiene que configurar un administrador.» sin botón. Un paso «Todavía no disponible»: «Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.» sin botón. «Tus apps» no sale en Inicio porque ya lo ofrece «Mis apps»; con «Ver todo» sí.
+Si falla: si no llega respuesta, la tarjeta no sale (o se queda con la última que llegó); nunca dice «listo» sin respuesta. Cerrar sesión no borra la última lista leída: si la lectura de la persona siguiente falla, ve la de la anterior hasta que una lectura funcione. Un paso que no es de esta persona: «Esto lo tiene que configurar un administrador.» sin botón. Un paso «Todavía no disponible»: «Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.» sin botón. «Tus apps» no sale en Inicio porque ya lo ofrece «Mis apps»; con «Ver todo» sí.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB-F35 (calcular la lista de puesta en marcha)
 QA: BD-01, BD-02
@@ -66,7 +66,7 @@ Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: Franja «Todavía no puedes facturar»
 Pasos:
-1. Mientras falte algo sin lo que el hub rechazaría un tique o una factura (los datos del negocio y, en producción sin vía hasta la AEAT, el certificado), en todas las pantallas con menú sale bajo la barra la franja roja «Todavía no puedes facturar» — «No se podrá emitir ningún ticket ni factura hasta que configures esto:».
+1. Mientras falte algo sin lo que el hub rechazaría un tique o una factura —los datos del negocio (razón social y NIF) siempre y, fuera del entorno de pruebas (también mientras el perfil fiscal no está resuelto) y sin vía hasta la AEAT, el paso de la app que pide el certificado (VeriFactu)—, en todas las pantallas con menú sale bajo la barra la franja roja «Todavía no puedes facturar» — «No se podrá emitir ningún ticket ni factura hasta que configures esto:».
 2. Debajo, una línea por cosa que falta, cada una con su «Configurar» (o, si no te toca, «Esto lo tiene que configurar un administrador.»).
 3. En un móvil apaisado la franja se pliega a una línea con «Ver qué falta» / «Ocultar».
 4. La franja no se puede cerrar: desaparece sola cuando ya no falta nada. En la pestaña «Resumen» de **Inicio** no sale, porque la lista entera ya está a la vista.
@@ -140,7 +140,7 @@ Pasos:
 1. En **Inicio**, la tarjeta «Mis apps» enseña una baldosa por app que esta persona puede abrir, con su icono y su nombre (si no cabe, el nombre entero sale al pasar por encima).
 2. Las más usadas en este navegador van primero.
 3. Toca una baldosa: se abre la app.
-4. «Añadir apps», siempre la última, lleva a **Apps**. En el móvil, a partir de cinco apps se ven las primeras cuatro y «Ver todas las apps».
+4. «Añadir apps», siempre la última, lleva a **Apps**. En el móvil, con seis apps o más se ven las cuatro primeras, «Ver todas las apps» y «Añadir apps».
 Entra: la lista de apps del menú que da el hub (la misma del lanzador de la barra).
 Sale: cuenta en este navegador cuántas veces se abre cada app (solo para ordenar).
 Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lector de pantalla. Sin apps de verdad: «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si la lista no se pudo pedir: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca «no tienes apps».
@@ -149,7 +149,7 @@ Pendiente de enlazar: hub — HUB-F31 (servir el menú de las aplicaciones)
 QA: BD-03
 
 ### HUB_SHELL-F33 Ver los paneles de las apps en Inicio
-Estado: parcial — la pantalla no filtra los paneles por permiso: quien no puede ver uno (un empleado y «Caja (sesión actual)») lo encuentra en el catálogo y, si está puesto, sale «No disponible»; las apps cuyo menú no ve esa persona no aportan paneles; instalar una app desde Apps no vuelve a leer los paneles (sí importar una plantilla), sin confirmar si al volver a Inicio se releen
+Estado: parcial — la pantalla no filtra los paneles por permiso: quien no puede ver uno (un empleado y «Caja (sesión actual)») lo encuentra en el catálogo y, si está puesto, sale «No disponible»; las apps cuyo menú no ve esa persona no aportan paneles; instalar una app desde Apps (o el asistente, u otro dispositivo) no vuelve a leer los paneles: aparecen al recargar Inicio (al volver con «Atrás» no se releen; volviendo por el menú, sin confirmar)
 Actor: administrador, responsable, empleado
 Pantalla: Paneles de Inicio
 Pasos:
@@ -186,9 +186,9 @@ Estado: hecho
 Actor: sistema
 Pantalla: Paneles de Inicio
 Pasos:
-1. Cada panel puede declarar qué avisos de su app lo cambian (una venta, un movimiento de caja, un recuento).
+1. Cada panel declarativo (cifra, lista, cronología, gráfico) puede declarar qué avisos de su app lo cambian (una venta, un movimiento de caja, un recuento).
 2. Cuando el hub emite en vivo uno de esos avisos, el panel vuelve a pedir sus datos a los 0,8 s (varios avisos seguidos cuentan como uno), sin vaciarse mientras tanto.
-3. Un panel sin avisos declarados se pinta una vez al entrar y no se mueve hasta volver a cargar Inicio.
+3. Un panel sin avisos declarados se pinta una vez al entrar y no se mueve hasta volver a cargar Inicio. Un panel que es un trozo de la pantalla de la app se pinta una vez y solo se refresca si la app lo hace por su cuenta.
 Entra: los avisos en vivo del hub que el panel declara (`refresh_on`).
 Sale: nada guardado.
 Si falla: el refresco que falla deja «No disponible», no el valor de antes. Un panel no se refresca con un aviso que su app no declara (por ejemplo, el stock tras una venta).
@@ -199,14 +199,14 @@ Pendiente de enlazar: verifactu — VERIFACTU-F31 (el panel «Pendientes VeriFac
 QA: qa-hub-restaurant §7.12
 
 ### HUB_SHELL-F36 Consultar la actividad reciente
-Estado: parcial — solo enseña ventas (no otros movimientos del negocio); una venta anulada o devuelta sale como «Pendiente»; si la lectura falla, la tabla sale vacía como si no hubiera ventas
+Estado: parcial — el importe sale cien veces mayor (la venta guarda céntimos y la tabla los pinta como euros: 12,50 € sale «1.250,00 €»); todo lo que no está completado —anulada, devuelta, abierta— sale como «Pendiente»; solo enseña ventas (no otros movimientos del negocio); si la lectura falla, la tabla sale vacía como si no hubiera ventas
 Actor: administrador, responsable, empleado
 Pantalla: Inicio
 Pasos:
 1. En **Inicio**, pestaña «Actividad».
-2. «Cargando…» y después una tabla con las últimas 100 ventas: «Fecha», «Venta», «Cliente», «Método», «Importe» y «Estado» («Completada» en verde o «Pendiente» en gris).
+2. «Cargando…» y después una tabla con las últimas 100 ventas: «Fecha», «Venta», «Cliente», «Método», «Importe» (hoy multiplicado por cien, ver Estado) y «Estado» («Completada» en verde o «Pendiente» en gris para todo lo demás).
 3. Busca con «Buscar actividad…» (venta, cliente o método), filtra por método o estado, ordena, cambia a tarjetas o elige columnas; 15 por página.
-Entra: las ventas de la app Ventas, si está activa, con los permisos de quien mira.
+Entra: las ventas de la app Ventas (`sales.list`, con el total en céntimos), si está activa, con los permisos de quien mira.
 Sale: nada guardado.
 Si falla: sin la app Ventas, la tabla vacía. Un fallo de lectura también la deja vacía, sin aviso.
 Implicados: pendiente
