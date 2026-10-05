@@ -150,3 +150,223 @@ Si falla: una expresión que no se puede resolver no se programa y se avisa.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, automatizaciones (disparadores de reloj)
 QA: ninguno
+
+### HUB-F230 Exportar los datos del negocio
+Estado: parcial — el volcado traga en silencio los errores de lectura de usuarios, perfiles y automatizaciones (un fallo da un zip sin esa parte y sin avisar), descarta lo marcado como borrado (`is_deleted`) y toda fila con `created_by = 'system'`, y el nombre y país del manifiesto se leen de claves que no existen (`business_name`, `country`): salen vacío y `ES`
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
+Pasos:
+1. El administrador escribe un nombre (letras, números, guiones; hasta 64) y el idioma, y elige copia de seguridad o plantilla.
+2. Marca personas, ajustes, datos fiscales, archivos y, por app, si entra la app y sus datos (y qué tablas).
+3. Pulsa exportar; el navegador descarga `<nombre>_<idioma>.blueprint.zip`.
+Entra: nombre, idioma y selección, con sesión de administrador.
+Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Una plantilla no lleva personas, datos fiscales, permisos ni automatizaciones; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
+Si falla: nombre inválido, 422; sin sesión de administrador, 401. Una parte que no se puede leer falta del zip sin aviso.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
+QA: ninguno
+
+### HUB-F231 Meter los archivos y el certificado en el zip
+Estado: parcial — con finalidad plantilla y «datos fiscales» marcado, esta capa añade igualmente el certificado propio al zip; los ficheros de más de 25 MiB se omiten sin decirlo y todo se carga en memoria antes de empaquetar
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
+Pasos:
+1. El administrador marca datos fiscales y/o archivos.
+2. El hub añade el certificado y recorre la carpeta de archivos.
+Entra: la selección del export.
+Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero de la carpeta de archivos bajo `media/`, menos las carpetas de primer nivel que empiezan por `_` (registros y sistema). El sha256 de cada uno entra en el manifiesto.
+Si falla: un fichero que no se descarga, o pasa de 25 MiB, falta del zip y solo queda en el log.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
+QA: ninguno
+
+### HUB-F232 Ver qué tablas y cuántas filas lleva cada app
+Estado: hecho
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Exportar
+Pasos:
+1. Al abrir Exportar, la pantalla pide el recuento por tabla de cada app instalada.
+2. El administrador desmarca las tablas que no quiere publicar.
+Entra: sesión de administrador.
+Sale: por app, sus tablas con el número de filas que de verdad volcaría el export (mismas reglas de hub, borrados y filas sembradas), de más a menos, y la finalidad impuesta si la hay.
+Si falla: 401 sin sesión de administrador.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Exportar
+QA: ninguno
+
+### HUB-F233 Inspeccionar un fichero antes de importarlo
+Estado: hecho
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. El administrador elige un `.blueprint.zip` de su equipo.
+2. El hub lo abre en memoria, comprueba las rutas y lee el manifiesto.
+3. La pantalla muestra nombre, idioma, país, apps y secciones, y deja marcar qué aplicar.
+Entra: el zip (hasta 256 MiB).
+Sale: un identificador de subida y el manifiesto; el zip queda en una carpeta temporal del hub hasta que se importa.
+Si falla: 422 si el zip está mal formado, una ruta intenta salir de su carpeta, falta `manifest.json` o la versión de formato no es la 1.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar
+QA: ninguno
+
+### HUB-F234 Traer una plantilla del catálogo
+Estado: hecho
+Actor: administrador, responsable, empleado, cajero
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. La pantalla muestra el catálogo de plantillas de erplora.com («Desde erplora.com»).
+2. La persona elige una; el hub la descarga.
+3. Sigue el mismo camino que un fichero local (HUB-F233 y HUB-F235).
+Entra: el identificador de la plantilla (y el idioma si hay dos).
+Sale: el zip, entregado solo si su sha256 coincide con el que anunció el SaaS; la credencial de máquina no sale del hub. Lista y descarga piden sesión de usuario de cualquier perfil; aplicarla pide administrador.
+Si falla: sin credencial, 424; hash distinto, error y ningún byte; un identificador en dos idiomas, el SaaS contesta 400.
+Implicados: pendiente
+Pendiente de enlazar: saas — catálogo de plantillas y descarga firmada
+QA: BD-01
+
+### HUB-F235 Importar un fichero o una plantilla
+Estado: parcial — el aviso «sin SQL arbitrario» cubre la forma, no el valor: una sección no se aplica en una transacción, así que una sentencia que falla deja las anteriores escritas (quedan en el lote y se pueden deshacer, salvo ajustes y tablas sin `id`); y las apps del manifiesto se instalan aunque no estén marcadas
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. El administrador marca qué aplicar y pulsa importar.
+2. El hub comprueba la integridad y instala las apps que falten.
+3. Aplica las secciones y devuelve el informe (HUB-F239).
+Entra: el identificador de subida y la selección (personas, ajustes, fiscal, archivos, apps con datos).
+Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps), solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. Una sección que sustituye a una fila de marcador sembrada por la app (por ejemplo el horario genérico) la retira si la sección aterrizó. El arranque de un hub nuevo ya no importa ninguna plantilla.
+Si falla: una sección fallida se anota y el resto sigue; una app que no se instala deja `failed` su sección («módulo no instalado»).
+Implicados: INVENTORY-F12, SCHEDULES-F12
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar
+Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la semana de Horarios
+QA: BD-01, qa-hub §4
+
+### HUB-F236 Qué deja entrar el hub según de quién es el fichero
+Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context`: un zip fabricado con él pasa por copia propia y se lleva personas, permisos, automatizaciones y datos ligados a la instalación
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. El hub compara el origen del manifiesto con su propio identificador; un origen vacío nunca coincide.
+2. Aplica a cada sección la regla de abajo.
+Entra: el manifiesto y la selección.
+Sale: nunca entran los datos de sistema (`_*`). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla.
+Si falla: la sección descartada sale `Ignored` con su código y el número de filas.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB, perfil fiscal (la cadena VeriFactu no cruza hubs)
+QA: BD-01
+
+### HUB-F237 Permisos, roles y automatizaciones que trae el fichero
+Estado: hecho
+Actor: sistema, administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. Tras las secciones de datos, el hub activa los roles del manifiesto.
+2. Si es la copia propia, devuelve los permisos concedidos a cada app.
+3. Guarda las automatizaciones por la misma puerta que la pantalla de automatizaciones.
+4. Al terminar, la pantalla pregunta por los permisos que una plantilla no puede conceder.
+Entra: `active_roles`, `capability_grants` y `flows` del manifiesto.
+Sale: un rol que ninguna app declara, o uno base o de administración, se rechaza (`roles_not_activatable`). Los permisos de una plantilla se descartan siempre (`capability_grants_not_portable`); en la copia propia se vuelven a conceder los que la app instalada declara (`capabilities_not_grantable` para el resto). Cada automatización entra apagada, con una copia de sus permisos solo si es la copia propia, y se enciende al final si todos volvieron; si no, queda en pausa (`flows_paused_without_grants`). Un documento que la pantalla rechazaría se cuenta y no entra (`flows_not_restorable`). Misma nombre y documento ya vivos no se duplican; nunca se borra lo creado después. Los secretos no viajan. Estas tres piezas se aplican aunque ninguna casilla las nombre.
+Si falla: un fallo de base de datos sale `Failed`, no como descarte.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB, automatizaciones (guardar una automatización y sus permisos)
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Permisos (los permisos que la plantilla no concede)
+QA: BD-01
+
+### HUB-F238 Volver a importar lo mismo
+Estado: hecho
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. El administrador importa un fichero o plantilla que ya aplicó, o uno que choca con datos que ya tiene.
+2. El hub salta las filas que ya existen.
+3. El informe cuenta las secciones como aplicadas.
+Entra: el mismo zip, o uno con las mismas claves naturales.
+Sale: identificadores derivados del hub y de la fila origen: reimportar en el mismo hub no duplica. Además, una fila se salta si ya hay una equivalente por cualquier índice único de su tabla (el SKU de un producto, el código de una serie) y por las claves que declara el sembrado de la app, salvo en la copia propia. Nunca se actualiza una fila existente ni se renumera: un SKU repetido conserva el precio y el stock que ya tiene. Los ajustes ya guardados no se pisan (se escribe solo lo que no tiene fila). Los importes y cantidades entran sin convertir.
+Si falla: sin confirmar qué pasa con un índice parcial que el hub no sabe leer: esa clave se ignora y la fila puede chocar.
+Implicados: INVENTORY-F12
+QA: BD-01
+
+### HUB-F239 El informe de la importación
+Estado: hecho
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. Al terminar, la pantalla pinta una línea por sección: aplicada, omitida, descartada, parcial o fallida.
+2. Si se sale de la pantalla, al volver a Ajustes › Datos recupera el último informe.
+Entra: el resultado de la importación.
+Sale: una fila por sección con su estado, el motivo estable y las filas descartadas; más apps instaladas (`installed`, `already_installed`, `failed`, `blocked`, versión pedida si se sustituyó), archivos copiados y fallidos, estado del certificado y el origen (plantilla y versión, o fichero local). Se guarda por lote y se borra al deshacerlo.
+Si falla: si no se puede guardar, la importación vale y solo se pierde esta vista.
+Implicados: INVENTORY-F12
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar (informe y tarjeta de inicio)
+QA: BD-01
+
+### HUB-F240 Reintentar lo que falló en una importación
+Estado: parcial — solo las importaciones de plantilla del catálogo; una de fichero local se rechaza
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Importar
+Pasos:
+1. Tras un informe parcial, el administrador pulsa reintentar.
+2. El hub vuelve a bajar la misma plantilla y aplica solo lo fallido.
+3. Sale un informe nuevo.
+Entra: el lote del informe.
+Sale: reaplica solo secciones `Failed`, apps `failed` o `blocked` y archivos que fallaron. Se niega si el catálogo ya sirve otra versión. Si no queda nada, responde que no hay nada que reintentar.
+Si falla: `import_origin_not_retryable`, `import_retry_version_unavailable`, `import_retry_batch_not_found`.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Importar (botón de reintento)
+QA: ninguno
+
+### HUB-F241 Deshacer una importación
+Estado: parcial — solo quita filas con `id`; los ajustes y las tablas de vínculo no se revierten
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Restablecer
+Pasos:
+1. El administrador elige una importación de la lista y la deshace.
+2. El hub borra las filas que trajo.
+Entra: el lote.
+Sale: se borran exactamente las filas registradas, en una transacción, sin tocar lo creado después; vuelven los marcadores sembrados que el lote retiró, si nadie escribió ahí. La lista avisa de las tablas editadas después. Deshacer dos veces, o un lote ajeno, no hace nada.
+Si falla: si el borrado revierte, el lote sigue.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Restablecer
+QA: ninguno
+
+### HUB-F242 Restablecer el hub
+Estado: parcial — las secciones «archivos» y «datos fiscales» se aceptan pero no borran nada (solo bloquean si ya se emitió); el borrado de personas deja su perfil y preferencias; el servidor no pide ninguna confirmación (el nombre del negocio lo pide la pantalla)
+Actor: administrador
+Pantalla: HUB_SHELL: Ajustes › Datos › Restablecer
+Pasos:
+1. El administrador abre Restablecer y ve cada sección con su número de filas y sus bloqueos.
+2. Marca solo lo necesario y confirma en pantalla.
+3. Lee el informe.
+Entra: la selección (ajustes, personas, roles, cola de impresión, apps); todo apagado por defecto.
+Sale: borrado duro, acotado al hub, en una sola transacción, en orden inverso de claves foráneas; las filas que sembró la app sobreviven. Las personas se borran menos quien ejecuta (sale de su sesión). La cola de impresión se vacía; las impresoras emparejadas no. Si el hub ya emitió registros fiscales (sello del primer registro o facturas remitidas), Verifactu, Facturas y Ventas y los datos fiscales quedan bloqueados (RD 1007/2023) y el servidor lo rechaza con 409 aunque el cliente lo fuerce. No toca historial de avisos ni automatizaciones.
+Si falla: 409 con el motivo y «No se ha borrado nada»; si la transacción falla, no se borra nada.
+Implicados: pendiente
+Pendiente de enlazar: hub — HUB_SHELL, Ajustes › Datos › Restablecer
+QA: ninguno
+
+### HUB-F243 Convertir el dinero de un hub antiguo a céntimos
+Estado: parcial — solo se lanza como subcomando del binario (`--backfill-money`), sin puerta de API
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Al arrancar, un hub con todo el dinero ya en enteros se marca `money_unit = cents`.
+2. Un hub antiguo en euros espera la orden de conversión.
+3. La orden convierte cada columna de dinero.
+Entra: el tipo declarado de cada columna de dinero de `MONEY_COLUMNS`.
+Sale: si todas son enteras, solo se marca; si todas son decimales, se multiplica por 100 y se marca en una transacción; si hay mezcla, se niega, no marca ni convierte y lo comunica. Repetirla no hace nada. No toca las cantidades (escala 10⁶).
+Si falla: `money_unit_ambiguous` en un hub a medias.
+Implicados: pendiente
+Pendiente de enlazar: infra — operación de conversión de dinero en un hub desplegado
+QA: ninguno
+
+### HUB-F244 Comprobar la unidad del dinero sin escribir
+Estado: parcial — solo como subcomando del binario (`--check-money-unit`)
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Operaciones lanza la comprobación contra la base del hub.
+2. Lee el marcador y el tipo de cada columna.
+Entra: la base del hub.
+Sale: céntimos, euros, sin dinero o mezcla, sin crear ni escribir nada.
+Si falla: una mezcla se comunica por el registro de errores y por stderr.
+Implicados: ninguno
+QA: ninguno
