@@ -19,13 +19,13 @@ Actor: empleado, responsable, administrador, asistente, sistema
 Pantalla: ninguna
 Pasos:
 1. Una pantalla de un módulo, el asistente, una automatización o una integración pide una consulta por su nombre (`modulo.entidad.accion`) con sus datos de búsqueda.
-2. El hub comprueba la sesión (o la llave de API), que la app dueña de la consulta esté instalada, activa e incluida en el plan del hub, y que quien pregunta tenga el permiso que la consulta declara. Una consulta nunca pide el PIN de un responsable: sin permiso se rechaza y ya está.
-3. Comprueba los datos contra el esquema de la consulta, rechaza cualquier dato que la consulta no conozca y cualquier dato que su SQL necesite y no haya llegado.
-4. Añade por su cuenta el negocio (hub), quién pregunta, la hora, la identidad fiscal del negocio, su zona horaria, el idioma de quien pregunta y si el negocio es una demo; nadie puede mandar esos valores desde fuera.
+2. El hub comprueba la sesión (o la llave de API). En `/api/query` comprueba además que la app esté incluida en el plan del hub (402); la llave de API, las automatizaciones y las lecturas internas no lo comprueban.
+3. Por este orden: que la app dueña esté instalada y activa; que quien pregunta tenga el permiso que la consulta declara (una consulta nunca pide el PIN de un responsable: sin permiso se rechaza y ya está); el esquema de la consulta, sin rellenar valores por defecto; y, después de añadir los datos del hub, que no llegue ningún dato que la consulta no conozca ni falte ninguno que su SQL necesite. Una consulta no pasa por el bloqueo de otra app (HUB-F13) ni tiene versión interna.
+4. Añade por su cuenta el negocio (hub), quién pregunta, la hora, la identidad fiscal del negocio, su zona horaria, el idioma de quien pregunta, si el negocio es una demo, si tiene certificado y si la app tiene concedidos sus permisos de host; nadie puede mandar esos valores desde fuera.
 5. Devuelve las filas. Si la consulta es de lista, devuelve la página con el total (HUB-F02).
 Entra: el nombre de la consulta y sus datos (`POST /api/query`, o `POST /api/v1/{módulo}/q/{consulta}` con llave si el módulo la marca `expose_api`); la sesión de quien pregunta; los ajustes del negocio (`hub_settings`).
-Sale: nada guardado. Una consulta de un módulo no instalado o apagado contesta `module_not_installed` / `module_inactive` (404), que el SDK de los módulos convierte en «no hay» cuando la pide como opcional; la de un módulo fuera del plan, `module_entitlement_blocked` (402).
-Si falla: sin sesión, 401. Sin permiso, `permission_denied` (403). Un dato que no cumple el esquema, `invalid_payload` (422) con los campos señalados. Un dato que la consulta no conoce, `unknown_filter` (422) con la lista de los aceptados; uno que falta, `missing_required_param` (422): antes contestaban «no hay nada» y se confundían con una ficha inexistente (hub#1173, hub#1913, hub#2383). Una consulta inexistente en una app activa es `not_found` (contrato roto). El error se anota en el registro de errores con las claves del payload, nunca sus valores.
+Sale: nada guardado. Una consulta de un módulo no instalado o apagado contesta `module_not_installed` / `module_inactive` (404), que el SDK de los módulos convierte en «no hay» cuando la pide como opcional; la de un módulo fuera del plan, por `/api/query`, `module_entitlement_blocked` (402).
+Si falla: sin sesión, 401, sin código estable (`{"ok": false, "error": "<texto>"}`). Sin permiso, `permission_denied` (403). Un dato que no cumple el esquema, `invalid_payload` (422). Un dato que la consulta no conoce, `unknown_filter` (422), con la lista de los aceptados solo dentro de la frase; uno que falta, `missing_required_param` (422): antes contestaban «no hay nada» y se confundían con una ficha inexistente (hub#1173, hub#1913, hub#2383). Las lecturas que hace el propio hub por una orden (lecturas previas, bloqueos, cambios parciales) toleran el dato que falta y lo dejan vacío. Una consulta inexistente en una app activa es `not_found` (contrato roto). El error, también un rechazo normal de permiso o de esquema, se anota en el registro de errores atribuido al módulo, con las claves del payload y nunca sus valores. Por la llave de API, una consulta no publicada da 404 y una publicada sin llave válida da 401, así que se puede averiguar qué está publicado.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, acceso: la sesión, la llave de API y el permiso de cada perfil que el hub comprueba en cada puerta
 Pendiente de enlazar: hub — HUB, acceso: el bloqueo de un módulo que el plan del hub ya no incluye (`module_entitlement_blocked`)
@@ -43,7 +43,7 @@ Pasos:
 5. Devuelve la página, el total de filas que cumplen y el tamaño y desplazamiento usados.
 Entra: los datos de la lista (`limit`, `offset`, `search`, `sort`, `dir`, `f_<columna>`, `f_<columna>_from`/`_to`) y los datos de contexto que su SQL use.
 Sale: `{rows, total, limit, offset}`. Sin tamaño pedido manda el que declara el módulo; con tamaño pedido se devuelve exactamente ese, sin tope oculto. Cuando el propio hub lee una lista entera (lecturas previas de una orden, guardas, avisos) recorre todas las páginas y se niega con un error claro por encima de 100.000 filas, en vez de cortar en silencio.
-Si falla: un extremo de rango que la columna no sabe leer, `invalid_filter_bound` (422); un dato de contexto obligatorio que falta, `missing_required_param` (422). Si el hub no puede averiguar el tipo de las columnas, ordena sin desempate y compara los rangos tal como llegaron, y lo deja escrito en el registro.
+Si falla: una página pedida más allá del final devuelve `total: 0` en lugar del total real (defecto). Un extremo de rango que la columna no sabe leer, `invalid_filter_bound` (422); un dato de contexto obligatorio que falta, `missing_required_param` (422). Si el hub no puede averiguar el tipo de las columnas, ordena sin desempate y compara los rangos tal como llegaron, y lo deja escrito en el registro.
 Implicados: ninguno
 QA: qa-hub §11
 
@@ -53,19 +53,21 @@ Actor: empleado, responsable, administrador, asistente, sistema
 Pantalla: ninguna
 Pasos:
 1. Una pantalla, el asistente, una automatización, otra aplicación (por un aviso o una tarea programada) o una integración pide una orden por su nombre con su contenido.
-2. El hub comprueba la sesión y que la app esté instalada, activa e incluida en el plan del hub, y prepara los datos que pone él: negocio, quién pide, hora, un identificador nuevo, la identidad fiscal, el país, la zona horaria, el idioma y si los permisos de host de la app están concedidos.
-3. Pasa la orden por sus puertas, siempre en este orden: orden interna llamada desde fuera (HUB-F08) · bloqueo que pone otra app (HUB-F13) · permiso, o aprobación del responsable (HUB-F05) · completar una edición parcial (HUB-F07) · esquema y valores por defecto (HUB-F04) · reglas del dueño · candados fiscales.
-4. Ejecuta el SQL de la orden, o el manejador del módulo (HUB-F10, HUB-F12), y apunta los avisos que la orden emite en la misma transacción: o queda todo, o no queda nada.
-5. Si la orden declara la comprobación de filas afectadas y no se cumple, deshace todo (HUB-F06).
-6. Tras guardar, avisa en vivo a las pantallas conectadas y contesta `ok` con los identificadores que ha creado.
+2. El hub comprueba la sesión y que la app esté instalada y activa. Solo en `/api/command` comprueba además que la app esté incluida en el plan del hub (402): la llave de API, la página pública, las automatizaciones, la cola de avisos y las tareas programadas no lo comprueban.
+3. Prepara los datos que pone él y que nadie puede mandar: negocio (`:hub_id`), quién pide, hora, un identificador nuevo (`:new_id`), la identidad fiscal del negocio, la zona horaria, el idioma de quien pide, si el negocio tiene certificado o vía de envío (`:has_certificate`), si es una demo (`:is_demo_hub`), si la app tiene concedidos sus permisos de host (`:capabilities_granted`) y quién aprobó (`:approved_by`). El país y la región del negocio solo llegan al manejador WASM (`context.country_code`, `context.region_code`), no al SQL ni al motor nativo.
+4. Pasa la orden por sus puertas, siempre en este orden (el de `architecture/hub/runtime-dispatcher.md` §2.0, sin olvidar que ese documento aún no recoge las reglas del dueño ni el cambio parcial): orden interna llamada desde fuera (HUB-F08) · bloqueo que pone otra app (HUB-F13) · permiso, o aprobación del responsable (HUB-F05) · completar una edición parcial (HUB-F07) · esquema y valores por defecto (HUB-F04) · reglas del dueño · candados fiscales.
+5. Ejecuta el SQL de la orden, o el manejador del módulo (HUB-F10, HUB-F12), y apunta en la cola de avisos, en la misma transacción, una fila por cada aviso que la orden emite: o quedan los cambios y esas filas, o no queda nada. Lo que hacen después las apps que escuchan corre más tarde, cada una en su propia transacción.
+6. Si la orden declara la comprobación de filas afectadas y no se cumple, deshace todo (HUB-F06).
+7. Tras guardar, avisa en vivo a las pantallas conectadas y contesta `ok`. En el camino SQL la respuesta trae siempre un identificador nuevo (`new_ids`), aunque la orden no haya creado nada; con manejador, solo los identificadores que sus operaciones usaron.
 Entra: el nombre de la orden y su contenido (`POST /api/command` desde el hub; `POST /api/v1/{módulo}/c/{orden}` con llave si el módulo la marca `expose_api`); la aprobación del responsable, si la hay, en la cabecera `X-Elevation-Token`, nunca dentro del contenido.
-Sale: lo que la orden escribe en las tablas del módulo; una fila por aviso emitido en la cola de avisos, en la misma transacción (los entrega después la cola a las apps que escuchan); el aviso en vivo, solo si se guardó; la marca de quién aprobó (`approved_by`) junto a quién pidió. Si la orden abre una cadena fiscal con el hub ya en producción, el hub deja sellado el primer registro y desde entonces no se puede volver a pruebas. Las órdenes públicas que cuentan como actividad del negocio se anotan en el registro de actividad.
+Sale: lo que la orden escribe en las tablas del módulo; una fila por aviso emitido en la cola de avisos, en la misma transacción (los entrega después la cola a las apps que escuchan, cada una en su propia transacción; si una falla, la orden sigue hecha y el aviso acaba en avisos caídos); el aviso en vivo, solo si se guardó; la marca de quién aprobó (`approved_by`) junto a quién pidió. Las órdenes públicas que cuentan como actividad del negocio se anotan en el registro de actividad. Repetir una orden la ejecuta otra vez: lo único que no se repite es un aviso declarado con clave de duplicado y la entrega a cada app que escucha. **Sello del primer registro en producción**: solo lo pone una orden SQL que declara en su `emit` el aviso que abre la cadena fiscal; una orden con manejador no sella nunca, y la factura normal (`invoice.created`) la devuelve un manejador, así que hoy una venta no sella (defecto, leído en el código sin ejecutar).
 Si falla: cada puerta contesta con su código estable (HUB-F14) y nada queda escrito. Una cascada de avisos de más de 16 niveles se corta (`event_loop`). Un fallo de base de datos sale como «the request could not be completed — the hub recorded the details» y el detalle queda en el registro del servidor.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, avisos: la cola que entrega los avisos de una orden a las apps que escuchan, sus reintentos y los avisos caídos
 Pendiente de enlazar: hub — HUB, automatizaciones: el paso de una automatización que ejecuta una orden con su propio permiso concedido
 Pendiente de enlazar: hub — HUB, acceso: las reglas que escribe el dueño (políticas) y que se comprueban después del esquema
 Pendiente de enlazar: hub — HUB, perfil fiscal: los candados fiscales (identidad, certificado, vía hasta la AEAT, periodo cerrado, demo en pruebas)
+Pendiente de enlazar: hub — HUB, perfil fiscal (HUB-F308): volver a pruebas mientras no se haya sellado el primer registro en producción
 Pendiente de enlazar: hub — HUB, negocio y datos: el registro de actividad del negocio
 QA: qa-hub §11, BD-09
 
@@ -76,12 +78,13 @@ Pantalla: ninguna
 Pasos:
 1. Antes de tocar la base de datos o el manejador del módulo, el hub compara el contenido de la orden con el esquema que el módulo declara para ella (compilado una sola vez, al instalar).
 2. Si algo no cumple (falta un campo obligatorio, un tipo no es el esperado, sobra un campo que el esquema prohíbe), rechaza la orden entera: la comprobación propia del manejador no llega a ejecutarse.
-3. Si cumple, rellena con el valor por defecto del esquema cada campo que no ha llegado. Un campo que llega, aunque sea vacío (`null`), no se toca.
-4. Ajusta cada número a la forma que el esquema declara (entero o decimal), venga como venga.
-5. Ese contenido completado es el que reciben el SQL, el manejador y las reglas del dueño.
+3. Si cumple, rellena con su `default` cada campo **de primer nivel** que no ha llegado; los `default` de objetos anidados y de las líneas (listas) no se rellenan. Como el esquema se comprueba antes, un campo obligatorio no se salva con su `default`: si no llega, la orden se rechaza.
+4. Un campo que llega, aunque sea `null`, no se toca: un `null` explícito llega como `null`.
+5. Ajusta cada número de primer nivel a la forma que el esquema declara (entero o decimal), venga como venga.
+6. Ese contenido completado es el que reciben el SQL, el manejador y las reglas del dueño. Las operaciones que propone después un manejador no pasan por el esquema de su sub-orden (HUB-F10).
 Entra: el contenido de la orden y el esquema del módulo (`schemas/*.json`).
-Sale: el contenido completado. Por eso un `COALESCE` posterior del módulo nunca ve vacío un campo con valor por defecto: el ajuste que venía detrás no se aplica nunca.
-Si falla: `invalid_payload` (422) con la lista de campos rechazados en `fields`, que la pestaña de Ajustes del hub usa para marcar cada campo. Una orden sin esquema acepta cualquier contenido. Las consultas se comprueban igual, pero sin rellenar valores por defecto.
+Sale: el contenido completado. Un `COALESCE` posterior del módulo nunca ve vacío un campo de primer nivel con `default` que no llegó (el ajuste que venía detrás no se aplica); sí actúa sobre un `null` explícito y sobre los campos anidados.
+Si falla: `invalid_payload` (422), con como mucho cinco violaciones en la frase. `fields` nombra solo los campos presentes con un valor inválido (un campo anidado nombra su campo raíz); un campo obligatorio que falta o uno que sobra se dice en la frase pero no sale en `fields`, así que la pestaña de Ajustes no marca ese control. Una orden sin esquema acepta cualquier contenido. Las consultas se comprueban igual, pero sin rellenar valores por defecto.
 Implicados: ninguno
 QA: ninguno
 
@@ -95,8 +98,8 @@ Pasos:
 3. La pantalla repite la orden con el pase.
 4. El hub gasta el pase en la misma puerta del permiso, solo si coincide con el mismo hub, el mismo empleado, la misma orden, el mismo contenido y el mismo permiso; anota quién aprobó antes de ejecutar y la orden sigue con el empleado como autor y el responsable como aprobador.
 Entra: el pase en la cabecera `X-Elevation-Token`; la tabla de permisos por perfil de cada app instalada.
-Sale: la orden ejecutada con `approved_by` y el recibo de la aprobación. El pase vale para esa acción y no para la siguiente.
-Si falla: un pase de otra acción, de otro empleado, de otro hub, caducado o ya usado vale lo mismo que ninguno: otra vez `requires_elevation`. Las consultas, la llave de API y las automatizaciones nunca piden PIN: un permiso que falta es un rechazo. Dentro del manejador, una operación que pida más permiso que la orden se rechaza sin ofrecer PIN. El pase se gasta al pasar la puerta: si la orden falla después (esquema, regla del dueño, candado fiscal), hay que volver a pedir el PIN (leído en el código, sin ejecutar).
+Sale: la orden ejecutada con `approved_by` y el recibo de la aprobación (`_elevation_audit`), escrito antes de ejecutar y fuera de la transacción de la orden. El pase vale para esa acción y no para la siguiente, durante 120 s como mucho. El pase vive en la memoria del proceso: si la repetición la atiende otra copia del hub (durante un despliegue conviven dos) o el hub se ha reiniciado, contesta otra vez `requires_elevation` y hay que volver a teclear el PIN.
+Si falla: un pase de otra acción, de otro empleado, de otro hub, caducado o ya usado vale lo mismo que ninguno: otra vez `requires_elevation` (un pase de otra acción no se gasta). La huella del contenido se calcula sobre lo que llega, antes del cambio parcial y de los valores por defecto. El pase abre la puerta de la orden, no amplía el permiso del empleado: si una operación del manejador declara el permiso que se aprobó, sale `permission_denied` con el pase ya gastado y el recibo escrito. Las consultas, la llave de API y las automatizaciones nunca piden PIN: un permiso que falta es un rechazo. Dentro del manejador, una operación que pida más permiso que la orden se rechaza sin ofrecer PIN. El pase se gasta al pasar la puerta: si la orden falla después (esquema, regla del dueño, candado fiscal), hay que volver a pedir el PIN (leído en el código, sin ejecutar).
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB, acceso: comprobar el PIN del responsable y emitir el pase de un solo uso (`/api/elevation/approve`)
 Pendiente de enlazar: hub — HUB_SHELL, diálogo que pide el PIN del responsable y repite la orden
@@ -111,9 +114,9 @@ Pasos:
 1. Un módulo puede declarar en una orden cuántas filas tiene que cambiar como mínimo (`expect_rows`, con su código de error, y opcionalmente cuál de sus sentencias es la que cuenta).
 2. El hub ejecuta la orden dentro de su transacción y cuenta las filas cambiadas: las de la sentencia señalada o, si no señala ninguna, la suma de todas las de la orden (nunca las de la cola de avisos).
 3. Si no llega al mínimo, deshace la transacción entera, sin cambios y sin avisos, y contesta con el código que el módulo declaró.
-4. La misma regla vale para cada operación que propone un manejador: cada una con su propio mínimo.
+4. En una orden con manejador, cuenta el mínimo de la sub-orden de cada operación que propone, cada una con el suyo; el `expect_rows` de la propia orden con manejador se ignora (y el instalador lo acepta). Una sub-orden sin comprobación que no cambia nada contesta `ok`.
 Entra: la declaración de la orden en `module.json`.
-Sale: nada si no se cumple; la orden normal si se cumple.
+Sale: nada si no se cumple; la orden normal si se cumple. Una orden SQL sin comprobación sobre una fila que no existe contesta `ok` con un identificador nuevo que no nombra nada, y se enteran igual las apps que escuchan (por la cola de avisos, después), las pantallas conectadas (aviso en vivo) y, si cuenta como actividad, el registro de actividad.
 Si falla: con `expect_rows`, el código del módulo (409), que su traducción convierte en frase. Con la forma antigua (`min_affected_rows`), `not_found` o `conflict` (409). **Una orden que no declara la comprobación contesta `ok` y emite sus avisos aunque no haya cambiado ninguna fila**: el hub no puede saber qué significa «nada» para cada orden, así que declararla es responsabilidad del módulo. El instalador rechaza un módulo que combine las dos formas o que use la antigua sobre varias sentencias.
 Implicados: ninguno
 QA: ninguno
@@ -154,10 +157,10 @@ Pantalla: ninguna
 Pasos:
 1. Un módulo declara en una orden qué índice único de sus tablas protege y con qué código quiere que se cuente el choque (`on_unique`).
 2. Si al guardar la base de datos rechaza la fila por ese índice, el hub contesta con ese código en vez del error genérico.
-3. Vale igual si el choque viene del SQL de la orden, de una operación del manejador o del motor propio del módulo.
+3. Vale igual si el choque viene del SQL de la orden, de una operación del manejador o del motor propio del módulo, siempre que el índice lo nombre la orden pedida: el `on_unique` de una sub-orden que solo alcanza un manejador no se aplica.
 Entra: la declaración `on_unique` de la orden.
 Sale: nada guardado; el código del módulo.
-Si falla: un índice que la orden no nombra, o una tabla de otro módulo o del hub, deja el error de base de datos genérico (redactado, HUB-F14): un módulo no puede rebautizar el rechazo de un índice ajeno. El instalador exige que el código sea del espacio del módulo y esté en su catálogo de errores.
+Si falla: un índice que la orden no nombra, o una tabla de otro módulo o del hub, deja el error de base de datos genérico (redactado, HUB-F14): un módulo no puede rebautizar el rechazo de un índice ajeno. El instalador exige que el código sea del espacio del módulo y, si el módulo declara catálogo de errores, que esté en él.
 Implicados: ninguno
 QA: ninguno
 
@@ -169,11 +172,12 @@ Pasos:
 1. Si la orden tiene manejador, el hub le entrega el contenido ya comprobado, sus datos de sistema, la hora única de la orden, 256 identificadores nuevos y las lecturas previas (HUB-F11).
 2. El manejador corre aislado, sin acceso a la base de datos ni a la red, con topes de memoria (32 MB), de instrucciones y de tiempo (5 s); el hub lo compila una vez por versión instalada.
 3. El manejador contesta con operaciones (órdenes SQL de su propio módulo), avisos, un rechazo de negocio o una respuesta.
-4. El hub valida cada operación (que sea SQL, de su mismo módulo y que no pida más permiso que la orden), cada aviso (declarado, de su espacio de nombres; un recordatorio exige el permiso de avisar concedido y una impresión el de imprimir declarado) y aplica los candados fiscales a lo que resultó.
-5. Guarda todas las operaciones y avisos en una sola transacción, cada operación con su comprobación de filas (HUB-F06), y contesta con los identificadores que de verdad se usaron y, si la hay, la respuesta del manejador.
+4. El hub valida cada operación: que sea SQL, de su mismo módulo, que su sub-orden tenga SQL declarativo y que no pida más permiso del que tiene quien llama. **No** la compara con el esquema de su sub-orden ni le pone sus valores por defecto: solo ajusta sus números a la forma declarada. El `emit` de la sub-orden no se emite: solo los avisos de la orden pedida y los que devuelve el manejador.
+5. Valida cada aviso que devuelve el manejador: un recordatorio exige el permiso de avisar declarado y concedido, y una impresión el de imprimir declarado; un aviso con el espacio de nombres de otra app instalada se rechaza; si el módulo declara su lista de avisos (`events.emits`), cualquiera fuera de ella se rechaza; si no la declara, un aviso no declarado de su espacio, o de nadie, pasa con una nota en el registro. Luego aplica los candados fiscales a lo que resultó.
+6. Guarda todas las operaciones y avisos en una sola transacción, cada operación con la comprobación de filas de su sub-orden (HUB-F06; la de la orden pedida no cuenta), y contesta con los identificadores que de verdad se usaron y, si la hay, la respuesta del manejador.
 Entra: el código del manejador del paquete instalado; topes ajustables por despliegue (`HUB_WASM_MEMORY_MAX_MB`, `HUB_WASM_FUEL`, `HUB_WASM_TIMEOUT_MS`).
 Sale: lo mismo que HUB-F03. Un aviso que la orden declara y el manejador también emite sale una sola vez, con el contenido del manejador.
-Si falla: un rechazo de negocio sale con el código del módulo (409), si es de su espacio y está en su catálogo; si no, es un fallo del módulo. Pasarse de instrucciones da `wasm_budget_exceeded` y del tiempo `wasm_timeout`: nada cambia y la pantalla dice «Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.» o «Esta acción ha tardado demasiado en terminar. No se ha cambiado nada: prueba con menos elementos o un rango más corto.». Una respuesta de más de 64 KiB, una operación de otro módulo o un aviso no declarado tumban la orden entera sin escribir nada.
+Si falla: un rechazo de negocio sale con el código del módulo (409), si es de su espacio y está en su catálogo; si no, es un fallo del módulo. Pasarse de instrucciones da `wasm_budget_exceeded` y del tiempo `wasm_timeout`: nada cambia y la pantalla dice «Esta acción es demasiado grande para hacerla de una vez. No se ha cambiado nada: prueba con menos elementos o un rango más corto.» o «Esta acción ha tardado demasiado en terminar. No se ha cambiado nada: prueba con menos elementos o un rango más corto.». Si se agota el margen del hub (el tiempo del manejador más 2 s), sale un fallo genérico redactado, no `wasm_timeout`. Una respuesta de más de 64 KiB, una operación de otro módulo o un aviso rechazado (paso 5) tumban la orden entera sin escribir nada. El código WASM se compila una vez por versión instalada y se precalienta al arrancar.
 Implicados: ninguno
 QA: ninguno
 
@@ -199,9 +203,9 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Algunas órdenes de un módulo de primera parte (hoy solo VeriFactu) las resuelve un motor compilado dentro del hub, que sí puede usar la red y el certificado.
+1. Algunas órdenes de un módulo de primera parte (hoy solo VeriFactu) las resuelve un motor compilado dentro del hub, que sí puede usar la red, el certificado, llamar a la nube de ERPlora y escribir ficheros en la carpeta propia del módulo.
 2. Antes de ejecutarlo, el hub exige que todos los permisos de host que el módulo pide (red, certificado…) estén concedidos en Ajustes › Permisos; si falta uno, no corre.
-3. El motor lee solo con consultas de lectura que hace el hub por él y propone operaciones y avisos como un manejador.
+3. El motor lee la base de datos solo con `SELECT` que hace el hub por él (cualquier tabla), no recibe lecturas previas ni el país del negocio, y para escribir en la base propone operaciones y avisos como un manejador.
 4. El hub valida y guarda lo propuesto igual que en HUB-F10.
 Entra: el motor registrado al arrancar; los permisos concedidos.
 Sale: lo mismo que HUB-F10.
@@ -233,13 +237,13 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Cualquier rechazo de una consulta o una orden sale con la misma forma: `{ok: false, error: {code, message}}` y el estado HTTP de su familia.
+1. Los rechazos de una consulta o una orden salen con la forma `{ok: false, error: {code, message}}` y el estado HTTP de su familia. Excepción: el 401 de `/api/query`, `/api/command`, la llave de API y la emisión de localizadores sale como `{ok: false, error: "<texto>"}`, sin código.
 2. El código es estable y es lo que traducen las pantallas; los datos que la pantalla necesita viajan aparte (el permiso que falta, las apps que dependen, los campos rechazados, lo que falta para facturar, la consulta y el dato que no llegó, la app afectada).
 3. El texto solo llega a quien llama si lo escribió el hub o el módulo a propósito y no lleva palabras del motor de base de datos ni direcciones internas; si no, sale una frase fija y el detalle queda en el registro del servidor.
-4. Un fallo de instalación o de actualización nunca sale como error 5xx, para que el proxy de delante no se coma el código.
+4. Un fallo de instalación o de actualización nunca sale como error 5xx, para que el proxy de delante no se coma el código. Las órdenes sí pueden: una orden sin SQL ni manejador da `not_implemented` (501) y un hub sin conexiones libres, `pool_limit` (503).
 Entra: el error de cualquier puerta.
 Sale: la respuesta al que llama y, para los fallos del sistema, una entrada en el registro de errores atribuida al módulo cuando se sabe cuál es.
-Si falla: un cuerpo que no es JSON contesta `invalid_body` con su estado (400 o 422), no la frase en inglés del servidor web.
+Si falla: un cuerpo que no se puede leer contesta `invalid_body` con el estado del lector (400 si no es JSON, 415 sin `Content-Type: application/json`, 422 si falta un campo), no la frase en inglés del servidor web. El rechazo de bloqueo (`protects_guard`) lleva en su frase el nombre de la consulta interna y un texto propio de la caja, y no lleva como campo qué app bloquea a cuál.
 Implicados: pendiente
 Pendiente de enlazar: hub — HUB_SHELL, traducción de los códigos del hub a frases en la pantalla (catálogo del SDK y `runtimeErrors`)
 QA: ninguno
@@ -251,42 +255,42 @@ Pantalla: ninguna
 Pasos:
 1. Un administrador (o una herramienta con su sesión) pide el catálogo de operaciones, entero o de un módulo.
 2. El hub contesta, ordenado por nombre, cada consulta y orden que su despachador acepta hoy: nombre exacto, permiso que pide, forma del contenido y si está publicada para la API con llave.
-3. No anuncia lo que rechazaría: ni las órdenes internas ni las de apps apagadas.
+3. No anuncia las órdenes internas ni las de apps apagadas; sí anuncia las de apps que el plan del hub ya no incluye (que `/api/command` rechazaría con 402) y las consultas propias del hub (`hub.*`).
 Entra: `GET /api/hub/operations[?module=]`.
 Sale: el catálogo; no guarda nada.
-Si falla: sin sesión, 401; con sesión que no es de administrador, 403. Si quien llama se identifica como un módulo, ese módulo necesita además el permiso de host «administrar automatizaciones» concedido.
+Si falla: sin sesión, 401; con sesión que no es de administrador, 403. Si quien llama se identifica como un módulo (la cabecera es voluntaria), ese módulo necesita además el permiso de host «administrar automatizaciones» concedido.
 Implicados: ninguno
 QA: qa-hub §11
 
 ### HUB-F16 Emitir el localizador para que el cliente pida su factura
-Estado: hecho
+Estado: parcial — solo se comprueba el permiso de la orden: se puede emitir un localizador para una orden interna, y la fecha límite que manda la app no se valida (se compara como texto)
 Actor: empleado, sistema
 Pantalla: ninguna
 Pasos:
 1. Al imprimir un tique, la app que lo imprime pide al hub un localizador para él: qué orden ejecutará el canje, con qué contenido sellado (líneas e importes del tique), qué campos podrá rellenar el cliente y, si quiere, las opciones de algunos campos (país, tipo de documento) y la fecha límite.
-2. El hub comprueba que quien lo pide podría ejecutar esa orden él mismo; si no, no lo emite.
-3. Calcula un localizador de 16 caracteres a partir del tique con una clave propia del negocio, y guarda el localizador cifrado, la orden, el contenido sellado, los campos y la fecha límite (45 días si nadie fija otra).
+2. El hub comprueba que quien lo pide tiene el permiso que declara esa orden; no mira si es interna, ni el bloqueo de otra app, ni el plan, y no ofrece PIN.
+3. Calcula un localizador de 16 caracteres a partir del tique con una clave propia del negocio, y guarda la huella del localizador (SHA-256; el localizador en sí no se guarda), la orden, el contenido sellado en claro, los campos y la fecha límite (45 días si nadie fija otra).
 4. Devuelve el localizador y su dirección (`/p/<localizador>`), que la app imprime como segundo código QR.
 Entra: `POST /api/hub/public-claims` con sesión; la clave del negocio (`_public_claim_key`), creada la primera vez.
-Sale: la fila del localizador (`_public_claim`). Reimprimir el mismo tique devuelve el mismo localizador, sin mover la fecha límite ni reabrir uno ya canjeado.
-Si falla: orden desconocida, `unknown_command` (400); sin su permiso, `permission_denied` (403); opciones mal formadas o de más de 400 entradas, `invalid_choices` (400); sin tipo, tique u orden, `public_claim.incomplete` / `public_claim.no_command` (409).
+Sale: la fila del localizador (`_public_claim`). Reimprimir el mismo tique devuelve el mismo localizador, sin mover la fecha límite ni reabrir uno ya canjeado; si la reimpresión llega con otro contenido sellado, se ignora en silencio.
+Si falla: orden desconocida o de una app apagada (también una orden vacía), `unknown_command` (400); sin su permiso, `permission_denied` (403); opciones mal formadas o de más de 400 entradas, `invalid_choices` (400); sin tipo o sin tique, `public_claim.incomplete` (409). Sin sesión, 401 sin código.
 Implicados: pendiente
 Pendiente de enlazar: sales — SALES-F29 (el tique impreso lleva el QR «Pide tu factura» con el localizador)
 QA: L-02
 
 ### HUB-F17 Canjear un localizador en la página pública
-Estado: parcial — un dato rechazado (un NIF mal escrito) puede enseñarse con la frase del módulo o del esquema en inglés aunque la página esté en español; los tres campos fijos (NIF, nombre, domicilio) se piden siempre, los declare o no el localizador
+Estado: parcial — nunca enseña la referencia de la factura (busca claves que la respuesta de una orden no trae); un segundo envío ve «emitida» sin referencia, aunque el primero acabe fallando; un fallo del propio hub le dice al cliente que revise el NIF y le cuenta como intento fallido; un dato rechazado puede salir con la frase del módulo o del esquema en inglés; los tres campos fijos se piden siempre, los declare o no el localizador
 Actor: cliente
 Pantalla: Página pública para pedir la factura
 Pasos:
-1. El cliente escanea el segundo QR del tique o escribe la dirección y el «Código del tique»; no inicia sesión.
+1. El cliente escanea el segundo QR del tique o escribe la dirección `/p/<código>` en el navegador (no hay campo para teclear el código: la página lo enseña como «Código del tique»); no inicia sesión.
 2. Ve «Pide tu factura», «Convierte el tique que te han dado en una factura completa con tus datos fiscales.» y el formulario: «NIF/CIF», «Nombre o razón social», «Domicilio» y, si el tique los ofrece, desplegables como el país o el tipo de documento.
 3. Pulsa «Emitir mi factura».
-4. El hub marca el localizador como usado antes de ejecutar nada, junta lo sellado con solo los campos que el cliente puede rellenar (lo sellado gana siempre) y ejecuta la orden con el permiso que esa orden pide, como si fuera el que imprimió el tique.
-5. Ve «Tu factura está emitida», la referencia de la factura y «Guarda esta referencia. Si necesitas una copia, enséñala en el mostrador.».
+4. El hub marca el localizador como usado antes de ejecutar nada, junta lo sellado con solo los campos que el cliente puede rellenar (lo sellado gana siempre) y ejecuta la orden con un autor propio del localizador (`public-claim:<id>`) que solo tiene el permiso que la orden declara hoy; quién emitió el localizador no cuenta.
+5. Ve «Tu factura está emitida» y «Guarda esta referencia. Si necesitas una copia, enséñala en el mostrador.». La línea con la referencia no sale: el hub busca `number`, `invoice_number`, `id` o `invoice_id` en la respuesta, y una orden contesta `{ok, new_ids}` o `{ok, operations, new_ids, result}`.
 Entra: el localizador; los datos fiscales del cliente; el idioma de la página (el del negocio, o `?lang=es|en`).
-Sale: lo que produce la orden del localizador (hoy, la factura completa que sustituye al tique) y la referencia guardada en el localizador. Volver a abrirlo enseña la misma referencia.
-Si falla: un código desconocido o de otro negocio: «Este código no corresponde a ningún tique de este negocio. Comprueba que lo has escrito tal como está impreso.» (404). Pasada la fecha: «El plazo para pedir factura de este tique terminó el {fecha}. Pregunta en el mostrador.» (410). Si la orden se rechaza, el localizador se libera y se vuelve al formulario con lo escrito y el motivo (o «No se han podido aceptar los datos. Revisa el NIF y vuelve a intentarlo.»). Si la orden ya no existe en el hub: «Este negocio no puede emitir facturas ahora mismo. Pregunta en el mostrador.». Demasiados fallos desde la misma dirección: «Demasiados intentos. Vuelve a probar en {segundos} segundos.» (429). Dos envíos a la vez: el segundo ve la factura del primero, nunca dos facturas.
+Sale: lo que produce la orden del localizador (hoy, la factura completa que sustituye al tique) y el localizador marcado como usado; la referencia que se guarda queda vacía. Volver a abrirlo enseña «emitida» sin referencia.
+Si falla: un código desconocido o de otro negocio: «Este código no corresponde a ningún tique de este negocio. Comprueba que lo has escrito tal como está impreso.» (404). Pasada la fecha: «El plazo para pedir factura de este tique terminó el {fecha}. Pregunta en el mostrador.» (410), con la fecha como `AAAA-MM-DD` en UTC. Si la orden se rechaza, el localizador se libera y se vuelve al formulario con lo escrito y el motivo: la frase del módulo o del esquema si el rechazo es de negocio o de datos; si es del propio hub (falta la identidad fiscal, una lectura obligatoria, el bloqueo de otra app, una orden interna), «No se han podido aceptar los datos. Revisa el NIF y vuelve a intentarlo.», y cuenta como intento fallido. Si la orden ya no existe en el hub: «Este negocio no puede emitir facturas ahora mismo. Pregunta en el mostrador.». Demasiados fallos desde la misma dirección: «Demasiados intentos. Vuelve a probar en {segundos} segundos.» (429). Dos envíos a la vez: nunca dos facturas; el segundo ve «Tu factura está emitida» en cuanto el primero ha marcado el localizador, aunque el primero falle después y lo libere. La página pública no comprueba el plan del hub.
 Implicados: pendiente
 Pendiente de enlazar: invoice — INVOICE-F04 (el cliente pide la factura completa de su tique)
 Pendiente de enlazar: architecture — REC_FISCAL-F10 (pasar un tique a factura completa sustitutiva)
@@ -297,11 +301,11 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Los manejadores de los módulos que calculan dinero (Venta, Impuestos, Facturación, Cocina, Servicios, Precios, Carrito, Inventario, Caja) enlazan la misma aritmética del hub (`guest-sdk`).
-2. Todo importe es un entero de la unidad mínima de la moneda del negocio (céntimos en euros); las tasas y las cantidades llevan decimales y se calculan en decimal exacto, nunca en coma flotante.
+1. Los manejadores de los módulos que calculan dinero enlazan la misma aritmética del hub (`guest-sdk`); comprobado su uso en Venta, Impuestos y Facturación (también lo enlazan Cocina, Servicios, Precios, `cart_checkout`, Inventario y Caja, sin comprobar para qué).
+2. Todo importe es un entero de la unidad mínima de la moneda (céntimos en euros). Las operaciones de dinero de `guest-sdk` multiplican en decimal exacto, pero las tasas viajan como número de coma flotante (`TaxComponent.rate_pct`) y Venta suma tasas en coma flotante antes de pasarlas a decimal.
 3. El dinero pierde precisión en un solo sitio: el redondeo a la unidad mínima, con la mitad exacta alejándose de cero (la regla de la ley del euro).
-4. Una línea se calcula `precio × cantidad − descuento` con un solo redondeo al final; con IVA incluido, la base sale de dividir y la cuota es lo que resta, así que lo cobrado no se mueve un céntimo; el desglose por tipo redondea la cuota una vez por tipo.
-Entra: importes, tasas y cantidades de cada manejador; la moneda y sus decimales de los ajustes del negocio.
+4. Una línea se calcula `precio × cantidad × (1 − descuento %)` con un solo redondeo al final; con IVA incluido, la base sale de dividir y la cuota es lo que resta, así que lo cobrado no se mueve un céntimo; el desglose por tipo redondea la cuota una vez por tipo.
+Entra: importes, tasas y cantidades de cada manejador. El hub no le inyecta la moneda ni sus decimales: cada módulo trabaja en unidades mínimas sin saber cuáles son.
 Sale: los importes que cada módulo guarda y declara.
 Si falla: un decimal que llegue donde se espera un importe se redondea, nunca se trunca. Cambiar el redondeo en el hub no llega a un módulo hasta que ese módulo se vuelve a compilar y publicar (lo enlaza al compilarse); el motor de VeriFactu formatea sus importes por su cuenta (HUB_VERIFACTU).
 Implicados: pendiente

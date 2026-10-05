@@ -21,9 +21,10 @@ El hub es el servidor de **un** negocio: una peluquería, un bar o una tienda qu
 con su propia base de datos. No tiene funciones de negocio propias: las ponen las **aplicaciones**
 (módulos) que el negocio instala desde el catálogo —Venta, Caja, Inventario, Citas, VeriFactu…—, y el
 hub es quien las instala, las actualiza, las aísla entre sí y las sirve. Cada vez que alguien pide
-datos o pide hacer algo, el hub decide si puede (sesión, permiso, PIN del responsable, plan
-contratado, permisos de la app), comprueba lo que llega contra lo que la app declara, lo ejecuta en
-una sola transacción con sus avisos a otras apps, y contesta con un código que la pantalla sabe
+datos o pide hacer algo, el hub decide si puede (sesión, permiso, PIN del responsable, permisos de
+la app y, en las puertas de las pantallas, el plan contratado), comprueba lo que llega contra lo que
+la app declara, lo ejecuta en una sola transacción junto con los avisos que deja para otras apps, y
+contesta con un código que la pantalla sabe
 traducir. Además guarda lo que es del negocio y no de ninguna app (las personas y su acceso, los
 ajustes, el perfil fiscal, la cola de impresión, las automatizaciones, el asistente).
 
@@ -38,7 +39,7 @@ que una persona hace en pantalla está en `HUB_SHELL`, y aquí está lo que el s
 
 | Área | Fichero | IDs | Código que gobierna |
 |---|---|---|---|
-| Módulos y órdenes: consultas, órdenes, puerta pública, redondeo | [workflow/modulos.md](workflow/modulos.md) | F01–F18 | `runtime`: dispatch, commands, queries, manifest, registry, native, wasm, wasm_cache, errors, error_registry, public_claim · `server`: dispatch_api, public_door, operations_catalog · crates `wasm-host`, `guest-sdk` |
+| Módulos y órdenes: consultas, órdenes, puerta pública, redondeo | [workflow/modulos.md](workflow/modulos.md) | F01–F18 | `runtime`: dispatch, commands, queries, manifest, registry, native, wasm, wasm_cache, errors, error_registry, public_claim, capabilities (F12) · `server`: dispatch_api, public_door, operations_catalog · crates `wasm-host`, `guest-sdk`. Las puertas que usan y gobierna acceso: `runtime` permissions, policies, elevation; `server` entitlement (el 402), api_keys (la puerta `expose_api`) |
 | Módulos y órdenes: aplicaciones, ajustes, paneles, puesta en marcha | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) | F19–F35 | `runtime`: installer, module_lifecycle, module_update, module_package, lifecycle, loader, seed, migrations, migration_guard, capabilities, setup_status, settings_api (permisos de módulo), ui · `server`: module_api, install, install_guard, module_reconcile, settings (permisos de módulo) · crates `source`, `installer` |
 | Avisos entre módulos | `workflow/avisos.md` | F50–F79 | `runtime`: events, events_api, event_shape, outbox, host_notify, scheduler · `server`: event_stream, outbox_admin, notify_transport, activity |
 | Automatizaciones | `workflow/automatizaciones.md` | F80–F129 | `runtime/src/flows/`, flows_api, secret_box · `server`: flows_api, flow_io, flows_header_media, agent_runner |
@@ -139,7 +140,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F13 | Bloquear las órdenes de un módulo mientras otro no cumpla su condición | parcial | [workflow/modulos.md](workflow/modulos.md) |
 | HUB-F14 | Contestar un fallo con un código estable y sin detalles internos | hecho | [workflow/modulos.md](workflow/modulos.md) |
 | HUB-F15 | Consultar qué órdenes y consultas acepta el hub | hecho | [workflow/modulos.md](workflow/modulos.md) |
-| HUB-F16 | Emitir el localizador para que el cliente pida su factura | hecho | [workflow/modulos.md](workflow/modulos.md) |
+| HUB-F16 | Emitir el localizador para que el cliente pida su factura | parcial | [workflow/modulos.md](workflow/modulos.md) |
 | HUB-F17 | Canjear un localizador en la página pública | parcial | [workflow/modulos.md](workflow/modulos.md) |
 | HUB-F18 | Redondear el dinero igual en todos los módulos | hecho | [workflow/modulos.md](workflow/modulos.md) |
 | HUB-F19 | Instalar una aplicación del catálogo | parcial | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
@@ -168,7 +169,7 @@ fiscal (F300–).
 
 | Pieza compartida | Flujos que la usan |
 |---|---|
-| El embudo de una orden, con sus puertas siempre en el mismo orden: interna → bloqueo de otra app → permiso o PIN → edición parcial → esquema → reglas del dueño → candados fiscales → transacción | F03–F13 y toda orden de cualquier módulo, también las de la página pública (F17) y las de guardar ajustes (F33) |
+| El embudo de una orden, con sus puertas siempre en el mismo orden: interna → bloqueo de otra app → permiso o PIN → edición parcial → esquema → reglas del dueño → permisos de host (motor nativo) → candados fiscales → transacción | F03–F13 y toda orden de cualquier módulo, también las de la página pública (F17) y las de guardar ajustes (F33) |
 | Los datos que pone el hub y nadie puede mandar (negocio, quién, hora, identidad fiscal, zona, idioma, demo, permisos concedidos, quién aprobó) | F01, F03, F10, F12 |
 | El registro de cada app (`installer::install`): validar, migrar, sembrar, registrar; si falla una actualización, vuelve la versión anterior | F19–F23, F25, F26, F30 |
 | El resolutor de versiones: la más nueva sin cuarentena, nunca hacia atrás, el pin de soporte gana | F23, F24, F25 |
@@ -197,8 +198,9 @@ fiscal (F300–).
 | Aprobación del responsable con PIN para una acción | hecho | HUB-F05 |
 | Validar lo que llega antes de ejecutar | hecho | HUB-F04 |
 | Errores traducibles sin filtrar detalles internos | hecho | HUB-F14 |
-| Factura completa pedida por el cliente desde el tique | parcial: errores que pueden salir en inglés | HUB-F16, HUB-F17 |
-| Un solo redondeo del dinero en todo el producto | hecho en los módulos con manejador; el motor de VeriFactu va aparte | HUB-F18 |
+| Factura completa pedida por el cliente desde el tique | parcial: sin referencia de la factura, errores del hub contados como «revisa el NIF», frases en inglés, localizadores para órdenes internas | HUB-F16, HUB-F17 |
+| Un solo redondeo del dinero en todo el producto | hecho en los módulos con manejador (las tasas viajan en coma flotante); el motor de VeriFactu va aparte | HUB-F18 |
+| Una orden repetida no se ejecuta dos veces | no hecho en el hub: solo los avisos con clave de duplicado y la entrega a cada app que escucha; lo resuelve cada módulo | HUB-F03 |
 
 Áreas del servidor que faltan aquí: (integrador) tablas de cobertura de las demás áreas.
 
@@ -207,8 +209,11 @@ fiscal (F300–).
 - **Del hub (área de módulos)**: qué apps tiene el negocio, en qué versión, si están encendidas y el
   pin de soporte (`hub_module`); qué migraciones de cada app se aplicaron (`_hub_migrations`); la
   copia de cada paquete instalado (`hub_module_package`); los permisos de host concedidos a cada app
-  (`_module_capability_grants`); los localizadores de la página pública y su clave
-  (`_public_claim`, `_public_claim_key`); lo último que dijo el catálogo (`_hub_meta`,
+  (`_module_capability_grants`); los localizadores de la página pública (`_public_claim`: la
+  huella SHA-256 del localizador, nunca el localizador, y el contenido sellado en claro) y su clave
+  (`_public_claim_key`, un secreto guardado en claro en una tabla sin puerta HTTP); los recibos de las
+  aprobaciones del responsable que produce HUB-F05 (`_elevation_audit`, tabla del área de acceso); lo
+  último que dijo el catálogo (`_hub_meta`,
   `setup.catalog_offer`).
 - **De cada app**: sus tablas (con el prefijo de la app), sus ajustes y sus datos de partida. El hub
   las crea y migra, pero no las lee salvo por las consultas de la propia app (lecturas previas,
@@ -218,10 +223,14 @@ fiscal (F300–).
 - **Datos personales (inventario de esta área)**, recorridas las migraciones de sistema:
   - `_module_capability_grants.granted_by`: el usuario del hub que concedió o retiró un permiso.
   - `_public_claim`: quién emitió el localizador (`created_by`), el contenido sellado que decide la
-    app que lo emite (hoy, líneas del tique; si incluye datos del cliente, sin confirmar), la
-    referencia de la factura emitida. Los datos fiscales que escribe el cliente **no** se guardan en
+    app que lo emite (hoy, líneas del tique; si incluye datos del cliente, sin confirmar) y la
+    referencia del resultado (hoy siempre vacía, HUB-F17). Los datos fiscales que escribe el cliente **no** se guardan en
     el localizador: van a la orden (y de ahí a la factura de Facturación).
-  - `hub_module`, `_hub_migrations`, `hub_module_package`, `_public_claim_key`: sin datos personales.
+  - `_elevation_audit`: quién pidió (`created_by`), quién aprobó (`approved_by`), la orden, el
+    permiso, la huella del contenido y, si se aprobó con tarjeta, su tipo y referencia
+    (`credential_kind`, `credential_ref`).
+  - `hub_module`, `_hub_migrations`, `hub_module_package`: sin datos personales. `_public_claim_key`
+    tampoco, pero es un secreto.
   - Los avisos de una orden llevan quién la pidió y quién la aprobó, y la identidad fiscal del
     negocio (que para un autónomo es su nombre y su NIF).
   - El registro de errores guarda las **claves** del contenido de una orden fallida, nunca sus
@@ -237,17 +246,36 @@ API, otra app).
 
 - **Cada fila es de un negocio.** El hub pone él mismo el negocio (`:hub_id`), quién pide y la hora
   en todo el SQL de las apps, y los sobrescribe si alguien los manda; cada petición se resuelve
-  contra la base de su negocio antes de tocar nada.
+  contra la base de su negocio antes de tocar nada. El hub **no** comprueba que el SQL de una app
+  filtre por `:hub_id` (ni el instalador ni la guarda de migraciones lo miran): la separación real es
+  una base de datos por hub.
 - **Una app solo escribe en sus tablas.** El SQL de sus órdenes y de su semilla, y sus migraciones,
   se rechazan si tocan tablas de otra app o del hub (HUB-F20, HUB-F21). Un manejador solo propone
   operaciones de su propia app, y un aviso solo lo atiende una orden de la app que escucha.
-- **Primero se comprueba, luego se ejecuta.** El contenido se valida contra el esquema antes del
-  manejador y de la base de datos; una consulta rechaza un dato que no conoce o que le falta.
-- **Una orden es una transacción**: sus cambios y sus avisos a otras apps se guardan juntos o no se
-  guarda nada; si declara un mínimo de filas y no llega, nada.
+- **Primero se comprueba, luego se ejecuta.** El contenido de una orden se valida contra su esquema
+  antes del manejador y de la base de datos; una consulta rechaza un dato que no conoce o que le
+  falta. Excepción: las operaciones que propone un manejador no pasan por el esquema de su sub-orden
+  (HUB-F10).
+- **Una orden es una transacción**: sus cambios y la fila de cada aviso en la cola se guardan juntos o
+  no se guarda nada; si declara un mínimo de filas y no llega, nada. Lo que hacen las apps que
+  escuchan corre después, cada una en su propia transacción: si una falla, la orden sigue hecha y el
+  aviso acaba en avisos caídos.
 - **El permiso lo comprueba el servidor en cada orden.** Si lo tiene el perfil responsable de la app,
-  se ofrece su PIN; la aprobación vale para una sola acción, de ese empleado, con ese contenido. Las
-  consultas, la llave de API y las automatizaciones no se elevan.
+  se ofrece su PIN; la aprobación vale para una sola acción, de ese empleado, con ese contenido, y no
+  sobrevive a otra copia del hub ni a un reinicio. Las consultas, la llave de API y las
+  automatizaciones no se elevan.
+- **El orden de las puertas de una orden no se cambia sin revisar** (HUB-F03): la huella del PIN se
+  calcula sobre el contenido tal como llega, antes del cambio parcial y de los valores por defecto
+  (si el esquema pasara delante, los PIN ya aprobados no casarían); las reglas del dueño tienen que ir
+  después del permiso y del esquema (área de acceso); el permiso de una automatización fija parte
+  del contenido antes del esquema (área de automatizaciones); `validate_payload`, que usan las
+  aprobaciones manuales de los flujos, es la misma comprobación; el diálogo del PIN de `HUB_SHELL` y
+  SALES-F14 cuentan con que un cajero sin permiso vea `requires_elevation` antes que
+  `invalid_payload`; y lo fijan `architecture/hub/runtime-dispatcher.md` §2.0 y las pruebas
+  `kernel_conformance_permissions`, `command_elevation*` y `policy_gate_e2e`.
+- **El plan contratado solo se comprueba en `/api/query` y `/api/command`** (402
+  `module_entitlement_blocked`): la llave de API, la página pública, las automatizaciones, la cola de
+  avisos y las tareas programadas no lo comprueban (hueco).
 - **Las órdenes internas de una app no se pueden pedir desde fuera.**
 - **El dinero es un entero de unidades mínimas** y se redondea en un solo sitio, la mitad alejándose
   de cero (HUB-F18), en los módulos que enlazan la aritmética común.
@@ -264,7 +292,7 @@ API, otra app).
 - **El cliente de la página pública solo rellena los campos que el localizador permite**; lo sellado
   en el mostrador gana siempre, y un localizador produce como mucho un documento.
 - **Los errores no enseñan detalles internos** (motor de base de datos, direcciones de ERPlora): salen
-  con un código estable y una frase fija.
+  con un código estable y una frase fija (salvo el 401, que hoy sale sin código, HUB-F14).
 
 Áreas del servidor que faltan aquí: (integrador) reglas de las demás áreas.
 
@@ -275,7 +303,10 @@ API, otra app).
 - No borra los datos de una app al desinstalarla.
 - No baja de versión una app desde la pantalla ni la actualiza a una versión en cuarentena.
 - No pide PIN para leer: un informe no se desbloquea con el código del responsable.
-- No deja que un manejador toque la base de datos, la red ni otra app: propone, y el hub valida.
+- No deja que un manejador WASM toque la base de datos, la red ni otra app: propone, y el hub valida.
+  El motor nativo de confianza (hoy VeriFactu) sí lee cualquier tabla con `SELECT`, usa la red y el
+  certificado, llama a la nube y escribe ficheros en su carpeta, con sus permisos de host concedidos
+  (HUB-F12); para escribir en la base también propone.
 - No pinta formularios de ajustes, paneles ni la lista de puesta en marcha: sirve los datos y
   `HUB_SHELL` los pinta.
 - No deja a un módulo declararse imprescindible para vender: el nivel ⛔ de la puesta en marcha lo
