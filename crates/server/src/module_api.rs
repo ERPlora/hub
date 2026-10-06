@@ -926,7 +926,6 @@ pub(crate) async fn install_module(
     headers: HeaderMap,
     Json(req): Json<InstallReq>,
 ) -> Response {
-    let _module_ops = st.module_ops.lock().await;
     let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
@@ -974,7 +973,6 @@ pub(crate) async fn activate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let _module_ops = st.module_ops.lock().await;
     let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
@@ -1000,7 +998,6 @@ pub(crate) async fn deactivate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let _module_ops = st.module_ops.lock().await;
     let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
