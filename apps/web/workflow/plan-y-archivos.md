@@ -185,8 +185,8 @@ QA: ninguno
 - **Archivos**: del almacenamiento de erplora.com (o disco en desarrollo); el hub los sirve.
 
 Datos personales que pasan por estas pantallas: el PDF de cada factura, que se guarda en el
-dispositivo; el contenido de `_logs` y de los XML, que cualquier perfil puede abrir en Archivos. Las
-facturas que lista el hub son las de la persona en todos sus negocios.
+dispositivo; el contenido de `_logs` y de los XML, que en Archivos solo abren el propietario y un
+administrador (HUB-F245). Las facturas que lista el hub son las de la persona en todos sus negocios.
 
 ## Reglas que no se rompen
 
@@ -205,7 +205,6 @@ facturas que lista el hub son las de la persona en todos sus negocios.
 Se resuelven con `market-decision`; no las decide el worker.
 
 - ¿Copiar archivos entre carpetas?
-- ¿Debe Archivos ocultar a un cajero los registros del sistema y los XML de VeriFactu (ERPlora/hub#2495)?
 - ¿Qué filtra erplora.com en las facturas (por negocio) y qué campos manda en las suscripciones? Hoy
   la pantalla de suscripciones no funciona (HUB_SHELL-F127).
 
