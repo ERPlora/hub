@@ -213,9 +213,9 @@ describe('a PIN or badge session never carries erplora.com credentials', () => {
     } as never);
     const wrapper = await mountLogin();
 
-    wrapper.find('ok-pinpad').element.dispatchEvent(
-      new CustomEvent('ok-complete', { detail: { value: '000000' }, bubbles: true }),
-    );
+    wrapper
+      .find('ok-pinpad')
+      .element.dispatchEvent(new CustomEvent('ok-complete', { detail: { value: '000000' }, bubbles: true }));
     await flushPromises();
 
     expect(runtimePinLogin).toHaveBeenCalledWith('Demo', '000000');
@@ -230,9 +230,9 @@ describe('a PIN or badge session never carries erplora.com credentials', () => {
     vi.mocked(runtimePinLogin).mockRejectedValue(new Error('refused'));
     const wrapper = await mountLogin();
 
-    wrapper.find('ok-pinpad').element.dispatchEvent(
-      new CustomEvent('ok-complete', { detail: { value: '111111' }, bubbles: true }),
-    );
+    wrapper
+      .find('ok-pinpad')
+      .element.dispatchEvent(new CustomEvent('ok-complete', { detail: { value: '111111' }, bubbles: true }));
     await flushPromises();
 
     expect(replace).not.toHaveBeenCalled();

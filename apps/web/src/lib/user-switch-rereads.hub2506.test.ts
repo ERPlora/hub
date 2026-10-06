@@ -70,7 +70,10 @@ async function seedManagerShift(): Promise<void> {
   setHubSession('sess-ana');
   setTokens('acc-ana', 'ref-ana');
 
-  cloudEntitlement.mockResolvedValue({ modules: [{ moduleId: 'reports' }, { moduleId: 'sales' }], blockedModules: ['reports'] });
+  cloudEntitlement.mockResolvedValue({
+    modules: [{ moduleId: 'reports' }, { moduleId: 'sales' }],
+    blockedModules: ['reports'],
+  });
   await resolveEntitlement();
   loadMenu.mockResolvedValue(MANAGER_MENU);
   await refreshModuleNav();
