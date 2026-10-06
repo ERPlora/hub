@@ -230,12 +230,14 @@ import {
   listHubRoles,
   listHubUsers,
   localUserIssue,
+  pinLockRefusal,
   updateHubUser,
   type HubRole,
   type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
 import { runtimeErrorKey } from '../lib/runtime-error-sentence';
+import { sayRefusal } from '../lib/lock-refusal';
 import { fieldRefusalOf, invalidFieldMessage } from '../lib/invalid-field';
 import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
@@ -520,8 +522,12 @@ async function onSave(): Promise<void> {
     // pintarlo tal cual es lo que dejaba «the name is required» delante de una encargada. Se
     // conserva como ÚLTIMO recurso porque dice más que cualquier genérico inventado (misma regla
     // que `platformFailureMessage`, hub#1102).
+    // hub#2518 — the editor's PIN budget is spent: how long to wait goes first.
+    const lock = pinLockRefusal(error);
     const key = hubUserErrorKey(error);
-    const message = key
+    const message = lock
+      ? sayRefusal(t, lock)
+      : key
       ? t(`employeeForm.errors.${key}`)
       : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
         platformFailureMessage(error, locale.value) ??

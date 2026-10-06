@@ -1144,6 +1144,11 @@ export default {
   },
   employeeForm: {
     titleEdit: 'Editar usuario',
+    // hub#2518: creating or editing a person with a PIN spends the editor's budget of tries (the
+    // one «My profile» spends too, hub#2499) — every try counts, so not «failed attempts».
+    pinTooManyAttempts:
+      'Demasiados cambios de PIN en poco tiempo. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados cambios de PIN en poco tiempo. Espera unos minutos y vuelve a intentarlo.',
     titleNew: 'Nuevo usuario',
     fullName: 'Nombre y apellidos',
     email: 'Email',
