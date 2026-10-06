@@ -100,8 +100,8 @@ Pasos:
 1. La persona pulsa **Archivos** en el menú lateral (la ven todos los perfiles).
 2. Mientras carga, el gestor muestra el indicador. Después ve el árbol de carpetas a la izquierda (en una pantalla estrecha se pliega en un selector), la ruta de la carpeta abierta, los archivos en vista de cuadrícula o de lista y el espacio usado («Espacio», o «Sin límite»).
 3. Navega pulsando carpetas, busca en «Buscar archivos…» (solo dentro de la carpeta abierta) y, sin archivos, lee «Sin archivos».
-4. En la raíz están las carpetas de las apps (adjuntos de cada una), los registros del sistema y la actividad. Algunas son de solo lectura.
-Entra: el listado de la carpeta con qué se puede hacer en ella. La pantalla enseña a cualquier sesión, cajero incluido, lo mismo que sirve la API: la carpeta de registros, la de actividad del sistema y los XML de VeriFactu (ERPlora/hub#2495); no oculta nada.
+4. En la raíz están las carpetas del negocio y, para el propietario o un administrador, también las de las apps (adjuntos de cada una), los registros del sistema y la actividad. Algunas son de solo lectura.
+Entra: el listado de la carpeta con qué se puede hacer en ella. La pantalla enseña lo que sirve la API: a quien no administra (responsable, empleado, cajero) el servidor no le manda la carpeta de registros, la de actividad del sistema ni la de las apps con los XML de VeriFactu, así que no aparecen en el árbol (HUB-F245, ERPlora/hub#2495).
 Sale: nada guardado.
 Si falla: «No se pudieron cargar los archivos» con el motivo («Esta carpeta es de una app que no permite cambiar sus archivos.», el de erplora.com sin contestar o, si no llegó a salir, «Comprueba la conexión y vuelve a intentarlo.») y «Reintentar»; el gestor queda vacío sin inventar datos.
 Implicados: HUB-F245, WHATSAPP_INBOX-F06
@@ -185,8 +185,8 @@ QA: ninguno
 - **Archivos**: del almacenamiento de erplora.com (o disco en desarrollo); el hub los sirve.
 
 Datos personales que pasan por estas pantallas: el PDF de cada factura, que se guarda en el
-dispositivo; el contenido de `_logs` y de los XML, que cualquier perfil puede abrir en Archivos. Las
-facturas que lista el hub son las de la persona en todos sus negocios.
+dispositivo; el contenido de `_logs` y de los XML, que en Archivos solo abren el propietario y un
+administrador (HUB-F245). Las facturas que lista el hub son las de la persona en todos sus negocios.
 
 ## Reglas que no se rompen
 
@@ -205,7 +205,6 @@ facturas que lista el hub son las de la persona en todos sus negocios.
 Se resuelven con `market-decision`; no las decide el worker.
 
 - ¿Copiar archivos entre carpetas?
-- ¿Debe Archivos ocultar a un cajero los registros del sistema y los XML de VeriFactu (ERPlora/hub#2495)?
 - ¿Qué filtra erplora.com en las facturas (por negocio) y qué campos manda en las suscripciones? Hoy
   la pantalla de suscripciones no funciona (HUB_SHELL-F127).
 

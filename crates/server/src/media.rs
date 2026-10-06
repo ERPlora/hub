@@ -10,8 +10,10 @@
 //! reenvía la petición al Cloud con las cabeceras de máquina (`X-Hub-Token` + `X-Hub-Id`) y mapea
 //! la respuesta al contrato del frontend. Sin token de máquina no se puede proxyar (502).
 //!
-//! Seguridad: listar/abrir exige sesión de usuario; subir, crear carpetas y borrar exige sesión
-//! owner/admin. Una API key nunca accede al gestor de archivos. La validación de rutas
+//! Security: listing/opening asks for a user session, and the hub's own folders (`_*`) and the
+//! apps' tree (`modules/…`) for an owner/admin, who are also the only ones whose folder tree names
+//! them (hub#2495, `read_requires_admin`); uploading, creating folders and deleting asks for an
+//! owner/admin session. Una API key nunca accede al gestor de archivos. La validación de rutas
 //! (anti path-traversal) la hace el Cloud, dueño del almacenamiento.
 //!
 //! Endpoints (contrato consumido por `lib/media.ts`):
@@ -60,6 +62,28 @@ async fn require_user(st: &AppState, headers: &HeaderMap) -> Result<(), Response
         .map_err(unauthorized)
 }
 
+/// The reading gate (hub#2495): a session of the hub, and the hub's own folders and the apps' tree
+/// only for whoever administers the hub ([`read_requires_admin`]). Answers whether the session
+/// reads EVERY folder, so the listing can leave out of the tree what it may not open.
+///
+/// Administering is asked as the `hub.administer` permission, not as a role, so the same predicate
+/// that refuses here is the one that filters the tree, and Dev mode (`*`) reads everything as it
+/// already did.
+async fn require_reader(st: &AppState, headers: &HeaderMap, rel: &str) -> Result<bool, Response> {
+    let rt = st.runtime.read().await;
+    let ctx = auth::require_user_session(headers, &st.config, &rt)
+        .await
+        .map_err(unauthorized)?;
+    let reads_everything =
+        erplora_runtime::permissions::has(&ctx, erplora_runtime::hub_users::ADMINISTER_PERMISSION);
+    if !reads_everything && read_requires_admin(rel) {
+        return Err(unauthorized(auth::AuthError::Forbidden(
+            "only an owner or an administrator can open this folder".into(),
+        )));
+    }
+    Ok(reads_everything)
+}
+
 async fn require_admin(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
     let rt = st.runtime.read().await;
     auth::require_admin_session(headers, &st.config, &rt)
@@ -106,7 +130,7 @@ fn fmt_iso(s: &str) -> String {
 
 /// `GET /api/v1/hub/device/media/?folder=` → mapea el shape RAW del Cloud al del frontend
 /// (formatea bytes/fecha, quota "sin límite").
-async fn cloud_list(st: &AppState, folder: &str) -> Response {
+async fn cloud_list(st: &AppState, folder: &str, reads_everything: bool) -> Response {
     let url = format!(
         "{}/api/v1/hub/device/media/?folder={}",
         cloud_base(st),
@@ -191,8 +215,12 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     // dueño no concede ninguna acción de modificación (carpetas reservadas del hub `_logs/_system`,
     // `modules/` raíz o un módulo que no opte en `static_files.user_actions`). La UI lo usa para
     // marcarlas como no arrastrables y no receptoras de drops (ADR-0172, arrastrar-y-soltar).
-    let folders =
-        decorate_folders(raw.get("folders").cloned().unwrap_or_else(|| json!([])), st).await;
+    // Quien no administra no recibe ni el nombre de lo que no puede abrir (hub#2495).
+    let mut folders = raw.get("folders").cloned().unwrap_or_else(|| json!([]));
+    if !reads_everything {
+        folders = without_restricted_folders(folders);
+    }
+    let folders = decorate_folders(folders, st).await;
     let data = json!({
         "folders": folders,
         "files": files,
@@ -568,6 +596,32 @@ fn decorate_folders(
     })
 }
 
+/// El árbol de carpetas sin los nodos (ni su subárbol) que [`read_requires_admin`] reserva.
+fn without_restricted_folders(folders: Value) -> Value {
+    let Value::Array(nodes) = folders else {
+        return folders;
+    };
+    Value::Array(
+        nodes
+            .into_iter()
+            .filter(|node| {
+                !node
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .is_some_and(read_requires_admin)
+            })
+            .map(|mut node| {
+                if let Some(obj) = node.as_object_mut() {
+                    if let Some(children) = obj.remove("children") {
+                        obj.insert("children".into(), without_restricted_folders(children));
+                    }
+                }
+                node
+            })
+            .collect(),
+    )
+}
+
 // ─────────────────────────── GET /api/media ───────────────────────────
 
 #[derive(Deserialize)]
@@ -582,10 +636,10 @@ pub async fn media_list(
     headers: HeaderMap,
     Query(q): Query<FolderQuery>,
 ) -> Response {
-    if let Err(response) = require_user(&st, &headers).await {
-        return response;
+    match require_reader(&st, &headers, &q.folder).await {
+        Ok(reads_everything) => cloud_list(&st, &q.folder, reads_everything).await,
+        Err(response) => response,
     }
-    cloud_list(&st, &q.folder).await
 }
 
 // ─────────────────────────── GET /api/media/raw ───────────────────────────
@@ -612,7 +666,7 @@ pub async fn media_raw(
     headers: HeaderMap,
     Query(q): Query<PathQuery>,
 ) -> Response {
-    if let Err(response) = require_user(&st, &with_cookie_session(headers)).await {
+    if let Err(response) = require_reader(&st, &with_cookie_session(headers), &q.path).await {
         return response;
     }
     cloud_raw(&st, &q.path).await
@@ -1463,8 +1517,12 @@ fn relayed(raw_status: u16, message: &str) -> Response {
 
 // ─────────────────────────── Política de acciones del usuario (ADR-0172) ───────────────────────────
 //
-// Ver y descargar es siempre posible con sesión. Lo que MODIFICA (subir, renombrar, borrar) depende
-// de quién sea el dueño de la carpeta:
+// Reading (list, open, download) asks for a session, and the hub's own folders (`_*`) and the apps'
+// tree (`modules/…`) for an owner or an administrator: they hold the hub's request log and the
+// records sent to the tax agency with the customers' data (hub#2495, `read_requires_admin`). Every
+// other folder is read by any session — the till paints its product photos for the cashier.
+//
+// Lo que MODIFICA (subir, renombrar, borrar) depende de quién sea el dueño de la carpeta:
 //
 //   `_logs/`, `_system/`      → solo lectura. Son el rastro del propio Hub y tienen retención
 //                               automática; borrarlos a mano solo serviría para taparlo.
@@ -1545,6 +1603,27 @@ pub fn module_folder_of(rel: &str) -> Option<&str> {
     let rest = trimmed.strip_prefix(MODULES_ROOT)?.strip_prefix('/')?;
     let folder = rest.split('/').next().unwrap_or("");
     (!folder.is_empty()).then_some(folder)
+}
+
+/// `true` when only an owner or an administrator may READ `rel` (hub#2495): a folder of the hub
+/// (first segment starting with `_`: `_logs`, `_system`, `_import_tmp`…) or anything under the apps'
+/// tree (`modules`, `modules/<folder>/…`). No app declares today who else may read its files, and the
+/// only one that keeps files there (VeriFactu) keeps fiscal evidence with customers' data.
+///
+/// The question is asked of the path as erplora.com will resolve it, not of the first characters:
+/// `\` counts as a separator and a `.` or `..` segment answers `true`, so `hospitality/../_logs/x`
+/// cannot read as a folder of the business. An administrator still passes those to erplora.com,
+/// which validates the route as it always did.
+pub fn read_requires_admin(rel: &str) -> bool {
+    let normalized = rel.replace('\\', "/");
+    let mut segments = normalized.split('/').filter(|s| !s.is_empty());
+    let Some(top) = segments.next() else {
+        return false;
+    };
+    if top == "." || top == ".." || segments.any(|s| s == "." || s == "..") {
+        return true;
+    }
+    top.starts_with('_') || top == MODULES_ROOT
 }
 
 /// Política de la ruta. `owner` es el `static_files` del módulo dueño (lo resuelve el llamante

@@ -25,8 +25,8 @@ Pasos:
 1. La persona abre **Archivos** y navega por carpetas.
 2. Abre un archivo en el visor o lo descarga.
 Entra: la carpeta o la ruta; sesión de usuario de cualquier perfil. Una llave de API no entra.
-Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura). Todo usuario con sesión puede leer cualquier carpeta, incluidos `_logs` (registro de peticiones) y los XML de Verifactu: no hay permiso de lectura por fichero: la política de carpetas de HUB-F246 solo regula escribir. El alcance es el negocio propio.
-Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401.
+Sale: el listado (carpetas, ficheros, cuota y qué acciones permite cada carpeta) y los bytes, que el hub pide al almacenamiento de erplora.com y entrega (tope de 25 MiB, 8 descargas a la vez). Para que una imagen del TPV se cargue sin cabecera, el hub da una cookie de solo lectura (`erplora_media`, `HttpOnly`, `Secure`, `SameSite=Strict`, solo para la puerta de lectura), que pasa por la misma regla. Leer sigue la regla de las carpetas (hub#2495): las del propio hub (las que empiezan por `_`: `_logs`, el registro de peticiones; `_system`, la actividad) y todo el árbol de las apps (`modules`, donde VeriFactu guarda los XML enviados a Hacienda con el NIF y el nombre de los clientes) solo las lee el propietario o un administrador (permiso `hub.administer`); cualquier otra carpeta del negocio (fotos de producto, cabeceras de WhatsApp, lo que sube una persona) la lee cualquier sesión. A quien no administra, el árbol del listado ni siquiera le nombra esas carpetas. Ninguna app declara hoy quién más puede leer sus archivos. El alcance es el negocio propio.
+Si falla: hub sin credencial de máquina o nube caída, 424 con código; sin sesión, 401; quien no administra pide una carpeta o un archivo del hub o de una app (también escrito con `..`, `.` o `\`), 403 `forbidden`, antes de pedir nada a erplora.com.
 Implicados: HUB_SHELL-F130, HUB_SHELL-F132, WHATSAPP_INBOX-F06, SAAS_DASHBOARD-F67, SAAS_DASHBOARD-F68
 QA: ninguno
 
@@ -182,8 +182,8 @@ QA: ninguno
   `apikey:<id>` si la orden llegó con una llave), tipo e instante; sin nombre. Viaja a erplora.com en
   el latido (HUB-F164) y se borra cuando erplora.com lo confirma (HUB-F254).
 - El almacenamiento de archivos (en erplora.com): los XML de Verifactu con NIF y nombre de clientes,
-  los adjuntos, las fotos de perfil y `_logs` (registro de peticiones); lo lee cualquier sesión
-  (HUB-F245).
+  los adjuntos, las fotos de perfil y `_logs` (registro de peticiones); `_logs`, `_system` y los XML
+  de Verifactu solo los lee el propietario o un administrador, el resto cualquier sesión (HUB-F245).
 - Lo que el hub vacía al borrar a una persona: `_event_outbox`, `_flow_runs`, `_flow_run_steps` y
   `_flow_approvals` terminales (HUB-F249). Lo que **no** alcanza —la cola de impresión con el HTML de
   cada documento, sin purga; los localizadores públicos (`_public_claim`), sin purga de caducados;
@@ -200,14 +200,16 @@ QA: ninguno
 
 ## Reglas que no se rompen
 
-- Leer archivos: cualquier sesión del hub, cajero incluido, lee cualquier carpeta; la política de
-  carpetas solo regula escribir (hueco, HUB-F245).
+- Leer archivos: las carpetas del propio hub (`_*`) y el árbol de las apps (`modules`) solo las lee
+  el propietario o un administrador, y el árbol que recibe otra sesión no las nombra; las demás
+  carpetas del negocio, cualquier sesión (HUB-F245).
 - El borrado de una persona vacía (no borra la fila) y solo lo terminal; lo pendiente y lo atascado
   no se toca (HUB-F249).
 
 ## Lo que NO hace, a propósito
 
-- No copia archivos ni da permiso de lectura por fichero.
+- No copia archivos ni da permiso de lectura por fichero; una app no puede abrir a su personal la
+  lectura de su carpeta (solo el propietario o un administrador la lee).
 - No purga la cola de impresión.
 - Los 90 días de retención no son configurables (HUB-F253).
 
