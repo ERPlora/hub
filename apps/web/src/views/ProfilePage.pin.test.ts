@@ -182,4 +182,40 @@ describe('«Mi perfil» → cambiar mi PIN (hub#1430)', () => {
     expect(errorText).not.toContain('the current PIN does not match');
     expect(errorText).toBe(es.employeeForm.errors.pin_current_mismatch);
   });
+
+  // hub#2499 — the door now spends a budget of tries per person (`429 too_many_attempts` with the
+  // wait). Before, that refusal fell through to the generic «could not save» toast: the person was
+  // told nothing about waiting, and kept retrying into the lock.
+  it('says how long to wait once the PIN-change tries are spent (429 too_many_attempts)', async () => {
+    stubRuntime(true, async () =>
+      new Response(JSON.stringify({ ok: false, code: 'too_many_attempts', retry_after_secs: 240 }), {
+        status: 429,
+      }),
+    );
+    const wrapper = await mountProfile();
+
+    wrapper.vm.currentPin = '1379';
+    wrapper.vm.newPin = '8246';
+    wrapper.vm.confirmPin = '8246';
+    await wrapper.vm.savePin();
+    await flushPromises();
+
+    const plural = es.profile.pinTooManyAttempts.split('|')[1].trim();
+    expect(pinInput(wrapper, es.profile.newPin)?.props('errorText')).toBe(plural.replace('{minutes}', '4'));
+  });
+
+  it('without the wait in the response, says «a few minutes»', async () => {
+    stubRuntime(true, async () =>
+      new Response(JSON.stringify({ ok: false, code: 'too_many_attempts' }), { status: 429 }),
+    );
+    const wrapper = await mountProfile();
+
+    wrapper.vm.currentPin = '1379';
+    wrapper.vm.newPin = '8246';
+    wrapper.vm.confirmPin = '8246';
+    await wrapper.vm.savePin();
+    await flushPromises();
+
+    expect(pinInput(wrapper, es.profile.newPin)?.props('errorText')).toBe(es.profile.pinTooManyAttemptsNoWait);
+  });
 });

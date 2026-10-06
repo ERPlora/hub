@@ -583,6 +583,10 @@ export default {
     setPin: 'Set PIN',
     pinSaved: 'PIN updated',
     pinMismatch: 'The two PINs do not match.',
+    // hub#2499: every try spends the budget, the accepted ones too — so not «failed attempts».
+    pinTooManyAttempts:
+      'Too many PIN change attempts. Wait {minutes} minute and try again. | Too many PIN change attempts. Wait {minutes} minutes and try again.',
+    pinTooManyAttemptsNoWait: 'Too many PIN change attempts. Wait a few minutes and try again.',
   },
   // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
   // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,

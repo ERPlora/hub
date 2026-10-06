@@ -84,7 +84,7 @@ Implicados: HUB_SHELL-F02, REC_ALTA-F07, SAAS_AUTH-F19, SAAS_DASHBOARD-F04, SAAS
 QA: ninguno
 
 ### HUB-F132 Elegir o cambiar el propio PIN
-Estado: parcial — al cambiar el PIN el hub dice si el número «ya lo usa otra persona», sin freno por intentos: se puede averiguar el PIN de otro (ERPlora/hub#2499)
+Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: HUB_SHELL: Mi perfil
 Pasos:
@@ -93,8 +93,8 @@ Pasos:
 3. Escribe el nuevo dos veces y lo guarda.
 4. Desde ese momento el hub le deja entrar con él en los dispositivos de confianza; la rejilla del pinpad no la enseña hasta que se recarga la pantalla.
 Entra: la sesión de la persona (solo puede tocar su propio PIN); el número de dígitos del negocio (4 o 6).
-Sale: el PIN guardado como huella (argon2id) en su ficha; el anterior deja de valer. No se avisa a erplora.com. Esta puerta no tiene freno por intentos (ni por nombre ni por dirección), y su rechazo «ya lo tiene otro usuario activo» dice si un PIN es de alguien: es un hueco de seguridad (ver huecos).
-Si falla: PIN actual que no coincide, «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; dígitos repetidos o seguidos (1111, 1234), «Ese PIN se adivina a la primera…»; PIN que ya usa otra persona activa, «Ese PIN ya lo tiene otro usuario activo…»; longitud distinta de la del negocio, el aviso de dígitos. La ficha del dueño de la cuenta solo la cambia él (HUB-F148), pero esta puerta es la suya.
+Sale: el PIN guardado como huella (argon2id) en su ficha; el anterior deja de valer. No se avisa a erplora.com. Como el PIN es único, el rechazo «ya lo tiene otro usuario activo» dice que ese número es de alguien; por eso esta puerta gasta el mismo presupuesto que la entrada (HUB-F135): 5 intentos en 5 minutos por persona, contando también los que se aceptan, y agotado no mira el número (ERPlora/hub#2499).
+Si falla: PIN actual que no coincide, «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; dígitos repetidos o seguidos (1111, 1234), «Ese PIN se adivina a la primera…»; PIN que ya usa otra persona activa, «Ese PIN ya lo tiene otro usuario activo…»; longitud distinta de la del negocio, el aviso de dígitos; con los 5 intentos gastados, «Demasiados intentos de cambiar el PIN. Espera {minutes} minutos y vuelve a intentarlo.» (429 `too_many_attempts`), sin decir si el número estaba libre. La ficha del dueño de la cuenta solo la cambia él (HUB-F148), pero esta puerta es la suya.
 Implicados: HUB_SHELL-F03, HUB_SHELL-F22, HUB_SHELL-F85
 QA: qa-hub-restaurant §7.02
 
@@ -135,7 +135,7 @@ Pasos:
 1. Cada PIN o placa erróneos cuentan contra ese nombre (o esa tarjeta): con 5 fallos seguidos, ese nombre queda bloqueado 5 minutos; un acierto pone la cuenta a cero.
 2. Además, el hub cuenta por la dirección desde la que llegan: 20 PIN o placas erróneos en 15 minutos, sea cual sea el nombre, o 20 sesiones inventadas distintas, bloquean el PIN y la placa a toda esa dirección durante 15 minutos.
 3. Quien ya tiene sesión abierta sigue trabajando: el bloqueo solo cierra las puertas de PIN y placa.
-4. La aprobación con el PIN de un responsable (HUB-F152) cuenta en el mismo contador por nombre, pero **no** pasa por el freno por dirección (ni lo consulta ni le suma fallos); con placa, la aprobación cuenta contra el número leído y el acceso contra su índice, así que son dos contadores para la misma tarjeta. El cambio del propio PIN (HUB-F132) no tiene freno.
+4. La aprobación con el PIN de un responsable (HUB-F152) cuenta en el mismo contador por nombre, pero **no** pasa por el freno por dirección (ni lo consulta ni le suma fallos); con placa, la aprobación cuenta contra el número leído y el acceso contra su índice, así que son dos contadores para la misma tarjeta. El cambio del propio PIN (HUB-F132) tiene su propio presupuesto por persona (no por nombre ni por dirección): 5 intentos en 5 minutos contados desde el primero, cuentan también los aceptados (un PIN aceptado también informa) y entrar bien con el PIN no lo pone a cero.
 Entra: los rechazos de las puertas de PIN y placa (y, solo por nombre, de la aprobación); la dirección del último salto del proxy (`X-Forwarded-For`); sin esa cabecera no hay freno por dirección.
 Sale: la respuesta `too_many_attempts` (429) con los segundos que faltan; una línea de registro `event=auth_failed` por fallo (con la dirección y, para sesiones, una huella del token, nunca el token) para que el borde pueda banear. Los contadores viven en memoria: un reinicio los pone a cero.
 Si falla: detrás de una misma dirección pública (CGNAT, wifi de un centro comercial) veinte fallos ajenos cierran el PIN a toda la tienda 15 minutos; se pasa solo. La pantalla lo dice con «Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.».

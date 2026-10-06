@@ -131,7 +131,7 @@ Pasos:
 4. En la lista, la columna «Acceso» de esa persona dice «PIN local» (o «PIN + placa»).
 Entra: el PIN nuevo; el número de dígitos del negocio, que sale del arranque de la pantalla.
 Sale: pide al servidor la edición con solo el PIN (HUB-F148). La ficha no comprueba el PIN antes de guardar (solo limita los dígitos que caben): lo valida el hub. Cambiar la longitud del negocio (HUB_SHELL-F100) no toca los PIN ya puestos. El PIN de uno mismo se cambia en **Mi perfil** (acceso y navegación), no aquí.
-Si falla: un PIN de otra longitud sale bajo el campo («El PIN debe tener {n} dígitos.»); uno fácil («Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).») o ya usado («Ese PIN ya lo tiene otro usuario activo…») sale en el aviso rojo de arriba. Este último confirma a quien edita que ese número es el PIN de alguien (ERPlora/hub#2499). El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
+Si falla: un PIN de otra longitud sale bajo el campo («El PIN debe tener {n} dígitos.»); uno fácil («Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).») o ya usado («Ese PIN ya lo tiene otro usuario activo…») sale en el aviso rojo de arriba. Este último confirma a quien edita que ese número es el PIN de alguien, sin freno por intentos (ERPlora/hub#2518). El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
 Implicados: HUB-F132, HUB-F148, STAFF-F03, REC_ALTA-F15, REC_ALTA-F16
 QA: qa-hub-restaurant §6
 
@@ -506,4 +506,4 @@ Se resuelven con `market-decision`; no las decide el worker.
   «Usuarios → API keys», que hoy es Empleados › API keys.
 - Manual `hand-book/hub/03-personas-y-permisos.md`: «Lista vacía con opción de alta» y «Perfil: PIN
   propio». Cierto; el PIN propio es de Mi perfil (HUB_SHELL-F22, área de acceso, que recoge además el
-  oráculo del PIN de otros, hub#2499).
+  oráculo del PIN de otros, que en Empleados sigue sin freno, hub#2518).

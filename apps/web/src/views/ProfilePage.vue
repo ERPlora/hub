@@ -274,6 +274,7 @@ import { availableLocales } from '../i18n';
 import { getAccessToken, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
 import { HUB_USERS_ERROR_PREFIX, isGuessablePin } from '../lib/hub-users';
+import { lockRefusal } from '../lib/lock-refusal';
 import { openExternal } from '../lib/open-external';
 import { hubPinLength } from '../lib/pin-length';
 import { saasDoor } from '../lib/saas-door';
@@ -322,9 +323,11 @@ const currentPin = ref('');
 const newPin = ref('');
 const confirmPin = ref('');
 const pinSaving = ref(false);
-// '' | 'length' | 'clientMismatch' (comprobados aquí) | el tail de un código `hub.users.*` que
-// devolvió el runtime (`pin_too_simple`, `pin_in_use`, `pin_current_mismatch`…).
+// '' | 'length' | 'clientMismatch' (checked here) | the tail of a `hub.users.*` code the runtime
+// returned (`pin_too_simple`, `pin_in_use`, `pin_current_mismatch`…) | 'tooManyAttempts'
+// (hub#2499: the door's budget of tries is spent; the wait travels in `pinLockMinutes`).
 const pinErrorCode = ref('');
+const pinLockMinutes = ref<number | undefined>(undefined);
 const pinError = computed<string>(() => {
   switch (pinErrorCode.value) {
     case '':
@@ -333,6 +336,10 @@ const pinError = computed<string>(() => {
       return t('employeeForm.errors.pin_length', { n: hubPinLength.value });
     case 'clientMismatch':
       return t('profile.pinMismatch');
+    case 'tooManyAttempts':
+      return pinLockMinutes.value === undefined
+        ? t('profile.pinTooManyAttemptsNoWait')
+        : t('profile.pinTooManyAttempts', { minutes: pinLockMinutes.value }, pinLockMinutes.value);
     default:
       return t(`employeeForm.errors.${pinErrorCode.value}`);
   }
@@ -381,7 +388,10 @@ async function savePin(): Promise<void> {
     await toast(t('profile.pinSaved'), 'success');
   } catch (error) {
     const key = pinErrorKeyFrom(error);
-    if (key) {
+    if ((error as { code?: string } | null)?.code === 'too_many_attempts') {
+      pinLockMinutes.value = lockRefusal(error).minutes;
+      pinErrorCode.value = 'tooManyAttempts';
+    } else if (key) {
       pinErrorCode.value = key;
     } else {
       await toast(t('profile.saveError'), 'danger');
