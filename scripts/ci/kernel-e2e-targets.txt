@@ -28,6 +28,7 @@ blueprint_seed_reglas_no_duplican
 capability_denied_listener_e2e
 dashboard_widgets_e2e
 emit_schema_contract_hub1076
+erasure_owner_gate_hub2485
 export_test
 fixture_quantities_match_the_published_grid
 import_no_duplica_lo_sembrado
