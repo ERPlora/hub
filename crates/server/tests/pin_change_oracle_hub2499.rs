@@ -14,7 +14,9 @@
 //!  - refusals (`pin_current_mismatch`, `pin_in_use`) spend the same budget;
 //!  - the lock is the prober's: a colleague still changes their own PIN;
 //!  - signing in again does not lift it (the key is the person, not the pinpad's name counter that
-//!    a successful login clears).
+//!    a successful login clears);
+//!  - the budget is this door's alone: the pinpad counts against whatever NAME the caller types,
+//!    so a name spelt like this door's key neither locks somebody's PIN change nor refills it.
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
@@ -28,7 +30,9 @@ use tower::ServiceExt;
 const HUB: &str = "hub-pin-oracle";
 const PROBER: &str = "Nora Vega";
 const PROBER_PIN: &str = "1379";
+const VICTIM: &str = "Marta Ruiz";
 const VICTIM_PIN: &str = "4917";
+const ACCOMPLICE_PIN: &str = "9053";
 /// Free, non-guessable PINs the prober rotates through (none repeats a digit run nor matches
 /// [`VICTIM_PIN`]). One more than the budget, so a test can always ask for one past it.
 const FREE_PINS: [&str; 6] = ["8246", "3058", "6193", "7402", "5817", "2964"];
@@ -40,6 +44,14 @@ async fn body_json(response: axum::response::Response) -> Value {
 
 /// Router + the prober's session + the victim's session, both employees of the same hub.
 async fn fixture() -> (axum::Router, String, String) {
+    fixture_with(|_| None).await
+}
+
+/// [`fixture`] plus, when `accomplice` names one, a third person called whatever it returns for
+/// the prober's id, holding [`ACCOMPLICE_PIN`].
+async fn fixture_with(
+    accomplice: impl Fn(&str) -> Option<String>,
+) -> (axum::Router, String, String) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -47,8 +59,13 @@ async fn fixture() -> (axum::Router, String, String) {
         .create_user(PROBER, PROBER_PIN, "employee", None)
         .await
         .unwrap();
+    if let Some(name) = accomplice(&prober) {
+        rt.create_user(&name, ACCOMPLICE_PIN, "employee", None)
+            .await
+            .unwrap();
+    }
     let victim = rt
-        .create_user("Marta Ruiz", VICTIM_PIN, "admin", None)
+        .create_user(VICTIM, VICTIM_PIN, "admin", None)
         .await
         .unwrap();
     let prober_session = rt.create_session(&prober, 3600, None).await.unwrap();
@@ -116,6 +133,28 @@ async fn pin_login(router: &axum::Router, name: &str, pin: &str) -> axum::respon
         )
         .await
         .unwrap()
+}
+
+/// A person's id as the pinpad grid hands it out — to anybody, no session needed.
+async fn grid_id(router: &axum::Router, name: &str) -> String {
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/context")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    body["pin_users"]
+        .as_array()
+        .and_then(|users| users.iter().find(|u| u["name"] == name))
+        .and_then(|u| u["id"].as_str())
+        .unwrap_or_else(|| panic!("{name} is on the grid: {body}"))
+        .to_string()
 }
 
 /// Rotates the prober's PIN `n` times through [`FREE_PINS`], each accepted; returns the PIN the
@@ -219,4 +258,53 @@ async fn signing_in_again_does_not_lift_the_lock() {
         .expect("a session token")
         .to_string();
     assert_locked(set_pin(&router, &fresh, VICTIM_PIN, held).await).await;
+}
+
+/// How this door's key could be spelt as a NAME at the pinpad: the bare id, or the id behind the
+/// prefix the first cut of the fix used. Neither may reach the budget.
+fn spellings(id: &str) -> [String; 2] {
+    [id.to_string(), format!("pin_change:{id}")]
+}
+
+/// The pinpad counts wrong PINs against whatever NAME the caller types, and the grid hands out
+/// everybody's id without a session. Were this door's key a name in the pinpad's map, five wrong
+/// PINs typed under it would lock that person out of changing their PIN — again every five
+/// minutes, for as long as somebody kept typing, and never enough to trip the per-address guard.
+#[tokio::test]
+async fn wrong_pins_at_the_pinpad_do_not_lock_somebodys_pin_change() {
+    let (router, _, victim) = fixture().await;
+    for name in spellings(&grid_id(&router, VICTIM).await) {
+        for _ in 0..MAX_FAILURES {
+            let guess = pin_login(&router, &name, "0007").await;
+            assert_eq!(guess.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    let own = set_pin(&router, &victim, FREE_PINS[0], VICTIM_PIN).await;
+    assert_eq!(
+        own.status(),
+        StatusCode::OK,
+        "nobody was probing this door: {}",
+        body_json(own).await
+    );
+}
+
+/// The other direction of the same collision: a successful pinpad login clears the counter of the
+/// NAME typed. With somebody on the staff list called like the prober's key, signing them in would
+/// hand the prober a fresh budget every four probes.
+#[tokio::test]
+async fn a_sign_in_under_a_name_spelt_like_the_key_does_not_refill_the_budget() {
+    for spelling in 0..2 {
+        let (router, prober, _) = fixture_with(|id| Some(spellings(id)[spelling].clone())).await;
+        let name = spellings(&grid_id(&router, PROBER).await)[spelling].clone();
+        let held = rotate(&router, &prober, MAX_FAILURES as usize - 1).await;
+
+        let login = pin_login(&router, &name, ACCOMPLICE_PIN).await;
+        assert_eq!(login.status(), StatusCode::OK, "{name} signs in");
+
+        // The fifth try is still the fifth: it is answered, and the one after it is not.
+        let fifth = set_pin(&router, &prober, VICTIM_PIN, held).await;
+        assert_eq!(fifth.status(), StatusCode::CONFLICT, "as {name}");
+        assert_locked(set_pin(&router, &prober, VICTIM_PIN, held).await).await;
+    }
 }

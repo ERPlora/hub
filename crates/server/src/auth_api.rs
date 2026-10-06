@@ -650,9 +650,11 @@ pub(crate) struct SetPinReq {
 /// colleague's, then try it against the names on the pinpad grid. It spends the pinpad's budget
 /// (five tries, five minutes) against the PERSON, and every try counts, the accepted ones too: an
 /// accepted number becomes the prober's PIN and they carry on, so counting only refusals would
-/// still hand out a taken PIN per refusal. The key is the user id, not the pinpad's name counter,
-/// which a successful login clears. No per-address guard here: the caller holds a session that
-/// resolves, and the person is a key they cannot rotate the way an attacker rotates names.
+/// still hand out a taken PIN per refusal. The key is the user id, in a map of this door's own
+/// (`pin_change_throttle`): the pinpad's counter is keyed by whatever name the caller types, a
+/// successful login clears it, and five wrong PINs under a name lock it — none of which may reach
+/// this budget. No per-address guard here: the caller holds a session that resolves, and the
+/// person is a key they cannot rotate the way an attacker rotates names.
 pub(crate) async fn auth_set_pin(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -672,11 +674,10 @@ pub(crate) async fn auth_set_pin(
         Err(e) => return err_response(e),
     };
     // Checked BEFORE the runtime looks at the digits: a locked caller gets no taken/free signal.
-    let throttle_key = format!("pin_change:{}", user.id);
-    if let Some(retry_after_secs) = st.login_throttle.locked_for(&throttle_key) {
+    if let Some(retry_after_secs) = st.pin_change_throttle.locked_for(&user.id) {
         return too_many_attempts(retry_after_secs);
     }
-    st.login_throttle.record_attempt(&throttle_key);
+    st.pin_change_throttle.record_attempt(&user.id);
     match rt
         .set_pin(&user.id, req.current_pin.as_deref(), &req.pin)
         .await
