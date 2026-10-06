@@ -191,7 +191,7 @@ Implicados: HUB_SHELL-F09, HUB_SHELL-F195
 QA: qa-hub-restaurant §7.02, L-13
 
 ### HUB-F139 Marcar un dispositivo como compartido o personal
-Estado: hecho
+Estado: parcial — sin haber entrado, el hub dice de cualquier identificador de dispositivo que le presenten si es de confianza, no solo del que pregunta (ERPlora/hub#2551)
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › General
 Pasos:

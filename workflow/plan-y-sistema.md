@@ -46,7 +46,7 @@ Implicados: HUB_SHELL-F12, REC_ALTA-F06, SAAS_DASHBOARD-F28
 QA: ninguno
 
 ### HUB-F161 Decir si el hub está listo para servir
-Estado: parcial — la respuesta, sin sesión, lleva la versión y los errores internos tal como salen (ERPlora/hub#2510), y queda retenida mientras se instala o actualiza una aplicación (ERPlora/hub#2508)
+Estado: parcial — la respuesta, sin sesión, lleva la versión y los errores internos tal como salen (ERPlora/hub#2549), y queda retenida mientras se instala o actualiza una aplicación (ERPlora/hub#2508)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
