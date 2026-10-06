@@ -416,8 +416,10 @@ Cada área tiene su tabla (elemento de la referencia → estado → flujo) en su
 falta, por área:
 
 - Módulos y órdenes ([modulos.md](workflow/modulos.md),
-  [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md)): seguir cobrando mientras se instala o
-  actualiza una app; que una orden repetida no se ejecute dos veces; la factura pedida desde el tique.
+  [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md)): seguir cobrando mientras otra copia
+  del hub se pone al día con una app (instalar y actualizar ya no paran la caja) y un tope total de
+  tiempo para instalar; que una orden repetida no se ejecute dos veces; la factura pedida desde el
+  tique.
 - Avisos ([avisos.md](workflow/avisos.md)): avisar a quien lanzó lo que falló; tareas programadas con
   estado visible.
 - Automatizaciones ([automatizaciones.md](workflow/automatizaciones.md)): reanudar desde el paso que
