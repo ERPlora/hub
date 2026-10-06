@@ -318,3 +318,9 @@ appointments/tests/busy_agenda_booking.hub.test.py
 # coverage, not moved.
 # pending-publication: appointments#288 until 2026-11-02
 appointments/tests/recurring_create_eligibility.hub.test.py
+# appointments: a daily series with more dates than one run books (80 on the default 90-day
+# window) is booked WHOLE by following the handler's `next_from` like «Book appointments» does —
+# the 50-per-run cap says where the next run starts instead of dropping the rest — and a second
+# tap books nothing twice, against the real kernel (appointments#299). New coverage, not moved.
+# pending-publication: appointments#312 until 2026-11-05
+appointments/tests/series_past_fifty.hub.test.py
