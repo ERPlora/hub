@@ -322,7 +322,7 @@ QA: BD-01, BD-02
 | Desinstalar conservando los datos | hecho | HUB-F29 |
 | Borrar los datos de una app desinstalada | no hecho, a propósito | — |
 | Permisos de la app concedidos por el dueño | hecho | HUB-F32 |
-| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor; quien no puede leerlos (empleados de Venta e Inventario) ve los de fábrica | HUB-F33 |
+| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor | HUB-F33 |
 | Paneles de Inicio por app | parcial: un panel sin permiso sale «No disponible» en vez de ocultarse | HUB-F34 |
 | Lista de puesta en marcha | hecho | HUB-F35 |
 
