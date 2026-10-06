@@ -184,7 +184,11 @@ impl ModuleStorage for ModuleMediaStorage {
         };
         let url = format!("{}/api/v1/hub/device/media/", self.base_url);
         let headers = cloud_client::CloudClient::new(&self.base_url).headers_for(&url, &auth);
-        let mut request = self.http.post(&url).multipart(form).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
+        let mut request = self
+            .http
+            .post(&url)
+            .multipart(form)
+            .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
         for (key, value) in headers {
             request = request.header(key, value);
         }

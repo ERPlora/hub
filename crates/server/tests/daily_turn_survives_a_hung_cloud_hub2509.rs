@@ -24,7 +24,8 @@ use erplora_server::daily_usage::{
 };
 use erplora_server::entitlement::fetch_verified_claims;
 use erplora_server::{
-    AppState, AuthMode, HubConfig, CLOUD_CALL_TIMEOUT, CLOUD_CONNECT_TIMEOUT, CLOUD_TRANSFER_TIMEOUT,
+    AppState, AuthMode, HubConfig, CLOUD_CALL_TIMEOUT, CLOUD_CONNECT_TIMEOUT,
+    CLOUD_TRANSFER_TIMEOUT,
 };
 use tokio::io::AsyncReadExt;
 
@@ -295,10 +296,7 @@ async fn assistant_stream_pausing(pause: Duration) -> (String, axum::body::BodyD
     rt.ensure_system_tables().await.unwrap();
     let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&admin, 3600, None).await.unwrap();
-    let router = erplora_server::app(AppState::with_config(
-        rt,
-        config(format!("http://{addr}")),
-    ));
+    let router = erplora_server::app(AppState::with_config(rt, config(format!("http://{addr}"))));
 
     let response = router
         .oneshot(
@@ -341,7 +339,14 @@ async fn read_to_end(body: &mut axum::body::BodyDataStream) -> String {
             None => return rest,
         }
     }
-    let tail: String = rest.chars().rev().take(300).collect::<Vec<_>>().into_iter().rev().collect();
+    let tail: String = rest
+        .chars()
+        .rev()
+        .take(300)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
     panic!("the assistant stream never ended: {MAX_FRAMES} frames and still going, last: {tail}");
 }
 
@@ -354,7 +359,10 @@ async fn the_assistant_stream_outlives_the_shared_ceiling() {
     let started = tokio::time::Instant::now();
     text.push_str(&read_to_end(&mut body).await);
 
-    assert!(started.elapsed() >= pause, "the pause did not happen: {text}");
+    assert!(
+        started.elapsed() >= pause,
+        "the pause did not happen: {text}"
+    );
     assert!(
         text.contains("second") && !text.contains("\"type\":\"error\""),
         "the stream was cut at the shared ceiling instead of reaching its end: {text}"
@@ -410,7 +418,10 @@ async fn a_connection_that_never_completes_is_given_up_at_the_connect_limit() {
         tokio::spawn(async move { fetch_verified_claims(&state.http, &base, &machine(), 0).await });
     let reached = tokio::time::Instant::now() + Duration::from_secs(10);
     while held.lock().unwrap().is_empty() {
-        assert!(tokio::time::Instant::now() < reached, "the call never reached erplora.com");
+        assert!(
+            tokio::time::Instant::now() < reached,
+            "the call never reached erplora.com"
+        );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     tokio::time::pause();
@@ -419,7 +430,10 @@ async fn a_connection_that_never_completes_is_given_up_at_the_connect_limit() {
         .expect("the plan check is still connecting an hour later (hub#2509)")
         .unwrap();
 
-    assert!(outcome.is_err(), "a connection that never completes is a failed check");
+    assert!(
+        outcome.is_err(),
+        "a connection that never completes is a failed check"
+    );
     let waited = started.elapsed();
     assert!(
         waited >= CLOUD_CONNECT_TIMEOUT && waited < CLOUD_CALL_TIMEOUT,

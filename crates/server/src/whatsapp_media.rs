@@ -110,7 +110,10 @@ pub(crate) async fn whatsapp_media(
     };
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let req = cloud.whatsapp_media(&auth, &media_id);
-    let mut call = st.http.get(&req.url).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
+    let mut call = st
+        .http
+        .get(&req.url)
+        .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
     for (k, v) in cloud.headers_for(&req.url, &auth) {
         call = call.header(k, v);
     }

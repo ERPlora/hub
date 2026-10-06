@@ -165,7 +165,11 @@ pub(crate) async fn assistant_chat_stream(
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let req = cloud.assistant_chat_stream(&auth);
     // The stream outlives the shared client's ceiling (hub#2509): it asks for the transfer one.
-    let mut r = st.http.post(&req.url).json(&body).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
+    let mut r = st
+        .http
+        .post(&req.url)
+        .json(&body)
+        .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
     for (k, v) in &req.headers {
         r = r.header(*k, v);
     }

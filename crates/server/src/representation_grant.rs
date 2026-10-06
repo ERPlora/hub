@@ -405,7 +405,10 @@ pub async fn forward_capture(
         );
     }
 
-    let mut sent = http.post(&request.url).multipart(form).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
+    let mut sent = http
+        .post(&request.url)
+        .multipart(form)
+        .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
     for (name, value) in request.headers {
         sent = sent.header(name, value);
     }

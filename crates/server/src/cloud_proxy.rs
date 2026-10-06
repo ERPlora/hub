@@ -950,7 +950,13 @@ pub(crate) async fn fetch_blueprint(
     let version = info["version"].as_str().unwrap_or_default().to_string();
 
     // 2) Descarga directa de Object Storage (URL prefirmada: sin credenciales nuestras).
-    let zip = match st.http.get(url).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT).send().await {
+    let zip = match st
+        .http
+        .get(url)
+        .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT)
+        .send()
+        .await
+    {
         Ok(r) if r.status().is_success() => r
             .bytes()
             .await
