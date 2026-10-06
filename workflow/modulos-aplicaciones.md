@@ -204,7 +204,7 @@ Estado: parcial — forzar deja activas las apps que dependen de la quitada; en 
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
-1. Un administrador pide desinstalar una app.
+1. Un administrador pide desinstalar una app. Si hay otro cambio de apps en curso (instalar, actualizar o importar una plantilla), espera su turno en la misma cola (HUB-F19).
 2. El hub aplica, por este orden, el candado del proveedor fiscal, la pregunta al motor de la app (HUB-F28) y, salvo que se pida forzar, la comprobación de dependientes: si otras apps instaladas la necesitan, apagadas o no, lo niega y las nombra.
 3. La pantalla de Apps enseña antes las apps que dependen de ella y, si la persona confirma su pregunta de desinstalar, ya manda forzar (`force: true`): no hay un segundo paso «quitarla igualmente». Forzar solo se salta la comprobación de dependientes; los candados fiscales siguen, pero solo miran la app quitada. Las dependientes quedan activas y registradas sin su dependencia: en el siguiente arranque fallan con `missing_dependency`, la re-descarga de cada una vuelve a instalar la app quitada en su última versión y, sin catálogo, su copia local falla y la salud del hub queda en rojo.
 4. Quita sus consultas, órdenes, menú y tareas programadas, olvida los roles que solo ella declaraba (las personas conservan su rol), borra su fila y su copia guardada, y quita sus textos del índice del asistente.

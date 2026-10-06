@@ -64,6 +64,16 @@ enum Hold {
     Versions,
     /// The zip, after a first chunk.
     Download,
+    /// The zip of an app that came in erplora.com's install plan: the path production takes (the
+    /// other three leave the hub resolving by manifest, because their marketplace has no plan).
+    PlannedDownload,
+}
+
+impl Hold {
+    /// Whether a marketplace built with this choice keeps the answer `stage` waiting.
+    fn holds(self, stage: Hold) -> bool {
+        self == stage || (self == Hold::PlannedDownload && stage == Hold::Download)
+    }
 }
 
 /// What the test sees of the marketplace: `held` flips when a held answer starts waiting,
@@ -93,16 +103,17 @@ impl Marketplace {
     }
 }
 
-/// A marketplace with no install plan that publishes `version` and holds the answer `hold`. The
-/// zip is not a real one, so the install fails its checksum: what is under test is what the REST
-/// of the hub does meanwhile, not the install's outcome.
+/// A marketplace that publishes `version` and holds the answer `hold`; it has no install plan
+/// unless `hold` is [`Hold::PlannedDownload`], where the plan is the app asked for. The zip is not
+/// a real one, so the install fails its checksum: what is under test is what the REST of the hub
+/// does meanwhile, not the install's outcome.
 async fn a_marketplace_that_holds(hold: Hold, version: &'static str) -> (String, Marketplace) {
     use axum::routing::{get, post};
     use futures_util::StreamExt;
 
     let market = Marketplace::default();
     let wait = move |stage: Hold, market: Marketplace| async move {
-        if stage == hold {
+        if hold.holds(stage) {
             market.held.store(true, Ordering::SeqCst);
             market.release.notified().await;
         }
@@ -112,9 +123,28 @@ async fn a_marketplace_that_holds(hold: Hold, version: &'static str) -> (String,
             "/api/v1/marketplace/install-plan/",
             post({
                 let market = market.clone();
-                move || async move {
+                move |axum::Json(asked): axum::Json<Value>| async move {
+                    use axum::response::IntoResponse;
+                    if hold == Hold::PlannedDownload {
+                        return axum::Json(json!({
+                            "requested": asked["module_id"],
+                            "plan": [{
+                                "module_id": asked["module_id"],
+                                "version": version,
+                                "sha256": "0".repeat(64),
+                                "tier": "free",
+                                "entitled": true,
+                                "requires_purchase": false,
+                                "reason": "requested",
+                            }],
+                            "already_satisfied": [],
+                            "blocked": false,
+                            "blocked_on": [],
+                        }))
+                        .into_response();
+                    }
                     wait(Hold::Plan, market).await;
-                    StatusCode::NOT_FOUND
+                    StatusCode::NOT_FOUND.into_response()
                 }
             }),
         )
@@ -327,7 +357,12 @@ async fn ends(gesture: &str, request: tokio::task::JoinHandle<axum::response::Re
 
 #[tokio::test]
 async fn the_hub_keeps_answering_while_an_app_installs() {
-    for hold in [Hold::Plan, Hold::Versions, Hold::Download] {
+    for hold in [
+        Hold::Plan,
+        Hold::Versions,
+        Hold::Download,
+        Hold::PlannedDownload,
+    ] {
         let (cloud, market) = a_marketplace_that_holds(hold, "1.0.0").await;
         let hub = a_hub(cloud, "install", None).await;
 
@@ -345,7 +380,7 @@ async fn the_hub_keeps_answering_while_an_app_installs() {
 
 #[tokio::test]
 async fn the_hub_keeps_answering_while_an_app_updates() {
-    for hold in [Hold::Versions, Hold::Download] {
+    for hold in [Hold::Versions, Hold::Download, Hold::PlannedDownload] {
         let (cloud, market) = a_marketplace_that_holds(hold, "2.0.0").await;
         let hub = a_hub(cloud, "update", Some("1.0.0")).await;
 
