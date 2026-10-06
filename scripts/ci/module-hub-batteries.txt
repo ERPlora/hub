@@ -73,6 +73,13 @@ sales/tests/cash_limit.hub.test.py
 # pending-publication: sales#506 until 2026-11-03
 sales/tests/refund_race.hub.test.py
 
+# sales × kitchen × combos: a set menu fired from the till reaches the kitchen as the DISHES the
+# table chose — one ticket, each dish on the station of ITS product, grouped under the menu's
+# kitchen name with the menu's note on every dish — and a supplement renamed after ordering keeps
+# the name it was ordered with, against the real kernel (sales#522). New coverage, not moved.
+# pending-publication: sales#522 until 2026-11-05
+sales/tests/combo_fire.hub.test.py
+
 # ← kitchen_e2e.rs (slice 2, hub#1342)
 kitchen/tests/combos.hub.test.py
 kitchen/tests/stations.hub.test.py
