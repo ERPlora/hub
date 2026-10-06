@@ -900,7 +900,11 @@ pub fn build_router(state: AppState, web_dir: Option<&str>) -> Router {
 /// que el dashboard derive el preset "Recomendado" de widgets (ADR-0054) + `currency`/`language`:
 /// settings del hub (tabla `hub_settings` ∪ defaults), lectura barata en el arranque del SPA para no
 /// pegar a `/api/settings` por separado. Contrato del frontend.
-pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
+///
+/// `pin_users` and `hub_id` name the team and the business, so they only reach a caller that
+/// [`may_name_the_team`] (hub#2510): anybody else gets `[]` and `null` and the rest of the boot
+/// context, which names nobody. The answer is still a 200 — the login screen must boot.
+pub(crate) async fn hub_context(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let hub_id = st.hub_id();
     // El primer login Tauri puede haber adoptado el UUID real después de arrancar Axum. Antes de
     // abrir la sesión local reconciliamos el Runtime y aplicamos las migraciones scoped del nuevo
@@ -910,18 +914,22 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (pin_users, currency, currency_decimals, language, timezone, pin_length) = {
+    let (named, pin_users, currency, currency_decimals, language, timezone, pin_length) = {
         let rt = runtime.read().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
         }
-        let pin_users: Vec<Value> = rt
-            .list_pin_users()
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
-            .collect();
+        let named = may_name_the_team(&st, &rt, &headers).await;
+        let pin_users: Vec<Value> = if named {
+            rt.list_pin_users()
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
+                .collect()
+        } else {
+            Vec::new()
+        };
         // Settings del hub: si la lectura falla (no debería), cae a los defaults del contrato para
         // no romper el arranque del SPA.
         let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));
@@ -965,6 +973,7 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
             .and_then(|v| v.as_i64())
             .unwrap_or(erplora_runtime::pin_policy::DEFAULT_PIN_LENGTH);
         (
+            named,
             pin_users,
             currency,
             currency_decimals,
@@ -981,7 +990,7 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
     let demo = st.is_dev_hub();
     let machine_registered = st.machine_registered();
     Json(json!({
-        "hub_id": hub_id,
+        "hub_id": if named { json!(hub_id) } else { Value::Null },
         "user": Value::Null,
         "pin_users": pin_users,
         "demo": demo,
