@@ -31,7 +31,7 @@
     :message="t('moduleSettings.loadErrorBody')"
   >
     <ion-button
-      slot="actions"
+      slot="action"
       size="small"
       fill="outline"
       data-testid="module-settings-retry"

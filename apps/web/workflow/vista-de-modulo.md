@@ -290,7 +290,7 @@ QA: ninguno
 | Estado «sin permiso» propio en la vista de una app | no hecho (se dice «Aquí todavía no hay nada») | HUB_SHELL-F41 |
 | Estado «necesita un hub más nuevo» en la vista | no hecho (solo al instalar/actualizar en Apps) | HUB_SHELL-F41 |
 | Pestañas y nombres traducidos, sin recargar al cambiar de idioma | hecho | HUB_SHELL-F42 |
-| Ajustes declarativos: ver | parcial (lectura fallida → valores de fábrica sin aviso) | HUB_SHELL-F43 |
+| Ajustes declarativos: ver | parcial (lectura fallida → «No se pudieron cargar» con «Reintentar», hub#2511; pero la pestaña sale también a quien no puede leerlos y las listas salen sin traducir) | HUB_SHELL-F43 |
 | Ajustes declarativos: guardar con el mismo permiso que el servidor | parcial (pantalla: solo administrador) | HUB_SHELL-F44 |
 | Ajustes: validación antes de enviar (mínimos, obligatorios) | no hecho (solo el servidor) | HUB_SHELL-F44 |
 | Probar un ajuste sin guardar | parcial (ninguna app lo declara) | HUB_SHELL-F45 |
