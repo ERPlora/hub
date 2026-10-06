@@ -74,10 +74,8 @@ async fn require_reader(st: &AppState, headers: &HeaderMap, rel: &str) -> Result
     let ctx = auth::require_user_session(headers, &st.config, &rt)
         .await
         .map_err(unauthorized)?;
-    let reads_everything = erplora_runtime::permissions::has(
-        &ctx,
-        erplora_runtime::hub_users::ADMINISTER_PERMISSION,
-    );
+    let reads_everything =
+        erplora_runtime::permissions::has(&ctx, erplora_runtime::hub_users::ADMINISTER_PERMISSION);
     if !reads_everything && read_requires_admin(rel) {
         return Err(unauthorized(auth::AuthError::Forbidden(
             "only an owner or an administrator can open this folder".into(),

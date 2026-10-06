@@ -159,7 +159,10 @@ async fn send(router: &Router, request: Request) -> (StatusCode, Value) {
         .await
         .unwrap()
         .to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// Every folder id in the tree, flattened.
@@ -196,7 +199,11 @@ async fn a_cashier_cannot_list_the_hubs_logs_nor_the_records_sent_to_the_tax_age
         for folder in RESTRICTED {
             let (status, body) = send(&hub.router, list(folder, session)).await;
             assert_eq!(status, StatusCode::FORBIDDEN, "listing {folder:?}");
-            assert_eq!(body["error"]["code"], json!("forbidden"), "listing {folder:?}");
+            assert_eq!(
+                body["error"]["code"],
+                json!("forbidden"),
+                "listing {folder:?}"
+            );
         }
     }
     assert!(
