@@ -55,7 +55,11 @@ vi.mock('./cloud', async (importOriginal) => ({
 vi.mock('./runtime', () => ({
   ensureMediaCookie: vi.fn(async () => {}),
   refreshActiveModuleIds: vi.fn(async () => {}),
+  // hub#2506: the hand-over re-reads the setup checklist and the launcher for the arriving person
+  // (pinned in `user-switch-rereads.hub2506.test.ts`); here they only need a quiet network.
+  getClient: () => ({ query: async () => null }),
 }));
+vi.mock('./module-loader', () => ({ loadMenu: async () => [], invalidateManifestCache: () => {} }));
 
 const getUserProfile = vi.fn(async () => null);
 const resetUserProfile = vi.fn();
