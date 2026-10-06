@@ -83,7 +83,7 @@ Implicados: HUB-F31
 QA: ninguno
 
 ### HUB_SHELL-F43 Ver los ajustes de una app en su pestaña «Ajustes»
-Estado: parcial — si la lectura de los valores falla, el formulario enseña los valores de fábrica como si fueran los del negocio, sin aviso: a un empleado de Ventas e Inventario le pasa siempre (su lectura exige `sales.manage_settings` / `inventory.manage_settings`), al administrador solo con un fallo pasajero (red, hub reiniciándose, 5xx); la pestaña sale a todo el mundo; y como ninguna de las 8 apps publica la traducción de sus opciones, toda lista sale con el valor interno (`chime`, `dine_in`, `ticket`)
+Estado: parcial — la pestaña sale a todo el mundo, también a quien no puede leer los ajustes (un empleado de Ventas e Inventario, cuya lectura exige `sales.manage_settings` / `inventory.manage_settings`: ve «No puedes ver estos ajustes»); y como ninguna de las 8 apps publica la traducción de sus opciones, toda lista sale con el valor interno (`chime`, `dine_in`, `ticket`)
 Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo › Ajustes
 Pasos:
@@ -91,17 +91,17 @@ Pasos:
 2. Mientras carga: «Cargando ajustes…».
 3. Ve un formulario con un campo por ajuste, en el orden del esquema de la app. El control sale del tipo: `boolean`, o `integer` con `enum:[0,1]` → interruptor (se guarda como 0/1); cualquier otro `enum` → lista; `integer` o `number` → número; todo lo demás (un `string`, pero también un `array`, un `object` o un tipo anulable como `["integer","null"]`) → caja de texto, vacía con «Escribe aquí…».
 4. Los textos los pone la app en su `locales/<idioma>.json`: el nombre en `settings.fields.<clave>.label` (si no, el `title` del esquema, y si no, la clave «humanizada»), la explicación en `…description`, el título del bloque en `settings.title` (se omite si repite el nombre de la app) y cada opción de una lista en `settings.fields.<clave>.options.<valor>` (si no, el valor crudo).
-5. Cada valor es el guardado; si no hay, el `default` del esquema; si tampoco, apagado o vacío.
+5. Cada valor es el guardado; si la app aún no tiene nada guardado (la lectura contesta sin fila), el `default` del esquema; si tampoco, apagado o vacío. Si la lectura FALLA, no se pinta el formulario (hub#2511): ni valores de fábrica ni «Guardar» (ver «Si falla»).
 6. Quien no es administrador ve los campos sin poder tocarlos y la línea «Solo un administrador puede cambiar estos ajustes.», sin botón «Guardar».
 7. Si la app trae su propia pantalla de ajustes (`settings.component`), se monta esa en lugar del formulario genérico, sin el candado de administrador. Hoy ninguna lo usa.
 Entra: el bloque `settings` del `module.json` (esquema, consulta de lectura y orden de guardar), el esquema servido con la app, las traducciones `settings` de su `locales/<idioma>.json` y la consulta de lectura (HUB-F33).
 Sale: nada.
-Si falla: si el esquema no carga, «No se pudieron cargar los ajustes.». Si es la lectura de valores la que falla, no se dice nada y se ven los de fábrica (leído en el código, sin ejecutar). En Caja, Cocina, Citas, Servicios, Personal y Mesas el empleado sí lee los valores reales. Sin traducción de un campo, su título del esquema (inglés) o el nombre de la columna «humanizado» (`Warning Time Minutes`). Un campo de tipo objeto o lista se pinta como texto y, si se edita, se guarda como cadena y el hub lo rechaza.
+Si falla: si el esquema o la lectura de valores no cargan (red, hub reiniciándose, 5xx), en lugar del formulario sale «No se pudieron cargar los ajustes.» con «Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.» y el botón «Reintentar», que vuelve a leer; no hay «Guardar», así que nada se puede guardar encima de lo que no se leyó (hub#2511, mismo patrón que los eventos caídos de Sistema, HUB_SHELL-F145). Si la lectura se rechaza por permiso (`permission_denied` o `requires_elevation`), sale «No puedes ver estos ajustes» con «Pide a un administrador que los revise o los cambie si hace falta.», sin «Reintentar» (reintentar no lo arregla). En Caja, Cocina, Citas, Servicios, Personal y Mesas el empleado sí lee los valores reales. Sin traducción de un campo, su título del esquema (inglés) o el nombre de la columna «humanizado» (`Warning Time Minutes`). Un campo de tipo objeto o lista se pinta como texto y, si se edita, se guarda como cadena y el hub lo rechaza.
 Implicados: CASH_REGISTER-F01, HUB-F33, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: ninguno
 
 ### HUB_SHELL-F44 Guardar los ajustes de una app
-Estado: parcial — la pantalla solo deja guardar al dueño o al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Ventas, Inventario, Cocina y Personal y lo hace por el asistente); la pantalla no comprueba nada antes de enviar salvo el largo máximo de un texto (ni mínimos, ni máximos, ni patrones, ni obligatorios); y como se manda el formulario entero, si el administrador guarda tras un fallo pasajero de lectura pisa todos los campos con los de fábrica (en Caja, también «Activar caja»)
+Estado: parcial — la pantalla solo deja guardar al dueño o al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Ventas, Inventario, Cocina y Personal y lo hace por el asistente); y la pantalla no comprueba nada antes de enviar salvo el largo máximo de un texto (ni mínimos, ni máximos, ni patrones, ni obligatorios)
 Actor: administrador
 Pantalla: Vista de un módulo › Ajustes
 Pasos:
@@ -109,7 +109,7 @@ Pasos:
 2. Pulsa «Guardar»; el botón se desactiva mientras va.
 3. Si el hub acepta: «Ajustes guardados.».
 4. Si el hub rechaza campos concretos, debajo del formulario sale «No se pudieron guardar los ajustes.» con «Revisa los campos marcados y vuelve a guardar.», y cada campo rechazado lleva «Este valor no se admite.».
-Entra: todos los valores del formulario, uno por campo del esquema, en la forma que declara el esquema (un sí/no guardado como 0/1 se manda como 0/1; un número vaciado, como `null`).
+Entra: todos los valores del formulario, uno por campo del esquema, en la forma que declara el esquema (un sí/no guardado como 0/1 se manda como 0/1; un número vaciado, como `null`). Solo se puede guardar sobre valores LEÍDOS (HUB_SHELL-F43 paso 5, hub#2511): lo que la persona no tocó viaja con el valor guardado, nunca con el de fábrica. Se manda el formulario entero y no solo lo cambiado porque la orden de guardar de una app es un «sustituir todo» con todos los campos obligatorios (en Caja, `required` de los ocho y un `ON CONFLICT … SET` de todas las columnas): un envío parcial lo rechazaría el esquema o, rellenado con los de fábrica (HUB-F04), pisaría lo guardado.
 Sale: la orden de guardar de la app, que pasa por el embudo de siempre: permiso, esquema con sus valores por defecto y su comprobación (HUB-F03, HUB-F04, HUB-F33). La app avisa a quien escuche, si su orden lo hace.
 Si falla: un rechazo sin campos (permiso, una regla de la app) se queda en pantalla con su frase: la del catálogo del shell si el código la tiene; si no, el texto que dejó el SDK (la frase de plataforma, la de la app, o el del hub tal cual); solo si viene vacío, «No se pudieron guardar los ajustes.» (hub#1094). Siempre sale además el aviso flotante «No se pudieron guardar los ajustes.». Un rechazo de permiso llega como «permiso denegado: requiere `…`», con el nombre interno del permiso (leído en el código, sin ejecutar).
 Implicados: CASH_REGISTER-F01, HUB-F04, HUB-F33, INVENTORY-F19, KITCHEN-F26, SALES-F34

@@ -2,6 +2,16 @@
   "id": "e2e_settings",
   "name": "E2E Settings",
   "version": "1.0.0",
+  "permissions": ["e2e_settings.configure"],
+  "role_permissions": {
+    "admin": ["e2e_settings.configure"]
+  },
+  "queries": {
+    "e2e_settings.settings.get": {
+      "permission": "e2e_settings.configure",
+      "sql": "queries/settings_get.sql"
+    }
+  },
   "ui": {
     "entry": "dist/e2e_settings.esm.js"
   },

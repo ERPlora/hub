@@ -38,6 +38,7 @@ import hardwareChipOutline from '~icons/ion/hardware-chip-outline?raw';
 import imageOutline from '~icons/ion/image-outline?raw';
 import informationCircleOutline from '~icons/ion/information-circle-outline?raw';
 import keypadOutline from '~icons/ion/keypad-outline?raw';
+import lockClosedOutline from '~icons/ion/lock-closed-outline?raw';
 import languageOutline from '~icons/ion/language-outline?raw';
 import logInOutline from '~icons/ion/log-in-outline?raw';
 import logOutOutline from '~icons/ion/log-out-outline?raw';
@@ -207,6 +208,7 @@ const SVGS: Record<string, string> = {
   'image-outline': imageOutline,
   'information-circle-outline': informationCircleOutline,
   'keypad-outline': keypadOutline,
+  'lock-closed-outline': lockClosedOutline,
   'language-outline': languageOutline,
   'log-in-outline': logInOutline,
   'log-out-outline': logOutOutline,
