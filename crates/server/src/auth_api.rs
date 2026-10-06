@@ -650,8 +650,8 @@ pub(crate) struct SetPinReq {
 /// colleague's, then try it against the names on the pinpad grid. It spends the pinpad's budget
 /// (five tries, five minutes) against the PERSON, and every try counts, the accepted ones too: an
 /// accepted number becomes the prober's PIN and they carry on, so counting only refusals would
-/// still hand out a taken PIN per refusal. The key is the user id, in a map of this door's own
-/// (`pin_change_throttle`): the pinpad's counter is keyed by whatever name the caller types, a
+/// still hand out a taken PIN per refusal. The key is the user id, in a map kept apart from the
+/// pinpad's (`pin_change_throttle`, shared with the PIN doors of Empleados, hub#2518): the pinpad's counter is keyed by whatever name the caller types, a
 /// successful login clears it, and five wrong PINs under a name lock it — none of which may reach
 /// this budget. No per-address guard here: the caller holds a session that resolves, and the
 /// person is a key they cannot rotate the way an attacker rotates names.
