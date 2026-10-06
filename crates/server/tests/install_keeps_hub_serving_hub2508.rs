@@ -208,10 +208,10 @@ impl Hub {
             .unwrap()
     }
 
-    fn install(&self, module_id: &str) -> Request<Body> {
+    fn install(&self, module_id: &str, version: &str) -> Request<Body> {
         self.post(
             "/api/modules/request-install",
-            json!({ "module_id": module_id, "version": "1.0.0" }).to_string(),
+            json!({ "module_id": module_id, "version": version }).to_string(),
         )
     }
 
@@ -223,15 +223,15 @@ impl Hub {
         self.post(&format!("/api/modules/{module_id}/uninstall"), "{}".into())
     }
 
-    /// Upload a template that installs `module_id`, and the request that imports it.
-    async fn template_import(&self, module_id: &str) -> Request<Body> {
+    /// Upload a template that installs `module_id` at `version`, and the request that imports it.
+    async fn template_import(&self, module_id: &str, version: &str) -> Request<Body> {
         let manifest = json!({
             "schema_version": 1,
             "name": "salon",
             "locale": "es",
             "hub": { "name": "Demo", "country": "ES", "currency": "EUR" },
             "created_at": "2026-10-06T00:00:00Z",
-            "modules": [{ "id": module_id, "version": "1.0.0", "with_data": false }],
+            "modules": [{ "id": module_id, "version": version, "with_data": false }],
             "sections": [],
             "sha256": {},
         })
@@ -300,11 +300,12 @@ impl Hub {
         .unwrap();
         assert_eq!(apps.status(), StatusCode::OK);
 
-        tokio::time::timeout(MUST_ANSWER_WITHIN, self.runtime.write())
+        let writer = tokio::time::timeout(MUST_ANSWER_WITHIN, self.runtime.write())
             .await
             .unwrap_or_else(|_| {
                 panic!("the {gesture} holds the runtime while erplora.com answers (hub#2508)")
             });
+        drop(writer);
     }
 }
 
@@ -330,7 +331,7 @@ async fn the_hub_keeps_answering_while_an_app_installs() {
         let (cloud, market) = a_marketplace_that_holds(hold, "1.0.0").await;
         let hub = a_hub(cloud, "install", None).await;
 
-        let install = hub.send(hub.install("sales"));
+        let install = hub.send(hub.install("sales", "1.0.0"));
         market.wait_until_held().await;
 
         hub.still_answers("install").await;
@@ -378,7 +379,7 @@ async fn the_hub_keeps_answering_while_a_template_installs_its_apps() {
     let (cloud, market) = a_marketplace_that_holds(Hold::Download, "1.0.0").await;
     let hub = a_hub(cloud, "template", None).await;
 
-    let import = hub.send(hub.template_import("sales").await);
+    let import = hub.send(hub.template_import("sales", "1.0.0").await);
     market.wait_until_held().await;
 
     hub.still_answers("template import").await;
@@ -405,14 +406,15 @@ async fn app_changes_wait_for_each_other() {
     // its own if nothing holds it back.
     let settle = || tokio::time::sleep(Duration::from_millis(400));
 
-    let install = hub.send(hub.install("sales"));
+    // The marketplace publishes 2.0.0 only: every change below reaches its download.
+    let install = hub.send(hub.install("sales", "2.0.0"));
     market.wait_until_held().await;
 
     let update = hub.send(hub.update("notes"));
     settle().await;
     assert_eq!(started(), 1, "an update ran during an install (hub#2508)");
 
-    let import = hub.send(hub.template_import("taxes").await);
+    let import = hub.send(hub.template_import("taxes", "2.0.0").await);
     settle().await;
     assert_eq!(
         started(),
