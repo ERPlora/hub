@@ -458,12 +458,12 @@ fn acquire_from_file(
 /// (`&RwLock<Runtime>`), whose write lock is then taken only to register each verified package
 /// (hub#2508, [`RuntimeAccess`]).
 #[allow(clippy::too_many_arguments)]
-pub async fn install_from_cloud<'r>(
+pub async fn install_from_cloud(
     http: &reqwest::Client,
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: impl Into<RuntimeAccess<'r>>,
+    runtime: impl Into<RuntimeAccess<'_>>,
     module_id: &str,
     requested_version: &str,
     on_progress: OnProgress<'_>,
@@ -508,12 +508,12 @@ pub async fn install_from_cloud<'r>(
 /// ([`module_update::resolve_template_version`]) — otherwise a salon opened today runs on the day
 /// the template was exported until its next boot moves it forward.
 #[allow(clippy::too_many_arguments)]
-pub async fn install_bundle_module<'r>(
+pub async fn install_bundle_module(
     http: &reqwest::Client,
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: impl Into<RuntimeAccess<'r>>,
+    runtime: impl Into<RuntimeAccess<'_>>,
     module_id: &str,
     manifest_version: &str,
     purpose: erplora_runtime::export::BundlePurpose,
@@ -1190,12 +1190,12 @@ pub async fn support_pin(runtime: &erplora_runtime::Runtime, module_id: &str) ->
 /// (`installer::install`). Lo único que no se deshace es el esquema — las migraciones son aditivas
 /// y hacia delante (ADR-0269 §3.4/§7).
 #[allow(clippy::too_many_arguments)]
-pub async fn update_from_cloud<'r>(
+pub async fn update_from_cloud(
     http: &reqwest::Client,
     cloud_base_url: &str,
     cache_root: &std::path::Path,
     auth: &Auth,
-    runtime: impl Into<RuntimeAccess<'r>>,
+    runtime: impl Into<RuntimeAccess<'_>>,
     module_id: &str,
     requested_version: &str,
     on_progress: OnProgress<'_>,
