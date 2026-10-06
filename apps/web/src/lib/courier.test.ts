@@ -1,24 +1,36 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { runtimeCourierSession, setTokens, setHubSession, setUser } = vi.hoisted(() => ({
-  runtimeCourierSession: vi.fn(),
-  setTokens: vi.fn(),
-  setHubSession: vi.fn(),
-  setUser: vi.fn(),
-}));
+const { runtimeCourierSession, setTokens, setHubSession, setUser, refreshHubIdentity, order } =
+  vi.hoisted(() => {
+    const order: string[] = [];
+    return {
+      order,
+      runtimeCourierSession: vi.fn(),
+      setTokens: vi.fn(),
+      setHubSession: vi.fn(() => {
+        order.push('session');
+      }),
+      setUser: vi.fn(),
+      refreshHubIdentity: vi.fn(async () => {
+        order.push('identity');
+      }),
+    };
+  });
 
 vi.mock('./cloud', () => ({ runtimeCourierSession, setTokens }));
 vi.mock('./device', () => ({
   getDeviceContext: vi.fn(async () => ({ id: 'device-1', clientType: 'hub-desktop' })),
 }));
 vi.mock('./session', () => ({ setHubSession, setUser }));
+vi.mock('./runtime', () => ({ refreshHubIdentity }));
 
 import { bootCourier, takeCourierCode } from './courier';
 
 describe('shell courier boot', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    order.length = 0;
     window.history.replaceState(null, '', '/?shell=1');
   });
 
@@ -56,5 +68,8 @@ describe('shell courier boot', () => {
     expect(setUser).toHaveBeenCalledWith(expect.objectContaining({
       id: 'local-1', cloudUserId: 'cloud-1', role: 'employee',
     }));
+    // hub#2510: a browser that came in through the panel was never trusted, so the boot read was
+    // told neither the hub id nor the faces. With the session it is — before the router mounts.
+    expect(order).toEqual(['session', 'identity']);
   });
 });

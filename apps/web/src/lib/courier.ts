@@ -1,6 +1,7 @@
 import { RuntimeError, runtimeCourierSession, setTokens } from './cloud';
 import { getDeviceContext } from './device';
 import { reportClientError } from './error-report';
+import { refreshHubIdentity } from './runtime';
 import { setHubSession, setUser } from './session';
 
 const COURIER_KEY = 'courier';
@@ -137,6 +138,9 @@ async function exchangeCourier(code: string): Promise<boolean> {
     role: result.user.role,
     permissions: result.permissions,
   });
+  // hub#2510: a browser that came in through the panel was never trusted, so the boot read was told
+  // neither the hub id nor the faces. With the session it is, before the router mounts.
+  await refreshHubIdentity();
   return true;
 }
 

@@ -116,7 +116,6 @@ async function signInWithTheAccount() {
     [email, 'marta@bar.example'],
     [password, 'secret'],
   ] as const) {
-    (input.element as HTMLElement & { value: string }).value = value;
     input.element.dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
   }
   await form.trigger('submit');

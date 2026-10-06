@@ -125,9 +125,10 @@ export function getHubSector(): string | null {
 }
 
 /**
- * Usuarios-PIN del hub resueltos en el boot (`GET /api/hub/context`). El LoginPage los usa para
- * mostrar el grid de PIN directamente cuando el hub ya tiene usuarios (p. ej. el demo: "Demo"),
- * sin depender de un flag en localStorage. `[]` hasta que el boot responde.
+ * The hub's PIN users, from `GET /api/hub/context`. The login screen paints the PIN grid from them
+ * (e.g. the demo's "Demo") without depending on a localStorage flag. `[]` until the boot answers,
+ * and also when the hub withholds them — a device it does not trust, without a session (hub#2510);
+ * signing in re-reads them ([`refreshHubIdentity`]).
  */
 export const pinUsers = ref<PinUser[]>([]);
 /** `true` cuando `/api/hub/context` respondió y `pinUsers` ya es una lista autoritativa. */

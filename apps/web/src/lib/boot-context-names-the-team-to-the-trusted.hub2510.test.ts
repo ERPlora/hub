@@ -112,7 +112,10 @@ describe('hub#2510 — after signing in, the shell learns what the boot was not 
 
   it('a re-read that is refused keeps what was known', async () => {
     config.hubId = 'hub-1';
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })),
+    );
 
     await refreshHubIdentity();
 
