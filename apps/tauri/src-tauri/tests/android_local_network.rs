@@ -176,6 +176,7 @@ fn an_unterminated_comment_hides_everything_after_it() {
 
 // ── The generated manifest still declares what the shell asks for ───────────────────────────────
 
+// Regression test for ERPlora/hub#2552
 #[test]
 fn the_generated_manifest_declares_every_permission_the_till_needs() {
     let declared = declared_permissions(APP_MANIFEST);
@@ -285,6 +286,7 @@ fn a_manifest_that_only_talks_about_the_feature_does_not_declare_it_optional() {
     ));
 }
 
+// Regression test for ERPlora/hub#2552
 #[test]
 fn an_implied_feature_does_not_hide_the_app_from_devices_without_it() {
     // Both copies, because either one alone would let the requirement back in: the merger takes
