@@ -269,10 +269,10 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F142 | Abrir erplora.com ya identificado | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F143 | Cambiar mis datos, idioma, apariencia y foto | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F144 | Cerrar la puerta a quien ya no es miembro en erplora.com | parcial | [acceso.md](workflow/acceso.md) |
-| HUB-F145 | Dar de alta a una persona que entra solo con PIN | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB-F145 | Dar de alta a una persona que entra solo con PIN | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F146 | Invitar a una persona con su cuenta de erplora.com | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F147 | Llegar al tope de plazas del plan | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
-| HUB-F148 | Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB-F148 | Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F149 | Dar de baja y reincorporar a una persona | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F150 | Ver los roles y encender los que trae un módulo | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F151 | Rechazar una orden para la que no se tiene permiso | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
