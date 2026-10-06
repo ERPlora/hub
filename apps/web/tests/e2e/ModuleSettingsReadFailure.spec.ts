@@ -16,13 +16,18 @@ import { join } from 'node:path';
 import type { Route } from '@playwright/test';
 
 import { expect, request as pwRequest, test, type Page } from '../bench-boot';
-import { VIEWPORTS } from './viewports';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 const MODULES_DIR = process.env.HUB_E2E_MODULES_DIR ?? '';
 const FIXTURES = join(import.meta.dirname, 'fixtures', 'modules');
 const MODULE_ID = 'e2e_settings';
 const GET_QUERY = 'e2e_settings.settings.get';
+// The three sizes the fleet checks every screen at (pm#529): 375x667 is the narrowest phone we serve.
+const VIEWPORTS = [
+  { width: 1440, height: 900 },
+  { width: 820, height: 1180 },
+  { width: 375, height: 667 },
+] as const;
 
 interface Session {
   token: string;
@@ -123,6 +128,7 @@ test.describe('a failed read of a module settings shows «could not read», neve
       await expect(page.getByTestId('module-settings-save')).toHaveCount(0);
       await expect(page.getByTestId('module-settings-field-track_stock')).toHaveCount(0);
       await expectInsideViewport(page, 'module-settings-error', viewport.width);
+      await expectInsideViewport(page, 'module-settings-retry', viewport.width);
       await page.screenshot({ path: testInfo.outputPath(`read-failed-${viewport.width}x${viewport.height}.png`) });
 
       // The hub is back: Retry reads again and the screen becomes the form (no row yet → defaults).
@@ -131,6 +137,7 @@ test.describe('a failed read of a module settings shows «could not read», neve
       await expect(page.getByTestId('module-settings-field-track_stock')).toBeVisible();
       await expect(page.getByTestId('module-settings-save')).toBeVisible();
       await expect(page.getByTestId('module-settings-error')).toHaveCount(0);
+      await page.screenshot({ path: testInfo.outputPath(`read-retried-${viewport.width}x${viewport.height}.png`) });
     });
 
     test(`at ${viewport.width}px: a read refused for permission says so, without Retry`, async ({ page }, testInfo) => {
