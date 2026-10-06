@@ -84,7 +84,7 @@ Implicados: HUB_SHELL-F02, REC_ALTA-F07, SAAS_AUTH-F19, SAAS_DASHBOARD-F04, SAAS
 QA: ninguno
 
 ### HUB-F132 Elegir o cambiar el propio PIN
-Estado: hecho
+Estado: parcial — el freno de 5 intentos en 5 minutos no para a quien va despacio (4 cada 5 minutos no bloquean nunca) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526)
 Actor: administrador, responsable, empleado
 Pantalla: HUB_SHELL: Mi perfil
 Pasos:
