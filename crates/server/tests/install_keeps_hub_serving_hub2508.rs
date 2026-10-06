@@ -11,7 +11,7 @@
 //! rest until the test releases it, so the install is provably in the middle of its download when
 //! the other requests arrive.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -52,13 +52,15 @@ fn config(cloud_base_url: String, tag: &str) -> HubConfig {
 }
 
 /// A marketplace with no install plan (the hub resolves by manifest), that publishes `version` and
-/// whose download sends a first chunk, flags `downloading`, and waits for `release` before ending.
+/// whose download counts itself in `downloads`, sends a first chunk, flags `downloading`, and waits
+/// for `release` before ending.
 /// The bytes are not a real zip, so once released the install fails its checksum: what is under
 /// test is what the REST of the hub does meanwhile, not the install's outcome.
 async fn a_marketplace_that_holds_the_zip(
     version: &'static str,
     downloading: Arc<AtomicBool>,
     release: Arc<Notify>,
+    downloads: Arc<AtomicUsize>,
 ) -> String {
     use axum::routing::{get, post};
     use futures_util::StreamExt;
@@ -83,6 +85,7 @@ async fn a_marketplace_that_holds_the_zip(
             get(move || {
                 let downloading = downloading.clone();
                 let release = release.clone();
+                downloads.fetch_add(1, Ordering::SeqCst);
                 async move {
                     let first = futures_util::stream::once(async {
                         Ok::<_, std::io::Error>(axum::body::Bytes::from_static(b"PK\x03\x04first"))
@@ -144,6 +147,28 @@ async fn the_hub_still_answers(router: &Router, session: &str, gesture: &str) {
     assert_eq!(apps.status(), StatusCode::OK);
 }
 
+/// A hub with an administrator, its session, and its marketplace stall limit set for the test.
+async fn hub_with_an_admin(cloud: String, tag: &str) -> (Router, String) {
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), "hub-2508");
+    rt.ensure_system_tables().await.unwrap();
+    let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
+    let session = rt.create_session(&admin, 3600, None).await.unwrap();
+    let mut state = AppState::with_config(rt, config(cloud, tag));
+    state.marketplace_http = marketplace_client(STALL);
+    (app(state), session)
+}
+
+fn install_request(session: &str, module_id: &str) -> Request<Body> {
+    Request::post("/api/modules/request-install")
+        .header("x-hub-session", session)
+        .header("content-type", "application/json")
+        .body(Body::from(format!(
+            r#"{{"module_id":"{module_id}","version":"1.0.0"}}"#
+        )))
+        .unwrap()
+}
+
 async fn body_json(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -156,7 +181,13 @@ async fn body_json(response: axum::response::Response) -> Value {
 async fn the_hub_keeps_answering_while_an_app_installs() {
     let downloading = Arc::new(AtomicBool::new(false));
     let release = Arc::new(Notify::new());
-    let cloud = a_marketplace_that_holds_the_zip("1.0.0", downloading.clone(), release.clone()).await;
+    let cloud = a_marketplace_that_holds_the_zip(
+        "1.0.0",
+        downloading.clone(),
+        release.clone(),
+        Arc::default(),
+    )
+    .await;
 
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-2508");
@@ -201,7 +232,13 @@ async fn the_hub_keeps_answering_while_an_app_installs() {
 async fn the_hub_keeps_answering_while_an_app_updates() {
     let downloading = Arc::new(AtomicBool::new(false));
     let release = Arc::new(Notify::new());
-    let cloud = a_marketplace_that_holds_the_zip("2.0.0", downloading.clone(), release.clone()).await;
+    let cloud = a_marketplace_that_holds_the_zip(
+        "2.0.0",
+        downloading.clone(),
+        release.clone(),
+        Arc::default(),
+    )
+    .await;
 
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "hub-2508");
@@ -259,4 +296,145 @@ async fn the_hub_keeps_answering_while_an_app_updates() {
         "1.0.0",
         "a failed update keeps the version the app had"
     );
+}
+
+/// Importing a template installs its apps by the same door: the till keeps charging meanwhile.
+#[tokio::test]
+async fn the_hub_keeps_answering_while_a_template_installs_its_apps() {
+    let downloading = Arc::new(AtomicBool::new(false));
+    let release = Arc::new(Notify::new());
+    let cloud = a_marketplace_that_holds_the_zip(
+        "1.0.0",
+        downloading.clone(),
+        release.clone(),
+        Arc::default(),
+    )
+    .await;
+    let (router, session) = hub_with_an_admin(cloud, "template").await;
+
+    let manifest = serde_json::json!({
+        "schema_version": 1,
+        "name": "salon",
+        "locale": "es",
+        "hub": { "name": "Demo", "country": "ES", "currency": "EUR" },
+        "created_at": "2026-10-06T00:00:00Z",
+        "modules": [{ "id": "sales", "version": "1.0.0", "with_data": false }],
+        "sections": [],
+        "sha256": {},
+    })
+    .to_string();
+    let mut zip_bytes = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_bytes));
+        let options: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.start_file("manifest.json", options).unwrap();
+        std::io::Write::write_all(&mut zip, manifest.as_bytes()).unwrap();
+        zip.finish().unwrap();
+    }
+    let inspected = router
+        .clone()
+        .oneshot(
+            Request::post("/api/hub/import/inspect")
+                .header("x-hub-session", &session)
+                .header("content-type", "application/octet-stream")
+                .body(Body::from(zip_bytes))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let inspected = body_json(inspected).await;
+    let upload_id = inspected["upload_id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("inspect gave no upload_id: {inspected}"))
+        .to_string();
+
+    let import = tokio::spawn({
+        let router = router.clone();
+        let session = session.clone();
+        async move {
+            router
+                .oneshot(
+                    Request::post("/api/hub/import")
+                        .header("x-hub-session", &session)
+                        .header("content-type", "application/json")
+                        .body(Body::from(
+                            serde_json::json!({ "upload_id": upload_id, "selection": {} })
+                                .to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+        }
+    });
+    wait_until(&downloading).await;
+
+    the_hub_still_answers(&router, &session, "template import").await;
+
+    release.notify_one();
+    let response = tokio::time::timeout(Duration::from_secs(10), import)
+        .await
+        .expect("the import never ended once the zip arrived")
+        .unwrap();
+    // The app itself fails its checksum; the import reports it and carries on (best-effort).
+    let body = body_json(response).await;
+    assert_eq!(
+        body["report"]["installed_modules"][0]["status"], "failed",
+        "{body}"
+    );
+}
+
+/// Without the write lock around the whole install, something else has to keep two installs from
+/// interleaving (both resolve against the same registry and register into it): the second one
+/// waits for the first, and only then starts its download.
+#[tokio::test]
+async fn two_installs_never_run_at_the_same_time() {
+    let downloading = Arc::new(AtomicBool::new(false));
+    let release = Arc::new(Notify::new());
+    let downloads = Arc::new(AtomicUsize::new(0));
+    let cloud = a_marketplace_that_holds_the_zip(
+        "1.0.0",
+        downloading.clone(),
+        release.clone(),
+        downloads.clone(),
+    )
+    .await;
+    let (router, session) = hub_with_an_admin(cloud, "two").await;
+
+    let first = tokio::spawn(router.clone().oneshot(install_request(&session, "sales")));
+    wait_until(&downloading).await;
+    let second = tokio::spawn(router.clone().oneshot(install_request(&session, "notes")));
+
+    // Loopback reaches the download in milliseconds: give the second install ample time to get
+    // there if nothing holds it back.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(
+        downloads.load(Ordering::SeqCst),
+        1,
+        "the second install started while the first was still downloading (hub#2508)"
+    );
+
+    release.notify_one();
+    let first = tokio::time::timeout(Duration::from_secs(10), first)
+        .await
+        .expect("the first install never ended")
+        .unwrap()
+        .unwrap();
+    assert_eq!(body_json(first).await["ok"], Value::Bool(false));
+
+    // Now the second one runs: it downloads (held again) and ends once released.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while downloads.load(Ordering::SeqCst) < 2 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the second install never started after the first ended");
+    release.notify_one();
+    let second = tokio::time::timeout(Duration::from_secs(10), second)
+        .await
+        .expect("the second install never ended")
+        .unwrap()
+        .unwrap();
+    assert_eq!(body_json(second).await["ok"], Value::Bool(false));
 }
