@@ -538,6 +538,11 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK")
           echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.nfc'" \
             || { echo "::error::el APK EXIGE android.hardware.nfc — Play lo ocultaría de las tablets sin chip (hub#988)"; echo "$BADGING" | grep -i nfc; exit 1; }
+          # Mismo riesgo con la ubicación (hub#2552): ACCESS_COARSE/FINE_LOCATION implican
+          # `android.hardware.location` SEA CUAL SEA el targetSdk (solo `.gps`/`.network` dependen
+          # de él). El TPV no la necesita; solo la pide un módulo como `attendance`.
+          echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.location'" \
+            || { echo "::error::el APK EXIGE android.hardware.location — Play lo ocultaría de los dispositivos sin ubicación (hub#2552)"; echo "$BADGING" | grep -i location; exit 1; }
 
       - name: Stage artifacts
         run: |

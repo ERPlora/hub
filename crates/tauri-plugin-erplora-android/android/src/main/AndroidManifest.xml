@@ -98,6 +98,16 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- 🔴 Load-bearing, same trap as the NFC feature above. Either location permission makes
+         Google Play add an IMPLICIT `android.hardware.location` requirement, and unlike the
+         `.gps` / `.network` sub-features this parent one is implied whatever the target SDK
+         (read back with aapt2 at targetSdk 36). The till itself never needs a position: only a
+         module like `attendance` asks for one, and it already handles a device without it.
+         Saying `required="false"` keeps the listing open to tablets without location hardware. -->
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false" />
+
     <application>
         <!-- `specialUse` because none of the typed foreground services (dataSync, mediaPlayback,
              …) describes «stay reachable for incoming orders»; Google Play asks for the subtype
