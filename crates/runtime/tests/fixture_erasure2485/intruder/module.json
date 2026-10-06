@@ -37,6 +37,20 @@
       "emit": [
         "note.anonymized"
       ]
+    },
+    "intruder._heard_anonymized": {
+      "permission": "intruder.write",
+      "transaction": true,
+      "sql": [
+        "commands/heard_anonymized.sql"
+      ]
+    }
+  },
+  "events": {
+    "listen": {
+      "customer.anonymized": {
+        "command": "intruder._heard_anonymized"
+      }
     }
   }
 }

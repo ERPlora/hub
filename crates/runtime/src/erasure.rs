@@ -37,8 +37,10 @@
 //!   `.print.due`. Today only `customer.anonymized` follows it.
 //! - **Only the owner erases (hub#2485).** The id must have the shape the hub generates (a
 //!   canonical uuid) and be a row of one of the EMITTER's tables in this hub. Anything else is
-//!   refused with a code (`erasure.invalid_subject_id`, `erasure.subject_not_owned`): the event is
-//!   not delivered, retries and ends in the dead letters, where a human sees it.
+//!   refused with a code (`erasure.invalid_subject_id`, `erasure.subject_not_owned`): nothing is
+//!   emptied and the row is not marked delivered — it retries and ends in the dead letters, where
+//!   a human sees it. The gate guards this history, not the delivery: the apps that listen to the
+//!   event still get it, once each.
 //!
 //! **Cost.** There is no index on payload content: one erasure reads the hub's terminal history
 //! once (at most ninety days of it, thanks to `retention`). Erasures are rare, manual and

@@ -144,6 +144,42 @@ async fn only_the_app_that_owns_the_customer_erases_her_history() {
     assert_eq!(created_payload(&rt).await, "{}");
 }
 
+/// What a refusal does NOT stop: the gate guards the hub's own history, not the delivery. The apps
+/// that listen to the event still get it — once, by their `_event_delivery` marker — while the row
+/// itself stays undelivered with the refusal's code. An erasure the hub refuses (say, a sheet
+/// whose id it did not generate) must not also keep every other app from erasing its own copy.
+#[tokio::test]
+async fn a_refused_erasure_still_reaches_the_apps_that_listen() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
+    let rt = hub().await;
+    let ana = ana(&rt).await;
+
+    rt.execute_command(
+        "intruder.customers.forget",
+        &params(json!({ "customer_id": ana })),
+        &admin(),
+    )
+    .await
+    .expect("intruder.customers.forget");
+    rt.drain_outbox().await.expect("drain");
+    rt.drain_outbox().await.expect("second drain");
+
+    assert_eq!(erasure_row(&rt, "intruder", "status").await, "pending");
+    assert_eq!(
+        one(
+            &rt,
+            "SELECT CAST(COUNT(*) AS TEXT) AS v FROM intruder_heard \
+              WHERE hub_id = :hub_id AND customer_id = :customer_id",
+            &[("customer_id", &ana)],
+        )
+        .await,
+        "1",
+        "the listener gets the refused event exactly once"
+    );
+}
+
 /// The vector of the issue: `intruder` owns a note whose id is `"id"` and erases it. As a needle,
 /// `"id"` is a key of nearly every payload; the hub refuses an id it did not generate, even from
 /// its owner, and nothing of Ana's moves.
