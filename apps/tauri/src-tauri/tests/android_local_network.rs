@@ -65,6 +65,13 @@ const REQUIRED: &[&str] = &[
     // throws a SecurityException and Android freezes the page the moment the screen goes dark.
     "android.permission.FOREGROUND_SERVICE",
     "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+    // A module asking where the device is (hub#2552); the first one is `attendance`, which can
+    // require the employee to clock in near the venue. RUNTIME permissions: wry's
+    // `RustWebChromeClient.onGeolocationPermissionsShowPrompt` asks for them when a page calls
+    // `navigator.geolocation`. Without the declaration the request is answered DENIED with no
+    // dialog, the page gets PERMISSION_DENIED, and a personal-device clock-in is rejected forever.
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_COARSE_LOCATION",
 ];
 
 /// The hardware feature the NFC permission drags in behind it (hub#988).

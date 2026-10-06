@@ -88,6 +88,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Where the device is, for a module that calls `navigator.geolocation` (hub#2552). The
+         first consumer is the `attendance` module, which can require an employee clocking in from
+         a personal phone to be near the venue. RUNTIME permissions: wry's
+         `RustWebChromeClient.onGeolocationPermissionsShowPrompt` asks for both when the page
+         asks for a position. Without the declaration that request is answered DENIED with no
+         dialog, forever, the page gets PERMISSION_DENIED and the clock-in is rejected. FINE for a
+         GPS fix, COARSE because Android 12+ lets the user grant only an approximate one. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application>
         <!-- `specialUse` because none of the typed foreground services (dataSync, mediaPlayback,
              …) describes «stay reachable for incoming orders»; Google Play asks for the subtype
