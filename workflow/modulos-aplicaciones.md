@@ -260,7 +260,7 @@ Implicados: FLOWS-F01, HUB_SHELL-F29, HUB_SHELL-F109, HUB_SHELL-F115, HUB_SHELL-
 QA: BD-03
 
 ### HUB-F33 Leer y guardar los ajustes de un módulo
-Estado: parcial — la pantalla solo deja guardar al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Venta, Inventario y Cocina y lo hace por el asistente); y si la lectura de los ajustes falla (por ejemplo, sin permiso), la pantalla enseña los valores de fábrica del esquema como si fueran los guardados
+Estado: parcial — la pantalla solo deja guardar al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Venta, Inventario y Cocina y lo hace por el asistente)
 Actor: administrador, responsable, asistente
 Pantalla: HUB_SHELL: Vista de un módulo › Ajustes
 Pasos:
@@ -270,7 +270,7 @@ Pasos:
 4. La pantalla dice «Ajustes guardados.».
 Entra: el bloque `settings` del `module.json` (esquema, consulta, orden).
 Sale: la fila de ajustes del módulo y el aviso que su orden emita.
-Si falla: si la consulta de lectura falla, el error se traga y se pintan los valores de fábrica del esquema como si fueran los del negocio («No se pudieron cargar los ajustes.» solo sale si falla otra cosa, como el esquema). Los ven así quienes no tienen permiso de leerlos —hoy solo los empleados de Venta e Inventario, cuya consulta de lectura pide el permiso de gestionar los ajustes; en Cocina y Caja el empleado sí puede leerlos— y cualquiera tras un fallo pasajero de lectura; solo un administrador puede pisar entonces lo guardado con esos valores de fábrica, si guarda sin darse cuenta; al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
+Si falla: si la consulta de lectura falla, la pantalla no pinta el formulario ni deja guardar (hub#2511): un fallo pasajero dice «No se pudieron cargar los ajustes.» con «Reintentar», y un rechazo por permiso —hoy los empleados de Venta e Inventario, cuya consulta de lectura pide el permiso de gestionar los ajustes; en Cocina y Caja el empleado sí puede leerlos— dice «No puedes ver estos ajustes». Los valores de fábrica solo se enseñan cuando la lectura contesta sin fila (nunca se guardó nada). Al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
 Implicados: CASH_REGISTER-F01, HUB_SHELL-F43, HUB_SHELL-F44, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: qa-hub-restaurant §7.03 (discrepa)
 
@@ -322,7 +322,7 @@ QA: BD-01, BD-02
 | Desinstalar conservando los datos | hecho | HUB-F29 |
 | Borrar los datos de una app desinstalada | no hecho, a propósito | — |
 | Permisos de la app concedidos por el dueño | hecho | HUB-F32 |
-| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor; quien no puede leerlos (empleados de Venta e Inventario) ve los de fábrica | HUB-F33 |
+| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor | HUB-F33 |
 | Paneles de Inicio por app | parcial: un panel sin permiso sale «No disponible» en vez de ocultarse | HUB-F34 |
 | Lista de puesta en marcha | hecho | HUB-F35 |
 
