@@ -202,18 +202,18 @@ Implicados: INVOICE-F06, REC_FISCAL-F09, HUB_SHELL-F60, HUB_SHELL-F62
 QA: BD-09
 
 ### HUB-F60 Avisar a las pantallas en vivo
-Estado: parcial — no filtra por perfil: cualquier sesión del hub, también la de un cajero, recibe todos los avisos con los datos de los clientes; el tope de 16 conexiones es para el hub entero (todas las pantallas comparten llave); en `/ws` un segundo mensaje de autenticación cambia la llave y su alcance; el canal SSE acepta una API key de larga duración en la dirección; y revocar una llave o cerrar sesión no corta un canal ya abierto (leído, sin ejecutar)
+Estado: parcial — revocar una llave, cerrar sesión o cambiar el rol de alguien no corta ni recorta un canal ya abierto: sigue oyendo lo que podía al conectarse hasta que se reconecta (hub#2522); y el canal SSE acepta una API key de larga duración en la dirección (hub#2523) (leído, sin ejecutar)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Al abrirse, la aplicación del hub pide al hub un pase de un solo uso (vale 60 segundos) con la sesión de quien la usa, sea del perfil que sea.
-2. Con ese pase abre el canal en vivo (por SSE, en la dirección; o por WebSocket, en el primer mensaje). Desde entonces recibe al momento cada aviso que se guarda en el hub: una venta cobrada, una comanda nueva, una cita, una pregunta de una automatización, un módulo instalado.
+2. Con ese pase abre el canal en vivo (por SSE, en la dirección; o por WebSocket, en el primer mensaje). Desde entonces recibe al momento cada aviso que se guarda en el hub **y que esa persona podría leer por la API normal**: una venta cobrada, una comanda nueva, una cita, un módulo instalado; una pregunta de una automatización, solo si administra el hub.
 3. Cada pantalla reacciona por su cuenta: la cocina pinta la comanda, el TPV que cobró imprime el tique, la campana o el aviso del sistema avisan.
 4. Si la conexión se corta, la aplicación pide otro pase y se vuelve a conectar.
-Entra: la sesión de una persona del hub (para el pase), o una API key del hub que pueda leer (para una integración).
-Sale: cada aviso con su contenido, el módulo que lo emitió y la pantalla que mandó la orden (`client_instance`), por WebSocket (`/ws`) o por SSE (`/api/events`). La aplicación entra con la llave de solo lectura del propio hub y recibe **todo, sea cual sea el perfil de quien la abre** (también un cajero recibe los avisos con datos de clientes, los mensajes de WhatsApp y las preguntas de las automatizaciones). Una llave de integración `read_only` o `full` lo recibe todo; una `custom`, solo lo de los módulos que puede leer, y nada del hub. Los avisos propios del hub (módulo instalado, impresión) llevan otra forma de mensaje (`{"type": …}`).
+Entra: la sesión de una persona del hub (para el pase, que queda atado a esa persona y a los permisos de su rol al pedirlo), o una API key del hub que pueda leer (para una integración).
+Sale: cada aviso con su contenido, el módulo que lo emitió y la pantalla que mandó la orden (`client_instance`), por WebSocket (`/ws`) o por SSE (`/api/events`). La aplicación entra como la persona que la usa (hub#2501): recibe los avisos de los módulos en los que su rol puede leer al menos una consulta —la misma regla que la puerta de las consultas—, los avisos propios del hub sin datos (módulo instalado, actualizado, encendido, apagado o quitado; trabajo de impresión en cola) y, solo si administra el hub, los demás avisos del hub, como las preguntas de las automatizaciones, que nombran al cliente. Un cajero sin permiso de lectura en Clientes no recibe sus avisos. Un módulo instalado después de abrir el canal se oye al reconectar. Una llave de integración `read_only` o `full` lo recibe todo; una `custom`, solo lo de los módulos que puede leer, y nada del hub. Los avisos propios del hub (módulo instalado, impresión) llevan otra forma de mensaje (`{"type": …}`).
 En este mismo documento se apoya en: HUB-F155 (Crear, rotar y revocar llaves de API).
-Si falla: el canal en vivo no guarda nada: un aviso que llega mientras la pantalla está desconectada, o que se pierde porque la pantalla va lenta (más de 256 avisos de retraso), no se le vuelve a mandar; los módulos sí lo reciben por la cola (HUB-F51). Sin credencial, o con una de otro hub, se rechaza; una llave que solo puede escribir también. Más de 16 conexiones a la vez **en todo el hub** (todas las pantallas y dispositivos comparten la llave de la aplicación) se rechazan: la pantalla 17.ª se queda sin avisos en vivo. En `/ws` los rechazos llegan como mensaje `stream.error`, no como código HTTP, y una credencial inválida en la cabecera del saludo se ignora y acaba en «sin autenticar» a los 15 segundos.
+Si falla: el canal en vivo no guarda nada: un aviso que llega mientras la pantalla está desconectada, o que se pierde porque la pantalla va lenta (más de 256 avisos de retraso), no se le vuelve a mandar; los módulos sí lo reciben por la cola (HUB-F51). Sin credencial, o con una de otro hub, se rechaza; una llave que solo puede escribir también. Más de 16 conexiones a la vez **de la misma persona** (o de la misma llave de integración) se rechazan: su pantalla 17.ª se queda sin avisos en vivo, y las de las demás personas no se ven afectadas. En `/ws` un segundo mensaje de autenticación en un canal ya abierto se rechaza (`invalid_payload`) y el canal sigue con lo que tenía: no se puede ampliar con otra credencial. En `/ws` los rechazos llegan como mensaje `stream.error`, no como código HTTP, y una credencial inválida en la cabecera del saludo se ignora y acaba en «sin autenticar» a los 15 segundos.
 Implicados: KITCHEN-F05, HUB_APP-F24, HUB_APP-F26, HUB_SHELL-F35, HUB_SHELL-F65, HUB_SHELL-F66, HUB_SHELL-F70, HUB_SHELL-F72, SALES-F01
 QA: qa-hub-restaurant §7.08
 
@@ -327,8 +327,9 @@ HUB-F254).
   el texto de los mensajes con los datos insertados), `payload` de las propuestas. La dirección del
   destinatario de un mensaje se oculta en el historial (solo vive en la cola); los secretos se
   ocultan. La traza de un aviso (HUB-F63) devuelve el `input` de sus ejecuciones.
-- Canal en vivo (HUB-F60): no guarda nada, pero entrega los avisos completos, con datos de clientes,
-  a cualquier sesión del hub, también la de un cajero.
+- Canal en vivo (HUB-F60): no guarda nada y entrega los avisos completos, con datos de clientes,
+  solo a quien puede leer el módulo que los emite (las preguntas de las automatizaciones, solo a quien
+  administra el hub).
 - Ejemplos del editor (HUB-F109): el texto de un WhatsApp entrante sale como ejemplo.
 - `_flow_run_waits.correlate_value` (id de una cita o una reserva).
 - **Borrado de un cliente** (lo hace negocio y datos, HUB-F249, `erasure.rs`): al llegar
@@ -372,15 +373,11 @@ HUB-F254).
    avisa a quien lanzó la tarea), en vez de solo el recuento genérico del administrador?
 2. ¿Debe una tarea programada que falla tener intentos máximos, un estado de error visible y un sitio
    en «Eventos caídos»?
-3. ¿Debe el canal en vivo filtrar por perfil (un cajero no necesita los datos de clientes ni las
-   preguntas de las automatizaciones), y el tope de conexiones ser por dispositivo y no por hub?
 
 ## Fuentes contrastadas
 
 - `architecture/hub/state-durability.md` §4: dice que `ActivityState` vive solo en memoria; desde
   hub#670 se guarda en `_hub_activity` cada minuto (HUB-F64).
-- `crates/server/src/event_stream.rs:675-678`: el comentario dice que `handle_frame` rechaza un segundo
-  `auth`; lo acepta y cambia la llave del socket (HUB-F60).
 - `architecture/hub/event-outbox.md` «Estado / verificado»: el «kick» inmediato tras cada orden no
   existe; el repartidor solo repasa cada segundo (HUB-F51).
 - `WORKFLOW.md` de `flows` (FLOWS-F25): «tras sus reintentos»; los rechazados por permiso, cuota o

@@ -22,15 +22,18 @@
 //! prefix of the event's name, which is a convention nothing verifies: a module may declare
 //! `emit: ["invoice.paid"]` and hand itself another module's audience.
 //!
-//! # Our own app is not an exception
+//! # Our own app listens as the person using it (hub#2501)
 //!
-//! The shell — the webview that prints tickets and refreshes the dashboard — needs this channel.
-//! It gets in the same way an accountant's integration does: with a key. The difference is only
-//! **who issues it**: the hub mints itself a `read_only` key the first time the app connects
-//! ([`erplora_runtime::api_keys::ensure_app_key`]), and that key cannot be revoked from the keys
-//! screen. There is no `if this_is_our_app` anywhere in this file, and that is the point — the
-//! first exception is what turns one model into a sieve. If the minting code is ever deleted, the
-//! app stops reading the stream on the next connect. Loud, not silent.
+//! The shell — the webview that prints tickets and refreshes the dashboard — needs this channel,
+//! and it has no key: it has a person's session. It asks `POST /api/events/ticket` for a ticket
+//! **bound to that session** ([`TicketHolder::Session`]), and the socket it opens hears what that
+//! person's role reads through the normal API ([`StreamAudience::Session`]): the frames of the
+//! modules with a query their permissions let through, the hub's housekeeping frames, and the
+//! hub's own named events (a flow's question names the customer) only if they administer the hub.
+//! Until hub#2501 the ticket was bound to a `read_only` key the hub minted for itself, so a
+//! cashier's till heard every customer, every WhatsApp and every approval of the business. There
+//! is still no `if this_is_our_app` anywhere in this file: the person is the principal, exactly as
+//! on the query door.
 //!
 //! # How the credential travels
 //!
@@ -59,7 +62,7 @@
 //! | [`ERR_UNAUTHENTICATED`] | 401 | no credential, or one this hub does not recognise — including a key of **another hub**, whose rows are not this hub's (the *message* tells them apart, the code does not: existence is not something to leak) |
 //! | [`ERR_READ_REQUIRED`] | 403 | a valid key that may not read (a `write_only` feed). It is a different answer from "who are you?" on purpose: if both refusals said the same thing, either guard could be deleted and every test would still pass |
 //! | [`ERR_NOT_READY`] | — | any frame on `/ws` before the socket authenticated |
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -68,7 +71,8 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyPrincipal, ApiKeyScope};
+use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyScope};
+use erplora_runtime::RequestContext;
 use serde_json::{json, Value};
 
 use crate::auth;
@@ -101,12 +105,27 @@ pub const ERR_INVALID_FRAME: &str = "invalid_payload";
 /// A peer pushing more than [`MAX_FRAME_BYTES`] at a socket that may not even be authenticated.
 pub const ERR_FRAME_TOO_LARGE: &str = "events.frame_too_large";
 
+/// Who a ticket was minted for, and so who the socket it opens listens as.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TicketHolder {
+    /// An API key, by id: the socket hears what the key's scope may read ([`may_receive`]).
+    Key(String),
+    /// A person of the hub (hub#2501): the session's user and the permissions its role had when
+    /// the ticket was minted. The socket hears what those permissions read through the normal API
+    /// ([`StreamAudience::Session`]) — never the hub's blanket key, which used to hand a cashier
+    /// every event of the business.
+    Session {
+        user_id: String,
+        permissions: HashSet<String>,
+    },
+}
+
 /// One minted, not yet spent, stream ticket.
 struct Ticket {
     /// The hub it was minted in. One process can serve several (ADR-0005), so a ticket that
     /// forgot this would be a door between tenants.
     hub_id: String,
-    key_id: String,
+    holder: TicketHolder,
     expires_at: i64,
 }
 
@@ -128,6 +147,11 @@ impl std::fmt::Debug for StreamTickets {
 impl StreamTickets {
     /// Mints a ticket for `key_id` in `hub_id`, valid for [`TICKET_TTL_SECONDS`] from `now`.
     pub fn mint_at(&self, hub_id: &str, key_id: &str, now: i64) -> String {
+        self.mint_for_at(hub_id, TicketHolder::Key(key_id.to_string()), now)
+    }
+
+    /// Mints a ticket for `holder` in `hub_id`, valid for [`TICKET_TTL_SECONDS`] from `now`.
+    pub fn mint_for_at(&self, hub_id: &str, holder: TicketHolder, now: i64) -> String {
         let ticket = format!("{TICKET_PREFIX}{}", random_ticket_secret());
         if let Ok(mut held) = self.inner.lock() {
             // Sweep what nobody came back for, so a hub that runs for months does not grow a map
@@ -137,7 +161,7 @@ impl StreamTickets {
                 ticket.clone(),
                 Ticket {
                     hub_id: hub_id.to_string(),
-                    key_id: key_id.to_string(),
+                    holder,
                     expires_at: now + TICKET_TTL_SECONDS,
                 },
             );
@@ -145,23 +169,36 @@ impl StreamTickets {
         ticket
     }
 
-    /// Spends a ticket: `Some(key_id)` once, and never again. A ticket of another hub, or an
+    /// Spends a ticket: `Some(holder)` once, and never again. A ticket of another hub, or an
     /// expired one, resolves to nothing **and is not spent** — refusing it must not be a way to
     /// burn somebody else's ticket.
-    pub fn redeem_at(&self, ticket: &str, hub_id: &str, now: i64) -> Option<String> {
+    pub fn redeem_at(&self, ticket: &str, hub_id: &str, now: i64) -> Option<TicketHolder> {
         let mut held = self.inner.lock().ok()?;
         let found = held.get(ticket)?;
         if found.hub_id != hub_id || found.expires_at <= now {
             return None;
         }
-        held.remove(ticket).map(|t| t.key_id)
+        held.remove(ticket).map(|t| t.holder)
     }
 
     pub fn mint(&self, hub_id: &str, key_id: &str) -> String {
         self.mint_at(hub_id, key_id, chrono::Utc::now().timestamp())
     }
 
-    pub fn redeem(&self, ticket: &str, hub_id: &str) -> Option<String> {
+    /// Mints a ticket for a person's session (hub#2501): the socket it opens listens with the
+    /// permissions of `ctx`, not with any key.
+    pub fn mint_session(&self, hub_id: &str, ctx: &RequestContext) -> String {
+        self.mint_for_at(
+            hub_id,
+            TicketHolder::Session {
+                user_id: ctx.user_id.clone(),
+                permissions: ctx.permissions.clone(),
+            },
+            chrono::Utc::now().timestamp(),
+        )
+    }
+
+    pub fn redeem(&self, ticket: &str, hub_id: &str) -> Option<TicketHolder> {
         self.redeem_at(ticket, hub_id, chrono::Utc::now().timestamp())
     }
 
@@ -302,11 +339,97 @@ pub fn may_receive(scope: &ApiKeyScope, frame: &WsEvent) -> bool {
     }
 }
 
+/// The hub's own frames that say nothing about anybody and that every screen needs, whoever is
+/// looking at it (hub#2501): an app was installed, updated, switched on or off, removed — the
+/// menu refreshes — and a ticket was queued for a print role, which carries the role and nothing
+/// else (`print.rs` says so on purpose). Anything else that belongs to no module is a fact about
+/// the business with content in it, and goes only to whoever can see it ([`StreamAudience`]).
+fn is_housekeeping(frame: &WsEvent) -> bool {
+    match frame.get("type").and_then(Value::as_str) {
+        Some(kind) => kind.starts_with("module.") || kind == crate::print_ws::EVENT_JOB_QUEUED,
+        None => false,
+    }
+}
+
+/// **Who a live connection is talking to**, decided once when it authenticates.
+///
+/// | Audience | Gets |
+/// |----------|------|
+/// | an API key | [`may_receive`] on its scope (hub#529) |
+/// | a person's session (hub#2501) | the frames of the modules their role may read through the normal API ([`erplora_runtime::Registry::modules_readable_by`] — the query door's own predicate), the hub's housekeeping frames, and the hub's own named events (a flow's question, which names the customer) only if they administer the hub, which is who the approvals tray serves |
+///
+/// The default grants **nothing**, so a connection that somehow reached the fan-out without
+/// authenticating is sent nothing rather than everything.
+#[derive(Debug, Clone)]
+pub enum StreamAudience {
+    Key(ApiKeyScope),
+    Session {
+        /// The session holds `*` (dev mode, the runtime's own contexts): it reads everything.
+        wildcard: bool,
+        /// It holds [`erplora_runtime::hub_users::ADMINISTER_PERMISSION`].
+        administers: bool,
+        /// Active modules with at least one query its permissions let through.
+        modules: HashSet<String>,
+    },
+}
+
+impl Default for StreamAudience {
+    fn default() -> Self {
+        StreamAudience::Key(ApiKeyScope::default())
+    }
+}
+
+impl StreamAudience {
+    /// The session audience of `ctx`, read against the modules installed right now.
+    pub fn of_session(registry: &erplora_runtime::Registry, ctx: &RequestContext) -> Self {
+        StreamAudience::Session {
+            wildcard: ctx
+                .permissions
+                .contains(erplora_runtime::permissions::WILDCARD),
+            administers: erplora_runtime::permissions::has(
+                ctx,
+                erplora_runtime::hub_users::ADMINISTER_PERMISSION,
+            ),
+            modules: registry.modules_readable_by(ctx),
+        }
+    }
+
+    /// Whether this audience is entitled to `frame`. **One rule for both transports**: the socket
+    /// loop and the SSE stream both ask here.
+    pub fn may_receive(&self, frame: &WsEvent) -> bool {
+        match self {
+            StreamAudience::Key(scope) => may_receive(scope, frame),
+            StreamAudience::Session {
+                wildcard,
+                administers,
+                modules,
+            } => {
+                if *wildcard {
+                    return true;
+                }
+                match frame.get(FRAME_MODULE).and_then(Value::as_str) {
+                    Some(module) => modules.contains(module),
+                    None => is_housekeeping(frame) || *administers,
+                }
+            }
+        }
+    }
+}
+
+/// What a credential that may listen is granted.
+#[derive(Debug)]
+pub struct StreamGrant {
+    /// Whose connections the per-holder cap counts ([`StreamLimiter`]): the key's id, or
+    /// `session:<user id>` for a person — so one person's tabs never lock another person out.
+    pub holder_id: String,
+    pub audience: StreamAudience,
+}
+
 /// What presenting a credential to this channel gets you.
 #[derive(Debug)]
 pub enum StreamAuth {
-    /// A key of this hub that may read.
-    Granted(Box<ApiKeyPrincipal>),
+    /// A key of this hub that may read, or a person's session ticket.
+    Granted(Box<StreamGrant>),
     /// No credential, or one this hub does not know. The string is the *message* — it tells
     /// "you sent none" from "yours is not valid here" without the code leaking which.
     Unauthenticated(String),
@@ -360,7 +483,17 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
 
     let resolved = if credential.starts_with(TICKET_PREFIX) {
         match st.stream_tickets.redeem(credential, &hub_id) {
-            Some(key_id) => rt.resolve_api_key_id(&key_id).await,
+            Some(TicketHolder::Key(key_id)) => rt.resolve_api_key_id(&key_id).await,
+            Some(TicketHolder::Session {
+                user_id,
+                permissions,
+            }) => {
+                let ctx = RequestContext::new(hub_id.clone(), user_id.clone(), permissions);
+                return StreamAuth::Granted(Box::new(StreamGrant {
+                    holder_id: format!("session:{user_id}"),
+                    audience: StreamAudience::of_session(rt.registry(), &ctx),
+                }));
+            }
             None => Ok(None),
         }
     } else {
@@ -369,7 +502,10 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
     match resolved {
         Ok(Some(principal)) => {
             if principal.scope.can_read() {
-                StreamAuth::Granted(Box::new(principal))
+                StreamAuth::Granted(Box::new(StreamGrant {
+                    holder_id: principal.key_id,
+                    audience: StreamAudience::Key(principal.scope),
+                }))
             } else {
                 StreamAuth::ReadRequired
             }
@@ -407,9 +543,10 @@ fn refused(auth: &StreamAuth) -> Response {
 
 /// `POST /api/events/ticket` — **the app asking the hub for its own credential.**
 ///
-/// Authenticated by the hub session, so an anonymous browser cannot get one. It ensures the hub's
-/// own read-only key exists (minting it on a hub that has just been created or restored) and hands
-/// back a ticket bound to it.
+/// Authenticated by the hub session, so an anonymous browser cannot get one. The ticket is bound to
+/// **that session's permissions** (hub#2501): the socket it opens hears what the person's role may
+/// read, not what the hub's own blanket key may — which used to give a cashier every event of the
+/// business, customers and flow questions included.
 pub async fn mint_ticket(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let hub_id = st.hub_id();
     let arc = match st.runtime_for(&hub_id).await {
@@ -417,21 +554,20 @@ pub async fn mint_ticket(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.read().await;
-    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({
-                "ok": false,
-                "error": { "code": ERR_UNAUTHENTICATED, "message": e.message() }
-            })),
-        )
-            .into_response();
-    }
-    let key_id = match rt.ensure_app_api_key().await {
-        Ok(id) => id,
-        Err(e) => return crate::err_response(e),
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({
+                    "ok": false,
+                    "error": { "code": ERR_UNAUTHENTICATED, "message": e.message() }
+                })),
+            )
+                .into_response();
+        }
     };
-    let ticket = st.stream_tickets.mint(&hub_id, &key_id);
+    let ticket = st.stream_tickets.mint_session(&hub_id, &ctx);
     Json(json!({
         "ok": true,
         "data": { "ticket": ticket, "expires_in_seconds": TICKET_TTL_SECONDS }
@@ -450,13 +586,13 @@ pub async fn sse(
     Query(q): Query<StreamQuery>,
 ) -> Response {
     let credential = http_credential(&headers, q.ticket.as_deref());
-    let principal = match authenticate(&st, credential.as_deref()).await {
-        StreamAuth::Granted(p) => p,
+    let grant = match authenticate(&st, credential.as_deref()).await {
+        StreamAuth::Granted(g) => g,
         refusal => return refused(&refusal),
     };
     // hub#531: the per-key cap applies to SSE too — `EventSource` reconnects on its own, and a bug
     // that spawns reconnections without closing the old one reaches the ceiling the same way.
-    let slot = match st.stream_limiter.acquire(&principal.key_id) {
+    let slot = match st.stream_limiter.acquire(&grant.holder_id) {
         Some(s) => s,
         None => {
             return (
@@ -473,21 +609,22 @@ pub async fn sse(
         }
     };
     let rx = st.events.subscribe();
-    // hub#529: the same filter the socket applies, from the same function. The scope travels with
-    // the stream so a later frame is judged by the key that opened it, not by a re-read.
-    let scope = principal.scope.clone();
-    let stream =
-        futures_util::stream::unfold((rx, slot, scope), |(mut rx, slot, scope)| async move {
+    // hub#529, hub#2501: the same filter the socket applies, from the same function. The audience
+    // travels with the stream so a later frame is judged by who opened it, not by a re-read.
+    let audience = grant.audience;
+    let stream = futures_util::stream::unfold(
+        (rx, slot, audience),
+        |(mut rx, slot, audience)| async move {
             loop {
                 match rx.recv().await {
                     Ok(ev) => {
-                        if !may_receive(&scope, &ev) {
+                        if !audience.may_receive(&ev) {
                             continue;
                         }
                         let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
                         return Some((
                             Ok::<Event, std::convert::Infallible>(Event::default().data(data)),
-                            (rx, slot, scope),
+                            (rx, slot, audience),
                         ));
                     }
                     // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
@@ -496,7 +633,8 @@ pub async fn sse(
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
                 }
             }
-        });
+        },
+    );
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
@@ -520,12 +658,12 @@ pub async fn upgrade(
 /// "not authenticated" state — there is no boolean anybody can forget to set.
 #[derive(Debug, Default)]
 pub struct StreamConnection {
+    /// Whose connections the cap counts: a key id, or `session:<user id>` ([`StreamGrant`]).
     key_id: String,
-    /// What the key that opened this socket may read (hub#529). The default —
-    /// [`ApiKeyAccess::Custom`] with no modules — grants **nothing**, so a socket that somehow
-    /// reached the fan-out without going through [`handle_frame`] is sent nothing rather than
-    /// everything.
-    scope: ApiKeyScope,
+    /// What the credential that opened this socket may read (hub#529, hub#2501). The default
+    /// grants **nothing**, so a socket that somehow reached the fan-out without going through
+    /// [`handle_frame`] is sent nothing rather than everything.
+    audience: StreamAudience,
 }
 
 impl StreamConnection {
@@ -536,7 +674,7 @@ impl StreamConnection {
     /// Whether this socket is entitled to `frame`. Delegates to [`may_receive`] — the socket loop
     /// must not grow a second copy of the rule.
     pub fn may_receive(&self, frame: &WsEvent) -> bool {
-        may_receive(&self.scope, frame)
+        self.audience.may_receive(frame)
     }
 }
 
@@ -567,10 +705,12 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
         .get("type")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    if frame_type != "auth" {
-        // This channel speaks ONE client frame. Before `auth` that is an unauthenticated peer
+    if frame_type != "auth" || conn.is_ready() {
+        // This channel speaks ONE client frame, ONCE. Before `auth` that is an unauthenticated peer
         // trying its luck and the socket goes; after it, a client talking nonsense on a channel
-        // that only listens — two different facts, so two different answers.
+        // that only listens — two different facts, so two different answers. A second `auth` is
+        // the second kind (hub#2501): a socket keeps the audience it opened with, so a cashier's
+        // socket cannot be widened by presenting somebody else's key.
         let (code, message) = if conn.is_ready() {
             (
                 ERR_INVALID_FRAME,
@@ -592,12 +732,16 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
         .and_then(Value::as_str)
         .unwrap_or_default();
     match authenticate(st, Some(token)).await {
-        StreamAuth::Granted(principal) => {
-            conn.key_id = principal.key_id.clone();
+        StreamAuth::Granted(grant) => {
+            let StreamGrant {
+                holder_id,
+                audience,
+            } = *grant;
+            conn.key_id = holder_id;
             // hub#529: what this socket may be sent is decided here, once, from the credential it
             // presented — not re-read per frame, where a revoked key would change the answer
             // mid-stream in a way nothing tests.
-            conn.scope = principal.scope.clone();
+            conn.audience = audience;
             Reply {
                 frame: json!({ "type": "stream.ready" }),
                 keep_open: true,
@@ -631,17 +775,21 @@ async fn stream_loop(mut socket: WebSocket, st: AppState, handshake_credential: 
     let mut rx = st.events.subscribe();
     // A client that could set a header is already authenticated; it never sends a frame.
     if let Some(credential) = handshake_credential {
-        if let StreamAuth::Granted(principal) = authenticate(&st, Some(&credential)).await {
+        if let StreamAuth::Granted(grant) = authenticate(&st, Some(&credential)).await {
             // hub#531: a correct, read-entitled key that has opened too many sockets is a third
             // refusal. The handshake path closes the socket right here.
-            match st.stream_limiter.acquire(&principal.key_id) {
+            match st.stream_limiter.acquire(&grant.holder_id) {
                 Some(s) => {
                     slot = Some(s);
-                    conn.key_id = principal.key_id.clone();
-                    // hub#529: the handshake path sets the scope too. Setting only the id here is
-                    // exactly how a socket would end up entitled to nothing (or, before the
+                    let StreamGrant {
+                        holder_id,
+                        audience,
+                    } = *grant;
+                    conn.key_id = holder_id;
+                    // hub#529: the handshake path sets the audience too. Setting only the id here
+                    // is exactly how a socket would end up entitled to nothing (or, before the
                     // fail-closed default, to everything).
-                    conn.scope = principal.scope.clone();
+                    conn.audience = audience;
                 }
                 None => {
                     let frame = json!({
@@ -1011,8 +1159,8 @@ mod tests {
         let t = tickets.mint_at(HUB_ID, "key-1", 1_000);
         assert!(t.starts_with(TICKET_PREFIX));
         assert_eq!(
-            tickets.redeem_at(&t, HUB_ID, 1_000).as_deref(),
-            Some("key-1")
+            tickets.redeem_at(&t, HUB_ID, 1_000),
+            Some(TicketHolder::Key("key-1".into()))
         );
         assert_eq!(
             tickets.redeem_at(&t, HUB_ID, 1_000),
@@ -1032,13 +1180,13 @@ mod tests {
         let second = tickets.mint_at(HUB_ID, "key-1", 1_001);
 
         assert_eq!(
-            tickets.redeem_at(&first, HUB_ID, 1_001).as_deref(),
-            Some("key-1"),
+            tickets.redeem_at(&first, HUB_ID, 1_001),
+            Some(TicketHolder::Key("key-1".into())),
             "the first tab's ticket survived the second tab asking for one"
         );
         assert_eq!(
-            tickets.redeem_at(&second, HUB_ID, 1_001).as_deref(),
-            Some("key-1")
+            tickets.redeem_at(&second, HUB_ID, 1_001),
+            Some(TicketHolder::Key("key-1".into()))
         );
     }
 
@@ -1095,8 +1243,8 @@ mod tests {
         let t = tickets.mint_at(HUB_ID, "key-1", 1_000);
         assert_eq!(tickets.redeem_at(&t, NEIGHBOUR_ID, 1_000), None);
         assert_eq!(
-            tickets.redeem_at(&t, HUB_ID, 1_000).as_deref(),
-            Some("key-1"),
+            tickets.redeem_at(&t, HUB_ID, 1_000),
+            Some(TicketHolder::Key("key-1".into())),
             "the rightful owner can still spend it"
         );
     }
@@ -1127,18 +1275,21 @@ mod tests {
         assert_eq!(tickets.redeem_at("erpl_tkt_made_up", HUB_ID, 1_000), None);
     }
 
-    /// The app's route end to end: session → key issued → ticket → socket open. This is the
+    /// The app's route end to end: session → ticket from the real door → socket open. This is the
     /// **only** thing standing between the shell and a dead dashboard, so it is asserted through
     /// the real door, not through a helper that fabricates an authenticated context.
     #[tokio::test]
     async fn the_app_reaches_the_stream_with_a_ticket_it_asked_for() {
         let f = fixture().await;
-        let key_id = {
-            let arc = f.st.runtime_for(&f.st.hub_id()).await.unwrap();
-            let rt = arc.read().await;
-            rt.ensure_app_api_key().await.unwrap()
-        };
-        let ticket = f.st.stream_tickets.mint(&f.st.hub_id(), &key_id);
+        let mut headers = HeaderMap::new();
+        headers.insert("x-hub-session", f.session.parse().unwrap());
+        let resp = mint_ticket(State(f.st.clone()), headers).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&bytes).unwrap();
+        let ticket = body["data"]["ticket"].as_str().unwrap().to_string();
 
         let mut conn = StreamConnection::default();
         let r = send(&f.st, &mut conn, auth_frame(&ticket)).await;
