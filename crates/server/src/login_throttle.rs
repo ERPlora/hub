@@ -6,7 +6,10 @@
 //! attack expensive. This module is that second half.
 //!
 //! Shape of the guard: per identity, N consecutive failures ⇒ locked for a fixed window; a
-//! success clears the counter. In-memory on purpose — the lock protects a login that only this
+//! success clears the counter. A door where even an accepted try tells the caller something (the
+//! own-PIN change, hub#2499) counts **attempts** instead: every one spends the budget, and since no
+//! success ever clears it, they are forgotten once [`LOCK_WINDOW`] has passed since the first one.
+//! In-memory on purpose — the lock protects a login that only this
 //! process serves, and a restart is not a free pass (an attacker cannot trigger one).
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -23,6 +26,17 @@ struct Attempts {
     failures: u32,
     /// When the current lock expires. `None` = not locked.
     locked_until: Option<Instant>,
+    /// First attempt of the current window, for the identities counted with
+    /// [`LoginThrottle::record_attempt`]. `None` for the login doors, whose counter a success clears.
+    window_start: Option<Instant>,
+}
+
+impl Attempts {
+    /// The attempt window closed without a lock: nothing left to hold against the identity.
+    fn window_elapsed(&self, now: Instant) -> bool {
+        self.window_start
+            .is_some_and(|start| now.duration_since(start) >= LOCK_WINDOW)
+    }
 }
 
 /// Per-identity failure counters. Cheap enough to keep behind one `Mutex`: it is touched once per
@@ -57,6 +71,13 @@ impl LoginThrottle {
         self.record_failure_at(identity, Instant::now())
     }
 
+    /// Records an attempt that spends the budget **whatever its outcome** (hub#2499): the own-PIN
+    /// change, where an accepted number is as informative as a refused one. Same threshold and lock
+    /// as [`Self::record_failure`]; never cleared by a success, only by the window running out.
+    pub fn record_attempt(&self, identity: &str) {
+        self.record_attempt_at(identity, Instant::now())
+    }
+
     /// Clears the counter after a successful login: an honest user who mistyped twice starts
     /// fresh, so the guard never accumulates against normal use.
     pub fn record_success(&self, identity: &str) {
@@ -84,6 +105,19 @@ impl LoginThrottle {
     fn record_failure_at(&self, identity: &str, now: Instant) {
         let mut entries = self.lock();
         let entry = entries.entry(identity.to_string()).or_default();
+        entry.failures += 1;
+        if entry.failures >= MAX_FAILURES {
+            entry.locked_until = Some(now + LOCK_WINDOW);
+        }
+    }
+
+    fn record_attempt_at(&self, identity: &str, now: Instant) {
+        let mut entries = self.lock();
+        let entry = entries.entry(identity.to_string()).or_default();
+        if entry.window_elapsed(now) {
+            *entry = Attempts::default();
+        }
+        entry.window_start.get_or_insert(now);
         entry.failures += 1;
         if entry.failures >= MAX_FAILURES {
             entry.locked_until = Some(now + LOCK_WINDOW);
@@ -165,5 +199,66 @@ mod tests {
         }
         let secs = t.locked_for("Admin").expect("locked");
         assert!(secs > 0 && secs <= LOCK_WINDOW.as_secs());
+    }
+
+    #[test]
+    fn attempts_lock_at_the_same_threshold() {
+        let t = LoginThrottle::new();
+        let now = Instant::now();
+        for _ in 0..MAX_FAILURES - 1 {
+            t.record_attempt_at("pin_change:u-1", now);
+            assert!(t.locked_for_at("pin_change:u-1", now).is_none());
+        }
+        t.record_attempt_at("pin_change:u-1", now);
+        assert!(t.locked_for_at("pin_change:u-1", now).is_some());
+    }
+
+    /// hub#2499: an attempt counts whatever its outcome, so nothing clears the counter but time.
+    /// Without a window, somebody changing their PIN once a month would hit the lock on the fifth.
+    #[test]
+    fn attempts_older_than_the_window_are_forgotten() {
+        let t = LoginThrottle::new();
+        let start = Instant::now();
+        for _ in 0..MAX_FAILURES - 1 {
+            t.record_attempt_at("pin_change:u-1", start);
+        }
+        let later = start + LOCK_WINDOW + Duration::from_secs(1);
+        t.record_attempt_at("pin_change:u-1", later);
+        assert!(
+            t.locked_for_at("pin_change:u-1", later).is_none(),
+            "the four old attempts fell out of the window"
+        );
+    }
+
+    /// The window starts at the first attempt: spacing them out inside it does not reset it.
+    #[test]
+    fn attempts_inside_the_window_add_up() {
+        let t = LoginThrottle::new();
+        let start = Instant::now();
+        let step = LOCK_WINDOW / (MAX_FAILURES + 1);
+        for i in 0..MAX_FAILURES {
+            t.record_attempt_at("pin_change:u-1", start + step * i);
+        }
+        let last = start + step * (MAX_FAILURES - 1);
+        assert!(t.locked_for_at("pin_change:u-1", last).is_some());
+    }
+
+    /// The window runs from the FIRST attempt, not from the latest: a later attempt does not push
+    /// the old ones forward. Here two attempts open the window, and the rest arrive just after it
+    /// closed — a fresh window that holds three, not five.
+    #[test]
+    fn the_window_runs_from_the_first_attempt() {
+        let t = LoginThrottle::new();
+        let start = Instant::now();
+        t.record_attempt_at("pin_change:u-1", start);
+        t.record_attempt_at("pin_change:u-1", start + LOCK_WINDOW / 2);
+        let next = start + LOCK_WINDOW + Duration::from_secs(1);
+        for _ in 0..MAX_FAILURES - 2 {
+            t.record_attempt_at("pin_change:u-1", next);
+        }
+        assert!(
+            t.locked_for_at("pin_change:u-1", next).is_none(),
+            "the first two attempts fell out of the window that started with them"
+        );
     }
 }

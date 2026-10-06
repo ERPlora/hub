@@ -358,7 +358,7 @@ Pasos:
 4. «PIN actualizado».
 Entra: la sesión; la longitud del PIN del negocio.
 Sale: pide al hub fijar el PIN propio (`/api/auth/set-pin`), con el actual si lo había.
-Si falla: longitud distinta: «El PIN debe tener {n} dígitos.»; los dos no coinciden: «Los dos PIN no coinciden.»; fácil de adivinar: «Ese PIN se adivina a la primera…»; ya lo usa otra persona: «Ese PIN ya lo tiene otro usuario activo…»; actual erróneo: «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.». Otro fallo: «No se pudo guardar el perfil».
+Si falla: longitud distinta: «El PIN debe tener {n} dígitos.»; los dos no coinciden: «Los dos PIN no coinciden.»; fácil de adivinar: «Ese PIN se adivina a la primera…»; ya lo usa otra persona: «Ese PIN ya lo tiene otro usuario activo…»; actual erróneo: «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; cinco intentos en cinco minutos (también los que salieron bien, HUB-F132): «Demasiados intentos de cambiar el PIN. Espera {minutes} minutos y vuelve a intentarlo.» (sin el tiempo: «…Espera unos minutos y vuelve a intentarlo.»). Otro fallo: «No se pudo guardar el perfil».
 Implicados: HUB-F132, REC_ALTA-F16
 QA: ninguno
 
@@ -507,8 +507,6 @@ Se resuelven con `market-decision`; no las decide el worker.
   `src/lib/entitlement.ts` solo pone `unknown` o `unlocked`, nunca `needs_activation`.
 - Manual 01: «En móvil, las acciones secundarias se agrupan en **Más**»: el botón no tiene texto, es
   ⋮ con el nombre accesible «Más opciones».
-- Manual 03 («Usa Perfil para el PIN propio»): Mi perfil muestra «Ese PIN ya lo tiene otro usuario
-  activo…» sin freno, un oráculo del PIN de otros (hub#2499, HUB_SHELL-F22).
 - `es.ts` `login.popoverBody` («Si no la marcas, siempre tendrás que iniciar sesión con email») es
   falso: el hub vuelve de confianza el dispositivo en todo acceso con cuenta (HUB_SHELL-F01).
 - `es.ts` `shell.changeHubBody` («Este dispositivo cerrará la sesión de este negocio…»): no la cierra

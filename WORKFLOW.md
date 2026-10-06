@@ -256,7 +256,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F112 | Subir la foto, el vídeo o el PDF de la cabecera de un WhatsApp | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F130 | Entrar con la cuenta de erplora.com | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F131 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho | [acceso.md](workflow/acceso.md) |
-| HUB-F132 | Elegir o cambiar el propio PIN | parcial | [acceso.md](workflow/acceso.md) |
+| HUB-F132 | Elegir o cambiar el propio PIN | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F133 | Entrar con PIN | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F134 | Entrar pasando la placa | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F135 | Frenar a quien prueba PIN o sesiones | hecho | [acceso.md](workflow/acceso.md) |

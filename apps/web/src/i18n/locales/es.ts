@@ -533,6 +533,10 @@ export default {
     setPin: 'Establecer PIN',
     pinSaved: 'PIN actualizado',
     pinMismatch: 'Los dos PIN no coinciden.',
+    // hub#2499: every try spends the budget, the accepted ones too — so not «failed attempts».
+    pinTooManyAttempts:
+      'Demasiados intentos de cambiar el PIN. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados intentos de cambiar el PIN. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados intentos de cambiar el PIN. Espera unos minutos y vuelve a intentarlo.',
   },
   // hub#358 — «este dispositivo»: si esta terminal pregunta quién la está usando. El texto dice la
   // CONSECUENCIA de cada modo, nunca su nombre técnico: el dueño de un bar tiene que poder deducir,
