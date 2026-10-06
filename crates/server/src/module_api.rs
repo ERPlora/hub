@@ -49,13 +49,15 @@ pub(crate) async fn request_install(
         }));
     };
 
-    let mut rt = st.runtime.write().await;
+    // hub#2508: no runtime lock while erplora.com answers and the zip downloads — only to register
+    // it — so the till keeps charging on every device; `module_ops` serializes app changes.
+    let _module_ops = st.module_ops.lock().await;
     let result = install::install_from_cloud(
         &st.marketplace_http,
         &st.config.cloud_base_url,
         &st.config.module_cache,
         &auth,
-        &mut rt,
+        &*st.runtime,
         &req.module_id,
         &req.version,
         &on_progress,
@@ -65,8 +67,9 @@ pub(crate) async fn request_install(
 
     match result {
         Ok(installed) => {
-            let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
-            drop(rt);
+            let chunks =
+                ingest::collect_chunks(st.runtime.read().await.registry(), &installed.module_id);
+            drop(_module_ops);
             index_module_embeddings(&st, &auth, &installed.module_id, &installed.version, chunks)
                 .await;
 
@@ -198,6 +201,8 @@ pub(crate) async fn update_module(
             .into_response();
     };
 
+    // hub#2508: one app change at a time, and no runtime lock while erplora.com answers.
+    let _module_ops = st.module_ops.lock().await;
     // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
     let installed = {
         let rt = st.runtime.read().await;
@@ -216,18 +221,15 @@ pub(crate) async fn update_module(
         .unwrap_or_default()
         .version
         .unwrap_or_default();
-    let target = {
-        let rt = st.runtime.read().await;
-        install::resolve_update_target(
-            &st.marketplace_http,
-            &st.config.cloud_base_url,
-            &auth,
-            &rt,
-            &module_id,
-            &requested,
-        )
-        .await
-    };
+    let target = install::resolve_update_target(
+        &st.marketplace_http,
+        &st.config.cloud_base_url,
+        &auth,
+        &install::RuntimeAccess::from(&*st.runtime),
+        &module_id,
+        &requested,
+    )
+    .await;
 
     // Mismas fases que instalar (`resolving → downloading → verifying → installing`): la card del
     // catálogo ya sabe pintarlas, así que actualizar se ve igual de vivo que instalar.
@@ -259,13 +261,12 @@ pub(crate) async fn update_module(
         let on_progress = &on_progress;
         let first_error = first_error.clone();
         async move {
-            let mut rt = st.runtime.write().await;
             let result = install::update_from_cloud(
                 &st.marketplace_http,
                 &st.config.cloud_base_url,
                 &st.config.module_cache,
                 &auth,
-                &mut rt,
+                &*st.runtime,
                 &module_id,
                 &version,
                 on_progress,
@@ -1032,6 +1033,7 @@ pub(crate) async fn uninstall_module(
     body: Option<Json<UninstallReq>>,
 ) -> Response {
     let force = body.map(|Json(b)| b.force).unwrap_or_default();
+    let _module_ops = st.module_ops.lock().await;
     let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);

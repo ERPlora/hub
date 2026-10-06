@@ -40,7 +40,7 @@ Para la plataforma de aplicaciones se adopta esto, no más:
 ## Flujos
 
 ### HUB-F19 Instalar una aplicación del catálogo
-Estado: parcial — mientras se instala una app (descarga, firma, migraciones, semilla y aviso a ERPlora incluidos) el hub no atiende ninguna petición —ni la caja, ni el menú, ni la comprobación de salud—, sin tope total de tiempo; un fallo a mitad deja migraciones, semilla y dependencias aplicadas (leído en el código, sin ejecutar)
+Estado: parcial — sin tope total de tiempo: una descarga lenta que no se corta tiene la instalación abierta sin límite y deja esperando a los demás cambios de apps (hub#2556); un fallo a mitad deja migraciones, semilla y dependencias aplicadas (hub#2557)
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
@@ -51,7 +51,7 @@ Pasos:
 5. Guarda una copia del paquete en la base del propio hub, avisa a ERPlora de que está instalada e indexa sus textos para el asistente.
 6. Las pantallas reciben `module.installed` y refrescan el menú; la respuesta dice qué dependencias se instalaron de paso.
 Entra: `POST /api/modules/request-install` con sesión de administrador y la credencial de máquina del hub; el catálogo y los paquetes de ERPlora. También instalan por aquí la importación de una plantilla (Ajustes › Datos y copias) y la reposición del arranque (HUB-F25).
-Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Durante todo el proceso el hub mantiene su candado de escritura: cada petición (consultas, órdenes, menú, autenticación, `/readyz`) espera; cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando retiene el hub sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`); y por esa vía la descarga de erplora.com no mira el interruptor de corte de la app (solo la retirada y el derecho de uso): una app cortada se instala, y la bloquea después el permiso firmado (HUB-F162).
+Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Mientras pregunta a ERPlora, descarga y verifica, el hub sigue atendiendo todo lo demás (consultas, órdenes —la caja—, menú, autenticación, `/readyz`): su candado de escritura solo se toma para registrar cada app ya verificada (del paso 4, de validar a dejarla activa) (hub#2508). Los cambios de apps —instalar, actualizar, importar una plantilla y desinstalar— van de uno en uno, en el orden en que llegan; encender y apagar no esperan. Cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando hace esperar a los siguientes cambios sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`); y por esa vía la descarga de erplora.com no mira el interruptor de corte de la app (solo la retirada y el derecho de uso): una app cortada se instala, y la bloquea después el permiso firmado (HUB-F162).
 En este mismo documento se apoya en: HUB-F62 (Ejecutar las tareas programadas de los módulos), HUB-F104 (Servir las recetas de fábrica de los módulos), HUB-F235 (Importar un fichero o una plantilla).
 Si falla: dependencia de pago sin contratar, `install_blocked` (409) con lo que hay que comprar; versión inexistente o app fuera del catálogo del hub, 404; firma rechazada, `install_bad_signature` (403); un paquete que no pasa la validación o una migración que falla, `install_runtime_failed` (422) —el motivo concreto se pierde en el código—, y lo que ya se aplicó (migraciones, filas de semilla, dependencias instaladas de paso, declaración del régimen fiscal) se queda; la app necesita un hub más nuevo, `core_version_too_old` (422): «Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.»; ERPlora no contesta a tiempo, «ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.» (424). El sobre de error es `{ok: false, error: "<frase>", code}`, con el código en la raíz. Sin sesión de administrador, 401 (también con sesión que no es de administrador). Ningún fallo de instalación sale como 5xx. Fallar al guardar la copia, al avisar a ERPlora o al indexar no deshace la instalación.
 Implicados: HUB_SHELL-F109, HUB_SHELL-F110, HUB_SHELL-F111, HUB_SHELL-F112, HUB_SHELL-F113, HUB_SHELL-F115, REC_ALTA-F08, SAAS_DASHBOARD-F192, SAAS_PUBLIC-F03, SAAS_PUBLIC-F05, SAAS_PUBLIC-F16, SAAS_PUBLIC-F17, SAAS_PUBLIC-F18, SAAS_PUBLIC-F19
@@ -104,14 +104,14 @@ Implicados: SCHEDULES-F12
 QA: BD-01
 
 ### HUB-F23 Actualizar una aplicación
-Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena); actualizar paraliza el hub entero como instalar (HUB-F19); un fallo deja migraciones, semilla y dependencias de la versión nueva; actualizar una app apagada la enciende (leído en el código, sin ejecutar)
+Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena) (hub#2546); sin tope total de tiempo, como instalar (hub#2556); un fallo deja migraciones, semilla y dependencias de la versión nueva; actualizar una app apagada la enciende (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
 1. En **Apps**, un administrador pulsa «Actualizar» en una app instalada (o elige una versión de la lista, HUB-F24).
 2. Sin versión, el hub decide: la más nueva publicada que no esté en cuarentena, nunca hacia atrás, y la que fije soporte si hay un pin. Con una versión explícita (la pide el cuerpo de la petición, basta sesión de administrador) se usa tal cual: sin el resolutor, sin pin y, si llega por el plan de ERPlora, quizá sin cuarentena. En la nube el siguiente despliegue la vuelve a subir a la última; en la app instalada se queda.
 3. Si ya está en esa versión, contesta sin hacer nada.
-4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo.
+4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo, en la misma cola de cambios de apps y con el hub atendiendo mientras pregunta a ERPlora y descarga.
 5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. La app queda encendida aunque estuviera apagada.
 6. Anota el cambio en el historial de actualizaciones, reindexa sus textos para el asistente y avisa `module.updated` y `module.installed`.
 Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial de máquina; versión opcional.
@@ -160,7 +160,7 @@ Pasos:
 2. Una app instalada o actualizada por la otra copia se carga exactamente en la versión anotada: de su carpeta, de la copia guardada o, si no hay, del catálogo.
 3. Una app quitada por la otra se olvida; una apagada o encendida por la otra cambia aquí también.
 4. Las pantallas conectadas a esta copia reciben el aviso en vivo correspondiente; al recargar una versión distinta sale `module.installed`, nunca `module.updated`, y no se reindexa el asistente.
-5. Mientras carga, esta copia mantiene su candado de escritura, descarga del catálogo incluida, y no atiende peticiones (como HUB-F19).
+5. Mientras carga, esta copia mantiene su candado de escritura, descarga del catálogo incluida, y no atiende peticiones; instalar y actualizar ya no lo hacen (HUB-F19, HUB-F23), reconciliar sí (hub#2555).
 Entra: `hub_module` y `HUB_MODULE_RECONCILE_SECS`.
 Sale: el registro de esta copia igual que la base.
 Si falla: una versión que no se puede cargar no se reintenta hasta que la base anote otra; la app sigue con lo que tenía.
@@ -204,7 +204,7 @@ Estado: parcial — forzar deja activas las apps que dependen de la quitada; en 
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
-1. Un administrador pide desinstalar una app.
+1. Un administrador pide desinstalar una app. Si hay otro cambio de apps en curso (instalar, actualizar o importar una plantilla), espera su turno en la misma cola (HUB-F19).
 2. El hub aplica, por este orden, el candado del proveedor fiscal, la pregunta al motor de la app (HUB-F28) y, salvo que se pida forzar, la comprobación de dependientes: si otras apps instaladas la necesitan, apagadas o no, lo niega y las nombra.
 3. La pantalla de Apps enseña antes las apps que dependen de ella y, si la persona confirma su pregunta de desinstalar, ya manda forzar (`force: true`): no hay un segundo paso «quitarla igualmente». Forzar solo se salta la comprobación de dependientes; los candados fiscales siguen, pero solo miran la app quitada. Las dependientes quedan activas y registradas sin su dependencia: en el siguiente arranque fallan con `missing_dependency`, la re-descarga de cada una vuelve a instalar la app quitada en su última versión y, sin catálogo, su copia local falla y la salud del hub queda en rojo.
 4. Quita sus consultas, órdenes, menú y tareas programadas, olvida los roles que solo ella declaraba (las personas conservan su rol), borra su fila y su copia guardada, y quita sus textos del índice del asistente.
@@ -313,7 +313,7 @@ QA: BD-01, BD-02
 | Instalar una app con sus dependencias | hecho | HUB-F19 |
 | Instalar sin cobrar una dependencia de pago sin consentimiento | hecho (se para y dice qué contratar) | HUB-F19 |
 | Verificar integridad y firma del paquete | hecho (firma obligatoria solo si el despliegue tiene claves) | HUB-F19 |
-| Seguir cobrando mientras se instala, actualiza o reconcilia una app | no hecho: el hub entero deja de atender, sin tope total de tiempo | HUB-F19, HUB-F23, HUB-F26 |
+| Seguir cobrando mientras se instala, actualiza o reconcilia una app | parcial: instalar, actualizar e importar una plantilla ya no paran la caja; reconciliar entre copias sí, mientras descarga (hub#2555); sin tope total de tiempo (hub#2556) | HUB-F19, HUB-F23, HUB-F26 |
 | Actualizar una app sin reiniciar y volver a la anterior si falla | hecho | HUB-F23 |
 | Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); en la nube vuelven encendidas las apagadas | HUB-F25 |
 | No bajar de versión ni saltarse el pin de soporte | parcial: un administrador, por la API con versión explícita, baja y se salta el pin | HUB-F23 |
@@ -368,8 +368,8 @@ QA: BD-01, BD-02
 
 ## Dudas abiertas
 
-Se resuelven con `market-decision`; no las decide el worker. (Que instalar o actualizar deja al hub
-entero sin atender está en las dudas comunes del índice.)
+Se resuelven con `market-decision`; no las decide el worker. (Que reconciliar deja a esa copia
+del hub sin atender mientras descarga está en las dudas comunes del índice.)
 
 1. ¿Quién guarda los ajustes de una app: solo el administrador (la pantalla) o quien tenga el
    permiso de la orden de guardar (el servidor, el asistente)? Hoy discrepan (HUB-F33, SALES-F34,
@@ -386,8 +386,8 @@ entero sin atender está en las dudas comunes del índice.)
 5. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
    - si la cuarentena se respeta con una versión explícita que llega por el plan de ERPlora (depende
      del SaaS);
-   - si `/readyz` retenido por el candado durante una instalación larga hace que Swarm reinicie el
-     contenedor (depende del `healthcheck` de `infra`);
+   - si `/readyz` retenido por el candado durante una reconciliación larga (HUB-F26) hace que Swarm
+     reinicie el contenedor (depende del `healthcheck` de `infra`);
    - si una migración que falla a la mitad se deshace sola (depende de si `erplora-db` ejecuta cada
      fichero en una transacción);
    - si `request_install`, que no pasa `module_id_is_safe` como actualizar y versiones, es explotable:

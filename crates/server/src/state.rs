@@ -1045,6 +1045,11 @@ pub struct AppState {
     /// beyond the cap queue on the semaphore instead of failing. Each permit is held for the
     /// whole life of the streamed response body, not just the handler call.
     pub media_fetch_limiter: Arc<tokio::sync::Semaphore>,
+    /// One install, update, template import or uninstall at a time (hub#2508). Installing no longer
+    /// holds the runtime's write lock while it talks to erplora.com, so this is what keeps two of
+    /// them from interleaving (or an app from being removed halfway through its update) without
+    /// making a sale wait for a download.
+    pub module_ops: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl AppState {
@@ -1110,6 +1115,7 @@ impl AppState {
             media_fetch_limiter: Arc::new(tokio::sync::Semaphore::new(
                 crate::media::MAX_CONCURRENT_MEDIA_FETCHES,
             )),
+            module_ops: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
