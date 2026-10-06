@@ -23,7 +23,9 @@ use erplora_server::daily_usage::{
     send_heartbeat, spawn_daily_turn, DailyUsageHeartbeat, PendingObligationFields,
 };
 use erplora_server::entitlement::fetch_verified_claims;
-use erplora_server::{AppState, AuthMode, HubConfig, CLOUD_CALL_TIMEOUT, CLOUD_CONNECT_TIMEOUT};
+use erplora_server::{
+    AppState, AuthMode, HubConfig, CLOUD_CALL_TIMEOUT, CLOUD_CONNECT_TIMEOUT, CLOUD_TRANSFER_TIMEOUT,
+};
 use tokio::io::AsyncReadExt;
 
 const HEARTBEAT_PATH: &str = "/api/v1/hub/device/heartbeat/";
@@ -255,16 +257,15 @@ async fn the_daily_turn_keeps_beating_when_a_cloud_call_hangs() {
     );
 }
 
-/// The other side of the ceiling: a call that streams asks for a longer one, so the assistant's
-/// answer is not cut at the shared client's limit when erplora.com pauses in the middle of it.
-#[tokio::test]
-async fn the_assistant_stream_outlives_the_shared_ceiling() {
+/// Opens the assistant's chat stream against an erplora.com that sends one frame, goes quiet for
+/// `pause` and then finishes; hands back the first frame and the rest of the stream, with the clock
+/// paused from that first frame on.
+async fn assistant_stream_pausing(pause: Duration) -> (String, axum::body::BodyDataStream) {
     use axum::body::Body;
     use axum::http::Request;
     use futures_util::StreamExt;
     use tower::ServiceExt; // oneshot
 
-    let pause = CLOUD_CALL_TIMEOUT + Duration::from_secs(30);
     let app = axum::Router::new().route(
         "/api/v1/hub/device/assistant/chat/stream/",
         axum::routing::post(move || async move {
@@ -314,7 +315,6 @@ async fn the_assistant_stream_outlives_the_shared_ceiling() {
         .await
         .unwrap();
     let mut body = response.into_body().into_data_stream();
-    let mut text = String::new();
     // Real clock until erplora.com is streaming (the session check reads the database, whose pool
     // has time limits of its own); from the first frame on, the clock is paused.
     let first = tokio::time::timeout(Duration::from_secs(10), body.next())
@@ -322,20 +322,37 @@ async fn the_assistant_stream_outlives_the_shared_ceiling() {
         .expect("the assistant stream did not start")
         .expect("the assistant stream ended before its first frame")
         .unwrap();
-    text.push_str(&String::from_utf8_lossy(&first));
-
     tokio::time::pause();
-    let started = tokio::time::Instant::now();
-    let rest = tokio::time::timeout(Duration::from_secs(3600), async {
-        let mut rest = String::new();
-        while let Some(chunk) = body.next().await {
-            rest.push_str(&String::from_utf8_lossy(&chunk.unwrap()));
+    (String::from_utf8_lossy(&first).into_owned(), body)
+}
+
+/// Reads what is left of the assistant stream. A bounded number of frames: a stream that never
+/// ends has to fail the test, not hang it.
+async fn read_to_end(body: &mut axum::body::BodyDataStream) -> String {
+    use futures_util::StreamExt;
+    const MAX_FRAMES: usize = 50;
+    let mut rest = String::new();
+    for _ in 0..MAX_FRAMES {
+        let next = tokio::time::timeout(Duration::from_secs(3600), body.next())
+            .await
+            .expect("the assistant stream went silent for an hour");
+        match next {
+            Some(chunk) => rest.push_str(&String::from_utf8_lossy(&chunk.unwrap())),
+            None => return rest,
         }
-        rest
-    })
-    .await
-    .expect("the assistant stream never ended");
-    text.push_str(&rest);
+    }
+    let tail: String = rest.chars().rev().take(300).collect::<Vec<_>>().into_iter().rev().collect();
+    panic!("the assistant stream never ended: {MAX_FRAMES} frames and still going, last: {tail}");
+}
+
+/// The other side of the ceiling: a call that streams asks for a longer one, so the assistant's
+/// answer is not cut at the shared client's limit when erplora.com pauses in the middle of it.
+#[tokio::test]
+async fn the_assistant_stream_outlives_the_shared_ceiling() {
+    let pause = CLOUD_CALL_TIMEOUT + Duration::from_secs(30);
+    let (mut text, mut body) = assistant_stream_pausing(pause).await;
+    let started = tokio::time::Instant::now();
+    text.push_str(&read_to_end(&mut body).await);
 
     assert!(started.elapsed() >= pause, "the pause did not happen: {text}");
     assert!(
@@ -344,40 +361,68 @@ async fn the_assistant_stream_outlives_the_shared_ceiling() {
     );
 }
 
-/// An erplora.com that never even completes the connection (a full accept queue drops the
-/// handshake, like a firewall that swallows it) is given up at the connection limit, well before
-/// the ceiling of the whole call.
+/// A stream erplora.com stops feeding is cut at the transfer limit with ONE error the drawer can
+/// translate, and then it ends: once the limit has passed, every further read fails the same way,
+/// and the cut must not turn into an endless run of error frames for the browser.
+#[tokio::test]
+async fn an_assistant_stream_cut_at_the_transfer_limit_ends_with_one_error() {
+    let pause = CLOUD_TRANSFER_TIMEOUT + Duration::from_secs(60);
+    let (mut text, mut body) = assistant_stream_pausing(pause).await;
+    let started = tokio::time::Instant::now();
+    text.push_str(&read_to_end(&mut body).await);
+
+    assert!(
+        started.elapsed() < pause,
+        "the stream waited for erplora.com instead of the transfer limit: {text}"
+    );
+    assert!(!text.contains("second"), "the stream was not cut: {text}");
+    assert_eq!(
+        text.matches("\"type\":\"error\"").count(),
+        1,
+        "the cut is one error frame, then the end: {text}"
+    );
+    assert!(
+        text.contains("\"code\":\"cloud_unreachable\""),
+        "the cut carries the code the drawer translates: {text}"
+    );
+}
+
+/// An erplora.com that never completes the connection — it takes the TCP connection and never
+/// answers the TLS handshake, like a middlebox that swallows it — is given up at the connection
+/// limit, well before the ceiling of the whole call. (A full accept queue is not used: macOS
+/// completes those connections anyway, and the test would pass without the limit.)
 #[tokio::test]
 async fn a_connection_that_never_completes_is_given_up_at_the_connect_limit() {
-    let socket = tokio::net::TcpSocket::new_v4().unwrap();
-    socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let listener = socket.listen(1).unwrap(); // never accepts
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    // Fill the accept queue: from here on the kernel drops every new handshake.
-    let mut fillers = Vec::new();
-    for _ in 0..16 {
-        fillers.push(tokio::spawn(tokio::net::TcpStream::connect(addr)));
-    }
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    let state = state_against(format!("http://{addr}")).await;
+    let held = Arc::new(Mutex::new(Vec::new()));
+    let holder = held.clone();
+    tokio::spawn(async move {
+        while let Ok((socket, _)) = listener.accept().await {
+            holder.lock().unwrap().push(socket); // never reads, never writes
+        }
+    });
+    let state = state_against(format!("https://{addr}")).await;
 
-    tokio::time::pause();
     let started = tokio::time::Instant::now();
-    let outcome = tokio::time::timeout(
-        Duration::from_secs(3600),
-        fetch_verified_claims(&state.http, &format!("http://{addr}"), &machine(), 0),
-    )
-    .await
-    .expect("the plan check is still connecting an hour later (hub#2509)");
+    let base = format!("https://{addr}");
+    let call =
+        tokio::spawn(async move { fetch_verified_claims(&state.http, &base, &machine(), 0).await });
+    let reached = tokio::time::Instant::now() + Duration::from_secs(10);
+    while held.lock().unwrap().is_empty() {
+        assert!(tokio::time::Instant::now() < reached, "the call never reached erplora.com");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::pause();
+    let outcome = tokio::time::timeout(Duration::from_secs(3600), call)
+        .await
+        .expect("the plan check is still connecting an hour later (hub#2509)")
+        .unwrap();
 
     assert!(outcome.is_err(), "a connection that never completes is a failed check");
+    let waited = started.elapsed();
     assert!(
-        started.elapsed() < CLOUD_CALL_TIMEOUT,
-        "gave up after {:?}: the connection limit ({CLOUD_CONNECT_TIMEOUT:?}) did not act",
-        started.elapsed()
+        waited >= CLOUD_CONNECT_TIMEOUT && waited < CLOUD_CALL_TIMEOUT,
+        "gave up after {waited:?}: the connection limit ({CLOUD_CONNECT_TIMEOUT:?}) did not act"
     );
-    drop(listener);
-    for filler in fillers {
-        filler.abort();
-    }
 }

@@ -186,9 +186,15 @@ pub(crate) async fn assistant_chat_stream(
     // Un buffer mantiene líneas partidas entre chunks de red.
     let mut buf = String::new();
     let mut byte_stream = upstream.bytes_stream();
+    // Set once the cut has been reported: past the transfer limit every read fails the same way,
+    // and polling on would send the browser an endless run of error frames (hub#2509).
+    let mut cut = false;
 
     let translated = futures_util::stream::poll_fn(move |cx| {
         use std::task::Poll;
+        if cut {
+            return Poll::Ready(None);
+        }
         loop {
             // Vacía líneas completas ya bufferizadas.
             if let Some(idx) = buf.find('\n') {
@@ -205,7 +211,9 @@ pub(crate) async fn assistant_chat_stream(
                     buf.push_str(&String::from_utf8_lossy(&chunk));
                 }
                 Poll::Ready(Some(Err(e))) => {
-                    // El stream se cortó a mitad: mismo criterio que al abrirlo (hub#1689).
+                    // The stream was cut halfway: same code as when it does not open (hub#1689),
+                    // sent once, and then the stream ends.
+                    cut = true;
                     let code = cloud_proxy::cloud_unreachable(&e.to_string());
                     let frame =
                         assistant::sse(&json!({ "type": "error", "error": code, "code": code }));
