@@ -110,7 +110,8 @@ pub(crate) async fn whatsapp_template_header_sample(
         // Declared, so the body leaves with its length and not chunked: the SaaS and the edge in
         // front of it know up front how much is coming.
         .header(header::CONTENT_LENGTH, declared)
-        .body(reqwest::Body::wrap_stream(body.into_data_stream()));
+        .body(reqwest::Body::wrap_stream(body.into_data_stream()))
+        .timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
     for (k, v) in cloud.headers_for(&req.url, &auth) {
         call = call.header(k, v);
     }

@@ -60,7 +60,7 @@ Implicados: HUB_SHELL-F13, HUB_SHELL-F14, REC_ALTA-F06, SAAS_DASHBOARD-F04, SAAS
 QA: ninguno
 
 ### HUB-F162 Comprobar el plan y qué apps puede usar el negocio
-Estado: parcial — el plan vive solo en memoria (tras reiniciar sin conexión no se aplica ningún tope ni bloqueo, sin límite de tiempo); el corte de una app solo vale en las órdenes y consultas de la pantalla, no en la API pública, las tareas programadas, las automatizaciones ni los avisos; el tope de base de datos no se aplica; la comprobación diaria no tiene tiempo límite y una conexión colgada la congela; no existe «hub pausado»
+Estado: parcial — el plan vive solo en memoria (tras reiniciar sin conexión no se aplica ningún tope ni bloqueo, sin límite de tiempo); el corte de una app solo vale en las órdenes y consultas de la pantalla, no en la API pública, las tareas programadas, las automatizaciones ni los avisos; el tope de base de datos no se aplica; no existe «hub pausado»
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -70,7 +70,7 @@ Pasos:
 4. Los topes de personas y dispositivos se aplican al dar de alta (HUB-F147) y al entrar (HUB-F137).
 Entra: el permiso firmado (`GET /api/v1/hub/device/entitlement/`) con la credencial de máquina; la clave pública (`/api/v1/auth/public-key/`).
 Sale: el plan verificado en memoria; las órdenes y consultas de una app bloqueada contestan `module_entitlement_blocked` (402) y la vista del módulo dice «Suscripción necesaria». Con una sesión de PIN (sin credencial de erplora.com) la pantalla no conoce el plan y no pinta el bloqueo: la app aparece normal y sus peticiones fallan con el 402. La pantalla recibe el plan por una puerta propia con 60 s de memoria, que ante un «demasiadas peticiones» de erplora.com sigue sirviendo el último bueno. En el mismo turno se recoge el cupo de mensajes de WhatsApp del mes.
-Si falla: sin ninguna comprobación buena todavía, no se bloquea nada (la autoridad es erplora.com). Una firma que no cuadra cuenta como fallo y se mantiene lo último bueno. Ante un fallo de red, la puerta de la pantalla contesta 424 y no sirve el último bueno (solo lo hace ante un «demasiadas peticiones»). Las llamadas no tienen tiempo máximo: si una se queda colgada, el turno diario se congela, no cuenta fallos (las apps de pago nunca se cortan) y no sale el latido.
+Si falla: sin ninguna comprobación buena todavía, no se bloquea nada (la autoridad es erplora.com). Una firma que no cuadra cuenta como fallo y se mantiene lo último bueno. Ante un fallo de red, la puerta de la pantalla contesta 424 y no sirve el último bueno (solo lo hace ante un «demasiadas peticiones»). Cada llamada a erplora.com tiene tope —10 s para conectar y 60 s en total— y cada paso del turno (el permiso, el latido, el cupo de WhatsApp, la entrega de la actividad) tiene además el suyo de 5 minutos: una comprobación que erplora.com deja sin contestar cuenta como fallo, el turno sigue sin ella y el siguiente sale a su hora.
 Implicados: HUB_SHELL-F41, HUB_SHELL-F46, HUB_SHELL-F49, HUB_SHELL-F128, WHATSAPP_INBOX-F13, REC_ALTA-F15, REC_ALTA-F21, REC_ALTA-F22, SAAS-F11, SAAS_DASHBOARD-F53, SAAS_DASHBOARD-F100, SAAS_DASHBOARD-F111, SAAS_DASHBOARD-F113, SAAS_DASHBOARD-F116, SAAS_DASHBOARD-F188, SAAS_DASHBOARD-F189, SAAS_PUBLIC-F20, SAAS_PUBLIC-F23, SAAS_PUBLIC-F35, SAAS_PUBLIC-F36
 QA: ninguno
 
@@ -89,7 +89,7 @@ Implicados: REC_ALTA-F05, SAAS_DASHBOARD-F40, SAAS_DASHBOARD-F54, SAAS_DASHBOARD
 QA: ninguno
 
 ### HUB-F164 Mandar el latido diario de uso a erplora.com
-Estado: parcial — la llamada no tiene tiempo límite: si erplora.com deja la conexión colgada, el hub deja de mandar el latido hasta que se reinicia (ERPlora/hub#2509)
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -98,7 +98,7 @@ Pasos:
 3. Si erplora.com confirma, borra de su cola la actividad que ya entregó; si no, la vuelve a mandar en el siguiente latido.
 Entra: las ventas cobradas hoy y la última, los dispositivos con sesión, las personas activas, la última actividad, la versión del hub, lo que cada motor nativo debe aún a una autoridad (cuánto y desde cuándo), la vía de envío fiscal, la CPU y la memoria.
 Sale: el latido (`POST /api/v1/hub/device/heartbeat/`); la actividad del negocio (tipo, momento y el identificador interno de quien la hizo, nunca su nombre ni datos de clientes), como mucho 500 por latido y entregada al menos una vez mientras quepa en la cola: tras un corte largo la cola se recorta a 5000 y se pierde lo más viejo. El recuento de personas activas es el mismo que usa el tope de plazas.
-Si falla: un latido fallido queda en el registro y se repite en el siguiente turno; si la tabla de ventas no se puede leer, el dato se omite en vez de mandar un cero.
+Si falla: un latido fallido —también el que erplora.com deja sin contestar, que se da por fallido a los 60 s— queda en el registro y se repite en el siguiente turno con la misma marca de actividad, que solo se da por entregada cuando erplora.com confirma el latido; si la tabla de ventas no se puede leer, el dato se omite en vez de mandar un cero.
 Implicados: REC_ALTA-F21, SAAS_DASHBOARD-F34, SAAS_DASHBOARD-F36, SAAS_DASHBOARD-F55, SAAS_DASHBOARD-F57
 QA: ninguno
 
@@ -158,7 +158,7 @@ Pasos:
 Entra: la sesión de la persona (también para la versión publicada de la app, aunque esa llamada a erplora.com sale sin credencial); la credencial de máquina, que solo vive en el servidor.
 Sale: la respuesta de erplora.com. La credencial del hub y la de la persona solo viajan a erplora.com y a los anfitriones de confianza declarados en el despliegue; a cualquier otro destino se llama sin ellas. Las facturas, suscripciones y el estado de suscripción de una app los pide la pantalla a erplora.com con la credencial de la persona, sin pasar por aquí.
 En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F24 (Consultar qué actualizaciones y versiones hay), HUB-F260 (Conectar el número de WhatsApp del negocio), HUB-F261 (Saber qué número está conectado y si hay que reconectarlo), HUB-F277 (Ver el plan del asistente y lo que queda del mes).
-Si falla: erplora.com no contesta, «Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.» (`cloud_unreachable`, 424); contesta con error, «ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.» (`cloud_rejected`); hub sin conectar, «Este hub todavía no está conectado con ERPlora.». El cuerpo de un error 5xx de erplora.com no llega al navegador, pero los 4xx se pasan tal cual, con su texto en inglés. Las llamadas no tienen tiempo máximo (tampoco el catálogo); solo instalar, actualizar, listar versiones y pedir una instalación cortan a los 30 s sin respuesta.
+Si falla: erplora.com no contesta, «Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.» (`cloud_unreachable`, 424); contesta con error, «ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.» (`cloud_rejected`); hub sin conectar, «Este hub todavía no está conectado con ERPlora.». El cuerpo de un error 5xx de erplora.com no llega al navegador, pero los 4xx se pasan tal cual, con su texto en inglés. Cada llamada tiene tope: 10 s para conectar y 60 s en total (también el catálogo), y pasado el tope la pantalla recibe el mismo «no ha podido llegar»; el chat del asistente y las subidas y bajadas de archivos tienen 15 minutos. Instalar, actualizar, listar versiones y pedir una instalación cortan además a los 30 s sin recibir nada.
 Implicados: SAAS-F02, SAAS_ASSISTANT-F01, SAAS_ASSISTANT-F19, SAAS_AUTH-F27, SAAS_DASHBOARD-F50, SAAS_PUBLIC-F12
 QA: ninguno
 
@@ -209,7 +209,7 @@ QA: qa-hub-restaurant §6
 
 | Elemento | Estado | Flujo |
 |---|---|---|
-| Plan firmado, gracia sin conexión, bloqueo de apps | parcial (memoria; tras reinicio sin topes; el corte no alcanza la API pública, tareas, automatizaciones ni avisos; sin tiempo límite; con sesión de PIN la pantalla no pinta el bloqueo) | HUB-F162 |
+| Plan firmado, gracia sin conexión, bloqueo de apps | parcial (memoria; tras reinicio sin topes; el corte no alcanza la API pública, tareas, automatizaciones ni avisos; con sesión de PIN la pantalla no pinta el bloqueo) | HUB-F162 |
 | Cambio de plan aplicado al momento | hecho | HUB-F163 |
 | Hub pausado | no hecho en el servidor | HUB-F162 |
 | Tope de tamaño de base de datos | no hecho (solo se muestra) | HUB-F165 |

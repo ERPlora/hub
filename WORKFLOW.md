@@ -288,7 +288,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F161 | Decir si el hub está listo para servir | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F162 | Comprobar el plan y qué apps puede usar el negocio | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F163 | Aplicar un cambio de plan al momento | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
-| HUB-F164 | Mandar el latido diario de uso a erplora.com | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
+| HUB-F164 | Mandar el latido diario de uso a erplora.com | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F165 | Ver el uso de recursos frente a los límites del plan | hecho | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F166 | Ver el estado del sistema, sus registros y documentos | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
 | HUB-F167 | Saber qué versión corre y qué se le ha actualizado | parcial | [plan-y-sistema.md](workflow/plan-y-sistema.md) |
