@@ -10,7 +10,9 @@
 //! that emits the same event — or names its own row `"id"` — is refused, its event stays
 //! undelivered with the refusal's code, and her history is untouched.
 //!
-//! Real Postgres, ephemeral schema per test.
+//! Real Postgres, ephemeral schema per test. Needs the `customers` module: the job without the
+//! catalogue skips it visibly (`require_modules_workspace`); the unit tests in `erasure.rs` cover
+//! the gate there.
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
@@ -102,6 +104,9 @@ async fn erasure_row(rt: &Runtime, module: &str, field: &str) -> String {
 /// same erasure from `customers` goes through and empties it.
 #[tokio::test]
 async fn only_the_app_that_owns_the_customer_erases_her_history() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = hub().await;
     let ana = ana(&rt).await;
     assert!(created_payload(&rt).await.contains("Ana Pérez"));
@@ -144,6 +149,9 @@ async fn only_the_app_that_owns_the_customer_erases_her_history() {
 /// its owner, and nothing of Ana's moves.
 #[tokio::test]
 async fn an_app_cannot_empty_the_history_by_naming_a_common_word() {
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = hub().await;
     ana(&rt).await;
     rt.execute_command(
