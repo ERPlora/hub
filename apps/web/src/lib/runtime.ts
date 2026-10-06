@@ -26,7 +26,7 @@ import { normalizePinLength } from './pin-length';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
-import { setRuntimeClientKind } from './device';
+import { resolveDeviceId, setRuntimeClientKind } from './device';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 import { sessionEndReason } from './session-end-reason';
@@ -53,7 +53,11 @@ export interface PinUser {
 
 /** Respuesta de `GET /api/hub/context` del runtime. */
 export interface HubContext {
-  hub_id: string;
+  /**
+   * The business id. `null` unless the read carried a live session or came from a device the PIN
+   * door trusts (hub#2510): it names the business, so the hub withholds it from strangers.
+   */
+  hub_id: string | null;
   user: unknown | null;
   /** Demo es la única excepción al registro obligatorio de máquina. */
   demo?: boolean;
@@ -63,7 +67,10 @@ export interface HubContext {
   registration_required?: boolean;
   /** La clave pública RSA del SaaS está disponible para validar el JWT de usuario. */
   public_key_loaded?: boolean;
-  /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
+  /**
+   * Active users with a PIN (the ones who can sign in locally). `[]` unless the read carried a live
+   * session or came from a device the PIN door trusts (hub#2510).
+   */
   pin_users?: PinUser[];
   /**
    * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`). Lo usa
@@ -1573,7 +1580,7 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
     let res: Response;
     try {
       res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: await contextHeaders(),
         signal: controller.signal,
       });
     } catch {
@@ -1623,6 +1630,41 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
     clearTimeout(timer);
     // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
     resolveCloudApiUrl(cloudBaseUrl);
+  }
+}
+
+/**
+ * Who is asking for the context (hub#2510): the faces of the pinpad and the hub id only reach a
+ * caller with a live session or a device the PIN door trusts, so the read says which device this is
+ * and presents the session it holds. Never throws: a device that cannot name itself just asks
+ * anonymously and gets the context that names nobody.
+ */
+async function contextHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const device = await resolveDeviceId().catch(() => null);
+  if (device) headers['X-Device-Id'] = device;
+  const session = getHubSession();
+  if (session) headers['X-Hub-Session'] = session;
+  return headers;
+}
+
+/**
+ * Re-reads the context right after signing in (hub#2510). A browser the hub did not trust yet was
+ * told neither the hub id nor the faces at boot; with the new session it is told both. The hub id
+ * is what later calls send as `X-Hub-Id`, and the faces are what the login screen reads to know
+ * whether this person already has a PIN (hub#772). Deliberately narrow: it does not touch the
+ * currency, language or timezone the boot already published. Never throws; a failed or withheld
+ * answer keeps what was known.
+ */
+export async function refreshHubIdentity(): Promise<void> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/context`, { headers: await contextHeaders() });
+    if (!res.ok) return;
+    const ctx = (await res.json()) as HubContext;
+    if (ctx.hub_id) config.hubId = ctx.hub_id;
+    if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
+  } catch {
+    // Best effort: the session is already open; the next boot reads the context again.
   }
 }
 
