@@ -35,6 +35,10 @@
 //! - **The kernel does not know the customers module.** The trigger is the naming convention
 //!   (`<subject>.anonymized` + `<subject>_id`), the same kind of contract as `.reminder.due` and
 //!   `.print.due`. Today only `customer.anonymized` follows it.
+//! - **Only the owner erases (hub#2485).** The id must have the shape the hub generates (a
+//!   canonical uuid) and be a row of one of the EMITTER's tables in this hub. Anything else is
+//!   refused with a code (`erasure.invalid_subject_id`, `erasure.subject_not_owned`): the event is
+//!   not delivered, retries and ends in the dead letters, where a human sees it.
 //!
 //! **Cost.** There is no index on payload content: one erasure reads the hub's terminal history
 //! once (at most ninety days of it, thanks to `retention`). Erasures are rare, manual and
@@ -43,7 +47,8 @@
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
 
-use crate::errors::Result;
+use crate::errors::{Result, RuntimeError};
+use crate::registry::Registry;
 
 /// The suffix of the events that erase their subject from the kernel's history.
 pub const ANONYMIZED_SUFFIX: &str = ".anonymized";
@@ -77,6 +82,79 @@ pub fn subject_id(event_name: &str, payload: &Params) -> Option<String> {
         Some(Json::String(id)) if !id.is_empty() => Some(id.clone()),
         _ => None,
     }
+}
+
+/// Whether `id` has the shape of the ids the hub hands out: the canonical hyphenated uuid of
+/// `registry::new_id` (36 characters). Anything else — a word, a number, the braced or compact
+/// spellings `uuid` would also parse — is refused as a needle: `"id"` is a KEY of nearly every
+/// payload, so naming it would empty the whole history (hub#2485).
+pub(crate) fn is_generated_id(id: &str) -> bool {
+    id.len() == 36 && uuid::Uuid::try_parse(id).is_ok()
+}
+
+/// A refused erasure, with its stable code first in the message so the dead-letter row says it.
+fn refused(code: &str, detail: String) -> RuntimeError {
+    RuntimeError::Domain {
+        code: code.to_string(),
+        message: format!("{code}: {detail}"),
+    }
+}
+
+/// The tables of this hub's database that carry both `id` and `hub_id`: the row contract every
+/// module table follows, and the only ones an owner check can ask.
+const ROW_TABLES: &str = "\
+SELECT table_name AS name FROM information_schema.columns \
+ WHERE table_schema = current_schema() AND column_name IN ('id', 'hub_id') \
+ GROUP BY table_name HAVING COUNT(*) = 2";
+
+/// **The owner gate (hub#2485).** An app may only erase a subject that is its own data: `id` must
+/// be a row of one of the EMITTER's tables, in THIS hub. Ownership is the longest installed prefix
+/// (`export::table_owner`, the rule export and reset use), so the kernel (no emitter), an app that
+/// is not installed and an app naming another app's row are all refused — the same way
+/// `.reminder.due` and `.print.due` only open their host door to the app that declared it.
+async fn authorize(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    emitter: &str,
+    id: &str,
+) -> Result<()> {
+    if !is_generated_id(id) {
+        return Err(refused(
+            "erasure.invalid_subject_id",
+            format!("`{emitter}` named `{id}`, which is not an id the hub generates"),
+        ));
+    }
+    let installed: Vec<String> = registry.installed.iter().map(|m| m.id.clone()).collect();
+    let tables = db.query(ROW_TABLES, &Params::new()).await?;
+    let own = tables
+        .rows
+        .iter()
+        .filter_map(|r| r["name"].as_str())
+        .filter(|t| crate::export::safe_ident(t))
+        // No installed id is empty, so the kernel (`emitter == ""`) owns no table.
+        .filter(|t| crate::export::table_owner(t, &installed).as_deref() == Some(emitter));
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("id".into(), json!(id));
+    for table in own {
+        let hit = db
+            .query(
+                &format!(
+                    "SELECT 1 AS hit FROM \"{table}\" \
+                     WHERE hub_id = :hub_id AND CAST(id AS TEXT) = :id LIMIT 1"
+                ),
+                &p,
+            )
+            .await?;
+        if !hit.rows.is_empty() {
+            return Ok(());
+        }
+    }
+    Err(refused(
+        "erasure.subject_not_owned",
+        format!("`{id}` is not a row of `{emitter}` in this hub, so `{emitter}` cannot erase it"),
+    ))
 }
 
 /// Everything named in the module header, in ONE statement so the erasure is atomic and every
@@ -130,13 +208,16 @@ WITH hit AS (\
 /// Anything else is a no-op that touches the database not at all.
 pub async fn on_event(
     db: &dyn DatabaseAdapter,
+    registry: &Registry,
     hub_id: &str,
+    emitter: &str,
     event_name: &str,
     payload: &Params,
 ) -> Result<ErasureReport> {
     let Some(id) = subject_id(event_name, payload) else {
         return Ok(ErasureReport::default());
     };
+    authorize(db, registry, hub_id, emitter, &id).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("needle".into(), json!(Json::String(id).to_string()));
@@ -165,7 +246,6 @@ fn cell(res: &erplora_db::QueryResult, key: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::Registry;
     use erplora_db::testutil::fresh_db;
     use erplora_db::PgAdapter;
 
@@ -180,6 +260,49 @@ mod tests {
         crate::outbox::ensure_tables(db).await.unwrap();
         crate::system_migrations::apply(db, HUB).await.unwrap();
         crate::flows::store::ensure_indexes(db).await.unwrap();
+        // The emitter's own data: the customers app owns Ana and Bea in both hubs, and the
+        // intruder owns a row of its own whose id is a common word.
+        db.execute_batch(
+            "CREATE TABLE customers_customer (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+                                              name TEXT NOT NULL DEFAULT ''); \
+             CREATE TABLE intruder_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
+        for id in [ANA, BEA] {
+            owned_row(db, "customers_customer", id, HUB).await;
+        }
+        owned_row(db, "intruder_item", "id", HUB).await;
+    }
+
+    async fn owned_row(db: &PgAdapter, table: &str, id: &str, hub: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub));
+        db.execute(
+            &format!("INSERT INTO {table} (id, hub_id) VALUES (:id, :hub_id)"),
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    const CUSTOMERS: &str = "customers";
+    const INTRUDER: &str = "intruder";
+
+    /// The customers app and an intruder, both installed: ownership is decided by the installed
+    /// apps' table prefixes (the same rule as export and reset).
+    fn registry() -> Registry {
+        let mut reg = Registry::new();
+        for id in [CUSTOMERS, INTRUDER] {
+            reg.installed.push(
+                serde_json::from_str(&format!(
+                    r#"{{"id":"{id}","name":"{id}","version":"1.0.0"}}"#
+                ))
+                .unwrap(),
+            );
+        }
+        reg
     }
 
     fn now() -> String {
@@ -514,9 +637,16 @@ mod tests {
         system_schema(&db).await;
         ana_history(&db, HUB, "").await;
 
-        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let report = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             event_payload(&db, "ev-upd").await,
@@ -573,9 +703,16 @@ mod tests {
         ana_history(&db, HUB, "").await;
         ana_history(&db, OTHER_HUB, "b-").await;
 
-        on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert!(event_payload(&db, "b-ev-upd").await.contains("Ana Pérez"));
         assert!(event_payload(&db, "b-ev-sale").await.contains(ANA));
@@ -646,9 +783,16 @@ mod tests {
         )
         .await;
 
-        on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert!(event_payload(&db, "ev-bea").await.contains("Bea"));
         assert!(run_memory(&db, "run-bea").await.contains(BEA));
@@ -735,9 +879,16 @@ mod tests {
         )
         .await;
 
-        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let report = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             report,
@@ -795,9 +946,16 @@ mod tests {
             anonymized(Json::Null),
             missing,
         ] {
-            let report = on_event(&db, HUB, "customer.anonymized", &payload)
-                .await
-                .unwrap();
+            let report = on_event(
+                &db,
+                &registry(),
+                HUB,
+                CUSTOMERS,
+                "customer.anonymized",
+                &payload,
+            )
+            .await
+            .unwrap();
             assert_eq!(report, ErasureReport::default(), "{payload:?}");
         }
         assert!(event_payload(&db, "ev-blank").await.contains("Carla"));
@@ -812,9 +970,16 @@ mod tests {
         ana_history(&db, HUB, "").await;
 
         for name in ["customer.updated", "sale.completed", "customer.deleted"] {
-            let report = on_event(&db, HUB, name, &anonymized(json!(ANA)))
-                .await
-                .unwrap();
+            let report = on_event(
+                &db,
+                &registry(),
+                HUB,
+                CUSTOMERS,
+                name,
+                &anonymized(json!(ANA)),
+            )
+            .await
+            .unwrap();
             assert_eq!(report, ErasureReport::default(), "{name}");
         }
         assert!(event_payload(&db, "ev-upd").await.contains("Ana Pérez"));
@@ -828,12 +993,26 @@ mod tests {
         system_schema(&db).await;
         ana_history(&db, HUB, "").await;
 
-        let first = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
-        let second = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let first = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
+        let second = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert!(first.total() > 0);
         assert_eq!(second, ErasureReport::default());
@@ -859,7 +1038,7 @@ mod tests {
         )
         .await;
 
-        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+        crate::outbox::drain(&db, &registry()).await.unwrap();
 
         assert_eq!(event_payload(&db, "ev-upd").await, EMPTY);
         assert_eq!(run_memory(&db, "run").await, EMPTY_RUN);
@@ -903,7 +1082,7 @@ mod tests {
         .await
         .unwrap();
 
-        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+        crate::outbox::drain(&db, &registry()).await.unwrap();
 
         assert_eq!(
             cell(
@@ -938,7 +1117,7 @@ mod tests {
         )
         .await
         .unwrap();
-        crate::outbox::drain(&db, &Registry::new()).await.unwrap();
+        crate::outbox::drain(&db, &registry()).await.unwrap();
 
         assert_eq!(
             cell(
@@ -971,9 +1150,16 @@ mod tests {
         )
         .await;
 
-        let report = on_event(&db, HUB, "customer.anonymized", &anonymized(json!(ANA)))
-            .await
-            .unwrap();
+        let report = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(run_memory(&db, "run-in").await, EMPTY_RUN);
         assert_eq!(step_memory(&db, "run-in-s").await, EMPTY_RUN);
@@ -1014,5 +1200,184 @@ mod tests {
         ] {
             assert_eq!(subject_id(name, &payload), None, "{name}");
         }
+    }
+
+    /// The code a refused erasure carries (tests assert on codes, never on prose — ADR-0055).
+    fn refusal_code(err: &crate::errors::RuntimeError) -> &str {
+        match err {
+            crate::errors::RuntimeError::Domain { code, .. } => code,
+            other => panic!("expected a coded refusal, got {other:?}"),
+        }
+    }
+
+    /// Everything of Ana's history in `HUB` still says who she is.
+    async fn assert_ana_history_intact(db: &PgAdapter) {
+        assert!(event_payload(db, "ev-upd").await.contains("Ana Pérez"));
+        assert!(run_memory(db, "run").await.contains("Ana Pérez"));
+        assert!(step_memory(db, "step").await.contains("+34600111222"));
+        assert!(approval_payload(db, "appr").await.contains("Hola Ana"));
+        assert!(event_payload(db, "ev-reminder")
+            .await
+            .contains("+34600111222"));
+    }
+
+    /// hub#2485, the owner gate: an app may only erase a subject that is ITS OWN data. An app that
+    /// names Ana — whose sheet belongs to `customers` — is refused, and so is the kernel (no app
+    /// behind the event) and an app that is not installed. Not one byte of her history moves.
+    #[tokio::test]
+    async fn an_app_cannot_erase_a_subject_it_does_not_own() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        // A table that holds Ana's id but whose app is not installed owns nothing.
+        db.execute_batch("CREATE TABLE ghost_item (id TEXT PRIMARY KEY, hub_id TEXT NOT NULL);")
+            .await
+            .unwrap();
+        owned_row(&db, "ghost_item", ANA, HUB).await;
+
+        for emitter in [INTRUDER, "", "ghost"] {
+            let err = on_event(
+                &db,
+                &registry(),
+                HUB,
+                emitter,
+                "customer.anonymized",
+                &anonymized(json!(ANA)),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                refusal_code(&err),
+                "erasure.subject_not_owned",
+                "{emitter:?}"
+            );
+        }
+        assert_ana_history_intact(&db).await;
+    }
+
+    /// The owner gate goes through `hub_id`: Ana's sheet in ANOTHER hub does not make her this
+    /// hub's subject. Without the filter, any id the app owns anywhere would open the door here.
+    #[tokio::test]
+    async fn owning_the_subject_in_another_hub_does_not_open_this_one() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        db.execute(
+            "UPDATE customers_customer SET hub_id = 'h2' WHERE id = :id",
+            &{
+                let mut p = Params::new();
+                p.insert("id".into(), json!(ANA));
+                p
+            },
+        )
+        .await
+        .unwrap();
+
+        let err = on_event(
+            &db,
+            &registry(),
+            HUB,
+            CUSTOMERS,
+            "customer.anonymized",
+            &anonymized(json!(ANA)),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(refusal_code(&err), "erasure.subject_not_owned");
+        assert_ana_history_intact(&db).await;
+    }
+
+    /// The vector of hub#2485: an app that OWNS a row whose id is a common word (`"id"`) names it
+    /// as the subject. As a needle, `"id"` is a key of nearly every payload, so the erasure would
+    /// empty the hub's whole history. The hub only takes ids of the shape it generates itself.
+    #[tokio::test]
+    async fn an_id_that_is_not_one_the_hub_generates_is_refused_even_from_its_owner() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+
+        let mut payload = Params::new();
+        payload.insert("item_id".into(), json!("id"));
+        let err = on_event(&db, &registry(), HUB, INTRUDER, "item.anonymized", &payload)
+            .await
+            .unwrap_err();
+
+        assert_eq!(refusal_code(&err), "erasure.invalid_subject_id");
+        assert_ana_history_intact(&db).await;
+    }
+
+    /// The shape: a canonical hyphenated uuid, the form `registry::new_id` produces. Words,
+    /// numbers and the other spellings `uuid` would parse are not ids the hub handed out.
+    #[test]
+    fn only_a_canonical_uuid_is_an_id_the_hub_generates() {
+        assert!(is_generated_id(ANA));
+        assert!(is_generated_id(&crate::registry::new_id()));
+        for id in [
+            "id",
+            "1",
+            "whatsapp",
+            "name",
+            "6f1c2a7e0d4b4f539a3e6c1d2b7e8f90",
+            "{6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f90}",
+            "urn:uuid:6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f90",
+            "6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f9",
+            "6f1c2a7e-0d4b-4f53-9a3e-6c1d2b7e8f9z",
+        ] {
+            assert!(!is_generated_id(id), "{id}");
+        }
+    }
+
+    /// The real path, with a test app: `intruder` emits `customer.anonymized` naming Ana through
+    /// the outbox. The relay refuses it — the event is NOT delivered (a refused erasure is never
+    /// swallowed), the refusal is labelled as the erasure's with its code, and her history is
+    /// intact. The same event from `customers` erases (the wiring test above).
+    #[tokio::test]
+    async fn the_relay_refuses_an_erasure_from_an_app_that_does_not_own_the_subject() {
+        let db = fresh_db().await;
+        system_schema(&db).await;
+        ana_history(&db, HUB, "").await;
+        event(
+            &db,
+            Ev {
+                id: "ev-anon",
+                hub: HUB,
+                status: "pending",
+                name: "customer.anonymized",
+                payload: json!({"customer_id": ANA, "reason": "gdpr request"}),
+                run_id: "",
+            },
+        )
+        .await;
+        db.execute(
+            "UPDATE _event_outbox SET module_id = 'intruder' WHERE id = 'ev-anon'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+
+        crate::outbox::drain(&db, &registry()).await.unwrap();
+
+        assert_eq!(
+            cell(
+                &db,
+                "SELECT status AS v FROM _event_outbox WHERE id = :id",
+                "ev-anon"
+            )
+            .await,
+            "pending"
+        );
+        let last_error = cell(
+            &db,
+            "SELECT last_error AS v FROM _event_outbox WHERE id = :id",
+            "ev-anon",
+        )
+        .await;
+        assert!(last_error.starts_with("erasure:"), "{last_error}");
+        assert!(
+            last_error.contains("erasure.subject_not_owned"),
+            "{last_error}"
+        );
+        assert_ana_history_intact(&db).await;
     }
 }

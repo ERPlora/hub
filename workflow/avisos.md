@@ -337,8 +337,8 @@ HUB-F254).
   **No** alcanza: avisos pendientes o caídos, ejecuciones vivas (hub#2484), `last_error`, el `error` de
   cada paso, el `title`, `summary`, `reason` y `comment` de las preguntas, las esperas
   (`_flow_run_waits`), y copias con el teléfono pero sin el id (mensajes de WhatsApp entrantes,
-  hub#2477; número sin ficha, hub#2474). Cualquier módulo puede emitir un `*.anonymized` sin
-  declararlo (hub#2485).
+  hub#2477; número sin ficha, hub#2474). Solo vacía la app dueña del identificador en este hub
+  (hub#2485); la de otra app se queda sin entregar con `erasure.subject_not_owned`.
 
 ## Reglas que no se rompen
 
