@@ -41,7 +41,7 @@ Pasos:
 2. Ve país, región, zona horaria, moneda, idioma, apariencia, identidad del negocio y las opciones del PIN. Quien no administra los ve sin poder guardarlos (lo pinta el shell).
 3. Antes de iniciar sesión, el teclado del PIN y el formato de dinero salen de otra lectura sin sesión (moneda, decimales, idioma, zona resuelta y dígitos del PIN).
 Entra: una sesión de usuario válida, de cualquier perfil (`GET /api/settings`); la lectura sin sesión es `GET /api/hub/context`.
-Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión. Esa lectura sin sesión publica además el identificador del hub (la llave de HUB-F236) y el nombre y rol de cada persona con PIN, para la rejilla de acceso.
+Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión. Esa lectura sin sesión lleva además el identificador del hub (la llave de HUB-F236) y el nombre y rol de cada persona con PIN, para la rejilla de acceso, pero solo a una sesión viva o a un dispositivo que el PIN dejaría pasar; a cualquier otro, la lista vacía y el identificador nulo (HUB-F133, ERPlora/hub#2510).
 Si falla: sin sesión, 401 con su código. Si la lectura de arranque falla, el shell arranca con los valores por defecto (EUR, español, UTC).
 Implicados: HUB_SHELL-F155
 QA: BD-02
@@ -259,7 +259,7 @@ Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la sema
 QA: BD-01, qa-hub §4
 
 ### HUB-F236 Qué deja entrar el hub según de quién es el fichero
-Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context`: un zip fabricado con él pasa por copia propia y trae personas con `pin_hash`, ajustes sin validar, permisos de módulo y automatizaciones encendidas con sus permisos. Hace falta que un administrador del propio hub suba el fichero; no es una puerta anónima
+Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador no es un secreto: lo recibe en `GET /api/hub/context` toda sesión y todo dispositivo de confianza (desde ERPlora/hub#2510 ya no cualquiera sin sesión): un zip fabricado con él pasa por copia propia y trae personas con `pin_hash`, ajustes sin validar, permisos de módulo y automatizaciones encendidas con sus permisos. Hace falta que un administrador del propio hub suba el fichero; no es una puerta anónima
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -407,8 +407,9 @@ De esta área (las tablas de la segunda mitad, en
   de importación, sus filas, lo que retiraron y su informe (HUB-F235 a HUB-F241).
 - `_hub_meta`: la marca de la unidad del dinero (`money_unit`, HUB-F243), entre otras claves de
   otras áreas.
-- `GET /api/hub/context` expone sin sesión el nombre y el rol de cada persona con PIN, para la rejilla
-  de acceso, y el identificador del hub (HUB-F220).
+- `GET /api/hub/context` da el nombre y el rol de cada persona con PIN, para la rejilla de acceso, y
+  el identificador del hub (HUB-F220), solo a una sesión viva o a un dispositivo que el PIN dejaría
+  pasar; a cualquier otro, la lista vacía y sin identificador (HUB-F133, ERPlora/hub#2510).
 - Los datos personales de los clientes viven en cada módulo, no en el hub.
 
 ## Reglas que no se rompen

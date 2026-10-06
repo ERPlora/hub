@@ -99,7 +99,7 @@ Implicados: HUB_SHELL-F03, HUB_SHELL-F22, HUB_SHELL-F85
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F133 Entrar con PIN
-Estado: parcial — sin haber entrado se ven el nombre y el rol de cada persona con PIN (ERPlora/hub#2510), y las bajas siguen saliendo en la rejilla hasta recargar
+Estado: parcial — las bajas siguen saliendo en la rejilla hasta recargar
 Actor: responsable, empleado
 Pantalla: HUB_SHELL: Acceso
 Pasos:
@@ -107,7 +107,7 @@ Pasos:
 2. La persona toca su nombre y teclea su PIN; el teclado entra solo al último dígito.
 3. El hub comprueba, por este orden: que esta dirección no esté frenada (HUB-F135), que el dispositivo sea de confianza, que ese nombre no esté frenado y que el PIN sea el de una persona activa.
 4. Se abre la sesión y la persona entra.
-Entra: el nombre, el PIN y el `device_id`; la lista pública de personas con PIN y la longitud del PIN, que el hub sirve sin sesión a la pantalla de acceso (nombre, rol e identificador, nunca el correo; la misma respuesta lleva el identificador del negocio). En una demo (`HUB_DEMO`) sin ningún dispositivo de confianza, el primero que manda un PIN queda adoptado.
+Entra: el nombre, el PIN y el `device_id`; la lista de personas con PIN y la longitud del PIN, que el hub da en su contexto a la pantalla de acceso (nombre, rol e identificador, nunca el correo; la misma respuesta lleva el identificador del negocio). La lista y el identificador del negocio solo llegan a quien el PIN dejaría pasar, preguntado en el mismo orden: una sesión viva (aprobación y cambio de usuario; una sesión inventada cuenta contra la dirección como en cualquier puerta, HUB-F135); si no, una dirección no frenada y un dispositivo de confianza (o el freno de dispositivos apagado, o el primero de una demo virgen). A cualquier otro el hub le contesta igual, pero con la lista vacía y sin identificador: el resto del contexto (moneda, idioma, zona, longitud del PIN) no nombra a nadie (ERPlora/hub#2510). En una demo (`HUB_DEMO`) sin ningún dispositivo de confianza, el primero que manda un PIN queda adoptado.
 Sale: la sesión (`hub_session`, credencial `pin`), con su duración según el dispositivo y el negocio (HUB-F136); si el plan admite un solo dispositivo, cierra las sesiones de los demás (HUB-F137). El PIN se comprueba en el hub: funciona aunque erplora.com no responda.
 Si falla: dispositivo que nunca entró con una cuenta o que un administrador quitó (no se distinguen), «En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí…»; navegador que no guarda datos, «Este navegador no puede recordar qué dispositivo es…»; nombre o PIN erróneos, «PIN incorrecto»; demasiados fallos, «Demasiados intentos fallidos. Espera {minutes} minutos…». Con el dial del negocio en «no mostrar pinpad» no hay rejilla y quien solo tiene PIN no puede entrar (HUB-F140).
 Implicados: HUB_SHELL-F04, REC_ALTA-F16, SAAS_PUBLIC-F80, SAAS_PUBLIC-F83
