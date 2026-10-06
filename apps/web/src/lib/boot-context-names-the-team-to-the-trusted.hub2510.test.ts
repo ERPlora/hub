@@ -2,18 +2,17 @@
 // ERPlora/hub#2510 — **the boot context names the team only to whoever the PIN door would let in**.
 //
 // `GET /api/hub/context` used to hand ANY caller on the internet the name and role of everybody with
-// a PIN, and the hub id. The hub now answers `pin_users: []` and `hub_id: null` unless the caller
-// has a live session or is a device the PIN door trusts
+// a PIN. The hub now answers `pin_users: []` unless the caller has a live session or is a device
+// the PIN door trusts
 // (`crates/server/tests/hub_context_trusted_device_hub2510.rs` pins that half). This file pins the
 // shell half:
 //
 // - the boot read SAYS which device is asking (`X-Device-Id`) and presents the session it holds
 //   (`X-Hub-Session`): without them a trusted till would lose its grid of faces;
 // - after signing in on a browser the hub did not trust yet (account form, or the panel courier),
-//   the shell asks again with the new session and learns the hub id and the faces it was not given
-//   at boot — the hub id is what every later call sends as `X-Hub-Id`, and the faces are what the
-//   «does this person already have a PIN?» check of the login screen reads (hub#772);
-// - a withheld answer never invents an identity, and a failed re-read keeps what was known.
+//   the shell asks again with the new session and learns the faces it was not given at boot — they
+//   are what the «does this person already have a PIN?» check of the login screen reads (hub#772);
+// - a withheld answer never invents a face, and a failed re-read keeps what was known.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { config } from './config';
@@ -21,7 +20,7 @@ import { resolveDeviceId } from './device';
 import { bootHubContext, pinUsers, refreshHubIdentity } from './runtime';
 import { setHubSession } from './session';
 
-type Answer = { hub_id: string | null; pin_users: Array<{ id: string; name: string; role: string }> };
+type Answer = { hub_id: string; pin_users: Array<{ id: string; name: string; role: string }> };
 
 const MARTA = { id: 'u-marta', name: 'Marta', role: 'cashier' };
 
@@ -72,13 +71,14 @@ describe('hub#2510 — the boot read says who is asking', () => {
     expect(config.hubId).toBe('hub-1');
   });
 
-  it('a withheld answer leaves the hub id unknown and the grid empty — nothing is invented', async () => {
-    contextAnswers({ hub_id: null, pin_users: [] });
+  it('a withheld answer leaves the grid empty — no face is invented', async () => {
+    pinUsers.value = [MARTA];
+    contextAnswers({ hub_id: 'hub-1', pin_users: [] });
 
     await bootHubContext();
 
-    expect(config.hubId).toBe('');
     expect(pinUsers.value).toEqual([]);
+    expect(config.hubId).toBe('hub-1');
   });
 });
 

@@ -186,9 +186,9 @@ pub(crate) async fn device_trust_gate(
     None
 }
 
-/// Whether this caller may learn WHO works here — the faces of the pinpad and the hub id that the
-/// boot context carries (hub#2510). Those exist for the pinpad, and the pinpad only opens on a
-/// device the PIN door would let through, so the question is asked in the order that door asks it:
+/// Whether this caller may learn WHO works here — the faces of the pinpad that the boot context
+/// carries (hub#2510). They exist for the pinpad, and the pinpad only opens on a device the PIN
+/// door would let through, so the question is asked in the order that door asks it:
 ///
 /// 1. a **live session** says yes: the approval dialog and «switch user» run behind one, also on a
 ///    browser that came in through the panel courier and was never trusted (HUB-F131). A session

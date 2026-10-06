@@ -901,9 +901,10 @@ pub fn build_router(state: AppState, web_dir: Option<&str>) -> Router {
 /// settings del hub (tabla `hub_settings` ∪ defaults), lectura barata en el arranque del SPA para no
 /// pegar a `/api/settings` por separado. Contrato del frontend.
 ///
-/// `pin_users` and `hub_id` name the team and the business, so they only reach a caller that
-/// [`may_name_the_team`] (hub#2510): anybody else gets `[]` and `null` and the rest of the boot
-/// context, which names nobody. The answer is still a 200 — the login screen must boot.
+/// `pin_users` names the team, so it only reaches a caller that [`may_name_the_team`] (hub#2510):
+/// anybody else gets `[]` and the rest of the boot context, which names nobody. The answer is still
+/// a 200 — the login screen must boot. `hub_id` stays open on purpose: erplora.com reads it without
+/// a credential to prove a custom domain reaches this hub, and so does the module toolkit.
 pub(crate) async fn hub_context(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let hub_id = st.hub_id();
     // El primer login Tauri puede haber adoptado el UUID real después de arrancar Axum. Antes de
@@ -914,13 +915,12 @@ pub(crate) async fn hub_context(State(st): State<AppState>, headers: HeaderMap) 
         Err(error) => return tenant_rejected(error),
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
-    let (named, pin_users, currency, currency_decimals, language, timezone, pin_length) = {
+    let (pin_users, currency, currency_decimals, language, timezone, pin_length) = {
         let rt = runtime.read().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
         }
-        let named = may_name_the_team(&st, &rt, &headers).await;
-        let pin_users: Vec<Value> = if named {
+        let pin_users: Vec<Value> = if may_name_the_team(&st, &rt, &headers).await {
             rt.list_pin_users()
                 .await
                 .unwrap_or_default()
@@ -973,7 +973,6 @@ pub(crate) async fn hub_context(State(st): State<AppState>, headers: HeaderMap) 
             .and_then(|v| v.as_i64())
             .unwrap_or(erplora_runtime::pin_policy::DEFAULT_PIN_LENGTH);
         (
-            named,
             pin_users,
             currency,
             currency_decimals,
@@ -990,7 +989,7 @@ pub(crate) async fn hub_context(State(st): State<AppState>, headers: HeaderMap) 
     let demo = st.is_dev_hub();
     let machine_registered = st.machine_registered();
     Json(json!({
-        "hub_id": if named { json!(hub_id) } else { Value::Null },
+        "hub_id": hub_id,
         "user": Value::Null,
         "pin_users": pin_users,
         "demo": demo,

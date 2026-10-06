@@ -1,8 +1,7 @@
-//! E2E — the boot context names the team and the business only to a trusted device (hub#2510).
+//! E2E — the boot context names the team only to a trusted device (hub#2510).
 //!
 //! `GET /api/hub/context` takes no session: the login screen reads it before anybody signed in. It
-//! used to hand EVERY caller on the internet the name and role of each person with a PIN, and the
-//! hub id (the one that lets somebody forge a backup the hub accepts as its own, hub#2497). The
+//! used to hand EVERY caller on the internet the name and role of each person with a PIN. The
 //! faces exist for one screen — the pinpad — and the pinpad only works on a trusted device
 //! (HUB-F133), so that is who gets them, gated in the order the PIN door already applies:
 //!
@@ -17,7 +16,11 @@
 //! (hub#2282): without it this door would be a free oracle for session tokens.
 //!
 //! Everything else in the context (currency, PIN length, Cloud URL, registration flags) still
-//! reaches everybody: the login screen needs it and it names nobody.
+//! reaches everybody: the login screen needs it and it names nobody. So does the hub id, on
+//! purpose: erplora.com reads it without a credential to prove that a custom domain reaches THIS
+//! hub (`saas` `custom_domains._fetch_hub_id`), and so do the module toolkit's `--against-hub` and
+//! the CI batteries. It names the business, not a person, and it is no secret: the import that
+//! trusts it is fixed where it trusts it (hub#2497).
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
@@ -41,7 +44,10 @@ async fn hub(device_trust_enforce: bool, demo: bool) -> Hub {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
-    let admin = rt.create_user("Admin", "1357", "admin", None).await.unwrap();
+    let admin = rt
+        .create_user("Admin", "1357", "admin", None)
+        .await
+        .unwrap();
     rt.create_user("Marta", "2468", "cashier", None)
         .await
         .unwrap();
@@ -115,12 +121,11 @@ fn faces(body: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Nothing in the answer names a person or the business.
+/// Nothing in the answer names a person.
 fn assert_withheld(body: &Value, why: &str) {
     assert_eq!(faces(body), Vec::<String>::new(), "{why}: {body}");
-    assert!(body["hub_id"].is_null(), "{why}: hub id leaked: {body}");
     let text = body.to_string();
-    for leaked in ["Marta", "cashier", HUB_ID] {
+    for leaked in ["Marta", "Admin", "cashier"] {
         assert!(!text.contains(leaked), "{why}: «{leaked}» leaked: {body}");
     }
     // What the login screen needs to paint itself is still there.
@@ -131,6 +136,8 @@ fn assert_withheld(body: &Value, why: &str) {
         json!("https://example.invalid"),
         "{why}: {body}"
     );
+    // The custom-domain probe of erplora.com reads it with no credential (see the header).
+    assert_eq!(body["hub_id"], json!(HUB_ID), "{why}: {body}");
 }
 
 fn assert_disclosed(body: &Value, why: &str) {

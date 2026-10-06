@@ -53,11 +53,7 @@ export interface PinUser {
 
 /** Respuesta de `GET /api/hub/context` del runtime. */
 export interface HubContext {
-  /**
-   * The business id. `null` unless the read carried a live session or came from a device the PIN
-   * door trusts (hub#2510): it names the business, so the hub withholds it from strangers.
-   */
-  hub_id: string | null;
+  hub_id: string;
   user: unknown | null;
   /** Demo es la única excepción al registro obligatorio de máquina. */
   demo?: boolean;
@@ -1635,10 +1631,10 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
 }
 
 /**
- * Who is asking for the context (hub#2510): the faces of the pinpad and the hub id only reach a
- * caller with a live session or a device the PIN door trusts, so the read says which device this is
- * and presents the session it holds. Never throws: a device that cannot name itself just asks
- * anonymously and gets the context that names nobody.
+ * Who is asking for the context (hub#2510): the faces of the pinpad only reach a caller with a live
+ * session or a device the PIN door trusts, so the read says which device this is and presents the
+ * session it holds. Never throws: a device that cannot name itself just asks anonymously and gets
+ * the context that names nobody.
  */
 async function contextHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1651,11 +1647,11 @@ async function contextHeaders(): Promise<Record<string, string>> {
 
 /**
  * Re-reads the context right after signing in (hub#2510). A browser the hub did not trust yet was
- * told neither the hub id nor the faces at boot; with the new session it is told both. The hub id
- * is what later calls send as `X-Hub-Id`, and the faces are what the login screen reads to know
- * whether this person already has a PIN (hub#772). Deliberately narrow: it does not touch the
- * currency, language or timezone the boot already published. Never throws; a failed or withheld
- * answer keeps what was known.
+ * not told the faces at boot; with the new session it is. They are what the login screen reads to
+ * know whether this person already has a PIN (hub#772), and what «switch user» and the approval
+ * dialog paint. The hub id is republished too: it is what later calls send as `X-Hub-Id`.
+ * Deliberately narrow: it does not touch the currency, language or timezone the boot already
+ * published. Never throws; a failed answer keeps what was known.
  */
 export async function refreshHubIdentity(): Promise<void> {
   try {
