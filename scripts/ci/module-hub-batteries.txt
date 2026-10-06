@@ -249,6 +249,12 @@ services/tests/grant_adjust.hub.test.py
 # queue on the voucher's row lock, against the real kernel (services#120). New coverage, not moved.
 # pending-publication: services#129 until 2026-10-28
 services/tests/grant_race.hub.test.py
+# services: voiding a PAID sale (`sale.voided`) gives back every voucher session spent on it —
+# recorded as returned, signed by whoever voided it, with the void's reason and the voided sale as
+# the document — and voids the vouchers it sold while they are intact; a used one stays live,
+# against the real kernel (services#151). New coverage, not moved.
+# pending-publication: services#155 until 2026-11-05
+services/tests/sale_void.hub.test.py
 # cart_checkout: a cart the assistant or an API integration creates WITHOUT a currency is born in the
 # HUB's currency — the setting `PUT /api/settings` writes is the one `cart_checkout.carts.create`
 # reads once the runtime has applied the schema — `null` counts as absent and an explicit currency
