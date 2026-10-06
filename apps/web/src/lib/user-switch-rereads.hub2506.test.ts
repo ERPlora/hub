@@ -24,11 +24,17 @@ vi.mock('./cloud', async (importOriginal) => ({
   cloudEntitlement: () => cloudEntitlement(),
 }));
 
+// The real loader drops every module the plan does not entitle (`isModuleEntitled`, §2.10); the
+// double keeps that one rule so the ORDER plan → launcher is observable.
 const loadMenu = vi.fn();
-vi.mock('./module-loader', () => ({
-  loadMenu: () => loadMenu(),
-  invalidateManifestCache: vi.fn(),
-}));
+vi.mock('./module-loader', async () => {
+  const { isModuleEntitled } = await import('./entitlement');
+  return {
+    loadMenu: async () =>
+      ((await loadMenu()) as Array<{ moduleId: string }>).filter((e) => isModuleEntitled(e.moduleId)),
+    invalidateManifestCache: vi.fn(),
+  };
+});
 
 const query = vi.fn();
 vi.mock('./runtime', () => ({
@@ -115,6 +121,21 @@ describe('the hand-over re-reads what the shell built for the person who left', 
     expect(entitlementStatus.value).toBe('unknown');
     expect(isModuleBlocked('reports')).toBe(false);
     expect(cloudEntitlement).toHaveBeenCalledTimes(1); // only the seed — never with her token again
+  });
+
+  it('gates the launcher with the plan of the person who arrived, not the one resolved for the leaver', async () => {
+    // `tables` was not in the plan resolved with the manager's account. The arriving PIN session has
+    // no account to resolve one with, so the gate is back to «not resolved» (permissive) BEFORE the
+    // launcher is re-read — read in the other order, the leaver's plan would still be filtering it.
+    loadMenu.mockResolvedValue([
+      ...CASHIER_MENU,
+      { moduleId: 'tables', moduleName: 'Tables', nav: { id: 'floor', label: 'Floor', icon: '' } },
+    ]);
+    query.mockResolvedValue(checklist('cashier-step'));
+
+    await switchUser('Leo', '1357');
+
+    expect(moduleNav.value.map((m) => m.path)).toEqual(['/m/sales', '/m/tables']);
   });
 
   it('re-reads the setup checklist for the person who arrived', async () => {

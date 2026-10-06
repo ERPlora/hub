@@ -168,6 +168,21 @@ describe('an account sign-in that does not finish', () => {
     expect(localStorage.getItem('erplora.refresh')).toBeNull();
   });
 
+  it('does not leave an earlier person’s credentials behind either', async () => {
+    // Somebody else's credentials were already on this till (an earlier attempt, a pass from the
+    // panel). Bob's own attempt is refused by the hub: what stays must not be hers.
+    setTokens('earlier-access', 'earlier-refresh');
+    vi.mocked(cloudLogin).mockResolvedValue({ ...ANNA, hubId: undefined });
+    vi.mocked(runtimeCloudSession).mockRejectedValue(Object.assign(new Error('refused'), { code: 'not_a_member' }));
+    const wrapper = await mountLogin();
+
+    await signInWithAccount(wrapper);
+
+    expect(wrapper.find('[data-testid="login-error"]').exists()).toBe(true);
+    expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem('erplora.refresh')).toBeNull();
+  });
+
   it('keeps the credentials of an account sign-in that finishes (positive control)', async () => {
     vi.mocked(cloudLogin).mockResolvedValue({ ...ANNA, hubId: undefined });
     vi.mocked(runtimeCloudSession).mockResolvedValue({
