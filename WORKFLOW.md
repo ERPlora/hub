@@ -556,9 +556,10 @@ sobre la marcha. Las de cada área están en `## Dudas abiertas` de su fichero:
 
 Comunes a varias áreas:
 
-1. **Instalar o actualizar una app para todo el hub** —caja, avisos y comprobación de salud
-   incluidos— sin tope total de tiempo (HUB-F19, HUB-F23, HUB-F26): ¿se acepta, o se descarga fuera
-   del candado? Afecta a todas las áreas, no solo a módulos.
+1. **Reconciliar una app entre copias para esa copia del hub** —caja, avisos y comprobación de
+   salud incluidos— mientras la descarga (HUB-F26, hub#2555). Instalar, actualizar e importar una
+   plantilla ya descargan fuera del candado (HUB-F19, HUB-F23, hub#2508); a ninguno se le pone tope
+   total de tiempo (hub#2556). Afecta a todas las áreas, no solo a módulos.
 2. **El plan tras un reinicio sin conexión** (HUB-F162): hoy el hub no aplica ningún tope hasta su
    primera comprobación buena. ¿Se guarda el último plan firmado en base de datos? Afecta al cobro,
    a las automatizaciones y a WhatsApp.
