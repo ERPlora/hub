@@ -351,8 +351,10 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<ApiKeyIn
     Ok(res.rows.iter().map(row_to_info).collect())
 }
 
-/// **The key the hub issues to itself** (hub#504), so our own app reads the event stream through
-/// the same door as everybody else instead of through a hole cut for it.
+/// **The key the hub issues to itself** (hub#504). It used to be what our own app read the event
+/// stream with; since hub#2501 the app listens as the person using it (a stream ticket bound to
+/// the session, `event_stream.rs`), because this blanket key handed a cashier every event of the
+/// business. Nothing in production asks for it any more; retiring it is hub#2524.
 ///
 /// Idempotent: returns the id of the existing one, or mints it. Three properties are the design:
 ///
@@ -364,9 +366,6 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<ApiKeyIn
 ///  - **Re-issued, never restored.** A hub poured from a blueprint or restored from a backup has
 ///    no `hub_api_key` rows (credentials must not travel in an export, same reasoning hub#361 used
 ///    for the elevation window). The app asks again on connect and gets a **new** key.
-///
-/// If this function is ever deleted, the app stops reading the stream — loudly, on the next
-/// connect. That is the intended failure: an auth hole would be silent.
 pub async fn ensure_app_key(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<String> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));

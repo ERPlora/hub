@@ -41,8 +41,11 @@ async fn serve() -> Server {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
+    // The owner: this file is about the DOOR (anonymous vs authenticated), and the sale below is
+    // a frame of the hub's own shape, which since hub#2501 only an administrator's session hears.
+    // What each role hears is `event_stream_session_scope_hub2501.rs`.
     let user = rt
-        .create_user("Cashier", "1111", "employee", None)
+        .create_user("Owner", "1111", "admin", None)
         .await
         .unwrap();
     let session = rt.create_session(&user, 3600, None).await.unwrap();
@@ -375,18 +378,15 @@ async fn the_ticket_door_needs_a_session() {
     let resp = ticket_over_http(&srv, Some("not-a-session")).await;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 
-    // With a real session it mints — and the key it minted is the hub's own, marked so the keys
-    // screen shows it and refuses to delete it.
+    // With a real session it mints — bound to that session (hub#2501), so no key is minted for
+    // it: the hub's blanket `read_only` key is exactly what used to hand a cashier every event.
     let t = ticket(&srv).await;
     assert!(t.starts_with("erpl_tkt_"));
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
     let rt = arc.read().await;
     let keys = rt.list_api_keys().await.unwrap();
-    assert_eq!(
-        keys.len(),
-        1,
-        "one key, however many tickets were asked for"
+    assert!(
+        keys.is_empty(),
+        "a session's ticket mints no API key: {keys:?}"
     );
-    assert!(keys[0].system);
-    assert_eq!(keys[0].access, ApiKeyAccess::ReadOnly);
 }
