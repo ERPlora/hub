@@ -208,6 +208,13 @@ kitchen/tests/rush_after_fire.hub.test.py
 # Landed pending publication (customers#87); the module has published it: now a normal entry.
 customers/tests/merge.hub.test.py
 
+# customers: every write of the customer card saves the phone in E.164 or refuses it — create,
+# update, update_with_fields and bulk_create read a number without prefix in the business country
+# and refuse an impossible one with `customers.phone_invalid`, against the real kernel
+# (customers#121). New coverage, not moved.
+# pending-publication: customers#129 until 2026-11-05
+customers/tests/phone_e164.hub.test.py
+
 # appointments: mover y anular una cita dejan su línea de historial (quién lo pidió y por qué) y
 # un movimiento rechazado no deja ninguna, contra el kernel real (appointments#196). Cobertura
 # nueva, no mudada.
