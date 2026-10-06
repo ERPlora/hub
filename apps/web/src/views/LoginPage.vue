@@ -419,7 +419,7 @@ import { isGuessablePin } from '../lib/hub-users';
 import { setUser, setHubSession, getHubSession } from '../lib/session';
 import type { LoginResult } from '../lib/cloud';
 import {
-  cloudLogin, cloudLogin2fa, TwoFactorRequiredError, setTokens,
+  cloudLogin, cloudLogin2fa, TwoFactorRequiredError, setTokens, clearTokens,
   runtimeBadgeLogin, runtimeCloudSession, runtimePinLogin, runtimeSetPin,
   googleLoginUrl, exchangeGoogleCode,
 } from '../lib/cloud';
@@ -667,11 +667,15 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
     throw new Error('machine_registration');
   }
 
-  setTokens(result.access, result.refresh);
+  // hub#2506: whatever an earlier attempt on this till left is not this person's, and this
+  // person's credentials are only stored once the hub has accepted the session — a refusal
+  // (no longer a member, hub unreachable) leaves nothing for whoever signs in next with a PIN.
+  clearTokens();
 
-  // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).
-  // El `name` se reusa para el login por PIN (el runtime resuelve el usuario por nombre).
+  // Opens the runtime's LOCAL session from the JWT (local permission authority, §2.9); the call
+  // sends the bearer explicitly. The `name` is reused by the PIN login (resolved by name).
   const sess = await runtimeCloudSession(result.access, result.user.name, result.user.email);
+  setTokens(result.access, result.refresh);
   setHubSession(sess.token, sess.credential_kind);
 
   setUser({
@@ -951,6 +955,9 @@ async function checkPin(pin: string): Promise<void> {
     const u = pinUser.value;
     const sess = await runtimePinLogin(u.name, pin);
     setHubSession(sess.token, sess.credential_kind);
+    // hub#2506: a PIN session never carries erplora.com credentials — any left on this till
+    // belong to somebody else.
+    clearTokens();
     // Rol LOCAL del runtime (mismo que el gate del backend) → gatea la UI admin (pestaña API keys).
     setUser({
       id: sess.user.id,
@@ -995,6 +1002,8 @@ async function signInWithBadge(badge: string): Promise<void> {
   try {
     const sess = await runtimeBadgeLogin(badge);
     setHubSession(sess.token, sess.credential_kind);
+    // hub#2506: same rule as the PIN — a badge session carries no erplora.com credentials.
+    clearTokens();
     setUser({
       id: sess.user.id,
       name: sess.user.name,
