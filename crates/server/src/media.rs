@@ -279,7 +279,7 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
             reqwest::multipart::Part::bytes(data).file_name(fname),
         );
     }
-    let mut r = st.http.post(&url).multipart(form);
+    let mut r = st.http.post(&url).multipart(form).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
     for (k, v) in headers {
         r = r.header(k, v);
     }
@@ -479,7 +479,7 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
             "erplora.com returned no URL for the file",
         );
     }
-    let object = match st.http.get(&signed).send().await {
+    let object = match st.http.get(&signed).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT).send().await {
         Ok(o) if o.status().is_success() => o,
         // Igual que arriba: el objeto que no está es un `404`; el almacén que falla es una avería
         // del que guarda la foto, y decir «no encontrado» la daría por perdida (hub#1763).
@@ -977,7 +977,7 @@ async fn fetch_object_bytes(st: &AppState, path: &str) -> Option<Vec<u8>> {
     if signed.is_empty() {
         return None;
     }
-    let object = st.http.get(&signed).send().await.ok()?;
+    let object = st.http.get(&signed).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT).send().await.ok()?;
     if !object.status().is_success() {
         return None;
     }
@@ -1189,7 +1189,7 @@ async fn upload_bundle_batch(
             form = form.part("files", part);
         }
 
-        let mut request = st.http.post(&url).multipart(form);
+        let mut request = st.http.post(&url).multipart(form).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
         for (key, value) in headers {
             request = request.header(*key, value);
         }
@@ -1352,7 +1352,7 @@ pub(crate) async fn store_vetted_file(
         let form = reqwest::multipart::Form::new()
             .text("folder", folder.to_string())
             .part("files", part);
-        let mut request = st.http.post(&url).multipart(form);
+        let mut request = st.http.post(&url).multipart(form).timeout(crate::state::CLOUD_TRANSFER_TIMEOUT);
         for (key, value) in &headers {
             request = request.header(*key, value);
         }

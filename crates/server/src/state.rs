@@ -948,6 +948,32 @@ pub fn marketplace_client(stall: std::time::Duration) -> reqwest::Client {
         })
 }
 
+/// How long connecting to erplora.com may take before a call gives up (hub#2509).
+pub const CLOUD_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The ceiling of every call through the shared [`AppState::http`] client (hub#2509): a control
+/// plane that accepts the connection and never answers ends the call here, instead of freezing
+/// whatever waits on it — the daily plan check and heartbeat did, until the next restart.
+pub const CLOUD_CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The ceiling a call that streams or carries a file asks for on its own request (the assistant's
+/// stream, media and file uploads and downloads): long enough for a slow line, never endless.
+pub const CLOUD_TRANSFER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The shared client every call to erplora.com goes through (hub#2509): `connect` bounds the
+/// connection, `call` the whole call — a request that needs longer asks for it with its own
+/// `.timeout(...)`, which overrides this one.
+pub fn cloud_client(connect: std::time::Duration, call: std::time::Duration) -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(connect)
+        .timeout(call)
+        .build()
+        .unwrap_or_else(|e| {
+            tracing::error!(error = %e, "cloud client without time limits (hub#2509)");
+            reqwest::Client::new()
+        })
+}
+
 /// Estado de la app Axum. El runtime va tras el [`SharedRuntime`] de arriba (lectores en
 /// paralelo, escritores exclusivos); para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) sobra.
 ///
@@ -970,7 +996,8 @@ pub struct AppState {
     /// Identidad de Hub **viva**. Token e id se actualizan juntos al completar el registro de la
     /// máquina, evitando firmar una llamada con el token nuevo y el UUID placeholder anterior.
     pub hub_id: HubId,
-    /// Cliente HTTP async (rustls) compartido para hablar con el Cloud (descargas + proxy SSE).
+    /// Shared async HTTP client (rustls) to talk to the Cloud, built by [`cloud_client`]: every
+    /// call has a ceiling (hub#2509); a stream or a file transfer asks for a longer one per request.
     pub http: reqwest::Client,
     /// Client for the marketplace side of erplora.com: install, update and version listings
     /// (hub#2251). Unlike `http` it gives up on a stalled answer, so «Installing…» always ends.
@@ -1064,7 +1091,7 @@ impl AppState {
             config,
             machine_token,
             hub_id,
-            http: reqwest::Client::new(),
+            http: cloud_client(CLOUD_CONNECT_TIMEOUT, CLOUD_CALL_TIMEOUT),
             marketplace_http: marketplace_client(MARKETPLACE_STALL_TIMEOUT),
             tenants: None,
             vector: None,

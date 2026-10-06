@@ -164,6 +164,7 @@ pub(crate) async fn assistant_chat_stream(
     // Construye la petición al Cloud (POST, Bearer + X-Hub-Id) y abre el stream.
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let req = cloud.assistant_chat_stream(&auth);
+    // The stream outlives the shared client's ceiling (hub#2509): it asks for the transfer one.
     let mut r = st.http.post(&req.url).json(&body);
     for (k, v) in &req.headers {
         r = r.header(*k, v);
