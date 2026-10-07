@@ -306,3 +306,48 @@ async fn the_business_next_door_using_the_same_tablet_does_not_keep_mine() {
     assert_eq!(mine.prune_stale_devices("").await.unwrap().removed, 1);
     assert!(listed(&theirs, "shared-tablet").await.is_some());
 }
+
+/// hub#2599: the server ends the live channels (`/ws`, `/api/events`) of the sessions the clean-up
+/// deletes, so the runtime says exactly which ones — the dead device's of THIS business, never the
+/// session of a device that stays nor the one of the business next door with the same tablet id.
+#[tokio::test]
+async fn cleaning_names_exactly_the_sessions_it_ended_hub2599() {
+    let test_db = TestDb::new().await;
+    let mine = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-2599-mine");
+    let theirs = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-2599-theirs");
+    let mut dead = Vec::new();
+    for (rt, hub_id) in [(&mine, "hub-2599-mine"), (&theirs, "hub-2599-theirs")] {
+        rt.ensure_system_tables().await.unwrap();
+        let admin = rt
+            .create_user("Admin", "1111", "admin", None)
+            .await
+            .unwrap();
+        rt.trust_device("dead-browser", "Ana").await.unwrap();
+        dead.push(
+            rt.create_session(&admin, 3600, Some("dead-browser"))
+                .await
+                .unwrap(),
+        );
+        age_device(rt, hub_id, "dead-browser", 60, 40).await;
+        age_sessions(rt, hub_id, "dead-browser", 40, 39).await;
+    }
+    let admin = mine
+        .create_user("Owner", "2222", "admin", None)
+        .await
+        .unwrap();
+    mine.trust_device("till-1", "Owner").await.unwrap();
+    let at_till = mine
+        .create_session(&admin, 3600, Some("till-1"))
+        .await
+        .unwrap();
+
+    let pruned = mine.prune_stale_devices("").await.unwrap();
+
+    assert_eq!(pruned.removed, 1);
+    assert_eq!(pruned.ended_sessions, vec![dead[0].clone()]);
+    assert!(!pruned.ended_sessions.contains(&at_till));
+    assert_eq!(
+        session_rows(&theirs, "hub-2599-theirs", "dead-browser").await,
+        1
+    );
+}
