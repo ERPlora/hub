@@ -226,7 +226,7 @@
     "name": "Liveness (public)"
   },
   "GET /readyz": {
-    "name": "Readiness — what the container HEALTHCHECK reads (public)"
+    "name": "Readiness — what the container HEALTHCHECK reads (public: statuses only; the detail of each check needs an owner/admin session)"
   },
   "GET /modules/:id/*path": {
     "name": "Static asset of an installed module (public)"

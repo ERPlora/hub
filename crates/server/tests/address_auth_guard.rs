@@ -285,6 +285,33 @@ async fn invented_event_tickets_count_like_sessions() {
     assert_locked(&router, attacker).await;
 }
 
+/// hub#2549: `/readyz` shows its whole diagnosis to an owner or administrator session and answers
+/// the same status code to everybody else — so without counting, it would tell an attacker, for
+/// free and without limit, which invented token is an administrator's. A forged session there
+/// counts against the address like at any other door (hub#2282), while the probe itself keeps
+/// answering: its status code is the orchestrator's verdict, never a `401`.
+#[tokio::test]
+async fn invented_sessions_at_the_readiness_probe_count_like_sessions_hub2549() {
+    let router = fixture().await;
+    let attacker = "198.51.100.70";
+    for i in 0..MAX_FORGED_SESSIONS {
+        let request = Request::builder()
+            .uri("/readyz")
+            .header("x-hub-session", format!("forged-readyz-{i:052}"))
+            .header("x-forwarded-for", forwarded(attacker))
+            .body(Body::empty())
+            .unwrap();
+        let (status, body) = send(&router, request).await;
+        assert_ne!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "the probe never rejects: {body}"
+        );
+    }
+    assert_locked(&router, attacker).await;
+    assert_signs_in(&router, "198.51.100.71").await;
+}
+
 /// infra#334: a till retrying its one dead session all day long is not an attack.
 #[tokio::test]
 async fn a_till_repeating_its_dead_session_never_locks_the_shop() {

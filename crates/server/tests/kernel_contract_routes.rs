@@ -55,6 +55,8 @@ const PRIMITIVES: &[(&str, &str)] = &[
     // NOT here on purpose: `auth::hub_scoped_auth` / `auth::machine_auth`. They hand the runtime
     // its OWN credential to call the Cloud (ADR-0003) and never look at who is calling — an
     // outbound token is not a gate, and listing it painted open routes as `auth:hub-token`.
+    // Nor `auth::open_door_caller` (hub#2549): `/readyz` answers everybody and only shows MORE to
+    // an administrator, so the route is open and has to keep reading `none`.
 ];
 
 /// A session gate written by hand: the body READS the session credential AND RESOLVES it

@@ -46,7 +46,7 @@
 use std::collections::BTreeMap;
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Value};
@@ -240,17 +240,52 @@ async fn report_recovered_switchovers(st: &AppState) {
 }
 
 /// `GET /readyz`.
-pub async fn readyz(State(st): State<AppState>) -> Response {
+///
+/// Open to anyone, because its readers —Swarm's `HEALTHCHECK`, Traefik, the load balancer, the
+/// SaaS— ask without a credential. But what an anonymous caller reads is the verdict and each
+/// part's status, never the inside: the database driver's error text, the migration count, the
+/// missing modules or the path and reason of a failed install (hub#2549). The whole diagnosis is
+/// for an owner or an administrator, through the same gate as the System screen (hub#2519) — the
+/// pattern of Spring Boot's `show-details: when-authorized`. Who asks never changes the status
+/// code: a session that does not resolve is an anonymous caller, not a `401` — and it still counts
+/// against the address like at any other door (hub#2282).
+pub async fn readyz(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let checks = snapshot(&st).await;
     report_recovered_switchovers(&st).await;
     let status = aggregate(&checks);
+    let caller = {
+        let runtime = st.runtime.read().await;
+        crate::auth::open_door_caller(&headers, &st.config, &runtime).await
+    };
+    let detailed = match caller {
+        crate::auth::OpenDoorCaller::Admin => true,
+        crate::auth::OpenDoorCaller::Other => false,
+        crate::auth::OpenDoorCaller::ForgedSession(token) => {
+            let client = crate::address_guard::client_address(&headers);
+            crate::address_guard::record_rejected_credential(
+                &st,
+                client.as_deref(),
+                crate::address_guard::Failure::SessionInvalid,
+                &token,
+            );
+            false
+        }
+    };
+    let checks: serde_json::Map<_, _> = checks
+        .iter()
+        .map(|(name, check)| {
+            let shown = if detailed {
+                check.to_json()
+            } else {
+                json!({ "status": check.status.as_str() })
+            };
+            (name.clone(), shown)
+        })
+        .collect();
     let body = json!({
         "status": status.as_str(),
         "version": crate::version::HUB_VERSION,
-        "checks": checks
-            .iter()
-            .map(|(name, check)| (name.clone(), check.to_json()))
-            .collect::<serde_json::Map<_, _>>(),
+        "checks": checks,
     });
 
     (status_code(status), Json(body)).into_response()

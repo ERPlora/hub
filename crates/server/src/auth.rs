@@ -293,6 +293,38 @@ pub async fn require_admin_session(
     }
 }
 
+/// Who asks an OPEN door that shows more only to an owner or administrator (`/readyz`, hub#2549).
+pub enum OpenDoorCaller {
+    /// An owner or administrator session — the audience of the System screen (hub#2519).
+    Admin,
+    /// Anybody else: no session, a live session whose role falls short, or a session this hub
+    /// could not look up (a database error is not proof that the token was invented).
+    Other,
+    /// A session token that resolves to nothing. The door still answers, so the caller has to
+    /// count it against the address (hub#2282), or the door is a free oracle for admin tokens.
+    ForgedSession(String),
+}
+
+/// Classifies the caller of an open door with the same rule as [`require_admin_session`].
+///
+/// It widens an answer, it never refuses one: there is no `Err` for the door to turn into a `401`.
+pub async fn open_door_caller(
+    headers: &HeaderMap,
+    config: &HubConfig,
+    rt: &Runtime,
+) -> OpenDoorCaller {
+    match require_admin_session(headers, config, rt).await {
+        Ok(_) => OpenDoorCaller::Admin,
+        Err(AuthError::Invalid(_) | AuthError::SessionEnded(_)) => match session_token(headers) {
+            Some(token) if matches!(rt.resolve_session(&token).await, Ok(None)) => {
+                OpenDoorCaller::ForgedSession(token)
+            }
+            _ => OpenDoorCaller::Other,
+        },
+        Err(AuthError::MissingSession | AuthError::Forbidden(_)) => OpenDoorCaller::Other,
+    }
+}
+
 /// ¿El rol gestiona API keys? owner/admin (insensible a mayúsculas). Conjunto cerrado y conservador
 /// (ADR-0057 §6: "gestionado por owner/admin"). Lo reusa `crate::hub_users` para no tener DOS
 /// definiciones de "quién administra el hub" que puedan divergir.
