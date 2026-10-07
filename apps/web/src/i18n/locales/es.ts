@@ -1916,6 +1916,8 @@ export default {
       'ERPlora no ha podido atender esta instalación ahora mismo. Inténtalo en unos minutos.',
     install_cloud_timeout:
       'ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.',
+    update_version_not_offered:
+      'Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, o es anterior a la que tienes. No ha cambiado nada.',
     core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',

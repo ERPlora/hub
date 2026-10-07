@@ -136,6 +136,8 @@ describe('moduleFailureMessage · cada causa de instalación tiene SU frase, no 
     'install_cloud_rejected',
     // hub#2251 — the marketplace took the call and went silent.
     'install_cloud_timeout',
+    // hub#2546 — the version asked for is one this hub does not move to (support pin, or behind).
+    'update_version_not_offered',
   ] as const;
 
   it.each(CAUSES)('%s reads as a sentence of the catalogue, never as the engine prose', (code) => {
@@ -172,5 +174,18 @@ describe('moduleFailureMessage — an update that lost the module', () => {
   it('has its Spanish sentence too (en + es, ADR-0055)', () => {
     expect(typeof es.runtimeErrors.module.update_lost).toBe('string');
     expect(es.runtimeErrors.module.update_lost).not.toBe(en.runtimeErrors.module.update_lost);
+  });
+});
+
+// hub#2546 — an update refused because support pinned the app (or the version is behind the one
+// installed) is told as such, in both languages, never as the engine's English prose.
+describe('moduleFailureMessage — a version the hub does not move to (hub#2546)', () => {
+  it('has its own sentence in en and es', () => {
+    const code = 'update_version_not_offered';
+    const enLine = (en.runtimeErrors as Record<string, unknown>)[code];
+    const esLine = (es.runtimeErrors as Record<string, unknown>)[code];
+    expect(typeof enLine).toBe('string');
+    expect(typeof esLine).toBe('string');
+    expect(esLine).not.toBe(enLine);
   });
 });
