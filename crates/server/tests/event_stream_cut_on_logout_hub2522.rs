@@ -413,4 +413,3 @@ async fn revoking_a_key_closes_its_sse_stream_and_no_other_keys() {
     sse_assert_cut(&mut integration, &srv, "the key was revoked").await;
     sse_assert_still_hears(&mut other, "another key").await;
 }
-

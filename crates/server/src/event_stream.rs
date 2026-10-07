@@ -35,6 +35,16 @@
 //! is still no `if this_is_our_app` anywhere in this file: the person is the principal, exactly as
 //! on the query door.
 //!
+//! # Ending the credential ends the channel (hub#2522)
+//!
+//! The audience is decided once, when the channel opens — but the credential it opened with can
+//! end while it is open. Signing out, revoking a key and rotating it call
+//! [`StreamLimiter::cut`] with the credential's [`Lifeline`] tag, and every channel opened with it
+//! gets [`ERR_CREDENTIAL_ENDED`] as its last frame and closes. A ticket minted before its session
+//! signed out opens nothing afterwards. Until hub#2522 a till that signed out, or an integration
+//! whose key was revoked, kept hearing everything it heard at connect time until it reconnected.
+//! Changing a person's role or permissions does **not** cut yet: that is a different door.
+//!
 //! # How the credential travels
 //!
 //! A browser cannot put a header on a WebSocket handshake, and `EventSource` cannot either. So:
@@ -62,6 +72,7 @@
 //! | [`ERR_UNAUTHENTICATED`] | 401 | no credential, or one this hub does not recognise — including a key of **another hub**, whose rows are not this hub's (the *message* tells them apart, the code does not: existence is not something to leak) |
 //! | [`ERR_READ_REQUIRED`] | 403 | a valid key that may not read (a `write_only` feed). It is a different answer from "who are you?" on purpose: if both refusals said the same thing, either guard could be deleted and every test would still pass |
 //! | [`ERR_NOT_READY`] | — | any frame on `/ws` before the socket authenticated |
+//! | [`ERR_CREDENTIAL_ENDED`] | — | the last frame of an open channel whose credential ended: the session signed out, or the key was revoked or rotated (hub#2522) |
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -658,7 +669,8 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
         );
     }
     // hub#2522: taken BEFORE the key is looked up, so a revocation that lands while it is being
-    // verified (argon2 is slow on purpose) counts as after the check and ends the channel.
+    // verified (argon2 is slow on purpose) counts as after the check: the channel is born cut
+    // when it registers (`StreamLimiter::watch`) and closes before it forwards anything.
     let checked_at = Instant::now();
     let hub_id = st.hub_id();
     let arc = match st.runtime_for(&hub_id).await {
@@ -701,9 +713,7 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
                 tag: key_tag(&principal.key_id),
                 checked_at,
             };
-            if st.stream_limiter.has_ended(&lifeline) {
-                credential_not_valid()
-            } else if principal.scope.can_read() {
+            if principal.scope.can_read() {
                 StreamAuth::Granted(Box::new(StreamGrant {
                     holder_id: principal.key_id,
                     audience: StreamAudience::Key(principal.scope),
@@ -1678,7 +1688,11 @@ mod tests {
         let mut reconnected = lim.watch(lifeline("key:k1"));
 
         drop(old);
-        assert_eq!(lim.cut("key:k1"), 1, "the reconnected channel is still known");
+        assert_eq!(
+            lim.cut("key:k1"),
+            1,
+            "the reconnected channel is still known"
+        );
         assert!(is_cut(&mut reconnected));
     }
 
