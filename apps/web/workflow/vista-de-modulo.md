@@ -74,7 +74,7 @@ Pantalla: Vista de un módulo
 Pasos:
 1. Con la app abierta, la persona toca otra pestaña de la barra inferior.
 2. La pestaña nueva se monta; la dirección cambia sin apilar historial.
-3. Si la barra no cabe (un móvil con cinco pestañas), se desplaza de lado y la pestaña activa se trae a la vista al entrar por un enlace.
+3. Si la barra no cabe (un móvil con cinco pestañas), se desplaza de lado y la pestaña activa se trae a la vista al entrar por un enlace: entera y fuera del difuminado que avisa de que hay más pestañas por ese lado; si es la primera o la última, la barra llega hasta su principio o su final, donde ya no hay difuminado (hub#2603). En tableta y escritorio las pestañas caben y la barra no se mueve.
 4. Si la persona cambia de idioma, los nombres de las pestañas y el título se vuelven a pedir en el idioma nuevo sin recargar lo que hay en pantalla (un tique a medias no se pierde).
 Entra: los nombres de las pestañas, que traduce el hub (HUB-F31); el shell añade dos pestañas suyas: «Ajustes» (si la app declara ajustes) y «Plan» (si la app declara planes).
 Sale: nada.

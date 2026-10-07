@@ -19,7 +19,7 @@
  * is published in OutfitKit's own public token, `--ok-tabbar-min`, which is exactly what it is for
  * («cada producto puede ajustarlo»); the strip keeps scrolling and no tab is hidden behind anything.
  */
-import { syncTabbarOverflow } from '@erplora/outfitkit/tabbar';
+import { FADE_PX, syncTabbarOverflow } from '@erplora/outfitkit/tabbar';
 
 /** OutfitKit's token for the narrowest a tab may be before the strip starts scrolling. */
 const PEEK_PROPERTY = '--ok-tabbar-min';
@@ -191,19 +191,30 @@ function readLabelNeeds(segment: HTMLElement): TabLabelNeed[] {
 }
 
 /**
- * Scrolls the strip the least it takes to show its selected tab whole.
+ * Scrolls the strip the least it takes to show its selected tab whole and clear of the edge fade.
  *
  * Ionic brings the chosen tab into view when it is chosen, measured on the widths of that moment;
  * when a pass here changes those widths afterwards (the chosen label is painted heavier in `ios` and
  * its word grows), the tab it placed at the edge can end half off the screen (hub#2414).
+ *
+ * «In view» is not enough: OutfitKit paints a `FADE_PX` fade over every edge that still hides tabs,
+ * and a chosen tab pushed against that edge comes out faded — Kitchen › Settings on a 375px phone
+ * ended 4px short of the strip's end, with its own pill under the fade (hub#2603). So the tab is
+ * kept one fade away from each edge. The engine clamps the scroll to the strip, so the last tab takes
+ * it to its end, where nothing is hidden and OutfitKit paints no fade; the first one, back to its
+ * start; and a strip that fits does not move at all.
+ * Offsets, like OutfitKit's own `scrollActiveTabIntoView`: they are the strip's scroll coordinates.
  */
 function keepSelectedTabInView(segment: HTMLElement): void {
   const selected = segment.querySelector<HTMLElement>('ion-segment-button.segment-button-checked');
   if (!selected) return;
-  const strip = segment.getBoundingClientRect();
-  const tab = selected.getBoundingClientRect();
-  if (tab.right > strip.right) segment.scrollLeft += tab.right - strip.right;
-  else if (tab.left < strip.left) segment.scrollLeft -= strip.left - tab.left;
+  const tabStart = selected.offsetLeft;
+  const tabEnd = tabStart + selected.offsetWidth;
+  let target = segment.scrollLeft;
+  if (tabEnd > target + segment.clientWidth - FADE_PX) target = tabEnd - segment.clientWidth + FADE_PX;
+  // The leading edge wins when the tab is too wide for both: its label starts there.
+  if (tabStart < target + FADE_PX) target = tabStart - FADE_PX;
+  segment.scrollLeft = target;
 }
 
 /** Reads the live geometry of a strip. `null` when there is not enough of it to measure a pitch. */
