@@ -1924,6 +1924,14 @@ export default {
       update_lost:
         'La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.',
     },
+    verifactu: {
+      unsent_records:
+        'VeriFactu aún tiene registros que la AEAT no ha aceptado. Abre VeriFactu para enviarlos o corregirlos y vuelve a intentarlo.',
+    },
+    fiscal: {
+      no_provider_left:
+        'Tu negocio tiene que conservar una app que envíe sus facturas a Hacienda, y así se quedaría sin ninguna. Instala antes otra app que lo haga y vuelve a intentarlo.',
+    },
     default: 'No ha funcionado. Vuelve a intentarlo dentro de un minuto.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here (translation of the one in `en.ts`)
