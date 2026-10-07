@@ -169,7 +169,7 @@ Pasos:
 3. El hub da por terminadas las sesiones de todos los demás dispositivos y apunta el motivo.
 4. En el dispositivo desalojado, la siguiente acción lleva al acceso con «Sesión abierta en otro dispositivo» y «Tu plan cubre un dispositivo a la vez…», con la salida a ampliar el plan.
 Entra: el número de dispositivos del plan, del último plan verificado (HUB-F162); sin plan verificado no hay límite, y un acceso que no dice qué dispositivo es (el acceso con cuenta no lo exige) no desaloja a nadie: solo el siguiente acceso que sí lo dice desaloja a todos los demás.
-Sale: las sesiones de los otros dispositivos caducadas con el motivo `device_limit`; el 401 de la puerta que sondea la pantalla lleva el código `session_evicted_device_limit`. Las sesiones del mismo dispositivo se conservan.
+Sale: las sesiones de los otros dispositivos caducadas con el motivo `device_limit`, y sus canales de avisos en vivo cerrados al momento con `events.credential_ended` (HUB-F60, ERPlora/hub#2571); el 401 de la puerta que sondea la pantalla lleva el código `session_evicted_device_limit`. Las sesiones del mismo dispositivo se conservan.
 Si falla: si el hub no puede leer el motivo, el 401 sale sin él y la pantalla solo dice que la sesión terminó.
 Implicados: HUB_APP-F06, HUB_SHELL-F06, SAAS_DASHBOARD-F59, SAAS_DASHBOARD-F206
 QA: ninguno

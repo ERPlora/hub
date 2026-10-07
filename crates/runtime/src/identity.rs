@@ -1648,10 +1648,10 @@ pub async fn enforce_device_limit(
     hub_id: &str,
     max_devices: u32,
     device_id: Option<&str>,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     // Solo el plan de 1 dispositivo con un device_id conocido desaloja. 0 = ilimitado.
     let (1, Some(device_id)) = (max_devices, device_id) else {
-        return Ok(());
+        return Ok(Vec::new());
     };
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -1681,7 +1681,19 @@ pub async fn enforce_device_limit(
         &p,
     )
     .await?;
-    Ok(())
+    // The tokens just thrown out, so the server closes their live channels (hub#2571). The
+    // previous generation was swept above, so every tombstone left is this one's.
+    let evicted = db
+        .query(
+            "SELECT token FROM hub_session WHERE hub_id = :hub_id AND ended_reason = :reason",
+            &p,
+        )
+        .await?;
+    Ok(evicted
+        .rows
+        .iter()
+        .filter_map(|row| row["token"].as_str().map(str::to_string))
+        .collect())
 }
 
 /// El código estable que viaja hasta la pantalla de entrada cuando a alguien lo desalojó otro
@@ -2311,6 +2323,68 @@ mod tests {
                 .unwrap()
                 .id,
             uid
+        );
+    }
+
+    #[tokio::test]
+    async fn enforce_device_limit_names_exactly_the_sessions_it_threw_out() {
+        // hub#2571: the server closes the live channels of the sessions an eviction ends, so it
+        // has to be told which ones — this time's, of this hub, and none it kept.
+        let db = fresh_db().await;
+        setup_identity(&db).await;
+        let uid = create_user(&db, HUB, "Ada", "1234", "admin", None)
+            .await
+            .unwrap();
+        let earlier = create_session(&db, HUB, &uid, 3600, Some("dev-0"))
+            .await
+            .unwrap();
+        enforce_device_limit(&db, HUB, 1, Some("dev-A"))
+            .await
+            .unwrap();
+        let on_a = create_session(&db, HUB, &uid, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        let unnamed = create_session(&db, HUB, &uid, 3600, None).await.unwrap();
+        let on_b = create_session(&db, HUB, &uid, 3600, Some("dev-B"))
+            .await
+            .unwrap();
+        let next_door_user = create_user(&db, "hub-next-door", "Bea", "5678", "admin", None)
+            .await
+            .unwrap();
+        let next_door = create_session(&db, "hub-next-door", &next_door_user, 3600, Some("dev-A"))
+            .await
+            .unwrap();
+        // The business next door has just thrown its own device out: its tombstone is not ours.
+        enforce_device_limit(&db, "hub-next-door", 1, Some("dev-Z"))
+            .await
+            .unwrap();
+
+        let mut evicted = enforce_device_limit(&db, HUB, 1, Some("dev-B"))
+            .await
+            .unwrap();
+        evicted.sort();
+        let mut expected = vec![on_a, unnamed];
+        expected.sort();
+        assert_eq!(evicted, expected);
+        assert!(
+            !evicted.contains(&on_b),
+            "the device signing in keeps its session"
+        );
+        assert!(
+            !evicted.contains(&earlier),
+            "the previous eviction is not this one"
+        );
+        assert!(
+            !evicted.contains(&next_door),
+            "another hub's sessions are not ours"
+        );
+
+        assert!(
+            enforce_device_limit(&db, HUB, 0, Some("dev-C"))
+                .await
+                .unwrap()
+                .is_empty(),
+            "without a limit nobody is thrown out"
         );
     }
 
