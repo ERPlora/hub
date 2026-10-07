@@ -138,4 +138,21 @@ test.describe('Blocking strip, seen by someone who does not run the hub (hub#256
       }
     });
   }
+
+  // The other side of the fix: only the note's row wraps. An admin's «Set up» is short and stays
+  // beside the step's name, even on the narrowest phone — it must not drop under the icon.
+  test('320×568: an admin keeps «Set up» beside the step’s name', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await withSession(page, await loginByPin());
+
+    await page.goto('/profile');
+    const item = page.getByTestId('setup-strip-item-business_identity');
+    const button = page.getByTestId('setup-strip-action-business_identity');
+    await expect(button).toBeVisible();
+
+    const name = await box(item.locator('.setup-strip-name'));
+    const cta = await box(button);
+    expect(cta.x, 'the button sits on the name’s row, to its right').toBeGreaterThanOrEqual(name.x + name.width);
+    expect(cta.x + cta.width, 'and inside the screen').toBeLessThanOrEqual(320.5);
+  });
 });

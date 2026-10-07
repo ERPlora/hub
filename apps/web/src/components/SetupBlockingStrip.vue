@@ -39,6 +39,7 @@
           v-for="item in view.items"
           :key="item.key"
           class="setup-strip-item"
+          :class="{ 'setup-strip-item--delegated': !isActionable(item) }"
           :data-testid="`setup-strip-item-${item.key}`"
         >
           <HubIcon class="setup-strip-icon" :name="item.icon || 'settings-outline'" />
@@ -224,9 +225,9 @@ function titleOf(item: SetupItem): string {
 /* A phone (hub#2567): beside the step's name the note ran off the screen — «This has to be set up by
    an admin…», the one thing the band tells whoever is not one — and squeezed the name into three
    lines. It goes UNDER the name, lined up with it, and wraps like any list on a phone. The button
-   (an admin's row) is short and stays where it is. */
+   (an admin's row) is short and stays where it is: only the note's row wraps. */
 @media (max-width: 540px) {
-  .setup-strip-item {
+  .setup-strip-item--delegated {
     flex-wrap: wrap;
     row-gap: 0.1rem;
   }
