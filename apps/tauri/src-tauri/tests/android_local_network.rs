@@ -354,3 +354,23 @@ fn the_release_build_reads_the_permissions_back_off_the_apk() {
         );
     }
 }
+
+/// The location pair, on its own: the one `attendance` needs to geofence a clock-in from a
+/// personal phone. Without it the WebView answers `PERMISSION_DENIED` with no dialog.
+// Regression test for ERPlora/hub#2552
+#[test]
+fn the_location_permissions_are_declared_in_both_manifests_hub2552() {
+    let plugin = fs::read_to_string(plugin_manifest_path()).expect("the plugin manifest");
+    for (label, manifest) in [("gen/android", APP_MANIFEST), ("plugin", plugin.as_str())] {
+        let declared = declared_permissions(manifest);
+        for permission in [
+            "android.permission.ACCESS_FINE_LOCATION",
+            "android.permission.ACCESS_COARSE_LOCATION",
+        ] {
+            assert!(
+                declared.iter().any(|p| p == permission),
+                "{label} manifest does not declare {permission} (hub#2552)"
+            );
+        }
+    }
+}
