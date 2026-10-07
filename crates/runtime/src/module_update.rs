@@ -162,6 +162,34 @@ pub fn offer(
         .collect()
 }
 
+/// Whether an administrator may ask the update door for this exact `requested` version (hub#2546).
+///
+/// **Not a second policy: [`offer`] asked about one version.** A version the list would not offer
+/// cannot be reached by typing it into the request either — otherwise the request is the door that
+/// lets in what the list keeps out:
+///
+/// - **A support pin leaves only the pin.** Asking for the pin is what the resolver already does on
+///   its own; anything else walks around it, up or down.
+/// - **Without a pin, only forwards** (or the installed one, which is a no-op).
+///
+/// Quarantine is not judged here: the caller does not read the marketplace before this, so the
+/// candidate is taken as installable and what is published is still checked by the install itself.
+pub fn may_request(installed: &str, pinned: Option<&str>, requested: &str) -> bool {
+    if let Some(pin) = pinned {
+        return requested == pin;
+    }
+    if requested == installed {
+        return true;
+    }
+    let candidate = [Available {
+        version: requested.to_string(),
+        is_active: true,
+    }];
+    offer(Some(installed), None, &candidate)
+        .iter()
+        .any(|offered| offered == requested)
+}
+
 /// Qué versión instalar por la que un BUNDLE anotó (`manifest.modules[].version`, hub#751/#752).
 ///
 /// La versión de un blueprint **no es un requisito, es una foto**: el exportador escribe lo que el
@@ -824,5 +852,31 @@ mod tests {
     #[test]
     fn a_template_module_with_nothing_published_resolves_to_nothing() {
         assert_eq!(resolve_template_version("1.4.1", &[]), None);
+    }
+
+    // ── may_request: the update door holds an explicit version to `offer` (hub#2546) ──────────
+
+    #[test]
+    fn hub2546_an_explicit_version_behind_the_installed_one_is_not_requestable() {
+        assert!(!may_request("1.0.0", None, "0.5.0"));
+        assert!(may_request("1.0.0", None, "1.1.0"));
+    }
+
+    #[test]
+    fn hub2546_a_support_pin_leaves_only_the_pin_requestable() {
+        assert!(!may_request("1.0.0", Some("1.0.0"), "0.5.0"));
+        assert!(!may_request("1.0.0", Some("1.0.0"), "2.0.0"));
+        assert!(may_request("1.2.0", Some("1.0.0"), "1.0.0"));
+    }
+
+    #[test]
+    fn hub2546_asking_for_the_installed_version_is_a_no_op_not_a_refusal() {
+        assert!(may_request("1.0.0", None, "1.0.0"));
+    }
+
+    #[test]
+    fn hub2546_a_version_that_cannot_be_ordered_is_not_requestable() {
+        assert!(!may_request("1.0.0", None, "nightly"));
+        assert!(!may_request("no-semver", None, "2.0.0"));
     }
 }

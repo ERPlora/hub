@@ -160,6 +160,10 @@ pub enum InstallError {
     /// no headers, or the zip stopped arriving. Retrying later is all there is to do.
     #[error("the marketplace did not answer in time")]
     CloudTimeout,
+    /// An explicit version the update door does not move this hub to (hub#2546): support pinned the
+    /// module, or the version is behind the installed one. Same rule as the version list (HUB-F24).
+    #[error("`{module_id}` cannot be moved to {version} on this hub")]
+    VersionNotOffered { module_id: String, version: String },
 }
 
 impl InstallError {
@@ -200,6 +204,7 @@ impl InstallError {
             InstallError::NotInCatalog { .. } => "install_not_in_catalog",
             InstallError::CloudRejected { .. } => "install_cloud_rejected",
             InstallError::CloudTimeout => "install_cloud_timeout",
+            InstallError::VersionNotOffered { .. } => "update_version_not_offered",
         }
     }
 }
