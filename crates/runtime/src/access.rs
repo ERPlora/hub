@@ -327,12 +327,12 @@ impl Runtime {
 
     /// **Cierra el acceso local** de una identidad cloud cuyo membresía ha revocado el SaaS (paso 2b
     /// regla D, hub#348): desactiva su `hub_user` (sesión abierta, PIN y pinpad caen con él) y borra
-    /// sus sesiones. Idempotente; devuelve cuántas filas cerró.
+    /// sus sesiones. Idempotente; returns the ids of the rows it closed (hub#2598).
     pub async fn revoke_cloud_access(
         &self,
         cloud_user_id: &str,
         email: Option<&str>,
-    ) -> Result<usize> {
+    ) -> Result<Vec<String>> {
         identity::revoke_cloud_access(self.db.as_ref(), &self.hub_id, cloud_user_id, email).await
     }
 

@@ -1092,13 +1092,16 @@ async fn raise_role_to_floor(
 /// Alcanza tanto la fila ya enlazada (`cloud_user_id`) como la **pre-provisionada por email** que
 /// aún no ha hecho login (invitación/owner sembrado): el email del JWT está autenticado (firma del
 /// SaaS) y es la misma clave con la que `get_or_link_cloud_user` enlaza, así que no amplía la
-/// confianza. Idempotente: solo toca filas activas. Devuelve cuántas cerró.
+/// confianza. Idempotente: solo toca filas activas.
+///
+/// Returns the ids of the rows it closed, so the caller can end those people's live channels
+/// (hub#2598): deleting the sessions does not reach a socket that is already open.
 pub async fn revoke_cloud_access(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     cloud_user_id: &str,
     email: Option<&str>,
-) -> Result<usize> {
+) -> Result<Vec<String>> {
     let mut ids: Vec<String> = Vec::new();
     let mut by_cloud_id = Params::new();
     by_cloud_id.insert("hub_id".into(), json!(hub_id));
@@ -1142,7 +1145,7 @@ pub async fn revoke_cloud_access(
         )
         .await?;
     }
-    Ok(ids.len())
+    Ok(ids)
 }
 
 /// Acumula los `id` de un resultado en `out` sin repetir (las dos búsquedas de
@@ -3030,8 +3033,8 @@ mod tests {
             revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com"))
                 .await
                 .unwrap(),
-            1,
-            "closes the one row of that cloud identity",
+            vec![user.id.clone()],
+            "closes the one row of that cloud identity and names it (hub#2598: its channels end)",
         );
 
         assert!(
@@ -3058,7 +3061,8 @@ mod tests {
         assert_eq!(
             revoke_cloud_access(&db, HUB, "42", Some("ada@bar.com"))
                 .await
-                .unwrap(),
+                .unwrap()
+                .len(),
             0,
             "idempotent: a second revocation touches nothing",
         );
@@ -3078,7 +3082,8 @@ mod tests {
         assert_eq!(
             revoke_cloud_access(&db, HUB, "99", Some("socia@bar.com"))
                 .await
-                .unwrap(),
+                .unwrap()
+                .len(),
             1,
         );
         assert!(!list_login_users(&db, HUB).await.unwrap()[0].is_active);
