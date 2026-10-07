@@ -4990,7 +4990,7 @@
         {
           "name": "GET /api/system",
           "request": {
-            "description": "auth: session",
+            "description": "auth: admin",
             "header": [
               {
                 "key": "X-Hub-Session",
