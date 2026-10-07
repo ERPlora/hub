@@ -514,6 +514,9 @@ export default {
     saved: 'Perfil guardado',
     saveError: 'No se pudo guardar el perfil',
     loadError: 'No se pudo cargar el perfil',
+    loadErrorBody: 'Tus datos siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    loading: 'Cargando tu perfil…',
+    retry: 'Reintentar',
     photoSaved: 'Foto actualizada',
     photoError: 'No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.',
     manageTitle: 'Gestión de la cuenta',
@@ -622,6 +625,10 @@ export default {
   },
   // Ver la nota del bloque equivalente en `en.ts`.
   settings: {
+    loading: 'Cargando los ajustes del negocio…',
+    loadError: 'No se pudieron cargar los ajustes del negocio',
+    loadErrorBody: 'Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    retry: 'Reintentar',
     hubWide: 'Ajustes generales',
     currency: 'Moneda',
     currencyDesc: 'Moneda de tu negocio para precios y totales',
