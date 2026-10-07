@@ -110,7 +110,11 @@ fn regions_sharing_a_calling_code_share_their_trunk_prefix() {
     // while every region behind one code dials the same trunk prefix.
     for r in REGIONS {
         for other in REGIONS.iter().filter(|o| o.code == r.code) {
-            assert_eq!(r.trunk, other.trunk, "{} and {} share +{}", r.iso, other.iso, r.code);
+            assert_eq!(
+                r.trunk, other.trunk,
+                "{} and {} share +{}",
+                r.iso, other.iso, r.code
+            );
         }
     }
 }
@@ -151,6 +155,13 @@ fn unknown_or_empty_business_country_reads_as_spain() {
 }
 
 #[test]
+fn business_country_is_read_whatever_its_case() {
+    // A lowercase code is still the business's country, not the Spanish fallback.
+    assert_eq!(ok("07700 900123", "gb"), "+447700900123");
+    assert_eq!(ok("07700 900123", " GB "), "+447700900123");
+}
+
+#[test]
 fn default_country_is_in_the_table() {
     assert!(REGIONS.iter().any(|r| r.iso == DEFAULT_COUNTRY));
 }
@@ -165,7 +176,13 @@ fn unknown_calling_code_is_refused() {
 fn an_e164_number_is_read_back_as_itself() {
     // What a module saved yesterday is read again today (a sweep, an edit that keeps the phone):
     // the canonical form must be a fixed point, or every pass would rewrite it.
-    for e164 in ["+34600111222", "+447700900123", "+390612345678", "+12125550123", "+78001234567"] {
+    for e164 in [
+        "+34600111222",
+        "+447700900123",
+        "+390612345678",
+        "+12125550123",
+        "+78001234567",
+    ] {
         assert_eq!(ok(e164, "ES"), e164);
         assert_eq!(ok(e164, "US"), e164);
     }

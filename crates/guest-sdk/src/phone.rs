@@ -109,11 +109,7 @@ fn international(digits: &str) -> Result<String, InvalidPhone> {
 /// with an `8` of its own. (Without a trunk prefix, `rest` is `digits`.)
 fn strip_trunk<'a>(digits: &'a str, trunk: &str, code: &str) -> &'a str {
     match digits.strip_prefix(trunk) {
-        Some(rest)
-            if trunk == "0" || !possible(code, digits) =>
-        {
-            rest
-        }
+        Some(rest) if trunk == "0" || !possible(code, digits) => rest,
         _ => digits,
     }
 }
@@ -123,7 +119,7 @@ fn possible(code: &str, national: &str) -> bool {
     // No region has a zero length, so the empty number is never possible.
     let len = national.len();
     REGIONS
-            .iter()
-            .filter(|r| r.code == code)
-            .any(|r| r.lengths.iter().any(|l| usize::from(*l) == len))
+        .iter()
+        .filter(|r| r.code == code)
+        .any(|r| r.lengths.iter().any(|l| usize::from(*l) == len))
 }
