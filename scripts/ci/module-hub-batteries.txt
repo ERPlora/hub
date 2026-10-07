@@ -339,6 +339,13 @@ appointments/tests/recurring_create_eligibility.hub.test.py
 # (pm#637; the two-hub tenancy is pinned by its `.pg` twin). New coverage, not moved.
 # pending-publication: reservations#101 until 2026-11-06
 reservations/tests/customer_erasure.hub.test.py
+# tables: erasing a customer's personal data in Clientes (`customers.anonymize` →
+# `customer.anonymized`) empties the guest name her confirmed reservation copied onto the floor
+# plan hold, keeps the table reserved with its time, party size and `customer_id` (the screen reads
+# «Deleted customer»), and leaves another customer's hold untouched, against the real kernel
+# (pm#637; the two-hub tenancy is pinned by its `.postgres` twin). New coverage, not moved.
+# pending-publication: tables#128 until 2026-11-06
+tables/tests/customer_erasure.hub.test.py
 # appointments: a daily series with more dates than one run books (80 on the default 90-day
 # window) is booked WHOLE by following the handler's `next_from` like «Book appointments» does —
 # the 50-per-run cap says where the next run starts instead of dropping the rest — and a second
