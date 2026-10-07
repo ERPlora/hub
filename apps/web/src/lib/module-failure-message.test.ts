@@ -58,13 +58,15 @@ describe('moduleFailureMessage', () => {
     expect(moduleFailureMessage(new InstallFailedError('x', 'install_failed', '   '), FALLBACK, I18N)).toBe(FALLBACK);
   });
 
-  it('carries the reason of an action the runtime REFUSED', () => {
-    // hub#314: deactivating or removing a module that still owes records to the AEAT is refused
-    // with a domain code and a sentence that says how many are left. Same rule, same helper — this
-    // used to live in a private `reasonOf` inside AppsPage, which is why install never got it.
-    const error = new ModuleActionError('VeriFactu still has 3 records to submit.', 'verifactu.unsent_records');
+  it('carries the reason of an action the runtime REFUSED with a code the catalogue does not know', () => {
+    // hub#314: deactivating or removing a module that still owes work to an authority is refused
+    // with a domain code and a sentence. Same rule, same helper — this used to live in a private
+    // `reasonOf` inside AppsPage, which is why install never got it. The engine's sentence is the
+    // last resort for a code this shell has no line for yet (an engine published after it); the
+    // codes it does know are translated (hub#2579, below).
+    const error = new ModuleActionError('Acme still has 3 filings to submit.', 'acme.unsent_records');
 
-    expect(moduleFailureMessage(error, FALLBACK, I18N)).toBe('VeriFactu still has 3 records to submit.');
+    expect(moduleFailureMessage(error, FALLBACK, I18N)).toBe('Acme still has 3 filings to submit.');
   });
 
   it('does not invent a reason for a transport failure of a module action', () => {

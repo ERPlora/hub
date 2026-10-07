@@ -283,7 +283,7 @@ Implicados: SAAS_DASHBOARD-F186, SAAS_DASHBOARD-F187, SAAS_PUBLIC-F22
 QA: ninguno
 
 ### HUB_SHELL-F122 Desactivar una app
-Estado: parcial — el error de desactivar sale en un aviso que desaparece a los 2,5 s, también cuando es la negativa larga de un motor en inglés (HUB_SHELL-F125) (leído en el código, sin ejecutar)
+Estado: parcial — el error de desactivar sale en un aviso que desaparece a los 2,5 s, también cuando es la negativa larga de un motor (HUB_SHELL-F125, ERPlora/hub#2594; visto en el banco, hub#2579)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -327,16 +327,16 @@ Implicados: HUB-F29, VERIFACTU-F32
 QA: L-14
 
 ### HUB_SHELL-F125 Ver que una app se niega a desactivarse o desinstalarse
-Estado: parcial — la negativa de un motor sale con la frase en inglés tal como la escribió el motor, en un aviso que desaparece a los 2,5 s (leído en el código, sin ejecutar)
+Estado: parcial — la negativa sale en un aviso que desaparece a los 2,5 s (ERPlora/hub#2594), y la de VeriFactu no dice cuántos registros faltan: el hub manda el número solo dentro de su frase inglesa, no como dato (ERPlora/hub#2595) (visto en el banco, hub#2579)
 Actor: administrador
 Pantalla: Apps
 Pasos:
 1. El administrador intenta desactivar VeriFactu o una app cuya desactivación lo arrastra (Facturación), o desinstalar VeriFactu, con registros sin aceptar por la AEAT; o desactivar o desinstalar la última app que cumple el régimen fiscal del negocio. Desinstalar una app de la que depende VeriFactu también pasa por la negativa de su motor, porque confirmar la pregunta se la llevaría con ella (HUB_SHELL-F124).
 2. El hub se niega y no cambia nada: ni la pedida ni las arrastradas.
-3. La pantalla enseña el motivo en un aviso rojo; en el caso de VeriFactu: «{n} VeriFactu record(s) have not reached the AEAT yet: send them before disabling or removing the module».
+3. La pantalla enseña el motivo en un aviso rojo, en el idioma de la pantalla. VeriFactu con registros pendientes: «VeriFactu aún tiene registros que la AEAT no ha aceptado. Abre VeriFactu para enviarlos o corregirlos y vuelve a intentarlo.». La última app fiscal: «Tu negocio tiene que conservar una app que envíe sus facturas a Hacienda, y así se quedaría sin ninguna. Instala antes otra app que lo haga y vuelve a intentarlo.».
 4. La app sigue «Activo» en la fila.
 Entra: el rechazo del hub con el código del motor y la frase que mandó.
-Sale: nada guardado. La pantalla solo conoce códigos genéricos de plataforma; la frase de un motor la pinta tal cual, porque el hub dice más que cualquier genérico.
+Sale: nada guardado. La pantalla traduce por el código las dos negativas fiscales (`verifactu.unsent_records`, `fiscal.no_provider_left`, hub#2579) igual que los códigos de plataforma; la frase de un motor cuyo código no conoce (uno publicado después que la pantalla) la pinta tal cual, porque dice más que cualquier genérico.
 Si falla: sin frase del hub, «No se pudo cambiar el estado de {name}.» o «No se pudo desinstalar {name}.».
 Implicados: HUB-F28, HUB-F29, VERIFACTU-F32
 QA: L-14
@@ -362,7 +362,7 @@ QA: L-14
 | App retirada del catálogo | hecho | HUB_SHELL-F121 |
 | Desactivar / activar con cascada | parcial / parcial | HUB_SHELL-F122, F123 |
 | Desinstalar nombrando lo que se va con ella | hecho (se quitan juntas al confirmar) | HUB_SHELL-F124 |
-| Negativa de un motor (VeriFactu) | parcial (frase en inglés) | HUB_SHELL-F125 |
+| Negativa de un motor (VeriFactu) | parcial (aviso de 2,5 s, sin el número de registros) | HUB_SHELL-F125 |
 
 ## Datos: de quién es cada dato
 
@@ -390,8 +390,9 @@ Se resuelven con `market-decision`; no las decide el worker.
 
 - Servidor HUB-F29: no hay opción aparte «quitarla igualmente»; confirmar la pregunta ya fuerza, y
   forzar se lleva las dependientes que la pregunta nombró (hub#2545).
-- VERIFACTU-F32: la frase sale en inglés **y** en un aviso que desaparece a los 2,5 s.
-- Servidor HUB-F28 y VERIFACTU-F32: la negativa de un motor sale en inglés en la pantalla española
-  (confirmado: la pantalla solo traduce códigos de plataforma, no el de un motor).
+- VERIFACTU-F32: la frase sale en un aviso que desaparece a los 2,5 s.
+- Servidor HUB-F28 y VERIFACTU-F32: hasta hub#2579 la negativa fiscal salía en inglés en la pantalla
+  española (la pantalla solo traducía códigos de plataforma); ahora se traduce por el código, y el
+  número de registros pendientes, que el hub solo manda dentro de su frase inglesa, no se enseña.
 - Servidor HUB-F23: una versión explícita sigue la regla de la lista (con pin, solo el pin; sin pin,
   solo hacia delante) y la que no la cumple sale `update_version_not_offered` (hub#2546).

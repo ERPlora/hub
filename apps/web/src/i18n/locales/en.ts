@@ -2254,6 +2254,19 @@ export default {
       update_lost:
         'The update failed and the previous version could not be restored, so this app is no longer installed. Install it again from Apps; if that fails too, contact support.',
     },
+    // hub#2579 — the two FISCAL refusals of switching off or uninstalling an app. The runtime sends
+    // a stable code and an English line for the log; without these the Apps toast painted that line
+    // on a Spanish screen. Each one says what to do, because the way out is different: the engine
+    // still owes records to the AEAT (ADR-0202 R2), or the hub would be left with no app filing its
+    // regime (ADR-0273 D5).
+    verifactu: {
+      unsent_records:
+        'VeriFactu still has records the AEAT has not accepted. Open VeriFactu to send or correct them, then try again.',
+    },
+    fiscal: {
+      no_provider_left:
+        'Your business has to keep an app that sends its invoices to the tax authority, and this would leave it without one. Install another app that does it first, then try again.',
+    },
     default: 'Something went wrong. Try again in a minute.',
   },
   // hub#1258 used to carry a `platformFailure` catalogue here for what the core says when it
