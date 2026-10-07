@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use erplora_db::testutil::{fresh_db, TestDb};
+use erplora_db::DatabaseAdapter;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Runtime, RuntimeError};
 use erplora_wasm_host::Output;
@@ -166,6 +167,63 @@ async fn after_a_forced_uninstall_the_next_boot_has_nothing_to_bring_back() {
         to_redownload.iter().all(|(id, _)| id == "dloose"),
         "nothing that depended on the removed app may be brought back at boot, got {to_redownload:?}"
     );
+}
+
+#[tokio::test]
+async fn the_dependents_that_went_with_it_are_named_the_farthest_first() {
+    let mut rt = hub_with_chain().await;
+
+    // `dtop` needs `dmid`, which needs `dbase`: the answer (and the live frames the server sends
+    // from it) lists them in the order they left, so `dtop` is never announced after the app it
+    // stood on.
+    let also = rt.uninstall_forced("dbase").await.expect("confirmed");
+    assert_eq!(also, vec!["dtop", "dmid"]);
+}
+
+#[tokio::test]
+async fn a_forced_uninstall_that_fails_halfway_leaves_no_app_without_its_dependency() {
+    let tdb = TestDb::new().await;
+    let db = tdb.adapter().await;
+    let mut rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545");
+    rt.ensure_system_tables().await.unwrap();
+    for m in ["dbase", "dmid", "dtop", "dloose"] {
+        rt.install_from_dir(&fixture(m))
+            .await
+            .unwrap_or_else(|e| panic!("install {m}: {e}"));
+    }
+    // Removing `dmid`'s row fails, the way a lock or a lost connection would.
+    db.execute_batch(
+        "CREATE FUNCTION refuse_dmid_delete() RETURNS trigger LANGUAGE plpgsql AS $$ \
+            BEGIN IF OLD.module_id = 'dmid' THEN RAISE EXCEPTION 'simulated failure'; END IF; \
+            RETURN OLD; END $$; \
+         CREATE TRIGGER refuse_dmid BEFORE DELETE ON hub_module FOR EACH ROW \
+            EXECUTE FUNCTION refuse_dmid_delete();",
+    )
+    .await
+    .unwrap();
+
+    let before = db.query("SELECT module_id, hub_id FROM hub_module ORDER BY module_id", &Default::default()).await.unwrap().rows;
+    eprintln!("DEBUG before={before:?}");
+    let r = rt.uninstall_forced("dbase").await;
+    eprintln!("DEBUG result={r:?}");
+    assert!(r.is_err(), "the failure must surface");
+
+    // The farthest go first, so whatever survives still has what it needs: `dmid` stays with
+    // `dbase` under it. Removing `dbase` first would leave `dmid` in `hub_module` on a dependency
+    // that no longer exists — exactly what dragged a removed app back in at boot (hub#2545).
+    let rows = db
+        .query(
+            "SELECT module_id FROM hub_module ORDER BY module_id",
+            &Default::default(),
+        )
+        .await
+        .unwrap()
+        .rows;
+    let left: Vec<&str> = rows
+        .iter()
+        .filter_map(|r| r["module_id"].as_str())
+        .collect();
+    assert_eq!(left, vec!["dbase", "dloose", "dmid"]);
 }
 
 #[tokio::test]
