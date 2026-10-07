@@ -1638,7 +1638,14 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
  */
 async function contextHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const device = await resolveDeviceId().catch(() => null);
+  // `try`, not `.catch`: a resolver that throws before handing back a promise must not take the
+  // boot read down with it — the login screen would lose its Cloud URL and its PIN length.
+  let device: string | null = null;
+  try {
+    device = await resolveDeviceId();
+  } catch {
+    device = null;
+  }
   if (device) headers['X-Device-Id'] = device;
   const session = getHubSession();
   if (session) headers['X-Hub-Session'] = session;

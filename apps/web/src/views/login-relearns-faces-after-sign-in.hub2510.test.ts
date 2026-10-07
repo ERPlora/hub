@@ -68,6 +68,7 @@ vi.mock('../lib/cloud', () => ({
     ticket = '';
   },
   setTokens: vi.fn(),
+  clearTokens: vi.fn(),
   runtimeCloudSession: vi.fn(async () => ({
     token: 'sess-1',
     credential_kind: 'cloud',
