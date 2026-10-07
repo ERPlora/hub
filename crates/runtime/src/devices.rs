@@ -107,10 +107,14 @@ pub struct TrustedDevice {
 pub const STALE_AFTER_DAYS: i64 = 30;
 
 /// What a bulk clean-up actually did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Pruned {
     /// Devices forgotten by this call.
     pub removed: usize,
+    /// The tokens of the sessions deleted with them, so the server can close the live channels
+    /// they still held (hub#2599). Credentials: never serialized.
+    #[serde(skip)]
+    pub ended_sessions: Vec<String>,
 }
 
 /// The ONE definition of "unused" (hub#2215), as SQL over a `hub_trusted_device` row, bound to
@@ -159,6 +163,7 @@ pub async fn prune_stale(db: &dyn DatabaseAdapter, hub_id: &str, keep: &str) -> 
         .await?;
     let keep = keep.trim();
     let mut removed = 0;
+    let mut ended_sessions = Vec::new();
     for row in &candidates.rows {
         let Some(device_id) = row["device_id"].as_str() else {
             continue;
@@ -180,27 +185,43 @@ pub async fn prune_stale(db: &dyn DatabaseAdapter, hub_id: &str, keep: &str) -> 
         if forgotten.affected == 0 {
             continue; // used in the meantime: it stays, and so do its sessions.
         }
-        db.execute(
-            "DELETE FROM hub_session \
-              WHERE hub_id = :hub_id AND device_id = :device_id AND expires_at <= :cutoff",
-            &one,
-        )
-        .await?;
+        let deleted = db
+            .query(
+                "DELETE FROM hub_session \
+                  WHERE hub_id = :hub_id AND device_id = :device_id AND expires_at <= :cutoff \
+                  RETURNING token",
+                &one,
+            )
+            .await?;
+        ended_sessions.extend(tokens_of(&deleted.rows));
         removed += 1;
     }
-    Ok(Pruned { removed })
+    Ok(Pruned {
+        removed,
+        ended_sessions,
+    })
 }
 
 /// What a revocation actually did — the honest report, not "ok".
 ///
 /// The owner just told the hub a device was lost, so the two facts worth answering are whether the
 /// hub knew it at all and how many open sessions were closed by the gesture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Revocation {
     /// `true` if there was a trust row to remove. `false` is not an error — see [`revoke`].
     pub was_known: bool,
     /// Sessions that stopped resolving because of this call.
     pub sessions_closed: usize,
+    /// The tokens of every session row deleted, expired ones included, so the server can close
+    /// the live channels they still held (hub#2599). Credentials: never serialized.
+    #[serde(skip)]
+    pub ended_sessions: Vec<String>,
+}
+
+/// The `token` column of the rows a `DELETE … RETURNING token` gave back.
+fn tokens_of(rows: &[serde_json::Value]) -> impl Iterator<Item = String> + '_ {
+    rows.iter()
+        .filter_map(|row| row["token"].as_str().map(str::to_string))
 }
 
 /// What naming a device actually did (hub#494).
@@ -405,11 +426,13 @@ pub async fn revoke(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> 
         .and_then(|row| row["n"].as_i64())
         .unwrap_or_default()
         .max(0) as usize;
-    db.execute(
-        "DELETE FROM hub_session WHERE hub_id = :hub_id AND device_id = :device_id",
-        &p,
-    )
-    .await?;
+    let deleted = db
+        .query(
+            "DELETE FROM hub_session WHERE hub_id = :hub_id AND device_id = :device_id \
+              RETURNING token",
+            &p,
+        )
+        .await?;
     let forgotten = db
         .execute(
             "DELETE FROM hub_trusted_device WHERE hub_id = :hub_id AND device_id = :device_id",
@@ -419,6 +442,7 @@ pub async fn revoke(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> 
     Ok(Revocation {
         was_known: forgotten.affected > 0,
         sessions_closed: closed,
+        ended_sessions: tokens_of(&deleted.rows).collect(),
     })
 }
 

@@ -325,3 +325,72 @@ async fn an_expired_session_is_not_somebody_signed_in() {
     assert_eq!(devices[0].last_sign_in, "");
     assert_eq!(devices[0].signed_in_until, "");
 }
+
+/// hub#2599: the server ends the live channels (`/ws`, `/api/events`) of the sessions a revocation
+/// deletes, so the runtime has to say exactly which ones it deleted — every row of THIS device in
+/// THIS business, the expired one included (a channel outlives the expiry of the session it opened
+/// with, hub#2600) — and none of the other till, none that names no device, and none of the
+/// business next door that knows a tablet by the same id, whose rows live in the same database.
+#[tokio::test]
+async fn revoking_a_device_names_exactly_the_sessions_it_ended_hub2599() {
+    let test_db = erplora_db::testutil::TestDb::new().await;
+    let mine = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-2599-mine");
+    let theirs = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-2599-theirs");
+    let mut tokens = Vec::new();
+    for rt in [&mine, &theirs] {
+        rt.ensure_system_tables().await.unwrap();
+        let admin = rt
+            .create_user("Admin", "1111", "admin", None)
+            .await
+            .unwrap();
+        rt.trust_device("laptop-1", "Office laptop").await.unwrap();
+        tokens.push(
+            rt.create_session(&admin, 3600, Some("laptop-1"))
+                .await
+                .unwrap(),
+        );
+    }
+    let (at_laptop, neighbour_laptop) = (tokens[0].clone(), tokens[1].clone());
+    let admin = mine
+        .create_user("Owner", "2222", "admin", None)
+        .await
+        .unwrap();
+    let at_till = mine
+        .create_session(&admin, 3600, Some("till-1"))
+        .await
+        .unwrap();
+    let anonymous = mine.create_session(&admin, 3600, None).await.unwrap();
+    let expired_on_laptop = mine
+        .create_session(&admin, 3600, Some("laptop-1"))
+        .await
+        .unwrap();
+    let mut p = erplora_db::Params::new();
+    p.insert("token".into(), serde_json::json!(expired_on_laptop));
+    p.insert(
+        "past".into(),
+        serde_json::json!((chrono::Utc::now() - chrono::Duration::days(2)).to_rfc3339()),
+    );
+    mine.db()
+        .execute(
+            "UPDATE hub_session SET expires_at = :past WHERE token = :token",
+            &p,
+        )
+        .await
+        .unwrap();
+
+    let revocation = mine.revoke_device("laptop-1").await.unwrap();
+
+    let mut ended = revocation.ended_sessions.clone();
+    ended.sort();
+    let mut expected = vec![at_laptop, expired_on_laptop];
+    expected.sort();
+    assert_eq!(ended, expected, "exactly the rows of this device, here");
+    assert_eq!(
+        revocation.sessions_closed, 1,
+        "the count the owner reads is still the open ones only"
+    );
+    for kept in [&at_till, &anonymous] {
+        assert!(session_is_alive(&mine, kept).await);
+    }
+    assert!(session_is_alive(&theirs, &neighbour_laptop).await);
+}

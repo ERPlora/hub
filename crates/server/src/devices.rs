@@ -197,7 +197,11 @@ pub async fn revoke_device(
     // holding" could no longer be answered.
     let was_current = !target.is_empty() && target == device_id_of(&headers);
     match rt.revoke_device(target).await {
-        Ok(revocation) => Json(json!({
+        Ok(revocation) => {
+            // hub#2599: after the rows are gone, so a ticket minted from now on cannot see them
+            // alive. By session, never by person: the device is cut, not who used it.
+            end_live_channels(&st, &revocation.ended_sessions);
+            Json(json!({
             "ok": true,
             "data": {
                 "device_id": target,
@@ -205,11 +209,21 @@ pub async fn revoke_device(
                 "sessions_closed": revocation.sessions_closed,
                 "was_current": was_current,
             },
-        }))
-        .into_response(),
+            }))
+            .into_response()
+        }
         // A blank segment (`/api/devices/%20`) is a mis-built URL, not an instruction: the runtime
         // refuses it (422) instead of running a `DELETE` keyed on nothing.
         Err(e) => crate::err_response(e),
+    }
+}
+
+/// Closes the live channels (`/ws`, `/api/events`) of the sessions a device door just deleted,
+/// with `events.credential_ended` (hub#2599) — the same cut signing out does (hub#2522).
+fn end_live_channels(st: &AppState, ended_sessions: &[String]) {
+    for token in ended_sessions {
+        st.stream_limiter
+            .cut(&crate::event_stream::session_tag(token));
     }
 }
 
@@ -236,8 +250,10 @@ pub async fn prune_devices(State(st): State<AppState>, headers: HeaderMap) -> Re
         return unauthorized(e);
     }
     match rt.prune_stale_devices(device_id_of(&headers)).await {
-        Ok(pruned) => Json(json!({ "ok": true, "data": { "removed": pruned.removed } }))
-            .into_response(),
+        Ok(pruned) => {
+            end_live_channels(&st, &pruned.ended_sessions);
+            Json(json!({ "ok": true, "data": { "removed": pruned.removed } })).into_response()
+        }
         Err(e) => crate::err_response(e),
     }
 }
