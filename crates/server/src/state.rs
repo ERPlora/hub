@@ -133,8 +133,9 @@ pub fn parse_auth_mode(raw: Option<&str>) -> AuthMode {
 /// propia —presentaba el `hub_id`, o nada—, así que armarla habría dejado un hub recién creado sin
 /// ningún login por PIN posible. Ya la tiene, y desde el primer arranque. Lo que queda al otro lado
 /// del interruptor es un PIN de **cuatro dígitos** contestando a internet entero en
-/// `{slug}.erplora.com`, con la lista de nombres publicada sin sesión por `GET /api/hub/context`:
-/// el device-trust es el segundo factor de *sitio* que hace que esos cuatro dígitos valgan algo.
+/// `{slug}.erplora.com` (y, con el freno apagado, `GET /api/hub/context` nombra al equipo a
+/// cualquiera, hub#2510): el device-trust es el segundo factor de *sitio* que hace que esos
+/// cuatro dígitos valgan algo.
 ///
 /// `false`, `0` y `no` **arman** la puerta, aunque suenen a interruptor. Honrarlos daría tres
 /// grafías de «abierto» contra una de «cerrado», y la que se colara sería siempre la insegura.

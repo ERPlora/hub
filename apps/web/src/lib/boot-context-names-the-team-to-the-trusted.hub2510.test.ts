@@ -61,7 +61,7 @@ describe('hub#2510 — the boot read says who is asking', () => {
     expect(headersOf(spy)['X-Hub-Session']).toBeUndefined();
   });
 
-  it('presents the session it holds, so a reload behind a session keeps the hub id', async () => {
+  it('presents the session it holds, so a reload behind a session keeps its grid', async () => {
     setHubSession('sess-1', 'cloud');
     const spy = contextAnswers({ hub_id: 'hub-1', pin_users: [MARTA] });
 
@@ -112,13 +112,21 @@ describe('hub#2510 — after signing in, the shell learns what the boot was not 
 
   it('a re-read that is refused keeps what was known', async () => {
     config.hubId = 'hub-1';
+    pinUsers.value = [MARTA];
+    // A refusal whose body LOOKS like a context (a proxy's error page, a hub mid-restart): the
+    // status decides, never the body.
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })),
+      vi.fn(async () => ({
+        ok: false,
+        status: 503,
+        json: async () => ({ hub_id: 'somebody-else', pin_users: [] }),
+      })),
     );
 
     await refreshHubIdentity();
 
     expect(config.hubId).toBe('hub-1');
+    expect(pinUsers.value).toEqual([MARTA]);
   });
 });

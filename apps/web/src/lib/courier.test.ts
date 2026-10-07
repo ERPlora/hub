@@ -69,7 +69,7 @@ describe('shell courier boot', () => {
       id: 'local-1', cloudUserId: 'cloud-1', role: 'employee',
     }));
     // hub#2510: a browser that came in through the panel was never trusted, so the boot read was
-    // told neither the hub id nor the faces. With the session it is — before the router mounts.
+    // not told the faces. With the session it is — before the router mounts.
     expect(order).toEqual(['session', 'identity']);
   });
 });

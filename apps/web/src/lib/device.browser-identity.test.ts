@@ -98,10 +98,10 @@ describe('the device identity of a browser (hub#454)', () => {
     expect(fromTill).not.toBe(fromLaptop);
   });
 
-  it('never presents the hub id as a device: it names the hub, and every device shares it', async () => {
-    // The hub id names the hub: every trusted till and every signed-in browser is told the same one
-    // (hub#2510 withholds it from strangers, but not from them). An identity that every device
-    // shares is not an identity.
+  it('never presents the hub id as a device: it names the hub, and anyone can read it', async () => {
+    // `GET /api/hub/context` takes no session — the hub id is public by design (hub#2510 withholds
+    // the faces from a stranger, not the hub id: erplora.com reads it to prove a custom domain). An
+    // identity that every browser shares AND that an attacker can simply fetch is not an identity.
     const browser = browserProfile();
 
     expect(await deviceIdPresentedBy(browser)).not.toBe(HUB_ID);

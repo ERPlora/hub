@@ -172,6 +172,27 @@ async fn the_trusted_till_gets_its_pinpad() {
 }
 
 #[tokio::test]
+async fn the_trusted_till_keeps_its_pinpad_when_its_session_has_died() {
+    // Every morning: the till boots with yesterday's session still stored and the shell presents
+    // it (HUB_SHELL-F04). It no longer resolves — but the device is still the trusted one, so the
+    // grid is painted: a dead session is a reason to ask the device, never to send the till to the
+    // account door. And a till repeating its own dead session is one token, counted once (HUB-F135):
+    // it cannot lock itself out by rebooting.
+    let hub = hub(true, false).await;
+    let client = "198.51.100.9";
+    for _ in 0..(MAX_FORGED_SESSIONS + 5) {
+        let body = context(
+            &hub.router,
+            client,
+            Some(TILL),
+            Some("sess-that-expired-overnight"),
+        )
+        .await;
+        assert_disclosed(&body, "trusted till with a dead session");
+    }
+}
+
+#[tokio::test]
 async fn a_live_session_gets_them_even_on_an_untrusted_device() {
     let hub = hub(true, false).await;
     let session = hub.rt_session.clone();
