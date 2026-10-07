@@ -170,3 +170,15 @@ describe('Home › Activity says when it could not read the sales (hub#2505)', (
     expect(cell(w, 'amount', 'T-0001'), 'the last good list stays').toBe(`12,50${NBSP}€`);
   });
 });
+
+describe('Home › Activity with no sales yet keeps the table (hub#2505)', () => {
+  it('an answer with zero sales paints the table and its own empty state, not a blank tab', async () => {
+    queryPage.mockReset().mockResolvedValue(page([]));
+    const w = mountDashboard('es');
+    await settle();
+
+    expect(loadError(w).exists(), 'nothing failed, so nothing to say').toBe(false);
+    expect(table(w), 'the table carries the empty state (ok-data-table without rows)').toBeTruthy();
+    expect(table(w)!.rows ?? []).toEqual([]);
+  });
+});
