@@ -231,7 +231,7 @@ Pasos:
 3. Si se pierde uno, pulsa «Quitar este dispositivo» y confirma: su sesión se cierra al momento y deja de poder entrar con PIN.
 4. Con «Quitar los {n} dispositivos sin usar desde hace 30 días» limpia de golpe los que nadie usa; el que tiene en la mano nunca cuenta.
 Entra: la sesión de administrador; el dispositivo desde el que pregunta.
-Sale: el nombre del dispositivo; al quitarlo, sus sesiones borradas y su confianza retirada (con ella, el modo personal). Quitar el propio dispositivo cierra la sesión de quien lo hace. Volver a entrar con una cuenta lo hace de confianza otra vez: se corta el dispositivo, no la persona.
+Sale: el nombre del dispositivo; al quitarlo, sus sesiones borradas y su confianza retirada (con ella, el modo personal), y el canal de avisos en vivo que tuviera abierto, cerrado al momento (HUB-F60, hub#2599); lo mismo con cada dispositivo de la limpieza de los 30 días. Quitar el propio dispositivo cierra la sesión de quien lo hace. Volver a entrar con una cuenta lo hace de confianza otra vez: se corta el dispositivo, no la persona.
 Si falla: «Ese dispositivo ya no está registrado aquí. Actualiza la lista.»; nombre largo, «Ese nombre es demasiado largo…»; sin ser administrador, «Solo el propietario o un administrador puede gestionar los dispositivos.».
 Implicados: HUB_SHELL-F101, HUB_SHELL-F102, HUB_SHELL-F103, HUB_SHELL-F104
 QA: ninguno
