@@ -466,7 +466,8 @@ impl Runtime {
     /// confirmed is the list of what is removed. Leaving them installed kept them «Active» on a
     /// dependency that no longer exists, and on the next boot their re-download dragged the removed
     /// app back in. Since the whole set leaves, both fiscal locks look at the whole set (the same
-    /// rule as [`Self::deactivate`]). Returns the dependents removed along with it.
+    /// rule as [`Self::deactivate`]). Returns the dependents removed along with it, in the order
+    /// they left (the farthest first).
     pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<Vec<String>> {
         self.uninstall_with(module_id, true).await
     }
@@ -496,7 +497,7 @@ impl Runtime {
         for id in leaving.iter().rev() {
             installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, id).await?;
         }
-        Ok(dependents)
+        Ok(dependents.into_iter().rev().collect())
     }
 
     /// Rechaza si algún módulo instalado depende de `module_id` (hub#1101).
