@@ -460,12 +460,21 @@ pub(crate) async fn open_cloud_session(
     // todas esas puertas. Se hace ANTES de responder y con el mismo token autenticado que prueba
     // la revocación.
     if !claims.is_member_of_hub(&hub_id) {
-        if let Err(e) = rt
+        match rt
             .revoke_cloud_access(&cloud_user_id, login_email.as_deref())
             .await
         {
+            // hub#2598: deleting the sessions does not reach a channel that is already open, so the
+            // people just closed are cut too — after the write, as every door of hub#2571.
+            Ok(closed) => {
+                for user_id in &closed {
+                    crate::hub_users::end_live_channels_of(st, user_id);
+                }
+            }
             // El cierre local falló, pero el rechazo no se negocia: se registra y se sigue.
-            tracing::error!(error = %e, "rule D: could not deactivate the revoked hub_user");
+            Err(e) => {
+                tracing::error!(error = %e, "rule D: could not deactivate the revoked hub_user")
+            }
         }
         return (
             StatusCode::FORBIDDEN,

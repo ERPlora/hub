@@ -180,7 +180,7 @@ async fn the_saas_revoking_a_membership_closes_the_door_of_a_row_written_before_
         .await
         .unwrap();
 
-    assert_eq!(closed, 1, "the revocation has to reach her row");
+    assert_eq!(closed.len(), 1, "the revocation has to reach her row");
     assert!(!is_active(&raw, "u-ana").await, "her row is deactivated");
     assert!(
         rt.resolve_session(&session).await.unwrap().is_none(),
@@ -395,7 +395,8 @@ async fn the_case_of_the_address_is_preserved() {
     assert_eq!(
         rt.revoke_cloud_access("cloud-ana", Some("Ana.Soto@Example.com"))
             .await
-            .unwrap(),
+            .unwrap()
+            .len(),
         1,
         "the SaaS revokes by the address it holds, and that comparison is exact"
     );

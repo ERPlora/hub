@@ -317,7 +317,8 @@ async fn a_membership_revoked_by_the_saas_is_not_worked_around_with_a_local_alta
     assert_eq!(
         rt.revoke_cloud_access("cloud-9", Some("ana@example.com"))
             .await
-            .unwrap(),
+            .unwrap()
+            .len(),
         1
     );
 
