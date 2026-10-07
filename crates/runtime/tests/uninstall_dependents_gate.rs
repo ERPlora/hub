@@ -229,6 +229,75 @@ async fn a_forced_uninstall_that_fails_halfway_leaves_no_app_without_its_depende
     assert_eq!(left, vec!["dbase", "dloose", "dmid"]);
 }
 
+/// A module written for one test: `id` declaring `depends_on`, nothing else.
+fn module_dir(id: &str, depends_on: &[&str]) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("erplora-2545-{id}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        serde_json::json!({ "id": id, "name": id, "version": "1.0.0", "depends_on": depends_on })
+            .to_string(),
+    )
+    .unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn a_forced_uninstall_that_fails_halfway_in_a_diamond_leaves_no_app_without_its_dependency() {
+    let tdb = TestDb::new().await;
+    let db = tdb.adapter().await;
+    let mut rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545d");
+    rt.ensure_system_tables().await.unwrap();
+    // `da` ← `db` ← `dc` ← `dd`, and `dd` ALSO declares `da` directly. Walking the dependents in
+    // waves lists `dd` in the first wave (it names `da`) although it stands on `dc` (second wave):
+    // a wave order is not a removal order.
+    for (id, deps) in [
+        ("da", &[][..]),
+        ("db", &["da"][..]),
+        ("dc", &["db"][..]),
+        ("dd", &["da", "dc"][..]),
+    ] {
+        let dir = module_dir(id, deps);
+        rt.install_from_dir(&dir)
+            .await
+            .unwrap_or_else(|e| panic!("install {id}: {e}"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+    // Removing `dd`'s row fails, the way a lock or a lost connection would.
+    db.execute_batch(
+        "CREATE FUNCTION refuse_dd_delete() RETURNS trigger LANGUAGE plpgsql AS $$ \
+            BEGIN IF OLD.module_id = 'dd' THEN RAISE EXCEPTION 'simulated failure'; END IF; \
+            RETURN OLD; END $$; \
+         CREATE TRIGGER refuse_dd BEFORE DELETE ON hub_module FOR EACH ROW \
+            EXECUTE FUNCTION refuse_dd_delete();",
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        rt.uninstall_forced("da").await.is_err(),
+        "the failure must surface"
+    );
+
+    // Nothing may leave while something still installed depends on it: `dd` has to go before `dc`,
+    // so the failure on `dd` leaves everything in place. Removing by reversed waves took `dc` first
+    // and left `dd` registered on a dependency that no longer existed — the very row that drags a
+    // removed app back in at boot (hub#2545).
+    let rows = db
+        .query(
+            "SELECT module_id FROM hub_module ORDER BY module_id",
+            &Default::default(),
+        )
+        .await
+        .unwrap()
+        .rows;
+    let left: Vec<&str> = rows
+        .iter()
+        .filter_map(|r| r["module_id"].as_str())
+        .collect();
+    assert_eq!(left, vec!["da", "db", "dc", "dd"]);
+}
+
 #[tokio::test]
 async fn force_does_not_take_a_dependent_that_still_owes_records() {
     let mut rt = hub_with_chain().await;

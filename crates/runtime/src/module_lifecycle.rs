@@ -492,12 +492,24 @@ impl Runtime {
         if !force {
             self.ensure_nobody_depends_on(module_id)?;
         }
-        // The farthest dependents first: nothing is ever left registered on a dependency that has
-        // already gone, even if a later step fails.
-        for id in leaving.iter().rev() {
-            installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, id).await?;
+        // An app leaves only once nothing still installed depends on it — the farthest first, the
+        // requested one last — so even if a later step fails nothing is left registered on a
+        // dependency that has already gone. The waves of `dependents_of` are not that order: an app
+        // declaring both the requested one and one of its dependents lands in the first wave. With a
+        // dependency cycle in the manifests nobody qualifies, so the farthest wave goes first.
+        let mut pending = leaving;
+        let mut gone: Vec<String> = Vec::with_capacity(pending.len());
+        while !pending.is_empty() {
+            let next = pending
+                .iter()
+                .rposition(|id| self.dependents_of(id).is_empty())
+                .unwrap_or(pending.len() - 1);
+            let id = pending.remove(next);
+            installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, &id).await?;
+            gone.push(id);
         }
-        Ok(dependents.into_iter().rev().collect())
+        gone.retain(|id| id != module_id);
+        Ok(gone)
     }
 
     /// Rechaza si algún módulo instalado depende de `module_id` (hub#1101).
