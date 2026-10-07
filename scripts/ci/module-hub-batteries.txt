@@ -359,3 +359,10 @@ appointments/tests/series_past_fifty.hub.test.py
 # same id in another hub untouched, against the real kernel (pm#637). New coverage, not moved.
 # pending-publication: appointments#315 until 2026-11-04
 appointments/tests/customer_erasure.hub.test.py
+# attendance: the clock cycle against the real kernel — clock in, start and end a break, clock
+# out, the open day as `records.mine_open` sees it, a second clock-in while a day is open refused
+# with `attendance.clock_in_rejected`, a personal-device clock-in refused when the business requires
+# the location and the phone sends none, settings round-trip, a correction with its reason and the
+# correction trail, and `records.mine` showing only the caller's own days. New module, new coverage.
+# pending-publication: attendance#9 until 2026-11-07
+attendance/tests/clock_cycle.hub.test.py
