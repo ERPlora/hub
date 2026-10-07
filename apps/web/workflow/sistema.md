@@ -47,7 +47,7 @@ Estado: hecho
 Actor: administrador
 Pantalla: Sistema › Recursos
 Pasos:
-1. El dueño o un administrador abre **Recursos**. El título es «Recursos en la nube» y una pastilla dice «Nube». Quien no administra no ve este bloque (ni pide la evolución): en **Recursos** le quedan las tarjetas de su dispositivo (F137–F140).
+1. El dueño o un administrador abre **Recursos**. El título es «Recursos en la nube» y una pastilla dice «Nube». Quien no administra no ve este bloque (ni pide la evolución): en su lugar lee «Solo el dueño o un administrador puede ver cuánto está usando el hub.» y debajo le quedan las tarjetas de su dispositivo (F137–F140).
 2. Debajo hay un selector de rango: «3 h», «24 h» (el que se abre) y «3 días». Es el máximo a propósito: erplora.com no guarda más.
 3. Ve cuatro tarjetas: **CPU**, **Memoria**, **Base de datos** (siempre «PostgreSQL» y debajo «Base de datos compartida»: el hub no manda el tamaño; el tamaño solo lo da **Plan y límites**) y **Conexiones**. CPU, memoria y conexiones llevan el valor actual y la evolución del rango elegido, con la etiqueta «Últimas 24 horas» (o la del rango).
 4. Cerca del límite de su plan, la tarjeta dice «Al {pct} % del límite de tu plan.»; por encima, «Al {pct} % del límite de tu plan: el hub puede ir más lento.». Si erplora.com marca que el plan se queda corto, sale además «Tu plan se está quedando corto de recursos. Con un plan mayor este hub tiene más margen.» con **Actualizar plan**, que abre erplora.com en el navegador del sistema; ese botón no sale en la copia que reparte Google Play.
