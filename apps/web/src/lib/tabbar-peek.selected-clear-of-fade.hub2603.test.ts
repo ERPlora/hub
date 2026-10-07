@@ -66,7 +66,8 @@ const MD_HISTORY: StripSpec = {
  */
 function strip(spec: StripSpec): HTMLElement {
   const segment = document.createElement('ion-segment');
-  const tabWidth = (): number => Number.parseFloat(segment.style.getPropertyValue('--ok-tabbar-min')) || spec.floorWidth;
+  const tabWidth = (): number =>
+    Number.parseFloat(segment.style.getPropertyValue('--ok-tabbar-min')) || spec.floorWidth;
   const contentWidth = (): number => 2 * spec.padding + spec.tabCount * tabWidth() + (spec.tabCount - 1) * spec.gap;
   const maxScroll = (): number => Math.max(0, contentWidth() - spec.visibleWidth);
   let scrollLeft = spec.scrollLeft;
@@ -79,8 +80,7 @@ function strip(spec: StripSpec): HTMLElement {
       scrollLeft = Math.max(0, Math.min(value, maxScroll()));
     },
   });
-  segment.getBoundingClientRect = () =>
-    new DOMRect(spec.viewportLeft, 0, spec.visibleWidth, 56);
+  segment.getBoundingClientRect = () => new DOMRect(spec.viewportLeft, 0, spec.visibleWidth, 56);
 
   for (let i = 0; i < spec.tabCount; i += 1) {
     const tab = document.createElement('ion-segment-button');
@@ -88,8 +88,7 @@ function strip(spec: StripSpec): HTMLElement {
     const left = (): number => spec.padding + i * (tabWidth() + spec.gap);
     Object.defineProperty(tab, 'offsetLeft', { get: left });
     Object.defineProperty(tab, 'offsetWidth', { get: tabWidth });
-    tab.getBoundingClientRect = () =>
-      new DOMRect(spec.viewportLeft + left() - segment.scrollLeft, 0, tabWidth(), 56);
+    tab.getBoundingClientRect = () => new DOMRect(spec.viewportLeft + left() - segment.scrollLeft, 0, tabWidth(), 56);
     segment.appendChild(tab);
   }
   document.body.appendChild(segment);
