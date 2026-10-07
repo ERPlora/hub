@@ -8,15 +8,57 @@
 // the set the SDK reads (`activeModuleIds()`), so the gate lives here, in front of the read.
 import type { ErploraClient } from '@erplora/module-sdk';
 
+import { formatMoney, type FormatMoneyOptions } from './money';
+
+/** The states a sale can be in (`sales`' `status` column: draft|pending|completed|voided|refunded),
+ *  plus `other` for one this shell does not know yet — painted as its own neutral word, never
+ *  borrowed from a known state (hub#2505). */
+export type ActivityStatus = 'completed' | 'pending' | 'draft' | 'voided' | 'refunded' | 'other';
+
 /** One row of the feed. `status` is a stable machine value; the view translates it (hub#863). */
 export interface ActivityRow {
   date: string;
   sale: string;
   customer: string;
   method: string;
+  /** The sale total in MINOR units (cents), exactly as `sales` stores and serves it (hub#2505). */
   amount: number;
-  status: 'completed' | 'pending';
-  tone: 'success' | 'medium';
+  status: ActivityStatus;
+  tone: 'success' | 'medium' | 'danger' | 'warning';
+}
+
+/** The i18n key of each state's badge. The words match the ones the sales history uses. */
+export const ACTIVITY_STATUS_KEY: Record<ActivityStatus, string> = {
+  completed: 'dashboard.activityStatusCompleted',
+  pending: 'dashboard.activityStatusPending',
+  draft: 'dashboard.activityStatusDraft',
+  voided: 'dashboard.activityStatusVoided',
+  refunded: 'dashboard.activityStatusRefunded',
+  other: 'dashboard.activityStatusOther',
+};
+
+const STATUS_TONE: Record<ActivityStatus, ActivityRow['tone']> = {
+  completed: 'success',
+  pending: 'medium',
+  draft: 'medium',
+  voided: 'danger',
+  refunded: 'warning',
+  other: 'medium',
+};
+
+function activityStatus(raw: unknown): ActivityStatus {
+  return typeof raw === 'string' && raw !== 'other' && Object.hasOwn(STATUS_TONE, raw)
+    ? (raw as ActivityStatus)
+    : 'other';
+}
+
+/**
+ * The «Amount» cell. `amount` is in cents, so it goes through `formatMoney` — the formatter every
+ * other screen that paints a sale uses. `formatAmount` (for amounts already in euros) painted a
+ * 12,50 € ticket as «1.250,00 €» (hub#2505).
+ */
+export function formatActivityAmount(row: Pick<ActivityRow, 'amount'>, opts?: FormatMoneyOptions): string {
+  return formatMoney(row.amount, opts);
 }
 
 /** The module the feed belongs to — the owner segment of every query it makes. */
@@ -40,13 +82,16 @@ export async function loadRecentSales(
     sort: 'created_at',
     dir: 'desc',
   });
-  return page.rows.map((r) => ({
-    date: String(r.created_at ?? ''),
-    sale: String(r.sale_number ?? `#${r.id}`),
-    customer: String(r.customer_name ?? '—'),
-    method: String(r.payment_method_name ?? '—'),
-    amount: Number(r.total) || 0,
-    status: r.status === 'completed' ? 'completed' : 'pending',
-    tone: r.status === 'completed' ? 'success' : 'medium',
-  }));
+  return page.rows.map((r) => {
+    const status = activityStatus(r.status);
+    return {
+      date: String(r.created_at ?? ''),
+      sale: String(r.sale_number ?? `#${r.id}`),
+      customer: String(r.customer_name ?? '—'),
+      method: String(r.payment_method_name ?? '—'),
+      amount: Number(r.total) || 0,
+      status,
+      tone: STATUS_TONE[status],
+    };
+  });
 }
