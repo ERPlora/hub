@@ -197,6 +197,31 @@ describe('hub2588 — the Settings tab of an app follows the permission of its s
     expect(tabIds(wrapper)).toContain('settings');
   });
 
+  // Seen on the bench (real runtime, real attendance): the PIN session of an administrator lists the
+  // permissions of the apps installed WHEN it was opened (`["hub.users.view","hub.administer"]`
+  // before attendance). Installing an app and opening it to configure it is the administrator's
+  // daily path, and the hub lets an owner/admin run every command; so does the module's client
+  // (`lib/runtime.ts` hands `*` to those roles). The tab must not depend on the session's list.
+  for (const role of ['admin', 'owner']) {
+    it(`shows the tab to an ${role} whose session predates the app (no permission of it listed)`, async () => {
+      signIn(role, ['hub.users.view', 'hub.administer']);
+      const wrapper = mountModuleView();
+      await settle();
+
+      expect(tabIds(wrapper)).toEqual(['clock', 'records', 'settings']);
+    });
+
+    it(`mounts the settings screen for an ${role} whose session predates the app`, async () => {
+      signIn(role, ['hub.users.view', 'hub.administer']);
+      routeParams.navId = 'settings';
+      const wrapper = mountModuleView();
+      await settle();
+
+      expect(wrapper.find('[data-testid="not-found"]').exists()).toBe(false);
+      expect(wrapper.find('erp-attendance-settings').exists()).toBe(true);
+    });
+  }
+
   it('shows the tab to everybody when the save command declares no permission', async () => {
     // The hub lets anybody run a command without a permission, so the screen has nothing to hide.
     loadManifestMock.mockResolvedValue(manifest(undefined, 'erp-attendance-settings'));

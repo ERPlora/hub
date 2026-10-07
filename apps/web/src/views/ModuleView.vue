@@ -189,7 +189,7 @@ import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
 import { settingsSavePermission, shellTabHeading } from '../lib/module-settings';
-import { hasPermission } from '../lib/session';
+import { hasPermission, isAdmin } from '../lib/session';
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient, listInstalledModules } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
@@ -256,9 +256,13 @@ const settingsPermission = ref<string | null>(null);
  * module are already filtered by their permission (`/api/navigation`, hub#1052) and this synthetic
  * one was not, so an employee filled a form the hub then refused. It reads the session, so a
  * change of person re-evaluates it. A filter of the screen: the hub re-checks the command.
+ * An owner/admin passes by ROLE, as in the module's client (`lib/runtime.ts`): the permission list
+ * of their session only names the apps installed when it was opened.
  */
 const settingsTabAllowed = computed(
-  () => !!settings.value && (!settingsPermission.value || hasPermission(settingsPermission.value)),
+  () =>
+    !!settings.value &&
+    (!settingsPermission.value || isAdmin.value || hasPermission(settingsPermission.value)),
 );
 /**
  * Controles de chrome que la pestaña ACTIVA declara en su `navigation[].chrome` (ADR-0048, Nivel 1).
