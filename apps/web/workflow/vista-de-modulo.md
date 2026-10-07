@@ -26,8 +26,9 @@ Prefijo: HUB_SHELL
 ## Antes de empezar
 
 - La pestaña «Ajustes» de una app solo existe si su `module.json` declara el bloque `settings`
-  (hoy: appointments, cash_register, inventory, kitchen, sales, services, staff, tables); la pestaña
-  «Plan», si declara `billing`.
+  (hoy: appointments, attendance, cash_register, inventory, kitchen, sales, services, staff, tables),
+  y solo la ve quien tiene el permiso de su orden de guardar (hub#2588); la pestaña «Plan», si
+  declara `billing`.
 - El bloqueo por suscripción, el rebote de apps fuera del plan y el estado de la pestaña «Plan» solo
   se ven con una sesión iniciada con cuenta de erplora.com (regla común «Sesión de PIN frente a
   sesión con cuenta» del índice; HUB_SHELL-F41, F46, F49).
@@ -59,7 +60,7 @@ Pasos:
 3. El hub contestó con un fallo: «No se pudo cargar el módulo.» — «Comprueba que el módulo siga instalado y activo, y vuelve a intentarlo.» con «Reintentar».
 4. La app está instalada pero no da ninguna pestaña (apagada, o ninguna que esta persona pueda ver): «Aquí todavía no hay nada» — «Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.».
 5. El hub no tiene esa app: «Esta app no está instalada» — «Este hub no tiene esta app. Búscala en el catálogo de Apps o abre otra desde el menú.» con «Ir al catálogo». Con el plan resuelto solo llega aquí una app del plan que no está instalada; con sesión de PIN, cualquier identificador que el hub no tenga.
-6. La dirección nombra una pestaña que la app no tiene, o una que el menú le quitó a esta persona por permiso (un empleado en `/m/sales/departments`): la misma página «Esta página no existe» que el resto del hub («…Puede ser un enlace antiguo…»), con la dirección a la vista y la barra de pestañas debajo.
+6. La dirección nombra una pestaña que la app no tiene, o una que el menú le quitó a esta persona por permiso (un empleado en `/m/sales/departments`, o en `/m/attendance/settings` sin el permiso de guardar esos ajustes, hub#2588): la misma página «Esta página no existe» que el resto del hub («…Puede ser un enlace antiguo…»), con la dirección a la vista y la barra de pestañas debajo.
 7. Con una sesión que trae cuenta de erplora.com (correo o Google) y el plan del hub ya leído, una app que el plan no nombra (o un identificador que el hub nunca tuvo) no se abre: sale «Esta app no está disponible para este hub.» y la persona vuelve a Inicio. Con sesión de PIN el shell no conoce el plan: la app se abre y cada pantalla falla con el rechazo del hub «el módulo `x` no está incluido en el entitlement vigente del hub».
 Entra: el menú (HUB-F31), la lista de apps instaladas del hub y el permiso de apps del plan (HUB-F162).
 Sale: nada.
@@ -76,27 +77,27 @@ Pasos:
 2. La pestaña nueva se monta; la dirección cambia sin apilar historial.
 3. Si la barra no cabe (un móvil con cinco pestañas), se desplaza de lado y la pestaña activa se trae a la vista al entrar por un enlace: entera y fuera del difuminado que avisa de que hay más pestañas por ese lado; si es la primera o la última, la barra llega hasta su principio o su final, donde ya no hay difuminado (hub#2603). En tableta y escritorio las pestañas caben y la barra no se mueve.
 4. Si la persona cambia de idioma, los nombres de las pestañas y el título se vuelven a pedir en el idioma nuevo sin recargar lo que hay en pantalla (un tique a medias no se pierde).
-Entra: los nombres de las pestañas, que traduce el hub (HUB-F31); el shell añade dos pestañas suyas: «Ajustes» (si la app declara ajustes) y «Plan» (si la app declara planes).
+Entra: los nombres de las pestañas, que traduce el hub (HUB-F31); el shell añade dos pestañas suyas: «Ajustes» (si la app declara ajustes y la persona tiene el permiso de su orden de guardar, hub#2588) y «Plan» (si la app declara planes).
 Sale: nada.
 Si falla: si pedir los nombres en el idioma nuevo falla, se quedan los anteriores hasta el siguiente cambio (hub#2353).
 Implicados: HUB-F31
 QA: ninguno
 
 ### HUB_SHELL-F43 Ver los ajustes de una app en su pestaña «Ajustes»
-Estado: parcial — la pestaña sale a todo el mundo, también a quien no puede leer los ajustes (un empleado de Ventas e Inventario, cuya lectura exige `sales.manage_settings` / `inventory.manage_settings`: ve «No puedes ver estos ajustes»); y, salvo Cocina (que publica el nombre de cada opción en `en` y `es`, kitchen#159), ninguna app publica la traducción de sus opciones, así que sus listas salen con el valor interno (`ticket`)
+Estado: parcial — salvo Cocina (que publica el nombre de cada opción en `en` y `es`, kitchen#159), ninguna app publica la traducción de sus opciones, así que sus listas salen con el valor interno (`ticket`)
 Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo › Ajustes
 Pasos:
-1. En una app que declara ajustes, la persona toca la pestaña «Ajustes» (engranaje), la última antes de «Plan».
+1. En una app que declara ajustes, la persona toca la pestaña «Ajustes» (engranaje), la última antes de «Plan». La pestaña solo sale a quien tiene el permiso que la app pide a su orden de guardar (`settings.set` → su `commands[…].permission`; el administrador lo tiene siempre); a los demás no les sale, como cualquier pestaña de la app que su permiso no abre, y si teclean la dirección (`/m/<app>/settings`) ven «Esta página no existe» (HUB_SHELL-F41 paso 6, hub#2588). Si la orden no pide permiso, la ve todo el que abre la app.
 2. Mientras carga: «Cargando ajustes…».
 3. Ve un formulario con un campo por ajuste, en el orden del esquema de la app. El control sale del tipo: `boolean`, o `integer` con `enum:[0,1]` → interruptor (se guarda como 0/1); cualquier otro `enum` → lista; `integer` o `number` → número; todo lo demás (un `string`, pero también un `array`, un `object` o un tipo anulable como `["integer","null"]`) → caja de texto, vacía con «Escribe aquí…».
 4. Los textos los pone la app en su `locales/<idioma>.json`: el nombre en `settings.fields.<clave>.label` (si no, el `title` del esquema, y si no, la clave «humanizada»), la explicación en `…description`, el título del bloque en `settings.title` (se omite si repite el nombre de la app) y cada opción de una lista en `settings.fields.<clave>.options.<valor>` (si no, el valor crudo).
 5. Cada valor es el guardado; si la app aún no tiene nada guardado (la lectura contesta sin fila), el `default` del esquema; si tampoco, apagado o vacío. Si la lectura FALLA, no se pinta el formulario (hub#2511): ni valores de fábrica ni «Guardar» (ver «Si falla»).
-6. Quien no es administrador ve los campos sin poder tocarlos y la línea «Solo un administrador puede cambiar estos ajustes.», sin botón «Guardar».
-7. Si la app trae su propia pantalla de ajustes (`settings.component`), se monta esa en lugar del formulario genérico, sin el candado de administrador. Hoy ninguna lo usa.
+6. Quien llega aquí sin ser administrador (un responsable con el permiso de guardar) ve los campos sin poder tocarlos y la línea «Solo un administrador puede cambiar estos ajustes.», sin botón «Guardar» (HUB_SHELL-F44).
+7. Si la app trae su propia pantalla de ajustes (`settings.component`), se monta esa en lugar del formulario genérico, sin el candado de administrador: hoy, Control horario (`erp-attendance-settings`). La puerta de la pestaña es la misma del paso 1.
 Entra: el bloque `settings` del `module.json` (esquema, consulta de lectura y orden de guardar), el esquema servido con la app, las traducciones `settings` de su `locales/<idioma>.json` y la consulta de lectura (HUB-F33).
 Sale: nada.
-Si falla: si el esquema o la lectura de valores no cargan (red, hub reiniciándose, 5xx), en lugar del formulario sale «No se pudieron cargar los ajustes.» con «Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.» y el botón «Reintentar», que vuelve a leer; no hay «Guardar», así que nada se puede guardar encima de lo que no se leyó (hub#2511, mismo patrón que los eventos caídos de Sistema, HUB_SHELL-F145). Si la lectura se rechaza por permiso (`permission_denied` o `requires_elevation`), sale «No puedes ver estos ajustes» con «Pide a un administrador que los revise o los cambie si hace falta.», sin «Reintentar» (reintentar no lo arregla). En Caja, Cocina, Citas, Servicios, Personal y Mesas el empleado sí lee los valores reales. Sin traducción de un campo, su título del esquema (inglés) o el nombre de la columna «humanizado» (`Warning Time Minutes`). Un campo de tipo objeto o lista se pinta como texto y, si se edita, se guarda como cadena y el hub lo rechaza.
+Si falla: si el esquema o la lectura de valores no cargan (red, hub reiniciándose, 5xx), en lugar del formulario sale «No se pudieron cargar los ajustes.» con «Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.» y el botón «Reintentar», que vuelve a leer; no hay «Guardar», así que nada se puede guardar encima de lo que no se leyó (hub#2511, mismo patrón que los eventos caídos de Sistema, HUB_SHELL-F145). Si la lectura se rechaza por permiso (`permission_denied` o `requires_elevation`), sale «No puedes ver estos ajustes» con «Pide a un administrador que los revise o los cambie si hace falta.», sin «Reintentar» (reintentar no lo arregla). Como la pestaña solo sale a quien puede guardar, este rechazo solo lo ve quien tiene el permiso de guardar y no el de leer (ninguna app de fábrica lo reparte así). Sin traducción de un campo, su título del esquema (inglés) o el nombre de la columna «humanizado» (`Warning Time Minutes`). Un campo de tipo objeto o lista se pinta como texto y, si se edita, se guarda como cadena y el hub lo rechaza.
 Implicados: CASH_REGISTER-F01, HUB-F33, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: ninguno
 
@@ -290,7 +291,7 @@ QA: ninguno
 | Estado «sin permiso» propio en la vista de una app | no hecho (se dice «Aquí todavía no hay nada») | HUB_SHELL-F41 |
 | Estado «necesita un hub más nuevo» en la vista | no hecho (solo al instalar/actualizar en Apps) | HUB_SHELL-F41 |
 | Pestañas y nombres traducidos, sin recargar al cambiar de idioma | hecho | HUB_SHELL-F42 |
-| Ajustes declarativos: ver | parcial (lectura fallida → «No se pudieron cargar» con «Reintentar», hub#2511; pero la pestaña sale también a quien no puede leerlos y las listas salen sin traducir, salvo en Cocina) | HUB_SHELL-F43 |
+| Ajustes declarativos: ver | parcial (lectura fallida → «No se pudieron cargar» con «Reintentar», hub#2511; la pestaña solo sale a quien puede guardar, hub#2588; pero las listas salen sin traducir, salvo en Cocina) | HUB_SHELL-F43 |
 | Ajustes declarativos: guardar con el mismo permiso que el servidor | parcial (pantalla: solo administrador) | HUB_SHELL-F44 |
 | Ajustes: validación antes de enviar (mínimos, obligatorios) | no hecho (solo el servidor) | HUB_SHELL-F44 |
 | Probar un ajuste sin guardar | parcial (ninguna app lo declara) | HUB_SHELL-F45 |

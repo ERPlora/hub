@@ -264,13 +264,13 @@ Estado: parcial — la pantalla solo deja guardar al administrador, mientras el 
 Actor: administrador, responsable, asistente
 Pantalla: HUB_SHELL: Vista de un módulo › Ajustes
 Pasos:
-1. Si el módulo declara un bloque de ajustes, la pantalla le añade la pestaña «Ajustes»: pinta un formulario a partir del esquema del módulo (o el componente propio que el módulo indique).
+1. Si el módulo declara un bloque de ajustes, la pantalla le añade la pestaña «Ajustes» a quien tiene el permiso de la orden de guardar (hub#2588; los demás no la ven, y la orden la sigue negando el embudo del paso 3): pinta un formulario a partir del esquema del módulo (o el componente propio que el módulo indique).
 2. Para cargarlo, ejecuta la consulta de lectura del módulo, con su permiso.
 3. Al pulsar «Guardar», manda todos los valores a la orden de guardar del módulo, que pasa por el embudo de siempre (HUB-F03): su permiso y su esquema con sus valores por defecto. Con un componente propio del módulo (`settings.component`), la pantalla no pone ningún candado de administrador.
 4. La pantalla dice «Ajustes guardados.».
 Entra: el bloque `settings` del `module.json` (esquema, consulta, orden).
 Sale: la fila de ajustes del módulo y el aviso que su orden emita.
-Si falla: si la consulta de lectura falla, la pantalla no pinta el formulario ni deja guardar (hub#2511): un fallo pasajero dice «No se pudieron cargar los ajustes.» con «Reintentar», y un rechazo por permiso —hoy los empleados de Venta e Inventario, cuya consulta de lectura pide el permiso de gestionar los ajustes; en Cocina y Caja el empleado sí puede leerlos— dice «No puedes ver estos ajustes». Los valores de fábrica solo se enseñan cuando la lectura contesta sin fila (nunca se guardó nada). Al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
+Si falla: si la consulta de lectura falla, la pantalla no pinta el formulario ni deja guardar (hub#2511): un fallo pasajero dice «No se pudieron cargar los ajustes.» con «Reintentar», y un rechazo por permiso dice «No puedes ver estos ajustes» (solo le llega a quien puede guardar y no leer: los empleados de Venta e Inventario, que antes lo veían, ya no tienen la pestaña). Los valores de fábrica solo se enseñan cuando la lectura contesta sin fila (nunca se guardó nada). Al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
 Implicados: CASH_REGISTER-F01, HUB_SHELL-F43, HUB_SHELL-F44, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: qa-hub-restaurant §7.03 (discrepa)
 
