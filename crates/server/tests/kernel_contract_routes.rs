@@ -72,6 +72,26 @@ const SESSION_BY_HAND_READ: &str = "auth::session_token(";
 /// this rule fails to recognise does not degrade the snapshot: it inverts it.
 const SESSION_BY_HAND_RESOLVE: &str = ".resolve_session";
 
+/// Whether `body` reads the session credential in the shape that REFUSES without one (hub#2510).
+///
+/// `if let Some(token) = auth::session_token(..)` falls through when there is no session and the
+/// handler answers anyway: `may_name_the_team` widens the open boot context with the pinpad faces,
+/// it does not close it. Any other read — `let Some(..) = .. else`, a `match`, a `?` — keeps
+/// counting as a gate, so a shape this rule does not know errs towards `session`, as before.
+fn refuses_without_a_session(body: &str) -> bool {
+    body.match_indices(SESSION_BY_HAND_READ).any(|(at, _)| {
+        let Some(binding) = body[..at].trim_end().strip_suffix('=') else {
+            return true;
+        };
+        let statement_start = binding
+            .rfind(|c| matches!(c, ';' | '{' | '}'))
+            .map_or(0, |p| p + 1);
+        !binding[statement_start..]
+            .trim_start()
+            .starts_with("if let ")
+    })
+}
+
 /// How far a gate may sit from the handler. Six is past the fixed point measured on `develop`
 /// (handler → local helper → macro → `auth::…` closes at four), so it is a guard against a cycle,
 /// not a limit anybody is meant to hit.
@@ -161,6 +181,37 @@ fn the_hub_machine_token_is_an_outbound_credential_not_a_gate_hub1235() {
         classes.is_empty(),
         "un token de salida se ha leído como puerta: {classes:?}"
     );
+}
+
+/// 🔴 hub#2510 — a session read that only WIDENS an open answer is not a gate.
+///
+/// `GET /api/hub/context` answers a 200 to anybody (the login screen has to boot) and asks
+/// `may_name_the_team` whether this caller also gets the pinpad faces: a live session says yes,
+/// otherwise the device decides. That helper reads the session AND resolves it, so the by-hand
+/// rule painted the route `auth:session` — a door open to the whole internet written down as
+/// gated, in the artefact a reviewer reads to FIND open doors. The gate shape is the read that
+/// REFUSES without a token (`let Some(..) = auth::session_token(..) else`); `if let Some(..)`
+/// falls through and answers anyway.
+#[test]
+fn an_optional_session_that_only_widens_an_open_answer_is_not_a_gate_hub2510() {
+    let optional = "{ if let Some(token) = auth::session_token(headers) { \
+                    match rt.resolve_session(&token).await { Ok(Some(_)) => return true, _ => {} } } \
+                    rt.is_device_trusted(device_id).await.unwrap_or(false) }";
+    let classes = classes_of(optional);
+    assert!(
+        classes.is_empty(),
+        "una sesión opcional que solo amplía una respuesta abierta se ha leído como puerta: {classes:?}"
+    );
+    // The half that must NOT change: the refusing read is still a gate, also when the same body
+    // carries an optional read too.
+    let gate = "{ let Some(token) = auth::session_token(&headers) else { return unauthorized(); }; \
+                if let Some(other) = auth::session_token(&headers) { let _ = other; } \
+                let user = match rt.resolve_session(&token).await { Ok(Some(u)) => u, _ => return unauthorized() }; }";
+    assert_eq!(classes_of(gate), BTreeSet::from(["session".to_string()]));
+    // A read this rule has no shape for (a `match`, no binding) errs towards `session`.
+    let matched = "{ let token = match auth::session_token(&headers) { Some(t) => t, None => return unauthorized() }; \
+                   let user = match rt.resolve_session(&token).await { Ok(Some(u)) => u, _ => return unauthorized() }; }";
+    assert_eq!(classes_of(matched), BTreeSet::from(["session".to_string()]));
 }
 
 /// Classes of one synthetic handler body, through the same fixed point the snapshot uses.
@@ -355,7 +406,7 @@ fn class_map(
                 direct.insert((*class).to_string());
             }
         }
-        if body.contains(SESSION_BY_HAND_READ) && body.contains(SESSION_BY_HAND_RESOLVE) {
+        if refuses_without_a_session(body) && body.contains(SESSION_BY_HAND_RESOLVE) {
             direct.insert("session".to_string());
         }
         classes.insert(key.clone(), direct);

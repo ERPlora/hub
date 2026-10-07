@@ -133,8 +133,9 @@ pub fn parse_auth_mode(raw: Option<&str>) -> AuthMode {
 /// propia —presentaba el `hub_id`, o nada—, así que armarla habría dejado un hub recién creado sin
 /// ningún login por PIN posible. Ya la tiene, y desde el primer arranque. Lo que queda al otro lado
 /// del interruptor es un PIN de **cuatro dígitos** contestando a internet entero en
-/// `{slug}.erplora.com`, con la lista de nombres publicada sin sesión por `GET /api/hub/context`:
-/// el device-trust es el segundo factor de *sitio* que hace que esos cuatro dígitos valgan algo.
+/// `{slug}.erplora.com` (y, con el freno apagado, `GET /api/hub/context` nombra al equipo a
+/// cualquiera, hub#2510): el device-trust es el segundo factor de *sitio* que hace que esos
+/// cuatro dígitos valgan algo.
 ///
 /// `false`, `0` y `no` **arman** la puerta, aunque suenen a interruptor. Honrarlos daría tres
 /// grafías de «abierto» contra una de «cerrado», y la que se colara sería siempre la insegura.
@@ -1025,9 +1026,11 @@ pub struct AppState {
     /// Brute-force guard for the PIN login (hub#329). A PIN is 4 digits on a host that lives on
     /// the public internet; without a failure counter those are 10,000 free tries.
     pub login_throttle: Arc<crate::login_throttle::LoginThrottle>,
-    /// The own-PIN change's budget of tries, per person (hub#2499). Its own map on purpose:
-    /// `login_throttle` is keyed by whatever NAME the caller types at the pinpad or the approval
-    /// dialog, so a key of this door kept there could be locked — or cleared — by typing it as a name.
+    /// The budget of tries of every door that sets a PIN and so answers «that one is taken», per
+    /// person: the own-PIN change (hub#2499) and the alta and edit of Empleados (hub#2518), one
+    /// budget shared by the three. Its own map on purpose: `login_throttle` is keyed by whatever
+    /// NAME the caller types at the pinpad or the approval dialog, so a key of these doors kept
+    /// there could be locked — or cleared — by typing it as a name.
     pub pin_change_throttle: Arc<crate::login_throttle::LoginThrottle>,
     /// The same guard per CLIENT ADDRESS (hub#2282): wrong PINs/badges across any name, and
     /// session credentials that do not resolve. The edge stopped banning on 401s (infra#335), so

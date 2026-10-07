@@ -101,16 +101,16 @@ pub async fn update_history(
 
 /// GET /api/system — métricas + base de datos reales, según el despliegue.
 pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    // Sistema expone logs, métricas y detalles del almacenamiento. Es información interna del Hub:
-    // la protección de la ruta Vue no sustituye la autenticación de la API.
+    // System exposes the event log, the server's usage and the storage details: internal state of
+    // the hub, read by an owner or an administrator only (hub#2519). A refused VeriFactu record
+    // leaves the tax agency's Fault in `last_error`, with the customer's tax id and name — the same
+    // rows the dead-letter queue (`outbox_admin`) already keeps from anyone who does not administer
+    // the hub. Hiding the menu entry is not the gate: this is. No session `401`, any other role
+    // `403 forbidden`.
     {
         let rt = st.runtime.read().await;
-        if let Err(error) = auth::require_user_session(&headers, &st.config, &rt).await {
-            return (
-                axum::http::StatusCode::UNAUTHORIZED,
-                Json(json!({ "ok": false, "error": error.message() })),
-            )
-                .into_response();
+        if let Err(error) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return crate::auth_rejected(error);
         }
     }
 

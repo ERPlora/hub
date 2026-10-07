@@ -25,6 +25,8 @@ vi.mock('../lib/runtime', async () => {
     hubContextReady: ref(false),
     machineRegistered: ref(true),
     machineRegistrationRequired: ref(false),
+    // hub#2510: the sign-in re-reads the hub context once the session is open.
+    refreshHubIdentity: vi.fn(async () => {}),
   };
 });
 

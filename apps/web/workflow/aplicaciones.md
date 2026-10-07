@@ -165,16 +165,16 @@ QA: ninguno
 
 ### HUB_SHELL-F114 Ver que una app necesita un hub más nuevo
 Estado: hecho
-Actor: administrador, responsable, empleado
+Actor: administrador
 Pantalla: Apps
 Pasos:
 1. En el catálogo, una app cuya versión exige una versión de ERPlora más alta que la de este hub sale con el estado «Necesita ERPlora {version}» y sin «Instalar».
 2. En su lugar aparece la acción «Ver tu versión de ERPlora y sus actualizaciones», que lleva a **Sistema › Actualizaciones**, donde se ve qué versión corre el hub y qué se le ha cambiado (el hub se actualiza solo).
 3. Si no se puede saber la versión del hub, o la app no declara mínimo, no se bloquea nada: el hub rechaza la instalación si hace falta («Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.» o, con las dos versiones, «Esta app necesita un hub más nuevo (ERPlora {required}). El tuyo tiene la {core}: actualiza el hub e inténtalo de nuevo.»).
-Entra: el mínimo que declara la app y la versión del hub.
+Entra: el mínimo que declara la app y la versión del hub, que viaja en el estado del sistema y solo se pide con sesión de dueño o administrador (HUB-F166): instalar es suyo, así que a quien no administra no se le pide ni se le avisa de ningún mínimo.
 Sale: nada guardado.
-Si falla: sin la versión del hub, la comprobación se salta y se avisa en la consola del navegador, no a la persona.
-Implicados: HUB-F20, SAAS_PUBLIC-F15
+Si falla: sin la versión del hub (el hub no contestó a quien administra), la comprobación se salta y se avisa en la consola del navegador, no a la persona.
+Implicados: HUB-F20, HUB-F166, SAAS_PUBLIC-F15
 QA: ninguno
 
 ### HUB_SHELL-F115 Saber que una app se instaló sin sus permisos
@@ -233,10 +233,10 @@ Pasos:
 2. En la fila de Mis apps la versión dice «{version} · La versión {version} necesita ERPlora {floor}» y no hay «Actualizar»: en su lugar, «Ver tu versión de ERPlora y sus actualizaciones», que lleva a **Sistema › Actualizaciones**.
 3. En el catálogo la fila dice «La versión {version} necesita ERPlora {floor}».
 4. «Actualizar todas» y el aviso de la campana no cuentan esa app.
-Entra: el mínimo de la versión nueva que ofrece el catálogo y la versión del hub.
+Entra: el mínimo de la versión nueva que ofrece el catálogo y la versión del hub, que solo se pide con sesión de dueño o administrador (HUB-F166, como en F114).
 Sale: nada guardado.
 Si falla: sin la versión del hub o sin mínimo declarado, la fila ofrece «Actualizar» como siempre.
-Implicados: HUB-F24
+Implicados: HUB-F24, HUB-F166
 QA: ninguno
 
 ### HUB_SHELL-F119 Enterarse de que hay versiones nuevas

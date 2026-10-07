@@ -20,6 +20,9 @@ contrastadas en `qa-hub-flows` R8 y `qa-hub` §8.
 
 - Para ver y tocar los eventos caídos hace falta ser dueño o administrador; el resto de perfiles ve la
   pestaña como vacía (HUB_SHELL-F145).
+- El estado del sistema (uso del servidor, versión y Registros) también es solo de dueño o
+  administrador (HUB-F166): el resto de perfiles ve en Recursos solo las tarjetas de su dispositivo
+  y no tiene la pestaña Registros.
 
 ## Flujos
 
@@ -32,7 +35,8 @@ Pasos:
 2. Mientras el hub contesta, sale un círculo de carga en el centro de la pantalla.
 3. Abajo hay cinco pestañas, en este orden: **Recursos**, **Plan y límites**, **Actualizaciones**, **Eventos caídos**, **Registros**. Se abre **Recursos**; la pestaña elegida queda en la dirección (`#resources`, `#plan`, `#updates`, `#events`, `#logs`), así que el botón Atrás y un enlace guardado vuelven a la misma pestaña.
 4. Una dirección con una pestaña que no existe abre **Recursos**; la antigua `#backups` ya no es una pestaña: lleva a **Ajustes › Datos y copias**.
-Entra: la sesión de cualquiera de los perfiles (la entrada del menú no se oculta a nadie); el estado del sistema que da el hub (HUB-F166). También se llega a `#updates` desde Apps (acción de ver las actualizaciones del hub).
+5. Quien no es dueño ni administrador ve cuatro pestañas: **Registros** no existe para él, y `#logs` abre **Recursos**.
+Entra: la sesión de cualquiera de los perfiles (la entrada del menú no se oculta a nadie); el estado del sistema que da el hub (HUB-F166), que solo se pide con sesión de dueño o administrador: al resto no se le pide (el hub lo negaría) y no le sale ningún aviso de error por ello. Si la sesión pasa a ser de administrador con la pantalla abierta, se pide entonces; si deja de serlo (cambio de persona en una caja compartida), lo leído sale de la pantalla. También se llega a `#updates` desde Apps (acción de ver las actualizaciones del hub).
 Sale: nada guardado.
 Si falla: si el hub no contesta al estado del sistema sale, encima de la pestaña, el aviso «No se pudo consultar el sistema — Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo.» con **Reintentar**, que solo vuelve a pedir ese estado (cada pestaña pide lo suyo aparte). En móvil la barra de pestañas se desplaza; en tableta y escritorio caben todas.
 Implicados: HUB-F166
@@ -40,10 +44,10 @@ QA: ninguno
 
 ### HUB_SHELL-F136 Ver cuánto está usando el hub
 Estado: hecho
-Actor: administrador, responsable, empleado
+Actor: administrador
 Pantalla: Sistema › Recursos
 Pasos:
-1. Abre **Recursos**. El título es «Recursos en la nube» y una pastilla dice «Nube».
+1. El dueño o un administrador abre **Recursos**. El título es «Recursos en la nube» y una pastilla dice «Nube». Quien no administra no ve este bloque (ni pide la evolución): en su lugar lee «Solo el dueño o un administrador puede ver cuánto está usando el hub.» y debajo le quedan las tarjetas de su dispositivo (F137–F140).
 2. Debajo hay un selector de rango: «3 h», «24 h» (el que se abre) y «3 días». Es el máximo a propósito: erplora.com no guarda más.
 3. Ve cuatro tarjetas: **CPU**, **Memoria**, **Base de datos** (siempre «PostgreSQL» y debajo «Base de datos compartida»: el hub no manda el tamaño; el tamaño solo lo da **Plan y límites**) y **Conexiones**. CPU, memoria y conexiones llevan el valor actual y la evolución del rango elegido, con la etiqueta «Últimas 24 horas» (o la del rango).
 4. Cerca del límite de su plan, la tarjeta dice «Al {pct} % del límite de tu plan.»; por encima, «Al {pct} % del límite de tu plan: el hub puede ir más lento.». Si erplora.com marca que el plan se queda corto, sale además «Tu plan se está quedando corto de recursos. Con un plan mayor este hub tiene más margen.» con **Actualizar plan**, que abre erplora.com en el navegador del sistema; ese botón no sale en la copia que reparte Google Play.
@@ -126,7 +130,7 @@ Estado: parcial — un historial que no se pudo leer sale igual que uno vacío (
 Actor: administrador, responsable, empleado
 Pantalla: Sistema › Actualizaciones
 Pasos:
-1. Abre **Actualizaciones**. El título es «Qué te hemos actualizado» y una pastilla dice «Vas por la {versión}» (con «—» si el hub no la dio).
+1. Abre **Actualizaciones**. El título es «Qué te hemos actualizado» y, para un dueño o administrador, una pastilla dice «Vas por la {versión}» (con «—» si el hub no la dio); quien no administra no ve la pastilla, porque la versión viaja en el estado del sistema (HUB-F166).
 2. Debajo: «Este Hub web se actualiza automáticamente durante los despliegues del servicio.». El hub se actualiza solo, sin preguntar y sin botón: esta pestaña existe para que el dueño pueda saber qué le cambiaron.
 3. Si hubo cambios (como mucho los 20 últimos, de los últimos 90 días), salen agrupados por día (más reciente primero; «Hoy», «Ayer» o la fecha completa en el reloj del negocio): hora, nombre de la app como el dueño la conoce y «1.1.1 → 1.1.2».
 4. Una vuelta atrás se dice: «Volvió a la {versión}: la nueva no arrancó». Una app que quedó sin funcionar: «Esta app no está funcionando: estamos en ello». El error técnico que causó la vuelta atrás no se pinta.
@@ -153,14 +157,14 @@ Implicados: HUB-F24
 QA: ninguno
 
 ### HUB_SHELL-F144 Ver el registro de sucesos del sistema
-Estado: parcial — el «evento» es el nombre interno del aviso y el «detalle» su estado crudo (`delivered`, `pending`) o su último error tal cual, sin traducir; «El runtime no ha reportado…» es jerga; y cualquier sesión lee el último error de los avisos caídos que Eventos caídos esconde a quien no administra (leído, sin ejecutar)
-Actor: administrador, responsable, empleado
+Estado: parcial — el «evento» es el nombre interno del aviso y el «detalle» su estado crudo (`delivered`, `pending`) o su último error tal cual, sin traducir; «El runtime no ha reportado…» es jerga
+Actor: administrador
 Pantalla: Sistema › Registros
 Pasos:
-1. Abre **Registros**: el título es «Registro de eventos».
+1. El dueño o un administrador abre **Registros**: el título es «Registro de eventos». Para el resto de perfiles la pestaña no existe (F135).
 2. Ve una tabla con **Hora**, **Nivel** (pastilla INFO, WARN o ERROR; se puede filtrar por nivel) y **Evento** (el mensaje y, a su lado, el detalle). Se busca con «Buscar evento…» y pagina de 20 en 20.
 3. Sin sucesos: «Sin eventos — El runtime no ha reportado eventos recientes.».
-Entra: los 50 últimos avisos entre apps (HUB-F166) con su estado o su último error, sin el contenido del aviso; los lee cualquier sesión, a diferencia de la cola de F145, que es solo de dueño o administrador.
+Entra: los 50 últimos avisos entre apps (HUB-F166) con su estado o su último error, sin el contenido del aviso; solo un dueño o administrador, igual que la cola de F145 (el último error puede llevar datos de un cliente).
 Sale: nada guardado.
 Si falla: si el estado del sistema no se pudo leer, sale el aviso general de F135 y debajo la lista vacía «Sin eventos»; el mensaje de cada fila es el del hub, sin traducir. Una lectura fallida sale como «Sin eventos» bajo el aviso de error.
 Implicados: HUB-F166

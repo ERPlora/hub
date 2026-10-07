@@ -1311,6 +1311,11 @@ export default {
   },
   employeeForm: {
     titleEdit: 'Edit user',
+    // hub#2518: creating or editing a person with a PIN spends the editor's budget of tries (the
+    // one «My profile» spends too, hub#2499) — every try counts, so not «failed attempts».
+    pinTooManyAttempts:
+      'Too many PIN changes in a short time. Wait {minutes} minute and try again. | Too many PIN changes in a short time. Wait {minutes} minutes and try again.',
+    pinTooManyAttemptsNoWait: 'Too many PIN changes in a short time. Wait a few minutes and try again.',
     titleNew: 'New user',
     fullName: 'Full name',
     email: 'Email',
@@ -1506,6 +1511,8 @@ export default {
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
+    // hub#2519 — the server's usage is an owner's or an administrator's; everybody else is told so.
+    resourcesAdminOnly: 'Only an owner or an administrator can see how much the hub is using.',
     // Usage-series range selector (saas#1511). The contract stops at 3 days on purpose.
     usageRange3h: '3 h',
     usageRange24h: '24 h',

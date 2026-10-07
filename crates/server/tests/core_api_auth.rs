@@ -86,8 +86,9 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
             .unwrap();
         assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED, "{uri}");
     }
+    // `/api/system` is no longer here: it carries the event log, and since hub#2519 it is read by an
+    // owner or an administrator only (`system_admin_only_hub2519.rs` holds the `403` of the rest).
     for uri in [
-        "/api/system",
         "/api/navigation",
         "/api/modules",
         "/api/modules/updates",

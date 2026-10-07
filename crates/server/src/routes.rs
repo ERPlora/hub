@@ -900,7 +900,12 @@ pub fn build_router(state: AppState, web_dir: Option<&str>) -> Router {
 /// que el dashboard derive el preset "Recomendado" de widgets (ADR-0054) + `currency`/`language`:
 /// settings del hub (tabla `hub_settings` ∪ defaults), lectura barata en el arranque del SPA para no
 /// pegar a `/api/settings` por separado. Contrato del frontend.
-pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
+///
+/// `pin_users` names the team, so it only reaches a caller that [`may_name_the_team`] (hub#2510):
+/// anybody else gets `[]` and the rest of the boot context, which names nobody. The answer is still
+/// a 200 — the login screen must boot. `hub_id` stays open on purpose: erplora.com reads it without
+/// a credential to prove a custom domain reaches this hub, and so does the module toolkit.
+pub(crate) async fn hub_context(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let hub_id = st.hub_id();
     // El primer login Tauri puede haber adoptado el UUID real después de arrancar Axum. Antes de
     // abrir la sesión local reconciliamos el Runtime y aplicamos las migraciones scoped del nuevo
@@ -915,13 +920,16 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
         }
-        let pin_users: Vec<Value> = rt
-            .list_pin_users()
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
-            .collect();
+        let pin_users: Vec<Value> = if may_name_the_team(&st, &rt, &headers).await {
+            rt.list_pin_users()
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(id, name, role)| json!({ "id": id, "name": name, "role": role }))
+                .collect()
+        } else {
+            Vec::new()
+        };
         // Settings del hub: si la lectura falla (no debería), cae a los defaults del contrato para
         // no romper el arranque del SPA.
         let settings = rt.get_settings().await.unwrap_or_else(|_| json!({}));

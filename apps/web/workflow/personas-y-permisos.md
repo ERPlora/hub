@@ -59,7 +59,7 @@ Implicados: HUB-F158, KITCHEN-F10, STAFF-F03
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F81 Dar de alta a una persona que entra solo con PIN
-Estado: hecho
+Estado: parcial — al montar la plantilla seguida, la sexta alta con PIN en menos de 5 minutos sale con «Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos…» y hay que parar hasta que pase la ventana (ERPlora/hub#2564)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
@@ -70,7 +70,7 @@ Pasos:
 5. El panel se cierra, la lista se recarga con la persona nueva y sale el aviso «Usuario creado.». La casilla «Usuario local» se queda como estaba para dar de alta a la siguiente.
 Entra: nombre, rol y PIN (más la casilla); la lista de personas ya cargada, para adelantar los fallos evidentes.
 Sale: pide al servidor el alta (HUB-F145); el panel solo adelanta lo que ya puede saber (PIN vacío, de otra longitud, fácil, rol de administrador, nombre repetido). Una placa no se puede dar de alta desde este panel, solo desde la ficha (HUB_SHELL-F87).
-Si falla: el motivo sale dentro del panel, en rojo, y lo tecleado se conserva. «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.», «El PIN debe tener {n} dígitos.», «Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).», «Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.», «Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.» y, solo cuando responde el servidor, «Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.». Un rechazo que la pantalla no sabe traducir sale con la frase que mandó el servidor.
+Si falla: el motivo sale dentro del panel, en rojo, y lo tecleado se conserva. «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.», «El PIN debe tener {n} dígitos.», «Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).», «Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.», «Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.» y, solo cuando responde el servidor, «Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.» o, con el presupuesto de intentos de PIN de quien da el alta gastado (HUB-F145), «Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos y vuelve a intentarlo.» (sin los minutos, «Espera unos minutos»). Un rechazo que la pantalla no sabe traducir sale con la frase que mandó el servidor.
 Implicados: HUB-F145, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §6
 
@@ -121,7 +121,7 @@ Implicados: HUB-F148, STAFF-F03
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F85 Poner o cambiar el PIN de otra persona
-Estado: hecho
+Estado: parcial — cambiar el PIN a más de 5 personas seguidas en menos de 5 minutos obliga a esperar a que pase la ventana del freno (ERPlora/hub#2564)
 Actor: administrador
 Pantalla: Ficha de usuario
 Pasos:
@@ -131,7 +131,7 @@ Pasos:
 4. En la lista, la columna «Acceso» de esa persona dice «PIN local» (o «PIN + placa»).
 Entra: el PIN nuevo; el número de dígitos del negocio, que sale del arranque de la pantalla.
 Sale: pide al servidor la edición con solo el PIN (HUB-F148). La ficha no comprueba el PIN antes de guardar (solo limita los dígitos que caben): lo valida el hub. Cambiar la longitud del negocio (HUB_SHELL-F100) no toca los PIN ya puestos. El PIN de uno mismo se cambia en **Mi perfil** (acceso y navegación), no aquí.
-Si falla: un PIN de otra longitud sale bajo el campo («El PIN debe tener {n} dígitos.»); uno fácil («Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).») o ya usado («Ese PIN ya lo tiene otro usuario activo…») sale en el aviso rojo de arriba. Este último confirma a quien edita que ese número es el PIN de alguien, sin freno por intentos (ERPlora/hub#2518). El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
+Si falla: un PIN de otra longitud sale bajo el campo («El PIN debe tener {n} dígitos.»); uno fácil («Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).») o ya usado («Ese PIN ya lo tiene otro usuario activo…») sale en el aviso rojo de arriba. Este último confirma a quien edita que ese número es el PIN de alguien, así que cada guardado con PIN gasta un intento de quien edita (HUB-F148): agotados, sale en el mismo aviso «Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos y vuelve a intentarlo.» y el hub no dice si el número estaba libre (ERPlora/hub#2518). El PIN del dueño de la cuenta no lo cambia nadie más («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido…»).
 Implicados: HUB-F132, HUB-F148, STAFF-F03, REC_ALTA-F15, REC_ALTA-F16
 QA: qa-hub-restaurant §6
 
@@ -506,4 +506,4 @@ Se resuelven con `market-decision`; no las decide el worker.
   «Usuarios → API keys», que hoy es Empleados › API keys.
 - Manual `hand-book/hub/03-personas-y-permisos.md`: «Lista vacía con opción de alta» y «Perfil: PIN
   propio». Cierto; el PIN propio es de Mi perfil (HUB_SHELL-F22, área de acceso, que recoge además el
-  oráculo del PIN de otros, que en Empleados sigue sin freno, hub#2518).
+  oráculo del PIN de otros, que en Empleados se frena por intentos desde hub#2518).

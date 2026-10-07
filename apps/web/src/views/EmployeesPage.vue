@@ -193,6 +193,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useHashTab } from '../lib/hash-tab';
+import { sayRefusal } from '../lib/lock-refusal';
 import { useI18n } from 'vue-i18n';
 import {
   IonButton,
@@ -228,6 +229,7 @@ import {
   listHubRoles,
   listHubUsers,
   localUserIssue,
+  pinLockRefusal,
   type HubRole,
   type HubUser,
 } from '../lib/hub-users';
@@ -495,6 +497,9 @@ async function createUser(): Promise<void> {
  * código); enseñarlo tal cual es lo que ponía «the name is required» delante de una encargada.
  */
 function rejectionMessage(error: unknown, fallback = t('employees.saveError')): string {
+  // hub#2518 — the editor's PIN budget is spent: say how long to wait, not the server's sentence.
+  const lock = pinLockRefusal(error);
+  if (lock) return sayRefusal(t, lock);
   const key = hubUserErrorKey(error);
   if (key) return t(`employeeForm.errors.${key}`);
   const translated = invalidFieldMessage(error, t, te, { length: hubPinLength.value });

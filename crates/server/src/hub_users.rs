@@ -76,6 +76,28 @@ pub(crate) fn plan_max_users(st: &AppState) -> u32 {
     st.entitlement.read().map(|g| g.max_users()).unwrap_or(0)
 }
 
+/// Spends one try of the editor's PIN budget when a PIN travels in the request (hub#2518).
+///
+/// PINs are unique (hub#355), so the alta and the edit have to say «that one is taken» — which,
+/// unbraked, let whoever manages the staff type numbers into any record until the refusal named a
+/// colleague's PIN, the account owner's included. Same budget, same map and same key as changing
+/// one's own PIN (`auth_api::auth_set_pin`, hub#2499): five tries per five minutes against the
+/// EDITOR's id, every try counted (an accepted number is stored and the prober moves on), and one
+/// budget per person across the three doors — a budget per door would only multiply the tries.
+/// Never `login_throttle`: that one is keyed by whatever name the caller types at the pinpad.
+/// Checked BEFORE the runtime looks at the digits. A request without a PIN (or with an empty one,
+/// which reveals nothing) spends nothing and is never locked.
+fn spend_pin_try(st: &AppState, editor_id: &str, pin: Option<&str>) -> Result<(), Response> {
+    if !pin.is_some_and(|p| !p.trim().is_empty()) {
+        return Ok(());
+    }
+    if let Some(retry_after_secs) = st.pin_change_throttle.locked_for(editor_id) {
+        return Err(crate::auth_api::too_many_attempts(retry_after_secs));
+    }
+    st.pin_change_throttle.record_attempt(editor_id);
+    Ok(())
+}
+
 fn not_found() -> Response {
     (
         StatusCode::NOT_FOUND,
@@ -195,6 +217,9 @@ pub async fn create_user(
     if let Some(Guard::Forbidden { code, message }) = grant_decision(&actor.role, &input.role) {
         return forbidden(code, message);
     }
+    if let Err(response) = spend_pin_try(&st, &actor.id, Some(&input.pin)) {
+        return response;
+    }
     // …y el plan tiene que tener plaza (hub#1685). El tope lo trae el entitlement, que vive aquí y
     // no en el runtime; `0` (incluido «aún no hubo refresh exitoso») = sin tope. Viaja CON el alta
     // y no como comprobación previa (hub#1804): mirarlo antes dejaba una ventana en la que otra
@@ -286,6 +311,9 @@ async fn apply_update(
         Ok(target) => target,
         Err(response) => return response,
     };
+    if let Err(response) = spend_pin_try(&st, &admin.id, input.pin.as_deref()) {
+        return response;
+    }
     // **Reactivar es dar de alta** (hub#1685): la baja liberó la plaza y puede haberla ocupado otro,
     // así que volver a entrar vuelve a pedirla. Editar a quien ya está dentro (rol, nombre, PIN) no
     // gasta ninguna: si el tope se mirase en toda escritura, un hub Gratis con sus tres usuarios no
