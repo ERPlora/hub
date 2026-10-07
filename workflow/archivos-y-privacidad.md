@@ -86,14 +86,14 @@ Implicados: CUSTOMERS-F16, WHATSAPP_INBOX-F11
 QA: L-10
 
 ### HUB-F250 Lo que le toca a cada app al recibir el aviso de borrado
-Estado: parcial — Citas (nombre, teléfono, correo y notas en citas, series e historial), Reservas (RESERVATIONS-F22) y Reservas online no escuchan el aviso
+Estado: parcial — Reservas online no escucha el aviso (pm#637); Citas deja la etiqueta de los huecos apartados de la bandeja retirada de WhatsApp (APPOINTMENTS-F24)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Una app que guarda datos de la persona escucha el aviso.
 2. Vacía sus tablas por el identificador de la ficha.
 Entra: `customer.anonymized` y su identificador.
-Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Servicios marca sus bonos; Nadie toca los XML de Verifactu del almacenamiento de archivos ni los localizadores públicos. Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
+Sale: el hub garantiza entrega con reintentos, el vaciado de su historial (HUB-F249) y que ningún módulo puede tocar las tablas del núcleo. No garantiza que cada app escuche, ni vacía las tablas de una app. Hoy: WhatsApp vacía y cierra sus conversaciones unidas a la ficha; Citas vacía nombre, teléfono, correo y notas de sus citas (APPOINTMENTS-F24); Reservas vacía nombre, contacto y notas de reservas y lista de espera, también las apuntadas a mano (RESERVATIONS-F22); Servicios marca sus bonos; Nadie toca los XML de Verifactu del almacenamiento de archivos ni los localizadores públicos. Ventas y Facturas conservan su copia fiscal a propósito, y Verifactu conserva NIF y nombre del cliente en sus registros y XML porque la norma obliga a conservarlos.
 Si falla: el aviso de esa app se reintenta como cualquier otro.
 Implicados: CUSTOMERS-F16, RESERVATIONS-F22, WHATSAPP_INBOX-F11
 QA: L-10, WA-06 (discrepa)
