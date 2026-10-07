@@ -1093,7 +1093,7 @@ export default {
     uninstallTitle: 'Uninstall {name}',
     // What the old text said was what is KEPT. This is the half it left out: the apps that need
     // this one stop working, and unlike deactivating, there is no switching them back on.
-    uninstallBreaks: 'These apps need {name} and will stop working:',
+    uninstallBreaks: 'These apps need {name} and will be uninstalled too:',
     uninstallBody: 'The app will no longer be available. Its data and files will be kept for a later reinstall.',
     uninstallConfirm: 'Uninstall',
     toggleError: 'Could not change the status of {name}.',
