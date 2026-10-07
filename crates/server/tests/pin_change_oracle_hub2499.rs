@@ -4,8 +4,9 @@
 //! numbers one after another learnt which PINs belong to somebody, and the pinpad grid hands out the
 //! names to try them against: the manager's or the owner's till session was a few minutes away.
 //!
-//! The door now spends a per-person budget, the same five tries per five minutes the pinpad gives a
-//! name ([`erplora_server::login_throttle`]). **Every** try spends it, the accepted ones too: a free
+//! The door now spends a per-person budget, shared with the PIN doors of Empleados (hub#2518) and
+//! sized for setting up a whole staff ([`PIN_CHANGE_MAX_ATTEMPTS`] per hour, hub#2564, fewer tries
+//! a day than the five every five minutes it started with). **Every** try spends it, the accepted ones too: a free
 //! number is stored as the prober's own PIN and they keep going, so counting only refusals would
 //! still give them unlimited probes and a taken PIN every refusal. What this file locks down:
 //!
@@ -21,10 +22,11 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::login_throttle::MAX_FAILURES;
+use erplora_server::login_throttle::{LoginThrottle, MAX_FAILURES, PIN_CHANGE_MAX_ATTEMPTS};
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
+use std::sync::Arc;
 use tower::ServiceExt;
 
 const HUB: &str = "hub-pin-oracle";
@@ -33,17 +35,42 @@ const PROBER_PIN: &str = "1379";
 const VICTIM: &str = "Marta Ruiz";
 const VICTIM_PIN: &str = "4917";
 const ACCOMPLICE_PIN: &str = "9053";
-/// Free, non-guessable PINs the prober rotates through (none repeats a digit run nor matches
-/// [`VICTIM_PIN`]). One more than the budget, so a test can always ask for one past it.
-const FREE_PINS: [&str; 6] = ["8246", "3058", "6193", "7402", "5817", "2964"];
+/// The budget of tries, as a count.
+const BUDGET: usize = PIN_CHANGE_MAX_ATTEMPTS as usize;
+
+/// Free, non-guessable PINs the prober rotates through (steps of 41 from 2000: none is a repeated
+/// digit or a run, nor the fixture's PINs). One more than the budget, so a test can always ask for
+/// one past it.
+fn free_pin(i: usize) -> String {
+    format!("{:04}", 2000 + 41 * i)
+}
+
+/// The tries a prober already spent before the ones a test watches, spent straight into the
+/// door's budget: the same map (`pin_change_throttle`) and the same key (the person's id) the door
+/// spends. Each try through the door costs several argon2 hashes in a debug build, and with a
+/// budget of thirty, spending all of it over HTTP cost the CI suite minutes (hub#2564). The tries
+/// that decide —the last ones and the one past the budget— always go through the door.
+struct Spent {
+    throttle: Arc<LoginThrottle>,
+    id: String,
+}
+
+impl Spent {
+    fn tries(&self, n: usize) {
+        for _ in 0..n {
+            self.throttle.record_attempt(&self.id);
+        }
+    }
+}
 
 async fn body_json(response: axum::response::Response) -> Value {
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     serde_json::from_slice(&bytes).unwrap_or(Value::Null)
 }
 
-/// Router + the prober's session + the victim's session, both employees of the same hub.
-async fn fixture() -> (axum::Router, String, String) {
+/// Router + the prober's session + the victim's session, both employees of the same hub, + the
+/// prober's budget.
+async fn fixture() -> (axum::Router, String, String, Spent) {
     fixture_with(|_| None).await
 }
 
@@ -51,7 +78,7 @@ async fn fixture() -> (axum::Router, String, String) {
 /// the prober's id, holding [`ACCOMPLICE_PIN`].
 async fn fixture_with(
     accomplice: impl Fn(&str) -> Option<String>,
-) -> (axum::Router, String, String) {
+) -> (axum::Router, String, String, Spent) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -90,11 +117,12 @@ async fn fixture_with(
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
-    (
-        app(AppState::with_config(rt, cfg)),
-        prober_session,
-        victim_session,
-    )
+    let state = AppState::with_config(rt, cfg);
+    let spent = Spent {
+        throttle: state.pin_change_throttle.clone(),
+        id: prober,
+    };
+    (app(state), prober_session, victim_session, spent)
 }
 
 async fn set_pin(
@@ -157,12 +185,12 @@ async fn grid_id(router: &axum::Router, name: &str) -> String {
         .to_string()
 }
 
-/// Rotates the prober's PIN `n` times through [`FREE_PINS`], each accepted; returns the PIN the
+/// Rotates the prober's PIN `n` times through [`free_pin`], each accepted; returns the PIN the
 /// prober holds afterwards.
-async fn rotate(router: &axum::Router, session: &str, n: usize) -> &'static str {
-    let mut current = PROBER_PIN;
-    for next in FREE_PINS.iter().take(n) {
-        let response = set_pin(router, session, next, current).await;
+async fn rotate(router: &axum::Router, session: &str, n: usize) -> String {
+    let mut current = PROBER_PIN.to_string();
+    for next in (0..n).map(free_pin) {
+        let response = set_pin(router, session, &next, &current).await;
         assert_eq!(
             response.status(),
             StatusCode::OK,
@@ -186,10 +214,11 @@ async fn assert_locked(response: axum::response::Response) {
 /// The symptom of the issue: before, the probe past the budget still answered `pin_in_use`.
 #[tokio::test]
 async fn a_taken_pin_is_not_confirmed_once_the_budget_is_spent() {
-    let (router, prober, _) = fixture().await;
+    let (router, prober, _, spent) = fixture().await;
     // Inside the budget the door does its job, refusal included: the PIN is unique.
-    let held = rotate(&router, &prober, MAX_FAILURES as usize - 1).await;
-    let probe = set_pin(&router, &prober, VICTIM_PIN, held).await;
+    spent.tries(BUDGET - 2);
+    let held = rotate(&router, &prober, 1).await;
+    let probe = set_pin(&router, &prober, VICTIM_PIN, &held).await;
     assert_eq!(probe.status(), StatusCode::CONFLICT);
     assert_eq!(
         body_json(probe).await["error"]["code"],
@@ -197,24 +226,26 @@ async fn a_taken_pin_is_not_confirmed_once_the_budget_is_spent() {
     );
 
     // Budget spent: the same probe no longer says whose it is.
-    assert_locked(set_pin(&router, &prober, VICTIM_PIN, held).await).await;
+    assert_locked(set_pin(&router, &prober, VICTIM_PIN, &held).await).await;
 }
 
 /// Accepted changes spend the budget too: a free number is stored and the prober keeps going, so
 /// a brake that counted only refusals would let them probe for ever.
 #[tokio::test]
 async fn accepted_changes_spend_the_budget_too() {
-    let (router, prober, _) = fixture().await;
-    let held = rotate(&router, &prober, MAX_FAILURES as usize).await;
-    assert_locked(set_pin(&router, &prober, VICTIM_PIN, held).await).await;
+    let (router, prober, _, spent) = fixture().await;
+    spent.tries(BUDGET - 2);
+    let held = rotate(&router, &prober, 2).await;
+    assert_locked(set_pin(&router, &prober, VICTIM_PIN, &held).await).await;
 }
 
 /// Guessing the current PIN from an unattended session is the other half of the same door.
 #[tokio::test]
 async fn refusals_spend_the_same_budget() {
-    let (router, prober, _) = fixture().await;
-    for _ in 0..MAX_FAILURES {
-        let wrong = set_pin(&router, &prober, FREE_PINS[0], "0007").await;
+    let (router, prober, _, spent) = fixture().await;
+    spent.tries(BUDGET - 2);
+    for _ in 0..2 {
+        let wrong = set_pin(&router, &prober, &free_pin(0), "0007").await;
         assert_eq!(wrong.status(), StatusCode::CONFLICT);
         assert_eq!(
             body_json(wrong).await["error"]["code"],
@@ -222,16 +253,17 @@ async fn refusals_spend_the_same_budget() {
         );
     }
     // Even the right current PIN is turned away now, before it is checked.
-    assert_locked(set_pin(&router, &prober, FREE_PINS[0], PROBER_PIN).await).await;
+    assert_locked(set_pin(&router, &prober, &free_pin(0), PROBER_PIN).await).await;
 }
 
 #[tokio::test]
 async fn the_lock_is_the_probers_alone() {
-    let (router, prober, victim) = fixture().await;
-    let held = rotate(&router, &prober, MAX_FAILURES as usize).await;
-    assert_locked(set_pin(&router, &prober, FREE_PINS[5], held).await).await;
+    let (router, prober, victim, spent) = fixture().await;
+    spent.tries(BUDGET - 1);
+    let held = rotate(&router, &prober, 1).await;
+    assert_locked(set_pin(&router, &prober, &free_pin(BUDGET), &held).await).await;
 
-    let own = set_pin(&router, &victim, FREE_PINS[5], VICTIM_PIN).await;
+    let own = set_pin(&router, &victim, &free_pin(BUDGET), VICTIM_PIN).await;
     assert_eq!(
         own.status(),
         StatusCode::OK,
@@ -243,11 +275,12 @@ async fn the_lock_is_the_probers_alone() {
 /// key, the prober would sign in again with their own PIN and start a fresh budget.
 #[tokio::test]
 async fn signing_in_again_does_not_lift_the_lock() {
-    let (router, prober, _) = fixture().await;
-    let held = rotate(&router, &prober, MAX_FAILURES as usize).await;
-    assert_locked(set_pin(&router, &prober, VICTIM_PIN, held).await).await;
+    let (router, prober, _, spent) = fixture().await;
+    spent.tries(BUDGET - 1);
+    let held = rotate(&router, &prober, 1).await;
+    assert_locked(set_pin(&router, &prober, VICTIM_PIN, &held).await).await;
 
-    let login = pin_login(&router, PROBER, held).await;
+    let login = pin_login(&router, PROBER, &held).await;
     assert_eq!(
         login.status(),
         StatusCode::OK,
@@ -257,7 +290,7 @@ async fn signing_in_again_does_not_lift_the_lock() {
         .as_str()
         .expect("a session token")
         .to_string();
-    assert_locked(set_pin(&router, &fresh, VICTIM_PIN, held).await).await;
+    assert_locked(set_pin(&router, &fresh, VICTIM_PIN, &held).await).await;
 }
 
 /// How this door's key could be spelt as a NAME at the pinpad: the bare id, or the id behind the
@@ -272,7 +305,7 @@ fn spellings(id: &str) -> [String; 2] {
 /// minutes, for as long as somebody kept typing, and never enough to trip the per-address guard.
 #[tokio::test]
 async fn wrong_pins_at_the_pinpad_do_not_lock_somebodys_pin_change() {
-    let (router, _, victim) = fixture().await;
+    let (router, _, victim, _) = fixture().await;
     for name in spellings(&grid_id(&router, VICTIM).await) {
         for _ in 0..MAX_FAILURES {
             let guess = pin_login(&router, &name, "0007").await;
@@ -280,7 +313,7 @@ async fn wrong_pins_at_the_pinpad_do_not_lock_somebodys_pin_change() {
         }
     }
 
-    let own = set_pin(&router, &victim, FREE_PINS[0], VICTIM_PIN).await;
+    let own = set_pin(&router, &victim, &free_pin(0), VICTIM_PIN).await;
     assert_eq!(
         own.status(),
         StatusCode::OK,
@@ -291,20 +324,22 @@ async fn wrong_pins_at_the_pinpad_do_not_lock_somebodys_pin_change() {
 
 /// The other direction of the same collision: a successful pinpad login clears the counter of the
 /// NAME typed. With somebody on the staff list called like the prober's key, signing them in would
-/// hand the prober a fresh budget every four probes.
+/// hand the prober a fresh budget whenever it ran low.
 #[tokio::test]
 async fn a_sign_in_under_a_name_spelt_like_the_key_does_not_refill_the_budget() {
     for spelling in 0..2 {
-        let (router, prober, _) = fixture_with(|id| Some(spellings(id)[spelling].clone())).await;
+        let (router, prober, _, spent) =
+            fixture_with(|id| Some(spellings(id)[spelling].clone())).await;
         let name = spellings(&grid_id(&router, PROBER).await)[spelling].clone();
-        let held = rotate(&router, &prober, MAX_FAILURES as usize - 1).await;
+        spent.tries(BUDGET - 2);
+        let held = rotate(&router, &prober, 1).await;
 
         let login = pin_login(&router, &name, ACCOMPLICE_PIN).await;
         assert_eq!(login.status(), StatusCode::OK, "{name} signs in");
 
-        // The fifth try is still the fifth: it is answered, and the one after it is not.
-        let fifth = set_pin(&router, &prober, VICTIM_PIN, held).await;
-        assert_eq!(fifth.status(), StatusCode::CONFLICT, "as {name}");
-        assert_locked(set_pin(&router, &prober, VICTIM_PIN, held).await).await;
+        // The last try is still the last: it is answered, and the one after it is not.
+        let last = set_pin(&router, &prober, VICTIM_PIN, &held).await;
+        assert_eq!(last.status(), StatusCode::CONFLICT, "as {name}");
+        assert_locked(set_pin(&router, &prober, VICTIM_PIN, &held).await).await;
     }
 }

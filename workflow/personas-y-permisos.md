@@ -32,7 +32,7 @@ Para esta parte del área (la de entrar y las sesiones está en [acceso.md](acce
 ## Flujos
 
 ### HUB-F145 Dar de alta a una persona que entra solo con PIN
-Estado: parcial — el freno de 5 intentos en 5 minutos de quien edita no para a quien va despacio (4 cada 5 minutos no bloquean nunca) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526); y el mismo freno hace esperar a quien monta la plantilla seguida: la sexta alta con PIN en menos de 5 minutos tiene que esperar a que pase la ventana (ERPlora/hub#2564)
+Estado: parcial — el freno de 30 intentos por hora de quien edita no para a quien va despacio (29 cada hora no bloquean nunca, unos 700 al día) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526)
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
@@ -41,7 +41,7 @@ Pasos:
 3. Guarda.
 4. La persona aparece en la lista y en el pinpad de los dispositivos compartidos de confianza.
 Entra: la sesión de administrador; el nombre (hasta 150 caracteres), el rol, el PIN y la placa opcional; las plazas del plan (HUB-F147).
-Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148). Como el PIN es único, «ya lo tiene otro usuario activo» dice que ese número es de alguien: por eso cada alta que lleva PIN gasta un intento del presupuesto de **quien da el alta**, el mismo que el cambio del propio PIN (HUB-F132): 5 en 5 minutos, contando también los aceptados; agotado, no mira el número ni escribe nada (ERPlora/hub#2518).
+Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148). Como el PIN es único, «ya lo tiene otro usuario activo» dice que ese número es de alguien: por eso cada alta que lleva PIN gasta un intento del presupuesto de **quien da el alta**, el mismo que el cambio del propio PIN (HUB-F132): 30 intentos por hora contados desde el primero, también los aceptados; agotado, no mira el número ni escribe nada durante una hora (ERPlora/hub#2518). Treinta caben para dar de alta a toda la plantilla seguida sin esperar, y aun así quien prueba números saca menos intentos al día que con los 5 en 5 minutos de antes (ERPlora/hub#2564).
 Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: el **alta** de un usuario local no admite administrador (ojo: la edición de la ficha sí deja subirlo después a administrador, HUB-F148, y un administrador con PIN entra por el pinpad con todos sus permisos; solo el pase a erplora.com, HUB-F142, exige haber entrado con la cuenta); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin decir si el número estaba libre.
 Implicados: HUB_SHELL-F81, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §7.02
@@ -77,7 +77,7 @@ Implicados: HUB_SHELL-F83, REC_ALTA-F15, SAAS_DASHBOARD-F13, SAAS_DASHBOARD-F53,
 QA: ninguno
 
 ### HUB-F148 Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona
-Estado: parcial — el freno de 5 intentos en 5 minutos de quien edita no para a quien va despacio (4 cada 5 minutos no bloquean nunca) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526); y el mismo freno hace esperar a quien cambia el PIN a más de 5 personas seguidas en menos de 5 minutos (ERPlora/hub#2564)
+Estado: parcial — el freno de 30 intentos por hora de quien edita no para a quien va despacio (29 cada hora no bloquean nunca, unos 700 al día) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526)
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
