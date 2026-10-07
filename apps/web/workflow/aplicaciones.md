@@ -193,7 +193,7 @@ Implicados: HUB-F19, HUB-F32
 QA: ninguno
 
 ### HUB_SHELL-F116 Actualizar una app
-Estado: parcial — la pantalla solo ofrece versiones hacia delante (bajar de versión existe en el hub por la API con una versión explícita, pero no tiene botón); y los avisos de error (salvo el de apps de pago sin contratar, que es fijo) y el de «ya está al día» desaparecen a los 2,5 s (leído en el código, sin ejecutar)
+Estado: parcial — la pantalla solo ofrece versiones hacia delante (bajar de versión existe en el hub por la API con una versión explícita, pero no tiene botón)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -204,7 +204,7 @@ Pasos:
 5. Si ya estaba en la última: «{name} ya está en la última versión.».
 Entra: la versión nueva que ofrece el catálogo; si soporte ha fijado una versión, esa manda.
 Sale: pide al servidor la actualización (HUB-F23). Si falla, el hub deja la versión que había y funcionando.
-Si falla: «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
+Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594): «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
 Implicados: HUB-F23, HUB-F24
 QA: BD-03
 
@@ -283,7 +283,7 @@ Implicados: SAAS_DASHBOARD-F186, SAAS_DASHBOARD-F187, SAAS_PUBLIC-F22
 QA: ninguno
 
 ### HUB_SHELL-F122 Desactivar una app
-Estado: parcial — el error de desactivar sale en un aviso que desaparece a los 2,5 s, también cuando es la negativa larga de un motor (HUB_SHELL-F125, ERPlora/hub#2594; visto en el banco, hub#2579)
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -293,7 +293,7 @@ Pasos:
 4. Confirma con «Desactivar». Sale «{name} desactivado.», la fila pasa a «Inactivo», las arrastradas a «Inactivo (en cascada)» y la app desaparece del menú.
 Entra: las dependencias que declaran las apps instaladas.
 Sale: pide al servidor apagarla (HUB-F28). Los datos no se tocan. Cada pestaña y dispositivo del hub recibe el cambio y se refresca.
-Si falla: «No se pudo cambiar el estado de {name}.» o la frase del motor que se niega (HUB_SHELL-F125).
+Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594): «No se pudo cambiar el estado de {name}.» o la frase del motor que se niega (HUB_SHELL-F125).
 Implicados: HUB-F28, VERIFACTU-F32
 QA: L-14
 
@@ -307,7 +307,7 @@ Pasos:
 3. Confirma con «Activar». Sale «{name} activado.», vuelve al menú y las arrastradas por una dependencia que se apagó vuelven solas.
 Entra: las dependencias declaradas.
 Sale: pide al servidor encenderla (HUB-F27).
-Si falla: «No se pudo cambiar el estado de {name}.» o la frase del hub; la pantalla solo recarga la lista si todo va bien, así que ese error no muestra la app ya activa.
+Si falla: en el mismo aviso rojo que se queda hasta que se pulsa «Cerrar» que al desactivar, «No se pudo cambiar el estado de {name}.» o la frase del hub; la pantalla solo recarga la lista si todo va bien, así que ese error no muestra la app ya activa.
 Implicados: HUB-F27
 QA: ninguno
 
@@ -322,18 +322,18 @@ Pasos:
 4. Confirma con «Desinstalar». Sale «{name} desinstalado.»; ella y las apps nombradas desaparecen de Mis apps y del menú, y el catálogo vuelve a ofrecerlas.
 Entra: las apps instaladas y sus dependencias, para nombrar lo que se va con ella.
 Sale: pide al servidor desinstalar (HUB-F29), forzando solo si la pregunta ya nombró dependientes: el hub quita juntas la app y esas dependientes, y ninguna vuelve al reiniciar. Los datos y archivos de todas se quedan en la base y en Archivos.
-Si falla: «No se pudo desinstalar {name}.»; si la lista con la que se preguntó se había quedado vieja y el hub encuentra dependientes: «{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.» (con los identificadores que mandó el hub y la lista recargada); o la negativa de un motor (HUB_SHELL-F125).
+Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594): «No se pudo desinstalar {name}.»; si la lista con la que se preguntó se había quedado vieja y el hub encuentra dependientes: «{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.» (con los identificadores que mandó el hub y la lista recargada); o la negativa de un motor (HUB_SHELL-F125).
 Implicados: HUB-F29, VERIFACTU-F32
 QA: L-14
 
 ### HUB_SHELL-F125 Ver que una app se niega a desactivarse o desinstalarse
-Estado: parcial — la negativa sale en un aviso que desaparece a los 2,5 s (ERPlora/hub#2594), y la de VeriFactu no dice cuántos registros faltan: el hub manda el número solo dentro de su frase inglesa, no como dato (ERPlora/hub#2595) (visto en el banco, hub#2579)
+Estado: parcial — la de VeriFactu no dice cuántos registros faltan: el hub manda el número solo dentro de su frase inglesa, no como dato (ERPlora/hub#2595) (visto en el banco, hub#2579)
 Actor: administrador
 Pantalla: Apps
 Pasos:
 1. El administrador intenta desactivar VeriFactu o una app cuya desactivación lo arrastra (Facturación), o desinstalar VeriFactu, con registros sin aceptar por la AEAT; o desactivar o desinstalar la última app que cumple el régimen fiscal del negocio. Desinstalar una app de la que depende VeriFactu también pasa por la negativa de su motor, porque confirmar la pregunta se la llevaría con ella (HUB_SHELL-F124).
 2. El hub se niega y no cambia nada: ni la pedida ni las arrastradas.
-3. La pantalla enseña el motivo en un aviso rojo, en el idioma de la pantalla. VeriFactu con registros pendientes: «VeriFactu aún tiene registros que la AEAT no ha aceptado. Abre VeriFactu para enviarlos o corregirlos y vuelve a intentarlo.». La última app fiscal: «Tu negocio tiene que conservar una app que envíe sus facturas a Hacienda, y así se quedaría sin ninguna. Instala antes otra app que lo haga y vuelve a intentarlo.».
+3. La pantalla enseña el motivo en un aviso rojo, en el idioma de la pantalla, que se queda hasta que el administrador pulsa «Cerrar» (ERPlora/hub#2594): son frases largas que dicen qué hacer. VeriFactu con registros pendientes: «VeriFactu aún tiene registros que la AEAT no ha aceptado. Abre VeriFactu para enviarlos o corregirlos y vuelve a intentarlo.». La última app fiscal: «Tu negocio tiene que conservar una app que envíe sus facturas a Hacienda, y así se quedaría sin ninguna. Instala antes otra app que lo haga y vuelve a intentarlo.».
 4. La app sigue «Activo» en la fila.
 Entra: el rechazo del hub con el código del motor y la frase que mandó.
 Sale: nada guardado. La pantalla traduce por el código las dos negativas fiscales (`verifactu.unsent_records`, `fiscal.no_provider_left`, hub#2579) igual que los códigos de plataforma; la frase de un motor cuyo código no conoce (uno publicado después que la pantalla) la pinta tal cual, porque dice más que cualquier genérico.
@@ -360,9 +360,9 @@ QA: L-14
 | Ver qué cambia en la versión nueva antes de actualizar | no hecho (el historial está en Sistema › Actualizaciones, ya hecho) | HUB_SHELL-F116 |
 | Aviso de versiones nuevas en la campana y reintento | hecho | HUB_SHELL-F119, F120 |
 | App retirada del catálogo | hecho | HUB_SHELL-F121 |
-| Desactivar / activar con cascada | parcial / parcial | HUB_SHELL-F122, F123 |
+| Desactivar / activar con cascada | hecho / parcial | HUB_SHELL-F122, F123 |
 | Desinstalar nombrando lo que se va con ella | hecho (se quitan juntas al confirmar) | HUB_SHELL-F124 |
-| Negativa de un motor (VeriFactu) | parcial (aviso de 2,5 s, sin el número de registros) | HUB_SHELL-F125 |
+| Negativa de un motor (VeriFactu) | parcial (sin el número de registros; el aviso se queda hasta cerrarlo) | HUB_SHELL-F125 |
 
 ## Datos: de quién es cada dato
 
@@ -391,7 +391,8 @@ Se resuelven con `market-decision`; no las decide el worker.
 
 - Servidor HUB-F29: no hay opción aparte «quitarla igualmente»; confirmar la pregunta ya fuerza, y
   forzar se lleva las dependientes que la pregunta nombró (hub#2545).
-- VERIFACTU-F32: la frase sale en un aviso que desaparece a los 2,5 s.
+- VERIFACTU-F32: hasta hub#2594 la frase salía en un aviso que desaparecía a los 2,5 s; ahora se queda hasta
+  que se pulsa «Cerrar», como el fallo de instalar (hub#2244).
 - Servidor HUB-F28 y VERIFACTU-F32: hasta hub#2579 la negativa fiscal salía en inglés en la pantalla
   española (la pantalla solo traducía códigos de plataforma); ahora se traduce por el código, y el
   número de registros pendientes, que el hub solo manda dentro de su frase inglesa, no se enseña.
