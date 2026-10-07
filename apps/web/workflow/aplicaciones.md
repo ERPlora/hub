@@ -193,7 +193,7 @@ Implicados: HUB-F19, HUB-F32
 QA: ninguno
 
 ### HUB_SHELL-F116 Actualizar una app
-Estado: parcial — la pantalla solo ofrece versiones hacia delante (bajar de versión existe en el hub por la API con una versión explícita, pero no tiene botón)
+Estado: parcial — el aviso de «ya está al día» desaparece a los 2,5 s (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -204,7 +204,7 @@ Pasos:
 5. Si ya estaba en la última: «{name} ya está en la última versión.».
 Entra: la versión nueva que ofrece el catálogo; si soporte ha fijado una versión, esa manda.
 Sale: pide al servidor la actualización (HUB-F23). Si falla, el hub deja la versión que había y funcionando.
-Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594): «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
+Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594): «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; si la versión elegida ya no se puede poner (soporte la fijó entretanto, o es anterior a la instalada), «Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, o es anterior a la que tienes. No ha cambiado nada.» (hub#2546); y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
 Implicados: HUB-F23, HUB-F24
 QA: BD-03
 
@@ -356,7 +356,7 @@ QA: L-14
 | Permisos de la app al instalar | hecho (todo o nada) | HUB_SHELL-F109, F115 |
 | Conceder solo algunos de los permisos pedidos | no hecho | HUB_SHELL-F109 |
 | Actualizar una / actualizar todas | parcial / hecho | HUB_SHELL-F116, F117 |
-| Bajar de versión desde la pantalla | no hecho (solo API con versión explícita) | HUB_SHELL-F116 |
+| Bajar de versión desde la pantalla | no hecho, a propósito (lo hace soporte con el pin; tampoco por la API, hub#2546) | HUB_SHELL-F116 |
 | Ver qué cambia en la versión nueva antes de actualizar | no hecho (el historial está en Sistema › Actualizaciones, ya hecho) | HUB_SHELL-F116 |
 | Aviso de versiones nuevas en la campana y reintento | hecho | HUB_SHELL-F119, F120 |
 | App retirada del catálogo | hecho | HUB_SHELL-F121 |
@@ -384,7 +384,6 @@ QA: L-14
 
 Se resuelven con `market-decision`; no las decide el worker.
 
-- ¿Bajar una app de versión desde la pantalla, o dejarlo solo para soporte por la API?
 - ¿Conceder solo parte de los permisos que pide una app al instalar?
 
 ## Fuentes contrastadas
@@ -396,5 +395,5 @@ Se resuelven con `market-decision`; no las decide el worker.
 - Servidor HUB-F28 y VERIFACTU-F32: hasta hub#2579 la negativa fiscal salía en inglés en la pantalla
   española (la pantalla solo traducía códigos de plataforma); ahora se traduce por el código, y el
   número de registros pendientes, que el hub solo manda dentro de su frase inglesa, no se enseña.
-- Servidor HUB-F23: «un administrador puede bajar de versión por la API». La pantalla solo ofrece
-  versiones hacia delante.
+- Servidor HUB-F23: una versión explícita sigue la regla de la lista (con pin, solo el pin; sin pin,
+  solo hacia delante) y la que no la cumple sale `update_version_not_offered` (hub#2546).

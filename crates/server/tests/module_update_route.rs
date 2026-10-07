@@ -595,3 +595,178 @@ async fn pressing_update_on_something_already_current_writes_nothing() {
 
     let _ = std::fs::remove_dir_all(temp);
 }
+
+// ── 6. An explicit version cannot walk around the support pin or go backwards (hub#2546) ────────
+
+/// What support writes when it pins a module on this hub (`hub_module.pinned_version`).
+async fn pin_support_version(state: &AppState, version: &str) {
+    let rt = state.runtime.read().await;
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("hub-upd"));
+    p.insert("module_id".into(), json!("parts"));
+    p.insert("pin".into(), json!(version));
+    rt.db()
+        .execute(
+            "UPDATE hub_module SET pinned_version = :pin \
+             WHERE hub_id = :hub_id AND module_id = :module_id",
+            &p,
+        )
+        .await
+        .expect("pin parts");
+}
+
+/// A marketplace that publishes `parts` 0.5.0, 1.0.0 and 2.0.0, every one of them installable: if
+/// the door lets a version through, it really lands, so a refusal is the only way to stay put.
+fn three_published_versions() -> Shared {
+    let mut packages = HashMap::new();
+    for version in ["0.5.0", "1.0.0", "2.0.0"] {
+        let zip = parts_package(version, None);
+        let sha = sha256_hex(&zip);
+        packages.insert(("parts".to_string(), version.to_string()), (zip, sha));
+    }
+    Arc::new(MockCloud {
+        packages,
+        offered: HashMap::from([(
+            "parts".to_string(),
+            vec!["0.5.0".into(), "1.0.0".into(), "2.0.0".into()],
+        )]),
+        calls: Mutex::new(Vec::new()),
+    })
+}
+
+/// The refusal hub#2546 asks for: its own code, nothing downloaded, the module where it was.
+async fn assert_refused_and_untouched(
+    response: axum::response::Response,
+    mock: &Shared,
+    state: &AppState,
+) {
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let body = json_body(response).await;
+    assert_eq!(body["ok"], json!(false), "{body}");
+    assert_eq!(body["code"], json!("update_version_not_offered"), "{body}");
+    let calls = mock.calls.lock().unwrap().clone();
+    assert!(
+        !calls.iter().any(|c| c.starts_with("download:")),
+        "a refused version is never downloaded: {calls:?}"
+    );
+    assert_eq!(recorded_version(state).await, "1.0.0");
+    assert_eq!(
+        state
+            .runtime
+            .read()
+            .await
+            .registry()
+            .module_version("parts"),
+        "1.0.0",
+        "the module keeps serving the version it had"
+    );
+}
+
+/// hub#2546: with support's pin on 1.0.0, an administrator asking the API for 0.5.0 got 0.5.0. The
+/// pin is support's lever, not the owner's: an explicit version other than the pin is refused.
+#[tokio::test]
+async fn hub2546_an_explicit_older_version_does_not_walk_around_the_support_pin() {
+    let mock = three_published_versions();
+    let (router, session, state, temp) = fixture("hub2546-pin-down", mock.clone()).await;
+    pin_support_version(&state, "1.0.0").await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"0.5.0"}"#))
+        .await
+        .unwrap();
+    assert_refused_and_untouched(response, &mock, &state).await;
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2546: the pin also holds against an explicit NEWER version — «stay on 1.0.0 while 2.0.0 is
+/// fixed» is exactly what the pin is for, and the version list (HUB-F24) offers nothing pinned.
+#[tokio::test]
+async fn hub2546_an_explicit_newer_version_does_not_walk_around_the_support_pin() {
+    let mock = three_published_versions();
+    let (router, session, state, temp) = fixture("hub2546-pin-up", mock.clone()).await;
+    pin_support_version(&state, "1.0.0").await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_refused_and_untouched(response, &mock, &state).await;
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2546: without a pin, an explicit version only goes forwards, like the version list
+/// (HUB-F24). Going back would re-run a schema the newer version already moved past.
+#[tokio::test]
+async fn hub2546_an_explicit_older_version_is_refused_without_a_pin() {
+    let mock = three_published_versions();
+    let (router, session, state, temp) = fixture("hub2546-down", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"0.5.0"}"#))
+        .await
+        .unwrap();
+    assert_refused_and_untouched(response, &mock, &state).await;
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2546, the other side: the guard refuses what the version list would not offer and nothing
+/// else. An explicit newer version without a pin still installs.
+#[tokio::test]
+async fn hub2546_an_explicit_newer_version_without_a_pin_still_installs() {
+    let mock = three_published_versions();
+    let (router, session, state, temp) = fixture("hub2546-up", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"2.0.0"}"#))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["data"]["updated"], json!(true), "{body}");
+    assert_eq!(recorded_version(&state).await, "2.0.0");
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2546: asking explicitly for the pinned version is what support's pin already does on its
+/// own (the resolver goes to the pin), so it goes through — the guard is about walking AROUND the
+/// pin, not about the word «explicit».
+#[tokio::test]
+async fn hub2546_an_explicit_request_for_the_pinned_version_goes_to_the_pin() {
+    let mock = three_published_versions();
+    let (router, session, state, temp) = fixture("hub2546-pin-eq", mock.clone()).await;
+    pin_support_version(&state, "0.5.0").await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"0.5.0"}"#))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["data"]["version"], json!("0.5.0"), "{body}");
+    assert_eq!(recorded_version(&state).await, "0.5.0");
+
+    let _ = std::fs::remove_dir_all(temp);
+}
+
+/// hub#2546: `"latest"` is the resolver's word, not a version — it is not held to the explicit
+/// version rule and goes where the resolver says.
+#[tokio::test]
+async fn hub2546_latest_is_still_the_resolver_and_not_an_explicit_version() {
+    let mock = three_published_versions();
+    let (router, session, state, temp) = fixture("hub2546-latest", mock.clone()).await;
+
+    let response = router
+        .oneshot(update_request(&session, r#"{"version":"latest"}"#))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    assert_eq!(body["data"]["version"], json!("2.0.0"), "{body}");
+    assert_eq!(recorded_version(&state).await, "2.0.0");
+
+    let _ = std::fs::remove_dir_all(temp);
+}
