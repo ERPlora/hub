@@ -104,7 +104,7 @@ Implicados: SCHEDULES-F12
 QA: BD-01
 
 ### HUB-F23 Actualizar una aplicación
-Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena) (hub#2546); sin tope total de tiempo, como instalar (hub#2556); un fallo deja migraciones, semilla y dependencias de la versión nueva; actualizar una app apagada la enciende (leído en el código, sin ejecutar)
+Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena) (hub#2546); sin tope total de tiempo, como instalar (hub#2556); un fallo deja migraciones, semilla y dependencias de la versión nueva
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
@@ -112,7 +112,7 @@ Pasos:
 2. Sin versión, el hub decide: la más nueva publicada que no esté en cuarentena, nunca hacia atrás, y la que fije soporte si hay un pin. Con una versión explícita (la pide el cuerpo de la petición, basta sesión de administrador) se usa tal cual: sin el resolutor, sin pin y, si llega por el plan de ERPlora, quizá sin cuarentena. En la nube el siguiente despliegue la vuelve a subir a la última; en la app instalada se queda.
 3. Si ya está en esa versión, contesta sin hacer nada.
 4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo, en la misma cola de cambios de apps y con el hub atendiendo mientras pregunta a ERPlora y descarga.
-5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. La app queda encendida aunque estuviera apagada.
+5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. Actualizar no enciende ni apaga: una app apagada sigue apagada en la versión nueva (hub#2544).
 6. Anota el cambio en el historial de actualizaciones, reindexa sus textos para el asistente y avisa `module.updated` y `module.installed`.
 Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial de máquina; versión opcional.
 Sale: la app en la versión nueva (o en la de antes), la línea del historial y los avisos en vivo.
@@ -136,16 +136,16 @@ Implicados: HUB_SHELL-F60, HUB_SHELL-F116, HUB_SHELL-F118, HUB_SHELL-F119, HUB_S
 QA: BD-03
 
 ### HUB-F25 Reponer las aplicaciones al arrancar y actualizarlas solas
-Estado: parcial — en la nube cada despliegue vuelve a encender las apps que el administrador había apagado (la re-descarga y la copia local las registran activas); el pin de soporte de una app apagada se ignora; con la carpeta de descargas ya presente, la copia local no vuelve a comprobar huella ni firma
+Estado: parcial — el pin de soporte de una app apagada se ignora; con la carpeta de descargas ya presente, la copia local no vuelve a comprobar huella ni firma
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al arrancar, el hub vuelve a registrar cada app que su base dice instalada desde la carpeta de descargas; solo en este camino vuelve a apagar las que el administrador había apagado a mano (las apagadas en cascada vuelven activas).
-2. Cada app que no queda registrada (porque falta `cache/<app>/<versión>/module.json` —en la nube la carpeta se vacía en cada despliegue— o porque su registro falla) la vuelve a descargar del catálogo, y en ese momento elige la última versión instalable: así las apps se actualizan solas, app por app. Con la carpeta presente no se actualiza nada. Si la nueva falla, vuelve a la que tenía y lo avisa. Las apps re-descargadas quedan encendidas, estuvieran como estuvieran.
-3. Si el catálogo no contesta, la repone de la copia guardada en la propia base, con las comprobaciones de huella y firma (salvo que su carpeta ya exista, en cuyo caso se usa sin volver a comprobar); también queda encendida.
+1. Al arrancar, el hub vuelve a registrar cada app que su base dice instalada desde la carpeta de descargas. Por cualquiera de los tres caminos (carpeta, catálogo o copia guardada) cada app conserva el estado que tenía (hub#2544): la que el administrador apagó sigue apagada, y la que cayó en cascada con ella sigue apagada esperándola (vuelve sola al encender la otra, HUB-F27). Una caída en cascada cuyas dependencias ya están todas encendidas vuelve encendida: sin causa no hay caída. Solo una app sin fila previa entra encendida.
+2. Cada app que no queda registrada (porque falta `cache/<app>/<versión>/module.json` —en la nube la carpeta se vacía en cada despliegue— o porque su registro falla) la vuelve a descargar del catálogo, y en ese momento elige la última versión instalable: así las apps se actualizan solas, app por app. Con la carpeta presente no se actualiza nada. Si la nueva falla, vuelve a la que tenía y lo avisa. Las re-descargadas conservan su estado, también al actualizarse.
+3. Si el catálogo no contesta, la repone de la copia guardada en la propia base, con las comprobaciones de huella y firma (salvo que su carpeta ya exista, en cuyo caso se usa sin volver a comprobar); también con su estado.
 4. Lo que no se pueda reponer por ninguna vía se denuncia y deja la comprobación de salud del hub en rojo, para que el despliegue no se dé por bueno.
 Entra: `hub_module`, la carpeta de descargas, el catálogo y `hub_module_package`.
-Sale: el hub sirviendo las mismas apps (o versiones más nuevas), las líneas del historial de actualizaciones y, si falta alguna, el aviso de arranque incompleto.
+Sale: el hub sirviendo las mismas apps (o versiones más nuevas), cada una encendida o apagada como estaba, las líneas del historial de actualizaciones y, si falta alguna, el aviso de arranque incompleto.
 En este mismo documento se apoya en: HUB-F161 (Decir si el hub está listo para servir), HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
 Si falla: un hub sin credencial de máquina no puede volver a descargar y depende de la copia local; si la versión que tenía ya no se sirve en erplora.com (podada, SAAS_PUBLIC-F07, o en cuarentena, SAAS_PUBLIC-F09: la descarga contesta 404), la re-descarga y la vuelta atrás fallan y también depende de la copia guardada en la base; una app instalada antes de que existiera la copia y sin catálogo queda fuera y la salud del hub lo dice.
 Implicados: HUB_SHELL-F142, SAAS_DASHBOARD-F31, SAAS_PUBLIC-F01, SAAS_PUBLIC-F07, SAAS_PUBLIC-F08, SAAS_PUBLIC-F16, SAAS_PUBLIC-F18, SAAS_PUBLIC-F36
@@ -191,7 +191,7 @@ Pasos:
 2. El hub calcula todo lo que caería con ella: la app y cada app activa que depende de ella, en cadena.
 3. Si el perfil fiscal del negocio está activo y ese conjunto se lleva al último módulo que cumple su régimen fiscal, lo niega.
 4. Pregunta al motor de cada app del conjunto si aún debe algo a una autoridad (VeriFactu: registros sin aceptar por la AEAT); si alguna debe, no apaga ninguna.
-5. Si puede, apaga la pedida (queda apagada hasta que alguien la encienda) y las arrastradas (vuelven solas, HUB-F27). Las pantallas reciben `module.deactivated`, solo para la app pedida. En la nube, el siguiente despliegue puede volver a encenderla (HUB-F25).
+5. Si puede, apaga la pedida (queda apagada hasta que alguien la encienda) y las arrastradas (vuelven solas, HUB-F27). Las pantallas reciben `module.deactivated`, solo para la app pedida. Sigue apagada tras cualquier despliegue, reinicio o actualización (HUB-F25, HUB-F23).
 Entra: `POST /api/modules/:id/deactivate` con sesión de administrador.
 Sale: el estado en `hub_module`. Una app apagada no sirve consultas ni órdenes (`module_inactive`) ni aporta menú, paneles ni pasos de puesta en marcha.
 En este mismo documento se apoya en: HUB-F316 (No dejar en producción a un hub sin ningún módulo que cumpla su régimen).
@@ -315,7 +315,7 @@ QA: BD-01, BD-02
 | Verificar integridad y firma del paquete | hecho (firma obligatoria solo si el despliegue tiene claves) | HUB-F19 |
 | Seguir cobrando mientras se instala, actualiza o reconcilia una app | parcial: instalar, actualizar e importar una plantilla ya no paran la caja; reconciliar entre copias sí, mientras descarga (hub#2555); sin tope total de tiempo (hub#2556) | HUB-F19, HUB-F23, HUB-F26 |
 | Actualizar una app sin reiniciar y volver a la anterior si falla | hecho | HUB-F23 |
-| Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); en la nube vuelven encendidas las apagadas | HUB-F25 |
+| Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); cada app conserva si estaba encendida o apagada | HUB-F25 |
 | No bajar de versión ni saltarse el pin de soporte | parcial: un administrador, por la API con versión explícita, baja y se salta el pin | HUB-F23 |
 | Apagar una app y lo que depende de ella | hecho | HUB-F28 |
 | Desinstalar avisando de lo que depende | hecho (al confirmar se quitan juntas, tras enseñarlas) | HUB-F29 |
@@ -352,7 +352,9 @@ QA: BD-01, BD-02
   administrador.
 - **Piezas que comparten los flujos de esta parte** (si cambias una, revisa todos sus flujos):
   - el registro de cada app (`installer::install`): validar, migrar, sembrar, registrar; si falla una
-    actualización, vuelve la versión anterior — HUB-F19 a HUB-F23, HUB-F25, HUB-F26, HUB-F30;
+    actualización, vuelve la versión anterior; nunca enciende ni apaga: una app con fila conserva su
+    estado y solo la que entra por primera vez nace encendida (hub#2544) — HUB-F19 a HUB-F23,
+    HUB-F25, HUB-F26, HUB-F30;
   - el resolutor de versiones: la más nueva sin cuarentena, nunca hacia atrás, el pin de soporte
     gana — HUB-F23, HUB-F24, HUB-F25;
   - los permisos de host concedidos — HUB-F12, HUB-F32, HUB-F35 (y, fuera del área, los del índice).
@@ -377,8 +379,8 @@ del hub sin atender mientras descarga está en las dudas comunes del índice.)
 2. ¿Se puede bajar de versión una app con una versión explícita por la API de un administrador, o
    solo soporte? (HUB-F23)
 3. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
-   no se actualizan solas al arrancar (solo las que no encuentra en la carpeta); y en la nube cada
-   despliegue vuelve a encender las apagadas. ¿Es lo que se quiere? (HUB-F25)
+   no se actualizan solas al arrancar (solo las que no encuentra en la carpeta). ¿Es lo que se
+   quiere? (HUB-F25)
 4. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
    - si la cuarentena se respeta con una versión explícita que llega por el plan de ERPlora (depende
      del SaaS);
