@@ -325,7 +325,7 @@ describe('the plan pressure (hub#1922)', () => {
     expect(ram.metric?.message).toContain('77');
   });
 
-  it('offers the plan door once, in the person\'s words, where this copy may offer it', async () => {
+  it("offers the plan door once, in the person's words, where this copy may offer it", async () => {
     fetchUsageSeriesMock.mockResolvedValue(underPressure);
     const wrapper = await mountSystem();
 

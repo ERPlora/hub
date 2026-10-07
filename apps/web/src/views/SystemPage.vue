@@ -1,6 +1,5 @@
 <template>
   <AppPage :title="t('nav.system')" content-layout="detail">
-
     <!-- ── Cargando: una sola vez en el boot ─────────────────────────── -->
     <div v-if="loading" class="boot-loading">
       <ion-spinner name="crescent" />
@@ -32,109 +31,105 @@
              administrator (`/api/system` answers 403 to the rest). Somebody else at this screen
              came for the device cards below, not for «we could not read this» four times. -->
         <template v-if="isAdmin">
-        <div class="block-header">
-          <h3 class="block-header__title">{{ resourcesTitle }}</h3>
-          <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
-        </div>
-        <!-- Range of the usage series (saas#1511). 3 days is the maximum on purpose: the SaaS
+          <div class="block-header">
+            <h3 class="block-header__title">{{ resourcesTitle }}</h3>
+            <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
+          </div>
+          <!-- Range of the usage series (saas#1511). 3 days is the maximum on purpose: the SaaS
              records no more, and offering a longer range would only pretend otherwise. -->
-        <ion-segment
-          class="usage-range"
-          :value="usageRange"
-          @ion-change="onUsageRangeChange"
-        >
-          <ion-segment-button v-for="r in USAGE_RANGES" :key="r" :value="r">
-            <ion-label>{{ t(RANGE_SHORT_KEYS[r]) }}</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-        <!-- hub#1922 — the plan is running short. ONE notice, in the person's words, with the door
+          <ion-segment class="usage-range" :value="usageRange" @ion-change="onUsageRangeChange">
+            <ion-segment-button v-for="r in USAGE_RANGES" :key="r" :value="r">
+              <ion-label>{{ t(RANGE_SHORT_KEYS[r]) }}</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+          <!-- hub#1922 — the plan is running short. ONE notice, in the person's words, with the door
              to THIS hub's plan page (`lib/upgrade-plan-link`): the SaaS's own link used to ride on
              each panel as an `<a href>` to a relative `/pricing/`, which took the hub's window to
              «this page does not exist» — and on the Play copy it was an invitation to pay. Where
              the copy may not offer it (hub#756) there is no notice at all: the panels already say
              how close to the limit each metric is. -->
-        <ok-inline-feedback
-          v-if="offersPlanUpgrade"
-          data-testid="system-plan-pressure"
-          class="system-feedback"
-          tone="warning"
-          icon="trending-up-outline"
-        >
-          {{ t('system.planPressure') }}
-          <ion-button
-            slot="actions"
-            data-testid="system-upgrade-plan"
-            size="small"
-            fill="outline"
-            @click="onUpgradePlan"
+          <ok-inline-feedback
+            v-if="offersPlanUpgrade"
+            data-testid="system-plan-pressure"
+            class="system-feedback"
+            tone="warning"
+            icon="trending-up-outline"
           >
-            {{ t('nav.upgradePlan') }}
-          </ion-button>
-        </ok-inline-feedback>
-        <!-- A metric nobody reported is NOT 0% (hub#375/ADR-0237). The panels get `known:false`
+            {{ t('system.planPressure') }}
+            <ion-button
+              slot="actions"
+              data-testid="system-upgrade-plan"
+              size="small"
+              fill="outline"
+              @click="onUpgradePlan"
+            >
+              {{ t('nav.upgradePlan') }}
+            </ion-button>
+          </ok-inline-feedback>
+          <!-- A metric nobody reported is NOT 0% (hub#375/ADR-0237). The panels get `known:false`
              and paint their own «we could not read this» state — never a flat green line at zero.
              The series comes from the SaaS (proxied by the runtime, machine token stays server-side,
              ADR-0003); the instant reading of `/api/system` remains the `current` fallback, because
              a value we DID measure locally is still a measurement even when the history is not. -->
-        <!-- hub#2418 — the columns follow the room the cards really get (a container query), not
+          <!-- hub#2418 — the columns follow the room the cards really get (a container query), not
              the window: a usage panel needs ~260 px for its heading and its gauge + trend side by
              side. One column on a phone, 2×2 on a tablet or a laptop beside the menu, four across
              only when four fit. -->
-        <div class="resources">
-          <div class="resources-grid">
-            <ion-card class="ion-no-margin metric-card">
-              <ion-card-content class="metric-card__content metric-card__content--panel">
-                <ok-resource-usage
-                  label="CPU"
-                  :unit="cpuUnit"
-                  :range-label="usageRangeLabel"
-                  :unreadable-label="t('system.health.notMeasured')"
-                  :metric.prop="cpuPanel"
-                  :thresholds.prop="panelThresholds"
-                ></ok-resource-usage>
-              </ion-card-content>
-            </ion-card>
+          <div class="resources">
+            <div class="resources-grid">
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content metric-card__content--panel">
+                  <ok-resource-usage
+                    label="CPU"
+                    :unit="cpuUnit"
+                    :range-label="usageRangeLabel"
+                    :unreadable-label="t('system.health.notMeasured')"
+                    :metric.prop="cpuPanel"
+                    :thresholds.prop="panelThresholds"
+                  ></ok-resource-usage>
+                </ion-card-content>
+              </ion-card>
 
-            <ion-card class="ion-no-margin metric-card">
-              <ion-card-content class="metric-card__content metric-card__content--panel">
-                <ok-resource-usage
-                  :label="t('system.memory')"
-                  :unit="ramUnit"
-                  :range-label="usageRangeLabel"
-                  :unreadable-label="t('system.health.notMeasured')"
-                  :metric.prop="memPanel"
-                  :thresholds.prop="panelThresholds"
-                ></ok-resource-usage>
-              </ion-card-content>
-            </ion-card>
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content metric-card__content--panel">
+                  <ok-resource-usage
+                    :label="t('system.memory')"
+                    :unit="ramUnit"
+                    :range-label="usageRangeLabel"
+                    :unreadable-label="t('system.health.notMeasured')"
+                    :metric.prop="memPanel"
+                    :thresholds.prop="panelThresholds"
+                  ></ok-resource-usage>
+                </ion-card-content>
+              </ion-card>
 
-            <!-- Database: a shared Postgres (ADR-0154), so there is no "local size": N/A. The
+              <!-- Database: a shared Postgres (ADR-0154), so there is no "local size": N/A. The
                  engine (PostgreSQL) goes in the sub-label. -->
-            <ion-card class="ion-no-margin metric-card">
-              <ion-card-content class="metric-card__content metric-stat">
-                <HubIcon name="cube-outline" class="metric-stat__icon" />
-                <div class="metric-stat__label">{{ t('system.database') }}</div>
-                <div class="metric-stat__value">{{ dbValue }}</div>
-                <div class="metric-stat__sub">{{ dbSub }}</div>
-              </ion-card-content>
-            </ion-card>
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content metric-stat">
+                  <HubIcon name="cube-outline" class="metric-stat__icon" />
+                  <div class="metric-stat__label">{{ t('system.database') }}</div>
+                  <div class="metric-stat__value">{{ dbValue }}</div>
+                  <div class="metric-stat__sub">{{ dbSub }}</div>
+                </ion-card-content>
+              </ion-card>
 
-            <!-- Real DB connections (pool / pg_stat_activity). A minimal idle hub is ≈ 0 — but a REAL
+              <!-- Real DB connections (pool / pg_stat_activity). A minimal idle hub is ≈ 0 — but a REAL
                  zero and a zero because we could not ask are not the same zero. -->
-            <ion-card class="ion-no-margin metric-card">
-              <ion-card-content class="metric-card__content metric-card__content--panel">
-                <ok-resource-usage
-                  :label="t('system.connections')"
-                  :unit="connectionsUnit"
-                  :range-label="usageRangeLabel"
-                  :unreadable-label="t('system.health.notMeasured')"
-                  :metric.prop="connectionsPanel"
-                  :thresholds.prop="panelThresholds"
-                ></ok-resource-usage>
-              </ion-card-content>
-            </ion-card>
+              <ion-card class="ion-no-margin metric-card">
+                <ion-card-content class="metric-card__content metric-card__content--panel">
+                  <ok-resource-usage
+                    :label="t('system.connections')"
+                    :unit="connectionsUnit"
+                    :range-label="usageRangeLabel"
+                    :unreadable-label="t('system.health.notMeasured')"
+                    :metric.prop="connectionsPanel"
+                    :thresholds.prop="panelThresholds"
+                  ></ok-resource-usage>
+                </ion-card-content>
+              </ion-card>
+            </div>
           </div>
-        </div>
         </template>
 
         <!-- ── Your printer ──────────────────────────────────────────────────────────
@@ -191,12 +186,7 @@
                 {{ t('system.downloadAppHint') }}
               </p>
               <div class="bridge-os-row">
-                <ion-button
-                  v-for="os in DOWNLOAD_OS"
-                  :key="os.label"
-                  :fill="os.fill"
-                  @click="handleAppDownload(os)"
-                >
+                <ion-button v-for="os in DOWNLOAD_OS" :key="os.label" :fill="os.fill" @click="handleAppDownload(os)">
                   <HubIcon slot="start" :name="os.icon" />
                   {{ os.label }}
                 </ion-button>
@@ -309,7 +299,9 @@
           <ion-card-content>
             <div class="block-header">
               <h3 class="block-header__title">{{ t('system.updateHistory') }}</h3>
-              <ok-status-pill v-if="isAdmin" tone="info">{{ t('system.updatesRunning', { version: info?.hubVersion ?? '—' }) }}</ok-status-pill>
+              <ok-status-pill v-if="isAdmin" tone="info">{{
+                t('system.updatesRunning', { version: info?.hubVersion ?? '—' })
+              }}</ok-status-pill>
             </div>
             <p class="muted-note updates-hint">{{ t('system.updatesCloudHint') }}</p>
 
@@ -455,7 +447,9 @@
                 <div class="event-row__main">
                   <div class="event-row__top">
                     <code class="event-row__name">{{ ev.event_name }}</code>
-                    <ion-badge color="warning" class="event-row__attempts">{{ ev.attempts }}× {{ t('system.attempts') }}</ion-badge>
+                    <ion-badge color="warning" class="event-row__attempts"
+                      >{{ ev.attempts }}× {{ t('system.attempts') }}</ion-badge
+                    >
                     <span class="event-row__module" v-if="ev.module_id">{{ ev.module_id }}</span>
                     <span class="event-row__when">{{ formatWhen(ev.created_at) }}</span>
                   </div>
@@ -467,13 +461,21 @@
                 <div class="event-row__actions">
                   <ion-button
                     v-if="ev.retryable"
-                    size="small" fill="clear" color="success"
+                    size="small"
+                    fill="clear"
+                    color="success"
                     :disabled="eventsBusyId === ev.id"
                     @click="retryOne(ev.id)"
                   >
                     <HubIcon slot="icon-only" name="refresh-outline" />
                   </ion-button>
-                  <ion-button size="small" fill="clear" color="medium" :disabled="eventsBusyId === ev.id" @click="discardOne(ev.id)">
+                  <ion-button
+                    size="small"
+                    fill="clear"
+                    color="medium"
+                    :disabled="eventsBusyId === ev.id"
+                    @click="discardOne(ev.id)"
+                  >
                     <HubIcon slot="icon-only" name="trash-outline" />
                   </ion-button>
                 </div>
@@ -482,14 +484,18 @@
           </ion-card-content>
         </ion-card>
       </template>
-
     </template>
 
     <!-- ── Footer con ion-segment (tabs) ─────────────────────────── -->
     <template #footer>
       <ion-footer class="ion-no-border">
         <ion-toolbar>
-          <ion-segment class="ok-tabbar" :value="visibleTab" scrollable @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
+          <ion-segment
+            class="ok-tabbar"
+            :value="visibleTab"
+            scrollable
+            @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value"
+          >
             <ion-segment-button value="resources">
               <HubIcon name="pulse-outline" />
               <ion-label>{{ t('system.tabResources') }}</ion-label>
@@ -531,8 +537,16 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar,
-  IonFooter, IonSegment, IonSegmentButton, IonLabel, IonCard, IonCardContent,
-  IonBadge, IonButton, IonToast, IonSpinner
+  IonFooter,
+  IonSegment,
+  IonSegmentButton,
+  IonLabel,
+  IonCard,
+  IonCardContent,
+  IonBadge,
+  IonButton,
+  IonToast,
+  IonSpinner,
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -563,17 +577,8 @@ import {
 import { fetchPrintHosts, type PrintRoleCoverage } from '../lib/print-coverage';
 import { dataTableLabels } from '../lib/data-table-labels';
 import { listInstalledModules, type InstalledModule } from '../lib/runtime';
-import {
-  fetchUpdateHistory,
-  groupByDay,
-  versionJump,
-  type UpdateHistoryEntry,
-} from '../lib/update-history';
-import {
-  isLegacyBackupsHash,
-  resolveSystemTab,
-  type SystemTab as Tab,
-} from '../lib/system-tabs';
+import { fetchUpdateHistory, groupByDay, versionJump, type UpdateHistoryEntry } from '../lib/update-history';
+import { isLegacyBackupsHash, resolveSystemTab, type SystemTab as Tab } from '../lib/system-tabs';
 import {
   fetchDeadLetters,
   retryDeadLetter,
@@ -711,11 +716,7 @@ const noticesBlocked = computed(
   () =>
     notices.value === 'denied' &&
     hasNoticeSource(
-      new Set(
-        (installedModules.value ?? [])
-          .filter((module) => module.status === 'active')
-          .map((module) => module.id),
-      ),
+      new Set((installedModules.value ?? []).filter((module) => module.status === 'active').map((module) => module.id)),
       bellModules.value,
     ),
 );
@@ -760,15 +761,13 @@ function goToModuleUpdates(): void {
 // this screen is allowed to offer (hub#480). Read once: it cannot change while the page is open.
 const inInstalledApp = isTauri();
 
-const printerSteps = computed<string[]>(() =>
-  printerSetupStepKeys(inInstalledApp).map((key) => t(key)),
-);
+const printerSteps = computed<string[]>(() => printerSetupStepKeys(inInstalledApp).map((key) => t(key)));
 
 // macOS is out (local development only). The Cloud serves Windows/Linux/Android.
 // Brand logo per OS + the first one `solid`, same as the buttons of erplora.com/download/.
 const DOWNLOAD_OS: DownloadOs[] = [
-  { label: 'Windows', icon: 'logo-windows', platform: 'windows', fill: 'solid'   },
-  { label: 'Linux',   icon: 'logo-tux',     platform: 'linux',   fill: 'outline' },
+  { label: 'Windows', icon: 'logo-windows', platform: 'windows', fill: 'solid' },
+  { label: 'Linux', icon: 'logo-tux', platform: 'linux', fill: 'outline' },
   { label: 'Android', icon: 'logo-android', platform: 'android', fill: 'outline' },
 ];
 
@@ -781,10 +780,10 @@ const DOWNLOAD_OS: DownloadOs[] = [
 //   • Bridge — hardware local → siempre EXCEPTO cloud-sin-bridge (caso "solo PWA": solo métricas).
 //     Con `info` sin cargar (null) todavía no sabemos ⇒ mostramos Bridge (nunca dejamos Recursos vacío).
 const resourcesTitle = computed<string>(() =>
-  info.value?.backend === 'cloud' ? t('system.resourcesCloud') : t('system.resourcesSystem')
+  info.value?.backend === 'cloud' ? t('system.resourcesCloud') : t('system.resourcesSystem'),
 );
 const resourcesSource = computed<string | null>(() =>
-  info.value?.backend === 'cloud' ? t('system.sourceCloud') : null
+  info.value?.backend === 'cloud' ? t('system.sourceCloud') : null,
 );
 /** The one sentence about the printer, or `null` when this hub has nothing that prints (hub#375). */
 const printerHealth = computed<HealthLine | null>(() =>
@@ -894,12 +893,8 @@ function pressureSentence(status: string, current: number | null): string | null
   return null;
 }
 
-const cpuPanel = computed<PanelMetric>(() =>
-  toPanelMetric(usageSeries.value?.metrics.cpu, cpuReading.value),
-);
-const memPanel = computed<PanelMetric>(() =>
-  toPanelMetric(usageSeries.value?.metrics.ram, memReading.value),
-);
+const cpuPanel = computed<PanelMetric>(() => toPanelMetric(usageSeries.value?.metrics.cpu, cpuReading.value));
+const memPanel = computed<PanelMetric>(() => toPanelMetric(usageSeries.value?.metrics.ram, memReading.value));
 const connectionsPanel = computed<PanelMetric>(() =>
   toPanelMetric(usageSeries.value?.metrics.db_connections, connectionsReading.value),
 );
@@ -918,9 +913,7 @@ const panelThresholds = computed(() => usageSeries.value?.thresholds ?? { warnin
 // offered the plan door. Inside the installed app it starts closed until the shell has answered,
 // so a Play copy never shows it for a frame; a browser sends no `distribution` and is offered it.
 const canOfferPlanUpgrade = ref(!isTauri());
-const offersPlanUpgrade = computed(
-  () => usageSeries.value?.upgrade?.show === true && canOfferPlanUpgrade.value,
-);
+const offersPlanUpgrade = computed(() => usageSeries.value?.upgrade?.show === true && canOfferPlanUpgrade.value);
 
 // pm#196 — out through the shared door, like the sidebar's «Upgrade plan»: the system browser
 // does not share the webview's cookies, so without the one-time pass the owner would land on a
@@ -986,7 +979,11 @@ function levelPill(row: Row): Node {
 const logColumns = computed<DataTableColumn[]>(() => [
   { key: 'when', header: t('system.colTime'), format: (r) => fmtDateTime(String(r.when)) },
   { key: 'level', header: t('system.colLevel'), filterable: true, filterType: 'select', render: levelPill },
-  { key: 'message', header: t('system.colEvent'), format: (r) => `${String(r.message)}${r.meta ? `  ${String(r.meta)}` : ''}` },
+  {
+    key: 'message',
+    header: t('system.colEvent'),
+    format: (r) => `${String(r.message)}${r.meta ? `  ${String(r.meta)}` : ''}`,
+  },
 ]);
 
 // ── Handlers ─────────────────────────────────────────────────────
@@ -1126,11 +1123,7 @@ async function turnOnNotices(): Promise<void> {
     notices.value = await notificationPermissionState();
     // Listen with the screen off from now on, not from the next sign-in (hub#2307).
     await resyncNoticeListening();
-    void toast(
-      notices.value === 'denied'
-        ? t('system.notices.blockedInSettings')
-        : t('system.notices.turnedOn'),
-    );
+    void toast(notices.value === 'denied' ? t('system.notices.blockedInSettings') : t('system.notices.turnedOn'));
   } finally {
     askingForNotices.value = false;
   }
