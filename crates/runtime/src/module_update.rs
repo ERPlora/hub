@@ -121,8 +121,9 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
 ///   mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es la forma de saltárselo.
 /// - **Nada en cuarentena.** Es literalmente para lo que se marca rota una versión.
 /// - **Nada hacia atrás, ni la instalada.** Bajar ejecutaría migraciones ya pasadas sobre datos que
-///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Bajar a un cliente sigue siendo la palanca
-///   de soporte —versión explícita contra la ruta de update—, no una opción del dueño.
+///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Moving a customer back is support's lever
+///   —the pin, which the resolver follows—, never the owner's: an explicit version on the update
+///   route is held to this same rule ([`may_request`], hub#2546).
 /// - **Lo que no se puede ordenar, no se ofrece**; y si la ilegible es la instalada, no se ofrece
 ///   nada: sin poder comparar no se sabe qué sería «hacia delante».
 ///
@@ -527,8 +528,8 @@ mod tests {
 
     /// **Elegir versión no es poder bajar de versión.** Retroceder ejecutaría migraciones ya
     /// pasadas sobre datos que la nueva escribió, y no hay `down` (ADR-0269 §3.4): no es una
-    /// operación que exista. Bajar a alguien sigue siendo la palanca de soporte —versión explícita
-    /// contra la ruta—, no un desplegable del dueño.
+    /// operación que exista. Moving someone back is support's pin, not an owner's dropdown nor an
+    /// explicit version on the route (hub#2546).
     #[test]
     fn an_installed_module_is_never_offered_a_downgrade() {
         let offered = offer(

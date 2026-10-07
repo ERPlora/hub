@@ -136,8 +136,9 @@ pub(crate) async fn index_module_embeddings(
     }
 }
 
-/// Cuerpo (opcional) de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo
-/// que se ofrece por defecto; con `version` = la que se eligió (palanca de soporte).
+/// Optional body of `POST /api/modules/:id/update`. No `version` = **the latest**, the default
+/// offer; with `version` = the one picked from the list, and only one the list would offer
+/// (forwards, or the pin when support set one — hub#2546).
 ///
 /// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
 /// (ADR-0269 — nadie se queda atrás). Clavar es el **pin de soporte**, herramienta nuestra, y no se

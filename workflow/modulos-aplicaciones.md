@@ -104,12 +104,12 @@ Implicados: SCHEDULES-F12
 QA: BD-01
 
 ### HUB-F23 Actualizar una aplicación
-Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena) (hub#2546); sin tope total de tiempo, como instalar (hub#2556); un fallo deja migraciones, semilla y dependencias de la versión nueva
+Estado: parcial — una versión explícita en cuarentena no se rechaza en la puerta (hub#2596); sin tope total de tiempo, como instalar (hub#2556); un fallo deja migraciones, semilla y dependencias de la versión nueva
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
 1. En **Apps**, un administrador pulsa «Actualizar» en una app instalada (o elige una versión de la lista, HUB-F24).
-2. Sin versión, el hub decide: la más nueva publicada que no esté en cuarentena, nunca hacia atrás, y la que fije soporte si hay un pin. Con una versión explícita (la pide el cuerpo de la petición, basta sesión de administrador) se usa tal cual: sin el resolutor, sin pin y, si llega por el plan de ERPlora, quizá sin cuarentena. En la nube el siguiente despliegue la vuelve a subir a la última; en la app instalada se queda.
+2. Sin versión, el hub decide: la más nueva publicada que no esté en cuarentena, nunca hacia atrás, y la que fije soporte si hay un pin. Con una versión explícita (la pide el cuerpo de la petición, basta sesión de administrador) vale la misma regla que la lista de versiones (HUB-F24), comprobada antes de preguntar nada a ERPlora: con pin, solo la del pin; sin pin, solo hacia delante (o la instalada, que no hace nada); la que no se pueda ordenar, no (hub#2546). La cuarentena no se mira aquí (hub#2596). En la nube el siguiente despliegue la vuelve a subir a la última; en la app instalada se queda. Bajar a un negocio de versión es cosa de soporte, con el pin.
 3. Si ya está en esa versión, contesta sin hacer nada.
 4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo, en la misma cola de cambios de apps y con el hub atendiendo mientras pregunta a ERPlora y descarga.
 5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. Actualizar no enciende ni apaga: una app apagada sigue apagada en la versión nueva (hub#2544).
@@ -117,7 +117,7 @@ Pasos:
 Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial de máquina; versión opcional.
 Sale: la app en la versión nueva (o en la de antes), la línea del historial y los avisos en vivo.
 En este mismo documento se apoya en: HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
-Si falla: app no instalada, `update_not_installed` (404); dependencia de pago, `install_blocked` (409); la nueva falla y vuelve la anterior: respuesta correcta con el aviso `module.update_failed_kept_previous`; fallan las dos (en la práctica, solo si alguien quita la app entre los dos intentos): `module.update_lost` (424), con la versión en lugar del nombre de la app en `error`, y la pantalla dice «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.». Las migraciones que la versión nueva ya aplicó se quedan.
+Si falla: app no instalada, `update_not_installed` (404); versión explícita que la regla de la lista no permite (otra que la del pin, o anterior a la instalada), `update_version_not_offered` (409), sin descargar ni tocar nada, y la pantalla dice «Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, o es anterior a la que tienes. No ha cambiado nada.»; dependencia de pago, `install_blocked` (409); la nueva falla y vuelve la anterior: respuesta correcta con el aviso `module.update_failed_kept_previous`; fallan las dos (en la práctica, solo si alguien quita la app entre los dos intentos): `module.update_lost` (424), con la versión en lugar del nombre de la app en `error`, y la pantalla dice «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.». Las migraciones que la versión nueva ya aplicó se quedan.
 Implicados: HUB_SHELL-F116, HUB_SHELL-F117, HUB_SHELL-F142, SAAS_PUBLIC-F08, SAAS_PUBLIC-F16
 QA: BD-03
 
@@ -316,7 +316,7 @@ QA: BD-01, BD-02
 | Seguir cobrando mientras se instala, actualiza o reconcilia una app | parcial: instalar, actualizar e importar una plantilla ya no paran la caja; reconciliar entre copias sí, mientras descarga (hub#2555); sin tope total de tiempo (hub#2556) | HUB-F19, HUB-F23, HUB-F26 |
 | Actualizar una app sin reiniciar y volver a la anterior si falla | hecho | HUB-F23 |
 | Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); cada app conserva si estaba encendida o apagada | HUB-F25 |
-| No bajar de versión ni saltarse el pin de soporte | parcial: un administrador, por la API con versión explícita, baja y se salta el pin | HUB-F23 |
+| No bajar de versión ni saltarse el pin de soporte | hecho (también con versión explícita por la API, hub#2546); la cuarentena con versión explícita, no (hub#2596) | HUB-F23 |
 | Apagar una app y lo que depende de ella | hecho | HUB-F28 |
 | Desinstalar avisando de lo que depende | hecho (al confirmar se quitan juntas, tras enseñarlas) | HUB-F29 |
 | Desinstalar conservando los datos | hecho | HUB-F29 |
@@ -363,8 +363,9 @@ QA: BD-01, BD-02
 
 - No cobra una app de pago por su cuenta: si el plan pide comprarla, se para y lo dice.
 - No borra los datos de una app al desinstalarla.
-- No ofrece en la pantalla bajar de versión ni versiones en cuarentena (por la API, un administrador
-  con versión explícita sí puede bajar: hueco, HUB-F23).
+- No deja bajar de versión a un administrador, ni en la pantalla ni por la API: bajar a un negocio es
+  el pin de soporte (HUB-F23). No ofrece versiones en cuarentena (por la API con versión explícita
+  aún no se rechazan: hub#2596).
 - No deja a un módulo declararse imprescindible para vender: el nivel ⛔ de la puesta en marcha lo
   decide el hub.
 
@@ -376,14 +377,12 @@ del hub sin atender mientras descarga está en las dudas comunes del índice.)
 1. ¿Quién guarda los ajustes de una app: solo el administrador (la pantalla) o quien tenga el
    permiso de la orden de guardar (el servidor, el asistente)? Hoy discrepan (HUB-F33, SALES-F34,
    KITCHEN-F26, INVENTORY-F19).
-2. ¿Se puede bajar de versión una app con una versión explícita por la API de un administrador, o
-   solo soporte? (HUB-F23)
-3. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
+2. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
    no se actualizan solas al arrancar (solo las que no encuentra en la carpeta). ¿Es lo que se
    quiere? (HUB-F25)
-4. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
+3. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
    - si la cuarentena se respeta con una versión explícita que llega por el plan de ERPlora (depende
-     del SaaS);
+     del SaaS; hub#2596);
    - si `/readyz` retenido por el candado durante una reconciliación larga (HUB-F26) hace que Swarm
      reinicie el contenedor (depende del `healthcheck` de `infra`);
    - si una migración que falla a la mitad se deshace sola (depende de si `erplora-db` ejecuta cada
