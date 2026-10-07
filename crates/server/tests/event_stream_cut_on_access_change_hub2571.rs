@@ -325,7 +325,11 @@ async fn removing_a_member_closes_their_socket_even_when_erplora_does_not_answer
 
     let status = admin_call(&srv, "DELETE", &format!("/api/members/{STAFF_EMAIL}"), None).await;
     assert_ne!(status, StatusCode::OK, "erplora.com is not reachable here");
-    assert_ne!(status, StatusCode::FORBIDDEN, "the admin may remove members");
+    assert_ne!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the admin may remove members"
+    );
 
     assert_cut(&mut staff, &srv, "the member was removed").await;
     assert_still_hears(&mut manager, &srv, "another person").await;
@@ -345,7 +349,11 @@ async fn regranting_a_member_with_another_role_closes_their_socket() {
         Some(json!({ "email": STAFF_EMAIL, "role": "manager" })),
     )
     .await;
-    assert_ne!(status, StatusCode::FORBIDDEN, "the admin may re-grant members");
+    assert_ne!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the admin may re-grant members"
+    );
 
     assert_cut(&mut staff, &srv, "the member's role changed").await;
     assert_still_hears(&mut manager, &srv, "another person").await;
@@ -364,7 +372,11 @@ async fn regranting_a_member_with_the_same_role_leaves_their_socket_open() {
         Some(json!({ "email": STAFF_EMAIL, "role": "employee" })),
     )
     .await;
-    assert_ne!(status, StatusCode::FORBIDDEN, "the admin may re-grant members");
+    assert_ne!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the admin may re-grant members"
+    );
 
     assert_still_hears(&mut staff, &srv, "the role did not change").await;
 }

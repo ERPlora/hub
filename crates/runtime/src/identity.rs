@@ -2366,9 +2366,18 @@ mod tests {
         let mut expected = vec![on_a, unnamed];
         expected.sort();
         assert_eq!(evicted, expected);
-        assert!(!evicted.contains(&on_b), "the device signing in keeps its session");
-        assert!(!evicted.contains(&earlier), "the previous eviction is not this one");
-        assert!(!evicted.contains(&next_door), "another hub's sessions are not ours");
+        assert!(
+            !evicted.contains(&on_b),
+            "the device signing in keeps its session"
+        );
+        assert!(
+            !evicted.contains(&earlier),
+            "the previous eviction is not this one"
+        );
+        assert!(
+            !evicted.contains(&next_door),
+            "another hub's sessions are not ours"
+        );
 
         assert!(
             enforce_device_limit(&db, HUB, 0, Some("dev-C"))
