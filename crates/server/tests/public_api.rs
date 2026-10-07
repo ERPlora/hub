@@ -351,6 +351,133 @@ async fn data_surface_rejects_non_api_key_bearer() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
+/// POST to the data surface with no credential at all.
+fn anonymous_post(uri: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// The paths a prober tries: an exposed query and command, operations that exist but are private,
+/// operations that do not exist, an exposed query under the wrong module, and a module that is not
+/// installed at all. Without a usable key every one of them must look the same.
+const PROBED_PATHS: [&str; 8] = [
+    "/api/v1/catalog/q/items.list",
+    "/api/v1/catalog/c/item.create",
+    "/api/v1/catalog/q/items.secret",
+    "/api/v1/catalog/c/item.purge",
+    "/api/v1/catalog/q/does.not.exist",
+    "/api/v1/catalog/c/does.not.exist",
+    "/api/v1/other/q/items.list",
+    "/api/v1/nope/q/anything",
+];
+
+/// hub#2550: the key is checked BEFORE the operation is looked up. Answering `404` for an
+/// operation that is not published and `401` for one that is told anybody without a key which
+/// operations a hub has installed and open, by trying names. Without a usable key the answer is
+/// the same `401` with the same body, whatever is asked for.
+#[tokio::test]
+async fn without_a_usable_key_every_operation_answers_the_same_401_hub2550() {
+    let app = make_app().await;
+    let credentials: [(&str, Option<&str>); 3] = [
+        ("no credential", None),
+        (
+            "an invented key",
+            Some("erpl_live_deadbeef_notasecretatall"),
+        ),
+        ("a bearer that is not a key", Some("some-jwt-token")),
+    ];
+    for (label, token) in credentials {
+        let mut bodies = Vec::new();
+        for path in PROBED_PATHS {
+            let request = match token {
+                Some(token) => api_post(path, token, json!({})),
+                None => anonymous_post(path, json!({})),
+            };
+            let resp = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(
+                resp.status(),
+                StatusCode::UNAUTHORIZED,
+                "{label} at {path} must be 401, not a hint of whether the operation exists"
+            );
+            bodies.push((path, body_json(resp).await));
+        }
+        let (_, first) = &bodies[0];
+        for (path, body) in &bodies {
+            assert_eq!(
+                body, first,
+                "{label}: the body at {path} must not differ from the one at an exposed operation"
+            );
+        }
+    }
+}
+
+/// hub#2550: with a valid key, asking for an operation that is not published is still `404`, and
+/// that answer is paid from the key's quota like any other call — otherwise a key holder could
+/// map the private surface of the hub without ever meeting the limit.
+#[tokio::test]
+async fn an_unpublished_operation_asked_with_a_valid_key_spends_its_quota_hub2550() {
+    let app = make_app().await;
+    // (unpublished operation, published one of the same kind, body of the published one)
+    let cases = [
+        (
+            "/api/v1/catalog/q/does.not.exist",
+            "/api/v1/catalog/q/items.list",
+            json!({}),
+        ),
+        (
+            "/api/v1/catalog/c/item.purge",
+            "/api/v1/catalog/c/item.create",
+            json!({ "payload": { "name": "X" } }),
+        ),
+    ];
+    for (unpublished, published, body) in cases {
+        let resp = app
+            .clone()
+            .oneshot(admin_post(
+                "/api/keys",
+                json!({
+                    "name": "One per minute",
+                    "scope": [{ "module": "catalog", "read": true, "write": true }],
+                    "rate_limit_per_minute": 1
+                }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let secret = body_json(resp).await["data"]["secret"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let resp = app
+            .clone()
+            .oneshot(api_post(unpublished, &secret, json!({})))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{unpublished}");
+        assert_eq!(body_json(resp).await["error"]["code"], json!("not_found"));
+
+        let resp = app
+            .clone()
+            .oneshot(api_post(published, &secret, body))
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "the 404 at {unpublished} must have spent the only call of the minute"
+        );
+        assert_eq!(
+            body_json(resp).await["error"]["code"],
+            json!("rate_limited")
+        );
+    }
+}
+
 /// GET con cabeceras de **sesión de usuario** (en `AuthMode::Dev` del fixture, la identidad la
 /// llevan las cabeceras `x-hub-id`/`x-user-id`/`x-permissions`, igual que el resto de endpoints
 /// gateados por sesión). Es la forma del fixture de "montar una sesión" sin Cloud.
