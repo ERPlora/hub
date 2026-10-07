@@ -322,6 +322,11 @@ async fn the_sse_door_refuses_a_request_without_a_credential() {
     let resp = sse(&srv, "/api/events", None).await;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(code_of(resp).await, "unauthenticated");
+
+    // An empty `?ticket=` is no credential either, not a key in the address (hub#2523).
+    let resp = sse(&srv, "/api/events?ticket=", None).await;
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(code_of(resp).await, "unauthenticated");
 }
 
 #[tokio::test]
@@ -363,6 +368,59 @@ async fn the_sse_door_takes_a_ticket_in_the_query_and_spends_it() {
         StatusCode::UNAUTHORIZED,
         "a spent ticket is not a credential"
     );
+}
+
+/// **A key never rides in the address** (hub#2523). `?ticket=` exists because `EventSource` sets
+/// no headers, and it is acceptable only for something that is spent by the time anyone reads the
+/// access log. A key is not: an integration that put its `erpl_live_…` there left it in every
+/// proxy log on the way, readable — and usable to read the business — by whoever reads the logs.
+/// The refusal has its own code so the integration learns WHY, and the same key in the header
+/// still opens: the door did not close to the key, only to the address.
+#[tokio::test]
+async fn the_sse_door_refuses_a_key_in_the_address_and_takes_it_in_the_header() {
+    let srv = serve().await;
+    let read_key = key_with(&srv, ApiKeyAccess::ReadOnly).await;
+
+    let resp = sse(&srv, &format!("/api/events?ticket={read_key}"), None).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(code_of(resp).await, "events.key_in_url");
+
+    let resp = sse(&srv, "/api/events", Some(&read_key)).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the header is the key's door"
+    );
+}
+
+/// The refusal is decided by the SHAPE of what is in the address, before anything is looked up:
+/// a real key and a made-up one get the same answer. If the hub resolved it first, the address
+/// would still be an oracle for which keys exist — and argon2 would still run for every guess.
+#[tokio::test]
+async fn a_key_in_the_address_is_refused_without_being_looked_up() {
+    let srv = serve().await;
+    let made_up = "erpl_live_0000000000000000_not-a-key-of-anybody";
+
+    let resp = sse(&srv, &format!("/api/events?ticket={made_up}"), None).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(code_of(resp).await, "events.key_in_url");
+}
+
+/// A key in the header does not launder a key in the address: the secret is in the log the moment
+/// the request is made, so the request is refused even though the header alone would open.
+#[tokio::test]
+async fn a_key_in_the_address_is_refused_even_with_a_good_header() {
+    let srv = serve().await;
+    let read_key = key_with(&srv, ApiKeyAccess::ReadOnly).await;
+
+    let resp = sse(
+        &srv,
+        &format!("/api/events?ticket={read_key}"),
+        Some(&read_key),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(code_of(resp).await, "events.key_in_url");
 }
 
 /// **The ticket door needs a session.** If it did not, the hub would be handing its own read-only
