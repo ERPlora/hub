@@ -83,7 +83,7 @@ Implicados: HUB-F31
 QA: ninguno
 
 ### HUB_SHELL-F43 Ver los ajustes de una app en su pestaña «Ajustes»
-Estado: parcial — la pestaña sale a todo el mundo, también a quien no puede leer los ajustes (un empleado de Ventas e Inventario, cuya lectura exige `sales.manage_settings` / `inventory.manage_settings`: ve «No puedes ver estos ajustes»); y como ninguna de las 8 apps publica la traducción de sus opciones, toda lista sale con el valor interno (`chime`, `dine_in`, `ticket`)
+Estado: parcial — la pestaña sale a todo el mundo, también a quien no puede leer los ajustes (un empleado de Ventas e Inventario, cuya lectura exige `sales.manage_settings` / `inventory.manage_settings`: ve «No puedes ver estos ajustes»); y, salvo Cocina (que publica el nombre de cada opción en `en` y `es`, kitchen#159), ninguna app publica la traducción de sus opciones, así que sus listas salen con el valor interno (`ticket`)
 Actor: empleado, responsable, administrador
 Pantalla: Vista de un módulo › Ajustes
 Pasos:
@@ -290,7 +290,7 @@ QA: ninguno
 | Estado «sin permiso» propio en la vista de una app | no hecho (se dice «Aquí todavía no hay nada») | HUB_SHELL-F41 |
 | Estado «necesita un hub más nuevo» en la vista | no hecho (solo al instalar/actualizar en Apps) | HUB_SHELL-F41 |
 | Pestañas y nombres traducidos, sin recargar al cambiar de idioma | hecho | HUB_SHELL-F42 |
-| Ajustes declarativos: ver | parcial (lectura fallida → «No se pudieron cargar» con «Reintentar», hub#2511; pero la pestaña sale también a quien no puede leerlos y las listas salen sin traducir) | HUB_SHELL-F43 |
+| Ajustes declarativos: ver | parcial (lectura fallida → «No se pudieron cargar» con «Reintentar», hub#2511; pero la pestaña sale también a quien no puede leerlos y las listas salen sin traducir, salvo en Cocina) | HUB_SHELL-F43 |
 | Ajustes declarativos: guardar con el mismo permiso que el servidor | parcial (pantalla: solo administrador) | HUB_SHELL-F44 |
 | Ajustes: validación antes de enviar (mínimos, obligatorios) | no hecho (solo el servidor) | HUB_SHELL-F44 |
 | Probar un ajuste sin guardar | parcial (ninguna app lo declara) | HUB_SHELL-F45 |
