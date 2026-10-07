@@ -403,12 +403,22 @@ async fn register_module(
     // on/off state it has — re-downloaded at boot, put back from the local copy, reloaded by the
     // reconciliation or updated. Only a module with no row yet starts active. Forcing `Active` here
     // switched every app the owner had turned off back on at each Hub Cloud deploy, and overwrote
-    // the row, so not even the next boot could tell it had been off.
+    // the row, so not even the next boot could tell it had been off. A module that fell in cascade
+    // whose dependencies are all on already has no cause to stay down (ADR-0128): it comes back.
     let id = manifest.id.clone();
     let version = manifest.version.clone();
-    let status = recorded_status(db, hub_id, &id)
-        .await?
-        .unwrap_or(ModuleStatus::Active);
+    let status = match recorded_status(db, hub_id, &id).await? {
+        None => ModuleStatus::Active,
+        Some(ModuleStatus::InactiveAuto)
+            if manifest
+                .depends_on
+                .iter()
+                .all(|d| registry.is_active(&d.id)) =>
+        {
+            ModuleStatus::Active
+        }
+        Some(recorded) => recorded,
+    };
     registry.installed.push(manifest);
     registry.status.insert(id.clone(), status);
 

@@ -98,8 +98,11 @@ async fn cloud_that_is_down() -> String {
     format!("http://{addr}")
 }
 
+/// A fresh cache directory, unique per call: the tests run in parallel and each one empties its own.
 fn empty_cache(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("erplora-2544-{}-{tag}", std::process::id()));
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("erplora-2544-{}-{n}-{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -253,11 +256,17 @@ async fn an_app_switched_off_stays_off_when_the_local_copy_puts_it_back() {
 }
 
 /// The cascade survives too: the app switched off by hand stays off by hand, and the one that fell
-/// with it stays off waiting for it (and comes back when the owner switches the first one on).
+/// with it stays off waiting for it (and comes back when the owner switches the first one on) — even
+/// when another of its dependencies is still on.
 #[tokio::test]
 async fn an_app_that_fell_in_cascade_stays_off_and_comes_back_with_its_dependency() {
     let db = TestDb::new().await;
-    let (cloud, _handle) = spawn_cloud(&[("ledger", &[]), ("invoicing", &["ledger"])]).await;
+    let (cloud, _handle) = spawn_cloud(&[
+        ("ledger", &[]),
+        ("stamps", &[]),
+        ("invoicing", &["ledger", "stamps"]),
+    ])
+    .await;
 
     let mut rt = first_life(&db, &cloud, &["invoicing"]).await;
     rt.deactivate("ledger").await.unwrap();
@@ -287,6 +296,39 @@ async fn an_app_that_fell_in_cascade_stays_off_and_comes_back_with_its_dependenc
         status_of(&rt, "invoicing").await,
         (Some(ModuleStatus::Active), Some(ModuleStatus::Active)),
         "switching ledger back on brings invoicing back"
+    );
+}
+
+/// A cascade with no cause left does not keep an app down: an app recorded as fallen in cascade
+/// whose dependencies are all on again comes back on at the next boot (ADR-0128: no cause, no
+/// fall). Keeping the recorded state must not freeze it off with nothing that would ever lift it.
+#[tokio::test]
+async fn an_app_fallen_in_cascade_whose_dependency_is_on_comes_back_on_at_boot() {
+    let db = TestDb::new().await;
+    let (cloud, _handle) = spawn_cloud(&[("ledger", &[]), ("invoicing", &["ledger"])]).await;
+
+    let rt = first_life(&db, &cloud, &["invoicing"]).await;
+    let mut p = erplora_db::Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    rt.db()
+        .execute(
+            "UPDATE hub_module SET status = 'inactive_auto' \
+             WHERE hub_id = :hub_id AND module_id = 'invoicing'",
+            &p,
+        )
+        .await
+        .unwrap();
+    drop(rt);
+
+    let rt = boot_downloading(&db, &cloud, "orphan").await;
+    assert_eq!(
+        status_of(&rt, "ledger").await,
+        (Some(ModuleStatus::Active), Some(ModuleStatus::Active))
+    );
+    assert_eq!(
+        status_of(&rt, "invoicing").await,
+        (Some(ModuleStatus::Active), Some(ModuleStatus::Active)),
+        "its dependency is on: nothing keeps it down"
     );
 }
 

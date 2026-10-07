@@ -359,8 +359,9 @@ impl Runtime {
 
     /// Puts back a status that is ALREADY persisted, after the module was registered again
     /// (hub#1875: another task of this hub installed or updated it). Registering keeps the state
-    /// this hub records (hub#2544); this re-derives the cascade from a manual `inactive`. Same rule as the rehydration at boot: restoring a persisted state is
-    /// not a new decision, so it does not go through the retention gate (hub#314).
+    /// this hub records (hub#2544); this re-derives the cascade from a manual `inactive`. Same rule
+    /// as the rehydration at boot: restoring a persisted state is not a new decision, so it does
+    /// not go through the retention gate (hub#314).
     pub async fn restore_persisted_status(
         &mut self,
         module_id: &str,
