@@ -283,7 +283,7 @@ Pantalla: Ajustes › Impresión
 Pasos:
 1. La persona abre Ajustes, pestaña «Impresión» (o llega desde la fila de la campana). La tarjeta se vuelve a pedir cada vez que se entra en la pestaña.
 2. Si hay algo que contar (el hub devuelve alguna función: un negocio que nunca ha impreso no ve nada), ve «Estado de impresión» — «Qué dispositivos están sacando cada tipo de tique ahora mismo.», con una fila por función («Tiques de venta», «Comandas de cocina», «Comandas de barra», «Etiquetas»):
-3. «Imprimiendo en {dispositivos}» en verde si hay alguno vivo; «Nadie está imprimiendo esto — {n} tiques en espera» en rojo si hay trabajo y nadie; «El dispositivo que imprimía esto no responde» en ámbar si no hay nadie y nada espera.
+3. «Imprimiendo en {dispositivos}» en verde si hay alguno vivo (cada uno por su nombre; el que no tiene, por los cuatro últimos caracteres de su identificador, «…e7f8», nunca el identificador entero, hub#2551); «Nadie está imprimiendo esto — {n} tiques en espera» en rojo si hay trabajo y nadie; «El dispositivo que imprimía esto no responde» en ámbar si no hay nadie y nada espera.
 4. Debajo de las dos últimas: «Abre la app de ERPlora en el equipo conectado a esta impresora.».
 5. Este flujo recoge también el antiguo HUB_SHELL-F166 «Ver quién está sacando cada tipo de tique» (área de ajustes), retirado por describir la misma tarjeta; la pestaña Impresión es de Ajustes, la tarjeta de esta área.
 Entra: los dispositivos dados de alta y la cobertura por función (`GET /api/print/hosts`, HUB-F202).

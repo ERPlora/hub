@@ -191,7 +191,7 @@ Implicados: HUB_SHELL-F09, HUB_SHELL-F195
 QA: qa-hub-restaurant §7.02, L-13
 
 ### HUB-F139 Marcar un dispositivo como compartido o personal
-Estado: parcial — sin haber entrado, el hub dice de cualquier identificador de dispositivo que le presenten si es de confianza, no solo del que pregunta (ERPlora/hub#2551)
+Estado: hecho
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › General
 Pasos:
@@ -200,7 +200,7 @@ Pasos:
 3. El hub guarda la decisión en la ficha de confianza de ese dispositivo.
 4. En compartido, la pantalla de acceso ofrece pinpad y la sesión dura un turno; en personal, no hay pinpad y la sesión dura 30 días.
 Entra: el dispositivo (el que hace la petición, o uno nombrado); la sesión de administrador.
-Sale: el modo, quién y cuándo lo cambió. La pantalla de acceso lo lee sin sesión junto con el dial del negocio y si el dispositivo es de confianza. Un dispositivo desconocido, ilegible o sin identificar se trata siempre como compartido. Entrar otra vez con la cuenta no pisa el modo. El cambio vale para las sesiones que se abran a partir de ahora: la abierta conserva su caducidad (HUB-F136). La puerta sin sesión que lee la pantalla de acceso dice, para cualquier identificador que se le presente, su modo y si es de confianza.
+Sale: el modo, quién y cuándo lo cambió. La pantalla de acceso lo lee sin sesión junto con el dial del negocio y si el dispositivo es de confianza. Un dispositivo desconocido, ilegible o sin identificar se trata siempre como compartido. Entrar otra vez con la cuenta no pisa el modo. El cambio vale para las sesiones que se abran a partir de ahora: la abierta conserva su caducidad (HUB-F136). La puerta sin sesión que lee la pantalla de acceso dice, para cualquier identificador que se le presente, su modo y si es de confianza: el hub no puede distinguir al dispositivo de quien presenta su identificador, porque ese identificador (128 bits aleatorios, no adivinables) **es** la prueba del dispositivo. Por eso el identificador no sale de él salvo hacia un administrador: la lista de dispositivos es solo suya (HUB-F141) y la de quién imprime solo le da a cada empleado el de su propio dispositivo, y nunca nombra a uno por su identificador (HUB-F202, hub#2551).
 Si falla: un dispositivo en el que nadie entró nunca con una cuenta no se puede marcar (`hub.device.unknown_device`); sin ser administrador, «Solo un administrador puede cambiar cómo entra la gente en este dispositivo.».
 Implicados: HUB_APP-F06, HUB_SHELL-F11, REC_ALTA-F16
 QA: qa-hub-restaurant §7.02
