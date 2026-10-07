@@ -247,16 +247,29 @@ async fn report_recovered_switchovers(st: &AppState) {
 /// missing modules or the path and reason of a failed install (hub#2549). The whole diagnosis is
 /// for an owner or an administrator, through the same gate as the System screen (hub#2519) — the
 /// pattern of Spring Boot's `show-details: when-authorized`. Who asks never changes the status
-/// code: a session that does not resolve is an anonymous caller, not a `401`.
+/// code: a session that does not resolve is an anonymous caller, not a `401` — and it still counts
+/// against the address like at any other door (hub#2282).
 pub async fn readyz(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let checks = snapshot(&st).await;
     report_recovered_switchovers(&st).await;
     let status = aggregate(&checks);
-    let detailed = {
+    let caller = {
         let runtime = st.runtime.read().await;
-        crate::auth::require_admin_session(&headers, &st.config, &runtime)
-            .await
-            .is_ok()
+        crate::auth::open_door_caller(&headers, &st.config, &runtime).await
+    };
+    let detailed = match caller {
+        crate::auth::OpenDoorCaller::Admin => true,
+        crate::auth::OpenDoorCaller::Other => false,
+        crate::auth::OpenDoorCaller::ForgedSession(token) => {
+            let client = crate::address_guard::client_address(&headers);
+            crate::address_guard::record_rejected_credential(
+                &st,
+                client.as_deref(),
+                crate::address_guard::Failure::SessionInvalid,
+                &token,
+            );
+            false
+        }
     };
     let checks: serde_json::Map<_, _> = checks
         .iter()
