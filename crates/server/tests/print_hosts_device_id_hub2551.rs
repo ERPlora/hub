@@ -167,7 +167,10 @@ async fn hub2551_an_administrator_reads_every_device_id() {
     let body = registry(&router, &admin, None).await;
 
     assert_eq!(host_named(&body, "Caja 1")["deviceId"], json!(TILL));
-    assert_eq!(host_named(&body, "Tablet cocina")["deviceId"], json!(TABLET));
+    assert_eq!(
+        host_named(&body, "Tablet cocina")["deviceId"],
+        json!(TABLET)
+    );
 }
 
 #[tokio::test]
@@ -203,7 +206,11 @@ async fn hub2551_a_nameless_host_is_never_named_by_its_id() {
         Some(json!({ "name": "hub.print.coverage", "params": {} })),
     )
     .await;
-    assert_eq!(query["data"][0]["liveHostLabels"], json!(["…e7f8"]), "{query}");
+    assert_eq!(
+        query["data"][0]["liveHostLabels"],
+        json!(["…e7f8"]),
+        "{query}"
+    );
     assert!(
         !query.to_string().contains(TILL),
         "a module must not read the till's id either: {query}"

@@ -84,7 +84,9 @@ pub const MAX_LABEL_CHARS: usize = 120;
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrintHost {
-    /// The device (`X-Device-Id`, ADR-0154). An identifier, never a credential.
+    /// The device (`X-Device-Id`, ADR-0154). Not a credential on the print doors, but it IS the
+    /// proof the access doors ask for to treat a browser as a trusted device (hub#2551): it never
+    /// goes out as a NAME ([`display_name`]), and over HTTP only to its own device or an admin.
     pub device_id: String,
     /// Which queue it drains, by the **station's** key: `receipt`, `kitchen`, `bar`, `label`, or
     /// whatever this hub added. Always the canonical spelling — [`register`] resolves what the
@@ -138,8 +140,8 @@ pub struct RoleCoverage {
     /// moved to the dispatcher (printing#30, hub#1107), because the hub knew the answer and it did
     /// not cross.
     ///
-    /// A host that registered without a name is listed by its `device_id`: an empty string in this
-    /// list would paint *"Printing from: "* and read as a bug.
+    /// A host that registered without a name is listed by [`display_name`] (`…e7f8`), never by its
+    /// `device_id` (hub#2551) and never as an empty string, which would paint *"Printing from: "*.
     pub live_host_labels: Vec<String>,
 }
 
@@ -492,9 +494,8 @@ pub async fn is_registered_for(db: &dyn DatabaseAdapter, hub_id: &str, role: &st
 /// `cutoff` is the caller's, on purpose: it is the same value [`LIVE_EXPR`] compares against in the
 /// same statement's sibling, so "live" means the same instant for the count and for the names.
 ///
-/// The name falls back to the `device_id` when the host registered without a label — the same
-/// fallback the shell's Settings card applies over `GET /api/print/hosts`, and the reason is
-/// unchanged: an empty entry in this list would paint a dangling "Printing from:".
+/// The name is [`display_name`]: the label, or the tail of the `device_id` when the host registered
+/// without one — the same `name` `GET /api/print/hosts` gives each host.
 async fn live_host_labels(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -515,13 +516,11 @@ async fn live_host_labels(
         std::collections::HashMap::new();
     for row in &res.rows {
         let role = row["role"].as_str().unwrap_or_default().to_string();
-        let label = row["label"].as_str().unwrap_or_default().trim();
-        let name = if label.is_empty() {
-            row["device_id"].as_str().unwrap_or_default().trim()
-        } else {
-            label
-        };
-        by_role.entry(role).or_default().push(name.to_string());
+        let name = display_name(
+            row["label"].as_str().unwrap_or_default(),
+            row["device_id"].as_str().unwrap_or_default(),
+        );
+        by_role.entry(role).or_default().push(name);
     }
     // Sorted by the name the owner actually reads: the list is rendered as one sentence, and an
     // order that changed between two reads of the same screen would look like the devices moved.
@@ -529,6 +528,29 @@ async fn live_host_labels(
         names.sort();
     }
     Ok(by_role)
+}
+
+/// How many trailing characters of the `device_id` the fallback name keeps (hub#2551).
+const DISPLAY_ID_TAIL_CHARS: usize = 4;
+
+/// **The name a host is presented by**: its label, or — when it registered without one — the last
+/// few characters of its `device_id` behind an ellipsis (`…e7f8`), never the id itself.
+///
+/// The id is what the access doors take as proof of a trusted device (`auth_api.rs`, hub#2510), so
+/// spelling it out on a screen every cashier and every module reads handed the till's trust to
+/// whoever copied it (hub#2551). The tail still tells two nameless devices apart and is never
+/// blank, which is why there is a fallback at all: an empty entry paints a dangling
+/// "Printing from:" (hub#1527).
+pub fn display_name(label: &str, device_id: &str) -> String {
+    let label = label.trim();
+    if !label.is_empty() {
+        return label.to_string();
+    }
+    let id: Vec<char> = device_id.trim().chars().collect();
+    let tail: String = id[id.len().saturating_sub(DISPLAY_ID_TAIL_CHARS)..]
+        .iter()
+        .collect();
+    format!("…{tail}")
 }
 
 /// Seconds between `queued_at` (RFC-3339 as the queue stores it) and `now`, floored at `0`.
@@ -1472,19 +1494,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hub1527_a_host_that_never_sent_a_name_is_listed_by_its_device_id() {
+    async fn hub1527_a_host_that_never_sent_a_name_is_listed_by_the_tail_of_its_device_id() {
         // `label` is optional on the wire, so a lean client registers without one. An empty string
-        // in the list would paint "Printing from: " and read as a bug; its id is at least
-        // something the owner can match against the device in front of them — and it is what the
-        // shell's Settings card already falls back to over `GET /api/print/hosts`.
+        // in the list would paint "Printing from: " and read as a bug; the tail of its id is still
+        // something the owner can match against Settings › Devices — and the whole id is not, since
+        // it is the proof of a trusted device (hub#2551).
         let db = hosts_db().await;
-        register(&db, "h1", "till-9", "kitchen", "", "u1").await.unwrap();
+        register(
+            &db,
+            "h1",
+            "dev_0a1b2c3d4e5f60718293a4b5c6d7e8f9",
+            "kitchen",
+            "",
+            "u1",
+        )
+        .await
+        .unwrap();
 
         let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
             .cloned()
             .unwrap();
 
-        assert_eq!(kitchen.live_host_labels, ["till-9"]);
+        assert_eq!(kitchen.live_host_labels, ["…e8f9"]);
     }
 
     #[tokio::test]
@@ -1666,5 +1697,27 @@ mod tests {
                 "the two reads disagree about `{role}`",
             );
         }
+    }
+
+    // ── hub#2551: the fallback name is never the device id ───────────────────────────────────
+
+    #[test]
+    fn hub2551_display_name_prefers_the_label() {
+        assert_eq!(display_name("  Caja 1 ", "dev_3f9c2b1c"), "Caja 1");
+    }
+
+    #[test]
+    fn hub2551_display_name_without_a_label_keeps_only_the_tail_of_the_id() {
+        let id = "dev_3f9c2b1c4d5e6f708192a3b4c5d6e7f8";
+        let name = display_name("  ", id);
+        assert_eq!(name, "…e7f8");
+        assert!(!name.contains("3f9c2b1c"), "the id must not leak: {name}");
+    }
+
+    #[test]
+    fn hub2551_display_name_of_a_short_or_padded_id_is_never_blank() {
+        assert_eq!(display_name("", " ab "), "…ab");
+        assert_eq!(display_name("", ""), "…");
+        assert_eq!(display_name("", "dev_ñandú"), "…andú");
     }
 }
