@@ -53,7 +53,7 @@
 //! |--------|-----|
 //! | Anything that controls headers (an integration, `websocat`, `erplora-sync`) | `Authorization: Bearer erpl_live_…` on the handshake / the SSE request |
 //! | The browser, on `/ws` | the **first frame**: `{"type":"auth","token":…}` — the same shape `/ws/print` uses (hub#343), and for the same reason: the query string ends up in every access log and proxy trace along the way |
-//! | The browser, on `/api/events` | `?ticket=erpl_tkt_…`, because SSE has no first frame |
+//! | The browser, on `/api/events` | `?ticket=erpl_tkt_…`, because SSE has no first frame — and **only** a ticket: a key there is refused ([`ERR_KEY_IN_URL`], hub#2523) |
 //!
 //! **A ticket is not a key.** It is minted by `POST /api/events/ticket`, which needs a hub session,
 //! and it is single-use and lives [`TICKET_TTL_SECONDS`] seconds, in memory only. That is what lets
@@ -73,6 +73,7 @@
 //! | [`ERR_READ_REQUIRED`] | 403 | a valid key that may not read (a `write_only` feed). It is a different answer from "who are you?" on purpose: if both refusals said the same thing, either guard could be deleted and every test would still pass |
 //! | [`ERR_NOT_READY`] | — | any frame on `/ws` before the socket authenticated |
 //! | [`ERR_CREDENTIAL_ENDED`] | — | the last frame of an open channel whose credential ended: the session signed out, or the key was revoked or rotated (hub#2522) |
+//! | [`ERR_KEY_IN_URL`] | 400 | `/api/events?ticket=` carrying anything but a ticket — a key in the address is a key in the log, so it is refused by its shape, unresolved, even with a good header beside it (hub#2523) |
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -119,6 +120,9 @@ pub const ERR_FRAME_TOO_LARGE: &str = "events.frame_too_large";
 /// The last frame of a channel whose credential ended while it was open (hub#2522): the session
 /// signed out, or the key was revoked or rotated. The channel closes right after it.
 pub const ERR_CREDENTIAL_ENDED: &str = "events.credential_ended";
+/// Something other than a ticket in the address of `/api/events` (hub#2523): a key there is a key
+/// in every access log on the way. Refused by its shape, before anything is looked up.
+pub const ERR_KEY_IN_URL: &str = "events.key_in_url";
 
 /// Who a ticket was minted for, and so who the socket it opens listens as.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -629,6 +633,9 @@ pub enum StreamAuth {
     Unauthenticated(String),
     /// A real key of this hub that may not read anything.
     ReadRequired,
+    /// Something other than a ticket in the address (hub#2523). Never resolved: whether it was a
+    /// real key is not something the address gets to learn.
+    KeyInUrl,
 }
 
 impl StreamAuth {
@@ -637,6 +644,7 @@ impl StreamAuth {
             StreamAuth::Granted(_) => "",
             StreamAuth::Unauthenticated(_) => ERR_UNAUTHENTICATED,
             StreamAuth::ReadRequired => ERR_READ_REQUIRED,
+            StreamAuth::KeyInUrl => ERR_KEY_IN_URL,
         }
     }
 
@@ -647,6 +655,9 @@ impl StreamAuth {
             StreamAuth::ReadRequired => {
                 "this API key may not read: the event stream is a read".into()
             }
+            StreamAuth::KeyInUrl => "the address only takes a single-use ticket from \
+                 POST /api/events/ticket: send an API key in the Authorization header"
+                .into(),
         }
     }
 
@@ -655,6 +666,7 @@ impl StreamAuth {
             StreamAuth::Granted(_) => StatusCode::OK,
             StreamAuth::Unauthenticated(_) => StatusCode::UNAUTHORIZED,
             StreamAuth::ReadRequired => StatusCode::FORBIDDEN,
+            StreamAuth::KeyInUrl => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -737,8 +749,20 @@ fn credential_not_valid() -> StreamAuth {
 
 /// Credential presented on an HTTP request: the `Authorization: Bearer` header, else the `ticket`
 /// query parameter (the browser's only option on `EventSource`).
-fn http_credential(headers: &HeaderMap, ticket: Option<&str>) -> Option<String> {
-    auth::api_key_token(headers).or_else(|| ticket.map(str::to_string))
+///
+/// hub#2523: the address takes a **ticket** and nothing else. Anything else there is refused by its
+/// prefix, here and not in [`authenticate`] — so it is never resolved (the address is no oracle for
+/// which keys exist) and a good header beside it does not launder it: the secret reached the access
+/// log the moment the request was made, and the integration has to hear that.
+fn http_credential(
+    headers: &HeaderMap,
+    ticket: Option<&str>,
+) -> Result<Option<String>, StreamAuth> {
+    let ticket = ticket.map(str::trim).filter(|t| !t.is_empty());
+    if ticket.is_some_and(|t| !t.starts_with(TICKET_PREFIX)) {
+        return Err(StreamAuth::KeyInUrl);
+    }
+    Ok(auth::api_key_token(headers).or_else(|| ticket.map(str::to_string)))
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -805,7 +829,10 @@ pub async fn sse(
     headers: HeaderMap,
     Query(q): Query<StreamQuery>,
 ) -> Response {
-    let credential = http_credential(&headers, q.ticket.as_deref());
+    let credential = match http_credential(&headers, q.ticket.as_deref()) {
+        Ok(credential) => credential,
+        Err(refusal) => return refused(&refusal),
+    };
     let grant = match authenticate(&st, credential.as_deref()).await {
         StreamAuth::Granted(g) => g,
         refusal => return refused(&refusal),

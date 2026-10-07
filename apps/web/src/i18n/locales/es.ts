@@ -446,6 +446,14 @@ export default {
     // Status badge of an activity row; it agrees with «venta» — the row is a sale (hub#863).
     activityStatusCompleted: 'Completada',
     activityStatusPending: 'Pendiente',
+    // The words of the sales history (`sales` locales), so a sale reads the same in both places (hub#2505).
+    activityStatusDraft: 'Borrador',
+    activityStatusVoided: 'Anulada',
+    activityStatusRefunded: 'Devuelta',
+    activityStatusOther: 'Otro',
+    activityLoadErrorTitle: 'No se han podido cargar las últimas ventas',
+    activityLoadErrorBody: 'Comprueba la conexión y vuelve a intentarlo.',
+    activityRetry: 'Reintentar',
     widgets: 'Widgets',
     loadingWidgets: 'Cargando widgets…',
     customizePanel: 'Personalizar panel',
@@ -514,6 +522,9 @@ export default {
     saved: 'Perfil guardado',
     saveError: 'No se pudo guardar el perfil',
     loadError: 'No se pudo cargar el perfil',
+    loadErrorBody: 'Tus datos siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    loading: 'Cargando tu perfil…',
+    retry: 'Reintentar',
     photoSaved: 'Foto actualizada',
     photoError: 'No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.',
     manageTitle: 'Gestión de la cuenta',
@@ -622,6 +633,10 @@ export default {
   },
   // Ver la nota del bloque equivalente en `en.ts`.
   settings: {
+    loading: 'Cargando los ajustes del negocio…',
+    loadError: 'No se pudieron cargar los ajustes del negocio',
+    loadErrorBody: 'Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    retry: 'Reintentar',
     hubWide: 'Ajustes generales',
     currency: 'Moneda',
     currencyDesc: 'Moneda de tu negocio para precios y totales',
@@ -948,7 +963,7 @@ export default {
     toggleOnBody: '{name} vuelve al TPV, con los datos que ya tenía.',
     toggleOnConfirm: 'Activar',
     uninstallTitle: 'Desinstalar {name}',
-    uninstallBreaks: 'Estas apps necesitan {name} y dejarán de funcionar:',
+    uninstallBreaks: 'Estas apps necesitan {name} y también se desinstalarán:',
     uninstallBody: 'La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',
@@ -1916,6 +1931,14 @@ export default {
     module: {
       update_lost:
         'La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.',
+    },
+    verifactu: {
+      unsent_records:
+        'VeriFactu aún tiene registros que la AEAT no ha aceptado. Abre VeriFactu para enviarlos o corregirlos y vuelve a intentarlo.',
+    },
+    fiscal: {
+      no_provider_left:
+        'Tu negocio tiene que conservar una app que envíe sus facturas a Hacienda, y así se quedaría sin ninguna. Instala antes otra app que lo haga y vuelve a intentarlo.',
     },
     default: 'No ha funcionado. Vuelve a intentarlo dentro de un minuto.',
   },

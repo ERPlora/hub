@@ -117,6 +117,14 @@ export interface Notification {
   message: string;
 }
 
+/**
+ * How much identity friction THIS device asks for (hub#357/#358): `shared` is the till at the
+ * counter that several people take turns at; `personal` is somebody's own phone or laptop. The pair
+ * is CLOSED — the same two spellings as `DeviceMode::parse` in the runtime. Read it through
+ * `erplora.deviceMode`.
+ */
+export type DeviceMode = 'shared' | 'personal';
+
 /** Opciones de formateo de dinero (ADR-0059). Mismo shape que `apps/web/src/lib/money.ts`. */
 export interface FormatMoneyOptions {
   /** ISO-4217. Por defecto, la moneda del hub (`erplora.currency`). */
@@ -3369,6 +3377,13 @@ export class ErploraClient {
        * be the SYMMETRIC regression: a real query silently skipped. Injectable for tests.
        */
       installedModules?: () => ReadonlySet<string> | undefined;
+      /**
+       * The mode of THIS device as the hub last answered (`GET /api/device/mode`, hub#358),
+       * injected by the shell from its reactive `deviceMode`. A module cannot ask the hub itself:
+       * the device id is native in the installable app and the runtime URL is not the page origin.
+       * Re-read on every access, so a revoked `personal` is seen at once. Injectable for tests.
+       */
+      deviceMode?: () => DeviceMode;
     } = {},
     bridge?: BridgeTransport,
   ) {
@@ -3920,6 +3935,23 @@ export class ErploraClient {
       /* noop — degradación elegante */
     }
     return 'UTC';
+  }
+
+  /**
+   * The mode of THIS device (hub#358): `shared` (the till at the counter) or `personal` (somebody's
+   * own device). Modules use it to pick the friction a flow asks for — e.g. the time clock only
+   * checks the geofence on a `personal` device, since the till is already at the shop.
+   *
+   * **Fails towards the strict mode**, like the shell's `device-mode.ts`: no injected getter, a
+   * getter that throws, or anything that is not EXACTLY `'personal'` reads as `'shared'`. It is a
+   * friction hint, never a permission — the runtime revalidates every call.
+   */
+  get deviceMode(): DeviceMode {
+    try {
+      return this.opts.deviceMode?.() === 'personal' ? 'personal' : 'shared';
+    } catch {
+      return 'shared';
+    }
   }
 
   /** `Intl.NumberFormat` de moneda con la moneda del hub (o `opts.currency`) y el locale activo. */

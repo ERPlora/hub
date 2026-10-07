@@ -497,6 +497,14 @@ export default {
     // Status badge of an activity row; it agrees with «sale» — the row is a sale (hub#863).
     activityStatusCompleted: 'Completed',
     activityStatusPending: 'Pending',
+    // The words of the sales history (`sales` locales), so a sale reads the same in both places (hub#2505).
+    activityStatusDraft: 'Draft',
+    activityStatusVoided: 'Voided',
+    activityStatusRefunded: 'Refunded',
+    activityStatusOther: 'Other',
+    activityLoadErrorTitle: 'Could not load the latest sales',
+    activityLoadErrorBody: 'Check the connection and try again.',
+    activityRetry: 'Retry',
     widgets: 'Widgets',
     loadingWidgets: 'Loading widgets…',
     customizePanel: 'Customize panel',
@@ -564,6 +572,9 @@ export default {
     saved: 'Profile saved',
     saveError: 'Could not save the profile',
     loadError: 'Could not load the profile',
+    loadErrorBody: 'Your details are unchanged. Check the connection and try again.',
+    loading: 'Loading your profile…',
+    retry: 'Retry',
     photoSaved: 'Photo updated',
     photoError: 'Could not save the photo. Use a JPG, PNG or WebP up to 2 MB.',
     manageTitle: 'Account management',
@@ -688,6 +699,10 @@ export default {
   // sirve el runtime, que es quien lo archiva — una copia en el bundle sería el mismo documento
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
   settings: {
+    loading: 'Loading the business settings…',
+    loadError: 'Could not load the business settings',
+    loadErrorBody: 'Your saved settings are unchanged. Check the connection and try again.',
+    retry: 'Retry',
     hubWide: 'General settings',
     currency: 'Currency',
     currencyDesc: 'Your business currency for prices and totals',
@@ -1093,7 +1108,7 @@ export default {
     uninstallTitle: 'Uninstall {name}',
     // What the old text said was what is KEPT. This is the half it left out: the apps that need
     // this one stop working, and unlike deactivating, there is no switching them back on.
-    uninstallBreaks: 'These apps need {name} and will stop working:',
+    uninstallBreaks: 'These apps need {name} and will be uninstalled too:',
     uninstallBody: 'The app will no longer be available. Its data and files will be kept for a later reinstall.',
     uninstallConfirm: 'Uninstall',
     toggleError: 'Could not change the status of {name}.',
@@ -2242,6 +2257,19 @@ export default {
     module: {
       update_lost:
         'The update failed and the previous version could not be restored, so this app is no longer installed. Install it again from Apps; if that fails too, contact support.',
+    },
+    // hub#2579 — the two FISCAL refusals of switching off or uninstalling an app. The runtime sends
+    // a stable code and an English line for the log; without these the Apps toast painted that line
+    // on a Spanish screen. Each one says what to do, because the way out is different: the engine
+    // still owes records to the AEAT (ADR-0202 R2), or the hub would be left with no app filing its
+    // regime (ADR-0273 D5).
+    verifactu: {
+      unsent_records:
+        'VeriFactu still has records the AEAT has not accepted. Open VeriFactu to send or correct them, then try again.',
+    },
+    fiscal: {
+      no_provider_left:
+        'Your business has to keep an app that sends its invoices to the tax authority, and this would leave it without one. Install another app that does it first, then try again.',
     },
     default: 'Something went wrong. Try again in a minute.',
   },

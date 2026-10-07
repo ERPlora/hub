@@ -339,6 +339,13 @@ appointments/tests/recurring_create_eligibility.hub.test.py
 # (pm#637; the two-hub tenancy is pinned by its `.pg` twin). New coverage, not moved.
 # pending-publication: reservations#101 until 2026-11-06
 reservations/tests/customer_erasure.hub.test.py
+# tables: erasing a customer's personal data in Clientes (`customers.anonymize` →
+# `customer.anonymized`) empties the guest name her confirmed reservation copied onto the floor
+# plan hold, keeps the table reserved with its time, party size and `customer_id` (the screen reads
+# «Deleted customer»), and leaves another customer's hold untouched, against the real kernel
+# (pm#637; the two-hub tenancy is pinned by its `.postgres` twin). New coverage, not moved.
+# pending-publication: tables#128 until 2026-11-06
+tables/tests/customer_erasure.hub.test.py
 # appointments: a daily series with more dates than one run books (80 on the default 90-day
 # window) is booked WHOLE by following the handler's `next_from` like «Book appointments» does —
 # the 50-per-run cap says where the next run starts instead of dropping the rest — and a second
@@ -352,3 +359,10 @@ appointments/tests/series_past_fifty.hub.test.py
 # same id in another hub untouched, against the real kernel (pm#637). New coverage, not moved.
 # pending-publication: appointments#315 until 2026-11-04
 appointments/tests/customer_erasure.hub.test.py
+# attendance: the clock cycle against the real kernel — clock in, start and end a break, clock
+# out, the open day as `records.mine_open` sees it, a second clock-in while a day is open refused
+# with `attendance.clock_in_rejected`, a personal-device clock-in refused when the business requires
+# the location and the phone sends none, settings round-trip, a correction with its reason and the
+# correction trail, and `records.mine` showing only the caller's own days. New module, new coverage.
+# pending-publication: attendance#9 until 2026-11-07
+attendance/tests/clock_cycle.hub.test.py

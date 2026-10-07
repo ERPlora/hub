@@ -16,6 +16,7 @@ use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
+use erplora_vector::{Chunk, MemoryVectorStore, VectorStore};
 use serde_json::json;
 use tokio::sync::broadcast::error::TryRecvError;
 use tower::ServiceExt; // oneshot
@@ -172,6 +173,100 @@ async fn uninstalling_a_module_broadcasts_module_uninstalled_exactly_once_hub131
         rx.try_recv().unwrap_err(),
         TryRecvError::Empty,
         "uninstall must broadcast module.uninstalled exactly once"
+    );
+
+    std::fs::remove_dir_all(cache).ok();
+}
+
+/// hub#2545: forcing the uninstall of an app others depend on removes them too, so every other
+/// tab/device has to hear about EACH app that left — not only the one the owner clicked, or their
+/// menus would keep tabs for apps that are no longer installed. The answer names the dependents
+/// that went with it, for the screen that asked.
+#[tokio::test]
+async fn a_forced_uninstall_broadcasts_every_app_that_left_and_names_them_hub2545() {
+    let (state, admin, cache) = fixture("hub-lifecycle-forced-2545", "base").await;
+    let child = cache.join("child").join("1.0.0");
+    std::fs::create_dir_all(&child).unwrap();
+    std::fs::write(
+        child.join("module.json"),
+        r#"{"id":"child","name":"child","version":"1.0.0","depends_on":["base"]}"#,
+    )
+    .unwrap();
+    state
+        .runtime
+        .write()
+        .await
+        .install_from_dir(&child)
+        .await
+        .unwrap();
+    // Both apps taught the assistant something: what leaves must leave its index too (§9.6).
+    let store = std::sync::Arc::new(MemoryVectorStore::new());
+    for ref_id in ["base", "child"] {
+        store
+            .upsert(&Chunk {
+                id: format!("{ref_id}-1"),
+                hub_id: "hub-lifecycle-forced-2545".into(),
+                ref_id: ref_id.into(),
+                version: "1.0.0".into(),
+                lang: "es".into(),
+                source: "module.json".into(),
+                content: ref_id.into(),
+                embedding: vec![1.0, 0.0],
+            })
+            .await
+            .unwrap();
+    }
+    let state = state.with_vector(store.clone());
+    let mut rx = state.events.subscribe();
+
+    let response = app(state.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/modules/base/uninstall")
+                .header("x-hub-session", admin.as_str())
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"force":true}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body, json!({ "ok": true, "also_uninstalled": ["child"] }));
+
+    let mut frames = Vec::new();
+    for _ in 0..2 {
+        frames.push(
+            tokio::time::timeout(Duration::from_secs(2), rx.recv())
+                .await
+                .expect("timed out waiting for module.uninstalled")
+                .unwrap(),
+        );
+    }
+    assert_eq!(
+        frames,
+        vec![
+            json!({ "type": "module.uninstalled", "module_id": "child" }),
+            json!({ "type": "module.uninstalled", "module_id": "base" }),
+        ]
+    );
+    assert_eq!(
+        rx.try_recv().unwrap_err(),
+        TryRecvError::Empty,
+        "one module.uninstalled per app that left, and no more"
+    );
+    assert!(state.runtime.read().await.modules().is_empty());
+    assert!(
+        store
+            .indexed_refs("hub-lifecycle-forced-2545")
+            .await
+            .unwrap()
+            .is_empty(),
+        "the assistant must not keep answering about an app that left with the forced one"
     );
 
     std::fs::remove_dir_all(cache).ok();

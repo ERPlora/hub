@@ -41,7 +41,7 @@ hace en pantalla está en `HUB_SHELL`, y aquí está lo que el servidor garantiz
 
 | Área | Qué cubre | Fichero | IDs | Código que gobierna |
 |---|---|---|---|---|
-| Módulos y órdenes | Consultas, órdenes y su embudo de puertas, manejadores, errores, página pública del tique, redondeo | [workflow/modulos.md](workflow/modulos.md) | F01–F18 | `runtime`: dispatch, commands, queries, manifest, registry, native, wasm, wasm_cache, column_kinds_cache, errors, error_registry, public_claim, capabilities (F12) · `server`: dispatch_api, public_door, operations_catalog, error_sink · crates `wasm-host`, `guest-sdk`. Puertas que usa y gobierna acceso: `runtime` permissions, policies, elevation; `server` entitlement (el 402), api_keys (la puerta `expose_api`) |
+| Módulos y órdenes | Consultas, órdenes y su embudo de puertas, manejadores, errores, página pública del tique, redondeo | [workflow/modulos.md](workflow/modulos.md) | F01–F18, F36 | `runtime`: dispatch, commands, queries, manifest, registry, native, wasm, wasm_cache, column_kinds_cache, errors, error_registry, public_claim, capabilities (F12) · `server`: dispatch_api, public_door, operations_catalog, error_sink · crates `wasm-host`, `guest-sdk`. Puertas que usa y gobierna acceso: `runtime` permissions, policies, elevation; `server` entitlement (el 402), api_keys (la puerta `expose_api`) |
 | Módulos y órdenes | Instalar, actualizar, reponer, encender, apagar y quitar apps; permisos de host; ajustes de app; paneles; puesta en marcha | [workflow/modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) | F19–F35 | `runtime`: installer, module_lifecycle, module_update, module_package, lifecycle, loader, seed, migrations, migration_guard, manifest_warning_grandfather, capabilities, setup_status, settings_api (permisos de módulo), ui · `server`: module_api, install, install_guard, module_reconcile, settings (permisos de módulo) · crate `source` |
 | Avisos entre módulos | Cola de avisos, entrega, reintentos, avisos caídos, canal en vivo, mensajes al exterior, tareas programadas, señal de última entrada | [workflow/avisos.md](workflow/avisos.md) | F50–F64 | `runtime`: events, events_api, event_shape, outbox, host_notify, scheduler, capabilities (reencola los avisos al conceder un permiso, F58) · `server`: event_stream, outbox_admin, notify_transport, activity (la señal de última entrada, F64; **no** es el registro de actividad, que es de negocio y datos) |
 | Automatizaciones | El motor de automatizaciones: disparadores, pasos, permisos, secretos, preguntas, historial, recetas de fábrica | [workflow/automatizaciones.md](workflow/automatizaciones.md) | F80–F112 | `runtime`: flows/ (agent, approvals, def, executor, grants, http, mod, net, notify, query, schema, secrets, store, templates, triggers, waits), flows_api, secret_box · `server`: flows_api, flow_io, flows_header_media, agent_runner (el paso del asistente, compartido con asistente) |
@@ -57,7 +57,7 @@ hace en pantalla está en `HUB_SHELL`, y aquí está lo que el servidor garantiz
 | Esqueleto común | Sin flujos propios: lo gobierna este índice; quien cambie un comportamiento visible desde aquí lo escribe en el área a la que afecta | este fichero | — | `server`: main, lib, config (configuración del despliegue y CSP), routes (monta las rutas y el contexto público `/api/hub/context`), state, logging; solo pruebas: log_capture · `runtime`: lib, system_migrations (crea las tablas de sistema de todas las áreas; cada tabla la gobierna su área, ver «Datos»); solo pruebas: e2e_support · crate `db` (el adaptador de base de datos) |
 | Sin uso | Ningún otro crate los enlaza: no gobiernan nada observable | — | — | crates `installer` (la instalación real es `runtime` installer y `server` install) y `sync` |
 
-Números libres para flujos nuevos: F36–F49, F65–F79, F113–F129, F172–F189, F208–F219, F256–F259,
+Números libres para flujos nuevos: F37–F49, F65–F79, F113–F129, F172–F189, F208–F219, F256–F259,
 F280–F299 y F318–F339.
 
 Otros documentos del mismo repo: `apps/web/WORKFLOW.md` (`HUB_SHELL`, pantallas),
@@ -189,6 +189,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F16 | Emitir el localizador para que el cliente pida su factura | parcial | [modulos.md](workflow/modulos.md) |
 | HUB-F17 | Canjear un localizador en la página pública | parcial | [modulos.md](workflow/modulos.md) |
 | HUB-F18 | Redondear el dinero igual en todos los módulos | hecho | [modulos.md](workflow/modulos.md) |
+| HUB-F36 | Leer un teléfono en formato internacional igual en todos los módulos | parcial | [modulos.md](workflow/modulos.md) |
 | HUB-F19 | Instalar una aplicación del catálogo | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F20 | Rechazar un paquete que rompe las reglas del hub | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F21 | Aplicar las migraciones de un módulo con su guarda | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
@@ -198,7 +199,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F25 | Reponer las aplicaciones al arrancar y actualizarlas solas | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F26 | Seguir lo que otra copia del hub instaló, actualizó, apagó o quitó | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F27 | Activar una aplicación | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
-| HUB-F28 | Desactivar una aplicación preguntando antes si puede irse | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
+| HUB-F28 | Desactivar una aplicación preguntando antes si puede irse | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F29 | Desinstalar una aplicación | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F30 | Instalar un módulo desde una carpeta en modo desarrollo | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F31 | Servir el menú, las pantallas y los ficheros de las aplicaciones | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
@@ -386,7 +387,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F313 | En producción, sin vía no se cobra | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F314 | Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F315 | Clavar a pruebas un hub de demostración | hecho | [fiscal.md](workflow/fiscal.md) |
-| HUB-F316 | No dejar en producción a un hub sin ningún módulo que cumpla su régimen | parcial | [fiscal.md](workflow/fiscal.md) |
+| HUB-F316 | No dejar en producción a un hub sin ningún módulo que cumpla su régimen | hecho | [fiscal.md](workflow/fiscal.md) |
 | HUB-F317 | No emitir un documento fiscal sin la identidad del negocio | hecho | [fiscal.md](workflow/fiscal.md) |
 
 ## Qué comparten las áreas del servidor
@@ -586,4 +587,5 @@ que hace el código. Las de cada área están en `## Fuentes contrastadas` de su
 - Las pestañas de Ajustes se llaman «General» (no «Hub») y «Datos y copias» (no «Datos») (`es.ts`);
   `architecture/hub/auth.md` aún dice «Ajustes › Hub».
 - Los textos que el servidor manda tal cual a la pantalla (rechazos del motor de automatizaciones,
-  `409` de reenviar un aviso, negativas fiscales al apagar una app) están en inglés.
+  `409` de reenviar un aviso) están en inglés. Las negativas fiscales al apagar o desinstalar una
+  app ya se traducen por su código (hub#2579).

@@ -309,6 +309,21 @@ Si falla: un decimal que llegue donde se espera un importe se redondea, nunca se
 Implicados: INVOICE-F01, SALES-F01, TAXES-F18, CART_CHECKOUT-F02
 QA: L-08
 
+### HUB-F36 Leer un teléfono en formato internacional igual en todos los módulos
+Estado: parcial — lo enlaza Citas; Clientes (el alta, su tarea de repaso en SQL y la búsqueda por número) y la bandeja de WhatsApp aún llevan su propia copia de las reglas (customers#130)
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. El manejador de un módulo que guarda un teléfono escrito por una persona («600 111 222», «0034 600 111 222», «07700 900123») lo pasa por la misma lectura del hub (`guest-sdk`, `phone::to_e164`) con el país del negocio (`context.country_code`).
+2. La lectura quita espacios, guiones, puntos, barras y paréntesis; entiende el `+`, el prefijo internacional que se marca desde el país del negocio (`00` en España) y el prefijo nacional (el `0` del Reino Unido, también dentro de `+44 (0)…`), y comprueba que el número tiene una longitud posible para su país (reglas de libphonenumber, generadas en `crates/guest-sdk/tools/phone-metadata`).
+3. Devuelve el número en E.164 (`+34600111222`), que es como el hub compara a las personas entre módulos (la ficha de Clientes, la cita, la conversación de WhatsApp). Un número ya en E.164 se lee igual a sí mismo, así que repasar lo guardado no lo reescribe.
+Entra: el texto escrito y el país del negocio (código ISO de dos letras, en mayúsculas o minúsculas; vacío o desconocido → España).
+Sale: el número en E.164, o vacío si llegó vacío (el teléfono no es obligatorio). No guarda nada: guarda el módulo.
+Si falla: letras (una extensión, una nota), un segundo `+` o una longitud imposible para el país («600111», dos números en el mismo campo) devuelven un rechazo, y es el módulo quien decide su código (Citas: `appointments.phone_invalid`). Cambiar las reglas no llega a un módulo hasta que se vuelve a compilar y publicar (lo enlaza al compilarse), igual que el redondeo (HUB-F18).
+Implicados: APPOINTMENTS-F22
+Pendiente de enlazar: customers — CUSTOMERS-F11 guarda la ficha en E.164 con su copia propia de estas reglas (customers#130)
+QA: ninguno
+
 ## Cobertura contra la referencia
 
 | Elemento | Estado | Flujo |

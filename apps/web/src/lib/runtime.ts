@@ -27,6 +27,7 @@ import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
 import { resolveDeviceId, setRuntimeClientKind } from './device';
+import { deviceMode } from './device-mode';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 import { sessionEndReason } from './session-end-reason';
@@ -407,6 +408,12 @@ export function getClient(): ErploraClient {
         // it, the only way to learn a module was missing was to ask the transport anyway and catch
         // `module_not_installed` after the request had already travelled.
         installedModules: activeModuleIds,
+        // The mode the hub answered for THIS device (hub#358), read live from the shell's ref: a
+        // module cannot ask itself (the device id is native in the app and the runtime URL is not
+        // the page origin), so `erplora.deviceMode` is the shell's answer. The SDK resolves
+        // anything but `personal` to `shared`. Read lazily, so the import cycle with
+        // `device-mode.ts` (which imports `RUNTIME_URL` from here) never touches an unready binding.
+        deviceMode: () => deviceMode.value,
         notifier: (n) => {
           const color: ToastColor =
             n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';

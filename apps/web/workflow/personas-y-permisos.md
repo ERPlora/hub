@@ -337,7 +337,7 @@ Pasos:
 Entra: la sesión de administrador; la política actual, la misma que lee la pantalla de acceso.
 Sale: pide al servidor guardar solo las claves del control (HUB-F140). Apagarlo y volver a encenderlo vuelve al valor de fábrica (pedir PIN por turno), no a los minutos de antes. Esta tarjeta nunca alarga la sesión de un dispositivo compartido.
 En este mismo documento se apoya en: HUB_SHELL-F04 (Entrar con PIN), HUB_SHELL-F08 (Cerrar la sesión de una caja que nadie toca).
-Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.» en un banner rojo. Quien no administra ve los controles apagados y «Solo un administrador puede cambiar si se pregunta.».
+Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.» en un banner rojo. Si Ajustes no pudo leer los ajustes del negocio, la tarjeta no sale: en su lugar está «No se pudieron cargar los ajustes del negocio» con «Reintentar» (HUB_SHELL-F155). Quien no administra ve los controles apagados y «Solo un administrador puede cambiar si se pregunta.».
 Implicados: HUB-F140, REC_ALTA-F15
 QA: ninguno
 

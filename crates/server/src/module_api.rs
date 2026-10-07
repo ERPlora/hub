@@ -1038,27 +1038,39 @@ pub(crate) async fn uninstall_module(
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
+    // hub#2545: forcing takes the dependents with it (farthest first), so `also` names them.
     let outcome = if force {
         rt.uninstall_forced(&id).await
     } else {
-        rt.uninstall(&id).await
+        rt.uninstall(&id).await.map(|()| Vec::new())
     };
     match outcome {
-        Ok(()) => {
+        Ok(also) => {
             drop(rt);
             // hub#1317: emitted NOW, before the best-effort embeddings cleanup below — what
             // matters to another tab/device is that the runtime already uninstalled the module,
-            // not whether the best-effort vector index cleanup finished. Same for `force`: the
-            // module is gone either way.
-            st.broadcast(json!({ "type": "module.uninstalled", "module_id": id }));
-            // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
-            // Best-effort: no falla la desinstalación si el store da error.
+            // not whether the best-effort vector index cleanup finished. One frame per app that
+            // left, in the order they left: a dependent removed by `force` is just as gone.
+            let gone: Vec<&String> = also.iter().chain(std::iter::once(&id)).collect();
+            for module_id in &gone {
+                st.broadcast(json!({ "type": "module.uninstalled", "module_id": module_id }));
+            }
+            // Drops each departed module's chunks from the vector index (§9.6): uninstall →
+            // delete chunks. Best-effort: a store error does not fail the uninstall.
             if let Some(store) = &st.vector {
-                if let Err(e) = embed::drop_module(store.as_ref(), &st.hub_id(), &id).await {
-                    tracing::warn!(module_id = %id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
+                for module_id in &gone {
+                    if let Err(e) =
+                        embed::drop_module(store.as_ref(), &st.hub_id(), module_id).await
+                    {
+                        tracing::warn!(module_id = %module_id, error = %e, "could not drop the module's embeddings (non-critical)");
+                    }
                 }
             }
-            Json(json!({ "ok": true })).into_response()
+            if also.is_empty() {
+                Json(json!({ "ok": true })).into_response()
+            } else {
+                Json(json!({ "ok": true, "also_uninstalled": also })).into_response()
+            }
         }
         Err(e) => err_response(e),
     }
