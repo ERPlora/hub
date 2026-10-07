@@ -1506,6 +1506,8 @@ export default {
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
+    // hub#2519 — the server's usage is an owner's or an administrator's; everybody else is told so.
+    resourcesAdminOnly: 'Only an owner or an administrator can see how much the hub is using.',
     // Usage-series range selector (saas#1511). The contract stops at 3 days on purpose.
     usageRange3h: '3 h',
     usageRange24h: '24 h',

@@ -148,6 +148,14 @@ describe('someone who does not administer the hub', () => {
     expect(offersLogsTab(wrapper)).toBe(false);
   });
 
+  it('is told on Resources why the server usage is not there, instead of a blank card', async () => {
+    const wrapper = await mountSystem();
+
+    const note = wrapper.find('[data-testid="system-resources-admin-only"]');
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toBe((en.system as Record<string, unknown>).resourcesAdminOnly);
+  });
+
   it('lands on Resources from an address with #logs, never on an empty log', async () => {
     route.hash = '#logs';
     const wrapper = await mountSystem();
@@ -174,6 +182,7 @@ describe('an owner or an administrator', () => {
     expect(fetchUsageSeries).toHaveBeenCalled();
     expect(wrapper.findAll('ok-resource-usage')).toHaveLength(3);
     expect(offersLogsTab(wrapper)).toBe(true);
+    expect(wrapper.find('[data-testid="system-resources-admin-only"]').exists()).toBe(false);
   });
 
   it('reads the log on #logs', async () => {

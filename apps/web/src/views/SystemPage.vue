@@ -131,6 +131,11 @@
             </div>
           </div>
         </template>
+        <!-- Without the device cards (no printing app, a browser) this would be a blank card: say
+             why the server's usage is not here. -->
+        <p v-else class="muted-note" data-testid="system-resources-admin-only">
+          {{ t('system.resourcesAdminOnly') }}
+        </p>
 
         <!-- ── Your printer ──────────────────────────────────────────────────────────
              Same sentence as the panel badge (hub#375), from the same `printerLine`: the headline

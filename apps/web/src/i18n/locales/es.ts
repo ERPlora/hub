@@ -1304,6 +1304,7 @@ export default {
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
+    resourcesAdminOnly: 'Solo el dueño o un administrador puede ver cuánto está usando el hub.',
     // Selector de rango de las series de uso (saas#1511). El contrato para en 3 días a propósito.
     usageRange3h: '3 h',
     usageRange24h: '24 h',
