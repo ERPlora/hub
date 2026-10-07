@@ -1144,6 +1144,11 @@ export default {
   },
   employeeForm: {
     titleEdit: 'Editar usuario',
+    // hub#2518: creating or editing a person with a PIN spends the editor's budget of tries (the
+    // one «My profile» spends too, hub#2499) — every try counts, so not «failed attempts».
+    pinTooManyAttempts:
+      'Demasiados cambios de PIN en poco tiempo. Espera {minutes} minuto y vuelve a intentarlo. | Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos y vuelve a intentarlo.',
+    pinTooManyAttemptsNoWait: 'Demasiados cambios de PIN en poco tiempo. Espera unos minutos y vuelve a intentarlo.',
     titleNew: 'Nuevo usuario',
     fullName: 'Nombre y apellidos',
     email: 'Email',
@@ -1304,6 +1309,7 @@ export default {
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
+    resourcesAdminOnly: 'Solo el dueño o un administrador puede ver cuánto está usando el hub.',
     // Selector de rango de las series de uso (saas#1511). El contrato para en 3 días a propósito.
     usageRange3h: '3 h',
     usageRange24h: '24 h',
@@ -1751,6 +1757,10 @@ export default {
     tab: 'Ajustes',
     loading: 'Cargando ajustes…',
     loadError: 'No se pudieron cargar los ajustes.',
+    retry: 'Reintentar',
+    loadErrorBody: 'Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.',
+    noPermissionTitle: 'No puedes ver estos ajustes',
+    noPermissionBody: 'Pide a un administrador que los revise o los cambie si hace falta.',
     save: 'Guardar',
     saved: 'Ajustes guardados.',
     saveError: 'No se pudieron guardar los ajustes.',

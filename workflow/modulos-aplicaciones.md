@@ -40,7 +40,7 @@ Para la plataforma de aplicaciones se adopta esto, no más:
 ## Flujos
 
 ### HUB-F19 Instalar una aplicación del catálogo
-Estado: parcial — mientras se instala una app (descarga, firma, migraciones, semilla y aviso a ERPlora incluidos) el hub no atiende ninguna petición —ni la caja, ni el menú, ni la comprobación de salud—, sin tope total de tiempo; un fallo a mitad deja migraciones, semilla y dependencias aplicadas (leído en el código, sin ejecutar)
+Estado: parcial — sin tope total de tiempo: una descarga lenta que no se corta tiene la instalación abierta sin límite y deja esperando a los demás cambios de apps (hub#2556); un fallo a mitad deja migraciones, semilla y dependencias aplicadas (hub#2557)
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
@@ -51,7 +51,7 @@ Pasos:
 5. Guarda una copia del paquete en la base del propio hub, avisa a ERPlora de que está instalada e indexa sus textos para el asistente.
 6. Las pantallas reciben `module.installed` y refrescan el menú; la respuesta dice qué dependencias se instalaron de paso.
 Entra: `POST /api/modules/request-install` con sesión de administrador y la credencial de máquina del hub; el catálogo y los paquetes de ERPlora. También instalan por aquí la importación de una plantilla (Ajustes › Datos y copias) y la reposición del arranque (HUB-F25).
-Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Durante todo el proceso el hub mantiene su candado de escritura: cada petición (consultas, órdenes, menú, autenticación, `/readyz`) espera; cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando retiene el hub sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`); y por esa vía la descarga de erplora.com no mira el interruptor de corte de la app (solo la retirada y el derecho de uso): una app cortada se instala, y la bloquea después el permiso firmado (HUB-F162).
+Sale: la fila de la app en `hub_module` (activa), sus tablas y datos de partida, su copia (`hub_module_package`), sus tareas programadas, sus recetas de automatización disponibles y el aviso en vivo. Mientras pregunta a ERPlora, descarga y verifica, el hub sigue atendiendo todo lo demás (consultas, órdenes —la caja—, menú, autenticación, `/readyz`): su candado de escritura solo se toma para registrar cada app ya verificada (del paso 4, de validar a dejarla activa) (hub#2508). Los cambios de apps —instalar, actualizar, importar una plantilla y desinstalar— van de uno en uno, en el orden en que llegan; encender y apagar no esperan. Cada espera de red tiene un tope de 30 s sin recibir nada, pero una descarga lenta que sigue enviando hace esperar a los siguientes cambios sin límite. Con el plan de ERPlora, una app ya instalada no se reinstala y una dependencia de pago para todo; si el plan no llega y se resuelve por el manifiesto, esas dos garantías no existen (se reinstala, actualiza o baja lo ya instalado, `install.rs:1504-1581`); y por esa vía la descarga de erplora.com no mira el interruptor de corte de la app (solo la retirada y el derecho de uso): una app cortada se instala, y la bloquea después el permiso firmado (HUB-F162).
 En este mismo documento se apoya en: HUB-F62 (Ejecutar las tareas programadas de los módulos), HUB-F104 (Servir las recetas de fábrica de los módulos), HUB-F235 (Importar un fichero o una plantilla).
 Si falla: dependencia de pago sin contratar, `install_blocked` (409) con lo que hay que comprar; versión inexistente o app fuera del catálogo del hub, 404; firma rechazada, `install_bad_signature` (403); un paquete que no pasa la validación o una migración que falla, `install_runtime_failed` (422) —el motivo concreto se pierde en el código—, y lo que ya se aplicó (migraciones, filas de semilla, dependencias instaladas de paso, declaración del régimen fiscal) se queda; la app necesita un hub más nuevo, `core_version_too_old` (422): «Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.»; ERPlora no contesta a tiempo, «ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.» (424). El sobre de error es `{ok: false, error: "<frase>", code}`, con el código en la raíz. Sin sesión de administrador, 401 (también con sesión que no es de administrador). Ningún fallo de instalación sale como 5xx. Fallar al guardar la copia, al avisar a ERPlora o al indexar no deshace la instalación.
 Implicados: HUB_SHELL-F109, HUB_SHELL-F110, HUB_SHELL-F111, HUB_SHELL-F112, HUB_SHELL-F113, HUB_SHELL-F115, REC_ALTA-F08, SAAS_DASHBOARD-F192, SAAS_PUBLIC-F03, SAAS_PUBLIC-F05, SAAS_PUBLIC-F16, SAAS_PUBLIC-F17, SAAS_PUBLIC-F18, SAAS_PUBLIC-F19
@@ -104,15 +104,15 @@ Implicados: SCHEDULES-F12
 QA: BD-01
 
 ### HUB-F23 Actualizar una aplicación
-Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena); actualizar paraliza el hub entero como instalar (HUB-F19); un fallo deja migraciones, semilla y dependencias de la versión nueva; actualizar una app apagada la enciende (leído en el código, sin ejecutar)
+Estado: parcial — un administrador puede, por la API y con una versión explícita, bajar de versión saltándose el pin de soporte (y quizá la cuarentena) (hub#2546); sin tope total de tiempo, como instalar (hub#2556); un fallo deja migraciones, semilla y dependencias de la versión nueva
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
 1. En **Apps**, un administrador pulsa «Actualizar» en una app instalada (o elige una versión de la lista, HUB-F24).
 2. Sin versión, el hub decide: la más nueva publicada que no esté en cuarentena, nunca hacia atrás, y la que fije soporte si hay un pin. Con una versión explícita (la pide el cuerpo de la petición, basta sesión de administrador) se usa tal cual: sin el resolutor, sin pin y, si llega por el plan de ERPlora, quizá sin cuarentena. En la nube el siguiente despliegue la vuelve a subir a la última; en la app instalada se queda.
 3. Si ya está en esa versión, contesta sin hacer nada.
-4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo.
-5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. La app queda encendida aunque estuviera apagada.
+4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo, en la misma cola de cambios de apps y con el hub atendiendo mientras pregunta a ERPlora y descarga.
+5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. Actualizar no enciende ni apaga: una app apagada sigue apagada en la versión nueva (hub#2544).
 6. Anota el cambio en el historial de actualizaciones, reindexa sus textos para el asistente y avisa `module.updated` y `module.installed`.
 Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial de máquina; versión opcional.
 Sale: la app en la versión nueva (o en la de antes), la línea del historial y los avisos en vivo.
@@ -136,16 +136,16 @@ Implicados: HUB_SHELL-F60, HUB_SHELL-F116, HUB_SHELL-F118, HUB_SHELL-F119, HUB_S
 QA: BD-03
 
 ### HUB-F25 Reponer las aplicaciones al arrancar y actualizarlas solas
-Estado: parcial — en la nube cada despliegue vuelve a encender las apps que el administrador había apagado (la re-descarga y la copia local las registran activas); el pin de soporte de una app apagada se ignora; con la carpeta de descargas ya presente, la copia local no vuelve a comprobar huella ni firma
+Estado: parcial — el pin de soporte de una app apagada se ignora; con la carpeta de descargas ya presente, la copia local no vuelve a comprobar huella ni firma
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Al arrancar, el hub vuelve a registrar cada app que su base dice instalada desde la carpeta de descargas; solo en este camino vuelve a apagar las que el administrador había apagado a mano (las apagadas en cascada vuelven activas).
-2. Cada app que no queda registrada (porque falta `cache/<app>/<versión>/module.json` —en la nube la carpeta se vacía en cada despliegue— o porque su registro falla) la vuelve a descargar del catálogo, y en ese momento elige la última versión instalable: así las apps se actualizan solas, app por app. Con la carpeta presente no se actualiza nada. Si la nueva falla, vuelve a la que tenía y lo avisa. Las apps re-descargadas quedan encendidas, estuvieran como estuvieran.
-3. Si el catálogo no contesta, la repone de la copia guardada en la propia base, con las comprobaciones de huella y firma (salvo que su carpeta ya exista, en cuyo caso se usa sin volver a comprobar); también queda encendida.
+1. Al arrancar, el hub vuelve a registrar cada app que su base dice instalada desde la carpeta de descargas. Por cualquiera de los tres caminos (carpeta, catálogo o copia guardada) cada app conserva el estado que tenía (hub#2544): la que el administrador apagó sigue apagada, y la que cayó en cascada con ella sigue apagada esperándola (vuelve sola al encender la otra, HUB-F27). Una caída en cascada cuyas dependencias ya están todas encendidas vuelve encendida: sin causa no hay caída. Solo una app sin fila previa entra encendida.
+2. Cada app que no queda registrada (porque falta `cache/<app>/<versión>/module.json` —en la nube la carpeta se vacía en cada despliegue— o porque su registro falla) la vuelve a descargar del catálogo, y en ese momento elige la última versión instalable: así las apps se actualizan solas, app por app. Con la carpeta presente no se actualiza nada. Si la nueva falla, vuelve a la que tenía y lo avisa. Las re-descargadas conservan su estado, también al actualizarse.
+3. Si el catálogo no contesta, la repone de la copia guardada en la propia base, con las comprobaciones de huella y firma (salvo que su carpeta ya exista, en cuyo caso se usa sin volver a comprobar); también con su estado.
 4. Lo que no se pueda reponer por ninguna vía se denuncia y deja la comprobación de salud del hub en rojo, para que el despliegue no se dé por bueno.
 Entra: `hub_module`, la carpeta de descargas, el catálogo y `hub_module_package`.
-Sale: el hub sirviendo las mismas apps (o versiones más nuevas), las líneas del historial de actualizaciones y, si falta alguna, el aviso de arranque incompleto.
+Sale: el hub sirviendo las mismas apps (o versiones más nuevas), cada una encendida o apagada como estaba, las líneas del historial de actualizaciones y, si falta alguna, el aviso de arranque incompleto.
 En este mismo documento se apoya en: HUB-F161 (Decir si el hub está listo para servir), HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
 Si falla: un hub sin credencial de máquina no puede volver a descargar y depende de la copia local; si la versión que tenía ya no se sirve en erplora.com (podada, SAAS_PUBLIC-F07, o en cuarentena, SAAS_PUBLIC-F09: la descarga contesta 404), la re-descarga y la vuelta atrás fallan y también depende de la copia guardada en la base; una app instalada antes de que existiera la copia y sin catálogo queda fuera y la salud del hub lo dice.
 Implicados: HUB_SHELL-F142, SAAS_DASHBOARD-F31, SAAS_PUBLIC-F01, SAAS_PUBLIC-F07, SAAS_PUBLIC-F08, SAAS_PUBLIC-F16, SAAS_PUBLIC-F18, SAAS_PUBLIC-F36
@@ -160,7 +160,7 @@ Pasos:
 2. Una app instalada o actualizada por la otra copia se carga exactamente en la versión anotada: de su carpeta, de la copia guardada o, si no hay, del catálogo.
 3. Una app quitada por la otra se olvida; una apagada o encendida por la otra cambia aquí también.
 4. Las pantallas conectadas a esta copia reciben el aviso en vivo correspondiente; al recargar una versión distinta sale `module.installed`, nunca `module.updated`, y no se reindexa el asistente.
-5. Mientras carga, esta copia mantiene su candado de escritura, descarga del catálogo incluida, y no atiende peticiones (como HUB-F19).
+5. Mientras carga, esta copia mantiene su candado de escritura, descarga del catálogo incluida, y no atiende peticiones; instalar y actualizar ya no lo hacen (HUB-F19, HUB-F23), reconciliar sí (hub#2555).
 Entra: `hub_module` y `HUB_MODULE_RECONCILE_SECS`.
 Sale: el registro de esta copia igual que la base.
 Si falla: una versión que no se puede cargar no se reintenta hasta que la base anote otra; la app sigue con lo que tenía.
@@ -191,7 +191,7 @@ Pasos:
 2. El hub calcula todo lo que caería con ella: la app y cada app activa que depende de ella, en cadena.
 3. Si el perfil fiscal del negocio está activo y ese conjunto se lleva al último módulo que cumple su régimen fiscal, lo niega.
 4. Pregunta al motor de cada app del conjunto si aún debe algo a una autoridad (VeriFactu: registros sin aceptar por la AEAT); si alguna debe, no apaga ninguna.
-5. Si puede, apaga la pedida (queda apagada hasta que alguien la encienda) y las arrastradas (vuelven solas, HUB-F27). Las pantallas reciben `module.deactivated`, solo para la app pedida. En la nube, el siguiente despliegue puede volver a encenderla (HUB-F25).
+5. Si puede, apaga la pedida (queda apagada hasta que alguien la encienda) y las arrastradas (vuelven solas, HUB-F27). Las pantallas reciben `module.deactivated`, solo para la app pedida. Sigue apagada tras cualquier despliegue, reinicio o actualización (HUB-F25, HUB-F23).
 Entra: `POST /api/modules/:id/deactivate` con sesión de administrador.
 Sale: el estado en `hub_module`. Una app apagada no sirve consultas ni órdenes (`module_inactive`) ni aporta menú, paneles ni pasos de puesta en marcha.
 En este mismo documento se apoya en: HUB-F316 (No dejar en producción a un hub sin ningún módulo que cumpla su régimen).
@@ -204,7 +204,7 @@ Estado: parcial — forzar deja activas las apps que dependen de la quitada; en 
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
-1. Un administrador pide desinstalar una app.
+1. Un administrador pide desinstalar una app. Si hay otro cambio de apps en curso (instalar, actualizar o importar una plantilla), espera su turno en la misma cola (HUB-F19).
 2. El hub aplica, por este orden, el candado del proveedor fiscal, la pregunta al motor de la app (HUB-F28) y, salvo que se pida forzar, la comprobación de dependientes: si otras apps instaladas la necesitan, apagadas o no, lo niega y las nombra.
 3. La pantalla de Apps enseña antes las apps que dependen de ella y, si la persona confirma su pregunta de desinstalar, ya manda forzar (`force: true`): no hay un segundo paso «quitarla igualmente». Forzar solo se salta la comprobación de dependientes; los candados fiscales siguen, pero solo miran la app quitada. Las dependientes quedan activas y registradas sin su dependencia: en el siguiente arranque fallan con `missing_dependency`, la re-descarga de cada una vuelve a instalar la app quitada en su última versión y, sin catálogo, su copia local falla y la salud del hub queda en rojo.
 4. Quita sus consultas, órdenes, menú y tareas programadas, olvida los roles que solo ella declaraba (las personas conservan su rol), borra su fila y su copia guardada, y quita sus textos del índice del asistente.
@@ -260,7 +260,7 @@ Implicados: FLOWS-F01, HUB_SHELL-F29, HUB_SHELL-F109, HUB_SHELL-F115, HUB_SHELL-
 QA: BD-03
 
 ### HUB-F33 Leer y guardar los ajustes de un módulo
-Estado: parcial — la pantalla solo deja guardar al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Venta, Inventario y Cocina y lo hace por el asistente); y si la lectura de los ajustes falla (por ejemplo, sin permiso), la pantalla enseña los valores de fábrica del esquema como si fueran los guardados
+Estado: parcial — la pantalla solo deja guardar al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Venta, Inventario y Cocina y lo hace por el asistente)
 Actor: administrador, responsable, asistente
 Pantalla: HUB_SHELL: Vista de un módulo › Ajustes
 Pasos:
@@ -270,7 +270,7 @@ Pasos:
 4. La pantalla dice «Ajustes guardados.».
 Entra: el bloque `settings` del `module.json` (esquema, consulta, orden).
 Sale: la fila de ajustes del módulo y el aviso que su orden emita.
-Si falla: si la consulta de lectura falla, el error se traga y se pintan los valores de fábrica del esquema como si fueran los del negocio («No se pudieron cargar los ajustes.» solo sale si falla otra cosa, como el esquema). Los ven así quienes no tienen permiso de leerlos —hoy solo los empleados de Venta e Inventario, cuya consulta de lectura pide el permiso de gestionar los ajustes; en Cocina y Caja el empleado sí puede leerlos— y cualquiera tras un fallo pasajero de lectura; solo un administrador puede pisar entonces lo guardado con esos valores de fábrica, si guarda sin darse cuenta; al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
+Si falla: si la consulta de lectura falla, la pantalla no pinta el formulario ni deja guardar (hub#2511): un fallo pasajero dice «No se pudieron cargar los ajustes.» con «Reintentar», y un rechazo por permiso —hoy los empleados de Venta e Inventario, cuya consulta de lectura pide el permiso de gestionar los ajustes; en Cocina y Caja el empleado sí puede leerlos— dice «No puedes ver estos ajustes». Los valores de fábrica solo se enseñan cuando la lectura contesta sin fila (nunca se guardó nada). Al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
 Implicados: CASH_REGISTER-F01, HUB_SHELL-F43, HUB_SHELL-F44, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: qa-hub-restaurant §7.03 (discrepa)
 
@@ -313,16 +313,16 @@ QA: BD-01, BD-02
 | Instalar una app con sus dependencias | hecho | HUB-F19 |
 | Instalar sin cobrar una dependencia de pago sin consentimiento | hecho (se para y dice qué contratar) | HUB-F19 |
 | Verificar integridad y firma del paquete | hecho (firma obligatoria solo si el despliegue tiene claves) | HUB-F19 |
-| Seguir cobrando mientras se instala, actualiza o reconcilia una app | no hecho: el hub entero deja de atender, sin tope total de tiempo | HUB-F19, HUB-F23, HUB-F26 |
+| Seguir cobrando mientras se instala, actualiza o reconcilia una app | parcial: instalar, actualizar e importar una plantilla ya no paran la caja; reconciliar entre copias sí, mientras descarga (hub#2555); sin tope total de tiempo (hub#2556) | HUB-F19, HUB-F23, HUB-F26 |
 | Actualizar una app sin reiniciar y volver a la anterior si falla | hecho | HUB-F23 |
-| Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); en la nube vuelven encendidas las apagadas | HUB-F25 |
+| Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); cada app conserva si estaba encendida o apagada | HUB-F25 |
 | No bajar de versión ni saltarse el pin de soporte | parcial: un administrador, por la API con versión explícita, baja y se salta el pin | HUB-F23 |
 | Apagar una app y lo que depende de ella | hecho | HUB-F28 |
 | Desinstalar avisando de lo que depende | parcial: si se fuerza, las dependientes quedan activas y la app quitada vuelve en el siguiente arranque | HUB-F29 |
 | Desinstalar conservando los datos | hecho | HUB-F29 |
 | Borrar los datos de una app desinstalada | no hecho, a propósito | — |
 | Permisos de la app concedidos por el dueño | hecho | HUB-F32 |
-| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor; quien no puede leerlos (empleados de Venta e Inventario) ve los de fábrica | HUB-F33 |
+| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor | HUB-F33 |
 | Paneles de Inicio por app | parcial: un panel sin permiso sale «No disponible» en vez de ocultarse | HUB-F34 |
 | Lista de puesta en marcha | hecho | HUB-F35 |
 
@@ -352,7 +352,9 @@ QA: BD-01, BD-02
   administrador.
 - **Piezas que comparten los flujos de esta parte** (si cambias una, revisa todos sus flujos):
   - el registro de cada app (`installer::install`): validar, migrar, sembrar, registrar; si falla una
-    actualización, vuelve la versión anterior — HUB-F19 a HUB-F23, HUB-F25, HUB-F26, HUB-F30;
+    actualización, vuelve la versión anterior; nunca enciende ni apaga: una app con fila conserva su
+    estado y solo la que entra por primera vez nace encendida (hub#2544) — HUB-F19 a HUB-F23,
+    HUB-F25, HUB-F26, HUB-F30;
   - el resolutor de versiones: la más nueva sin cuarentena, nunca hacia atrás, el pin de soporte
     gana — HUB-F23, HUB-F24, HUB-F25;
   - los permisos de host concedidos — HUB-F12, HUB-F32, HUB-F35 (y, fuera del área, los del índice).
@@ -368,8 +370,8 @@ QA: BD-01, BD-02
 
 ## Dudas abiertas
 
-Se resuelven con `market-decision`; no las decide el worker. (Que instalar o actualizar deja al hub
-entero sin atender está en las dudas comunes del índice.)
+Se resuelven con `market-decision`; no las decide el worker. (Que reconciliar deja a esa copia
+del hub sin atender mientras descarga está en las dudas comunes del índice.)
 
 1. ¿Quién guarda los ajustes de una app: solo el administrador (la pantalla) o quien tenga el
    permiso de la orden de guardar (el servidor, el asistente)? Hoy discrepan (HUB-F33, SALES-F34,
@@ -377,8 +379,8 @@ entero sin atender está en las dudas comunes del índice.)
 2. ¿Se puede bajar de versión una app con una versión explícita por la API de un administrador, o
    solo soporte? (HUB-F23)
 3. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
-   no se actualizan solas al arrancar (solo las que no encuentra en la carpeta); y en la nube cada
-   despliegue vuelve a encender las apagadas. ¿Es lo que se quiere? (HUB-F25)
+   no se actualizan solas al arrancar (solo las que no encuentra en la carpeta). ¿Es lo que se
+   quiere? (HUB-F25)
 4. Forzar la desinstalación de una app de la que dependen otras: ¿debe quitar (o apagar) esas otras?
    Odoo y Business Central las quitan juntas tras enseñarlas; hoy ERPlora las deja activas sin su
    dependencia, y en el siguiente arranque vuelve a instalar sola la app quitada o, sin catálogo,
@@ -386,8 +388,8 @@ entero sin atender está en las dudas comunes del índice.)
 5. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
    - si la cuarentena se respeta con una versión explícita que llega por el plan de ERPlora (depende
      del SaaS);
-   - si `/readyz` retenido por el candado durante una instalación larga hace que Swarm reinicie el
-     contenedor (depende del `healthcheck` de `infra`);
+   - si `/readyz` retenido por el candado durante una reconciliación larga (HUB-F26) hace que Swarm
+     reinicie el contenedor (depende del `healthcheck` de `infra`);
    - si una migración que falla a la mitad se deshace sola (depende de si `erplora-db` ejecuta cada
      fichero en una transacción);
    - si `request_install`, que no pasa `module_id_is_safe` como actualizar y versiones, es explotable:

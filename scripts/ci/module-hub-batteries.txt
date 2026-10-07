@@ -263,6 +263,12 @@ services/tests/grant_adjust.hub.test.py
 # queue on the voucher's row lock, against the real kernel (services#120). New coverage, not moved.
 # pending-publication: services#129 until 2026-10-28
 services/tests/grant_race.hub.test.py
+# services: voiding a PAID sale (`sale.voided`) gives back every voucher session spent on it —
+# recorded as returned, signed by whoever voided it, with the void's reason and the voided sale as
+# the document — and voids the vouchers it sold while they are intact; a used one stays live,
+# against the real kernel (services#151). New coverage, not moved.
+# pending-publication: services#155 until 2026-11-05
+services/tests/sale_void.hub.test.py
 # cart_checkout: a cart the assistant or an API integration creates WITHOUT a currency is born in the
 # HUB's currency — the setting `PUT /api/settings` writes is the one `cart_checkout.carts.create`
 # reads once the runtime has applied the schema — `null` counts as absent and an explicit currency
@@ -325,3 +331,31 @@ appointments/tests/busy_agenda_booking.hub.test.py
 # coverage, not moved.
 # pending-publication: appointments#288 until 2026-11-02
 appointments/tests/recurring_create_eligibility.hub.test.py
+# reservations: erasing a customer's personal data in Clientes (`customers.anonymize` →
+# `customer.anonymized`) blanks her name, phone, email, guest and internal notes and the
+# cancellation reason on every reservation (live, cancelled), and name, phone, email and notes on
+# her waitlist entries, keeps date, time, party size and status, hands `customer_id` with the blank
+# name to the list, and leaves another customer's booking untouched, against the real kernel
+# (pm#637; the two-hub tenancy is pinned by its `.pg` twin). New coverage, not moved.
+# pending-publication: reservations#101 until 2026-11-06
+reservations/tests/customer_erasure.hub.test.py
+# tables: erasing a customer's personal data in Clientes (`customers.anonymize` →
+# `customer.anonymized`) empties the guest name her confirmed reservation copied onto the floor
+# plan hold, keeps the table reserved with its time, party size and `customer_id` (the screen reads
+# «Deleted customer»), and leaves another customer's hold untouched, against the real kernel
+# (pm#637; the two-hub tenancy is pinned by its `.postgres` twin). New coverage, not moved.
+# pending-publication: tables#128 until 2026-11-06
+tables/tests/customer_erasure.hub.test.py
+# appointments: a daily series with more dates than one run books (80 on the default 90-day
+# window) is booked WHOLE by following the handler's `next_from` like «Book appointments» does —
+# the 50-per-run cap says where the next run starts instead of dropping the rest — and a second
+# tap books nothing twice, against the real kernel (appointments#299). New coverage, not moved.
+# pending-publication: appointments#312 until 2026-11-05
+appointments/tests/series_past_fifty.hub.test.py
+# appointments: erasing a customer's personal data in Clientes (`customers.anonymize` →
+# `customer.anonymized`) blanks her name, phone, email, both notes and the cancellation reason on
+# every appointment, the name on her series and the name/reason keys of their history, keeps the
+# slot, price, professional and status, hands `customer_id` to the series list, and leaves the
+# same id in another hub untouched, against the real kernel (pm#637). New coverage, not moved.
+# pending-publication: appointments#315 until 2026-11-04
+appointments/tests/customer_erasure.hub.test.py

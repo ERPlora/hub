@@ -263,16 +263,16 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F136 | Mantener la sesión abierta y cerrarla | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F137 | Perder la sesión porque se abrió en otro dispositivo | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F138 | Cambiar de usuario sin perder la venta | hecho | [acceso.md](workflow/acceso.md) |
-| HUB-F139 | Marcar un dispositivo como compartido o personal | hecho | [acceso.md](workflow/acceso.md) |
+| HUB-F139 | Marcar un dispositivo como compartido o personal | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F140 | Decidir si el negocio pide PIN y cuántos dígitos tiene | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F141 | Ver, nombrar y quitar los dispositivos del negocio | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F142 | Abrir erplora.com ya identificado | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F143 | Cambiar mis datos, idioma, apariencia y foto | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F144 | Cerrar la puerta a quien ya no es miembro en erplora.com | parcial | [acceso.md](workflow/acceso.md) |
-| HUB-F145 | Dar de alta a una persona que entra solo con PIN | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB-F145 | Dar de alta a una persona que entra solo con PIN | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F146 | Invitar a una persona con su cuenta de erplora.com | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F147 | Llegar al tope de plazas del plan | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
-| HUB-F148 | Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB-F148 | Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F149 | Dar de baja y reincorporar a una persona | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F150 | Ver los roles y encender los que trae un módulo | parcial | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB-F151 | Rechazar una orden para la que no se tiene permiso | hecho | [personas-y-permisos.md](workflow/personas-y-permisos.md) |
@@ -416,8 +416,10 @@ Cada área tiene su tabla (elemento de la referencia → estado → flujo) en su
 falta, por área:
 
 - Módulos y órdenes ([modulos.md](workflow/modulos.md),
-  [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md)): seguir cobrando mientras se instala o
-  actualiza una app; que una orden repetida no se ejecute dos veces; la factura pedida desde el tique.
+  [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md)): seguir cobrando mientras otra copia
+  del hub se pone al día con una app (instalar y actualizar ya no paran la caja) y un tope total de
+  tiempo para instalar; que una orden repetida no se ejecute dos veces; la factura pedida desde el
+  tique.
 - Avisos ([avisos.md](workflow/avisos.md)): avisar a quien lanzó lo que falló; tareas programadas con
   estado visible.
 - Automatizaciones ([automatizaciones.md](workflow/automatizaciones.md)): reanudar desde el paso que
@@ -556,9 +558,10 @@ sobre la marcha. Las de cada área están en `## Dudas abiertas` de su fichero:
 
 Comunes a varias áreas:
 
-1. **Instalar o actualizar una app para todo el hub** —caja, avisos y comprobación de salud
-   incluidos— sin tope total de tiempo (HUB-F19, HUB-F23, HUB-F26): ¿se acepta, o se descarga fuera
-   del candado? Afecta a todas las áreas, no solo a módulos.
+1. **Reconciliar una app entre copias para esa copia del hub** —caja, avisos y comprobación de
+   salud incluidos— mientras la descarga (HUB-F26, hub#2555). Instalar, actualizar e importar una
+   plantilla ya descargan fuera del candado (HUB-F19, HUB-F23, hub#2508); a ninguno se le pone tope
+   total de tiempo (hub#2556). Afecta a todas las áreas, no solo a módulos.
 2. **El plan tras un reinicio sin conexión** (HUB-F162): hoy el hub no aplica ningún tope hasta su
    primera comprobación buena. ¿Se guarda el último plan firmado en base de datos? Afecta al cobro,
    a las automatizaciones y a WhatsApp.

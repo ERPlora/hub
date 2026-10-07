@@ -64,7 +64,7 @@ Pasos:
 5. Se abre la sesión y la persona entra en Inicio.
 Entra: la credencial firmada que entrega erplora.com (JWT con la lista de negocios de los que es miembro y su rol en cada uno), comprobada sin conexión con la clave pública de erplora.com que el hub carga al arrancar (`HUB_JWT_PUBLIC_KEY` o `/api/v1/auth/public-key/`); el `device_id` del navegador o de la app.
 Sale: la sesión (`hub_session`, credencial `cloud`), la persona enlazada o creada (`hub_user`), su correo en el perfil si estaba vacío, la fila de confianza del dispositivo (`hub_trusted_device`) y una línea de actividad de inicio de sesión. Esta entrada no gasta plaza del plan: la plaza de un miembro la controla erplora.com. Si el correo del token difiere solo en mayúsculas del que se escribió al invitar, el hub crea una **segunda** ficha (sin pasar por el tope de plazas) y la invitada queda sin enlazar (ver huecos).
-Si falla: sin credencial, `cloud_token_missing`; credencial caducada o no firmada por erplora.com, `cloud_token_invalid`; el hub no pudo cargar la clave pública al arrancar, `cloud_login_not_configured` (503) y solo funciona el PIN; quien ya no es miembro, `not_a_member` (y el hub le cierra la puerta, HUB-F144); a quien el administrador dio de baja en el hub, `user_deactivated`. La pantalla no tiene frase propia para estos dos últimos: dice «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Hueco de seguridad: si erplora.com acepta la contraseña y el hub rechaza la entrada, los tokens de erplora.com se quedan guardados en el navegador (`LoginPage.vue`).
+Si falla: sin credencial, `cloud_token_missing`; credencial caducada o no firmada por erplora.com, `cloud_token_invalid`; el hub no pudo cargar la clave pública al arrancar, `cloud_login_not_configured` (503) y solo funciona el PIN; quien ya no es miembro, `not_a_member` (y el hub le cierra la puerta, HUB-F144); a quien el administrador dio de baja en el hub, `user_deactivated`. La pantalla no tiene frase propia para estos dos últimos: dice «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Si erplora.com acepta la contraseña y el hub rechaza la entrada, la pantalla no deja guardados los tokens de erplora.com (HUB_SHELL-F01, hub#2506).
 Implicados: HUB_SHELL-F01, SAAS_AUTH-F16, SAAS_AUTH-F17, SAAS_AUTH-F20, SAAS_AUTH-F29, SAAS_DASHBOARD-F13, SAAS_DASHBOARD-F15
 QA: qa-hub-restaurant §7.02
 
@@ -93,13 +93,13 @@ Pasos:
 3. Escribe el nuevo dos veces y lo guarda.
 4. Desde ese momento el hub le deja entrar con él en los dispositivos de confianza; la rejilla del pinpad no la enseña hasta que se recarga la pantalla.
 Entra: la sesión de la persona (solo puede tocar su propio PIN); el número de dígitos del negocio (4 o 6).
-Sale: el PIN guardado como huella (argon2id) en su ficha; el anterior deja de valer. No se avisa a erplora.com. Como el PIN es único, el rechazo «ya lo tiene otro usuario activo» dice que ese número es de alguien; por eso esta puerta gasta el mismo presupuesto que la entrada (HUB-F135): 5 intentos en 5 minutos por persona, contando también los que se aceptan, y agotado no mira el número (ERPlora/hub#2499).
+Sale: el PIN guardado como huella (argon2id) en su ficha; el anterior deja de valer. No se avisa a erplora.com. Como el PIN es único, el rechazo «ya lo tiene otro usuario activo» dice que ese número es de alguien; por eso esta puerta gasta el mismo presupuesto que la entrada (HUB-F135): 5 intentos en 5 minutos por persona, contando también los que se aceptan, y agotado no mira el número (ERPlora/hub#2499). Es el mismo presupuesto que gastan el alta y la edición de personas con PIN en Empleados (HUB-F145, HUB-F148, ERPlora/hub#2518): uno por persona entre las tres puertas.
 Si falla: PIN actual que no coincide, «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; dígitos repetidos o seguidos (1111, 1234), «Ese PIN se adivina a la primera…»; PIN que ya usa otra persona activa, «Ese PIN ya lo tiene otro usuario activo…»; longitud distinta de la del negocio, el aviso de dígitos; con los 5 intentos gastados, «Demasiados intentos de cambiar el PIN. Espera {minutes} minutos y vuelve a intentarlo.» (429 `too_many_attempts`), sin decir si el número estaba libre. La ficha del dueño de la cuenta solo la cambia él (HUB-F148), pero esta puerta es la suya.
 Implicados: HUB_SHELL-F03, HUB_SHELL-F22, HUB_SHELL-F85
 QA: qa-hub-restaurant §7.02
 
 ### HUB-F133 Entrar con PIN
-Estado: parcial — sin haber entrado se ven el nombre y el rol de cada persona con PIN (ERPlora/hub#2510), y las bajas siguen saliendo en la rejilla hasta recargar
+Estado: parcial — las bajas siguen saliendo en la rejilla hasta recargar
 Actor: responsable, empleado
 Pantalla: HUB_SHELL: Acceso
 Pasos:
@@ -107,7 +107,7 @@ Pasos:
 2. La persona toca su nombre y teclea su PIN; el teclado entra solo al último dígito.
 3. El hub comprueba, por este orden: que esta dirección no esté frenada (HUB-F135), que el dispositivo sea de confianza, que ese nombre no esté frenado y que el PIN sea el de una persona activa.
 4. Se abre la sesión y la persona entra.
-Entra: el nombre, el PIN y el `device_id`; la lista pública de personas con PIN y la longitud del PIN, que el hub sirve sin sesión a la pantalla de acceso (nombre, rol e identificador, nunca el correo; la misma respuesta lleva el identificador del negocio). En una demo (`HUB_DEMO`) sin ningún dispositivo de confianza, el primero que manda un PIN queda adoptado.
+Entra: el nombre, el PIN y el `device_id`; la lista de personas con PIN y la longitud del PIN, que el hub da en su contexto a la pantalla de acceso (nombre, rol e identificador, nunca el correo; la misma respuesta lleva el identificador del negocio). La lista solo llega a quien el PIN dejaría pasar, preguntado en el mismo orden: una sesión viva (aprobación y cambio de usuario; una sesión inventada cuenta contra la dirección como en cualquier puerta, HUB-F135); si no, una dirección no frenada y un dispositivo de confianza (o el freno de dispositivos apagado, o el primero de una demo virgen). A cualquier otro el hub le contesta igual, pero con la lista vacía: el resto del contexto (moneda, idioma, zona, longitud del PIN) no nombra a nadie (ERPlora/hub#2510). El identificador del negocio sigue llegando a todos: erplora.com lo lee sin credencial para comprobar que un dominio propio llega a este hub, y no es un secreto (la importación que se fiaba de él se arregla en ERPlora/hub#2497). En una demo (`HUB_DEMO`) sin ningún dispositivo de confianza, el primero que manda un PIN queda adoptado.
 Sale: la sesión (`hub_session`, credencial `pin`), con su duración según el dispositivo y el negocio (HUB-F136); si el plan admite un solo dispositivo, cierra las sesiones de los demás (HUB-F137). El PIN se comprueba en el hub: funciona aunque erplora.com no responda.
 Si falla: dispositivo que nunca entró con una cuenta o que un administrador quitó (no se distinguen), «En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí…»; navegador que no guarda datos, «Este navegador no puede recordar qué dispositivo es…»; nombre o PIN erróneos, «PIN incorrecto»; demasiados fallos, «Demasiados intentos fallidos. Espera {minutes} minutos…». Con el dial del negocio en «no mostrar pinpad» no hay rejilla y quien solo tiene PIN no puede entrar (HUB-F140).
 Implicados: HUB_SHELL-F04, REC_ALTA-F16, SAAS_PUBLIC-F80, SAAS_PUBLIC-F83
@@ -133,10 +133,10 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada PIN o placa erróneos cuentan contra ese nombre (o esa tarjeta): con 5 fallos seguidos, ese nombre queda bloqueado 5 minutos; un acierto pone la cuenta a cero.
-2. Además, el hub cuenta por la dirección desde la que llegan: 20 PIN o placas erróneos en 15 minutos, sea cual sea el nombre, o 20 sesiones inventadas distintas, bloquean el PIN y la placa a toda esa dirección durante 15 minutos.
+2. Además, el hub cuenta por la dirección desde la que llegan: 20 PIN o placas erróneos en 15 minutos, sea cual sea el nombre, o 20 sesiones inventadas distintas, bloquean el PIN y la placa a toda esa dirección durante 15 minutos; mientras dura, la lectura del contexto tampoco le da la lista de caras (HUB-F133). Una sesión inventada presentada en esa lectura cuenta igual; la misma sesión caducada repetida (una caja que arranca cada mañana) cuenta una sola vez.
 3. Quien ya tiene sesión abierta sigue trabajando: el bloqueo solo cierra las puertas de PIN y placa.
 4. La aprobación con el PIN de un responsable (HUB-F152) cuenta en el mismo contador por nombre, pero **no** pasa por el freno por dirección (ni lo consulta ni le suma fallos); con placa, la aprobación cuenta contra el número leído y el acceso contra su índice, así que son dos contadores para la misma tarjeta. El cambio del propio PIN (HUB-F132) tiene su propio presupuesto por persona (no por nombre ni por dirección): 5 intentos en 5 minutos contados desde el primero, cuentan también los aceptados (un PIN aceptado también informa) y entrar bien con el PIN no lo pone a cero.
-Entra: los rechazos de las puertas de PIN y placa (y, solo por nombre, de la aprobación); la dirección del último salto del proxy (`X-Forwarded-For`); sin esa cabecera no hay freno por dirección.
+Entra: los rechazos de las puertas de PIN y placa (y, solo por nombre, de la aprobación) y las sesiones que no resuelven en la lectura del contexto (HUB-F133); la dirección del último salto del proxy (`X-Forwarded-For`); sin esa cabecera no hay freno por dirección.
 Sale: la respuesta `too_many_attempts` (429) con los segundos que faltan; una línea de registro `event=auth_failed` por fallo (con la dirección y, para sesiones, una huella del token, nunca el token) para que el borde pueda banear. Los contadores viven en memoria: un reinicio los pone a cero.
 Si falla: detrás de una misma dirección pública (CGNAT, wifi de un centro comercial) veinte fallos ajenos cierran el PIN a toda la tienda 15 minutos; se pasa solo. La pantalla lo dice con «Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.».
 Implicados: HUB_SHELL-F04
@@ -185,13 +185,13 @@ Pasos:
 4. La venta sigue en pantalla y lo siguiente queda a nombre de quien entró («Ahora atiende {name}»).
 Entra: el nombre y el PIN de quien entra; el token de quien sale.
 Sale: una sesión nueva y la anterior borrada. Cuando el PIN nuevo se acepta, la pantalla además olvida las credenciales de erplora.com y la conversación con el asistente de quien se fue (hub#1538, hub#1544, cerrada). El servidor no guarda ninguna conversación del asistente que haya que borrar.
-Hueco de la pantalla (no del servidor): tras el relevo, el lanzador, «Mis apps» y la lista siguen siendo los de quien se fue hasta que se navega.
+Tras el relevo, la pantalla vuelve a leer para quien entra el plan, el lanzador, «Mis apps» y la lista de configuración (HUB_SHELL-F09, hub#2506). Hueco de la pantalla (no del servidor): la pantalla abierta sigue siendo la de quien se fue hasta que se navega (hub#2539).
 Si falla: un PIN rechazado no cambia nada (quien estaba dentro sigue dentro, con su conversación): «Esos datos no han funcionado…». Dispositivo sin confianza: «Este dispositivo todavía no está dado de alta para el PIN…».
 Implicados: HUB_SHELL-F09, HUB_SHELL-F195
 QA: qa-hub-restaurant §7.02, L-13
 
 ### HUB-F139 Marcar un dispositivo como compartido o personal
-Estado: hecho
+Estado: parcial — sin haber entrado, el hub dice de cualquier identificador de dispositivo que le presenten si es de confianza, no solo del que pregunta (ERPlora/hub#2551)
 Actor: administrador
 Pantalla: HUB_SHELL: Ajustes › General
 Pasos:

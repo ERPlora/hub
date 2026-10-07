@@ -89,7 +89,7 @@ Implicados: REC_ALTA-F22, SAAS_PUBLIC-F12
 QA: ninguno
 
 ### HUB_SHELL-F109 Instalar una app
-Estado: parcial — mientras dura, el hub retiene todas las consultas y órdenes (también la caja), sin tope de tiempo ni en el hub ni en la pantalla, y nadie más que quien instala ve por qué; las apps que entran de paso no pasan por la pregunta de permisos y quedan con todos denegados, sin aviso; y el aviso de éxito de la pantalla y el del canal en vivo pueden pisarse (leído en el código, sin ejecutar)
+Estado: parcial — la instalación no tiene tope de tiempo ni en el hub ni en la pantalla (hub#2556); las apps que entran de paso no pasan por la pregunta de permisos y quedan con todos denegados, sin aviso; y el aviso de éxito de la pantalla y el del canal en vivo pueden pisarse (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -150,7 +150,7 @@ Implicados: HUB-F19
 QA: BD-03
 
 ### HUB_SHELL-F113 Seguir una instalación mientras se navega
-Estado: parcial — mientras instala, las demás pantallas del hub esperan sin avisar de por qué, y el cliente no pone ningún límite a la espera de la orden de instalar (leído en el código, sin ejecutar)
+Estado: parcial — el cliente no pone ningún límite a la espera de la orden de instalar (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -158,23 +158,23 @@ Pasos:
 2. El aviso «Instalando {name}…» sigue a la vista como aviso global; cuando termina, el resultado (éxito o error con «Reintentar») sale donde esté, no en la pantalla de Apps que ya no existe.
 3. Al volver a Apps, la fila vuelve a mostrar la fase en cuanto llega el siguiente aviso de progreso.
 Entra: los avisos de progreso por fases que manda el hub por el canal en vivo.
-Sale: nada guardado. La retención de consultas y órdenes durante la instalación es del servidor (HUB-F19): la pantalla de Apps no la nombra y quien cobra en otro dispositivo solo nota que sus pantallas tardan; la barra de espera de arriba solo se ve en el dispositivo que instala.
+Sale: nada guardado. Mientras instala, el resto del hub sigue atendiendo (HUB-F19): quien cobra en otro dispositivo no espera a la instalación; la barra de espera de arriba solo se ve en el dispositivo que instala.
 Si falla: si el canal en vivo se cae, la fila se queda en «Instalando…» hasta que la orden contesta o se recarga la pantalla. Si la instalación falla después de salir de Apps y volver, el resultado sale en el aviso global pero la fila de la pantalla nueva sigue en «Instalando…», porque solo la limpia el aviso de instalada (leído en el código, sin ejecutar). La orden de instalar no tiene tiempo máximo en el cliente.
 Implicados: HUB-F19
 QA: ninguno
 
 ### HUB_SHELL-F114 Ver que una app necesita un hub más nuevo
 Estado: hecho
-Actor: administrador, responsable, empleado
+Actor: administrador
 Pantalla: Apps
 Pasos:
 1. En el catálogo, una app cuya versión exige una versión de ERPlora más alta que la de este hub sale con el estado «Necesita ERPlora {version}» y sin «Instalar».
 2. En su lugar aparece la acción «Ver tu versión de ERPlora y sus actualizaciones», que lleva a **Sistema › Actualizaciones**, donde se ve qué versión corre el hub y qué se le ha cambiado (el hub se actualiza solo).
 3. Si no se puede saber la versión del hub, o la app no declara mínimo, no se bloquea nada: el hub rechaza la instalación si hace falta («Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.» o, con las dos versiones, «Esta app necesita un hub más nuevo (ERPlora {required}). El tuyo tiene la {core}: actualiza el hub e inténtalo de nuevo.»).
-Entra: el mínimo que declara la app y la versión del hub.
+Entra: el mínimo que declara la app y la versión del hub, que viaja en el estado del sistema y solo se pide con sesión de dueño o administrador (HUB-F166): instalar es suyo, así que a quien no administra no se le pide ni se le avisa de ningún mínimo.
 Sale: nada guardado.
-Si falla: sin la versión del hub, la comprobación se salta y se avisa en la consola del navegador, no a la persona.
-Implicados: HUB-F20, SAAS_PUBLIC-F15
+Si falla: sin la versión del hub (el hub no contestó a quien administra), la comprobación se salta y se avisa en la consola del navegador, no a la persona.
+Implicados: HUB-F20, HUB-F166, SAAS_PUBLIC-F15
 QA: ninguno
 
 ### HUB_SHELL-F115 Saber que una app se instaló sin sus permisos
@@ -233,10 +233,10 @@ Pasos:
 2. En la fila de Mis apps la versión dice «{version} · La versión {version} necesita ERPlora {floor}» y no hay «Actualizar»: en su lugar, «Ver tu versión de ERPlora y sus actualizaciones», que lleva a **Sistema › Actualizaciones**.
 3. En el catálogo la fila dice «La versión {version} necesita ERPlora {floor}».
 4. «Actualizar todas» y el aviso de la campana no cuentan esa app.
-Entra: el mínimo de la versión nueva que ofrece el catálogo y la versión del hub.
+Entra: el mínimo de la versión nueva que ofrece el catálogo y la versión del hub, que solo se pide con sesión de dueño o administrador (HUB-F166, como en F114).
 Sale: nada guardado.
 Si falla: sin la versión del hub o sin mínimo declarado, la fila ofrece «Actualizar» como siempre.
-Implicados: HUB-F24
+Implicados: HUB-F24, HUB-F166
 QA: ninguno
 
 ### HUB_SHELL-F119 Enterarse de que hay versiones nuevas
@@ -394,7 +394,5 @@ Se resuelven con `market-decision`; no las decide el worker.
 - VERIFACTU-F32: la frase sale en inglés **y** en un aviso que desaparece a los 2,5 s.
 - Servidor HUB-F28 y VERIFACTU-F32: la negativa de un motor sale en inglés en la pantalla española
   (confirmado: la pantalla solo traduce códigos de plataforma, no el de un motor).
-- Servidor HUB-F19: el hub retiene todas las órdenes durante la instalación. La pantalla no lo dice
-  a nadie.
 - Servidor HUB-F23: «un administrador puede bajar de versión por la API». La pantalla solo ofrece
   versiones hacia delante.

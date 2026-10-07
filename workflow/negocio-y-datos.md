@@ -41,7 +41,7 @@ Pasos:
 2. Ve país, región, zona horaria, moneda, idioma, apariencia, identidad del negocio y las opciones del PIN. Quien no administra los ve sin poder guardarlos (lo pinta el shell).
 3. Antes de iniciar sesión, el teclado del PIN y el formato de dinero salen de otra lectura sin sesión (moneda, decimales, idioma, zona resuelta y dígitos del PIN).
 Entra: una sesión de usuario válida, de cualquier perfil (`GET /api/settings`); la lectura sin sesión es `GET /api/hub/context`.
-Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión. Esa lectura sin sesión publica además el identificador del hub (la llave de HUB-F236) y el nombre y rol de cada persona con PIN, para la rejilla de acceso.
+Sale: un objeto con las 20 claves conocidas: lo guardado más el valor por defecto de lo que no tiene fila. Una fila que ya no valida se lee como su valor por defecto; una clave desconocida se ignora. La zona horaria viaja cruda (`null` mientras se deduzca del país); la resuelta va en la lectura sin sesión. Esa lectura sin sesión publica además el identificador del hub (la llave de HUB-F236) y, para la rejilla de acceso, el nombre y rol de cada persona con PIN, esto último solo a una sesión viva o a un dispositivo que el PIN dejaría pasar; a cualquier otro, la lista vacía (HUB-F133, ERPlora/hub#2510).
 Si falla: sin sesión, 401 con su código. Si la lectura de arranque falla, el shell arranca con los valores por defecto (EUR, español, UTC).
 Implicados: HUB_SHELL-F155
 QA: BD-02
@@ -252,14 +252,14 @@ Pasos:
 2. El hub comprueba la integridad y instala las apps que falten.
 3. Aplica las secciones y devuelve el informe (HUB-F239).
 Entra: el identificador de subida y la selección (personas, ajustes, fiscal, archivos, apps con datos).
-Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps): solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino; la única excepción es el `UPDATE` de la retirada de marcadores de abajo. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos, en la carpeta que nombre cada ruta: solo se comprueba que no se salga de `media/`, sin política de carpetas ni filtro por finalidad. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. En una tabla que la app declara como objeto único (su semilla se guarda por el hub entero, p. ej. la semana de Horarios), lo que hubiera antes —sembrado, escrito por el negocio o traído por otra plantilla— se marca como borrado (apuntado en el lote) en cuanto entra al menos una fila del fichero, también en la copia propia; el informe de la sección no lo dice. El arranque de un hub nuevo ya no importa ninguna plantilla.
+Sale: en este orden: (1) sha256 de cada fichero en ambos sentidos y versión de formato; si falla, 422 sin efectos. (2) Instalación de las apps del manifiesto no instaladas; una copia reinstala la versión del manifiesto, una plantilla la más nueva compatible; una app de pago sin comprar sale `blocked`. Mientras se descargan, el hub sigue atendiendo (la caja cobra) y la importación espera su turno en la cola de cambios de apps (HUB-F19). (3) Un lote de importación con el nombre de la plantilla. (4) Las secciones en el orden del manifiesto (personas, ajustes, apps): solo `INSERT` de literales en sus propias tablas, nunca tablas `_*`, cada fila con un identificador nuevo derivado del hub destino; la única excepción es el `UPDATE` de la retirada de marcadores de abajo. (5) Roles, permisos y automatizaciones (HUB-F237). (6) Archivos al gestor, por lotes de 40 y 25 MiB con reintentos, en la carpeta que nombre cada ruta: solo se comprueba que no se salga de `media/`, sin política de carpetas ni filtro por finalidad. (7) El certificado nunca se aplica: queda `pending` y se sube a mano, porque su contraseña no viaja; en una plantilla, `ignored`. En una tabla que la app declara como objeto único (su semilla se guarda por el hub entero, p. ej. la semana de Horarios), lo que hubiera antes —sembrado, escrito por el negocio o traído por otra plantilla— se marca como borrado (apuntado en el lote) en cuanto entra al menos una fila del fichero, también en la copia propia; el informe de la sección no lo dice. El arranque de un hub nuevo ya no importa ninguna plantilla.
 Si falla: una sección fallida se anota y el resto sigue; una app que no se instala deja `failed` su sección («módulo no instalado»).
 Implicados: INVENTORY-F12, SCHEDULES-F12, HUB_SHELL-F26, HUB_SHELL-F177, REC_ALTA-F08, SAAS_PUBLIC-F16
 Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la semana de Horarios
 QA: BD-01, qa-hub §4
 
 ### HUB-F236 Qué deja entrar el hub según de quién es el fichero
-Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context`: un zip fabricado con él pasa por copia propia y trae personas con `pin_hash`, ajustes sin validar, permisos de módulo y automatizaciones encendidas con sus permisos. Hace falta que un administrador del propio hub suba el fichero; no es una puerta anónima
+Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context` (erplora.com lo lee así para comprobar los dominios propios): un zip fabricado con él pasa por copia propia y trae personas con `pin_hash`, ajustes sin validar, permisos de módulo y automatizaciones encendidas con sus permisos. Hace falta que un administrador del propio hub suba el fichero; no es una puerta anónima
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -407,8 +407,9 @@ De esta área (las tablas de la segunda mitad, en
   de importación, sus filas, lo que retiraron y su informe (HUB-F235 a HUB-F241).
 - `_hub_meta`: la marca de la unidad del dinero (`money_unit`, HUB-F243), entre otras claves de
   otras áreas.
-- `GET /api/hub/context` expone sin sesión el nombre y el rol de cada persona con PIN, para la rejilla
-  de acceso, y el identificador del hub (HUB-F220).
+- `GET /api/hub/context` da el nombre y el rol de cada persona con PIN, para la rejilla de acceso,
+  solo a una sesión viva o a un dispositivo que el PIN dejaría pasar (HUB-F133, ERPlora/hub#2510);
+  el identificador del hub lo da sin sesión a cualquiera (HUB-F220).
 - Los datos personales de los clientes viven en cada módulo, no en el hub.
 
 ## Reglas que no se rompen

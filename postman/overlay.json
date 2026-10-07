@@ -1,7 +1,7 @@
 {
   "GET /api/hub/context": {
     "name": "Hub context — who am I talking to (public)",
-    "description": "The hub's identity and state before any session: hub_id, cloud_base_url, language, currency, whether a machine is registered, the PIN users. First request of every visit."
+    "description": "The hub's identity and state before any session: hub_id, cloud_base_url, language, currency, whether a machine is registered and, only for a live session or a device the PIN door trusts (hub#2510), the PIN users — anybody else gets an empty list. First request of every visit."
   },
   "POST /api/auth/cloud": {
     "name": "Open a session with the SaaS JWT",

@@ -410,7 +410,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                             .map(|m| m.name.clone())
                             .unwrap_or_else(|| id.clone());
                         // Progreso no-op: en el arranque aún no hay clientes WS a los que retransmitir.
-                        let attempt = match install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
+                        let attempt = match install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut *rt, &id, target.version(), &|_, _| {}, &state.config.signature_policy()).await {
                             Ok(_) if target.is_update() => {
                                 eprintln!("✓ módulo actualizado: {id} {version} → {}", target.version());
                                 Some(erplora_runtime::module_update::Outcome::Updated { from: version.clone(), to: target.version().to_string() })
@@ -421,7 +421,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                                 // un hub con la versión de ayer funciona, uno sin el módulo no. Se
                                 // cae a la que tenía registrada.
                                 eprintln!("✗ actualización de {id} a {}: {e} — vuelvo a {version}", target.version());
-                                let fallback = install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await;
+                                let fallback = install::install_from_cloud(&state.marketplace_http, &cloud, &cache_root, &machine, &mut *rt, &id, &version, &|_, _| {}, &state.config.signature_policy()).await;
                                 match &fallback {
                                     Ok(_) => eprintln!("✓ {id} sigue en {version}"),
                                     Err(e) => eprintln!("✗ {id}@{version} tampoco: {e}"),

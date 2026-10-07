@@ -16,6 +16,7 @@
 //
 // Mismo transporte que el resto del shell (`runtime.ts`): mismo origen + `runtimeHeaders()`.
 
+import { lockRefusal, type Refusal } from './lock-refusal';
 import { hubPinLength } from './pin-length';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
@@ -177,6 +178,9 @@ export class HubUsersError extends Error {
     // out of a sentence — same rule as `field`/`reason` above.
     readonly module?: string,
     readonly query?: string,
+    // hub#2518: the wait of a `too_many_attempts` refusal, read by `lockRefusal` like the
+    // pinpad's (`RuntimeError.retryAfterSecs`, hub#2283).
+    readonly retryAfterSecs?: number,
   ) {
     super(message);
     this.name = 'HubUsersError';
@@ -197,6 +201,18 @@ function errorCode(body: unknown): string | undefined {
   return typeof error === 'string' ? undefined : error?.code;
 }
 
+/**
+ * The lock of the PIN doors (hub#2518) is a PLATFORM refusal, shaped like the pinpad's:
+ * `{ok:false, error:"<sentence>", code:"too_many_attempts", retry_after_secs}` — code and wait at
+ * the top, beside a plain-string `error`.
+ */
+function topLevelLock(body: unknown): [string | undefined, number | undefined] {
+  const env = body as { code?: unknown; retry_after_secs?: unknown } | undefined;
+  const code = typeof env?.code === 'string' ? env.code : undefined;
+  const secs = typeof env?.retry_after_secs === 'number' ? env.retry_after_secs : undefined;
+  return [code, secs];
+}
+
 /** `field` and `reason` of the envelope when the refusal names one (hub#1190). */
 function errorFieldReason(body: unknown): [string | undefined, string | undefined] {
   const error = (body as Envelope<unknown> | undefined)?.error;
@@ -214,7 +230,16 @@ function errorModuleQuery(body: unknown): [string | undefined, string | undefine
 function failed(body: unknown, fallback: string): HubUsersError {
   const [field, reason] = errorFieldReason(body);
   const [module, query] = errorModuleQuery(body);
-  return new HubUsersError(errorMessage(body, fallback), errorCode(body), field, reason, module, query);
+  const [lockCode, retryAfterSecs] = topLevelLock(body);
+  return new HubUsersError(
+    errorMessage(body, fallback),
+    errorCode(body) ?? lockCode,
+    field,
+    reason,
+    module,
+    query,
+    retryAfterSecs,
+  );
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -413,6 +438,20 @@ export function hubUserErrorKey(error: unknown): string | undefined {
   if (!code) return undefined;
   if (code.startsWith(HUB_USERS_ERROR_PREFIX)) return code.slice(HUB_USERS_ERROR_PREFIX.length);
   return (ACCESS_SYNC_ERRORS as readonly string[]).includes(code) ? code : undefined;
+}
+
+/**
+ * The sentence of a spent PIN budget (hub#2518), or `undefined` for any other refusal. Creating a
+ * person or editing their record with a PIN spends the EDITOR's tries —the same budget as changing
+ * one's own PIN (hub#2499)— and past it the hub answers `too_many_attempts` instead of saying
+ * whether the number is taken. The minutes are the pinpad's rounding (`lockRefusal`).
+ */
+export function pinLockRefusal(error: unknown): Refusal | undefined {
+  if (!(error instanceof HubUsersError) || error.code !== 'too_many_attempts') return undefined;
+  const { minutes } = lockRefusal(error);
+  return minutes === undefined
+    ? { key: 'employeeForm.pinTooManyAttemptsNoWait' }
+    : { key: 'employeeForm.pinTooManyAttempts', minutes };
 }
 
 /**

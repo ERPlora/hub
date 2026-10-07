@@ -26,7 +26,7 @@ import { normalizePinLength } from './pin-length';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
-import { setRuntimeClientKind } from './device';
+import { resolveDeviceId, setRuntimeClientKind } from './device';
 import { deviceMode } from './device-mode';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
 import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
@@ -64,7 +64,10 @@ export interface HubContext {
   registration_required?: boolean;
   /** La clave pública RSA del SaaS está disponible para validar el JWT de usuario. */
   public_key_loaded?: boolean;
-  /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
+  /**
+   * Active users with a PIN (the ones who can sign in locally). `[]` unless the read carried a live
+   * session or came from a device the PIN door trusts (hub#2510).
+   */
   pin_users?: PinUser[];
   /**
    * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`). Lo usa
@@ -119,9 +122,10 @@ export function getHubSector(): string | null {
 }
 
 /**
- * Usuarios-PIN del hub resueltos en el boot (`GET /api/hub/context`). El LoginPage los usa para
- * mostrar el grid de PIN directamente cuando el hub ya tiene usuarios (p. ej. el demo: "Demo"),
- * sin depender de un flag en localStorage. `[]` hasta que el boot responde.
+ * The hub's PIN users, from `GET /api/hub/context`. The login screen paints the PIN grid from them
+ * (e.g. the demo's "Demo") without depending on a localStorage flag. `[]` until the boot answers,
+ * and also when the hub withholds them — a device it does not trust, without a session (hub#2510);
+ * signing in re-reads them ([`refreshHubIdentity`]).
  */
 export const pinUsers = ref<PinUser[]>([]);
 /** `true` cuando `/api/hub/context` respondió y `pinUsers` ya es una lista autoritativa. */
@@ -1580,7 +1584,7 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
     let res: Response;
     try {
       res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: await contextHeaders(),
         signal: controller.signal,
       });
     } catch {
@@ -1630,6 +1634,48 @@ async function readBootContext(): Promise<HubContext | BootFailure> {
     clearTimeout(timer);
     // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
     resolveCloudApiUrl(cloudBaseUrl);
+  }
+}
+
+/**
+ * Who is asking for the context (hub#2510): the faces of the pinpad only reach a caller with a live
+ * session or a device the PIN door trusts, so the read says which device this is and presents the
+ * session it holds. Never throws: a device that cannot name itself just asks anonymously and gets
+ * the context that names nobody.
+ */
+async function contextHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // `try`, not `.catch`: a resolver that throws before handing back a promise must not take the
+  // boot read down with it — the login screen would lose its Cloud URL and its PIN length.
+  let device: string | null = null;
+  try {
+    device = await resolveDeviceId();
+  } catch {
+    device = null;
+  }
+  if (device) headers['X-Device-Id'] = device;
+  const session = getHubSession();
+  if (session) headers['X-Hub-Session'] = session;
+  return headers;
+}
+
+/**
+ * Re-reads the context right after signing in (hub#2510). A browser the hub did not trust yet was
+ * not told the faces at boot; with the new session it is. They are what the login screen reads to
+ * know whether this person already has a PIN (hub#772), and what «switch user» and the approval
+ * dialog paint. The hub id is republished too: it is what later calls send as `X-Hub-Id`.
+ * Deliberately narrow: it does not touch the currency, language or timezone the boot already
+ * published. Never throws; a failed answer keeps what was known.
+ */
+export async function refreshHubIdentity(): Promise<void> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/context`, { headers: await contextHeaders() });
+    if (!res.ok) return;
+    const ctx = (await res.json()) as HubContext;
+    if (ctx.hub_id) config.hubId = ctx.hub_id;
+    if (Array.isArray(ctx.pin_users)) pinUsers.value = ctx.pin_users;
+  } catch {
+    // Best effort: the session is already open; the next boot reads the context again.
   }
 }
 

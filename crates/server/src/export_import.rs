@@ -676,9 +676,11 @@ pub(crate) async fn run_import(
             .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
-        let mut rt = arc.write().await;
+        // hub#2508: the runtime is locked only to register each downloaded app, so the till keeps
+        // charging while a template installs; `module_ops` keeps it from crossing another install.
+        let _module_ops = st.module_ops.lock().await;
         for m in &manifest.modules {
-            if rt.registry().is_installed(&m.id) {
+            if arc.read().await.registry().is_installed(&m.id) {
                 installed_modules.push(
                     json!({ "id": m.id, "version": m.version, "status": "already_installed" }),
                 );
@@ -713,7 +715,7 @@ pub(crate) async fn run_import(
                         &st.config.cloud_base_url,
                         &st.config.module_cache,
                         auth_cred,
-                        &mut rt,
+                        &*arc,
                         &m.id,
                         &m.version,
                         manifest.purpose,
