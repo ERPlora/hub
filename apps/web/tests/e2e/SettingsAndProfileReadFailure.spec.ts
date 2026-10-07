@@ -78,7 +78,9 @@ test.describe('a screen that could not read its data says so and saves nothing (
       await expect(page.getByTestId('settings-save-business')).toHaveCount(0);
       await expect(page.getByTestId('settings-business-tax-id')).toHaveCount(0);
       await expectInsideViewport(page, 'settings-load-retry', viewport.width);
-      await page.screenshot({ path: testInfo.outputPath(`settings-business-${viewport.width}x${viewport.height}.png`) });
+      await page.screenshot({
+        path: testInfo.outputPath(`settings-business-${viewport.width}x${viewport.height}.png`),
+      });
 
       // The hub is back: Retry reads again and the form is there, with the stored values.
       await page.unrouteAll({ behavior: 'wait' });
@@ -98,7 +100,14 @@ test.describe('a screen that could not read its data says so and saves nothing (
 
       await expect(page.getByTestId('profile-load-error')).toBeVisible();
       await expect(page.getByTestId('profile-load-retry')).toBeVisible();
-      for (const id of ['profile-first-name', 'profile-save', 'profile-language', 'profile-pin-form', 'profile-save-pin']) {
+      for (const id of [
+        'profile-change-photo',
+        'profile-first-name',
+        'profile-save',
+        'profile-language',
+        'profile-pin-form',
+        'profile-save-pin',
+      ]) {
         await expect(page.getByTestId(id)).toHaveCount(0);
       }
       await expectInsideViewport(page, 'profile-load-error', viewport.width);

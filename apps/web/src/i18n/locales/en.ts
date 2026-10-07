@@ -564,6 +564,9 @@ export default {
     saved: 'Profile saved',
     saveError: 'Could not save the profile',
     loadError: 'Could not load the profile',
+    loadErrorBody: 'Your details are unchanged. Check the connection and try again.',
+    loading: 'Loading your profile…',
+    retry: 'Retry',
     photoSaved: 'Photo updated',
     photoError: 'Could not save the photo. Use a JPG, PNG or WebP up to 2 MB.',
     manageTitle: 'Account management',
@@ -688,6 +691,10 @@ export default {
   // sirve el runtime, que es quien lo archiva — una copia en el bundle sería el mismo documento
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
   settings: {
+    loading: 'Loading the business settings…',
+    loadError: 'Could not load the business settings',
+    loadErrorBody: 'Your saved settings are unchanged. Check the connection and try again.',
+    retry: 'Retry',
     hubWide: 'General settings',
     currency: 'Currency',
     currencyDesc: 'Your business currency for prices and totals',
