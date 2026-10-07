@@ -46,16 +46,16 @@ Implicados: HUB_SHELL-F12, REC_ALTA-F06, SAAS_DASHBOARD-F28
 QA: ninguno
 
 ### HUB-F161 Decir si el hub está listo para servir
-Estado: parcial — la respuesta, sin sesión, lleva la versión y los errores internos tal como salen (ERPlora/hub#2549), y queda retenida mientras se instala o actualiza una aplicación (ERPlora/hub#2508)
+Estado: parcial — la respuesta, sin sesión, sigue diciendo la versión exacta del hub (ERPlora/hub#2604), y queda retenida mientras se instala o actualiza una aplicación (ERPlora/hub#2508)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. El orquestador del servidor pregunta cada 30 s si el hub está listo. erplora.com también lo pregunta, varias veces seguidas, cuando recibe un aviso o un latido de un hub que todavía tiene como «desplegando» (HUB-F159), y mantiene abierta la petición del hub mientras lo hace.
 2. El hub comprueba su base de datos, que la tabla de migraciones se pueda leer (no que haya alguna) y que todas las apps activas estén cargadas.
 3. Si todo está bien contesta «listo»; si algo falla o no lo sabe, «no me mandes tráfico». Que el despliegue de una versión que no llega a «listo» se deshaga es cosa de la infraestructura (sin confirmar en este repo).
-Entra: nada; sin sesión.
-Sale: `/readyz` con el estado general, la versión y cada comprobación (la base de datos, las migraciones contadas, las apps que faltan o fallaron con su motivo): 200 solo si todo está bien, 503 en otro caso. `/healthz` solo dice que el proceso vive. Ninguna de las dos pregunta a erplora.com ni pasa por el freno de carga. Como `/readyz` no pide sesión, cualquiera lee la versión del hub y, si la base de datos falla, el texto crudo del error (ver huecos).
-Si falla: un 503 deja el hub sin tráfico hasta que se recupere; el motivo queda en el cuerpo.
+Entra: nada; sin sesión. Con la sesión de un dueño o administrador, la misma pregunta trae además el detalle.
+Sale: `/readyz` con el estado general, la versión y el estado de cada comprobación (la base de datos, las migraciones, las apps): 200 solo si todo está bien, 503 en otro caso, sea quien sea quien pregunte. El detalle de cada comprobación (el texto del error de la base de datos, las migraciones contadas, las apps que faltan o fallaron con su motivo) solo lo lee la sesión de un dueño o administrador, la misma que entra en la pantalla de Sistema; sin sesión, con otro rol o con una sesión que no existe se lee solo el estado. Una sesión inventada cuenta contra la dirección como en cualquier otra puerta (HUB-F135). `/healthz` solo dice que el proceso vive. Ninguna de las dos pregunta a erplora.com ni pasa por el freno de carga. Sin sesión, cualquiera sigue leyendo la versión exacta del hub (ver huecos).
+Si falla: un 503 deja el hub sin tráfico hasta que se recupere; el motivo lo lee un administrador en el cuerpo.
 Implicados: HUB_SHELL-F13, HUB_SHELL-F14, REC_ALTA-F06, SAAS_DASHBOARD-F04, SAAS_DASHBOARD-F29, SAAS_DASHBOARD-F32
 QA: ninguno
 

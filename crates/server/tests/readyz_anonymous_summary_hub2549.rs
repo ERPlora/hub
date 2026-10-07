@@ -25,6 +25,7 @@ const HUB: &str = "hub-readyz-2549";
 
 struct Fixture {
     router: axum::Router,
+    state: AppState,
     admin: String,
     cashier: String,
     _db: TestDb,
@@ -34,6 +35,11 @@ struct Fixture {
 /// ledger is gone, so the `migrations` check fails with the database's own error text — the
 /// internal detail hub#2549 is about.
 async fn fixture(broken: bool) -> Fixture {
+    fixture_without(if broken { Some("_hub_migrations") } else { None }).await
+}
+
+/// The same hub with `table` dropped after the sessions are open.
+async fn fixture_without(table: Option<&str>) -> Fixture {
     let test_db = TestDb::new().await;
     let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -44,9 +50,9 @@ async fn fixture(broken: bool) -> Fixture {
         .unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let cashier = rt.create_session(&cashier_id, 3600, None).await.unwrap();
-    if broken {
+    if let Some(table) = table {
         rt.db_for_test()
-            .execute("DROP TABLE _hub_migrations", &Params::new())
+            .execute(&format!("DROP TABLE {table}"), &Params::new())
             .await
             .unwrap();
     }
@@ -67,8 +73,10 @@ async fn fixture(broken: bool) -> Fixture {
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
+    let state = AppState::with_config(rt, cfg);
     Fixture {
-        router: app(AppState::with_config(rt, cfg)),
+        router: app(state.clone()),
+        state,
         admin,
         cashier,
         _db: test_db,
@@ -177,4 +185,29 @@ async fn an_administrator_keeps_the_whole_diagnosis_hub2549() {
     );
     assert!(body["checks"]["modules"]["expected"].is_number(), "{body}");
     assert!(body["version"].is_string(), "{body}");
+}
+
+/// A session this hub cannot look up because its own database fails is not an invented token.
+/// Counting it would lock a shop's address out of its PIN door during an outage — the rule the
+/// door-wide count already follows (`track_rejected_credentials`, hub#2282).
+#[tokio::test]
+async fn a_session_the_hub_cannot_look_up_is_not_counted_as_invented_hub2549() {
+    let f = fixture_without(Some("hub_session")).await;
+    let shop = "198.51.100.80";
+
+    for i in 0..erplora_server::address_guard::MAX_FORGED_SESSIONS {
+        let request = Request::builder()
+            .uri("/readyz")
+            .header("x-hub-session", format!("unreadable-{i:054}"))
+            .header("x-forwarded-for", format!("10.9.9.9, {shop}"))
+            .body(Body::empty())
+            .unwrap();
+        let response = f.router.clone().oneshot(request).await.unwrap();
+        assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    assert!(
+        f.state.address_guard.locked_for(shop).is_none(),
+        "a database outage locked the address as if its sessions were invented"
+    );
 }

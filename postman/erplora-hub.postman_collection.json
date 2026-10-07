@@ -5287,7 +5287,7 @@
           "response": []
         },
         {
-          "name": "Readiness — what the container HEALTHCHECK reads (public)",
+          "name": "Readiness — what the container HEALTHCHECK reads (public: statuses only; the detail of each check needs an owner/admin session)",
           "request": {
             "auth": {
               "type": "noauth"
