@@ -208,6 +208,13 @@ kitchen/tests/closed_check.hub.test.py
 # Landed pending publication (kitchen#95); the module has published it: now a normal entry.
 kitchen/tests/rush_after_fire.hub.test.py
 
+# kitchen × sales: deleting an open check cancels its rounds still on the line, a void that reaches
+# a check already charged changes nothing, and merging two checks hands the absorbed rounds to the
+# check that stays (needs the `sales.order.merged` of sales#548), against the real kernel
+# (kitchen#162, KITCHEN-F28). New coverage, not moved.
+# pending-publication: kitchen#169 until 2026-11-06
+kitchen/tests/voided_or_merged_check.hub.test.py
+
 # customers: merge two duplicate customer records against the real kernel — the manifest with the
 # ANCHORED `expect_rows` guard installs, the dispatcher binds the 15 statements, the merge moves the
 # timeline, and a repeated id or an already-retired record is rejected with
