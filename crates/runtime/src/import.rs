@@ -956,7 +956,7 @@ async fn apply_section(
     // hueco que el módulo ya te había sembrado.
     let seed_declared = (!same_hub).then(|| rt.registry());
     let keys = natural_keys_for_sql(rt.db(), seed_declared, &sql).await;
-    let sql = remap_section_ids(&sql, target_hub_id, &keys);
+    let sql = remap_section_ids(&sql, target_hub_id, &keys, same_hub);
     // 🌱 hub#1548: la foto de lo que hay AHORA en cada tabla de objeto único, ANTES de aplicar.
     // Lo que la sección meta encima sustituye a esto, no convive con ello — y comparar las dos
     // fotos es además la única forma honesta de saber si la sección llegó a entrar EN ESTA TABLA
@@ -1044,8 +1044,10 @@ async fn apply_section(
             if section == "hub_users" {
                 for extra in ["data/hub_user_profile.sql", "data/hub_user_pref.sql"] {
                     if let Some(bytes) = files.get(extra) {
-                        if let Err(e) =
-                            apply_identity_extra(rt, extra, bytes, target_hub_id, batch_id).await
+                        if let Err(e) = apply_identity_extra(
+                            rt, extra, bytes, target_hub_id, batch_id, same_hub,
+                        )
+                        .await
                         {
                             return (SectionStatus::Failed(e.to_string()), 0);
                         }
@@ -1071,6 +1073,7 @@ async fn apply_identity_extra(
     bytes: &[u8],
     target_hub_id: &str,
     batch_id: Option<&str>,
+    same_hub: bool,
 ) -> Result<(), crate::RuntimeError> {
     let raw = std::str::from_utf8(bytes)
         .map_err(|_| crate::RuntimeError::Other(format!("{path} no es UTF-8 válido")))?;
@@ -1084,7 +1087,7 @@ async fn apply_identity_extra(
     // Sin claves de seed (hub#842): estas son tablas de IDENTIDAD del core, que ningún módulo
     // siembra — y esta ruta solo corre para la copia del PROPIO hub (`identity_not_portable`).
     let keys = natural_keys_for_sql(rt.db(), None, &sql).await;
-    let sql = remap_section_ids(&sql, target_hub_id, &keys);
+    let sql = remap_section_ids(&sql, target_hub_id, &keys, same_hub);
     match batch_id {
         Some(batch) => {
             crate::reset::apply_tracked_into(rt, batch, target_hub_id, &sql, &scope).await?;
@@ -1289,6 +1292,7 @@ fn remap_section_ids(
     sql: &str,
     target_hub_id: &str,
     keys: &std::collections::HashMap<String, Vec<crate::export::NaturalKey>>,
+    same_hub: bool,
 ) -> String {
     let Ok(stmts) = crate::import_sql::split_statements(sql) else {
         return sql.to_string(); // el import lo rechazará igual con el mismo troceo
@@ -1304,27 +1308,39 @@ fn remap_section_ids(
     // versión «barata» del fix de fondo del issue: no reasigna ids al azar (rompería la idempotencia)
     // ni reutiliza los del origen (rompería la PK global). Se hace sobre TODAS las sentencias antes
     // de reescribir, así una fila HIJA que se emita ANTES que su padre sigue remapeando su FK.
+    //
+    // 🔴 hub#2513: FOREIGN bundles ONLY. A hub restoring its OWN copy (`same_hub`) already has
+    // these rows under the very ids the bundle carries: deriving fresh ids made the
+    // `(hub_id, id)` guard ask for an id that never existed → the row landed AGAIN as a duplicate
+    // on the live hub, and on an empty install it landed under a different id than the one the FKs
+    // in the bundle's OTHER files (`hub_user_profile`, any reference that crosses sections) keep
+    // pointing at. Keeping the source id keeps idempotency too: the guard matches the row that is
+    // already there. No global PK at stake: these ids were born in THIS hub, so no sibling hub can
+    // hold them (this hub's bundle imported somewhere else goes through the `!same_hub` path, which
+    // does derive).
     let mut id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    for stmt in &stmts {
-        let Some(parsed) = parse_insert(stmt) else {
-            continue;
-        };
-        // Solo las filas ACOTADAS POR HUB entran al mapa: son las únicas cuyo `id` se remapea.
-        // Meter aquí el id de una fila no hub-scoped (`hub_user`) haría que una FK que lo
-        // referenciase se reescribiera hacia un id que nunca se insertó.
-        if !parsed.cols.iter().any(|c| c == "hub_id") {
-            continue;
-        }
-        if let Some(old) = parsed.id_literal() {
-            let derived = derive_id(target_hub_id, &old);
-            id_map.entry(old).or_insert(derived);
+    if !same_hub {
+        for stmt in &stmts {
+            let Some(parsed) = parse_insert(stmt) else {
+                continue;
+            };
+            // Solo las filas ACOTADAS POR HUB entran al mapa: son las únicas cuyo `id` se remapea.
+            // Meter aquí el id de una fila no hub-scoped (`hub_user`) haría que una FK que lo
+            // referenciase se reescribiera hacia un id que nunca se insertó.
+            if !parsed.cols.iter().any(|c| c == "hub_id") {
+                continue;
+            }
+            if let Some(old) = parsed.id_literal() {
+                let derived = derive_id(target_hub_id, &old);
+                id_map.entry(old).or_insert(derived);
+            }
         }
     }
 
     // 2ª pasada: reescribir cada sentencia con los nuevos ids y la guarda acotada.
     let mut out = String::with_capacity(sql.len());
     for stmt in &stmts {
-        out.push_str(&rewrite_insert(stmt, &id_map, target_hub_id, keys));
+        out.push_str(&rewrite_insert(stmt, &id_map, target_hub_id, keys, same_hub));
     }
     out
 }
@@ -1388,6 +1404,7 @@ fn rewrite_insert(
     id_map: &std::collections::HashMap<String, String>,
     target_hub_id: &str,
     keys: &std::collections::HashMap<String, Vec<crate::export::NaturalKey>>,
+    same_hub: bool,
 ) -> String {
     let trimmed = stmt.trim();
     let Some(after_into) = trimmed.strip_prefix("INSERT INTO ") else {
@@ -1476,6 +1493,13 @@ fn rewrite_insert(
         };
         let mapped = if col == "id" && !hub_scoped {
             // Identidad del core: conserva su id (idempotente para toda la organización).
+            None
+        } else if col == "id" && same_hub {
+            // 🔴 hub#2513: a hub restoring its OWN copy keeps the id the row already has. Deriving
+            // a new one broke the guard's idempotency (`(hub_id, id)` would ask for an id that never
+            // existed → duplicate on the live hub) and dangled every reference to this id living in
+            // the bundle's OTHER files (`hub_user_profile.user_id`, and any FK that crosses
+            // sections): each section is remapped with its OWN map.
             None
         } else if col == "id" {
             // El propio id: siempre el nuevo (del mapa si se captó en la 1ª pasada; si no, se
@@ -2288,7 +2312,7 @@ mod tests {
         let sql = "INSERT INTO inventory_product (\"id\", \"hub_id\", \"name\", \"sku\") \
                    SELECT 'src-prod', 'h2', 'Café', 'CAF' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');";
-        let out = remap_section_ids(sql, "h2", &Default::default());
+        let out = remap_section_ids(sql, "h2", &Default::default(), false);
         // El id de origen NO aparece (fue reescrito por el derivado).
         assert!(
             !out.contains("'src-prod'"),
@@ -2307,7 +2331,7 @@ mod tests {
         // Idempotencia: misma entrada → misma salida (el id derivado es estable).
         assert_eq!(
             out,
-            remap_section_ids(sql, "h2", &Default::default()),
+            remap_section_ids(sql, "h2", &Default::default(), false),
             "el remap debe ser determinista"
         );
     }
@@ -2334,6 +2358,7 @@ mod tests {
             sql,
             "56f2bbe7-792e-44d3-adfe-c18891cfc925",
             &Default::default(),
+            false,
         );
 
         assert!(
@@ -2361,12 +2386,71 @@ mod tests {
         let sql = "INSERT INTO hub_user (\"hub_id\", \"id\", \"name\", \"role\") \
                    SELECT '__HUB_ID__', 'u-1', 'Ana', 'admin' \
                    WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'u-1');";
-        let out = remap_section_ids(sql, "hub-destino", &Default::default());
+        let out = remap_section_ids(sql, "hub-destino", &Default::default(), false);
 
         assert_eq!(
             out.matches("\"hub_id\"").count(),
             2,
             "una en la lista de columnas y una en la guarda — ni una tercera inyectada:\n{out}"
+        );
+    }
+
+    /// 🔴 hub#2513: a hub restoring its OWN backup (`same_hub`) keeps the ids its rows already
+    /// live under. The person row travels hub-scoped (every bundle since hub#497 carries
+    /// `hub_id`), which used to route it through id derivation: the guard then asked for a derived
+    /// id nobody ever wrote → the row landed twice on the live hub, and on an empty install it
+    /// landed under an id that `hub_user_profile.user_id` (remapped in its own file, with its own
+    /// empty map) kept pointing past. Keeping the source id keeps the guard honest — it matches
+    /// the row that is already there — and no sibling hub can hold these ids, because they were
+    /// born in THIS hub.
+    #[test]
+    fn a_hub_restoring_its_own_backup_keeps_the_ids_it_already_has() {
+        let sql = "INSERT INTO hub_user (\"hub_id\", \"id\", \"name\", \"role\") \
+                   SELECT 'h1', 'u-1', 'Ana', 'admin' \
+                   WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'u-1');\n\
+                   INSERT INTO inventory_product (\"id\", \"hub_id\", \"name\", \"sku\") \
+                   SELECT 'src-prod', 'h1', 'Café', 'CAF' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');\n\
+                   INSERT INTO inventory_product_categories (\"product_id\", \"category_id\") \
+                   SELECT 'src-prod', 'src-cat' \
+                   WHERE NOT EXISTS (SELECT 1 FROM inventory_product_categories WHERE product_id = 'src-prod');";
+        let out = remap_section_ids(sql, "h1", &Default::default(), true);
+
+        // The ids are NOT rewritten: the guard asks for the id the row already has.
+        assert!(
+            out.contains("'u-1'") && out.contains("'src-prod'"),
+            "same-hub restore must keep the source ids: {out}"
+        );
+        // The guards are still regenerated and hub-scoped, so the restore stays idempotent
+        // (the `WHERE NOT EXISTS` skips whoever is already there).
+        assert!(
+            out.contains("SELECT 1 FROM hub_user WHERE \"hub_id\" = 'h1' AND id = 'u-1'"),
+            "the guard must ask for the ORIGINAL id under the target hub: {out}"
+        );
+        assert!(
+            out.contains(
+                "SELECT 1 FROM inventory_product WHERE \"hub_id\" = 'h1' AND id = 'src-prod'"
+            ),
+            "module rows keep their ids too: {out}"
+        );
+        // And no derived id leaked in: every literal the bundle carried is still there, which
+        // also means the FKs of the bundle's OTHER files (not remapped, or remapped with their
+        // own empty map) still point at rows that exist.
+        assert_eq!(
+            out.matches(derive_id("h1", "u-1").as_str()).count()
+                + out.matches(derive_id("h1", "src-prod").as_str()).count(),
+            0,
+            "same-hub restore derived ids nobody asked for: {out}"
+        );
+        // The M2M link is a FK-only row in the SAME file: rewriting it (or its guard) towards a
+        // derived id would point at a product nobody inserted and duplicate the link on re-import.
+        let link = out
+            .lines()
+            .find(|l| l.contains("INSERT INTO inventory_product_categories"))
+            .expect("the link row survived the rewrite");
+        assert!(
+            link.contains("'src-prod'") && link.contains("'src-cat'"),
+            "same-hub restore must not rewrite the link's FKs: {link}"
         );
     }
 
@@ -2386,7 +2470,7 @@ mod tests {
                    INSERT INTO inventory_product_categories (\"product_id\", \"category_id\") \
                    SELECT 'src-prod', 'src-cat' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product_categories WHERE product_id = 'src-prod');";
-        let out = remap_section_ids(sql, "h2", &Default::default());
+        let out = remap_section_ids(sql, "h2", &Default::default(), false);
 
         assert!(
             !out.contains("'src-prod'"),
@@ -2437,7 +2521,7 @@ mod tests {
                    INSERT INTO inventory_product (\"id\", \"hub_id\", \"category_id\", \"tax_rate_id\") \
                    SELECT 'src-prod', 'h2', 'src-cat', 'ext-rate' \
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');";
-        let out = remap_section_ids(sql, "h2", &Default::default());
+        let out = remap_section_ids(sql, "h2", &Default::default(), false);
 
         // `ext-rate` no es id de ninguna fila del bundle → se conserva (referencia externa).
         assert!(
@@ -2501,7 +2585,7 @@ mod tests {
                 seeded_only: false,
             }],
         );
-        let out = remap_section_ids(sql, "h2", &keys);
+        let out = remap_section_ids(sql, "h2", &keys, false);
 
         assert!(
             out.contains("\"hub_id\" = 'h2' AND id = "),
