@@ -138,7 +138,7 @@ test.describe('an older version asked for by «Update» is refused by the runtim
 
       const toast = page.locator('ion-toast').filter({ hasText: 'Esta app no se puede pasar a esa versión' });
       await expect(toast).toBeVisible();
-      // The danger toast is gone after 2.5 s: the shot is taken as soon as it is on screen.
+      // The danger toast stays until «Cerrar» is pressed (hub#2594); the shot is taken as soon as it is on screen.
       const shot = `update-refused-version-${size.width}x${size.height}.png`;
       await page.screenshot({ path: SHOTS_DIR ? join(SHOTS_DIR, shot) : testInfo.outputPath(shot) });
 

@@ -907,6 +907,15 @@ function closeButton(): ToastButton {
 }
 
 /**
+ * The hub refused to switch off, uninstall or update an app (hub#2594). The reason is a long
+ * sentence that says what to do next («Open VeriFactu to send them…»): it stays in red until the
+ * person closes it, like a failed install (hub#2244). It used to go away after 2.5 s, unread.
+ */
+function notifyRefusal(msg: string): void {
+  showToast(msg, 'danger', 0, [closeButton()]);
+}
+
+/**
  * El módulo entró pero sus permisos NO se concedieron (pm#132).
  *
  * Es la red de seguridad: sin ella el siguiente paso del usuario es abrir el módulo y leer «no
@@ -1037,18 +1046,14 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
     reloadForModuleUpdate();
   } catch (e) {
     if (e instanceof InstallBlockedError) {
-      // ADR-0060: a la versión nueva le faltan módulos de pago sin contratar. No se ha tocado nada
-      // y NO se ha cobrado nada; el módulo sigue en la versión anterior. Sticky para poder leerlo.
-      notify(
-        t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') }),
-        'danger',
-        0,
-      );
+      // ADR-0060: the new version needs paid apps not subscribed to. Nothing was touched and
+      // NOTHING was charged; the app stays on its previous version. Sticky so it can be read.
+      notifyRefusal(t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') }));
     } else {
       // What the RUNTIME said, and only if it said anything (hub#673). What matters about the
       // message is still that the module was NOT left half-done — the runtime guarantees that,
       // not the sentence.
-      notify(moduleFailureMessage(e, t('apps.updateError', { name }), { t, te }), 'danger');
+      notifyRefusal(moduleFailureMessage(e, t('apps.updateError', { name }), { t, te }));
     }
   } finally {
     setUpdating(id, false);
@@ -1448,7 +1453,7 @@ async function toggleModule(m: InstalledModule): Promise<void> {
     await loadInstalled();
     void refreshModuleNav();
   } catch (e) {
-    notify(moduleFailureMessage(e, t('apps.toggleError', { name: m.name }), { t, te }), 'danger');
+    notifyRefusal(moduleFailureMessage(e, t('apps.toggleError', { name: m.name }), { t, te }));
   }
 }
 
@@ -1495,11 +1500,11 @@ async function removeModule(m: InstalledModule): Promise<void> {
     // names the apps THE RUNTIME sent, which are the real ones.
     if (e instanceof ModuleActionError && e.code === 'has_dependents') {
       const names = (e.dependents ?? []).join(', ');
-      notify(t('apps.uninstallBlocked', { name: m.name, apps: names }), 'danger');
+      notifyRefusal(t('apps.uninstallBlocked', { name: m.name, apps: names }));
       await loadInstalled();
       return;
     }
-    notify(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name }), { t, te }), 'danger');
+    notifyRefusal(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name }), { t, te }));
   }
 }
 
