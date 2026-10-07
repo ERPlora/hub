@@ -39,7 +39,13 @@ const FLAN = {
 
 function fakeClient(
   items: unknown[] = [CROQUETAS, CANAS],
-  header: Record<string, unknown> = { id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018', status: 'cancelled' },
+  header: Record<string, unknown> = {
+    id: 'k-1',
+    label: 'Mesa 4',
+    round_number: 2,
+    order_number: 'C-018',
+    status: 'cancelled',
+  },
 ) {
   return {
     query: vi.fn(async (name: string) => {
