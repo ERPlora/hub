@@ -52,6 +52,8 @@ read_unavailable_reason_hub2410                  # por qué no resolvió una rea
 reads_e2e
 reset_test
 reset_undo_test
+restore_own_backup_roundtrip_hub2513              # el IMPORT conserva los ids de la copia propia
+                                                  # (hub#2513): `taxes` + `inventory` son el banco
 sale_event_client_instance                       # el DISPATCHER pasa la pestaña al sink en el
                                                  # sitio WASM (hub#1980): `sales` es el banco
 sale_refused_without_route_in_production_hub1935 # el gate fiscal del DISPATCHER (hub#1935):
