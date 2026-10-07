@@ -136,8 +136,9 @@ pub(crate) async fn index_module_embeddings(
     }
 }
 
-/// Cuerpo (opcional) de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo
-/// que se ofrece por defecto; con `version` = la que se eligió (palanca de soporte).
+/// Optional body of `POST /api/modules/:id/update`. No `version` = **the latest**, the default
+/// offer; with `version` = the one picked from the list, and only one the list would offer
+/// (forwards, or the pin when support set one — hub#2546).
 ///
 /// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
 /// (ADR-0269 — nadie se queda atrás). Clavar es el **pin de soporte**, herramienta nuestra, y no se
@@ -221,6 +222,20 @@ pub(crate) async fn update_module(
         .unwrap_or_default()
         .version
         .unwrap_or_default();
+    // hub#2546: an explicit version is held to the version list's rule (`module_update::offer`),
+    // or typing it into the request walks around the support pin and goes backwards. Checked here,
+    // at the administrator's door, and not in `resolve_update_target`: the rollback below and the
+    // reconcile between copies (HUB-F26) pass explicit versions that are not anyone's choice.
+    let explicit = requested.trim();
+    if !matches!(explicit, "" | "latest") {
+        let pinned = install::support_pin(&*st.runtime.read().await, &module_id).await;
+        if !erplora_runtime::module_update::may_request(&installed, pinned.as_deref(), explicit) {
+            return install_error_response(&install::InstallError::VersionNotOffered {
+                module_id,
+                version: explicit.to_string(),
+            });
+        }
+    }
     let target = install::resolve_update_target(
         &st.marketplace_http,
         &st.config.cloud_base_url,
@@ -567,6 +582,9 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
         // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
         install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        // hub#2546: the module's state (a support pin, or a newer version installed) is what
+        // refuses the version asked for — nothing failed, nothing was touched.
+        install::InstallError::VersionNotOffered { .. } => StatusCode::CONFLICT,
         // hub#1720: el Cloud CONTESTÓ que ese módulo no está en el catálogo de este hub. Es la
         // misma frase que `VersionNotFound` un escalón más arriba —«eso no existe para ti»—, así
         // que se cuenta igual y no como una avería.
@@ -1111,6 +1129,7 @@ mod install_error_status_tests {
         NotInCatalog,
         CloudRejected,
         CloudTimeout,
+        VersionNotOffered,
     );
 
     fn tag(e: &install::InstallError) -> Tag {
@@ -1127,6 +1146,7 @@ mod install_error_status_tests {
             install::InstallError::NotInCatalog { .. } => Tag::NotInCatalog,
             install::InstallError::CloudRejected { .. } => Tag::CloudRejected,
             install::InstallError::CloudTimeout => Tag::CloudTimeout,
+            install::InstallError::VersionNotOffered { .. } => Tag::VersionNotOffered,
         }
     }
 
@@ -1159,6 +1179,10 @@ mod install_error_status_tests {
             },
             Tag::CloudRejected => install::InstallError::CloudRejected { status: 500 },
             Tag::CloudTimeout => install::InstallError::CloudTimeout,
+            Tag::VersionNotOffered => install::InstallError::VersionNotOffered {
+                module_id: "sales".into(),
+                version: "0.5.0".into(),
+            },
         }
     }
 

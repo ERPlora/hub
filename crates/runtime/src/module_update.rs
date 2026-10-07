@@ -121,8 +121,9 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
 ///   mientras se arregla la `3.2`, un desplegable que ofrezca la `3.2` es la forma de saltárselo.
 /// - **Nada en cuarentena.** Es literalmente para lo que se marca rota una versión.
 /// - **Nada hacia atrás, ni la instalada.** Bajar ejecutaría migraciones ya pasadas sobre datos que
-///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Bajar a un cliente sigue siendo la palanca
-///   de soporte —versión explícita contra la ruta de update—, no una opción del dueño.
+///   la nueva escribió, y no hay `down` (ADR-0269 §3.4). Moving a customer back is support's lever
+///   —the pin, which the resolver follows—, never the owner's: an explicit version on the update
+///   route is held to this same rule ([`may_request`], hub#2546).
 /// - **Lo que no se puede ordenar, no se ofrece**; y si la ilegible es la instalada, no se ofrece
 ///   nada: sin poder comparar no se sabe qué sería «hacia delante».
 ///
@@ -160,6 +161,34 @@ pub fn offer(
         .into_iter()
         .map(|(_, version)| version.to_string())
         .collect()
+}
+
+/// Whether an administrator may ask the update door for this exact `requested` version (hub#2546).
+///
+/// **Not a second policy: [`offer`] asked about one version.** A version the list would not offer
+/// cannot be reached by typing it into the request either — otherwise the request is the door that
+/// lets in what the list keeps out:
+///
+/// - **A support pin leaves only the pin.** Asking for the pin is what the resolver already does on
+///   its own; anything else walks around it, up or down.
+/// - **Without a pin, only forwards** (or the installed one, which is a no-op).
+///
+/// Quarantine is not judged here: the caller does not read the marketplace before this, so the
+/// candidate is taken as installable and what is published is still checked by the install itself.
+pub fn may_request(installed: &str, pinned: Option<&str>, requested: &str) -> bool {
+    if let Some(pin) = pinned {
+        return requested == pin;
+    }
+    if requested == installed {
+        return true;
+    }
+    let candidate = [Available {
+        version: requested.to_string(),
+        is_active: true,
+    }];
+    offer(Some(installed), None, &candidate)
+        .iter()
+        .any(|offered| offered == requested)
 }
 
 /// Qué versión instalar por la que un BUNDLE anotó (`manifest.modules[].version`, hub#751/#752).
@@ -499,8 +528,8 @@ mod tests {
 
     /// **Elegir versión no es poder bajar de versión.** Retroceder ejecutaría migraciones ya
     /// pasadas sobre datos que la nueva escribió, y no hay `down` (ADR-0269 §3.4): no es una
-    /// operación que exista. Bajar a alguien sigue siendo la palanca de soporte —versión explícita
-    /// contra la ruta—, no un desplegable del dueño.
+    /// operación que exista. Moving someone back is support's pin, not an owner's dropdown nor an
+    /// explicit version on the route (hub#2546).
     #[test]
     fn an_installed_module_is_never_offered_a_downgrade() {
         let offered = offer(
@@ -824,5 +853,31 @@ mod tests {
     #[test]
     fn a_template_module_with_nothing_published_resolves_to_nothing() {
         assert_eq!(resolve_template_version("1.4.1", &[]), None);
+    }
+
+    // ── may_request: the update door holds an explicit version to `offer` (hub#2546) ──────────
+
+    #[test]
+    fn hub2546_an_explicit_version_behind_the_installed_one_is_not_requestable() {
+        assert!(!may_request("1.0.0", None, "0.5.0"));
+        assert!(may_request("1.0.0", None, "1.1.0"));
+    }
+
+    #[test]
+    fn hub2546_a_support_pin_leaves_only_the_pin_requestable() {
+        assert!(!may_request("1.0.0", Some("1.0.0"), "0.5.0"));
+        assert!(!may_request("1.0.0", Some("1.0.0"), "2.0.0"));
+        assert!(may_request("1.2.0", Some("1.0.0"), "1.0.0"));
+    }
+
+    #[test]
+    fn hub2546_asking_for_the_installed_version_is_a_no_op_not_a_refusal() {
+        assert!(may_request("1.0.0", None, "1.0.0"));
+    }
+
+    #[test]
+    fn hub2546_a_version_that_cannot_be_ordered_is_not_requestable() {
+        assert!(!may_request("1.0.0", None, "nightly"));
+        assert!(!may_request("no-semver", None, "2.0.0"));
     }
 }

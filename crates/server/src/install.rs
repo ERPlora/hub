@@ -160,6 +160,10 @@ pub enum InstallError {
     /// no headers, or the zip stopped arriving. Retrying later is all there is to do.
     #[error("the marketplace did not answer in time")]
     CloudTimeout,
+    /// An explicit version the update door does not move this hub to (hub#2546): support pinned the
+    /// module, or the version is behind the installed one. Same rule as the version list (HUB-F24).
+    #[error("`{module_id}` cannot be moved to {version} on this hub")]
+    VersionNotOffered { module_id: String, version: String },
 }
 
 impl InstallError {
@@ -200,6 +204,7 @@ impl InstallError {
             InstallError::NotInCatalog { .. } => "install_not_in_catalog",
             InstallError::CloudRejected { .. } => "install_cloud_rejected",
             InstallError::CloudTimeout => "install_cloud_timeout",
+            InstallError::VersionNotOffered { .. } => "update_version_not_offered",
         }
     }
 }
@@ -1122,10 +1127,12 @@ pub fn installed_version(runtime: &erplora_runtime::Runtime, module_id: &str) ->
 
 /// A qué versión debe ir un módulo instalado si se le pide actualizar (hub#516).
 ///
-/// Una versión **explícita** es nuestra (soporte): manda tal cual, sin resolver — es la única forma
-/// de bajar a alguien a `sales@3.1` mientras se arregla la `3.2`. Vacío o `latest` es el botón del
-/// dueño y el arranque, y ahí decide el **resolutor del arranque**: nunca una versión en cuarentena,
-/// nunca hacia atrás, y el pin de soporte gana.
+/// An **explicit** version goes as-is, unresolved: the administrator's door has already held it to
+/// the version list's rule (`module_update::may_request`, hub#2546), and the rollback of a failed
+/// update and the reconcile between copies (HUB-F26) pass explicit versions that are nobody's
+/// choice. Moving a customer back to `sales@3.1` while `3.2` is fixed is support's pin, not this.
+/// Empty or `latest` is the owner's button and the boot, and there the **boot resolver** decides:
+/// never a quarantined version, never backwards, and support's pin wins.
 ///
 /// Devuelve **siempre una versión concreta** (la instalada si no hay nada mejor), porque quien la
 /// pide necesita saber a dónde volver si el intento se cae.
