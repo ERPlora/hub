@@ -333,7 +333,7 @@ Implicados: HUB-F167, HUB_APP-F31
 QA: ninguno
 
 ### HUB_SHELL-F21 Cambiar mis datos, foto, idioma y apariencia
-Estado: parcial — el resumen de la cuenta se anuncia en inglés al lector de pantalla («Account summary»); si el perfil no carga, el formulario queda vacío y solo avisa «No se pudo cargar el perfil»
+Estado: parcial — el resumen de la cuenta se anuncia en inglés al lector de pantalla («Account summary»)
 Actor: administrador, responsable, empleado
 Pantalla: Mi perfil
 Pasos:
@@ -343,7 +343,7 @@ Pasos:
 4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» (modo «Sistema (auto)», «Claro», «Oscuro» y la paleta) se guardan al elegir y se aplican al momento; «Usar la apariencia del negocio» deshace lo propio.
 Entra: el perfil de quien tiene la sesión.
 Sale: pide al hub guardar el perfil, las preferencias y la foto; el idioma y la apariencia siguen a la persona en cualquier dispositivo en el que entre. El «Correo electrónico» no es solo de contacto: en una persona sin correo de acceso (todo usuario local), el hub lo usa para decidir qué membresía de erplora.com da o quita al cambiarle el rol o darla de baja (HUB-F143).
-Si falla: «No se pudo guardar el perfil»; foto rechazada: «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.».
+Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» («Tus datos siguen igual. Comprueba la conexión y vuelve a intentarlo.») con «Reintentar» en lugar de «Datos de la cuenta», «Preferencias» y «PIN», y sin «Cambiar foto»: no hay nada que guardar hasta que la lectura funcione; la cabecera (nombre y rol, de la sesión) y «Gestión de la cuenta» siguen, y mientras se lee sale el indicador de carga (hub#2541). Al guardar: «No se pudo guardar el perfil»; foto rechazada: «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.».
 Implicados: HUB-F143
 QA: ninguno
 
@@ -352,7 +352,7 @@ Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: Mi perfil
 Pasos:
-1. En **Mi perfil**, tarjeta «PIN»: «El PIN con el que entras en la caja. Cámbialo cuando quieras — no hace falta que lo haga nadie más.» (sin PIN: «Todavía no tienes un PIN. Establece uno para poder entrar también desde la caja.»).
+1. En **Mi perfil**, tarjeta «PIN» (solo cuando el perfil se pudo leer, HUB_SHELL-F21): «El PIN con el que entras en la caja. Cámbialo cuando quieras — no hace falta que lo haga nadie más.» (sin PIN: «Todavía no tienes un PIN. Establece uno para poder entrar también desde la caja.»).
 2. Si ya tienes PIN, escribe «PIN actual».
 3. Escribe «PIN nuevo» y «Repite el PIN nuevo» y pulsa «Cambiar PIN» (o «Establecer PIN»).
 4. «PIN actualizado».

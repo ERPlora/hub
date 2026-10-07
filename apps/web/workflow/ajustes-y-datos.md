@@ -34,7 +34,7 @@ Prefijo: HUB_SHELL
 ## Flujos
 
 ### HUB_SHELL-F155 Abrir Ajustes y moverse por sus pestañas
-Estado: parcial — si el hub no contesta a los ajustes, la pantalla enseña España, EUR y español como si fueran los del negocio, sin avisar (leído, sin ejecutar)
+Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: Ajustes
 Pasos:
@@ -44,9 +44,10 @@ Pasos:
 4. Quien no es dueño ni administrador ve todo en solo lectura: los desplegables se sustituyen por el valor, los campos no se pueden editar, los interruptores no se pueden pulsar y muestran su valor, y el botón «Guardar cambios» no existe.
 5. **General** también trae tres tarjetas que son de otras áreas: «Este dispositivo» (HUB_SHELL-F11), «Pinpad» y «Dispositivos» (HUB_SHELL-F99 a F104).
 6. Cada cambio de **General** se guarda al instante («Ajustes guardados»); **Negocio** se guarda con su botón.
+7. Mientras llegan los ajustes, **General** y **Negocio** enseñan lo que ya se leyó antes en la sesión o, si no hay nada, el indicador de carga («Cargando los ajustes del negocio…»).
 Entra: los ajustes del negocio que da el hub (HUB-F220); se leen al arrancar y otra vez al abrir la pantalla.
 Sale: nada guardado.
-Si falla: la lectura al abrir no avisa si falla; se queda lo que había en memoria, o los valores por defecto si no había nada. Lo que depende de los nombres y direcciones de las pestañas está listado en el índice (los módulos enlazan a `#hub` y, en versiones publicadas, a `#tax`).
+Si falla: si la lectura al abrir falla, **General** y **Negocio** dicen «No se pudieron cargar los ajustes del negocio» («Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.») con «Reintentar», en lugar de lo que sale de esa lectura: en General, País, Zona horaria, Moneda, Idioma del negocio, Paleta, «Mostrar documentación de la API» y la tarjeta «Pinpad»; en Negocio, el formulario entero con «Guardar cambios». No se pinta ningún valor por defecto ni lo leído antes en la sesión, y no hay nada que guardar encima. «Este dispositivo», «Dispositivos», la fila de hardware y las pestañas Impresión, Permisos y Datos y copias no dependen de esa lectura y siguen. «Reintentar» vuelve a leer (el botón se apaga mientras tanto) y, si contesta, sale todo con lo guardado (hub#2541). Lo que depende de los nombres y direcciones de las pestañas está listado en el índice (los módulos enlazan a `#hub` y, en versiones publicadas, a `#tax`).
 Implicados: HUB-F220, VERIFACTU-F01, REC_ALTA-F09
 QA: ninguno
 
