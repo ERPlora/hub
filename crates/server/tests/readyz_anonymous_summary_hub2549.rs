@@ -35,7 +35,12 @@ struct Fixture {
 /// ledger is gone, so the `migrations` check fails with the database's own error text — the
 /// internal detail hub#2549 is about.
 async fn fixture(broken: bool) -> Fixture {
-    fixture_without(if broken { Some("_hub_migrations") } else { None }).await
+    fixture_without(if broken {
+        Some("_hub_migrations")
+    } else {
+        None
+    })
+    .await
 }
 
 /// The same hub with `table` dropped after the sessions are open.
@@ -43,7 +48,10 @@ async fn fixture_without(table: Option<&str>) -> Fixture {
     let test_db = TestDb::new().await;
     let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), HUB);
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let cashier_id = rt
         .create_user("cashier", "4444", "cashier", None)
         .await
@@ -101,9 +109,16 @@ async fn readyz(router: &axum::Router, session: Option<&str>) -> (StatusCode, Va
 /// Every check of an anonymous answer is `{status}` and nothing else.
 fn assert_only_statuses(body: &Value, who: &str) {
     let checks = body["checks"].as_object().expect("checks is an object");
-    assert!(!checks.is_empty(), "{who}: the parts are still listed: {body}");
+    assert!(
+        !checks.is_empty(),
+        "{who}: the parts are still listed: {body}"
+    );
     for (name, check) in checks {
-        let keys: Vec<&String> = check.as_object().expect("a check is an object").keys().collect();
+        let keys: Vec<&String> = check
+            .as_object()
+            .expect("a check is an object")
+            .keys()
+            .collect();
         assert_eq!(
             keys,
             vec!["status"],
