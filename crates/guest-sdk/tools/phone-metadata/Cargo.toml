@@ -1,0 +1,15 @@
+# Generator of `crates/guest-sdk/src/phone/metadata.rs` (customers#121, appointments#313): reads libphonenumber's metadata
+# through the `phonenumber` crate and writes the per-country table the handler normalises with.
+# Not part of the SDK build (its own workspace, outside the hub's members); run it by hand when libphonenumber moves:
+#   cargo run --release --manifest-path crates/guest-sdk/tools/phone-metadata/Cargo.toml > crates/guest-sdk/src/phone/metadata.rs
+[package]
+name = "phone-metadata"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+phonenumber = "=0.3.10"
+
+[workspace]
