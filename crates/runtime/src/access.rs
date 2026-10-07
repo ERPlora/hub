@@ -448,6 +448,15 @@ impl Runtime {
         identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
+    /// When the live session behind `token` runs out (hub#2600), or `None` if it is not a live
+    /// session of this hub.
+    pub async fn session_expires_at(
+        &self,
+        token: &str,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
+        identity::session_expires_at(self.db.as_ref(), &self.hub_id, token).await
+    }
+
     /// **Why** the session behind `token` is no longer valid, when [`Self::resolve_session`] says
     /// nothing (hub#1801).
     ///
