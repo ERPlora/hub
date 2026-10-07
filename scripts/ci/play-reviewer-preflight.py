@@ -18,6 +18,9 @@ Exits 0 only when ALL of it holds, and 1 naming the first thing that does not:
   hub_not_in_account   PLAY_REVIEWER_HUB names a hub that is not one of the account's
   hub_unreachable      that hub's address does not answer
   hub_not_ready        it answers, but it is not `status: UP`
+  hub_session_refused  the hub would not open a session for the account (its module count is
+                       only shown to an owner/admin session since hub#2549)
+  hub_detail_withheld  it opened one, but the account does not administer that hub
   hub_without_modules  it is up and EMPTY                               → the 09/09 shell
 
 The slug is never written here: it comes from `PLAY_REVIEWER_HUB`. A hardcoded one would keep
@@ -110,10 +113,16 @@ def credentials() -> tuple[str, str, str]:
 
 
 def request(
-    url: str, *, data: dict | None = None, token: str | None = None
+    url: str,
+    *,
+    data: dict | None = None,
+    token: str | None = None,
+    hub_session: str | None = None,
 ) -> tuple[int, str]:
     """`(status, body)`. An HTTP error is an answer, not a crash — the verdict reads its code."""
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    if hub_session:
+        headers["X-Hub-Session"] = hub_session
     body = None
     if data is not None:
         body = json.dumps(data).encode()
@@ -213,12 +222,37 @@ def main() -> None:
         )
 
     # ── 5. …and is not an empty shell. This is the 09/09 failure ─────────────
+    # Since hub#2549 an anonymous `/readyz` says only whether each part is up: the module count is
+    # for an owner/admin session. The account enters its hub through the same door the reviewer's
+    # app uses (the SaaS `access` → `/api/auth/cloud`), and asks again with that session.
+    status, raw = request(f"{hub_url}/api/auth/cloud", data={}, token=token)
+    if status == 0:
+        fail("hub_unreachable", f"{hub_url}/api/auth/cloud no contesta: {raw}")
+    session = as_json(raw)
+    hub_session = session.get("token") if isinstance(session, dict) else None
+    if status != 200 or not hub_session:
+        fail(
+            "hub_session_refused",
+            f"el hub {wanted_slug} no abre sesión a la cuenta de revisión (HTTP {status}): "
+            "si a esta cuenta no la deja entrar, al revisor tampoco.",
+        )
+    status, raw = request(f"{hub_url}/readyz", hub_session=hub_session)
+    ready = as_json(raw)
+    if status == 0 or not isinstance(ready, dict):
+        fail("hub_not_ready", f"{hub_url}/readyz dejó de contestar con sesión: {raw}")
     modules = (
         ready.get("checks", {}).get("modules", {})
         if isinstance(ready.get("checks"), dict)
         else {}
     )
     registered = modules.get("registered") if isinstance(modules, dict) else None
+    if registered is None:
+        fail(
+            "hub_detail_withheld",
+            f"el hub {wanted_slug} abre sesión a la cuenta de revisión pero no le enseña cuántos "
+            "módulos tiene: la cuenta no es dueña ni administradora de ese hub, así que no se "
+            "puede comprobar qué verá el revisor. Usa una cuenta que lo administre.",
+        )
     if not isinstance(registered, int) or registered <= 0:
         fail(
             "hub_without_modules",

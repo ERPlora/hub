@@ -88,6 +88,7 @@ scenario = json.load(open(sys.argv[1]))
 port_file, ua_log = sys.argv[2], sys.argv[3]
 expected_email, expected_password = sys.argv[4], sys.argv[5]
 TOKEN = "tok"
+HUB_SESSION = "hub-session"
 
 
 class H(BaseHTTPRequestHandler):
@@ -118,6 +119,18 @@ class H(BaseHTTPRequestHandler):
             if scenario.get("login_without_access"):
                 return self._send(200, {"user": {"email": expected_email, "id": "1"}})
             return self._send(200, {"access": TOKEN, "refresh": "r", "user": {"email": expected_email, "id": "1"}})
+        if self.path.startswith("/hub/") and self.path.endswith("/api/auth/cloud"):
+            # The hub's own door for a SaaS account (hub#2549): the SaaS `access` goes in as the
+            # Bearer and a hub session comes back as `token`, like at the real runtime.
+            slug = self.path[len("/hub/"):-len("/api/auth/cloud")]
+            if slug not in scenario.get("readyz", {}):
+                return self._send(404, {"detail": "no such hub"})
+            if self.headers.get("Authorization") != f"Bearer {TOKEN}":
+                return self._send(401, {"ok": False, "code": "cloud_token_invalid"})
+            code = scenario.get("cloud_session_status", 200)
+            if code != 200:
+                return self._send(code, {"ok": False, "code": "cloud_login_refused"})
+            return self._send(200, {"ok": True, "token": HUB_SESSION})
         self._send(404, {"detail": "nope"})
 
     def do_GET(self):
@@ -134,7 +147,16 @@ class H(BaseHTTPRequestHandler):
             spec = scenario.get("readyz", {}).get(slug)
             if spec is None:
                 return self._send(404, {"detail": "no such hub"})
-            return self._send(spec.get("code", 200), spec.get("body", {}))
+            body = spec.get("body", {})
+            # Like the real runtime since hub#2549: the inside of each check (the module count
+            # among it) only reaches an owner/admin session; anybody else reads the statuses.
+            admin = scenario.get("session_is_admin", True)
+            if not (admin and self.headers.get("X-Hub-Session") == HUB_SESSION) and isinstance(body.get("checks"), dict):
+                body = dict(body, checks={
+                    name: {"status": check.get("status")} if isinstance(check, dict) else check
+                    for name, check in body["checks"].items()
+                })
+            return self._send(spec.get("code", 200), body)
         self._send(404, {"detail": "nope"})
 
     def log_message(self, *a):
@@ -319,6 +341,19 @@ expect_fail "🔴 login 200 pero sin \`access\` → ROJO" "$tmp/env.noaccess" "l
 start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
 write_env "$tmp/env.saasdown" "$FAKE_SLUG"
 expect_fail "🔴 el SaaS no responde (nadie escuchando) → ROJO" "$tmp/env.saasdown" "saas_unreachable" "" "http://127.0.0.1:1"
+
+# 2i. 🔴 hub#2549: el hub ya no cuenta sus módulos a quien no ha entrado. El control entra en el
+# hub con la propia cuenta (la misma puerta que usa el revisor); si el hub no le abre sesión, no
+# puede contar nada, y eso es ROJO, nunca «cero módulos» ni un verde.
+start_stub "{\"cloud_session_status\": 403, \"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.nosession" "$FAKE_SLUG"
+expect_fail "🔴 el hub no abre sesión a la cuenta de revisión → ROJO" "$tmp/env.nosession" "hub_session_refused"
+
+# 2j. La sesión se abre pero la cuenta no administra el hub: /readyz le da solo los estados y el
+# recuento de módulos no llega. No se puede comprobar → ROJO con su código, no «sin módulos».
+start_stub "{\"session_is_admin\": false, \"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
+write_env "$tmp/env.notadmin" "$FAKE_SLUG"
+expect_fail "🔴 la cuenta no administra su hub (sin detalle en /readyz) → ROJO" "$tmp/env.notadmin" "hub_detail_withheld"
 
 # ── 3. Sin válvula: faltar configuración es ROJO, nunca un skip silencioso ───
 start_stub "{\"hubs\": [\"$FAKE_SLUG\"], \"readyz\": {\"$FAKE_SLUG\": {\"code\": 200, \"body\": $healthy_body}}}"
