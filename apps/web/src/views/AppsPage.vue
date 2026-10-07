@@ -548,10 +548,19 @@ const installedIds = computed<Set<string>>(() => new Set(installedModules.value.
 // is blocked: the runtime still refuses a too-new app at install time (hub#1620).
 const hubVersion = ref<string | null>(null);
 async function loadHubVersion(): Promise<void> {
+  // The version travels in the System state, which the runtime gives to an owner or an administrator
+  // only (hub#2519) — and installing is theirs too: nobody else is asked for, nor warned about, a
+  // floor they cannot act on.
+  if (!isAdmin.value) {
+    hubVersion.value = null;
+    return;
+  }
   const info = await fetchSystemInfo();
   if (!info) console.warn('[apps] could not read the hub version: the catalog cannot warn about app floors');
   hubVersion.value = info?.hubVersion ?? null;
 }
+// The session may resolve after the page opened, or change hands on a shared till.
+watch(isAdmin, () => void loadHubVersion());
 
 // Los ids que el CATÁLOGO trae hoy. Estar ahí ya es la respuesta: la lista del marketplace sólo
 // sirve `publication_status='listed'` (lo filtra el SaaS en su acción `list`), así que un módulo

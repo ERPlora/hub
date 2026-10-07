@@ -128,7 +128,7 @@ Entra: la sesión de dueño o administrador (no una llave), la misma puerta que 
 Sale: nada guardado.
 En este mismo documento se apoya en: HUB-F50 (Dejar un aviso en la cola al guardar una orden), HUB-F51 (Entregar un aviso a los módulos que lo escuchan), HUB-F52 (Reintentar un aviso que un módulo no pudo procesar).
 Si falla: «No se pudo consultar el sistema» con «Reintentar»; si erplora.com no da los documentos, la lista sale vacía.
-Implicados: HUB_SHELL-F135, HUB_SHELL-F136, HUB_SHELL-F144, SAAS_DASHBOARD-F69
+Implicados: HUB_SHELL-F114, HUB_SHELL-F118, HUB_SHELL-F135, HUB_SHELL-F136, HUB_SHELL-F144, SAAS_DASHBOARD-F69
 QA: ninguno
 
 ### HUB-F167 Saber qué versión corre y qué se le ha actualizado
