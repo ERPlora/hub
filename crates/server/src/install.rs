@@ -8,7 +8,8 @@
 //!      de módulos, con el SHA256 calculado sobre la marcha (hub#981: el zip no vive en RAM).
 //!   3. verify SHA256 + unzip    → reusa `erplora-source::ModuleStore` (anti zip-slip + cache),
 //!      leyendo del fichero (`install_from_file`).
-//!   4. `Runtime::install_from_dir` → migra, registra capacidades, deja el módulo activo.
+//!   4. `Runtime::install_from_dir` → migra, registra capacidades; activo si es la primera vez,
+//!      y si no con el estado que ya tenía en este hub (hub#2544).
 //!   5. `POST mark_installed/`   → registra la instalación en el Cloud (best-effort).
 //!
 //! Auth = JWT del usuario activo (`Authorization: Bearer`) + `X-Hub-Id` (cabeceras de la
@@ -1666,7 +1667,8 @@ fn install_recursive<'a, 'r: 'a>(
             dragged_in.push(installed_dep.module_id);
         }
 
-        // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
+        // (5) Install the module (migrates, registers; keeps a recorded on/off state, hub#2544) —
+        // its deps already present.
         on_progress(&module_id, "installing");
         let installed_id = runtime
             .register(&dir, &module_id, updating.as_deref())
