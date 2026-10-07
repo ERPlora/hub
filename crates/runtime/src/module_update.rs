@@ -172,19 +172,33 @@ pub fn offer(
 /// - **A support pin leaves only the pin.** Asking for the pin is what the resolver already does on
 ///   its own; anything else walks around it, up or down.
 /// - **Without a pin, only forwards** (or the installed one, which is a no-op).
+/// - **Only what is published, nothing in quarantine** (hub#2596): `published` is what the
+///   marketplace's `versions/` lists. erplora.com leaves a quarantined version out of it (it keeps
+///   only active rows), so a version the list does not name — or names as inactive — is one the
+///   list would never offer. The pin still wins, as in [`resolve`].
 ///
-/// Quarantine is not judged here: the caller does not read the marketplace before this, so the
-/// candidate is taken as installable and what is published is still checked by the install itself.
-pub fn may_request(installed: &str, pinned: Option<&str>, requested: &str) -> bool {
+/// `published: None` is «I don't know» (`versions/` could not be read, hub#2336): only the pin
+/// and the direction are judged, and what is published is left to the install, whose plan and
+/// download refuse what erplora.com does not publish.
+pub fn may_request(
+    installed: &str,
+    pinned: Option<&str>,
+    requested: &str,
+    published: Option<&[Available]>,
+) -> bool {
     if let Some(pin) = pinned {
         return requested == pin;
     }
     if requested == installed {
         return true;
     }
+    let is_active = published.is_none_or(|list| {
+        list.iter()
+            .any(|candidate| candidate.version == requested && candidate.is_active)
+    });
     let candidate = [Available {
         version: requested.to_string(),
-        is_active: true,
+        is_active,
     }];
     offer(Some(installed), None, &candidate)
         .iter()
@@ -859,25 +873,82 @@ mod tests {
 
     #[test]
     fn hub2546_an_explicit_version_behind_the_installed_one_is_not_requestable() {
-        assert!(!may_request("1.0.0", None, "0.5.0"));
-        assert!(may_request("1.0.0", None, "1.1.0"));
+        assert!(!may_request("1.0.0", None, "0.5.0", None));
+        assert!(may_request("1.0.0", None, "1.1.0", None));
     }
 
     #[test]
     fn hub2546_a_support_pin_leaves_only_the_pin_requestable() {
-        assert!(!may_request("1.0.0", Some("1.0.0"), "0.5.0"));
-        assert!(!may_request("1.0.0", Some("1.0.0"), "2.0.0"));
-        assert!(may_request("1.2.0", Some("1.0.0"), "1.0.0"));
+        assert!(!may_request("1.0.0", Some("1.0.0"), "0.5.0", None));
+        assert!(!may_request("1.0.0", Some("1.0.0"), "2.0.0", None));
+        assert!(may_request("1.2.0", Some("1.0.0"), "1.0.0", None));
     }
 
     #[test]
     fn hub2546_asking_for_the_installed_version_is_a_no_op_not_a_refusal() {
-        assert!(may_request("1.0.0", None, "1.0.0"));
+        assert!(may_request("1.0.0", None, "1.0.0", None));
+    }
+
+    // ── may_request: quarantine is part of the rule, as it is for `offer` (hub#2596) ─────────
+
+    fn published(entries: &[(&str, bool)]) -> Vec<Available> {
+        entries
+            .iter()
+            .map(|(version, is_active)| Available {
+                version: version.to_string(),
+                is_active: *is_active,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn hub2596_an_explicit_quarantined_version_is_not_requestable() {
+        let list = published(&[("1.0.0", true), ("2.0.0", false)]);
+        assert!(!may_request("1.0.0", None, "2.0.0", Some(&list)));
+    }
+
+    #[test]
+    fn hub2596_an_active_version_next_to_a_quarantined_one_stays_requestable() {
+        let list = published(&[("1.0.0", true), ("2.0.0", true), ("3.0.0", false)]);
+        assert!(may_request("1.0.0", None, "2.0.0", Some(&list)));
+    }
+
+    #[test]
+    fn hub2596_a_version_the_published_list_leaves_out_is_not_requestable() {
+        // How erplora.com shows quarantine: `versions/` keeps only active rows, so a version marked
+        // broken is absent. The list would never offer it, so it cannot be asked for by name.
+        assert!(!may_request(
+            "1.0.0",
+            None,
+            "2.0.0",
+            Some(&published(&[("1.0.0", true)]))
+        ));
+        assert!(!may_request("1.0.0", None, "2.0.0", Some(&[])));
+    }
+
+    #[test]
+    fn hub2596_without_the_published_list_only_the_hubs_own_rule_applies() {
+        // `versions/` could not be read: «I don't know» (hub#2336). The pin and the direction still
+        // hold; what is published is left to the plan and the download (SAAS_PUBLIC-F09).
+        assert!(may_request("1.0.0", None, "2.0.0", None));
+        assert!(!may_request("1.0.0", None, "0.5.0", None));
+    }
+
+    #[test]
+    fn hub2596_the_support_pin_wins_over_quarantine_as_in_resolve() {
+        let list = published(&[("1.0.0", true), ("2.0.0", false)]);
+        assert!(may_request("1.0.0", Some("2.0.0"), "2.0.0", Some(&list)));
+    }
+
+    #[test]
+    fn hub2596_the_installed_version_stays_a_no_op_even_if_quarantined() {
+        let list = published(&[("1.0.0", false)]);
+        assert!(may_request("1.0.0", None, "1.0.0", Some(&list)));
     }
 
     #[test]
     fn hub2546_a_version_that_cannot_be_ordered_is_not_requestable() {
-        assert!(!may_request("1.0.0", None, "nightly"));
-        assert!(!may_request("no-semver", None, "2.0.0"));
+        assert!(!may_request("1.0.0", None, "nightly", None));
+        assert!(!may_request("no-semver", None, "2.0.0", None));
     }
 }
