@@ -211,7 +211,7 @@ Pasos:
 5. Las pantallas reciben un `module.uninstalled` por cada app quitada, en el orden en que se fueron.
 Entra: `POST /api/modules/:id/uninstall` con sesión de administrador y, opcionalmente, `{"force": true}`.
 Sale: la app (y, al forzar, sus dependientes) fuera del hub; la respuesta es `{"ok": true}` y, si se fueron dependientes, `also_uninstalled` con sus identificadores, la más lejana primero. **Sus tablas y sus datos se quedan** en la base, y también su carpeta en la caché de descargas, sus permisos de host concedidos y su declaración fiscal. ERPlora no recibe aviso de la desinstalación.
-Si falla: dependientes sin forzar, `has_dependents` (409) con la lista en `dependents`; motor con trabajo pendiente o último proveedor fiscal (de la app o de cualquiera de sus dependientes al forzar), su código (409); nada cambia.
+Si falla: dependientes sin forzar, `has_dependents` (409) con la lista en `dependents`; motor con trabajo pendiente o último proveedor fiscal (de la app o de cualquiera de sus dependientes al forzar), su código (409); nada cambia. Si la base falla a mitad de quitarlas, la respuesta es el error y se quedan quitadas solo las más lejanas que ya se fueron: ninguna de las que siguen instaladas se queda sin la suya, y repetir la desinstalación quita el resto.
 Implicados: HUB_SHELL-F124, HUB_SHELL-F125, VERIFACTU-F32, SAAS_PUBLIC-F19
 QA: L-14
 
