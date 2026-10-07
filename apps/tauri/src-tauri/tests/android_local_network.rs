@@ -65,6 +65,13 @@ const REQUIRED: &[&str] = &[
     // throws a SecurityException and Android freezes the page the moment the screen goes dark.
     "android.permission.FOREGROUND_SERVICE",
     "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+    // A module asking where the device is (hub#2552); the first one is `attendance`, which can
+    // require the employee to clock in near the venue. RUNTIME permissions: wry's
+    // `RustWebChromeClient.onGeolocationPermissionsShowPrompt` asks for them when a page calls
+    // `navigator.geolocation`. Without the declaration the request is answered DENIED with no
+    // dialog, the page gets PERMISSION_DENIED, and a personal-device clock-in is rejected forever.
+    "android.permission.ACCESS_FINE_LOCATION",
+    "android.permission.ACCESS_COARSE_LOCATION",
 ];
 
 /// The hardware feature the NFC permission drags in behind it (hub#988).
@@ -75,6 +82,20 @@ const REQUIRED: &[&str] = &[
 /// LEAST likely to own a USB reader and most in need of the app. The listing would narrow because
 /// of a convenience feature, and nothing in the build would say so.
 const NFC_FEATURE: &str = "android.hardware.nfc";
+
+/// The hardware feature the location permissions drag in behind them (hub#2552).
+///
+/// Same trap as [`NFC_FEATURE`], and NOT gated by the target SDK: only the `.gps` / `.network`
+/// sub-features stop being implied at targetSdk 21, the parent `android.hardware.location` is
+/// implied by ACCESS_COARSE_LOCATION / ACCESS_FINE_LOCATION whatever the target (read back with
+/// aapt2 off an APK at minSdk 24 / targetSdk 36). The till does not need a location at all; only
+/// a module like `attendance` asks for one, on a personal phone, and degrades when there is none.
+const LOCATION_FEATURE: &str = "android.hardware.location";
+
+/// Every hardware feature that one of the permissions in [`REQUIRED`] implies and the till can
+/// live without. Each one must be declared `required="false"` or Play hides the app from every
+/// device lacking it.
+const OPTIONAL_FEATURES: &[&str] = &[NFC_FEATURE, LOCATION_FEATURE];
 
 /// The manifest of the generated Android project — the one a lost file makes `android init` rewrite.
 const APP_MANIFEST: &str = include_str!("../gen/android/app/src/main/AndroidManifest.xml");
@@ -155,6 +176,7 @@ fn an_unterminated_comment_hides_everything_after_it() {
 
 // ── The generated manifest still declares what the shell asks for ───────────────────────────────
 
+// Regression test for ERPlora/hub#2552
 #[test]
 fn the_generated_manifest_declares_every_permission_the_till_needs() {
     let declared = declared_permissions(APP_MANIFEST);
@@ -216,14 +238,14 @@ fn the_permissions_also_live_where_regenerating_the_project_cannot_reach_them() 
     }
 }
 
-// ── The NFC permission must not narrow who can install the app ──────────────────────────────────
+// ── A permission must not narrow who can install the app ────────────────────────────────────────
 
-/// Does this manifest say the NFC chip is OPTIONAL?
+/// Does this manifest say `feature` is OPTIONAL?
 ///
 /// Read as a live `<uses-feature>` tag with `required="false"` on it, for the same reason
 /// [`declared_permissions`] reads tags: the prose around it names the feature, and a `contains()`
 /// would keep passing on the explanation after the tag was gone.
-fn nfc_is_optional(manifest: &str) -> bool {
+fn feature_is_optional(manifest: &str, feature: &str) -> bool {
     without_comments(manifest)
         .split("<uses-feature")
         .skip(1)
@@ -231,7 +253,7 @@ fn nfc_is_optional(manifest: &str) -> bool {
             tag.split("android:name=\"")
                 .nth(1)
                 .and_then(|value| value.split('"').next())
-                == Some(NFC_FEATURE)
+                == Some(feature)
         })
         .any(|tag| {
             tag.split("android:required=\"")
@@ -245,17 +267,28 @@ fn nfc_is_optional(manifest: &str) -> bool {
 fn a_manifest_that_only_talks_about_the_feature_does_not_declare_it_optional() {
     // The guard has to detect the positive before it is allowed to certify a negative. A manifest
     // that merely mentions the feature — in a comment, or requiring it — is NOT the opt-out.
-    assert!(!nfc_is_optional(r#"<manifest><!-- android.hardware.nfc required=false --></manifest>"#));
-    assert!(!nfc_is_optional(
-        r#"<manifest><uses-feature android:name="android.hardware.nfc" android:required="true" /></manifest>"#
+    assert!(!feature_is_optional(
+        r#"<manifest><!-- android.hardware.nfc required=false --></manifest>"#,
+        NFC_FEATURE
     ));
-    assert!(nfc_is_optional(
-        r#"<manifest><uses-feature android:name="android.hardware.nfc" android:required="false" /></manifest>"#
+    assert!(!feature_is_optional(
+        r#"<manifest><uses-feature android:name="android.hardware.nfc" android:required="true" /></manifest>"#,
+        NFC_FEATURE
+    ));
+    assert!(feature_is_optional(
+        r#"<manifest><uses-feature android:name="android.hardware.nfc" android:required="false" /></manifest>"#,
+        NFC_FEATURE
+    ));
+    // A sibling feature being optional says nothing about this one: `.gps` is not the parent.
+    assert!(!feature_is_optional(
+        r#"<manifest><uses-feature android:name="android.hardware.location.gps" android:required="false" /></manifest>"#,
+        LOCATION_FEATURE
     ));
 }
 
+// Regression test for ERPlora/hub#2552
 #[test]
-fn the_nfc_permission_does_not_hide_the_app_from_tablets_without_a_chip() {
+fn an_implied_feature_does_not_hide_the_app_from_devices_without_it() {
     // Both copies, because either one alone would let the requirement back in: the merger takes
     // the STRICTEST of the two, so an app manifest that stays quiet while the plugin says
     // `required="false"` is fine, but a `required="true"` anywhere wins.
@@ -266,13 +299,16 @@ fn the_nfc_permission_does_not_hide_the_app_from_tablets_without_a_chip() {
             fs::read_to_string(plugin_manifest_path()).expect("the plugin manifest"),
         ),
     ] {
-        assert!(
-            nfc_is_optional(&manifest),
-            "{name} declares android.permission.NFC without saying the chip is optional. Google \
-             Play adds an IMPLICIT android.hardware.nfc requirement for that permission and hides \
-             the app from every device without one — the cheap counter tablets this till is for. \
-             Put back: <uses-feature android:name=\"{NFC_FEATURE}\" android:required=\"false\" /> (hub#988)"
-        );
+        for feature in OPTIONAL_FEATURES {
+            assert!(
+                feature_is_optional(&manifest, feature),
+                "{name} declares a permission that implies {feature} without saying it is \
+                 optional. Google Play adds that IMPLICIT requirement and hides the app from every \
+                 device without it — the cheap counter tablets this till is for. Put back: \
+                 <uses-feature android:name=\"{feature}\" android:required=\"false\" /> \
+                 (hub#988, hub#2552)"
+            );
+        }
     }
 }
 
@@ -299,16 +335,42 @@ fn the_release_build_reads_the_permissions_back_off_the_apk() {
             "the release job does not check {permission} on the built APK"
         );
     }
-    // And the feature the NFC permission drags in with it. This one is invisible everywhere else:
-    // an implicit `android.hardware.nfc` requirement breaks no build and fails no test — it just
-    // makes Play stop offering the app to devices without a chip, months later, silently.
-    // Matched loosely because the job's own pattern is a regex: aapt1 prints
+    // And the features those permissions drag in with them (NFC, location). Invisible everywhere
+    // else: an implicit hardware requirement breaks no build and fails no test — it just makes
+    // Play stop offering the app to devices without that hardware, months later, silently.
+    // Matched as the job's own regex (`: ?name=`) because aapt1 prints
     // `uses-feature-not-required:name=` and aapt2 puts a space after the colon, so the step
-    // tolerates both. What must not disappear is the CHECK.
+    // tolerates both. What must not disappear is the CHECK, one per feature.
     assert!(
-        RELEASE_WORKFLOW.contains("uses-feature-not-required")
-            && RELEASE_WORKFLOW.contains(NFC_FEATURE),
-        "the release job never reads back whether the built APK still says the NFC chip is \
-         OPTIONAL, so a merged manifest that requires it would ship and narrow the listing (hub#988)"
+        RELEASE_WORKFLOW.contains("uses-feature-not-required"),
+        "the release job never reads back which features the built APK declares OPTIONAL"
     );
+    for feature in OPTIONAL_FEATURES {
+        assert!(
+            RELEASE_WORKFLOW.contains(&format!("uses-feature-not-required: ?name='{feature}'")),
+            "the release job never reads back whether the built APK still says {feature} is \
+             OPTIONAL, so a merged manifest that requires it would ship and narrow the listing \
+             (hub#988, hub#2552)"
+        );
+    }
+}
+
+/// The location pair, on its own: the one `attendance` needs to geofence a clock-in from a
+/// personal phone. Without it the WebView answers `PERMISSION_DENIED` with no dialog.
+// Regression test for ERPlora/hub#2552
+#[test]
+fn the_location_permissions_are_declared_in_both_manifests_hub2552() {
+    let plugin = fs::read_to_string(plugin_manifest_path()).expect("the plugin manifest");
+    for (label, manifest) in [("gen/android", APP_MANIFEST), ("plugin", plugin.as_str())] {
+        let declared = declared_permissions(manifest);
+        for permission in [
+            "android.permission.ACCESS_FINE_LOCATION",
+            "android.permission.ACCESS_COARSE_LOCATION",
+        ] {
+            assert!(
+                declared.iter().any(|p| p == permission),
+                "{label} manifest does not declare {permission} (hub#2552)"
+            );
+        }
+    }
 }

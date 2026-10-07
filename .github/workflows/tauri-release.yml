@@ -519,7 +519,9 @@ jobs:
                    android.permission.BLUETOOTH_CONNECT \
                    android.permission.NFC \
                    android.permission.FOREGROUND_SERVICE \
-                   android.permission.FOREGROUND_SERVICE_SPECIAL_USE; do
+                   android.permission.FOREGROUND_SERVICE_SPECIAL_USE \
+                   android.permission.ACCESS_FINE_LOCATION \
+                   android.permission.ACCESS_COARSE_LOCATION; do
             echo "$PERMISOS" | grep -q "name='$P'" \
               || { echo "::error::el APK NO declara $P — el hardware moriría EN SILENCIO (hub#337)"; exit 1; }
           done
@@ -536,6 +538,11 @@ jobs:
           BADGING=$("$AAPT" dump badging "$APK")
           echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.nfc'" \
             || { echo "::error::el APK EXIGE android.hardware.nfc — Play lo ocultaría de las tablets sin chip (hub#988)"; echo "$BADGING" | grep -i nfc; exit 1; }
+          # Same risk with location (hub#2552): ACCESS_COARSE/FINE_LOCATION imply
+          # `android.hardware.location` WHATEVER the targetSdk (only `.gps`/`.network` depend on
+          # it). The till does not need it; only a module such as `attendance` asks for a position.
+          echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.location'" \
+            || { echo "::error::the APK REQUIRES android.hardware.location — Play would hide it from devices without location hardware (hub#2552)"; echo "$BADGING" | grep -i location; exit 1; }
 
       - name: Stage artifacts
         run: |
