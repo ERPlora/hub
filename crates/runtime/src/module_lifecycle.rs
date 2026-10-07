@@ -3,7 +3,9 @@
 use crate::*;
 
 impl Runtime {
-    /// Instala un módulo ya extraído en `dir` (lee `module.json`, migra, registra, activa).
+    /// Installs a module already extracted in `dir` (reads `module.json`, migrates, registers). A
+    /// first install starts active; a module this hub already records keeps its on/off state
+    /// (hub#2544).
     pub async fn install_from_dir(&mut self, dir: &Path) -> Result<String> {
         installer::install(self.db.as_ref(), &mut self.registry, &self.hub_id, dir).await
     }
@@ -108,10 +110,9 @@ impl Runtime {
                 ),
             }
         }
-        // 2) Estado persistido por hub ANTES de instalar (hub#31): `install` reactiva todo al
-        // re-registrar desde disco, así que capturamos aquí el activo/inactivo previo **de este
-        // hub** (filtrado por `hub_id`; en BD compartida no toma el estado de otro hub) para
-        // reponerlo tras instalar. Lo leemos antes porque el upsert de `install` lo sobreescribiría.
+        // 2) This hub's recorded on/off state (hub#31), filtered by `hub_id` (a shared database never
+        // lends another hub's state). Registering keeps it (hub#2544); it is read here so step 5 can
+        // re-derive the cascade from the modules switched off by hand.
         let persisted = installer::installed_status(self.db.as_ref(), &self.hub_id).await?;
 
         // 3) Orden topológico por depends_on (un ciclo sí aborta: error de diseño del conjunto).
@@ -144,12 +145,10 @@ impl Runtime {
         // reponer estados dejaría el hub incompleto Y sin la anotación que lo explica.
         self.registry.failed_installs = failures;
 
-        // 5) Repón el estado inactivo previo de este hub sobre el registro recién reconstruido y
-        // persístelo (el upsert del install lo había dejado `active`). Solo módulos presentes en
-        // disco; un estado huérfano de un módulo ya borrado se ignora. Basta con reponer los
-        // MANUALES: `deactivate` re-deriva la cascada (ADR-0128), así que los `inactive_auto`
-        // persistidos renacen solos de su raíz — y si su raíz ya no existe, quedan activos, que
-        // es lo coherente (sin causa no hay caída).
+        // 5) Re-derive the cascade (ADR-0128) from the modules this hub switched off BY HAND.
+        // Registering already kept every recorded state (hub#2544); this pass makes sure what
+        // depends on a manual `inactive` is down with it. Only modules present on disk; an orphan
+        // state of a module already gone is ignored.
         for (id, status) in persisted {
             if status == ModuleStatus::Inactive && self.registry.is_installed(&id) {
                 // `_unchecked`: reponer un estado ya persistido no es una decisión nueva, así que
@@ -170,7 +169,7 @@ impl Runtime {
     /// Idempotente y tolerante: salta los ya registrados (p. ej. los de `modules_dir`); un módulo
     /// cuya carpeta falte o cuyo install falle se omite con log (no tumba el arranque). `install_from_dir`
     /// reaplica migraciones sin efecto (registradas en `_hub_migrations`). Respeta el estado inactivo
-    /// persistido. Devuelve los ids re-hidratados.
+    /// persistido (hub#2544: registrar ya lo conserva). Devuelve los ids re-hidratados.
     pub async fn rehydrate_installed(&mut self, cache_root: &Path) -> Result<Vec<String>> {
         let persisted =
             installer::installed_status_versioned(self.db.as_ref(), &self.hub_id).await?;
@@ -190,8 +189,9 @@ impl Runtime {
             match self.install_from_dir(&dir).await {
                 Ok(rid) => {
                     if status == ModuleStatus::Inactive {
-                        // `_unchecked`: repón inactivo (install lo dejó active). Es estado ya
-                        // persistido, no una decisión nueva → sin retention gate (hub#314).
+                        // Re-derives the cascade from a manual `inactive` (registering already kept
+                        // the state, hub#2544). `_unchecked`: a recorded state is not a new
+                        // decision → no retention gate (hub#314).
                         let _ = self.deactivate_unchecked(&rid).await;
                     }
                     eprintln!("✓ módulo re-hidratado: {rid}@{version}");
@@ -358,9 +358,8 @@ impl Runtime {
     }
 
     /// Puts back a status that is ALREADY persisted, after the module was registered again
-    /// (hub#1875: another task of this hub installed or updated it). Registering always leaves a
-    /// module active, so without this a module the admin switched off would come back on just
-    /// because it was reloaded. Same rule as the rehydration at boot: restoring a persisted state is
+    /// (hub#1875: another task of this hub installed or updated it). Registering keeps the state
+    /// this hub records (hub#2544); this re-derives the cascade from a manual `inactive`. Same rule as the rehydration at boot: restoring a persisted state is
     /// not a new decision, so it does not go through the retention gate (hub#314).
     pub async fn restore_persisted_status(
         &mut self,

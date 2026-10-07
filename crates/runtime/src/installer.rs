@@ -399,13 +399,34 @@ async fn register_module(
     // borra las retiradas del manifest. El `command` de cada tarea debe ser del propio módulo.
     crate::scheduler::seed_module_tasks(db, &manifest.id, &manifest.scheduled_tasks).await?;
 
+    // Registering again is not a decision (hub#2544): a module this hub already records keeps the
+    // on/off state it has — re-downloaded at boot, put back from the local copy, reloaded by the
+    // reconciliation or updated. Only a module with no row yet starts active. Forcing `Active` here
+    // switched every app the owner had turned off back on at each Hub Cloud deploy, and overwrote
+    // the row, so not even the next boot could tell it had been off.
     let id = manifest.id.clone();
     let version = manifest.version.clone();
+    let status = recorded_status(db, hub_id, &id)
+        .await?
+        .unwrap_or(ModuleStatus::Active);
     registry.installed.push(manifest);
-    registry.status.insert(id.clone(), ModuleStatus::Active);
+    registry.status.insert(id.clone(), status);
 
-    persist_status(db, hub_id, &id, &version, ModuleStatus::Active).await?;
+    persist_status(db, hub_id, &id, &version, status).await?;
     Ok(id)
+}
+
+/// The status `hub_module` records for `module_id` in this hub, or `None` if it has no row.
+async fn recorded_status(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    module_id: &str,
+) -> Result<Option<ModuleStatus>> {
+    Ok(installed_status_versioned(db, hub_id)
+        .await?
+        .into_iter()
+        .find(|(id, _, _)| id == module_id)
+        .map(|(_, _, status)| status))
 }
 
 /// **The SQL a module's COMMANDS and SEED ship may only WRITE its own tables** (hub#633,
