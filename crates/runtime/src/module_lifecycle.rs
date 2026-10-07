@@ -451,7 +451,7 @@ impl Runtime {
     /// hub#1101: y se rechaza si otros módulos instalados lo declaran en `depends_on`, nombrándolos
     /// ([`Self::dependents_of`]). Para saltárselo hace falta [`Self::uninstall_forced`].
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
-        self.uninstall_with(module_id, false).await
+        self.uninstall_with(module_id, false).await.map(|_| ())
     }
 
     /// [`Self::uninstall`] **saltándose el gate de dependientes** (hub#1101) — y solo ese.
@@ -461,28 +461,42 @@ impl Runtime {
     /// soporte por API. Lo que NO abre es el lado fiscal: si el motor aún debe registros a una
     /// autoridad, o si el módulo es el último proveedor fiscal del hub, esto sigue rechazando —
     /// esas dos no son preguntas del dueño (ADR-0202 R2, ADR-0273 D5).
-    pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<()> {
+    ///
+    /// hub#2545: the dependents go WITH it, as in Odoo and Business Central — the list the owner
+    /// confirmed is the list of what is removed. Leaving them installed kept them «Active» on a
+    /// dependency that no longer exists, and on the next boot their re-download dragged the removed
+    /// app back in. Since the whole set leaves, both fiscal locks look at the whole set (the same
+    /// rule as [`Self::deactivate`]). Returns the dependents removed along with it.
+    pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<Vec<String>> {
         self.uninstall_with(module_id, true).await
     }
 
-    async fn uninstall_with(&mut self, module_id: &str, force: bool) -> Result<()> {
+    async fn uninstall_with(&mut self, module_id: &str, force: bool) -> Result<Vec<String>> {
+        let dependents = if force {
+            self.dependents_of(module_id)
+        } else {
+            Vec::new()
+        };
+        let leaving: Vec<String> = std::iter::once(module_id.to_string())
+            .chain(dependents.iter().cloned())
+            .collect();
         // ADR-0273 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
         // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
-        self.ensure_fiscal_provider_remains(&[module_id.to_string()])
-            .await?;
-        self.ensure_module_can_go(module_id).await?;
+        self.ensure_fiscal_provider_remains(&leaving).await?;
+        for id in &leaving {
+            self.ensure_module_can_go(id).await?;
+        }
         // El último, y a propósito: es el ÚNICO forzable, así que va detrás de los candados que no
         // lo son. Ponerlo delante haría que un `force` los saltara por el orden de las guardas.
         if !force {
             self.ensure_nobody_depends_on(module_id)?;
         }
-        installer::uninstall(
-            self.db.as_ref(),
-            &mut self.registry,
-            &self.hub_id,
-            module_id,
-        )
-        .await
+        // The farthest dependents first: nothing is ever left registered on a dependency that has
+        // already gone, even if a later step fails.
+        for id in leaving.iter().rev() {
+            installer::uninstall(self.db.as_ref(), &mut self.registry, &self.hub_id, id).await?;
+        }
+        Ok(dependents)
     }
 
     /// Rechaza si algún módulo instalado depende de `module_id` (hub#1101).

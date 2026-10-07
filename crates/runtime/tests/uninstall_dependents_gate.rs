@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use erplora_db::testutil::fresh_db;
+use erplora_db::testutil::{fresh_db, TestDb};
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Runtime, RuntimeError};
 use erplora_wasm_host::Output;
@@ -125,10 +125,70 @@ async fn the_top_of_the_chain_is_never_blocked_by_what_it_itself_depends_on() {
 async fn force_is_the_owner_who_was_shown_the_list_and_said_yes() {
     let mut rt = hub_with_chain().await;
 
-    rt.uninstall_forced("dbase")
+    let mut also = rt
+        .uninstall_forced("dbase")
         .await
         .expect("an explicit confirmation is a decision, not a mistake to block");
-    assert_eq!(installed(&rt), vec!["dloose", "dmid", "dtop"]);
+    also.sort();
+
+    // hub#2545: the list the owner confirmed is the list of what goes WITH it (Odoo, Business
+    // Central). Leaving `dmid` and `dtop` installed without `dbase` is what kept them «Active» on
+    // a dependency that no longer exists and brought `dbase` back on the next boot.
+    assert_eq!(also, vec!["dmid", "dtop"], "the answer names what went with it");
+    assert_eq!(installed(&rt), vec!["dloose"]);
+}
+
+#[tokio::test]
+async fn after_a_forced_uninstall_the_next_boot_has_nothing_to_bring_back() {
+    let tdb = TestDb::new().await;
+    let mut rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545");
+    rt.ensure_system_tables().await.unwrap();
+    for m in ["dbase", "dmid", "dtop", "dloose"] {
+        rt.install_from_dir(&fixture(m))
+            .await
+            .unwrap_or_else(|e| panic!("install {m}: {e}"));
+    }
+    rt.uninstall_forced("dbase").await.expect("confirmed");
+
+    // The next boot over the same data, with the download cache emptied (every cloud redeploy).
+    // Whatever `hub_module` still says is installed but cannot be registered is re-downloaded, and
+    // the install plan drags in its missing dependencies: a surviving `dmid` row is exactly how the
+    // removed `dbase` came back on its own (hub#2545).
+    let mut rebooted = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545");
+    rebooted.ensure_system_tables().await.unwrap();
+    let empty_cache = std::env::temp_dir().join(format!("erplora-2545-{}", std::process::id()));
+    rebooted
+        .rehydrate_installed(&empty_cache)
+        .await
+        .expect("rehydrate");
+    let to_redownload = rebooted.installed_but_unregistered().await.expect("read");
+    assert!(
+        to_redownload.iter().all(|(id, _)| id == "dloose"),
+        "nothing that depended on the removed app may be brought back at boot, got {to_redownload:?}"
+    );
+}
+
+#[tokio::test]
+async fn force_does_not_take_a_dependent_that_still_owes_records() {
+    let mut rt = hub_with_chain().await;
+    rt.register_native("dtop", Arc::new(OwingEngine { module: "dtop", count: 2 }));
+
+    // Removing `dbase` now takes `dtop` with it, so `dtop`'s engine is asked too: the same rule as
+    // switching off a chain (HUB-F28). Asking only the app the owner clicked was the back door
+    // that let records owed to the AEAT be orphaned through their dependency (hub#2545).
+    let err = rt
+        .uninstall_forced("dbase")
+        .await
+        .expect_err("a dependent that owes records holds the whole chain");
+    assert!(
+        matches!(err, RuntimeError::Domain { ref code, .. } if code == "dtop.unsent_records"),
+        "expected the retention refusal of the dependent, got {err:?}"
+    );
+    assert_eq!(
+        installed(&rt),
+        vec!["dbase", "dloose", "dmid", "dtop"],
+        "a refused uninstall must not half-apply"
+    );
 }
 
 #[tokio::test]
@@ -145,9 +205,10 @@ async fn a_module_that_is_not_installed_still_reports_that_and_not_the_dependent
     );
 }
 
-/// The engine of `dloose`, owing `count` units of work to an external authority (hub#314).
+/// The engine of `module`, owing `count` units of work to an external authority (hub#314).
 #[derive(Debug)]
 struct OwingEngine {
+    module: &'static str,
     count: u64,
 }
 
@@ -170,7 +231,7 @@ impl NativeHandler for OwingEngine {
         Ok((self.count > 0).then(|| PendingObligation {
             count: self.count,
             oldest_pending_at: None,
-            code: "dloose.unsent_records".to_string(),
+            code: format!("{}.unsent_records", self.module),
             message: format!("{} record(s) still unsent", self.count),
         }))
     }
@@ -179,7 +240,7 @@ impl NativeHandler for OwingEngine {
 #[tokio::test]
 async fn force_does_not_open_the_retention_gate() {
     let mut rt = hub_with_chain().await;
-    rt.register_native("dloose", Arc::new(OwingEngine { count: 4 }));
+    rt.register_native("dloose", Arc::new(OwingEngine { module: "dloose", count: 4 }));
 
     // `force` is the answer to ONE question — «other apps need this, remove it anyway?» — and the
     // owner can answer it. Whether records still owed to a tax authority may be orphaned is not

@@ -1039,7 +1039,7 @@ pub(crate) async fn uninstall_module(
         return unauthorized(e);
     }
     let outcome = if force {
-        rt.uninstall_forced(&id).await
+        rt.uninstall_forced(&id).await.map(|_| ())
     } else {
         rt.uninstall(&id).await
     };
