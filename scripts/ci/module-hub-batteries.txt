@@ -337,3 +337,10 @@ appointments/tests/recurring_create_eligibility.hub.test.py
 # tap books nothing twice, against the real kernel (appointments#299). New coverage, not moved.
 # pending-publication: appointments#312 until 2026-11-05
 appointments/tests/series_past_fifty.hub.test.py
+# appointments: erasing a customer's personal data in Clientes (`customers.anonymize` →
+# `customer.anonymized`) blanks her name, phone, email, both notes and the cancellation reason on
+# every appointment, the name on her series and the name/reason keys of their history, keeps the
+# slot, price, professional and status, hands `customer_id` to the series list, and leaves the
+# same id in another hub untouched, against the real kernel (pm#637). New coverage, not moved.
+# pending-publication: appointments#315 until 2026-11-04
+appointments/tests/customer_erasure.hub.test.py
