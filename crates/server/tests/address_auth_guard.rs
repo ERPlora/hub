@@ -140,6 +140,9 @@ fn media_with_cookie(client: &str, token: &str) -> Request<Body> {
         .unwrap()
 }
 
+/// The invented tickets below carry the ticket prefix (`erpl_tkt_`) because that is what a guesser
+/// has to send: since hub#2523 anything else in the address is refused by its shape (400), never
+/// looked up, and so is not a guess this guard needs to count.
 fn events_with_ticket(client: &str, ticket: &str) -> Request<Body> {
     Request::builder()
         .uri(format!("/api/events?ticket={ticket}"))
@@ -274,7 +277,7 @@ async fn invented_event_tickets_count_like_sessions() {
     for i in 0..MAX_FORGED_SESSIONS {
         let (status, _) = send(
             &router,
-            events_with_ticket(attacker, &format!("evt_forged{i}")),
+            events_with_ticket(attacker, &format!("erpl_tkt_evt_forged{i}")),
         )
         .await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -294,7 +297,11 @@ async fn a_till_repeating_its_dead_session_never_locks_the_shop() {
         )
         .await;
         send(&router, media_with_cookie(shop, "dead-session-of-the-till")).await;
-        send(&router, events_with_ticket(shop, "evt_used_ticket")).await;
+        send(
+            &router,
+            events_with_ticket(shop, "erpl_tkt_evt_used_ticket"),
+        )
+        .await;
     }
     assert_signs_in(&router, shop).await;
 }
@@ -305,7 +312,7 @@ async fn every_failure_leaves_a_stable_log_line() {
     let client = "198.51.100.80";
     send(&router, pin_login(client, "Admin", "0000")).await;
     send(&router, profile_with_session(client, "forged-token")).await;
-    send(&router, events_with_ticket(client, "evt_forged")).await;
+    send(&router, events_with_ticket(client, "erpl_tkt_evt_forged")).await;
     let lines = failure_lines(client);
     for reason in ["pin", "session_invalid", "ticket_invalid"] {
         assert!(
@@ -421,12 +428,16 @@ async fn hub2293_a_rejected_session_line_carries_the_token_fingerprint() {
     let client = "198.51.100.110";
     send(&router, profile_with_session(client, "forged-header-2293")).await;
     send(&router, media_with_cookie(client, "forged-cookie-2293")).await;
-    send(&router, events_with_ticket(client, "evt_forged_2293")).await;
+    send(
+        &router,
+        events_with_ticket(client, "erpl_tkt_evt_forged_2293"),
+    )
+    .await;
     let lines = failure_lines(client);
     for (reason, token) in [
         ("session_invalid", "forged-header-2293"),
         ("session_invalid", "forged-cookie-2293"),
-        ("ticket_invalid", "evt_forged_2293"),
+        ("ticket_invalid", "erpl_tkt_evt_forged_2293"),
     ] {
         let tail = format!(
             "reason={reason} client={client} token={} hub={HUB_ID}",
