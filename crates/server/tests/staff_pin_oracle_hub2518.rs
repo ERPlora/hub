@@ -24,10 +24,11 @@ use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::hub_users::NewHubUser;
 use erplora_runtime::Runtime;
-use erplora_server::login_throttle::PIN_CHANGE_MAX_ATTEMPTS;
+use erplora_server::login_throttle::{LoginThrottle, MAX_FAILURES, PIN_CHANGE_MAX_ATTEMPTS};
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
+use std::sync::Arc;
 use tower::ServiceExt;
 
 const OWNER_PIN: &str = "4917";
@@ -52,6 +53,23 @@ struct Fixture {
     prober_session: String,
     /// A local employee whose record the prober types numbers into.
     dummy_id: String,
+    /// The budget of PIN tries every door of hub#2499/#2518 spends (`pin_change_throttle`).
+    throttle: Arc<LoginThrottle>,
+    /// The prober's id: the key those doors spend the prober's tries under.
+    prober_id: String,
+}
+
+impl Fixture {
+    /// The tries the prober already spent before the ones a test watches, spent straight into the
+    /// budget under the same key the doors use. Each try through a door costs several argon2
+    /// hashes in a debug build, and with a budget of thirty, spending all of it over HTTP cost the
+    /// CI suite minutes (hub#2564). The tries that decide —the last ones and the one past the
+    /// budget— always go through the doors.
+    fn spent(&self, n: usize) {
+        for _ in 0..n {
+            self.throttle.record_attempt(&self.prober_id);
+        }
+    }
 }
 
 async fn fixture(hub_id: &str) -> Fixture {
@@ -108,11 +126,15 @@ async fn fixture(hub_id: &str) -> Fixture {
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
+    let state = AppState::with_config(rt, cfg);
+    let throttle = state.pin_change_throttle.clone();
     Fixture {
-        router: app(AppState::with_config(rt, cfg)),
+        router: app(state),
         owner_session,
         prober_session,
         dummy_id: dummy,
+        throttle,
+        prober_id: prober,
     }
 }
 
@@ -180,7 +202,8 @@ async fn probing_a_record_is_braked_before_the_owners_pin_is_named() {
     let budget = BUDGET;
     let free_pins = free_pins();
 
-    for pin in &free_pins[..budget] {
+    fx.spent(budget - 2);
+    for pin in &free_pins[budget - 2..budget] {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
         assert_eq!(status, StatusCode::OK, "a free PIN is accepted: {body}");
     }
@@ -198,7 +221,8 @@ async fn probing_a_record_is_braked_before_the_owners_pin_is_named() {
 async fn refusals_spend_the_budget_too() {
     let fx = fixture("hub-2518-refusals").await;
 
-    for _ in 0..BUDGET {
+    fx.spent(BUDGET - 2);
+    for _ in 0..2 {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": OWNER_PIN })).await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         assert_eq!(body["error"]["code"], "hub.users.pin_in_use", "{body}");
@@ -213,7 +237,8 @@ async fn creating_people_spends_the_same_budget() {
     let budget = BUDGET;
     let free_pins = free_pins();
 
-    for (i, pin) in free_pins[..budget].iter().enumerate() {
+    fx.spent(budget - 2);
+    for (i, pin) in free_pins[budget - 2..budget].iter().enumerate() {
         let (status, body) = create_local(&fx, &format!("Probe {i}"), pin).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
@@ -237,9 +262,9 @@ async fn the_lock_is_the_editors_not_the_records() {
     let budget = BUDGET;
     let free_pins = free_pins();
 
-    for pin in &free_pins[..budget] {
-        edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
-    }
+    fx.spent(budget - 1);
+    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[0] })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
     let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[budget] })).await;
     assert_locked(status, &body);
 
@@ -260,11 +285,10 @@ async fn edits_that_carry_no_pin_spend_nothing_and_are_never_locked() {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "name": format!("Pau {i}") })).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
-    // The whole PIN budget is still there.
-    for pin in &free_pins[..budget] {
-        let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-    }
+    // The whole PIN budget is still there: all but its last try spent, the last one is answered.
+    fx.spent(budget - 1);
+    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[0] })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
     // Locked for PINs now, yet a rename still goes through.
     let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[budget] })).await;
     assert_locked(status, &body);
@@ -289,10 +313,9 @@ async fn the_budget_is_shared_with_changing_ones_own_pin() {
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     // …leaves the rest for Empleados.
-    for pin in &free_pins[1..budget] {
-        let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-    }
+    fx.spent(budget - 2);
+    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[1] })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
     let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": OWNER_PIN })).await;
     assert_locked(status, &body);
 
@@ -309,13 +332,18 @@ async fn the_budget_is_shared_with_changing_ones_own_pin() {
 }
 
 /// hub#2564 — the brake must not tax the very first thing the app asks of a new owner: setting up
-/// the whole staff in one sitting, each person with their own PIN. Twenty altas in a row (a large
-/// restaurant's floor and kitchen) go through without a single «wait».
+/// the whole staff in one sitting, each person with their own PIN. The alta past the pinpad's
+/// budget (the sixth, where it used to stop) goes through without a «wait»; that the budget holds
+/// a whole staff is the unit test of [`LoginThrottle::pin_change`].
 #[tokio::test]
 async fn a_whole_staff_is_set_up_in_one_sitting_without_waiting() {
     let fx = fixture("hub-2564-onboarding").await;
 
-    for (i, pin) in free_pins().iter().take(20).enumerate() {
+    for (i, pin) in free_pins()
+        .iter()
+        .take(MAX_FAILURES as usize + 1)
+        .enumerate()
+    {
         let (status, body) = create_local(&fx, &format!("Staff {i}"), pin).await;
         assert_eq!(
             status,

@@ -22,10 +22,11 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::login_throttle::{MAX_FAILURES, PIN_CHANGE_MAX_ATTEMPTS};
+use erplora_server::login_throttle::{LoginThrottle, MAX_FAILURES, PIN_CHANGE_MAX_ATTEMPTS};
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
+use std::sync::Arc;
 use tower::ServiceExt;
 
 const HUB: &str = "hub-pin-oracle";
@@ -44,13 +45,32 @@ fn free_pin(i: usize) -> String {
     format!("{:04}", 2000 + 41 * i)
 }
 
+/// The tries a prober already spent before the ones a test watches, spent straight into the
+/// door's budget: the same map (`pin_change_throttle`) and the same key (the person's id) the door
+/// spends. Each try through the door costs several argon2 hashes in a debug build, and with a
+/// budget of thirty, spending all of it over HTTP cost the CI suite minutes (hub#2564). The tries
+/// that decide —the last ones and the one past the budget— always go through the door.
+struct Spent {
+    throttle: Arc<LoginThrottle>,
+    id: String,
+}
+
+impl Spent {
+    fn tries(&self, n: usize) {
+        for _ in 0..n {
+            self.throttle.record_attempt(&self.id);
+        }
+    }
+}
+
 async fn body_json(response: axum::response::Response) -> Value {
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     serde_json::from_slice(&bytes).unwrap_or(Value::Null)
 }
 
-/// Router + the prober's session + the victim's session, both employees of the same hub.
-async fn fixture() -> (axum::Router, String, String) {
+/// Router + the prober's session + the victim's session, both employees of the same hub, + the
+/// prober's budget.
+async fn fixture() -> (axum::Router, String, String, Spent) {
     fixture_with(|_| None).await
 }
 
@@ -58,7 +78,7 @@ async fn fixture() -> (axum::Router, String, String) {
 /// the prober's id, holding [`ACCOMPLICE_PIN`].
 async fn fixture_with(
     accomplice: impl Fn(&str) -> Option<String>,
-) -> (axum::Router, String, String) {
+) -> (axum::Router, String, String, Spent) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -97,11 +117,12 @@ async fn fixture_with(
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
-    (
-        app(AppState::with_config(rt, cfg)),
-        prober_session,
-        victim_session,
-    )
+    let state = AppState::with_config(rt, cfg);
+    let spent = Spent {
+        throttle: state.pin_change_throttle.clone(),
+        id: prober,
+    };
+    (app(state), prober_session, victim_session, spent)
 }
 
 async fn set_pin(
@@ -193,9 +214,10 @@ async fn assert_locked(response: axum::response::Response) {
 /// The symptom of the issue: before, the probe past the budget still answered `pin_in_use`.
 #[tokio::test]
 async fn a_taken_pin_is_not_confirmed_once_the_budget_is_spent() {
-    let (router, prober, _) = fixture().await;
+    let (router, prober, _, spent) = fixture().await;
     // Inside the budget the door does its job, refusal included: the PIN is unique.
-    let held = rotate(&router, &prober, BUDGET - 1).await;
+    spent.tries(BUDGET - 2);
+    let held = rotate(&router, &prober, 1).await;
     let probe = set_pin(&router, &prober, VICTIM_PIN, &held).await;
     assert_eq!(probe.status(), StatusCode::CONFLICT);
     assert_eq!(
@@ -211,16 +233,18 @@ async fn a_taken_pin_is_not_confirmed_once_the_budget_is_spent() {
 /// a brake that counted only refusals would let them probe for ever.
 #[tokio::test]
 async fn accepted_changes_spend_the_budget_too() {
-    let (router, prober, _) = fixture().await;
-    let held = rotate(&router, &prober, BUDGET).await;
+    let (router, prober, _, spent) = fixture().await;
+    spent.tries(BUDGET - 2);
+    let held = rotate(&router, &prober, 2).await;
     assert_locked(set_pin(&router, &prober, VICTIM_PIN, &held).await).await;
 }
 
 /// Guessing the current PIN from an unattended session is the other half of the same door.
 #[tokio::test]
 async fn refusals_spend_the_same_budget() {
-    let (router, prober, _) = fixture().await;
-    for _ in 0..BUDGET {
+    let (router, prober, _, spent) = fixture().await;
+    spent.tries(BUDGET - 2);
+    for _ in 0..2 {
         let wrong = set_pin(&router, &prober, &free_pin(0), "0007").await;
         assert_eq!(wrong.status(), StatusCode::CONFLICT);
         assert_eq!(
@@ -234,8 +258,9 @@ async fn refusals_spend_the_same_budget() {
 
 #[tokio::test]
 async fn the_lock_is_the_probers_alone() {
-    let (router, prober, victim) = fixture().await;
-    let held = rotate(&router, &prober, BUDGET).await;
+    let (router, prober, victim, spent) = fixture().await;
+    spent.tries(BUDGET - 1);
+    let held = rotate(&router, &prober, 1).await;
     assert_locked(set_pin(&router, &prober, &free_pin(BUDGET), &held).await).await;
 
     let own = set_pin(&router, &victim, &free_pin(BUDGET), VICTIM_PIN).await;
@@ -250,8 +275,9 @@ async fn the_lock_is_the_probers_alone() {
 /// key, the prober would sign in again with their own PIN and start a fresh budget.
 #[tokio::test]
 async fn signing_in_again_does_not_lift_the_lock() {
-    let (router, prober, _) = fixture().await;
-    let held = rotate(&router, &prober, BUDGET).await;
+    let (router, prober, _, spent) = fixture().await;
+    spent.tries(BUDGET - 1);
+    let held = rotate(&router, &prober, 1).await;
     assert_locked(set_pin(&router, &prober, VICTIM_PIN, &held).await).await;
 
     let login = pin_login(&router, PROBER, &held).await;
@@ -279,7 +305,7 @@ fn spellings(id: &str) -> [String; 2] {
 /// minutes, for as long as somebody kept typing, and never enough to trip the per-address guard.
 #[tokio::test]
 async fn wrong_pins_at_the_pinpad_do_not_lock_somebodys_pin_change() {
-    let (router, _, victim) = fixture().await;
+    let (router, _, victim, _) = fixture().await;
     for name in spellings(&grid_id(&router, VICTIM).await) {
         for _ in 0..MAX_FAILURES {
             let guess = pin_login(&router, &name, "0007").await;
@@ -302,9 +328,11 @@ async fn wrong_pins_at_the_pinpad_do_not_lock_somebodys_pin_change() {
 #[tokio::test]
 async fn a_sign_in_under_a_name_spelt_like_the_key_does_not_refill_the_budget() {
     for spelling in 0..2 {
-        let (router, prober, _) = fixture_with(|id| Some(spellings(id)[spelling].clone())).await;
+        let (router, prober, _, spent) =
+            fixture_with(|id| Some(spellings(id)[spelling].clone())).await;
         let name = spellings(&grid_id(&router, PROBER).await)[spelling].clone();
-        let held = rotate(&router, &prober, BUDGET - 1).await;
+        spent.tries(BUDGET - 2);
+        let held = rotate(&router, &prober, 1).await;
 
         let login = pin_login(&router, &name, ACCOMPLICE_PIN).await;
         assert_eq!(login.status(), StatusCode::OK, "{name} signs in");
