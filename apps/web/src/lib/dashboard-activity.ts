@@ -62,7 +62,27 @@ export function formatActivityAmount(row: Pick<ActivityRow, 'amount'>, opts?: Fo
 }
 
 /** The module the feed belongs to — the owner segment of every query it makes. */
-const FEED_MODULE = 'sales';
+export const FEED_MODULE = 'sales';
+
+/**
+ * The factory payment methods `sales` seeds (`seed/install.*.sql`, canonical English per ADR-0055)
+ * → the key of their word in `sales`' own catalogue (`locales/<lang>.json` → `ui`). The same pair
+ * `sales` reads in `payMethodDisplayName` (`ui/lib/pay-icons.ts`, `SEED_NAME_TO_KEY`): the words
+ * are NOT duplicated here, only which stored names are the factory ones.
+ */
+const SEEDED_METHOD_KEY: Readonly<Record<string, string>> = { Cash: 'cash', Card: 'card' };
+
+/**
+ * The «Method» cell, named the way the Sales history names it (hub#2590): a factory method is
+ * translated from `sales`' catalogue in the language on screen; a method the owner created or
+ * renamed («BBVA TPV») keeps the name they typed. Without the catalogue (not read yet, or failed),
+ * the stored name — never a blank or a key.
+ */
+export function activityMethodName(name: string, salesUi: Readonly<Record<string, unknown>> | undefined): string {
+  const key = SEEDED_METHOD_KEY[name.trim()];
+  const word = key ? salesUi?.[key] : undefined;
+  return typeof word === 'string' && word.trim() ? word : name;
+}
 
 /**
  * Reads the feed, or answers `[]` WITHOUT a request when `active` proves `sales` is absent.

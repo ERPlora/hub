@@ -298,7 +298,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F33 | Ver los paneles de las apps en Inicio | parcial | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F34 | Personalizar el tablero de paneles | hecho | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F35 | Mantener los paneles al día sin recargar | hecho | [workflow/inicio.md](workflow/inicio.md) |
-| HUB_SHELL-F36 | Consultar la actividad reciente | parcial | [workflow/inicio.md](workflow/inicio.md) |
+| HUB_SHELL-F36 | Consultar la actividad reciente | hecho | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F37 | Ver si la impresora y WhatsApp funcionan | parcial | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F38 | Ir a configurar desde el panel «Configura tu negocio» | hecho | [workflow/inicio.md](workflow/inicio.md) |
 | HUB_SHELL-F39 | Ver Inicio al día después de importar una plantilla | hecho | [workflow/inicio.md](workflow/inicio.md) |
