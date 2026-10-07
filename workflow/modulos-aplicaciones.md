@@ -183,7 +183,7 @@ Implicados: HUB_SHELL-F123
 QA: ninguno
 
 ### HUB-F28 Desactivar una aplicación preguntando antes si puede irse
-Estado: parcial — la negativa del motor del módulo (`verifactu.unsent_records`) y la del candado fiscal del propio hub (`fiscal.no_provider_left`) salen con su frase en inglés, sin traducción en la pantalla española
+Estado: hecho
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
@@ -200,7 +200,7 @@ Implicados: HUB_SHELL-F122, HUB_SHELL-F125, VERIFACTU-F32
 QA: L-14
 
 ### HUB-F29 Desinstalar una aplicación
-Estado: parcial — quedan sus permisos de host y ERPlora no se entera; las negativas salen en inglés como en HUB-F28
+Estado: parcial — quedan sus permisos de host y ERPlora no se entera
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
@@ -410,4 +410,4 @@ del hub sin atender mientras descarga está en las dudas comunes del índice.)
   (HUB-F34).
 - CASH_REGISTER-F01 no describe su paso de puesta en marcha («Tu caja»: hecho tras el primer
   guardado, solo administrador, 🟡) (HUB-F35).
-- VERIFACTU-F32: la pantalla no traduce `verifactu.unsent_records` (HUB-F28).
+- VERIFACTU-F32 decía que la negativa `verifactu.unsent_records` sale en inglés; desde hub#2579 se traduce y lo corrige ERPlora/verifactu#178.

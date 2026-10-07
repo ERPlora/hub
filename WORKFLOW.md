@@ -199,7 +199,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F25 | Reponer las aplicaciones al arrancar y actualizarlas solas | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F26 | Seguir lo que otra copia del hub instaló, actualizó, apagó o quitó | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F27 | Activar una aplicación | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
-| HUB-F28 | Desactivar una aplicación preguntando antes si puede irse | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
+| HUB-F28 | Desactivar una aplicación preguntando antes si puede irse | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F29 | Desinstalar una aplicación | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F30 | Instalar un módulo desde una carpeta en modo desarrollo | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F31 | Servir el menú, las pantallas y los ficheros de las aplicaciones | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
@@ -587,4 +587,5 @@ que hace el código. Las de cada área están en `## Fuentes contrastadas` de su
 - Las pestañas de Ajustes se llaman «General» (no «Hub») y «Datos y copias» (no «Datos») (`es.ts`);
   `architecture/hub/auth.md` aún dice «Ajustes › Hub».
 - Los textos que el servidor manda tal cual a la pantalla (rechazos del motor de automatizaciones,
-  `409` de reenviar un aviso, negativas fiscales al apagar una app) están en inglés.
+  `409` de reenviar un aviso) están en inglés. Las negativas fiscales al apagar o desinstalar una
+  app ya se traducen por su código (hub#2579).
