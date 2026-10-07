@@ -8,7 +8,8 @@
 //
 // Dos entradas:
 //   - formatMoney(cents, opts?)  → importe en CÉNTIMOS (enteros del runtime; evita errores float).
-//   - formatAmount(units, opts?) → importe ya en UNIDADES mayores (lo que hoy usan Dashboard/Billing).
+//   - formatAmount(units, opts?) → amount already in MAJOR units (Billing). Never for a sale or a
+//     till total: those are cents, and `formatAmount` paints them a hundred times bigger (hub#2505).
 // Both default to the hub currency; `opts.currency` overrides it (e.g. Cloud invoices that carry
 // their own currency) — and with it the scale of the minor units (hub#2391).
 import { getLocale } from '../i18n';

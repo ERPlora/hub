@@ -497,6 +497,14 @@ export default {
     // Status badge of an activity row; it agrees with «sale» — the row is a sale (hub#863).
     activityStatusCompleted: 'Completed',
     activityStatusPending: 'Pending',
+    // The words of the sales history (`sales` locales), so a sale reads the same in both places (hub#2505).
+    activityStatusDraft: 'Draft',
+    activityStatusVoided: 'Voided',
+    activityStatusRefunded: 'Refunded',
+    activityStatusOther: 'Other',
+    activityLoadErrorTitle: 'Could not load the latest sales',
+    activityLoadErrorBody: 'Check the connection and try again.',
+    activityRetry: 'Retry',
     widgets: 'Widgets',
     loadingWidgets: 'Loading widgets…',
     customizePanel: 'Customize panel',

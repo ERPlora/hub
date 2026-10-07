@@ -35,16 +35,16 @@ describe('the activity feed only asks `sales` when `sales` is there (hub#1211)',
 
   it('asks `sales.list` — newest first, one page of 100 — when `sales` is active', async () => {
     const { client, calls } = countingClient([
-      { id: 's1', created_at: '2026-08-29T10:00:00Z', sale_number: 'T-1', total: '12.5', status: 'completed' },
-      { id: 's2', created_at: '2026-08-29T09:00:00Z', customer_name: 'Ana', payment_method_name: 'Card', total: 3, status: 'open' },
+      { id: 's1', created_at: '2026-08-29T10:00:00Z', sale_number: 'T-1', total: 1250, status: 'completed' },
+      { id: 's2', created_at: '2026-08-29T09:00:00Z', customer_name: 'Ana', payment_method_name: 'Card', total: 300, status: 'pending' },
     ]);
 
     const rows = await loadRecentSales(client, new Set(['sales']));
 
     expect(calls).toEqual([{ name: 'sales.list', params: { limit: 100, sort: 'created_at', dir: 'desc' } }]);
     expect(rows).toEqual([
-      { date: '2026-08-29T10:00:00Z', sale: 'T-1', customer: '—', method: '—', amount: 12.5, status: 'completed', tone: 'success' },
-      { date: '2026-08-29T09:00:00Z', sale: '#s2', customer: 'Ana', method: 'Card', amount: 3, status: 'pending', tone: 'medium' },
+      { date: '2026-08-29T10:00:00Z', sale: 'T-1', customer: '—', method: '—', amount: 1250, status: 'completed', tone: 'success' },
+      { date: '2026-08-29T09:00:00Z', sale: '#s2', customer: 'Ana', method: 'Card', amount: 300, status: 'pending', tone: 'medium' },
     ]);
   });
 
