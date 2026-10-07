@@ -199,18 +199,18 @@ Implicados: HUB_SHELL-F94, HUB_SHELL-F95, HUB_SHELL-F96, HUB_SHELL-F97
 QA: ninguno
 
 ### HUB-F156 Leer y escribir datos del negocio con una llave de API
-Estado: parcial — la operación se comprueba antes que la llave, así que sin llave se puede averiguar qué operaciones hay publicadas (ERPlora/hub#2550), y esta puerta no comprueba el plan contratado
+Estado: parcial — esta puerta no comprueba el plan contratado
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Un sistema externo (la gestoría, una tienda online) llama al hub con su llave.
 2. Pide una consulta o una orden de un módulo por su nombre.
-3. El hub comprueba, por este orden: que el módulo publica esa operación para terceros (antes de mirar la llave), que la llave existe y está activa, que no ha pasado su límite por minuto (el intento cuenta aunque luego falte permiso) y que la llave tiene el permiso.
+3. El hub comprueba, por este orden: que la llave existe y está activa (antes de mirar qué operación se pide, hub#2550), que no ha pasado su límite por minuto (el intento cuenta aunque luego la operación no exista o falte permiso), que el módulo publica esa operación para terceros y que la llave tiene el permiso.
 4. Contesta igual que a la pantalla, y lo que escribe queda a nombre de la llave.
 Entra: la llave en `Authorization: Bearer erpl_live_…`; la operación (`/api/v1/<módulo>/q/<consulta>` o `/c/<orden>`).
 Sale: la respuesta del módulo; las escrituras con autor `apikey:<id>`; el último uso de la llave. La llave no ve al personal ni puede pedir aprobaciones, y no sirve en las puertas de la pantalla.
 En este mismo documento se apoya en: HUB-F01 (Leer datos de un módulo), HUB-F03 (Ejecutar una orden de un módulo), HUB-F15 (Consultar qué órdenes y consultas acepta el hub).
-Si falla: operación que el módulo no publica o no existe, 404 (las dos igual), también sin llave: un anónimo distingue así una operación publicada (401) de una que no (404); llave desconocida o revocada, 401; sin permiso, `permission_denied`; pasado el límite, `rate_limited` (429) con `Retry-After`.
+Si falla: sin llave, o con una llave desconocida o revocada, 401 con la misma respuesta pida lo que pida: sin llave no se puede averiguar qué operaciones hay publicadas; con llave válida, operación que el módulo no publica o no existe, 404 (las dos igual); sin permiso, `permission_denied`; pasado el límite, `rate_limited` (429) con `Retry-After`.
 Implicados: HUB_SHELL-F97
 QA: ninguno
 
