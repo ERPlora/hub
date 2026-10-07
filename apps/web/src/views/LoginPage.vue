@@ -430,6 +430,7 @@ import {
   machineRegistered,
   machineRegistrationRequired,
   pinUsers,
+  refreshHubIdentity,
 } from '../lib/runtime';
 import { deviceMode, deviceTrusted, loadDeviceMode, offersPinLogin } from '../lib/device-mode';
 import { asksForPin, pinPolicy } from '../lib/pin-policy';
@@ -677,6 +678,9 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
   const sess = await runtimeCloudSession(result.access, result.user.name, result.user.email);
   setTokens(result.access, result.refresh);
   setHubSession(sess.token, sess.credential_kind);
+  // hub#2510: a browser the hub did not trust at boot was given no faces. With the session it is,
+  // and the «does this person already have a PIN?» check below (hub#772) reads them.
+  await refreshHubIdentity();
 
   setUser({
     id: sess.user.id,

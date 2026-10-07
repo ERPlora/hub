@@ -186,6 +186,67 @@ pub(crate) async fn device_trust_gate(
     None
 }
 
+/// Whether this caller may learn WHO works here — the faces of the pinpad that the boot context
+/// carries (hub#2510). They exist for the pinpad, and the pinpad only opens on a device the PIN
+/// door would let through, so the question is asked in the order that door asks it:
+///
+/// 1. a **live session** says yes: the approval dialog and «switch user» run behind one, also on a
+///    browser that came in through the panel courier and was never trusted (HUB-F131). A session
+///    is not stopped by the address lock (HUB-F135: whoever is in keeps working). One that does
+///    not resolve counts against the address like at any other door (hub#2282), or this read would
+///    be a free oracle for session tokens;
+/// 2. a **locked address** says no, before looking at the device — the PIN door's first check;
+/// 3. the **device**, by the PIN door's own rule: trust disarmed, trusted, or the first device of a
+///    virgin demo ([`device_mode::demo_would_adopt`], shared so the two cannot drift).
+///
+/// Fail-closed: a lookup that errors withholds; the login screen then offers the account door.
+pub(crate) async fn may_name_the_team(
+    st: &AppState,
+    rt: &erplora_runtime::Runtime,
+    headers: &HeaderMap,
+) -> bool {
+    let client = crate::address_guard::client_address(headers);
+    if let Some(token) = auth::session_token(headers) {
+        match rt.resolve_session(&token).await {
+            Ok(Some(_)) => return true,
+            Ok(None) => crate::address_guard::record_rejected_credential(
+                st,
+                client.as_deref(),
+                crate::address_guard::Failure::SessionInvalid,
+                &token,
+            ),
+            Err(error) => {
+                tracing::warn!(%error, "hub context: could not resolve the presented session");
+                return false;
+            }
+        }
+    }
+    if client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
+        .is_some()
+    {
+        return false;
+    }
+    if !st.config.device_trust_enforce {
+        return true;
+    }
+    let device_id = device_mode::device_id_of(headers);
+    if device_id.is_empty() {
+        return false;
+    }
+    match rt.is_device_trusted(device_id).await {
+        Ok(true) => true,
+        Ok(false) => device_mode::demo_would_adopt(st.config.demo, rt, device_id)
+            .await
+            .unwrap_or(false),
+        Err(error) => {
+            tracing::warn!(%error, "hub context: could not read the device trust");
+            false
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 pub(crate) struct BadgeReq {
     /// Lo que el lector escribió como ráfaga de teclado (o lo que se tecleó, para un iButton).

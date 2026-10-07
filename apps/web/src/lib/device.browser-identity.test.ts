@@ -99,8 +99,9 @@ describe('the device identity of a browser (hub#454)', () => {
   });
 
   it('never presents the hub id as a device: it names the hub, and anyone can read it', async () => {
-    // `GET /api/hub/context` takes no session — the hub id is public by design. An identity that
-    // every browser shares AND that an attacker can simply fetch is not an identity.
+    // `GET /api/hub/context` takes no session — the hub id is public by design (hub#2510 withholds
+    // the faces from a stranger, not the hub id: erplora.com reads it to prove a custom domain). An
+    // identity that every browser shares AND that an attacker can simply fetch is not an identity.
     const browser = browserProfile();
 
     expect(await deviceIdPresentedBy(browser)).not.toBe(HUB_ID);
