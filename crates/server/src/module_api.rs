@@ -1055,12 +1055,14 @@ pub(crate) async fn uninstall_module(
             for module_id in &gone {
                 st.broadcast(json!({ "type": "module.uninstalled", "module_id": module_id }));
             }
-            // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
-            // Best-effort: no falla la desinstalación si el store da error.
+            // Drops each departed module's chunks from the vector index (§9.6): uninstall →
+            // delete chunks. Best-effort: a store error does not fail the uninstall.
             if let Some(store) = &st.vector {
                 for module_id in &gone {
-                    if let Err(e) = embed::drop_module(store.as_ref(), &st.hub_id(), module_id).await {
-                        tracing::warn!(module_id = %module_id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
+                    if let Err(e) =
+                        embed::drop_module(store.as_ref(), &st.hub_id(), module_id).await
+                    {
+                        tracing::warn!(module_id = %module_id, error = %e, "could not drop the module's embeddings (non-critical)");
                     }
                 }
             }

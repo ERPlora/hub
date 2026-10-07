@@ -135,7 +135,11 @@ async fn force_is_the_owner_who_was_shown_the_list_and_said_yes() {
     // hub#2545: the list the owner confirmed is the list of what goes WITH it (Odoo, Business
     // Central). Leaving `dmid` and `dtop` installed without `dbase` is what kept them «Active» on
     // a dependency that no longer exists and brought `dbase` back on the next boot.
-    assert_eq!(also, vec!["dmid", "dtop"], "the answer names what went with it");
+    assert_eq!(
+        also,
+        vec!["dmid", "dtop"],
+        "the answer names what went with it"
+    );
     assert_eq!(installed(&rt), vec!["dloose"]);
 }
 
@@ -202,11 +206,10 @@ async fn a_forced_uninstall_that_fails_halfway_leaves_no_app_without_its_depende
     .await
     .unwrap();
 
-    let before = db.query("SELECT module_id, hub_id FROM hub_module ORDER BY module_id", &Default::default()).await.unwrap().rows;
-    eprintln!("DEBUG before={before:?}");
-    let r = rt.uninstall_forced("dbase").await;
-    eprintln!("DEBUG result={r:?}");
-    assert!(r.is_err(), "the failure must surface");
+    assert!(
+        rt.uninstall_forced("dbase").await.is_err(),
+        "the failure must surface"
+    );
 
     // The farthest go first, so whatever survives still has what it needs: `dmid` stays with
     // `dbase` under it. Removing `dbase` first would leave `dmid` in `hub_module` on a dependency
@@ -229,7 +232,13 @@ async fn a_forced_uninstall_that_fails_halfway_leaves_no_app_without_its_depende
 #[tokio::test]
 async fn force_does_not_take_a_dependent_that_still_owes_records() {
     let mut rt = hub_with_chain().await;
-    rt.register_native("dtop", Arc::new(OwingEngine { module: "dtop", count: 2 }));
+    rt.register_native(
+        "dtop",
+        Arc::new(OwingEngine {
+            module: "dtop",
+            count: 2,
+        }),
+    );
 
     // Removing `dbase` now takes `dtop` with it, so `dtop`'s engine is asked too: the same rule as
     // switching off a chain (HUB-F28). Asking only the app the owner clicked was the back door
@@ -298,7 +307,13 @@ impl NativeHandler for OwingEngine {
 #[tokio::test]
 async fn force_does_not_open_the_retention_gate() {
     let mut rt = hub_with_chain().await;
-    rt.register_native("dloose", Arc::new(OwingEngine { module: "dloose", count: 4 }));
+    rt.register_native(
+        "dloose",
+        Arc::new(OwingEngine {
+            module: "dloose",
+            count: 4,
+        }),
+    );
 
     // `force` is the answer to ONE question — «other apps need this, remove it anyway?» — and the
     // owner can answer it. Whether records still owed to a tax authority may be orphaned is not

@@ -242,6 +242,8 @@ async fn a_module_nobody_depends_on_still_uninstalls_with_no_body() {
         StatusCode::OK,
         "the gate must not tax the normal case, and the caller sends no body"
     );
+    // Nothing went with it, so the answer stays the one every caller already reads.
+    assert_eq!(json_body(res).await, json!({ "ok": true }));
     assert_eq!(
         installed(&router, &session).await,
         vec!["dbase", "dmid", "dtop"]
