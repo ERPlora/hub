@@ -106,7 +106,11 @@ async fn ticket(srv: &Server, session: &str) -> String {
         .body(Body::empty())
         .unwrap();
     let resp = app(srv.state.clone()).oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "a live session gets a ticket");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "a live session gets a ticket"
+    );
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&bytes).unwrap();
     json["data"]["ticket"].as_str().unwrap().to_string()
@@ -114,7 +118,10 @@ async fn ticket(srv: &Server, session: &str) -> String {
 
 /// Waits until the short session has run out, with a margin.
 async fn until_the_shift_ends() {
-    tokio::time::sleep(Duration::from_millis(SHORT_SESSION_SECS as u64 * 1000 + 500)).await;
+    tokio::time::sleep(Duration::from_millis(
+        SHORT_SESSION_SECS as u64 * 1000 + 500,
+    ))
+    .await;
 }
 
 /// A frame every listener of this file is entitled to (an app was installed).

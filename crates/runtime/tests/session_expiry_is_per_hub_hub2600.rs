@@ -61,7 +61,11 @@ async fn hub2600_a_session_of_the_business_next_door_has_no_end_here() {
         "the neighbour's session is not a session of this hub"
     );
     assert!(
-        neighbour.session_expires_at(&theirs).await.unwrap().is_some(),
+        neighbour
+            .session_expires_at(&theirs)
+            .await
+            .unwrap()
+            .is_some(),
         "…and it is still alive at home"
     );
     assert!(mine.session_expires_at(&ours).await.unwrap().is_some());
