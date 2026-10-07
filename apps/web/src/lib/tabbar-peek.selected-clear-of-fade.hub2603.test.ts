@@ -164,6 +164,26 @@ describe('bindTabbarPeek leaves the chosen tab clear of the edge fade (hub#2603)
     unbind();
   });
 
+  it('a tab too wide to clear both fades keeps its LEADING edge clear: its label starts there', () => {
+    // 160px tabs on a 200px strip: 160 > 200 - 2 * FADE_PX, so one fade has to fall on it.
+    const segment = strip({
+      viewportLeft: 0,
+      visibleWidth: 200,
+      padding: 4,
+      gap: 4,
+      floorWidth: 160,
+      tabCount: 3,
+      selected: 1,
+      scrollLeft: 0,
+    });
+    const unbind = bindTabbarPeek(segment);
+    const tab = segment.querySelector<HTMLElement>('.segment-button-checked')!;
+
+    expect(segment.scrollLeft).toBeCloseTo(tab.offsetLeft - FADE_PX, 5);
+    expect(underFade(segment).start).toBe(0);
+    unbind();
+  });
+
   it('leaves alone a chosen tab that is already clear of the fade', () => {
     // Stations, centred: after the widening it sits well inside the strip. Nothing to fix, nothing moved
     // beyond what the width change itself demanded.
