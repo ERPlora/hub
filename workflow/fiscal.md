@@ -287,12 +287,12 @@ Implicados: VERIFACTU-F08, REC_ALTA-F02, SAAS_PUBLIC-F91
 QA: BD-02, qa-hub §7
 
 ### HUB-F316 No dejar en producción a un hub sin ningún módulo que cumpla su régimen
-Estado: parcial — al desinstalar solo se mira el módulo que se desinstala, no lo que arrastra: desinstalar Facturación forzando la guarda de dependientes deja a VeriFactu sin facturas que registrar, la venta deja de contar como apertura de cadena y el TPV cobra sin factura ni registro (leído, sin ejecutar)
+Estado: hecho
 Actor: sistema
 Pantalla: HUB_SHELL: Apps
 Pasos:
-1. Alguien desactiva o desinstala un módulo, o uno que arrastra a otros (apagar Facturación apaga VeriFactu).
-2. Con el hub en producción, al **desactivar** el núcleo calcula todo lo que se iría (el módulo y lo que arrastra) y, si no quedaría ningún módulo activo que cumpla el régimen, lo niega aunque la cola esté vacía. Al **desinstalar** solo mira el módulo que se desinstala; la desinstalación forzada (para un administrador, que salta la guarda de dependientes) no salta esta guarda, pero como Facturación no cumple ningún régimen, quitarla pasa.
+1. Alguien desactiva o desinstala un módulo, o uno que arrastra a otros (apagar Facturación apaga VeriFactu; desinstalarla confirmando la pregunta se lleva VeriFactu, HUB-F29).
+2. Con el hub en producción, al **desactivar** o al **desinstalar** el núcleo calcula todo lo que se iría (el módulo y lo que arrastra; al desinstalar forzando, sus dependientes, que se van con él) y, si no quedaría ningún módulo activo que cumpla el régimen, lo niega aunque la cola esté vacía (hub#2545). La desinstalación forzada solo salta la guarda de dependientes, nunca esta.
 3. Con dos módulos del mismo régimen, quitar uno se permite.
 Entra: el conjunto de módulos que se irían y el perfil fiscal.
 Sale: nada si se niega.
@@ -320,7 +320,7 @@ QA: BD-02, qa-hub §7
 
 | Elemento | Estado | Flujo |
 |---|---|---|
-| La obligación fiscal no depende de que el módulo esté instalado | parcial: desinstalar forzando Facturación en producción deja cobrar sin factura ni registro | HUB-F300, HUB-F314, HUB-F316 |
+| La obligación fiscal no depende de que el módulo esté instalado | hecho (desinstalar Facturación se llevaría VeriFactu y se niega si es el último proveedor) | HUB-F300, HUB-F314, HUB-F316 |
 | Certificado del negocio custodiado en el núcleo, cifrado | hecho | HUB-F302 |
 | Comprobar el certificado al subirlo (contraseña, caducidad visible) | parcial: no comprueba la contraseña; no enseña la caducidad | HUB-F302 |
 | Elegir la vía (propia o ERPlora) sin perder el certificado | hecho | HUB-F304 |
@@ -362,7 +362,7 @@ QA: BD-02, qa-hub §7
 
 - **La obligación es del núcleo**: en producción no se desactiva (con lo que arrastra) ni se
   desinstala el último módulo que cumple el régimen (HUB-F316) y, sin él, no se abre ninguna cadena
-  (HUB-F314). Hueco: al desinstalar no se mira lo que arrastra (HUB-F316).
+  (HUB-F314); al desactivar y al desinstalar se mira también lo que arrastra (HUB-F316).
 - **En producción, sin vía no se cobra** (`hub.fiscal.transmission` y el despachador leen la misma
   regla): toda transacción que abriría una cadena fiscal se niega antes de escribir si el hub, en
   producción, no tiene vía; en pruebas nunca; una AEAT o una celda caídas nunca (HUB-F313).
@@ -404,8 +404,6 @@ QA: BD-02, qa-hub §7
    de la conexión segura?
 5. ¿Entra en el MVP una puerta para cerrar el perfil de un negocio que cesa (HUB-F309) y otra para
    adoptar una instalación ajena (HUB-F314)?
-6. ¿Debe la guarda del último proveedor mirar, al desinstalar, lo que arrastra la desinstalación,
-   como ya hace al desactivar (HUB-F316)?
 
 ## Fuentes contrastadas
 

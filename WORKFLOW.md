@@ -386,7 +386,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F313 | En producción, sin vía no se cobra | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F314 | Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena | parcial | [fiscal.md](workflow/fiscal.md) |
 | HUB-F315 | Clavar a pruebas un hub de demostración | hecho | [fiscal.md](workflow/fiscal.md) |
-| HUB-F316 | No dejar en producción a un hub sin ningún módulo que cumpla su régimen | parcial | [fiscal.md](workflow/fiscal.md) |
+| HUB-F316 | No dejar en producción a un hub sin ningún módulo que cumpla su régimen | hecho | [fiscal.md](workflow/fiscal.md) |
 | HUB-F317 | No emitir un documento fiscal sin la identidad del negocio | hecho | [fiscal.md](workflow/fiscal.md) |
 
 ## Qué comparten las áreas del servidor
