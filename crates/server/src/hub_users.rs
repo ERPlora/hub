@@ -335,6 +335,11 @@ async fn apply_update(
             Err(e) => return crate::err_response(e),
         }
     };
+    // hub#2571: after the write (a ticket asked for from now on reads the new role) and before
+    // erplora.com is told (which may fail and return): the person's open channels close here.
+    if ends_live_channels(&target, &input) {
+        end_live_channels_of(&st, id);
+    }
 
     if let AccessSync::Revoke { email } = &plan {
         if let Err(e) = crate::members::notify_member_removed(&st, email).await {
@@ -427,6 +432,33 @@ pub(crate) async fn enforce_seat_for_email(
 
 /// El id de la fila del censo cuyo email de **ACCESO** es `email`.
 ///
+/// **Whether an edit changes what the person's live channels may hear** (hub#2571): what a channel
+/// hears was decided by the role when it opened, so a new role or a removal ends it. The name, the
+/// PIN, the badge and the email do not change a single permission, and saving the role the person
+/// already has (the form sends every field back) neither.
+fn ends_live_channels(target: &HubUserRow, input: &UpdateHubUser) -> bool {
+    input.is_active == Some(false) || input.role.as_deref().is_some_and(|r| r != target.role)
+}
+
+/// Closes every live channel (`/ws`, `/api/events`) of the person `user_id`, on every device, with
+/// `events.credential_ended` (hub#2571); the app reconnects with a ticket that carries their new
+/// role, or gets none if they were taken off the team.
+pub(crate) fn end_live_channels_of(st: &AppState, user_id: &str) {
+    st.stream_limiter
+        .cut(&crate::event_stream::person_tag(&st.hub_id(), user_id));
+}
+
+/// The census row whose ACCESS email is `email` ([`census_id_by_access_email`]) — what the members
+/// door is about to write over, so it can tell what the write changes (hub#2571).
+pub(crate) async fn census_row_by_access_email(
+    rt: &Runtime,
+    email: &str,
+) -> erplora_runtime::Result<Option<HubUserRow>> {
+    let users = rt.list_hub_users().await?;
+    Ok(census_id_by_access_email(&users, email)
+        .and_then(|id| users.into_iter().find(|u| u.id == id)))
+}
+
 /// Se compara contra `hub_user.email` a propósito y no contra el email que pinta Personal, que es un
 /// `COALESCE` con el del perfil: el del perfil lo edita cada uno en «Mi perfil» y sin control de
 /// unicidad, así que dejarlo decidir permitiría hacerse pasar por la fila de otro —la del dueño, la

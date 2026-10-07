@@ -75,6 +75,7 @@ pub(crate) async fn auth_pin(
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session(
                 &rt,
+                &st.stream_limiter,
                 user,
                 device_id,
                 max_devices,
@@ -307,6 +308,7 @@ pub(crate) async fn auth_badge(
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session(
                 &rt,
+                &st.stream_limiter,
                 matched.user,
                 device_id,
                 max_devices,
@@ -522,6 +524,7 @@ pub(crate) async fn open_cloud_session(
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
             mint_session_with_extra(
                 &rt,
+                &st.stream_limiter,
                 user,
                 device_id.as_deref(),
                 max_devices,
@@ -1004,16 +1007,28 @@ pub(crate) async fn auth_handoff(
 /// petición al no resolver). `0` = ilimitado / sin `device_id` = comportamiento actual.
 pub(crate) async fn mint_session(
     rt: &erplora_runtime::Runtime,
+    stream_limiter: &crate::event_stream::StreamLimiter,
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
     credential: &erplora_runtime::identity::Credential,
 ) -> Response {
-    mint_session_with_extra(rt, user, device_id, max_devices, credential, None).await
+    mint_session_with_extra(
+        rt,
+        stream_limiter,
+        user,
+        device_id,
+        max_devices,
+        credential,
+        None,
+    )
+    .await
 }
 
 pub(crate) async fn mint_session_with_extra(
     rt: &erplora_runtime::Runtime,
+    // hub#2571: the live channels of the sessions the device limit throws out close with them.
+    stream_limiter: &crate::event_stream::StreamLimiter,
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
@@ -1023,8 +1038,13 @@ pub(crate) async fn mint_session_with_extra(
     credential: &erplora_runtime::identity::Credential,
     extra: Option<Value>,
 ) -> Response {
-    if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
-        return err_response(e);
+    match rt.enforce_device_limit(max_devices, device_id).await {
+        Ok(evicted) => {
+            for token in evicted {
+                stream_limiter.cut(&crate::event_stream::session_tag(&token));
+            }
+        }
+        Err(e) => return err_response(e),
     }
     // Cuánto vive la sesión lo decide el MODO DEL DISPOSITIVO (hub#358), no una constante global:
     // un mostrador caduca dentro del turno que abrió y el equipo propio conserva la sesión larga.

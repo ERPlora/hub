@@ -434,11 +434,12 @@ impl Runtime {
     /// Aplica el límite de dispositivos del plan ANTES de abrir sesión (ADR-0154): con
     /// `max_devices == 1` y `device_id` presente, desaloja las sesiones de otros dispositivos
     /// (*single active device session* con takeover). `0` = ilimitado / sin `device_id` = no-op.
+    /// Devuelve los tokens desalojados, para cerrar sus canales en vivo (hub#2571).
     pub async fn enforce_device_limit(
         &self,
         max_devices: u32,
         device_id: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<Vec<String>> {
         identity::enforce_device_limit(self.db.as_ref(), &self.hub_id, max_devices, device_id).await
     }
 

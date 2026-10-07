@@ -351,6 +351,24 @@ async fn regranting_a_member_with_another_role_closes_their_socket() {
     assert_still_hears(&mut manager, &srv, "another person").await;
 }
 
+/// …while re-granting the role they already have (the invitation sent again) closes nothing.
+#[tokio::test]
+async fn regranting_a_member_with_the_same_role_leaves_their_socket_open() {
+    let srv = serve().await;
+    let mut staff = ws_as(&srv, &srv.staff).await;
+
+    let status = admin_call(
+        &srv,
+        "POST",
+        "/api/members",
+        Some(json!({ "email": STAFF_EMAIL, "role": "employee" })),
+    )
+    .await;
+    assert_ne!(status, StatusCode::FORBIDDEN, "the admin may re-grant members");
+
+    assert_still_hears(&mut staff, &srv, "the role did not change").await;
+}
+
 // ── The device limit (HUB-F137) ─────────────────────────────────────────────────────────────────
 
 fn one_device_plan() -> EntitlementClaims {
