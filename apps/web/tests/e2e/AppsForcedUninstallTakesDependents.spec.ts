@@ -115,6 +115,8 @@ test.describe('uninstalling an app others need takes them with it (hub#2545)', (
       await expect(alert).toContainText(`Estas apps necesitan ${BASE.name} y también se desinstalarán:`);
       await expect(alert).toContainText(`· ${CHILD.name}`);
       await expect(alert).not.toContainText('dejarán de funcionar');
+      // Wait out the enter animation: a shot taken mid-fade shows the page above the dialog.
+      await expect(alert.locator('.alert-wrapper')).toHaveCSS('opacity', '1');
       const shot = `forced-uninstall-dialog-${size.width}x${size.height}.png`;
       await page.screenshot({ path: SHOTS_DIR ? join(SHOTS_DIR, shot) : testInfo.outputPath(shot) });
 
