@@ -44,3 +44,16 @@ export function comandaFailureNotice(f: ComandaPrintFailure, words: NoticeWords)
   // Its sentence carries the way out, so it stays up as long as the waiting one, not toastError's.
   return { messageKey: 'print.comandaFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS };
 }
+
+/**
+ * The VOID slip of a cancelled round did not come out, or is waiting for a printer (kitchen#168).
+ * Same tones as the comanda's, other sentences: the card has just left the kitchen screen, so the
+ * way out is to tell the station out loud that the dish is no longer to be made.
+ */
+export function voidFailureNotice(f: ComandaPrintFailure, words: NoticeWords): PrintNotice {
+  const params = { label: f.label || words.t('print.comandaDefaultLabel'), station: stationName(f.role, words) };
+  if (f.awaitingHost) {
+    return { messageKey: 'print.voidWaitingForPrinter', params, color: 'warning', duration: READ_A_SENTENCE_MS };
+  }
+  return { messageKey: 'print.voidFailed', params, color: 'danger', duration: READ_A_SENTENCE_MS };
+}

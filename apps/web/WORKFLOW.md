@@ -22,7 +22,7 @@ Un worker lee este índice **y** el fichero del área que va a tocar: cada fiche
 | Acceso, navegación y perfil | [workflow/acceso-y-navegacion.md](workflow/acceso-y-navegacion.md) | F01–F23 | LoginPage, ActivationPage, AuthenticatedChrome, AppTopbar (salvo la campana), AppPage, NotFoundPage, NotFoundState, ProfilePage, UserSwitchOverlay, DeviceModeCard, OfflineStrip, BootUnreachable, SidebarInstallQr, SidebarAppUpdate |
 | Inicio y puesta en marcha | [workflow/inicio.md](workflow/inicio.md) | F25–F39 | DashboardPage, SetupChecklistCard, SetupBlockingStrip, BlueprintHeroCard, MyAppsCard |
 | La vista de un módulo | [workflow/vista-de-modulo.md](workflow/vista-de-modulo.md) | F40–F56 | ModuleView, ModuleSettingsForm, ModulePlanPanel, ElevationDialog |
-| Avisos e impresión | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) | F60–F77 | la campana de AppTopbar |
+| Avisos e impresión | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) | F60–F78 | la campana de AppTopbar |
 | Personas y permisos | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) | F80–F104 | EmployeesPage, EmployeeFormPage, RolesPanel, ApprovalsPanel, ApiKeysPanel, ApiDocsPage, PinPolicyCard, DevicesCard |
 | Aplicaciones (1.ª mitad del área «Aplicaciones, plan y archivos») | [workflow/aplicaciones.md](workflow/aplicaciones.md) | F105–F125 | AppsPage |
 | Plan y archivos (2.ª mitad) | [workflow/plan-y-archivos.md](workflow/plan-y-archivos.md) | F126–F134 | BillingPage, PlanLimitsPanel, FilesPage, FilePreviewModal |
@@ -30,7 +30,7 @@ Un worker lee este índice **y** el fichero del área que va a tocar: cada fiche
 | Ajustes del negocio y datos | [workflow/ajustes-y-datos.md](workflow/ajustes-y-datos.md) | F155–F181 | SettingsPage, WhatsAppConnect, DataPanel, ExportPanel, ImportPanel, ImportPermissionsConsent, ResetPanel |
 | Asistente | [workflow/asistente.md](workflow/asistente.md) | F185–F199 | AssistantDrawer |
 
-Libres: F24, F57–F59, F78–F79, F150–F154, F182–F184. Retirados por duplicados (cabecera `[retirado]` en su fichero): F55 (lo sustituye F18), F141 (F128) y F166 (F75).
+Libres: F24, F57–F59, F79, F150–F154, F182–F184. Retirados por duplicados (cabecera `[retirado]` en su fichero): F55 (lo sustituye F18), F141 (F128) y F166 (F75).
 
 Ficheros de `src/lib/` (y `src/router/`) por área:
 
@@ -39,7 +39,7 @@ Ficheros de `src/lib/` (y `src/router/`) por área:
 | Acceso, navegación y perfil | `session.ts`, `courier.ts`, `cloud.ts`, `runtime.ts`, `config.ts`, `user-switch.ts`, `pin-policy.ts`, `pin-length.ts`, `pinpad-dial.ts` (también lo usa la tarjeta Pinpad), `device-mode.ts`, `device.ts`, `boot.ts`, `boot-screen.ts`, `offline.ts`, `immersive.ts`, `change-hub.ts`, `install-qr.ts`, `deep-link.ts`, `user-profile.ts`, `branding.ts`, `routes.ts`, `hash-tab.ts`, `tabbar-peek.ts`, `list-load-state.ts`, `shell.ts`, `shell-menu.ts`, `nav.ts`, `idle-logout.ts`, `session-end-reason.ts`, `pwa.ts`, `theme.ts`, `viewport.ts`, y `router/` |
 | Inicio y puesta en marcha | `dashboard-widgets.ts`, `dashboard-activity.ts`, `dashboard-heading.ts`, `dashboard-blueprint-widget.ts`, `blueprint-hero.ts`, `setup-status.ts`, `app-usage.ts` |
 | La vista de un módulo | `module-loader.ts`, `module-url.ts`, `module-settings.ts`, `module-quota.ts`, `module-usage.ts`, `module-plan-link.ts`, `protects.ts`, `lock-refusal.ts`, `elevation.ts`, `elevation-label.ts`, `module-failure-message.ts` (también Aplicaciones), `runtime-error-sentence.ts`, `invalid-field.ts` (también Personas), `slot-fillers.ts`, `outfitkit-skew.ts`, `teleported-styles.ts` |
-| Avisos e impresión | `bell-counters.ts`, `bell-notice.ts`, `notice-listening.ts`, `notice-tap.ts`, `notification-permission.ts`, `appointment-notice.ts`, `print.ts`, `print-on-sale.ts`, `print-on-sale-notice.ts`, `print-comanda.ts`, `print-comanda-notice.ts`, `print-host.ts`, `print-host-registration.ts`, `print-drain.ts`, `print-enqueue.ts`, `print-alert.ts`, `print-coverage.ts`, `native-print.ts`, `receipt-template.ts`, `sale-document.ts`, `printer-discovery.ts`, `toast.ts`, `bridge-transport.ts`, `client-instance.ts` (`HUB_APP` cuenta el transporte de la app) |
+| Avisos e impresión | `bell-counters.ts`, `bell-notice.ts`, `notice-listening.ts`, `notice-tap.ts`, `notification-permission.ts`, `appointment-notice.ts`, `print.ts`, `print-on-sale.ts`, `print-on-sale-notice.ts`, `print-comanda.ts`, `print-comanda-notice.ts`, `print-void.ts`, `print-host.ts`, `print-host-registration.ts`, `print-drain.ts`, `print-enqueue.ts`, `print-alert.ts`, `print-coverage.ts`, `native-print.ts`, `receipt-template.ts`, `sale-document.ts`, `printer-discovery.ts`, `toast.ts`, `bridge-transport.ts`, `client-instance.ts` (`HUB_APP` cuenta el transporte de la app) |
 | Personas y permisos | `hub-users.ts`, `approvals.ts`, `api-keys.ts`, `api-docs.ts`, `devices.ts`, `badge-scanner.ts`, `nfc-badge.ts`, `platform-failure.ts` |
 | Aplicaciones | `apps-catalog.ts`, `apps-grid.ts`, `apps-list-columns.ts`, `installed-app-actions.ts`, `module-updates.ts`, `module-update-notice.ts` (también la campana y Sistema), `module-capabilities.ts` |
 | Plan y archivos | `entitlement.ts`, `upgrade-plan-link.ts`, `management-link.ts`, `saas-door.ts`, `open-external.ts`, `save-download.ts`, `media.ts`, `file-preview.ts`, `file-preview-loaders.ts` |
@@ -337,6 +337,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F75 | Ver quién imprime cada función | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F76 | Saber qué sale en el papel del tique y dónde se cambia | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F77 | Imprimir un documento desde una pantalla | hecho | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
+| HUB_SHELL-F78 | Imprimir el vale de anulación al cancelar una ronda ya enviada | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F80 | Ver la lista de personas del negocio | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F81 | Dar de alta a una persona que entra solo con PIN | hecho | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F82 | Invitar a una persona con su cuenta de erplora.com | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |

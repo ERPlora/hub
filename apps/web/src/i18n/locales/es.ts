@@ -806,6 +806,13 @@ export default {
     comandaNoticeFor: 'Nueva comanda · {label}',
     comandaNoticeLines: '{n} línea | {n} líneas',
     comandaDefaultLabel: 'sala',
+    // kitchen#168 — the VOID slip of a cancelled round.
+    voidLabel: 'ANULADA · {label}',
+    voidLabelBare: 'ANULADA',
+    voidFailed:
+      'No se imprimió el vale de anulación de {station} de {label}. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
+    voidWaitingForPrinter:
+      'El vale de anulación de {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
   },
   // hub#2168 — system notices for a booking or cancellation that did NOT come from a till.
   appointmentNotice: {

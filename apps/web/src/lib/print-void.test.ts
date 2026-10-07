@@ -1,0 +1,232 @@
+// kitchen#168 — a round already printed at the station and then cancelled (by hand in Kitchen ›
+// Orders, or because its bill was deleted, KITCHEN-F28) left the paper on the rail: the kitchen
+// cooked it. The screen drops the card, but a paper-only station never looks at a screen. Toast,
+// Square and Lightspeed print a VOID chit at the same printer; so does this, by the comanda's own
+// route (HUB_SHELL-F72) and with the comanda's own document, so an installed app that cannot be
+// updated still prints it.
+import { describe, it, expect, vi } from 'vitest';
+import { bootPrintVoid, onKitchenOrderCancelled } from './print-void';
+import { CLIENT_INSTANCE } from './client-instance';
+import type { PrintRequest, PrintResult } from './print';
+
+// Echoes the key and its params: a test pins WHICH words are asked for, not their prose (ADR-0055).
+const t = (key: string, params?: Record<string, unknown>) => (params ? `${key}${JSON.stringify(params)}` : key);
+
+// `kitchen.orders.items` does not filter by status: after the cancel the lines are still there, with
+// the station and printer role frozen when the round was fired.
+const CROQUETAS = {
+  product_name: 'Croquetas',
+  quantity: 2_000_000,
+  notes: 'sin gluten',
+  status: 'cancelled',
+  destination: 'printer',
+  printer_role: 'kitchen',
+};
+const CANAS = {
+  product_name: 'Cañas',
+  quantity: 2_000_000,
+  status: 'cancelled',
+  destination: 'display',
+  printer_role: 'bar',
+};
+const FLAN = {
+  product_name: 'Flan',
+  quantity: 500_000,
+  status: 'cancelled',
+  destination: 'both',
+  printer_role: 'bar',
+};
+
+function fakeClient(
+  items: unknown[] = [CROQUETAS, CANAS],
+  header: Record<string, unknown> = { id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018', status: 'cancelled' },
+) {
+  return {
+    query: vi.fn(async (name: string) => {
+      if (name === 'kitchen.orders.items') return items;
+      if (name === 'kitchen.orders.get') return [header];
+      return [];
+    }),
+  } as never;
+}
+
+const printed = () =>
+  vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+
+describe('the void slip of a cancelled round (kitchen#168)', () => {
+  it('prints one slip per printer role, unattended, on the comanda document', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient([CROQUETAS, CANAS, FLAN]), { order_id: 'k-1' }, { print, t });
+
+    expect(print.mock.calls.map((c) => c[0].role).sort()).toEqual(['bar', 'kitchen']);
+    const req = print.mock.calls.find((c) => c[0].role === 'kitchen')![0];
+    // The document an installed app already renders: a new type would print nothing on it.
+    expect(req.documentType).toBe('kitchen_order');
+    expect(req.fallbackToBrowser).toBe(false);
+  });
+
+  it('says VOID with the floor label, in the app language', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient(), { order_id: 'k-1' }, { print, t });
+    expect(print.mock.calls[0]![0].data?.label).toBe('print.voidLabel{"label":"Mesa 4"}');
+  });
+
+  it('with no floor label says VOID alone, never a hole', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(
+      fakeClient([CROQUETAS], { id: 'k-1', label: '', round_number: 1, order_number: 'C-018' }),
+      { order_id: 'k-1' },
+      { print, t },
+    );
+    expect(print.mock.calls[0]![0].data?.label).toBe('print.voidLabelBare');
+  });
+
+  it('lists the cancelled dishes with a NEGATIVE quantity, so nobody reads it as a new round', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient([CROQUETAS, FLAN]), { order_id: 'k-1' }, { print, t });
+
+    const kitchen = print.mock.calls.find((c) => c[0].role === 'kitchen')![0];
+    expect(kitchen.data?.items).toEqual([{ name: 'Croquetas', quantity: -2, notes: 'sin gluten' }]);
+    const bar = print.mock.calls.find((c) => c[0].role === 'bar')![0];
+    expect(bar.data?.items).toEqual([{ name: 'Flan', quantity: -0.5 }]);
+  });
+
+  it('carries the order number and the round, like the comanda it cancels', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient(), { order_id: 'k-1' }, { print, t });
+    const data = print.mock.calls[0]![0].data!;
+    expect(data.receipt_id).toBe('C-018');
+    expect(data.round_number).toBe(2);
+  });
+
+  it('never prints the URGENT banner: a cancelled rush round is not a dish to hurry', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(
+      fakeClient([CROQUETAS], { id: 'k-1', label: 'Mesa 4', order_number: 'C-018', priority: 'rush' }),
+      { order_id: 'k-1' },
+      { print, t },
+    );
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('priority');
+  });
+
+  it('has a job key of its own: the queue must not drop it as a repeat of the comanda', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient(), { order_id: 'k-1' }, { print, t });
+    expect(print.mock.calls[0]![0].jobId).toBe('kitchen-void-k-1-kitchen');
+  });
+
+  it('a round that only went to a screen prints nothing: there is no paper to take back', async () => {
+    const print = printed();
+    const client = fakeClient([CANAS]) as unknown as { query: ReturnType<typeof vi.fn> };
+    await onKitchenOrderCancelled(client as never, { order_id: 'k-1' }, { print, t });
+    expect(print).not.toHaveBeenCalled();
+    // Nor asks for the header: one query less on every screen-only cancel.
+    expect(client.query.mock.calls.map((c) => c[0])).toEqual(['kitchen.orders.items']);
+  });
+
+  it('an order with no dishes (made by hand) prints nothing', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient([]), { order_id: 'k-1' }, { print, t });
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  it('an event with no order does nothing', async () => {
+    const print = printed();
+    await onKitchenOrderCancelled(fakeClient(), {}, { print, t });
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  it('with no printer for that station it warns the till, and does not print it at another one', async () => {
+    const print = vi.fn(async () => ({ via: 'none' as const, role: 'kitchen' }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCancelled(fakeClient(), { order_id: 'k-1' }, { print, t, onFailure });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ orderId: 'k-1', role: 'kitchen', label: 'Mesa 4' });
+    // The reason is for the log, as a code (hub#2257).
+    expect(onFailure.mock.calls[0]![0].error).toMatch(/^[a-z][a-z_]*$/);
+  });
+
+  it('queued with nobody to print that station, it warns that it is waiting', async () => {
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen', awaitingHost: true }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCancelled(fakeClient(), { order_id: 'k-1' }, { print, t, onFailure });
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ orderId: 'k-1', awaitingHost: true });
+  });
+
+  it('queued with somebody draining it says nothing: it comes out', async () => {
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen', awaitingHost: false }));
+    const onFailure = vi.fn();
+    await onKitchenOrderCancelled(fakeClient(), { order_id: 'k-1' }, { print, t, onFailure });
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('a printer that throws does not stop the other station from getting its slip', async () => {
+    const print = vi.fn(async (req: PrintRequest) => {
+      if (req.role === 'kitchen') throw new Error('out of paper');
+      return { via: 'bridge' as const, role: req.role ?? 'bar' };
+    });
+    const onFailure = vi.fn();
+    await expect(
+      onKitchenOrderCancelled(fakeClient([CROQUETAS, FLAN]), { order_id: 'k-1' }, { print, t, onFailure }),
+    ).resolves.toBeUndefined();
+    expect(print).toHaveBeenCalledTimes(2);
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ role: 'kitchen' });
+  });
+});
+
+describe('the void slip comes out once, where the comanda came out (kitchen#168, hub#2029)', () => {
+  const TILL_NEXT_DOOR = 'till-next-door-7c1e';
+
+  function tillHearing() {
+    const listeners: ((payload: unknown, meta: { clientInstance?: string }) => void)[] = [];
+    const client = {
+      ...(fakeClient() as object),
+      onEvent: (event: string, cb: (typeof listeners)[number]) => {
+        if (event === 'kitchen.order.cancelled') listeners.push(cb);
+        return () => {};
+      },
+    } as never;
+    const emit = async (payload: unknown, meta: { clientInstance?: string }) => {
+      for (const cb of listeners) cb(payload, meta);
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    return { client, emit };
+  }
+
+  it('the tab that cancelled it prints the slip, by its usual route', async () => {
+    const print = printed();
+    const { client, emit } = tillHearing();
+    bootPrintVoid(client, { print, t });
+
+    await emit({ order_id: 'k-1' }, { clientInstance: CLIENT_INSTANCE });
+
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].queueOnly).toBeFalsy();
+  });
+
+  it('a cancel made at another till prints nothing here', async () => {
+    const print = printed();
+    const onFailure = vi.fn();
+    const { client, emit } = tillHearing();
+    bootPrintVoid(client, { print, t, onFailure });
+
+    await emit({ order_id: 'k-1' }, { clientInstance: TILL_NEXT_DOOR });
+
+    expect(print).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('a cancel no till made (API, a flow) goes ONLY to the hub queue, one job for every till', async () => {
+    const print = printed();
+    const { client, emit } = tillHearing();
+    bootPrintVoid(client, { print, t });
+
+    await emit({ order_id: 'k-1' }, {});
+
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].queueOnly).toBe(true);
+    expect(print.mock.calls[0]![0].jobId).toBe('kitchen-void-k-1-kitchen');
+  });
+});

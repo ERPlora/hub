@@ -3,12 +3,12 @@
 Prefijo: HUB_SHELL
 
 > Detalle del índice `apps/web/WORKFLOW.md`. La campana, los avisos del sistema del dispositivo y la
-> impresión que hace el shell solo (el tique al cobrar, la comanda al disparar, el dispositivo que
-> saca la cola). Código: `components/AppTopbar.vue` (campana), `lib/bell-counters.ts`,
+> impresión que hace el shell solo (el tique al cobrar, la comanda al disparar y su vale al cancelarla, el
+> dispositivo que saca la cola). Código: `components/AppTopbar.vue` (campana), `lib/bell-counters.ts`,
 > `lib/dead-letter.ts`, `lib/print-alert.ts`, `lib/module-update-notice.ts`, `lib/bell-notice.ts`,
 > `lib/appointment-notice.ts`, `lib/notice-tap.ts`, `lib/notification-permission.ts`,
 > `lib/notice-listening.ts`, `lib/print.ts`, `lib/print-on-sale.ts`, `lib/print-on-sale-notice.ts`,
-> `lib/print-comanda.ts`, `lib/print-comanda-notice.ts`, `lib/sale-document.ts`,
+> `lib/print-comanda.ts`, `lib/print-comanda-notice.ts`, `lib/print-void.ts`, `lib/sale-document.ts`,
 > `lib/print-enqueue.ts`, `lib/print-host.ts`, `lib/print-host-registration.ts`,
 > `lib/print-drain.ts`, `lib/print-coverage.ts`, `lib/receipt-template.ts`, `lib/native-print.ts`,
 > `lib/printer-discovery.ts`, `lib/toast.ts`; el cableado en `main.ts` y `App.vue`.
@@ -324,6 +324,23 @@ Si falla: dentro de la app instalada no hay respaldo de navegador: si no hay imp
 Implicados: HUB-F190, HUB_APP-F22, HUB_PERIPHERALS-F06, INVENTORY-F25, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F09
 QA: qa-hub §8
 
+### HUB_SHELL-F78 Imprimir el vale de anulación al cancelar una ronda ya enviada
+Estado: parcial — con la impresora de red apagada o sin papel el vale no sale y nadie lo sabe, como la comanda (hub#2494); y si la cancelación no la hizo ninguna caja y todas las pantallas están cerradas, no lo encola nadie
+Vertical: restaurante
+Actor: sistema
+Pantalla: kitchen: Comandas
+Pasos:
+1. Un responsable cancela una ronda en **Cocina → Comandas** (KITCHEN-F22), o se elimina la cuenta que la envió y Cocina cancela sus rondas en marcha (KITCHEN-F28).
+2. La pantalla que canceló lee en Cocina las líneas de esa ronda (siguen ahí, canceladas) y las agrupa como la comanda: una hoja por función de impresora («Cocina», «Barra»); lo que fue solo a pantalla no imprime nada, y una ronda que no salió en papel no saca vale.
+3. Sale una hoja por función, en la misma impresora que sacó la comanda: «ANULADA · Mesa 4» (o «ANULADA» sin etiqueta) donde va la mesa, en doble altura, el número y la ronda, y cada plato con la cantidad en negativo («-2x Croquetas»), con sus suplementos y su nota. Nunca lleva «URGENTE».
+4. Directo si este dispositivo tiene la impresora de esa función; si no, por la cola del hub. Las demás pantallas no imprimen. Una cancelación que no hizo ninguna caja (el asistente, la API, un flujo) la encola cada pantalla abierta y conectada, con la misma clave, así que queda un solo vale.
+Entra: el aviso en vivo de comanda cancelada con la pantalla que la mandó (`kitchen.order.cancelled`, HUB-F60); las líneas y la cabecera de la comanda, de Cocina.
+Sale: una hoja por función, clave `kitchen-void-<pedido>-<función>` (distinta de la de la comanda, para que la cola no la tome por repetida).
+Si falla: nunca bloquea la cancelación. Avisos en la pantalla que canceló: «No se imprimió el vale de anulación de {estación} de {mesa}. Avisa en {estación} de viva voz: esa comanda ya no se prepara.»; «El vale de anulación de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {estación} de viva voz: esa comanda ya no se prepara.». Sin aviso del sistema del dispositivo. Nunca se desvía a la impresora de tiques. Si no se pueden leer las líneas, no sale nada y no se avisa (como la comanda, HUB_SHELL-F72).
+Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN-F22, KITCHEN-F28
+Pendiente de enlazar: printing — PRINTING-F10, la impresora con la función «Cocina» o «Barra» que saca la comanda saca también su vale de anulación
+QA: qa-hub-restaurant §7.13
+
 ## Cobertura contra la referencia
 
 | Elemento | Estado | Flujo |
@@ -340,6 +357,7 @@ QA: qa-hub §8
 | Confirmación de papel real | no hecho (se confirma al encolar en el dispositivo) | HUB_SHELL-F74 |
 | Reintento de un trabajo que falló | parcial (vuelve a la cola sin despertar a nadie) | HUB_SHELL-F74 |
 | Comanda de un pedido sin caja con todas las pantallas cerradas | no hecho (no sale ni avisa) | HUB_SHELL-F72 |
+| Vale de anulación en la impresora de la comanda al cancelar la ronda | parcial (impresora apagada mudo, hub#2494) | HUB_SHELL-F78 |
 | Cobertura por función visible | parcial (recalcula el estado; puede mentir) | HUB_SHELL-F75 |
 | Hora de la venta y nombre de quien atiende en el tique | no hecho | HUB_SHELL-F76 |
 | A4 con diálogo del sistema / navegador | hecho | HUB_SHELL-F77 |
@@ -372,7 +390,7 @@ papel del tique y en la fila de la cola del hub cuando va por ella.
   cerradas no la encola nadie (hueco, no regla).
 - **Una venta o una comanda nunca se caen por la impresión**: la impresión es posterior y sus
   fallos solo avisan.
-- **La comanda nunca se desvía a la impresora de tiques** (`print-comanda.ts:263`).
+- **La comanda y su vale de anulación nunca se desvían a la impresora de tiques** (`print-comanda.ts:263`, `print-void.ts`).
 - **Dentro de la app instalada no hay «impreso por el navegador»**: sin impresora ni cola la
   respuesta es «no salió» (`print.ts:354-362`).
 - **Un documento sin contenido estructurado no se encola** (saldría en blanco, `print.ts:320`).
