@@ -338,11 +338,11 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F76 | Saber qué sale en el papel del tique y dónde se cambia | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F77 | Imprimir un documento desde una pantalla | hecho | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F80 | Ver la lista de personas del negocio | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
-| HUB_SHELL-F81 | Dar de alta a una persona que entra solo con PIN | hecho | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB_SHELL-F81 | Dar de alta a una persona que entra solo con PIN | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F82 | Invitar a una persona con su cuenta de erplora.com | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F83 | Llegar al tope de personas del plan | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F84 | Cambiar el nombre, el correo, el rol o el estado de una persona | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
-| HUB_SHELL-F85 | Poner o cambiar el PIN de otra persona | hecho | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
+| HUB_SHELL-F85 | Poner o cambiar el PIN de otra persona | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F86 | Retirar el PIN a una persona | hecho | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F87 | Dar de alta o retirar la placa de una persona | hecho | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F88 | Dar de baja a una persona | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |

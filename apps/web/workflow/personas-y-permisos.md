@@ -59,7 +59,7 @@ Implicados: HUB-F158, KITCHEN-F10, STAFF-F03
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F81 Dar de alta a una persona que entra solo con PIN
-Estado: hecho
+Estado: parcial — al montar la plantilla seguida, la sexta alta con PIN en menos de 5 minutos sale con «Demasiados cambios de PIN en poco tiempo. Espera {minutes} minutos…» y hay que parar hasta que pase la ventana (ERPlora/hub#2564)
 Actor: administrador
 Pantalla: Empleados
 Pasos:
@@ -121,7 +121,7 @@ Implicados: HUB-F148, STAFF-F03
 QA: qa-hub-restaurant §6
 
 ### HUB_SHELL-F85 Poner o cambiar el PIN de otra persona
-Estado: hecho
+Estado: parcial — cambiar el PIN a más de 5 personas seguidas en menos de 5 minutos obliga a esperar a que pase la ventana del freno (ERPlora/hub#2564)
 Actor: administrador
 Pantalla: Ficha de usuario
 Pasos:
