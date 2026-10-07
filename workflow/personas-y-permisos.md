@@ -32,7 +32,7 @@ Para esta parte del área (la de entrar y las sesiones está en [acceso.md](acce
 ## Flujos
 
 ### HUB-F145 Dar de alta a una persona que entra solo con PIN
-Estado: hecho
+Estado: parcial — el freno de 5 intentos en 5 minutos de quien edita no para a quien va despacio (4 cada 5 minutos no bloquean nunca) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526); y el mismo freno hace esperar a quien monta la plantilla seguida: la sexta alta con PIN en menos de 5 minutos tiene que esperar a que pase la ventana (ERPlora/hub#2564)
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
@@ -41,8 +41,8 @@ Pasos:
 3. Guarda.
 4. La persona aparece en la lista y en el pinpad de los dispositivos compartidos de confianza.
 Entra: la sesión de administrador; el nombre (hasta 150 caracteres), el rol, el PIN y la placa opcional; las plazas del plan (HUB-F147).
-Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148).
-Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: el **alta** de un usuario local no admite administrador (ojo: la edición de la ficha sí deja subirlo después a administrador, HUB-F148, y un administrador con PIN entra por el pinpad con todos sus permisos; solo el pase a erplora.com, HUB-F142, exige haber entrado con la cuenta); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147.
+Sale: la ficha (`hub_user`) con el PIN y la placa guardados como huella; nada en erplora.com: esta persona no tiene cuenta y solo existe en este negocio. Más tarde se le puede añadir un correo y convertirla en persona con cuenta sin perder su historial (HUB-F148). Como el PIN es único, «ya lo tiene otro usuario activo» dice que ese número es de alguien: por eso cada alta que lleva PIN gasta un intento del presupuesto de **quien da el alta**, el mismo que el cambio del propio PIN (HUB-F132): 5 en 5 minutos, contando también los aceptados; agotado, no mira el número ni escribe nada (ERPlora/hub#2518).
+Si falla: con correo, «local_has_email»; sin PIN, «Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.»; con rol de administrador, «local_cannot_administer»: el **alta** de un usuario local no admite administrador (ojo: la edición de la ficha sí deja subirlo después a administrador, HUB-F148, y un administrador con PIN entra por el pinpad con todos sus permisos; solo el pase a erplora.com, HUB-F142, exige haber entrado con la cuenta); un nombre que el hub ya conoce, aunque esté de baja, «Este hub ya conoce a alguien con ese nombre…»; PIN fácil o repetido, los mismos avisos que HUB-F132; placa con forma rara o ya usada, «Una placa tiene entre 4 y 64 caracteres…» o «Esa placa ya la lleva otro usuario activo…»; sin plazas, HUB-F147; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin decir si el número estaba libre.
 Implicados: HUB_SHELL-F81, STAFF-F01, REC_ALTA-F15
 QA: qa-hub-restaurant §7.02
 
@@ -77,7 +77,7 @@ Implicados: HUB_SHELL-F83, REC_ALTA-F15, SAAS_DASHBOARD-F13, SAAS_DASHBOARD-F53,
 QA: ninguno
 
 ### HUB-F148 Cambiar el nombre, el rol, el PIN, la placa o el correo de una persona
-Estado: hecho
+Estado: parcial — el freno de 5 intentos en 5 minutos de quien edita no para a quien va despacio (4 cada 5 minutos no bloquean nunca) y los intentos no dejan rastro: con tiempo se sigue pudiendo averiguar el PIN de otra persona (ERPlora/hub#2526); y el mismo freno hace esperar a quien cambia el PIN a más de 5 personas seguidas en menos de 5 minutos (ERPlora/hub#2564)
 Actor: administrador
 Pantalla: HUB_SHELL: Empleados
 Pasos:
@@ -86,8 +86,8 @@ Pasos:
 3. Guarda.
 4. El rol nuevo vale desde la siguiente acción de esa persona, también en sesiones ya abiertas.
 Entra: la sesión de administrador; los campos que cambian (solo esos).
-Sale: la ficha. El orden depende del cambio: lo que concede (rol, correo, reincorporación) se pide primero a erplora.com y solo después se escribe aquí; el nombre, el PIN y la placa no se cuentan a erplora.com y funcionan aunque no conteste. El correo con el que se habla con erplora.com es el de acceso o, si no lo hay, el del perfil de la persona (HUB-F143). La edición **no** repite la guarda del alta local: un administrador puede subir a administrador a una persona que solo tiene PIN, y desde ese momento ese PIN abre una sesión de administrador (ver huecos).
-Si falla: la ficha del dueño de la cuenta solo la cambia él, PIN incluido («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»); nadie se da de alta su propia placa («Nadie da de alta su propia placa. Pídeselo a otro administrador.», salvo el dueño); la placa no puede quedar como única forma de entrar («La placa no puede ser su única vía de entrada…»); quitar el rol de administrador al último que queda, «No puedes dar de baja al último administrador…»; un rol de un módulo que está apagado, «Ya no se puede asignar «{role}».»; PIN o correo repetidos, los avisos de HUB-F132 y HUB-F146.
+Sale: la ficha. El orden depende del cambio: lo que concede (rol, correo, reincorporación) se pide primero a erplora.com y solo después se escribe aquí; el nombre, el PIN y la placa no se cuentan a erplora.com y funcionan aunque no conteste. El correo con el que se habla con erplora.com es el de acceso o, si no lo hay, el del perfil de la persona (HUB-F143). Una edición que trae PIN gasta un intento del presupuesto de **quien edita**, compartido con el alta (HUB-F145) y con el cambio del propio PIN (HUB-F132), sea cual sea la ficha: así nadie averigua en unos minutos el PIN de un compañero, el del dueño incluido, probando números en otra ficha (ERPlora/hub#2518); yendo despacio todavía se puede (ERPlora/hub#2526). Lo que no lleva PIN (nombre, rol, correo, baja) no gasta ni se frena. La edición **no** repite la guarda del alta local: un administrador puede subir a administrador a una persona que solo tiene PIN, y desde ese momento ese PIN abre una sesión de administrador (ver huecos).
+Si falla: la ficha del dueño de la cuenta solo la cambia él, PIN incluido («Esta es la ficha del dueño de la cuenta y solo él puede cambiarla…»); nadie se da de alta su propia placa («Nadie da de alta su propia placa. Pídeselo a otro administrador.», salvo el dueño); la placa no puede quedar como única forma de entrar («La placa no puede ser su única vía de entrada…»); quitar el rol de administrador al último que queda, «No puedes dar de baja al último administrador…»; un rol de un módulo que está apagado, «Ya no se puede asignar «{role}».»; PIN o correo repetidos, los avisos de HUB-F132 y HUB-F146; con el presupuesto de intentos de PIN gastado, 429 `too_many_attempts` con los segundos que faltan, sin mirar el número ni escribir nada.
 Implicados: HUB_SHELL-F84, HUB_SHELL-F85, HUB_SHELL-F86, HUB_SHELL-F87, HUB_SHELL-F92, STAFF-F03
 QA: qa-hub-restaurant §7.02
 
