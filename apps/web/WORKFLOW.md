@@ -381,7 +381,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F121 | Ver qué apps ya no se ofrecen | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F122 | Desactivar una app | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F123 | Activar una app | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
-| HUB_SHELL-F124 | Desinstalar una app | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
+| HUB_SHELL-F124 | Desinstalar una app | hecho | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F125 | Ver que una app se niega a desactivarse o desinstalarse | parcial | [workflow/aplicaciones.md](workflow/aplicaciones.md) |
 | HUB_SHELL-F126 | Ver las facturas del plan y descargarlas | parcial | [workflow/plan-y-archivos.md](workflow/plan-y-archivos.md) |
 | HUB_SHELL-F127 | Ver las suscripciones y dónde se gestionan los pagos | no hecho | [workflow/plan-y-archivos.md](workflow/plan-y-archivos.md) |

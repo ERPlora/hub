@@ -200,18 +200,18 @@ Implicados: HUB_SHELL-F122, HUB_SHELL-F125, VERIFACTU-F32
 QA: L-14
 
 ### HUB-F29 Desinstalar una aplicación
-Estado: parcial — forzar deja activas las apps que dependen de la quitada; en el siguiente arranque el hub vuelve a instalar sola la app quitada desde el catálogo o, sin catálogo, arranca con la salud en rojo; quedan sus permisos de host y ERPlora no se entera; las negativas salen en inglés como en HUB-F28
+Estado: parcial — quedan sus permisos de host y ERPlora no se entera; las negativas salen en inglés como en HUB-F28
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
 1. Un administrador pide desinstalar una app. Si hay otro cambio de apps en curso (instalar, actualizar o importar una plantilla), espera su turno en la misma cola (HUB-F19).
-2. El hub aplica, por este orden, el candado del proveedor fiscal, la pregunta al motor de la app (HUB-F28) y, salvo que se pida forzar, la comprobación de dependientes: si otras apps instaladas la necesitan, apagadas o no, lo niega y las nombra.
-3. La pantalla de Apps enseña antes las apps que dependen de ella y, si la persona confirma su pregunta de desinstalar, ya manda forzar (`force: true`): no hay un segundo paso «quitarla igualmente». Forzar solo se salta la comprobación de dependientes; los candados fiscales siguen, pero solo miran la app quitada. Las dependientes quedan activas y registradas sin su dependencia: en el siguiente arranque fallan con `missing_dependency`, la re-descarga de cada una vuelve a instalar la app quitada en su última versión y, sin catálogo, su copia local falla y la salud del hub queda en rojo.
-4. Quita sus consultas, órdenes, menú y tareas programadas, olvida los roles que solo ella declaraba (las personas conservan su rol), borra su fila y su copia guardada, y quita sus textos del índice del asistente.
-5. Las pantallas reciben `module.uninstalled`.
+2. Sin forzar, el hub aplica, por este orden, el candado del proveedor fiscal, la pregunta al motor de la app (HUB-F28) y la comprobación de dependientes: si otras apps instaladas la necesitan, apagadas o no, lo niega y las nombra.
+3. La pantalla de Apps enseña antes las apps que dependen de ella y, si la persona confirma su pregunta de desinstalar, ya manda forzar (`force: true`): no hay un segundo paso «quitarla igualmente». Forzar desinstala **también** esas dependientes —en cadena y apagadas o no, las mismas que nombró la pantalla—, como Odoo y Business Central (hub#2545). Los candados fiscales siguen y miran el conjunto entero: el proveedor fiscal, que no se vaya en él el último módulo que cumple el régimen; el motor, se pregunta a cada app del conjunto. Si alguno se niega, no se quita ninguna.
+4. Quita cada app solo cuando ya no queda instalada ninguna que dependa de ella (la dependiente más lejana primero, la pedida al final; una app que depende de la pedida y de otra dependiente a la vez se va antes que las dos), para que nunca quede registrada una app sin la suya. De cada una quita sus consultas, órdenes, menú y tareas programadas, olvida los roles que solo ella declaraba (las personas conservan su rol), borra su fila y su copia guardada, y quita sus textos del índice del asistente. Como ninguna queda en `hub_module`, el siguiente arranque no repone ninguna (HUB-F25).
+5. Las pantallas reciben un `module.uninstalled` por cada app quitada, en el orden en que se fueron.
 Entra: `POST /api/modules/:id/uninstall` con sesión de administrador y, opcionalmente, `{"force": true}`.
-Sale: la app fuera del hub. **Sus tablas y sus datos se quedan** en la base, y también su carpeta en la caché de descargas, sus permisos de host concedidos y su declaración fiscal. ERPlora no recibe aviso de la desinstalación.
-Si falla: dependientes, `has_dependents` (409) con la lista en `dependents`; motor con trabajo pendiente o último proveedor fiscal, su código (409); nada cambia.
+Sale: la app (y, al forzar, sus dependientes) fuera del hub; la respuesta es `{"ok": true}` y, si se fueron dependientes, `also_uninstalled` con sus identificadores, la más lejana primero. **Sus tablas y sus datos se quedan** en la base, y también su carpeta en la caché de descargas, sus permisos de host concedidos y su declaración fiscal. ERPlora no recibe aviso de la desinstalación.
+Si falla: dependientes sin forzar, `has_dependents` (409) con la lista en `dependents`; motor con trabajo pendiente o último proveedor fiscal (de la app o de cualquiera de sus dependientes al forzar), su código (409); nada cambia. Si la base falla a mitad de quitarlas, la respuesta es el error y se quedan quitadas solo las más lejanas que ya se fueron: ninguna de las que siguen instaladas se queda sin la suya, y repetir la desinstalación quita el resto.
 Implicados: HUB_SHELL-F124, HUB_SHELL-F125, VERIFACTU-F32, SAAS_PUBLIC-F19
 QA: L-14
 
@@ -318,7 +318,7 @@ QA: BD-01, BD-02
 | Actualizaciones automáticas | parcial: al arrancar, app por app, solo las que no están en la carpeta de descargas (en la nube, todas); cada app conserva si estaba encendida o apagada | HUB-F25 |
 | No bajar de versión ni saltarse el pin de soporte | parcial: un administrador, por la API con versión explícita, baja y se salta el pin | HUB-F23 |
 | Apagar una app y lo que depende de ella | hecho | HUB-F28 |
-| Desinstalar avisando de lo que depende | parcial: si se fuerza, las dependientes quedan activas y la app quitada vuelve en el siguiente arranque | HUB-F29 |
+| Desinstalar avisando de lo que depende | hecho (al confirmar se quitan juntas, tras enseñarlas) | HUB-F29 |
 | Desinstalar conservando los datos | hecho | HUB-F29 |
 | Borrar los datos de una app desinstalada | no hecho, a propósito | — |
 | Permisos de la app concedidos por el dueño | hecho | HUB-F32 |
@@ -381,11 +381,7 @@ del hub sin atender mientras descarga está en las dudas comunes del índice.)
 3. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
    no se actualizan solas al arrancar (solo las que no encuentra en la carpeta). ¿Es lo que se
    quiere? (HUB-F25)
-4. Forzar la desinstalación de una app de la que dependen otras: ¿debe quitar (o apagar) esas otras?
-   Odoo y Business Central las quitan juntas tras enseñarlas; hoy ERPlora las deja activas sin su
-   dependencia, y en el siguiente arranque vuelve a instalar sola la app quitada o, sin catálogo,
-   arranca con la salud en rojo (HUB-F29).
-5. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
+4. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
    - si la cuarentena se respeta con una versión explícita que llega por el plan de ERPlora (depende
      del SaaS);
    - si `/readyz` retenido por el candado durante una reconciliación larga (HUB-F26) hace que Swarm

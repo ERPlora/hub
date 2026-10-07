@@ -114,7 +114,7 @@ Pasos:
 3. Al terminar, el mismo aviso de éxito nombra todo: «{name} instalado correctamente. También se instaló: {names}.», con los nombres como los conoce el catálogo cuando los tiene y, si no, con el identificador.
 4. Las apps instaladas de paso aparecen en Mis apps como cualquier otra.
 Entra: la lista de apps que el hub instaló de paso.
-Sale: nada guardado en la pantalla. Es el reverso del aviso de desinstalar, que nombra lo que dejaría de funcionar (HUB_SHELL-F124). Una app sin dependencias nuevas recibe el aviso simple, sin «También se instaló».
+Sale: nada guardado en la pantalla. Es el reverso del aviso de desinstalar, que nombra lo que se desinstala con ella (HUB_SHELL-F124). Una app sin dependencias nuevas recibe el aviso simple, sin «También se instaló».
 Si falla: si no se puede instalar una dependencia, no se instala nada y sale el motivo (HUB_SHELL-F112).
 Implicados: HUB-F19, SAAS_PUBLIC-F16
 QA: BD-03
@@ -312,16 +312,16 @@ Implicados: HUB-F27
 QA: ninguno
 
 ### HUB_SHELL-F124 Desinstalar una app
-Estado: parcial — confirmar ya fuerza la desinstalación aunque otras apps la necesiten (no hay opción aparte); esas apps siguen «Activo» y en el siguiente arranque el hub vuelve a instalar sola la app quitada (o arranca con la salud en rojo), y la pregunta no lo dice
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
 1. En la fila de la app de **Mis apps**, el administrador pulsa el icono rojo «Desinstalar».
-2. Pregunta «Desinstalar {name}». Si otras apps la necesitan —también las apagadas, y en cadena— las nombra antes: «Estas apps necesitan {name} y dejarán de funcionar:» con la lista.
+2. Pregunta «Desinstalar {name}». Si otras apps la necesitan —también las apagadas, y en cadena— las nombra antes: «Estas apps necesitan {name} y también se desinstalarán:» con la lista.
 3. Debajo, siempre: «La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.».
-4. Confirma con «Desinstalar». Sale «{name} desinstalado.», desaparece de Mis apps y del menú, y el catálogo vuelve a ofrecerla.
-Entra: las apps instaladas y sus dependencias, para nombrar lo que se rompe.
-Sale: pide al servidor desinstalar (HUB-F29), forzando solo si la pregunta ya nombró dependientes (los nombres de esa lista son identificadores). Las dependientes quedan «Activo» en Mis apps y fallan en el siguiente arranque con una dependencia que falta. Los datos y archivos se quedan en la base y en Archivos.
+4. Confirma con «Desinstalar». Sale «{name} desinstalado.»; ella y las apps nombradas desaparecen de Mis apps y del menú, y el catálogo vuelve a ofrecerlas.
+Entra: las apps instaladas y sus dependencias, para nombrar lo que se va con ella.
+Sale: pide al servidor desinstalar (HUB-F29), forzando solo si la pregunta ya nombró dependientes: el hub quita juntas la app y esas dependientes, y ninguna vuelve al reiniciar. Los datos y archivos de todas se quedan en la base y en Archivos.
 Si falla: «No se pudo desinstalar {name}.»; si la lista con la que se preguntó se había quedado vieja y el hub encuentra dependientes: «{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.» (con los identificadores que mandó el hub y la lista recargada); o la negativa de un motor (HUB_SHELL-F125).
 Implicados: HUB-F29, VERIFACTU-F32
 QA: L-14
@@ -331,7 +331,7 @@ Estado: parcial — la negativa de un motor sale con la frase en inglés tal com
 Actor: administrador
 Pantalla: Apps
 Pasos:
-1. El administrador intenta desactivar VeriFactu o una app cuya desactivación lo arrastra (Facturación), o desinstalar VeriFactu, con registros sin aceptar por la AEAT; o desactivar o desinstalar la última app que cumple el régimen fiscal del negocio. Desinstalar Facturación no pasa por la negativa del motor: se fuerza desde la pregunta (HUB_SHELL-F124).
+1. El administrador intenta desactivar VeriFactu o una app cuya desactivación lo arrastra (Facturación), o desinstalar VeriFactu, con registros sin aceptar por la AEAT; o desactivar o desinstalar la última app que cumple el régimen fiscal del negocio. Desinstalar una app de la que depende VeriFactu también pasa por la negativa de su motor, porque confirmar la pregunta se la llevaría con ella (HUB_SHELL-F124).
 2. El hub se niega y no cambia nada: ni la pedida ni las arrastradas.
 3. La pantalla enseña el motivo en un aviso rojo; en el caso de VeriFactu: «{n} VeriFactu record(s) have not reached the AEAT yet: send them before disabling or removing the module».
 4. La app sigue «Activo» en la fila.
@@ -361,7 +361,7 @@ QA: L-14
 | Aviso de versiones nuevas en la campana y reintento | hecho | HUB_SHELL-F119, F120 |
 | App retirada del catálogo | hecho | HUB_SHELL-F121 |
 | Desactivar / activar con cascada | parcial / parcial | HUB_SHELL-F122, F123 |
-| Desinstalar nombrando lo que se rompe | parcial (confirmar ya fuerza; la app vuelve sola al arrancar) | HUB_SHELL-F124 |
+| Desinstalar nombrando lo que se va con ella | hecho (se quitan juntas al confirmar) | HUB_SHELL-F124 |
 | Negativa de un motor (VeriFactu) | parcial (frase en inglés) | HUB_SHELL-F125 |
 
 ## Datos: de quién es cada dato
@@ -389,8 +389,8 @@ Se resuelven con `market-decision`; no las decide el worker.
 
 ## Fuentes contrastadas
 
-- Servidor HUB-F29 (pendiente): «ofrece quitarla igualmente». No hay opción aparte: confirmar la
-  pregunta ya fuerza.
+- Servidor HUB-F29: no hay opción aparte «quitarla igualmente»; confirmar la pregunta ya fuerza, y
+  forzar se lleva las dependientes que la pregunta nombró (hub#2545).
 - VERIFACTU-F32: la frase sale en inglés **y** en un aviso que desaparece a los 2,5 s.
 - Servidor HUB-F28 y VERIFACTU-F32: la negativa de un motor sale en inglés en la pantalla española
   (confirmado: la pantalla solo traduce códigos de plataforma, no el de un motor).

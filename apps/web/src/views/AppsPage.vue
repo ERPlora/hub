@@ -1452,14 +1452,13 @@ async function toggleModule(m: InstalledModule): Promise<void> {
   }
 }
 
-/** Desinstala un módulo y refresca la lista + la nav del shell. */
+/** Uninstalls a module and refreshes the list and the shell nav. */
 async function removeModule(m: InstalledModule): Promise<void> {
   if (!isAdmin.value) { notify(t('apps.adminOnly'), 'danger'); return; }
-  // Qué se lleva por delante, ANTES de llevárselo (hub#773). El diálogo decía qué se CONSERVA
-  // («los datos y archivos se guardan») y callaba lo único irreversible del momento: las otras apps
-  // que dependen de esta se quedan sin ella. Se nombran, transitivamente y aunque estén apagadas —
-  // desinstalar no es desactivar: el paquete se va, así que una dependiente apagada ya no se podrá
-  // volver a encender.
+  // What goes with it, BEFORE it goes (hub#773). The apps that depend on this one —
+  // transitively and even when switched off — are named, because confirming uninstalls them too:
+  // the runtime removes the whole set together, the farthest first (hub#2545, HUB-F29), as Odoo
+  // and Business Central do. Their data stays, like the app's own.
   const breaks = dependentsOf(m.id, installedModules.value);
   const body = breaks.length
     ? `${t('apps.uninstallBreaks', { name: m.name })}\n${breaks.map((a) => `· ${a.name}`).join('\n')}\n\n${t('apps.uninstallBody')}`
@@ -1481,19 +1480,19 @@ async function removeModule(m: InstalledModule): Promise<void> {
   const result = await alert.onDidDismiss();
   if (result.role !== 'confirm') return;
   try {
-    // hub#1101: el runtime rechaza por su cuenta si algo depende de esta app, y hace bien — esa
-    // guarda existe para el que NUNCA vio esta lista (un script, el asistente, un flujo, un
-    // `curl`). Aquí sí se vio y sí se confirmó, así que la pantalla contesta esa pregunta. Sin
-    // dependientes no se manda nada: si la lista se hubiera quedado vieja, el rechazo tiene que
-    // llegar en lugar de colarse.
+    // hub#1101: the runtime refuses on its own when something depends on this app, and rightly so
+    // — that guard is for whoever NEVER saw this list (a script, the assistant, a flow, a `curl`).
+    // Here it was seen and confirmed, so the screen answers that question. With no dependents
+    // nothing is forced: if the list had gone stale, the refusal must arrive instead of slipping
+    // through.
     await uninstallModule(m.id, { force: breaks.length > 0 });
     notify(t('apps.uninstalled', { name: m.name }), 'primary');
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
   } catch (e) {
-    // Ese caso — la lista con la que se pintó el diálogo era vieja — llega con su código estable y
-    // sus dependientes. La frase del runtime va en inglés (es código), así que se traduce y se
-    // nombran las apps QUE MANDÓ ÉL, que son las de verdad.
+    // That case — the list the dialog was drawn from had gone stale — arrives with its stable code
+    // and its dependents. The runtime's sentence is English (it is code), so it is translated and
+    // names the apps THE RUNTIME sent, which are the real ones.
     if (e instanceof ModuleActionError && e.code === 'has_dependents') {
       const names = (e.dependents ?? []).join(', ');
       notify(t('apps.uninstallBlocked', { name: m.name, apps: names }), 'danger');

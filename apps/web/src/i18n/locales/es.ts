@@ -948,7 +948,7 @@ export default {
     toggleOnBody: '{name} vuelve al TPV, con los datos que ya tenía.',
     toggleOnConfirm: 'Activar',
     uninstallTitle: 'Desinstalar {name}',
-    uninstallBreaks: 'Estas apps necesitan {name} y dejarán de funcionar:',
+    uninstallBreaks: 'Estas apps necesitan {name} y también se desinstalarán:',
     uninstallBody: 'La app dejará de estar disponible. Sus datos y archivos se conservarán para una reinstalación posterior.',
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',

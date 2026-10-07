@@ -19,7 +19,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use erplora_db::testutil::fresh_db;
+use erplora_db::testutil::{fresh_db, TestDb};
+use erplora_db::DatabaseAdapter;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Runtime, RuntimeError};
 use erplora_wasm_host::Output;
@@ -125,10 +126,205 @@ async fn the_top_of_the_chain_is_never_blocked_by_what_it_itself_depends_on() {
 async fn force_is_the_owner_who_was_shown_the_list_and_said_yes() {
     let mut rt = hub_with_chain().await;
 
-    rt.uninstall_forced("dbase")
+    let mut also = rt
+        .uninstall_forced("dbase")
         .await
         .expect("an explicit confirmation is a decision, not a mistake to block");
-    assert_eq!(installed(&rt), vec!["dloose", "dmid", "dtop"]);
+    also.sort();
+
+    // hub#2545: the list the owner confirmed is the list of what goes WITH it (Odoo, Business
+    // Central). Leaving `dmid` and `dtop` installed without `dbase` is what kept them «Active» on
+    // a dependency that no longer exists and brought `dbase` back on the next boot.
+    assert_eq!(
+        also,
+        vec!["dmid", "dtop"],
+        "the answer names what went with it"
+    );
+    assert_eq!(installed(&rt), vec!["dloose"]);
+}
+
+#[tokio::test]
+async fn after_a_forced_uninstall_the_next_boot_has_nothing_to_bring_back() {
+    let tdb = TestDb::new().await;
+    let mut rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545");
+    rt.ensure_system_tables().await.unwrap();
+    for m in ["dbase", "dmid", "dtop", "dloose"] {
+        rt.install_from_dir(&fixture(m))
+            .await
+            .unwrap_or_else(|e| panic!("install {m}: {e}"));
+    }
+    rt.uninstall_forced("dbase").await.expect("confirmed");
+
+    // The next boot over the same data, with the download cache emptied (every cloud redeploy).
+    // Whatever `hub_module` still says is installed but cannot be registered is re-downloaded, and
+    // the install plan drags in its missing dependencies: a surviving `dmid` row is exactly how the
+    // removed `dbase` came back on its own (hub#2545).
+    let mut rebooted = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545");
+    rebooted.ensure_system_tables().await.unwrap();
+    let empty_cache = std::env::temp_dir().join(format!("erplora-2545-{}", std::process::id()));
+    rebooted
+        .rehydrate_installed(&empty_cache)
+        .await
+        .expect("rehydrate");
+    let to_redownload = rebooted.installed_but_unregistered().await.expect("read");
+    assert!(
+        to_redownload.iter().all(|(id, _)| id == "dloose"),
+        "nothing that depended on the removed app may be brought back at boot, got {to_redownload:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_dependents_that_went_with_it_are_named_the_farthest_first() {
+    let mut rt = hub_with_chain().await;
+
+    // `dtop` needs `dmid`, which needs `dbase`: the answer (and the live frames the server sends
+    // from it) lists them in the order they left, so `dtop` is never announced after the app it
+    // stood on.
+    let also = rt.uninstall_forced("dbase").await.expect("confirmed");
+    assert_eq!(also, vec!["dtop", "dmid"]);
+}
+
+#[tokio::test]
+async fn a_forced_uninstall_that_fails_halfway_leaves_no_app_without_its_dependency() {
+    let tdb = TestDb::new().await;
+    let db = tdb.adapter().await;
+    let mut rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545");
+    rt.ensure_system_tables().await.unwrap();
+    for m in ["dbase", "dmid", "dtop", "dloose"] {
+        rt.install_from_dir(&fixture(m))
+            .await
+            .unwrap_or_else(|e| panic!("install {m}: {e}"));
+    }
+    // Removing `dmid`'s row fails, the way a lock or a lost connection would.
+    db.execute_batch(
+        "CREATE FUNCTION refuse_dmid_delete() RETURNS trigger LANGUAGE plpgsql AS $$ \
+            BEGIN IF OLD.module_id = 'dmid' THEN RAISE EXCEPTION 'simulated failure'; END IF; \
+            RETURN OLD; END $$; \
+         CREATE TRIGGER refuse_dmid BEFORE DELETE ON hub_module FOR EACH ROW \
+            EXECUTE FUNCTION refuse_dmid_delete();",
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        rt.uninstall_forced("dbase").await.is_err(),
+        "the failure must surface"
+    );
+
+    // The farthest go first, so whatever survives still has what it needs: `dmid` stays with
+    // `dbase` under it. Removing `dbase` first would leave `dmid` in `hub_module` on a dependency
+    // that no longer exists — exactly what dragged a removed app back in at boot (hub#2545).
+    let rows = db
+        .query(
+            "SELECT module_id FROM hub_module ORDER BY module_id",
+            &Default::default(),
+        )
+        .await
+        .unwrap()
+        .rows;
+    let left: Vec<&str> = rows
+        .iter()
+        .filter_map(|r| r["module_id"].as_str())
+        .collect();
+    assert_eq!(left, vec!["dbase", "dloose", "dmid"]);
+}
+
+/// A module written for one test: `id` declaring `depends_on`, nothing else.
+fn module_dir(id: &str, depends_on: &[&str]) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("erplora-2545-{id}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        serde_json::json!({ "id": id, "name": id, "version": "1.0.0", "depends_on": depends_on })
+            .to_string(),
+    )
+    .unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn a_forced_uninstall_that_fails_halfway_in_a_diamond_leaves_no_app_without_its_dependency() {
+    let tdb = TestDb::new().await;
+    let db = tdb.adapter().await;
+    let mut rt = Runtime::with_hub_id(Box::new(tdb.adapter().await), "h2545d");
+    rt.ensure_system_tables().await.unwrap();
+    // `da` ← `db` ← `dc` ← `dd`, and `dd` ALSO declares `da` directly. Walking the dependents in
+    // waves lists `dd` in the first wave (it names `da`) although it stands on `dc` (second wave):
+    // a wave order is not a removal order.
+    for (id, deps) in [
+        ("da", &[][..]),
+        ("db", &["da"][..]),
+        ("dc", &["db"][..]),
+        ("dd", &["da", "dc"][..]),
+    ] {
+        let dir = module_dir(id, deps);
+        rt.install_from_dir(&dir)
+            .await
+            .unwrap_or_else(|e| panic!("install {id}: {e}"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+    // Removing `dd`'s row fails, the way a lock or a lost connection would.
+    db.execute_batch(
+        "CREATE FUNCTION refuse_dd_delete() RETURNS trigger LANGUAGE plpgsql AS $$ \
+            BEGIN IF OLD.module_id = 'dd' THEN RAISE EXCEPTION 'simulated failure'; END IF; \
+            RETURN OLD; END $$; \
+         CREATE TRIGGER refuse_dd BEFORE DELETE ON hub_module FOR EACH ROW \
+            EXECUTE FUNCTION refuse_dd_delete();",
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        rt.uninstall_forced("da").await.is_err(),
+        "the failure must surface"
+    );
+
+    // Nothing may leave while something still installed depends on it: `dd` has to go before `dc`,
+    // so the failure on `dd` leaves everything in place. Removing by reversed waves took `dc` first
+    // and left `dd` registered on a dependency that no longer existed — the very row that drags a
+    // removed app back in at boot (hub#2545).
+    let rows = db
+        .query(
+            "SELECT module_id FROM hub_module ORDER BY module_id",
+            &Default::default(),
+        )
+        .await
+        .unwrap()
+        .rows;
+    let left: Vec<&str> = rows
+        .iter()
+        .filter_map(|r| r["module_id"].as_str())
+        .collect();
+    assert_eq!(left, vec!["da", "db", "dc", "dd"]);
+}
+
+#[tokio::test]
+async fn force_does_not_take_a_dependent_that_still_owes_records() {
+    let mut rt = hub_with_chain().await;
+    rt.register_native(
+        "dtop",
+        Arc::new(OwingEngine {
+            module: "dtop",
+            count: 2,
+        }),
+    );
+
+    // Removing `dbase` now takes `dtop` with it, so `dtop`'s engine is asked too: the same rule as
+    // switching off a chain (HUB-F28). Asking only the app the owner clicked was the back door
+    // that let records owed to the AEAT be orphaned through their dependency (hub#2545).
+    let err = rt
+        .uninstall_forced("dbase")
+        .await
+        .expect_err("a dependent that owes records holds the whole chain");
+    assert!(
+        matches!(err, RuntimeError::Domain { ref code, .. } if code == "dtop.unsent_records"),
+        "expected the retention refusal of the dependent, got {err:?}"
+    );
+    assert_eq!(
+        installed(&rt),
+        vec!["dbase", "dloose", "dmid", "dtop"],
+        "a refused uninstall must not half-apply"
+    );
 }
 
 #[tokio::test]
@@ -145,9 +341,10 @@ async fn a_module_that_is_not_installed_still_reports_that_and_not_the_dependent
     );
 }
 
-/// The engine of `dloose`, owing `count` units of work to an external authority (hub#314).
+/// The engine of `module`, owing `count` units of work to an external authority (hub#314).
 #[derive(Debug)]
 struct OwingEngine {
+    module: &'static str,
     count: u64,
 }
 
@@ -170,7 +367,7 @@ impl NativeHandler for OwingEngine {
         Ok((self.count > 0).then(|| PendingObligation {
             count: self.count,
             oldest_pending_at: None,
-            code: "dloose.unsent_records".to_string(),
+            code: format!("{}.unsent_records", self.module),
             message: format!("{} record(s) still unsent", self.count),
         }))
     }
@@ -179,7 +376,13 @@ impl NativeHandler for OwingEngine {
 #[tokio::test]
 async fn force_does_not_open_the_retention_gate() {
     let mut rt = hub_with_chain().await;
-    rt.register_native("dloose", Arc::new(OwingEngine { count: 4 }));
+    rt.register_native(
+        "dloose",
+        Arc::new(OwingEngine {
+            module: "dloose",
+            count: 4,
+        }),
+    );
 
     // `force` is the answer to ONE question — «other apps need this, remove it anyway?» — and the
     // owner can answer it. Whether records still owed to a tax authority may be orphaned is not
