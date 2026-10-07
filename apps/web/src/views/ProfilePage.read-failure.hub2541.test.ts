@@ -115,6 +115,36 @@ describe('My profile with the read down (hub#2541)', () => {
     expect(vm.email).toBe('nora@example.com');
   });
 
+  it('Retry is off while it reads again, and back on if that read fails too', async () => {
+    let answerRetry: (r: Response) => void = () => undefined;
+    const answers: Array<() => Promise<Response>> = [
+      async () => down(),
+      () => new Promise<Response>((resolve) => (answerRetry = resolve)),
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) =>
+        String(url).endsWith('/api/profile') && (init?.method ?? 'GET') === 'GET'
+          ? answers.shift()!()
+          : new Response('{}', { status: 200 }),
+      ),
+    );
+    const wrapper = await mountProfile();
+    // The real <ion-button> takes `disabled` as a property, not as an attribute.
+    const retryOff = () =>
+      (wrapper.find('[data-testid="profile-load-retry"]').element as HTMLElement & { disabled?: boolean }).disabled;
+    expect(retryOff(), 'on before pressing').toBe(false);
+
+    await wrapper.find('[data-testid="profile-load-retry"]').trigger('click');
+    await flushPromises();
+    expect(retryOff(), 'off while reading').toBe(true);
+
+    answerRetry(down());
+    await flushPromises();
+    expect(has(wrapper, 'profile-load-error')).toBe(true);
+    expect(retryOff(), 'on again after the failed read').toBe(false);
+  });
+
   it('🔴 while the read is on its way it says it is loading, with no empty form', async () => {
     vi.stubGlobal(
       'fetch',

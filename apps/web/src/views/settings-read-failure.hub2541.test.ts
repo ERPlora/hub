@@ -174,6 +174,24 @@ describe('Settings with the read down (hub#2541)', () => {
     expect((wrapper.vm as unknown as { businessTaxId: string }).businessTaxId).toBe('B12345674');
   });
 
+  it('Retry is off while it reads again, and back on if that read fails too', async () => {
+    getHubSettings.mockRejectedValueOnce(new Error('settings → 503'));
+    const wrapper = await mountSettings('#hub');
+    const retry = () => wrapper.find('[data-testid="settings-load-retry"]');
+    expect(retry().attributes('disabled'), 'on before pressing').not.toBe('true');
+
+    let failRetry: (e: Error) => void = () => undefined;
+    getHubSettings.mockImplementationOnce(() => new Promise((_, reject) => (failRetry = reject)));
+    await retry().trigger('click');
+    await flushPromises();
+    expect(retry().attributes('disabled'), 'off while reading').toBe('true');
+
+    failRetry(new Error('settings → 503'));
+    await flushPromises();
+    expect(has(wrapper, 'settings-load-error')).toBe(true);
+    expect(retry().attributes('disabled'), 'on again after the failed read').not.toBe('true');
+  });
+
   it('🔴 while the first read is on its way with nothing read before, it says it is loading and offers nothing', async () => {
     getHubSettings.mockReturnValue(new Promise(() => undefined));
     const wrapper = await mountSettings('#hub');
