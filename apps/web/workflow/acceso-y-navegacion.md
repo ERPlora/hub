@@ -41,7 +41,7 @@ propio de esta área:
 ## Flujos
 
 ### HUB_SHELL-F01 Entrar con la cuenta de erplora.com
-Estado: parcial — la verificación en dos pasos dice «Hemos enviado un código de un solo uso a tu email», pero erplora.com no manda nada: el código está en la app autenticadora de la persona (o es uno de recuperación); la pantalla no distingue «ya no eres miembro de este negocio» ni «un administrador te dio de baja» de unas credenciales erróneas: las tres dicen «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.»; la casilla «Confiar en este dispositivo» no cambia nada en el hub (todo acceso con cuenta vuelve de confianza el dispositivo): desmarcarla solo evita el paso «Crea tu PIN» y que este navegador recuerde a la persona, y su ⓘ promete lo contrario; [SEG] si el acceso falla después de que erplora.com acepte la contraseña, sus tokens se quedan en el navegador y los usa la sesión siguiente
+Estado: parcial — la verificación en dos pasos dice «Hemos enviado un código de un solo uso a tu email», pero erplora.com no manda nada: el código está en la app autenticadora de la persona (o es uno de recuperación); la pantalla no distingue «ya no eres miembro de este negocio» ni «un administrador te dio de baja» de unas credenciales erróneas: las tres dicen «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.»; la casilla «Confiar en este dispositivo» no cambia nada en el hub (todo acceso con cuenta vuelve de confianza el dispositivo): desmarcarla solo evita el paso «Crea tu PIN» y que este navegador recuerde a la persona, y su ⓘ promete lo contrario
 Actor: administrador, responsable, empleado
 Pantalla: Acceso
 Pasos:
@@ -51,8 +51,8 @@ Pasos:
 4. Si la cuenta pide verificación, la tarjeta cambia a «Verifica que eres tú»: «Hemos enviado un código de un solo uso a tu email. Introdúcelo para continuar.». Es falso: erplora.com contesta `method: "totp"` y `delivered: false` y no manda nada; el código es el de la app autenticadora de la persona o uno de sus códigos de recuperación, y la pantalla no lee esos dos campos. Escribe el «Código de verificación» y pulsa «Verificar»; «Volver» regresa al formulario.
 5. Si confiaste el dispositivo y aún no tienes PIN, la pantalla te pide uno (HUB_SHELL-F03). Si no, entras en la pantalla que habías pedido o en **Inicio**.
 Entra: el correo y la contraseña (o el código de Google), que comprueba erplora.com; el identificador del dispositivo; si el hub ofrece PIN aquí (modo del dispositivo, confianza y dial del negocio, los tres leídos del hub sin sesión).
-Sale: pide a erplora.com la credencial y al hub la sesión local (`/api/auth/cloud`, con el identificador de este navegador pero sin la casilla): el hub vuelve de confianza el dispositivo siempre. Con la sesión, vuelve a leer el contexto del hub para conocer la lista de caras, que no se da a un navegador que aún no era de confianza (HUB-F133); es esa lista la que decide si la persona ya tiene PIN (HUB_SHELL-F03). Guarda en este navegador la sesión, el nombre, el correo, el rol y los permisos de la persona, y los tokens de erplora.com (se guardan **antes** de pedir la sesión al hub). Salvo que se desmarque la casilla (marcada por defecto, también donde no se ve), apunta a la persona —con su correo— en la lista de caras de este navegador, que no se borra al cerrar sesión.
-Si falla: campos vacíos o correo sin «@»: «Introduce un email válido y tu contraseña.». Credenciales erróneas, persona dada de baja o que ya no es miembro: «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Código vacío: «Introduce el código que enviamos a tu email.»; erróneo o caducado: «Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.» (no vuelve a pedir la contraseña; tampoco se envía ningún código nuevo); otro fallo del código: «No se pudo verificar el código. Inténtalo de nuevo.». Google que no termina: «No se pudo iniciar sesión con Google. Inténtalo de nuevo.». Hub sin registrar: HUB_SHELL-F12. [SEG] Cuando erplora.com acepta la contraseña y el hub rechaza después (baja, ya no miembro, hub que no contesta), los tokens de erplora.com se quedan en el navegador: entrar después con PIN no los borra y la sesión de la persona siguiente los manda al hub, resuelve con ellos el plan y la facturación, y Mi perfil le ofrece «Gestionar cuenta en erplora.com».
+Sale: pide a erplora.com la credencial y al hub la sesión local (`/api/auth/cloud`, con el identificador de este navegador pero sin la casilla): el hub vuelve de confianza el dispositivo siempre. Con la sesión, vuelve a leer el contexto del hub para conocer la lista de caras, que no se da a un navegador que aún no era de confianza (HUB-F133); es esa lista la que decide si la persona ya tiene PIN (HUB_SHELL-F03). Guarda en este navegador la sesión, el nombre, el correo, el rol y los permisos de la persona, y los tokens de erplora.com, que solo se guardan cuando el hub ha dado la sesión; al empezar borra los que hubiera de un intento anterior (hub#2506). Salvo que se desmarque la casilla (marcada por defecto, también donde no se ve), apunta a la persona —con su correo— en la lista de caras de este navegador, que no se borra al cerrar sesión.
+Si falla: campos vacíos o correo sin «@»: «Introduce un email válido y tu contraseña.». Credenciales erróneas, persona dada de baja o que ya no es miembro: «No se pudo iniciar sesión. Revisa tus credenciales o la conexión.». Código vacío: «Introduce el código que enviamos a tu email.»; erróneo o caducado: «Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.» (no vuelve a pedir la contraseña; tampoco se envía ningún código nuevo); otro fallo del código: «No se pudo verificar el código. Inténtalo de nuevo.». Google que no termina: «No se pudo iniciar sesión con Google. Inténtalo de nuevo.». Hub sin registrar: HUB_SHELL-F12. Cuando erplora.com acepta la contraseña y el hub rechaza después (baja, ya no miembro, hub que no contesta), en el navegador no queda ninguna credencial de erplora.com, ni la de esta persona ni la de un intento anterior.
 Implicados: HUB-F130, HUB-F144, REC_ALTA-F07, SAAS_AUTH-F04, SAAS_AUTH-F16, SAAS_AUTH-F17, SAAS_AUTH-F20, SAAS_AUTH-F29
 QA: qa-hub-restaurant §7.02
 
@@ -94,8 +94,8 @@ Pasos:
 2. Toca tu nombre; sale tu cara y el teclado con tantos círculos como dígitos tenga el PIN del negocio. La flecha a la izquierda del 0 («Cambiar usuario») vuelve a la rejilla.
 3. Teclea el PIN: entra solo al último dígito, sin botón.
 4. Entras en la pantalla que habías pedido o en **Inicio**. El pie de la tarjeta dice «ERPlora · dispositivo de confianza».
-Entra: la lista de personas con PIN y la longitud del PIN, que el hub da en su contexto, leída una vez, al abrir ERPlora; la lectura dice qué dispositivo pregunta y presenta la sesión que haya, porque la lista solo llega a una sesión viva o a un dispositivo que el PIN dejaría pasar (en otro, la rejilla sale vacía y queda «Email», HUB-F133). Tras entrar con la cuenta o desde el panel se vuelve a leer con la sesión nueva (HUB_SHELL-F01, F02); el nombre elegido y los dígitos. Si el navegador recuerda a alguien de esa lista (HUB_SHELL-F01), su tarjeta enseña además su correo.
-Sale: pide al hub la sesión por PIN (`/api/auth/pin`) y guarda la sesión, el rol y los permisos. Funciona aunque erplora.com no responda.
+Entra: la lista de personas con PIN y la longitud del PIN, que el hub da en su contexto, leída una vez, al abrir ERPlora; la lectura dice qué dispositivo pregunta y presenta la sesión que haya, porque la lista solo llega a una sesión viva o a un dispositivo que el PIN dejaría pasar (en otro, la rejilla sale vacía y queda «Email», HUB-F133). Tras entrar con la cuenta o desde el panel se vuelve a leer con la sesión nueva (HUB_SHELL-F01, F02); el nombre elegido y los dígitos. Si el navegador recuerda a alguien de esa lista (HUB_SHELL-F01), su tarjeta enseña además su correo (hub#2536).
+Sale: pide al hub la sesión por PIN (`/api/auth/pin`) y guarda la sesión, el rol y los permisos; al tenerla, borra de este navegador los tokens de erplora.com que hubiera (una sesión de PIN nunca los lleva, hub#2506). Funciona aunque erplora.com no responda.
 Si falla: PIN erróneo: los círculos se vacían y debajo «PIN incorrecto». Dispositivo que nunca entró con una cuenta o que un administrador quitó: «En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Navegador que no guarda datos (ventana privada): «Este navegador no puede recordar qué dispositivo es, así que aquí no se puede usar un PIN. Entra con tu cuenta, o permite que este sitio guarde datos y vuelve a intentarlo.». Demasiados intentos: «Demasiados intentos fallidos. Espera {minutes} minutos y vuelve a intentarlo.» (los minutos redondeados hacia arriba; sin dato, «Espera unos minutos»). Siempre queda «Email» para entrar con la cuenta.
 Implicados: HUB-F133, HUB-F135, REC_ALTA-F16
 QA: qa-hub-restaurant §7.02
@@ -154,12 +154,12 @@ Pasos:
 3. La sesión se cierra y la caja vuelve a **Acceso**, al pinpad.
 Entra: el dial del negocio y los minutos (5 si el valor guardado no se entiende), el modo del dispositivo y que haya sesión.
 Sale: la sesión cerrada en el hub y en este navegador. La cuenta abierta la conserva su app.
-Si falla: con «Hasta cerrar sesión», en un dispositivo personal o sin sesión el vigilante no se arma. Si la pantalla no puede leer el dial del negocio (la lectura del modo del dispositivo falla y no la corrige una lectura posterior de los ajustes, por ejemplo al abrir Ajustes › General), toma «por turno» y tampoco se arma: la caja se queda abierta hasta el tope de la sesión, sin aviso. La persona no ve ningún mensaje de por qué volvió al pinpad. Quien cambie este tiempo revisa también la tarjeta Pinpad de Ajustes › General (área «Personas y permisos» de este documento), los topes de la pantalla (1, 5, 10, 15 o 30 minutos; 5 por defecto) y los del servidor (HUB-F140), y el tope de 1 hora de «pedir siempre» (HUB-F136).
+Si falla: con «Hasta cerrar sesión», en un dispositivo personal o sin sesión el vigilante no se arma. Si la pantalla no puede leer el dial del negocio (la lectura del modo del dispositivo falla y no la corrige una lectura posterior de los ajustes, por ejemplo al abrir Ajustes › General), toma «por turno» y tampoco se arma: la caja se queda abierta hasta el tope de la sesión, sin aviso (hub#2537). La persona no ve ningún mensaje de por qué volvió al pinpad. Quien cambie este tiempo revisa también la tarjeta Pinpad de Ajustes › General (área «Personas y permisos» de este documento), los topes de la pantalla (1, 5, 10, 15 o 30 minutos; 5 por defecto) y los del servidor (HUB-F140), y el tope de 1 hora de «pedir siempre» (HUB-F136).
 Implicados: HUB-F136, HUB-F140, SALES-F17
 QA: ninguno
 
 ### HUB_SHELL-F09 Cambiar de usuario sin perder la venta
-Estado: parcial — el relevo no acepta la placa, solo nombre y PIN (el acceso y la aprobación sí la aceptan); [SEG] tras el relevo, el lanzador, «Mis apps» y la lista de configuración siguen siendo los de quien se fue hasta cambiar de pantalla o recargar, y la pantalla abierta sigue enseñando lo que él veía; las caras son las de HUB_SHELL-F04 (lista leída al abrir ERPlora)
+Estado: parcial — el relevo no acepta la placa, solo nombre y PIN (el acceso y la aprobación sí la aceptan); [SEG] la pantalla abierta sigue enseñando lo que veía quien se fue hasta que se navega (hub#2539); el asistente conserva su texto y adjuntos sin enviar (HUB_SHELL-F195, hub#2538); las caras son las de HUB_SHELL-F04 (lista leída al abrir ERPlora)
 Actor: responsable, empleado
 Pantalla: Cambiar de usuario
 Pasos:
@@ -168,7 +168,7 @@ Pasos:
 3. Toca la tuya y teclea el PIN. La flecha («Otra persona») vuelve a las caras; «Cancelar» cierra sin cambiar nada.
 4. Sale «Ahora atiende {name}»; la pantalla sigue donde estaba y lo siguiente queda a nombre de quien entró.
 Entra: el nombre y el PIN de quien entra; la sesión de quien sale.
-Sale: abre la sesión nueva por la misma puerta que HUB_SHELL-F04 y, solo cuando la tiene, cierra la anterior; olvida los tokens de erplora.com, el idioma, la apariencia y la conversación del asistente de quien se fue.
+Sale: abre la sesión nueva por la misma puerta que HUB_SHELL-F04 y, solo cuando la tiene, cierra la anterior; olvida los tokens de erplora.com, el idioma, la apariencia y la conversación del asistente de quien se fue, y vuelve a leer para quien entra el plan, el lanzador y «Mis apps», y la lista «Termina de configurar tu negocio», en ese orden (hub#2506). Si una de esas lecturas falla, se ve que no se pudo cargar, nunca la lista de quien se fue.
 Si falla: PIN o nombre erróneos: «Esos datos no han funcionado. Revisa el nombre y el PIN, y vuelve a intentarlo.» y quien estaba dentro sigue dentro. Dispositivo sin dar de alta: «Este dispositivo todavía no está dado de alta para el PIN. Entra una vez con una cuenta de ERPlora en él y el PIN funcionará a partir de entonces.»; sin identificar: «Este dispositivo no ha podido identificarse. Recarga la página y vuelve a intentarlo.». Demasiados intentos: la frase de HUB_SHELL-F04. Si el hub aún no ha dado la lista de caras, se escribe «Su nombre» y se pulsa «Continuar».
 Implicados: HUB-F138
 QA: qa-hub-restaurant §7.02, L-13
@@ -182,7 +182,7 @@ Pasos:
 2. Pulsa «Cerrar sesión».
 3. El menú se cierra y sale **Acceso**.
 Entra: la sesión.
-Sale: pide al hub borrar la sesión (sin esperar la respuesta) y borra de este navegador la sesión, los tokens de erplora.com, el perfil, la apariencia y el idioma personales, el plan resuelto y la conversación del asistente. La lista de caras y correos de este navegador se conserva.
+Sale: pide al hub borrar la sesión (sin esperar la respuesta) y borra de este navegador la sesión, los tokens de erplora.com, el perfil, la apariencia y el idioma personales, el plan resuelto, el lanzador, la lista «Termina de configurar tu negocio» y la conversación del asistente. La lista de caras y correos de este navegador se conserva.
 Si falla: si el hub no contesta, la sesión local se borra igual y la del hub caduca sola.
 Implicados: HUB-F136
 QA: ninguno
@@ -391,7 +391,7 @@ QA: L-17
 | Bloqueo por intentos con el tiempo de espera | hecho (lo aplica el servidor, HUB-F135) | F04 |
 | Placa en el acceso | parcial: sin validar con hardware real | F05 |
 | Placa en el relevo de turno | no hecho | F09 |
-| Relevo de turno encima de la venta | parcial: el lanzador y la lista siguen siendo los de quien se fue hasta navegar | F09 |
+| Relevo de turno encima de la venta | parcial: la pantalla abierta sigue siendo la de quien se fue hasta navegar | F09 |
 | Cierre por inactividad configurable | parcial: solo la pantalla; sin aviso previo ni motivo | F08 |
 | Avisar de la sesión desalojada por el plan | hecho | F06 |
 | Dispositivo compartido o personal | hecho (rechazo en inglés) | F11 |
@@ -427,15 +427,15 @@ HUB-F143). Lo que esta área guarda en **el navegador del dispositivo** (leído 
 |---|---|---|---|
 | `erplora.session` | identificador, nombre, correo, foto, rol y permisos de quien tiene la sesión | sí | al cerrar sesión o perderla |
 | `erplora.hub_session`, `erplora.hub_session_credential` | la sesión del hub y cómo se abrió (cuenta, PIN, placa) | credencial | al cerrar sesión |
-| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión y en el relevo de turno; **no** si el acceso con cuenta falla después de que erplora.com acepte la contraseña, ni al entrar con PIN, ni con «Cambiar de negocio» [SEG] |
+| tokens de erplora.com (`erplora.access`, `erplora.refresh`) | la credencial de la cuenta | credencial | al cerrar sesión, en el relevo de turno, al entrar con PIN o placa y al empezar un acceso con cuenta (que solo los guarda cuando el hub le da la sesión); **no** con «Cambiar de negocio» [SEG] |
 | `erplora.trusted_users`, `erplora.trusted` | id, nombre, **correo** e iniciales de quien entró con su cuenta en este navegador sin desmarcar «Confiar» (marcada por defecto, también donde no se ve); la rejilla de PIN enseña el correo | sí | nunca al cerrar sesión, al quitar el dispositivo ni al pasarlo a personal [SEG]; se recorta contra la lista del hub al abrir Acceso (conservando el correo de quien siga con PIN) y se vacía si nadie tiene PIN |
 | `erplora.device_id` | el identificador de este dispositivo | no | nunca (es lo que el hub reconoce como de confianza) |
 | `erplora.locale` | el idioma activo | no | se rehace en cada arranque |
 | `erplora.theme`, `erplora.palette` | claves antiguas del tema | no | se borran al arrancar |
 
 El PIN no se guarda nunca: viaja en el cuerpo de la petición y el ticket del código de verificación
-vive solo en memoria. En memoria (no en el navegador) queda, tras el relevo, el menú de apps de quien
-se fue. La conversación del asistente (`erplora.assistant.history`) es del área «Asistente».
+vive solo en memoria. En memoria (no en el navegador) están el lanzador y la lista de configuración:
+se vacían al cerrar sesión y se vuelven a leer en el relevo. La conversación del asistente (`erplora.assistant.history`) es del área «Asistente».
 
 ## Reglas que no se rompen
 
@@ -448,18 +448,19 @@ Solo lo que el código hace cumplir:
 - Un rechazo del hub solo cierra la sesión si una comprobación aparte confirma que está muerta (no
   por falta de rol ni por un corte de red), y la cierra una vez aunque haya muchas peticiones en vuelo.
 - El relevo de turno no navega y no suelta la sesión anterior hasta tener la nueva; un PIN erróneo no
-  cambia nada.
+  cambia nada. Con la nueva, vuelve a leer el plan, el lanzador y la lista para quien entra.
+- Una sesión de PIN o placa nunca lleva credenciales de erplora.com: al abrirla se borran las que
+  hubiera; un acceso con cuenta solo las guarda cuando el hub le ha dado la sesión (hub#2506).
 - El hub solo da el pase hacia erplora.com a una sesión abierta con la cuenta; a cualquier otra, la
   pantalla le abre el enlace normal, que pide la contraseña. El botón «erplora.com» solo se ofrece con
   el permiso de administrar.
 - La franja de conexión no se puede cerrar.
 
 Lo que hoy **no** se cumple y no es una regla, sino un hueco de seguridad [SEG] (detalle en sus
-flujos): los tokens de erplora.com de un acceso fallido se quedan y los usa la sesión siguiente
-(HUB_SHELL-F01); tras el relevo el lanzador y la lista son los de quien se fue (HUB_SHELL-F09); una
-lectura rota del dial desarma el cierre por inactividad (HUB_SHELL-F08); los correos de la rejilla
-sobreviven al cierre de sesión, a quitar el dispositivo y a pasarlo a personal (HUB_SHELL-F04);
-«Cambiar de negocio» no cierra la sesión (HUB_SHELL-F16).
+flujos): tras el relevo la pantalla abierta es la de quien se fue hasta navegar (HUB_SHELL-F09,
+hub#2539); una lectura rota del dial desarma el cierre por inactividad (HUB_SHELL-F08, hub#2537); los
+correos de la rejilla sobreviven al cierre de sesión, a quitar el dispositivo y a pasarlo a personal
+(HUB_SHELL-F04, hub#2536); «Cambiar de negocio» no cierra la sesión (HUB_SHELL-F16).
 
 ## Lo que NO hace, a propósito
 

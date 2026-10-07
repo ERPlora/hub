@@ -660,7 +660,16 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // subject (`crate::erasure`). No module can do it: these tables are the kernel's (ADR-0127).
     // Idempotent by construction (an emptied payload no longer holds the id), so it needs no
     // `_event_delivery` marker; a failure here defers the row like any listener's.
-    if let Err(e) = crate::erasure::on_event(db, &ctx.hub_id, &event_name, &payload).await {
+    if let Err(e) = crate::erasure::on_event(
+        db,
+        registry,
+        &ctx.hub_id,
+        row["module_id"].as_str().unwrap_or_default(),
+        &event_name,
+        &payload,
+    )
+    .await
+    {
         failures += 1;
         if first_err.is_none() {
             first_err = Some(format!("erasure: {e}"));

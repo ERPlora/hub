@@ -226,6 +226,10 @@ export function logout(): void {
   shutDown(import('../i18n'), (m) => m.resetUserLocale());
   // Olvida el entitlement resuelto: el próximo login lo recalcula para el hub activo.
   shutDown(import('./entitlement'), (m) => m.resetEntitlement());
+  // The launcher and the setup checklist were read for this person; both keep their last answer
+  // when a read fails, so the next person on a shared till would see them (hub#2506).
+  shutDown(import('./nav'), (m) => m.resetModuleNav());
+  shutDown(import('./setup-status'), (m) => m.resetSetupStatus());
   // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.
   shutDown(import('./assistant-history'), (m) => m.clearAssistantHistory());
   // La campana de dead-letters deja de sondear y se limpia (hub#660): sin sesión no hay cola que

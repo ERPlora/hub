@@ -435,7 +435,9 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
       'module-settings-admin-only',
       'module-settings-error',
       'module-settings-loading',
+      'module-settings-no-permission',
       'module-settings-refusal',
+      'module-settings-retry',
       'module-settings-save',
     ],
     computed: [

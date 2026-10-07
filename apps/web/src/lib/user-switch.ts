@@ -40,6 +40,10 @@ import { deviceMode, deviceTrusted, type DeviceMode } from './device-mode';
 import { asksForPin, pinPolicy, type PinPolicy } from './pin-policy';
 import { clearTokens, runtimeLogout, runtimePinLogin } from './cloud';
 import { clearAssistantHistory } from './assistant-history';
+import { resolveEntitlement } from './entitlement';
+import { refreshModuleNav, resetModuleNav } from './nav';
+import { refreshSetupStatus, resetSetupStatus } from './setup-status';
+import { getClient } from './runtime';
 import { getHubSession, isAuthed, setHubSession, setUser } from './session';
 import { getUserProfile, resetUserProfile } from './user-profile';
 import { resetUserThemePreferences } from './theme';
@@ -160,6 +164,18 @@ export async function switchUser(name: string, pin: string): Promise<void> {
   resetUserThemePreferences();
   resetUserLocale();
   await getUserProfile().catch(() => null);
+
+  // What the shell built for the person who left goes too (hub#2506): the launcher and «My apps»
+  // (filtered by HER permissions), the plan (resolved with HER erplora.com credentials, cleared
+  // above) and the setup checklist (answered for HER session). The shell only re-reads them when
+  // `isAuthed` flips, and a hand-over never flips it. Emptied first, so a failed re-read leaves
+  // «could not load» on screen and not her lists; then re-read in the order of a fresh sign-in
+  // (`gateAndRefresh` in App.vue): the plan gates the launcher.
+  resetModuleNav();
+  resetSetupStatus();
+  await resolveEntitlement();
+  await refreshModuleNav();
+  await refreshSetupStatus(getClient());
 }
 
 /**

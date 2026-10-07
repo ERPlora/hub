@@ -18,6 +18,10 @@ vi.mock('../lib/runtime', async () => {
   return { pinUsers: ref<Array<{ id: string; name: string; role: string }>>([]) };
 });
 
+// The real `user-switch` imports the launcher store (hub#2506), which reaches the module loader and
+// its icon registry; the swap is a double here, so the loader never runs — it only has to load.
+vi.mock('../lib/module-loader', () => ({ loadMenu: async () => [], invalidateManifestCache: () => {} }));
+
 const switchUser = vi.fn(async (_name: string, _pin: string) => {});
 vi.mock('../lib/user-switch', async () => {
   const actual = await vi.importActual<typeof import('../lib/user-switch')>('../lib/user-switch');

@@ -57,6 +57,7 @@ vi.mock('../lib/cloud', () => ({
     ticket = '';
   },
   setTokens: vi.fn(),
+  clearTokens: vi.fn(),
   runtimeCloudSession: vi.fn(),
   runtimePinLogin: vi.fn(),
   runtimeBadgeLogin: (...a: unknown[]) => runtimeBadgeLogin(...a),
