@@ -119,12 +119,12 @@ QA: ninguno
 
 ### HUB-F166 Ver el estado del sistema, sus registros y documentos
 Estado: parcial — en el servidor de producción la CPU y la memoria solo dan el porcentaje (sin cifras ni historial) y los documentos salen sin enlace para abrirlos
-Actor: administrador, responsable, empleado
+Actor: administrador
 Pantalla: HUB_SHELL: Sistema
 Pasos:
-1. Cualquiera con sesión abre **Sistema**.
+1. El dueño o un administrador abre **Sistema**.
 2. Ve el uso de CPU y memoria, la base de datos y sus conexiones, los últimos 50 avisos entre apps como **Registros** (error, aviso o información). La pantalla ya no enseña los documentos guardados en la nube, aunque el servidor los sigue pidiendo.
-Entra: la sesión (cualquier rol; no una llave); los documentos y el espacio usado los pide el hub a erplora.com con su credencial.
+Entra: la sesión de dueño o administrador (no una llave), la misma puerta que la cola de avisos caídos (HUB-F54): el último error de un aviso puede llevar el NIF y el nombre de un cliente (el rechazo de la AEAT). Sin sesión, 401; cualquier otro rol, 403 `forbidden` sin datos. Los documentos y el espacio usado los pide el hub a erplora.com con su credencial.
 Sale: nada guardado.
 En este mismo documento se apoya en: HUB-F50 (Dejar un aviso en la cola al guardar una orden), HUB-F51 (Entregar un aviso a los módulos que lo escuchan), HUB-F52 (Reintentar un aviso que un módulo no pudo procesar).
 Si falla: «No se pudo consultar el sistema» con «Reintentar»; si erplora.com no da los documentos, la lista sale vacía.
