@@ -18,6 +18,7 @@ use serde_json::{json, Map, Value};
 use erplora_runtime::api_keys::{ApiKeyAccess, ApiKeyScope, ScopeEntry};
 
 use crate::auth;
+use crate::event_stream;
 use crate::state::AppState;
 
 // ── 1) Gestión de keys (auth = sesión admin owner/admin) ────────────────────────────────────
@@ -112,7 +113,11 @@ pub async fn rotate_key(
         return admin_unauthorized(e);
     }
     match rt.rotate_api_key(&id).await {
-        Ok(Some(secret)) => Json(json!({ "ok": true, "data": secret })).into_response(),
+        Ok(Some(secret)) => {
+            // hub#2522: the old secret is dead, and so is every live channel it opened.
+            st.stream_limiter.cut(&event_stream::key_tag(&id));
+            Json(json!({ "ok": true, "data": secret })).into_response()
+        }
         Ok(None) => key_not_found(),
         Err(e) => key_err(e),
     }
@@ -130,7 +135,11 @@ pub async fn revoke_key(
         return admin_unauthorized(e);
     }
     match rt.revoke_api_key(&id).await {
-        Ok(true) => Json(json!({ "ok": true })).into_response(),
+        Ok(true) => {
+            // hub#2522: a kill-switch that leaves the open channels listening is not one.
+            st.stream_limiter.cut(&event_stream::key_tag(&id));
+            Json(json!({ "ok": true })).into_response()
+        }
         Ok(false) => key_not_found(),
         Err(e) => key_err(e),
     }

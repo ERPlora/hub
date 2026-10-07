@@ -692,6 +692,9 @@ pub(crate) async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) 
     if let Some(token) = auth::session_token(&headers) {
         let rt = st.runtime.read().await;
         let _ = rt.delete_session(&token).await;
+        // hub#2522: after the row is gone, so a ticket minted from now on cannot see it alive.
+        st.stream_limiter
+            .cut(&crate::event_stream::session_tag(&token));
     }
     Json(json!({ "ok": true })).into_response()
 }
