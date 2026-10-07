@@ -106,7 +106,9 @@ async function answerWhatTheCloudWould(page: Page): Promise<void> {
     }),
   );
   await page.route(new RegExp(`/api/modules/${APP.id}/versions`), (r) =>
-    r.fulfill({ json: { ok: true, data: { module_id: APP.id, installed: APP.version, latest: OLDER, versions: [OLDER] } } }),
+    r.fulfill({
+      json: { ok: true, data: { module_id: APP.id, installed: APP.version, latest: OLDER, versions: [OLDER] } },
+    }),
   );
 }
 
