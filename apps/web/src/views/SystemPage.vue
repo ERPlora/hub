@@ -21,13 +21,17 @@
       </ok-inline-feedback>
 
       <!-- ── Tab: Recursos ──────────────────────────────────────── -->
-      <template v-if="tab === 'resources'">
+      <template v-if="visibleTab === 'resources'">
         <!-- ── Bloque Recursos del sistema — SIEMPRE visible ──
              Postgres-only (ADR-0154): CPU/Memoria/Conexiones las mide el runtime según el despliegue
              (ECS Task Metadata / cgroup v2 del contenedor / sysinfo en dev) + Postgres. La BD es
              compartida por organización → sin "tamaño local": N/A.
              La pill indica la fuente. CPU/Memoria/Conexiones = ok-resource-usage (serie del
              SaaS, saas#1511); BD = stat. -->
+        <!-- hub#2519 — the server's usage is the System state the runtime keeps for an owner or an
+             administrator (`/api/system` answers 403 to the rest). Somebody else at this screen
+             came for the device cards below, not for «we could not read this» four times. -->
+        <template v-if="isAdmin">
         <div class="block-header">
           <h3 class="block-header__title">{{ resourcesTitle }}</h3>
           <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
@@ -131,6 +135,7 @@
             </ion-card>
           </div>
         </div>
+        </template>
 
         <!-- ── Your printer ──────────────────────────────────────────────────────────
              Same sentence as the panel badge (hub#375), from the same `printerLine`: the headline
@@ -289,7 +294,7 @@
       </template>
 
       <!-- ── Tab: Plan y límites (ADR-0154) — telemetría vs cuota del plan + CTA de upgrade ─── -->
-      <template v-else-if="tab === 'plan'">
+      <template v-else-if="visibleTab === 'plan'">
         <PlanLimitsPanel />
       </template>
 
@@ -299,12 +304,12 @@
            control de update del hub —el botón del dueño se retiró porque contradice ADR-0269—,
            solo el derecho a SABER. Y solo lo que cambió: un día sin cambios no es una fila que
            diga «sin cambios», es nada. -->
-      <template v-else-if="tab === 'updates'">
+      <template v-else-if="visibleTab === 'updates'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
             <div class="block-header">
               <h3 class="block-header__title">{{ t('system.updateHistory') }}</h3>
-              <ok-status-pill tone="info">{{ t('system.updatesRunning', { version: info?.hubVersion ?? '—' }) }}</ok-status-pill>
+              <ok-status-pill v-if="isAdmin" tone="info">{{ t('system.updatesRunning', { version: info?.hubVersion ?? '—' }) }}</ok-status-pill>
             </div>
             <p class="muted-note updates-hint">{{ t('system.updatesCloudHint') }}</p>
 
@@ -380,7 +385,7 @@
       </template>
 
       <!-- ── Tab: Registros ─────────────────────────────────────── -->
-      <template v-else-if="tab === 'logs'">
+      <template v-else-if="visibleTab === 'logs'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
             <h3 class="logs-title">{{ t('system.eventLog') }}</h3>
@@ -408,7 +413,7 @@
            la pestaña le muestra vacío (no es un agujero de permiso, es que no hay nada para él). El
            flujo es «arreglar la causa y reenviar tal cual» — el payload nunca se edita (inmutabilidad
            de la cadena fiscal, ADR-0189); si la causa sigue, la fila vuelve a morir y reaparece. -->
-      <template v-else-if="tab === 'events'">
+      <template v-else-if="visibleTab === 'events'">
         <ion-card class="ion-no-margin">
           <ion-card-content>
             <div class="events-head">
@@ -484,7 +489,7 @@
     <template #footer>
       <ion-footer class="ion-no-border">
         <ion-toolbar>
-          <ion-segment class="ok-tabbar" :value="tab" scrollable @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
+          <ion-segment class="ok-tabbar" :value="visibleTab" scrollable @ion-change="tab = ($event as CustomEvent<{ value: Tab }>).detail.value">
             <ion-segment-button value="resources">
               <HubIcon name="pulse-outline" />
               <ion-label>{{ t('system.tabResources') }}</ion-label>
@@ -501,7 +506,7 @@
               <HubIcon name="alert-circle-outline" />
               <ion-label>{{ t('system.tabEvents') }}</ion-label>
             </ion-segment-button>
-            <ion-segment-button value="logs">
+            <ion-segment-button v-if="isAdmin" value="logs">
               <HubIcon name="document-text-outline" />
               <ion-label>{{ t('system.tabLogs') }}</ion-label>
             </ion-segment-button>
@@ -666,6 +671,11 @@ watch([() => route.path, () => route.hash], ([path, h]) => {
   const next = resolveSystemTab(h);
   if (next !== tab.value) tab.value = next;
 });
+// hub#2519 — the Logs tab is the event log of `/api/system`, which only an owner or an
+// administrator may read. For anybody else the tab does not exist, and an address that names it
+// shows Resources instead of an empty log that would read as «nothing happened». `tab` keeps the
+// address's choice: a session that resolves as an administrator after landing on `#logs` gets it.
+const visibleTab = computed<Tab>(() => (tab.value === 'logs' && !isAdmin.value ? 'resources' : tab.value));
 
 const toastMessage = ref('');
 const toastOpen = ref(false);
@@ -808,6 +818,8 @@ const usageRange = ref<UsageRange>('24h');
 const usageSeries = ref<UsageSeries | null>(null);
 
 async function loadUsageSeries(): Promise<void> {
+  // Only painted next to the System state, which is an administrator's (hub#2519).
+  if (!isAdmin.value) return;
   usageSeries.value = await fetchUsageSeries(usageRange.value);
 }
 watch(usageRange, () => {
@@ -1145,6 +1157,14 @@ watch(locale, async () => {
 });
 
 async function loadSystemInfo(): Promise<void> {
+  // hub#2519 — the runtime answers 403 to anybody who does not administer the hub: asking would
+  // only paint «Could not reach the system» on a screen whose device cards work.
+  if (!isAdmin.value) {
+    info.value = null;
+    loadFailed.value = false;
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   info.value = await fetchSystemInfo();
   loadFailed.value = info.value == null;
@@ -1152,6 +1172,20 @@ async function loadSystemInfo(): Promise<void> {
   await nextTick();
   applyTableLabels();
 }
+
+// The session may resolve after the page opened (a direct load of /system): when it turns out to
+// administer the hub, the state and its usage are asked for then; when it stops (a switch of user
+// on a shared till), what the previous person read leaves the screen.
+watch(isAdmin, (admin) => {
+  if (admin) {
+    void loadSystemInfo();
+    void loadUsageSeries();
+  } else {
+    info.value = null;
+    usageSeries.value = null;
+    loadFailed.value = false;
+  }
+});
 
 // ── Dead-letters (hub#660) ────────────────────────────────────────────────────
 // El flujo del operador: ver la cola → arreglar la causa → reenviar (uno o todos) o descartar.

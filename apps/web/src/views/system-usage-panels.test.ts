@@ -64,6 +64,14 @@ const { fetchUsageSeriesMock } = vi.hoisted(() => ({
   fetchUsageSeriesMock: vi.fn<() => Promise<UsageSeries | null>>(async () => contractSeries),
 }));
 
+// The server's usage is an owner's or an administrator's to read (hub#2519): these panels are what
+// an administrator sees.
+vi.mock('../lib/session', async () => {
+  const vue = await import('vue');
+  const actual = await vi.importActual<typeof import('../lib/session')>('../lib/session');
+  return { ...actual, isAdmin: vue.ref(true) };
+});
+
 // SystemPage reads the modules with a bell counter (hub#2306) through `module-loader`, whose icon
 // chain (`~icons/…?raw`) the vitest transform denies — stubbed like DataPanel/dashboard-widgets.
 vi.mock('../lib/module-loader', () => ({ loadInstalledManifests: vi.fn(async () => []) }));
