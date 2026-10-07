@@ -25,7 +25,13 @@ import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
 /** A registered print host, as `GET /api/print/hosts` returns it (camelCase over the wire). */
 export interface PrintHostEntry {
+  /**
+   * Empty for any device but the caller's own, unless the session administers the hub: the id is
+   * the proof of a trusted device and never reaches a cashier (hub#2551).
+   */
   deviceId: string;
+  /** What the hub says to paint: the label, or the tail of the id (`…e7f8`) — never the id. */
+  name: string;
   role: string;
   label: string;
   live: boolean;
@@ -45,7 +51,7 @@ export type PrintRoleStatus = 'ready' | 'stalled' | 'unattended';
 /** One row of the coverage screen: a role, its state, and who (if anybody) is printing it. */
 export interface PrintRoleRow extends PrintRoleCoverage {
   status: PrintRoleStatus;
-  /** Human names of the LIVE hosts draining this role (device id when a host has no label). */
+  /** Human names of the LIVE hosts draining this role (the hub's `name` when it has no label). */
   hosts: string[];
 }
 
@@ -72,14 +78,16 @@ export function coverageRows(
     status: classifyRole(c),
     hosts: (hosts ?? [])
       .filter((h) => h.live && h.role === c.role)
-      .map((h) => h.label.trim() || h.deviceId),
+      .map((h) => h.label.trim() || h.name.trim() || h.deviceId),
   }));
   // Stable within a status: the API already orders roles alphabetically.
   return rows.sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);
 }
 
 /** A row of the wire payload before it is trusted. */
-type WireHost = Partial<Record<'deviceId' | 'role' | 'label', unknown>> & { live?: unknown };
+type WireHost = Partial<Record<'deviceId' | 'name' | 'role' | 'label', unknown>> & {
+  live?: unknown;
+};
 type WireCoverage = Partial<Record<'role', unknown>> & { waiting?: unknown; liveHosts?: unknown };
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -108,6 +116,7 @@ export async function fetchPrintHosts(): Promise<{
   return {
     hosts: (payload.hosts ?? []).map((h) => ({
       deviceId: str(h.deviceId),
+      name: str(h.name),
       role: str(h.role),
       label: str(h.label),
       live: h.live === true,

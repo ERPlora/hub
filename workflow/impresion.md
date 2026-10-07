@@ -204,7 +204,8 @@ Pasos:
 3. Un dispositivo puede retirarse de una función o de todas. Retirar el de **otro** (la caja cambiada o
    robada) lo hace un administrador.
 Entra: `POST /api/print/hosts/heartbeat` (sesión de usuario y `X-Device-Id`), o la señal por el canal en
-vivo; `DELETE /api/print/hosts?role=&deviceId=`.
+vivo; `DELETE /api/print/hosts?role=&deviceId=`. El `deviceId` de otro dispositivo solo lo lee un
+administrador en `GET /api/print/hosts` (HUB-F202).
 Sale: la marca de última señal. Estar vivo no se guarda: se calcula al leer, porque un dispositivo apagado no
 puede escribir. Retirar borra la fila (a diferencia de apagarse, que la deja «no viva»).
 Si falla: sin `X-Device-Id`, 422; retirar a otro sin ser administrador, 403. «Refrescadas: 0» es una
@@ -314,7 +315,12 @@ Pasos:
 Entra: la consulta `hub.print.coverage` (módulos), `GET /api/print/hosts` (shell) o
 `GET /api/print/undrained` (solo las atascadas, para la campana). Vale cualquier sesión local, **no**
 hace falta ser administrador y no vale una clave de API.
-Sale: la misma vista para las tres puertas, con el veredicto ya resuelto: nadie recalcula el umbral. Una
+Sale: la misma vista para las tres puertas, con el veredicto ya resuelto: nadie recalcula el umbral. Cada
+dispositivo se nombra por su nombre o, si se dio de alta sin él, por los cuatro últimos caracteres de su
+identificador («…e7f8»), nunca por el identificador entero: es la prueba de un dispositivo de confianza
+(HUB-F139). `GET /api/print/hosts` lista además los dispositivos dados de alta con ese mismo `name`; su
+`deviceId` solo va al propio dispositivo (el de la cabecera `X-Device-Id`) o a un administrador, que lo
+necesita para retirar uno ajeno (HUB-F197) (hub#2551). Una
 función sin dispositivo y sin trabajo no aparece (hasta que algo espere); un hub sin impresoras da una lista
 vacía.
 Si falla: una lectura que falla no se pinta como «todo al día» (la pantalla lo cuida).

@@ -264,7 +264,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F136 | Mantener la sesión abierta y cerrarla | parcial | [acceso.md](workflow/acceso.md) |
 | HUB-F137 | Perder la sesión porque se abrió en otro dispositivo | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F138 | Cambiar de usuario sin perder la venta | hecho | [acceso.md](workflow/acceso.md) |
-| HUB-F139 | Marcar un dispositivo como compartido o personal | parcial | [acceso.md](workflow/acceso.md) |
+| HUB-F139 | Marcar un dispositivo como compartido o personal | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F140 | Decidir si el negocio pide PIN y cuántos dígitos tiene | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F141 | Ver, nombrar y quitar los dispositivos del negocio | hecho | [acceso.md](workflow/acceso.md) |
 | HUB-F142 | Abrir erplora.com ya identificado | hecho | [acceso.md](workflow/acceso.md) |
