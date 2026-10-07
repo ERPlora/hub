@@ -2244,10 +2244,11 @@ export default {
     // hub#2251 — erplora.com took the call and then went silent: the hub gave up waiting.
     install_cloud_timeout:
       'erplora.com did not answer in time, so the app was not installed. Try again in a few minutes.',
-    // hub#2546 — the version asked for is not one this app can move to here: support has fixed its
-    // version on this hub, or it is older than the one installed. Nothing changed.
+    // hub#2546 · hub#2596 — the version asked for is not one this app can move to here: support has
+    // fixed its version on this hub, it is older than the one installed, or support marked it broken
+    // (quarantine). Nothing changed.
     update_version_not_offered:
-      'This app cannot be moved to that version: support has fixed the version it runs, or it is older than the one you have. Nothing has changed.',
+      'This app cannot be moved to that version: support has fixed the version it runs, it is older than the one you have, or it has been withdrawn because of a fault. Nothing has changed.',
     // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
     // not run whole); the owner can act on it by updating the hub. The line that names both versions
     // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.
