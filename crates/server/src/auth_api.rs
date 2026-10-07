@@ -708,8 +708,10 @@ pub(crate) struct SetPinReq {
 ///
 /// **Brute-force guard (hub#2499).** PINs are unique (hub#355), so this door has to say «that one
 /// is taken» — which, unbraked, let anybody with a session probe numbers until they hit a
-/// colleague's, then try it against the names on the pinpad grid. It spends the pinpad's budget
-/// (five tries, five minutes) against the PERSON, and every try counts, the accepted ones too: an
+/// colleague's, then try it against the names on the pinpad grid. It spends a budget of tries
+/// against the PERSON ([`crate::login_throttle::LoginThrottle::pin_change`]: thirty an hour,
+/// hub#2564, fewer a day than the pinpad's five every five minutes), and every try counts, the
+/// accepted ones too: an
 /// accepted number becomes the prober's PIN and they carry on, so counting only refusals would
 /// still hand out a taken PIN per refusal. The key is the user id, in a map kept apart from the
 /// pinpad's (`pin_change_throttle`, shared with the PIN doors of Empleados, hub#2518): the pinpad's counter is keyed by whatever name the caller types, a

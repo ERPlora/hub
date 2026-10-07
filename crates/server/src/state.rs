@@ -1028,7 +1028,9 @@ pub struct AppState {
     pub login_throttle: Arc<crate::login_throttle::LoginThrottle>,
     /// The budget of tries of every door that sets a PIN and so answers «that one is taken», per
     /// person: the own-PIN change (hub#2499) and the alta and edit of Empleados (hub#2518), one
-    /// budget shared by the three. Its own map on purpose: `login_throttle` is keyed by whatever
+    /// budget shared by the three, and its own size (`LoginThrottle::pin_change`, thirty an hour,
+    /// hub#2564) so that setting up a whole staff never waits. Its own map on purpose:
+    /// `login_throttle` is keyed by whatever
     /// NAME the caller types at the pinpad or the approval dialog, so a key of these doors kept
     /// there could be locked — or cleared — by typing it as a name.
     pub pin_change_throttle: Arc<crate::login_throttle::LoginThrottle>,
@@ -1111,7 +1113,7 @@ impl AppState {
             entitlement_proxy: crate::entitlement::new_shared_proxy_cache(),
             activity: Arc::new(crate::activity::ActivityState::new()),
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
-            pin_change_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
+            pin_change_throttle: Arc::new(crate::login_throttle::LoginThrottle::pin_change()),
             address_guard: Arc::new(crate::address_guard::AddressGuard::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
             stream_limiter: Arc::new(crate::event_stream::StreamLimiter::default()),

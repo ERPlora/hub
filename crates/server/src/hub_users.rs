@@ -81,9 +81,12 @@ pub(crate) fn plan_max_users(st: &AppState) -> u32 {
 /// PINs are unique (hub#355), so the alta and the edit have to say «that one is taken» — which,
 /// unbraked, let whoever manages the staff type numbers into any record until the refusal named a
 /// colleague's PIN, the account owner's included. Same budget, same map and same key as changing
-/// one's own PIN (`auth_api::auth_set_pin`, hub#2499): five tries per five minutes against the
-/// EDITOR's id, every try counted (an accepted number is stored and the prober moves on), and one
-/// budget per person across the three doors — a budget per door would only multiply the tries.
+/// one's own PIN (`auth_api::auth_set_pin`, hub#2499): thirty tries an hour against the EDITOR's id
+/// ([`crate::login_throttle::LoginThrottle::pin_change`]), every try counted (an accepted number is
+/// stored and the prober moves on), and one budget per person across the three doors — a budget
+/// per door would only multiply the tries. Thirty, not the pinpad's five every five minutes, so
+/// that setting up a whole staff in one sitting never waits (hub#2564), while a prober still gets
+/// fewer tries a day than under those five.
 /// Never `login_throttle`: that one is keyed by whatever name the caller types at the pinpad.
 /// Checked BEFORE the runtime looks at the digits. A request without a PIN (or with an empty one,
 /// which reveals nothing) spends nothing and is never locked.

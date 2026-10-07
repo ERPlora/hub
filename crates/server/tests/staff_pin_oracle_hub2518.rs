@@ -5,11 +5,11 @@
 //! until the refusal named a taken PIN, the account owner's included (whose own record they cannot
 //! touch), and then sign in at the till by picking the owner's name on the pinpad.
 //!
-//! These doors now spend the same per-person budget as changing one's own PIN (hub#2499): five
-//! tries per five minutes ([`erplora_server::login_throttle`]), counted against the EDITOR, every
-//! try a PIN travels in, the accepted ones too (an accepted number is stored and the prober carries
-//! on with the next). One budget per person across all three doors: a separate one per door would
-//! just multiply the tries. What this file locks down:
+//! These doors now spend the same per-person budget as changing one's own PIN (hub#2499):
+//! [`PIN_CHANGE_MAX_ATTEMPTS`] tries per hour ([`erplora_server::login_throttle`], hub#2564),
+//! counted against the EDITOR, every try a PIN travels in, the accepted ones too (an accepted
+//! number is stored and the prober carries on with the next). One budget per person across all
+//! three doors: a separate one per door would just multiply the tries. What this file locks down:
 //!
 //!  - once spent, the door answers `429 too_many_attempts` BEFORE looking at the digits, so a taken
 //!    PIN no longer says `pin_in_use`, and nothing is written;
@@ -17,13 +17,14 @@
 //!  - creating people spends it as editing them does;
 //!  - the lock is the editor's: another administrator still sets that same record's PIN;
 //!  - edits that carry no PIN (name, role, deactivation) spend nothing and are not locked;
-//!  - the budget is shared with the own-PIN change of «Mi perfil».
+//!  - the budget is shared with the own-PIN change of «Mi perfil»;
+//!  - and it is big enough for a whole staff set up in one sitting (hub#2564).
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::hub_users::NewHubUser;
 use erplora_runtime::Runtime;
-use erplora_server::login_throttle::MAX_FAILURES;
+use erplora_server::login_throttle::PIN_CHANGE_MAX_ATTEMPTS;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
@@ -32,8 +33,16 @@ use tower::ServiceExt;
 const OWNER_PIN: &str = "4917";
 const DUMMY: &str = "Pau Gil";
 const DUMMY_PIN: &str = "1379";
-/// Free, non-guessable PINs the prober rotates through; one more than the budget.
-const FREE_PINS: [&str; 6] = ["8246", "3058", "6193", "7402", "5817", "2964"];
+/// The budget of tries, as a count.
+const BUDGET: usize = PIN_CHANGE_MAX_ATTEMPTS as usize;
+
+/// Free, non-guessable PINs the prober rotates through; one more than the budget. Steps of 41 from
+/// 2000 never land on a repeated digit or a run (1234), nor on the fixture's PINs.
+fn free_pins() -> Vec<String> {
+    (0..=BUDGET)
+        .map(|i| format!("{:04}", 2000 + 41 * i))
+        .collect()
+}
 
 struct Fixture {
     router: axum::Router,
@@ -168,9 +177,10 @@ fn assert_locked(status: StatusCode, body: &Value) {
 #[tokio::test]
 async fn probing_a_record_is_braked_before_the_owners_pin_is_named() {
     let fx = fixture("hub-2518-probe").await;
-    let budget = MAX_FAILURES as usize;
+    let budget = BUDGET;
+    let free_pins = free_pins();
 
-    for pin in &FREE_PINS[..budget] {
+    for pin in &free_pins[..budget] {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
         assert_eq!(status, StatusCode::OK, "a free PIN is accepted: {body}");
     }
@@ -179,7 +189,7 @@ async fn probing_a_record_is_braked_before_the_owners_pin_is_named() {
     let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": OWNER_PIN })).await;
     assert_locked(status, &body);
     assert!(
-        pin_opens(&fx, DUMMY, FREE_PINS[budget - 1]).await,
+        pin_opens(&fx, DUMMY, &free_pins[budget - 1]).await,
         "the refused edit left the record's PIN as it was"
     );
 }
@@ -188,7 +198,7 @@ async fn probing_a_record_is_braked_before_the_owners_pin_is_named() {
 async fn refusals_spend_the_budget_too() {
     let fx = fixture("hub-2518-refusals").await;
 
-    for _ in 0..MAX_FAILURES {
+    for _ in 0..BUDGET {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": OWNER_PIN })).await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         assert_eq!(body["error"]["code"], "hub.users.pin_in_use", "{body}");
@@ -200,9 +210,10 @@ async fn refusals_spend_the_budget_too() {
 #[tokio::test]
 async fn creating_people_spends_the_same_budget() {
     let fx = fixture("hub-2518-create").await;
-    let budget = MAX_FAILURES as usize;
+    let budget = BUDGET;
+    let free_pins = free_pins();
 
-    for (i, pin) in FREE_PINS[..budget].iter().enumerate() {
+    for (i, pin) in free_pins[..budget].iter().enumerate() {
         let (status, body) = create_local(&fx, &format!("Probe {i}"), pin).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
@@ -216,31 +227,33 @@ async fn creating_people_spends_the_same_budget() {
     );
 
     // And the two doors share it: editing a record is locked as well.
-    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": FREE_PINS[budget] })).await;
+    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[budget] })).await;
     assert_locked(status, &body);
 }
 
 #[tokio::test]
 async fn the_lock_is_the_editors_not_the_records() {
     let fx = fixture("hub-2518-whose").await;
-    let budget = MAX_FAILURES as usize;
+    let budget = BUDGET;
+    let free_pins = free_pins();
 
-    for pin in &FREE_PINS[..budget] {
+    for pin in &free_pins[..budget] {
         edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
     }
-    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": FREE_PINS[budget] })).await;
+    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[budget] })).await;
     assert_locked(status, &body);
 
     // The owner sets that same record's PIN: their budget is untouched.
-    let (status, body) = edit(&fx, &fx.owner_session, json!({ "pin": FREE_PINS[budget] })).await;
+    let (status, body) = edit(&fx, &fx.owner_session, json!({ "pin": free_pins[budget] })).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(pin_opens(&fx, DUMMY, FREE_PINS[budget]).await);
+    assert!(pin_opens(&fx, DUMMY, &free_pins[budget]).await);
 }
 
 #[tokio::test]
 async fn edits_that_carry_no_pin_spend_nothing_and_are_never_locked() {
     let fx = fixture("hub-2518-no-pin").await;
-    let budget = MAX_FAILURES as usize;
+    let budget = BUDGET;
+    let free_pins = free_pins();
 
     // Twice the budget in renames: none of them is a try.
     for i in 0..(2 * budget) {
@@ -248,12 +261,12 @@ async fn edits_that_carry_no_pin_spend_nothing_and_are_never_locked() {
         assert_eq!(status, StatusCode::OK, "{body}");
     }
     // The whole PIN budget is still there.
-    for pin in &FREE_PINS[..budget] {
+    for pin in &free_pins[..budget] {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
     // Locked for PINs now, yet a rename still goes through.
-    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": FREE_PINS[budget] })).await;
+    let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": free_pins[budget] })).await;
     assert_locked(status, &body);
     let (status, body) = edit(&fx, &fx.prober_session, json!({ "name": DUMMY })).await;
     assert_eq!(status, StatusCode::OK, "{body}");
@@ -262,7 +275,8 @@ async fn edits_that_carry_no_pin_spend_nothing_and_are_never_locked() {
 #[tokio::test]
 async fn the_budget_is_shared_with_changing_ones_own_pin() {
     let fx = fixture("hub-2518-shared").await;
-    let budget = MAX_FAILURES as usize;
+    let budget = BUDGET;
+    let free_pins = free_pins();
 
     // One try at «Mi perfil» (the prober has no PIN yet, so no current one is asked)…
     let (status, body) = send(
@@ -270,12 +284,12 @@ async fn the_budget_is_shared_with_changing_ones_own_pin() {
         "POST",
         "/api/auth/set-pin",
         Some(&fx.prober_session),
-        json!({ "pin": FREE_PINS[0] }),
+        json!({ "pin": free_pins[0] }),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    // …leaves four for Empleados.
-    for pin in &FREE_PINS[1..budget] {
+    // …leaves the rest for Empleados.
+    for pin in &free_pins[1..budget] {
         let (status, body) = edit(&fx, &fx.prober_session, json!({ "pin": pin })).await;
         assert_eq!(status, StatusCode::OK, "{body}");
     }
@@ -288,8 +302,26 @@ async fn the_budget_is_shared_with_changing_ones_own_pin() {
         "POST",
         "/api/auth/set-pin",
         Some(&fx.prober_session),
-        json!({ "pin": OWNER_PIN, "current_pin": FREE_PINS[0] }),
+        json!({ "pin": OWNER_PIN, "current_pin": free_pins[0] }),
     )
     .await;
     assert_locked(status, &body);
+}
+
+/// hub#2564 — the brake must not tax the very first thing the app asks of a new owner: setting up
+/// the whole staff in one sitting, each person with their own PIN. Twenty altas in a row (a large
+/// restaurant's floor and kitchen) go through without a single «wait».
+#[tokio::test]
+async fn a_whole_staff_is_set_up_in_one_sitting_without_waiting() {
+    let fx = fixture("hub-2564-onboarding").await;
+
+    for (i, pin) in free_pins().iter().take(20).enumerate() {
+        let (status, body) = create_local(&fx, &format!("Staff {i}"), pin).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "alta #{} with PIN {pin}: {body}",
+            i + 1
+        );
+    }
 }
