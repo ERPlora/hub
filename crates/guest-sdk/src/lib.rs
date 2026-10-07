@@ -75,6 +75,11 @@ pub mod money;
 pub mod tax;
 pub mod units;
 
+/// **La lectura de un teléfono en E.164** (appointments#313). Un número tecleado de cualquier
+/// forma, leído con las reglas de libphonenumber en el país del negocio. Antes vivía en el handler
+/// de `customers`, y Citas necesitaba la misma lectura para la copia del teléfono de cada cita.
+pub mod phone;
+
 /// Entrada arbitraria que el host pasa al handler WASM.
 ///
 /// Es un wrapper transparente sobre un [`serde_json::Value`]; el guest decide
