@@ -363,13 +363,13 @@ Implicados: HUB-F132, REC_ALTA-F16
 QA: ninguno
 
 ### HUB_SHELL-F23 Gestionar o borrar mi cuenta de erplora.com
-Estado: parcial — erplora.com pide la contraseña para borrar, así que una cuenta sin contraseña usable (la que solo entra con Google) no puede borrarse; y borrar la cuenta no cancela el plan del negocio ni deja otro propietario
+Estado: parcial — erplora.com pide la contraseña para borrar, así que una cuenta sin contraseña usable (la que solo entra con Google) no puede borrarse
 Actor: administrador, responsable, empleado
 Pantalla: Mi perfil
 Pasos:
 1. Al pie de **Mi perfil**, «Gestión de la cuenta»: con cuenta de erplora.com, «Puedes editar aquí tus propios datos. Sigue siendo tu cuenta de erplora.com.» y los botones «Gestionar cuenta en erplora.com» y «Borrar mi cuenta»; sin ella, «Esta identidad pertenece solo a este negocio…» y ningún botón.
 2. Pulsa uno: erplora.com se abre en el navegador, en la página de la cuenta o en la confirmación de borrado, sin el resto del panel.
-3. El borrado lo confirma erplora.com, no el hub, pidiendo la contraseña de la cuenta: una cuenta sin contraseña usable (la que solo entra con Google) no puede borrarse. Borrar la cuenta no cancela el plan del negocio ni deja otro propietario: el negocio se queda sin dueño y su plan sigue cobrándose.
+3. El borrado lo confirma erplora.com, no el hub, pidiendo la contraseña de la cuenta: una cuenta sin contraseña usable (la que solo entra con Google) no puede borrarse. Si la cuenta es la única propietaria de algún negocio, erplora.com no la borra: enseña esos negocios y pide borrarlos o traspasarlos antes desde erplora.com, así que ningún negocio se queda sin dueño cobrando (SAAS_DASHBOARD-F208).
 Entra: los tokens de erplora.com de la sesión.
 Sale: con sesión abierta con la cuenta, un pase de un solo uso para entrar ya identificado; con PIN, el enlace normal, que pide la contraseña.
 Si falla: «No se pudo abrir la página de tu cuenta en el navegador. Entra en erplora.com para gestionarla.».
