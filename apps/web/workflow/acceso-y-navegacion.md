@@ -333,7 +333,7 @@ Implicados: HUB-F167, HUB_APP-F31
 QA: ninguno
 
 ### HUB_SHELL-F21 Cambiar mis datos, foto, idioma y apariencia
-Estado: parcial — el resumen de la cuenta se anuncia en inglés al lector de pantalla («Account summary»)
+Estado: parcial — el resumen de la cuenta se anuncia en inglés al lector de pantalla («Account summary», ERPlora/hub#2589)
 Actor: administrador, responsable, empleado
 Pantalla: Mi perfil
 Pasos:
