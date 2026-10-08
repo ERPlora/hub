@@ -236,7 +236,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F91 | Paso «Solo sigue si» | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F92 | Paso «Esperar» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F93 | Paso «Enviar un mensaje» a un cliente | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
-| HUB-F94 | Paso «Llamar a otro sistema» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
+| HUB-F94 | Paso «Llamar a otro sistema» | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F95 | Paso «Pedírselo al asistente» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F96 | Paso «Preguntar antes a alguien» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F97 | «Solo si» y «seguir si falla» en cada paso | hecho | [automatizaciones.md](workflow/automatizaciones.md) |

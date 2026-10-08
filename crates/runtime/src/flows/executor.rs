@@ -770,7 +770,10 @@ async fn run_step(
         // left to decide.
         StepSpec::Http { .. } => {
             let authority = grants::authority(db, hub_id, flow_id).await?;
-            match http::prepare(db, hub_id, flow_id, step, scope, &authority).await {
+            // `run.idempotency_key` is this call's key, for a service that reads it from the body
+            // or from another header (hub#2675).
+            let scope = http::with_run_key(scope, run_id, &step.id);
+            match http::prepare(db, hub_id, flow_id, step, &scope, &authority).await {
                 Ok(prepared) => {
                     // The re-issued attempt after a restart carries the same key (hub#2659).
                     let prepared = prepared.with_idempotency_key(run_id, &step.id);
