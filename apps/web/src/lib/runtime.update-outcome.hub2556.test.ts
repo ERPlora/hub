@@ -41,7 +41,10 @@ const fill = (s: string, params: Record<string, string>) =>
   Object.entries(params).reduce((acc, [k, v]) => acc.split(`{${k}}`).join(v), s);
 
 async function update(body: Record<string, unknown>, status = 200): Promise<unknown> {
-  vi.stubGlobal('fetch', vi.fn(async () => answer(body, status)));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => answer(body, status)),
+  );
   return updateModule('notes', '').then(
     (result) => ({ result }),
     (error) => ({ error }),
@@ -126,6 +129,15 @@ describe('the sentence for an update that did not go in (hub#2556)', () => {
       );
     });
   }
+
+  it('a failure with an error status keeps the runtime sentence for its code (hub#1693)', async () => {
+    const { error } = (await update(
+      { ok: false, error: 'cloud: cloud_unreachable', code: 'install_cloud_unavailable' },
+      502,
+    )) as { error: unknown };
+    const { t, te } = translator('es');
+    expect(updateFailureMessage(error, 'Notes', { t, te })).toBe(t('runtimeErrors.install_cloud_unavailable'));
+  });
 
   it('the technical English of the warning never reaches the screen', async () => {
     const { error } = (await update(keptPrevious('install_cloud_timeout'))) as { error: unknown };

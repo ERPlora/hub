@@ -36,14 +36,17 @@ describe('Apps destructive actions', () => {
     for (const fn of [
       'async function toggleModule',
       'async function removeModule',
-      'async function updateInstalledModule',
+      // hub#2556: the update request (and its «Retry») lives in `runUpdate`; its sentence comes
+      // from `updateFailureMessage`, which hands everything but a rolled-back update to
+      // `moduleFailureMessage` (pinned in lib/runtime.update-outcome.hub2556.test.ts).
+      'async function runUpdate',
       'async function doInstall',
     ]) {
       const start = source.indexOf(fn);
       expect(start, `${fn} must exist`).toBeGreaterThan(-1);
       const implementation = source.slice(start, source.indexOf('\n}', start));
       expect(implementation, `${fn} must capture the error`).toMatch(/catch\s*\(/);
-      expect(implementation, `${fn} must surface the reason`).toContain('moduleFailureMessage(');
+      expect(implementation, `${fn} must surface the reason`).toMatch(/\b(moduleFailureMessage|updateFailureMessage)\(/);
     }
     // And the private helper that knew the rule for two of the four is gone: being private to this
     // file is exactly why install never got it.
