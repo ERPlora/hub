@@ -185,6 +185,26 @@ export function settingValueForStorage(
 }
 
 /**
+ * The permission the hub demands to run the module's save command (`settings.set`), read from
+ * the `commands` block of its `module.json` — hub#2588. `null` when the command declares none
+ * (the hub then lets anybody run it).
+ *
+ * The shell paints the «Settings» tab only for a session that holds it: the same question the hub
+ * asks on Save, so nobody fills a form the hub is going to refuse. A filter of the screen, never
+ * the gate — the dispatcher checks the permission again on every command.
+ */
+export function settingsSavePermission(manifest: {
+  settings?: Pick<ModuleSettingsDef, 'set'>;
+  commands?: unknown;
+} | null | undefined): string | null {
+  const set = manifest?.settings?.set;
+  const commands = manifest?.commands;
+  if (!set || !commands || typeof commands !== 'object') return null;
+  const permission = (commands as Record<string, { permission?: unknown } | undefined>)[set]?.permission;
+  return typeof permission === 'string' && permission ? permission : null;
+}
+
+/**
  * Heading of the shell-owned tabs of a module (Plan, Settings) — hub#959.
  *
  * The nav entries carry `module_name` already localised by the runtime (ADR-0055); the manifest

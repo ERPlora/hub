@@ -36,6 +36,8 @@ const PIN = '742958';
 
 /** The UI contract's three sizes, the low phone of the report and the narrowest phone there is. */
 const SIZES = [...VIEWPORTS, { width: 375, height: 667 }, { width: 320, height: 568 }] as const;
+/** Up to here OutfitKit lays a `fill` list out as a phone list: as tall as its content (outfitkit#218). */
+const PHONE_MAX_WIDTH = 640;
 
 interface HubUser {
   id: string;
@@ -152,6 +154,55 @@ test.describe('My apps, seen by someone who does not run the hub (hub#2570)', ()
         const box = await target.boundingBox();
         expect(box?.y ?? -1, `${what} starts on screen`).toBeGreaterThanOrEqual(0);
       }
+    });
+  }
+
+  // Regression test for ERPlora/hub#2651 — on a phone the list grew past the box the screen gave it
+  // (pinned to the scroller's height), so it ran into the page scroll as overflow: the page lost its
+  // bottom padding and, scrolled to its end, the card's edge sat flush on the tabbar. Where the
+  // strip left a fractional height (320×568 under the wrapped admin-only note) it ended half a
+  // pixel UNDER it, and develop went red. A phone list scrolls WITH the page, so the page holds it
+  // and ends with its own margin, as any other screen does.
+  for (const viewport of SIZES.filter((size) => size.width <= PHONE_MAX_WIDTH)) {
+    test(`${viewport.width}×${viewport.height}: the list stays inside the page and ends with its bottom margin above the tabbar (hub#2651)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const api = await pwRequest.newContext();
+      const res = await api.post(`${RUNTIME}/api/auth/pin`, {
+        data: { name: viewer.name, pin: PIN, device_id: 'e2e-browser-device' },
+      });
+      expect(res.ok(), `employee PIN login: ${res.status()} ${await res.text()}`).toBeTruthy();
+      const session = await res.json();
+      await api.dispose();
+      await withSession(page, { token: session.token, user: session.user });
+
+      await page.goto('/apps');
+      await expect(page.getByText('Puedes ver las apps, pero solo un administrador puede instalarlas')).toBeVisible();
+      const table = myApps(page);
+      await expect(table.getByText('Aún no tienes apps.')).toBeVisible();
+
+      const tabbarTop = await scrollToEnd(page);
+      const margin = await page.locator('.ion-page:not(.ion-page-hidden) > ion-content').evaluate((content) => {
+        const scroller = content.shadowRoot?.querySelector<HTMLElement>('.inner-scroll');
+        if (!scroller) throw new Error('ion-content has no scroller');
+        return parseFloat(getComputedStyle(scroller).paddingBottom);
+      });
+      expect(margin, 'the page has a bottom margin to keep').toBeGreaterThan(0);
+
+      // The page's box for the list holds all of it: nothing of the list is overflow.
+      const surface = table.locator('xpath=..');
+      const overflow = async () => (await bottomOf(table, 'the list')) - (await bottomOf(surface, 'the list’s box'));
+      await expect.poll(overflow, 'the list ends inside the box the page gives it').toBeLessThanOrEqual(0.5);
+      // And so, at rest at the end of the page, exactly the page's own margin sits between the list
+      // and the tabbar (one pixel of slack for the scroller's whole-pixel scroll range): never less,
+      // the list flush on (or under) the tabbar; never more, a short list no longer reaching down
+      // to it, which is how this screen has always looked.
+      const gap = async () => tabbarTop - (await bottomOf(table, 'the list'));
+      await expect
+        .poll(gap, 'the page’s bottom margin is left between the list and the tabbar')
+        .toBeGreaterThanOrEqual(margin - 1);
+      expect(await gap(), 'the list reaches down to the page’s bottom margin').toBeLessThanOrEqual(margin + 1);
     });
   }
 });

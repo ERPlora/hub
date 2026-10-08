@@ -399,7 +399,20 @@ pub trait NotifyTransport: Send + Sync + std::fmt::Debug {
     /// Envía `intent` por `routing`. `Ok(SendOutcome::Sent)` si se entregó al proveedor; `Err`
     /// para que el relay reintente (fallo transitorio) o, si es terminal (cuota agotada / canal
     /// no configurado), lo registre como fallo (acabará en dead-letter tras los reintentos).
-    async fn send(&self, intent: &NotifyIntent, routing: Routing) -> Result<SendOutcome>;
+    ///
+    /// `delivery_key` names **this delivery**, and is the same on every attempt of it (hub#2648):
+    /// the relay sends first and records the send afterwards, and a send and a database row cannot
+    /// share a transaction. Whatever breaks between the two — the mark refused, the process dying
+    /// mid-call, the provider erroring after the message left — retries the delivery, and the key
+    /// is what lets the far end recognise the retry and answer what it answered the first time
+    /// instead of sending the customer the message again. A transport that reaches a provider
+    /// MUST pass it on; it is never the customer, the text or anything a module wrote.
+    async fn send(
+        &self,
+        intent: &NotifyIntent,
+        routing: Routing,
+        delivery_key: &str,
+    ) -> Result<SendOutcome>;
 }
 
 /// Decide el routing de un canal según el `tier` del módulo (ADR-0012/ADR-0006). Hoy: WhatsApp en
@@ -465,7 +478,12 @@ impl MockTransport {
 
 #[async_trait::async_trait]
 impl NotifyTransport for MockTransport {
-    async fn send(&self, intent: &NotifyIntent, routing: Routing) -> Result<SendOutcome> {
+    async fn send(
+        &self,
+        intent: &NotifyIntent,
+        routing: Routing,
+        _delivery_key: &str,
+    ) -> Result<SendOutcome> {
         if self.fail {
             return Err(RuntimeError::Notify(
                 "mock transport configured to fail".into(),
@@ -691,7 +709,7 @@ mod tests {
     async fn mock_transport_records_send() {
         let t = MockTransport::new();
         let intent = NotifyIntent::from_event_payload(&intent_params("sms")).unwrap();
-        let out = t.send(&intent, Routing::Tenant).await.unwrap();
+        let out = t.send(&intent, Routing::Tenant, "ev-1").await.unwrap();
         assert_eq!(
             out,
             SendOutcome::Sent {
@@ -707,6 +725,6 @@ mod tests {
     async fn failing_transport_errors() {
         let t = MockTransport::failing();
         let intent = NotifyIntent::from_event_payload(&intent_params("email")).unwrap();
-        assert!(t.send(&intent, Routing::Tenant).await.is_err());
+        assert!(t.send(&intent, Routing::Tenant, "ev-1").await.is_err());
     }
 }
