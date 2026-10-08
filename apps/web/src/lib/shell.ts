@@ -69,6 +69,16 @@ export function openAssistantForSetup(itemKey: string | null = null): void {
   assistantOpen.value = true;
 }
 
+/**
+ * Closes the panel and drops what it was opened for (hub#2538). The panel and its setup mode belong
+ * to the person who opened them: a hand-over or a sign-out must not leave the next person inside
+ * the previous one's configuration chat.
+ */
+export function forgetAssistantPanel(): void {
+  assistantIntent.value = null;
+  assistantOpen.value = false;
+}
+
 
 // Capacidad del asistente: en ERPlora el asistente es una capacidad CORE del Hub (proxy al Cloud,
 // ADR-0033), así que por defecto está disponible mientras haya sesión. Si en el futuro se quiere

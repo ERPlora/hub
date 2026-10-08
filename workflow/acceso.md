@@ -185,7 +185,7 @@ Pasos:
 4. La venta sigue en pantalla y lo siguiente queda a nombre de quien entró («Ahora atiende {name}»).
 Entra: el nombre y el PIN de quien entra; el token de quien sale.
 Sale: una sesión nueva y la anterior borrada. Cuando el PIN nuevo se acepta, la pantalla además olvida las credenciales de erplora.com y la conversación con el asistente de quien se fue (hub#1538, hub#1544, cerrada). El servidor no guarda ninguna conversación del asistente que haya que borrar.
-Tras el relevo, la pantalla vuelve a leer para quien entra el plan, el lanzador, «Mis apps» y la lista de configuración (HUB_SHELL-F09, hub#2506). Hueco de la pantalla (no del servidor): la pantalla abierta sigue siendo la de quien se fue hasta que se navega (hub#2539).
+Tras el relevo, la pantalla vuelve a leer para quien entra el plan, el lanzador, «Mis apps» y la lista de configuración (HUB_SHELL-F09, hub#2506), y vuelve a montar para ella la pantalla abierta y el panel del asistente, o la lleva a Inicio si esa pantalla no es para ella (hub#2539, hub#2538). La venta sigue porque la caja recuerda su cuenta abierta.
 Si falla: un PIN rechazado no cambia nada (quien estaba dentro sigue dentro, con su conversación): «Esos datos no han funcionado…». Dispositivo sin confianza: «Este dispositivo todavía no está dado de alta para el PIN…».
 Implicados: HUB_SHELL-F09, HUB_SHELL-F195
 QA: qa-hub-restaurant §7.02, L-13
