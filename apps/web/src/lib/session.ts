@@ -230,8 +230,10 @@ export function logout(): void {
   // when a read fails, so the next person on a shared till would see them (hub#2506).
   shutDown(import('./nav'), (m) => m.resetModuleNav());
   shutDown(import('./setup-status'), (m) => m.resetSetupStatus());
-  // El historial del AED muere con la sesión (ADR-0149): el Cloud ya no guarda copia.
+  // The assistant thread dies with the session (ADR-0149): the Cloud keeps no copy.
   shutDown(import('./assistant-history'), (m) => m.clearAssistantHistory());
+  // …and the panel's setup mode, which otherwise outlived the sign-out until a reload (hub#2538).
+  shutDown(import('./shell'), (m) => m.forgetAssistantPanel());
   // La campana de dead-letters deja de sondear y se limpia (hub#660): sin sesión no hay cola que
   // mirar, y el badge no debe sobrevivir al logout.
   shutDown(import('./dead-letter'), (m) => m.stopDeadLetterWatch());

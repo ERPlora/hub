@@ -160,14 +160,16 @@
         </ion-menu>
       </AuthenticatedChrome>
 
-      <ion-router-outlet id="main" />
+      <!-- Keyed on the hand-over (hub#2539): the next person gets every screen mounted again for
+           her, never what was read with the session of the one who left. -->
+      <ion-router-outlet id="main" :key="screenKey" />
     </ion-split-pane>
 
     <!-- Drawer del asistente (lo abre el sparkles de la topbar). Hermano del split-pane:
          va por encima del shell. Los errores del frontend se reportan AUTOMÁTICAMENTE al runtime
          (lib/error-report), sin modal ni acción del usuario. -->
     <AuthenticatedChrome>
-      <AssistantDrawer />
+      <AssistantDrawer :key="screenKey" />
       <!-- El diálogo de aprobación por PIN (hub#363). Se monta UNA vez, aquí, y lo abre el
            TRANSPORTE ante un `requires_elevation` — nunca un módulo ni una pantalla: así el
            encargado aprueba igual venga la acción de la app que venga, y ninguna se lo deja sin
@@ -212,7 +214,7 @@ import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import SidebarInstallQr from './components/SidebarInstallQr.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { setManagementDistribution } from './lib/management-link';
-import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
+import { moduleNav, moduleNavState, refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
 import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from './lib/upgrade-plan-link';
@@ -229,7 +231,7 @@ import { installIdleLogout } from './lib/idle-logout';
 import { installBadgeScanner } from './lib/badge-scanner';
 import { installNfcBadgeReader } from './lib/nfc-badge';
 import { loadDeviceMode } from './lib/device-mode';
-import { openUserSwitch, userSwitchOffered } from './lib/user-switch';
+import { handovers, openUserSwitch, screenAfterHandover, userSwitchOffered } from './lib/user-switch';
 import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
@@ -453,6 +455,16 @@ watch(isAuthed, (authed) => {
 installIdleLogout(() => {
   logout();
   void router.replace('/login');
+});
+// After a hand-over (hub#2539) the screen under the overlay, the pages Ionic keeps hidden for «back»
+// and the assistant panel still hold what was read for the person who left. Bumping the key mounts
+// them again for whoever arrived. A screen she may not open is left FIRST, so it is never mounted
+// again under her session; the sale in progress survives the remount (the till keeps its open check).
+const screenKey = ref(0);
+watch(handovers, async () => {
+  const to = screenAfterHandover(route, moduleNav.value, moduleNavState.value);
+  if (to) await router.replace(to);
+  screenKey.value += 1;
 });
 // **El lector de placas escucha AQUÍ, en el shell** (hub#658), y no en la pantalla que la espera.
 // Un lector RFID/NFC es un teclado: la ráfaga se reconoce por su VELOCIDAD, nunca porque un campo
