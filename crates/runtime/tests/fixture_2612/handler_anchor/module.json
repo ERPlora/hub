@@ -1,0 +1,44 @@
+{
+  "id": "w2612h",
+  "name": "W2612 handler anchor",
+  "version": "1.0.0",
+  "permissions": [
+    "w2612h.hold.manage"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "navigation": [],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "commands": {
+    "w2612h.holds.expire": {
+      "permission": "w2612h.hold.manage",
+      "transaction": true,
+      "sql": [
+        "commands/holds_expire.sql"
+      ],
+      "handler": {
+        "type": "wasm",
+        "file": "handler/handler.wasm",
+        "function": "expire"
+      },
+      "emit": [
+        {
+          "event": "w2612h.hold.released",
+          "when_rows": "commands/holds_expire.sql"
+        }
+      ]
+    }
+  },
+  "events": {
+    "emits": [
+      "w2612h.hold.released"
+    ]
+  }
+}

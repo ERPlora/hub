@@ -1663,6 +1663,7 @@ mod tests {
                         ),
                     ],
                     &[],
+                    &[],
                 )
                 .await
                 .expect("la conexión que sostiene el candado no puede fallar");

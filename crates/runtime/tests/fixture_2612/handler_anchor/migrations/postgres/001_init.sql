@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS w2612h_holds (
+    id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_w2612h_holds_hub ON w2612h_holds (hub_id);
+CREATE TABLE IF NOT EXISTS w2612h_sweeps (
+    hub_id TEXT PRIMARY KEY, last_sweep TEXT NOT NULL);

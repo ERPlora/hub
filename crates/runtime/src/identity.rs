@@ -641,7 +641,7 @@ pub(crate) async fn write_taking_a_seat(
         min: 1,
     }];
     Ok(matches!(
-        db.execute_tx_gated(&ops, &gates).await?,
+        db.execute_tx_gated(&ops, &gates, &[]).await?,
         TxGatedOutcome::Committed { .. }
     ))
 }

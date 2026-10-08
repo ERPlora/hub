@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS fprov2612_records (
+    id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, created_at TEXT NOT NULL);

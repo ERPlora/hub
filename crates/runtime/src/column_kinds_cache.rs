@@ -98,6 +98,7 @@ mod tests {
             &self,
             _: &[(String, Params)],
             _: &[RowGate],
+            _: &[erplora_db::OpCondition],
         ) -> Result<TxGatedOutcome, DbError> {
             unreachable!("the cache only describes")
         }

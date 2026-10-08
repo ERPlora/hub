@@ -1898,6 +1898,7 @@ mod tests {
             &self,
             _ops: &[(String, erplora_db::Params)],
             _gates: &[erplora_db::RowGate],
+            _conditions: &[erplora_db::OpCondition],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             panic!("el filtro de tablas retiradas no escribe");
         }

@@ -851,6 +851,34 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                 }
             }
         }
+        // hub#2612: `emit[].when_rows` gates an event on ONE of the command's own statements. An
+        // anchor that names none would read as "announces only on change" while the runtime
+        // cannot honour it; and a command resolved by a handler does not run its `sql` list as
+        // written, so there is no statement count to anchor to. Both refused here, before any
+        // side effect, instead of announcing every execution in silence.
+        for event in &command.emit {
+            let Some(anchor) = event.when_rows() else {
+                continue;
+            };
+            if command.handler.is_some() {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` gates `{}` with `emit[].when_rows`, but it is \
+                     resolved by a handler, whose statements are not the ones it declares; \
+                     return the event from the handler instead",
+                    manifest.id,
+                    event.event()
+                )));
+            }
+            if !command.sql.iter().any(|sql| sql == anchor) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` anchors `emit[].when_rows` of `{}` to \
+                     `{anchor}`, which is not one of its `sql` entries {:?}",
+                    manifest.id,
+                    event.event(),
+                    command.sql
+                )));
+            }
+        }
     }
     Ok(())
 }
