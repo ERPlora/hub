@@ -244,7 +244,7 @@ Implicados: FLOWS-F15
 QA: qa-hub-flows R7
 
 ### HUB-F94 Paso «Llamar a otro sistema»
-Estado: hecho
+Estado: parcial — un servicio que pide la clave de no repetición en el cuerpo o con otro nombre de cabecera (Square, PayPal) aún no la recibe, y puede crear dos veces lo mismo si el hub se reinicia durante la llamada (hub#2675)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -254,7 +254,7 @@ Pasos:
 4. Guarda la respuesta (código, y el cuerpo como datos o como texto) para los pasos siguientes.
 Entra: método (GET, POST, PUT, PATCH, DELETE), dirección, cabeceras, cuerpo y tiempo de espera (1 a 30 s, 10 de fábrica).
 Sale: la salida del paso con el código y el cuerpo, cortado a 1 MiB con la marca de cortado; los secretos sustituidos por asteriscos en lo guardado.
-Si falla: sin permiso, ninguna llamada sale. Una dirección con usuario y contraseña, interna o que resuelve a una interna se bloquea (`flow.http_blocked`); una dirección rellenada que no es una URL, `flow.http_url_invalid`; no se siguen redirecciones; una respuesta que no es 2xx (`flow.http_status`), un fallo de conexión o de TLS (`flow.http_failed`) o que tarda más del plazo (`flow.http_timeout`) para la ejecución salvo «seguir si falla». La llamada sale **al menos una vez**: si el hub se reinicia durante la llamada, se repite a los 5 minutos, así que un servicio que no admite repetirse necesita su clave de no repetición en el documento. El tapado de secretos en la respuesta es por coincidencia exacta: si el otro sistema lo devuelve codificado (base64, URL), no se tapa.
+Si falla: sin permiso, ninguna llamada sale. Una dirección con usuario y contraseña, interna o que resuelve a una interna se bloquea (`flow.http_blocked`); una dirección rellenada que no es una URL, `flow.http_url_invalid`; no se siguen redirecciones; una respuesta que no es 2xx (`flow.http_status`), un fallo de conexión o de TLS (`flow.http_failed`) o que tarda más del plazo (`flow.http_timeout`) para la ejecución salvo «seguir si falla». La llamada sale **al menos una vez**: si el hub se reinicia durante la llamada, se repite a los 5 minutos, y por eso cada intento lleva la misma cabecera `Idempotency-Key` (una por ejecución y paso, distinta en cada ejecución, y guardada en el historial), con la que el otro sistema reconoce la repetición y no crea el pedido o el cobro dos veces (hub#2659); si el autor escribe su propia `Idempotency-Key`, manda la suya. Un servicio que pide la clave en otro sitio (en el cuerpo, o con otro nombre de cabecera) aún no tiene cómo recibirla (hub#2675). El tapado de secretos en la respuesta es por coincidencia exacta: si el otro sistema lo devuelve codificado (base64, URL), no se tapa.
 Implicados: FLOWS-F16
 QA: qa-hub-flows R5, qa-hub-flows R9
 

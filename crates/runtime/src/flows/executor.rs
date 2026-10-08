@@ -82,9 +82,9 @@ const STEP_WAITING_APPROVAL: &str = "waiting_approval";
 /// **The run stays claimed while its I/O is in flight** — status `running`, lease held — so the
 /// next tick skips it and advances everybody else. If the process dies mid-call the lease expires,
 /// the run is reclaimed and the step is re-issued: an `http` step is **at-least-once**, like every
-/// other outbound thing in this hub (the outbox, the print queue). A step that must not happen
-/// twice is a step whose endpoint takes an idempotency key, and the flow author puts it in the
-/// document.
+/// other outbound thing in this hub (the outbox, the print queue). So every attempt of an `http`
+/// step carries the same `Idempotency-Key`, one per run and step (hub#2659): an endpoint that
+/// honours it acts once.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PendingIo {
     /// hub#662 — `http`, already allow-listed and with its secrets substituted.
@@ -772,6 +772,8 @@ async fn run_step(
             let authority = grants::authority(db, hub_id, flow_id).await?;
             match http::prepare(db, hub_id, flow_id, step, scope, &authority).await {
                 Ok(prepared) => {
+                    // The re-issued attempt after a restart carries the same key (hub#2659).
+                    let prepared = prepared.with_idempotency_key(run_id, &step.id);
                     // The step is written BEFORE the call leaves, with the redacted request: if
                     // this hub dies mid-call, the run history still says what it was doing.
                     write_step(

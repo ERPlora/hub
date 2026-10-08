@@ -353,7 +353,7 @@ HUB-F254).
   (correo, WhatsApp) y una llamada de un paso «Llamar a otro sistema» salen **al menos una vez**: se
   pueden repetir (HUB-F61, HUB-F94). Todos los intentos de un mismo mensaje llevan la misma clave de
   no repetición (`Idempotency-Key` = el `event_id` del aviso), para que erplora.com no lo mande dos
-  veces (HUB-F61).
+  veces (HUB-F61); los de una misma llamada, la suya (una por ejecución y paso, HUB-F94).
 - **Un receptor reacciona con la autoridad de su módulo**, nunca con la del cajero; el `hub_id` sale
   siempre de la fila; la atribución (`created_by`) es la persona que causó el aviso. Las comprobaciones
   fiscales, de permisos de host y de esquema siguen aplicándose a los receptores.
