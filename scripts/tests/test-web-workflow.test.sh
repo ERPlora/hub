@@ -266,7 +266,11 @@ else
     ok "\`pull_request\` is back, with \`ready_for_review\` in its types"
 fi
 pr_paths="$(on_sub_block pull_request)"
-for p in "apps/web/**" "packages/**" "$guard_path" ".github/workflows/test-web.yml"; do
+# `crates/**`, `Cargo.toml` and `Cargo.lock` came back on 2026-10-08 (hub#2705, pm#655 J3): the
+# `e2e` job builds `erplora-server` and drives the shell against the REAL runtime, and a runtime
+# regression that broke the shell only surfaced on the nightly or on the next web PR. They were
+# left out by hub#1251 to spare the single self-hosted runner, which is no longer the ceiling.
+for p in "apps/web/**" "packages/**" "$guard_path" ".github/workflows/test-web.yml" "crates/**" "Cargo.toml" "Cargo.lock"; do
     grep -qF "$p" <<<"$pr_paths" \
         && ok "\`pull_request.paths\` includes \`$p\`" \
         || bad "\`pull_request.paths\` includes \`$p\`" "a PR touching it would open with no web check"
