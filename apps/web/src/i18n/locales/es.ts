@@ -622,6 +622,8 @@ export default {
     offConsequence:
       'Nadie teclea un PIN. Quien abriera la caja por la mañana es el nombre de todas las ventas hasta que acabe el turno, las hiciera quien las hiciera: no podrás saber quién vendió qué ni quién hizo un descuento. El personal que solo tiene PIN y no tiene cuenta no podrá entrar.',
     idleTitle: 'Volver a preguntar tras inactividad',
+    unreadableIdleLock:
+      'No se ha podido leer cómo pide el PIN esta caja. Por seguridad, volverá al pinpad tras {n} minutos sin usarla.',
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Hasta cerrar sesión',
     idleMinutesConsequence:

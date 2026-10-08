@@ -154,7 +154,7 @@ Pasos:
 3. La sesión se cierra y la caja vuelve a **Acceso**, al pinpad.
 Entra: el dial del negocio y los minutos (5 si el valor guardado no se entiende), el modo del dispositivo y que haya sesión.
 Sale: la sesión cerrada en el hub y en este navegador. La cuenta abierta la conserva su app.
-Si falla: con «Hasta cerrar sesión», en un dispositivo personal o sin sesión el vigilante no se arma. Si la pantalla no puede leer el dial del negocio (la lectura del modo del dispositivo falla y no la corrige una lectura posterior de los ajustes, por ejemplo al abrir Ajustes › General), toma «por turno» y tampoco se arma: la caja se queda abierta hasta el tope de la sesión, sin aviso (hub#2537). La persona no ve ningún mensaje de por qué volvió al pinpad. Quien cambie este tiempo revisa también la tarjeta Pinpad de Ajustes › General (área «Personas y permisos» de este documento), los topes de la pantalla (1, 5, 10, 15 o 30 minutos; 5 por defecto) y los del servidor (HUB-F140), y el tope de 1 hora de «pedir siempre» (HUB-F136).
+Si falla: con «Hasta cerrar sesión», en un dispositivo personal o sin sesión el vigilante no se arma. Si la pantalla no puede leer el dial del negocio (la lectura del modo del dispositivo falla y no la corrige una lectura posterior de los ajustes, por ejemplo al abrir Ajustes › General), el vigilante se arma igual, como con «pedir siempre», con los minutos guardados o 5 si tampoco se conocen, y la caja avisa una vez abajo: «No se ha podido leer cómo pide el PIN esta caja. Por seguridad, volverá al pinpad tras N minutos sin usarla» (hub#2537); una lectura buena posterior manda y, si dice «por turno» o «Hasta cerrar sesión», lo desarma. La lectura rota no se reintenta sola: se corrige en el siguiente acceso, que vuelve a leer el modo (hub#2677). La persona no ve ningún mensaje de por qué volvió al pinpad. Quien cambie este tiempo revisa también la tarjeta Pinpad de Ajustes › General (área «Personas y permisos» de este documento), los topes de la pantalla (1, 5, 10, 15 o 30 minutos; 5 por defecto) y los del servidor (HUB-F140), y el tope de 1 hora de «pedir siempre» (HUB-F136).
 Implicados: HUB-F136, HUB-F140, SALES-F17
 QA: ninguno
 
@@ -458,7 +458,7 @@ Solo lo que el código hace cumplir:
 
 Lo que hoy **no** se cumple y no es una regla, sino un hueco de seguridad [SEG] (detalle en sus
 flujos): tras el relevo la pantalla abierta es la de quien se fue hasta navegar (HUB_SHELL-F09,
-hub#2539); una lectura rota del dial desarma el cierre por inactividad (HUB_SHELL-F08, hub#2537); los
+hub#2539); los
 correos de la rejilla sobreviven al cierre de sesión, a quitar el dispositivo y a pasarlo a personal
 (HUB_SHELL-F04, hub#2536); «Cambiar de negocio» no cierra la sesión (HUB_SHELL-F16).
 

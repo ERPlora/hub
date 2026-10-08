@@ -20,7 +20,10 @@
 //     same strict value, and a previously granted `never` is **taken back** by the next unreadable
 //     answer: the decision behind it lives in the hub, not in this tab;
 //   - **it is never cached in `localStorage`.** A stored `never` would be a pinpad switch inside
-//     devtools, editable by whoever is holding the tablet.
+//     devtools, editable by whoever is holding the tablet;
+//   - **the fallback is only strict for the PINPAD.** `per_shift` paints the pinpad exactly like
+//     `always`, but it has no idle window, so a reader that needs to know whether the business asked
+//     for one reads {@link knownPinPolicy}, which says «not known» instead of guessing (hub#2537).
 //
 // **This module never writes.** The write door is `PUT /api/settings` behind an **admin session**
 // (`hub-settings.ts`), which is the whole point: the login screen runs with no session, so it can
@@ -47,6 +50,16 @@ export const STRICT_PIN_POLICY: PinPolicy = 'per_shift';
 export const pinPolicy = ref<PinPolicy>(STRICT_PIN_POLICY);
 
 /**
+ * Where {@link pinPolicy} came from: no answer yet, an answer the hub gave, or a read that failed
+ * (a dead runtime, a 5xx, a spelling this build does not know). Overwritten on every publish, like
+ * the value itself.
+ */
+export type PinPolicyRead = 'pending' | 'answered' | 'unreadable';
+
+/** How the dial in force was obtained (hub#2537). Starts `pending`: nothing has been read yet. */
+export const pinPolicyRead = ref<PinPolicyRead>('pending');
+
+/**
  * The three spellings the hub knows, and nothing near them — no trimming and no case folding, the
  * same closed set as `PinPolicy::parse` in the runtime. Two spellings on the wire would mean the
  * one that slips through is always the lax one, and the lax one here gives up the name on every
@@ -65,9 +78,22 @@ export function parsePinPolicy(value: unknown): PinPolicy | null {
  * one lucky answer outlive the decision behind it.
  */
 export function publishPinPolicy(value: unknown): PinPolicy {
-  const next = parsePinPolicy(value) ?? STRICT_PIN_POLICY;
+  const parsed = parsePinPolicy(value);
+  const next = parsed ?? STRICT_PIN_POLICY;
   pinPolicy.value = next;
+  pinPolicyRead.value = parsed ? 'answered' : 'unreadable';
   return next;
+}
+
+/**
+ * The dial as the hub ACTUALLY said it, or `null` when it has not (yet, or because the read failed).
+ *
+ * {@link pinPolicy} always holds a value because the pinpad needs one; this is for the readers whose
+ * strict side is not `per_shift` — the idle sign-out (hub#2537), whose strict side is «armed», and
+ * which would otherwise be disarmed by the very fallback that keeps the pinpad up.
+ */
+export function knownPinPolicy(): PinPolicy | null {
+  return pinPolicyRead.value === 'answered' ? pinPolicy.value : null;
 }
 
 /**
