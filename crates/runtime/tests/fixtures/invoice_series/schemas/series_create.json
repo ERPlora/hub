@@ -1,0 +1,14 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "invoice_series.series.create payload", "type": "object", "additionalProperties": false,
+  "required": ["code", "name", "document_type", "prefix", "country_code", "fiscal_year"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "document_type": { "type": "string", "enum": ["invoice", "credit_note", "proforma", "receipt", "quote"] },
+    "prefix": { "type": "string", "minLength": 1, "maxLength": 20 },
+    "suffix": { "type": "string", "maxLength": 20, "default": "" },
+    "format": { "type": "string", "maxLength": 255, "default": "{prefix}-{year}-{seq:05d}" },
+    "country_code": { "type": "string", "maxLength": 2 },
+    "region_code": { "type": "string", "maxLength": 10, "default": "" },
+    "fiscal_year": { "type": "integer" },
+    "is_default": { "type": "integer", "enum": [0, 1], "default": 0 } } }

@@ -418,10 +418,14 @@ jobs:
           set -euo pipefail
           # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
           # Actions, y el script se corre también en local, donde solo sería ruido.
-          if ! targets=$(bash scripts/ci/kernel-e2e-targets.sh); then
-            echo "::error::la lista revisada de e2e del kernel no cuadra con crates/runtime/tests"
-            echo "::error::(el detalle, arriba en este mismo paso). Se edita scripts/ci/kernel-e2e-targets.txt"
-            echo "::error::en la MISMA PR que añade o quita el .rs — ver hub#1359."
+          # `--catalogue` (pm#655): además de la lista, cada módulo que instala un target tiene que
+          # estar en el catálogo PUBLICADO. Si no, `cargo test` solo lo dice tras compilarlo todo,
+          # como `Io(NotFound)` (le pasó a `invoice_series`, archivado y privado).
+          if ! targets=$(bash scripts/ci/kernel-e2e-targets.sh --catalogue "$ERPLORA_MODULES_DIR"); then
+            echo "::error::los e2e del kernel no cuadran con la lista revisada o con el catálogo publicado"
+            echo "::error::(el detalle, arriba en este mismo paso). La lista: se edita scripts/ci/kernel-e2e-targets.txt"
+            echo "::error::en la MISMA PR que añade o quita el .rs (hub#1359). Un módulo que falta del"
+            echo "::error::catálogo: fixture en crates/runtime/tests/fixtures/<id>/ (pm#655)."
             exit 1
           fi
           count=$(printf '%s\n' "$targets" | grep -c .)

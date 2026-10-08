@@ -239,6 +239,102 @@ real_count=$(printf '%s\n' "$real_out" | grep -c .)
 ok
 printf 'note: the checked-in manifest declares %s kernel e2e target(s)\n' "$real_count"
 
+# ── 10 · --catalogue: every module a target installs must BE in the published catalogue ──
+# pm#655 changed where the catalogue comes from (the org's public, non-archived module repos) and
+# silently dropped `invoice_series` — archived and private — which six kernel e2e still installed
+# from it. The workflow tests passed 115/115 and 14 mutants, and the first sign was `cargo test`
+# dying twenty minutes in with `instalar invoice_series: Io(NotFound)` on every kernel PR. With
+# `--catalogue <dir>` the guard answers that in seconds, BEFORE cargo, naming target and module.
+# The three ways the real tree names a module are covered: a literal `modules_root().join("x")`,
+# a one-line helper wrapping it (`mdir("x")`), and a `for m in [..]` whose body joins `m`.
+add_installing_target() { # $1=dir, $2=name, $3=body of the test fn
+    cat > "$1/$2.rs" <<EOF
+use erplora_runtime::e2e_support::{modules_root, require_modules_workspace};
+use std::path::PathBuf;
+
+fn mdir(n: &str) -> PathBuf {
+    erplora_runtime::e2e_support::modules_root().join(n)
+}
+
+#[tokio::test]
+async fn installs_modules() {
+    if !require_modules_workspace() {
+        return;
+    }
+$3
+}
+EOF
+}
+make_catalogue() { # $1=dir, rest=module ids published in it
+    local dir="$1" id
+    shift
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    for id in "$@"; do
+        mkdir -p "$dir/$id"
+        printf '{"id": "%s"}\n' "$id" > "$dir/$id/module.json"
+    done
+}
+run_guard_catalogue() { # $1=tests dir, $2=manifest, $3=catalogue
+    out=$("$script" --tests-dir "$1" --manifest "$2" --catalogue "$3" 2>"$tmp_dir/err")
+    status=$?
+    err=$(cat "$tmp_dir/err")
+}
+catalogue="$tmp_dir/catalogue"
+
+make_tree "$tree"
+add_installing_target "$tree" literal_e2e '    rt.install_from_dir(&modules_root().join("taxes")).await.unwrap();'
+add_installing_target "$tree" helper_e2e '    rt.install_from_dir(&mdir("sales")).await.unwrap();'
+add_installing_target "$tree" loop_e2e '    for m in ["inventory", "verifactu"] {
+        rt.install_from_dir(&modules_root().join(m)).await.unwrap();
+    }
+    // A loop over TABLE names that never reaches modules_root() names no module.
+    for t in ["sales_sale", "fiscal"] {
+        assert!(!t.is_empty());
+    }
+    // A comment is not an install: modules_root().join("ghost_in_a_comment")'
+make_manifest "$manifest" helper_e2e literal_e2e loop_e2e
+
+make_catalogue "$catalogue" taxes sales inventory verifactu
+run_guard_catalogue "$tree" "$manifest" "$catalogue"
+[ "$status" -eq 0 ] || fail "pm#655: a catalogue with every installed module must pass, got $status: $err"
+ok
+[ "$out" = "helper_e2e
+literal_e2e
+loop_e2e" ] || fail "pm#655: --catalogue must not change the stdout contract, got: $out"
+ok
+
+for gone in taxes sales verifactu; do
+    make_catalogue "$catalogue" taxes sales inventory verifactu
+    rm -rf "${catalogue:?}/$gone"
+    run_guard_catalogue "$tree" "$manifest" "$catalogue"
+    [ "$status" -eq 1 ] \
+        || fail "pm#655: a target installing \`$gone\`, absent from the catalogue, must FAIL (1), got $status"
+    ok
+    grep -q "$gone" <<<"$err" || fail "pm#655: the failure must NAME the module \`$gone\`, got: $err"
+    ok
+    [ -z "$out" ] || fail "pm#655: a failed run must print no targets for cargo, got: $out"
+    ok
+done
+grep -q "loop_e2e" <<<"$err" || fail "pm#655: the failure must NAME the target that installs it, got: $err"
+ok
+grep -q "tests/fixtures" <<<"$err" \
+    || fail "pm#655: the failure must say how to fix it (a fixture under crates/runtime/tests/fixtures), got: $err"
+ok
+
+# The negatives: neither a table-name loop nor a comment is an install.
+make_catalogue "$catalogue" taxes sales inventory verifactu
+run_guard_catalogue "$tree" "$manifest" "$catalogue"
+for ghost in sales_sale fiscal ghost_in_a_comment; do
+    grep -q "$ghost" <<<"$err" && fail "pm#655: \`$ghost\` is not an installed module, got: $err"
+done
+ok
+
+# A catalogue directory that does not exist is the ENVIRONMENT, not a verdict (exit 2).
+run_guard_catalogue "$tree" "$manifest" "$tmp_dir/no-such-catalogue"
+[ "$status" -eq 2 ] || fail "pm#655: a missing catalogue dir must exit 2, got $status"
+ok
+
 # ── 9 · The guard actually RUNS on the pull requests that can break it ───────────────────
 # A guard nobody executes is a comment. Three properties, asserted one after another so the
 # failure names the one that broke:

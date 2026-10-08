@@ -14,6 +14,13 @@
 # Regression test for ERPlora/hub#1359 (the red it fixed: hub#1354); cases in
 # `scripts/tests/kernel-e2e-targets.test.sh`.
 #
+# `--catalogue <dir>` (pm#655) adds a second check: every module a resolved target installs from
+# `modules_root()` has to be IN that catalogue. pm#655 moved the catalogue to the org's public,
+# non-archived module repos and `invoice_series` (archived, private) fell out of it while six
+# kernel e2e still installed it — `cargo test` only said so twenty minutes later, as
+# `Io(NotFound)`. A retired module the kernel still has to be tested against becomes a fixture
+# under `crates/runtime/tests/fixtures/`, never a dependency on the catalogue.
+#
 # WHY A LIST AND NOT A NUMBER. The set is derived from the tree (a `require_modules_workspace()`
 # call), which is right: a new e2e joins on its own and no hand-written list rots in silence. But
 # a derived set can also SHRINK in silence, so hub#1229 bolted a floor on it — `[ "$count" -ge 30 ]`.
@@ -35,6 +42,7 @@ repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 
 tests_dir="$repo_root/crates/runtime/tests"
 manifest="$script_dir/kernel-e2e-targets.txt"
+catalogue=""
 # The guard that puts a target in the set. Kept in one place so the workflow, the manifest header
 # and this resolver cannot drift apart on it.
 marker="require_modules_workspace"
@@ -43,12 +51,13 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --tests-dir) tests_dir="$2"; shift 2 ;;
         --manifest) manifest="$2"; shift 2 ;;
+        --catalogue) catalogue="$2"; shift 2 ;;
         -h | --help)
-            printf 'usage: %s [--tests-dir <dir>] [--manifest <file>]\n' "$0"
+            printf 'usage: %s [--tests-dir <dir>] [--manifest <file>] [--catalogue <dir>]\n' "$0"
             exit 0
             ;;
         *)
-            printf 'usage: %s [--tests-dir <dir>] [--manifest <file>]\n' "$0" >&2
+            printf 'usage: %s [--tests-dir <dir>] [--manifest <file>] [--catalogue <dir>]\n' "$0" >&2
             exit 2
             ;;
     esac
@@ -60,6 +69,10 @@ if [ ! -d "$tests_dir" ]; then
 fi
 if [ ! -f "$manifest" ]; then
     printf 'kernel-e2e-targets: no such manifest: %s\n' "$manifest" >&2
+    exit 2
+fi
+if [ -n "$catalogue" ] && [ ! -d "$catalogue" ]; then
+    printf 'kernel-e2e-targets: no such catalogue directory: %s\n' "$catalogue" >&2
     exit 2
 fi
 
@@ -116,6 +129,60 @@ if [ -n "$undeclared" ]; then
     failures="$failures
   - IN THE TREE but not declared — an e2e whose coverage nobody signed off:
 $(printf '%s\n' "$undeclared" | sed 's/^/      /')"
+fi
+
+# ── What the CATALOGUE has (only with --catalogue) ──────────────────────────────────────
+# The module ids a target installs, read from its source in the three shapes the tree uses: a
+# literal `modules_root().join("x")`, a one-line helper that wraps it (`fn mdir(n: &str) ->
+# PathBuf { …modules_root().join(n) }` called as `mdir("x")`), and a `for m in [..]` whose body
+# joins `m`. Line comments are dropped first, and a `for` over table names that never reaches
+# `modules_root()` names nothing. Targets that walk the WHOLE catalogue name no id and pass.
+if [ -n "$catalogue" ] && [ -z "$failures" ] && [ -n "$actual" ]; then
+    installs=$(printf '%s\n' "$actual" | python3 -c '
+import re, sys
+tests_dir = sys.argv[1]
+ID = r"[a-z][a-z0-9_]*"
+for name in sys.stdin.read().split():
+    src = re.sub(r"//[^\n]*", "", open(f"{tests_dir}/{name}.rs", encoding="utf-8").read())
+    ids = set(re.findall(r"modules_root\(\)\.join\(\"(" + ID + r")\"\)", src))
+    helpers = [h for h, _ in re.findall(
+        r"fn (\w+)\(\s*(\w+)\s*:\s*&str\s*\)\s*->\s*PathBuf\s*\{\s*[\w:]*modules_root\(\)\.join\(\2\)\s*\}",
+        src)]
+    for helper in helpers:
+        ids |= set(re.findall(r"\b" + helper + r"\(\s*\"(" + ID + r")\"", src))
+    for loop in re.finditer(r"for (\w+) in &?\[([^\]]*)\]\s*\{", src):
+        var, depth, i = loop.group(1), 1, loop.end()
+        while i < len(src) and depth:
+            depth += {"{": 1, "}": -1}.get(src[i], 0)
+            i += 1
+        body = src[loop.end():i]
+        joins = re.search(r"modules_root\(\)\.join\(&?" + var + r"\)", body) or any(
+            re.search(r"\b" + h + r"\(\s*&?" + var + r"\s*\)", body) for h in helpers)
+        if joins:
+            ids |= set(re.findall(r"\"(" + ID + r")\"", loop.group(2)))
+    for module in sorted(ids):
+        print(name, module)
+' "$tests_dir") || {
+        printf 'kernel-e2e-targets: could not read the modules the targets install (python3 failed above)\n' >&2
+        exit 2
+    }
+    absent=$(printf '%s\n' "$installs" | while read -r target module; do
+        [ -n "$module" ] || continue
+        [ -f "$catalogue/$module/module.json" ] || printf '      %s installs `%s`\n' "$target" "$module"
+    done)
+    if [ -n "$absent" ]; then
+        {
+            printf 'kernel-e2e-targets: kernel e2e install modules that the catalogue %s does not have:\n' "$catalogue"
+            printf '%s\n\n' "$absent"
+            printf 'The catalogue is the PUBLISHED one: the org'"'"'s public, non-archived module repos.\n'
+            printf 'A module missing from it was retired, archived or made private, and `cargo test`\n'
+            printf 'would only say `Io(NotFound)` after building everything. If the kernel still has to\n'
+            printf 'be tested against it (hubs that keep it installed), freeze what the test needs as\n'
+            printf 'a fixture under crates/runtime/tests/fixtures/<id>/ and install it from there, as\n'
+            printf 'export_test/import_test do with invoice_series (pm#655).\n'
+        } >&2
+        exit 1
+    fi
 fi
 
 if [ -n "$failures" ]; then

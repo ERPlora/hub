@@ -253,6 +253,19 @@ if len(tests_step) == 1:
         "inlining the resolution again is how the local gate and this job drifted apart"
         " over the module catalogue (hub#1153)",
     )
+    # pm#655: the catalogue source moved to the org's public, non-archived repos and dropped
+    # `invoice_series`, which six kernel e2e still installed — `cargo test` said so twenty minutes
+    # in, as `Io(NotFound)`, and none of these cases saw it coming. The resolver can check every
+    # installed module against the catalogue BEFORE cargo, but only if the step hands it over.
+    resolver_call = re.search(re.escape(RESOLVER) + r"[^\n]*", tests_code)
+    check(
+        "the tests step hands the catalogue to the resolver (`--catalogue \"$ERPLORA_MODULES_DIR\"`)",
+        bool(resolver_call)
+        and re.search(r"--catalogue\s+\"?\$\{?ERPLORA_MODULES_DIR\}?\"?", resolver_call.group(0)) is not None,
+        f"the call is {resolver_call.group(0) if resolver_call else None!r} — without it a kernel e2e"
+        " that installs a module the published catalogue no longer has is only caught by"
+        " `cargo test` failing on `Io(NotFound)` (pm#655, invoice_series)",
+    )
     # `-ge <n>` / `-lt <n>` over the target count in any form: the exact shape that broke, and
     # any near-miss rewrite of it.
     numeric_floor = re.search(r"\$\{?count\}?\"?\s*-(?:ge|gt|lt|le|eq|ne)\s*\"?\d+", tests_code)
