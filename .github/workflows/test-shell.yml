@@ -116,6 +116,13 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
+      # Windows runners check out with `core.autocrlf=true`. Several tests read this repo's own
+      # sources (`include_str!("lib.rs")`, the workflows, the Gradle files) and split them on "\n",
+      # so they would test CRLF bytes that Linux, macOS and the repository never hold (hub#2705).
+      - name: Check out with LF on Windows
+        if: matrix.label == 'windows'
+        run: git config --global core.autocrlf false
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -181,8 +188,10 @@ jobs:
           cache-bin: false
           save-if: ${{ runner.environment != 'self-hosted' }}
 
+      # `--no-fail-fast`: every test binary reports, not only the first red one — on a matrix of
+      # three systems, one red per round trip is how a Windows-only failure takes an afternoon.
       - name: cargo test -p erplora-tauri
-        run: cargo test -p erplora-tauri -p tauri-plugin-erplora-android
+        run: cargo test --no-fail-fast -p erplora-tauri -p tauri-plugin-erplora-android
 
       # ── Kotlin tests of the Android plugin (hub#933) — Linux only ─────────────────────────
       #

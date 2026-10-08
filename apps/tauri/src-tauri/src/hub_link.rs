@@ -471,7 +471,7 @@ mod tests {
     // ── Through the IPC: what a page actually gets back ────────────────────────────────────────
     //
     // A real `on_message` round trip on the mock runtime, with the gate in front of a dispatcher
-    // that answers "ran" to any command. The request travels as the bundled page (`tauri://`): the
+    // that answers "ran" to any command. The request travels as the bundled page (`bundled_page`): the
     // mock context carries no ACL manifest, so Tauri's own pattern check stays out of the way and
     // what is measured is the gate alone — which reads the page the WINDOW shows (the request's
     // origin, the one Tauri's ACL checks, is not handed to a command handler).
@@ -509,13 +509,21 @@ mod tests {
                 cmd: command.into(),
                 callback: tauri::ipc::CallbackFn(0),
                 error: tauri::ipc::CallbackFn(1),
-                url: url("tauri://localhost"),
+                url: bundled_page(),
                 body: tauri::ipc::InvokeBody::default(),
                 headers: Default::default(),
                 invoke_key: INVOKE_KEY.to_string(),
             },
         )
         .map(|body| body.deserialize::<serde_json::Value>().expect("json answer"))
+    }
+
+    /// The origin a request from the app's own bundled page carries: `tauri://localhost` on macOS
+    /// and Linux, `http://tauri.localhost` on Windows and Android (hub#2705). A hard-coded
+    /// `tauri://` reads as a REMOTE page on Windows, and Tauri's ACL refuses it before the gate
+    /// under test is ever asked.
+    fn bundled_page() -> Url {
+        crate::connectivity::bundled_page_url().expect("the bundled page's URL")
     }
 
     fn refused() -> Result<serde_json::Value, serde_json::Value> {
@@ -626,7 +634,7 @@ mod tests {
                 cmd: format!("plugin:erplora-android|{command}"),
                 callback: tauri::ipc::CallbackFn(0),
                 error: tauri::ipc::CallbackFn(1),
-                url: url("tauri://localhost"),
+                url: bundled_page(),
                 body: tauri::ipc::InvokeBody::Json(body),
                 headers: Default::default(),
                 invoke_key: INVOKE_KEY.to_string(),
@@ -744,7 +752,7 @@ mod tests {
                 cmd: format!("plugin:notification|{command}"),
                 callback: tauri::ipc::CallbackFn(0),
                 error: tauri::ipc::CallbackFn(1),
-                url: url("tauri://localhost"),
+                url: bundled_page(),
                 body: tauri::ipc::InvokeBody::Json(body),
                 headers: Default::default(),
                 invoke_key: INVOKE_KEY.to_string(),

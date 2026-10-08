@@ -153,7 +153,7 @@ def run_of(step):
     return str(step.get("run", ""))
 
 
-cargo_steps = [s for s in steps if "cargo test -p erplora-tauri" in run_of(s)]
+cargo_steps = [s for s in steps if "cargo test" in run_of(s) and "-p erplora-tauri" in run_of(s)]
 check("a step runs `cargo test -p erplora-tauri`", len(cargo_steps) == 1, f"found {len(cargo_steps)}")
 for s in cargo_steps:
     check(
@@ -184,6 +184,32 @@ for name in (
             str(step.get("if", "")).strip() == LINUX_ONLY,
             f"if is {step.get('if')!r} — webkit2gtk, the Kotlin tests and the OS-independent bash rules are Linux-only work",
         )
+
+# Windows checks out with `core.autocrlf=true`: the tests that read this repo's own sources
+# (`include_str!("lib.rs")`, workflows, gradle files) would see CRLF where Linux and macOS see the
+# committed LF, and split on "\n" would find nothing. LF is pinned BEFORE the checkout (hub#2705).
+names = [str(s.get("name", "")) for s in steps if isinstance(s, dict)]
+checkout_at = next((i for i, s in enumerate(steps) if "actions/checkout" in str(s.get("uses", ""))), None)
+lf_at = next((i for i, s in enumerate(steps) if "core.autocrlf false" in run_of(s)), None)
+check(
+    "Windows checks out with LF (`git config --global core.autocrlf false` before the checkout)",
+    lf_at is not None and checkout_at is not None and lf_at < checkout_at,
+    f"steps are {names}",
+)
+if lf_at is not None:
+    check(
+        "the LF step runs on Windows only",
+        str(steps[lf_at].get("if", "")).strip() == "matrix.label == 'windows'",
+        f"if is {steps[lf_at].get('if')!r}",
+    )
+
+# All the test binaries report, not just the first red one: on a matrix, one round trip per red.
+for s in cargo_steps:
+    check(
+        "the cargo test step runs with `--no-fail-fast`",
+        "--no-fail-fast" in run_of(s),
+        run_of(s),
+    )
 
 # Windows runs `run:` under PowerShell by default: a bash body that is not Linux-only must say so.
 for s in steps:
