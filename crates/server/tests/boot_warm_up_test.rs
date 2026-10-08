@@ -40,5 +40,8 @@ async fn a_hub_without_handlers_still_announces_the_end_of_its_warm_up() {
         line.starts_with(WARM_UP_DONE),
         "the boot prints the line the batteries wait for: {line}"
     );
-    assert!(line.contains("0/0"), "nothing to compile, and it says so: {line}");
+    assert!(
+        line.contains("0/0"),
+        "nothing to compile, and it says so: {line}"
+    );
 }

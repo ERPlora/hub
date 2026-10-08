@@ -343,12 +343,22 @@ fn the_warm_up_announces_its_end_with_a_fixed_line() {
     let cache = WasmCache::default();
     let line = warm_up_report(
         &cache,
-        &[modulo("sales", "2.14.1", true), modulo("invoice", "1.2.0", true)],
+        &[
+            modulo("sales", "2.14.1", true),
+            modulo("invoice", "1.2.0", true),
+        ],
         WasmLimits::default(),
     );
-    assert!(line.starts_with(WARM_UP_DONE), "the line starts with the marker: {line}");
+    assert!(
+        line.starts_with(WARM_UP_DONE),
+        "the line starts with the marker: {line}"
+    );
     assert!(line.contains("2/2"), "and says how many compiled: {line}");
-    assert_eq!(cache.len(), 2, "the report IS the warm-up, not a description of it");
+    assert_eq!(
+        cache.len(),
+        2,
+        "the report IS the warm-up, not a description of it"
+    );
 }
 
 #[test]
@@ -356,7 +366,10 @@ fn the_warm_up_announces_its_end_even_with_nothing_to_compile() {
     use erplora_runtime::wasm_cache::{warm_up_report, WARM_UP_DONE};
 
     let line = warm_up_report(&WasmCache::default(), &[], WasmLimits::default());
-    assert!(line.starts_with(WARM_UP_DONE), "a hub without handlers is warm too: {line}");
+    assert!(
+        line.starts_with(WARM_UP_DONE),
+        "a hub without handlers is warm too: {line}"
+    );
     assert!(line.contains("0/0"), "{line}");
 }
 
@@ -367,11 +380,18 @@ fn a_broken_handler_still_ends_the_warm_up() {
     let line = warm_up_report(
         &WasmCache::default(),
         &[
-            ("broken".to_string(), "1.0.0".to_string(), Some(vec![0u8, 1, 2, 3])),
+            (
+                "broken".to_string(),
+                "1.0.0".to_string(),
+                Some(vec![0u8, 1, 2, 3]),
+            ),
             modulo("sales", "2.14.1", true),
         ],
         WasmLimits::default(),
     );
     assert!(line.starts_with(WARM_UP_DONE), "{line}");
-    assert!(line.contains("1/2"), "only the one that compiled counts: {line}");
+    assert!(
+        line.contains("1/2"),
+        "only the one that compiled counts: {line}"
+    );
 }
