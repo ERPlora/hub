@@ -168,6 +168,39 @@ async fn hub2500_taking_the_email_away_from_an_invited_administrator_is_refused(
     assert_eq!(row(&rt, &ana).await.email, "ana@example.com");
 }
 
+/// The other half of the rule: an administrator who already signs in with their erplora.com account
+/// (`cloud_user_id` linked) keeps administering through that account, so taking the access email
+/// off their record is not «a PIN administering the hub» and goes through (hub#2500).
+#[tokio::test]
+async fn hub2500_taking_the_email_off_an_administrator_who_signs_in_with_their_account_is_allowed() {
+    let rt = runtime("hub-2500-c2").await;
+    let _owner = rt
+        .get_or_link_cloud_user("cloud-owner", "Ioan", "admin", None, None)
+        .await
+        .unwrap();
+    let ana = rt
+        .get_or_link_cloud_user("cloud-ana", "Ana", "admin", Some("ana@example.com"), None)
+        .await
+        .unwrap();
+    assert_eq!(row(&rt, &ana.id).await.email, "ana@example.com");
+
+    let updated = rt
+        .update_hub_user(
+            &ana.id,
+            &UpdateHubUser {
+                email: Some(String::new()),
+                ..UpdateHubUser::default()
+            },
+            0,
+        )
+        .await
+        .expect("her linked account is what administers, not a PIN");
+    assert_eq!(updated.role, "admin");
+    let after = row(&rt, &ana.id).await;
+    assert_eq!(after.email, "");
+    assert!(after.has_account, "the linked account still counts as one");
+}
+
 #[tokio::test]
 async fn hub2500_a_pin_only_person_keeps_being_editable_in_everything_else() {
     let rt = runtime("hub-2500-d").await;
@@ -238,6 +271,22 @@ async fn hub2500_the_members_door_finds_the_person_whatever_the_capitals() {
         rt.deactivate_login_user("ANA.LOPEZ@EXAMPLE.COM").await.unwrap(),
         "the baja by address reaches her"
     );
+    assert!(!row(&rt, &ana).await.is_active);
+}
+
+#[tokio::test]
+async fn hub2500_the_door_closed_from_erplora_com_finds_the_invited_person_whatever_the_capitals() {
+    let rt = runtime("hub-2500-f2").await;
+    let ana = account_person(&rt, "Ana López", "Ana.Lopez@Example.com", "manager").await;
+
+    // Rule D (HUB-F144): somebody who is no longer a member tries to sign in, and the address the
+    // credential carries differs from the invited one only in its capitals.
+    let closed = rt
+        .revoke_cloud_access("cloud-ana", Some("ana.lopez@example.com"))
+        .await
+        .unwrap();
+
+    assert!(closed.contains(&ana), "the invited record is the one closed");
     assert!(!row(&rt, &ana).await.is_active);
 }
 
