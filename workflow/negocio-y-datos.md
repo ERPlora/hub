@@ -184,7 +184,7 @@ Pasos:
 2. Marca personas, ajustes, datos fiscales, archivos y, por app, si entra la app y sus datos (y qué tablas).
 3. Pulsa exportar; el navegador descarga `<nombre>_<idioma>.blueprint.zip`.
 Entra: nombre, idioma y selección, con sesión de administrador.
-Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Se dejan fuera, a propósito, las filas borradas y las que la app siembra al instalarse (salvo las tablas cuya semilla es dato del negocio, como `taxes_rule`). Una plantilla no lleva personas, permisos ni automatizaciones, ni las tablas y la sección fiscales (`verifactu_config`, certificado en el motor) ni la numeración; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
+Sale: un zip con `manifest.json` (versión de formato 1, finalidad, módulos con versión, secciones, roles activos, permisos de módulos, automatizaciones, sha256 de cada fichero y el sello del hub: una firma del manifiesto con su llave secreta, que es lo que al importar demuestra la copia propia, HUB-F236) y `data/*.sql`. Solo filas del hub, ordenadas para que un padre vaya antes que su hijo. Una copia lleva personas (con perfil, preferencias, PIN y el vínculo con la cuenta del SaaS a vacío), todos los ajustes, permisos concedidos, automatizaciones con sus permisos y el certificado propio. Se dejan fuera, a propósito, las filas borradas y las que la app siembra al instalarse (salvo las tablas cuya semilla es dato del negocio, como `taxes_rule`). Una plantilla no lleva personas, permisos ni automatizaciones, ni las tablas y la sección fiscales (`verifactu_config`, certificado en el motor) ni la numeración; de los ajustes solo `country_code`, `region_code`, `currency`, `currency_decimals`, `language` y `theme_palette` (la zona horaria no viaja); y deja fuera la numeración de facturas. Las casillas acotan, nunca amplían. Una demo y el hub de desarrollo exportan siempre plantilla. No salen nunca los secretos de automatizaciones, el historial ni las tablas `_hub_*`. Los importes y cantidades salen tal como se guardan (unidades mínimas y cantidades a escala 10⁶).
 Si falla: nombre inválido (letras, números, `-`, `_` y `.`), 422; sin sesión de administrador, 401. Una parte que no se puede leer falta del zip sin aviso.
 Implicados: HUB_SHELL-F173, HUB_SHELL-F174, REC_ALTA-F23, SAAS_PUBLIC-F40
 QA: ninguno
@@ -197,7 +197,7 @@ Pasos:
 1. El administrador marca datos fiscales y/o archivos.
 2. El hub añade el certificado y recorre la carpeta de archivos.
 Entra: la selección del export.
-Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero del almacenamiento bajo `media/`, incluidas las carpetas de las apps, menos las de primer nivel que empiezan por `_` (registros y sistema). No se filtra por finalidad. El sha256 de cada uno entra en el manifiesto.
+Sale: con datos fiscales, `data/fiscal/certificate.p12` solo si el negocio tiene certificado propio (nunca el delegado de ERPlora) y sin su contraseña. Con archivos, cada fichero del almacenamiento bajo `media/`, incluidas las carpetas de las apps, menos las de primer nivel que empiezan por `_` (registros y sistema). No se filtra por finalidad. El sha256 de cada uno entra en el manifiesto, y el manifiesto se vuelve a sellar después (HUB-F236), así que la copia descargada con su certificado y sus archivos sigue siendo la copia propia.
 Si falla: un fichero que no se descarga, o pasa de 25 MiB, falta del zip y solo queda en el log.
 Implicados: HUB_SHELL-F173, REC_ALTA-F23, SAAS_PUBLIC-F41
 QA: ninguno
@@ -259,17 +259,18 @@ Pendiente de enlazar: blueprints — catálogo de arranque que sustituye la sema
 QA: BD-01, qa-hub §4
 
 ### HUB-F236 Qué deja entrar el hub según de quién es el fichero
-Estado: parcial — «es mi propia copia» se decide solo con el `hub_id` que el propio fichero declara, y ese identificador lo ve cualquiera sin sesión en `GET /api/hub/context` (erplora.com lo lee así para comprobar los dominios propios): un zip fabricado con él pasa por copia propia y trae personas con `pin_hash`, ajustes sin validar, permisos de módulo y automatizaciones encendidas con sus permisos. Hace falta que un administrador del propio hub suba el fichero; no es una puerta anónima
+Estado: parcial — en la copia propia demostrada los ajustes se escriben sin pasar por la validación ni las congelaciones de HUB-F221 y HUB-F223 (solo las claves sin fila), y una copia hecha antes del sello ya no devuelve personas, permisos ni automatizaciones: se carga como un fichero ajeno
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. El hub compara el origen del manifiesto con su propio identificador; un origen vacío nunca coincide.
-2. Aplica a cada sección la regla de abajo.
+2. Si coincide, exige además el sello del hub: una firma del manifiesto con la llave secreta de ese hub (`HUB_SECRETS_KEY`, la que nunca sale del servidor) que pone el propio export. Solo origen igual **y** sello válido es la copia propia; el identificador solo lo ve cualquiera en `GET /api/hub/context`, el sello no.
+3. Aplica a cada sección la regla de abajo.
 Entra: el manifiesto y la selección.
-Sale: nunca entran los datos de sistema (`_*`). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla. El sha256 se comprueba contra el propio manifiesto (prueba que el zip no se corrompió, no de dónde viene), se exige sesión de administrador y el servidor no pide otra confirmación. En la copia propia los ajustes se escriben sin pasar por la validación ni las congelaciones de HUB-F221 y HUB-F223 (solo las claves sin fila).
+Sale: nunca entran los datos de sistema (`_*`). Un fichero que nombra este hub sin su sello válido (hecho antes del sello, editado después o fabricado con el identificador público) se trata como ajeno, y el informe lo dice con `origin_unproven: true` (HUB_SHELL-F178). Una plantilla descarta personas y datos fiscales aunque estén marcados. En un fichero que no es la copia propia se descartan: las personas, de los ajustes todo lo que no sea configuración (queda `PartiallyApplied` con `settings_not_portable` y el número de filas), la numeración de facturas y su libro (`numbering_not_portable`), los datos de apps ligados a la instalación como la cadena fiscal (`installation_bound_data`), y los permisos de módulo y de automatizaciones. Una fila de una tabla que la app instalada ya no tiene se salta (`table_gone_in_installed_version`) sin perder el resto. Se aplica la regla por el manifiesto, no por la casilla. El sha256 se comprueba contra el propio manifiesto (prueba que el zip no se corrompió; de dónde viene lo prueba el sello, que cubre el manifiesto y con él los sha256 de cada fichero), se exige sesión de administrador y el servidor no pide otra confirmación. En la copia propia los ajustes se escriben sin pasar por la validación ni las congelaciones de HUB-F221 y HUB-F223 (solo las claves sin fila).
 En este mismo documento se apoya en: HUB-F300 (Resolver el perfil fiscal del hub al arrancar), HUB-F314 (Bloquear la cadena fiscal sin módulo que cumpla o con una instalación ajena).
 Si falla: la sección descartada sale `Ignored` con su código y el número de filas.
-Implicados: HUB_SHELL-F177, SAAS_PUBLIC-F41
+Implicados: HUB_SHELL-F177, HUB_SHELL-F178, SAAS_PUBLIC-F41
 QA: BD-01
 
 ### HUB-F237 Permisos, roles y automatizaciones que trae el fichero
@@ -418,9 +419,10 @@ De esta área (las tablas de la segunda mitad, en
 - El NIF se congela con el primer registro fiscal y el país al activar el perfil fiscal (HUB-F223).
 - Objetivo, hoy sin cumplir del todo (HUB-F231): una plantilla no lleva personas, datos fiscales,
   permisos ni automatizaciones. Hoy el servidor mete el certificado propio si «datos fiscales» está
-  marcado y «archivos» copia las carpetas de las apps (los XML de Verifactu). Las identidades solo
-  deben entrar en la copia propia, que hoy se decide por el `hub_id` que declara el propio fichero
-  (HUB-F236, dudas).
+  marcado y «archivos» copia las carpetas de las apps (los XML de Verifactu).
+- Las identidades, los permisos y las automatizaciones solo entran en la copia propia, y la copia
+  propia se demuestra con el sello del hub (firma con su llave secreta), nunca con el `hub_id` que
+  declara el fichero (HUB-F236).
 - Las secciones de datos del import solo hacen `INSERT` de literales en las tablas de su sección y
   nunca tocan tablas `_*`. Excepciones: retira (borrado lógico) el contenido previo de las tablas de
   objeto único, y sube los archivos del zip a la carpeta que nombren, sin la política de carpetas.
@@ -435,8 +437,6 @@ De esta área (las tablas de la segunda mitad, en
 
 ## Dudas abiertas
 
-- Cómo decidir que un fichero es la copia propia sin fiarse de su manifiesto (firma del hub o prueba
-  de posesión) (HUB-F236).
 - Si la región debe congelarse también tras salir a producción (HUB-F223).
 - Si el servidor debe pedir una confirmación para restablecer (hoy solo la pantalla) (HUB-F242).
 - Si el fichero de exportación debe llevar una marca de unidad de dinero (HUB-F230, HUB-F243).
