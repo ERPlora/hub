@@ -239,6 +239,17 @@
           {{ t('importPage.reportRecovered', { name: recoveredReport.name, when: recoveredLabel }) }}
         </span>
       </div>
+      <!-- hub#2497 — the file names this hub but carries no valid seal of it (older than the seal,
+           or edited afterwards): the engine loaded it as another business's file. Without this the
+           admin restoring an old backup only sees «Discarded» on the people and no reason why. -->
+      <div
+        v-if="report.origin_unproven"
+        class="recovered-banner origin-unproven-banner"
+        data-testid="import-report-origin-unproven"
+      >
+        <HubIcon name="shield-outline" />
+        <span>{{ t('importPage.reportOriginUnproven') }}</span>
+      </div>
       <h2 class="section-title">{{ t('importPage.reportTitle') }}</h2>
       <ion-card data-testid="import-report">
         <ion-card-content class="p-0">
@@ -1189,6 +1200,17 @@ ok-data-table {
   background: var(--ion-color-light, #f4f5f8);
   color: var(--ion-color-medium);
   font-size: 0.8125rem;
+}
+/* hub#2497 — unlike the recovered note, this one explains a discard the admin did not expect:
+   warning tone, and the icon stays on the first line of a text that wraps on a phone. */
+.origin-unproven-banner {
+  align-items: flex-start;
+  color: var(--ion-color-warning-shade, var(--ion-color-medium));
+  border-color: var(--ion-color-warning, rgba(0, 0, 0, 0.08));
+}
+.origin-unproven-banner ion-icon {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
 }
 
 @media (max-width: 36rem) {
