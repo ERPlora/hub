@@ -329,6 +329,33 @@ describe('the void slip of one dish the till voided (hub#2640)', () => {
     ]);
   });
 
+  it('a menu voided after its starter was served takes back only what was still being made', async () => {
+    // Kitchen strikes only the lines still on the line (KITCHEN-F29): the served starter stays.
+    const SERVED = {
+      ...VOIDED,
+      id: 'ki-7',
+      combo_ref: 'c-1',
+      combo_name: 'Menú del día',
+      product_name: 'Gazpacho',
+      status: 'served',
+    };
+    const MAIN_DISH = { ...SERVED, id: 'ki-8', product_name: 'Entrecot', status: 'voided' };
+    const print = printed();
+    await onKitchenItemVoided(
+      fakeClient([SERVED, MAIN_DISH], HEADER),
+      { order_id: 'k-1', order_item_id: 'ki-8' },
+      {
+        print,
+        t,
+      },
+    );
+
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].data?.items).toEqual([
+      { name: 'Entrecot', quantity: -2, notes: 'sin gluten', combo_ref: 'c-1', combo_name: 'Menú del día' },
+    ]);
+  });
+
   it('the same event delivered twice prints once', async () => {
     const print = printed();
     const { client, emit } = tillHearingAll(fakeClient([VOIDED, ALIVE], HEADER));
@@ -353,6 +380,9 @@ describe('the void slip of one dish the till voided (hub#2640)', () => {
   it('a line that is not voided (stale or wrong event) prints nothing', async () => {
     const print = printed();
     await onKitchenItemVoided(fakeClient([{ ...VOIDED, status: 'preparing' }], HEADER), EVENT, { print, t });
+    // A line from before kitchen kept the sales line (no `sales_order_item_id`) is its own dish.
+    const LEGACY = { ...VOIDED, sales_order_item_id: null, status: 'preparing' };
+    await onKitchenItemVoided(fakeClient([LEGACY], HEADER), EVENT, { print, t });
     expect(print).not.toHaveBeenCalled();
   });
 
