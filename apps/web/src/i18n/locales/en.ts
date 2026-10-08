@@ -886,6 +886,11 @@ export default {
     // cashier hunting for a jam that is not there.
     // hub#2239: no machine reason after the colon — it told the cashier nothing to act on.
     ticketFailed: 'The receipt did NOT print. Print it again from the receipt screen.',
+    // hub#2494: this till's own printer did not take the paper; the notice carries a Retry button.
+    ticketPrinterFailed:
+      'The receipt did NOT print: the printer is not answering. Check it is on and has paper, then tap Retry.',
+    // hub#2494: the button on a print notice that prints that same paper again.
+    retry: 'Retry',
     ticketWaitingForPrinter:
       'The receipt is waiting: no printer is set up yet. Set one up and it will print on its own.',
     // hub#1921: the receipt itself could not be prepared (the sales app did not compose it), so

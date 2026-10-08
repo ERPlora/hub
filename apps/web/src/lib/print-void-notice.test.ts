@@ -175,8 +175,9 @@ describe('the shell boots the void slip and paints its warnings through this not
   it('picks neither its own colour nor its own key, and never paints the reason', () => {
     const call = voidBoot(MAIN);
     expect(call).toContain('voidFailureNotice(f, i18n.global)');
-    expect(call).toContain('i18n.global.t(n.messageKey, n.params');
-    expect(call).toMatch(/, n\.color, n\.duration\)/);
+    // hub#2494: painted by presentPrintNotice (tone, time, sentence and Retry: its own test).
+    expect(call).toContain('presentPrintNotice(voidFailureNotice(f, i18n.global))');
+    expect(call).not.toContain('toast(');
     expect(call).not.toMatch(/'(danger|warning|primary|success|medium)'/);
     expect(call).not.toContain('.error');
   });

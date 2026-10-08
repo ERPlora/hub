@@ -208,14 +208,15 @@ describe('the shell paints the kitchen order warnings through this notice', () =
     expect(call).not.toContain("'print.comandaFailed'");
     // The tone and the time are the notice's: a literal colour here (or the default 2.6 s) would
     // paint the waiting docket red again while every test above stays green.
-    expect(call).toMatch(/, n\.color, n\.duration\)/);
+    // hub#2494: painted by presentPrintNotice (tone, time, sentence and Retry: its own test).
+    expect(call).toContain('presentPrintNotice(comandaFailureNotice(f, i18n.global))');
+    expect(call).not.toContain('toast(');
     expect(call).not.toMatch(/'(danger|warning|primary|success|medium)'/);
   });
 
   it('paints the sentence the notice picked, naming the table and the station', () => {
     const call = comandaFailureCallback(MAIN);
-    // Without the params the toast reads «{label} ({role})»; without t() it reads the raw key.
-    expect(call).toContain('i18n.global.t(n.messageKey, n.params');
+    // The sentence is translated WITH its params by presentPrintNotice (print-retry-notice.hub2494).
     // The notice is handed the catalogue: it names the station and a docket with no label of its
     // own in the app's language (hub#2257), never the code's word or a blank.
     expect(call).toContain('comandaFailureNotice(f, i18n.global)');

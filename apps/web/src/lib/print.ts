@@ -120,6 +120,13 @@ export interface PrintResult {
    * dejaría de leerse.
    */
   awaitingHost?: boolean;
+  /**
+   * This device HAS a printer for the role and it did not take the paper: switched off, out of
+   * paper, off the network (hub#2494). The installed app answers only once the bytes reach the
+   * printer, so this is a real «did not print», not a guess. It is not queued — the device that
+   * drains the role is this same one, with the same dead printer — so the caller offers Retry.
+   */
+  printerFailed?: boolean;
 }
 
 /**
@@ -410,15 +417,13 @@ export function createPrintService(
       await client.peripherals.print(printerId, documentType, paper, req.jobId);
       return { via: 'bridge', role, printerId };
     } catch (e) {
-      // La impresora existe pero falló (sin papel, apagada…). A la cola antes que al navegador: si
-      // un print host del rol está conectado al hub, lo saca tarde en vez de perderse. Una venta
-      // NUNCA se cae por un problema de impresión.
+      // This device's printer for the role did not take the paper (switched off, out of paper —
+      // hub#2494). NOT to the queue: whoever drains this role is this same device, so the job would
+      // fail again there, nobody would ask for it again, and it would come out much later as a
+      // surprise duplicate while the till heard nothing. The caller is told, and offers Retry
+      // (Square, Toast, Lightspeed). A sale NEVER fails because of the paper.
       const reason = e instanceof Error ? e.message : String(e);
-      const q = await toQueue();
-      // Si la cola no absorbió el trabajo (vía 'browser'/'none'), el motivo del bridge se conserva
-      // para que el caller sepa por qué no fue directo.
-      if (q.via !== 'queue') q.error = reason;
-      return q;
+      return { ...toBrowser(reason), printerFailed: true };
     }
   };
 }

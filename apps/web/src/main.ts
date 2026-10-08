@@ -46,7 +46,11 @@ import { invokeTauri, listenTauriEvent, listenTauriPlugin } from './lib/device';
 import { sendSystemNotice } from './lib/bridge-transport';
 import { claimNoticeTaps, createNoticeDoor, listenForNoticeTaps } from './lib/notice-tap';
 import { bootPrintOnSale } from './lib/print-on-sale';
-import { saleTicketFailureNotice, saleTicketWithoutFiscalNotice } from './lib/print-on-sale-notice';
+import {
+  presentPrintNotice,
+  saleTicketFailureNotice,
+  saleTicketWithoutFiscalNotice,
+} from './lib/print-on-sale-notice';
 import { saleTicketDocument, SALE_DOCUMENT_TAG } from './lib/sale-document';
 import { bootPrintHost } from './lib/print-host';
 import { bootPrintComanda } from './lib/print-comanda';
@@ -288,13 +292,12 @@ bootPrintOnSale(getClient(), {
   // tone) in lib/print-on-sale-notice (hub#2210): a receipt waiting for a printer is not a fault
   // (hub#1731), the lost and the never-composed ones are (hub#1921), the one out without its
   // VeriFactu QR is a warning (hub#1867) — and none of them names the sale by its internal id.
+  // A printer that did not answer stays up with «Retry» (hub#2494): presentPrintNotice paints it.
   onFailure: (f) => {
-    const n = saleTicketFailureNotice(f);
-    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
+    void presentPrintNotice(saleTicketFailureNotice(f));
   },
   onPrintedWithoutFiscal: () => {
-    const n = saleTicketWithoutFiscalNotice();
-    void toast(i18n.global.t(n.messageKey), n.color, n.duration);
+    void presentPrintNotice(saleTicketWithoutFiscalNotice());
   },
 });
 
@@ -360,8 +363,7 @@ bootPrintComanda(getClient(), {
   // Waiting for the station's printer is a warning, not an error (hub#2238): the tone is decided
   // in print-comanda-notice.ts, with its test.
   onFailure: (f) => {
-    const n = comandaFailureNotice(f, i18n.global);
-    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
+    void presentPrintNotice(comandaFailureNotice(f, i18n.global));
   },
   // A SYSTEM notice, not a toast: a toast is only seen by whoever is looking at THIS screen, and in
   // a kitchen the tablet is usually propped up, on another view or locked. It goes through the
@@ -392,8 +394,7 @@ bootPrintVoid(getClient(), {
   print: (req) => (erploraClient as unknown as { print: ReturnType<typeof createPrintService> }).print(req),
   t: (key, params) => (params ? i18n.global.t(key, params) : i18n.global.t(key)),
   onFailure: (f) => {
-    const n = voidFailureNotice(f, i18n.global);
-    void toast(i18n.global.t(n.messageKey, n.params ?? {}), n.color, n.duration);
+    void presentPrintNotice(voidFailureNotice(f, i18n.global));
   },
 });
 
