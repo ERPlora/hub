@@ -215,6 +215,13 @@ kitchen/tests/rush_after_fire.hub.test.py
 # pending-publication: kitchen#169 until 2026-11-06
 kitchen/tests/voided_or_merged_check.hub.test.py
 
+# kitchen × sales: a dish the till voids after sending it (`sales.order.void_line`) is struck on the
+# KDS with the till's reason, the round goes on with what is left (nothing alive → cancelled; only
+# ready dishes → ready) and the round of the table next door is untouched, against the real kernel
+# (kitchen#161, KITCHEN-F29). New coverage, not moved.
+# pending-publication: kitchen#175 until 2026-11-07
+kitchen/tests/line_voided.hub.test.py
+
 # customers: merge two duplicate customer records against the real kernel — the manifest with the
 # ANCHORED `expect_rows` guard installs, the dispatcher binds the 15 statements, the merge moves the
 # timeline, and a repeated id or an already-retired record is rejected with
