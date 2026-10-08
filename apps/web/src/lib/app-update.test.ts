@@ -295,15 +295,47 @@ describe('checkAppUpdate', () => {
     expect(update.state).toBe('attention');
   });
 
+  it('the linked hub still loading at boot reads its version once the app lets it (hub#2658)', async () => {
+    // The watch starts while the page loads; right after the SaaS sends the window to the hub the
+    // app answers `not_the_linked_hub` until the page has finished loading.
+    vi.useFakeTimers();
+    let asked = 0;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'plugin:app|version') throw new Error('Command plugin:app|version not allowed by ACL');
+      if (command === 'erplora_bridge_status') {
+        asked += 1;
+        if (asked < 3) throw 'not_the_linked_hub';
+        return { version: '1.2.3' };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke } } });
+    cloudSays(200, { version: '1.2.4' });
+
+    const checking = checkAppUpdate();
+    await vi.runAllTimersAsync();
+    const update = await checking;
+    vi.useRealTimers();
+
+    expect(asked).toBe(3);
+    expect(update.installed).toBe('1.2.3');
+    expect(update.state).toBe('attention');
+  });
+
   it('stays quiet on a page that is not the linked hub: neither answer comes (hub#2658)', async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === 'plugin:app|version') throw new Error('Command plugin:app|version not allowed by ACL');
-      throw new Error('not_the_linked_hub');
+      // What the installed app rejects with: the bare code, not an `Error`.
+      throw 'not_the_linked_hub';
     });
     vi.stubGlobal('window', { __TAURI__: { core: { invoke } } });
     cloudSays(200, { version: '9.9.9' });
+    vi.useFakeTimers();
 
-    const update = await checkAppUpdate();
+    const checking = checkAppUpdate();
+    await vi.runAllTimersAsync();
+    const update = await checking;
+    vi.useRealTimers();
 
     expect(update.installed).toBeNull();
     expect(update.state).toBe('unknown');

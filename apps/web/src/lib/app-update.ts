@@ -30,7 +30,7 @@
 import { computed, ref, type ComputedRef } from 'vue';
 
 import { config } from './config';
-import { getDeviceContext, invokeTauri, isTauri, type DeviceContext } from './device';
+import { getDeviceContext, invokeTauri, isTauri, whileTheHubLands, type DeviceContext } from './device';
 import { ADMINISTER_PERMISSION } from './management-link';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 import { hasPermission } from './session';
@@ -155,7 +155,11 @@ async function installedVersion(): Promise<string | null> {
     // An app built from hub#2658 on refuses it to every page: ask the gated command below.
   }
   try {
-    const status = await invokeTauri<{ version?: unknown }>(GATED_APP_VERSION_COMMAND, {});
+    // At boot, right after the SaaS sends the window here, the app keeps it closed until the page has
+    // finished loading.
+    const status = await whileTheHubLands(() =>
+      invokeTauri<{ version?: unknown }>(GATED_APP_VERSION_COMMAND, {}),
+    );
     const version = status?.version;
     return typeof version === 'string' && version.trim() ? version.trim() : null;
   } catch {
