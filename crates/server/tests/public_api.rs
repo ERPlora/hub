@@ -2,6 +2,8 @@
 //! (sin red): gestión de keys, superficie de datos con `Auth::ApiKey` (doble puerta `expose_api`),
 //! y el OpenAPI 3.1 dinámico per-hub. Usa `tower::ServiceExt::oneshot` como `tests/http.rs`.
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -45,6 +47,42 @@ async fn make_app() -> axum::Router {
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture()).await.unwrap();
     app(AppState::with_config(rt, dev_config()))
+}
+
+/// Unix second 59 of a minute (1_800_000_000 is a whole minute): the worst instant for a test
+/// that reads the wall clock, the one where the next call already lands in another window.
+const LAST_SECOND_OF_A_MINUTE: i64 = 1_800_000_059;
+
+/// Same app, but the API-key quota reads `now` instead of the wall clock (hub#2628): a test that
+/// expects two calls to share the minute owns the minute.
+async fn make_app_at(now: Arc<AtomicI64>) -> axum::Router {
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
+    rt.set_api_key_clock(Arc::new(move || now.load(Ordering::SeqCst)));
+    rt.ensure_system_tables().await.unwrap();
+    rt.install_from_dir(&fixture()).await.unwrap();
+    app(AppState::with_config(rt, dev_config()))
+}
+
+/// A `catalog` read+write key allowed `per_minute` calls; returns its secret.
+async fn create_key_with_quota(app: &axum::Router, per_minute: i64) -> String {
+    let resp = app
+        .clone()
+        .oneshot(admin_post(
+            "/api/keys",
+            json!({
+                "name": "Limited",
+                "scope": [{ "module": "catalog", "read": true, "write": true }],
+                "rate_limit_per_minute": per_minute
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    body_json(resp).await["data"]["secret"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {
@@ -420,7 +458,9 @@ async fn without_a_usable_key_every_operation_answers_the_same_401_hub2550() {
 /// map the private surface of the hub without ever meeting the limit.
 #[tokio::test]
 async fn an_unpublished_operation_asked_with_a_valid_key_spends_its_quota_hub2550() {
-    let app = make_app().await;
+    // The clock is pinned (hub#2628): on the wall clock the second call sometimes landed in the
+    // next minute, found a fresh quota and answered 200.
+    let app = make_app_at(Arc::new(AtomicI64::new(LAST_SECOND_OF_A_MINUTE))).await;
     // (unpublished operation, published one of the same kind, body of the published one)
     let cases = [
         (
@@ -435,23 +475,7 @@ async fn an_unpublished_operation_asked_with_a_valid_key_spends_its_quota_hub255
         ),
     ];
     for (unpublished, published, body) in cases {
-        let resp = app
-            .clone()
-            .oneshot(admin_post(
-                "/api/keys",
-                json!({
-                    "name": "One per minute",
-                    "scope": [{ "module": "catalog", "read": true, "write": true }],
-                    "rate_limit_per_minute": 1
-                }),
-            ))
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let secret = body_json(resp).await["data"]["secret"]
-            .as_str()
-            .unwrap()
-            .to_string();
+        let secret = create_key_with_quota(&app, 1).await;
 
         let resp = app
             .clone()
@@ -476,6 +500,55 @@ async fn an_unpublished_operation_asked_with_a_valid_key_spends_its_quota_hub255
             json!("rate_limited")
         );
     }
+}
+
+/// hub#2628: a key's quota window is the clock minute the runtime reads. Pinned at the last
+/// second of a minute, a one-a-minute key is refused the second call and told to come back in
+/// one second; one second later the minute has turned and the same call goes through — which is
+/// exactly what the hub#2550 test met on a slow runner when it read the wall clock.
+#[tokio::test]
+async fn a_key_quota_window_is_the_minute_of_the_runtime_clock_hub2628() {
+    let now = Arc::new(AtomicI64::new(LAST_SECOND_OF_A_MINUTE));
+    let app = make_app_at(Arc::clone(&now)).await;
+    let secret = create_key_with_quota(&app, 1).await;
+    let list = "/api/v1/catalog/q/items.list";
+
+    let resp = app
+        .clone()
+        .oneshot(api_post(list, &secret, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "the only call of the minute");
+
+    let resp = app
+        .clone()
+        .oneshot(api_post(list, &secret, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        resp.headers()
+            .get(axum::http::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok()),
+        Some("1"),
+        "at second 59 the window reopens in one second"
+    );
+    assert_eq!(
+        body_json(resp).await["error"]["code"],
+        json!("rate_limited")
+    );
+
+    now.fetch_add(1, Ordering::SeqCst);
+    let resp = app
+        .clone()
+        .oneshot(api_post(list, &secret, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the minute turned: the key has a new call"
+    );
 }
 
 /// GET con cabeceras de **sesión de usuario** (en `AuthMode::Dev` del fixture, la identidad la

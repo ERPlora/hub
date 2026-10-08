@@ -157,6 +157,9 @@ pub struct Runtime {
     /// somebody standing at the till right now, so it dies with the process on purpose — see
     /// [`elevation`] for why persisting it would be worse than losing it.
     elevation: elevation::Grants,
+    /// "Now" for the API-key quota window (hub#2628): the wall clock, except in a test that
+    /// pins it with [`Runtime::set_api_key_clock`].
+    api_key_clock: api_keys::QuotaClock,
 }
 
 // `impl Runtime` split by responsibility (hub#1403). Private modules: every

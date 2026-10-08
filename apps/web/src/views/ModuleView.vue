@@ -188,7 +188,8 @@ import NotFoundState from '../components/NotFoundState.vue';
 import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
-import { shellTabHeading } from '../lib/module-settings';
+import { settingsSavePermission, shellTabHeading } from '../lib/module-settings';
+import { hasPermission, isAdmin } from '../lib/session';
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient, listInstalledModules } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
@@ -248,6 +249,21 @@ const billing = ref<ModuleBilling | null>(null);
  * `settings` del módulo se pinta con el FORM GENÉRICO (ModuleSettingsForm) en vez del WC declarado.
  */
 const settings = ref<ModuleSettingsDef | null>(null);
+/** Permission of the module's save command (`settings.set`), or `null` if it declares none (hub#2588). */
+const settingsPermission = ref<string | null>(null);
+/**
+ * Does this session see the «Settings» tab? Only if it may SAVE them (hub#2588): the tabs of the
+ * module are already filtered by their permission (`/api/navigation`, hub#1052) and this synthetic
+ * one was not, so an employee filled a form the hub then refused. It reads the session, so a
+ * change of person re-evaluates it. A filter of the screen: the hub re-checks the command.
+ * An owner/admin passes by ROLE, as in the module's client (`lib/runtime.ts`): the permission list
+ * of their session only names the apps installed when it was opened.
+ */
+const settingsTabAllowed = computed(
+  () =>
+    !!settings.value &&
+    (!settingsPermission.value || isAdmin.value || hasPermission(settingsPermission.value)),
+);
 /**
  * Controles de chrome que la pestaña ACTIVA declara en su `navigation[].chrome` (ADR-0048, Nivel 1).
  *
@@ -292,7 +308,7 @@ const segmentTabs = computed<SegmentTab[]>(() => {
   // Pestaña de ajustes SINTÉTICA: la coloca el shell a partir del bloque `settings` (igual que los
   // widgets, que no viven en `navigation[]`). Su label/icono salen del propio bloque. Se omite si el
   // módulo ya declara una entrada `navigation` con id `settings` (compatibilidad durante la migración).
-  if (settings.value && !tabs.value.some((e) => e.nav.id === 'settings')) {
+  if (settingsTabAllowed.value && !tabs.value.some((e) => e.nav.id === 'settings')) {
     // La pestaña SIEMPRE se llama "Ajustes" con icono de engranaje (no el nombre del módulo): es la
     // pestaña de settings, no una pantalla más. `settings.title` se usa como cabecera DENTRO del form.
     list.push({ id: 'settings', label: t('moduleSettings.tab'), icon: 'settings-outline' });
@@ -378,6 +394,7 @@ async function mount(): Promise<void> {
     if (generation !== mountGeneration) return;
     billing.value = manifest?.billing ?? null;
     settings.value = manifest?.settings ?? null;
+    settingsPermission.value = settingsSavePermission(manifest);
 
     // Pestaña "Plan": panel del shell, no un WC del módulo → no se monta nada en el outlet.
     if (navId === PLAN_TAB_ID && billing.value) {
@@ -392,7 +409,9 @@ async function mount(): Promise<void> {
     // que los widgets). Sin `component` → ModuleSettingsForm pinta el form genérico (limpiar outlet).
     // Con `component` (escape-hatch) → montamos ESE WC del módulo, cargando su bundle vía cualquier
     // entry de su nav. Se maneja ANTES del lookup de `entry` porque no hay entrada de nav para settings.
-    if (navId === 'settings' && settings.value) {
+    // Without the save permission (hub#2588) it falls through to the lookup below and answers like
+    // any tab the menu took away by permission: «This page does not exist» (hub#2205).
+    if (navId === 'settings' && settingsTabAllowed.value && settings.value) {
       moduleName.value = shellTabHeading(tabs.value, manifest, moduleId);
       activeNavId.value = 'settings';
       if (settings.value.component) {
