@@ -35,7 +35,9 @@ Pasos:
    ni la mata).
 Entra: la pulsación.
 Sale: la aplicación en segundo plano.
-Si falla: una aplicación más antigua que la orden devuelve el botón a Tauri, que sale por sí misma.
+Si falla: una aplicación más antigua que la orden devuelve el botón a Tauri, que sale por sí misma. Una página
+que no es el negocio enlazado no puede mandar la aplicación al fondo: recibe `not_the_linked_hub`
+(HUB_APP-F10, ERPlora/hub#2642).
 Implicados: HUB_SHELL-F15
 QA: ninguno
 
