@@ -363,7 +363,7 @@ async fn the_sources_that_do_not_answer_over_http_keep_the_address_out_of_their_
         interactive: serde_json::Value::Null,
     };
     let error = transport
-        .send(&intent, Routing::CloudProxy)
+        .send(&intent, Routing::CloudProxy, "ev-1")
         .await
         .expect_err("nobody is listening on that address");
     let text = error.to_string();

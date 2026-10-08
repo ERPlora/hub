@@ -114,7 +114,7 @@ Pasos:
 2. Un rol que trae un módulo (camarero, cocina…) se enciende para poder asignarlo.
 3. Desde entonces aparece entre los roles al dar de alta o editar a una persona.
 Entra: la sesión (leer, cualquiera; encender o apagar, administrador); los roles y permisos que declaran los módulos activos.
-Sale: el rol encendido o apagado, con quién lo hizo (`hub_role_activation`). Los permisos de un rol son la suma de lo que le conceden los módulos activos con esa misma clave (un rol que «deriva» de responsable o empleado no hereda sus permisos); el administrador además administra el hub y toda sesión puede ver al personal. Un rol de un módulo no abre las puertas de administración del hub (miran el rol), pero si un manifiesto le concede `*`, ese comodín pasa todos los permisos, también los del núcleo (hoy ningún módulo publicado lo hace; el instalador no lo impide). Una plantilla del negocio también puede encender roles al importarse, por la misma puerta.
+Sale: el rol encendido o apagado, con quién lo hizo (`hub_role_activation`). Apagarlo solo impide asignarlo a nadie más: quien ya lo tiene lo conserva con los mismos permisos, y sus sesiones y sus canales de avisos en vivo siguen como estaban (HUB-F60, hub#2601). Los permisos de un rol son la suma de lo que le conceden los módulos activos con esa misma clave (un rol que «deriva» de responsable o empleado no hereda sus permisos); el administrador además administra el hub y toda sesión puede ver al personal. Un rol de un módulo no abre las puertas de administración del hub (miran el rol), pero si un manifiesto le concede `*`, ese comodín pasa todos los permisos, también los del núcleo (hoy ningún módulo publicado lo hace; el instalador no lo impide). Una plantilla del negocio también puede encender roles al importarse, por la misma puerta.
 En este mismo documento se apoya en: HUB-F19 (Instalar una aplicación del catálogo), HUB-F20 (Rechazar un paquete que rompe las reglas del hub).
 Si falla: los roles de fábrica no se apagan («immutable»); no se puede encender un rol que ningún módulo declara («unknown»); sin ser administrador, el aviso de permiso de la pestaña.
 Implicados: HUB_SHELL-F91, REC_ALTA-F15
@@ -205,7 +205,7 @@ Pantalla: ninguna
 Pasos:
 1. Un sistema externo (la gestoría, una tienda online) llama al hub con su llave.
 2. Pide una consulta o una orden de un módulo por su nombre.
-3. El hub comprueba, por este orden: que la llave existe y está activa (antes de mirar qué operación se pide, hub#2550), que no ha pasado su límite por minuto (el intento cuenta aunque luego la operación no exista o falte permiso), que el módulo publica esa operación para terceros y que la llave tiene el permiso.
+3. El hub comprueba, por este orden: que la llave existe y está activa (antes de mirar qué operación se pide, hub#2550), que no ha pasado su límite por minuto (el intento cuenta aunque luego la operación no exista o falte permiso; el minuto es el del reloj: al cambiar de minuto la cuenta vuelve a cero), que el módulo publica esa operación para terceros y que la llave tiene el permiso.
 4. Contesta igual que a la pantalla, y lo que escribe queda a nombre de la llave.
 Entra: la llave en `Authorization: Bearer erpl_live_…`; la operación (`/api/v1/<módulo>/q/<consulta>` o `/c/<orden>`).
 Sale: la respuesta del módulo; las escrituras con autor `apikey:<id>`; el último uso de la llave. La llave no ve al personal ni puede pedir aprobaciones, y no sirve en las puertas de la pantalla.

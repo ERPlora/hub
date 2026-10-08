@@ -1770,6 +1770,38 @@ pub async fn resolve_session(
     Ok(res.rows.first().map(row_to_user))
 }
 
+/// When the session behind `token` runs out, if it is a live session of this hub (hub#2600): the
+/// live channel it opens closes at that instant. Read through the same scoped `JOIN` as
+/// [`resolve_session`] — it answers for a bearer token, so the neighbour's token, an expired one or
+/// one of a person taken off the team has no end to give here (`None`).
+pub async fn session_expires_at(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    token: &str,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("token".into(), json!(token));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .query(
+            "SELECT s.expires_at \
+              FROM hub_session s JOIN hub_user u ON u.id = s.user_id AND u.hub_id = s.hub_id \
+              WHERE s.hub_id = :hub_id AND s.token = :token \
+                AND s.expires_at > :now AND u.is_active = 1",
+            &p,
+        )
+        .await?;
+    let Some(row) = res.rows.first() else {
+        return Ok(None);
+    };
+    let stored = row["expires_at"].as_str().unwrap_or_default();
+    let ends = chrono::DateTime::parse_from_rfc3339(stored).map_err(|e| {
+        crate::errors::RuntimeError::Other(format!("hub_session.expires_at is not a date: {e}"))
+    })?;
+    Ok(Some(ends.with_timezone(&chrono::Utc)))
+}
+
 /// [`resolve_session`], also saying **what the identity was proved with** when the session opened.
 ///
 /// The column has existed since hub#658 as a trace ("who opened THIS session, and with what?"), and

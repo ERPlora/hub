@@ -911,7 +911,9 @@ async fn deliver_host_notify(
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
     let premium = !registry.premium_whatsapp_modules.is_empty();
     let routing = host_notify::route_channel(intent.channel, premium);
-    let message_id = match transport.send(&intent, routing).await? {
+    // The outbox row's id is the delivery's key (hub#2648): one per message, the same on every
+    // attempt of it — the ladder's, the reclaimed lease's and a hand resend from «Eventos caídos».
+    let message_id = match transport.send(&intent, routing, event_id).await? {
         host_notify::SendOutcome::Sent { message_id } => message_id,
         // A spent quota is not a stumble (hub#971): no ladder, dead now — but retryable by hand,
         // because a quota, unlike a revoked release, comes back.
@@ -936,8 +938,9 @@ async fn deliver_host_notify(
     } else {
         ""
     };
-    // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark), y con
-    // ella la ÚNICA pareja que existe entre el id del proveedor y quién preguntó.
+    // A successful send → record the delivery, and with it the ONLY pairing there is between the
+    // provider's id and who asked. A separate write, so a failure here retries the send: it is
+    // the `event_id` key above that keeps that retry from reaching the customer twice.
     let (sql, p) = delivery_op_sent(
         hub_id,
         event_id,

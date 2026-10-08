@@ -217,7 +217,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F57 | Cerrar un aviso caído con motivo | hecho | [avisos.md](workflow/avisos.md) |
 | HUB-F58 | Reenviar solo lo que un permiso había rechazado, al concederlo | hecho | [avisos.md](workflow/avisos.md) |
 | HUB-F59 | Contar los avisos caídos para la campana | hecho | [avisos.md](workflow/avisos.md) |
-| HUB-F60 | Avisar a las pantallas en vivo | parcial | [avisos.md](workflow/avisos.md) |
+| HUB-F60 | Avisar a las pantallas en vivo | hecho | [avisos.md](workflow/avisos.md) |
 | HUB-F61 | Mandar el email o el WhatsApp que pide un módulo o una automatización | parcial | [avisos.md](workflow/avisos.md) |
 | HUB-F62 | Ejecutar las tareas programadas de los módulos | parcial | [avisos.md](workflow/avisos.md) |
 | HUB-F63 | Seguir la cadena de lo que provocó un aviso | parcial | [avisos.md](workflow/avisos.md) |

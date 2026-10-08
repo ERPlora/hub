@@ -37,8 +37,10 @@ Pasos:
 2. Inicia sesión o crea la cuenta. Registrarse no crea el negocio: hace falta un paso más en erplora.com, «¿Cómo se llama tu negocio?» o, desde «Abre tu hub» sin ninguno, «Crear hub gratuito» → «Crea tu hub» con su nombre.
 3. Con un solo negocio listo, entra solo; con varios, elige uno en «Abre tu hub» (cada tarjeta enseña
    su rol y, si aún se despliega, «Preparando tu hub… esta página se refresca sola»).
-4. El SaaS lleva la ventana al negocio con la marca `?shell=1`. La aplicación recuerda **el origen** de
-   esa dirección y abre el negocio a pantalla completa, sin barra de direcciones.
+4. El SaaS lleva la ventana al negocio con la marca `?shell=1` (`/shell/open/<id>/` responde con una
+   redirección). Como la ventana viene de la página de entrada del SaaS, la aplicación **enlaza** ese negocio
+   (desde ahora es el único que usa el hardware, HUB_APP-F10), recuerda **el origen** de esa dirección y abre
+   el negocio a pantalla completa, sin barra de direcciones.
 5. Cierra y vuelve a abrir: entra directa en el negocio, sin pasar por el SaaS.
 Entra: la cuenta del SaaS; la dirección del negocio. Solo se recuerda `<etiqueta>[.<etiqueta>…].erplora.com`
 (**incluye `www` y `pre`, que son el SaaS, y cualquier subdominio**; el apex `erplora.com` no) o el bucle local
@@ -46,7 +48,9 @@ Entra: la cuenta del SaaS; la dirección del negocio. Solo se recuerda `<etiquet
 Sale: el origen en el fichero `hub.url` de la carpeta de datos de la aplicación, y el identificador de
 instalación `device.id` la primera vez (HUB_APP-F06). Una sola escritura por cambio. No se guarda
 ninguna contraseña ni sesión aquí: la sesión vive en la ventana (almacenamiento del origen del hub).
-Si falla: un destino que no es de la plataforma (el marcador viene de un enlace ajeno) **no se
+Si falla: una página que se lleva a sí misma, o a otro negocio, con `?shell=1` sin venir del SaaS (la web
+pública, otro negocio) **no se enlaza ni se recuerda**: el negocio enlazado sigue siendo el que era
+(ERPlora/hub#2504). Un destino que no es de la plataforma (el marcador viene de un enlace ajeno) **no se
 recuerda** y no queda rastro (la aplicación no instala ningún destino para sus registros); un `hub.url` editado a mano o de una versión sin el
 filtro se revalida al leerlo y, si no vale, se arranca en el SaaS. Sin red, HUB_APP-F11. Un negocio con
 dominio propio no tiene hardware en la aplicación (ver «Qué puede hacer cada página»).
@@ -62,7 +66,8 @@ Pasos:
 2. El sistema pregunta qué abrir: si ERPlora está cerrada, **arranca directa en ese negocio** (gana al
    recordado y al de desarrollo, y no comprueba si el recordado sigue existiendo); si está abierta, la
    misma ventana salta a ese negocio. En ordenador nunca se abre una segunda ventana.
-3. El negocio queda recordado como en HUB_APP-F02.
+3. La aplicación **enlaza** el negocio del enlace antes de navegar (es ella quien recibe el enlace del
+   sistema, no la página), y queda recordado como en HUB_APP-F02.
 4. Si la aplicación no está instalada, no pasa nada en el sistema: la página que lanzó el enlace espera
    800 ms y lleva el navegador al negocio por https (o a la descarga si la aplicación es obligatoria).
 Entra: un enlace con exactamente una pieza tras `hub/`: una dirección `*.erplora.com` (incluidos `www` y `pre`;
@@ -71,8 +76,8 @@ Sale: la ventana en `https://<dirección>/?shell=1`; nada más. La dirección se
 el nombre: ni consulta ni fragmento ni parámetros se leen.
 Si falla: un enlace que no cuadra (otro dominio, el apex, con usuario, con puerto, con más trozos) no
 hace nada, en silencio y a propósito: el que decide qué mostrar es el navegador que lo lanzó. Un
-negocio inexistente sí se acepta (se valida la forma, no la existencia). **Cualquier página o correo puede mandar este enlace y cambiar el negocio recordado del mostrador sin
-preguntar** (`lib.rs:2086-2098`, `1118-1127`). Un enlace `erplora://notice` no es una navegación: es el
+negocio inexistente sí se acepta (se valida la forma, no la existencia). **Cualquier página o correo puede mandar este enlace y cambiar el negocio recordado —y enlazado, con el
+hardware— del mostrador sin preguntar** (`open_hub_from_link`, `boot_link`; ERPlora/hub#2644). Un enlace `erplora://notice` no es una navegación: es el
 clic en un aviso (HUB_APP-F25).
 Implicados: HUB_SHELL-F19, SAAS_DASHBOARD-F06
 QA: ninguno
@@ -88,7 +93,8 @@ Pasos:
    (`/shell/?choose=1`), que fuerza la lista aunque solo haya uno.
 4. Elige otro: se recuerda como en HUB_APP-F02.
 Entra: la confirmación de la persona.
-Sale: el fichero `hub.url` borrado y nada más (`forget_hub`, `lib.rs:765-780`; `requestChangeHub` no llama a
+Sale: el fichero `hub.url` borrado y el negocio desenlazado (ninguna página maneja el hardware hasta elegir
+otro), y nada más (`forget_hub`; `requestChangeHub` no llama a
 `logout()`, `change-hub.ts:44-55`, a diferencia del 410, `main.ts:458-462`). Siguen en el almacenamiento del origen del
 negocio anterior el token de sesión del hub (`session.ts:29,163`), el usuario con nombre y correo
 (`session.ts:24,135`) y los tokens de acceso y refresco de erplora.com (`cloud.ts:101-113`). **Se conserva `device.id`** (ancla de la sesión única por
@@ -106,8 +112,8 @@ Pantalla: Ventana de ERPlora
 Pasos:
 1. Al arrancar con un negocio recordado, la ventana ya está abierta en él; en segundo plano la
    aplicación le hace una petición `HEAD` (6 s de plazo).
-2. Si contesta 404 o 410 (el negocio se borró), la aplicación olvida `hub.url` y lleva la ventana al
-   SaaS. Cualquier otra respuesta —viva, sin sesión, caída— o ningún contacto: lo conserva.
+2. Si contesta 404 o 410 (el negocio se borró), la aplicación olvida `hub.url`, lo desenlaza y lleva la
+   ventana al SaaS. Cualquier otra respuesta —viva, sin sesión, caída— o ningún contacto: lo conserva.
 3. Además, si estando dentro el Cloud contesta 410 «negocio no encontrado», el hub pide olvidar
    (`forget_hub` sin lista forzada) y cierra la sesión; como `forget_hub` navega toda la ventana, la persona acaba
    en `/shell/` del SaaS, no en el acceso del hub.
@@ -143,20 +149,36 @@ Implicados: HUB-F137, HUB-F139
 QA: qa-hub-android Fase 0
 
 ### HUB_APP-F10 Cada página tiene su juego de permisos
-Estado: hecho
+Estado: parcial — las órdenes de los plugins de terceros `plugin:notification` (escuchar los toques de los avisos) y `plugin:app` (la versión) solo pasan la primera puerta: cualquier página del patrón las usa (ERPlora/hub#2658)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada vez que la ventana enseña una página, Tauri comprueba el origen contra los tres juegos de «Qué
-   puede hacer cada página».
+   puede hacer cada página» (primera puerta, por patrón).
 2. Una orden nativa desde un origen que no la tiene concedida se rechaza antes de ejecutarse.
-3. El negocio recordado y la lista de destinos de un enlace salen de una regla parecida pero **no idéntica** a la de
+3. Si la pasa y es una orden de la aplicación o del plugin de Android (`plugin:erplora-android`: permisos, escucha,
+   salir de la aplicación, abrir sus ajustes; ERPlora/hub#2642), la segunda puerta (`src/hub_link.rs`) mira el origen de la
+   página que enseña la ventana: si no es el del negocio enlazado, **o esa página aún no ha terminado de
+   cargar** tras llegar desde otro origen, contesta `not_the_linked_hub` sin ejecutarla. La espera existe
+   porque la dirección de la ventana cambia al EMPEZAR la navegación mientras la página que la pidió sigue
+   ejecutándose: sin ella, otra página podría mandar la ventana al negocio y pedir el cajón acto seguido. Solo
+   `device_context`, `forget_hub` y `shell_retry` se saltan esta comprobación.
+4. Qué negocio está enlazado lo decide la aplicación: el recordado al arrancar, el de un enlace
+   `erplora://hub/…` (HUB_APP-F03), o el que el SaaS elige con `?shell=1` (HUB_APP-F02); se desenlaza al
+   cambiar de negocio o al olvidar uno borrado (HUB_APP-F04, F05).
+5. El negocio recordado y la lista de destinos de un enlace salen de una regla parecida pero **no idéntica** a la de
    los juegos: se recuerda el bucle local con cualquier puerto y `https` sobre bucle local (`lib.rs:617-619`), que
    el juego `default` no autoriza (solo `:8787` y `:5173`): puede quedar recordado un origen que no imprime.
-Entra: el origen de la página.
-Sale: órdenes aceptadas o rechazadas; nada guardado.
+Entra: el origen de la página y el negocio enlazado.
+Sale: órdenes aceptadas o rechazadas (`not_the_linked_hub`; se anota la orden y el origen con `log::warn!`,
+que hoy no llega a ningún destino); nada guardado.
 Si falla: un origen fuera de la plataforma no puede pedir `device_context`; el apex no puede tocar el
-hardware; y la orden de reintentar de la pantalla de espera solo existe para la página incluida (un
+hardware; otro negocio, la web pública, el entorno de pruebas o el bucle local no lo tocan si no son el
+negocio enlazado; sin estado de enlace o sin poder leer la dirección de la página, la puerta se cierra; una
+página que manda la ventana al negocio enlazado y pide el hardware antes de que este cargue recibe
+`not_the_linked_hub`; otra página que pide los permisos de Android, encender la escucha o sacar a la persona de
+la aplicación recibe `not_the_linked_hub` y Android no enseña nada (y si esa carga no llega a terminar, el negocio queda sin hardware hasta la siguiente
+página que cargue); y la orden de reintentar de la pantalla de espera solo existe para la página incluida (un
 origen remoto no puede mover la ventana). Una orden declarada y sin permiso generado la caza el test `tests/shell_surface.rs:247-300`; una orden no
 concedida se rechaza en ejecución.
 Implicados: HUB_SHELL-F162
