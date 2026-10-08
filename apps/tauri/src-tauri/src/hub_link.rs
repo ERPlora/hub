@@ -191,6 +191,10 @@ pub fn android_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri_plugin_erplora_android::init(linked_hub_only::<R>)
 }
 
+pub fn notification_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri_plugin_notification::init()
+}
+
 /// The page drives the device only when both are known: the link state, and the page the window
 /// shows. Missing either one, nothing does.
 fn drives_from(link: Option<&HubLink>, page: Option<&Url>) -> bool {
@@ -335,6 +339,7 @@ mod tests {
             "save_download",
             "print_document",
             "erplora_notify",
+            "erplora_bridge_status",
             "autostart_enable",
             "a_command_added_tomorrow",
         ] {
@@ -463,7 +468,13 @@ mod tests {
     #[test]
     fn the_website_is_refused_the_drawer_of_a_till_linked_to_a_hub() {
         let till = till_showing("https://www.erplora.com/", Some(linked_to_the_hub()));
-        for command in ["erplora_open_drawer", "erplora_print", "erplora_test_print", "erplora_nfc_read"] {
+        for command in [
+            "erplora_open_drawer",
+            "erplora_print",
+            "erplora_test_print",
+            "erplora_nfc_read",
+            "erplora_bridge_status",
+        ] {
             assert_eq!(ask(&till, command), refused(), "{command} ran for the website");
         }
     }
@@ -630,5 +641,114 @@ mod tests {
         for command in ANDROID_COMMANDS {
             assert_eq!(ask_android(&till, command), refused(), "{command} ran for the onboarding");
         }
+    }
+
+    // ── The notification plugin, through its own route (hub#2658) ─────────────────────────────
+    //
+    // `capabilities/default.json` grants `notification:allow-register-listener` to every page under
+    // erplora.com, so the page can hear a tap on a notice (HUB_APP-F25). The plugin is a third
+    // party's and takes no gate of its own: `run` registers it wrapped. On a phone,
+    // `register_listener` is answered by the Kotlin/Swift half once the plugin's Rust handler lets
+    // it through; on a computer nothing answers it, which is what "it reached the plugin" reads
+    // as here. `is_permission_granted` is answered in Rust on a computer: it proves the wrapped
+    // plugin still set itself up.
+
+    fn till_with_the_notification_plugin(page: &str, link: Option<HubLink>) -> Till {
+        use tauri::Manager;
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        for command in ["register_listener", "is_permission_granted"] {
+            context.runtime_authority_mut().__allow_command(
+                format!("plugin:notification|{command}"),
+                tauri::utils::acl::ExecutionContext::Local,
+            );
+        }
+        let app = tauri::test::mock_builder()
+            .plugin(notification_plugin())
+            .build(context)
+            .expect("mock app");
+        if let Some(link) = link {
+            app.manage(link);
+        }
+        let window =
+            tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::External(url(page)))
+                .build()
+                .expect("main window");
+        Till { _app: app, window }
+    }
+
+    fn ask_notification(till: &Till, command: &str) -> Result<serde_json::Value, serde_json::Value> {
+        let body = match command {
+            "register_listener" => serde_json::json!({ "event": "actionPerformed", "handler": 7 }),
+            _ => serde_json::json!({}),
+        };
+        tauri::test::get_ipc_response(
+            &till.window,
+            tauri::webview::InvokeRequest {
+                cmd: format!("plugin:notification|{command}"),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: url("tauri://localhost"),
+                body: tauri::ipc::InvokeBody::Json(body),
+                headers: Default::default(),
+                invoke_key: INVOKE_KEY.to_string(),
+            },
+        )
+        .map(|body| body.deserialize::<serde_json::Value>().expect("json answer"))
+    }
+
+    /// What a computer answers once the subscription got past the gate: the plugin has no Rust
+    /// handler for it, and a phone would hand it to its Kotlin/Swift half.
+    fn reached_the_plugin() -> Result<serde_json::Value, serde_json::Value> {
+        Err(serde_json::Value::from("Command register_listener not found"))
+    }
+
+    #[test]
+    fn the_website_cannot_hear_the_taps_on_the_notices_of_a_till_linked_to_a_hub() {
+        let till = till_with_the_notification_plugin("https://www.erplora.com/", Some(linked_to_the_hub()));
+        assert_eq!(ask_notification(&till, "register_listener"), refused());
+        assert_eq!(ask_notification(&till, "is_permission_granted"), refused());
+    }
+
+    #[test]
+    fn another_business_cannot_hear_the_taps_on_the_notices_of_the_till() {
+        let till = till_with_the_notification_plugin(
+            "https://otronegocio.a.erplora.com/m/sales",
+            Some(linked_to_the_hub()),
+        );
+        assert_eq!(ask_notification(&till, "register_listener"), refused());
+    }
+
+    #[test]
+    fn the_onboarding_cannot_hear_the_taps_on_the_notices() {
+        let till = till_with_the_notification_plugin("https://erplora.com/shell/", Some(on_the_onboarding()));
+        assert_eq!(ask_notification(&till, "register_listener"), refused());
+    }
+
+    #[test]
+    fn the_linked_hub_hears_the_taps_on_its_notices() {
+        let till = till_with_the_notification_plugin(
+            "https://panaderia.a.erplora.com/m/sales",
+            Some(linked_to_the_hub()),
+        );
+        assert_eq!(ask_notification(&till, "register_listener"), reached_the_plugin());
+        assert_eq!(ask_notification(&till, "is_permission_granted"), Ok(serde_json::Value::Bool(true)));
+    }
+
+    #[test]
+    fn the_hub_cannot_hear_the_taps_while_the_page_that_sent_the_window_there_may_still_run() {
+        use tauri::Manager;
+        let link = linked_to_the_hub();
+        link.follow(&url("https://otronegocio.a.erplora.com/"));
+        link.follow(&url("https://panaderia.a.erplora.com/"));
+        let till = till_with_the_notification_plugin("https://panaderia.a.erplora.com/", Some(link));
+        assert_eq!(ask_notification(&till, "register_listener"), refused(), "the other business still runs");
+        till._app.state::<HubLink>().landed(&url("https://panaderia.a.erplora.com/"));
+        assert_eq!(ask_notification(&till, "register_listener"), reached_the_plugin());
+    }
+
+    #[test]
+    fn without_a_link_state_nobody_hears_the_taps() {
+        let till = till_with_the_notification_plugin("https://panaderia.a.erplora.com/", None);
+        assert_eq!(ask_notification(&till, "register_listener"), refused());
     }
 }

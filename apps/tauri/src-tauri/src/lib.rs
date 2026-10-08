@@ -2790,6 +2790,11 @@ mod tests {
             body_of("pub fn run() {").contains(".plugin(hub_link::android_plugin())"),
             "run() registers the Android plugin without the gate (hub#2642)"
         );
+        assert!(
+            body_of("pub fn run() {").contains(".plugin(hub_link::notification_plugin())")
+                && !shell.contains(".plugin(tauri_plugin_notification::init())"),
+            "run() registers the notification plugin without the gate (hub#2658)"
+        );
         let window = body_of("fn open_main_window(");
         assert!(window.contains("app.manage(hub_link)"), "the window opens with no link state");
         let navigation = window.split(".on_navigation(").nth(1).unwrap_or_default();

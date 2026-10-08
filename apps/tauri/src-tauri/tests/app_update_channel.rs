@@ -1,16 +1,21 @@
 //! The two ends of the update channel of the installed app (hub#400), each of which fails MUTELY.
 //!
-//! The web app asks the shell "which build are you?" with `plugin:app|version`, and compares it
-//! with what the Cloud publishes. Neither half of that is code in this crate — the question is one
-//! line of TypeScript and the answer comes from Tauri's own `core:app` plugin — which is exactly
-//! why they need a guard here: **both ends can be removed without anything failing to compile.**
+//! The web app asks the shell "which build are you?" and compares it with what the Cloud
+//! publishes. Neither half of that is code in this crate — the question is TypeScript and the
+//! answer comes from a command — which is exactly why they need a guard here: **both ends can be
+//! removed without anything failing to compile.**
 //!
-//! * Trim `core:default` out of `capabilities/default.json` (a plausible tightening: "the till does
-//!   not need windows or menus") and the ACL starts refusing `app|version` **only from a remote
-//!   origin**. Dev, which loads loopback and `tauri://`, keeps working. Every till in the field goes
-//!   quiet, forever, with no error anywhere.
+//! * The question goes, first, to Tauri's own `plugin:app|version` — the one an app installed
+//!   before this channel existed answers — and, where that is refused, to `erplora_bridge_status`,
+//!   which carries the same version sealed by the release. Drop the second one and every app built
+//!   from hub#2658 on goes quiet, forever, with no error anywhere.
 //! * Stop publishing the version manifest from the release workflow and the Cloud has nothing to
 //!   report. Same silence, other end.
+//!
+//! And the version belongs to the LINKED hub (hub#2658): `core:app` is a Tauri plugin no gate can
+//! stand in front of, so the hub PWA's capability does not grant it — otherwise any page under
+//! erplora.com (another business, the website, the test SaaS) reads which build the till runs.
+//! `erplora_bridge_status` is one of the app's own commands, behind `src/hub_link.rs`.
 //!
 //! Neither is hypothetical bookkeeping: silence is the *correct* behaviour of the feature when it
 //! cannot check, so a broken update channel is indistinguishable from a healthy one that has
@@ -18,13 +23,19 @@
 
 use std::path::PathBuf;
 
-/// What the page invokes. Kept as a literal on both sides: the TypeScript writes the same string,
+/// What the page invokes. Kept as literals on both sides: the TypeScript writes the same strings,
 /// and there is no shared symbol between a webview bundle and this crate to bind them.
 const VERSION_COMMAND: &str = "plugin:app|version";
+const GATED_VERSION_COMMAND: &str = "erplora_bridge_status";
 
-/// The permission set that carries it. `core:default` is `["core:path:default", …,
-/// "core:app:default", …]`, and `core:app:default` enables `version` (tauri `build.rs`, PLUGINS).
+/// The permission that grants the gated one to the hub PWA.
+const GATED_VERSION_PERMISSION: &str = "allow-erplora-bridge-status";
+
+/// The sets that would hand `plugin:app|version` to every page of the pattern: `core:default` is
+/// `["core:path:default", …, "core:app:default", …]`, and `core:app:default` enables `version`
+/// (tauri `build.rs`, PLUGINS).
 const CORE_DEFAULT: &str = "core:default";
+const CORE_APP: &str = "core:app:";
 
 fn repo_root() -> PathBuf {
     // `apps/tauri/src-tauri` → up three.
@@ -47,33 +58,57 @@ fn hub_pwa_capability() -> serde_json::Value {
     serde_json::from_str(&raw).expect("capabilities/default.json is not valid JSON")
 }
 
-#[test]
-fn the_hub_pwa_may_ask_the_shell_which_build_it_is() {
-    let capability = hub_pwa_capability();
-    let permissions: Vec<&str> = capability["permissions"]
+fn hub_pwa_permissions() -> Vec<String> {
+    hub_pwa_capability()["permissions"]
         .as_array()
         .expect("permissions must be an array")
         .iter()
-        .map(|value| value.as_str().expect("every permission is a string"))
-        .collect();
+        .map(|value| {
+            value
+                .as_str()
+                .expect("every permission is a string")
+                .to_owned()
+        })
+        .collect()
+}
 
+#[test]
+fn the_hub_pwa_may_ask_the_shell_which_build_it_is() {
     assert!(
-        permissions.contains(&CORE_DEFAULT),
-        "capabilities/default.json no longer grants {CORE_DEFAULT}, so `{VERSION_COMMAND}` is \
-         refused to the hub PWA. Nothing breaks in dev and every installed till stops being able \
-         to tell whether it is out of date — in silence, which is also what a healthy till does \
-         when there is no news (hub#400)."
+        hub_pwa_permissions()
+            .iter()
+            .any(|p| p == GATED_VERSION_PERMISSION),
+        "capabilities/default.json no longer grants {GATED_VERSION_PERMISSION}, so \
+         `{GATED_VERSION_COMMAND}` is refused to the hub PWA and every app built from hub#2658 on \
+         stops being able to tell whether it is out of date — in silence, which is also what a \
+         healthy till does when there is no news (hub#400)."
     );
+}
+
+#[test]
+fn no_page_under_erplora_com_reads_the_build_through_tauri() {
+    // The pattern lets every page under erplora.com through, and Tauri's `app` plugin answers
+    // whoever passes it: no second gate can be put in front of a core plugin (hub#2658).
+    for permission in hub_pwa_permissions() {
+        assert!(
+            permission != CORE_DEFAULT && !permission.starts_with(CORE_APP),
+            "capabilities/default.json grants {permission}, which hands `{VERSION_COMMAND}` to \
+             any page under erplora.com — another business, the website, the test SaaS — and not \
+             only to the linked hub (hub#2658)"
+        );
+    }
 }
 
 #[test]
 fn the_page_and_the_shell_name_the_same_command() {
     let source = read("apps/web/src/lib/app-update.ts");
-    assert!(
-        source.contains(VERSION_COMMAND),
-        "the web app no longer invokes `{VERSION_COMMAND}`; whatever it invokes now must be a \
-         command some capability grants, or the check is dead on every installed app"
-    );
+    for command in [VERSION_COMMAND, GATED_VERSION_COMMAND] {
+        assert!(
+            source.contains(command),
+            "the web app no longer invokes `{command}`; an app installed before hub#2658 answers \
+             only `{VERSION_COMMAND}`, one built after it only `{GATED_VERSION_COMMAND}`"
+        );
+    }
 }
 
 #[test]

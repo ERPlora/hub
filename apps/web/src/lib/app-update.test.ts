@@ -276,6 +276,39 @@ describe('checkAppUpdate', () => {
     expect(update.installed).toBeNull();
   });
 
+  it('reads the version through the gated bridge status on an app that keeps it from other pages (hub#2658)', async () => {
+    // From hub#2658 on, the installed app no longer hands `plugin:app|version` to every page under
+    // erplora.com: the linked hub reads the same version through `erplora_bridge_status`, one of
+    // the app's own commands, behind the gate.
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'plugin:app|version') throw new Error('Command plugin:app|version not allowed by ACL');
+      if (command === 'erplora_bridge_status') return { version: '1.2.3' };
+      return null;
+    });
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke } } });
+    cloudSays(200, { version: '1.2.4' });
+
+    const update = await checkAppUpdate();
+
+    expect(invoke).toHaveBeenCalledWith('erplora_bridge_status', {});
+    expect(update.installed).toBe('1.2.3');
+    expect(update.state).toBe('attention');
+  });
+
+  it('stays quiet on a page that is not the linked hub: neither answer comes (hub#2658)', async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'plugin:app|version') throw new Error('Command plugin:app|version not allowed by ACL');
+      throw new Error('not_the_linked_hub');
+    });
+    vi.stubGlobal('window', { __TAURI__: { core: { invoke } } });
+    cloudSays(200, { version: '9.9.9' });
+
+    const update = await checkAppUpdate();
+
+    expect(update.installed).toBeNull();
+    expect(update.state).toBe('unknown');
+  });
+
   it('never says `ok` when it could not check', async () => {
     installedApp(new Error('nope'));
     cloudSays(200, { version: '1.2.3' });
