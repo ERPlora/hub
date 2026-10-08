@@ -25,7 +25,7 @@ import {
   shouldArmIdleLogout,
 } from './idle-logout';
 import { hubSettings, type HubSettings } from './hub-settings';
-import { pinPolicy } from './pin-policy';
+import { pinPolicy, pinPolicyRead, publishPinPolicy } from './pin-policy';
 import { deviceMode } from './device-mode';
 import { setUser } from './session';
 
@@ -40,6 +40,7 @@ afterEach(() => {
   setUser(null);
   hubSettings.value = null;
   pinPolicy.value = 'per_shift';
+  pinPolicyRead.value = 'pending';
   deviceMode.value = 'shared';
 });
 
@@ -59,6 +60,12 @@ describe('when the detector arms at all', () => {
 
   it('never arms with nobody signed in: there is no session to end', () => {
     expect(shouldArmIdleLogout('always', 'shared', false)).toBe(false);
+  });
+
+  it('arms when the dial is not known (hub#2537): the safe guess for a lock is that it is on', () => {
+    expect(shouldArmIdleLogout(null, 'shared', true)).toBe(true);
+    expect(shouldArmIdleLogout(null, 'personal', true)).toBe(false);
+    expect(shouldArmIdleLogout(null, 'shared', false)).toBe(false);
   });
 });
 
@@ -125,7 +132,7 @@ describe('installed in the shell', () => {
   function armedWorld(): void {
     setUser({ id: 'u1', name: 'Ana', email: 'ana@example.com' });
     deviceMode.value = 'shared';
-    pinPolicy.value = 'always';
+    publishPinPolicy('always');
     hubSettings.value = { pin_inactivity_minutes: 1 } as unknown as HubSettings;
   }
 
@@ -158,9 +165,19 @@ describe('installed in the shell', () => {
     const onIdle = vi.fn();
     const uninstall = installIdleLogout(onIdle);
 
-    pinPolicy.value = 'per_shift';
+    publishPinPolicy('per_shift');
     await vi.advanceTimersByTimeAsync(10 * MIN);
     expect(onIdle).not.toHaveBeenCalled();
+    uninstall();
+  });
+
+  it('before the hub has answered, a signed-in shared till is already armed (hub#2537)', async () => {
+    setUser({ id: 'u1', name: 'Ana', email: 'ana@example.com' });
+    const onIdle = vi.fn();
+    const uninstall = installIdleLogout(onIdle);
+
+    await vi.advanceTimersByTimeAsync(5 * MIN);
+    expect(onIdle).toHaveBeenCalledTimes(1);
     uninstall();
   });
 

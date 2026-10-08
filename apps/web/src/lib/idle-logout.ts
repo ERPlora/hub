@@ -12,6 +12,10 @@
 //   - **Only the counter till.** `shouldArmIdleLogout` demands `shared` + `always` + a signed-in
 //     session. A `personal` device locks with its owner's OS (hub#456 §1), the other two policy
 //     positions have no idle window, and with nobody signed in there is nothing to end.
+//   - **A dial it cannot read counts as `always`** (hub#2537). The pinpad's fallback, `per_shift`,
+//     would DISARM this detector, so a failed read at the wrong moment (the hub restarting) left the
+//     till open under the last person's name until the session's own cap. Unknown arms, with the
+//     default window when the minutes are unknown too, and the person at the till is told once why.
 //   - **Late timers still count.** Browsers throttle background-tab timers, so the expiry check
 //     re-measures elapsed time from the last touch and re-arms for the remainder instead of
 //     trusting one setTimeout to fire on schedule. Activity itself only stamps a timestamp —
@@ -22,8 +26,10 @@ import { watchEffect } from 'vue';
 
 import { deviceMode, type DeviceMode } from './device-mode';
 import { hubSettings, type HubSettings } from './hub-settings';
-import { pinPolicy, type PinPolicy } from './pin-policy';
+import { i18n } from '../i18n';
+import { knownPinPolicy, pinPolicyRead, type PinPolicy } from './pin-policy';
 import { isAuthed } from './session';
+import { toast } from './toast';
 
 /** Idle minutes assumed when the setting is absent or unreadable (mirror of the runtime, which
  *  degrades a corrupt row to its DEFAULT — never to a bound). */
@@ -32,9 +38,17 @@ export const DEFAULT_IDLE_MINUTES = 5;
 /** Ceiling of the idle window (mirror of the runtime's `MAX_PIN_INACTIVITY_MINUTES`). */
 const MAX_IDLE_MINUTES = 30;
 
-/** Does this combination of dial, device and session get an idle detector at all? */
-export function shouldArmIdleLogout(policy: PinPolicy, mode: DeviceMode, authed: boolean): boolean {
-  return authed && policy === 'always' && mode === 'shared';
+/** How long the notice of an unreadable dial stays on screen: long enough to be read at a till. */
+const UNREADABLE_NOTICE_MS = 8_000;
+
+/**
+ * Does this combination of dial, device and session get an idle detector at all?
+ *
+ * `policy` is the dial as the hub said it, or `null` when it is not known (no answer yet, or a read
+ * that failed): that arms, because the only safe guess for a lock is that it is on (hub#2537).
+ */
+export function shouldArmIdleLogout(policy: PinPolicy | null, mode: DeviceMode, authed: boolean): boolean {
+  return authed && (policy === null || policy === 'always') && mode === 'shared';
 }
 
 /** The idle window in force, from the hub's settings; unreadable → {@link DEFAULT_IDLE_MINUTES}. */
@@ -107,13 +121,23 @@ export function installIdleLogout(onIdle: () => void): () => void {
     for (const ev of IDLE_ACTIVITY_EVENTS) window.removeEventListener(ev, activity);
   };
 
+  // The unreadable-dial notice is said once per failure: a second failed read is the same failure,
+  // and a read that succeeds in between ends it.
+  let announced = false;
+
   const stopWatch = watchEffect(() => {
-    // Both reads happen before the early return so the effect tracks them all: a minutes change
+    // Every read happens before the early return so the effect tracks them all: a minutes change
     // re-arms with the fresh window, a disqualifying change disarms.
-    const arm = shouldArmIdleLogout(pinPolicy.value, deviceMode.value, isAuthed.value);
+    const arm = shouldArmIdleLogout(knownPinPolicy(), deviceMode.value, isAuthed.value);
     const minutes = idleMinutesOf(hubSettings.value);
+    const unreadable = pinPolicyRead.value === 'unreadable';
     disarm();
+    if (!unreadable) announced = false;
     if (!arm) return;
+    if (unreadable && !announced) {
+      announced = true;
+      void toast(i18n.global.t('pinPolicy.unreadableIdleLock', { n: minutes }), 'warning', UNREADABLE_NOTICE_MS);
+    }
     timer = createIdleTimer({ minutes, onIdle });
     for (const ev of IDLE_ACTIVITY_EVENTS) window.addEventListener(ev, activity, { passive: true });
   });

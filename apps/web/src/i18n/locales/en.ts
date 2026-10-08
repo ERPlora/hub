@@ -685,6 +685,8 @@ export default {
     offConsequence:
       'Nobody types a PIN. Whoever opened the till in the morning is the name on every sale until the shift ends, whoever actually made them — so you cannot tell who sold what, or who gave a discount. Staff who only have a PIN and no account will not be able to sign in.',
     idleTitle: 'Ask again after inactivity',
+    unreadableIdleLock:
+      "This till's PIN settings could not be read. To be safe, it will go back to the PIN pad after {n} minutes without use.",
     idleMinutes: '{n} min',
     idleUntilSignOut: 'Until you sign out',
     idleMinutesConsequence:
