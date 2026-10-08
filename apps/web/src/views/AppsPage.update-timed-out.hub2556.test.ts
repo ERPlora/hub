@@ -55,7 +55,7 @@ vi.mock('../lib/runtime', () => ({
       latest_min_erplora_version: null,
     },
   ],
-  listModuleVersions: async (id: string) => ({ module_id: id, installed: '1.0.0', latest: '2.0.0', versions: [] }),
+  listModuleVersions: async (id: string) => ({ module_id: id, installed: '1.0.0', latest: '2.0.0', versions: ['2.0.0'] }),
   modulePublicationStatus: async () => null,
 }));
 vi.mock('../lib/nav', () => ({ moduleNav: { value: [] }, refreshModuleNav: vi.fn() }));
@@ -169,14 +169,15 @@ describe('an update whose download ran out of time (hub#2556)', () => {
     await settle();
     await pressUpdate(w);
     expect(updateModule).toHaveBeenCalledTimes(1);
-    const firstCall = updateModule.mock.calls[0];
+    expect(updateModule).toHaveBeenLastCalledWith('sales', '2.0.0');
 
     updateModule.mockResolvedValue({ ok: true, module_id: 'sales', from: '1.0.0', to: '2.0.0', updated: true });
     await toast(w).buttons[0].handler?.();
     await settle();
 
     expect(updateModule).toHaveBeenCalledTimes(2);
-    expect(updateModule.mock.calls[1]).toEqual(firstCall);
+    // The same request: the same app and the version it was going to, without asking again.
+    expect(updateModule).toHaveBeenLastCalledWith('sales', '2.0.0');
     expect(toast(w).message).toBe(
       fill(enCatalogue.apps.updateSuccessReloading, { name: 'Sales', from: '1.0.0', to: '2.0.0' }),
     );
