@@ -247,7 +247,7 @@ Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN
 QA: qa-hub-restaurant §08, BD-08
 
 ### HUB_SHELL-F73 Dar de alta este dispositivo como el que imprime
-Estado: parcial — una impresora USB nunca da de alta al dispositivo; quitarle la función a una impresora (o borrarla) no lo da de baja en el hub, que sigue contándolo como vivo para esa función; y el alta sigue latiendo aunque el canal de impresión se haya parado para siempre (sesión caducada al reconectar, retirada por el hub, saludo tardío): el dispositivo cuenta como vivo sin sacar nada hasta reiniciar la app
+Estado: parcial — una impresora USB nunca da de alta al dispositivo; quitarle la función a una impresora (o borrarla) no lo da de baja en el hub, que sigue contándolo como vivo para esa función; y el alta sigue latiendo aunque el canal de impresión se haya parado para siempre (sesión caducada al reconectar, retirada por el hub, saludo tardío): el dispositivo cuenta como vivo sin sacar nada hasta reiniciar la app (hub#2712)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -263,7 +263,7 @@ Implicados: HUB-F196, HUB-F197, HUB_APP-F18, HUB_PERIPHERALS-F04, PRINTING-F04
 QA: qa-hub §8, qa-hub-android §Fase 2
 
 ### HUB_SHELL-F74 Sacar los trabajos de la cola y confirmar que salieron
-Estado: parcial — desde hub#2494 el dispositivo confirma «salió» cuando el papel llegó a la impresora y «falló» cuando no, pero un trabajo que falla vuelve a la cola sin despertar a nadie ni avisar en la caja o en la cocina
+Estado: parcial — desde hub#2494 el dispositivo confirma «salió» cuando el papel llegó a la impresora y «falló» cuando no, pero un trabajo que falla vuelve a la cola sin despertar a nadie ni avisar en la caja o en la cocina (hub#2711)
 Actor: sistema
 Pantalla: ninguna
 Pasos:

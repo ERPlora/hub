@@ -239,7 +239,7 @@ Implicados: HUB_APP-F18, HUB_SHELL-F74
 QA: qa-hub §8
 
 ### HUB-F199 Sacar un trabajo de la cola y confirmar que salió el papel
-Estado: parcial — desde hub#2494 un dispositivo con la impresora de red apagada contesta «falló» (antes confirmaba «hecho» al dejar los bytes en su cola en memoria), pero el trabajo que falla vuelve a «pendiente» sin aviso en vivo: nadie en la caja ni en la cocina se entera y no se vuelve a repartir hasta el siguiente trabajo de esa función o una reconexión (HUB_SHELL-F74)
+Estado: parcial — desde hub#2494 un dispositivo con la impresora de red apagada contesta «falló» (antes confirmaba «hecho» al dejar los bytes en su cola en memoria), pero el trabajo que falla vuelve a «pendiente» sin aviso en vivo: nadie en la caja ni en la cocina se entera y no se vuelve a repartir hasta el siguiente trabajo de esa función o una reconexión (HUB_SHELL-F74, hub#2711)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -303,7 +303,7 @@ Implicados: CASH_REGISTER-F08, HUB_SHELL-F60, HUB_SHELL-F63, HUB_SHELL-F75, PRIN
 QA: qa-hub §8, qa-hub-restaurant §16
 
 ### HUB-F202 Saber qué funciones tienen quién las imprima
-Estado: parcial — un dispositivo cuyo canal de impresión se paró sigue contando como vivo, y una función que se le quitó a una impresora en la aplicación sigue saliendo cubierta: la vista puede decir que hay quien imprima cuando no lo hay (ERPlora/hub#2494)
+Estado: parcial — un dispositivo cuyo canal de impresión se paró sigue contando como vivo, y una función que se le quitó a una impresora en la aplicación sigue saliendo cubierta: la vista puede decir que hay quien imprima cuando no lo hay (ERPlora/hub#2712)
 Actor: empleado, responsable, administrador, sistema
 Pantalla: PRINTING: Impresoras
 Pasos:
