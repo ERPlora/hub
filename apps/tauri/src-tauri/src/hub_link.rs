@@ -153,39 +153,40 @@ where
     F: Fn(Invoke<R>) -> bool + Send + Sync + 'static,
 {
     move |invoke: Invoke<R>| {
-        if !admits(&invoke) {
-            log::warn!(
-                "ipc: {} refused to {}: not the linked hub",
-                invoke.message.command(),
-                invoke
-                    .message
-                    .webview_ref()
-                    .url()
-                    .map(|page| origin_of(&page))
-                    .unwrap_or_else(|_| "an unreadable page".to_string())
-            );
-            invoke.resolver.reject(NOT_THE_LINKED_HUB);
-            return true;
+        if !is_open_command(invoke.message.command()) {
+            if let Err(code) = linked_hub_only(&invoke) {
+                invoke.resolver.reject(code);
+                return true;
+            }
         }
         commands(invoke)
     }
 }
 
-/// Does this invoke come from a page allowed to run its command? Fails closed: no link state, or a
-/// page whose address cannot be read, drives nothing.
-fn admits<R: Runtime>(invoke: &Invoke<R>) -> bool {
+/// The gate for a command that belongs to the linked hub: `Err(NOT_THE_LINKED_HUB)` unless the
+/// invoke comes from it, loaded. Fails closed: no link state, or a page whose address cannot be
+/// read, drives nothing. The Android plugin runs it before every one of its commands — none of
+/// them is open (hub#2642).
+pub fn linked_hub_only<R: Runtime>(invoke: &Invoke<R>) -> Result<(), &'static str> {
     use tauri::Manager;
-    if is_open_command(invoke.message.command()) {
-        return true;
-    }
     let webview = invoke.message.webview_ref();
+    let page = webview.url().ok();
     let link = webview.try_state::<HubLink>();
-    drives_from(link.as_deref(), webview.url().ok().as_ref())
+    if drives_from(link.as_deref(), page.as_ref()) {
+        return Ok(());
+    }
+    log::warn!(
+        "ipc: {} refused to {}: not the linked hub",
+        invoke.message.command(),
+        page.map(|page| origin_of(&page)).unwrap_or_else(|| "an unreadable page".to_string())
+    );
+    Err(NOT_THE_LINKED_HUB)
 }
 
-/// The Android plugin (`plugin:erplora-android`) as `run` registers it.
+/// The Android plugin (`plugin:erplora-android`: Android's permissions, the listening service, the
+/// way out of the app) as `run` registers it — behind the same gate as the app's own commands.
 pub fn android_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
-    tauri_plugin_erplora_android::init()
+    tauri_plugin_erplora_android::init(linked_hub_only::<R>)
 }
 
 /// The page drives the device only when both are known: the link state, and the page the window

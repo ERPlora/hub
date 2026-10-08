@@ -589,15 +589,37 @@ async fn request_permissions<R: Runtime>(
     app.erplora_android().request_permissions(permissions)
 }
 
-pub fn init<R: Runtime>() -> TauriPlugin<R> {
+/// Pins the type of the generated handler so it can be called from the gated one below.
+fn handler<R: Runtime, F: Fn(Invoke<R>) -> bool>(commands: F) -> F {
+    commands
+}
+
+/// The plugin, with `gate` in front of every one of its commands (hub#2642). The capability grants
+/// `erplora-android:default` to every page under erplora.com; the app hands in the gate that lets
+/// only the LINKED hub through (`hub_link::linked_hub_only`), and a page it refuses gets the error
+/// code the gate returns, with no command run.
+pub fn init<R, G>(gate: G) -> TauriPlugin<R>
+where
+    R: Runtime,
+    G: Fn(&Invoke<R>) -> Result<(), &'static str> + Send + Sync + 'static,
+{
+    let commands = handler::<R, _>(tauri::generate_handler![
+        check_permissions,
+        request_permissions,
+        leave_app,
+        open_app_settings,
+        keep_listening
+    ]);
     Builder::new("erplora-android")
-        .invoke_handler(tauri::generate_handler![
-            check_permissions,
-            request_permissions,
-            leave_app,
-            open_app_settings,
-            keep_listening
-        ])
+        .invoke_handler(move |invoke: Invoke<R>| {
+            if let Err(code) = gate(&invoke) {
+                invoke.resolver.reject(code);
+                // `true` on purpose: on Android, a plugin command the Rust side leaves unhandled
+                // falls through to the Kotlin plugin (Tauri's `run_command`), which would run it.
+                return true;
+            }
+            commands(invoke)
+        })
         .setup(|app, _api| {
             #[cfg(target_os = "android")]
             let handle = _api.register_android_plugin(PLUGIN_IDENTIFIER, "ErploraAndroidPlugin")?;
