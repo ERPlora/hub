@@ -937,43 +937,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // eso es peor que tardar. En su propia task y best-effort, como el import de blueprint y el
     // refetch del certificado: un plano de control inalcanzable deja un hub que FUNCIONA.
     boot_announce::spawn(&announce_state);
-    // Precalentar los handlers WASM (hub#926). La caché en disco de wasmtime vive DENTRO del
-    // contenedor, así que un deploy la estrena vacía: medido en producción, las dos primeras ventas
-    // tras desplegar costaron 8,2 s y 5,7 s, y las siguientes 75-91 ms. Compilar hay que compilar;
-    // lo que se elige aquí es hacerlo mientras nadie espera, no en el primer cobro del día.
-    //
-    // En su propia task y DESPUÉS de bindear, como el resto del arranque: el hub ya atiende, y si
-    // el precalentado tarda —o un módulo trae bytes rotos— no retrasa ni tumba nada.
-    {
-        tokio::spawn(async move {
-            // Se toma la caché (un `Arc` compartido con el registro) y se SUELTA el candado del
-            // runtime antes de compilar: calentar no puede bloquear a quien esté cobrando.
-            let (cache, modules) = {
-                let rt = warm_state.runtime.read().await;
-                (
-                    std::sync::Arc::clone(&rt.registry().wasm_cache),
-                    rt.registry().handlers_to_warm_up(),
-                )
-            };
-            if modules.is_empty() {
-                return;
-            }
-            let total = modules.len();
-            // `spawn_blocking`: compilar es trabajo de CPU y no debe ocupar un worker async.
-            match tokio::task::spawn_blocking(move || {
-                erplora_runtime::wasm_cache::warm_up(
-                    &cache,
-                    &modules,
-                    erplora_runtime::wasm_cache::Limits::from_env(),
-                )
-            })
-            .await
-            {
-                Ok(warmed) => eprintln!("wasm: {warmed}/{total} handler(s) precalentados"),
-                Err(e) => eprintln!("wasm: precalentado abortado: {e}"),
-            }
-        });
-    }
+    // Warm up the WASM handlers (hub#926) and announce the end in the log (hub#2693): see
+    // `boot_warm_up`. After binding, like the rest of the boot: the hub already serves.
+    crate::boot_warm_up::spawn(&warm_state);
 
     // Apagado limpio (ECS/Tauri): Ctrl-C o SIGTERM → deja de aceptar conexiones y drena las en
     // vuelo antes de salir, en vez de cortar a mitad (importante para ECS al desescalar/desplegar).
