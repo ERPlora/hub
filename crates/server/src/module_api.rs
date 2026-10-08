@@ -382,8 +382,8 @@ pub(crate) async fn update_module(
             st.broadcast(json!({ "type": "module.installed", "module_id": module_id }));
             Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
         }
-        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
-        // error haría pensar que el hub se quedó tocado, y no es el caso.
+        // 200, not 5xx: the update did not go in, but **the module keeps working**. Answering with
+        // an error would suggest the hub was left broken, and it was not.
         // `cause` is the stable code of why the new version did not go in (hub#2556): the screen
         // says «erplora.com did not answer in time, try again» for a download that ran out of time
         // instead of a bare «could not update». The English `message` stays for the log.
