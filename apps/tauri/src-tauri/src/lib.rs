@@ -23,6 +23,8 @@ mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
 /// Only the linked hub drives the device (hub#2504).
 mod hub_link;
+/// A link to another hub waits for the person's word (hub#2644).
+mod link_consent;
 mod navigation;
 mod notice_tap;
 pub use navigation::{NavigationVerdict, navigation_verdict};
@@ -748,7 +750,6 @@ fn initial_url_for(
 /// The development override is an entry (it may boot at a local SaaS that chooses the hub) and is
 /// linked only when it is a hub of ours that is not the SaaS itself (a local PWA).
 fn boot_link(
-    deep_link: Option<&str>,
     override_url: Option<&str>,
     persisted: Option<&str>,
     saas_base: &str,
@@ -762,12 +763,34 @@ fn boot_link(
             entries.push(dev);
         }
     }
-    let linked = match (deep_link, override_url) {
-        (Some(target), _) => hub(target),
-        (None, Some(dev)) => hub(dev).filter(|dev| Some(dev) != saas.as_ref()),
-        (None, None) => persisted.map(str::to_string),
+    let linked = match override_url {
+        Some(dev) => hub(dev).filter(|dev| Some(dev) != saas.as_ref()),
+        None => persisted.map(str::to_string),
     };
     (entries, linked)
+}
+
+/// What a cold start does with the link it was launched by (hub#2644).
+#[derive(Debug, PartialEq, Eq)]
+enum ColdStartLink {
+    /// Launched without one.
+    None,
+    /// A link to the hub the device is linked to: the window boots on it, as it always did.
+    Open(String),
+    /// A link to any other hub: the window boots where it would without a link, and the person is
+    /// asked ([`open_hub_from_link`]) before anything is linked.
+    Ask(String),
+}
+
+fn cold_start_link(deep_link: Option<&str>, linked: Option<&str>) -> ColdStartLink {
+    let Some(target) = deep_link else {
+        return ColdStartLink::None;
+    };
+    let hub = target.parse::<tauri::Url>().ok().as_ref().and_then(trusted_hub_origin);
+    match hub {
+        Some(hub) if linked == Some(hub.as_str()) => ColdStartLink::Open(target.to_string()),
+        _ => ColdStartLink::Ask(target.to_string()),
+    }
 }
 
 /// Where the window goes after forgetting the hub (hub#447).
@@ -1046,18 +1069,54 @@ fn forget_linked_hub<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
-/// A link the system handed the app (ADR-0196 §7): its hub becomes the linked one, then the window
-/// goes there (hub#2504).
+/// A link the system handed the app (ADR-0196 §7).
+///
+/// A link to the linked hub just takes the window there. A link to any other hub would hand it the
+/// printer, the drawer and the card reader and make it the business the app boots on (hub#2504), and
+/// anyone can send one — an email, a web page, a message — so the person in front of the device is
+/// asked first, by the system's own dialog (hub#2644): «Open» links it and goes there, anything else
+/// leaves the device as it was. With nobody to ask, the link is refused, never followed.
 ///
 /// `target` comes out of [`resolve_deep_link`], already a hub of ours; it is checked again here so
 /// this function does not lean on its caller for what it links.
 fn open_hub_from_link<R: tauri::Runtime>(app: &tauri::AppHandle<R>, target: &str) {
     use tauri::Manager;
-    let hub = target.parse::<tauri::Url>().ok().as_ref().and_then(trusted_hub_origin);
-    if let (Some(hub), Some(link)) = (hub, app.try_state::<hub_link::HubLink>()) {
-        link.link(&hub);
+    let Some(hub) = target.parse::<tauri::Url>().ok().as_ref().and_then(trusted_hub_origin) else {
+        log::warn!("shell: link ignored, it does not lead to a hub of ours ({target})");
+        return;
+    };
+    let Some(link) = app.try_state::<hub_link::HubLink>() else {
+        log::warn!("shell: link ignored, the device does not know its hub yet ({target})");
+        return;
+    };
+    let linked = link.linked();
+    if linked.as_deref() == Some(hub.as_str()) {
+        navigate_main_window(app, target);
+        return;
     }
-    navigate_main_window(app, target);
+    let Some(asker) = app.try_state::<link_consent::AskBeforeLinking>() else {
+        log::warn!("shell: link ignored, nobody to ask before linking {hub}");
+        return;
+    };
+    let question = link_consent::Question {
+        to: link_consent::host_of(&hub),
+        from: linked.as_deref().map(link_consent::host_of),
+    };
+    let handle = app.clone();
+    let target = target.to_string();
+    asker.ask(
+        question,
+        Box::new(move |open| {
+            if !open {
+                log::info!("shell: the person kept this device on its business; {hub} was not linked");
+                return;
+            }
+            if let Some(link) = handle.try_state::<hub_link::HubLink>() {
+                link.link(&hub);
+            }
+            navigate_main_window(&handle, &target);
+        }),
+    );
 }
 
 /// Lleva la ventana principal a `url`. Best-effort a propósito: sin ventana (o con una URL que no
@@ -1110,8 +1169,20 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
     // el ejecutable otra vez con la URL como argumento, así que aquí es donde llega. En macOS/iOS/
     // Android llega como evento y lo recoge `on_open_url` (ver `run`).
     let deep_link = deep_link_from_args(std::env::args());
+    // The second gate in front of the commands (hub#2504): only the linked hub drives the device.
+    let (entries, linked) = boot_link(
+        override_url.as_deref(),
+        persisted.as_deref(),
+        &saas_base_url(),
+    );
+    // Only a link to the linked hub boots on it; one to another hub asks first (hub#2644).
+    let cold = cold_start_link(deep_link.as_deref(), linked.as_deref());
+    let opens = match &cold {
+        ColdStartLink::Open(target) => Some(target.clone()),
+        ColdStartLink::None | ColdStartLink::Ask(_) => None,
+    };
     let initial = initial_url_for(
-        deep_link.as_deref(),
+        opens.as_deref(),
         override_url.as_deref(),
         persisted.as_deref(),
         &saas_base_url(),
@@ -1130,10 +1201,10 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
     // de abrir la ventana, no antes: bloquear el arranque de un TPV por una petición de red sería
     // peor que la pantalla que se intenta evitar.
     //
-    // Con deep link NO se comprueba: la ventana está en el hub del ENLACE, no en el recordado, y
-    // este chequeo termina navegando al onboarding — se llevaría por delante justo lo que el
-    // usuario acaba de pedir. El `?shell=1` del enlace ya reemplaza el `hub.url` recordado.
-    if override_url.is_none() && deep_link.is_none() {
+    // Not when the window boots on a link's hub: this check ends up navigating to the onboarding,
+    // and would take away exactly what the person just asked for. A link to ANOTHER hub boots on the
+    // remembered one, so that one is checked as usual while the person is asked (hub#2644).
+    if override_url.is_none() && opens.is_none() {
         if let (Some(dir), Some(origin)) = (cache_dir.clone(), persisted.clone()) {
             spawn_hub_liveness_check(app.handle().clone(), dir, origin);
         }
@@ -1150,13 +1221,6 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
             .parse()
             .map_err(tauri::Error::InvalidUrl)?,
     };
-    // The second gate in front of the commands (hub#2504): only the linked hub drives the device.
-    let (entries, linked) = boot_link(
-        deep_link.as_deref(),
-        override_url.as_deref(),
-        persisted.as_deref(),
-        &saas_base_url(),
-    );
     let hub_link = hub_link::HubLink::new(entries, Some(&initial_target));
     if let Some(origin) = linked {
         hub_link.link(&origin);
@@ -1214,6 +1278,11 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 
     // From here on, a load that never lands has an answer (hub#1716).
     spawn_connectivity_guard(window, nav_state);
+    // With the window up, a link to another hub gets its question (hub#2644).
+    match cold {
+        ColdStartLink::Ask(target) => open_hub_from_link(app.handle(), &target),
+        ColdStartLink::None | ColdStartLink::Open(_) => {}
+    }
     Ok(())
 }
 
@@ -2242,7 +2311,10 @@ pub fn run() {
             app.manage(PrintDocuments::default());
             // The notice tap the page was not there to hear, until it claims it (hub#2360).
             app.manage(notice_tap::KeptNoticeTap::default());
-            // Ventana única: onboarding del SaaS o el hub capturado (modo app).
+            // Who asks before a link links another hub (hub#2644): before the window, so a cold
+            // start by such a link already has somebody to ask.
+            app.manage(link_consent::native(app.handle().clone()));
+            // Single window: the SaaS onboarding or the captured hub (app mode).
             if let Err(e) = open_main_window(app, cache_dir) {
                 eprintln!("no se pudo crear la ventana principal: {e}");
             }
@@ -2711,36 +2783,154 @@ mod tests {
 
     #[test]
     fn a_fresh_install_starts_linked_to_nothing_and_lets_the_saas_choose() {
-        let (entries, linked) = boot_link(None, None, None, "https://erplora.com");
+        let (entries, linked) = boot_link(None, None, "https://erplora.com");
         assert_eq!(entries, vec!["https://erplora.com".to_string()]);
         assert_eq!(linked, None);
     }
 
     #[test]
     fn the_remembered_hub_is_the_linked_one_at_boot() {
-        let (_, linked) = boot_link(None, None, Some("https://panaderia.a.erplora.com"), "https://erplora.com");
+        let (_, linked) = boot_link(None, Some("https://panaderia.a.erplora.com"), "https://erplora.com");
         assert_eq!(linked.as_deref(), Some("https://panaderia.a.erplora.com"));
     }
 
+    // ── hub#2644: a link to another hub waits for the person's word ─────────────────────────────
+
     #[test]
-    fn a_cold_start_by_a_link_links_the_hub_of_the_link_not_the_remembered_one() {
-        let (_, linked) = boot_link(
-            Some("https://otronegocio.a.erplora.com/?shell=1"),
-            None,
-            Some("https://panaderia.a.erplora.com"),
-            "https://erplora.com",
+    fn a_cold_start_by_a_link_to_another_hub_boots_on_the_linked_one_and_asks() {
+        let (_, linked) = boot_link(None, Some("https://panaderia.a.erplora.com"), "https://erplora.com");
+        assert_eq!(linked.as_deref(), Some("https://panaderia.a.erplora.com"));
+        assert_eq!(
+            cold_start_link(Some("https://otronegocio.a.erplora.com/?shell=1"), linked.as_deref()),
+            ColdStartLink::Ask("https://otronegocio.a.erplora.com/?shell=1".into())
         );
-        assert_eq!(linked.as_deref(), Some("https://otronegocio.a.erplora.com"));
+    }
+
+    #[test]
+    fn a_cold_start_by_a_link_to_the_linked_hub_boots_on_it_without_asking() {
+        assert_eq!(
+            cold_start_link(
+                Some("https://panaderia.a.erplora.com/?shell=1"),
+                Some("https://panaderia.a.erplora.com")
+            ),
+            ColdStartLink::Open("https://panaderia.a.erplora.com/?shell=1".into())
+        );
+    }
+
+    #[test]
+    fn a_cold_start_by_a_link_on_a_device_linked_to_nothing_asks() {
+        assert_eq!(
+            cold_start_link(Some("https://otronegocio.a.erplora.com/?shell=1"), None),
+            ColdStartLink::Ask("https://otronegocio.a.erplora.com/?shell=1".into())
+        );
+        assert_eq!(cold_start_link(None, Some("https://panaderia.a.erplora.com")), ColdStartLink::None);
+    }
+
+    /// A till as it stands after booting on the bakery it remembers (`boot_link` links it, the
+    /// window shows it), and the person in front of it: `None` is nobody there to ask.
+    fn till_of_the_bakery(
+        linked: Option<&str>,
+        person: Option<bool>,
+    ) -> (tauri::App<tauri::test::MockRuntime>, Arc<std::sync::Mutex<Vec<link_consent::Question>>>) {
+        use tauri::Manager;
+        let app = app_with_kept_tap();
+        let (entries, _) = boot_link(None, linked, "https://erplora.com");
+        let showing = linked.map(|hub| url(&format!("{hub}/")));
+        let link = hub_link::HubLink::new(entries, showing.as_ref());
+        if let Some(hub) = linked {
+            link.link(hub);
+        }
+        app.manage(link);
+        let start = showing.unwrap_or_else(|| url("https://erplora.com/shell/"));
+        tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::External(start))
+            .build()
+            .expect("mock window");
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        if let Some(open) = person {
+            let heard = asked.clone();
+            app.manage(link_consent::AskBeforeLinking::new(move |question, answer| {
+                heard.lock().expect("questions").push(question);
+                answer(open);
+            }));
+        }
+        (app, asked)
+    }
+
+    fn window_url(app: &tauri::App<tauri::test::MockRuntime>) -> String {
+        use tauri::Manager;
+        app.get_webview_window("main").expect("window").url().expect("url").to_string()
+    }
+
+    fn linked_hub(app: &tauri::App<tauri::test::MockRuntime>) -> Option<String> {
+        use tauri::Manager;
+        app.state::<hub_link::HubLink>().linked()
+    }
+
+    const BAKERY: &str = "https://panaderia.a.erplora.com";
+    const OTHER_LINK: &str = "https://otronegocio.a.erplora.com/?shell=1";
+
+    #[test]
+    fn a_link_to_another_hub_does_not_move_the_till_with_nobody_to_ask() {
+        let (app, _) = till_of_the_bakery(Some(BAKERY), None);
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY), "the printer went to the link's hub");
+        assert_eq!(window_url(&app), "https://panaderia.a.erplora.com/");
+    }
+
+    #[test]
+    fn a_link_to_another_hub_links_it_once_the_person_says_open() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(true));
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(
+            *asked.lock().expect("questions"),
+            vec![link_consent::Question {
+                to: "otronegocio.a.erplora.com".into(),
+                from: Some("panaderia.a.erplora.com".into()),
+            }]
+        );
+        assert_eq!(linked_hub(&app).as_deref(), Some("https://otronegocio.a.erplora.com"));
+        assert_eq!(window_url(&app), OTHER_LINK);
+    }
+
+    #[test]
+    fn cancelling_leaves_the_till_on_its_business() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(false));
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(asked.lock().expect("questions").len(), 1, "nobody was asked");
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY));
+        assert_eq!(window_url(&app), "https://panaderia.a.erplora.com/");
+    }
+
+    #[test]
+    fn a_link_to_the_linked_hub_opens_it_without_asking() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(false));
+        open_hub_from_link(app.handle(), "https://panaderia.a.erplora.com/?shell=1");
+        assert!(asked.lock().expect("questions").is_empty(), "the till asked to open its own hub");
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY));
+        assert_eq!(window_url(&app), "https://panaderia.a.erplora.com/?shell=1");
+    }
+
+    #[test]
+    fn a_link_on_a_till_linked_to_nothing_asks_too() {
+        // A fresh install (or one that just changed business): yes would link the hub AND remember
+        // it for every boot to come, so a link from an email has to ask here as well.
+        let (app, asked) = till_of_the_bakery(None, Some(false));
+        open_hub_from_link(app.handle(), OTHER_LINK);
+        assert_eq!(
+            *asked.lock().expect("questions"),
+            vec![link_consent::Question { to: "otronegocio.a.erplora.com".into(), from: None }]
+        );
+        assert_eq!(linked_hub(&app), None);
+        assert_eq!(window_url(&app), "https://erplora.com/shell/");
     }
 
     #[test]
     fn the_development_override_links_a_local_hub_but_not_a_local_saas() {
         let (entries, linked) =
-            boot_link(None, Some("http://127.0.0.1:5173/"), None, "https://erplora.com");
+            boot_link(Some("http://127.0.0.1:5173/"), None, "https://erplora.com");
         assert_eq!(linked.as_deref(), Some("http://127.0.0.1:5173"));
         assert!(entries.contains(&"http://127.0.0.1:5173".to_string()));
         let (entries, linked) = boot_link(
-            None,
             Some("http://127.0.0.1:8001/shell/"),
             Some("https://panaderia.a.erplora.com"),
             "http://127.0.0.1:8001",
@@ -2751,17 +2941,11 @@ mod tests {
 
     #[cfg(desktop)]
     #[test]
-    fn a_link_to_a_hub_while_the_app_is_open_links_that_hub() {
-        use tauri::Manager;
-        let app = app_with_kept_tap();
-        let link = hub_link::HubLink::new(vec!["https://erplora.com".into()], None);
-        link.link("https://panaderia.a.erplora.com");
-        app.manage(link);
+    fn a_link_handed_over_by_a_second_launch_asks_before_linking_its_hub() {
+        let (app, asked) = till_of_the_bakery(Some(BAKERY), Some(false));
         on_second_launch(app.handle(), vec!["ERPlora.exe".into(), "erplora://hub/otronegocio.a.erplora.com".into()]);
-        assert_eq!(
-            app.state::<hub_link::HubLink>().linked().as_deref(),
-            Some("https://otronegocio.a.erplora.com")
-        );
+        assert_eq!(asked.lock().expect("questions").len(), 1, "nobody was asked");
+        assert_eq!(linked_hub(&app).as_deref(), Some(BAKERY));
     }
 
     #[test]
@@ -2813,6 +2997,20 @@ mod tests {
         assert!(
             body_of("pub fn run() {").contains("Some(target) => open_hub_from_link(&handle, &target)"),
             "a link with the app open navigates without linking its hub"
+        );
+        // hub#2644: the person is asked by the system's own dialog, set up before the window
+        // exists, and a cold start by a link to another hub goes through that same question.
+        let setup = body_of("pub fn run() {").split(".setup(|app| {").nth(1).unwrap_or_default();
+        let asker = setup.find("app.manage(link_consent::native(app.handle().clone()))");
+        let window_opens = setup.find("open_main_window(app, cache_dir)");
+        assert!(
+            matches!((asker, window_opens), (Some(a), Some(w)) if a < w),
+            "a link reaches a till with nobody to ask (asker {asker:?}, window {window_opens:?})"
+        );
+        assert!(window.contains("cold_start_link(deep_link.as_deref(), linked.as_deref())"));
+        assert!(
+            window.contains("ColdStartLink::Ask(target) => open_hub_from_link(app.handle(), &target)"),
+            "a cold start by a link to another hub never asks"
         );
     }
 

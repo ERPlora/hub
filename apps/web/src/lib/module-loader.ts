@@ -411,6 +411,12 @@ export interface ModuleLocaleFile {
    * `lib/module-quota.ts`.
    */
   billing?: ModuleBillingLocale;
+  /**
+   * The module's own screen strings, flat by key (`ui.cash` → `ui: { cash }`). The shell reads one
+   * of them only where it paints a module's data outside that module's screen: Home › Activity
+   * names `sales`' factory payment methods with these words (hub#2590).
+   */
+  ui?: Record<string, unknown>;
 }
 
 export interface InstalledManifest {

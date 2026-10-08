@@ -60,30 +60,42 @@ QA: qa-hub-android Fase 0, qa-hub-android Fase 1
 ### HUB_APP-F03 Abrir un negocio desde un enlace
 Estado: hecho
 Actor: administrador, responsable, empleado
-Pantalla: Ventana de ERPlora
+Pantalla: Ventana de ERPlora, «¿Abrir … en este dispositivo?»
 Pasos:
 1. En el SaaS o en un correo, pulsa «Abrir» en la aplicación (un enlace `erplora://hub/<dirección>`).
-2. El sistema pregunta qué abrir: si ERPlora está cerrada, **arranca directa en ese negocio** (gana al
-   recordado y al de desarrollo, y no comprueba si el recordado sigue existiendo); si está abierta, la
-   misma ventana salta a ese negocio. En ordenador nunca se abre una segunda ventana.
-3. La aplicación **enlaza** el negocio del enlace antes de navegar (es ella quien recibe el enlace del
-   sistema, no la página), y queda recordado como en HUB_APP-F02.
-4. Si la aplicación no está instalada, no pasa nada en el sistema: la página que lanzó el enlace espera
+2. Si el enlace lleva al **negocio enlazado**, la aplicación va a él sin preguntar: si estaba cerrada, arranca
+   directa en él; si estaba abierta, la misma ventana salta a él. En ordenador nunca se abre una segunda ventana.
+3. Si lleva a **otro negocio** (o el dispositivo no tiene ninguno enlazado: instalación nueva o recién cambiado de
+   negocio), la aplicación **pregunta antes** con un diálogo del sistema, nunca de la página: «¿Abrir
+   <dirección> en este dispositivo?» / «Open <dirección> on this device?», con el aviso de lo que se entrega
+   («Este dispositivo está enlazado a <el actual>. Si abres <dirección>, a partir de ahora usará la impresora, el
+   cajón y el lector de tarjetas de este dispositivo, y la aplicación lo abrirá cada vez que arranque.»; sin la
+   primera frase si no hay ninguno enlazado) y los botones «Abrir» y «Cancelar» («Open», «Cancel»); en ordenador
+   el botón por defecto (Intro) es «Cancelar», porque el lector de códigos del mostrador teclea un Intro tras cada lectura. Si estaba
+   cerrada, arranca primero donde lo haría sin enlace (el negocio recordado, con su chequeo de HUB_APP-F05, o el
+   SaaS) y pregunta encima. En ordenador va en español salvo que el sistema diga otro idioma (entonces en inglés);
+   en Android, igual con el idioma del dispositivo (`AlertDialog` del plugin propio, que ninguna página puede
+   abrir ni contestar).
+4. Con «Abrir», la aplicación **enlaza** ese negocio y lleva la ventana a él; queda recordado como en
+   HUB_APP-F02. Con «Cancelar», cerrando el diálogo, Atrás o tocando fuera, no cambia nada: el mostrador sigue
+   en su negocio, con su hardware.
+5. Si la aplicación no está instalada, no pasa nada en el sistema: la página que lanzó el enlace espera
    800 ms y lleva el navegador al negocio por https (o a la descarga si la aplicación es obligatoria).
 Entra: un enlace con exactamente una pieza tras `hub/`: una dirección `*.erplora.com` (incluidos `www` y `pre`;
-mayúsculas o minúsculas) o un bucle local con **cualquier** puerto numérico (`lib.rs:297-304`).
-Sale: la ventana en `https://<dirección>/?shell=1`; nada más. La dirección se reconstruye solo desde
-el nombre: ni consulta ni fragmento ni parámetros se leen.
+mayúsculas o minúsculas) o un bucle local con **cualquier** puerto numérico (`hub_url_for_host`); y, si es otro
+negocio, la respuesta de la persona.
+Sale: la ventana en `https://<dirección>/?shell=1` (tras «Abrir» si es otro negocio); nada más. La dirección se
+reconstruye solo desde el nombre: ni consulta ni fragmento ni parámetros se leen.
 Si falla: un enlace que no cuadra (otro dominio, el apex, con usuario, con puerto, con más trozos) no
 hace nada, en silencio y a propósito: el que decide qué mostrar es el navegador que lo lanzó. Un
-negocio inexistente sí se acepta (se valida la forma, no la existencia). **Cualquier página o correo puede mandar este enlace y cambiar el negocio recordado —y enlazado, con el
-hardware— del mostrador sin preguntar** (`open_hub_from_link`, `boot_link`; ERPlora/hub#2644). Un enlace `erplora://notice` no es una navegación: es el
-clic en un aviso (HUB_APP-F25).
+negocio inexistente sí se acepta (se valida la forma, no la existencia) y se pregunta igual. Si el diálogo no
+puede enseñarse o no contesta «Abrir», el enlace **no se sigue** (ni enlaza ni navega); sin quien pregunte (iOS,
+que no se construye) tampoco (ERPlora/hub#2644). Un enlace `erplora://notice` no es una navegación: es el clic en un aviso (HUB_APP-F25).
 Implicados: HUB_SHELL-F19, SAAS_DASHBOARD-F06
 QA: ninguno
 
 ### HUB_APP-F04 Cambiar de negocio
-Estado: parcial — el aviso dice «Este dispositivo cerrará la sesión de este negocio», pero no se cierra nada: quedan en la ventana la sesión del hub (12 h en dispositivo compartido, hasta 30 días en personal), el nombre y el correo de la persona y sus credenciales de erplora.com; el servidor no revoca la sesión; un enlace `erplora://hub/<el anterior>` vuelve a entrar sin pasar por erplora.com; y en Android sigue encendido el aviso «a la escucha» (leído, sin ejecutar)
+Estado: parcial — el aviso dice «Este dispositivo cerrará la sesión de este negocio», pero no se cierra nada: quedan en la ventana la sesión del hub (12 h en dispositivo compartido, hasta 30 días en personal), el nombre y el correo de la persona y sus credenciales de erplora.com; el servidor no revoca la sesión; un enlace `erplora://hub/<el anterior>` vuelve a entrar sin pasar por erplora.com con solo contestar «Abrir» (HUB_APP-F03); y en Android sigue encendido el aviso «a la escucha» (leído, sin ejecutar)
 Actor: administrador, responsable
 Pantalla: HUB_SHELL: Barra superior
 Pasos:
@@ -120,8 +132,8 @@ Pasos:
 Entra: el `hub.url` y la respuesta del negocio.
 Sale: el fichero borrado y la ventana en el SaaS. La asimetría es a propósito: olvidar de más obliga a
 rehacer el alta; olvidar de menos deja una pantalla fea que se arregla sola.
-Si falla: sin red no olvida nada (HUB_APP-F11). Sin confirmar: qué contesta hoy la dirección de un negocio pausado (servicio a cero réplicas) desde que el borde dejó Cloudflare; si fuera un 404, la aplicación lo olvidaría como si se hubiera borrado. Con un enlace de apertura (HUB_APP-F03) no corre el
-chequeo, para no llevarse por delante lo que se acaba de pedir. Se ve el 404 un instante antes del
+Si falla: sin red no olvida nada (HUB_APP-F11). Sin confirmar: qué contesta hoy la dirección de un negocio pausado (servicio a cero réplicas) desde que el borde dejó Cloudflare; si fuera un 404, la aplicación lo olvidaría como si se hubiera borrado. Con un enlace de apertura al negocio enlazado (HUB_APP-F03) no corre el
+chequeo, para no llevarse por delante lo que se acaba de pedir; con uno a otro negocio sí corre, sobre el recordado, mientras se pregunta. Se ve el 404 un instante antes del
 SaaS.
 Implicados: SAAS_DASHBOARD-F23, SAAS_DASHBOARD-F24
 QA: qa-hub-android Fase 1
@@ -167,7 +179,7 @@ Pasos:
    la da el plugin `plugin:app` de Tauri, que no se puede envolver y ningún juego concede, sino
    `erplora_bridge_status`, detrás de la puerta (ERPlora/hub#2658).
 4. Qué negocio está enlazado lo decide la aplicación: el recordado al arrancar, el de un enlace
-   `erplora://hub/…` (HUB_APP-F03), o el que el SaaS elige con `?shell=1` (HUB_APP-F02); se desenlaza al
+   `erplora://hub/…` tras contestar «Abrir» (HUB_APP-F03), o el que el SaaS elige con `?shell=1` (HUB_APP-F02); se desenlaza al
    cambiar de negocio o al olvidar uno borrado (HUB_APP-F04, F05).
 5. El negocio recordado y la lista de destinos de un enlace salen de una regla parecida pero **no idéntica** a la de
    los juegos: se recuerda el bucle local con cualquier puerto y `https` sobre bucle local (`lib.rs:617-619`), que
