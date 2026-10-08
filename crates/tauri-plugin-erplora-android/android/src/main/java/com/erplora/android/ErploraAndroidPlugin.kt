@@ -1,6 +1,7 @@
 package com.erplora.android
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,6 +20,7 @@ import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import java.io.File
+import java.util.Locale
 
 /**
  * Permisos de runtime del TPV en Android.
@@ -128,6 +130,46 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve()
         } catch (e: ActivityNotFoundException) {
             invoke.reject("app_settings_unavailable")
+        }
+    }
+
+    /**
+     * `askToOpenHub` (hub#2644) — «Open <hub> on this device?» before a link links another hub.
+     *
+     * Only Rust calls it (`ErploraAndroid::ask_to_open_hub`): it is in neither `build.rs` nor the
+     * default permissions, so no page can show it. The words come in both languages and the
+     * device's is picked here ([HubQuestion]). Answers `{ open: true }` for «Open» only: «Cancel»,
+     * Back, a tap outside or a dialog that goes away for any other reason are a no. Words missing,
+     * REJECTS: the app reads a failure as a no.
+     */
+    @Command
+    fun askToOpenHub(invoke: Invoke) {
+        val all = invoke.getArgs()
+        val language = all.getJSObject(HubQuestion.languageOf(Locale.getDefault().language))
+        val words = HubQuestion.wordsOf(
+            language?.getString("title", null),
+            language?.getString("message", null),
+            language?.getString("open", null),
+            language?.getString("cancel", null),
+        )
+        if (words == null) {
+            invoke.reject("ask_to_open_hub needs the words of the question")
+            return
+        }
+        activity.runOnUiThread {
+            var answered = false
+            fun answer(open: Boolean) {
+                if (answered) return
+                answered = true
+                invoke.resolve(JSObject().put("open", open))
+            }
+            AlertDialog.Builder(activity)
+                .setTitle(words.title)
+                .setMessage(words.message)
+                .setPositiveButton(words.open) { _, _ -> answer(true) }
+                .setNegativeButton(words.cancel) { _, _ -> answer(false) }
+                .setOnDismissListener { answer(false) }
+                .show()
         }
     }
 

@@ -119,6 +119,51 @@ pub(crate) struct Prepared {
     pub recorded_input: Json,
 }
 
+/// The header an API reads to recognise a repeated request (Stripe, Adyen, GoCardless, Mollie and
+/// the IETF `Idempotency-Key` draft spell it this way).
+pub const IDEMPOTENCY_KEY_HEADER: &str = "Idempotency-Key";
+
+impl Prepared {
+    /// **One key per run and step** (hub#2659). The step is at-least-once — a hub that dies mid-call
+    /// re-issues it once the lease expires — so every attempt carries the same `Idempotency-Key`
+    /// and the other system can tell the repeat from a second order. It is derived, not stored:
+    /// the reclaimed run rebuilds exactly the same one, and another run of the same flow gets
+    /// another one.
+    ///
+    /// A key the author wrote (any casing) wins: they may want the other system to dedupe on their
+    /// own data, such as an order number, and two keys in one request would be read as neither.
+    /// The run history records the key too, so a call can be matched against the other side's log.
+    pub(crate) fn with_idempotency_key(mut self, run_id: &str, step_id: &str) -> Self {
+        if self
+            .request
+            .headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case(IDEMPOTENCY_KEY_HEADER))
+        {
+            return self;
+        }
+        let key = idempotency_key(run_id, step_id);
+        self.request
+            .headers
+            .push((IDEMPOTENCY_KEY_HEADER.to_string(), key.clone()));
+        if let Some(recorded) = self.recorded_input["headers"].as_object_mut() {
+            recorded.insert(IDEMPOTENCY_KEY_HEADER.to_string(), json!(key));
+        }
+        self
+    }
+}
+
+/// A UUID (36 characters, inside every provider's length limit) that only depends on the run and
+/// the step. The run id is already unique per hub and per execution; the step id tells apart two
+/// calls of the same run.
+fn idempotency_key(run_id: &str, step_id: &str) -> String {
+    uuid::Uuid::new_v5(
+        &uuid::Uuid::NAMESPACE_URL,
+        format!("erplora:flow-run:{run_id}:step:{step_id}").as_bytes(),
+    )
+    .to_string()
+}
+
 /// Builds the request of an `http` step, or refuses it.
 ///
 /// Refuses when: the rendered URL is not an absolute http(s) URL, a referenced secret does not
@@ -595,5 +640,24 @@ mod tests {
             1,
             "the author declared the type; nothing is added on top"
         );
+    }
+
+    /// hub#2659 — the e2e (`flow_http_sent_once_after_restart_hub2659`) pins one step across a
+    /// restart and two runs; this pins the third axis: two calls of the SAME run are two calls.
+    #[test]
+    fn hub2659_the_idempotency_key_is_stable_per_run_and_step_and_differs_between_steps() {
+        let key = idempotency_key("run-1", "charge");
+        assert_eq!(
+            key,
+            idempotency_key("run-1", "charge"),
+            "same attempt, same key"
+        );
+        assert_ne!(
+            key,
+            idempotency_key("run-1", "refund"),
+            "another step of the run"
+        );
+        assert_ne!(key, idempotency_key("run-2", "charge"), "another run");
+        assert_eq!(key.len(), 36, "fits every provider's limit (Square: 45)");
     }
 }

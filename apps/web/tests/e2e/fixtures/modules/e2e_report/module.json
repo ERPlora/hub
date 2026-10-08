@@ -1,0 +1,25 @@
+{
+  "id": "e2e_report",
+  "name": "E2E Report",
+  "version": "1.0.0",
+  "permissions": ["e2e_report.view"],
+  "role_permissions": {
+    "admin": ["e2e_report.view"]
+  },
+  "queries": {
+    "e2e_report.figures.get": {
+      "permission": "e2e_report.view",
+      "sql": "queries/figures_get.sql"
+    }
+  },
+  "ui": { "entry": "dist/e2e_report.esm.js" },
+  "navigation": [
+    {
+      "id": "figures",
+      "label": "Figures",
+      "icon": "bar-chart-outline",
+      "component": "erp-e2e-report",
+      "permission": "e2e_report.view"
+    }
+  ]
+}

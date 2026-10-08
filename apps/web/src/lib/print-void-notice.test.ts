@@ -95,6 +95,64 @@ describe('the words on the void slip exist in English and in Spanish', () => {
   });
 });
 
+// hub#2640 — the slip of ONE voided dish: the round's sentence («that order is no longer to be
+// made») would send the cook to bin the whole table. Its own sentences name the dish.
+describe('the void slip of one dish that did not print (hub#2640)', () => {
+  it('is an error with the dish sentence, not the round one', () => {
+    const n = voidFailureNotice(failure({ dish: 'Croquetas' }), words);
+    expect(n.messageKey).toBe('print.voidDishFailed');
+    expect(n.color).toBe('danger');
+    expect(n.duration).toBeGreaterThanOrEqual(6000);
+  });
+
+  it('waiting for a printer is a warning with the dish sentence', () => {
+    const n = voidFailureNotice(failure({ dish: 'Croquetas', awaitingHost: true }), words);
+    expect(n.messageKey).toBe('print.voidDishWaitingForPrinter');
+    expect(n.color).toBe('warning');
+    expect(n.duration).toBeGreaterThanOrEqual(6000);
+  });
+
+  for (const [lang, station] of [
+    ['en', en.print.stationKitchen],
+    ['es', es.print.stationKitchen],
+  ] as const) {
+    for (const awaitingHost of [false, true]) {
+      it(`names the dish, the table and the station (${lang}, ${awaitingHost ? 'waiting' : 'failed'})`, () => {
+        locale.value = lang;
+        const text = painted(voidFailureNotice(failure({ dish: 'Croquetas', awaitingHost }), words));
+        expect(text).toContain('Croquetas');
+        expect(text).toContain('Table 4');
+        expect(text).toContain(station);
+        expect(text).not.toContain('void_slip_not_delivered');
+        expect(text).not.toMatch(/[{}]/);
+      });
+    }
+  }
+});
+
+describe('the words on the slip of one voided dish exist in English and in Spanish (hub#2640)', () => {
+  for (const [lang, catalogue] of [
+    ['en', en],
+    ['es', es],
+  ] as const) {
+    it(lang, () => {
+      const p = catalogue.print as Record<string, string>;
+      expect(p.voidDishLabel).toContain('{label}');
+      expect(p.voidDishLabel.startsWith(p.voidDishLabelBare)).toBe(true);
+      // On paper it must not read like the slip of a whole round.
+      expect(p.voidDishLabelBare).not.toBe(p.voidLabelBare);
+      expect(p.voidDishFailed).toContain('{dish}');
+      expect(p.voidDishFailed).toContain('{station}');
+      expect(p.voidDishWaitingForPrinter).toContain('{dish}');
+      expect(p.voidDishWaitingForPrinter).toContain('{station}');
+    });
+  }
+
+  it('the Spanish slip does not say it in English', () => {
+    expect(es.print.voidDishLabelBare).not.toBe(en.print.voidDishLabelBare);
+  });
+});
+
 const MAIN = readFileSync(fileURLToPath(new URL('../main.ts', import.meta.url)), 'utf8');
 
 function voidBoot(source: string): string {

@@ -52,6 +52,19 @@ export function comandaFailureNotice(f: ComandaPrintFailure, words: NoticeWords)
  */
 export function voidFailureNotice(f: ComandaPrintFailure, words: NoticeWords): PrintNotice {
   const params = { label: f.label || words.t('print.comandaDefaultLabel'), station: stationName(f.role, words) };
+  // ONE dish voided (hub#2640): «that order is no longer to be made» would stop the whole table.
+  if (f.dish) {
+    const dishParams = { ...params, dish: f.dish };
+    if (f.awaitingHost) {
+      return {
+        messageKey: 'print.voidDishWaitingForPrinter',
+        params: dishParams,
+        color: 'warning',
+        duration: READ_A_SENTENCE_MS,
+      };
+    }
+    return { messageKey: 'print.voidDishFailed', params: dishParams, color: 'danger', duration: READ_A_SENTENCE_MS };
+  }
   if (f.awaitingHost) {
     return { messageKey: 'print.voidWaitingForPrinter', params, color: 'warning', duration: READ_A_SENTENCE_MS };
   }

@@ -310,7 +310,7 @@ Pasos:
    debajo; la nota del camarero con «>>» y sin realce; las líneas de un menú, agrupadas bajo su nombre
    y sangradas.
 4. Una comanda marcada urgente cierra con «URGENTE» en grande. Se corta el papel.
-5. El vale de anulación de una ronda cancelada (HUB_SHELL-F78) es esta misma comanda: «ANULADA · Mesa 4» donde va la mesa y cada plato con la cantidad en negativo («-2x Croquetas», «-0.5x Flan»); el signo sale tal cual, nunca se redondea a positivo.
+5. El vale de anulación de una ronda cancelada o de un plato anulado en el TPV (HUB_SHELL-F78) es esta misma comanda: «ANULADA · Mesa 4» (o «PLATO ANULADO · Mesa 4» para un solo plato) donde va la mesa y cada plato con la cantidad en negativo («-2x Croquetas», «-0.5x Flan»); el signo sale tal cual, nunca se redondea a positivo.
 Entra: el documento que compone `kitchen` (o el shell): número, etiqueta de sala, camarero, ronda,
 prioridad y líneas con cantidad, nombre, suplementos, nota y menú.
 Sale: el papel. La función (Cocina o Barra) la decide el hub; esta parte pinta lo mismo en las dos.

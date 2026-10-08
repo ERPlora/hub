@@ -159,16 +159,16 @@ Implicados: HUB-F136, HUB-F140, SALES-F17
 QA: ninguno
 
 ### HUB_SHELL-F09 Cambiar de usuario sin perder la venta
-Estado: parcial — el relevo no acepta la placa, solo nombre y PIN (el acceso y la aprobación sí la aceptan); [SEG] la pantalla abierta sigue enseñando lo que veía quien se fue hasta que se navega (hub#2539); el asistente conserva su texto y adjuntos sin enviar (HUB_SHELL-F195, hub#2538); las caras son las de HUB_SHELL-F04 (lista leída al abrir ERPlora)
+Estado: parcial — el relevo no acepta la placa, solo nombre y PIN (el acceso y la aprobación sí la aceptan); las caras son las de HUB_SHELL-F04 (lista leída al abrir ERPlora)
 Actor: responsable, empleado
 Pantalla: Cambiar de usuario
 Pasos:
 1. En una caja compartida y de confianza cuyo negocio pide PIN, abre la tarjeta de usuario del menú y pulsa «Cambiar de usuario» (no sale en ningún otro caso).
 2. Sobre la pantalla en curso se abre **Cambiar de usuario**: «La venta sigue abierta. A partir de ahora queda a nombre de quien entre aquí.» y «¿Quién se pone?» con una cara por persona.
 3. Toca la tuya y teclea el PIN. La flecha («Otra persona») vuelve a las caras; «Cancelar» cierra sin cambiar nada.
-4. Sale «Ahora atiende {name}»; la pantalla sigue donde estaba y lo siguiente queda a nombre de quien entró.
+4. Sale «Ahora atiende {name}»; la pantalla sigue donde estaba, pero montada de nuevo para quien entró: lo que se ve lo ha leído con su sesión, y «atrás» ya no lleva a las pantallas que había abierto quien se fue. La venta en curso sigue (la caja recuerda su cuenta abierta) y lo siguiente queda a nombre de quien entró. Si estaba en una app, o en una pestaña de una app, que su lanzador no le da (o el lanzador no se pudo leer), la caja va a **Inicio**. El panel del asistente se cierra y, al abrirlo, está vacío (HUB_SHELL-F195).
 Entra: el nombre y el PIN de quien entra; la sesión de quien sale.
-Sale: abre la sesión nueva por la misma puerta que HUB_SHELL-F04 y, solo cuando la tiene, cierra la anterior; olvida los tokens de erplora.com, el idioma, la apariencia y la conversación del asistente de quien se fue, y vuelve a leer para quien entra el plan, el lanzador y «Mis apps», y la lista «Termina de configurar tu negocio», en ese orden (hub#2506). Si una de esas lecturas falla, se ve que no se pudo cargar, nunca la lista de quien se fue.
+Sale: abre la sesión nueva por la misma puerta que HUB_SHELL-F04 y, solo cuando la tiene, cierra la anterior; olvida los tokens de erplora.com, el idioma, la apariencia y la conversación del asistente de quien se fue, y vuelve a leer para quien entra el plan, el lanzador y «Mis apps», y la lista «Termina de configurar tu negocio», en ese orden (hub#2506). Si una de esas lecturas falla, se ve que no se pudo cargar, nunca la lista de quien se fue. Después vuelve a montar la pantalla abierta y el panel del asistente (cerrado, sin texto, adjuntos, aviso de cuota ni modo configuración de quien se fue), o lleva a Inicio si esa pantalla no es para quien entra (hub#2539, hub#2538).
 Si falla: PIN o nombre erróneos: «Esos datos no han funcionado. Revisa el nombre y el PIN, y vuelve a intentarlo.» y quien estaba dentro sigue dentro. Dispositivo sin dar de alta: «Este dispositivo todavía no está dado de alta para el PIN. Entra una vez con una cuenta de ERPlora en él y el PIN funcionará a partir de entonces.»; sin identificar: «Este dispositivo no ha podido identificarse. Recarga la página y vuelve a intentarlo.». Demasiados intentos: la frase de HUB_SHELL-F04. Si el hub aún no ha dado la lista de caras, se escribe «Su nombre» y se pulsa «Continuar».
 Implicados: HUB-F138
 QA: qa-hub-restaurant §7.02, L-13

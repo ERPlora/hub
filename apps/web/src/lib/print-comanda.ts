@@ -91,6 +91,11 @@ export interface ComandaPrintFailure {
    * así que la comida no se empieza. Quien pinta el aviso elige la frase con esto.
    */
   awaitingHost?: boolean;
+  /**
+   * The slip takes back ONE dish the till voided, not the round (hub#2640): the notice names it, so
+   * the station is told to stop that dish and not the whole table.
+   */
+  dish?: string;
 }
 
 /**

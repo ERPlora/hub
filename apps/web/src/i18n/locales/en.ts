@@ -922,6 +922,14 @@ export default {
       'The {station} void slip for {label} did not print. Tell the {station} out loud: that order is no longer to be made.',
     voidWaitingForPrinter:
       'The {station} void slip for {label} is waiting: no printer is set up for that station yet. Tell the {station} out loud: that order is no longer to be made.',
+    // hub#2640: the slip of ONE dish the till voided. Not «VOID» alone: on paper that reads as the
+    // whole round, and the cook would bin the rest of the table.
+    voidDishLabel: 'VOID ITEM · {label}',
+    voidDishLabelBare: 'VOID ITEM',
+    voidDishFailed:
+      'The {station} void slip for {dish} at {label} did not print. Tell the {station} out loud: that dish is no longer to be made.',
+    voidDishWaitingForPrinter:
+      'The {station} void slip for {dish} at {label} is waiting: no printer is set up for that station yet. Tell the {station} out loud: that dish is no longer to be made.',
   },
   // The system notices for a booking or a cancellation that did NOT come from a till (hub#2168):
   // a salon's twin of the kitchen order's notice above. `createdFor`/`cancelledFor` name the
@@ -2072,7 +2080,7 @@ export default {
     save: 'Save',
     saved: 'Settings saved.',
     saveError: 'Could not save settings.',
-    adminOnly: 'Only an administrator can change these settings.',
+    noSavePermission: 'You do not have permission to change these settings. Ask an administrator if you need to.',
     textPlaceholder: 'Type here…',
     invalidFields: 'Check the fields marked below and save again.',
     fieldInvalid: 'This value is not accepted.',

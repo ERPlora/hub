@@ -180,8 +180,8 @@
       {{ saveRefusal }}
     </ok-inline-feedback>
 
-    <p v-if="!canEdit" class="text-sm opacity-70 mt-2 px-1" data-testid="module-settings-admin-only">
-      {{ t('moduleSettings.adminOnly') }}
+    <p v-if="!canEdit" class="text-sm opacity-70 mt-2 px-1" data-testid="module-settings-read-only">
+      {{ t('moduleSettings.noSavePermission') }}
     </p>
 
     <ion-button
@@ -236,7 +236,7 @@ import { ErploraError, type ErploraClient } from '@erplora/module-sdk';
 import HubIcon from './HubIcon.vue';
 import { getClient } from '../lib/runtime';
 import { runtimeErrorKey } from '../lib/runtime-error-sentence';
-import { isAdmin } from '../lib/session';
+import { hasPermission, isAdmin } from '../lib/session';
 import { loadInstalledManifests, loadModuleComponent, loadModuleLocale } from '../lib/module-loader';
 import { moduleBase } from '../lib/module-url';
 import { toastSuccess, toastError } from '../lib/toast';
@@ -249,6 +249,7 @@ import {
   settingsHeading,
   settingsOptionLabel,
   settingsPreviewTag,
+  settingsSaveAllowed,
   type ModuleSettingControl,
   type ModuleSettingsLocale,
 } from '../lib/module-settings';
@@ -258,6 +259,8 @@ const props = defineProps<{
   settings: ModuleSettingsDef;
   /** Lo que la barra de la pantalla YA dice (nombre del módulo, localizado). Ver `settingsHeading`. */
   pageTitle?: string;
+  /** Permission of the module's save command (`settingsSavePermission`); `null`/absent = none. */
+  savePermission?: string | null;
 }>();
 
 const { t, te, locale } = useI18n();
@@ -270,9 +273,13 @@ const saving = ref(false);
 // Snapshot editable de los ajustes (clave → valor). Se construye de defaults + fila singleton.
 const model = reactive<Record<string, unknown>>({});
 
-// El form solo edita si el usuario es admin (el runtime revalida el command en server; aquí el gate
-// es cosmético). Los módulos cuyo command `set` no exija admin seguirían funcionando para todos.
-const canEdit = computed(() => isAdmin.value);
+// The form edits for whoever may run the save command — the same answer that shows the tab
+// (hub#2588, hub#2621): a manager holding the app's settings permission edits like an admin. It
+// reads the session, so a change of person locks or unlocks it. A filter of the screen: the hub
+// re-checks the command on Save.
+const canEdit = computed(() =>
+  settingsSaveAllowed(props.savePermission ?? null, { isAdmin: isAdmin.value, hasPermission }),
+);
 
 /** Un control resuelto a partir de una propiedad del JSON Schema. */
 interface Field {
@@ -508,7 +515,7 @@ async function runPreview(key: string): Promise<void> {
   }
 }
 
-/** Persiste el snapshot COMPLETO (upsert) vía el command `set`. Solo admin (el runtime revalida). */
+/** Persists the WHOLE snapshot (upsert) through the `set` command. Only if `canEdit` (the hub re-checks). */
 async function save(): Promise<void> {
   if (!canEdit.value) return;
   saving.value = true;

@@ -204,7 +204,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F30 | Instalar un módulo desde una carpeta en modo desarrollo | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F31 | Servir el menú, las pantallas y los ficheros de las aplicaciones | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F32 | Conceder o retirar un permiso de host a una aplicación | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
-| HUB-F33 | Leer y guardar los ajustes de un módulo | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
+| HUB-F33 | Leer y guardar los ajustes de un módulo | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F34 | Servir los datos de los paneles de Inicio | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F35 | Calcular la lista de puesta en marcha | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F50 | Dejar un aviso en la cola al guardar una orden | hecho | [avisos.md](workflow/avisos.md) |
@@ -236,13 +236,13 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F91 | Paso «Solo sigue si» | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F92 | Paso «Esperar» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F93 | Paso «Enviar un mensaje» a un cliente | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
-| HUB-F94 | Paso «Llamar a otro sistema» | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
+| HUB-F94 | Paso «Llamar a otro sistema» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F95 | Paso «Pedírselo al asistente» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F96 | Paso «Preguntar antes a alguien» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F97 | «Solo si» y «seguir si falla» en cada paso | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F98 | Conceder, limitar y retirar los permisos de una automatización | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F99 | Guardar secretos que no se pueden volver a leer | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
-| HUB-F100 | Decidir una pregunta o una propuesta que espera | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
+| HUB-F100 | Decidir una pregunta o una propuesta que espera | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F101 | Cerrar lo que nadie contestó a tiempo | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F102 | Guardar el historial de ejecuciones | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F103 | Reanudar una ejecución desde el paso que falló | no hecho | [automatizaciones.md](workflow/automatizaciones.md) |

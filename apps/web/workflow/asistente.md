@@ -191,7 +191,7 @@ Implicados: HUB-F273
 QA: qa-hub-assistant §R4
 
 ### HUB_SHELL-F195 La conversación: qué se guarda, dónde y cuándo se borra
-Estado: parcial — no hay «nueva conversación»: el hilo se reenvía entero en cada pregunta (el servicio solo lee los 100 mensajes más recientes, sin decirlo) y, si el cuerpo pasa de 2 MB, el hub lo rechaza y la persona solo sale cerrando sesión o cambiando de usuario; si el navegador no deja guardar (un adjunto grande), el hilo sigue en memoria pero no sobrevive a una recarga; recargar a mitad de una respuesta la pierde; al cambiar de usuario se borra el hilo pero no el texto ni los adjuntos sin enviar, ni el aviso de cuota agotada, ni el modo configuración
+Estado: parcial — no hay «nueva conversación»: el hilo se reenvía entero en cada pregunta (el servicio solo lee los 100 mensajes más recientes, sin decirlo) y, si el cuerpo pasa de 2 MB, el hub lo rechaza y la persona solo sale cerrando sesión o cambiando de usuario; si el navegador no deja guardar (un adjunto grande), el hilo sigue en memoria pero no sobrevive a una recarga; recargar a mitad de una respuesta la pierde
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:
@@ -200,7 +200,7 @@ Pasos:
 3. Se vacía el hilo, y con él se corta cualquier respuesta que estuviera llegando (se libera el cuadro), cuando: la persona cierra sesión; la sesión caduca o se pierde por inactividad o por abrirse en otro dispositivo; o **cambia de usuario con PIN** en la misma caja, en cuanto el PIN nuevo es aceptado.
 4. Si el PIN del cambio de usuario se rechaza, no se borra nada: quien estaba sigue dentro con su hilo.
 5. Lo que se guarda: lo que escribió la persona (con sus adjuntos), lo que respondió el asistente y los avisos de comprobación. No se guardan las órdenes ejecutadas ni lo que enseñó la tarjeta.
-6. Al cambiar de usuario **no** se limpian: el texto escrito y no enviado, los adjuntos sin enviar, el aviso de cuota agotada de quien se fue (sale bajo la primera respuesta de quien llega), el modo configuración (su panel vacío dice «Revisa la configuración de tu negocio…» y sus preguntas llevan ese contexto; no se apaga ni al cerrar sesión, hasta recargar) y el panel abierto. Cerrar sesión sí desmonta el panel y limpia texto, adjuntos y cuota.
+6. Al cambiar de usuario, con el PIN aceptado, también se van el texto escrito y no enviado, los adjuntos sin enviar, el aviso de cuota agotada de quien se fue y el modo configuración, y el panel se cierra: quien llega lo abre vacío (hub#2538). Cerrar sesión hace lo mismo.
 7. Para empezar de cero sin salir, hoy no hay botón.
 Entra: los mensajes del panel; los cierres de sesión y los relevos de usuario.
 Sale: la clave del navegador; en cada pregunta, el hilo entero va al servidor (HUB-F273) y se olvida al acabar el turno.
@@ -209,7 +209,7 @@ Implicados: HUB-F136, HUB-F138, HUB-F273, SAAS_ASSISTANT-F09
 QA: qa-hub-assistant §Pendiente (fase C) (cambio de usuario por PIN), qa-hub-restaurant §7.02
 
 ### HUB_SHELL-F196 El asistente en la puesta en marcha
-Estado: parcial — si la relectura de la lista falla, el asistente recibe la última lista leída como si fuera de ahora (solo dice «no se pudo» si nunca hubo una lectura buena); el modo configuración no se apaga hasta recargar la página, y pasa a la persona siguiente (HUB_SHELL-F195)
+Estado: parcial — si la relectura de la lista falla, el asistente recibe la última lista leída como si fuera de ahora (solo dice «no se pudo» si nunca hubo una lectura buena); el modo configuración no se apaga hasta recargar la página (se apaga al cerrar sesión y al cambiar de usuario, HUB_SHELL-F195)
 Actor: administrador, responsable
 Pantalla: Asistente
 Pasos:
@@ -225,7 +225,7 @@ Implicados: HUB-F35
 QA: qa-hub-assistant §R0 (pregunta 4), qa-hub-assistant §R4 (montar el hub por chat)
 
 ### HUB_SHELL-F197 Ver el plan del asistente, el límite de uso y ampliarlo
-Estado: parcial — el aviso de cuota, una vez agotada, se queda pegado al último mensaje del hilo hasta recargar la página o cerrar sesión (también tras renovarse, tras ampliar el plan y tras un cambio de usuario); el plan se escribe con su identificador interno («Plan basic»); el texto para quien no puede pagar manda a «el responsable del negocio», pero solo pagan el propietario y el administrador
+Estado: parcial — el aviso de cuota, una vez agotada, se queda pegado al último mensaje del hilo hasta recargar la página, cerrar sesión o cambiar de usuario (también tras renovarse y tras ampliar el plan); el plan se escribe con su identificador interno («Plan basic»); el texto para quien no puede pagar manda a «el responsable del negocio», pero solo pagan el propietario y el administrador
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Asistente
 Pasos:

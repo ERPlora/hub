@@ -90,6 +90,14 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 # there is always a print host draining the hub's queue. The OS keeps the state (LaunchAgent /
 # registry / autostart dir); the shell only exposes enable/disable/is_enabled over `invoke`.
 tauri-plugin-autostart = "2"
+# The question before a link links another hub (hub#2644), in the system's own dialog: the page is
+# exactly who must not be able to answer it. `rfd` and not `tauri-plugin-dialog`: that plugin's
+# `init` replaces `window.alert`/`window.confirm` on EVERY page with its own commands, which the hub's
+# pages are not granted — their `confirm()` would come back as a (truthy) promise. GTK on Linux, like
+# the webview; `common-controls-v6` gives the Windows dialog its «Open»/«Cancel» buttons.
+rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-controls-v6"] }
+# The system's language for that question: Spanish unless it says otherwise.
+sys-locale = "0.3"
 
 # A click on a notice on the computer (hub#2360). The notification plugin shows a desktop notice and
 # drops its handle, so no click ever comes back; the shell shows it itself and waits for the click.
