@@ -1703,6 +1703,32 @@ mod tests {
         assert!(text.contains("Ronda 2"), "la ronda está en el papel:\n{text}");
     }
 
+    /// **The VOID slip of a cancelled round is a `kitchen_order` (kitchen#168).** The shell
+    /// (`print-void.ts`) says the void with what an installed app that never updates already prints:
+    /// the word in the floor label and a negative quantity per dish. If this renderer ever dropped
+    /// the sign (or clamped it to 1), the slip would read as a NEW round and the dish would be
+    /// cooked twice — so the sign is pinned here, where the paper is made.
+    #[test]
+    fn a_void_slip_prints_the_word_and_negative_quantities() {
+        // Read back with the cp437 decoder: `paper` decodes as UTF-8 and the `·` of the label
+        // (cp437 0xFA) would come out as U+FFFD even though the printer gets it right.
+        let bytes = render_document(DocumentType::KitchenOrder, &json!({
+            "receipt_id": "K-217",
+            "label": "ANULADA · Mesa 4",
+            "round_number": 2,
+            "items": [
+                { "name": "Croquetas", "quantity": -2 },
+                { "name": "Flan", "quantity": -0.5 },
+            ],
+        }))
+        .expect("a void slip is a valid kitchen order");
+        let text = roll_lines(&bytes).join("\n");
+        assert!(text.contains("ANULADA · Mesa 4"), "the void word and the table:\n{text}");
+        assert!(text.contains("-2x Croquetas"), "the dish with its negative quantity:\n{text}");
+        assert!(text.contains("-0.5x Flan"), "a half ration keeps its sign:\n{text}");
+        assert!(!text.contains("URGENTE"), "a void is never urgent:\n{text}");
+    }
+
     /// **La primera ronda NO se anuncia.** Es el caso normal —una comanda que no es un segundo
     /// pase— y ponerle «Ronda 1» le añadiría una línea de ruido al 99 % del papel. La ronda dice
     /// «esto ya es el segundo envío de esta mesa», y eso sólo es cierto a partir de la dos.

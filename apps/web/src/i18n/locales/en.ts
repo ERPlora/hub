@@ -913,6 +913,15 @@ export default {
     // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
     // named in the warning, or the sentence reads «the order for ()».
     comandaDefaultLabel: 'the floor',
+    // kitchen#168: the VOID slip of a cancelled round. The word goes where the floor label goes on
+    // the comanda (double height), so keep it short: «VOID · Table 4» fits a 58 mm roll wide.
+    voidLabel: 'VOID · {label}',
+    voidLabelBare: 'VOID',
+    // The slip did not come out: the card has already left the kitchen screen, so the way out is a voice.
+    voidFailed:
+      'The {station} void slip for {label} did not print. Tell the {station} out loud: that order is no longer to be made.',
+    voidWaitingForPrinter:
+      'The {station} void slip for {label} is waiting: no printer is set up for that station yet. Tell the {station} out loud: that order is no longer to be made.',
   },
   // The system notices for a booking or a cancellation that did NOT come from a till (hub#2168):
   // a salon's twin of the kitchen order's notice above. `createdFor`/`cancelledFor` name the
