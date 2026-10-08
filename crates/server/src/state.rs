@@ -933,15 +933,26 @@ pub type SharedRuntime = Arc<tokio::sync::RwLock<Runtime>>;
 /// zip — before an install or update gives up (hub#2251).
 pub const MARKETPLACE_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
+/// The ceiling of a whole call to the marketplace — the zip included — however steadily it keeps
+/// sending (hub#2556). The biggest published package was ~3 MB zipped in 2026-10: this lets it
+/// through at ~10 KB/s, and app changes queue behind an install (hub#2508), so a crawling line
+/// must not hold the next one for longer.
+pub const MARKETPLACE_CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
 /// The client every install/update/version call to the marketplace goes through (hub#2251).
 ///
-/// `stall` bounds each wait — connecting, the headers, every next chunk (reqwest arms the read
-/// limit when the request starts) — not the whole call: a slow line that keeps sending finishes
-/// the zip, a silent one ends as `install_cloud_timeout`.
-/// The shared `http` client cannot take this limit: the assistant's stream may be quiet for longer.
-pub fn marketplace_client(stall: std::time::Duration) -> reqwest::Client {
+/// Two limits, both ending as `install_cloud_timeout`: `stall` bounds each wait — connecting, the
+/// headers, every next chunk (reqwest arms the read limit when the request starts) —, so a silent
+/// marketplace gives up early; `ceiling` bounds the whole call, so a line that trickles a byte now
+/// and then still ends (hub#2556).
+/// The shared `http` client cannot take these limits: the assistant's stream may be quiet for longer.
+pub fn marketplace_client(
+    stall: std::time::Duration,
+    ceiling: std::time::Duration,
+) -> reqwest::Client {
     reqwest::Client::builder()
         .read_timeout(stall)
+        .timeout(ceiling)
         .build()
         .unwrap_or_else(|e| {
             tracing::error!(error = %e, "marketplace client without stall limit (hub#2251)");
@@ -1106,7 +1117,10 @@ impl AppState {
             machine_token,
             hub_id,
             http: cloud_client(CLOUD_CONNECT_TIMEOUT, CLOUD_CALL_TIMEOUT),
-            marketplace_http: marketplace_client(MARKETPLACE_STALL_TIMEOUT),
+            marketplace_http: marketplace_client(
+                MARKETPLACE_STALL_TIMEOUT,
+                MARKETPLACE_CALL_TIMEOUT,
+            ),
             tenants: None,
             vector: None,
             entitlement: crate::entitlement::new_shared(),

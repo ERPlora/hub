@@ -20,7 +20,8 @@ use axum::http::Request;
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 use erplora_server::{
-    app, marketplace_client, AppState, AuthMode, HubConfig, MARKETPLACE_STALL_TIMEOUT,
+    app, marketplace_client, AppState, AuthMode, HubConfig, MARKETPLACE_CALL_TIMEOUT,
+    MARKETPLACE_STALL_TIMEOUT,
 };
 use serde_json::Value;
 use tower::ServiceExt; // oneshot
@@ -118,7 +119,7 @@ async fn install_against(cloud_base_url: String) -> (axum::http::StatusCode, Val
     let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&admin, 3600, None).await.unwrap();
     let mut state = AppState::with_config(rt, config(cloud_base_url));
-    state.marketplace_http = marketplace_client(TEST_STALL);
+    state.marketplace_http = marketplace_client(TEST_STALL, MARKETPLACE_CALL_TIMEOUT);
     let router = app(state);
 
     let started = Instant::now();
@@ -213,7 +214,7 @@ async fn an_update_against_a_marketplace_that_never_answers_ends() {
     let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&admin, 3600, None).await.unwrap();
     let mut state = AppState::with_config(rt, config(cloud));
-    state.marketplace_http = marketplace_client(TEST_STALL);
+    state.marketplace_http = marketplace_client(TEST_STALL, MARKETPLACE_CALL_TIMEOUT);
     let runtime = state.runtime.clone();
     let router = app(state);
 

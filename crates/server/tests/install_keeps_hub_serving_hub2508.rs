@@ -220,7 +220,7 @@ async fn a_hub(cloud: String, tag: &str, notes_version: Option<&str>) -> Hub {
     let admin = rt.create_user("Ana", "1111", "admin", None).await.unwrap();
     let session = rt.create_session(&admin, 3600, None).await.unwrap();
     let mut state = AppState::with_config(rt, config(cloud, tag));
-    state.marketplace_http = marketplace_client(STALL);
+    state.marketplace_http = marketplace_client(STALL, erplora_server::MARKETPLACE_CALL_TIMEOUT);
     let runtime = state.runtime.clone();
     Hub {
         router: app(state),
