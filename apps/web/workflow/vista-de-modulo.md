@@ -45,7 +45,7 @@ Pasos:
 4. Un enlace directo a una pestaña (`/m/inventory/products`) abre esa pestaña.
 Entra: el menú de las apps activas, con sus nombres en el idioma de la persona y la versión instalada (HUB-F31); el `module.json` y el código de la app, pedidos una sola vez por sesión.
 Sale: la pantalla de la app montada. Recibe un cliente del hub identificado como esa app (para sus permisos de host); no es una barrera: puede leer consultas de otras apps con el permiso de la persona, y cualquier componente puede pedir otra identidad (`forModule` es pública) o usar `globalThis.erplora`. Lo que protege es el permiso de cada consulta y orden en el hub. Nada guardado.
-Si falla: ver HUB_SHELL-F41. Si la persona se va de la app, la pantalla escondida suelta la app (deja de oír avisos y la dirección) y al volver la monta de nuevo: así una caja escondida no se come el `?appointment_id=` de la caja visible (hub#1797); un ir y volver rápido no deja la pantalla en el esqueleto para siempre (hub#2241).
+Si falla: ver HUB_SHELL-F41. Si la persona se va de la app, la pantalla escondida suelta la app (deja de oír avisos y la dirección) y al volver la monta de nuevo: así una caja escondida no se come el `?appointment_id=` de la caja visible (hub#1797); un ir y volver rápido no deja la pantalla en el esqueleto para siempre (hub#2241). Una app cuyo `module.json` no declara bloque `ui` no tiene pantalla que montar: no sale en el lanzador (las demás sí) y su dirección directa dice «Aquí todavía no hay nada» (hub#2635).
 Implicados: HUB-F31
 QA: BD-03
 
