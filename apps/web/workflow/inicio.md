@@ -180,16 +180,16 @@ Implicados: CASH_REGISTER-F12, HUB-F34, HUB-F60, INVENTORY-F17, VERIFACTU-F31
 QA: qa-hub-restaurant §7.12
 
 ### HUB_SHELL-F36 Consultar la actividad reciente
-Estado: parcial — el método de pago sale con el nombre de fábrica, en inglés («Cash»), donde el historial de Ventas dice «Efectivo» (hub#2590)
+Estado: parcial — en tableta (unos 820 px) la columna «Fecha» de la tabla corta la hora de la venta (hub#2637)
 Actor: administrador, responsable, empleado
 Pantalla: Inicio
 Pasos:
 1. En **Inicio**, pestaña «Actividad».
-2. «Cargando…» y después una tabla con las últimas 100 ventas: «Fecha», «Venta», «Cliente», «Método», «Importe» (con la moneda del negocio: 12,50 € sale «12,50 €») y «Estado», con las palabras del historial de Ventas: «Completada» en verde, «Anulada» en rojo, «Devuelta» en ámbar, «Pendiente» y «Borrador» en gris, y «Otro» en gris para un estado que esta pantalla aún no conoce.
+2. «Cargando…» y después una tabla con las últimas 100 ventas: «Fecha», «Venta», «Cliente», «Método» (con el nombre del historial de Ventas: los métodos de fábrica traducidos, «Efectivo» y «Tarjeta»; los que creó o renombró el negocio, con su nombre), «Importe» (con la moneda del negocio: 12,50 € sale «12,50 €») y «Estado», con las palabras del historial de Ventas: «Completada» en verde, «Anulada» en rojo, «Devuelta» en ámbar, «Pendiente» y «Borrador» en gris, y «Otro» en gris para un estado que esta pantalla aún no conoce.
 3. Busca con «Buscar actividad…» (venta, cliente o método), filtra por método o estado, ordena, cambia a tarjetas o elige columnas; 15 por página.
-Entra: las ventas de la app Ventas (`sales.list`, con el total en céntimos, que se pintan con `formatMoney`), si está activa, con los permisos de quien mira. Solo ventas: los demás movimientos del negocio (caja, citas) no salen aquí.
+Entra: las ventas de la app Ventas (`sales.list`, con el total en céntimos, que se pintan con `formatMoney`), si está activa, con los permisos de quien mira, y las palabras de sus métodos de fábrica del catálogo de la propia app Ventas (`locales/<idioma>.json`, el mismo que usa su historial), en el idioma en pantalla. Solo ventas: los demás movimientos del negocio (caja, citas) no salen aquí.
 Sale: nada guardado.
-Si falla: sin la app Ventas, la tabla vacía. Si no se pueden leer las ventas: «No se han podido cargar las últimas ventas» — «Comprueba la conexión y vuelve a intentarlo.» con «Reintentar», en lugar de la tabla; si ya había ventas en pantalla (un refresco tras importar una plantilla), se quedan debajo del aviso.
+Si falla: sin la app Ventas, la tabla vacía. Si no se puede leer el catálogo de Ventas, el método sale con el nombre guardado («Cash»), nunca en blanco. Si no se pueden leer las ventas: «No se han podido cargar las últimas ventas» — «Comprueba la conexión y vuelve a intentarlo.» con «Reintentar», en lugar de la tabla; si ya había ventas en pantalla (un refresco tras importar una plantilla), se quedan debajo del aviso.
 Implicados: SALES-F28
 QA: ninguno
 
@@ -249,7 +249,7 @@ QA: BD-01
 | Paneles por app con presets por sector | parcial: sin filtro por permiso en la pantalla | F33, F34 |
 | Tablero guardado por persona | no hecho: se guarda por navegador | F34 |
 | Paneles en vivo | hecho para lo que la app declara | F35 |
-| Actividad reciente | parcial: solo ventas; el método de pago sin traducir (hub#2590) | F36 |
+| Actividad reciente | parcial: solo ventas (caja y citas no salen); en tableta la fecha corta la hora (hub#2637) | F36 |
 | Estado de la impresora y de WhatsApp | parcial: detalle solo al pasar el ratón | F37 |
 
 ## Datos: de quién es cada dato

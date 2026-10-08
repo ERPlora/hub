@@ -213,10 +213,14 @@ import {
 } from '../lib/runtime';
 import {
   ACTIVITY_STATUS_KEY,
+  FEED_MODULE,
+  activityMethodName,
   formatActivityAmount,
   loadRecentSales,
   type ActivityRow,
 } from '../lib/dashboard-activity';
+import { loadModuleLocale } from '../lib/module-loader';
+import { moduleBase } from '../lib/module-url';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
@@ -555,12 +559,24 @@ function badgeCell(text: string, tone: Tone): Node {
 }
 
 const activityRaw = ref<ActivityRow[]>([]);
-// Display rows: `status` is translated here and ONLY here, so the badge, the select filter and its
-// options all see the same localized word — and a locale switch repaints them (the fetched value
-// underneath stays stable, so nothing ever compares against a translation).
+// `sales`' own screen strings in the language on screen: the factory payment methods are named
+// with ITS words, the ones the Sales history paints (hub#2590). Read only once there are sales to
+// name, so a hub without a till never asks for the catalogue of an app it does not have.
+// `loadModuleLocale` never throws: a missing or failed catalogue leaves the stored names.
+const salesUi = ref<Record<string, unknown> | undefined>(undefined);
+async function loadSalesWords(): Promise<void> {
+  const lang = locale.value;
+  const file = await loadModuleLocale(moduleBase(FEED_MODULE), lang);
+  // A slower read for the previous language must not overwrite the current one.
+  if (lang === locale.value) salesUi.value = file?.ui;
+}
+// Display rows: `status` and `method` are translated here and ONLY here, so the cell, the select
+// filter and its options all see the same localized word — and a locale switch repaints them (the
+// fetched value underneath stays stable, so nothing ever compares against a translation).
 const activity = computed(() =>
   activityRaw.value.map((r) => ({
     ...r,
+    method: activityMethodName(r.method, salesUi.value),
     status: t(ACTIVITY_STATUS_KEY[r.status]),
   })),
 );
@@ -601,6 +617,7 @@ watch(locale, () => {
   if (activityTable.value) {
     (activityTable.value as HTMLElement & { labels: Record<string, string> }).labels = dataTableLabels(locale.value);
   }
+  if (activityRaw.value.length) void loadSalesWords();
 });
 
 async function loadActivity(): Promise<void> {
@@ -613,6 +630,8 @@ async function loadActivity(): Promise<void> {
     await refreshActiveModuleIds();
     activityRaw.value = await loadRecentSales(client, activeModuleIds());
     activityState.value = 'ready';
+    // Not awaited: the table never waits on a secondary read; the cells repaint when it lands.
+    if (activityRaw.value.length) void loadSalesWords();
   } catch {
     // Not `[]`: «I could not ask» is not «nothing was sold» (hub#2505). The rows already on screen stay.
     activityState.value = 'error';
