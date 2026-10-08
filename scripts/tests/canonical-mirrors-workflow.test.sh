@@ -425,6 +425,18 @@ if tag_jobs:
     )
 
 
+# ── 6 · A push to develop/main is never cancelled by the next one (hub#2689) ─────────
+#
+# `cancel-in-progress: true` let every merge cancel the previous develop run; on GitHub's runners
+# the merges arrive faster than the runs end. Only a PR's new head supersedes the older run.
+concurrency = doc.get("concurrency") or {}
+check(
+    "a push to develop/main finishes; only a PR's newer head cancels its older run (hub#2689)",
+    str(concurrency.get("cancel-in-progress")).strip() == "${{ github.event_name == 'pull_request' }}",
+    f"cancel-in-progress is {concurrency.get('cancel-in-progress')!r} — every merge would cancel the develop run before it ends",
+)
+
+
 if failures:
     print(f"FAIL: {len(failures)} contract case(s) on {path}", file=sys.stderr)
     for f in failures:

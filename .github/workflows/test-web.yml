@@ -190,7 +190,12 @@ concurrency:
   # An OutfitKit notice (hub#2321) lands on `refs/heads/main`: its own group keeps it from
   # cancelling the push to main, and a newer release cancels the run of the older one.
   group: test-web-${{ github.ref }}${{ inputs.pr && format('-merge-check-{0}', inputs.pr) || '' }}${{ github.event_name == 'repository_dispatch' && '-outfitkit-published' || '' }}
-  cancel-in-progress: true
+  # hub#2689 — a newer run cancels the older one only where it REPLACES it: a PR's new head, a
+  # merge-check re-dispatched for the same PR, a newer OutfitKit release. A push to develop/main
+  # finishes: unconditional cancelling (sized for the single self-hosted runner) let every merge
+  # cancel the previous develop run, and on 08/10 none of six in a row ended. The cron shares
+  # `refs/heads/main` with the push to main, so it does not cancel either.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && inputs.pr != '') }}
 
 permissions:
   contents: read
