@@ -161,20 +161,23 @@ Implicados: HUB-F137, HUB-F139
 QA: qa-hub-android Fase 0
 
 ### HUB_APP-F10 Cada página tiene su juego de permisos
-Estado: parcial — las órdenes de los plugins de terceros `plugin:notification` (escuchar los toques de los avisos) y `plugin:app` (la versión) solo pasan la primera puerta: cualquier página del patrón las usa (ERPlora/hub#2658)
+Estado: parcial — el binario publicado deja pasar el bucle local (`127.0.0.1:8787` y `:5173`) y lo acepta como negocio enlazado, con el hardware (ERPlora/hub#2643)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada vez que la ventana enseña una página, Tauri comprueba el origen contra los tres juegos de «Qué
    puede hacer cada página» (primera puerta, por patrón).
 2. Una orden nativa desde un origen que no la tiene concedida se rechaza antes de ejecutarse.
-3. Si la pasa y es una orden de la aplicación o del plugin de Android (`plugin:erplora-android`: permisos, escucha,
-   salir de la aplicación, abrir sus ajustes; ERPlora/hub#2642), la segunda puerta (`src/hub_link.rs`) mira el origen de la
+3. Si la pasa y es una orden de la aplicación, del plugin de Android (`plugin:erplora-android`: permisos, escucha,
+   salir de la aplicación, abrir sus ajustes; ERPlora/hub#2642) o del plugin de avisos (`plugin:notification`:
+   escuchar los toques; ERPlora/hub#2658), la segunda puerta (`src/hub_link.rs`) mira el origen de la
    página que enseña la ventana: si no es el del negocio enlazado, **o esa página aún no ha terminado de
    cargar** tras llegar desde otro origen, contesta `not_the_linked_hub` sin ejecutarla. La espera existe
    porque la dirección de la ventana cambia al EMPEZAR la navegación mientras la página que la pidió sigue
    ejecutándose: sin ella, otra página podría mandar la ventana al negocio y pedir el cajón acto seguido. Solo
-   `device_context`, `forget_hub` y `shell_retry` se saltan esta comprobación.
+   `device_context`, `forget_hub` y `shell_retry` se saltan esta comprobación. La versión de la aplicación no
+   la da el plugin `plugin:app` de Tauri, que no se puede envolver y ningún juego concede, sino
+   `erplora_bridge_status`, detrás de la puerta (ERPlora/hub#2658).
 4. Qué negocio está enlazado lo decide la aplicación: el recordado al arrancar, el de un enlace
    `erplora://hub/…` tras contestar «Abrir» (HUB_APP-F03), o el que el SaaS elige con `?shell=1` (HUB_APP-F02); se desenlaza al
    cambiar de negocio o al olvidar uno borrado (HUB_APP-F04, F05).
@@ -189,7 +192,9 @@ hardware; otro negocio, la web pública, el entorno de pruebas o el bucle local 
 negocio enlazado; sin estado de enlace o sin poder leer la dirección de la página, la puerta se cierra; una
 página que manda la ventana al negocio enlazado y pide el hardware antes de que este cargue recibe
 `not_the_linked_hub`; otra página que pide los permisos de Android, encender la escucha o sacar a la persona de
-la aplicación recibe `not_the_linked_hub` y Android no enseña nada (y si esa carga no llega a terminar, el negocio queda sin hardware hasta la siguiente
+la aplicación recibe `not_the_linked_hub` y Android no enseña nada; otra página no oye los toques de los avisos
+ni lee la versión de la aplicación (`not_the_linked_hub`), y la página del negocio enlazado que se suscribe a los
+toques o pide la versión antes de terminar de cargar lo reintenta hasta unos 8 s después de su `load` (y si esa carga no llega a terminar, el negocio queda sin hardware hasta la siguiente
 página que cargue); y la orden de reintentar de la pantalla de espera solo existe para la página incluida (un
 origen remoto no puede mover la ventana). Una orden declarada y sin permiso generado la caza el test `tests/shell_surface.rs:247-300`; una orden no
 concedida se rechaza en ejecución.

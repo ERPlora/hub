@@ -110,7 +110,10 @@ Entra: el número del aviso y la ruta con que salió.
 Sale: la pantalla abierta; el toque se entrega **una vez**. Si la página es nueva y no recuerda el número,
 usa la ruta que el aviso trae, tras comprobar de nuevo que es una pantalla del hub.
 Si falla: un aviso sin número solo trae la ventana al frente. Una ruta que no es de una pantalla del hub
-(otra dirección, `//…`) se descarta. Un aviso que pasó sin clic (macOS, Linux) no abre nada.
+(otra dirección, `//…`) se descarta. Un aviso que pasó sin clic (macOS, Linux) no abre nada. Solo oye los
+toques la página del negocio enlazado: cualquier otra página de erplora.com que enseñe la ventana recibe
+`not_the_linked_hub` al suscribirse (ERPlora/hub#2658); la del negocio que se suscribe al arrancar, antes de
+terminar de cargar, lo reintenta hasta unos 8 s después de su `load`.
 Implicados: HUB_SHELL-F64, HUB_SHELL-F67, KITCHEN-F05
 QA: ninguno
 

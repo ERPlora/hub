@@ -20,6 +20,7 @@
 // A destination is followed only when it is a screen of the shell, by the same ANCHORED rule the
 // assistant's links use (hub#2204) — a path buried in an external address is not one.
 import { SCREEN_PATH } from './assistant-markdown';
+import { whileTheHubLands } from './device';
 
 /** How many notices the session remembers. A tap is on a recent notice, not on last week's. */
 export const REMEMBERED_NOTICES = 50;
@@ -97,9 +98,15 @@ export type NoticeTapListen = (cb: (payload: unknown) => void) => Promise<(() =>
  * `claimNoticeTaps`) and an installed app older than this shell has no permission to listen — the
  * notices still go out in all three.
  */
-export async function listenForNoticeTaps(door: NoticeDoor, listen: NoticeTapListen): Promise<() => void> {
+export async function listenForNoticeTaps(
+  door: NoticeDoor,
+  listen: NoticeTapListen,
+  wait?: (ms: number) => Promise<void>,
+): Promise<() => void> {
   try {
-    const stop = await listen((payload) => door.tapped(payload));
+    // The installed app hears the linked hub only once its page has loaded (hub#2658), and this runs
+    // at boot: right after the SaaS sends the window here, the first answers are `not_the_linked_hub`.
+    const stop = await whileTheHubLands(() => listen((payload) => door.tapped(payload)), wait);
     return stop ?? (() => {});
   } catch (e) {
     console.warn('[notice-tap] taps cannot be heard here', e);
