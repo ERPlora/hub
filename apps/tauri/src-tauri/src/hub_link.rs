@@ -123,7 +123,37 @@ where
     R: Runtime,
     F: Fn(Invoke<R>) -> bool + Send + Sync + 'static,
 {
-    move |invoke| commands(invoke)
+    move |invoke: Invoke<R>| {
+        if !admits(&invoke) {
+            log::warn!(
+                "ipc: {} refused to {}: not the linked hub",
+                invoke.message.command(),
+                invoke
+                    .message
+                    .webview_ref()
+                    .url()
+                    .map(|page| origin_of(&page))
+                    .unwrap_or_else(|_| "an unreadable page".to_string())
+            );
+            invoke.resolver.reject(NOT_THE_LINKED_HUB);
+            return true;
+        }
+        commands(invoke)
+    }
+}
+
+/// Does this invoke come from a page allowed to run its command? Fails closed: no link state, or a
+/// page whose address cannot be read, drives nothing.
+fn admits<R: Runtime>(invoke: &Invoke<R>) -> bool {
+    use tauri::Manager;
+    if is_open_command(invoke.message.command()) {
+        return true;
+    }
+    let webview = invoke.message.webview_ref();
+    let Some(link) = webview.try_state::<HubLink>() else {
+        return false;
+    };
+    webview.url().is_ok_and(|page| link.drives(&page))
 }
 
 #[cfg(test)]
