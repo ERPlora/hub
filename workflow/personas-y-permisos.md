@@ -205,7 +205,7 @@ Pantalla: ninguna
 Pasos:
 1. Un sistema externo (la gestoría, una tienda online) llama al hub con su llave.
 2. Pide una consulta o una orden de un módulo por su nombre.
-3. El hub comprueba, por este orden: que la llave existe y está activa (antes de mirar qué operación se pide, hub#2550), que no ha pasado su límite por minuto (el intento cuenta aunque luego la operación no exista o falte permiso), que el módulo publica esa operación para terceros y que la llave tiene el permiso.
+3. El hub comprueba, por este orden: que la llave existe y está activa (antes de mirar qué operación se pide, hub#2550), que no ha pasado su límite por minuto (el intento cuenta aunque luego la operación no exista o falte permiso; el minuto es el del reloj: al cambiar de minuto la cuenta vuelve a cero), que el módulo publica esa operación para terceros y que la llave tiene el permiso.
 4. Contesta igual que a la pantalla, y lo que escribe queda a nombre de la llave.
 Entra: la llave en `Authorization: Bearer erpl_live_…`; la operación (`/api/v1/<módulo>/q/<consulta>` o `/c/<orden>`).
 Sale: la respuesta del módulo; las escrituras con autor `apikey:<id>`; el último uso de la llave. La llave no ve al personal ni puede pedir aprobaciones, y no sirve en las puertas de la pantalla.
