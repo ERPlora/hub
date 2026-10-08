@@ -323,8 +323,9 @@ fn the_main_window_asks_the_verdict_before_it_follows_a_page() {
     );
 
     // A refused page must not be remembered as this till's hub, nor become the page the connectivity
-    // guard brings the window back to — the guard navigates by program, which no handler sees.
-    for later in ["shell_capture_origin(", "set_target("] {
+    // guard brings the window back to — the guard navigates by program, which no handler sees. The
+    // capture goes through the linked-hub state since hub#2504 (`HubLink::follow`).
+    for later in [".follow(nav)", "set_target("] {
         let at = handler
             .find(later)
             .unwrap_or_else(|| panic!("the handler no longer calls `{later}`"));
