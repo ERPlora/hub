@@ -716,6 +716,7 @@ mod tests {
             name: id.into(),
             email: String::new(),
             access_email: String::new(),
+            has_account: false,
             role: role.into(),
             cloud_user_id: None,
             is_active,
@@ -1104,6 +1105,7 @@ mod tests {
     fn with_email(mut row: HubUserRow, email: &str) -> HubUserRow {
         row.email = email.into();
         row.access_email = email.into();
+        row.has_account = true;
         row
     }
 

@@ -210,6 +210,11 @@ pub struct HubUserRow {
     /// reading `email`.
     #[serde(skip)]
     pub access_email: String,
+    /// `true` when this person signs in with an erplora.com account: an access email (invited) or a
+    /// linked account (`cloud_user_id`). It is what the screen reads to never offer administration
+    /// to somebody who would only have a PIN to exercise it (hub#2500): `email` above cannot say
+    /// it, because it may be the address typed in «My profile».
+    pub has_account: bool,
     pub role: String,
     /// Id del usuario en el Cloud si la identidad está vinculada al portal (owner/admin), o `None`
     /// para el personal **solo-local** (§2.9).
@@ -812,18 +817,21 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
         .iter()
         .map(|r| {
             let id = r["id"].as_str().unwrap_or_default().to_string();
+            let access_email = r["access_email"]
+                .as_str()
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            let cloud_user_id = r["cloud_user_id"].as_str().map(ToString::to_string);
             HubUserRow {
                 access_email_conflict: conflicts.iter().find(|c| c.user_id == id).map(|c| c.reason),
                 id,
                 name: r["name"].as_str().unwrap_or_default().to_string(),
                 email: r["email"].as_str().unwrap_or_default().to_string(),
-                access_email: r["access_email"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .trim()
-                    .to_string(),
+                has_account: !access_email.is_empty() || cloud_user_id.is_some(),
+                access_email,
                 role: r["role"].as_str().unwrap_or_default().to_string(),
-                cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
+                cloud_user_id,
                 is_active: truthy(&r["is_active"]),
                 is_account_owner: truthy(&r["is_account_owner"]),
                 has_pin: truthy(&r["has_pin"]),

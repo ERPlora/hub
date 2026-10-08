@@ -144,3 +144,36 @@ async fn hub2500_editing_a_pin_only_person_into_an_administrator_answers_the_sta
     );
     std::fs::remove_dir_all(f.media).ok();
 }
+
+#[tokio::test]
+async fn hub2500_the_list_tells_the_screen_who_has_an_account_whatever_their_profile_says() {
+    let f = fixture("hub-2500-http-c").await;
+    // The address Marta typed in her profile is still shown, but it gives her no account: the
+    // screen needs to know, so it never offers administration to a PIN (HUB_SHELL-F84).
+    let res = send(
+        &f.router,
+        "PUT",
+        "/api/profile",
+        &f.cashier,
+        json!({ "first_name": "Marta", "last_name": "Ruiz", "email": "ioan@example.com" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let res = send(&f.router, "GET", "/api/hub/users", &f.owner, json!({})).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = body_json(res).await;
+    let rows = body["data"].as_array().expect("a list of people");
+    let marta = rows
+        .iter()
+        .find(|r| r["id"] == f.cashier_id.as_str())
+        .expect("Marta is listed");
+    assert_eq!(marta["email"], "ioan@example.com", "the profile address is still shown");
+    assert_eq!(marta["has_account"], false, "a typed address is not an account");
+    let owner = rows
+        .iter()
+        .find(|r| r["id"] != f.cashier_id.as_str())
+        .expect("the owner is listed");
+    assert_eq!(owner["has_account"], true, "a linked erplora.com account is one");
+    std::fs::remove_dir_all(f.media).ok();
+}
