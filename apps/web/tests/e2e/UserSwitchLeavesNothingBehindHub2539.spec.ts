@@ -220,9 +220,10 @@ test.describe('Switch user leaves nothing of the previous person on screen (hub#
     // The till stays where it was (the sale is not lost: it is server-side, ADR-0144/0146)…
     await expect.poll(() => currentPath(page)).toBe('/m/e2e_till/pos');
     await settled(page);
-    // …but the page is a new one, mounted under her session.
+    // …but the page is a new one, mounted under her session. Polled: her name reaches the user card
+    // before the hand-over has re-read her launcher, and only then is the screen mounted again.
+    await expect.poll(() => till.getAttribute('data-instance'), { message: 'the till was mounted again for her' }).not.toBe(before);
     await expect(till).toHaveAttribute('data-booted', '1');
-    expect(await till.getAttribute('data-instance'), 'the till was mounted again for her').not.toBe(before);
     await expect(page.locator('erp-e2e-report')).toHaveCount(0);
     expect(await page.content()).not.toContain(SECRET_FIGURE);
   });
