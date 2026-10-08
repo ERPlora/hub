@@ -51,7 +51,9 @@ on:
 
 concurrency:
   group: test-gate-${{ github.ref }}
-  cancel-in-progress: true
+  # hub#2689 — a PR's newer head cancels its older run; a push to develop/main always finishes,
+  # or each merge would cancel the previous develop run before it ends.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
