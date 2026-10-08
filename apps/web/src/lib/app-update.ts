@@ -11,9 +11,11 @@
 // packages a fallback page and the real UI is served by the hub (ADR-0154/0159). So a check written
 // here reaches every app ALREADY INSTALLED on the next hub deploy, while the same check written as
 // a new Tauri command would only ever reach builds made after it — which is the very problem. That
-// is also why the installed version is read with `plugin:app|version`: it belongs to `core:app`,
-// whose default set `capabilities/default.json` already grants the hub PWA, so no new command, no
-// new permission and no new build are needed for a till in the field to answer.
+// is also why the installed version is read first with `plugin:app|version`: it belongs to
+// `core:app`, which the apps installed before hub#2658 grant the hub PWA. From hub#2658 on they do
+// not — Tauri's `app` plugin answers every page under erplora.com and no gate can stand in front of
+// it — and the linked hub reads the same version through `erplora_bridge_status`, one of the app's
+// own commands, behind the gate.
 //
 // **Three sentences, and the third one is silence.** The states are the ones `lib/system-health.ts`
 // already defines, for the same reason: `unknown` is not `ok` and not an alarm. A till with no
@@ -35,14 +37,20 @@ import { hasPermission } from './session';
 import type { HealthState } from './system-health';
 
 /**
- * The command that answers "which build am I?".
+ * The command that answers "which build am I?" on an app installed before hub#2658.
  *
- * `core:app` ships it in its default set and `capabilities/default.json` grants `core:default` to
- * `https://*.erplora.com/*`, so this works on apps built long before hub#400. Adding a command of
- * our own would have been cleaner to read and useless in practice: the tills that most need to hear
- * about an update are exactly the ones running an old binary.
+ * `core:app` ships it in its default set, and those apps grant `core:default` to
+ * `https://*.erplora.com/*`, so this works on apps built long before hub#400: the tills that most
+ * need to hear about an update are exactly the ones running an old binary.
  */
 export const APP_VERSION_COMMAND = 'plugin:app|version';
+
+/**
+ * The same question on an app built from hub#2658 on, which keeps `core:app` from the pages under
+ * erplora.com: the app's own command, answered only to the linked hub. It carries the version the
+ * release sealed in `tauri.conf.json` (hub#862).
+ */
+export const GATED_APP_VERSION_COMMAND = 'erplora_bridge_status';
 
 /** Where the runtime proxies "which is the latest published build?" (`crates/server`). */
 export const APP_RELEASE_ENDPOINT = '/api/app/release';
@@ -142,10 +150,17 @@ async function installedVersion(): Promise<string | null> {
   if (!isTauri()) return null;
   try {
     const version = await invokeTauri<string>(APP_VERSION_COMMAND);
+    if (typeof version === 'string' && version.trim()) return version.trim();
+  } catch {
+    // An app built from hub#2658 on refuses it to every page: ask the gated command below.
+  }
+  try {
+    const status = await invokeTauri<{ version?: unknown }>(GATED_APP_VERSION_COMMAND, {});
+    const version = status?.version;
     return typeof version === 'string' && version.trim() ? version.trim() : null;
   } catch {
-    // An app built before this, or one whose capability lost `core:default`. It cannot compare, so
-    // it says nothing at all — never that it is up to date.
+    // An app built before hub#400, or a page that is not the linked hub (`not_the_linked_hub`). It
+    // cannot compare, so it says nothing at all — never that it is up to date.
     return null;
   }
 }

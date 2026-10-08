@@ -2176,7 +2176,7 @@ pub fn run() {
                 .state::<PrintDocuments>()
                 .respond(request.uri().path())
         })
-        .plugin(tauri_plugin_notification::init())
+        .plugin(hub_link::notification_plugin())
         .plugin(hub_link::android_plugin())
         // The user's own browser (hub#475). Registered for its RUST api only: no `opener:*`
         // permission is granted to any origin (`tests/remote_acl.rs`), so the page cannot reach the

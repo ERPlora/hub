@@ -4,10 +4,10 @@
 //! pattern cannot name the one business this till belongs to: the hub is chosen at run time, from
 //! the SaaS, long after the binary was built. So the ACL lets every page under erplora.com through
 //! — another business's hub, the public website, the test SaaS — and this module is the second
-//! gate, in front of the app's own commands and of the Android plugin's (hub#2642): the printer,
-//! the drawer, the card reader, the way out to the browser, the Downloads folder, Android's
-//! permission dialogs, the listening service and the way out of the app answer only the page whose
-//! ORIGIN is the linked hub.
+//! gate, in front of the app's own commands, of the Android plugin's (hub#2642) and of the
+//! notification plugin's (hub#2658): the printer, the drawer, the card reader, the way out to the
+//! browser, the Downloads folder, Android's permission dialogs, the listening service, the way out
+//! of the app and the taps on the notices answer only the page whose ORIGIN is the linked hub.
 //!
 //! The link itself needs the same care, or the gate is one navigation away from moot: any page
 //! the window shows could navigate to its own address with `?shell=1` and become "the hub". So a
@@ -191,8 +191,65 @@ pub fn android_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri_plugin_erplora_android::init(linked_hub_only::<R>)
 }
 
-pub fn notification_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
-    tauri_plugin_notification::init()
+/// The notification plugin (`plugin:notification`: hearing a tap on a notice) as `run` registers
+/// it — behind the same gate (hub#2658). The plugin is a third party's and its `init` takes no
+/// gate, so [`Gated`] wraps it.
+pub fn notification_plugin<R: Runtime>() -> Gated<R> {
+    Gated(tauri_plugin_notification::init())
+}
+
+/// A third-party plugin with [`linked_hub_only`] in front of every one of its commands: everything
+/// else — its setup, the script it puts in every page, its hooks — is the plugin's own.
+pub struct Gated<R: Runtime>(tauri::plugin::TauriPlugin<R>);
+
+impl<R: Runtime> tauri::plugin::Plugin<R> for Gated<R> {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+
+    fn initialize(
+        &mut self,
+        app: &tauri::AppHandle<R>,
+        config: serde_json::Value,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.0.initialize(app, config)
+    }
+
+    // The plugin's script runs in the main frame only, which is what the trait's default
+    // `initialization_script_2` makes of this one.
+    fn initialization_script(&self) -> Option<String> {
+        self.0.initialization_script()
+    }
+
+    fn window_created(&mut self, window: tauri::Window<R>) {
+        self.0.window_created(window)
+    }
+
+    fn webview_created(&mut self, webview: tauri::Webview<R>) {
+        self.0.webview_created(webview)
+    }
+
+    fn on_navigation(&mut self, webview: &tauri::Webview<R>, url: &Url) -> bool {
+        self.0.on_navigation(webview, url)
+    }
+
+    fn on_page_load(&mut self, webview: &tauri::Webview<R>, payload: &tauri::webview::PageLoadPayload<'_>) {
+        self.0.on_page_load(webview, payload)
+    }
+
+    fn on_event(&mut self, app: &tauri::AppHandle<R>, event: &tauri::RunEvent) {
+        self.0.on_event(app, event)
+    }
+
+    fn extend_api(&mut self, invoke: Invoke<R>) -> bool {
+        if let Err(code) = linked_hub_only(&invoke) {
+            invoke.resolver.reject(code);
+            // Answered: on a phone an unanswered `plugin:*` command falls through to the plugin's
+            // Kotlin/Swift half, past the gate.
+            return true;
+        }
+        self.0.extend_api(invoke)
+    }
 }
 
 /// The page drives the device only when both are known: the link state, and the page the window
