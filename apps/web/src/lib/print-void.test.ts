@@ -5,7 +5,7 @@
 // route (HUB_SHELL-F72) and with the comanda's own document, so an installed app that cannot be
 // updated still prints it.
 import { describe, it, expect, vi } from 'vitest';
-import { bootPrintVoid, onKitchenOrderCancelled } from './print-void';
+import { bootPrintVoid, onKitchenItemVoided, onKitchenOrderCancelled } from './print-void';
 import { CLIENT_INSTANCE } from './client-instance';
 import type { PrintRequest, PrintResult } from './print';
 
@@ -236,3 +236,257 @@ describe('the void slip comes out once, where the comanda came out (kitchen#168,
     expect(print.mock.calls[0]![0].jobId).toBe('kitchen-void-k-1-kitchen');
   });
 });
+
+// hub#2640 — the till voids ONE dish already sent (SALES-F20 → KITCHEN-F29): the kitchen screen
+// strikes it, but a paper-only station keeps cooking it. Toast and Square print a void chit with
+// only that dish, at the printer that got it; the round's own slip (above) is for a whole round.
+describe('the void slip of one dish the till voided (hub#2640)', () => {
+  // `kitchen.orders.items` after kitchen.item.voided: the voided line is `voided`, the rest alive.
+  const VOIDED = {
+    id: 'ki-1',
+    sales_order_item_id: 'sl-1',
+    product_name: 'Croquetas',
+    quantity: 2_000_000,
+    notes: 'sin gluten',
+    status: 'voided',
+    void_reason: 'customer changed mind',
+    destination: 'printer',
+    printer_role: 'kitchen',
+  };
+  const ALIVE = {
+    id: 'ki-2',
+    sales_order_item_id: 'sl-2',
+    product_name: 'Entrecot',
+    quantity: 1_000_000,
+    status: 'preparing',
+    destination: 'printer',
+    printer_role: 'kitchen',
+  };
+  const VOIDED_EARLIER = {
+    id: 'ki-3',
+    sales_order_item_id: 'sl-3',
+    product_name: 'Gazpacho',
+    quantity: 1_000_000,
+    status: 'voided',
+    destination: 'printer',
+    printer_role: 'kitchen',
+  };
+  const HEADER = { id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018', status: 'preparing' };
+  const EVENT = { order_id: 'k-1', order_item_id: 'ki-1', action: 'item_voided', notes: 'customer changed mind' };
+
+  it('prints only that dish, with a negative quantity, at its station, on the comanda document', async () => {
+    const print = printed();
+    await onKitchenItemVoided(fakeClient([VOIDED, ALIVE, VOIDED_EARLIER], HEADER), EVENT, { print, t });
+
+    expect(print).toHaveBeenCalledTimes(1);
+    const req = print.mock.calls[0]![0];
+    expect(req.role).toBe('kitchen');
+    expect(req.documentType).toBe('kitchen_order');
+    expect(req.fallbackToBrowser).toBe(false);
+    // Neither the dish still cooking nor one voided before (its own slip already came out).
+    expect(req.data?.items).toEqual([{ name: 'Croquetas', quantity: -2, notes: 'sin gluten' }]);
+    expect(req.data?.receipt_id).toBe('C-018');
+    expect(req.data?.round_number).toBe(2);
+    expect(req.data).not.toHaveProperty('priority');
+  });
+
+  it('says it is ONE dish voided, not the round: the cook must not bin the rest of the table', async () => {
+    const print = printed();
+    await onKitchenItemVoided(fakeClient([VOIDED, ALIVE], HEADER), EVENT, { print, t });
+    expect(print.mock.calls[0]![0].data?.label).toBe('print.voidDishLabel{"label":"Mesa 4"}');
+  });
+
+  it('with no floor label says it alone, never a hole', async () => {
+    const print = printed();
+    await onKitchenItemVoided(fakeClient([VOIDED], { ...HEADER, label: '' }), EVENT, { print, t });
+    expect(print.mock.calls[0]![0].data?.label).toBe('print.voidDishLabelBare');
+  });
+
+  it("has a key of its own, per dish: neither the comanda's nor the round slip's", async () => {
+    const print = printed();
+    await onKitchenItemVoided(fakeClient([VOIDED], HEADER), EVENT, { print, t });
+    expect(print.mock.calls[0]![0].jobId).toBe('kitchen-void-k-1-sl-1-kitchen');
+  });
+
+  it('a menu voided whole prints ONE slip per station, not one per component event', async () => {
+    const STARTER = { ...VOIDED, id: 'ki-7', combo_ref: 'c-1', combo_name: 'Menú del día', product_name: 'Gazpacho' };
+    const MAIN_DISH = { ...STARTER, id: 'ki-8', product_name: 'Entrecot' };
+    const DRINK = { ...STARTER, id: 'ki-9', product_name: 'Caña', printer_role: 'bar' };
+    const print = printed();
+    const { client, emit } = tillHearingAll(fakeClient([STARTER, MAIN_DISH, DRINK, ALIVE], HEADER));
+    bootPrintVoid(client, { print, t });
+
+    for (const id of ['ki-7', 'ki-8', 'ki-9']) {
+      void emit('kitchen.item.voided', { order_id: 'k-1', order_item_id: id }, { clientInstance: CLIENT_INSTANCE });
+    }
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(print.mock.calls.map((c) => c[0].role).sort()).toEqual(['bar', 'kitchen']);
+    const kitchen = print.mock.calls.find((c) => c[0].role === 'kitchen')![0];
+    expect(kitchen.data?.items).toEqual([
+      { name: 'Gazpacho', quantity: -2, notes: 'sin gluten', combo_ref: 'c-1', combo_name: 'Menú del día' },
+      { name: 'Entrecot', quantity: -2, notes: 'sin gluten', combo_ref: 'c-1', combo_name: 'Menú del día' },
+    ]);
+  });
+
+  it('the same event delivered twice prints once', async () => {
+    const print = printed();
+    const { client, emit } = tillHearingAll(fakeClient([VOIDED, ALIVE], HEADER));
+    bootPrintVoid(client, { print, t });
+
+    await emit('kitchen.item.voided', EVENT, { clientInstance: CLIENT_INSTANCE });
+    await emit('kitchen.item.voided', EVENT, { clientInstance: CLIENT_INSTANCE });
+
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it('a dish that only went to a screen prints nothing, and does not ask for the header', async () => {
+    const print = printed();
+    const client = fakeClient([{ ...VOIDED, destination: 'display' }], HEADER) as unknown as {
+      query: ReturnType<typeof vi.fn>;
+    };
+    await onKitchenItemVoided(client as never, EVENT, { print, t });
+    expect(print).not.toHaveBeenCalled();
+    expect(client.query.mock.calls.map((c) => c[0])).toEqual(['kitchen.orders.items']);
+  });
+
+  it('a line that is not voided (stale or wrong event) prints nothing', async () => {
+    const print = printed();
+    await onKitchenItemVoided(fakeClient([{ ...VOIDED, status: 'preparing' }], HEADER), EVENT, { print, t });
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  it('an event with no line, or a line that is not in that order, prints nothing', async () => {
+    const print = printed();
+    await onKitchenItemVoided(fakeClient([VOIDED], HEADER), { order_id: 'k-1' }, { print, t });
+    await onKitchenItemVoided(fakeClient([VOIDED], HEADER), { order_id: 'k-1', order_item_id: 'ki-x' }, { print, t });
+    await onKitchenItemVoided(fakeClient([VOIDED], HEADER), { order_item_id: 'ki-1' }, { print, t });
+    expect(print).not.toHaveBeenCalled();
+  });
+
+  it('if the lines cannot be read nothing prints and nobody is warned, like the comanda', async () => {
+    const print = printed();
+    const onFailure = vi.fn();
+    const client = { query: vi.fn(async () => Promise.reject(new Error('offline'))) } as never;
+    await onKitchenItemVoided(client, EVENT, { print, t, onFailure });
+    expect(print).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('with no printer for that station it warns the till, naming the dish', async () => {
+    const print = vi.fn(async () => ({ via: 'none' as const, role: 'kitchen' }));
+    const onFailure = vi.fn();
+    await onKitchenItemVoided(fakeClient([VOIDED], HEADER), EVENT, { print, t, onFailure });
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({
+      orderId: 'k-1',
+      role: 'kitchen',
+      label: 'Mesa 4',
+      dish: 'Croquetas',
+    });
+    expect(onFailure.mock.calls[0]![0].error).toMatch(/^[a-z][a-z_]*$/);
+  });
+
+  it('a voided menu is named by the menu in the warning', async () => {
+    const print = vi.fn(async () => ({ via: 'queue' as const, role: 'kitchen', awaitingHost: true }));
+    const onFailure = vi.fn();
+    await onKitchenItemVoided(
+      fakeClient([{ ...VOIDED, combo_ref: 'c-1', combo_name: 'Menú del día' }], HEADER),
+      EVENT,
+      { print, t, onFailure },
+    );
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ dish: 'Menú del día', awaitingHost: true });
+  });
+
+  it('a printer that throws warns the till and does not stop the other station', async () => {
+    const DRINK = { ...VOIDED, id: 'ki-9', product_name: 'Caña', printer_role: 'bar' };
+    const print = vi.fn(async (req: PrintRequest) => {
+      if (req.role === 'kitchen') throw new Error('out of paper');
+      return { via: 'bridge' as const, role: req.role ?? 'bar' };
+    });
+    const onFailure = vi.fn();
+    await expect(
+      onKitchenItemVoided(fakeClient([VOIDED, DRINK], HEADER), EVENT, { print, t, onFailure }),
+    ).resolves.toBeUndefined();
+    expect(print).toHaveBeenCalledTimes(2);
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure.mock.calls[0]![0]).toMatchObject({ role: 'kitchen', dish: 'Croquetas' });
+  });
+
+  it('voided at another till prints nothing here; voided by no till goes only to the queue', async () => {
+    const print = printed();
+    const { client, emit } = tillHearingAll(fakeClient([VOIDED], HEADER));
+    bootPrintVoid(client, { print, t });
+
+    await emit('kitchen.item.voided', EVENT, { clientInstance: 'till-next-door-7c1e' });
+    expect(print).not.toHaveBeenCalled();
+
+    await emit('kitchen.item.voided', EVENT, {});
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].queueOnly).toBe(true);
+  });
+
+  it('the tab that voided it prints by its usual route', async () => {
+    const print = printed();
+    const { client, emit } = tillHearingAll(fakeClient([VOIDED], HEADER));
+    bootPrintVoid(client, { print, t });
+    await emit('kitchen.item.voided', EVENT, { clientInstance: CLIENT_INSTANCE });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].queueOnly).toBeFalsy();
+  });
+
+  it('the boot returns one stop for both listeners', () => {
+    const stops = [vi.fn(), vi.fn()];
+    const events: string[] = [];
+    const client = {
+      onEvent: (event: string) => {
+        events.push(event);
+        return stops[events.length - 1];
+      },
+    } as never;
+    const stop = bootPrintVoid(client, { print: printed(), t });
+    expect(events.sort()).toEqual(['kitchen.item.voided', 'kitchen.order.cancelled']);
+    stop();
+    expect(stops[0]).toHaveBeenCalledTimes(1);
+    expect(stops[1]).toHaveBeenCalledTimes(1);
+  });
+
+  describe('and the round slip does not void that dish a second time', () => {
+    it('cancelling the round later leaves out the dish already voided', async () => {
+      const print = printed();
+      const CANCELLED_ALIVE = { ...ALIVE, status: 'cancelled' };
+      await onKitchenOrderCancelled(fakeClient([VOIDED, CANCELLED_ALIVE], HEADER), { order_id: 'k-1' }, { print, t });
+      expect(print).toHaveBeenCalledTimes(1);
+      expect(print.mock.calls[0]![0].data?.items).toEqual([{ name: 'Entrecot', quantity: -1 }]);
+    });
+
+    it('voiding the last dish of a round prints ONE slip: the dish, and no round slip on top', async () => {
+      const print = printed();
+      const { client, emit } = tillHearingAll(fakeClient([VOIDED, VOIDED_EARLIER], { ...HEADER, status: 'cancelled' }));
+      bootPrintVoid(client, { print, t });
+
+      // The kitchen emits both, in this order, from the same void (KITCHEN-F29).
+      await emit('kitchen.item.voided', EVENT, { clientInstance: CLIENT_INSTANCE });
+      await emit('kitchen.order.cancelled', { order_id: 'k-1' }, { clientInstance: CLIENT_INSTANCE });
+
+      expect(print).toHaveBeenCalledTimes(1);
+      expect(print.mock.calls[0]![0].jobId).toBe('kitchen-void-k-1-sl-1-kitchen');
+    });
+  });
+});
+
+function tillHearingAll(base: unknown) {
+  const listeners = new Map<string, ((payload: unknown, meta: { clientInstance?: string }) => void)[]>();
+  const client = {
+    ...(base as object),
+    onEvent: (event: string, cb: (payload: unknown, meta: { clientInstance?: string }) => void) => {
+      listeners.set(event, [...(listeners.get(event) ?? []), cb]);
+      return () => {};
+    },
+  } as never;
+  const emit = async (event: string, payload: unknown, meta: { clientInstance?: string }) => {
+    for (const cb of listeners.get(event) ?? []) cb(payload, meta);
+    await new Promise((r) => setTimeout(r, 0));
+  };
+  return { client, emit };
+}
