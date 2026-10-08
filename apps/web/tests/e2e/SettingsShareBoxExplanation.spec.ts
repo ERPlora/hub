@@ -16,6 +16,9 @@ const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
 /** How the explanation starts in each language, to know the bench really painted that language. */
 const OPENING: Record<string, string> = { en: 'When you save,', es: 'Al guardar,' };
 
+/** The bench hub's own language: what the shell paints before the viewer's profile is read. */
+const BENCH_HUB_LANGUAGE = 'es';
+
 type Session = Awaited<ReturnType<typeof loginByPin>>;
 
 /**
@@ -60,6 +63,32 @@ async function forceMaterialMode(page: Page): Promise<void> {
     expect(body, 'main.ts still sets the Ionic mode in one literal').toContain('mode: "md", swipeBackEnabled');
     await route.fulfill({ response: res, body });
   });
+}
+
+/**
+ * hub#2624 — the shell paints the screen in the hub's language first and switches to the
+ * viewer's own one only when its profile read lands, at the END of the post-login chain
+ * (`gateAndRefresh` in App.vue: plan, launcher, hub settings, then `/api/profile`). On a loaded
+ * gate that read came late and the spec measured the Spanish first paint of an English run.
+ * Holding the browser's profile read until the box is on screen, and a second more, makes that
+ * order happen on EVERY run: a measurement taken as soon as the box shows is red here, not one
+ * push in ten on the gate. Only when the saved language is not the hub's own: otherwise the
+ * first paint already speaks it and nothing waits for the held read. `times: 1` lets go of the
+ * route once that read is through.
+ */
+const PROFILE_READ = /\/api\/profile$/;
+const PROFILE_AFTER_BOX_MS = 1000;
+
+async function profileReadLandsAfterTheBox(page: Page): Promise<void> {
+  await page.route(
+    PROFILE_READ,
+    async (route) => {
+      await page.getByTestId('settings-share-with-erplora').waitFor();
+      await new Promise((done) => setTimeout(done, PROFILE_AFTER_BOX_MS));
+      await route.continue();
+    },
+    { times: 1 },
+  );
 }
 
 interface ExplanationBox {
@@ -116,12 +145,17 @@ for (const locale of ['en', 'es'] as const) {
         page,
       }) => {
         if (mode === 'md') await forceMaterialMode(page);
+        if (locale !== BENCH_HUB_LANGUAGE) await profileReadLandsAfterTheBox(page);
         session = await loginByPin();
         await setProfileLanguage(session, locale);
         await withSession(page, session);
         await page.setViewportSize(VIEWPORTS[0]);
         await page.goto('/settings#business');
-        await expect(page.getByTestId('settings-share-with-erplora')).toBeVisible();
+        // hub#2624: visible is not yet in the viewer's language — the profile read applies it
+        // later. Measure once the explanation speaks the language this run saved.
+        await expect(page.getByTestId('settings-share-with-erplora').locator('ion-label p')).toHaveText(
+          new RegExp(`^\\s*${OPENING[locale]}`),
+        );
 
         for (const viewport of VIEWPORTS) {
           await page.setViewportSize(viewport);
