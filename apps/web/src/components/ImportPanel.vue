@@ -1205,12 +1205,13 @@ ok-data-table {
    warning tone, and the icon stays on the first line of a text that wraps on a phone. */
 .origin-unproven-banner {
   align-items: flex-start;
-  color: var(--ion-color-warning-shade, var(--ion-color-medium));
+  color: var(--ion-text-color);
   border-color: var(--ion-color-warning, rgba(0, 0, 0, 0.08));
 }
 .origin-unproven-banner ion-icon {
   flex: 0 0 auto;
   margin-top: 0.1rem;
+  color: var(--ion-color-warning-shade, var(--ion-color-medium));
 }
 
 @media (max-width: 36rem) {
