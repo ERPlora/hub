@@ -1,6 +1,12 @@
 <template>
   <ion-app>
-    <ion-split-pane content-id="main" when="lg" :class="{ rail: railCollapsed }">
+    <!-- Keyed on the hand-over (hub#2539): the next person gets every screen mounted again for
+         her, never what was read with the session of the one who left. The key sits on the split
+         pane and not on the outlet alone: Ionic wires `ion-split-pane` and `ion-menu` to their
+         `content-id` once, when they connect, so an outlet mounted again under them would start
+         unmarked (no `split-pane-main`: positioned over the sidebar on a wide till) and the menu
+         would go on driving the element that left. Mounting the pane again wires all of it again. -->
+    <ion-split-pane content-id="main" when="lg" :class="{ rail: railCollapsed }" :key="screenKey">
       <!-- Menú lateral (drawer en móvil, fijo en desktop ≥lg). Como TODO el chrome autenticado,
            va dentro de <AuthenticatedChrome>: quién lo ve se decide ahí, en un solo sitio
            (hub#925). -->
@@ -160,9 +166,7 @@
         </ion-menu>
       </AuthenticatedChrome>
 
-      <!-- Keyed on the hand-over (hub#2539): the next person gets every screen mounted again for
-           her, never what was read with the session of the one who left. -->
-      <ion-router-outlet id="main" :key="screenKey" />
+      <ion-router-outlet id="main" />
     </ion-split-pane>
 
     <!-- Drawer del asistente (lo abre el sparkles de la topbar). Hermano del split-pane:
@@ -458,8 +462,9 @@ installIdleLogout(() => {
 });
 // After a hand-over (hub#2539) the screen under the overlay, the pages Ionic keeps hidden for «back»
 // and the assistant panel still hold what was read for the person who left. Bumping the key mounts
-// them again for whoever arrived. A screen she may not open is left FIRST, so it is never mounted
-// again under her session; the sale in progress survives the remount (the till keeps its open check).
+// the split pane (sidebar and outlet, wired to each other again) and the assistant panel again for
+// whoever arrived. A screen she may not open is left FIRST, so it is never mounted again under her
+// session; the sale in progress survives the remount (the till keeps its open check).
 const screenKey = ref(0);
 watch(handovers, async () => {
   const to = screenAfterHandover(route, moduleNav.value, moduleNavState.value);

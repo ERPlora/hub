@@ -246,4 +246,29 @@ test.describe('Switch user leaves nothing of the previous person on screen (hub#
     await expect(page.locator('[data-testid="assistant-input"] textarea')).toHaveValue('');
     await expect(page.locator('.attach-chip')).toHaveCount(0);
   });
+
+  test('the shell around the screen survives the hand-over: the sidebar keeps its place and the menu drives the new screen', async ({ page }) => {
+    // Ionic wires the split pane and the menu to their `content-id` ONCE, when they connect
+    // (`ion-split-pane` marks the main child, `ion-menu` keeps a reference to it). A screen mounted
+    // again under the same id must be wired again, or a wide till loses its sidebar (the new outlet
+    // is positioned over it) and the menu goes on driving an element that is no longer on screen.
+    await openShellAsAdmin(page);
+    const main = page.locator('ion-router-outlet#main');
+    const sidebar = page.locator('ion-menu.dash-menu');
+    await expect(main).toHaveClass(/split-pane-main/);
+    await expect(main).toHaveClass(/menu-content/);
+
+    await handTillToEmployee(page);
+
+    await expect.poll(() => currentPath(page)).toBe('/dashboard');
+    await settled(page);
+    await expect(main).toHaveClass(/split-pane-main/);
+    await expect(main).toHaveClass(/menu-content/);
+    // Beside the sidebar, not over it: the screen starts where the sidebar ends.
+    const sidebarBox = await sidebar.boundingBox();
+    const mainBox = await main.boundingBox();
+    expect(sidebarBox, 'the sidebar is on screen').not.toBeNull();
+    expect(mainBox, 'the screen is on screen').not.toBeNull();
+    expect(mainBox!.x).toBeGreaterThanOrEqual(sidebarBox!.x + sidebarBox!.width - 1);
+  });
 });
