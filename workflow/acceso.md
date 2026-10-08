@@ -154,7 +154,7 @@ Pasos:
 4. «Cerrar sesión» borra la sesión en el hub al momento.
 5. Una sesión de administrador es una sesión abierta por alguien con rol de administrador (o la grafía antigua «owner»); es la que piden los ajustes, el personal, las llaves, los dispositivos, el motor de automatizaciones y las métricas.
 Entra: el token de sesión en la cabecera `X-Hub-Session`; el modo del dispositivo (HUB-F139) y el dial del negocio (HUB-F140).
-Sale: la sesión con su caducidad; al cerrarla, la fila borrada y una línea de actividad de cierre. Dar de baja a la persona o quitar el dispositivo también borra sus sesiones (HUB-F149, HUB-F141). De esa caducidad dependen además: la lista de dispositivos («sesión abierta», último uso) y su limpieza de 30 días (HUB-F141), el recuento de dispositivos con sesión del latido (HUB-F164) y de Plan y límites (HUB-F165), la cookie de las fotos (es el mismo token), el canal en vivo abierto con ella, que se cierra en el instante en que caduca (HUB-F60), y el plazo en que sigue viva la sesión de quien se quitó en erplora.com (HUB-F144). Cambiar la duración obliga a revisar esos flujos.
+Sale: la sesión con su caducidad; al cerrarla, la fila borrada y una línea de actividad de cierre. Dar de baja a la persona o quitar el dispositivo también borra sus sesiones (HUB-F149, HUB-F141); cambiar la contraseña en erplora.com borrará las abiertas con la cuenta (HUB-F129, no hecho). De esa caducidad dependen además: la lista de dispositivos («sesión abierta», último uso) y su limpieza de 30 días (HUB-F141), el recuento de dispositivos con sesión del latido (HUB-F164) y de Plan y límites (HUB-F165), la cookie de las fotos (es el mismo token), el canal en vivo abierto con ella, que se cierra en el instante en que caduca (HUB-F60), y el plazo en que sigue viva la sesión de quien se quitó en erplora.com (HUB-F144). Cambiar la duración obliga a revisar esos flujos.
 Si falla: una sesión caducada, borrada o de una persona dada de baja recibe 401 en su siguiente petición, también desde la pantalla de un módulo; la pantalla dice «Tu sesión ha terminado: caducó o se abrió en otro dispositivo. Vuelve a entrar.» y lleva al acceso. La venta a medias no se pierde: sus líneas ya estaban guardadas.
 Implicados: FLOWS-F01, HUB_SHELL-F07, HUB_SHELL-F08, HUB_SHELL-F10, HUB_SHELL-F195, SAAS_AUTH-F10, SAAS_AUTH-F12, SAAS_AUTH-F18
 QA: qa-hub-restaurant §7.02
@@ -281,6 +281,22 @@ Si falla: si la baja local no se puede escribir, queda en el registro de errores
 Implicados: HUB_SHELL-F01, REC_ALTA-F15, SAAS_AUTH-F22, SAAS_DASHBOARD-F16
 QA: ninguno
 
+### HUB-F129 Cerrar las sesiones abiertas con la cuenta cuando su dueño cambia la contraseña en erplora.com
+Estado: no hecho — el hub no tiene la puerta que recibe el aviso y erplora.com no lo manda: quien tenía la caja abierta con la cuenta sigue dentro hasta que su sesión caduca (12 h en compartido, 30 días en personal) (hub#2694, ERPlora/saas#2613)
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+1. Una persona cambia o restablece su contraseña en erplora.com, o se la cambian desde su consola (SAAS_AUTH-F10).
+2. erplora.com manda a cada negocio del que es miembro un aviso firmado con su clave, la misma que firma el permiso del plan (HUB-F163): a quién se refiere (su identificador de cuenta de erplora.com), para qué negocio es, el instante del cambio y hasta cuándo vale el aviso (minutos: cada reintento lleva uno recién firmado).
+3. El hub comprueba la firma, que el aviso es para este negocio y que sigue vigente, y busca a la persona por su identificador de cuenta.
+4. Borra las sesiones de esa persona abiertas **con la cuenta** (contraseña, Google o el pase desde el panel) que nacieron antes del instante del cambio, en todos los dispositivos, y cierra al momento sus canales de avisos en vivo (HUB-F60). En cada uno de esos dispositivos, la siguiente acción lleva al acceso con «Tu sesión ha terminado…» (HUB-F136); para volver hace falta la contraseña nueva.
+5. Sus sesiones de PIN o de placa siguen abiertas, y su PIN, su placa, su ficha, su rol y la confianza de los dispositivos no cambian: el PIN es otra credencial y se cambia en HUB-F132. Así lo hacen Square, Toast, Lightspeed, Clover y Shopify POS, y es lo que evita echar a la caja en plena hora de servicio por un cambio de contraseña.
+Entra: el aviso firmado, por una puerta sin sesión ni llave (la firma es la prueba, como en HUB-F163), que pasa por la barrera de registro (HUB-F160) y por un freno de rechazos por dirección.
+Sale: las sesiones con la cuenta (`credential_kind = cloud`) de esa persona anteriores al cambio, borradas con el motivo `password_changed`, sus canales en vivo cerrados con `events.credential_ended` y una línea de actividad; la respuesta `{"ok": true, "closed": <n>}`, también con 0 (persona sin ficha en este negocio o sin sesiones con la cuenta: no es un error). Repetir el mismo aviso no cierra nada más, y una sesión abierta después del cambio (con la contraseña nueva) nunca la cierra un aviso anterior.
+Si falla: firma que no cuadra, `password_notice_invalid`; aviso de otro negocio, `password_notice_wrong_hub`; aviso caducado, `password_notice_expired`; sin clave para comprobar, `password_notice_key_unavailable`; demasiados rechazos seguidos, `password_notice_throttled` (429). En todos los casos no se toca ninguna sesión. Si el hub no contesta o no confirma, erplora.com lo reintenta (SAAS_AUTH-F10); hasta que llegue, la sesión vive hasta su caducidad.
+Implicados: SAAS_AUTH-F10
+QA: ninguno
+
 ## Cobertura contra la referencia
 
 | Elemento | Estado | Flujo |
@@ -296,6 +312,7 @@ QA: ninguno
 | Duración de sesión por dispositivo y por negocio | hecho | HUB-F136 |
 | Bloqueo por inactividad | parcial (lo hace la pantalla) | HUB-F136 |
 | Cerrar todas mis sesiones | no hecho | — |
+| Cambiar la contraseña de la cuenta cierra las sesiones abiertas con ella (no las de PIN) | no hecho | HUB-F129 |
 | Un dispositivo a la vez en el plan gratuito | hecho | HUB-F137 |
 | Cambio rápido de usuario sobre la venta | hecho (solo con PIN, sin placa) | HUB-F138 |
 | Dispositivo compartido / personal | hecho | HUB-F139 |
