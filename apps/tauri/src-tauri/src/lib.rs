@@ -21,6 +21,8 @@ use serde::Serialize;
 /// What the window shows when the network dies under it (hub#1716).
 mod connectivity;
 use connectivity::{ShellNav, spawn_connectivity_guard};
+/// Only the linked hub drives the device (hub#2504).
+mod hub_link;
 mod navigation;
 mod notice_tap;
 pub use navigation::{NavigationVerdict, navigation_verdict};
@@ -2033,6 +2035,43 @@ fn on_second_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, argv: Vec<Stri
     }
 }
 
+/// Every command the app answers. `run` hands it to Tauri, and the tests drive the same
+/// dispatcher through the IPC.
+fn app_commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
+        device_context,
+        forget_hub,
+        open_external_url,
+        save_download,
+        // The system print dialog for an A4 document (hub#2006).
+        print_document,
+        // The way out when the network dies under the window (hub#1716).
+        shell_retry,
+        // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
+        // Camino de hardware: impresoras de red ESC/POS + cajón → peripherals.
+        erplora_bridge_status,
+        erplora_discover_printers,
+        erplora_get_devices,
+        erplora_print,
+        erplora_test_print,
+        erplora_open_drawer,
+        erplora_set_device_role,
+        erplora_add_network_printer,
+        erplora_set_device_name,
+        erplora_remove_device,
+        erplora_notify,
+        // The tap the page was not there to hear (hub#2360).
+        erplora_take_notice_tap,
+        // La placa por NFC (hub#988): la segunda vía de la MISMA puerta que el lector-teclado.
+        erplora_nfc_read,
+        // «Start on login» (hub#389): desktop-only in effect — on mobile they answer an
+        // error, and the settings toggle never renders there.
+        autostart_is_enabled,
+        autostart_enable,
+        autostart_disable
+    ]
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
@@ -2138,38 +2177,7 @@ pub fn run() {
             notice_tap::answer_link(app.handle(), std::env::args());
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            device_context,
-            forget_hub,
-            open_external_url,
-            save_download,
-            // The system print dialog for an A4 document (hub#2006).
-            print_document,
-            // The way out when the network dies under the window (hub#1716).
-            shell_retry,
-            // Datos: NO van por `invoke` (ADR-0050) — la PWA habla HTTP+WS con su hub cloud.
-            // Camino de hardware: impresoras de red ESC/POS + cajón → peripherals.
-            erplora_bridge_status,
-            erplora_discover_printers,
-            erplora_get_devices,
-            erplora_print,
-            erplora_test_print,
-            erplora_open_drawer,
-            erplora_set_device_role,
-            erplora_add_network_printer,
-            erplora_set_device_name,
-            erplora_remove_device,
-            erplora_notify,
-            // The tap the page was not there to hear (hub#2360).
-            erplora_take_notice_tap,
-            // La placa por NFC (hub#988): la segunda vía de la MISMA puerta que el lector-teclado.
-            erplora_nfc_read,
-            // «Start on login» (hub#389): desktop-only in effect — on mobile they answer an
-            // error, and the settings toggle never renders there.
-            autostart_is_enabled,
-            autostart_enable,
-            autostart_disable
-        ])
+        .invoke_handler(app_commands())
         .run(tauri::generate_context!())
         .expect("error while running ERPlora shell");
 }
