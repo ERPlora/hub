@@ -191,7 +191,9 @@ describe('forgetting a hub the Cloud says is gone (410)', () => {
     expect(end).toBeGreaterThan(start);
     const hook = main.slice(start, end);
 
-    expect(hook).toContain('signOutAndForgetHub(false)');
+    // Anchored to a statement at the start of a line: a commented-out `// signOutAndForgetHub(false)`
+    // left next to the old forget-then-logout code would still "contain" the call (hub#2696, same trap).
+    expect(hook).toMatch(/^\s*void signOutAndForgetHub\(false\)/m);
     expect(hook).not.toContain("invokeTauri('forget_hub'");
   });
 });

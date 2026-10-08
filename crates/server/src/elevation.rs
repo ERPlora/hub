@@ -14,8 +14,14 @@
 //! the wrong person in the dialog is a mistake anybody makes, and locking their account for it
 //! would teach the shop to stop using the dialog and share a password instead.
 //!
+//! It also answers to the pinpad's **per-address** guard ([`AddressGuard`], hub#2517): the
+//! per-name lock cannot see somebody who rotates names, or swipes invented card numbers, so every
+//! wrong PIN or unknown badge here also counts against the client address, and a locked address
+//! gets the same `429` here as at the pinpad — one budget for every door that checks a PIN.
+//!
 //! [`Runtime::approve_elevation`]: erplora_runtime::Runtime::approve_elevation
 //! [`LoginThrottle`]: crate::login_throttle::LoginThrottle
+//! [`AddressGuard`]: crate::address_guard::AddressGuard
 use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -55,24 +61,33 @@ pub struct ApproveReq {
 }
 
 impl ApproveReq {
-    /// The key the brute-force guard counts against.
+    fn is_badge(&self) -> bool {
+        !self.badge.trim().is_empty()
+    }
+
+    /// The key the brute-force guard counts against — always the one the matching sign-in door
+    /// uses, so a lock earned at one door holds at the other.
     ///
-    /// For a PIN it is the approver's NAME, unchanged since hub#361 — the same key the login
-    /// pinpad uses, so a lock earned at one door holds at the other. For a badge there is no name
-    /// to type, so it is the badge itself: the guard has to bound the attempts against the CARD
-    /// being tried, and a shared key would let anybody lock out a colleague by swiping rubbish.
-    fn throttle_key(&self) -> String {
-        if self.badge.trim().is_empty() {
-            self.approver.clone()
-        } else {
-            format!("badge:{}", self.badge.trim())
+    /// For a PIN it is the approver's NAME, unchanged since hub#361. For a badge there is no name
+    /// to type, so it is the CARD being tried, by its keyed index exactly like `/api/auth/badge`
+    /// (hub#2517): never the number as read, which kept the card in memory in the clear and gave
+    /// the same card a second budget here. A shared key would let anybody lock out a colleague by
+    /// swiping rubbish.
+    async fn throttle_key(&self, rt: &erplora_runtime::Runtime) -> Result<String, RuntimeError> {
+        if !self.is_badge() {
+            return Ok(self.approver.clone());
         }
+        let key = rt.badge_index_key().await?;
+        Ok(format!(
+            "badge:{}",
+            erplora_runtime::identity::badge_index(&key, &self.badge)
+        ))
     }
 
     /// What the approver presented. A badge wins when both travel: it is the more specific claim,
     /// and it cannot be typed by mistake into a dialog that is showing a pinpad.
     fn credential(&self) -> ApproverCredential<'_> {
-        if self.badge.trim().is_empty() {
+        if !self.is_badge() {
             ApproverCredential::Pin {
                 name: &self.approver,
                 pin: &self.pin,
@@ -113,22 +128,21 @@ pub async fn approve(
         Err(e) => return unauthorized(e),
     };
 
-    // Checked BEFORE verifying, like the pinpad (hub#329): a locked identity must stop leaking the
-    // right/wrong signal that is exactly what an attacker is fishing for.
-    let throttle_key = req.throttle_key();
+    // Both locks are checked BEFORE verifying, like the pinpad (hub#329, hub#2282): a locked
+    // identity or address must stop leaking the right/wrong signal an attacker is fishing for.
+    let client = crate::address_guard::client_address(&headers);
+    if let Some(retry_after_secs) = client
+        .as_deref()
+        .and_then(|c| st.address_guard.locked_for(c))
+    {
+        return too_many_attempts(retry_after_secs);
+    }
+    let throttle_key = match req.throttle_key(&rt).await {
+        Ok(key) => key,
+        Err(e) => return err_response(e),
+    };
     if let Some(retry_after_secs) = st.login_throttle.locked_for(&throttle_key) {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({
-                "ok": false,
-                "error": {
-                    "code": "too_many_attempts",
-                    "message": "too many failed attempts: wait a few minutes before approving again",
-                    "retry_after_secs": retry_after_secs
-                }
-            })),
-        )
-            .into_response();
+        return too_many_attempts(retry_after_secs);
     }
 
     match rt
@@ -159,10 +173,36 @@ pub async fn approve(
         Err(e) => {
             if is_bad_pin(&e) {
                 st.login_throttle.record_failure(&throttle_key);
+                crate::address_guard::record_guess(
+                    &st,
+                    client.as_deref(),
+                    if req.is_badge() {
+                        crate::address_guard::Failure::Badge
+                    } else {
+                        crate::address_guard::Failure::Pin
+                    },
+                );
             }
             err_response(e)
         }
     }
+}
+
+/// The lock's answer, the same for the per-name and the per-address guard: the dialog reads the
+/// code and the wait, never which guard said it.
+fn too_many_attempts(retry_after_secs: u64) -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({
+            "ok": false,
+            "error": {
+                "code": "too_many_attempts",
+                "message": "too many failed attempts: wait a few minutes before approving again",
+                "retry_after_secs": retry_after_secs
+            }
+        })),
+    )
+        .into_response()
 }
 
 /// Is this refusal about the **digits**? Only then does it spend an attempt.
