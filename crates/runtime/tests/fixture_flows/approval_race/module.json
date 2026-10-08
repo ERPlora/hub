@@ -1,0 +1,27 @@
+{
+  "id": "race",
+  "name": "Race",
+  "version": "1.0.0",
+  "permissions": [
+    "race.book"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "commands": {
+    "race.booking.add": {
+      "permission": "race.book",
+      "sql": [
+        "sql/add_booking_slowly.sql"
+      ]
+    },
+    "race.booking.broken": {
+      "permission": "race.book",
+      "sql": [
+        "sql/add_booking_without_text.sql"
+      ]
+    }
+  }
+}
