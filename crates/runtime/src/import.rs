@@ -632,7 +632,16 @@ pub mod ignore_reason {
 /// bundles older than that field read as unknown origin, and treating «unknown == unknown» as the
 /// same hub would hand exactly the artefacts this defends against (the blueprints published before
 /// the field existed) the one answer that lets their rows through.
+///
+/// And the id alone proves nothing (hub#2497): it is public — `GET /api/hub/context` serves it
+/// without a session — so any file can write it. The bundle must also carry this deployment's
+/// origin seal over the manifest exactly as it arrived ([`crate::export::has_valid_origin_seal`]).
 fn is_same_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
+    names_this_hub(manifest, target_hub_id) && crate::export::has_valid_origin_seal(manifest)
+}
+
+/// Does the bundle SAY it comes from this hub? A claim, never a proof: see [`is_same_hub`].
+fn names_this_hub(manifest: &BlueprintManifest, target_hub_id: &str) -> bool {
     !manifest.hub.hub_id.is_empty() && manifest.hub.hub_id == target_hub_id
 }
 
@@ -2008,7 +2017,28 @@ mod tests {
             capability_grants: Default::default(),
             flows: Vec::new(),
             sha256: BTreeMap::new(),
+            origin_seal: None,
         }
+    }
+
+    /// `HUB_SECRETS_KEY` set for the test, under the process-wide env lock (hub#2184): the
+    /// origin seal of hub#2497 is derived from it, both when sealing and when checking.
+    fn hub_key() -> (
+        crate::secret_box::test_support::EnvLockGuard,
+        crate::secret_box::test_support::EnvVarGuard,
+    ) {
+        use crate::secret_box::test_support::{env_lock, test_key_b64, EnvVarGuard};
+        let lock = env_lock();
+        let key = EnvVarGuard::set(&test_key_b64(0x31));
+        (lock, key)
+    }
+
+    /// [`manifest_from`] as THIS hub's export leaves it: sealed with the hub's key (hub#2497).
+    /// Needs [`hub_key`] held.
+    fn sealed_from(origin_hub_id: &str) -> BlueprintManifest {
+        let mut m = manifest_from(origin_hub_id);
+        assert!(crate::export::seal_manifest(&mut m), "the test key seals");
+        m
     }
 
     /// Identities belong to ONE installation: only that installation restoring itself may write
@@ -2016,8 +2046,9 @@ mod tests {
     /// zip — is discarded whatever its `purpose` says.
     #[test]
     fn identities_travel_only_within_the_same_hub() {
+        let _key = hub_key();
         assert_eq!(
-            identity_not_portable(&manifest_from("h1"), "hub_users", "h1"),
+            identity_not_portable(&sealed_from("h1"), "hub_users", "h1"),
             None,
             "a hub restoring its own backup keeps its users (ADR-0113 §1)"
         );
@@ -2043,6 +2074,11 @@ mod tests {
     /// ever match, a bundle would only need to omit the field to get its accounts in.
     #[test]
     fn an_unknown_origin_is_never_the_same_hub() {
+        let _key = hub_key();
+        assert!(
+            !is_same_hub(&sealed_from(""), ""),
+            "unknown origin must not match anything, sealed or not"
+        );
         assert!(
             !is_same_hub(&manifest_from(""), ""),
             "unknown origin must not match anything"
@@ -2055,6 +2091,99 @@ mod tests {
             identity_not_portable(&manifest_from(""), "hub_users", "h2").as_deref(),
             Some(ignore_reason::IDENTITY_NOT_PORTABLE)
         );
+    }
+
+    /// 🔴 hub#2497 — naming this hub is a claim, not a proof: the id is public. Without the hub's
+    /// seal a bundle that says `hub_id: h1` is any other file to `h1`.
+    #[test]
+    fn naming_this_hub_without_its_seal_is_not_the_same_hub() {
+        let _key = hub_key();
+        assert!(!is_same_hub(&manifest_from("h1"), "h1"));
+        assert_eq!(
+            identity_not_portable(&manifest_from("h1"), "hub_users", "h1").as_deref(),
+            Some(ignore_reason::IDENTITY_NOT_PORTABLE)
+        );
+        assert!(is_same_hub(&sealed_from("h1"), "h1"), "the sealed copy is");
+    }
+
+    /// 🔴 hub#2497 — the seal covers the whole manifest: rewriting the origin id of another hub's
+    /// sealed backup, or adding one permission to this hub's own, breaks it.
+    #[test]
+    fn a_sealed_manifest_edited_afterwards_is_not_the_same_hub() {
+        let _key = hub_key();
+        let mut other_hubs = sealed_from("h2");
+        other_hubs.hub.hub_id = "h1".into();
+        assert!(!is_same_hub(&other_hubs, "h1"), "an id rewritten by hand");
+
+        let mut widened = sealed_from("h1");
+        widened
+            .capability_grants
+            .insert("verifactu".into(), vec!["certificate".into()]);
+        assert!(!is_same_hub(&widened, "h1"), "one more permission");
+
+        let mut one_more_file = sealed_from("h1");
+        one_more_file
+            .sha256
+            .insert("data/hub_users.sql".into(), "00".repeat(32));
+        assert!(!is_same_hub(&one_more_file, "h1"), "one more file");
+
+        let mut garbage = sealed_from("h1");
+        garbage.origin_seal = Some("zz".into());
+        assert!(!is_same_hub(&garbage, "h1"), "a seal that is not hex");
+    }
+
+    /// 🔴 hub#2497 — the key is per hub: a seal made under another hub's key does not verify here,
+    /// and a hub without a key cannot tell its own copy from anybody's (it fails closed).
+    #[test]
+    fn only_this_hub_s_key_proves_the_copy() {
+        use crate::secret_box::test_support::{env_lock, test_key_b64, EnvVarGuard};
+        let _lock = env_lock();
+        let sealed_elsewhere = {
+            let _other = EnvVarGuard::set(&test_key_b64(0x77));
+            sealed_from("h1")
+        };
+        {
+            let _mine = EnvVarGuard::set(&test_key_b64(0x31));
+            assert!(!is_same_hub(&sealed_elsewhere, "h1"), "another hub's key");
+        }
+        let sealed_here = {
+            let _mine = EnvVarGuard::set(&test_key_b64(0x31));
+            sealed_from("h1")
+        };
+        let _none = EnvVarGuard::unset();
+        assert!(!is_same_hub(&sealed_here, "h1"), "no key here");
+        let mut unsealable = manifest_from("h1");
+        assert!(
+            !crate::export::seal_manifest(&mut unsealable),
+            "without a key nothing is sealed"
+        );
+        assert_eq!(unsealable.origin_seal, None);
+    }
+
+    /// The seal is checked on the manifest the import PARSED from `manifest.json`, so it has to
+    /// survive the trip through the file — pretty-printed, with a flow document inside — unchanged.
+    #[test]
+    fn the_seal_survives_the_trip_through_manifest_json() {
+        let _key = hub_key();
+        let mut m = manifest_from("h1");
+        m.flows.push(crate::export::FlowSpec {
+            name: "Reorder".into(),
+            enabled: true,
+            definition: serde_json::json!({
+                "version": 1,
+                "trigger": {"cron": "0 9 * * 1"},
+                "steps": [{"z": 1, "a": {"ratio": 0.1, "big": 12345678901u64, "neg": -3}}]
+            }),
+            grants: Vec::new(),
+        });
+        m.capability_grants
+            .insert("verifactu".into(), vec!["network".into()]);
+        assert!(crate::export::seal_manifest(&mut m));
+
+        let file = serde_json::to_vec_pretty(&m).unwrap();
+        let parsed: BlueprintManifest = serde_json::from_slice(&file).unwrap();
+
+        assert!(is_same_hub(&parsed, "h1"));
     }
 
     /// A destination registry where one module is installed, declaring (or not) that its data
@@ -2083,6 +2212,7 @@ mod tests {
     /// the flag, not the name.
     #[test]
     fn installation_bound_data_is_declared_by_the_module_not_named_by_the_core() {
+        let _key = hub_key();
         let bound = registry_with("ticketbai", true);
         assert_eq!(
             installation_bound_not_portable(
@@ -2099,7 +2229,7 @@ mod tests {
         assert_eq!(
             installation_bound_not_portable(
                 &bound,
-                &manifest_from("h1"),
+                &sealed_from("h1"),
                 "modules/ticketbai",
                 "h1"
             ),
@@ -2133,6 +2263,7 @@ mod tests {
     /// republication. Nothing else in the engine may grow a second name.
     #[test]
     fn verifactu_stays_bound_while_its_published_manifest_has_no_flag() {
+        let _key = hub_key();
         let published = registry_with("verifactu", false);
         assert_eq!(
             installation_bound_not_portable(
@@ -2148,7 +2279,7 @@ mod tests {
         assert_eq!(
             installation_bound_not_portable(
                 &published,
-                &manifest_from("h1"),
+                &sealed_from("h1"),
                 "modules/verifactu",
                 "h1"
             ),

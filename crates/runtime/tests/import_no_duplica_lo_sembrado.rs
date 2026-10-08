@@ -34,6 +34,7 @@ fn mdir(id: &str) -> PathBuf {
 /// A hub with `sales` installed — and therefore with its seed applied — under its OWN `hub_id`,
 /// exactly as production does it.
 async fn hub_con_sales(hub_id: &str) -> Runtime {
+    ensure_master_key();
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
@@ -432,4 +433,18 @@ async fn restaurar_el_backup_propio_no_pierde_una_forma_de_pago_del_dueno() {
         .await,
         3,
     );
+}
+
+/// `HUB_SECRETS_KEY` once for this binary, as every production hub has it: a hub's own copy is
+/// only proven by the origin seal derived from it (hub#2497), so a restore of the hub's own backup
+/// needs it at both ends.
+fn ensure_master_key() {
+    use base64::Engine as _;
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let key = base64::engine::general_purpose::STANDARD.encode([0x24u8; 32]);
+        // SAFETY: `Once` runs this before any test reads the variable, and nothing writes it again.
+        unsafe { std::env::set_var("HUB_SECRETS_KEY", key) };
+    });
 }

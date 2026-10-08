@@ -330,6 +330,94 @@ pub struct BlueprintManifest {
     pub flows: Vec<FlowSpec>,
     /// SHA256 hex por fichero del bundle (ruta relativa → hash). Verificado al importar.
     pub sha256: BTreeMap<String, String>,
+    /// The hub's **origin seal** (hub#2497): HMAC-SHA256 over the rest of this manifest under a
+    /// key derived from the producing hub's `HUB_SECRETS_KEY`. It is the only proof that a bundle
+    /// is a hub's own copy — `hub.hub_id` is public (`GET /api/hub/context`) and any file can write
+    /// it. Through `sha256` it also covers every file of the bundle. See [`seal_manifest`] and
+    /// [`has_valid_origin_seal`].
+    ///
+    /// `None` when the producer had no master key, and in every bundle older than this field: both
+    /// read as «not proven», which imports like any other hub's file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_seal: Option<String>,
+}
+
+/// Label of the key derived from `HUB_SECRETS_KEY` for the origin seal (hub#2497). Versioned: a
+/// change of what the seal covers is a new label, never a silent reinterpretation of old seals.
+const ORIGIN_SEAL_LABEL: &[u8] = b"erplora-hub/bundle-origin-seal/v1";
+
+/// The bytes the origin seal signs: the manifest as JSON with the seal itself left out.
+///
+/// Compact `serde_json` of the struct, not the bytes of `manifest.json`: the import holds the
+/// parsed manifest, and every map in it is a `BTreeMap`, so the same manifest always serialises
+/// to the same bytes. A field this runtime does not know is dropped on parsing and so is not
+/// signed — and it is not applied either.
+fn origin_seal_payload(manifest: &BlueprintManifest) -> Option<Vec<u8>> {
+    let mut unsealed = manifest.clone();
+    unsealed.origin_seal = None;
+    serde_json::to_vec(&unsealed).ok()
+}
+
+fn origin_seal_with(key: &crate::secret_box::SecretsKey, manifest: &BlueprintManifest) -> Option<String> {
+    let payload = origin_seal_payload(manifest)?;
+    let tag = ring::hmac::sign(&key.derived_hmac_key(ORIGIN_SEAL_LABEL), &payload);
+    Some(tag.as_ref().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+fn origin_seal_verifies_with(
+    key: &crate::secret_box::SecretsKey,
+    manifest: &BlueprintManifest,
+) -> bool {
+    let Some(seal) = manifest.origin_seal.as_deref() else {
+        return false;
+    };
+    let Some(tag) = decode_hex(seal) else {
+        return false;
+    };
+    let Some(payload) = origin_seal_payload(manifest) else {
+        return false;
+    };
+    // `verify` compares in constant time.
+    ring::hmac::verify(&key.derived_hmac_key(ORIGIN_SEAL_LABEL), &payload, &tag).is_ok()
+}
+
+fn decode_hex(s: &str) -> Option<Vec<u8>> {
+    if s.len() % 2 != 0 {
+        return None;
+    }
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(s.get(i..i + 2)?, 16).ok())
+        .collect()
+}
+
+/// Seals `manifest` as this hub's own copy (hub#2497), with the master key of the deployment.
+///
+/// Call it LAST, once nothing else will change in the manifest: the server adds the certificate
+/// and the media hashes after [`export_hub`], and it re-seals before writing `manifest.json`. A
+/// manifest changed after sealing simply stops being this hub's own copy.
+///
+/// Without a usable `HUB_SECRETS_KEY` the bundle leaves unsealed (`origin_seal = None`): it is
+/// still a complete export, it just cannot come back with the people, permissions and
+/// automations a proven own copy restores. Returns whether the manifest is sealed.
+pub fn seal_manifest(manifest: &mut BlueprintManifest) -> bool {
+    manifest.origin_seal = match crate::secret_box::master_key_from_env() {
+        Ok(Some(key)) => origin_seal_with(&key, manifest),
+        _ => None,
+    };
+    manifest.origin_seal.is_some()
+}
+
+/// Did THIS deployment seal `manifest` exactly as it is now? (hub#2497)
+///
+/// `false` without a seal, without a master key here, or when anything in the manifest changed
+/// after sealing (the origin id, one more permission, a file's hash). Paired with `hub.hub_id`,
+/// it is what the import asks before treating a bundle as this hub's own copy.
+pub fn has_valid_origin_seal(manifest: &BlueprintManifest) -> bool {
+    match crate::secret_box::master_key_from_env() {
+        Ok(Some(key)) => origin_seal_verifies_with(&key, manifest),
+        _ => false,
+    }
 }
 
 /// Selección del formulario de export (checkboxes): qué secciones incluir.
@@ -679,7 +767,7 @@ pub async fn export_hub(
     for (path, bytes) in &files {
         sha256.insert(path.clone(), sha256_hex(bytes));
     }
-    let manifest = BlueprintManifest {
+    let mut manifest = BlueprintManifest {
         schema_version: SCHEMA_VERSION,
         purpose: selection.purpose,
         name: name.to_string(),
@@ -703,7 +791,9 @@ pub async fn export_hub(
         capability_grants,
         flows,
         sha256,
+        origin_seal: None,
     };
+    seal_manifest(&mut manifest);
     Ok(ExportBundle { manifest, files })
 }
 
@@ -1526,6 +1616,7 @@ mod tests {
             )]),
             flows: Vec::new(),
             sha256: BTreeMap::from([("data/taxes.sql".into(), "ab".repeat(32))]),
+            origin_seal: None,
         };
         let json = serde_json::to_string(&m).unwrap();
         let back: BlueprintManifest = serde_json::from_str(&json).unwrap();

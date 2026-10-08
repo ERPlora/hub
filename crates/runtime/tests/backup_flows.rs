@@ -45,6 +45,7 @@ fn fixture(name: &str) -> PathBuf {
 /// A hub with the two fixture modules of the kernel's own e2e: `sales` emits `sale.completed`,
 /// `crm` owns the command a flow reaches for.
 async fn hub_with(hub_id: &str, modules: &[&str]) -> Runtime {
+    ensure_master_key();
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
     rt.ensure_system_tables().await.unwrap();
     for m in modules {
