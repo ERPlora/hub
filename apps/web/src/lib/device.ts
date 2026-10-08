@@ -182,6 +182,50 @@ export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>
 }
 
 /**
+ * What the installed app rejects a command that belongs to the linked hub with, when the page is
+ * not the linked hub — or is, but has not finished loading yet (hub#2504, `src/hub_link.rs`).
+ */
+export const NOT_THE_LINKED_HUB = 'not_the_linked_hub';
+
+/**
+ * How long, after the page's `load`, the app may still be saying `not_the_linked_hub` to the linked
+ * hub: it opens the gate when the webview reports the load finished, a moment after the page's own
+ * `load`. About eight seconds in all, then the page is taken at its word.
+ */
+const LANDING_RETRIES_MS = [250, 500, 1000, 2000, 4000];
+
+/** Waits for the page's `load` (at once if it already happened, or where there is no DOM), then `ms`. */
+function afterTheLoad(ms: number): Promise<void> {
+  const doc = (globalThis as { document?: Document }).document;
+  const loaded =
+    !doc || doc.readyState === 'complete'
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => globalThis.addEventListener('load', () => resolve(), { once: true }));
+  return loaded.then(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+}
+
+/**
+ * Asks `attempt` again while the installed app answers `not_the_linked_hub` (hub#2658). The page
+ * asks at boot, and right after the SaaS sends the window to the hub the app keeps the hub's
+ * commands closed until the hub's page has finished loading. A page that is not the linked hub is
+ * refused every time and gets that refusal back; any other refusal comes back at once.
+ */
+export async function whileTheHubLands<T>(
+  attempt: () => Promise<T>,
+  wait: (ms: number) => Promise<void> = afterTheLoad,
+): Promise<T> {
+  for (const ms of LANDING_RETRIES_MS) {
+    try {
+      return await attempt();
+    } catch (e) {
+      if (e !== NOT_THE_LINKED_HUB) throw e;
+    }
+    await wait(ms);
+  }
+  return attempt();
+}
+
+/**
  * Listen to an event a PLUGIN of the installed app reports (hub#2305: the tap on a notice is the
  * notification plugin's `actionPerformed`), through the same `window.__TAURI__` global.
  *

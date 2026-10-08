@@ -1,0 +1,87 @@
+{
+  "id": "w2612",
+  "name": "W2612 Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "w2612.hold.read",
+    "w2612.hold.manage"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "navigation": [],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "w2612.holds.list": {
+      "permission": "w2612.hold.read",
+      "sql": "queries/holds_list.sql"
+    }
+  },
+  "commands": {
+    "w2612.holds.create": {
+      "permission": "w2612.hold.manage",
+      "transaction": true,
+      "sql": [
+        "commands/hold_create.sql"
+      ]
+    },
+    "w2612.holds.expire": {
+      "permission": "w2612.hold.manage",
+      "internal": true,
+      "transaction": true,
+      "sql": [
+        "commands/holds_expire.sql"
+      ],
+      "emit": [
+        {
+          "event": "w2612.hold.released",
+          "when_rows": "commands/holds_expire.sql"
+        }
+      ]
+    },
+    "w2612.holds.expire_and_stamp": {
+      "permission": "w2612.hold.manage",
+      "transaction": true,
+      "sql": [
+        "commands/holds_expire.sql",
+        "commands/sweep_stamp.sql"
+      ],
+      "emit": [
+        {
+          "event": "w2612.hold.stamped_release",
+          "when_rows": "commands/holds_expire.sql"
+        }
+      ]
+    },
+    "w2612.holds.expire_legacy": {
+      "permission": "w2612.hold.manage",
+      "transaction": true,
+      "sql": [
+        "commands/holds_expire.sql"
+      ],
+      "emit": [
+        "w2612.hold.legacy_released"
+      ]
+    }
+  },
+  "scheduled_tasks": [
+    {
+      "name": "expire_holds",
+      "command": "w2612.holds.expire",
+      "cron": "* * * * *"
+    }
+  ],
+  "events": {
+    "emits": [
+      "w2612.hold.released",
+      "w2612.hold.stamped_release",
+      "w2612.hold.legacy_released"
+    ]
+  }
+}

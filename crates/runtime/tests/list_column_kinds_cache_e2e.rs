@@ -63,8 +63,9 @@ impl erplora_db::DatabaseAdapter for CountingDescribes {
         &self,
         ops: &[(String, Params)],
         gates: &[erplora_db::RowGate],
+        conditions: &[erplora_db::OpCondition],
     ) -> Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
-        self.db.execute_tx_gated(ops, gates).await
+        self.db.execute_tx_gated(ops, gates, conditions).await
     }
 
     async fn query(

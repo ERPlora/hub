@@ -17,6 +17,8 @@
 # network: the stub answers `gh issue list` from a fixture and RECORDS every `gh issue comment`/
 # `gh issue create` call so the assertions can tell which one happened, and to WHICH issue.
 set -uo pipefail
+# Actions sets GITHUB_RUN_ID on every job: unset it so only the cases that pass one see a run.
+unset GITHUB_RUN_ID
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SCRIPT="$script_dir/../ci/alert-issue.sh"
@@ -58,6 +60,7 @@ set -uo pipefail
 log="$STUB_DIR/calls.log"
 case "$1 $2" in
     "issue list")
+        printf '%s\n' "$*" >> "$STUB_DIR/list.log"
         jq_program=""
         prev=""
         for a in "$@"; do
@@ -222,7 +225,120 @@ grep -q '^issue comment 55 ' "$STUB_DIR/calls.log" || errs="$errs no-comment-on-
     && ok "a title with a quote and a backslash still matches (jq-escaped correctly)" \
     || bad "a title with a quote and a backslash still matches (jq-escaped correctly)" "$errs"
 
-# ── 8 · Two jobs that raced to open the SAME alert leave ONE open (pm#655) ─────────────────
+# ── 8 · A new alert in hub/saas carries `module:ci`, and the lookup is NOT narrowed by it ────
+#    pm#663: hub and saas issues are split by area of the handbook (`module:<key>`) and each
+#    area's queue is `gh issue list --label module:<key>`; an alert without one reaches nobody.
+#    Alerts already open were created without it, so `module:ci` must never join LABEL's
+#    server-side filter — that would miss them and open a twin, the bug hub#1246 fixed.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(REPO=ERPlora/hub TITLE="main HEAD has no image in GHCR" MATCH=exact BODY="stale" LABEL="area:ci-cd" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q '^issue create.*--label module:ci' "$STUB_DIR/calls.log" || errs="$errs create-call-is-missing---label-module:ci"
+grep -q '^issue create.*--label area:ci-cd' "$STUB_DIR/calls.log" || errs="$errs create-call-lost---label-area:ci-cd"
+grep -q 'module:ci' "$STUB_DIR/list.log" && errs="$errs lookup-narrowed-by-module:ci"
+grep -q -- '--label area:ci-cd' "$STUB_DIR/list.log" || errs="$errs lookup-lost-its-LABEL-filter"
+[ -z "$errs" ] \
+    && ok "a new hub alert carries module:ci without narrowing the lookup by it (pm#663)" \
+    || bad "a new hub alert carries module:ci without narrowing the lookup by it (pm#663)" "$errs calls=$(cat "$STUB_DIR/calls.log") list=$(cat "$STUB_DIR/list.log")"
+
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(REPO=ERPlora/saas TITLE="x" MATCH=exact BODY="stale" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q '^issue create.*--label module:ci' "$STUB_DIR/calls.log" || errs="$errs saas-create-is-missing-module:ci"
+[ -z "$errs" ] \
+    && ok "a new saas alert carries module:ci too, even with no LABEL (pm#663)" \
+    || bad "a new saas alert carries module:ci too, even with no LABEL (pm#663)" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+# ── 9 · A module repo has no `module:` labels (the repo IS the module) ──────────────────────
+#    `gh issue create` with a label the repo lacks fails WHOLE, so adding module:ci there would
+#    turn every alert into a red step that opens nothing.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(REPO=ERPlora/sales TITLE="x" MATCH=exact BODY="stale" LABEL="area:ci-cd" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q '^issue create' "$STUB_DIR/calls.log" || errs="$errs did-not-create"
+grep -q 'module:' "$STUB_DIR/calls.log" && errs="$errs module-label-on-a-module-repo"
+[ -z "$errs" ] \
+    && ok "an alert in a module repo carries no module: label (pm#663)" \
+    || bad "an alert in a module repo carries no module: label (pm#663)" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+# ── 10 · A new alert says how it reproduces: the red run's URL (pm#663, pm#656) ─────────────
+#    Every issue states how the failure is seen; for a CI alert that is the run itself. The
+#    body gets `## Cómo se reproduce` + `- Run: <url>` unless it already carries a `- Run:`.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=ERPlora/hub GITHUB_RUN_ID=777 \
+       REPO=ERPlora/hub TITLE="x" MATCH=exact BODY="stale" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q '^## Cómo se reproduce' "$STUB_DIR/calls.log" || errs="$errs no-reproduction-heading"
+# The stub logs every argument on one line, so the run URL ends at a space or at the end.
+grep -qE '^- Run: https://github.com/ERPlora/hub/actions/runs/777( |$)' "$STUB_DIR/calls.log" || errs="$errs no-run-line"
+[ -z "$errs" ] \
+    && ok "a new alert carries «- Run:» with the run URL (pm#663)" \
+    || bad "a new alert carries «- Run:» with the run URL (pm#663)" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=ERPlora/hub GITHUB_RUN_ID=777 \
+       REPO=ERPlora/hub TITLE="x" MATCH=exact BODY="$(printf 'stale\n\n## Cómo se reproduce\n- Run: https://github.com/ERPlora/hub/actions/runs/5')" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+[ "$(grep -c -- '^- Run:' "$STUB_DIR/calls.log")" = 1 ] || errs="$errs run-line-duplicated"
+[ -z "$errs" ] \
+    && ok "a body that already has «- Run:» is left as it is" \
+    || bad "a body that already has «- Run:» is left as it is" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(REPO=ERPlora/hub TITLE="x" MATCH=exact BODY="stale" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q -- '- Run:' "$STUB_DIR/calls.log" && errs="$errs invented-a-run-line-with-no-run"
+[ -z "$errs" ] \
+    && ok "outside a run (no GITHUB_RUN_ID) no run line is invented" \
+    || bad "outside a run (no GITHUB_RUN_ID) no run line is invented" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+# The run lives in the repo that RUNS the workflow, not the one the alert is opened in; and only
+# a `- Run:` line counts as already linked — the word «Run» in the prose does not.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=ERPlora/hub GITHUB_RUN_ID=777 \
+       REPO=ERPlora/saas TITLE="x" MATCH=exact BODY="Run 12 failed" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -qE '^- Run: https://github.com/ERPlora/hub/actions/runs/777( |$)' "$STUB_DIR/calls.log" || errs="$errs run-url-not-from-the-running-repo"
+[ -z "$errs" ] \
+    && ok "the run line points at the repo running the workflow, even when «Run» is in the prose" \
+    || bad "the run line points at the repo running the workflow, even when «Run» is in the prose" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+cat > "$STUB_DIR/issues.json" <<'JSON'
+[{"number": 42, "title": "x"}]
+JSON
+code=$(GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=ERPlora/hub GITHUB_RUN_ID=777 \
+       REPO=ERPlora/hub TITLE="x" MATCH=exact BODY="stale" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+[ "$(cat "$STUB_DIR/calls.log")" = "issue comment 42 --repo ERPlora/hub --body stale" ] || errs="$errs refresh-comment-changed"
+[ -z "$errs" ] \
+    && ok "a refresh comment is posted as given (labels and run line are for a new issue)" \
+    || bad "a refresh comment is posted as given (labels and run line are for a new issue)" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+# ── 11 · Two jobs that raced to open the SAME alert leave ONE open (pm#655) ─────────────────
 #    `test-hub-modules.yml` runs the battery alert in two matrix parts at once (`batteries 1/2`
 #    and `batteries 2/2`): when both fail with no alert open, both list (nothing), both create.
 #    After creating, the script lists again; if an older twin is open, the alert goes there as a

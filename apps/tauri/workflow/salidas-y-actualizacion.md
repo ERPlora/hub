@@ -89,8 +89,10 @@ Estado: parcial — la aplicación nunca se actualiza sola: abre la descarga en 
 Actor: administrador, responsable
 Pantalla: HUB_SHELL: Sistema
 Pasos:
-1. Al arrancar y cada 6 horas, la página pregunta a la aplicación qué versión es (orden estándar de
-   Tauri, que existe aun en aplicaciones viejas) y al hub cuál es la última publicada.
+1. Al arrancar y cada 6 horas, la página pregunta a la aplicación qué versión es y al hub cuál es la última
+   publicada. Primero por la orden estándar de Tauri, que contestan las aplicaciones anteriores a
+   ERPlora/hub#2658; en las nuevas, por `erplora_bridge_status`, que solo contesta al negocio enlazado (si la
+   página aún está cargando, lo reintenta hasta unos 8 s después de su `load`).
 2. Solo si hay sesión iniciada (la consulta la exige), la publicada es **estrictamente mayor** (comparando número a
    número) y quien está conectado administra el negocio, el menú lateral enseña «Actualizar ERPlora ({versión})»
    mientras la haya, y un aviso emergente lo dice una vez por versión.
@@ -103,7 +105,8 @@ canal.
 Sale: el navegador abierto en `erplora.com/app/download/<sistema>/` (el Cloud decide el instalador o la
 tienda). **La aplicación no comprueba nada de lo que se descarga**: no hay actualizador de Tauri ni firma
 (`.exe`/`.msi` sin firmar, `.dmg` sin notarizar).
-Si falla: sin red, versión ilegible o sin respuesta: silencio, ni alarma ni «estás al día». Para las
+Si falla: sin red, versión ilegible o sin respuesta (también una página que no es el negocio enlazado):
+silencio, ni alarma ni «estás al día». Para las
 copias de Play y de Microsoft Store no hay destino y no se ofrece (Google prohíbe descargar un APK fuera de
 Play). macOS no tiene descarga. Una versión con sufijo (`1.2.3-beta`) se ignora. «No hemos podido abrir
 tu navegador…» si no se pudo abrir.

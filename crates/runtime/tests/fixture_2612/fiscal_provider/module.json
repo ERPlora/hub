@@ -1,0 +1,28 @@
+{
+  "id": "fprov2612",
+  "name": "Fiscal provider stand-in (hub#2612)",
+  "version": "1.0.0",
+  "fiscal_regime": { "country": "ES", "regime": "verifactu" },
+  "capabilities": { "certificate": { "purpose": "fiscal-sign" } },
+  "permissions": ["fprov2612.ingest", "fprov2612.configure"],
+  "role_permissions": { "admin": ["*"] },
+  "navigation": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "fprov2612.config.get": {
+      "permission": "fprov2612.configure",
+      "sql": "queries/config_get.sql"
+    }
+  },
+  "commands": {
+    "fprov2612.ingest": {
+      "permission": "fprov2612.ingest",
+      "sql": ["commands/ingest.sql"]
+    }
+  },
+  "events": {
+    "listen": {
+      "w2612.hold.stamped_release": { "command": "fprov2612.ingest" }
+    }
+  }
+}

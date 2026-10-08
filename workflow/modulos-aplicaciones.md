@@ -104,7 +104,7 @@ Implicados: SCHEDULES-F12
 QA: BD-01
 
 ### HUB-F23 Actualizar una aplicación
-Estado: parcial — un fallo deja migraciones, semilla y dependencias de la versión nueva; tras actualizar, el turno de cambios de apps sigue tomado mientras se indexan los textos para el asistente (hasta 60 s, hub#2663)
+Estado: parcial — un fallo deja migraciones, semilla y dependencias de la versión nueva
 Actor: administrador
 Pantalla: HUB_SHELL: Apps
 Pasos:
@@ -113,7 +113,7 @@ Pasos:
 3. Si ya está en esa versión, contesta sin hacer nada.
 4. Si no, la instala por el mismo camino que HUB-F19 (huella, firma, validación, migraciones, semilla), con las mismas fases en vivo, en la misma cola de cambios de apps, con el hub atendiendo mientras pregunta a ERPlora y descarga, y con los mismos topes de tiempo (30 s callado, 5 min por llamada).
 5. Si la nueva falla, el hub repone en memoria la que tenía y sigue sirviéndola, y lo dice; el segundo intento de la vuelta atrás no reinstala nada. Las migraciones, las filas de semilla y las dependencias que la nueva ya aplicó se quedan. Actualizar no enciende ni apaga: una app apagada sigue apagada en la versión nueva (hub#2544).
-6. Anota el cambio en el historial de actualizaciones, reindexa sus textos para el asistente y avisa `module.updated` y `module.installed`.
+6. En cuanto la versión nueva queda puesta (o vuelve la anterior) suelta su turno en la cola de cambios de apps, como al instalar: anotar el cambio en el historial de actualizaciones y reindexar sus textos para el asistente (una llamada a ERPlora de hasta 60 s) ya no hacen esperar al siguiente cambio de apps (hub#2663). Después avisa `module.updated` y `module.installed`.
 Entra: `POST /api/modules/:id/update` con sesión de administrador y credencial de máquina; versión opcional.
 Sale: la app en la versión nueva (o en la de antes), la línea del historial y los avisos en vivo.
 En este mismo documento se apoya en: HUB-F167 (Saber qué versión corre y qué se le ha actualizado).
