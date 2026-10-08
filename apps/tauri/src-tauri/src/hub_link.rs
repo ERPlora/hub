@@ -12,6 +12,13 @@
 //! `?shell=1` navigation links the app only when it LEAVES an entry page (the SaaS, which chooses
 //! the hub among the person's own) or lands on the hub already linked. The app links on its own
 //! authority too — the hub it remembered, a link the system handed it — through [`HubLink::link`].
+//!
+//! The gate reads the page the WINDOW shows (`webview.url()`): Tauri checks its own ACL against the
+//! request's `Origin`, but does not hand that origin to a command handler. And the window's URL
+//! flips the moment a navigation STARTS, while the page that started it keeps running until the new
+//! one commits — so a page could send the window to the linked hub and ask for the drawer right
+//! after. Hence [`HubLink::landed`]: after a navigation to another origin, nothing drives the device
+//! until the new page has finished loading.
 
 use std::sync::Mutex;
 
@@ -44,6 +51,10 @@ struct LinkState {
     linked: Option<String>,
     /// The origin of the page the window last went to: the one a `?shell=1` navigation leaves.
     showing: Option<String>,
+    /// The origin of the page that last FINISHED loading. The window's URL reads as the new page
+    /// from the moment a navigation starts (WKWebView's `URL`, WebView2's `Source`), while the page
+    /// that started it keeps running until the new one commits: between the two, nothing drives.
+    landed: Option<String>,
 }
 
 /// The hub this installation is linked to, and the page the window is on.
@@ -57,13 +68,14 @@ pub struct HubLink {
 
 impl HubLink {
     /// `entries` are the origins a `?shell=1` navigation may leave; `showing` is where the window
-    /// starts.
+    /// starts — no page ran before it, so it counts as landed from the start.
     pub fn new(entries: Vec<String>, showing: Option<&Url>) -> Self {
         Self {
             entries,
             state: Mutex::new(LinkState {
                 linked: None,
                 showing: showing.map(origin_of),
+                landed: showing.map(origin_of),
             }),
         }
     }
@@ -96,7 +108,13 @@ impl HubLink {
     pub fn follow(&self, url: &Url) -> Option<String> {
         let captured = crate::shell_capture_origin(url);
         let mut state = self.state();
-        let left = state.showing.replace(origin_of(url));
+        let arriving = origin_of(url);
+        let left = state.showing.replace(arriving.clone());
+        if left.as_deref() != Some(arriving.as_str()) {
+            // Another origin: the page that leaves may still run while the window already reads as
+            // the one arriving. Nothing drives the device until the new page has finished loading.
+            state.landed = None;
+        }
         let origin = captured?;
         let from_an_entry = left.as_ref().is_some_and(|left| self.entries.contains(left));
         let already_linked = state.linked.as_deref() == Some(origin.as_str());
@@ -111,9 +129,20 @@ impl HubLink {
         Some(origin)
     }
 
-    /// May the page at `page` call the commands that belong to the linked hub?
+    /// The page at `url` finished loading (`PageLoadEvent::Finished`, wired by `open_main_window`):
+    /// whatever page started the navigation is gone, and this one may drive if it is the hub.
+    pub fn landed(&self, url: &Url) {
+        self.state().landed = Some(origin_of(url));
+    }
+
+    /// May the page at `page` call the commands that belong to the linked hub? Only when it is the
+    /// linked hub AND it is the page that finished loading — not one the window is merely on its
+    /// way to.
     pub fn drives(&self, page: &Url) -> bool {
-        self.state().linked.as_deref() == Some(origin_of(page).as_str())
+        let origin = origin_of(page);
+        let state = self.state();
+        state.linked.as_deref() == Some(origin.as_str())
+            && state.landed.as_deref() == Some(origin.as_str())
     }
 }
 
@@ -179,9 +208,12 @@ mod tests {
         HubLink::new(vec![SAAS.to_string()], Some(&url("https://erplora.com/shell/")))
     }
 
+    /// The till as it is every day after the first link: the SaaS sent the window to the hub, the
+    /// hub's page finished loading.
     fn linked_to_the_hub() -> HubLink {
         let link = on_the_onboarding();
-        link.link(HUB);
+        link.follow(&url("https://panaderia.a.erplora.com/?shell=1"));
+        link.landed(&url(HUB));
         link
     }
 
@@ -233,6 +265,52 @@ mod tests {
         assert!(drives_from(Some(&link), Some(&url(HUB))));
     }
 
+    // ── The window's URL flips BEFORE the page that started the navigation is gone ─────────────
+    //
+    // WKWebView's `URL` (and WebView2's `Source`) is the provisional URL from the moment a
+    // navigation starts, and the page that started it keeps running until the new one commits. So
+    // a page that sends the window to the linked hub and asks for the drawer right after would be
+    // read as the hub. The device answers only once the hub's page has finished loading.
+
+    #[test]
+    fn a_page_that_sends_the_window_to_the_hub_cannot_drive_it_until_the_hub_has_loaded() {
+        let link = linked_to_the_hub();
+        link.follow(&url("https://www.erplora.com/"));
+        assert_eq!(link.follow(&url("https://panaderia.a.erplora.com/")), None);
+        assert!(
+            !link.drives(&url("https://panaderia.a.erplora.com/")),
+            "the website still runs while the window already reads as the hub"
+        );
+        link.landed(&url("https://panaderia.a.erplora.com/"));
+        assert!(link.drives(&url("https://panaderia.a.erplora.com/")));
+    }
+
+    #[test]
+    fn a_navigation_inside_the_hub_keeps_the_hardware() {
+        let link = linked_to_the_hub();
+        assert_eq!(link.follow(&url("https://panaderia.a.erplora.com/login")), None);
+        assert!(link.drives(&url("https://panaderia.a.erplora.com/login")));
+    }
+
+    #[test]
+    fn the_page_the_window_starts_on_drives_as_soon_as_it_is_linked() {
+        // A cold start on the remembered hub: no page ran before it, nothing to wait for.
+        let link =
+            HubLink::new(vec![SAAS.to_string()], Some(&url("https://panaderia.a.erplora.com/")));
+        link.link(HUB);
+        assert!(link.drives(&url("https://panaderia.a.erplora.com/")));
+    }
+
+    #[test]
+    fn a_load_that_finishes_elsewhere_does_not_open_the_hub() {
+        let link = linked_to_the_hub();
+        link.follow(&url("https://www.erplora.com/"));
+        link.follow(&url("https://panaderia.a.erplora.com/"));
+        // The website's own load reports finished after the window already left it.
+        link.landed(&url("https://www.erplora.com/"));
+        assert!(!link.drives(&url("https://panaderia.a.erplora.com/")));
+    }
+
     #[test]
     fn only_identity_escape_and_retry_are_open_to_any_page() {
         for open in ["device_context", "forget_hub", "shell_retry"] {
@@ -268,6 +346,8 @@ mod tests {
             Some(HUB.to_string())
         );
         assert_eq!(link.linked().as_deref(), Some(HUB));
+        // …and drives the device once its page has loaded.
+        link.landed(&url("https://panaderia.a.erplora.com/"));
         assert!(link.drives(&url("https://panaderia.a.erplora.com/")));
     }
 
@@ -323,7 +403,8 @@ mod tests {
     // A real `on_message` round trip on the mock runtime, with the gate in front of a dispatcher
     // that answers "ran" to any command. The request travels as the bundled page (`tauri://`): the
     // mock context carries no ACL manifest, so Tauri's own pattern check stays out of the way and
-    // what is measured is the gate alone — which reads the page the WINDOW shows, as Tauri does.
+    // what is measured is the gate alone — which reads the page the WINDOW shows (the request's
+    // origin, the one Tauri's ACL checks, is not handed to a command handler).
 
     use tauri::test::{MockRuntime, INVOKE_KEY};
 
@@ -400,6 +481,18 @@ mod tests {
         assert_eq!(ask(&till, "device_context"), Ok("ran".into()));
         assert_eq!(ask(&till, "forget_hub"), Ok("ran".into()));
         assert_eq!(ask(&till, "erplora_print"), refused());
+    }
+
+    #[test]
+    fn the_hub_is_refused_while_the_page_that_sent_the_window_there_may_still_run() {
+        use tauri::Manager;
+        let link = linked_to_the_hub();
+        link.follow(&url("https://otronegocio.a.erplora.com/"));
+        link.follow(&url("https://panaderia.a.erplora.com/"));
+        let till = till_showing("https://panaderia.a.erplora.com/", Some(link));
+        assert_eq!(ask(&till, "erplora_open_drawer"), refused(), "the other business still runs");
+        till._app.state::<HubLink>().landed(&url("https://panaderia.a.erplora.com/"));
+        assert_eq!(ask(&till, "erplora_open_drawer"), Ok("ran".into()));
     }
 
     #[test]

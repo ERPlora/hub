@@ -157,8 +157,11 @@ Pasos:
    puede hacer cada página» (primera puerta, por patrón).
 2. Una orden nativa desde un origen que no la tiene concedida se rechaza antes de ejecutarse.
 3. Si la pasa y es una orden de la aplicación, la segunda puerta (`src/hub_link.rs`) mira el origen de la
-   página que enseña la ventana: si no es el del negocio enlazado, contesta `not_the_linked_hub` sin
-   ejecutarla. Solo `device_context`, `forget_hub` y `shell_retry` se saltan esta comprobación.
+   página que enseña la ventana: si no es el del negocio enlazado, **o esa página aún no ha terminado de
+   cargar** tras llegar desde otro origen, contesta `not_the_linked_hub` sin ejecutarla. La espera existe
+   porque la dirección de la ventana cambia al EMPEZAR la navegación mientras la página que la pidió sigue
+   ejecutándose: sin ella, otra página podría mandar la ventana al negocio y pedir el cajón acto seguido. Solo
+   `device_context`, `forget_hub` y `shell_retry` se saltan esta comprobación.
 4. Qué negocio está enlazado lo decide la aplicación: el recordado al arrancar, el de un enlace
    `erplora://hub/…` (HUB_APP-F03), o el que el SaaS elige con `?shell=1` (HUB_APP-F02); se desenlaza al
    cambiar de negocio o al olvidar uno borrado (HUB_APP-F04, F05).
@@ -170,7 +173,10 @@ Sale: órdenes aceptadas o rechazadas (`not_the_linked_hub`; se anota la orden y
 que hoy no llega a ningún destino); nada guardado.
 Si falla: un origen fuera de la plataforma no puede pedir `device_context`; el apex no puede tocar el
 hardware; otro negocio, la web pública, el entorno de pruebas o el bucle local no lo tocan si no son el
-negocio enlazado; sin estado de enlace o sin poder leer la dirección de la página, la puerta se cierra; y la orden de reintentar de la pantalla de espera solo existe para la página incluida (un
+negocio enlazado; sin estado de enlace o sin poder leer la dirección de la página, la puerta se cierra; una
+página que manda la ventana al negocio enlazado y pide el hardware antes de que este cargue recibe
+`not_the_linked_hub` (y si esa carga no llega a terminar, el negocio queda sin hardware hasta la siguiente
+página que cargue); y la orden de reintentar de la pantalla de espera solo existe para la página incluida (un
 origen remoto no puede mover la ventana). Una orden declarada y sin permiso generado la caza el test `tests/shell_surface.rs:247-300`; una orden no
 concedida se rechaza en ejecución.
 Implicados: HUB_SHELL-F162

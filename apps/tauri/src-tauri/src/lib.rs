@@ -1173,6 +1173,15 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
         .title("ERPlora")
         .inner_size(1280.0, 800.0)
         .min_inner_size(960.0, 600.0)
+        // The hardware waits for the page to have LOADED (hub#2504): the window's URL flips at the
+        // start of a navigation, while the page that started it still runs until the new one commits.
+        .on_page_load(|window, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                if let Some(link) = window.try_state::<hub_link::HubLink>() {
+                    link.landed(payload.url());
+                }
+            }
+        })
         .on_navigation(move |nav| {
             // hub#1915: the Play copy follows only the SaaS pages that cannot take money. First,
             // so a refused page is neither remembered as the hub nor watched by the guard below.
@@ -2782,6 +2791,11 @@ mod tests {
         let navigation = window.split(".on_navigation(").nth(1).unwrap_or_default();
         assert!(navigation.contains(".follow(nav)"), "a navigation links a hub without asking who chose it");
         assert!(!navigation.contains("shell_capture_origin(nav)"), "a navigation links a hub without asking who chose it");
+        let loaded = window.split(".on_page_load(").nth(1).unwrap_or_default();
+        assert!(
+            loaded.contains("PageLoadEvent::Finished") && loaded.contains(".landed("),
+            "the hardware opens before the hub's page has finished loading: the page that sent the window there may still run"
+        );
         assert!(body_of("fn forget_hub(").contains("forget_linked_hub(&app)"), "«Change business» keeps the old hub linked");
         assert!(
             body_of("fn spawn_hub_liveness_check(").contains("forget_linked_hub(&app)"),

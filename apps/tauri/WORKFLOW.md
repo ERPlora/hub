@@ -124,7 +124,9 @@ las dos (HUB_APP-F10).
    tiene ninguno.
 2. **Por el negocio enlazado** (`src/hub_link.rs`, ERPlora/hub#2504): de las páginas que deja pasar el
    patrón, **solo la del negocio enlazado** (mismo origen que `hub.url`: esquema, nombre y puerto) usa las
-   órdenes de la aplicación. Las únicas abiertas a cualquier página que pase el patrón son
+   órdenes de la aplicación, y solo **una vez cargada** si la ventana llegó a ella desde otro origen (la
+   dirección de la ventana cambia al empezar la navegación, mientras la página anterior sigue viva). Las
+   únicas abiertas a cualquier página que pase el patrón son
    `device_context`, `forget_hub` y `shell_retry`; cualquier otra, también una que se añada mañana, contesta
    el error `not_the_linked_hub` sin ejecutarse. Sin negocio enlazado (instalación nueva, tras «Cambiar
    de negocio» o tras olvidar uno borrado) ninguna página maneja el equipo. Las órdenes de los **plugins**
@@ -288,7 +290,8 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 
 - **El hardware solo lo usa el negocio enlazado** (ERPlora/hub#2504): la primera puerta lo limita a orígenes
   `*.erplora.com`, al bucle local en dos puertos y a la página incluida, sin el apex (`capabilities/default.json`,
-  `tests/remote_acl.rs`); la segunda, al origen exacto del negocio enlazado (`src/hub_link.rs`). Toda orden nueva
+  `tests/remote_acl.rs`); la segunda, al origen exacto del negocio enlazado **ya cargado** (`src/hub_link.rs`:
+  tras una navegación a otro origen nada maneja el equipo hasta que la página nueva termina de cargar). Toda orden nueva
   nace cerrada: solo `device_context`, `forget_hub` y `shell_retry` están abiertas a cualquier página del patrón.
   Las órdenes de los plugins aún no pasan por la segunda puerta (ERPlora/hub#2642, `[SEG]`).
 - **Solo el SaaS elige el negocio**: `?shell=1` enlaza y se recuerda solo si la ventana sale de la página de
