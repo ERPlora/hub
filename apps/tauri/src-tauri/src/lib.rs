@@ -2177,7 +2177,7 @@ pub fn run() {
                 .respond(request.uri().path())
         })
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_erplora_android::init())
+        .plugin(hub_link::android_plugin())
         // The user's own browser (hub#475). Registered for its RUST api only: no `opener:*`
         // permission is granted to any origin (`tests/remote_acl.rs`), so the page cannot reach the
         // plugin's own commands — which take any address, and two of which open FILES. What the
@@ -2316,7 +2316,7 @@ mod tests {
     fn app_with_kept_tap() -> tauri::App<tauri::test::MockRuntime> {
         use tauri::Manager;
         let app = tauri::test::mock_builder()
-            .plugin(tauri_plugin_erplora_android::init())
+            .plugin(hub_link::android_plugin())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .expect("mock app");
         app.manage(notice_tap::KeptNoticeTap::default());
@@ -2785,6 +2785,10 @@ mod tests {
         assert!(
             body_of("pub fn run() {").contains(".invoke_handler(hub_link::guard(app_commands()))"),
             "run() hands Tauri the commands without the gate"
+        );
+        assert!(
+            body_of("pub fn run() {").contains(".plugin(hub_link::android_plugin())"),
+            "run() registers the Android plugin without the gate (hub#2642)"
         );
         let window = body_of("fn open_main_window(");
         assert!(window.contains("app.manage(hub_link)"), "the window opens with no link state");

@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 use tauri::{
+    ipc::Invoke,
     plugin::{Builder, TauriPlugin},
     Manager, Runtime,
 };

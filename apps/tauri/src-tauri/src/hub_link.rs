@@ -183,6 +183,11 @@ fn admits<R: Runtime>(invoke: &Invoke<R>) -> bool {
     drives_from(link.as_deref(), webview.url().ok().as_ref())
 }
 
+/// The Android plugin (`plugin:erplora-android`) as `run` registers it.
+pub fn android_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri_plugin_erplora_android::init()
+}
+
 /// The page drives the device only when both are known: the link state, and the page the window
 /// shows. Missing either one, nothing does.
 fn drives_from(link: Option<&HubLink>, page: Option<&Url>) -> bool {
@@ -501,5 +506,126 @@ mod tests {
         let till = till_showing("https://panaderia.a.erplora.com/", None);
         assert_eq!(ask(&till, "erplora_open_drawer"), refused());
         assert_eq!(ask(&till, "device_context"), Ok("ran".into()));
+    }
+
+    // ── The Android plugin, through its own route (hub#2642) ──────────────────────────────────
+    //
+    // `plugin:erplora-android|…` never reaches the app's invoke handler: Tauri hands it to the
+    // plugin's. The real plugin, as `run` registers it, with every command granted to the page the
+    // way `capabilities/default.json` grants `erplora-android:default` to every page under
+    // erplora.com — so what is measured is the second gate alone. On a computer the plugin answers
+    // without Android (an empty permission map, nothing to leave), which is what "it ran" reads as.
+
+    const ANDROID_COMMANDS: [&str; 5] =
+        ["check_permissions", "request_permissions", "keep_listening", "leave_app", "open_app_settings"];
+
+    fn till_with_the_android_plugin(page: &str, link: Option<HubLink>) -> Till {
+        use tauri::Manager;
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        for command in ANDROID_COMMANDS {
+            context.runtime_authority_mut().__allow_command(
+                format!("plugin:erplora-android|{command}"),
+                tauri::utils::acl::ExecutionContext::Local,
+            );
+        }
+        let app = tauri::test::mock_builder()
+            .plugin(android_plugin())
+            .build(context)
+            .expect("mock app");
+        if let Some(link) = link {
+            app.manage(link);
+        }
+        let window =
+            tauri::WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::External(url(page)))
+                .build()
+                .expect("main window");
+        Till { _app: app, window }
+    }
+
+    /// What each Android command answers on a computer when it runs, with the arguments the shell
+    /// sends (`keep_listening` needs its `on`).
+    fn ask_android(till: &Till, command: &str) -> Result<serde_json::Value, serde_json::Value> {
+        let body = match command {
+            "keep_listening" => serde_json::json!({ "on": false }),
+            _ => serde_json::json!({}),
+        };
+        tauri::test::get_ipc_response(
+            &till.window,
+            tauri::webview::InvokeRequest {
+                cmd: format!("plugin:erplora-android|{command}"),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: url("tauri://localhost"),
+                body: tauri::ipc::InvokeBody::Json(body),
+                headers: Default::default(),
+                invoke_key: INVOKE_KEY.to_string(),
+            },
+        )
+        .map(|body| body.deserialize::<serde_json::Value>().expect("json answer"))
+    }
+
+    fn ran(command: &str) -> Result<serde_json::Value, serde_json::Value> {
+        match command {
+            "check_permissions" | "request_permissions" => Ok(serde_json::json!({})),
+            _ => Ok(serde_json::Value::Null),
+        }
+    }
+
+    #[test]
+    fn the_website_is_refused_the_android_permissions_of_a_till_linked_to_a_hub() {
+        let till = till_with_the_android_plugin("https://www.erplora.com/", Some(linked_to_the_hub()));
+        for command in ANDROID_COMMANDS {
+            assert_eq!(ask_android(&till, command), refused(), "{command} ran for the website");
+        }
+    }
+
+    #[test]
+    fn another_business_cannot_keep_the_till_listening_nor_send_the_person_out() {
+        let till = till_with_the_android_plugin(
+            "https://otronegocio.a.erplora.com/m/sales",
+            Some(linked_to_the_hub()),
+        );
+        for command in ANDROID_COMMANDS {
+            assert_eq!(ask_android(&till, command), refused(), "{command} ran for another business");
+        }
+    }
+
+    #[test]
+    fn the_linked_hub_asks_android_for_its_permissions() {
+        let till = till_with_the_android_plugin(
+            "https://panaderia.a.erplora.com/m/sales",
+            Some(linked_to_the_hub()),
+        );
+        for command in ANDROID_COMMANDS {
+            assert_eq!(ask_android(&till, command), ran(command), "{command} refused to the linked hub");
+        }
+    }
+
+    #[test]
+    fn the_hub_is_refused_android_permissions_while_the_page_that_sent_the_window_there_may_still_run() {
+        use tauri::Manager;
+        let link = linked_to_the_hub();
+        link.follow(&url("https://otronegocio.a.erplora.com/"));
+        link.follow(&url("https://panaderia.a.erplora.com/"));
+        let till = till_with_the_android_plugin("https://panaderia.a.erplora.com/", Some(link));
+        assert_eq!(ask_android(&till, "request_permissions"), refused(), "the other business still runs");
+        till._app.state::<HubLink>().landed(&url("https://panaderia.a.erplora.com/"));
+        assert_eq!(ask_android(&till, "request_permissions"), ran("request_permissions"));
+    }
+
+    #[test]
+    fn without_a_link_state_android_permissions_stay_closed() {
+        let till = till_with_the_android_plugin("https://panaderia.a.erplora.com/", None);
+        for command in ANDROID_COMMANDS {
+            assert_eq!(ask_android(&till, command), refused(), "{command} ran with no link state");
+        }
+    }
+
+    #[test]
+    fn the_onboarding_gets_no_android_permission() {
+        let till = till_with_the_android_plugin("https://erplora.com/shell/", Some(on_the_onboarding()));
+        for command in ANDROID_COMMANDS {
+            assert_eq!(ask_android(&till, command), refused(), "{command} ran for the onboarding");
+        }
     }
 }
