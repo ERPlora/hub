@@ -127,6 +127,16 @@ async function loadOutfitkitStamp(base: string, entry: string, moduleId: string)
   );
 }
 
+/**
+ * The bundle the module declares in `ui.entry`, or `null` when it declares none (hub#2635). The
+ * install gate does not require a `ui` block, so the manifest is read as it arrives and not as the
+ * type promises: reading `manifest.ui.entry` blindly threw for such a module and took the menu and
+ * the home board of EVERY module down with it.
+ */
+function uiEntryOf(manifest: ModuleManifest): string | null {
+  return (manifest as Partial<ModuleManifest>).ui?.entry || null;
+}
+
 async function loadIconMap(base: string, entry: string): Promise<Record<string, string>> {
   // icons.json vive junto al bundle del WC (dist/), lo genera `module-toolkit build`.
   const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
@@ -298,7 +308,8 @@ export async function loadMenu(): Promise<MenuEntry[]> {
       // runtime. Believing the manifest once the runtime has spoken would rebuild the bug: a cached
       // `module.json` would point at the —also cached— url of the old version.
       const base = moduleBase(moduleId, items[0].module_version ?? manifest.version);
-      const entry = manifest.ui.entry;
+      const entry = uiEntryOf(manifest);
+      if (!entry) return []; // no bundle to mount → module left out, the other apps stay (hub#2635).
       const icons = await loadIconMap(base, entry);
       return items.map((item) => ({
         moduleId,
@@ -416,8 +427,12 @@ export interface ModuleLocaleFile {
 export interface InstalledManifest {
   moduleId: string;
   manifest: ModuleManifest;
-  /** URL del bundle ESM del WC del módulo (`/modules/<id>/<ui.entry>`). */
-  entryUrl: string;
+  /**
+   * URL of the module's ESM bundle (`/modules/<id>/<ui.entry>`), or `null` when the manifest
+   * declares no `ui` block (hub#2635): its declarative widgets still render, a `component` widget
+   * or slot of it cannot be mounted.
+   */
+  entryUrl: string | null;
   /** The module strings for the active language (`undefined` if it ships no `locales/<lang>.json`). */
   locale?: ModuleLocaleFile;
 }
@@ -487,13 +502,18 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
     // Registra los iconos HORNEADOS del módulo (dist/icons.json) también por esta vía: el dashboard
     // usa `loadInstalledManifests` (no la navegación), así que sin esto los iconos de cabecera de
     // widget que SÍ están horneados salían vacíos si su módulo no tenía entrada de navegación (P2).
-    await loadIconMap(base, manifest.ui.entry);
-    void loadOutfitkitStamp(base, manifest.ui.entry, moduleId);
+    // A module without a `ui` block has no bundle, no `icons.json` and no stamp next to it; it is
+    // still collected, so its declarative widgets and the other modules' ones survive (hub#2635).
+    const entry = uiEntryOf(manifest);
+    if (entry) {
+      await loadIconMap(base, entry);
+      void loadOutfitkitStamp(base, entry, moduleId);
+    }
     const locale = await loadModuleLocale(base, lang);
     out.push({
       moduleId,
       manifest,
-      entryUrl: `${base}/${manifest.ui.entry}`,
+      entryUrl: entry ? `${base}/${entry}` : null,
       locale,
     });
   }
@@ -505,6 +525,8 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
  * `loadComponent`/`provides_slots`) y devuelve el tag a montar. El WC consulta sus datos él mismo.
  */
 export async function loadModuleComponent(mod: InstalledManifest, tag: string): Promise<string> {
+  // Rejecting is the caller's error state: the widget card says «No disponible», a slot skips it.
+  if (!mod.entryUrl) throw new Error(`module ${mod.moduleId} declares no ui.entry to mount <${tag}>`);
   await loadEntryUrl(mod.entryUrl);
   return tag;
 }
