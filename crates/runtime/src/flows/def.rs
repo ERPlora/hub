@@ -53,10 +53,25 @@ pub const CLOCK_ISO: &str = "iso";
 /// silently treated as a literal string — a step that thinks it is sending a secret and sends the
 /// text `secret.API_KEY` is worse than one that will not save.
 const ROOT_SECRET: &str = "secret";
+/// The call's own key (hub#2675). The hub sends one key per run and step in `Idempotency-Key`
+/// (hub#2659), which is where Stripe reads it; Square reads it from the body and PayPal from
+/// `PayPal-Request-Id`, so the author places that same key there with `run.idempotency_key`. Like
+/// `secret`, legal ONLY inside an `http` step: the key belongs to one step, and anywhere else the
+/// run has no such value.
+pub const ROOT_RUN: &str = "run";
+/// The one field of [`ROOT_RUN`].
+pub const RUN_IDEMPOTENCY_KEY: &str = "idempotency_key";
 /// Every root above — what [`is_path`] reads as a reference into the run. Published in the kernel
 /// contract (`[flow_path_roots]`, module-toolkit#234) because `erplora validate` has to tell a
 /// reference from a literal exactly as this does.
-pub const PATH_ROOTS: [&str; 5] = [ROOT_INPUT, ROOT_STEPS, ROOT_EVENT, ROOT_SECRET, ROOT_NOW];
+pub const PATH_ROOTS: [&str; 6] = [
+    ROOT_INPUT,
+    ROOT_STEPS,
+    ROOT_EVENT,
+    ROOT_SECRET,
+    ROOT_NOW,
+    ROOT_RUN,
+];
 
 /// The methods an `http` step may use. Frozen and small: the point of the step is to call a
 /// business API, and `CONNECT`/`TRACE` are how an allow-listed URL becomes a tunnel.
@@ -1659,11 +1674,13 @@ impl FlowDefinition {
             // the API being called; outside it there is no legitimate reader — a `command` step
             // would hand it to a module's table, and a `condition` could compare it byte by byte
             // until it had guessed it.
+            let mut step_paths = Vec::new();
+            for expr in step.expressions() {
+                template_paths(&expr, &mut step_paths);
+            }
+            check_run_paths(&step_paths, &step.id, step.kind == StepKind::Http)?;
             if step.kind != StepKind::Http {
-                let mut paths = Vec::new();
-                for expr in step.expressions() {
-                    template_paths(&expr, &mut paths);
-                }
+                let paths = &step_paths;
                 if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
                     return Err(invalid(
                         ERR_SECRET_NOT_AVAILABLE,
@@ -1683,6 +1700,7 @@ impl FlowDefinition {
                 for expr in guard.expressions() {
                     template_paths(&expr, &mut paths);
                 }
+                check_run_paths(&paths, &step.id, false)?;
                 if let Some(path) = paths.iter().find(|p| p.starts_with("secret.")) {
                     return Err(invalid(
                         ERR_SECRET_NOT_AVAILABLE,
@@ -1713,8 +1731,44 @@ impl FlowDefinition {
                 format!("`{path}`: a trigger cannot read a flow secret (ADR-0283 §4)"),
             ));
         }
+        check_run_paths(&paths, "trigger", false)?;
         Ok(())
     }
+}
+
+/// The save-time rule of [`ROOT_RUN`] (hub#2675), over the paths one part of a document names.
+///
+/// - **Only `run.idempotency_key`.** A typo or a guess (`run.id`) resolves to nothing and would go
+///   out as an EMPTY key — one every run shares, so the other system would swallow the second
+///   order. Refused instead of stored.
+/// - **Only inside the `http` step it belongs to** (`inside_call`): the key is per run AND step, so
+///   in a command, a condition, a `run_if` or a trigger there is no value it could mean.
+fn check_run_paths(paths: &[String], owner: &str, inside_call: bool) -> Result<()> {
+    let Some(path) = paths
+        .iter()
+        .find(|p| p.split('.').next() == Some(ROOT_RUN))
+    else {
+        return Ok(());
+    };
+    if path.as_str() != format!("{ROOT_RUN}.{RUN_IDEMPOTENCY_KEY}") {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "`{owner}`: `{path}` — the run offers one value, \
+                 `{ROOT_RUN}.{RUN_IDEMPOTENCY_KEY}`; anything else would go out empty"
+            ),
+        ));
+    }
+    if !inside_call {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "`{owner}`: `{path}` is the key of one call, so it can only be used in the URL, \
+                 headers or body of an `http` step (hub#2675)"
+            ),
+        ));
+    }
+    Ok(())
 }
 
 fn parse_trigger(value: &Json) -> Result<TriggerDef> {
@@ -5706,6 +5760,79 @@ mod tests {
                 ErrorPolicy::parse(unknown),
                 ErrorPolicy::Stop,
                 "`{unknown}` must not talk this hub into carrying on"
+            );
+        }
+    }
+
+    /// **hub#2675 — the key the hub already sends in `Idempotency-Key`, placed by the author where
+    /// the other system reads it.** Square wants it in the body, PayPal in `PayPal-Request-Id`: the
+    /// `http` step may name `run.idempotency_key` in its URL, headers and body.
+    #[test]
+    fn hub2675_the_run_key_saves_in_the_headers_and_the_body_of_a_call() {
+        assert!(is_path("run.idempotency_key"));
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pay", "kind": "http", "method": "POST",
+                "url": "https://connect.squareup.com/v2/payments",
+                "headers": { "PayPal-Request-Id": "{{run.idempotency_key}}" },
+                "body": { "idempotency_key": "run.idempotency_key", "note": "{{run.idempotency_key}}" }
+            }]
+        }));
+        assert!(def.is_ok(), "{def:?}");
+    }
+
+    /// The key is one per run AND step, so it only means something inside the call it belongs to.
+    /// Anywhere else the run has no such value: the text would go out empty or be compared as
+    /// literal characters, which is a flow doing something other than what its document says.
+    #[test]
+    fn hub2675_the_run_key_is_refused_outside_the_call_it_belongs_to() {
+        let call = json!({ "id": "pay", "kind": "http", "url": "https://api.example.com/x" });
+        let steps = [
+            json!([{ "id": "a", "kind": "command", "command": "m.c",
+                     "params": { "k": "{{run.idempotency_key}}" } }]),
+            json!([{ "id": "a", "kind": "condition",
+                     "when": { "run.idempotency_key": { "exists": true } } }]),
+            json!([{ "id": "a", "kind": "condition",
+                     "when": { "input.x": { "eq": "{{run.idempotency_key}}" } } }]),
+            json!([{ "id": "pay", "kind": "http", "url": "https://api.example.com/x",
+                     "run_if": { "run.idempotency_key": { "exists": true } } }]),
+        ];
+        for steps in steps {
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": steps }))
+                .expect_err("the run key only exists inside an http step");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+                "{err}"
+            );
+        }
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "triggers": [{ "kind": "event", "event": "sale.completed",
+                           "input": { "k": "{{run.idempotency_key}}" } }],
+            "steps": [call]
+        }))
+        .expect_err("a trigger runs before any call");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+            "{err}"
+        );
+    }
+
+    /// `run` carries one field. A typo (`run.idempotencykey`) or a guess (`run.id`) would go out as
+    /// an EMPTY key — and an empty key is one every run shares — so it does not save.
+    #[test]
+    fn hub2675_a_field_of_run_the_hub_does_not_have_is_refused() {
+        for written in ["{{run.id}}", "run.idempotencykey", "key {{ run.step }}"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "pay", "kind": "http", "url": "https://api.example.com/x",
+                            "headers": { "PayPal-Request-Id": written } }]
+            }))
+            .expect_err("an unknown run field must not save");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+                "{written}: {err}"
             );
         }
     }
