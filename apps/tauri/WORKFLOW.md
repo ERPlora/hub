@@ -99,6 +99,13 @@ Solo en ordenador: una ventana de 820×1060 titulada «ERPlora» que enseña el 
 diálogo de impresión del sistema (lista de impresoras y «Guardar como PDF»). En Android es la pantalla
 de impresión del propio Android.
 
+### «¿Abrir … en este dispositivo?»
+Un diálogo del sistema (no de la página) que sale cuando un enlace `erplora://hub/…` lleva a otro negocio que el
+enlazado (HUB_APP-F03): título «¿Abrir <dirección> en este dispositivo?», el aviso de que ese negocio usará la
+impresora, el cajón y el lector de tarjetas y será el que abra la aplicación al arrancar, y los botones «Abrir» y
+«Cancelar». En inglés («Open <dirección> on this device?», «Open», «Cancel») si el sistema no está en español.
+Cerrarlo es «Cancelar», y en ordenador «Cancelar» es también el botón de Intro.
+
 ### Pedir permiso
 Los diálogos del sistema operativo (red local, notificaciones, Bluetooth), precedidos por la frase del
 hub («Vamos a buscar tu impresora», «Deja que te avisemos»). Los textos son de `HUB_SHELL`.
@@ -146,8 +153,9 @@ Lo que esto significa de verdad:
   la segunda puerta les contesta `not_the_linked_hub`. Una página no se enlaza a sí misma: `?shell=1` solo
   enlaza cuando la ventana llega desde la página de entrada del SaaS (o es el negocio ya enlazado). Lo mismo los
   permisos de Android, la escucha y salir de la aplicación (ERPlora/hub#2642). Lo que queda abierto: escuchar
-  los toques de los avisos y leer la versión (plugins de terceros, ERPlora/hub#2658) y un enlace `erplora://hub/…`, que enlaza su
-  destino sin preguntar (ERPlora/hub#2644), también `www`/`pre` (ERPlora/hub#2645). `[SEG]`
+  los toques de los avisos y leer la versión (plugins de terceros, ERPlora/hub#2658) y que un enlace `erplora://hub/…`
+  acepta como destino también `www`/`pre` (ERPlora/hub#2645); ese enlace, si lleva a otro negocio, solo enlaza
+  cuando la persona contesta «Abrir» en un diálogo del sistema (ERPlora/hub#2644). `[SEG]`
 - El bucle local pasa el patrón solo en `:8787` y `:5173`, pero un enlace profundo lo acepta —y lo enlaza—
   con **cualquier puerto** (`hub_url_for_host`) y la captura lo deja recordado también con `https`
   (`trusted_hub_origin`): un proceso local que escuche en un puerto y un enlace dejan el mostrador arrancando
@@ -299,7 +307,8 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
   `plugin:app` aún no (ERPlora/hub#2658, `[SEG]`).
 - **Solo el SaaS elige el negocio**: `?shell=1` enlaza y se recuerda solo si la ventana sale de la página de
   entrada (el origen del SaaS; en desarrollo también el de `ERPLORA_SHELL_URL`) o cae en el negocio ya enlazado.
-  La aplicación enlaza por su cuenta el negocio recordado al arrancar y el destino de un enlace `erplora://hub/…`.
+  La aplicación enlaza por su cuenta el negocio recordado al arrancar; el destino de un enlace `erplora://hub/…`
+  a otro negocio, solo cuando la persona contesta «Abrir» en el diálogo del sistema (ERPlora/hub#2644).
 - **Solo se recuerda o se abre por enlace** `<etiqueta>.erplora.com` (incluidos `www` y `pre`) o el bucle local
   con cualquier puerto; al navegador del sistema también van el apex y `checkout.stripe.com`.
 - **El enlace profundo se resuelve, no se abre**: la dirección se reconstruye desde el nombre.
@@ -329,7 +338,6 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 - No sigue con permisos las páginas de otros dominios: un negocio con dominio propio no recibe hardware.
 - No deja el hardware ni los permisos de Android a una página de erplora.com que no sea el negocio enlazado,
   aunque la ventana la enseñe (otro negocio, la web pública, el entorno de pruebas): contesta `not_the_linked_hub`.
-- No pregunta antes de cambiar el negocio recordado cuando llega un enlace `erplora://hub/…` (defecto, F03).
 - No deja ningún registro de lo que falla: la aplicación no instala destino para `log`/`tracing`.
 
 ## Dudas abiertas
@@ -353,9 +361,8 @@ Se resuelven con `market-decision`; no las decide el worker.
    que en la aplicación no abre ninguna (`window.open` no hace nada): sin confirmar cómo se completa ahí.
 
 8. ~~`[SEG]` ¿Se restringe el hardware a los hubs?~~ Resuelta por ERPlora/hub#2504: solo el negocio enlazado
-   usa las órdenes de la aplicación, y desde ERPlora/hub#2642 las del plugin de Android. Quedan las de
-   `plugin:notification` y `plugin:app` (ERPlora/hub#2658), el enlace sin confirmación
-   (ERPlora/hub#2644), `www`/`pre` como negocio (ERPlora/hub#2645) y el bucle local en producción
+   usa las órdenes de la aplicación, y desde ERPlora/hub#2642 las del plugin de Android. Desde ERPlora/hub#2644 un enlace a otro negocio
+   pregunta antes de enlazarlo. Quedan las de `plugin:notification` y `plugin:app` (ERPlora/hub#2658), `www`/`pre` como negocio (ERPlora/hub#2645) y el bucle local en producción
    (ERPlora/hub#2643).
 9. `[SEG]` **Cambiar de negocio** debería cerrar la sesión del hub (`runtimeLogout`), borrar los tokens de
    erplora.com y parar la escucha de Android; hoy no lo hace.
