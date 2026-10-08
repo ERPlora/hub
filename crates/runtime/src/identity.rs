@@ -646,6 +646,55 @@ pub(crate) async fn write_taking_a_seat(
     ))
 }
 
+/// «…and somebody else still administers this hub». The `WHERE` piece that makes a write which
+/// takes administration away from the row `:id` check, while it writes, that another active
+/// administrator remains (hub#2500). `owner`/`admin` in any capitals, exactly like
+/// [`crate::hub_users::is_admin_role`].
+const ANOTHER_ADMIN_REMAINS: &str = "EXISTS (SELECT 1 FROM hub_user other \
+      WHERE other.hub_id = :hub_id AND other.id != :id AND other.is_active = 1 \
+        AND LOWER(other.role) IN ('owner', 'admin'))";
+
+/// Runs a write that **takes administration away** from the row `:id` (a demotion or a baja) only
+/// if another active administrator remains, counting and writing in the same step (hub#2500).
+///
+/// `sql` is the statement up to its `WHERE …` (or `AND …`): [`ANOTHER_ADMIN_REMAINS`] is glued on
+/// here, so no caller can forget it. `p` has to carry `hub_id` and `id`. `Ok(false)` = it would have
+/// left the hub without an administrator and **nothing was written**.
+///
+/// The advisory lock is what makes it hold, for the reason measured in [`write_taking_a_seat`]: in
+/// READ COMMITTED two overlapping demotions do not see each other's row, and both would find «the
+/// other one is still an administrator». With the lock taken by a previous statement, the second
+/// write's snapshot starts after the first one committed. Its own key space (`<hub>/admins`), so it
+/// never waits behind a seat or a boot migration.
+pub(crate) async fn write_keeping_an_admin(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    sql_up_to_the_admin_clause: &str,
+    p: &Params,
+) -> Result<bool> {
+    let mut p = p.clone();
+    p.insert("admins_key".into(), json!(format!("{hub_id}/admins")));
+    let ops = [
+        (
+            "SELECT pg_advisory_xact_lock(hashtext(:admins_key))".to_string(),
+            p.clone(),
+        ),
+        (
+            format!("{sql_up_to_the_admin_clause}{ANOTHER_ADMIN_REMAINS}"),
+            p.clone(),
+        ),
+    ];
+    let gates = [RowGate {
+        first: 1,
+        count: 1,
+        min: 1,
+    }];
+    Ok(matches!(
+        db.execute_tx_gated(&ops, &gates, &[]).await?,
+        TxGatedOutcome::Committed { .. }
+    ))
+}
+
 /// Asegura una identidad fija para `AuthMode::Dev`, donde el frontend es la autoridad de las
 /// cabeceras y puede traer un id demo ya persistido. No cambia una identidad existente.
 pub async fn ensure_dev_user(
@@ -973,7 +1022,7 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> 
     p.insert("email".into(), json!(email));
     let existing = db
         .query(
-            "SELECT id FROM hub_user WHERE hub_id = :hub_id AND email = :email",
+            "SELECT id FROM hub_user WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email)",
             &p,
         )
         .await?;
@@ -1121,7 +1170,7 @@ pub async fn revoke_cloud_access(
         let invited = db
             .query(
                 "SELECT id FROM hub_user \
-                  WHERE hub_id = :hub_id AND email = :email AND is_active = 1",
+                  WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email) AND is_active = 1",
                 &by_email,
             )
             .await?;
@@ -1274,7 +1323,7 @@ pub async fn get_or_link_cloud_user(
         let by_email = db
             .query(
                 "SELECT id, name, role, cloud_user_id, is_active, cloud_revoked_at FROM hub_user \
-                  WHERE hub_id = :hub_id AND email = :email AND cloud_user_id IS NULL",
+                  WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email) AND cloud_user_id IS NULL",
                 &pe,
             )
             .await?;
@@ -1403,7 +1452,7 @@ pub async fn create_login_user(
     let existing = db
         .query(
             "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
-              WHERE hub_id = :hub_id AND email = :email",
+              WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email)",
             &p,
         )
         .await?;
@@ -1420,12 +1469,16 @@ pub async fn create_login_user(
         // está dentro, no. Por eso la plaza solo se pide en el primer caso — y se pide en el mismo
         // paso que la escritura (hub#1804), no antes.
         if user.is_active {
-            db.execute(
-                "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
-                  WHERE id = :id AND hub_id = :hub_id",
-                &up,
-            )
-            .await?;
+            let sql = "UPDATE hub_user SET role = :role, is_active = 1, cloud_revoked_at = '' \
+                  WHERE id = :id AND hub_id = :hub_id";
+            // The same last-administrator rule as Personal, in the write (hub#2500).
+            if crate::hub_users::is_admin_role(&user.role) && !crate::hub_users::is_admin_role(role) {
+                if !write_keeping_an_admin(db, hub_id, &format!("{sql} AND "), &up).await? {
+                    return Err(crate::hub_users::last_admin());
+                }
+            } else {
+                db.execute(sql, &up).await?;
+            }
         } else {
             up.insert("max_users".into(), json!(seat_ceiling(max_users)));
             let reactivated = write_taking_a_seat(
@@ -1487,20 +1540,38 @@ pub async fn deactivate_login_user(
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("email".into(), json!(email));
-    let res = db
-        .execute(
-            "UPDATE hub_user SET is_active = 0, cloud_revoked_at = '' \
-              WHERE hub_id = :hub_id AND email = :email AND is_active = 1",
+    // The address in any capitals, like every other email lookup of the hub (hub#2500).
+    let active = db
+        .query(
+            "SELECT id, name, role, cloud_user_id, is_active FROM hub_user \
+              WHERE hub_id = :hub_id AND LOWER(email) = LOWER(:email) AND is_active = 1",
             &p,
         )
         .await?;
-    if res.affected == 0 {
+    let Some(row) = active.rows.first() else {
+        return Ok(false);
+    };
+    let user = row_to_user(row);
+    let mut up = Params::new();
+    up.insert("id".into(), json!(user.id));
+    up.insert("hub_id".into(), json!(hub_id));
+    let sql = "UPDATE hub_user SET is_active = 0, cloud_revoked_at = '' \
+          WHERE id = :id AND hub_id = :hub_id AND is_active = 1";
+    // The same last-administrator rule as Personal, in the write (hub#2500).
+    let written = if crate::hub_users::is_admin_role(&user.role) {
+        if !write_keeping_an_admin(db, hub_id, &format!("{sql} AND "), &up).await? {
+            return Err(crate::hub_users::last_admin());
+        }
+        true
+    } else {
+        db.execute(sql, &up).await?.affected > 0
+    };
+    if !written {
         return Ok(false);
     }
     db.execute(
-        "DELETE FROM hub_session WHERE hub_id = :hub_id AND user_id IN \
-          (SELECT id FROM hub_user WHERE hub_id = :hub_id AND email = :email)",
-        &p,
+        "DELETE FROM hub_session WHERE hub_id = :hub_id AND user_id = :id",
+        &up,
     )
     .await?;
     Ok(true)

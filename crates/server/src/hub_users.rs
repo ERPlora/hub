@@ -238,9 +238,9 @@ pub async fn create_user(
     };
     // Suelta el lock ANTES de la I/O de red al SaaS (mismo patrón que `members::add_member`).
     drop(rt);
-    if !created.email.is_empty() {
+    if !created.access_email.is_empty() {
         if let Err(e) =
-            crate::members::notify_member_added(&st, &created.email, &created.role).await
+            crate::members::notify_member_added(&st, &created.access_email, &created.role).await
         {
             return crate::members::members_error_response(e);
         }
@@ -476,7 +476,7 @@ fn census_id_by_access_email(users: &[HubUserRow], email: &str) -> Option<String
     }
     users
         .iter()
-        .find(|u| !u.email.is_empty() && u.email.eq_ignore_ascii_case(email))
+        .find(|u| !u.access_email.is_empty() && u.access_email.eq_ignore_ascii_case(email))
         .map(|u| u.id.clone())
 }
 
@@ -500,7 +500,7 @@ fn access_sync_plan(target: &HubUserRow, input: &UpdateHubUser) -> AccessSync {
         .as_deref()
         .map(str::trim)
         .filter(|e| !e.is_empty())
-        .unwrap_or(&target.email)
+        .unwrap_or(&target.access_email)
         .to_string();
     if email.is_empty() {
         return AccessSync::Nothing; // Identidad puramente local.
@@ -510,7 +510,7 @@ fn access_sync_plan(target: &HubUserRow, input: &UpdateHubUser) -> AccessSync {
     }
     let role = input.role.as_deref().unwrap_or(&target.role);
     let changes_the_membership = role != target.role
-        || !email.eq_ignore_ascii_case(&target.email)
+        || !email.eq_ignore_ascii_case(&target.access_email)
         || (input.is_active == Some(true) && !target.is_active);
     if changes_the_membership {
         AccessSync::Grant {
@@ -715,6 +715,7 @@ mod tests {
             id: id.into(),
             name: id.into(),
             email: String::new(),
+            access_email: String::new(),
             role: role.into(),
             cloud_user_id: None,
             is_active,
@@ -1102,7 +1103,27 @@ mod tests {
 
     fn with_email(mut row: HubUserRow, email: &str) -> HubUserRow {
         row.email = email.into();
+        row.access_email = email.into();
         row
+    }
+
+    /// A person who signs in with a PIN only and typed an address in «My profile»: the screen shows
+    /// it, but it is not the key of any access (hub#2500).
+    fn with_profile_email_only(mut row: HubUserRow, email: &str) -> HubUserRow {
+        row.email = email.into();
+        row
+    }
+
+    #[test]
+    fn hub2500_an_address_typed_in_my_profile_never_reaches_the_saas() {
+        let marta = with_profile_email_only(user("marta", "employee", true), "ioan@example.com");
+        assert_eq!(access_sync_plan(&marta, &deactivate()), AccessSync::Nothing);
+        assert_eq!(
+            access_sync_plan(&marta, &set_role("manager")),
+            AccessSync::Nothing
+        );
+        // …and the members door, which names people by address, does not take her for its owner.
+        assert_eq!(census_id_by_access_email(&[marta], "ioan@example.com"), None);
     }
 
     /// hub#1429 — **what the SaaS is told, and therefore what has to be asked first.**
