@@ -2070,7 +2070,7 @@ export default {
     save: 'Save',
     saved: 'Settings saved.',
     saveError: 'Could not save settings.',
-    adminOnly: 'Only an administrator can change these settings.',
+    noSavePermission: 'You do not have permission to change these settings. Ask an administrator if you need to.',
     textPlaceholder: 'Type here…',
     invalidFields: 'Check the fields marked below and save again.',
     fieldInvalid: 'This value is not accepted.',

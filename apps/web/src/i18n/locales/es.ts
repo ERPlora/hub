@@ -1786,7 +1786,7 @@ export default {
     save: 'Guardar',
     saved: 'Ajustes guardados.',
     saveError: 'No se pudieron guardar los ajustes.',
-    adminOnly: 'Solo un administrador puede cambiar estos ajustes.',
+    noSavePermission: 'No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.',
     textPlaceholder: 'Escribe aquí…',
     invalidFields: 'Revisa los campos marcados y vuelve a guardar.',
     fieldInvalid: 'Este valor no se admite.',

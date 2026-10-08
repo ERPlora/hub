@@ -17,7 +17,7 @@ import { createI18n } from 'vue-i18n';
 
 vi.mock('../lib/session', async () => {
   const { ref } = await import('vue');
-  return { isAdmin: ref(true) };
+  return { isAdmin: ref(true), hasPermission: () => false };
 });
 vi.mock('../lib/toast', () => ({ toastSuccess: vi.fn(), toastError: vi.fn() }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
