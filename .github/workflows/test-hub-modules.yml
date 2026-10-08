@@ -16,19 +16,21 @@
 # Este workflow se trae el catálogo de módulos (~27 repos) por su estado PUBLICADO (`main`) y
 # corre esos targets más el `--lib` del runtime.
 #
-# ── Los CUATRO disparadores, y por qué hacen falta los cuatro (hub#1239, hub#1438) ──
+# ── Los CINCO disparadores, y por qué hacen falta los cinco (hub#1239, hub#1438, pm#655) ──
 # La ADR «El Hub se CIERRA como KERNEL» (2026-08-27) fija la regla que esta pasada mide —el
 # kernel no rompe a un módulo publicado, nunca—: es el «crater/runbot» del hub, los 27 módulos
 # PUBLICADOS contra este runtime. El contrato completo: `architecture/hub/kernel-contract.md`.
 #
-# 🔴 La pasada PRE-MERGE no está aquí, está en el GATE LOCAL. Hasta el 2026-08-29 este fichero
-# llevaba además un bloque `pull_request:` con las seis superficies que la ADR congela
-# (`crates/runtime`, `crates/server`, `schemas`, `crates/db`, `crates/guest-sdk`,
-# `crates/wasm-host`), y era esa la puerta de una PR `kind:contract`. pm#197 la retiró (decisión
-# de Ioan, con `ci-runner-1` saturado): el gate pre-push materializa el catálogo PUBLICADO y
-# ejecuta estos mismos e2e por defecto (hub#1353), rojo = push abortado, y sin push no hay PR.
-# Antes de mergear, lo que `merge-pr.sh` exige es el sello `local-gate/hub-tests` — nunca un run
-# de este workflow. Lo que queda aquí es la red de FUERA de la PR:
+#   · `pull_request` sobre las seis superficies que la ADR congela (`crates/runtime`,
+#     `crates/server`, `schemas`, `crates/db`, `crates/guest-sdk`, `crates/wasm-host`) y los
+#     scripts de los que está hecho este job: la pasada PRE-MERGE. pm#197 la quitó el 29/08 con
+#     `ci-runner-1` saturado y la mandó al gate pre-push, pero ese gate se quedó en check + fmt +
+#     clippy el 03/09 y desde entonces estos e2e no corrían antes de ningún merge. Vuelve con
+#     pm#655, ya en las máquinas gratuitas de GitHub, sin borradores y repartida en una matriz
+#     (los targets del kernel + las baterías en varios trozos) para que no sea el camino crítico.
+#     `merge-pr.sh` espera a que TODOS los checks de la PR estén en verde, este incluido.
+#
+#   Y la red de FUERA de la PR:
 #
 #   · `push` a `main`/`develop`: la red POST-MERGE (hub#572), que el gate local no puede dar —
 #     dos PRs verdes por separado pueden romper `develop` juntas, y eso solo se ve sobre el
@@ -74,16 +76,28 @@ on:
   # POR DEFECTO del repo (`main`) — así se lee: «lo publicado contra lo desplegado».
   repository_dispatch:
     types: [module-published]
-  # Las seis superficies del kernel (ver la cabecera). `crates/runtime/**` ya cubre el antiguo
-  # `crates/runtime/src/e2e_support.rs`, que por eso deja de listarse aparte.
-  # Sin `pull_request` desde el 2026-08-29 (Ioan): estos e2e los corre el gate pre-push, que
-  # materializa el catálogo PUBLICADO y los ejecuta POR DEFECTO (hub#1353 — medido sobre develop
-  # limpio: 30 binarios, 1 365 tests, 0 fallos, 5m07s; la nota de «120 fallos» era anterior a
-  # hub#1153, cuando el catálogo se leía de `modules-workspace`). Rojo = push abortado, y sin
-  # push no hay PR: la prueba no se pierde, cambia de sitio.
-  # Si vuelve, vuelve CON su filtro de borradores: las PRs nacen en borrador y, medido el 29/08,
-  # la mitad de los minutos del runner se iban en runs cancelados por el re-push del revisor. El
-  # `if:` que lo aplicaba se retiró con el trigger (hub#1443): sin `pull_request` era constante.
+  # Las seis superficies del kernel (ver la cabecera) y los scripts de este job (pm#655).
+  # `crates/runtime/**` ya cubre el antiguo `crates/runtime/src/e2e_support.rs`. Vuelve CON su
+  # filtro de borradores (el `if:` del job): medido el 29/08, la mitad de los minutos se iban en
+  # runs de borrador cancelados por el re-push del revisor. `ready_for_review` es lo que arranca
+  # la pasada de una PR que nació en borrador.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'crates/runtime/**'
+      - 'crates/server/**'
+      - 'schemas/**'
+      - 'crates/db/**'
+      - 'crates/guest-sdk/**'
+      - 'crates/wasm-host/**'
+      - '.github/workflows/test-hub-modules.yml'
+      - 'scripts/materialize-published-modules.sh'
+      - 'scripts/ci/published-module-ids.sh'
+      - 'scripts/ci/module-hub-batteries.sh'
+      - 'scripts/ci/module-hub-batteries.txt'
+      - 'scripts/ci/run-module-hub-batteries.sh'
+      - 'scripts/ci/kernel-e2e-targets.sh'
+      - 'scripts/ci/kernel-e2e-targets.txt'
   # `push` a develop/main se queda: es la red POST-MERGE (hub#572) y el sitio donde el
   # `repository_dispatch` de un módulo recién publicado sigue midiendo contra el kernel.
 
@@ -101,8 +115,23 @@ permissions:
 
 jobs:
   module-e2e:
-    name: e2e con módulos reales
+    name: e2e con módulos reales (${{ matrix.part }}${{ matrix.shard && format(' {0}', matrix.shard) || '' }})
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # pm#655: de vuelta en las PRs del kernel, el job entero (39-44 min en self-hosted: ~11 de
+    # `cargo test`, ~28 de baterías) sería el camino crítico de cada merge. Se parte en tres
+    # trozos en paralelo: los targets del kernel, y las baterías en dos mitades disjuntas por
+    # MÓDULO (`run-module-hub-batteries.sh --shard k/n`). `fail-fast: false`: un trozo rojo no
+    # cancela a sus hermanos, o media señal se queda escondida detrás de la otra.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: targets
+          - part: batteries
+            shard: 1/2
+          - part: batteries
+            shard: 2/2
     # 45 → 70 con el corredor de baterías (hub#1381): levanta UN hub por módulo con el catálogo
     # publicado entero, y eso son 11 arranques — las **26** baterías en 11 módulos desde que
     # hub#1483 borró la última exención (`verifactu`: hub#1477 le dio el backend de disco para sus
@@ -187,13 +216,6 @@ jobs:
           sudo docker image prune -af || true
           df -h /
 
-      # ⚠️ El secreto es de REPO, no de organización: con la org en plan Free los
-      # secretos de organización NO llegan a los repos privados (por eso
-      # `ANDROID_KEYSTORE_*` está duplicado en los dos sitios). Un secreto ausente
-      # llega como cadena VACÍA, no como error — el mismo modo de fallo que dejó
-      # `CI_RUNNER_LABEL` vacía y mandó jobs a `ubuntu-latest` en verde. Por eso se
-      # comprueba explícitamente antes de usarlo.
-      #
       # El clonado en sí NO vive aquí: lo hace `scripts/materialize-published-modules.sh`,
       # el MISMO script que el gate local invoca desde `.githooks/pre-push` (hub#1153). Antes
       # el bucle de clonado, el suelo de ≥25 y el fallo ruidoso estaban escritos dentro de
@@ -202,31 +224,20 @@ jobs:
       # la misma lógica ya tumbó `main` una vez con la config de Postgres (hub#647).
       - name: Traer el catálogo de módulos por su estado PUBLICADO (main)
         env:
-          MODULES_DEPLOY_KEYS: ${{ secrets.MODULES_DEPLOY_KEYS }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "${MODULES_DEPLOY_KEYS}" ]; then
-            echo "::error::el secreto MODULES_DEPLOY_KEYS llegó VACÍO."
-            echo "Tiene que ser secreto DEL REPO ERPlora/hub (los de organización no"
-            echo "alcanzan a repos privados con la org en plan Free). Regenerarlo:"
-            echo "  ver hub#1216 — una deploy key read-only por módulo, en tar+base64."
+          # La lista de módulos SALE DE LA ORG, no de una lista escrita aquí (pm#655): los repos de
+          # módulo son PÚBLICOS desde el 08/10, así que «publicado» = repo público, no archivado y
+          # con `module.json` en `main`. Antes salía del paquete de deploy keys, que se mantenía a
+          # mano y se quedó corto: `attendance` nació sin clave y cada run murió en «catalogue is
+          # INCOMPLETE» día y medio, mientras se seguía clonando el `invoice_series` archivado.
+          if ! IDS=$(bash scripts/ci/published-module-ids.sh); then
+            echo "::error::no se pudo preguntar a la org por sus módulos publicados (el detalle,"
+            echo "::error::arriba en este mismo paso)."
             exit 1
           fi
-
-          # La lista de módulos SALE DEL PROPIO PAQUETE DE CLAVES, no de una lista escrita aquí:
-          # cada módulo necesita su deploy key de todas formas, así que el paquete es la única
-          # fuente que no puede quedarse corta. Una lista a mano sí: la primera versión traía 13 de
-          # los 27 y `module_manifest_contract` lo cazó — pero solo porque exige un MÍNIMO (≥20).
-          # Un módulo nuevo que faltase sin bajar de ese umbral no se habría probado, en silencio.
-          # Quien lee el paquete es el script; aquí solo se desempaqueta.
-          KEYS="$HOME/.erplora-module-keys"
-          rm -rf "$KEYS"
-          mkdir -p "$KEYS" && chmod 700 "$KEYS"
-          printf '%s' "$MODULES_DEPLOY_KEYS" | base64 -d | tar xz -C "$KEYS"
-          chmod 600 "$KEYS"/*
-
-          mkdir -p ~/.ssh
-          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          echo "módulos publicados: $(printf '%s\n' "$IDS" | grep -c .)"
 
           # 🔴 En `$RUNNER_TEMP`, que se vacía en cada job — NUNCA junto al checkout.
           #
@@ -253,15 +264,16 @@ jobs:
           # NO caza que falten unos pocos.
           # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
           # Actions, y el script también lo corre el gate local, donde solo sería ruido.
+          # Por https y sin clave: los repos son públicos (la plantilla por defecto es ssh).
+          # shellcheck disable=SC2086  # `$IDS` es una lista de ids separada por saltos de línea
           if ! RESOLVED=$(bash scripts/materialize-published-modules.sh \
-              --dest "$DEST" --keys "$KEYS" --floor 25); then
+              --dest "$DEST" --modules "$(printf '%s ' $IDS)" \
+              --remote-template 'https://github.com/ERPlora/%s.git' --floor 25); then
             echo "::error::no se pudo materializar el catálogo PUBLICADO (el detalle, arriba en"
-            echo "este mismo paso). Si se publicó un módulo nuevo, hay que añadir su deploy key"
-            echo "al paquete MODULES_DEPLOY_KEYS (hub#1216)."
+            echo "::error::este mismo paso)."
             exit 1
           fi
 
-          rm -rf "$KEYS"
           echo "ERPLORA_MODULES_DIR=$RESOLVED" >> "$GITHUB_ENV"
 
       # ── hub#1381 · la cobertura que hub#1264 muda tiene que ESTAR donde el slice prometió ──
@@ -328,7 +340,7 @@ jobs:
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';"
           docker restart "$PG"
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker exec "$PG" pg_isready -U postgres >/dev/null 2>&1 && break
             sleep 2
           done
@@ -341,7 +353,7 @@ jobs:
             exit 1
           fi
           ok=""
-          for i in $(seq 1 15); do
+          for _ in $(seq 1 15); do
             if timeout 2 bash -c "exec 3<>/dev/tcp/localhost/${HOST_PORT}" 2>/dev/null; then ok=1; break; fi
             sleep 2
           done
@@ -367,9 +379,12 @@ jobs:
       # `cache-bin: false` y `save-if` off en runner propio: el paso `Post` de esta
       # acción borra `$CARGO_HOME/bin` (se lleva `rustup`) y `~/.cargo/registry/src`,
       # que las DOS ranuras de `ci-runner-1` comparten. Explicación en `test-shell.yml`.
+      # Una caché por trozo (pm#655): los targets compilan los tests del runtime y las baterías
+      # solo el servidor, y con la misma clave el primero que guarda le deja al otro lo que no usa.
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.part }}
           cache-bin: false
           save-if: ${{ runner.environment != 'self-hosted' }}
 
@@ -398,6 +413,7 @@ jobs:
       # esconde el resto.
       - name: cargo test — los targets que necesitan módulos
         id: tests
+        if: matrix.part == 'targets'
         run: |
           set -euo pipefail
           # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
@@ -450,12 +466,12 @@ jobs:
       # «the batteries do not pass» alert on develop (hub#2187). Skipped, the red is the step that
       # really failed.
       - name: Compilar erplora-server para las baterías (hub#1381)
-        if: ${{ !cancelled() && steps.postgres.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.part == 'batteries' && steps.postgres.outcome == 'success' }}
         run: cargo build -p erplora-server
 
       - name: Las baterías de módulo pasan contra ESTE kernel (hub#1381)
         id: run-batteries
-        if: ${{ !cancelled() && steps.postgres.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.part == 'batteries' && steps.postgres.outcome == 'success' }}
         run: |
           set -uo pipefail
           # stdout es el detalle por batería y stderr el veredicto: separados para que la issue de
@@ -466,6 +482,7 @@ jobs:
             --database-url "$DATABASE_URL" \
             --pg-container "$PG_CONTAINER" \
             --server target/debug/erplora-server \
+            --shard "${{ matrix.shard }}" \
             > "$RUNNER_TEMP/run-batteries.out" \
             2> "$RUNNER_TEMP/run-batteries.err" || rc=$?
           cat "$RUNNER_TEMP/run-batteries.out"
@@ -590,7 +607,7 @@ jobs:
 
           Este job clona los ~27 módulos por su estado PUBLICADO (\`main\`) y los corre contra este runtime, que es la regla del kernel: **el hub no rompe a un módulo publicado, nunca** (ADR «El Hub se CIERRA como KERNEL»). Así que hay dos salidas, y solo dos: se revierte el cambio del hub, o —si el contrato tenía que cambiar de verdad— se convierte en una PR \`kind:contract\` y el módulo se adapta DESPUÉS (orden core → flota → módulo).
 
-          Mientras esto siga rojo, el CRATER NO SE EJECUTA: el guard de baterías corre ANTES de \`cargo test\`, así que ningún módulo publicado se está verificando contra el kernel y una regresión real queda tapada por un fallo de contabilidad. En hub#1396 fue un día entero, 14 runs. Esto NO bloquea ninguna PR —la puerta pre-merge es el sello \`local-gate/hub-tests\` del gate pre-push (pm#197)—, y por eso el rojo hay que mirarlo: nada más lo va a parar.
+          Mientras esto siga rojo, el CRATER NO SE EJECUTA: el guard de baterías corre ANTES de \`cargo test\`, así que ningún módulo publicado se está verificando contra el kernel y una regresión real queda tapada por un fallo de contabilidad. En hub#1396 fue un día entero, 14 runs. Las PRs del kernel corren este mismo job (pm#655), así que mientras siga rojo ninguna de ellas sale en verde: hay que mirarlo.
 
           Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando el catálogo vuelva a verde."
 
@@ -609,8 +626,9 @@ jobs:
       # una issue que se reutiliza, nunca una por run. Título propio porque el arreglo es otro —
       # aquí no se ha roto un módulo, se ha desparejado la lista— y quien la lee es otro.
       - name: Abrir o refrescar la issue de las baterías de módulo (hub#1381)
+        # Los tres trozos calculan el mismo veredicto del guard: solo uno abre la issue.
         if: >-
-          failure() && steps.batteries.outcome == 'failure' &&
+          failure() && steps.batteries.outcome == 'failure' && matrix.part == 'targets' &&
           (github.event_name == 'schedule' || github.event_name == 'repository_dispatch' ||
            github.event_name == 'push')
         env:
@@ -648,11 +666,19 @@ jobs:
           TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
             ./scripts/ci/alert-issue.sh
 
+      # J0 de pm#655: las máquinas gratuitas traen ~14 GB de disco y el `target/` ronda los 15 GB.
+      # Lo que queda tras compilar se escribe en cada run, también en rojo, para que el próximo
+      # «disco lleno» no se diagnostique a ciegas.
+      - name: Disco tras compilar
+        if: always()
+        run: |
+          df -h /
+          du -sh target 2>/dev/null || true
+
       # `always()`: si el job se cancela a media suite (`cancel-in-progress` lo hace a diario), el
       # residuo se quedaría en el runner envenenando al vecino. La limpieza no puede depender de
       # que el job termine bien.
       - name: Limpiar los módulos del runner
         if: always()
         run: |
-          rm -rf "$RUNNER_TEMP/modules-workspace" "$HOME/.erplora-module-keys" \
-                 "$GITHUB_WORKSPACE/../modules-workspace" || true
+          rm -rf "$RUNNER_TEMP/modules-workspace" "$GITHUB_WORKSPACE/../modules-workspace" || true

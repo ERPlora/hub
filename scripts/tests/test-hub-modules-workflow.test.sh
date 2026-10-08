@@ -100,14 +100,38 @@ REQUIRED_PATHS = [
     "crates/wasm-host/**",
     ".github/workflows/test-hub-modules.yml",
 ]
-# Desde el 29/08 (Ioan) estos e2e NO corren en las PRs: los corre el gate pre-push, que
-# materializa el catálogo publicado y los ejecuta por defecto (hub#1353 — medido: 30 binarios,
-# 1 365 tests, 0 fallos, 5m07s). Si están rojos, el push se aborta y no llega a haber PR. El
-# `push` a develop/main se queda: es la red post-merge de hub#572, que el gate no puede dar.
+# pm#655: back on `pull_request`. pm#197 (2026-08-29) moved these e2e to the pre-push gate, and
+# hub 9d91291 (2026-09-03) left that gate at check + fmt + clippy — so from then on they ran
+# nowhere before a merge. Now that the hub runs on GitHub's free machines, the PR is where they
+# belong again: every surface the ADR freezes, plus the scripts this job is made of (a PR that
+# breaks the materialiser or the battery runner must meet this job before it merges, not after).
+PR_PATHS = REQUIRED_PATHS + [
+    "scripts/materialize-published-modules.sh",
+    "scripts/ci/published-module-ids.sh",
+    "scripts/ci/module-hub-batteries.sh",
+    "scripts/ci/module-hub-batteries.txt",
+    "scripts/ci/run-module-hub-batteries.sh",
+    "scripts/ci/kernel-e2e-targets.sh",
+    "scripts/ci/kernel-e2e-targets.txt",
+]
+pr = triggers.get("pull_request")
+check("the workflow runs on `pull_request`", isinstance(pr, dict), f"got {pr!r}")
+pr = pr if isinstance(pr, dict) else {}
+pr_paths = pr.get("paths") or []
+for needed in PR_PATHS:
+    check(f"`pull_request.paths` covers {needed}", needed in pr_paths, f"paths = {pr_paths!r}")
+# `ready_for_review` is what starts the run on a PR born as a draft; without it the PR waits for
+# the next push to get its e2e.
+pr_types = pr.get("types") or []
+for needed in ("opened", "synchronize", "reopened", "ready_for_review"):
+    check(f"`pull_request.types` includes {needed}", needed in pr_types, f"types = {pr_types!r}")
+# Drafts stay out: measured on 2026-08-29, half the runner minutes went on runs the reviewer's
+# re-push cancelled.
+DRAFT_FILTER = "github.event_name != 'pull_request' || !github.event.pull_request.draft"
 check(
-    "el workflow NO corre en `pull_request` (lo corre el gate local)",
-    triggers.get("pull_request") is None,
-    f"got {triggers.get('pull_request')!r}",
+    "the job skips draft PRs",
+    DRAFT_FILTER in str(job.get("if", "")),
+    f"if: {job.get('if')!r}",
 )
 push_paths = (triggers.get("push") or {}).get("paths")
 check(
@@ -335,10 +359,40 @@ check(
     any("--floor 25" in code_of(s) for s in clone),
     "without it, a partial clone silently shrinks coverage instead of failing (hub#1216)",
 )
+# pm#655: the module repos are PUBLIC since 2026-10-08, so the catalogue is cloned over https
+# and the ids come from the org itself. The deploy-key bundle was the id source and had to be
+# kept in step by hand: `attendance` was born without a key and every run died on «the catalogue
+# is INCOMPLETE» for a day and a half, while the archived `invoice_series` was still cloned.
+IDS_SCRIPT = "scripts/ci/published-module-ids.sh"
 check(
-    "the materialiser is asked for the deploy-key bundle (`--keys`)",
-    any("--keys" in code_of(s) for s in clone),
-    "each module needs its own read-only key; the bundle is also the id source (hub#1216)",
+    "no deploy-key bundle is used any more (`--keys`)",
+    not any("--keys" in code_of(s) for s in clone),
+    "the bundle is a list kept by hand; the org is the list (pm#655)",
+)
+check(
+    "no step reads `secrets.MODULES_DEPLOY_KEYS`",
+    "MODULES_DEPLOY_KEYS" not in yaml.safe_dump(job),
+    "a secret that is not there arrives EMPTY on a PR from a fork, and the job goes red for it",
+)
+check(
+    f"the module ids come from `{IDS_SCRIPT}` and are handed over with `--modules`",
+    any(IDS_SCRIPT in code_of(s) and "--modules" in code_of(s) for s in clone),
+    "the org is the source of truth for what is published",
+)
+check(
+    "the catalogue is cloned over https (`--remote-template`)",
+    any("--remote-template" in code_of(s) and "https://github.com/" in code_of(s) for s in clone),
+    "the default template is ssh, which needs a key the runner does not have",
+)
+check(
+    "the clone step carries a token for the org lookup",
+    any("GH_TOKEN" in (s.get("env") or {}) for s in clone),
+    "`gh api graphql` needs a token even for public repos",
+)
+check(
+    f"`{IDS_SCRIPT}` really exists in this checkout",
+    os.path.isfile(os.path.join(os.environ["REPO_ROOT"], IDS_SCRIPT)),
+    "a workflow that calls a script nobody shipped fails at 3am, not at review time",
 )
 # Resolved against the REPO, never against `--workflow`: the whole point of that flag is to run
 # this guard over a mutated COPY living somewhere else.
@@ -661,6 +715,65 @@ if len(runner_alert) == 1:
         "an alert that does not say WHICH battery broke sends the reader back to the log",
     )
 
+
+# ── 7 · On a PR the job is split in parallel parts (pm#655) ──────────────────────────
+# The whole job took 39-44 min on the self-hosted runner: ~11 of `cargo test`, ~28 of batteries.
+# Back on every kernel PR that is the critical path of the merge, so it is cut in a matrix: one
+# part runs the kernel e2e targets, the others run disjoint shards of the batteries
+# (`run-module-hub-batteries.sh --shard k/n`). `fail-fast: false`, or a red shard cancels the
+# others and hides half the verdict.
+strategy = job.get("strategy") or {}
+check(
+    "the matrix does not cancel its siblings (`fail-fast: false`)",
+    strategy.get("fail-fast") is False,
+    f"strategy = {strategy!r}",
+)
+include = ((strategy.get("matrix") or {}).get("include")) or []
+parts = [str(e.get("part")) for e in include if isinstance(e, dict)]
+check("one matrix part runs the kernel e2e targets", parts.count("targets") == 1, f"parts = {parts!r}")
+shards = [str(e.get("shard")) for e in include if isinstance(e, dict) and e.get("part") == "batteries"]
+n_set = {s_.split("/")[-1] for s_ in shards}
+check(
+    "the batteries are split in shards k/n that cover 1..n exactly once",
+    len(shards) >= 2
+    and len(n_set) == 1
+    and sorted(shards) == [f"{k}/{len(shards)}" for k in range(1, len(shards) + 1)],
+    f"shards = {shards!r}",
+)
+tests_step = [s_ for s_ in steps if s_.get("id") == "tests"]
+check(
+    "`cargo test` runs only in the `targets` part",
+    len(tests_step) == 1 and "matrix.part == 'targets'" in str(tests_step[0].get("if", "")),
+    f"if: {tests_step[0].get('if') if tests_step else None!r}",
+)
+battery_parts = [s_ for s_ in steps if s_.get("id") == "run-batteries"] + [
+    s_ for s_ in steps if code_of(s_).strip() == "cargo build -p erplora-server"
+]
+for s_ in battery_parts:
+    check(
+        f"step «{s_.get('name')}» runs only in the `batteries` parts",
+        "matrix.part == 'batteries'" in str(s_.get("if", "")),
+        f"if: {s_.get('if')!r}",
+    )
+for s_ in [s_ for s_ in steps if s_.get("id") == "run-batteries"]:
+    check(
+        "the runner is handed its shard (`--shard`)",
+        "--shard" in code_of(s_) and "matrix.shard" in code_of(s_),
+        "without it every battery part runs the whole worklist",
+    )
+# The pairing alert reads a verdict every part computes: only one of them files it.
+for s_ in [s_ for s_ in steps if s_.get("name", "").startswith("Abrir o refrescar la issue de las baterías")]:
+    check(
+        "the pairing alert is filed by the `targets` part only",
+        "matrix.part == 'targets'" in str(s_.get("if", "")),
+        f"if: {s_.get('if')!r}",
+    )
+# J0 of pm#655: the free machines have ~14 GB of disk, and nobody had measured what is left.
+check(
+    "a step reports the disk left after the build (`df -h`), even on a red run",
+    any("df -h" in code_of(s_) and str(s_.get("if", "")).strip() == "always()" for s_ in steps),
+    "the next disk-full red would be diagnosed blind",
+)
 
 if failures:
     print(f"FAIL: {len(failures)} contract case(s) on {path}", file=sys.stderr)

@@ -253,12 +253,12 @@ printf 'note: the checked-in manifest declares %s kernel e2e target(s)\n' "$real
 #      written for (hub#1369, from the post-merge review of hub#1360). The list can only be
 #      broken by a PR that adds or deletes a kernel e2e, and such a PR need not touch a single
 #      path the caller currently watches.
-#      Until now `test-hub-modules.yml` covered that case with its own `pull_request` trigger on
-#      `crates/runtime/**`, but hub#1362 removes that trigger (the module e2e move to the pre-push
-#      gate) — and the gate resolves its targets with `cargo test --workspace`, never through
-#      `kernel-e2e-targets.sh`. Without this entry, a hub#1264 slice that deletes the `.rs` and
-#      forgets the `.txt` line meets NO guard before merge, and `develop` goes red for the whole
-#      fleet on the push — the very failure hub#1359 abolished.
+#      `test-hub-modules.yml` lost its `pull_request` trigger with hub#1362 and got it back with
+#      pm#655, but that run takes tens of minutes and skips drafts; this guard costs seconds and
+#      answers on every PR. Without this entry, a hub#1264 slice that deletes the `.rs` and
+#      forgets the `.txt` line would only learn it from the long run — or, on a draft, not before
+#      merge at all, and `develop` goes red for the whole fleet on the push — the very failure
+#      hub#1359 abolished.
 SELF='scripts/tests/kernel-e2e-targets.test.sh'
 TESTS_GLOB='crates/runtime/tests/**'
 if [ ! -f "$caller" ]; then
@@ -271,10 +271,10 @@ elif ! grep -qE "^[[:space:]]*- [\"']?${SELF//./\\.}[\"']?[[:space:]]*\$" "$call
 this test would not execute it"
 elif ! grep -qE "^[[:space:]]*- [\"']?crates/runtime/(tests/)?\*\*[\"']?[[:space:]]*\$" "$caller"; then
     fail "hub#1369: ${TESTS_GLOB} is missing from the \`paths:\` filter of $caller — a hub#1264
-slice that deletes a kernel e2e without editing scripts/ci/kernel-e2e-targets.txt would run NO
-guard at pull-request time (hub#1362 takes test-hub-modules.yml out of \`pull_request\`, and the
-pre-push gate runs \`cargo test --workspace\`, which never consults the list). It would merge
-green and turn develop red on the push — the failure hub#1359 abolished"
+slice that deletes a kernel e2e without editing scripts/ci/kernel-e2e-targets.txt would meet no
+fast guard at pull-request time (test-hub-modules.yml skips drafts and takes tens of minutes, and
+the pre-push gate never consults the list). It could merge green and turn develop red on the push
+— the failure hub#1359 abolished"
 fi
 ok
 
