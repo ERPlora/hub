@@ -93,8 +93,8 @@ Pasos:
 3. Ve un formulario con un campo por ajuste, en el orden del esquema de la app. El control sale del tipo: `boolean`, o `integer` con `enum:[0,1]` → interruptor (se guarda como 0/1); cualquier otro `enum` → lista; `integer` o `number` → número; todo lo demás (un `string`, pero también un `array`, un `object` o un tipo anulable como `["integer","null"]`) → caja de texto, vacía con «Escribe aquí…».
 4. Los textos los pone la app en su `locales/<idioma>.json`: el nombre en `settings.fields.<clave>.label` (si no, el `title` del esquema, y si no, la clave «humanizada»), la explicación en `…description`, el título del bloque en `settings.title` (se omite si repite el nombre de la app) y cada opción de una lista en `settings.fields.<clave>.options.<valor>` (si no, el valor crudo).
 5. Cada valor es el guardado; si la app aún no tiene nada guardado (la lectura contesta sin fila), el `default` del esquema; si tampoco, apagado o vacío. Si la lectura FALLA, no se pinta el formulario (hub#2511): ni valores de fábrica ni «Guardar» (ver «Si falla»).
-6. Quien llega aquí sin ser administrador (un responsable con el permiso de guardar) ve los campos sin poder tocarlos y la línea «Solo un administrador puede cambiar estos ajustes.», sin botón «Guardar» (HUB_SHELL-F44).
-7. Si la app trae su propia pantalla de ajustes (`settings.component`), se monta esa en lugar del formulario genérico, sin el candado de administrador: hoy, Control horario (`erp-attendance-settings`). La puerta de la pestaña es la misma del paso 1.
+6. Quien llega aquí puede cambiar los campos y guardarlos (HUB_SHELL-F44): la pestaña y el formulario hacen la misma pregunta, el permiso de la orden de guardar (el dueño y el administrador por su rol; el responsable, en Ventas, Inventario, Cocina y Personal, porque su rol de fábrica lo tiene), hub#2621. Si con la pestaña abierta entra otra persona sin ese permiso (relevo de turno), el formulario se bloquea: los campos sin poder tocarlos, sin «Guardar» y la línea «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
+7. Si la app trae su propia pantalla de ajustes (`settings.component`), se monta esa en lugar del formulario genérico, y lo que deja tocar lo decide esa pantalla: hoy, Control horario (`erp-attendance-settings`). La puerta de la pestaña es la misma del paso 1.
 Entra: el bloque `settings` del `module.json` (esquema, consulta de lectura y orden de guardar), el esquema servido con la app, las traducciones `settings` de su `locales/<idioma>.json` y la consulta de lectura (HUB-F33).
 Sale: nada.
 Si falla: si el esquema o la lectura de valores no cargan (red, hub reiniciándose, 5xx), en lugar del formulario sale «No se pudieron cargar los ajustes.» con «Tus ajustes guardados siguen igual. Comprueba la conexión y vuelve a intentarlo.» y el botón «Reintentar», que vuelve a leer; no hay «Guardar», así que nada se puede guardar encima de lo que no se leyó (hub#2511, mismo patrón que los eventos caídos de Sistema, HUB_SHELL-F145). Si la lectura se rechaza por permiso (`permission_denied` o `requires_elevation`), sale «No puedes ver estos ajustes» con «Pide a un administrador que los revise o los cambie si hace falta.», sin «Reintentar» (reintentar no lo arregla). Como la pestaña solo sale a quien puede guardar, este rechazo solo lo ve quien tiene el permiso de guardar y no el de leer (ninguna app de fábrica lo reparte así). Sin traducción de un campo, su título del esquema (inglés) o el nombre de la columna «humanizado» (`Warning Time Minutes`). Un campo de tipo objeto o lista se pinta como texto y, si se edita, se guarda como cadena y el hub lo rechaza.
@@ -102,11 +102,11 @@ Implicados: CASH_REGISTER-F01, HUB-F33, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: ninguno
 
 ### HUB_SHELL-F44 Guardar los ajustes de una app
-Estado: parcial — la pantalla solo deja guardar al dueño o al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Ventas, Inventario, Cocina y Personal y lo hace por el asistente); y la pantalla no comprueba nada antes de enviar salvo el largo máximo de un texto (ni mínimos, ni máximos, ni patrones, ni obligatorios)
-Actor: administrador
+Estado: parcial — la pantalla no comprueba nada antes de enviar salvo el largo máximo de un texto (ni mínimos, ni máximos, ni patrones, ni obligatorios): lo rechaza el servidor al guardar
+Actor: responsable, administrador
 Pantalla: Vista de un módulo › Ajustes
 Pasos:
-1. El administrador cambia uno o varios campos.
+1. Quien tiene el permiso de la orden de guardar de la app (el mismo que le enseña la pestaña, HUB_SHELL-F43; el dueño y el administrador siempre) cambia uno o varios campos: un responsable lo hace desde la pestaña igual que por el asistente (hub#2621).
 2. Pulsa «Guardar»; el botón se desactiva mientras va.
 3. Si el hub acepta: «Ajustes guardados.».
 4. Si el hub rechaza campos concretos, debajo del formulario sale «No se pudieron guardar los ajustes.» con «Revisa los campos marcados y vuelve a guardar.», y cada campo rechazado lleva «Este valor no se admite.».
@@ -292,7 +292,7 @@ QA: ninguno
 | Estado «necesita un hub más nuevo» en la vista | no hecho (solo al instalar/actualizar en Apps) | HUB_SHELL-F41 |
 | Pestañas y nombres traducidos, sin recargar al cambiar de idioma | hecho | HUB_SHELL-F42 |
 | Ajustes declarativos: ver | parcial (lectura fallida → «No se pudieron cargar» con «Reintentar», hub#2511; la pestaña solo sale a quien puede guardar, hub#2588; pero las listas salen sin traducir, salvo en Cocina) | HUB_SHELL-F43 |
-| Ajustes declarativos: guardar con el mismo permiso que el servidor | parcial (pantalla: solo administrador) | HUB_SHELL-F44 |
+| Ajustes declarativos: guardar con el mismo permiso que el servidor | hecho (hub#2621) | HUB_SHELL-F44 |
 | Ajustes: validación antes de enviar (mínimos, obligatorios) | no hecho (solo el servidor) | HUB_SHELL-F44 |
 | Probar un ajuste sin guardar | parcial (ninguna app lo declara) | HUB_SHELL-F45 |
 | Plan de la app: estado, planes, «tu plan» | parcial (un fallo de erplora.com no se dice) | HUB_SHELL-F46 |
@@ -342,9 +342,10 @@ del hub en el diálogo de aprobación, visibles a quien lo abre.
 
 ## Dudas abiertas
 
-- ¿La pestaña «Ajustes» debe dejar guardar a quien tenga el permiso de la orden (responsable), como
-  el servidor, o el servidor debe exigir administrador? Afecta a SALES-F34, KITCHEN-F26,
-  INVENTORY-F19, CASH_REGISTER-F01.
+Ninguna. (Resuelta en hub#2621: la pestaña «Ajustes» deja guardar a quien tiene el permiso de la
+orden de guardar, como el servidor y el asistente. Es lo que hacen Square, Toast, Clover, Lightspeed,
+Shopify, WooCommerce, Odoo y Business Central: los ajustes se abren por un permiso que se reparte por
+rol, no por ser administrador.)
 
 ## Fuentes contrastadas
 
