@@ -324,20 +324,21 @@ Si falla: dentro de la app instalada no hay respaldo de navegador: si no hay imp
 Implicados: HUB-F190, HUB_APP-F22, HUB_PERIPHERALS-F06, INVENTORY-F25, KITCHEN-F14, KITCHEN-F17, KITCHEN-F20, PRINTING-F09
 QA: qa-hub §8
 
-### HUB_SHELL-F78 Imprimir el vale de anulación al cancelar una ronda ya enviada
-Estado: parcial — con la impresora de red apagada o sin papel el vale no sale y nadie lo sabe, como la comanda (hub#2494); y si la cancelación no la hizo ninguna caja y todas las pantallas están cerradas, no lo encola nadie
+### HUB_SHELL-F78 Imprimir el vale de anulación al cancelar una ronda o anular un plato ya enviados
+Estado: parcial — con la impresora de red apagada o sin papel el vale no sale y nadie lo sabe, como la comanda (hub#2494); y si la cancelación o la anulación no la hizo ninguna caja y todas las pantallas están cerradas, no lo encola nadie
 Vertical: restaurante
 Actor: sistema
 Pantalla: kitchen: Comandas
 Pasos:
 1. Un responsable cancela una ronda en **Cocina → Comandas** (KITCHEN-F22), o se elimina la cuenta que la envió y Cocina cancela sus rondas en marcha (KITCHEN-F28).
-2. La pantalla que canceló lee en Cocina las líneas de esa ronda (siguen ahí, canceladas) y las agrupa como la comanda: una hoja por función de impresora («Cocina», «Barra»); lo que fue solo a pantalla no imprime nada, y una ronda que no salió en papel no saca vale.
+2. La pantalla que canceló lee en Cocina las líneas de esa ronda (siguen ahí, canceladas) y las agrupa como la comanda: una hoja por función de impresora («Cocina», «Barra»); lo que fue solo a pantalla no imprime nada, una ronda que no salió en papel no saca vale, y un plato que el TPV ya había anulado no vuelve a salir (ya tuvo su vale).
 3. Sale una hoja por función, en la misma impresora que sacó la comanda: «ANULADA · Mesa 4» (o «ANULADA» sin etiqueta) donde va la mesa, en doble altura, el número y la ronda, y cada plato con la cantidad en negativo («-2x Croquetas»), con sus suplementos y su nota. Nunca lleva «URGENTE».
 4. Directo si este dispositivo tiene la impresora de esa función; si no, por la cola del hub. Las demás pantallas no imprimen. Una cancelación que no hizo ninguna caja (el asistente, la API, un flujo) la encola cada pantalla abierta y conectada, con la misma clave, así que queda un solo vale.
-Entra: el aviso en vivo de comanda cancelada con la pantalla que la mandó (`kitchen.order.cancelled`, HUB-F60); las líneas y la cabecera de la comanda, de Cocina.
-Sale: una hoja por función, clave `kitchen-void-<pedido>-<función>` (distinta de la de la comanda, para que la cola no la tome por repetida).
-Si falla: nunca bloquea la cancelación. Avisos en la pantalla que canceló: «No se imprimió el vale de anulación de {estación} de {mesa}. Avisa en {estación} de viva voz: esa comanda ya no se prepara.»; «El vale de anulación de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {estación} de viva voz: esa comanda ya no se prepara.». Sin aviso del sistema del dispositivo. Nunca se desvía a la impresora de tiques. Si no se pueden leer las líneas, no sale nada y no se avisa (como la comanda, HUB_SHELL-F72).
-Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN-F22, KITCHEN-F28
+5. Si en el TPV se anula **un plato** ya enviado (KITCHEN-F29) y Cocina lo tacha, la pantalla que lo anuló saca su vale con solo ese plato: «PLATO ANULADO · Mesa 4» (o «PLATO ANULADO» sin etiqueta) y el plato en negativo («-1x Croquetas»), en la impresora de su función, por el mismo camino del paso 4. Un menú anulado entero saca un vale por función con sus platos, no uno por plato; un plato del menú que ya se había servido no entra. Si era el último plato vivo de la ronda, la ronda se cancela y no sale otro vale de ronda encima.
+Entra: el aviso en vivo de comanda cancelada (`kitchen.order.cancelled`) o de plato anulado (`kitchen.item.voided`, con la línea de cocina), con la pantalla que lo pidió (HUB-F60); las líneas y la cabecera de la comanda, de Cocina.
+Sale: una hoja por función, clave `kitchen-void-<pedido>-<función>` para la ronda y `kitchen-void-<pedido>-<línea de venta>-<función>` para un plato (distintas de la de la comanda, para que la cola no las tome por repetidas); un mismo plato no se imprime dos veces aunque el aviso llegue repetido.
+Si falla: nunca bloquea la cancelación ni la anulación. Avisos en la pantalla que canceló: «No se imprimió el vale de anulación de {estación} de {mesa}. Avisa en {estación} de viva voz: esa comanda ya no se prepara.»; «El vale de anulación de {estación} de {mesa} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {estación} de viva voz: esa comanda ya no se prepara.». Para un plato, la misma frase con el plato: «No se imprimió el vale de anulación de {plato} para {estación} de {mesa}. Avisa en {estación} de viva voz: ese plato ya no se prepara.» y su versión «está en espera». Sin aviso del sistema del dispositivo. Nunca se desvía a la impresora de tiques. Si no se pueden leer las líneas, no sale nada y no se avisa (como la comanda, HUB_SHELL-F72).
+Implicados: HUB-F60, HUB-F190, HUB_PERIPHERALS-F06, HUB_PERIPHERALS-F10, KITCHEN-F22, KITCHEN-F28, KITCHEN-F29
 Pendiente de enlazar: printing — PRINTING-F10, la impresora con la función «Cocina» o «Barra» que saca la comanda saca también su vale de anulación
 QA: qa-hub-restaurant §7.13
 
@@ -357,7 +358,7 @@ QA: qa-hub-restaurant §7.13
 | Confirmación de papel real | no hecho (se confirma al encolar en el dispositivo) | HUB_SHELL-F74 |
 | Reintento de un trabajo que falló | parcial (vuelve a la cola sin despertar a nadie) | HUB_SHELL-F74 |
 | Comanda de un pedido sin caja con todas las pantallas cerradas | no hecho (no sale ni avisa) | HUB_SHELL-F72 |
-| Vale de anulación en la impresora de la comanda al cancelar la ronda | parcial (impresora apagada mudo, hub#2494) | HUB_SHELL-F78 |
+| Vale de anulación en la impresora de la comanda al cancelar la ronda o anular un plato | parcial (impresora apagada mudo, hub#2494) | HUB_SHELL-F78 |
 | Cobertura por función visible | parcial (recalcula el estado; puede mentir) | HUB_SHELL-F75 |
 | Hora de la venta y nombre de quien atiende en el tique | no hecho | HUB_SHELL-F76 |
 | A4 con diálogo del sistema / navegador | hecho | HUB_SHELL-F77 |
