@@ -942,7 +942,7 @@ export default {
     updateUpToDate: '{name} ya está en la última versión.',
     updateError: 'No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.',
     // hub#2556: the new version's download ran out of time; the app stayed on the one it had.
-    updateTimedOut: 'erplora.com no ha contestado a tiempo, así que {name} no se ha actualizado. Sigue funcionando con la versión que tenía. Inténtalo en unos minutos.',
+    updateTimedOut: 'ERPlora no ha contestado a tiempo, así que {name} no se ha actualizado. Sigue funcionando con la versión que tenía. Inténtalo en unos minutos.',
     updateBlocked: 'La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.',
     updateAllOffer: '{n} app tiene una versión nueva. | {n} apps tienen una versión nueva.',
     updateAllAction: 'Actualizar todas',
