@@ -150,10 +150,17 @@ fn admits<R: Runtime>(invoke: &Invoke<R>) -> bool {
         return true;
     }
     let webview = invoke.message.webview_ref();
-    let Some(link) = webview.try_state::<HubLink>() else {
-        return false;
-    };
-    webview.url().is_ok_and(|page| link.drives(&page))
+    let link = webview.try_state::<HubLink>();
+    drives_from(link.as_deref(), webview.url().ok().as_ref())
+}
+
+/// The page drives the device only when both are known: the link state, and the page the window
+/// shows. Missing either one, nothing does.
+fn drives_from(link: Option<&HubLink>, page: Option<&Url>) -> bool {
+    match (link, page) {
+        (Some(link), Some(page)) => link.drives(page),
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -216,6 +223,14 @@ mod tests {
         link.forget();
         assert_eq!(link.linked(), None);
         assert!(!link.drives(&url("https://panaderia.a.erplora.com/")));
+    }
+
+    #[test]
+    fn a_page_whose_address_cannot_be_read_drives_nothing() {
+        let link = linked_to_the_hub();
+        assert!(!drives_from(Some(&link), None));
+        assert!(!drives_from(None, Some(&url(HUB))));
+        assert!(drives_from(Some(&link), Some(&url(HUB))));
     }
 
     #[test]
