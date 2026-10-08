@@ -1,0 +1,39 @@
+{
+  "id": "w2612d",
+  "name": "W2612 dangling anchor",
+  "version": "1.0.0",
+  "permissions": [
+    "w2612d.hold.manage"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "navigation": [],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "commands": {
+    "w2612d.holds.expire": {
+      "permission": "w2612d.hold.manage",
+      "transaction": true,
+      "sql": [
+        "commands/holds_expire.sql"
+      ],
+      "emit": [
+        {
+          "event": "w2612d.hold.released",
+          "when_rows": "commands/no_such_statement.sql"
+        }
+      ]
+    }
+  },
+  "events": {
+    "emits": [
+      "w2612d.hold.released"
+    ]
+  }
+}
