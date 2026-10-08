@@ -806,6 +806,13 @@ export default {
     comandaNoticeFor: 'Nueva comanda · {label}',
     comandaNoticeLines: '{n} línea | {n} líneas',
     comandaDefaultLabel: 'sala',
+    // kitchen#168 — the VOID slip of a cancelled round.
+    voidLabel: 'ANULADA · {label}',
+    voidLabelBare: 'ANULADA',
+    voidFailed:
+      'No se imprimió el vale de anulación de {station} de {label}. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
+    voidWaitingForPrinter:
+      'El vale de anulación de {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
   },
   // hub#2168 — system notices for a booking or cancellation that did NOT come from a till.
   appointmentNotice: {
@@ -1925,7 +1932,7 @@ export default {
     install_cloud_timeout:
       'ERPlora no ha contestado a tiempo, así que la app no se ha instalado. Inténtalo en unos minutos.',
     update_version_not_offered:
-      'Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, o es anterior a la que tienes. No ha cambiado nada.',
+      'Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, es anterior a la que tienes o se ha retirado por un fallo. No ha cambiado nada.',
     core_version_too_old: 'Esta app necesita un hub más nuevo: actualiza el hub e inténtalo de nuevo.',
     cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
     cloud_unreadable: 'ERPlora ha contestado algo que este hub no ha podido leer. Inténtalo en unos minutos.',

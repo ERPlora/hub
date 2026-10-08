@@ -69,7 +69,7 @@ Actor: administrador, responsable, empleado
 Pantalla: Franja «Todavía no puedes facturar»
 Pasos:
 1. Mientras falte algo sin lo que el hub rechazaría un tique o una factura —los datos del negocio (razón social y NIF) siempre y, fuera del entorno de pruebas (también mientras el perfil fiscal no está resuelto) y sin vía hasta la AEAT, el paso de la app que pide el certificado (VeriFactu)—, en todas las pantallas con menú sale bajo la barra la franja roja «Todavía no puedes facturar» — «No se podrá emitir ningún ticket ni factura hasta que configures esto:».
-2. Debajo, una línea por cosa que falta, cada una con su «Configurar» (o, si no te toca, «Esto lo tiene que configurar un administrador.»).
+2. Debajo, una línea por cosa que falta, cada una con su «Configurar» (o, si no te toca, «Esto lo tiene que configurar un administrador.»). En un móvil esa frase va debajo del nombre de lo que falta, alineada con él, y se parte en líneas en vez de salirse de la pantalla.
 3. En un móvil apaisado la franja se pliega a una línea con «Ver qué falta» / «Ocultar».
 4. La franja no se puede cerrar: desaparece sola cuando ya no falta nada. En la pestaña «Resumen» de **Inicio** no sale, porque la lista entera ya está a la vista.
 Entra: el contador de pasos que bloquean y esos pasos, de la misma lista de HUB_SHELL-F27.

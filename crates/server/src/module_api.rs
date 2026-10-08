@@ -226,10 +226,27 @@ pub(crate) async fn update_module(
     // or typing it into the request walks around the support pin and goes backwards. Checked here,
     // at the administrator's door, and not in `resolve_update_target`: the rollback below and the
     // reconcile between copies (HUB-F26) pass explicit versions that are not anyone's choice.
+    // hub#2596: the rule includes what erplora.com publishes — it leaves a quarantined version out
+    // of `versions/`. It is asked only when the hub's own rule lets the version through and the
+    // answer can change it (no pin, a real move), with the runtime released, like the version list
+    // (hub#2508): a pin or a step back is still refused without a call. A list that cannot be read
+    // is «I don't know», and then the plan and the download decide.
     let explicit = requested.trim();
     if !matches!(explicit, "" | "latest") {
+        use erplora_runtime::module_update::may_request;
         let pinned = install::support_pin(&*st.runtime.read().await, &module_id).await;
-        if !erplora_runtime::module_update::may_request(&installed, pinned.as_deref(), explicit) {
+        let mut allowed = may_request(&installed, pinned.as_deref(), explicit, None);
+        if allowed && pinned.is_none() && explicit != installed {
+            let published = install::listed_versions(
+                &st.marketplace_http,
+                &st.config.cloud_base_url,
+                &auth,
+                &module_id,
+            )
+            .await;
+            allowed = may_request(&installed, None, explicit, published.as_deref());
+        }
+        if !allowed {
             return install_error_response(&install::InstallError::VersionNotOffered {
                 module_id,
                 version: explicit.to_string(),

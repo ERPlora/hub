@@ -913,6 +913,15 @@ export default {
     // A docket with no label of its own: takeaway, or a hub with no table plan. It still has to be
     // named in the warning, or the sentence reads «the order for ()».
     comandaDefaultLabel: 'the floor',
+    // kitchen#168: the VOID slip of a cancelled round. The word goes where the floor label goes on
+    // the comanda (double height), so keep it short: «VOID · Table 4» fits a 58 mm roll wide.
+    voidLabel: 'VOID · {label}',
+    voidLabelBare: 'VOID',
+    // The slip did not come out: the card has already left the kitchen screen, so the way out is a voice.
+    voidFailed:
+      'The {station} void slip for {label} did not print. Tell the {station} out loud: that order is no longer to be made.',
+    voidWaitingForPrinter:
+      'The {station} void slip for {label} is waiting: no printer is set up for that station yet. Tell the {station} out loud: that order is no longer to be made.',
   },
   // The system notices for a booking or a cancellation that did NOT come from a till (hub#2168):
   // a salon's twin of the kitchen order's notice above. `createdFor`/`cancelledFor` name the
@@ -2244,10 +2253,11 @@ export default {
     // hub#2251 — erplora.com took the call and then went silent: the hub gave up waiting.
     install_cloud_timeout:
       'erplora.com did not answer in time, so the app was not installed. Try again in a few minutes.',
-    // hub#2546 — the version asked for is not one this app can move to here: support has fixed its
-    // version on this hub, or it is older than the one installed. Nothing changed.
+    // hub#2546 · hub#2596 — the version asked for is not one this app can move to here: support has
+    // fixed its version on this hub, it is older than the one installed, or support marked it broken
+    // (quarantine). Nothing changed.
     update_version_not_offered:
-      'This app cannot be moved to that version: support has fixed the version it runs, or it is older than the one you have. Nothing has changed.',
+      'This app cannot be moved to that version: support has fixed the version it runs, it is older than the one you have, or it has been withdrawn because of a fault. Nothing has changed.',
     // hub#1620 — the app needs a newer hub than this one. The hub refuses on purpose (the app would
     // not run whole); the owner can act on it by updating the hub. The line that names both versions
     // lives in `runtimeErrorFacts`: this catalogue is read with the bare code, so it needs no data.

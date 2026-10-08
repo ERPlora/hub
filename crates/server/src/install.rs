@@ -1021,11 +1021,24 @@ pub async fn available_versions(
     auth: &Auth,
     module_id: &str,
 ) -> Vec<erplora_runtime::module_update::Available> {
-    as_available(
-        &versions_as_published(http, cloud_base_url, auth, module_id)
-            .await
-            .unwrap_or_default(),
-    )
+    listed_versions(http, cloud_base_url, auth, module_id)
+        .await
+        .unwrap_or_default()
+}
+
+/// What the marketplace's `versions/` lists for this hub, or `None` when it could not be read — the
+/// same «I don't know» as [`available_versions`], kept apart for the caller that has to tell «not
+/// listed» from «could not ask» (the explicit version of an update, hub#2596). A 404 is an answer:
+/// nothing listed.
+pub async fn listed_versions(
+    http: &reqwest::Client,
+    cloud_base_url: &str,
+    auth: &Auth,
+    module_id: &str,
+) -> Option<Vec<erplora_runtime::module_update::Available>> {
+    versions_as_published(http, cloud_base_url, auth, module_id)
+        .await
+        .map(|published| as_available(&published))
 }
 
 /// What the resolver needs from each published version.

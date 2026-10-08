@@ -376,7 +376,7 @@ function priorityFor(header: Record<string, unknown> | undefined): string {
   return str(header?.priority) === 'rush' ? 'HIGH' : '';
 }
 
-function orderIdOf(payload: unknown): string | undefined {
+export function orderIdOf(payload: unknown): string | undefined {
   if (payload && typeof payload === 'object') {
     const p = payload as Record<string, unknown>;
     const id = p.order_id ?? p.id;
