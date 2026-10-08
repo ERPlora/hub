@@ -238,11 +238,14 @@ async fn the_row(db: &PgAdapter) -> Row {
     }
 }
 
-/// What the clock would do once the wait is over: the row is due again.
+/// What the clock would do once the wait is over: the row is due again. Only `next_attempt_at`
+/// moves — the relay's own lease (`claim_expires_at`, 5 min) is NOT cleared here, because clearing
+/// it is the relay's job when it parks the row: a lease left in place would hide the row for the
+/// whole 5 min and the «wait what erplora.com asked» (30 s) would silently become five minutes.
 async fn make_due_again(db: &PgAdapter) {
     db.execute_batch(
-        "UPDATE _event_outbox SET next_attempt_at = '2000-01-01T00:00:00+00:00', \
-         claim_expires_at = NULL WHERE status = 'pending';",
+        "UPDATE _event_outbox SET next_attempt_at = '2000-01-01T00:00:00+00:00' \
+         WHERE status = 'pending';",
     )
     .await
     .unwrap();
