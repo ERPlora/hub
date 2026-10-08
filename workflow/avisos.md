@@ -221,7 +221,7 @@ Implicados: KITCHEN-F05, HUB_APP-F24, HUB_APP-F26, HUB_SHELL-F35, HUB_SHELL-F65,
 QA: qa-hub-restaurant §7.08
 
 ### HUB-F61 Mandar el email o el WhatsApp que pide un módulo o una automatización
-Estado: parcial — un mensaje aún puede salir dos veces si falla algo entre el envío y la marca de «enviado»: el hub ya manda en cada intento la misma clave de no repetición, pero erplora.com todavía no la reconoce (saas#2633)
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -233,7 +233,7 @@ Pasos:
 Entra: el aviso de mensaje (`*.reminder.due`): canal, destinatario, plantilla y variables.
 Sale: la petición a erplora.com con la cabecera `Idempotency-Key` (el `event_id` del aviso), el mensaje entregado al proveedor y la marca de envío con el identificador del proveedor, la automatización y su paso. Un archivo de cabecera subido al hub se firma en cada intento para que WhatsApp lo pueda descargar.
 En este mismo documento se apoya en: HUB-F266 (Mandar un WhatsApp desde el hub), HUB-F272 (Reflejar en el hub el cupo y el consumo de WhatsApp del mes).
-Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402, o 429 con `quota_exceeded`) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); cualquier otro 429 es el freno de tasa de ERPlora: el aviso espera lo que pide `Retry-After` (de 1 s a 1 h; 1 min si no lo dice) y sale solo, sin gastar intentos de la escalera ni caer a «Eventos caídos» (hub#2649), salvo que en el mismo intento falle además otra cosa; el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, el hub se cae esperándola, ERPlora contesta un error después de entregarlo o falla apuntar la marca, el reintento lo vuelve a pedir con la misma clave: un erplora.com que la reconoce contesta lo de la primera vez sin mandarlo otra vez (hub#2648); mientras no la reconozca (saas#2633), el cliente puede recibir el mismo WhatsApp o correo dos veces. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
+Si falla: un fallo de red o del proveedor, o cualquier rechazo de ERPlora que no sea de cuota (número sin WhatsApp, plantilla rechazada), sigue la escalera de HUB-F52; solo la cuota agotada (402, o 429 con `quota_exceeded`) y el permiso del módulo sin conceder van directos a «Eventos caídos» (HUB-F53); cualquier otro 429 es el freno de tasa de ERPlora: el aviso espera lo que pide `Retry-After` (de 1 s a 1 h; 1 min si no lo dice) y sale solo, sin gastar intentos de la escalera ni caer a «Eventos caídos» (hub#2649), salvo que en el mismo intento falle además otra cosa; el permiso retirado de una automatización lo cierra para siempre sin destinatario. Un destinatario mal escrito (un correo sin dominio, un teléfono que no es internacional `+34…`), dos destinatarios en uno, uno que no es del hub, un canal no declarado o el SMS (sin transporte) se rechazan en cada intento y, tras los 8 (unos 4 min), acaban en «Eventos caídos». Sin enlace con ERPlora (token de máquina) no sale nada y se reintenta. Si la respuesta de ERPlora se pierde después de enviar, el hub se cae esperándola, ERPlora contesta un error después de entregarlo o falla apuntar la marca, el reintento lo vuelve a pedir con la misma clave y erplora.com la reconoce en las dos puertas, WhatsApp y correo: contesta lo de la primera vez sin mandarlo otra vez (hub#2648, saas#2633, saas#2651); si el primer envío sigue en curso contesta 409 y el aviso sigue la escalera. Solo si la petición que tenía la clave murió en erplora.com a medias (más de 2 min sin respuesta) puede salir dos veces: desde allí no se sabe si llegó al proveedor. Que el mensaje llegue al cliente no se comprueba: la marca dice «entregado al proveedor».
 Implicados: FLOWS-F15, SAAS-F05, SAAS-F06, SAAS_WHATSAPP_INBOX-F12, SAAS_WHATSAPP_INBOX-F13
 QA: qa-hub-flows R7
 
@@ -288,7 +288,7 @@ QA: ninguno
 | Elemento | Estado | Flujo |
 |---|---|---|
 | Guardar el aviso con la orden, sin perderlo en un reinicio | hecho | HUB-F50 |
-| Entrega al menos una vez, sin repetir por receptor | hecho para los módulos; un correo o WhatsApp lleva su clave de no repetición en cada intento, y puede salir dos veces hasta que erplora.com la reconozca (saas#2633) | HUB-F51, HUB-F61 |
+| Entrega al menos una vez, sin repetir por receptor | hecho para los módulos; un correo o WhatsApp lleva su clave de no repetición en cada intento y erplora.com la reconoce en las dos puertas (saas#2633, saas#2651) | HUB-F51, HUB-F61 |
 | Reintentos con espera creciente y número máximo | hecho (8, ~4 min, fijo; no configurable) | HUB-F52 |
 | Negativas que no merece la pena reintentar, al momento | hecho | HUB-F53 |
 | Cola de errores visible con el motivo | parcial: 100 más recientes, sin paginar | HUB-F54 |

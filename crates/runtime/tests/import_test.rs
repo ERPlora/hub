@@ -35,6 +35,14 @@ fn modules_root() -> PathBuf {
     erplora_runtime::e2e_support::modules_root()
 }
 
+/// The RETIRED `invoice_series` module (invoice_series#20, ADR-0369), frozen as a kernel fixture
+/// with only what these tests use. Its repo is archived and private, so the published catalogue the
+/// CI materialises no longer brings it (pm#655) — but hubs that still have it installed keep its
+/// tables, and the kernel still treats them by name (`export::TEMPLATE_EXCLUDED_TABLES`).
+fn invoice_series_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/invoice_series")
+}
+
 fn ctx(hub: &str) -> RequestContext {
     RequestContext::new(hub, "u1", ["*".to_string()])
 }
@@ -1015,7 +1023,7 @@ async fn una_fila_con_la_misma_clave_natural_que_el_destino_no_rompe_la_seccion(
 async fn fresh_series(hub: &str) -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub);
-    rt.install_from_dir(&modules_root().join("invoice_series"))
+    rt.install_from_dir(&invoice_series_fixture())
         .await
         .expect("instalar invoice_series");
     rt
