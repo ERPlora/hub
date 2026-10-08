@@ -74,6 +74,7 @@ import { createEnqueuePrintJob } from './lib/print-enqueue';
 import { loadModuleElement, loadSlotComponents } from './lib/module-loader';
 import { preloadTeleportedStyles } from './lib/teleported-styles';
 import { bootTheme } from './lib/theme';
+import { forgetTrustedUserEmails } from './lib/trusted-users';
 import { bootPwa } from './lib/pwa';
 import { makeHubProbe, startHubWatch } from './lib/offline';
 import { bootModuleNavLocale } from './lib/nav';
@@ -173,6 +174,11 @@ import './theme/global.css';
 
 // Aplica el modo de tema guardado (claro/oscuro/system) antes del primer render.
 bootTheme();
+
+// hub#2536: the PIN grid used to keep each face's e-mail in this browser, where any passer-by at a
+// shared till could read it. Forget what an older version stored, on every device and before the
+// first render (a till that keeps its session never opens Acceso to rewrite the list).
+forgetTrustedUserEmails();
 
 // Module names are localized BY THE RUNTIME and travel baked into the navigation (ADR-0055), so it
 // has to be ASKED FOR AGAIN when the language changes: the personal preference arrives after the

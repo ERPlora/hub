@@ -1,0 +1,145 @@
+{
+  "id": "invoice_series",
+  "name": "Invoice Series",
+  "version": "1.0.11",
+  "description": "Kernel test fixture: the data shape of the RETIRED invoice_series module (1.0.11, archived repo), kept so the export/import e2e can keep proving how the kernel treats its tables while hubs still have them.",
+  "depends_on": [],
+  "permissions": [
+    "invoice_series.view_series",
+    "invoice_series.manage_series",
+    "invoice_series.next_number"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "invoice_series.view_series",
+      "invoice_series.manage_series",
+      "invoice_series.next_number"
+    ],
+    "employee": [
+      "invoice_series.view_series",
+      "invoice_series.next_number"
+    ]
+  },
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql",
+      "migrations/postgres/002_validity_check.sql"
+    ]
+  },
+  "queries": {
+    "invoice_series.series.list": {
+      "permission": "invoice_series.view_series",
+      "sql": "queries/series_list.sql",
+      "list": {
+        "search": [
+          "code",
+          "name",
+          "country_code",
+          "region_code"
+        ],
+        "sort": [
+          "id",
+          "code",
+          "name",
+          "document_type",
+          "prefix",
+          "suffix",
+          "format",
+          "country_code",
+          "region_code",
+          "fiscal_year",
+          "current_sequence",
+          "is_default",
+          "is_active",
+          "start_date",
+          "end_date",
+          "created_at"
+        ],
+        "default_sort": "created_at",
+        "default_dir": "desc",
+        "filters": {
+          "code": {
+            "op": "eq"
+          },
+          "name": {
+            "op": "like"
+          },
+          "document_type": {
+            "op": "eq"
+          },
+          "prefix": {
+            "op": "eq"
+          },
+          "suffix": {
+            "op": "eq"
+          },
+          "format": {
+            "op": "eq"
+          },
+          "country_code": {
+            "op": "eq"
+          },
+          "region_code": {
+            "op": "eq"
+          },
+          "fiscal_year": {
+            "op": "eq"
+          },
+          "current_sequence": {
+            "op": "eq"
+          },
+          "is_default": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          },
+          "start_date": {
+            "op": "range"
+          },
+          "end_date": {
+            "op": "range"
+          },
+          "created_at": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists all configured invoice numbering series."
+      }
+    }
+  },
+  "commands": {
+    "invoice_series.series.create": {
+      "permission": "invoice_series.manage_series",
+      "transaction": true,
+      "sql": [
+        "commands/series_create.sql"
+      ],
+      "schema": "schemas/series_create.json",
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "invoice_series.series_create_rejected",
+        "message": "The series could not be created."
+      },
+      "emit": [
+        "invoice_series.series.created"
+      ],
+      "ai": {
+        "description": "Creates a new invoice series with its prefix and initial number."
+      }
+    }
+  },
+  "events": {
+    "listen": {},
+    "emits": [
+      "invoice_series.series.created"
+    ]
+  }
+}

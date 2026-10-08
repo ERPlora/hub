@@ -16,7 +16,7 @@ use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
     AiOutputKind, AiPolicy, ErrorPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind,
     DEFAULT_APPROVAL_TTL_SECONDS, DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS,
-    MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_OPTION_ROWS, MAX_QUERY_ROWS, MAX_WAIT_HOOKS,
+    MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_OPTION_ROWS, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, PATH_ROOTS,
     SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::{
@@ -799,4 +799,17 @@ fn the_step_guard_is_declared_on_both_sides() {
     assert!(parse("command", serde_json::json!({ "command": "crm.note.add" })).is_ok());
     assert!(parse("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_ok());
     assert!(parse("condition", serde_json::json!({ "when": {} })).is_err());
+}
+
+/// **The roots of the mapping language** (hub#2675) are declared as a closed list, the one the
+/// runtime accepts at save time: the editor reads it to know whether THIS hub resolves
+/// `{{run.idempotency_key}}` before offering it, because a hub without that root refuses to save a
+/// flow that uses it (`flow.invalid_definition`). A root the runtime gained without the schema
+/// naming it would be an insert the editor can never offer.
+#[test]
+fn the_roots_of_the_mapping_language_are_the_same_on_both_sides() {
+    let declared = enum_at(&schema(), "/$defs/path_root");
+    let runtime: BTreeSet<String> = PATH_ROOTS.iter().map(|r| r.to_string()).collect();
+    assert_eq!(declared, runtime);
+    assert!(declared.contains("run"), "{declared:?}");
 }

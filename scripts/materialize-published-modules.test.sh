@@ -17,6 +17,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
+# Hermetic git (pm#655): the fixtures must not lean on the developer's global config. A laptop with
+# `init.defaultBranch=main` hid that the bare origins were born on `master`; on a clean
+# `ubuntu-latest` runner the clones came out empty and all 21 cases went red.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+
 SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/materialize-published-modules.sh"
 pass=0
 fail=0
@@ -46,7 +51,7 @@ make_catalogue() {           # $1 = how many modules
         echo published > "$work/marker"
         git -C "$work" add module.json marker
         git -C "$work" commit -qm published
-        git init -q --bare "$origin"
+        git init -q --bare -b main "$origin"
         git -C "$work" remote add origin "$origin"
         git -C "$work" push -q origin main
         # …and the PARKED local checkout, on a branch that is NOT main.
@@ -519,7 +524,7 @@ echo '[workspace]' > "$hub_work/Cargo.toml"
 echo 'ARQUITECTURA' > "$hub_work/ARQUITECTURA.md"
 git -C "$hub_work" add -A
 git -C "$hub_work" commit -qm hub
-git init -q --bare "$base/origins/hub.git"
+git init -q --bare -b main "$base/origins/hub.git"
 git -C "$hub_work" remote add origin "$base/origins/hub.git"
 git -C "$hub_work" push -q origin main
 # …and the checkout the push comes from, whose git dir the hook inherits.
@@ -595,7 +600,7 @@ for i in 1 2; do
     echo 'ARQUITECTURA' > "$evil/ARQUITECTURA.md"
     git -C "$evil" add -A
     git -C "$evil" commit -qm hub
-    git init -q --bare "$base/evil/$id.git"
+    git init -q --bare -b main "$base/evil/$id.git"
     git -C "$evil" remote add origin "$base/evil/$id.git"
     git -C "$evil" push -q origin main
 done
@@ -649,7 +654,7 @@ git -C "$hub_work" config user.name hub
 echo 'ARQUITECTURA' > "$hub_work/ARQUITECTURA.md"
 git -C "$hub_work" add -A
 git -C "$hub_work" commit -qm hub
-git init -q --bare "$base/origins/hub.git"
+git init -q --bare -b main "$base/origins/hub.git"
 git -C "$hub_work" remote add origin "$base/origins/hub.git"
 git -C "$hub_work" push -q origin main
 git clone -q "$base/origins/hub.git" "$base/hubcheckout"

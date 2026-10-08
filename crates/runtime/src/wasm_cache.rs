@@ -168,3 +168,25 @@ pub fn warm_up(
     }
     warmed
 }
+
+/// The marker that starts the line [`warm_up_report`] returns (hub#2693).
+///
+/// `/readyz` answers UP before the warm-up is over — on purpose, see [`warm_up`]. Whoever needs a
+/// WARM hub (the CI module batteries, `scripts/ci/run-module-hub-batteries.sh`) waits for this
+/// line in the server log; `scripts/tests/run-module-hub-batteries.test.sh` fails if the two drift.
+pub const WARM_UP_DONE: &str = "wasm: warm-up done";
+
+/// Runs [`warm_up`] and returns the line that announces its end:
+/// `wasm: warm-up done: <compiled>/<handlers> handler module(s)`. Always returned — with nothing
+/// to compile or with a broken handler too — so a waiter never sits until its timeout.
+pub fn warm_up_report(
+    cache: &WasmCache,
+    modules: &[(String, String, Option<Vec<u8>>)],
+    limits: WasmLimits,
+) -> String {
+    let warmed = warm_up(cache, modules, limits);
+    format!(
+        "{WARM_UP_DONE}: {warmed}/{} handler module(s)",
+        modules.len()
+    )
+}

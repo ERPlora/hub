@@ -327,3 +327,71 @@ fn los_handlers_a_precalentar_van_uno_por_modulo() {
     );
     assert!(a_calentar.iter().all(|(_, _, w)| w.is_some()));
 }
+
+/// The line the boot warm-up prints when it is over (hub#2693).
+///
+/// `/readyz` says UP BEFORE the handlers are compiled — on purpose (hub#926): in production
+/// nobody waits for the warm-up. But whoever needs a WARM hub (the CI that runs the module
+/// batteries against a real server, `scripts/ci/run-module-hub-batteries.sh`) has nothing else
+/// to wait for: on a fresh runner the first sale raced Cranelift and `cash_register`'s battery
+/// timed out in 2 of 3 runs. So the end of the warm-up is announced with a fixed, greppable line —
+/// also when there was nothing to compile, or the waiter would sit until its timeout.
+#[test]
+fn the_warm_up_announces_its_end_with_a_fixed_line() {
+    use erplora_runtime::wasm_cache::{warm_up_report, WARM_UP_DONE};
+
+    let cache = WasmCache::default();
+    let line = warm_up_report(
+        &cache,
+        &[
+            modulo("sales", "2.14.1", true),
+            modulo("invoice", "1.2.0", true),
+        ],
+        WasmLimits::default(),
+    );
+    assert!(
+        line.starts_with(WARM_UP_DONE),
+        "the line starts with the marker: {line}"
+    );
+    assert!(line.contains("2/2"), "and says how many compiled: {line}");
+    assert_eq!(
+        cache.len(),
+        2,
+        "the report IS the warm-up, not a description of it"
+    );
+}
+
+#[test]
+fn the_warm_up_announces_its_end_even_with_nothing_to_compile() {
+    use erplora_runtime::wasm_cache::{warm_up_report, WARM_UP_DONE};
+
+    let line = warm_up_report(&WasmCache::default(), &[], WasmLimits::default());
+    assert!(
+        line.starts_with(WARM_UP_DONE),
+        "a hub without handlers is warm too: {line}"
+    );
+    assert!(line.contains("0/0"), "{line}");
+}
+
+#[test]
+fn a_broken_handler_still_ends_the_warm_up() {
+    use erplora_runtime::wasm_cache::{warm_up_report, WARM_UP_DONE};
+
+    let line = warm_up_report(
+        &WasmCache::default(),
+        &[
+            (
+                "broken".to_string(),
+                "1.0.0".to_string(),
+                Some(vec![0u8, 1, 2, 3]),
+            ),
+            modulo("sales", "2.14.1", true),
+        ],
+        WasmLimits::default(),
+    );
+    assert!(line.starts_with(WARM_UP_DONE), "{line}");
+    assert!(
+        line.contains("1/2"),
+        "only the one that compiled counts: {line}"
+    );
+}

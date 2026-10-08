@@ -71,6 +71,8 @@ on:
       # esperar a los 45 min del job de módulos: una PR que solo toque el corredor se entera aquí.
       - 'scripts/ci/run-module-hub-batteries.sh'
       - 'scripts/tests/run-module-hub-batteries.test.sh'
+      - 'scripts/ci/published-module-ids.sh'
+      - 'scripts/tests/published-module-ids.test.sh'
       # El cerrojo entre las dos listas (hub#1995): una PR que borra un e2e del kernel no puede
       # dejar su relevo «pendiente de publicar». Sus SUJETOS son las dos listas de arriba; estas
       # rutas son para el cerrojo y su test, que no dispararían nada por su cuenta.
@@ -323,6 +325,15 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/run-module-hub-batteries.test.sh
+
+      # ── De dónde sale la lista de módulos publicados (pm#655) ─────────────────────────
+      # `test-hub-modules.yml` clona los módulos que dice la org (repos públicos, no archivados,
+      # con `module.json` en `main`), no un paquete de claves mantenido a mano. El test usa un
+      # `gh` falso: no gasta API y caza un filtro que se pierda (privados, archivados, lista vacía).
+      - name: Lista de módulos publicados (pm#655)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/published-module-ids.test.sh
 
       # ── Y el cerrojo entre las dos listas (hub#1995) ──────────────────────────────────
       # La marca `# pending-publication:` (kitchen#84) sirve para baterías NUEVAS. Si la misma PR

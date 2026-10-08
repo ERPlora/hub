@@ -176,24 +176,43 @@ dead=$(sort -u "$tmp/dead")
 # exactamente `steps.scope.outputs.rust != 'false'` — solo un «no» explicito la salta; una salida
 # ausente (paso fallido, referencia colgante) evalua a cadena vacia y la suite CORRE.
 echo "hub#1463: la suite del workspace solo se omite con un rust=false explicito, nunca en silencio"
+# Desde hub#1522 la suite son 6 jobs (matriz de nextest) y la puerta del alcance sube al JOB:
+# `needs: scope` + `if:` con `needs.scope.outputs.rust != 'false'`. La forma segura es la misma —
+# solo un «no» explicito salta; una salida ausente evalua a cadena vacia y la suite CORRE—, ahora
+# en el `if:` del job que ejecuta la suite. Dentro de el, el unico `if:` admitido en un paso de
+# cargo es el de los doc-tests (`matrix.part == 1`: 4 tests, una sola particion los paga).
 python3 - "$wf" > "$tmp/gated" <<'PYEOF'
 import sys
 
 import yaml
 
+SAFE = "needs.scope.outputs.rust != 'false'"
 doc = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
-for job in (doc.get("jobs") or {}).values():
-    for step in (job.get("steps") or []):
-        if "cargo test" not in (step.get("run") or ""):
-            continue
-        cond = str(step.get("if") or "").strip()
-        if cond and cond != "steps.scope.outputs.rust != 'false'":
-            print("%s -> if: %s" % (step.get("name", "?"), cond))
+suite_jobs = 0
+for jid, job in (doc.get("jobs") or {}).items():
+    steps = job.get("steps") or []
+    runs_suite = [s for s in steps
+                  if "cargo test" in (s.get("run") or "") or "cargo nextest run" in (s.get("run") or "")]
+    if not runs_suite:
+        continue
+    suite_jobs += 1
+    needs = job.get("needs") or []
+    needs = [needs] if isinstance(needs, str) else needs
+    cond = str(job.get("if") or "")
+    if "scope" not in needs or SAFE not in cond or "== 'true'" in cond:
+        print("job %s -> needs: %s, if: %s" % (jid, needs, cond))
+    for step in runs_suite:
+        scond = str(step.get("if") or "").replace(" ", "")
+        doc_only = "--doc" in (step.get("run") or "") and scond == "matrix.part==1"
+        if scond and not doc_only:
+            print("%s -> if: %s" % (step.get("name", "?"), step.get("if")))
+if suite_jobs == 0:
+    print("ningun job ejecuta la suite: este guardia no comprobaria nada")
 PYEOF
 [ $? -eq 0 ] || bad "the guard itself could not run (python3 with PyYAML is required)"
 gated=$(cat "$tmp/gated")
-[ -z "$gated" ] && ok "cargo test solo lleva la condicion segura (rust != 'false')" \
-    || bad "un cargo test puede saltarse en silencio" "$gated"
+[ -z "$gated" ] && ok "el job de la suite solo se salta con un rust=false explicito (needs.scope.outputs.rust != 'false')" \
+    || bad "la suite puede saltarse en silencio" "$gated"
 
 echo "hub#1463: nadie lee una salida del paso borrado"
 # Una referencia colgante a steps.<id>.outputs.* NO es un error en Actions: evalua a cadena vacia.

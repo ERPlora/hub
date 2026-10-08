@@ -218,7 +218,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F58 | Reenviar solo lo que un permiso había rechazado, al concederlo | hecho | [avisos.md](workflow/avisos.md) |
 | HUB-F59 | Contar los avisos caídos para la campana | hecho | [avisos.md](workflow/avisos.md) |
 | HUB-F60 | Avisar a las pantallas en vivo | hecho | [avisos.md](workflow/avisos.md) |
-| HUB-F61 | Mandar el email o el WhatsApp que pide un módulo o una automatización | parcial | [avisos.md](workflow/avisos.md) |
+| HUB-F61 | Mandar el email o el WhatsApp que pide un módulo o una automatización | hecho | [avisos.md](workflow/avisos.md) |
 | HUB-F62 | Ejecutar las tareas programadas de los módulos | parcial | [avisos.md](workflow/avisos.md) |
 | HUB-F63 | Seguir la cadena de lo que provocó un aviso | parcial | [avisos.md](workflow/avisos.md) |
 | HUB-F64 | Contar que alguien usa el hub | hecho | [avisos.md](workflow/avisos.md) |
@@ -236,7 +236,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F91 | Paso «Solo sigue si» | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F92 | Paso «Esperar» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F93 | Paso «Enviar un mensaje» a un cliente | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
-| HUB-F94 | Paso «Llamar a otro sistema» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
+| HUB-F94 | Paso «Llamar a otro sistema» | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F95 | Paso «Pedírselo al asistente» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F96 | Paso «Preguntar antes a alguien» | parcial | [automatizaciones.md](workflow/automatizaciones.md) |
 | HUB-F97 | «Solo si» y «seguir si falla» en cada paso | hecho | [automatizaciones.md](workflow/automatizaciones.md) |
