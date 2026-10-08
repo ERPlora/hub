@@ -149,7 +149,7 @@ Implicados: HUB-F137, HUB-F139
 QA: qa-hub-android Fase 0
 
 ### HUB_APP-F10 Cada página tiene su juego de permisos
-Estado: hecho
+Estado: parcial — el binario publicado deja pasar el bucle local (`127.0.0.1:8787` y `:5173`) y lo acepta como negocio enlazado, con el hardware (ERPlora/hub#2643)
 Actor: sistema
 Pantalla: ninguna
 Pasos:

@@ -210,7 +210,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | HUB_APP-F07 | Android pide los permisos en su momento | parcial | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
 | HUB_APP-F08 | Volver a activar un permiso negado | hecho | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
 | HUB_APP-F09 | Red local en ordenador (macOS y Windows) | parcial | [workflow/permisos-y-avisos.md](workflow/permisos-y-avisos.md) |
-| HUB_APP-F10 | Cada página tiene su juego de permisos | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
+| HUB_APP-F10 | Cada página tiene su juego de permisos | parcial | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F11 | Cuando no hay conexión con el negocio | hecho | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F12 | En la copia de Google Play, solo páginas del SaaS que no cobran | parcial | [workflow/instalar-y-enlazar.md](workflow/instalar-y-enlazar.md) |
 | HUB_APP-F13 | Buscar impresoras | parcial | [workflow/impresion-y-hardware.md](workflow/impresion-y-hardware.md) |
@@ -246,7 +246,7 @@ El detalle de cada flujo vive en `workflow/<área>.md`; este índice solo lo enu
 | Escanear un QR dentro de la aplicación para enlazar | no existe (la aplicación no tiene cámara; el QR del menú abre el negocio por https en el móvil) | F03 |
 | Permisos de Android con explicación previa | parcial | F07, F08 |
 | Permiso de red local en macOS | parcial | F09 |
-| Juegos de permisos por origen y hardware solo para el negocio enlazado | hecho | F10 |
+| Juegos de permisos por origen y hardware solo para el negocio enlazado | parcial: el binario publicado acepta el bucle local como negocio (hub#2643) | F10 |
 | Pantalla sin conexión y vuelta sola | hecho | F11 |
 | Buscar impresoras (red, Bluetooth, USB) | parcial: Bluetooth negado sin aviso | F13 |
 | Añadir por IP | hecho | F14 |
