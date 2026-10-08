@@ -17,6 +17,8 @@
 # network: the stub answers `gh issue list` from a fixture and RECORDS every `gh issue comment`/
 # `gh issue create` call so the assertions can tell which one happened, and to WHICH issue.
 set -uo pipefail
+# Actions sets GITHUB_RUN_ID on every job: unset it so only the cases that pass one see a run.
+unset GITHUB_RUN_ID
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SCRIPT="$script_dir/../ci/alert-issue.sh"
@@ -265,7 +267,8 @@ code=$(GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=ERPlora/hub GITHUB
 errs=""
 [ "$code" = 0 ] || errs="$errs exit=$code"
 grep -q '^## Cómo se reproduce' "$STUB_DIR/calls.log" || errs="$errs no-reproduction-heading"
-grep -q '^- Run: https://github.com/ERPlora/hub/actions/runs/777$' "$STUB_DIR/calls.log" || errs="$errs no-run-line"
+# The stub logs every argument on one line, so the run URL ends at a space or at the end.
+grep -qE '^- Run: https://github.com/ERPlora/hub/actions/runs/777( |$)' "$STUB_DIR/calls.log" || errs="$errs no-run-line"
 [ -z "$errs" ] \
     && ok "a new alert carries «- Run:» with the run URL (pm#663)" \
     || bad "a new alert carries «- Run:» with the run URL (pm#663)" "$errs calls=$(cat "$STUB_DIR/calls.log")"
@@ -285,7 +288,7 @@ errs=""
 STUB_DIR=$(make_stub_dir); export STUB_DIR
 OUT="$STUB_DIR/out"
 printf '[]\n' > "$STUB_DIR/issues.json"
-code=$(env -u GITHUB_RUN_ID REPO=ERPlora/hub TITLE="x" MATCH=exact BODY="stale" run_script)
+code=$(REPO=ERPlora/hub TITLE="x" MATCH=exact BODY="stale" run_script)
 errs=""
 [ "$code" = 0 ] || errs="$errs exit=$code"
 grep -q -- '- Run:' "$STUB_DIR/calls.log" && errs="$errs invented-a-run-line-with-no-run"

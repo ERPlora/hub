@@ -29,9 +29,12 @@
 #                 query server-side — `gh issue list --label` filters on the issue's own field,
 #                 not the flaky search index, so it is safe to combine with the local title
 #                 match instead of relying on the title alone.
+#                 A new issue in ERPlora/hub or ERPlora/saas also gets `module:ci` (pm#663).
 #   BODY          the comment/issue body. Read from stdin instead when BODY is unset — so a
 #                 caller building a multi-line body can pipe it in rather than cram it into one
-#                 environment variable.
+#                 environment variable. Inside a run (GITHUB_RUN_ID set) a NEW issue gets
+#                 `## Cómo se reproduce` + `- Run: <run url>` unless the body already has a
+#                 `- Run:` line; a refresh comment is posted exactly as given.
 #
 # `GH_TOKEN`/`GITHUB_TOKEN` auth is inherited from the environment, same as any other `gh` call
 # in these workflows — this script does not touch it.
@@ -105,9 +108,26 @@ if [ -n "$existing" ]; then
     gh issue comment "$existing" --repo "$repo" --body "$body"
 else
     echo "Opening a new alert issue"
+    # Every issue says how the failure is seen (pm#656); for a CI alert that is the red run.
+    # A here-string, not `printf | grep -q`: grep quitting early would SIGPIPE printf and,
+    # under pipefail, read as "no run line" and add a second one.
+    if [ -n "${GITHUB_RUN_ID:-}" ] && ! grep -q '^- Run:' <<<"$body"; then
+        body="$body
+
+## Cómo se reproduce
+- Run: ${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-$repo}/actions/runs/$GITHUB_RUN_ID"
+    fi
     create_args=(issue create --repo "$repo" --title "$title" --body "$body")
     if [ -n "$label" ]; then
         create_args+=(--label "$label")
     fi
+    # hub and saas split their issues by handbook area and each area's queue is
+    # `gh issue list --label module:<key>`, so an alert there without one reaches nobody (pm#663).
+    # Only on create, never in the lookup: alerts already open were created without it, and
+    # narrowing by it would miss them and open a twin (hub#1246). Module repos have no such
+    # labels (the repo is the module), and a missing label fails the whole `gh issue create`.
+    case "$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')" in
+        erplora/hub | erplora/saas) create_args+=(--label module:ci) ;;
+    esac
     gh "${create_args[@]}"
 fi
