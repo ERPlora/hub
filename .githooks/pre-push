@@ -1326,13 +1326,15 @@ if [ -f "$green" ]; then
     exit 0
 fi
 
-# The module e2e — the ones that install the real modules — are the one place where "run what CI
-# ran" needs saying out loud, because `test-hub.yml` does NOT run them: the guard sees `CI=true`
-# and takes a legitimate skip (hub#253). They run in `test-hub-modules.yml`, against the PUBLISHED
-# catalogue, and that is the shape this gate has to reproduce or stay quiet about.
+# The module e2e — the ones that install the real modules — do NOT run in `test-hub.yml`: the
+# guard sees `CI=true` and takes a legitimate skip (hub#253). They run in `test-hub-modules.yml`,
+# against the PUBLISHED catalogue, and since pm#655 that workflow is back on every pull request
+# that touches a kernel surface — so the PR check is where they are proven before a merge.
 #
-# Default is therefore parity with `test-hub.yml`: skip. `HUB_GATE_WITH_MODULES=1` opts into the
-# stricter run.
+# This gate is LIGHT by default (hub#1466, `9d91291`): `HUB_GATE_DEPTH=fast` runs check + clippy
+# and nothing else, so in that mode the catalogue resolved below feeds no test. Only
+# `HUB_GATE_DEPTH=full` runs the suite here, and then the module e2e run against the published
+# catalogue unless `HUB_GATE_WITH_MODULES=0` skips them on purpose.
 #
 # ── hub#1153: WHICH modules, and why it is not the sibling checkout ──────────
 # This used to export `ERPLORA_MODULES_DIR=<monorepo>/modules-workspace/modules`, i.e. whatever
@@ -1355,14 +1357,13 @@ fi
 # como KERNEL», 2026-08-27).
 #
 # Escape hatches, both documented: `ERPLORA_MODULES_DIR` set by hand still wins (debugging a tree),
-# and dropping `HUB_GATE_WITH_MODULES` goes back to CI parity.
+# and `HUB_GATE_WITH_MODULES=0` skips the module e2e of a full run.
 MODULES_FLOOR="${HUB_GATE_MODULES_FLOOR:-25}"
 resolve_modules_dir() {
-    # Por defecto SÍ (Ioan, 2026-08-29): `test-hub-modules.yml` ya no corre en las PRs, así que si
-    # el gate se saltara los e2e de módulos no los correría NADIE — y esa es exactamente la vía por
-    # la que una PR del kernel rompe un módulo en producción. Medido el 29/08 sobre develop limpio:
-    # 30 binarios, 1 365 tests, 0 fallos, 5m07s (hub#1353). `HUB_GATE_WITH_MODULES=0` los salta a
-    # sabiendas — y como cualquier salto, deja el push sin atestiguar más abajo.
+    # On by default (2026-08-29, hub#1353 — measured on a clean develop: 30 binaries, 1 365 tests,
+    # 0 failures, 5m07s), and it only matters under `HUB_GATE_DEPTH=full`: the pre-merge proof of
+    # the module e2e is the `test-hub-modules.yml` check of the PR (pm#655). `HUB_GATE_WITH_MODULES=0`
+    # skips them knowingly — and like any skip, leaves a full push unattested further down.
     if [ "${HUB_GATE_WITH_MODULES:-1}" != "1" ]; then
         export ERPLORA_E2E_ALLOW_SKIP=1
         return 0

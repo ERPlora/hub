@@ -61,6 +61,12 @@ pg_container="${ERPLORA_PG_CONTAINER:-}"
 pg_user="${ERPLORA_PG_USER:-postgres}"
 bind_host="127.0.0.1"
 ready_timeout="${ERPLORA_HUB_READY_TIMEOUT:-180}"
+warmup_timeout="${ERPLORA_HUB_WARMUP_TIMEOUT:-300}"
+# The line the server prints on stderr once the boot warm-up of the WASM handlers is over —
+# `WARM_UP_DONE` in crates/runtime/src/wasm_cache.rs; `run-module-hub-batteries.test.sh` (case 13)
+# fails if the two drift apart.
+warm_up_done="wasm: warm-up done"
+shard=""
 
 # ── The exemptions ──────────────────────────────────────────────────────────────────────────
 # A module whose battery CANNOT run here yet, each with its issue and its reason. They are
@@ -92,7 +98,9 @@ usage: run-module-hub-batteries.sh [options]
   --pg-user <user>        Postgres superuser for the default --db-admin-cmd (default: postgres)
   --bind-host <host>      where the hubs listen (default: 127.0.0.1)
   --ready-timeout <secs>  how long a hub gets to answer /readyz UP (default: 180)
+  --warmup-timeout <secs> how long a hub then gets to finish compiling its WASM handlers (default: 300)
   --exempt <id=issue reason>  add an exemption on top of the built-in ones
+  --shard <k>/<n>         run only the k-th of n disjoint slices of the MODULES (1-based)
 USAGE
 }
 
@@ -108,7 +116,9 @@ while [ $# -gt 0 ]; do
         --pg-user) pg_user="$2"; shift 2 ;;
         --bind-host) bind_host="$2"; shift 2 ;;
         --ready-timeout) ready_timeout="$2"; shift 2 ;;
+        --warmup-timeout) warmup_timeout="$2"; shift 2 ;;
         --exempt) extra_exemptions+=("$2"); shift 2 ;;
+        --shard) shard="$2"; shift 2 ;;
         -h | --help) usage; exit 0 ;;
         *) usage >&2; exit 2 ;;
     esac
@@ -163,6 +173,31 @@ if [ -z "$batteries" ]; then
 fi
 
 modules=$(printf '%s\n' "$batteries" | sed 's|/.*||' | awk '!seen[$0]++')
+
+# ── The shard (pm#655) ──────────────────────────────────────────────────────────────────────
+# Back on kernel PRs, the batteries run as parallel jobs: `--shard k/n` keeps every n-th MODULE
+# starting at the k-th, so a module never splits across two hubs and the n shards add up to the
+# whole worklist. A shard that cannot be honoured — malformed, out of range, or EMPTY because the
+# matrix asks for more shards than there are modules — is an environment error: a job that ran
+# nothing must never read as a green battery run.
+if [ -n "$shard" ]; then
+    case "$shard" in
+        [0-9]*/[0-9]*) ;;
+        *) env_error "--shard must be <k>/<n>, got '$shard'" ;;
+    esac
+    shard_k=${shard%/*}
+    shard_n=${shard#*/}
+    case "$shard_k$shard_n" in *[!0-9]*) env_error "--shard must be <k>/<n>, got '$shard'" ;; esac
+    [ "$shard_n" -ge 1 ] && [ "$shard_k" -ge 1 ] && [ "$shard_k" -le "$shard_n" ] \
+        || env_error "--shard $shard is out of range: k must be between 1 and n"
+    modules=$(printf '%s\n' "$modules" | awk -v k="$shard_k" -v n="$shard_n" 'NF && (NR - k) % n == 0')
+    [ -n "$modules" ] \
+        || env_error "--shard $shard selects no module: the worklist has fewer than $shard_n modules"
+    batteries=$(printf '%s\n' "$batteries" | awk -v keep="$(printf '%s ' $modules)" '
+        BEGIN { split(keep, ids, " "); for (i in ids) want[ids[i]] = 1 }
+        { id = $0; sub(/\/.*/, "", id); if (id in want) print }')
+    printf 'run-module-hub-batteries: shard %s — module(s): %s\n' "$shard" "$(printf '%s ' $modules)" >&2
+fi
 
 exemption_for() { # $1=module id → prints "issue reason", empty when not exempt
     local entry
@@ -341,6 +376,28 @@ $(tail -20 "$server_log" 2> /dev/null | sed 's/^/      /')"
         continue
     fi
 
+    # hub#2693 · and then wait for the WASM warm-up. The server answers /readyz UP first and
+    # compiles every WASM handler afterwards, in the background (hub#926: in production nobody
+    # should wait for it). On a fresh CI runner — empty wasmtime disk cache, debug build — that
+    # compilation was still running when `cash_register/reverse_on_void` charged its first sale,
+    # and the battery timed out at 8 s waiting for a cash movement, in 2 of 3 runs. A battery
+    # measures the module on a hub as a cashier meets it: warmed up.
+    warm=0
+    deadline=$(( $(date +%s) + warmup_timeout ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        if ! kill -0 "$server_pid" 2> /dev/null; then break; fi
+        if grep -qF -- "$warm_up_done" "$server_log" 2> /dev/null; then warm=1; break; fi
+        sleep 1
+    done
+    if [ "$warm" -ne 1 ]; then
+        env_failures="$env_failures
+  - $module: the hub answered /readyz UP but never printed \`$warm_up_done\` within
+    ${warmup_timeout}s, so its WASM handlers may still be compiling. Its own log tail:
+$(tail -20 "$server_log" 2> /dev/null | sed 's/^/      /')"
+        teardown_module
+        continue
+    fi
+
     # What the RUNTIME says is installed — not what the catalogue holds, and not what /readyz
     # counts. The dev boot scan is tolerant on purpose (`install_all_from_dir` logs ✗ and carries
     # on) and /readyz counts only what reached the database, so a module that never installed is
@@ -407,7 +464,10 @@ $(grep -m1 -F "✗ módulo" "$server_log" 2> /dev/null | sed 's/^/      /')"
         if [ "$code" -ne 0 ]; then
             failures="$failures
   - $entry: the battery FAILED (exit $code)
-$(printf '%s\n' "$output" | tail -25 | sed 's/^/      /')"
+$(printf '%s\n' "$output" | tail -25 | sed 's/^/      /')
+    The hub's own log, last 30 lines (hub#2693 — the battery only sees HTTP answers; a listener
+    or a handler that failed inside the hub is only here):
+$(tail -30 "$server_log" 2> /dev/null | sed 's/^/      /')"
         elif looks_skipped "$output"; then
             failures="$failures
   - $entry: the battery SKIPPED ITSELF and still exited 0 — a green that proves nothing, with a

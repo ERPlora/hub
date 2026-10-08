@@ -79,9 +79,23 @@ case "$1 $2" in
             cat "$STUB_DIR/issues.json"
         fi
         ;;
-    "issue comment" | "issue create")
+    "issue comment" | "issue create" | "issue close")
         printf '%s\n' "$*" >> "$log"
         if [ "$1 $2" = "issue create" ]; then
+            # The new issue now EXISTS: a later `gh issue list` sees it as #9999. With
+            # $STUB_DIR/race present, a twin job opened the same alert a moment before (#9000).
+            title=""
+            prev=""
+            for a in "$@"; do
+                [ "$prev" = "--title" ] && title="$a"
+                prev="$a"
+            done
+            if [ -e "$STUB_DIR/race" ]; then
+                jq --arg t "$title" '. + [{"number": 9000, "title": $t}]' "$STUB_DIR/issues.json" \
+                    > "$STUB_DIR/issues.tmp" && mv "$STUB_DIR/issues.tmp" "$STUB_DIR/issues.json"
+            fi
+            jq --arg t "$title" '. + [{"number": 9999, "title": $t}]' "$STUB_DIR/issues.json" \
+                > "$STUB_DIR/issues.tmp" && mv "$STUB_DIR/issues.tmp" "$STUB_DIR/issues.json"
             echo "https://github.com/ERPlora/hub/issues/9999"
         fi
         ;;
@@ -323,6 +337,38 @@ errs=""
 [ -z "$errs" ] \
     && ok "a refresh comment is posted as given (labels and run line are for a new issue)" \
     || bad "a refresh comment is posted as given (labels and run line are for a new issue)" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
+# ── 11 · Two jobs that raced to open the SAME alert leave ONE open (pm#655) ─────────────────
+#    `test-hub-modules.yml` runs the battery alert in two matrix parts at once (`batteries 1/2`
+#    and `batteries 2/2`): when both fail with no alert open, both list (nothing), both create.
+#    After creating, the script lists again; if an older twin is open, the alert goes there as a
+#    comment and its own issue is closed as a duplicate — whichever job loses the race.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+touch "$STUB_DIR/race"
+code=$(REPO=ERPlora/hub TITLE="Module batteries fail" MATCH=exact BODY="shard 2/2 red" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q '^issue close 9999 ' "$STUB_DIR/calls.log" || errs="$errs did-not-close-its-own-duplicate-9999"
+grep -q '^issue comment 9000 ' "$STUB_DIR/calls.log" || errs="$errs alert-did-not-reach-the-older-twin-9000"
+grep -q '^issue close 9000' "$STUB_DIR/calls.log" && errs="$errs closed-the-SURVIVOR"
+[ -z "$errs" ] \
+    && ok "a job that lost the race closes its own duplicate and comments on the older twin" \
+    || bad "a job that lost the race closes its own duplicate and comments on the older twin" "$errs out=$(cat "$OUT") calls=$(cat "$STUB_DIR/calls.log")"
+
+# … and the job that WON (its issue is the oldest) keeps it: no close, no extra comment.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(REPO=ERPlora/hub TITLE="Module batteries fail" MATCH=exact BODY="shard 1/2 red" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q '^issue close' "$STUB_DIR/calls.log" && errs="$errs closed-its-own-surviving-issue"
+grep -q '^issue comment' "$STUB_DIR/calls.log" && errs="$errs commented-on-its-own-new-issue"
+[ -z "$errs" ] \
+    && ok "the job whose issue is the oldest keeps it open" \
+    || bad "the job whose issue is the oldest keeps it open" "$errs calls=$(cat "$STUB_DIR/calls.log")"
 
 echo
 if [ "$fail" -eq 0 ]; then

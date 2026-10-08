@@ -129,5 +129,27 @@ else
     case "$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')" in
         erplora/hub | erplora/saas) create_args+=(--label module:ci) ;;
     esac
-    gh "${create_args[@]}"
+    created_url=$(gh "${create_args[@]}") || exit $?
+    printf '%s\n' "$created_url"
+    created=${created_url##*/}
+
+    # Two jobs can race here (pm#655: `test-hub-modules.yml` runs the battery alert in two matrix
+    # parts at once): both listed nothing, both created. List again and keep the OLDEST open
+    # twin; the job that lost the race moves its alert there and closes its own as a duplicate.
+    # Both jobs see the same list, so exactly one issue survives whichever finishes first.
+    case "$match" in
+        exact)  oldest_program="[.[] | select(.title == \"$escaped_value\") | .number] | min // empty" ;;
+        prefix) oldest_program="[.[] | select(.title | startswith(\"$escaped_value\")) | .number] | min // empty" ;;
+    esac
+    list_args=(issue list --repo "$repo" --state open --limit 500 --json number,title --jq "$oldest_program")
+    if [ -n "$label" ]; then
+        list_args+=(--label "$label")
+    fi
+    oldest=$(gh "${list_args[@]}") || oldest=""
+    if [ -n "$oldest" ] && [ "$oldest" != "$created" ] && [ "$created" -gt "$oldest" ] 2> /dev/null; then
+        echo "Another job opened #$oldest first: moving the alert there and closing #$created"
+        gh issue comment "$oldest" --repo "$repo" --body "$body"
+        gh issue close "$created" --repo "$repo" --reason "not planned" \
+            --comment "Duplicate of #$oldest: two CI jobs opened the same alert at once."
+    fi
 fi
