@@ -242,7 +242,7 @@ Implicados: FLOWS-F15
 QA: qa-hub-flows R7
 
 ### HUB-F94 Paso «Llamar a otro sistema»
-Estado: hecho
+Estado: parcial — un servicio que pide la clave de no repetición en el cuerpo o con otro nombre de cabecera (Square, PayPal) aún no la recibe, y puede crear dos veces lo mismo si el hub se reinicia durante la llamada (hub#2675)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
