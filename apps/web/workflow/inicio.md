@@ -180,7 +180,7 @@ Implicados: CASH_REGISTER-F12, HUB-F34, HUB-F60, INVENTORY-F17, VERIFACTU-F31
 QA: qa-hub-restaurant §7.12
 
 ### HUB_SHELL-F36 Consultar la actividad reciente
-Estado: hecho
+Estado: parcial — en tableta (unos 820 px) la columna «Fecha» de la tabla corta la hora de la venta (hub#2637)
 Actor: administrador, responsable, empleado
 Pantalla: Inicio
 Pasos:
@@ -249,7 +249,7 @@ QA: BD-01
 | Paneles por app con presets por sector | parcial: sin filtro por permiso en la pantalla | F33, F34 |
 | Tablero guardado por persona | no hecho: se guarda por navegador | F34 |
 | Paneles en vivo | hecho para lo que la app declara | F35 |
-| Actividad reciente | hecho para las ventas (solo ventas: caja y citas no salen) | F36 |
+| Actividad reciente | parcial: solo ventas (caja y citas no salen); en tableta la fecha corta la hora (hub#2637) | F36 |
 | Estado de la impresora y de WhatsApp | parcial: detalle solo al pasar el ratón | F37 |
 
 ## Datos: de quién es cada dato
