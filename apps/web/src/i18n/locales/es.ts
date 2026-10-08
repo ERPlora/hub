@@ -813,6 +813,13 @@ export default {
       'No se imprimió el vale de anulación de {station} de {label}. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
     voidWaitingForPrinter:
       'El vale de anulación de {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {station} de viva voz: esa comanda ya no se prepara.',
+    // hub#2640 — the slip of ONE dish the till voided.
+    voidDishLabel: 'PLATO ANULADO · {label}',
+    voidDishLabelBare: 'PLATO ANULADO',
+    voidDishFailed:
+      'No se imprimió el vale de anulación de {dish} para {station} de {label}. Avisa en {station} de viva voz: ese plato ya no se prepara.',
+    voidDishWaitingForPrinter:
+      'El vale de anulación de {dish} para {station} de {label} está en espera: aún no hay ninguna impresora dada de alta para esa estación. Avisa en {station} de viva voz: ese plato ya no se prepara.',
   },
   // hub#2168 — system notices for a booking or cancellation that did NOT come from a till.
   appointmentNotice: {

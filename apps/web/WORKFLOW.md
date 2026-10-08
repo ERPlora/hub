@@ -337,7 +337,7 @@ gramática y el mismo prefijo. El porqué de cada `parcial` o `no hecho` está e
 | HUB_SHELL-F75 | Ver quién imprime cada función | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F76 | Saber qué sale en el papel del tique y dónde se cambia | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F77 | Imprimir un documento desde una pantalla | hecho | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
-| HUB_SHELL-F78 | Imprimir el vale de anulación al cancelar una ronda ya enviada | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
+| HUB_SHELL-F78 | Imprimir el vale de anulación al cancelar una ronda o anular un plato ya enviados | parcial | [workflow/avisos-e-impresion.md](workflow/avisos-e-impresion.md) |
 | HUB_SHELL-F80 | Ver la lista de personas del negocio | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F81 | Dar de alta a una persona que entra solo con PIN | hecho | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
 | HUB_SHELL-F82 | Invitar a una persona con su cuenta de erplora.com | parcial | [workflow/personas-y-permisos.md](workflow/personas-y-permisos.md) |
