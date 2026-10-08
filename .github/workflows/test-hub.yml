@@ -171,21 +171,21 @@ jobs:
         run: |
           set -uo pipefail
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "rust=true" >> "$GITHUB_OUTPUT"; echo "no es una PR (${{ github.event_name }}): suite completa"; exit 0
+            echo "rust=true" >> "$GITHUB_OUTPUT"; echo "not a PR (${{ github.event_name }}): full suite"; exit 0
           fi
           if ! files=$(git diff --name-only HEAD^1 HEAD); then
-            echo "::warning::no pude leer el diff de la PR: corro la suite completa"
+            echo "::warning::could not read the PR diff: running the full suite"
             echo "rust=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          # Solo el «no» explícito (exit 1) omite la suite: cualquier otro fallo del clasificador
-          # (no está, no arranca) cuenta como «sí», y los `if:` de abajo son `!= 'false'` para que
-          # una salida ausente (paso fallido) también corra la suite, nunca la salte en silencio.
+          # Only the explicit «no» (exit 1) skips the suite: any other failure of the classifier
+          # (missing, does not start) counts as «yes», and the `if:` that read this output are
+          # `!= 'false'` so a missing output (failed step) runs the suite, never skips it silently.
           rc=0; printf '%s\n' "$files" | bash scripts/ci/touches-rust.sh || rc=$?
           if [ "$rc" -eq 1 ]; then
             echo "rust=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Suite de Rust omitida::esta PR no toca Rust ni nada que los tests de Rust lean; la suite corre igualmente en el push a develop (hub#572)."
+            echo "::notice title=Rust suite skipped::this PR touches no Rust nor anything the Rust tests read; the suite still runs on the push to develop (hub#572)."
           else
-            echo "rust=true" >> "$GITHUB_OUTPUT"; echo "la PR toca Rust (o algo que Rust lee), o el clasificador falló (rc=$rc): suite completa"
+            echo "rust=true" >> "$GITHUB_OUTPUT"; echo "the PR touches Rust (or something Rust reads), or the classifier failed (rc=$rc): full suite"
           fi
 
   clippy:
@@ -300,28 +300,28 @@ jobs:
       # `--no-deps`: linta el workspace, no las ~600 cajas de terceros (sus avisos no los
       # arreglamos y solo ensucian el log).
       #
-      # Presupuesto propio (hub#1519): medido en 2m33s el 03/09, 8 min es 3× ese reloj. El
-      # `timeout` de shell salta un minuto ANTES que el del paso para poder decir en voz alta que
-      # lo que se agotó fue el TIEMPO y no un lint — el `timeout-minutes` de abajo es la red por si
-      # el propio `timeout` no llegara a arrancar.
+      # Own budget (hub#1519): measured at 2m33s on 03/09, 8 min is 3× that clock. The shell
+      # `timeout` fires one minute BEFORE the step's so the step can say out loud that what ran out
+      # was the TIME and not a lint — the `timeout-minutes` below is the net in case the `timeout`
+      # itself never starts.
       - name: cargo clippy --workspace
         id: clippy
         if: needs.scope.outputs.rust != 'false'
         timeout-minutes: 8
         run: |
           set -uo pipefail
-          # 🔴 `set +e` NO sobra: Actions corre este bloque como `bash -e {0}` (este workflow no
-          # fija `shell:`) y `set -uo pipefail` NO apaga ese `-e`. Sin esta línea, el `timeout` al
-          # saltar abortaría el bloque en la línea de abajo y ni el `rc=$?`, ni el `overrun=true`,
-          # ni el `::error::` llegarían a ejecutarse: el paso saldría rojo MUDO, que es justo lo que
-          # hub#1519 viene a quitar. Lo fija `scripts/tests/test-hub-workflow.test.sh`.
+          # 🔴 `set +e` is NOT redundant: Actions runs this block as `bash -e {0}` (this workflow
+          # sets no `shell:`) and `set -uo pipefail` does NOT clear that `-e`. Without this line a
+          # firing `timeout` would abort the block on the next line and neither the `rc=$?`, the
+          # `overrun=true` nor the `::error::` would run: the step would go MUTE red, exactly what
+          # hub#1519 removes. Pinned by `scripts/tests/test-hub-workflow.test.sh`.
           set +e
           timeout 7m cargo clippy --workspace --all-targets --no-deps \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android
           rc=$?
           if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
             echo "overrun=true" >> "$GITHUB_OUTPUT"
-            echo "::error title=Presupuesto de tiempo agotado (clippy)::clippy pasó de 7 min. NO es un lint roto: es el reloj (hub#1519)."
+            echo "::error title=Time budget exhausted (clippy)::clippy ran over 7 min. It is NOT a broken lint: it is the clock (hub#1519)."
           fi
           exit "$rc"
 
@@ -477,7 +477,7 @@ jobs:
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
           docker exec "$PG" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';"
           docker restart "$PG"
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker exec "$PG" pg_isready -U postgres >/dev/null 2>&1 && break
             sleep 2
           done
@@ -499,7 +499,7 @@ jobs:
           fi
           echo "Postgres host port after restart: ${HOST_PORT} (was ${PG_PORT} at container start)"
           ok=""
-          for i in $(seq 1 15); do
+          for _ in $(seq 1 15); do
             if timeout 2 bash -c "exec 3<>/dev/tcp/localhost/${HOST_PORT}" 2>/dev/null; then
               ok=1; break
             fi
@@ -622,22 +622,21 @@ jobs:
       # Doc-tests: partition 1 only (hub#1522) — nextest does not run them, and six legs paying a
       # doc build for 4 tests is waste. Skipped automatically when this leg's tests failed.
       #
-      # Los doc-tests, en su propio paso y CONTADOS (hub#1519). Eran la última línea del log cuando
-      # cayó el hachazo del run 33787341170 y nada lo dijo; aquí un exceso de tiempo se lee como lo
-      # que es, y su resultado no queda escondido detrás de los 30 min de la suite.
+      # The doc-tests, in their own step and COUNTED (hub#1519). They were the last line of the log
+      # when run 33787341170 was axed and nothing said so; here an overrun reads as what it is.
       #
-      # Se cuentan porque un paso de doc-tests que no ejecuta NINGUNO sale tan verde como uno que
-      # los pasa — el verde vacío que este repo ya se comió en hub#1216. Hoy son 4 (los de
-      # `erplora_guest_sdk`, medidos en el run 33811810476); si la selección de targets deja de
-      # coger nada, esto se pone rojo en vez de mentir.
-      - name: cargo test --doc (doc-tests, contados)
+      # Counted because a doc-test step that runs NONE is as green as one that passes them — the
+      # empty green this repo already swallowed in hub#1216. Today there are 4 (those of
+      # `erplora_guest_sdk`, measured in run 33811810476); if the target selection stops picking
+      # anything up, this goes red instead of lying.
+      - name: cargo test --doc (doc-tests, counted)
         id: doctests
         if: matrix.part == 1
         timeout-minutes: 8
         run: |
           set -uo pipefail
-          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
-          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          # `set +e`, same reason as in `clippy`: under the `bash -e` of Actions a firing `timeout`
+          # would abort here and the message below would never print.
           set +e
           log="$RUNNER_TEMP/doctests.log"
           timeout 7m cargo test --workspace --doc \
@@ -645,14 +644,14 @@ jobs:
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
             echo "overrun=true" >> "$GITHUB_OUTPUT"
-            echo "::error title=Presupuesto de tiempo agotado (doc-tests)::Los doc-tests pasaron de 7 min. NO es un test roto: es el reloj (hub#1519)."
+            echo "::error title=Time budget exhausted (doc-tests)::The doc-tests ran over 7 min. It is NOT a broken test: it is the clock (hub#1519)."
             exit "$rc"
           fi
           total=$(sed 's/\x1b\[[0-9;]*m//g' "$log" \
                     | awk '/^test result: ok\./ { s += $4 } END { print s+0 }')
-          echo "doc-tests ejecutados: ${total}"
+          echo "doc-tests run: ${total}"
           if [ "$rc" -eq 0 ] && [ "$total" -eq 0 ]; then
-            echo "::error title=Doc-tests vacíos::cargo test --doc salió verde sin ejecutar un solo doc-test (hub#1519): la selección de targets dejó de coger nada."
+            echo "::error title=Empty doc-tests::cargo test --doc went green without running a single doc-test (hub#1519): the target selection stopped picking anything up."
             exit 1
           fi
           exit "$rc"
