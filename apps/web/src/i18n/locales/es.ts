@@ -1206,6 +1206,8 @@ export default {
     localPinHelp: '{n} dígitos. Obligatorio: es cómo entra esta persona.',
     accountEmailHelp:
       'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
+    pinOnlyEmailHelp:
+      'Entra solo con PIN. Escribe su email para invitarle con una cuenta de ERPlora: administrar el hub la necesita.',
     accountPinHelp:
       'Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {

@@ -1380,6 +1380,8 @@ export default {
     localPinHelp: '{n} digits. Required: it is how this person signs in.',
     accountEmailHelp:
       'We email them an invitation to this hub. They choose their own password — you never see it.',
+    pinOnlyEmailHelp:
+      'Signs in with a PIN only. Type their email to invite them with an ERPlora account: administering the hub needs one.',
     accountPinHelp:
       'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
