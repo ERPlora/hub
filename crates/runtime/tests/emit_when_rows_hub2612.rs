@@ -352,3 +352,64 @@ fn the_schema_refuses_what_the_runtime_would_not_read_hub2612() {
         );
     }
 }
+
+// ── What else rides on «the event was written» ─────────────────────────────────────────────────
+
+async fn first_record_at(rt: &Runtime) -> String {
+    rt.fiscal_profile()
+        .await
+        .expect("read the fiscal profile")
+        .expect("the hub has a fiscal profile")
+        .first_record_at
+}
+
+/// The dispatcher seals the fiscal go-live when a committed command EMITS one of the events that
+/// start a fiscal chain (ADR-0273 D3). An entry that `when_rows` skipped was never written, so it
+/// must not close the way back to testing for a record that does not exist.
+#[tokio::test]
+async fn an_event_that_was_not_written_does_not_seal_the_fiscal_go_live_hub2612() {
+    let (mut rt, _sink) = hub().await;
+    // A provider of the hub's regime: what makes the hub owe VeriFactu at all (the runtime is
+    // business-free; a stand-in with the SHAPE of `verifactu` is all the fiscal gates read).
+    rt.install_from_dir(&fixture("fiscal_provider"))
+        .await
+        .expect("install the fiscal provider stand-in");
+    rt.refresh_fiscal_profile().await.expect("profile row");
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(HUB));
+    rt.db()
+        .execute(
+            "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
+               fiscal_trigger_events = '[\"w2612.hold.stamped_release\"]' WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .expect("a hub filing for real");
+    rt.db()
+        .execute(
+            "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES (:hub_id, 'own', 'v1:ciphertext', 'v1:ciphertext', '2026-10-08T09:00:00Z', 'x')",
+            &p,
+        )
+        .await
+        .expect("with a road to the AEAT");
+    rt.refresh_fiscal_profile().await.expect("refresh");
+
+    rt.execute_command("w2612.holds.expire_and_stamp", &Params::new(), &ctx())
+        .await
+        .expect("an empty pass on a live hub");
+    assert_eq!(
+        first_record_at(&rt).await,
+        "",
+        "nothing was written, nothing is sealed"
+    );
+
+    create_hold(&rt).await;
+    rt.execute_command("w2612.holds.expire_and_stamp", &Params::new(), &ctx())
+        .await
+        .expect("a pass that writes the event");
+    assert!(
+        !first_record_at(&rt).await.is_empty(),
+        "positive control: the written event does seal"
+    );
+}
