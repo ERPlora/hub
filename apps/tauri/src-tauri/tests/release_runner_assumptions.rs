@@ -162,6 +162,125 @@ fn the_linux_job_installs_what_the_appimage_takes_from_the_machine() {
 /// running on the OTHER slot of the same machine.
 const CACHE_SAVE_GUARD: &str = "save-if: ${{ runner.environment != 'self-hosted' }}";
 
+/// The clause of [`CACHE_SAVE_GUARD`] that does the work. A `save-if` keeps the save off a
+/// self-hosted runner when this clause is one of the `&&` operands of its expression: `false && x`
+/// is false whatever `x` is (hub#2706 writes `… && matrix.part == 1`, hub#2710).
+const NOT_SELF_HOSTED: &str = "runner.environment != 'self-hosted'";
+
+/// Whether a `save-if:` value is false on a self-hosted runner. Deliberately narrow: an `${{ }}`
+/// expression with no `||` anywhere whose `&&` operands include [`NOT_SELF_HOSTED`] (outer
+/// parentheses aside). Anything else — `||`, a negation, a bare literal — is not a guard.
+fn save_if_is_guard(value: &str) -> bool {
+    let Some(expression) = value
+        .trim()
+        .strip_prefix("${{")
+        .and_then(|rest| rest.strip_suffix("}}"))
+    else {
+        return false;
+    };
+    if expression.contains("||") {
+        return false;
+    }
+    expression.split("&&").any(|operand| {
+        let mut operand = operand.trim();
+        while let Some(inner) = operand.strip_prefix('(').and_then(|o| o.strip_suffix(')')) {
+            operand = inner.trim();
+        }
+        operand == NOT_SELF_HOSTED
+    })
+}
+
+/// One entry per `Swatinem/rust-cache` step of `code`, in order: whether that step's `save-if`
+/// keeps the save — and the registry pruning that comes with it — off a self-hosted runner.
+fn cache_step_guards(code: &str) -> Vec<bool> {
+    let lines: Vec<&str> = code.lines().collect();
+    let mut guards = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let Some(column) = line.find("uses: Swatinem/rust-cache") else {
+            continue;
+        };
+        // The step's own keys (`with:`, `if:`…) sit at the column of `uses:`; the step ends at the
+        // first line indented less — the `- ` of the next step, or the next job.
+        let step = lines[i + 1..]
+            .iter()
+            .take_while(|l| l.trim().is_empty() || l.len() - l.trim_start().len() >= column);
+        let guarded = step
+            .filter_map(|l| l.trim_start().strip_prefix("save-if:"))
+            .any(save_if_is_guard);
+        guards.push(guarded);
+    }
+    guards
+}
+
+/// A cache step as `test-hub.yml` writes it, with `save_if` as its `save-if` line (or none).
+fn cache_step_yaml(save_if: Option<&str>) -> String {
+    let mut yaml = String::from(
+        "    steps:\n      - name: Cache cargo\n        uses: Swatinem/rust-cache@v2\n        with:\n          cache-bin: false\n",
+    );
+    if let Some(value) = save_if {
+        yaml.push_str(&format!("          save-if: {value}\n"));
+    }
+    yaml.push_str("\n      - name: cargo test\n        run: cargo test\n");
+    yaml
+}
+
+#[test]
+fn hub2710_a_guard_anded_with_another_condition_still_guards() {
+    // Regression test for hub#2710. hub#2706 split the Rust suite into a matrix and saves the cache from part 1 only. The save
+    // is still off on `ci-runner-1`: `false && x` is false whatever `x` is.
+    let yaml = cache_step_yaml(Some(
+        "${{ runner.environment != 'self-hosted' && matrix.part == 1 }}",
+    ));
+    assert_eq!(cache_step_guards(&yaml), vec![true]);
+
+    let yaml = cache_step_yaml(Some(
+        "${{ matrix.part == 1 && (runner.environment != 'self-hosted') }}",
+    ));
+    assert_eq!(cache_step_guards(&yaml), vec![true]);
+}
+
+#[test]
+fn hub2710_the_plain_guard_still_guards() {
+    let yaml = cache_step_yaml(Some("${{ runner.environment != 'self-hosted' }}"));
+    assert_eq!(cache_step_guards(&yaml), vec![true]);
+}
+
+#[test]
+fn hub2710_a_cache_step_without_save_if_is_unguarded() {
+    assert_eq!(cache_step_guards(&cache_step_yaml(None)), vec![false]);
+}
+
+#[test]
+fn hub2710_a_condition_that_can_save_on_the_shared_runner_is_unguarded() {
+    for value in [
+        // `||`: part 1 saves — and prunes — on `ci-runner-1` too.
+        "${{ runner.environment != 'self-hosted' || matrix.part == 1 }}",
+        // `&&` binds tighter than `||`: a push saves on `ci-runner-1` whatever the first operand.
+        "${{ runner.environment != 'self-hosted' && matrix.part == 1 || github.event_name == 'push' }}",
+        "${{ matrix.part == 1 }}",
+        "${{ !(runner.environment != 'self-hosted') }}",
+        "${{ runner.environment == 'self-hosted' }}",
+        "true",
+    ] {
+        assert_eq!(
+            cache_step_guards(&cache_step_yaml(Some(value))),
+            vec![false],
+            "`save-if: {value}` saves on a self-hosted runner and must not count as a guard"
+        );
+    }
+}
+
+#[test]
+fn hub2710_a_guard_on_another_step_does_not_cover_an_unguarded_cache_step() {
+    // The old count matched the guard string anywhere in the file: a guard written on some other
+    // step would have balanced an unguarded cache step.
+    let yaml = format!(
+        "{}      - name: Other\n        uses: some/action@v1\n        with:\n          save-if: ${{{{ runner.environment != 'self-hosted' }}}}\n",
+        cache_step_yaml(None)
+    );
+    assert_eq!(cache_step_guards(&yaml), vec![false]);
+}
+
 #[test]
 fn the_cargo_cache_does_not_prune_the_registry_a_concurrent_job_is_reading() {
     let code = workflow_code();
@@ -180,13 +299,14 @@ fn the_cargo_cache_does_not_prune_the_registry_a_concurrent_job_is_reading() {
     // `save-if: false` returns before any cleaning (rust-cache `save.ts`), so the restore still
     // works and the hosted runners still save: it is only the destructive half that goes away, and
     // only where the machine outlives the job.
-    let cache_steps = code.matches("uses: Swatinem/rust-cache").count();
+    let guards = cache_step_guards(&code);
+    let cache_steps = guards.len();
     assert!(
         cache_steps >= 2,
         "expected the desktop and Android jobs to both cache cargo; found {cache_steps}"
     );
     assert_eq!(
-        code.matches(CACHE_SAVE_GUARD).count(),
+        guards.iter().filter(|&&guarded| guarded).count(),
         cache_steps,
         "every `Swatinem/rust-cache` step must carry `{CACHE_SAVE_GUARD}`. Without it the `Post` \
          of whichever job finishes first deletes the registry sources the other one is building \
@@ -239,11 +359,12 @@ fn no_workflow_on_the_shared_runner_prunes_the_cargo_registry() {
     let mut unguarded = Vec::new();
 
     for (name, code) in all_workflows_code() {
-        let cache_steps = code.matches("uses: Swatinem/rust-cache").count();
+        let step_guards = cache_step_guards(&code);
+        let cache_steps = step_guards.len();
         if cache_steps == 0 || !code.contains(SELF_HOSTED_MARKER) {
             continue;
         }
-        let guards = code.matches(CACHE_SAVE_GUARD).count();
+        let guards = step_guards.iter().filter(|&&guarded| guarded).count();
         if guards != cache_steps {
             unguarded.push(format!("{name}: {guards} guard(s) for {cache_steps} cache step(s)"));
         }
