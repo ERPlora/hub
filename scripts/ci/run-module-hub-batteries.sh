@@ -61,6 +61,7 @@ pg_container="${ERPLORA_PG_CONTAINER:-}"
 pg_user="${ERPLORA_PG_USER:-postgres}"
 bind_host="127.0.0.1"
 ready_timeout="${ERPLORA_HUB_READY_TIMEOUT:-180}"
+shard=""
 
 # ── The exemptions ──────────────────────────────────────────────────────────────────────────
 # A module whose battery CANNOT run here yet, each with its issue and its reason. They are
@@ -93,6 +94,7 @@ usage: run-module-hub-batteries.sh [options]
   --bind-host <host>      where the hubs listen (default: 127.0.0.1)
   --ready-timeout <secs>  how long a hub gets to answer /readyz UP (default: 180)
   --exempt <id=issue reason>  add an exemption on top of the built-in ones
+  --shard <k>/<n>         run only the k-th of n disjoint slices of the MODULES (1-based)
 USAGE
 }
 
@@ -109,6 +111,7 @@ while [ $# -gt 0 ]; do
         --bind-host) bind_host="$2"; shift 2 ;;
         --ready-timeout) ready_timeout="$2"; shift 2 ;;
         --exempt) extra_exemptions+=("$2"); shift 2 ;;
+        --shard) shard="$2"; shift 2 ;;
         -h | --help) usage; exit 0 ;;
         *) usage >&2; exit 2 ;;
     esac
@@ -163,6 +166,31 @@ if [ -z "$batteries" ]; then
 fi
 
 modules=$(printf '%s\n' "$batteries" | sed 's|/.*||' | awk '!seen[$0]++')
+
+# ── The shard (pm#655) ──────────────────────────────────────────────────────────────────────
+# Back on kernel PRs, the batteries run as parallel jobs: `--shard k/n` keeps every n-th MODULE
+# starting at the k-th, so a module never splits across two hubs and the n shards add up to the
+# whole worklist. A shard that cannot be honoured — malformed, out of range, or EMPTY because the
+# matrix asks for more shards than there are modules — is an environment error: a job that ran
+# nothing must never read as a green battery run.
+if [ -n "$shard" ]; then
+    case "$shard" in
+        [0-9]*/[0-9]*) ;;
+        *) env_error "--shard must be <k>/<n>, got '$shard'" ;;
+    esac
+    shard_k=${shard%/*}
+    shard_n=${shard#*/}
+    case "$shard_k$shard_n" in *[!0-9]*) env_error "--shard must be <k>/<n>, got '$shard'" ;; esac
+    [ "$shard_n" -ge 1 ] && [ "$shard_k" -ge 1 ] && [ "$shard_k" -le "$shard_n" ] \
+        || env_error "--shard $shard is out of range: k must be between 1 and n"
+    modules=$(printf '%s\n' "$modules" | awk -v k="$shard_k" -v n="$shard_n" 'NF && (NR - k) % n == 0')
+    [ -n "$modules" ] \
+        || env_error "--shard $shard selects no module: the worklist has fewer than $shard_n modules"
+    batteries=$(printf '%s\n' "$batteries" | awk -v keep="$(printf '%s ' $modules)" '
+        BEGIN { split(keep, ids, " "); for (i in ids) want[ids[i]] = 1 }
+        { id = $0; sub(/\/.*/, "", id); if (id in want) print }')
+    printf 'run-module-hub-batteries: shard %s — module(s): %s\n' "$shard" "$(printf '%s ' $modules)" >&2
+fi
 
 exemption_for() { # $1=module id → prints "issue reason", empty when not exempt
     local entry

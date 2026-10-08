@@ -378,4 +378,34 @@ got=$(awk -F'\t' '$1 == "beta/tests/only.hub.test.py" { print $2 }' "$tmp_dir/ps
     || fail "11b: ERPLORA_HUB_PSQL is '$got', not the toolkit's shape for ci-pg/$beta_db"
 ok
 
+# ── 12 · `--shard k/n` splits the MODULES across jobs, and the shards add up (pm#655) ─────
+# The batteries are ~28 of the ~42 minutes of `test-hub-modules.yml`; back on kernel PRs they run
+# as parallel jobs. A shard takes whole modules (one hub per module is not negotiable, see the
+# header), the shards are disjoint, and together they run every battery exactly once — a module
+# that falls between two shards is the hole hub#1381 exists to close.
+shard_ran=""
+for k in 1 2; do
+    INSTALLED=alpha,beta run_runner --shard "$k/2"
+    [ "$rc" -eq 0 ] || fail "12: shard $k/2 of a green catalogue must exit 0, got $rc"
+    boots=$(grep -c . "$tmp_dir/boot.log")
+    [ "$boots" -eq 1 ] || fail "12: shard $k/2 must boot ONE hub (one module of two), got $boots"
+    shard_ran="$shard_ran$(cut -d' ' -f1 "$tmp_dir/battery.log")"$'\n'
+done
+ok
+got=$(printf '%s' "$shard_ran" | sed '/^$/d' | sort)
+expected=$(printf 'alpha/tests/one.hub.test.py\nalpha/tests/two.hub.test.py\nbeta/tests/only.hub.test.py')
+[ "$got" = "$expected" ] || fail "12: shards 1/2 + 2/2 must run every battery exactly once, got:
+$got"
+ok
+
+# A shard that cannot be honoured is an ENVIRONMENT error (exit 2), never a green with nothing
+# run: a matrix asking for more shards than there are modules would otherwise pass empty.
+for bad in 0/2 3/2 2 a/b 1/0 3/3; do
+    INSTALLED=alpha,beta run_runner --shard "$bad"
+    [ "$rc" -eq 2 ] || fail "12: --shard $bad must exit 2 (environment), got $rc"
+    boots=$(grep -c . "$tmp_dir/boot.log")
+    [ "$boots" -eq 0 ] || fail "12: --shard $bad must not boot any hub, got $boots"
+done
+ok
+
 printf 'run-module-hub-batteries.test.sh: %s checks passed\n' "$passed"
