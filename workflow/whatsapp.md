@@ -152,7 +152,7 @@ Pendiente de enlazar: hub — HUB, automatizaciones (el paso «esperar respuesta
 QA: W-02, W-07
 
 ### HUB-F266 Mandar un WhatsApp desde el hub
-Estado: parcial — el hub no sabe si la clienta escribió en las últimas 24 h: si Meta rechaza en el acto, la plataforma contesta `502 meta_send_failed` y el hub lo reintenta 8 veces (≈4 min) antes de «Eventos caídos»; si Meta lo falla después, nada lo registra; y cualquier 429, también el freno de tasa, se toma por cupo agotado
+Estado: parcial — el hub no sabe si la clienta escribió en las últimas 24 h: si Meta rechaza en el acto, la plataforma contesta `502 meta_send_failed` y el hub lo reintenta 8 veces (≈4 min) antes de «Eventos caídos»; si Meta lo falla después, nada lo registra
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -164,7 +164,8 @@ Entra: la intención de envío (`channel`, `to`, `template`, `vars`, opciones `i
 Sale: el mensaje en el móvil de la clienta; en el historial del hub, la entrega con el identificador de Meta. La ventana de 24 h no la vigila el hub. Una automatización puede preguntar la hora actual en un paso «solo si» (`now.iso`, hub#1694), pero necesita además la hora del último mensaje de la clienta (sin confirmar qué consulta la da). Si Meta acepta el envío y lo falla después, la plataforma descarta ese estado y el hub lo da por enviado.
 En este mismo documento se apoya en: HUB-F52 (Reintentar un aviso que un módulo no pudo procesar), HUB-F53 (Mandar a «Eventos caídos» al momento lo que reintentar no arregla), HUB-F54 (Ver la cola de avisos caídos), HUB-F55 (Reenviar un aviso caído), HUB-F58 (Reenviar solo lo que un permiso había rechazado, al concederlo), HUB-F61 (Mandar el email o el WhatsApp que pide un módulo o una automatización), HUB-F93 (Paso «Enviar un mensaje» a un cliente), HUB-F98 (Conceder, limitar y retirar los permisos de una automatización), HUB-F112 (Subir la foto, el vídeo o el PDF de la cabecera de un WhatsApp).
 Si falla:
-- **Cupo del mes agotado** (la plataforma contesta 429 `quota_exceeded`): no se reintenta; el aviso cae al momento a «Eventos caídos» con el motivo y se reintenta a mano cuando haya cupo (hub#971). El hub trata así **cualquier** 429 o 402 sin mirar el cuerpo, y la plataforma también contesta 429 cuando el hub agota su freno de tasa por hora (compartido con la recogida, el asistente y el resto): un envío frenado por tasa cae igual, sin reintentos (hueco).
+- **Cupo del mes agotado** (la plataforma contesta 429 con `"error": "quota_exceeded"`, o 402): no se reintenta; el aviso cae al momento a «Eventos caídos» con el motivo y se reintenta a mano cuando haya cupo (hub#971).
+- **Freno de tasa** (cualquier otro 429: el hub agotó su freno por hora, compartido con la recogida, el asistente y el resto, o el de correos): no es un fallo del envío. El aviso espera lo que pide la plataforma en `Retry-After` (como poco 1 s y como mucho 1 h; 1 min si no lo dice) y vuelve a salir solo, **sin gastar** ninguno de los 8 intentos y sin pasar por «Eventos caídos» (hub#2649). Mientras el freno no se levante, el aviso sigue esperando, como mucho una vez por hora. Si en ese mismo intento falla además otra cosa (otro destinatario del aviso), manda la escalera de siempre.
 - **Módulo sin la capacidad de notificaciones concedida**: no se manda; cae al momento con su motivo y vuelve a la cola sola cuando el dueño la concede (hub#1192). Lo que pasa cuando a una automatización le retiran un permiso es del motor de automatizaciones.
 - **Plataforma caída, rechazo (Meta rechaza: `502 meta_send_failed`; plantilla no aprobada: `409 template_not_approved`), o el archivo de cabecera no se pudo firmar**: se reintenta con esperas de 2, 4, 8… 128 s y, tras 8 intentos (unos 4 minutos), cae a «Eventos caídos»: una caída de la plataforma de más de 4 minutos deja todos los envíos de ese rato para reintentar a mano.
 - **Hub sin enrolar**: falla y se reintenta, nunca se da por enviado.
@@ -292,7 +293,8 @@ delega y qué no existe.
 | Saber a qué pregunta contesta un toque | hecho | HUB-F265 |
 | No contestar automáticamente lo que llegó hace días (tras un apagón) | no hecho: el hub no mira la antigüedad | HUB-F263 |
 | Envío por plantilla, texto libre u opciones | hecho | HUB-F266 |
-| Cupo agotado: no se reintenta, cae a Eventos caídos | hecho, pero cualquier 429 (también el freno de tasa) se toma por cupo agotado | HUB-F266 |
+| Cupo agotado: no se reintenta, cae a Eventos caídos | hecho | HUB-F266 |
+| Freno de tasa: espera lo que pide `Retry-After` y reintenta solo | hecho (hub#2649) | HUB-F266 |
 | Motivos de Meta al conectar y al registrar plantilla | parcial: los 5xx con código llegan como `cloud_rejected` | HUB-F260, HUB-F269 |
 | Ventana de 24 h conocida por el hub | no hecho | HUB-F266 |
 | Adjuntos en streaming, sin guardar | hecho | HUB-F267 |
@@ -350,8 +352,9 @@ automatizaciones, o fuera del hub. Lo del asistente está en [asistente.md](asis
 3. **Refrescar el cupo de WhatsApp al cambiar de plan y al instalar la Bandeja** (hoy solo cada 24 h
    y al arrancar).
 4. **Freno de tasa compartido** (5.000 llamadas por hora y hub en la plataforma, 720 de ellas la
-   recogida): ¿se separa el cupo de mensajes del freno de tasa en la respuesta, para que el hub
-   reintente uno y no el otro?
+   recogida): el hub ya distingue uno de otro por el cuerpo (`quota_exceeded` es cupo; cualquier otro
+   429, freno) y reintenta solo el freno (hub#2649). Queda abierto si los envíos deben tener un freno
+   propio para no esperar detrás de la recogida y el asistente.
 
 ## Fuentes contrastadas
 
@@ -365,8 +368,7 @@ automatizaciones, o fuera del hub. Lo del asistente está en [asistente.md](asis
   puerta de muestras (`cloud_envelope_named_refusal`); la de registrar plantilla lo pierde.
 - `whatsapp_inbox` WORKFLOW F01: la etiqueta «App de WhatsApp Business» y «el bloque dice el motivo»
   — la etiqueta no sale y los motivos 5xx llegan genéricos. F03 y REC_WA_*-F02: con el cupo agotado
-  la receta corre igual. F13: tras instalar el módulo, nada hasta la vuelta diaria; un 429 por tasa
-  se confunde con cupo agotado. F29: «Meta no ha contestado…» y el motivo de Meta no llegan.
+  la receta corre igual. F13: tras instalar el módulo, nada hasta la vuelta diaria. F29: «Meta no ha contestado…» y el motivo de Meta no llegan.
 - `apps/web/src/i18n/locales/es.ts:829-841`: las frases de `whatsappConnect.errors.{not_configured,
   no_business_account, no_access_token, meta_unreachable, meta_api_error}` no se ven nunca a
   través del hub (llegan como `cloud_rejected`).

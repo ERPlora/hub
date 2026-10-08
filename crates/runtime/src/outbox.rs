@@ -420,6 +420,26 @@ fn backoff_seconds(attempts: i64) -> i64 {
     (1i64 << attempts.clamp(0, 12)).min(3600)
 }
 
+/// How long a delivery the proxy rate-limited waits when the proxy named no `Retry-After`
+/// (hub#2649) — the email door's `@quota` answers a bare 429.
+const RATE_LIMIT_FALLBACK_WAIT_SECS: i64 = 60;
+
+/// The longest a rate-limited delivery waits, whatever the proxy asks: the ladder's own cap. A
+/// reminder for this afternoon is worth trying again within the hour.
+const RATE_LIMIT_MAX_WAIT_SECS: i64 = 3600;
+
+/// The wait a proxy's `Retry-After` turns into (hub#2649): what it asked, at least a second (a
+/// `0` would have the relay hammer it in the same drain) and at most [`RATE_LIMIT_MAX_WAIT_SECS`];
+/// [`RATE_LIMIT_FALLBACK_WAIT_SECS`] when it named none.
+fn rate_limit_wait_secs(retry_after_secs: Option<u64>) -> i64 {
+    match retry_after_secs {
+        Some(secs) => i64::try_from(secs)
+            .unwrap_or(RATE_LIMIT_MAX_WAIT_SECS)
+            .clamp(1, RATE_LIMIT_MAX_WAIT_SECS),
+        None => RATE_LIMIT_FALLBACK_WAIT_SECS,
+    }
+}
+
 /// Un ciclo del relay: procesa hasta [`BATCH`] eventos vencidos. Devuelve cuántas filas tomó
 /// (0 = nada vencido). Las filas que fallan quedan diferidas (`next_attempt_at` futuro), así que
 /// no se vuelven a tomar en este `now`; los eventos en cascada que generen las entregas con éxito
@@ -551,6 +571,8 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // quota (nothing to say beyond the error), a code for a refusal with a name.
     let mut dead_now = false;
     let mut dead_now_kind = "";
+    // …or one the proxy asked the hub to wait out (hub#2649): seconds until the next attempt.
+    let mut wait_secs: Option<i64> = None;
     for listener in &listeners {
         if delivery_exists(db, &ctx.hub_id, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
@@ -623,6 +645,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
                 dead_now = true;
                 dead_now_kind = kind;
             }
+            wait_secs = f.wait_secs;
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {}", f.error));
             }
@@ -730,6 +753,12 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         if failures == 1 && dead_now {
             return mark_dead_as(db, &id, &err, dead_now_kind).await;
         }
+        // A rate limit is waited out, not climbed (hub#2649): when the proxy's «slow down» is the
+        // only thing that failed, the row waits what it asked and keeps every rung of its ladder.
+        // Alongside another failure the ladder applies as usual — that failure is real.
+        if let (1, Some(secs)) = (failures, wait_secs) {
+            return wait_without_spending(db, &id, secs, &err).await;
+        }
         return defer_or_dead(db, &id, attempts, &err).await;
     }
 
@@ -758,6 +787,10 @@ struct NotifyFailure {
     /// dead-letter BY `failure_kind`, so a row that dies unclassified is never put back when the
     /// owner grants the capability — the reminder is lost, not delayed.
     dead_now: Option<&'static str>,
+    /// Not a failure of the delivery at all (hub#2649): the proxy asked the hub to slow down. The
+    /// row waits these seconds and is tried again **without spending an attempt**. `None` = not
+    /// a rate limit.
+    wait_secs: Option<i64>,
 }
 
 impl NotifyFailure {
@@ -767,6 +800,7 @@ impl NotifyFailure {
             error,
             permanent: Some(kind),
             dead_now: None,
+            wait_secs: None,
         }
     }
 
@@ -777,6 +811,17 @@ impl NotifyFailure {
             error,
             permanent: None,
             dead_now: Some(kind),
+            wait_secs: None,
+        }
+    }
+
+    /// The proxy's «slow down» (hub#2649), waited out for `secs` without spending an attempt.
+    fn rate_limited(secs: i64, error: RuntimeError) -> Self {
+        Self {
+            error,
+            permanent: None,
+            dead_now: None,
+            wait_secs: Some(secs),
         }
     }
 }
@@ -790,6 +835,7 @@ impl From<RuntimeError> for NotifyFailure {
             error,
             permanent: None,
             dead_now: None,
+            wait_secs: None,
         }
     }
 }
@@ -923,6 +969,20 @@ async fn deliver_host_notify(
             return Err(NotifyFailure::dead_now(
                 "",
                 RuntimeError::Notify(format!("quota exceeded: {detail}")),
+            ));
+        }
+        // The proxy's rate limit, not the quota (hub#2649): it lifts on its own, so the row waits
+        // what the proxy asked — no ladder spent, nothing filed in «Eventos caídos».
+        host_notify::SendOutcome::RateLimited {
+            retry_after_secs,
+            detail,
+        } => {
+            let secs = rate_limit_wait_secs(retry_after_secs);
+            return Err(NotifyFailure::rate_limited(
+                secs,
+                RuntimeError::Notify(format!(
+                    "erplora.com asked the hub to slow down; trying again in {secs} s: {detail}"
+                )),
             ));
         }
     };
@@ -1214,6 +1274,28 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
     p.insert("err".into(), json!(err));
     db.execute(
         "UPDATE _event_outbox SET attempts = :attempts, next_attempt_at = :next_at, last_error = :err, claim_expires_at = NULL WHERE id = :id",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Puts a row the proxy rate-limited back in the queue `secs` from now (hub#2649), **leaving
+/// `attempts` alone**: waiting out a «slow down» is not a failed delivery, so it can neither kill
+/// the row nor bring it closer to `MAX_ATTEMPTS`. Clears the lease like [`defer_or_dead`].
+async fn wait_without_spending(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    secs: i64,
+    err: &str,
+) -> Result<()> {
+    let next_at = (chrono::Utc::now() + chrono::Duration::seconds(secs)).to_rfc3339();
+    let mut p = Params::new();
+    p.insert("id".into(), json!(id));
+    p.insert("next_at".into(), json!(next_at));
+    p.insert("err".into(), json!(err));
+    db.execute(
+        "UPDATE _event_outbox SET next_attempt_at = :next_at, last_error = :err, claim_expires_at = NULL WHERE id = :id",
         &p,
     )
     .await?;
@@ -1838,6 +1920,17 @@ mod tests {
     use crate::manifest::CommandDef;
     use crate::registry::{ModuleStatus, Principal, RegisteredCommand};
     use erplora_db::{testutil::fresh_db, PgAdapter};
+
+    /// What the proxy's `Retry-After` becomes (hub#2649): its seconds, never 0 (the relay would
+    /// hammer it in the same drain), never past the hour, and a minute when it named none.
+    #[test]
+    fn a_rate_limit_waits_what_the_proxy_asks_within_bounds_hub2649() {
+        assert_eq!(rate_limit_wait_secs(Some(30)), 30);
+        assert_eq!(rate_limit_wait_secs(Some(0)), 1);
+        assert_eq!(rate_limit_wait_secs(Some(86_400)), 3600);
+        assert_eq!(rate_limit_wait_secs(Some(u64::MAX)), 3600);
+        assert_eq!(rate_limit_wait_secs(None), 60);
+    }
 
     fn cmd(module: &str, sql: &str, emit: Vec<crate::manifest::EmitDef>) -> RegisteredCommand {
         RegisteredCommand {
