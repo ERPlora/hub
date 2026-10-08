@@ -388,6 +388,14 @@ pub enum SendOutcome {
     QuotaExceeded {
         detail: String,
     },
+    /// The proxy asked the hub to slow down (hub#2649): a rate limit, not the quota. It lifts on
+    /// its own, so the relay waits `retry_after_secs` (the proxy's `Retry-After`, `None` when it
+    /// named none) and tries again **without spending a rung of the ladder** — a burst of reminders
+    /// is not a failing delivery, and filing it as a spent quota lost every one of them.
+    RateLimited {
+        retry_after_secs: Option<u64>,
+        detail: String,
+    },
 }
 
 /// Transporte de notificación: el cliente real de un canal. **Trait inyectable** para no atar el
