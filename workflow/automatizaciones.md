@@ -143,16 +143,18 @@ Implicados: FLOWS-F03, FLOWS-F11, FLOWS-F21
 QA: qa-hub-flows R10
 
 ### HUB-F87 Pausar una automatización y volver a encenderla
-Estado: parcial — pausar no frena todo (hub#2650): una propuesta que esperaba se puede aprobar y su acción se ejecuta, los mensajes que ya estaban en cola salen, una llamada a otro sistema en vuelo se hace, y un turno del asistente en curso puede ejecutar su acción o dejar una propuesta nueva aunque ya esté en pausa; y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
+Estado: parcial — pausar no frena lo que ya está en marcha: una llamada a otro sistema en vuelo se hace, y un turno del asistente en curso puede ejecutar su acción o dejar una propuesta nueva aunque ya esté en pausa (esa propuesta ya no se puede aprobar mientras siga en pausa); y al volver a encenderla, el horario o la fecha que vencieron en la pausa disparan al momento
 Actor: administrador
 Pantalla: FLOWS: Automatizaciones
 Pasos:
 1. Se guarda la automatización con el interruptor apagado (HUB-F86).
 2. Desde ese momento no arranca con ningún aviso ni horario.
 3. Una ejecución que estaba lista para seguir se cancela en su siguiente paso (en un segundo); si la pausa llega mientras el motor la está avanzando en ese mismo segundo, puede dar hasta 8 pasos más. Una que estaba esperando un plazo se cancela al despertar, salvo que se haya vuelto a encender antes; mientras tanto, los avisos que cancelan o reprograman su espera siguen actuando.
-4. Al volver a encenderla, arranca de nuevo con lo que pase desde entonces.
+4. Una propuesta suya que espera en la bandeja no se puede aprobar mientras esté en pausa: se niega (`flow.disabled`), no se hace nada y sigue pendiente; se puede rechazar, caduca a su hora o se aprueba al volver a encenderla (HUB-F100). Si la pausa llega mientras se está aprobando, gana la pausa y no queda nada hecho.
+5. Sus mensajes que estaban en cola (WhatsApp, correo) no salen: el repartidor los cierra en su siguiente intento en «Eventos caídos», con el destinatario y un motivo que dice que la automatización está en pausa (HUB-F53, HUB-F54). Reenviarlos a mano mientras siga en pausa los vuelve a cerrar igual.
+6. Al volver a encenderla, arranca de nuevo con lo que pase desde entonces; los mensajes que cayeron en la pausa no salen solos: se reenvían a mano desde «Eventos caídos» si aún tienen sentido.
 Entra: la automatización con `enabled: false` o `true`.
-Sale: la automatización pausada o encendida; las ejecuciones canceladas con el motivo «la automatización se apagó mientras corría». Los permisos y el historial se quedan.
+Sale: la automatización pausada o encendida; las ejecuciones canceladas con el motivo «la automatización se apagó mientras corría»; sus propuestas pendientes, intactas; sus mensajes en cola, en «Eventos caídos» con su destinatario. Los permisos y el historial se quedan.
 Si falla: lo mismo que HUB-F86.
 Implicados: FLOWS-F03, FLOWS-F21
 QA: qa-hub-flows R10
@@ -332,7 +334,7 @@ Implicados: FLOWS-F16
 QA: qa-hub-flows R5
 
 ### HUB-F100 Decidir una pregunta o una propuesta que espera
-Estado: parcial — aprobar ejecuta aunque la automatización esté en pausa (hub#2650)
+Estado: hecho
 Actor: administrador
 Pantalla: FLOWS: Automatizaciones
 Pasos:
@@ -343,7 +345,7 @@ Pasos:
 5. Un no hace lo que el paso dijo (parar o seguir).
 Entra: la pregunta o propuesta, la decisión, la nota y la sesión (de ahí sale quién decidió, nunca del cuerpo).
 Sale: la decisión guardada con quién, cuándo y la nota; la ejecución sigue, se cancela o, si la acción aprobada falla, queda fallida con el error. Al llegar y al caducar una propuesta sale un aviso efímero por el canal en vivo (`flow.approval.created` / `flow.approval.expired`) que refresca la bandeja.
-Si falla: ya decidida, «alguien ya contestó» (`flow.approval_already_decided`); caducada, `flow.approval_expired`; de otro rol y sin ser administrador, `flow.approval_not_yours`. Si al aprobar falta el permiso, la propuesta sigue pendiente. Si dos personas deciden a la vez (o una aprueba justo cuando el repaso de HUB-F101 la cierra), gana una sola: la acción se ejecuta como mucho una vez, y la otra recibe «alguien ya contestó» o «caducada» sin que se haya hecho nada por ella.
+Si falla: ya decidida, «alguien ya contestó» (`flow.approval_already_decided`); caducada, `flow.approval_expired`; de otro rol y sin ser administrador, `flow.approval_not_yours`. Si al aprobar falta el permiso, la propuesta sigue pendiente. Si la automatización está en pausa, aprobar se niega (`flow.disabled`), no se hace nada y la propuesta sigue pendiente (HUB-F87); si se borra mientras se aprueba, no queda nada hecho y la propuesta sigue pendiente (HUB-F88). Si dos personas deciden a la vez (o una aprueba justo cuando el repaso de HUB-F101 la cierra), gana una sola: la acción se ejecuta como mucho una vez, y la otra recibe «alguien ya contestó» o «caducada» sin que se haya hecho nada por ella.
 Implicados: FLOWS-F24
 QA: qa-hub-flows R6
 
@@ -526,7 +528,7 @@ QA: qa-hub-flows R7
 | «Solo si» y «seguir si falla» por paso | hecho; sin reintento por paso | HUB-F97 |
 | Permisos por automatización con límites | parcial (escritura no todo-o-nada) | HUB-F98 |
 | Secretos de solo escritura y protección de llamadas salientes | hecho | HUB-F94, HUB-F99 |
-| Aprobación con plazo y qué pasa con el no y el silencio | parcial: el rol no restringe; aprobar ejecuta con la automatización en pausa (hub#2650) | HUB-F96, HUB-F100, HUB-F101 |
+| Aprobación con plazo y qué pasa con el no y el silencio | parcial: el rol no restringe | HUB-F96, HUB-F100, HUB-F101 |
 | Historial paginado con retención | hecho (90 días) | HUB-F102 |
 | Reanudar desde el paso que falló (Make, Power Automate) | no hecho (hub#952) | HUB-F103 |
 | Recetas de fábrica: servir, encender, apagar, restaurar | parcial: encender no es todo-o-nada; restaurar con hueco de pausa | HUB-F104…F107 |
@@ -568,10 +570,9 @@ automatizaciones, y lo que alcanza el borrado de un cliente, están en [avisos.m
 
 ## Dudas abiertas
 
-1. ¿Debe pausar una automatización cancelar también sus preguntas pendientes y sus mensajes en cola?
-2. ¿Debe volver a encenderse una automatización sin disparar lo que venció durante la pausa?
-3. ¿Quién debe poder contestar una pregunta dirigida a un rol (hoy solo administradores)?
-4. ¿Debe haber límite de ejecuciones a mano por minuto?
+1. ¿Debe volver a encenderse una automatización sin disparar lo que venció durante la pausa?
+2. ¿Quién debe poder contestar una pregunta dirigida a un rol (hoy solo administradores)?
+3. ¿Debe haber límite de ejecuciones a mano por minuto?
 
 ## Fuentes contrastadas
 
@@ -584,11 +585,16 @@ automatizaciones, y lo que alcanza el borrado de un cliente, están en [avisos.m
   (HUB-F80).
 - `WORKFLOW.md` de `flows` (FLOWS-F09, «Reglas»): «lo que esperaba una respuesta se cancela cuando
   alguien contesta o caduca» — cierto para rechazar o caducar; aprobar una propuesta de una
-  automatización pausada ejecuta la acción antes de cancelar la ejecución, y aprobar una de una
+  automatización pausada se niega (`flow.disabled`) y la deja pendiente, y aprobar una de una
   automatización borrada se niega (sin permiso) y la deja pendiente (HUB-F87, HUB-F88, HUB-F100).
 - `WORKFLOW.md` de `flows` (FLOWS-F03, «Reglas»): «pausar hace que lo que estaba en marcha se cancele
-  en su siguiente paso»; una espera dormida solo se cancela al despertar, y los mensajes en cola salen
-  igual (HUB-F87).
+  en su siguiente paso»; una espera dormida solo se cancela al despertar (HUB-F87). Sus mensajes en
+  cola ya no salen (hub#2650).
+- Mensajes en cola de una automatización en pausa (hub#2650): Zapier (apagar detiene lo que esperaba
+  y no lo reanuda), Shopify Flow (apagar cancela lo que esperaba), Odoo Marketing Automation (parar
+  cancela lo programado), HubSpot (al reencender, por defecto no ejecuta lo perdido), Klaviyo, Make,
+  Power Automate (apagar para) y Mailchimp (pausar retiene): gana «no se envía, no se reanuda solo,
+  se puede reenviar a mano» (HUB-F87).
 - `WORKFLOW.md` de `whatsapp_inbox` (WHATSAPP_INBOX-F14): «quedan… con exactamente los permisos que
   declaran»; cierto la primera vez; al volver a activar se conservan los del dueño (HUB-F105).
 - Los rechazos del motor que la pantalla pinta tal cual están en inglés (HUB-F80).

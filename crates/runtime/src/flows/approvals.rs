@@ -712,6 +712,13 @@ pub async fn mark_decided_with_comment(
 /// that is no longer pending the `CASE` yields `NULL`, the column is `NOT NULL`, and the
 /// transaction rolls back with the command's effects and its events. The caller then reads the row
 /// to tell the person who won ([`lost_race`]).
+///
+/// **The automation has to be ON, read in the same statement** (hub#2650). Approving a proposal of
+/// a paused automation used to run it: pausing is the owner's «stop», and a proposal written before
+/// the pause is exactly what they meant to stop. The check rides in the same `CASE` for the same
+/// reason as the `pending` one — in the `WHERE` it would only match zero rows and let the command
+/// commit — and in the same statement so a pause that commits while the command runs still wins.
+/// The row stays `pending`: nobody decided it.
 pub(crate) fn approve_op(
     hub_id: &str,
     id: &str,
@@ -728,7 +735,11 @@ pub(crate) fn approve_op(
     p.insert("now".into(), json!(now));
     (
         "UPDATE _flow_approvals \
-         SET status = CASE WHEN status = 'pending' AND deleted_at IS NULL THEN :status END, \
+         SET status = CASE WHEN status = 'pending' AND deleted_at IS NULL \
+                            AND EXISTS (SELECT 1 FROM _flow f \
+                                        WHERE f.id = _flow_approvals.flow_id AND f.hub_id = :hub_id \
+                                          AND f.enabled = 1 AND f.deleted_at IS NULL) \
+                           THEN :status END, \
              decided_by = :by, decided_at = :now, error = '', comment = :comment, \
              updated_at = :now \
          WHERE id = :id AND hub_id = :hub_id"

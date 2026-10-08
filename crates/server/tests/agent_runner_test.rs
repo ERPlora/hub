@@ -658,6 +658,85 @@ async fn approving_from_the_tray_books_the_appointment_without_asking_the_model_
     );
 }
 
+/// hub#2650 — the owner PAUSES the automation while its proposal waits in the tray (the assistant
+/// was booking the wrong slots). Approving it from the tray is refused with `409 flow.disabled`,
+/// nothing is booked and the proposal stays pending; once the automation is back on, the same
+/// proposal books.
+#[tokio::test]
+async fn approving_from_the_tray_a_proposal_of_a_paused_automation_books_nothing_hub2650() {
+    let cloud = FakeCloud::with(vec![sse_call(
+        "agenda.booking.create",
+        "c1",
+        json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 45 }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "paused",
+        agent_step("manual"),
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+    let id = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()[0]
+            .id
+            .clone()
+    };
+    let switch = |enabled: bool| {
+        let h = &h;
+        async move {
+            let rt = h.state.runtime.read().await;
+            let flow = rt.get_flow(&h.flow_id).await.unwrap();
+            rt.update_flow(
+                &h.flow_id,
+                &NewFlow {
+                    name: flow.name,
+                    enabled,
+                    definition: flow.definition,
+                },
+                "hub_user:owner",
+            )
+            .await
+            .unwrap();
+        }
+    };
+    let approve = || {
+        h.router.clone().oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{id}/approve"),
+            Some(&h.admin_session),
+            None,
+        ))
+    };
+
+    switch(false).await;
+    let response = approve().await.unwrap();
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    assert_eq!(body_json(response).await["error"]["code"], "flow.disabled");
+    assert!(
+        bookings(&h).await.is_empty(),
+        "a paused automation's proposal must not book"
+    );
+    {
+        let rt = h.state.runtime.read().await;
+        let row = rt.get_flow_approval(&id).await.unwrap();
+        assert_eq!(row.status, approvals::STATUS_PENDING, "{row:?}");
+    }
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_WAITING_APPROVAL
+    );
+
+    switch(true).await;
+    let response = approve().await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(bookings(&h).await.len(), 1, "back on, it books — once");
+}
+
 /// Rejecting is worth as much as approving: nothing is written, and the run stops rather than
 /// carrying on as if the booking had happened.
 #[tokio::test]
