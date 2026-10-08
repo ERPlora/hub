@@ -9,7 +9,9 @@ const MAIN = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 
 
 describe('main.ts forgets the e-mails of the PIN grid (hub#2536)', () => {
   it('calls forgetTrustedUserEmails before mounting', () => {
-    const forgetAt = MAIN.indexOf('forgetTrustedUserEmails();');
+    // A statement at the start of a line, not a mention: a commented-out call (`// forget…();`)
+    // or the name inside a comment must not satisfy this (rv-hub-2683, hub#2696 review).
+    const forgetAt = MAIN.search(/^forgetTrustedUserEmails\(\);$/m);
     const mountAt = MAIN.indexOf("app.mount('#app')");
     expect(forgetAt).toBeGreaterThan(-1);
     expect(mountAt).toBeGreaterThan(forgetAt);
