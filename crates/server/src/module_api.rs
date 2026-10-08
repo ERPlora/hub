@@ -322,7 +322,12 @@ pub(crate) async fn update_module(
     // una transición, así que si no se escribe cuando ocurre, no existe. Misma decisión que el
     // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
     // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
-    {
+    //
+    // hub#2663: what is read from the registry is read here, still holding the turn, and then the
+    // turn goes back — like installing does — because the version is in place (or the previous one
+    // is back): the history line and the assistant's indexing (an erplora.com call of up to 60 s)
+    // must not keep the next app change waiting.
+    let (module_name, chunks) = {
         let rt = st.runtime.read().await;
         let module_name = rt
             .registry()
@@ -331,6 +336,17 @@ pub(crate) async fn update_module(
             .find(|m| m.id == module_id)
             .map(|m| m.name.clone())
             .unwrap_or_else(|| module_id.clone());
+        // The new version may describe different tools: an index left with the previous one's
+        // texts routes blindly.
+        let chunks = match outcome {
+            Outcome::Updated { .. } => ingest::collect_chunks(rt.registry(), &module_id),
+            _ => Vec::new(),
+        };
+        (module_name, chunks)
+    };
+    drop(_module_ops);
+    {
+        let rt = st.runtime.read().await;
         if let Some(change) = erplora_runtime::update_history::from_module_outcome(
             &module_id,
             &module_name,
@@ -363,12 +379,6 @@ pub(crate) async fn update_module(
             Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
         }
         Outcome::Updated { from, to } => {
-            // La versión nueva puede describir tools distintas: un índice que se queda con el texto
-            // de la anterior enruta a ciegas.
-            let chunks = {
-                let rt = st.runtime.read().await;
-                ingest::collect_chunks(rt.registry(), &module_id)
-            };
             index_module_embeddings(&st, &auth, &module_id, &to, chunks).await;
             // Lo único que el dueño ve de toda la maquinaria (ADR-0269 §3.5): qué cambió y de qué
             // versión a cuál. `module.installed` va detrás porque es el evento que el shell YA
