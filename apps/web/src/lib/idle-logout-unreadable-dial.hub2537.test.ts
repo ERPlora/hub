@@ -15,13 +15,18 @@
 //     minutes are unknown too, and with the known minutes when they are not.
 //   - **A dial the hub DID answer still decides**: `per_shift` does not arm, `always` does.
 //   - **The failure is visible**: the person at the till is told, once, that it will go back to the
-//     pinpad after N minutes without use because the settings could not be read.
+//     pinpad after N minutes without use because the settings could not be read — and that notice
+//     is withdrawn as soon as a read succeeds, because from then on it is no longer true.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const resolveDeviceId = vi.fn<() => Promise<string | null>>();
 vi.mock('./device', () => ({ resolveDeviceId: () => resolveDeviceId() }));
-const toast = vi.fn<(message: string, color?: string, duration?: number) => Promise<void>>();
-vi.mock('./toast', () => ({ toast: (...args: [string, string?, number?]) => toast(...args) }));
+const toast = vi.fn<(message: string, color?: string, duration?: number, id?: string) => Promise<void>>();
+const dismissToast = vi.fn<(id: string) => Promise<boolean>>();
+vi.mock('./toast', () => ({
+  toast: (...args: [string, string?, number?, string?]) => toast(...args),
+  dismissToast: (id: string) => dismissToast(id),
+}));
 vi.mock('./theme', () => ({ setHubPalette: vi.fn() }));
 
 import { i18n } from '../i18n';
@@ -61,6 +66,9 @@ let uninstall: (() => void) | null = null;
 beforeEach(() => {
   vi.useFakeTimers();
   resolveDeviceId.mockResolvedValue('till-1');
+  // The real ones are promises (a toast is presented, then withdrawn).
+  toast.mockResolvedValue(undefined);
+  dismissToast.mockResolvedValue(true);
   setUser({ id: 'u1', name: 'Ana', email: 'ana@example.com' });
 });
 
@@ -117,7 +125,7 @@ describe('hub#2537: the dial cannot be read', () => {
     const expected = t('pinPolicy.unreadableIdleLock', { n: DEFAULT_IDLE_MINUTES });
     expect(expected).not.toBe('pinPolicy.unreadableIdleLock');
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith(expected, 'warning', expect.any(Number));
+    expect(toast).toHaveBeenCalledWith(expected, 'warning', expect.any(Number), expect.any(String));
 
     // A second failed read is the same failure, not a second notice.
     await loadDeviceMode();
@@ -144,6 +152,49 @@ describe('hub#2537: the dial cannot be read', () => {
     expect(toast).toHaveBeenCalledTimes(1);
   });
 
+  it('withdraws the notice when a later read answers: what it said is no longer true', async () => {
+    // At boot the shell reads the device mode and the settings side by side: the first can fail
+    // (503) and the second answer `per_shift` a moment later, which disarms the detector. A notice
+    // still promising «back to the pinpad after 5 minutes» would then be a lie.
+    respondWith(503, {});
+    await loadDeviceMode();
+    const onIdle = vi.fn();
+    uninstall = installIdleLogout(onIdle);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(toast).toHaveBeenCalledTimes(1);
+    const id = toast.mock.calls[0][3];
+    expect(id).toEqual(expect.any(String));
+    expect(dismissToast).not.toHaveBeenCalled();
+
+    respondWith(200, { pin_policy: 'per_shift', pin_inactivity_minutes: 5 });
+    await getHubSettings();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(dismissToast).toHaveBeenCalledTimes(1);
+    expect(dismissToast).toHaveBeenCalledWith(id);
+    await vi.advanceTimersByTimeAsync(60 * MIN);
+    expect(onIdle).not.toHaveBeenCalled();
+  });
+
+  it('a read that answers while the notice is still being presented withdraws it once it is up', async () => {
+    // Ionic presents a toast asynchronously; withdrawing it before it is up would find nothing,
+    // and the notice would then appear anyway and stay its full time.
+    let presented!: () => void;
+    toast.mockReturnValueOnce(new Promise<void>((resolve) => (presented = resolve)));
+    respondWith(503, {});
+    await loadDeviceMode();
+    uninstall = installIdleLogout(vi.fn());
+    await vi.advanceTimersByTimeAsync(0);
+
+    respondWith(200, { pin_policy: 'per_shift', pin_inactivity_minutes: 5 });
+    await getHubSettings();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(dismissToast).not.toHaveBeenCalled();
+
+    presented();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(dismissToast).toHaveBeenCalledTimes(1);
+  });
+
   it('says nothing on a personal device or with nobody signed in: there is no idle lock there', async () => {
     respondWith(200, { data: { mode: 'personal', trusted: true } });
     await loadDeviceMode();
@@ -165,6 +216,7 @@ describe('hub#2537: a dial the hub did answer still decides', () => {
     await vi.advanceTimersByTimeAsync(60 * MIN);
     expect(onIdle).not.toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalled();
+    expect(dismissToast).not.toHaveBeenCalled();
   });
 
   it('a successful read after a failure disarms again and the next failure is announced again', async () => {

@@ -29,7 +29,7 @@ import { hubSettings, type HubSettings } from './hub-settings';
 import { i18n } from '../i18n';
 import { knownPinPolicy, pinPolicyRead, type PinPolicy } from './pin-policy';
 import { isAuthed } from './session';
-import { toast } from './toast';
+import { dismissToast, toast } from './toast';
 
 /** Idle minutes assumed when the setting is absent or unreadable (mirror of the runtime, which
  *  degrades a corrupt row to its DEFAULT — never to a bound). */
@@ -40,6 +40,9 @@ const MAX_IDLE_MINUTES = 30;
 
 /** How long the notice of an unreadable dial stays on screen: long enough to be read at a till. */
 const UNREADABLE_NOTICE_MS = 8_000;
+
+/** The notice's toast id, so a read that succeeds can withdraw it. */
+const UNREADABLE_NOTICE_ID = 'idle-logout-unreadable-dial';
 
 /**
  * Does this combination of dial, device and session get an idle detector at all?
@@ -122,8 +125,11 @@ export function installIdleLogout(onIdle: () => void): () => void {
   };
 
   // The unreadable-dial notice is said once per failure: a second failed read is the same failure,
-  // and a read that succeeds in between ends it.
+  // and a read that succeeds in between ends it — and withdraws the notice, which stops being true
+  // (at boot the settings read can answer `per_shift` a moment after the device read failed).
+  // `shown` is the notice's own promise, so a withdrawal never runs ahead of its presentation.
   let announced = false;
+  let shown: Promise<void> = Promise.resolve();
 
   const stopWatch = watchEffect(() => {
     // Every read happens before the early return so the effect tracks them all: a minutes change
@@ -132,11 +138,19 @@ export function installIdleLogout(onIdle: () => void): () => void {
     const minutes = idleMinutesOf(hubSettings.value);
     const unreadable = pinPolicyRead.value === 'unreadable';
     disarm();
-    if (!unreadable) announced = false;
+    if (!unreadable && announced) {
+      announced = false;
+      void shown.then(() => dismissToast(UNREADABLE_NOTICE_ID));
+    }
     if (!arm) return;
     if (unreadable && !announced) {
       announced = true;
-      void toast(i18n.global.t('pinPolicy.unreadableIdleLock', { n: minutes }), 'warning', UNREADABLE_NOTICE_MS);
+      shown = toast(
+        i18n.global.t('pinPolicy.unreadableIdleLock', { n: minutes }),
+        'warning',
+        UNREADABLE_NOTICE_MS,
+        UNREADABLE_NOTICE_ID,
+      ).catch(() => undefined);
     }
     timer = createIdleTimer({ minutes, onIdle });
     for (const ev of IDLE_ACTIVITY_EVENTS) window.addEventListener(ev, activity, { passive: true });

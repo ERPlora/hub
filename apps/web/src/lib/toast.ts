@@ -11,16 +11,33 @@ import { i18n } from '../i18n';
 
 export type ToastColor = 'success' | 'danger' | 'medium' | 'primary' | 'warning';
 
-/** Shows a global toast. `duration` in ms (0 = sticky, closed by its button). */
-export async function toast(message: string, color: ToastColor = 'medium', duration = 2600): Promise<void> {
+/**
+ * Shows a global toast. `duration` in ms (0 = sticky, closed by its button). `id` names it so
+ * {@link dismissToast} can withdraw it once what it says stops being true.
+ */
+export async function toast(
+  message: string,
+  color: ToastColor = 'medium',
+  duration = 2600,
+  id?: string,
+): Promise<void> {
   const t = await toastController.create({
     message,
     color,
     duration,
     position: 'bottom',
     buttons: [{ text: 'OK', role: 'cancel' }],
+    ...(id ? { id } : {}),
   });
   await t.present();
+}
+
+/**
+ * Withdraws the toast shown with `id`. `false` when there is none on screen any more (it timed out
+ * or was tapped away): Ionic rejects that case, and a notice already gone is not a failure.
+ */
+export async function dismissToast(id: string): Promise<boolean> {
+  return toastController.dismiss(undefined, undefined, id).catch(() => false);
 }
 
 export const toastSuccess = (message: string): Promise<void> => toast(message, 'success');
