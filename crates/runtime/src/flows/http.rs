@@ -647,8 +647,16 @@ mod tests {
     #[test]
     fn hub2659_the_idempotency_key_is_stable_per_run_and_step_and_differs_between_steps() {
         let key = idempotency_key("run-1", "charge");
-        assert_eq!(key, idempotency_key("run-1", "charge"), "same attempt, same key");
-        assert_ne!(key, idempotency_key("run-1", "refund"), "another step of the run");
+        assert_eq!(
+            key,
+            idempotency_key("run-1", "charge"),
+            "same attempt, same key"
+        );
+        assert_ne!(
+            key,
+            idempotency_key("run-1", "refund"),
+            "another step of the run"
+        );
         assert_ne!(key, idempotency_key("run-2", "charge"), "another run");
         assert_eq!(key.len(), 36, "fits every provider's limit (Square: 45)");
     }

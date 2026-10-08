@@ -156,7 +156,11 @@ async fn hub2659_the_call_repeated_after_a_restart_carries_the_same_idempotency_
 
     // And the run history shows the key the call went out with, so support can match it against
     // the other system's log.
-    let run = rt.list_flow_runs(&flow_id, 1, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 1, None)
+        .await
+        .unwrap()
+        .remove(0);
     let (_, steps) = rt.get_flow_run(&run.id).await.unwrap();
     assert_eq!(
         steps[0].input["headers"]["Idempotency-Key"],
