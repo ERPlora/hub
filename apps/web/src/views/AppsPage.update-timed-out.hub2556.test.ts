@@ -55,7 +55,12 @@ vi.mock('../lib/runtime', () => ({
       latest_min_erplora_version: null,
     },
   ],
-  listModuleVersions: async (id: string) => ({ module_id: id, installed: '1.0.0', latest: '2.0.0', versions: ['2.0.0'] }),
+  listModuleVersions: async (id: string) => ({
+    module_id: id,
+    installed: '1.0.0',
+    latest: '2.0.0',
+    versions: ['2.0.0'],
+  }),
   modulePublicationStatus: async () => null,
 }));
 vi.mock('../lib/nav', () => ({ moduleNav: { value: [] }, refreshModuleNav: vi.fn() }));
