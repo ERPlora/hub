@@ -1755,6 +1755,18 @@ onBeforeUnmount(() => {
   height: auto;
   min-height: 0;
 }
+/* hub#2651 — On a phone OutfitKit lays a `fill` list out as tall as its content, scrolling WITH the
+   page (outfitkit#218, the 640px below which it does so). Pinned to the scroller's height, this box
+   left that list as overflow: the page lost its bottom padding and, at its end, the card sat flush
+   on the tabbar (half a pixel under it at 320×568). Here the box grows with the list, and is still
+   at least the scroller's height (and the floor), so a short list keeps reaching down to the
+   page's bottom margin as before. */
+@media (max-width: 640px) {
+  .fill {
+    height: auto;
+    min-height: max(100%, var(--ok-work-surface-min));
+  }
+}
 /* hub#2331 — «Update all». The offer is one line with its button (wrapping on a phone); the result
    lists every app of the batch, and with nine of them it scrolls inside itself instead of pushing
    «My apps» off the screen. */
