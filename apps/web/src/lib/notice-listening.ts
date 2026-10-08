@@ -112,3 +112,12 @@ export function registerNoticeListening(listening: NoticeListening): void {
 export async function resyncNoticeListening(): Promise<void> {
   await registered?.sync(true);
 }
+
+/**
+ * Stops the listening NOW and waits for the app to say so (hub#2503): «switch business» calls it
+ * before forgetting the hub, because afterwards this page is no longer the linked business and the
+ * app refuses the order (hub#2642). Never throws; a no-op before the boot registered anything.
+ */
+export async function stopNoticeListening(): Promise<void> {
+  await registered?.sync(false);
+}

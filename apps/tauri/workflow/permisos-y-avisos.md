@@ -131,8 +131,9 @@ Pasos:
    escucha». Mientras dura, la aplicación mantiene viva la página: la desbloquea cuando la pantalla se
    apaga o la aplicación pasa al fondo (sin ello Chromium la congela al minuto) y los avisos de la
    comanda y la cita siguen llegando.
-4. Al cerrar la sesión (`isAuthed=false`, `main.ts:420`), al destruirse la actividad o al cerrar la aplicación desde
-   recientes, se para. **No** se para al negar los avisos después, ni con «Cambiar de negocio».
+4. Al cerrar la sesión (`isAuthed=false`, `stopListeningWhenSignedOut` en `main.ts`), al cambiar de negocio o al
+   olvidar uno borrado (antes de olvidarlo, HUB_APP-F04 y F05), al destruirse la actividad o al cerrar la aplicación
+   desde recientes, se para. **No** se para al negar los avisos después.
 Entra: la petición de la página (activar con textos o desactivar).
 Sale: el servicio y su notificación silenciosa, sin sonido ni insignia. No se reinicia solo
 (`START_NOT_STICKY`): lo reabre la página al abrir la aplicación.
