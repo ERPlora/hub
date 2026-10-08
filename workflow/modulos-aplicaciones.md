@@ -260,17 +260,17 @@ Implicados: FLOWS-F01, HUB_SHELL-F29, HUB_SHELL-F109, HUB_SHELL-F115, HUB_SHELL-
 QA: BD-03
 
 ### HUB-F33 Leer y guardar los ajustes de un módulo
-Estado: parcial — la pantalla solo deja guardar al administrador, mientras el servidor acepta a quien tenga el permiso de la orden de guardar (el responsable lo tiene en Venta, Inventario y Cocina y lo hace por el asistente)
+Estado: hecho
 Actor: administrador, responsable, asistente
 Pantalla: HUB_SHELL: Vista de un módulo › Ajustes
 Pasos:
 1. Si el módulo declara un bloque de ajustes, la pantalla le añade la pestaña «Ajustes» a quien tiene el permiso de la orden de guardar (hub#2588; los demás no la ven, y la orden la sigue negando el embudo del paso 3): pinta un formulario a partir del esquema del módulo (o el componente propio que el módulo indique).
 2. Para cargarlo, ejecuta la consulta de lectura del módulo, con su permiso.
-3. Al pulsar «Guardar», manda todos los valores a la orden de guardar del módulo, que pasa por el embudo de siempre (HUB-F03): su permiso y su esquema con sus valores por defecto. Con un componente propio del módulo (`settings.component`), la pantalla no pone ningún candado de administrador.
+3. Al pulsar «Guardar», manda todos los valores a la orden de guardar del módulo, que pasa por el embudo de siempre (HUB-F03): su permiso y su esquema con sus valores por defecto. El formulario deja editar y guardar a quien tiene ese mismo permiso (el dueño y el administrador por su rol; el responsable en Venta, Inventario, Cocina y Personal, hub#2621); con un componente propio del módulo (`settings.component`), lo que deja tocar lo decide ese componente.
 4. La pantalla dice «Ajustes guardados.».
 Entra: el bloque `settings` del `module.json` (esquema, consulta, orden).
 Sale: la fila de ajustes del módulo y el aviso que su orden emita.
-Si falla: si la consulta de lectura falla, la pantalla no pinta el formulario ni deja guardar (hub#2511): un fallo pasajero dice «No se pudieron cargar los ajustes.» con «Reintentar», y un rechazo por permiso dice «No puedes ver estos ajustes» (solo le llega a quien puede guardar y no leer: los empleados de Venta e Inventario, que antes lo veían, ya no tienen la pestaña). Los valores de fábrica solo se enseñan cuando la lectura contesta sin fila (nunca se guardó nada). Al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Quien no es administrador ve «Solo un administrador puede cambiar estos ajustes.» y no tiene «Guardar»; por el asistente o la API guarda igualmente si tiene el permiso.
+Si falla: si la consulta de lectura falla, la pantalla no pinta el formulario ni deja guardar (hub#2511): un fallo pasajero dice «No se pudieron cargar los ajustes.» con «Reintentar», y un rechazo por permiso dice «No puedes ver estos ajustes» (solo le llega a quien puede guardar y no leer: los empleados de Venta e Inventario, que antes lo veían, ya no tienen la pestaña). Los valores de fábrica solo se enseñan cuando la lectura contesta sin fila (nunca se guardó nada). Al guardar, «No se pudieron guardar los ajustes.»; un campo rechazado por el esquema vuelve señalado («Revisa los campos marcados y vuelve a guardar.»). Si con la pestaña abierta entra otra persona sin el permiso de guardar, el formulario se bloquea sin «Guardar» y dice «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.»; el embudo del paso 3 rechaza igualmente la orden a quien no lo tiene.
 Implicados: CASH_REGISTER-F01, HUB_SHELL-F43, HUB_SHELL-F44, INVENTORY-F19, KITCHEN-F26, SALES-F34
 QA: qa-hub-restaurant §7.03 (discrepa)
 
@@ -322,7 +322,7 @@ QA: BD-01, BD-02
 | Desinstalar conservando los datos | hecho | HUB-F29 |
 | Borrar los datos de una app desinstalada | no hecho, a propósito | — |
 | Permisos de la app concedidos por el dueño | hecho | HUB-F32 |
-| Ajustes por app con formulario generado | parcial: quién guarda difiere entre pantalla y servidor | HUB-F33 |
+| Ajustes por app con formulario generado | hecho: guarda quien tiene el permiso de la orden, en pantalla y en el servidor (hub#2621) | HUB-F33 |
 | Paneles de Inicio por app | parcial: un panel sin permiso sale «No disponible» en vez de ocultarse | HUB-F34 |
 | Lista de puesta en marcha | hecho | HUB-F35 |
 
@@ -374,13 +374,10 @@ QA: BD-01, BD-02
 Se resuelven con `market-decision`; no las decide el worker. (Que reconciliar deja a esa copia
 del hub sin atender mientras descarga está en las dudas comunes del índice.)
 
-1. ¿Quién guarda los ajustes de una app: solo el administrador (la pantalla) o quien tenga el
-   permiso de la orden de guardar (el servidor, el asistente)? Hoy discrepan (HUB-F33, SALES-F34,
-   KITCHEN-F26, INVENTORY-F19).
-2. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
+1. En la app instalada (Windows, macOS, Android), donde la carpeta de descargas no se vacía, las apps
    no se actualizan solas al arrancar (solo las que no encuentra en la carpeta). ¿Es lo que se
    quiere? (HUB-F25)
-3. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
+2. Sin confirmar en el código del hub (lo verificó el verificador de la oleada y no lo pudo cerrar):
    - si `/readyz` retenido por el candado durante una reconciliación larga (HUB-F26) hace que Swarm
      reinicie el contenedor (depende del `healthcheck` de `infra`);
    - si una migración que falla a la mitad se deshace sola (depende de si `erplora-db` ejecuta cada

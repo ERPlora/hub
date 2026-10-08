@@ -438,7 +438,7 @@ const COVERED: Record<string, { prefix: string; contract: string[]; computed?: s
   'components/ModuleSettingsForm.vue': {
     prefix: 'module-settings-',
     contract: [
-      'module-settings-admin-only',
+      'module-settings-read-only',
       'module-settings-error',
       'module-settings-loading',
       'module-settings-no-permission',

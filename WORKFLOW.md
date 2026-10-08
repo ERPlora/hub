@@ -204,7 +204,7 @@ un solo sector, así que no usa la clave `Vertical:`.
 | HUB-F30 | Instalar un módulo desde una carpeta en modo desarrollo | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F31 | Servir el menú, las pantallas y los ficheros de las aplicaciones | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F32 | Conceder o retirar un permiso de host a una aplicación | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
-| HUB-F33 | Leer y guardar los ajustes de un módulo | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
+| HUB-F33 | Leer y guardar los ajustes de un módulo | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F34 | Servir los datos de los paneles de Inicio | parcial | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F35 | Calcular la lista de puesta en marcha | hecho | [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md) |
 | HUB-F50 | Dejar un aviso en la cola al guardar una orden | hecho | [avisos.md](workflow/avisos.md) |

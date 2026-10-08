@@ -205,6 +205,20 @@ export function settingsSavePermission(manifest: {
 }
 
 /**
+ * May this session change the module's settings? The one answer for the «Settings» tab (hub#2588)
+ * and for its form (hub#2621): the save `permission` (`settingsSavePermission`), or anybody when
+ * the command declares none. An owner/admin passes by ROLE, as in the module's client
+ * (`lib/runtime.ts`): the permission list of their session only names the apps installed when it
+ * was opened. A filter of the screen: the hub re-checks the command on every save.
+ */
+export function settingsSaveAllowed(
+  permission: string | null,
+  session: { isAdmin: boolean; hasPermission: (permission: string) => boolean },
+): boolean {
+  return !permission || session.isAdmin || session.hasPermission(permission);
+}
+
+/**
  * Heading of the shell-owned tabs of a module (Plan, Settings) — hub#959.
  *
  * The nav entries carry `module_name` already localised by the runtime (ADR-0055); the manifest
