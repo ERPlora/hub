@@ -37,6 +37,14 @@ const GATED_VERSION_PERMISSION: &str = "allow-erplora-bridge-status";
 const CORE_DEFAULT: &str = "core:default";
 const CORE_APP: &str = "core:app:";
 
+/// The only part of `core:app` the hub PWA keeps: the Android Back button reaches the page as the
+/// `back-button` event of that plugin (`onBackButtonPress`, `src/router/back-closes-overlay.ts`,
+/// hub#1906). It says nothing about the build, and it is the page on screen that hears it.
+const BACK_BUTTON_PERMISSIONS: [&str; 2] = [
+    "core:app:allow-register-listener",
+    "core:app:allow-remove-listener",
+];
+
 fn repo_root() -> PathBuf {
     // `apps/tauri/src-tauri` → up three.
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -90,11 +98,28 @@ fn no_page_under_erplora_com_reads_the_build_through_tauri() {
     // The pattern lets every page under erplora.com through, and Tauri's `app` plugin answers
     // whoever passes it: no second gate can be put in front of a core plugin (hub#2658).
     for permission in hub_pwa_permissions() {
+        let back_button = BACK_BUTTON_PERMISSIONS.contains(&permission.as_str());
         assert!(
-            permission != CORE_DEFAULT && !permission.starts_with(CORE_APP),
+            permission != CORE_DEFAULT && (back_button || !permission.starts_with(CORE_APP)),
             "capabilities/default.json grants {permission}, which hands `{VERSION_COMMAND}` to \
              any page under erplora.com — another business, the website, the test SaaS — and not \
              only to the linked hub (hub#2658)"
+        );
+    }
+}
+
+#[test]
+fn keeping_the_build_from_other_pages_keeps_the_android_back_button() {
+    // Dropping `core:default` for hub#2658 also dropped the listener of `core:app`: Tauri's
+    // activity then turns Back into `webView.goBack()` again and the router takes the screen —
+    // and the sale sheet, the modal or the side menu with it (hub#1906).
+    let granted = hub_pwa_permissions();
+    for permission in BACK_BUTTON_PERMISSIONS {
+        assert!(
+            granted.iter().any(|p| p == permission),
+            "capabilities/default.json no longer grants {permission}, so the hub PWA cannot hear \
+             the Android Back button and Back leaves the screen with the sheet still open \
+             (hub#1906, hub#2658)"
         );
     }
 }
