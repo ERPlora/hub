@@ -3362,6 +3362,10 @@ mod tests {
         // (crea o reactiva+re-rol); baja = desactiva (simétrica, idempotente).
         let db = fresh_db().await;
         ensure_identity_email(&db).await;
+        // Another administrator stays on the team: the door never takes off the last one (hub#2500).
+        create_login_user(&db, HUB, "boss@bar.com", "admin", 0)
+            .await
+            .unwrap();
 
         // Alta nueva.
         let u = create_login_user(&db, HUB, "ana@bar.com", "manager", 0)
@@ -3380,7 +3384,7 @@ mod tests {
             .unwrap();
         assert_eq!(u2.id, u.id, "reusa la fila del email (no duplica)");
         assert_eq!(u2.role, "admin", "actualiza el rol");
-        assert_eq!(list_login_users(&db, HUB).await.unwrap().len(), 1);
+        assert_eq!(list_login_users(&db, HUB).await.unwrap().len(), 2);
 
         // Baja: desactiva (true la primera vez, false si ya estaba inactiva = idempotente).
         assert!(deactivate_login_user(&db, HUB, "ana@bar.com")
@@ -3390,8 +3394,9 @@ mod tests {
             .await
             .unwrap());
         let listed = list_login_users(&db, HUB).await.unwrap();
-        assert_eq!(listed.len(), 1, "sigue listada (audit), pero inactiva");
-        assert!(!listed[0].is_active);
+        assert_eq!(listed.len(), 2, "sigue listada (audit), pero inactiva");
+        let ana = listed.iter().find(|l| l.email == "ana@bar.com").unwrap();
+        assert!(!ana.is_active);
 
         // Re-alta reactiva la misma fila.
         let u3 = create_login_user(&db, HUB, "ana@bar.com", "employee", 0)
