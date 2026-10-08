@@ -1744,29 +1744,30 @@ impl FlowDefinition {
 /// - **Only inside the `http` step it belongs to** (`inside_call`): the key is per run AND step, so
 ///   in a command, a condition, a `run_if` or a trigger there is no value it could mean.
 fn check_run_paths(paths: &[String], owner: &str, inside_call: bool) -> Result<()> {
-    let Some(path) = paths
+    // Every `run.…` the part names, not only the first: a valid one in front must not hide a
+    // typo behind it, which would still go out empty.
+    for path in paths
         .iter()
-        .find(|p| p.split('.').next() == Some(ROOT_RUN))
-    else {
-        return Ok(());
-    };
-    if path.as_str() != format!("{ROOT_RUN}.{RUN_IDEMPOTENCY_KEY}") {
-        return Err(invalid(
-            ERR_INVALID_DEFINITION,
-            format!(
-                "`{owner}`: `{path}` — the run offers one value, \
-                 `{ROOT_RUN}.{RUN_IDEMPOTENCY_KEY}`; anything else would go out empty"
-            ),
-        ));
-    }
-    if !inside_call {
-        return Err(invalid(
-            ERR_INVALID_DEFINITION,
-            format!(
-                "`{owner}`: `{path}` is the key of one call, so it can only be used in the URL, \
-                 headers or body of an `http` step (hub#2675)"
-            ),
-        ));
+        .filter(|p| p.split('.').next() == Some(ROOT_RUN))
+    {
+        if path.as_str() != format!("{ROOT_RUN}.{RUN_IDEMPOTENCY_KEY}") {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "`{owner}`: `{path}` — the run offers one value, \
+                     `{ROOT_RUN}.{RUN_IDEMPOTENCY_KEY}`; anything else would go out empty"
+                ),
+            ));
+        }
+        if !inside_call {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "`{owner}`: `{path}` is the key of one call, so it can only be used in the URL, \
+                     headers or body of an `http` step (hub#2675)"
+                ),
+            ));
+        }
     }
     Ok(())
 }
@@ -5813,6 +5814,23 @@ mod tests {
             "steps": [call]
         }))
         .expect_err("a trigger runs before any call");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+            "{err}"
+        );
+    }
+
+    /// The rule covers EVERY `run.…` the step names, not only the first one found (hub#2699
+    /// review): a step that writes `{{run.idempotency_key}}` in one header and `{{run.id}}` in the
+    /// next must not save — the second would still go out empty, hidden behind the first.
+    #[test]
+    fn hub2675_an_unknown_run_field_is_refused_even_after_a_valid_one() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "pay", "kind": "http", "url": "https://api.example.com/x",
+                        "headers": { "A-Key": "{{run.idempotency_key}}", "B-Key": "{{run.id}}" } }]
+        }))
+        .expect_err("an unknown run field must not save, wherever it sits");
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
             "{err}"
