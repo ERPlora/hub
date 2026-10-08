@@ -296,6 +296,20 @@ grep -q -- '- Run:' "$STUB_DIR/calls.log" && errs="$errs invented-a-run-line-wit
     && ok "outside a run (no GITHUB_RUN_ID) no run line is invented" \
     || bad "outside a run (no GITHUB_RUN_ID) no run line is invented" "$errs calls=$(cat "$STUB_DIR/calls.log")"
 
+# The run lives in the repo that RUNS the workflow, not the one the alert is opened in; and only
+# a `- Run:` line counts as already linked — the word «Run» in the prose does not.
+STUB_DIR=$(make_stub_dir); export STUB_DIR
+OUT="$STUB_DIR/out"
+printf '[]\n' > "$STUB_DIR/issues.json"
+code=$(GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=ERPlora/hub GITHUB_RUN_ID=777 \
+       REPO=ERPlora/saas TITLE="x" MATCH=exact BODY="Run 12 failed" run_script)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -qE '^- Run: https://github.com/ERPlora/hub/actions/runs/777( |$)' "$STUB_DIR/calls.log" || errs="$errs run-url-not-from-the-running-repo"
+[ -z "$errs" ] \
+    && ok "the run line points at the repo running the workflow, even when «Run» is in the prose" \
+    || bad "the run line points at the repo running the workflow, even when «Run» is in the prose" "$errs calls=$(cat "$STUB_DIR/calls.log")"
+
 STUB_DIR=$(make_stub_dir); export STUB_DIR
 OUT="$STUB_DIR/out"
 cat > "$STUB_DIR/issues.json" <<'JSON'
