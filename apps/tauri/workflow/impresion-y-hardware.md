@@ -139,7 +139,7 @@ Implicados: HUB-F196, HUB-F197, HUB-F198, HUB_PERIPHERALS-F04, HUB_SHELL-F73, HU
 QA: qa-hub §8
 
 ### HUB_APP-F19 Imprimir un tique, una factura o una comanda
-Estado: parcial — con una impresora de red, la aplicación contesta «correcto» al ponerlo en una cola en memoria y nadie se entera de si salió (ERPlora/hub#2494)
+Estado: parcial — desde hub#2494 la impresora de red contesta lo que pasó con el papel, pero una impresora encendida sin papel o con la tapa abierta sigue contestando «correcto» (no se consulta su estado), la cola interna vive en memoria y su trabajador único retiene ~13 s a las demás impresoras del equipo por cada trabajo a una apagada
 Actor: sistema, empleado
 Pantalla: ninguna
 Pasos:
@@ -147,9 +147,10 @@ Pasos:
    impresora de su función, el tipo de documento y el documento estructurado.
 2. La aplicación comprueba el identificador, que el tipo es uno de los ocho conocidos y que el documento
    se puede componer; si no, **rechaza ya** y el error vuelve a quien pidió el papel.
-3. **Red**: pone los bytes en una cola interna en memoria y contesta «correcto» (`erplora_print`,
-   `apps/tauri/src-tauri/src/lib.rs:1671-1683`). Un único trabajador la vacía: 3 intentos, 3 s para
-   conectar, 10 s para escribir, 2 s entre intentos.
+3. **Red**: pone los bytes en una cola interna en memoria y **espera** a que salgan (`erplora_print` →
+   `print_to_network`, hub#2494). Un único trabajador la vacía: 3 intentos, 3 s para conectar, 10 s para
+   escribir, 2 s entre intentos. Contesta «correcto» cuando la impresora se queda los bytes y el error
+   cuando se agotan los intentos.
 4. **Bluetooth**: manda los bytes por el canal serie y contesta cuando se han escrito; el fallo vuelve.
 5. **USB**: la orden existe pero la puerta no se la da (HUB_APP-F16).
 Entra: el identificador de la impresora, el tipo de documento y el documento (nunca HTML).
@@ -158,24 +159,25 @@ Sale: lo que **se le devuelve a la pantalla** por caso:
    | Caso | Qué recibe quien pidió el papel |
    |---|---|
    | Identificador mal formado, tipo desconocido, documento que no compone | Error al instante |
-   | Red, impresora apagada, IP equivocada, sin permiso de red local en Android 17 o en macOS 15 | **«Correcto»**. Tras los 3 intentos (unos 13 s) solo un `eprintln!` (`lib.rs:1256-1266`) **que se pierde**: la aplicación no instala ningún destino para sus registros; no queda rastro |
+   | Red, impresora apagada, IP equivocada, sin permiso de red local en Android 17 o en macOS 15 | Error «impresora inalcanzable» con el motivo, tras los 3 intentos (unos 13 s) (hub#2494) |
    | Red, impresora encendida pero sin papel o con la tapa abierta | **«Correcto» y nada más**: no se consulta el estado de la impresora; escribir en el socket funciona |
    | Bluetooth fuera de alcance, apagado o sin permiso | Error con el motivo |
    | USB (solo la hoja de prueba) | Error con el motivo si la cola no está lista o no saca el trabajo en 15 s |
 
-   Quien lo pidió trata el «correcto» como entregado: la puerta de impresión devuelve `via: bridge`
-   (`apps/web/src/lib/print.ts:381-404`), el puesto manda `done` al hub y la fila queda hecha
-   (`print-drain.ts:212-213`). Cuando el tique sale por la puerta directa ni siquiera hay fila en la cola.
+   Quien lo pidió trata el «correcto» como entregado y el error como no impreso: la puerta directa de
+   la caja devuelve `printerFailed` y la caja avisa con «Reintentar» (HUB_SHELL-F70, F72, F78); el
+   puesto que vacía la cola del hub manda `done` o `failed` según la respuesta (HUB-F199).
    La cola interna vive en memoria: lo que espera se pierde al cerrar la aplicación; no se deduplica el
    `jobId`; el trabajador único detiene ~13 s a las **demás** impresoras del mismo equipo por cada
-   trabajo a una impresora apagada. No hay estado de fallo, reintento posterior ni aviso a la persona.
-Si falla: lo anterior. La salida de verdad es mirar el papel; QA lo dice (qa-hub §8: «mira si sale papel,
-no el valor de retorno»). Ver también `HUB_PERIPHERALS-F06` y `HUB-F199`.
+   trabajo a una impresora apagada.
+Si falla: lo anterior. Sin papel o con la tapa abierta la respuesta sigue siendo «correcto»: ahí la
+salida de verdad es mirar el papel (qa-hub §8: «mira si sale papel, no el valor de retorno»). Ver
+también `HUB_PERIPHERALS-F06` y `HUB-F199`.
 Implicados: HUB-F199, HUB_PERIPHERALS-F06, KITCHEN-F08, PRINTING-F07, PRINTING-F10, SALES-F01
 QA: qa-hub §8, qa-hub-restaurant §16, qa-hub-android Fase 3
 
 ### HUB_APP-F20 Hacer una hoja de prueba
-Estado: parcial — con una impresora de red «Probar» no avisa si no contesta: la hoja entra en la misma cola en memoria y la orden contesta «correcto» (`lib.rs:1700-1706`); ERPlora/hub#2494
+Estado: hecho
 Actor: administrador, responsable, empleado
 Pantalla: printing: Impresoras
 Pasos:
@@ -185,8 +187,9 @@ Pasos:
 Entra: el identificador de la impresora y, opcionalmente, el nombre del negocio y el idioma.
 Sale: la hoja; nada guardado; no pasa por la cola del hub. Un módulo más antiguo que la aplicación
 no manda datos y la hoja sale igual con «ERPlora» en español.
-Si falla: de red: no hay error aunque la impresora no conteste (HUB_APP-F19). De USB o Bluetooth: el
-error vuelve y sale en rojo. Por eso **añadir por IP sí comprueba la conexión y «Probar» no**.
+Si falla: de red, tras los intentos (unos 13 s) vuelve «impresora inalcanzable» (HUB_APP-F19,
+hub#2494). De USB o Bluetooth, el error vuelve en el momento. En los dos casos sale en rojo en la
+pantalla de Impresión.
 Implicados: HUB_PERIPHERALS-F14, PRINTING-F05
 QA: qa-hub §8, qa-hub-android Fase 3
 

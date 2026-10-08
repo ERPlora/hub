@@ -239,7 +239,7 @@ Implicados: HUB_APP-F18, HUB_SHELL-F74
 QA: qa-hub §8
 
 ### HUB-F199 Sacar un trabajo de la cola y confirmar que salió el papel
-Estado: parcial — el papel de una impresora de red apagada se pierde sin aviso: `erplora_print` (`apps/tauri/src-tauri/src/lib.rs:1671-1683`) pone los bytes en una cola en memoria y contesta `Ok`; sus 3 intentos solo dejan rastro con `eprintln!` (`lib.rs:1256-1266`); el dispositivo manda `done` (`apps/web/src/lib/print-drain.ts:212-213`) y el hub marca el trabajo «hecho». No hay reintento, ni estado «fallido», ni aviso (HUB_PERIPHERALS-F06)
+Estado: parcial — desde hub#2494 un dispositivo con la impresora de red apagada contesta «falló» (antes confirmaba «hecho» al dejar los bytes en su cola en memoria), pero el trabajo que falla vuelve a «pendiente» sin aviso en vivo: nadie en la caja ni en la cocina se entera y no se vuelve a repartir hasta el siguiente trabajo de esa función o una reconexión (HUB_SHELL-F74)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -273,8 +273,9 @@ Entra: los fallos y desconexiones de los dispositivos.
 Sale: un trabajo en estado «muerto», visible en la cola. Su identificador sigue gastado (HUB-F192).
 Si falla: un trabajo solo muere por fallos **antes** del envío (la aplicación no pudo componer, el dispositivo no tiene impresora con esa
 función —también si se la quitaron sin retirarlo del hub, HUB-F197—, o una Bluetooth no contestó) o por
-desconexiones; una USB nunca recibe trabajos de la cola; una impresora de red apagada no lo mata,
-porque el dispositivo ya lo dio por hecho (HUB-F199). Un dispositivo que falla deja de pedir esa función
+desconexiones; una USB nunca recibe trabajos de la cola. Una impresora de red apagada sí cuenta desde
+hub#2494 (el dispositivo contesta «falló», HUB-F199); una encendida sin papel no, porque se da por
+impresa. Un dispositivo que falla deja de pedir esa función
 hasta que le llegue un aviso o se reconecte, para no gastar las cinco entregas en milisegundos; y el trabajo devuelto no despierta a nadie (HUB-F199).
 Implicados: HUB_SHELL-F74, PRINTING-F14
 QA: qa-hub-restaurant §16
@@ -429,7 +430,7 @@ QA: qa-hub §8
 | Canal en vivo con aviso «hay trabajo» | parcial: el aviso no llega con función omitida o escrita distinto, ni por la puerta de módulos, ni al reintentar un trabajo muerto ni cuando vuelve a la cola por un fallo | HUB-F190, HUB-F191, HUB-F198, HUB-F204 |
 | Trabajo en espera sin impresora y alarma | hecho | HUB-F201, HUB-F202 |
 | Reintentar y descartar con sello | hecho | HUB-F204, HUB-F205 |
-| «Hecho» solo cuando sale el papel | parcial: `erplora_print` contesta Ok al encolar en memoria (`apps/tauri/src-tauri/src/lib.rs:1671-1683`) | HUB-F199 |
+| «Hecho» solo cuando sale el papel | parcial: con red se confirma cuando la impresora se queda los bytes (hub#2494); sin papel no se detecta | HUB-F199 |
 | Retención y borrado RGPD de la cola | no hecho | HUB-F206 |
 | Cajón desde el servidor / sin venta | no hecho | HUB-F207 |
 
