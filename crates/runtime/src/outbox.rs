@@ -911,6 +911,24 @@ async fn deliver_host_notify(
             Ok(flow_id) => asking_flow = flow_id,
             Err(e) => return Err(NotifyFailure::permanent(FAILURE_RELEASE_REVOKED, e)),
         }
+        // A PAUSED automation's message does not go out (hub#2650): pausing is the owner's «stop»,
+        // and a message queued before it is part of what they stopped. Unlike a revoked release the
+        // owner may want it after all, so it dies now with its recipient and stays resendable by
+        // hand; turning the automation back on does not send it by itself, because a reminder that
+        // sat out the pause may be about something already over. Read at every attempt, so a hand
+        // resend while still paused dies the same way.
+        if !crate::flows::store::get(db, hub_id, &asking_flow)
+            .await?
+            .enabled
+        {
+            return Err(NotifyFailure::dead_now(
+                "",
+                RuntimeError::Notify(format!(
+                    "the automation `{asking_flow}` is paused, so its message was not sent; turn \
+                     it back on and resend it from «Eventos caídos»"
+                )),
+            ));
+        }
         host_notify::check_recipient_syntax(intent.channel, &intent.to)?;
     } else {
         // Puerta 1 — capability del MÓDULO emisor (no del hub): sin `notify` concedida, no hay
@@ -2389,11 +2407,20 @@ mod tests {
         .unwrap();
     }
 
+    /// A run and the automation it belongs to, switched on — a run never exists without its
+    /// automation, and the release reads whether that automation is paused (hub#2650).
     async fn seed_flow_run(db: &PgAdapter, run_id: &str, flow_id: &str) {
         let mut p = Params::new();
         p.insert("id".into(), json!(run_id));
         p.insert("flow_id".into(), json!(flow_id));
         p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _flow (id, hub_id, name, enabled, created_at, updated_at) \
+             VALUES (:flow_id, 'h1', :flow_id, 1, :at, :at) ON CONFLICT (id) DO NOTHING",
+            &p,
+        )
+        .await
+        .unwrap();
         db.execute(
             "INSERT INTO _flow_runs (id, hub_id, flow_id, status, created_at, updated_at) \
              VALUES (:id, 'h1', :flow_id, 'done', :at, :at)",

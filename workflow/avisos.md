@@ -101,14 +101,15 @@ Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
-1. Hay tres negativas que el octavo intento sabría igual que el primero, y el hub no espera los 4 minutos para reconocerlas:
+1. Hay cuatro negativas que el octavo intento sabría igual que el primero, y el hub no espera los 4 minutos para reconocerlas:
    - el módulo que escucha (o el que pide imprimir o mandar un mensaje) necesita un permiso que el dueño no le ha concedido en Ajustes → Permisos;
    - la cuota de WhatsApp del negocio está agotada (no el freno de tasa de erplora.com, que se espera, HUB-F61);
-   - el dueño retiró el permiso de una automatización mientras su mensaje esperaba en la cola.
-2. En los tres casos el aviso pasa a «Eventos caídos» en el primer intento, con el motivo marcado.
-3. Los dos primeros se pueden reenviar (al conceder el permiso o recuperar la cuota). El tercero no: al aviso se le borra el destinatario y no se ofrece reenviarlo.
+   - el dueño retiró el permiso de una automatización mientras su mensaje esperaba en la cola;
+   - la automatización que pidió el mensaje está en pausa (HUB-F87).
+2. En los cuatro casos el aviso pasa a «Eventos caídos» en el primer intento, con el motivo marcado.
+3. El primero, el segundo y el cuarto se pueden reenviar (al conceder el permiso, recuperar la cuota o volver a encender la automatización; mientras siga en pausa, reenviarlo lo vuelve a cerrar igual). El tercero no: al aviso se le borra el destinatario y no se ofrece reenviarlo.
 Entra: el aviso y la negativa del permiso, de la cuota o de la automatización.
-Sale: el aviso caído con su motivo (`failure_kind`: `module.capability_denied`, vacío para la cuota, o `flow.release_revoked`). En el tercer caso, el teléfono o el correo del destinatario desaparece del contenido guardado y queda la marca de destinatario oculto.
+Sale: el aviso caído con su motivo (`failure_kind`: `module.capability_denied`, vacío para la cuota y para la automatización en pausa, o `flow.release_revoked`). En el tercer caso, el teléfono o el correo del destinatario desaparece del contenido guardado y queda la marca de destinatario oculto.
 En este mismo documento se apoya en: HUB-F10 (Ejecutar el manejador de un módulo y validar lo que propone), HUB-F32 (Conceder o retirar un permiso de host a una aplicación).
 Si falla: solo se mata al momento si esa negativa es el único fallo de la pasada; si otro módulo también falló, el aviso sigue la escalera normal de HUB-F52. Un fallo de la base de datos al comprobar el permiso no cuenta como negativa: sigue la escalera.
 Implicados: PRINTING-F16, FLOWS-F25, HUB_VERIFACTU-F01

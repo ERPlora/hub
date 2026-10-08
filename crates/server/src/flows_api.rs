@@ -29,6 +29,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use erplora_runtime::flows::executor::ERR_FLOW_DISABLED;
 use erplora_runtime::flows::{agent, approvals, grants, secrets, store, templates, NewFlow};
 use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::RuntimeError;
@@ -138,16 +139,6 @@ fn flow_status(code: &str) -> Option<StatusCode> {
     };
     Some(status)
 }
-
-/// The one refusal of the family that the runtime spells inline (`flows::executor`) instead of
-/// exporting: a manual run of a flow whose author turned it off. Named here so [`flow_status`] can
-/// list it with the other conflicts instead of matching a bare string.
-///
-/// It is a copy of a literal, so it can drift — and what stops it is not a comment:
-/// `tests/flows_api_test.rs::a_disabled_flow_refuses_to_be_run_by_hand` asks the real router and
-/// would answer `400` the day the runtime renames it, because it would fall to the family default.
-/// Publishing it from the runtime is the proper fix and belongs with whoever owns that file.
-const ERR_FLOW_DISABLED: &str = "flow.disabled";
 
 /// The kernel's own errors, given the HTTP status [`flow_status`] says they mean.
 fn flow_err(e: RuntimeError) -> Response {

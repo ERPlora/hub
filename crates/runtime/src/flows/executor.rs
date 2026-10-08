@@ -1559,6 +1559,10 @@ pub async fn complete_io(
     Ok(())
 }
 
+/// The refusal of a paused automation: a manual run ([`start_manual_run`]) and, since hub#2650,
+/// approving one of its proposals (`Runtime::decide_flow_approval`).
+pub const ERR_FLOW_DISABLED: &str = "flow.disabled";
+
 /// Starts a run by hand (`POST /api/hub/flows/{id}/run`, ADR-0283 §3 `manual`). Refuses a flow
 /// that is disabled: the button must not do what the switch says it will not.
 pub async fn start_manual_run(
@@ -1571,7 +1575,7 @@ pub async fn start_manual_run(
     let flow = store::get(db, hub_id, flow_id).await?;
     if !flow.enabled {
         return Err(RuntimeError::Domain {
-            code: "flow.disabled".to_string(),
+            code: ERR_FLOW_DISABLED.to_string(),
             message: format!("flow `{flow_id}` is disabled"),
         });
     }
