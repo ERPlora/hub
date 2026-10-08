@@ -72,9 +72,7 @@ describe('hub#2469 — a chart axis shows the decimals of the currency it paints
     // The axis the issue measured: niceScale gives a 2-fils step for a 7-fils chart (5 marks), and
     // with the 2-decimal cap the gridline ticks at 0,008/0,006 both read «0,01 KWD» and 0,004/0,002
     // both read «0 KWD» — the labels lie about the scale they annotate.
-    expect(await renderChartAxis('KWD', [7])).toEqual([
-      '0,008 KWD', '0,006 KWD', '0,004 KWD', '0,002 KWD', '0 KWD',
-    ]);
+    expect(await renderChartAxis('KWD', [7])).toEqual(['0,008 KWD', '0,006 KWD', '0,004 KWD', '0,002 KWD', '0 KWD']);
   });
 
   it('a chart in the hub currency (3 decimals) labels its ticks with those decimals', async () => {
