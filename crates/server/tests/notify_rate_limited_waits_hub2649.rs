@@ -252,7 +252,12 @@ async fn make_due_again(db: &PgAdapter) {
 /// 30 s, without spending an attempt, and then leaves — once, with the same delivery key.
 #[tokio::test]
 async fn a_throttled_whatsapp_waits_what_erplora_asks_and_then_leaves_hub2649() {
-    let cloud = fake_cloud(vec![(StatusCode::TOO_MANY_REQUESTS, Some("30"), throttled())]).await;
+    let cloud = fake_cloud(vec![(
+        StatusCode::TOO_MANY_REQUESTS,
+        Some("30"),
+        throttled(),
+    )])
+    .await;
     let db = hub_db().await;
     let reg = registry(&cloud);
     authorize(&db, &reg).await;
@@ -261,8 +266,14 @@ async fn a_throttled_whatsapp_waits_what_erplora_asks_and_then_leaves_hub2649() 
     let _ = outbox::drain(&db, &reg).await;
 
     let row = the_row(&db).await;
-    assert_eq!(row.status, "pending", "a throttle is not a spent quota: it must not be dead");
-    assert_eq!(row.attempts, 0, "waiting out a throttle spends no rung of the ladder");
+    assert_eq!(
+        row.status, "pending",
+        "a throttle is not a spent quota: it must not be dead"
+    );
+    assert_eq!(
+        row.attempts, 0,
+        "waiting out a throttle spends no rung of the ladder"
+    );
     assert!(
         (25..=31).contains(&row.due_in),
         "it waits the 30 s erplora.com asked for, got {} s",
@@ -277,8 +288,14 @@ async fn a_throttled_whatsapp_waits_what_erplora_asks_and_then_leaves_hub2649() 
     assert_eq!(cloud.accepted(), 1, "it leaves once the wait is over");
     let keys = cloud.keys();
     assert_eq!(keys.len(), 2, "{keys:?}");
-    assert!(keys[0].as_deref().is_some_and(|k| !k.is_empty()), "{keys:?}");
-    assert_eq!(keys[0], keys[1], "the retry is the same delivery (hub#2648): {keys:?}");
+    assert!(
+        keys[0].as_deref().is_some_and(|k| !k.is_empty()),
+        "{keys:?}"
+    );
+    assert_eq!(
+        keys[0], keys[1],
+        "the retry is the same delivery (hub#2648): {keys:?}"
+    );
 }
 
 /// A delivery that has already climbed the ladder to its last rung (a provider outage earlier)
@@ -316,7 +333,12 @@ async fn a_throttle_on_the_last_rung_does_not_kill_the_reminder_hub2649() {
 /// same event that really failed keeps the row on the ladder — that failure is not waited out.
 #[tokio::test]
 async fn a_throttle_next_to_a_real_failure_keeps_the_ladder_hub2649() {
-    let cloud = fake_cloud(vec![(StatusCode::TOO_MANY_REQUESTS, Some("30"), throttled())]).await;
+    let cloud = fake_cloud(vec![(
+        StatusCode::TOO_MANY_REQUESTS,
+        Some("30"),
+        throttled(),
+    )])
+    .await;
     let db = hub_db().await;
     let mut reg = registry(&cloud);
     let broken: CommandDef = serde_json::from_value(json!({
@@ -344,7 +366,10 @@ async fn a_throttle_next_to_a_real_failure_keeps_the_ladder_hub2649() {
 
     let row = the_row(&db).await;
     assert_eq!(row.status, "pending");
-    assert_eq!(row.attempts, 1, "the listener's failure spends its rung as always");
+    assert_eq!(
+        row.attempts, 1,
+        "the listener's failure spends its rung as always"
+    );
 }
 
 /// The email door's limit (`@quota(rate="200/h")`) answers 429 with no `Retry-After`. The hub
@@ -378,8 +403,12 @@ async fn a_throttled_email_without_retry_after_waits_a_minute_hub2649() {
 /// worth trying again within the hour, and the ladder already caps itself there.
 #[tokio::test]
 async fn an_absurd_retry_after_is_capped_at_an_hour_hub2649() {
-    let cloud =
-        fake_cloud(vec![(StatusCode::TOO_MANY_REQUESTS, Some("86400"), throttled())]).await;
+    let cloud = fake_cloud(vec![(
+        StatusCode::TOO_MANY_REQUESTS,
+        Some("86400"),
+        throttled(),
+    )])
+    .await;
     let db = hub_db().await;
     let reg = registry(&cloud);
     authorize(&db, &reg).await;

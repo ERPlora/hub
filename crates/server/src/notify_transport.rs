@@ -1296,7 +1296,11 @@ mod tests {
         );
         for (status, retry_after, body) in [
             (StatusCode::TOO_MANY_REQUESTS, Some("30"), long.as_str()),
-            (StatusCode::PAYMENT_REQUIRED, Some("30"), r#"{"detail": "throttled"}"#),
+            (
+                StatusCode::PAYMENT_REQUIRED,
+                Some("30"),
+                r#"{"detail": "throttled"}"#,
+            ),
         ] {
             match outcome_of(status, retry_after, body).await {
                 SendOutcome::QuotaExceeded { .. } => {}
