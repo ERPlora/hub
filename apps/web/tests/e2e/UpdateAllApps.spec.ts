@@ -47,7 +47,8 @@ async function openMyAppsWithUpdates(page: Page): Promise<{ calls: () => string[
     }
     const from = APPS.find((a) => a.id === id)!.version;
     updated.add(id);
-    await r.fulfill({ json: { ok: true, module_id: id, from, to: '2.0.0', updated: true } });
+    // The runtime's real envelope (module_api.rs `update_module`); hub#2556 caught the flat shape.
+    await r.fulfill({ json: { ok: true, data: { module_id: id, from, version: '2.0.0', updated: true } } });
   });
   await loggedInSession(page);
   await page.goto('/apps#mine');

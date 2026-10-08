@@ -1084,6 +1084,8 @@ export default {
     updateSuccessReloading: '{name} updated: {from} → {to}. Reloading to use the new version…',
     updateUpToDate: '{name} is already on the latest version.',
     updateError: 'Could not update {name}. It keeps running the version it had.',
+    // hub#2556: the new version's download ran out of time; the app stayed on the one it had.
+    updateTimedOut: 'erplora.com did not answer in time, so {name} was not updated. It keeps running the version it had. Try again in a few minutes.',
     updateBlocked: 'The new version of {name} needs apps you have not subscribed to yet: {missing}. Nothing has changed and nothing has been charged.',
     // hub#2331 — «Update all» in «My apps». Same per-app update as the row button, one after another.
     updateAllOffer: '{n} app has a new version. | {n} apps have a new version.',

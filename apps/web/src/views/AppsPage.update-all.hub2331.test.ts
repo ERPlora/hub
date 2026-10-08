@@ -349,6 +349,29 @@ describe('«Update all» in «My apps» (hub#2331)', () => {
     );
   });
 
+  // hub#2556: the runtime put the previous version back because erplora.com ran out of time. It is
+  // a failed line that says so and can be retried — never «already on the latest version».
+  it('🔴 an app the hub kept on its version says erplora.com ran out of time, and can be retried', async () => {
+    updateModule
+      .mockImplementationOnce(async () => {
+        throw Object.assign(new Error('update sales kept 1.0.0'), {
+          code: 'module.update_failed_kept_previous',
+          reason: 'install_cloud_timeout',
+          version: '1.0.0',
+          detail: null,
+        });
+      })
+      .mockImplementationOnce(async () => ok('inventory'));
+    const w = mountApps();
+    await settle();
+    await pressUpdateAll(w);
+    await settle();
+    const line = painted(w, '[data-testid="apps-update-all-result"][data-id="sales"]');
+    expect(line).toContain(fill(enCatalogue.apps.updateTimedOut, { name: 'Sales' }));
+    expect(line).not.toContain(enCatalogue.apps.updateAllUpToDate);
+    expect(w.find('[data-testid="apps-update-all-retry"][data-id="sales"]').exists()).toBe(true);
+  });
+
   it('when every app failed, closing the result does not reload', async () => {
     updateModule.mockImplementation(async () => {
       throw failure('down');

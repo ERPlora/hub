@@ -274,7 +274,7 @@ import {
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { columnsForScreen, TABLE_PHONE_QUERY, type TableView } from '../lib/apps-list-columns';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
-import { moduleFailureMessage } from '../lib/module-failure-message';
+import { moduleFailureMessage, updateFailureMessage as describeUpdateFailure } from '../lib/module-failure-message';
 import {
   defaultVersion, hasUncheckedUpdates, pendingUpdate, shouldPickVersion, updateAll, updateAllTargets, updateLabel, updateNeedsNewerHub,
   type ModuleUpdateInfo, type UpdateAllResult, type UpdateAllTarget,
@@ -1029,6 +1029,15 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
   // Antes de tocar nada: si hay varias versiones, que elija. Cancelar aquí no deja rastro.
   const version = await chooseVersion(id, name);
   if (version === null) return;
+  await runUpdate(id, name, version);
+}
+
+/**
+ * Runs one update the person already asked for: `version` is what they chose, so «Retry» repeats
+ * exactly this request without asking again (hub#2556).
+ */
+async function runUpdate(id: string, name: string, version: string): Promise<void> {
+  if (updatingIds.value.has(id) || updateAllRunning.value) return;
   setUpdating(id, true);
   notify(t('apps.updating', { name }), 'primary', 0);
   try {
@@ -1050,10 +1059,14 @@ async function updateInstalledModule(id: string, name: string): Promise<void> {
       // NOTHING was charged; the app stays on its previous version. Sticky so it can be read.
       notifyRefusal(t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') }));
     } else {
-      // What the RUNTIME said, and only if it said anything (hub#673). What matters about the
-      // message is still that the module was NOT left half-done — the runtime guarantees that,
-      // not the sentence.
-      notifyRefusal(moduleFailureMessage(e, t('apps.updateError', { name }), { t, te }));
+      // What the RUNTIME said, and only if it said anything (hub#673); an update that ran out of
+      // time says so (hub#2556). What matters is still that the module was NOT left half-done —
+      // the runtime guarantees that, not the sentence. Sticky with «Retry», like a failed install
+      // (hub#2244): a slow erplora.com is usually a passing thing.
+      showToast(updateFailureMessage(e, name), 'danger', 0, [
+        { text: t('apps.installRetry'), handler: () => { void runUpdate(id, name, version); } },
+        closeButton(),
+      ]);
     }
   } finally {
     setUpdating(id, false);
@@ -1067,8 +1080,9 @@ function updateFailureMessage(e: unknown, name: string): string {
     // ADR-0060: nothing changed and nothing was charged; the app keeps the version it had.
     return t('apps.updateBlocked', { name, missing: e.blockedOn.join(', ') });
   }
-  // What the RUNTIME said, and only if it said anything (hub#673).
-  return moduleFailureMessage(e, t('apps.updateError', { name }), { t, te });
+  // What the RUNTIME said, and only if it said anything (hub#673); a download that ran out of time
+  // says so (hub#2556).
+  return describeUpdateFailure(e, name, { t, te });
 }
 
 // --- «Update all» (hub#2331) ---

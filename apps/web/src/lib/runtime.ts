@@ -738,16 +738,17 @@ async function moduleAction(
 }
 
 /**
- * Pide al runtime **actualizar** un módulo instalado (hub#516). Mismo pipeline verificado que
- * instalar (SHA256 + firma ed25519 + manifest + plan de dependencias) y las mismas fases por WS.
+ * Asks the runtime to **update** an installed module (hub#516). Same verified pipeline as
+ * installing (SHA256 + ed25519 signature + manifest + dependency plan) and the same WS phases.
  *
- * Sin versión, el runtime resuelve la que toca con el resolutor del arranque: nunca una en
- * cuarentena, nunca hacia atrás, y el pin de soporte gana. `updated: false` **no es un fallo**: es
- * «ya está en la versión que le toca».
+ * Without a version the runtime resolves the right one with the boot resolver: never a quarantined
+ * one, never backwards, and the support pin wins. `updated: false` **is not a failure**: it means
+ * «already on the version it should be on».
  *
- * Los errores llegan con el mismo contrato que `requestInstall`: un 409 por dependencia de pago sin
- * contratar sale como [`InstallBlockedError`] (nunca se cobra solo), el resto como
- * [`InstallFailedError`] con su `code` estable.
+ * Errors follow the `requestInstall` contract: a 409 for an unpaid paid dependency comes out as
+ * [`InstallBlockedError`] (nothing is ever charged on its own), the rest as [`InstallFailedError`]
+ * with its stable `code`. An update the runtime rolled back — 200 with a `warning` — comes out as
+ * [`UpdateKeptPreviousError`] (hub#2556).
  */
 export async function updateModule(moduleId: string, version = ''): Promise<ModuleUpdateResult> {
   beginRequest();
@@ -781,9 +782,54 @@ export async function updateModule(moduleId: string, version = ''): Promise<Modu
       }
       throw new InstallFailedError(message, code, detail, coreVersionParams(body));
     }
-    return (await res.json()) as ModuleUpdateResult;
+    // hub#2556: the runtime answers inside `data`, and an update that could not go in comes back
+    // as a 200 with `warning` (the app keeps running the version it had). Reading the top level
+    // found nothing, so every outcome — a real update included — read as «already up to date».
+    const body = (await res.json()) as {
+      ok?: boolean;
+      data?: { module_id?: string; from?: string; version?: string; updated?: boolean };
+      warning?: { code?: string; cause?: string | null };
+    };
+    const data = body.data ?? {};
+    const runsVersion = data.version ?? '';
+    if (body.warning?.code === UPDATE_KEPT_PREVIOUS) {
+      throw new UpdateKeptPreviousError(moduleId, body.warning.cause ?? null, runsVersion);
+    }
+    return {
+      ok: body.ok === true,
+      module_id: data.module_id ?? moduleId,
+      from: data.from ?? runsVersion,
+      to: runsVersion,
+      updated: data.updated === true,
+    };
   } finally {
     endRequest();
+  }
+}
+
+/** The warning code of an update that did not go in while the app kept its version (hub#2556). */
+export const UPDATE_KEPT_PREVIOUS = 'module.update_failed_kept_previous';
+
+/**
+ * An update that did not go in: the runtime put the previous version back and the app keeps
+ * running it (hub#2556). It is a failure for the person — they asked for the new version and did
+ * not get it — even though the runtime answers 200.
+ *
+ * `reason` is the stable code of why (`install_cloud_timeout` for a download that ran out of
+ * time), or `null` from a runtime that does not send one. `detail` is always `null`: the warning's
+ * English message is for the log, never for the screen.
+ */
+export class UpdateKeptPreviousError extends Error {
+  readonly code = UPDATE_KEPT_PREVIOUS;
+  readonly reason: string | null;
+  readonly version: string;
+  readonly detail: null = null;
+
+  constructor(moduleId: string, reason: string | null, version: string) {
+    super(`update ${moduleId} kept ${version}${reason ? ` (${reason})` : ''}`);
+    this.name = 'UpdateKeptPreviousError';
+    this.reason = reason;
+    this.version = version;
   }
 }
 

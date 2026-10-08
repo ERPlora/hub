@@ -418,9 +418,9 @@ falta, por área:
 
 - Módulos y órdenes ([modulos.md](workflow/modulos.md),
   [modulos-aplicaciones.md](workflow/modulos-aplicaciones.md)): seguir cobrando mientras otra copia
-  del hub se pone al día con una app (instalar y actualizar ya no paran la caja) y un tope total de
-  tiempo para instalar; que una orden repetida no se ejecute dos veces; la factura pedida desde el
-  tique.
+  del hub se pone al día con una app (instalar y actualizar ya no paran la caja, y toda llamada a
+  ERPlora para instalar se rinde a los 5 min); que una orden repetida no se ejecute dos veces; la
+  factura pedida desde el tique.
 - Avisos ([avisos.md](workflow/avisos.md)): avisar a quien lanzó lo que falló; tareas programadas con
   estado visible.
 - Automatizaciones ([automatizaciones.md](workflow/automatizaciones.md)): reanudar desde el paso que
@@ -561,8 +561,9 @@ Comunes a varias áreas:
 
 1. **Reconciliar una app entre copias para esa copia del hub** —caja, avisos y comprobación de
    salud incluidos— mientras la descarga (HUB-F26, hub#2555). Instalar, actualizar e importar una
-   plantilla ya descargan fuera del candado (HUB-F19, HUB-F23, hub#2508); a ninguno se le pone tope
-   total de tiempo (hub#2556). Afecta a todas las áreas, no solo a módulos.
+   plantilla ya descargan fuera del candado (HUB-F19, HUB-F23, hub#2508), y toda llamada a ERPlora
+   de cualquiera de ellos —también la de reconciliar— se rinde a los 5 min (hub#2556). Afecta a
+   todas las áreas, no solo a módulos.
 2. **El plan tras un reinicio sin conexión** (HUB-F162): hoy el hub no aplica ningún tope hasta su
    primera comprobación buena. ¿Se guarda el último plan firmado en base de datos? Afecta al cobro,
    a las automatizaciones y a WhatsApp.
