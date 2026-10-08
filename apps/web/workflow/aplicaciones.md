@@ -89,7 +89,7 @@ Implicados: REC_ALTA-F22, SAAS_PUBLIC-F12
 QA: ninguno
 
 ### HUB_SHELL-F109 Instalar una app
-Estado: parcial — la instalación no tiene tope de tiempo ni en el hub ni en la pantalla (hub#2556); las apps que entran de paso no pasan por la pregunta de permisos y quedan con todos denegados, sin aviso; y el aviso de éxito de la pantalla y el del canal en vivo pueden pisarse (leído en el código, sin ejecutar)
+Estado: parcial — las apps que entran de paso no pasan por la pregunta de permisos y quedan con todos denegados, sin aviso; y el aviso de éxito de la pantalla y el del canal en vivo pueden pisarse (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -150,7 +150,7 @@ Implicados: HUB-F19
 QA: BD-03
 
 ### HUB_SHELL-F113 Seguir una instalación mientras se navega
-Estado: parcial — el cliente no pone ningún límite a la espera de la orden de instalar (leído en el código, sin ejecutar)
+Estado: parcial — si el canal en vivo se cae, o se vuelve a Apps tras un fallo, la fila puede quedarse en «Instalando…» (leído en el código, sin ejecutar)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -159,7 +159,7 @@ Pasos:
 3. Al volver a Apps, la fila vuelve a mostrar la fase en cuanto llega el siguiente aviso de progreso.
 Entra: los avisos de progreso por fases que manda el hub por el canal en vivo.
 Sale: nada guardado. Mientras instala, el resto del hub sigue atendiendo (HUB-F19): quien cobra en otro dispositivo no espera a la instalación; la barra de espera de arriba solo se ve en el dispositivo que instala.
-Si falla: si el canal en vivo se cae, la fila se queda en «Instalando…» hasta que la orden contesta o se recarga la pantalla. Si la instalación falla después de salir de Apps y volver, el resultado sale en el aviso global pero la fila de la pantalla nueva sigue en «Instalando…», porque solo la limpia el aviso de instalada (leído en el código, sin ejecutar). La orden de instalar no tiene tiempo máximo en el cliente.
+Si falla: si el canal en vivo se cae, la fila se queda en «Instalando…» hasta que la orden contesta o se recarga la pantalla. Si la instalación falla después de salir de Apps y volver, el resultado sale en el aviso global pero la fila de la pantalla nueva sigue en «Instalando…», porque solo la limpia el aviso de instalada (leído en el código, sin ejecutar). La pantalla no pone un tiempo máximo propio a la orden de instalar: espera al hub, que se rinde con `install_cloud_timeout` cuando ERPlora calla 30 s o una descarga pasa de 5 min (HUB-F19, hub#2556), y entonces sale el aviso de HUB_SHELL-F112.
 Implicados: HUB-F19
 QA: ninguno
 
@@ -201,10 +201,10 @@ Pasos:
 2. El administrador pulsa «Actualizar». Si hay varias versiones por delante, «Elige una versión» (la última, marcada); si hay una, no pregunta. Las que están en cuarentena y las anteriores no salen.
 3. Sale «Actualizando {name}…» y la fila muestra el giro. El hub instala y comprueba la versión nueva.
 4. Al terminar: «{name} actualizado: {from} → {to}. Recargando para usar la versión nueva…» y la pantalla se recarga sola, porque la pantalla de la versión vieja sigue cargada hasta entonces.
-5. Si ya estaba en la última: «{name} ya está en la última versión.».
+5. Si ya estaba en la última: «{name} ya está en la última versión.». Solo lo dice si el hub contesta que no había nada que actualizar; una actualización que el hub deshizo es un fallo (abajo), no «ya está al día» (hub#2556).
 Entra: la versión nueva que ofrece el catálogo; si soporte ha fijado una versión, esa manda.
 Sale: pide al servidor la actualización (HUB-F23). Si falla, el hub deja la versión que había y funcionando.
-Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594): «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; si la versión elegida ya no se puede poner (soporte la fijó o la marcó rota entretanto, o es anterior a la instalada), «Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, es anterior a la que tienes o se ha retirado por un fallo. No ha cambiado nada.» (hub#2546, hub#2596); y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
+Si falla: en un aviso rojo que se queda hasta que se pulsa «Cerrar» (ERPlora/hub#2594), con «Reintentar» delante —repite la misma actualización, a la misma versión, sin volver a preguntar— salvo en el de apps de pago sin contratar: «No se pudo actualizar {name}. Sigue funcionando con la versión que tenía.» o la frase del hub; si la descarga de la versión nueva no llega a tiempo y el hub vuelve a la anterior, «ERPlora no ha contestado a tiempo, así que {name} no se ha actualizado. Sigue funcionando con la versión que tenía. Inténtalo en unos minutos.» (hub#2556); «La versión nueva de {name} necesita apps que aún no tienes contratadas: {missing}. No ha cambiado nada ni se ha cobrado nada.»; si la versión elegida ya no se puede poner (soporte la fijó o la marcó rota entretanto, o es anterior a la instalada), «Esta app no se puede pasar a esa versión: soporte ha fijado la versión que usa, es anterior a la que tienes o se ha retirado por un fallo. No ha cambiado nada.» (hub#2546, hub#2596); y si fallan la nueva y la vuelta atrás, «La actualización ha fallado y no se ha podido recuperar la versión anterior, así que esta app ya no está instalada. Vuelve a instalarla desde Apps; si también falla, avisa a soporte.».
 Implicados: HUB-F23, HUB-F24
 QA: BD-03
 
@@ -220,7 +220,7 @@ Pasos:
 5. Si en el fondo ya estaban todas al día: «Tus apps ya estaban en la última versión.».
 Entra: las apps con versión nueva que el hub marca (las que necesitan un hub más nuevo no entran, HUB_SHELL-F118).
 Sale: usa la misma actualización que el botón de cada fila (HUB-F23), así que un fallo de una no frena a las demás. Mientras corre, el botón de cada fila queda apagado.
-Si falla: cada fallo sale en su línea con la misma frase que daría «Actualizar» en su fila, incluida la de las apps de pago sin contratar.
+Si falla: cada fallo sale en su línea con la misma frase que daría «Actualizar» en su fila, incluida la de las apps de pago sin contratar y la de ERPlora sin contestar a tiempo; una app que el hub devolvió a su versión anterior cuenta como fallo, no como «Ya estaba en la última versión» (hub#2556).
 Implicados: HUB-F23
 QA: BD-03
 
